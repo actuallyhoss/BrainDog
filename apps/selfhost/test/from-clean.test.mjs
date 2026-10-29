@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { DEADLINE, DOES, OWNER, RECORD, dockerWords, kindOf, plan, readmeBlocks, restoreWords, scrub, words } from './from-clean.mjs';
+import { DEADLINE, DOES, IMAGE, OVERRIDE, OWNER, RECORD, composeEnv, kindOf, plan, readmeBlocks, restoreWords, scrub, words } from './from-clean.mjs';
 
 const README = readFileSync(fileURLToPath(new URL('../../../README.md', import.meta.url)), 'utf8');
 const WORKFLOW = readFileSync(fileURLToPath(new URL('../../../.github/workflows/selfhost.yml', import.meta.url)), 'utf8');
@@ -18,7 +18,9 @@ test("TODAY'S README: the self-host and container lines are read out of it, and 
   const { selfhost, container } = readmeBlocks(README);
   assert.ok(selfhost.some((l) => /^pnpm install\b/.test(l)), selfhost.join('\n'));
   assert.ok(selfhost.some((l) => /main\.ts init <record name>/.test(l)), selfhost.join('\n'));
-  assert.ok(container.some((l) => /^docker build\b/.test(l)), container.join('\n'));
+  assert.ok(container.some((l) => /^docker compose up -d\b/.test(l)), container.join('\n'));
+  /* A COMMENT AFTER A LINE IS NEVER A WORD OF IT. */
+  assert.ok(container.every((l) => !l.includes('#')), container.join('\n'));
   for (const line of [...selfhost, ...container]) assert.notEqual(kindOf(line), 'other', `${line} is a README line this check does not know how to place`);
 });
 
@@ -34,10 +36,13 @@ test('the plain run: the README lines in their order, then the real command agai
 });
 
 test('the container run, and outbound blocked once the install and the image are in', () => {
-  assert.deepEqual(ids(plan(readmeBlocks(README), { container: true, offline: true })), [
-    'copy', 'install', 'build the command', 'image', 'offline', 'init', 'start', 'healthy',
+  const steps = plan(readmeBlocks(README), { container: true, offline: true });
+  assert.deepEqual(ids(steps), [
+    'copy', 'install', 'build the command', 'env', 'up', 'offline', 'healthy', 'logs',
     'sign in', 'boot', 'write', 'read', 'export', 'verify', 'restore', 'start the copy', 'healthy there', 'sign in there', 'read there',
   ]);
+  /* THE RESTORE IS THE README'S OWN init LINE, with --from in place of the owner. */
+  assert.match(steps.find((s) => s.id === 'restore')?.line ?? '', /main\.ts init <record name>/);
   const plain = ids(plan(readmeBlocks(README), { offline: true }));
   assert.equal(plain[plain.indexOf('install') + 1], 'offline');
 });
@@ -49,21 +54,32 @@ test('A LINE CHANGED IN THE README IS THE LINE RUN, and a line taken out is refu
 
   const noInit = README.replace(/^node apps\/selfhost\/src\/main\.ts init .*$/m, '');
   assert.throws(() => plan(readmeBlocks(noInit)), /no init line/);
-  const noImage = README.replace(/^docker build .*$/m, '');
-  assert.throws(() => plan(readmeBlocks(noImage), { container: true }), /container lines have no image line/);
+  const noUp = README.replace(/^docker compose up .*$/m, '');
+  assert.throws(() => plan(readmeBlocks(noUp), { container: true }), /container lines have no up line/);
   const extra = README.replace('pnpm install\n', 'pnpm install\nnode tools/seed.mjs\n');
   assert.ok(ids(plan(readmeBlocks(extra))).includes('readme line'), 'a new README line was dropped rather than run');
-  assert.throws(() => readmeBlocks(README.replace('### The container', '### Containers')), /under ### The container/);
+  assert.throws(() => readmeBlocks(README.replace('### Run it yourself', '### Containers')), /under ### Run it yourself/);
+  assert.throws(() => readmeBlocks(README.replace('Without Docker', 'Without a container')), /after "Without Docker"/);
 });
 
 test('the placeholders are an invented record and owner, and the container is this run’s own', () => {
-  const { selfhost, container } = readmeBlocks(README);
+  const { selfhost } = readmeBlocks(README);
   const init = words(selfhost.find((l) => kindOf(l) === 'init'));
   assert.deepEqual(init.slice(-4), ['init', RECORD, '--owner', OWNER]);
   assert.deepEqual(restoreWords(init, '/copy/record.brainl').slice(-4), ['init', RECORD, '--from', '/copy/record.brainl']);
-  const run = dockerWords(container.find((l) => kindOf(l) === 'start'), { tag: 'img', volume: 'vol-a', port: 41234, envFile: '/x/env' });
-  assert.deepEqual(run, ['docker', 'run', '-d', '-v', 'vol-a:/data', '-p', '127.0.0.1:41234:8080', '--env-file', '/x/env', 'img']);
-  assert.ok(!run.includes('braindog'), 'the README’s own volume or image name was kept, and a person’s real one could be touched');
+  const env = composeEnv({ PATH: '/bin' }, { repo: '/r', override: '/x/over.yml', project: 'braindog-from-clean-ab12', port: 41234 });
+  assert.equal(env.COMPOSE_PROJECT_NAME, 'braindog-from-clean-ab12', 'the README’s own project, and so a person’s braindog volume, could be touched');
+  assert.equal(env.BRAINDOG_PORT, '127.0.0.1:41234');
+  assert.deepEqual(env.COMPOSE_FILE.split(/[:;]/), ['/r/docker-compose.yml', '/x/over.yml']);
+  assert.equal(env.PATH, '/bin');
+  assert.notEqual(IMAGE, 'braindog');
+  assert.match(OVERRIDE, new RegExp(`^ {4}image: ${IMAGE}$`, 'm'), 'the image built would replace a person’s own braindog image');
+  /* THE DEFAULT BRIDGE IS docker0, the one the workflow's outbound block names. */
+  assert.match(OVERRIDE, /^ {4}network_mode: bridge$/m);
+  /* AND THE README'S COMPOSE FILE STILL PUBLISHES THROUGH BRAINDOG_PORT, or the port above is never used. */
+  const compose = readFileSync(fileURLToPath(new URL('../../../docker-compose.yml', import.meta.url)), 'utf8');
+  assert.match(compose, /"\$\{BRAINDOG_PORT:-8080\}:8080"/);
+  assert.match(compose, /^ {2}braindog:$/m);
 });
 
 test('a line said never carries the inbound email token', () => {

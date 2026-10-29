@@ -86,12 +86,12 @@ const dataDir = (): string => env.BRAINDOG_DATA ?? '/data';
 /**
  * The app `apps/web` builds, served for every path that is not `/api` or `/auth` when it is there.
  *
- * `build/app` AND NOT `build/`, BECAUSE THAT IS WHERE THE WEB BUILD WRITES NOW. `apps/web/svelte.config.js` has
- * `paths.base: '/app'` and empties the build root, so `build/index.html` is never written and this looked for it: a
- * self-host started with no `BRAINDOG_SHELL` served no app and no bundled catalogue, and said nothing about either
- * (`test/app-path.test.ts`). The bundled catalogue is under it too, at `build/app/catalogue` (`catalogueFolder`).
+ * `build/`, WHERE THE WEB BUILD WRITES THE APP AT ITS ROOT. It was `build/app` while `apps/web/svelte.config.js` had
+ * `paths.base: '/app'`, and a self-host that looked in the wrong one of the two served no app and no bundled catalogue,
+ * and said nothing about either (`test/app-path.test.ts`). The bundled catalogue is in it, at `build/catalogue`
+ * (`catalogueFolder`).
  */
-const BUILT = fileURLToPath(new URL('../../web/build/app', import.meta.url));
+const BUILT = fileURLToPath(new URL('../../web/build', import.meta.url));
 
 /**
  * The kernel's migration lock, beside the migrations it locks: one line per migration file, its checksum.

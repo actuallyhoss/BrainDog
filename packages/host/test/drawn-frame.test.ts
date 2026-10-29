@@ -40,5 +40,5 @@ test('the document writes one draw from its parent and from no other window', ()
 
 test('only the one path is the frame', () => {
   assert.equal(isDrawnFrame(DRAWN_FRAME_PATH), true);
-  for (const path of ['/app/drawn-frame/', '/app/acme/drawn-frame', '/drawn-frame', '/app/drawn-frame.html']) assert.equal(isDrawnFrame(path), false, path);
+  for (const path of ['/drawn-frame/', '/acme/drawn-frame', '/app/drawn-frame', '/drawn-frame.html']) assert.equal(isDrawnFrame(path), false, path);
 });

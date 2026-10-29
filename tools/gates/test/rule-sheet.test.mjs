@@ -33,7 +33,7 @@ function stub(drawn, opened = []) {
     return {
       goto: async (url) => {
         opened.push(`${width} ${url}`);
-        const path = new URL(url).pathname.replace(/^\/app\/proof/u, '');
+        const path = new URL(url).pathname.replace(/^\/proof/u, '');
         here = drawn[width]?.[path] ?? null;
         if (here === null) throw new Error('it answered 404');
       },
@@ -52,7 +52,7 @@ function stub(drawn, opened = []) {
   };
 }
 
-const BASE = 'https://proof.example/app/proof';
+const BASE = 'https://proof.example/proof';
 
 const FENCE = '.block-degraded .degraded-fix';
 const RULES = rulesOf({

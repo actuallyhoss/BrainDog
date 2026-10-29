@@ -109,7 +109,8 @@ test('a cleared payment that names nothing is linked to the one bill it paid, an
   const theBill = m.bill();
   const pay = m.paid(400_000, '2026-09-28');
   await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['match_payment', 'settle_matched_line']);
+  /* AND `replace_posted` SINCE money-core 3.31.0: every cleared line asks whether it is the real charge for one posted. */
+  assert.deepEqual(m.queued().map((q) => q.script), ['match_payment', 'settle_matched_line', 'replace_posted']);
   await m.turn();
   assert.equal(m.k.get(pay.id)!.fields.settles, theBill.id, m.log.join(' | '));
   const f = m.k.get(theBill.id)!.fields;
@@ -123,10 +124,11 @@ test('a payment that names its bill already starts no search, and one not cleare
   m.paid(400_000, '2026-09-28', { settles: theBill.id });
   const pending = m.paid(400_000, '2026-09-29', { state: 'pending', what: 'SOMEBODY ELSE' });
   await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['settle']);
+  /* AND `replace_posted` SINCE money-core 3.31.0: every cleared line asks whether it is the real charge for one posted. */
+  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'replace_posted']);
   value(m.k.update('transactions', pending.id, { state: 'cleared' }, OWNER));
   await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'match_payment', 'settle_matched_line']);
+  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'replace_posted', 'match_payment', 'settle_matched_line', 'replace_posted']);
 });
 
 test('a payment that fits one instalment writes Paid by, and the instalment is marked paid', async () => {

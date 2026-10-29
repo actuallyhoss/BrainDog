@@ -123,6 +123,8 @@ export type FieldDecl = {
    */
   deadline?: boolean;
   required?: boolean;
+  /** One row a value: a `day` held unique makes the list one reading a day (`snapshots.on`), whose figure is its newest. */
+  unique?: boolean;
   /** `ref` and `list<ref>`: the register it points at. `blocks.ts` reads that pair to draw a list of links. */
   to?: string;
   /**

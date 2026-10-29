@@ -213,6 +213,8 @@
               {#if turn.legacy.footer}<p class="t-model">{turn.legacy.footer}</p>{/if}
               <!-- PIN THE ANSWER, loaded only once there is an answer to pin (`PinTo.svelte`). -->
               {#await import('./PinTo.svelte') then { default: PinTo }}<PinTo reading={turn.legacy.reading} asked={turn.legacy.question} proposal={turn.text ? { text: turn.text, figures: turn.figures } : null} />{/await}
+              <!-- ASKED AGAIN: the widget that answers it, offered from use ("You've asked this 3 times"). -->
+              {#await import('../board/AskedAgain.svelte') then { default: AskedAgain }}<AskedAgain asked={turn.legacy.question} />{/await}
               <details class="t-fold">
                 <summary class="tap">{copy.slashFold}</summary>
                 <ul>

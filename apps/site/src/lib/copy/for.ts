@@ -36,14 +36,15 @@ export const forPages = {
         nav: 'For personal records',
         title: 'For personal records · BrainDog',
         description:
-          'Bills, budgets, savings and habits in one record. What arrives is filed for you, and nothing that ' +
-          'moves money happens until you say yes.',
+          'Bills, budgets, subscriptions, splits, savings and net worth in one record. What arrives is filed ' +
+          'for you, and nothing that moves money happens until you say yes.',
         tag: 'For personal records',
         said: 'What is due, what is left to spend, and am I still on track?',
         /* Inbox is docs/07 §4; Needs you (once Decide, `apps/web/src/routes/decide/`) is where every proposal waits. */
         sub:
-          'Keep your bills, budgets, savings and habits in one record. Bills that arrive are filed for you, ' +
-          'and anything that would move money waits for your answer in Needs you.',
+          'Keep your bills, budgets, subscriptions, savings and habits in one record, with your net worth and ' +
+          'any gold you hold counted in. Bills that arrive are filed for you, and anything that would move money ' +
+          'waits for your answer in Needs you.',
         rows: [
           {
             head: 'Bills file themselves',
@@ -54,7 +55,7 @@ export const forPages = {
           {
             head: 'Budgets that say where you stand',
             /* The budget form of `progress`, `KINDS` in `packages/render/src/kinds.ts`. */
-            said: 'Each budget shows what is spent and what is left this month, so an expensive week shows early.',
+            said: 'Each budget shows what is spent and what is left, by the week, the month or the year, so an expensive week shows early.',
             draw: { page: 'home', at: 2 },
           },
           {

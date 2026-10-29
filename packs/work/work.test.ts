@@ -297,8 +297,11 @@ const released = (): Body & { version: string } => JSON.parse(readFileSync(RELEA
 test('ITS VERSION IS THE MODULE\'S, ONE MINOR STEP ABOVE THE RELEASED ONE, and it says what changed in one plain note', () => {
   const doc = file();
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.work, `the module is at ${FIRST_PARTY_VERSIONS.work}, and the file is the same step`);
-  const [major, minor] = released().version.split('.').map(Number) as [number, number];
-  assert.equal(doc.version, `${major}.${minor + 1}.0`, `${released().version} is released, so the file is the next minor step and not that one`);
+  /* 1.19.0 IS SERVED NOW (deployed 27 October, 51de57604), newer than the frozen 1.18.0 file, so the step is over it. */
+  const live = '1.19.0';
+  assert.ok(released().version < live, 'the frozen file is older than what is served');
+  const [major, minor] = live.split('.').map(Number) as [number, number];
+  assert.equal(doc.version, `${major}.${minor + 1}.0`, `${live} is released, so the file is the next minor step and not that one`);
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -412,15 +415,18 @@ test('HAND AND FILTER GO IN AS THE FILE SHIPS on all four records, and each wait
     stores[name] = [body('register.tasks').hand, body('page.work').filters];
     close();
   }
+  /* EACH COUNTS WHAT OPEN COUNTS (1.20.0), so the backlog is in no chip or segment. */
+  const OPEN = 'state is not backlog or done or dropped';
   const WHOSE = {
     field: 'whose',
     control: 'segmented',
+    counts: OPEN,
     options: [
       { value: 'yours', label: 'Yours', where: 'agent is empty' },
       { value: 'agents', label: 'Agents', where: 'agent is set' },
     ],
   };
-  const FILTER = [{ field: 'thing', control: 'chips' }, WHOSE];
+  const FILTER = [{ field: 'thing', control: 'chips', counts: OPEN }, WHOSE];
   assert.deepEqual(stores, {
     'with Projects and People': [{ person: 'owner', agent: 'agent', taken: 'doing' }, FILTER],
     'with Projects alone': [{ agent: 'agent', taken: 'doing' }, FILTER],

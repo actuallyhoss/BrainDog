@@ -99,8 +99,9 @@ function personal231(): Body {
   const { hands: _hands, ...rest } = now;
   /* AND 2.5.0'S FIRST THINGS TO PRESS ON HOME, with the figure and the list they read (personal-and-guide-99). */
   const firstActs = ['Bring your money in', 'Name something you are saving for', 'Name something you are making'];
+  /* AND 2.7.0'S DAYS IN A ROW (`log-streak`), for the Days in a row widget (round 1030). */
   const declarations = (now.declarations as Body[]).flatMap((d) =>
-    d.metric === 'savings-held'
+    d.metric === 'savings-held' || d.metric === 'log-streak'
       ? []
       : d.page === 'home-personal'
         ? [{ ...d, requires: (d.requires as string[]).filter((r) => r !== 'register.savings_goals'), blocks: (d.blocks as Body[]).filter((b) => !firstActs.includes(String(b.heading))) }]

@@ -15,7 +15,7 @@
  * now shows only a real record, so no variable names one any more, and a deploy that still sets it opens nothing
  * (`test/slash-demo.test.ts`, which answered 200 from the pinned record before this).
  *
- * AND A REQUEST MAY NOW NAME ITS RECORD IN THE PATH, `/app/<slug>/api/…`.
+ * AND A REQUEST MAY NOW NAME ITS RECORD IN THE PATH, `/<slug>/api/…`.
  * The slug is a claim like a bearer's record id: the Directory says whether it is this person's before anything
  * is addressed, and one 403 answers every name that is not.
  */
@@ -185,7 +185,7 @@ export type BearerDeps = {
     surface: 'api' | 'mcp',
     build?: string,
   ) => Promise<{ verified: NonNullable<Awaited<ReturnType<BearerDeps['verify']>>>; held: Held | null } | null>;
-  /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
+  /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/<slug>`. */
   named?: (slug: string) => Promise<string | null>;
   /**
    * The record's `operationGrant`: the method an operation bearer opens and who approved it, SPENT BY THE ASKING, or
@@ -379,7 +379,7 @@ const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels' | 'wheres'
  * The half every bearer shares once its secret is checked: the path's slug agrees with the bearer's record, and the
  * record says the person is on it.
  *
- * UNDER `/app/<slug>` THE PATH HAS TO AGREE WITH THE BEARER, OR NOTHING IS ANSWERED. The bearer names the record, and a
+ * UNDER `/<slug>` THE PATH HAS TO AGREE WITH THE BEARER, OR NOTHING IS ANSWERED. The bearer names the record, and a
  * URL that says it reads another one is the failure this boundary exists to prevent, so neither is picked. AFTER THE
  * SECRET IS CHECKED, so a bearer nobody issued is the same 401 under any slug and a stranger cannot ask which record a
  * name belongs to. A name nobody holds is the same 403 as another record's.
@@ -401,7 +401,7 @@ async function heldBy(
   return { held };
 }
 
-/** What `GET /app` needs: the Directory's `session` and `slugOf`, and the shell the static assets hold. */
+/** What `GET /` needs: the Directory's `session` and `slugOf`, and the shell the static assets hold. */
 export type EntryDeps = {
   session: (sid: string) => Promise<AuthResult<Who>>;
   slugOf: (record: string) => Promise<string | null>;
@@ -409,10 +409,10 @@ export type EntryDeps = {
 };
 
 /**
- * `GET /app`: the record this browser was last on, or the shell.
+ * `GET /`: the record this browser was last on, or the shell.
  *
  * ONE DIRECTORY READ AND NO PICKER. A session holding a record is a 302 to
- * `/app/<slug>/`, a session on no record yet is sent to `/app/start`, and no cookie is the shell. The shell asks
+ * `/<slug>/`, a session on no record yet is sent to `/start`, and no cookie is the shell. The shell asks
  * `/api/boot`, which answers a stranger 401 now there is no demo record behind it, and the app sends a 401 to sign-in.
  * The last record is the session row's, which only `/auth/switch` moves, and the switcher is the picker.
  *
@@ -430,6 +430,6 @@ export async function appEntry(request: Request, deps: EntryDeps): Promise<Respo
   const record = out.body.record;
   const slug = record === null ? null : await deps.slugOf(record);
   if (record !== null && slug === null) return withCookie(await deps.shell(), cookie);
-  const to = slug === null ? '/app/start' : `/app/${slug}/`;
+  const to = slug === null ? '/start' : `/${slug}/`;
   return withCookie(new Response(null, { status: 302, headers: { location: to, 'cache-control': 'no-store' } }), cookie);
 }

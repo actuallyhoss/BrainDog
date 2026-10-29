@@ -95,11 +95,11 @@ test('NOTHING THE GRAMMAR REFUSES: the page installs as a declaration', () => {
 });
 
 test('THE LINE IS SAID FROM signs-red, exactly one of three, and none at all while nothing has been read', () => {
-  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), ['Nothing on this record needs a look.']);
-  assert.deepEqual(leads(read([RED, GREEN], { 'signs-red': 1 })), ['One thing on this record needs a look.']);
+  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), ['Nothing needs a look.']);
+  assert.deepEqual(leads(read([RED, GREEN], { 'signs-red': 1 })), ['One thing needs a look.']);
   const three = leads(read([RED, RED, RED], { 'signs-red': 3 }));
   assert.equal(three.length, 1);
-  assert.match(three[0]!, /^\{\{signs-red\}\} things on this record need a look\.$|^3 things on this record need a look\.$/u);
+  assert.match(three[0]!, /^\{\{signs-red\}\} things need a look\.$|^3 things need a look\.$/u);
   assert.deepEqual(leads(read([NONE], { 'signs-red': null })), [], 'a record nobody has read is not told it is alive');
 });
 
@@ -107,7 +107,7 @@ test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: the line says only th
   const unread = [NONE, { ...NONE, sign: 'tools-listed', name: 'The tools list' }, { ...NONE, sign: 'rules-ran', name: 'Rules ran this week' }];
   /* `signs-red` reads 0 here, as the kernel reads it once one sign is green (`readVitals`). */
   const blocks = read([GREEN, ...unread], { 'signs-red': 0 });
-  assert.deepEqual(leads(blocks), ['Nothing on this record needs a look.']);
+  assert.deepEqual(leads(blocks), ['Nothing needs a look.']);
   for (const line of leads(blocks)) assert.doesNotMatch(line, /alive|healthy|everything/iu, line);
   assert.deepEqual(under(blocks, 'All good'), [GREEN.name]);
   assert.deepEqual(under(blocks, 'Not checked yet'), unread.map((u) => u.name), 'every unread sign is said, by its name');
@@ -116,7 +116,7 @@ test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: the line says only th
 
 test('HOW LONG IT HAS HELD is said from green-days in whole words, and not at all at nought or unread', () => {
   const lines = (days: number | null): string[] =>
-    drawn(read([GREEN], { 'signs-red': 0, 'green-days': days })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body));
+    drawn(read([GREEN], { 'signs-red': 0, 'green-days': days })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body)).filter((w) => !w.includes('[Tidy up]'));
   assert.deepEqual(lines(null), []);
   assert.deepEqual(lines(0), []);
   assert.deepEqual(lines(1), ['Every check passed yesterday.']);
@@ -157,10 +157,15 @@ test('THE WORDS ARE PLAIN: no em dash, no id, and never row, item or entity', ()
 
 test('HOW MANY SIGNS ARE NOT READ YET is said from signs-unread, and not at all at nought or unread', () => {
   const lines = (n: number | null): string[] =>
-    drawn(read([GREEN, NONE], { 'signs-red': 0, 'signs-unread': n })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body));
+    drawn(read([GREEN, NONE], { 'signs-red': 0, 'signs-unread': n })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body)).filter((w) => !w.includes('[Tidy up]'));
   assert.deepEqual(lines(null), []);
   assert.deepEqual(lines(0), []);
   assert.deepEqual(lines(1), ['One check has not run yet.']);
   assert.equal(lines(3).length, 1);
   assert.match(lines(3)[0]!, /^(\{\{signs-unread\}\}|3) checks have not run yet\.$/u);
+});
+
+test('HEALTH AND TIDY UP POINT AT EACH OTHER, so the two counts are never read as one', () => {
+  const notes = drawn(read([GREEN], { 'signs-red': 0 })).filter((b) => b.kind === 'note').map((b) => String((b as { body?: unknown }).body));
+  assert.ok(notes.some((w) => w.includes('](/settings/tidy)')), notes.join(' | '));
 });

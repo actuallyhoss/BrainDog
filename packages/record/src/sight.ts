@@ -486,7 +486,17 @@ export function writeSight(deps: SightDeps) {
        kernel holds a create to the predicate after it is made. */
     const conditional = (ctx.wheres !== undefined && Object.hasOwn(ctx.wheres, register)) || (ctx.writes !== undefined && Object.hasOwn(ctx.writes, register));
     if (row === null || !conditional) return null;
-    const gates = gateFields(register);
+    /**
+     * HER OWN GATES, AND NOT EVERYBODY'S, SINCE THE HOUSEHOLD SHARE (round 1030). Every field any grant's condition named
+     * was held still for every conditional writer, so one account shared with a partner (`account is ...` on the Ledger)
+     * stopped a Member kept to one project from moving any line of that project to another account. A writer is held
+     * to the fields HER conditions read, which is what keeps a row inside what she may write; the write is still held
+     * to her predicate after it is made. Moving a line onto a shared account shows it to whoever that account is shared
+     * with, as it would when an owner moves it.
+     */
+    const gates = new Set<string>();
+    for (const rule of [ctx.wheres?.[register], ctx.writes?.[register]]) if (rule !== undefined && rule !== null) for (const f of kernel.ruleFields(register, rule)) gates.add(f);
+    if (gates.size === 0) for (const f of gateFields(register)) gates.add(f);
     for (const key of Object.keys(sent)) {
       if (!gates.has(key) || !changes(row, key, sent[key])) continue;
       const label = kernel.register(register)?.fields.find((f) => f.id === key)?.label ?? key;

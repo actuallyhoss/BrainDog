@@ -27,13 +27,13 @@ const upper = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 /** "things" or "thing", by the count. */
 const plural = (n: number, one: string, many = `${one}s`): string => (n === 1 ? one : many);
 
-/** How late a day is against today: "1 day late", "5 days late", "3 weeks late", "2 months late". */
+/**
+ * How late a day is against today, IN DAYS ALWAYS: "1 day late", "64 days late". ONE WAY ACROSS THE APP (30 October):
+ * a list's cards and tables say days (money F6), and this said "2 months late" on the same screen as "64 days late".
+ */
 export function lateSaid(due: string, today: string): string {
   const n = Math.max(1, daysBetween(due, today));
-  if (n < 14) return `${n} ${plural(n, 'day')} late`;
-  if (n < 60) return `${Math.round(n / 7)} weeks late`;
-  const months = Math.round(n / 30.44);
-  return `${months} ${plural(months, 'month')} late`;
+  return `${n.toLocaleString('en')} ${plural(n, 'day')} late`;
 }
 
 /** How long something has waited, as a person says it: "5 min", "3 hours", "2 days", "3 weeks". */

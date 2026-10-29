@@ -10,7 +10,7 @@
  * THE COUNT IS IN MEMORY AND STARTS OVER WITH THE PROCESS, which can only give strangers more of a day than it should
  * after a restart, never fewer; a self-host is one process, so one count holds every request it serves.
  *
- * WHAT IS ON OFFER IS THE CATALOGUE THIS HOST SERVES: the use cases in the folder it answers `/app/catalogue/`
+ * WHAT IS ON OFFER IS THE CATALOGUE THIS HOST SERVES: the use cases in the folder it answers `/catalogue/`
  * from, read once and merged over the ones compiled in (`catalogueOffer`). No folder, or an index that does not read,
  * is the compiled list, said once in the log.
  */
@@ -45,7 +45,7 @@ export type SelfhostFirstReadDeps = {
   /** How a call leaves this host, to the model and to the bot check: `fetch`, a fake in tests. */
   send?: Send | undefined;
   /**
-   * The catalogue folder this host serves at `/app/catalogue/` (`catalogueFolder`), or `null` for none. Left out, it is
+   * The catalogue folder this host serves at `/catalogue/` (`catalogueFolder`), or `null` for none. Left out, it is
    * the one the environment names (`firstReadFolder`).
    */
   catalogue?: string | null | undefined;

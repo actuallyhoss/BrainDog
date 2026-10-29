@@ -24,6 +24,7 @@
   one would be a 404 with a promise attached.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import Icon from '$lib/Icon.svelte';
   import type { IconName } from '$lib/icons.ts';
   import { site } from '$lib/copy.ts';
@@ -101,16 +102,10 @@
 
 <svelte:window onhashchange={reveal} />
 
+<Seo title={site.meta.changelog.title} description={site.meta.changelog.description} path="/changelog" />
 <svelte:head>
-  <title>{site.meta.changelog.title}</title>
-  <meta name="description" content={site.meta.changelog.description} />
-  <link rel="canonical" href="https://brain.dog/changelog" />
   <link rel="alternate" type="application/atom+xml" title={copy.feedTitle} href={FEED} />
-  <meta property="og:url" content="https://brain.dog/changelog" />
-  <meta property="og:title" content={site.meta.changelog.title} />
-  <meta property="og:description" content={site.meta.changelog.description} />
 </svelte:head>
-
 <!-- ONE ENTRY: its kind as a glyph and a word, then its title with its permalink, and its body. -->
 {#snippet entry(item: Item)}
   <li class="entry" id={item.anchor} hidden={!shows(item.kind)}>

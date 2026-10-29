@@ -18,7 +18,7 @@ const NOUR = person('nour.json');
 const nav = (...names) => names.map((name) => ({ role: 'link', name, landmark: 'navigation' }));
 const START = { path: '/start', width: 390, text: ['Who are you?', 'Make it mine'], roles: [{ role: 'heading', name: 'Who are you?', landmark: 'main' }], counts: { people: 0, assignments: 0 } };
 const TODAY = (over = {}) => ({
-  path: '/app/laylas-studies/today',
+  path: '/laylas-studies/today',
   width: 1440,
   text: ['Today', 'Nothing is due yet', 'Layla'],
   roles: nav('Today', 'Decide', 'People', 'Assignments'),
@@ -111,7 +111,7 @@ test('what she typed is hers: a client in People, a task on the board', () => {
 });
 
 test('what the snapshot does not hold is said, never passed', () => {
-  const bare = { path: '/app/x/today', width: 390, text: '', roles: [] };
+  const bare = { path: '/x/today', width: 390, text: '', roles: [] };
   for (const r of checkScreen(bare, LAYLA).filter((x) => !['no-tour', 'no-count'].includes(x.id))) assert.equal(r.pass, null, `${r.id}: ${r.saw}`);
   assert.equal(firstScreen['team-no-task'](TODAY(), LAYLA).pass, null);
 });

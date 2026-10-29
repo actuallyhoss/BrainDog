@@ -15,7 +15,7 @@
  * PURE OF RUNES. The shell loads it after the first paint and hands it the document.
  */
 
-import { apiBase, BASE, here } from '../at.ts';
+import { apiBase, here, split } from '../at.ts';
 import { filterOf } from '../page/filters.ts';
 
 /** How long a pointer rests on a link before its screen is read: a pointer passing over a rail asks nothing. */
@@ -57,8 +57,9 @@ export function warmFor(url: URL): Warm | null {
 function linkOf(target: EventTarget | null): HTMLAnchorElement | null {
   const a = target instanceof Element ? target.closest('a[href]') : null;
   if (!(a instanceof HTMLAnchorElement) || a.target || a.hasAttribute('download')) return null;
-  /* THIS HOST'S OWN APP, by its scheme and host: an address anywhere else is no screen of this tab. */
-  if (a.protocol !== location.protocol || a.host !== location.host || !(a.pathname === BASE || a.pathname.startsWith(`${BASE}/`))) return null;
+  /* THIS HOST'S OWN APP, by its scheme and host, and not one of its doors: an address anywhere else is no screen of
+     this tab, and `/api` or `/auth` on this host is the host's and not a screen either (`split` in `at.ts`). */
+  if (a.protocol !== location.protocol || a.host !== location.host || split(a.pathname) === null) return null;
   if (a.closest('[data-sveltekit-preload-data="off"], [data-sveltekit-preload-data="false"]')) return null;
   return a;
 }

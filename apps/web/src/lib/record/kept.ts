@@ -39,12 +39,27 @@ const lineOf = (label: string, k: { accepted: number; answered: number; share: n
   answered: k.answered,
 });
 
+/**
+ * AN AGENT AS A PERSON SAYS IT (Q12 of 29 October): a key's label is the machine and the command it signed in with,
+ * "MARA-LAPTOP · braindog-cli", and the panel read "MARA-LAPTOP · braindog-cli 83%". The command is how agents on that
+ * machine reach the record, so it reads "Your agents on MARA-LAPTOP"; any other app by its name on the machine. The same
+ * words the record's own questions use (`agentSaid` in `packages/record/src/signs.ts`).
+ */
+const APPS: Readonly<Record<string, string>> = { 'claude-code': 'Claude Code', claude: 'Claude', codex: 'Codex', cursor: 'Cursor', windsurf: 'Windsurf' };
+export function agentWords(label: string): string {
+  const parts = label.split(' · ').map((p) => p.trim()).filter((p) => p !== '');
+  if (parts.length < 2) return label;
+  const [machine, app] = parts as [string, string];
+  const key = app.toLowerCase();
+  return key === 'braindog-cli' ? `Your agents on ${machine}` : `${APPS[key] ?? app.replace(/[-_]+/gu, ' ')} on ${machine}`;
+}
+
 /** Every agent with an answered suggestion, most answered first, each with its kinds as the record ordered them. */
 export function keptRows(standing: TrustStanding | null): KeptRow[] {
   if (standing === null) return [];
   return standing.agents
     .filter((a): a is Agent & { kept: NonNullable<Agent['kept']> } => a.kept !== undefined && a.kept.answered > 0)
-    .map((a) => ({ ...lineOf(a.agent, a.kept), agent: a.agent, days: a.kept.days, kinds: a.kept.kinds.filter((k) => k.answered > 0).map((k) => lineOf(k.kind, k)) }))
+    .map((a) => ({ ...lineOf(agentWords(a.agent), a.kept), agent: a.agent, days: a.kept.days, kinds: a.kept.kinds.filter((k) => k.answered > 0).map((k) => lineOf(k.kind, k)) }))
     .sort((x, y) => y.answered - x.answered);
 }
 

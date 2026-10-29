@@ -64,5 +64,5 @@ Past the allowance, an action waits for the first of next month, and failures ar
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

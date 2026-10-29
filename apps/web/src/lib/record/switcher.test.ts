@@ -63,7 +63,7 @@ test('OPENING ANOTHER RECORD posts its name from this page, and a host that hold
   const opened = host(() => json(200, { ok: true, value: { person: 'p_1', record: 'rec_2' } }));
   /* AND THE ANSWER SAYS WHERE TO GO. The switch used to reload the same address, and the address named no record, so a
      second tab on the first record silently started reading the second. Now the tab goes to the record it opened. */
-  assert.deepEqual(await openRecord(opened.io, 'kiln', 'https://brain.dog'), { from: 'opened', to: '/app/kiln/' });
+  assert.deepEqual(await openRecord(opened.io, 'kiln', 'https://brain.dog'), { from: 'opened', to: '/kiln/' });
   assert.equal(opened.sent[0]?.url, 'https://brain.dog/auth/switch');
   assert.equal(opened.sent[0]?.init?.method, 'POST');
   assert.equal(opened.sent[0]?.init?.body, JSON.stringify({ slug: 'kiln' }));

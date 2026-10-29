@@ -1,0 +1,1238 @@
+/*
+ * MONEY'S LOOK: the same kinds every page draws, worn the way a finance app wears them, on the pages Money brings
+ * (`data-money` on the page, set by `PageView.svelte` for the Money section and the pages about one account, bill or
+ * plan). Nothing here is a new block; every rule restyles a kind the page already declares, so a record on any version
+ * of Money's add-on reads the same way.
+ *
+ * WHAT IT DOES, IN ORDER:
+ * - THE HEAD IS A HEAD, NOT A HERO. The page's name and its sentence sit on the board, the sentence at reading size in
+ *   the second ink, so the first tile under it is the money itself.
+ * - ONE HERO NUMBER: the cash at display size with its code faint in front of it, its change as a calm line with a
+ *   triangle (green only when it rose), and the walk ahead as a wider line over a pale wash in the money accent.
+ * - ONE CARD GRAMMAR: every tile's head over a hairline; rows of equal height; amounts at the right in tabular figures.
+ * - BARS READ AS ROWS: the name and its amount on one line, a thin bar under them across the row, as a phone draws them.
+ * - LEDGER ROWS: the chip in the category's own colour, the payee in ink, "Category · Account" under it, the amount at
+ *   the right; money in green with its plus, money out in ink, red only for what is late.
+ * - THE PHONE: the hero's figures two by two instead of four rows, the walk the width of the tile.
+ *
+ * OUTSIDE ANY LAYER, ON PURPOSE: the kinds' rules sit in `@layer components` and the page's own in Svelte's scoped
+ * styles, and this sheet has to win over both on Money and touch nothing anywhere else, which the `[data-money]`
+ * scope on every selector holds. No colour is written: every value is a role a theme maps, so dark and high contrast
+ * follow.
+ */
+
+[data-money] {
+  /* THE MONEY ACCENT: one hue for every series and bar, the category teal, so a chart never borrows the brand red that
+     means late. Amounts stay ink. */
+  --money-accent: var(--cat-teal);
+  --money-wash: color-mix(in oklab, var(--cat-teal) 16%, transparent);
+  --money-bar: color-mix(in oklab, var(--cat-teal) 78%, var(--tile));
+  --money-bar-quiet: color-mix(in oklab, var(--ink) 22%, var(--tile));
+}
+
+/* ── the head ─────────────────────────────────────────────────────────────── */
+
+/* THE PAGE'S NAME AND ITS LINE, ON THE BOARD: no tile round them, the name a step up, the sentence at reading size. */
+[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) {
+  gap: var(--sp-1);
+  padding: var(--sp-2) 0 var(--sp-1);
+  background: none;
+}
+
+[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
+  max-inline-size: 44em;
+  color: var(--ink-2);
+  font-size: var(--fs-head);
+  font-weight: var(--fw-regular);
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+
+[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p .figure {
+  color: var(--ink);
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .lead-head .lead-name {
+  font-family: var(--font-display);
+  font-size: var(--fs-figure);
+  line-height: 28px;
+  letter-spacing: -0.01em;
+}
+
+[data-money] .lead-head .lead-glyph {
+  display: none;
+}
+
+/* THE LINE UNDER THE HEAD THAT POINTS AT WHAT IS LATE, a quiet link on the board. */
+[data-money] .next {
+  margin-block: calc(-1 * var(--sp-2)) 0;
+}
+
+/* ── tiles ────────────────────────────────────────────────────────────────── */
+
+/* A TILE IS A CARD: the tile fill, a hairline edge and the faintest lift, so tiles read as cards on the board in both
+   themes rather than as patches of a lighter grey. */
+[data-money] .page > .block-slot:not([data-lead]),
+[data-money] .page > .box {
+  border: 1px solid color-mix(in oklab, var(--rule) 70%, transparent);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ink) 4%, transparent), 0 8px 20px -14px color-mix(in oklab, var(--ink) 18%, transparent);
+}
+
+/* EVERY TILE'S HEAD OVER A HAIRLINE, the name at the body size and the count quiet beside it. */
+[data-money] .block-slot > .block-bar:not([data-quiet]) {
+  margin-inline: calc(-1 * var(--slot-pad, var(--tile-pad)));
+  margin-block-end: var(--sp-2);
+  padding-inline: var(--slot-pad, var(--tile-pad));
+  padding-block-end: var(--sp-3);
+  border-block-end: 1px solid var(--rule);
+}
+
+[data-money] .block-slot > .block-bar .well {
+  display: none;
+}
+
+[data-money] .block-slot > .block-bar .block-name {
+  font-weight: var(--fw-medium);
+}
+
+/* ── the hero ─────────────────────────────────────────────────────────────── */
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child {
+  padding-block-end: var(--sp-5);
+}
+
+[data-money] .block[data-form='lead'] .cell:first-child .cell-label {
+  color: var(--ink-2);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .block[data-form='lead'] .cell:first-child .cell-figure {
+  margin-block: var(--sp-2) var(--sp-2);
+  font-weight: var(--fw-semi);
+  letter-spacing: -0.03em;
+}
+
+/* THE CODE IN FRONT OF THE CASH, faint: the number is what is read. */
+[data-money] .block[data-form='lead'] .cell:first-child .cell-figure .amount-code {
+  color: var(--ink-3);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+}
+
+/* THE CHANGE ON A MONTH AGO AS A LINE, NOT A CHIP: a triangle and the figure, green only when the money rose. */
+[data-money] .cell-change {
+  min-block-size: 0;
+  margin-inline-end: var(--sp-1);
+  padding: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: var(--fw-semi);
+}
+
+[data-money] .cell-change::before {
+  margin-inline-end: 0.3em;
+  font-size: 0.8em;
+}
+
+[data-money] .cell-change[data-dir='up'] {
+  background: none;
+  color: var(--good);
+}
+
+[data-money] .cell-change[data-dir='up']::before {
+  content: '▲';
+}
+
+[data-money] .cell-change[data-dir='down']::before {
+  content: '▼';
+  color: var(--ink-3);
+}
+
+/* THE WALK AHEAD, WIDER AND TALLER, in the accent over a pale wash, its today and lowest point as dots. */
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > .cell-trend-ahead {
+  inline-size: min(440px, 44cqi);
+  align-self: end;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > .cell-trend-ahead > .cell-trend,
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > .cell-trend {
+  block-size: 72px;
+}
+
+[data-money] .trend-area {
+  fill: var(--money-wash);
+}
+
+[data-money] .trend-line {
+  stroke: var(--money-accent);
+}
+
+[data-money] :is(.trend-today, .trend-end) {
+  stroke: var(--money-accent);
+}
+
+[data-money] .trend-low {
+  stroke: var(--ink);
+}
+
+/* THE FIGURES UNDER THE CASH: a quiet label over each, the figure at a tile figure's size. */
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+  padding-block: var(--sp-4) 0;
+}
+
+[data-money] .block[data-kind='stat'] .cell:not(:first-child) .cell-label {
+  color: var(--ink-3);
+}
+
+[data-money] .block[data-kind='stat'] .cell-figure .amount-code {
+  color: var(--ink-3);
+}
+
+/* ── bars: a row a name and its amount, the bar under them ───────────────── */
+
+[data-money] .prop:has(> .prop-row) {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+[data-money] .prop > .prop-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-column: auto;
+  justify-content: stretch;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: baseline;
+  min-block-size: 0;
+  padding-block: var(--sp-3);
+}
+
+[data-money] .prop-row > .prop-label {
+  grid-area: 1 / 1;
+  min-inline-size: 0;
+  color: var(--ink);
+  font-size: var(--fs-body);
+}
+
+[data-money] .prop-row > .prop-value {
+  grid-area: 1 / 2;
+  justify-self: end;
+  font-size: var(--fs-body);
+  text-align: end;
+}
+
+[data-money] .prop-row:not(:has(> .glyph)) > .prop-value {
+  grid-column: 2 / -1;
+}
+
+[data-money] .prop-row > .glyph {
+  grid-area: 1 / 3;
+}
+
+[data-money] .prop-row > .prop-track {
+  grid-area: 2 / 1 / auto / -1;
+  block-size: 6px;
+  border-radius: var(--r-round);
+}
+
+[data-money] .prop-row > .prop-track::after {
+  background: var(--tone-fill, var(--money-bar-quiet));
+}
+
+/* THE LARGEST PART IN THE ACCENT, the rest quiet: the eye goes to where most of it is. The renderer says each bar's
+   length against the largest as `--magnitude`, so the largest is the one at 1. */
+[data-money] .prop-track[style*='--magnitude: 1.00'],
+[data-money] .prop-track[style*='--magnitude:1.00'] {
+  --money-bar-quiet: var(--money-bar);
+}
+
+[data-money] .prop-row > .prop-note {
+  grid-area: 3 / 1 / auto / -1;
+}
+
+[data-money] .prop-row > .prop-note:empty {
+  display: none;
+}
+
+/* A PART THAT OPENS ITS LINES ("Not filed yet") reads as the link it is, its bar hatched-quiet rather than the loudest. */
+[data-money] .prop-row:has(> .prop-label a) > .prop-track::after {
+  background: var(--tone-fill, color-mix(in oklab, var(--warn) 55%, var(--tile)));
+}
+
+/* A CURRENCY'S HEADING OVER ITS ROWS ("In EGP"), a quiet label and not a bold line. */
+[data-money] .block-slot > .document:has(+ .block[data-kind='bar']) p,
+[data-money] .block-slot > .document:has(+ .block[data-kind='bar']) strong {
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .block[data-kind='bar'] + .document {
+  margin-block-start: var(--sp-3);
+}
+
+/* ── progress: instalments and budgets ───────────────────────────────────── */
+
+[data-money] .progress-track {
+  block-size: 8px;
+  border-radius: var(--r-round);
+}
+
+[data-money] .progress-fill {
+  border-radius: var(--r-round);
+  background: var(--tone-fill, var(--money-bar));
+}
+
+[data-money] .progress-label {
+  color: var(--ink);
+  font-size: var(--fs-body);
+}
+
+/* ── ledger rows ──────────────────────────────────────────────────────────── */
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] {
+  padding-block: var(--sp-2);
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] > .item-title {
+  color: var(--ink);
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] > .item-detail {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .item-chip {
+  inline-size: 36px;
+  block-size: 36px;
+}
+
+[data-money] .list > .item-day {
+  color: var(--ink-3);
+}
+
+[data-money] .item-day-name {
+  color: var(--ink-2);
+  font-weight: var(--fw-medium);
+}
+
+/* ── motion ───────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-money] .page > .block-slot,
+  [data-money] .page > .box {
+    animation: money-rise 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-money] .page > :nth-child(3) {
+    animation-delay: 30ms;
+  }
+
+  [data-money] .page > :nth-child(n + 4) {
+    animation-delay: 60ms;
+  }
+
+  [data-money] .prop-track::after,
+  [data-money] .progress-fill {
+    transform-origin: left center;
+    animation: money-grow 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes money-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes money-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* ── the phone ────────────────────────────────────────────────────────────── */
+
+@container stat (inline-size < 480px) {
+  /* THE HERO'S FIGURES TWO BY TWO, label over figure, as a phone's finance app draws them, not four rows. */
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+    flex: 1 1 40%;
+    margin-inline: 0;
+    padding-inline: 0 var(--sp-2);
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'note note';
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    padding-block: var(--sp-3);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-figure {
+    justify-self: start;
+    font-size: var(--fs-head);
+    text-align: start;
+  }
+
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(odd):not(:first-child) {
+    margin-inline: 0;
+    padding-inline: var(--sp-3) 0;
+    border-inline-start: 1px solid var(--rule);
+  }
+
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > :is(.cell-trend, .cell-trend-ahead) {
+    inline-size: 100%;
+  }
+}
+
+@media (width < 640px) {
+  [data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
+    font-size: var(--fs-body);
+  }
+}
+
+/* ── the board packs its tiles by their heights (`masonry.ts`) ───────────── */
+
+/* EACH TILE AS TALL AS WHAT IT HOLDS, the next in its column starting under it: rows four pixels high, no gap between
+   them, and each tile spanning its own height and the gap under it. Set only while the page has two columns or more. */
+[data-money] .page[data-packed] {
+  grid-auto-rows: 4px;
+  row-gap: 0;
+}
+
+[data-money] .page[data-packed] > * {
+  /* `masonry.ts` sets each tile's own on its style, which wins over this one. */
+  --money-rows: 1;
+  grid-row-end: span var(--money-rows);
+  align-self: start;
+}
+
+/* A BAR ACROSS THE WHOLE PAGE IS TWO COLUMNS OF ROWS on a wide screen: one name 1,100px from its amount read as two
+   things. Read across, largest first. */
+@media (width >= 1200px) {
+  [data-money] .block-slot[data-full] .prop:has(> .prop-row) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sp-7);
+  }
+}
+
+/* ── where the money is kept: rows, not bars ─────────────────────────────── */
+
+/* AN ACCOUNT IS A ROW WITH ITS BALANCE, a hairline between, as a bank's app lists them: a bar against the largest
+   account in the same currency said nothing a balance does not. */
+[data-money] .block-slot[data-source='metric.cash-by-account'] .prop-track {
+  display: none;
+}
+
+[data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row {
+  padding-block: var(--sp-3);
+}
+
+[data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row + .prop-row {
+  border-block-start: 1px solid var(--rule);
+}
+
+/* ON A PHONE THE ACCOUNTS ARE CARDS THAT SCROLL SIDEWAYS, one currency a strip, so the tile is two short rows and not
+   a column a screen tall. */
+@media (width < 640px) {
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop:has(> .prop-row) {
+    flex-direction: row;
+    gap: var(--sp-2);
+    margin-inline: calc(-1 * var(--slot-pad, var(--tile-pad)));
+    padding-inline: var(--slot-pad, var(--tile-pad));
+    padding-block: var(--sp-1) var(--sp-2);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--slot-pad, var(--tile-pad));
+    scrollbar-width: none;
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row {
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr);
+    min-inline-size: 152px;
+    max-inline-size: 70%;
+    margin-inline: 0;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
+    scroll-snap-align: start;
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row + .prop-row {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop-row > .prop-label {
+    grid-area: 1 / 1;
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop-row > .prop-value {
+    grid-area: 2 / 1;
+    justify-self: start;
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    text-align: start;
+  }
+}
+
+/* ── cards: an account, a plan, a holding ────────────────────────────────── */
+
+/* A CARD IS A CARD ON MONEY: its own rounded panel on the tile's second fill with a hairline edge, a gap between,
+   rather than a section of the tile under a rule. A bank's accounts read as things you hold. */
+[data-money] .cards-grid {
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-2);
+  clip-path: none;
+}
+
+[data-money] :has(> [data-kind='cards'] ~ [data-kind='cards']) > [data-kind='cards'] > .cards-grid,
+[data-money] .cards-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+}
+
+[data-money] .cards-item {
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-pop);
+  background: color-mix(in oklab, var(--tile-2) 55%, var(--tile));
+  transition: border-color var(--d-state, 120ms) ease-out;
+}
+
+[data-money] .cards-item:has(.cards-title a):hover {
+  border-color: var(--rule-strong);
+}
+
+[data-money] .cards-item .cards-title {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+
+/* ITS FACTS AS ONE QUIET LINE, a label and its value side by side, not a two-column form inside a card. */
+[data-money] .cards-item .cards-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--sp-3);
+}
+
+[data-money] .cards-item .cards-fact {
+  display: inline-flex;
+  gap: var(--sp-1);
+}
+
+[data-money] .cards-item .cards-when {
+  margin-inline-start: auto;
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  white-space: nowrap;
+}
+
+/* A GROUP'S NAME OVER ITS CARDS ("Bank · 10 accounts"), the quiet label every group on Money wears. */
+[data-money] .block-slot > .document:has(+ .block[data-kind='cards']) p {
+  margin-block: var(--sp-2) var(--sp-1);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+}
+
+[data-money] .block-slot > .document:has(+ .block[data-kind='cards']) strong {
+  color: var(--ink-2);
+  font-weight: var(--fw-semi);
+}
+
+/* ── a whole cut into parts: the donut ───────────────────────────────────── */
+
+/* EVERY PART ITS OWN HUE, in one fixed order, so twelve categories are twelve colours and not three and a wall of grey.
+   The ring's arcs and the legend's dots take the same order (the ring's first circle is its track), and a part kept
+   under nothing ("No category yet", a link to file them) stays the quiet grey. */
+[data-money] .split {
+  --p1: var(--cat-teal);
+  --p2: var(--cat-blue);
+  --p3: var(--cat-violet);
+  --p4: var(--cat-pink);
+  --p5: var(--cat-sky);
+  --p6: var(--cat-yellow);
+  --p7: var(--cat-lime);
+  --p8: var(--cat-slate);
+}
+
+[data-money] .split .ring-arc:nth-of-type(8n + 2),
+[data-money] .split .split-item:nth-child(8n + 1) > .split-dot { --part: var(--p1); }
+[data-money] .split .ring-arc:nth-of-type(8n + 3),
+[data-money] .split .split-item:nth-child(8n + 2) > .split-dot { --part: var(--p2); }
+[data-money] .split .ring-arc:nth-of-type(8n + 4),
+[data-money] .split .split-item:nth-child(8n + 3) > .split-dot { --part: var(--p3); }
+[data-money] .split .ring-arc:nth-of-type(8n + 5),
+[data-money] .split .split-item:nth-child(8n + 4) > .split-dot { --part: var(--p4); }
+[data-money] .split .ring-arc:nth-of-type(8n + 6),
+[data-money] .split .split-item:nth-child(8n + 5) > .split-dot { --part: var(--p5); }
+[data-money] .split .ring-arc:nth-of-type(8n + 7),
+[data-money] .split .split-item:nth-child(8n + 6) > .split-dot { --part: var(--p6); }
+[data-money] .split .ring-arc:nth-of-type(8n + 8),
+[data-money] .split .split-item:nth-child(8n + 7) > .split-dot { --part: var(--p7); }
+[data-money] .split .ring-arc:nth-of-type(8n + 9),
+[data-money] .split .split-item:nth-child(8n + 8) > .split-dot { --part: var(--p8); }
+
+[data-money] .split .split-item:has(> .split-label a) > .split-dot,
+[data-money] .split:has(.split-item:last-child > .split-label a) .ring-arc:last-of-type {
+  --part: var(--money-bar-quiet);
+}
+
+[data-money] .split .split-seg {
+  fill: var(--part);
+}
+
+/* THE RING BIGGER AND THINNER, its total at a figure's weight, and the legend a table beside it. */
+[data-money] .split[data-form='donut'] {
+  gap: var(--sp-4) var(--sp-6);
+}
+
+[data-money] .split[data-form='donut'] .ring-dial,
+[data-money] .split[data-form='donut'] .ring-mark {
+  inline-size: 176px;
+  block-size: 176px;
+}
+
+[data-money] .split[data-form='donut'] :is(.ring-track, .ring-arc) {
+  stroke-width: 2.6;
+}
+
+[data-money] .split[data-form='donut'] .ring-figure {
+  max-inline-size: 128px;
+  font-size: var(--fs-ctl);
+  font-weight: var(--fw-semi);
+}
+
+[data-money] .split[data-form='donut'] .split-legend {
+  max-inline-size: 36rem;
+}
+
+[data-money] .split-item {
+  font-size: var(--fs-ctl);
+}
+
+[data-money] .split-item > .split-label {
+  color: var(--ink);
+}
+
+[data-money] .split-item > .split-share {
+  color: var(--ink-3);
+}
+
+/* THE CARD A PAGE ABOUT ONE ROW OPENS ON IS THE ROW'S OWN FACTS, not a card in a grid: it keeps the tile's plain lines. */
+[data-money] .block-slot[data-self] .cards-item {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* ── the cash walk on Forecast ───────────────────────────────────────────── */
+
+/* THE WALK IN THE MONEY ACCENT OVER ITS WASH, as the hero draws it small, so the two read as one line at two sizes.
+   The past stays ink: what happened, then what is expected, told apart by colour as well as by the today rule. */
+[data-money] .forecast-plot {
+  --chart-1: var(--money-accent);
+}
+
+[data-money] .forecast-area:not([data-below]) {
+  fill-opacity: 0.12;
+}
+
+[data-money] .forecast-past {
+  stroke: color-mix(in oklab, var(--ink) 55%, var(--tile));
+}
+
+[data-money] .forecast-chart {
+  block-size: 260px;
+}
+
+@media (width < 640px) {
+  /* THE HORIZON IS ONE ROW THAT SCROLLS, not four buttons wrapped onto two lines over the chart. */
+  [data-money] .forecast-segs {
+    flex-wrap: nowrap;
+    max-inline-size: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  [data-money] .forecast-segs > .segment {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* THE THREE ANSWERS: where it ends across the row, the lowest and the everyday spending side by side under it, so
+     the chart is on the first screen. */
+  [data-money] .forecast-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3) var(--sp-4);
+  }
+
+  [data-money] .forecast-sum[data-key='end'] {
+    grid-column: 1 / -1;
+  }
+
+  [data-money] .forecast-sum:not([data-key='end']) .forecast-sum-figure {
+    font-size: var(--fs-head);
+  }
+}
+
+/* ── the Ledger's search ─────────────────────────────────────────────────── */
+
+/* THE SEARCH IS A FIELD THAT LOOKS LIKE ONE: an edge, the tile's fill, a reading width, so the Ledger's first control is
+   found at a glance rather than read as a faint line of text. */
+[data-money] .head-search {
+  inline-size: min(100%, 420px);
+  min-block-size: 40px;
+  padding-inline: var(--sp-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-ctl);
+  background: var(--tile);
+  font-size: var(--fs-body);
+}
+
+[data-money] .head-search:hover {
+  border-color: var(--rule-strong);
+}
+
+/* ── a part's chip on a bar's row ────────────────────────────────────────── */
+
+/* A ROW WITH ITS CATEGORY'S OR ACCOUNT'S CHIP: the chip at the start across the name and the bar, as a finance app lists
+   where the money went; the name, its amount and the bar keep their places beside it. */
+[data-money] .prop > .prop-row:has(> .part-chip) {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-2);
+}
+
+[data-money] .prop-row > .part-chip {
+  grid-area: 1 / 1 / span 2;
+  align-self: center;
+  inline-size: 36px;
+  block-size: 36px;
+  font-size: var(--fs-meta);
+}
+
+[data-money] .prop-row:has(> .part-chip) > .prop-label {
+  grid-area: 1 / 2;
+}
+
+[data-money] .prop-row:has(> .part-chip) > .prop-value {
+  grid-area: 1 / 3 / auto / -1;
+}
+
+[data-money] .prop-row:has(> .part-chip) > .glyph {
+  grid-area: 1 / 4;
+}
+
+[data-money] .prop-row:has(> .part-chip) > .prop-track {
+  grid-area: 2 / 2 / auto / -1;
+}
+
+[data-money] .prop-row:has(> .part-chip) > .prop-note {
+  grid-area: 3 / 2 / auto / -1;
+}
+
+/* A CATEGORY'S BAR IN ITS OWN COLOUR, so the chip and its bar read as one thing. */
+[data-money] .prop-row:has(> .part-chip[data-slot]) > .prop-track::after {
+  background: var(--tone-fill, var(--part-hue, var(--money-bar-quiet)));
+}
+
+[data-money] .prop-row:has(> .part-chip[data-slot='blue']) { --part-hue: var(--cat-blue); }
+[data-money] .prop-row:has(> .part-chip[data-slot='violet']) { --part-hue: var(--cat-violet); }
+[data-money] .prop-row:has(> .part-chip[data-slot='pink']) { --part-hue: var(--cat-pink); }
+[data-money] .prop-row:has(> .part-chip[data-slot='teal']) { --part-hue: var(--cat-teal); }
+[data-money] .prop-row:has(> .part-chip[data-slot='sky']) { --part-hue: var(--cat-sky); }
+[data-money] .prop-row:has(> .part-chip[data-slot='yellow']) { --part-hue: var(--cat-yellow); }
+[data-money] .prop-row:has(> .part-chip[data-slot='lime']) { --part-hue: var(--cat-lime); }
+[data-money] .prop-row:has(> .part-chip[data-slot='slate']) { --part-hue: var(--cat-slate); }
+
+/* THE BALANCE AT HOME, quiet under a balance in another currency: "≈ EGP 427,940". */
+[data-money] .prop-row > .prop-approx {
+  grid-area: 2 / 3 / auto / -1;
+  justify-self: end;
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+}
+
+[data-money] .prop-row:has(> .prop-approx) > .prop-track {
+  grid-column-end: 3;
+}
+
+/* ── the line that says what is late ─────────────────────────────────────── */
+
+/* WHAT IS LATE IS PART OF THE HEAD, NOT A STRAY LINE BETWEEN IT AND THE FIRST TILE (Q19): a pill under the page's
+   sentence, a red dot before it, so it reads as the head's own warning and still opens what is late. */
+[data-money] .next {
+  margin-block: calc(-1 * var(--sp-3)) var(--sp-1);
+}
+
+[data-money] .next .next-act,
+[data-money] .next .next-line {
+  gap: var(--sp-2);
+  min-block-size: 32px;
+  padding-inline: var(--sp-3);
+  border: 1px solid color-mix(in oklab, var(--red) 28%, var(--rule));
+  border-radius: var(--r-round);
+  background: var(--red-tint);
+  color: var(--ink);
+  font-size: var(--fs-ctl);
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .next .next-line {
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-money] .next .next-act::before,
+[data-money] .next .next-line::before {
+  content: '';
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--r-round);
+  background: var(--red);
+}
+
+/* AN ACCOUNT'S ROW: its name level with its chip, the balance at the right with its home amount under it. */
+[data-money] .block-slot[data-source='metric.cash-by-account'] .prop-row:has(> .part-chip):has(> .prop-approx) > .prop-label {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+[data-money] .block-slot[data-source='metric.cash-by-account'] .prop-row:has(> .part-chip):not(:has(> .prop-approx)) > :is(.prop-label, .prop-value) {
+  align-self: center;
+}
+
+[data-money] .block-slot[data-source='metric.cash-by-account'] .prop-row:has(> .part-chip):not(:has(> .prop-approx)) > .part-chip {
+  grid-row: 1;
+}
+
+@media (width < 640px) {
+  /* ON THE PHONE AN ACCOUNT IS A CARD: the chip and the name on its first line, the balance large under them, and its
+     home amount under that. */
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row:has(> .part-chip) {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--sp-2);
+    row-gap: var(--sp-1);
+    min-inline-size: 168px;
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row > .part-chip {
+    grid-area: 1 / 1;
+    inline-size: 28px;
+    block-size: 28px;
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row:has(> .part-chip) > .prop-label {
+    grid-area: 1 / 2;
+    align-self: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row:has(> .part-chip) > .prop-value {
+    grid-area: 2 / 1 / auto / -1;
+    justify-self: start;
+    white-space: nowrap;
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row:has(> .part-chip) > .prop-approx {
+    grid-area: 3 / 1 / auto / -1;
+    justify-self: start;
+  }
+}
+
+/* ── the phone: room for the round +, and targets a thumb can hit ─────────── */
+
+@media (width < 640px) {
+  /* THE ROUND + NEVER COVERS THE LAST ROW (Q52): the page ends a button's height and a gap below the last tile, so the
+     day's total on the Ledger and the last line of a tile scroll clear of it. */
+  [data-money] .page {
+    padding-block-end: calc(56px + var(--sp-8, 32px));
+  }
+}
+
+/* EVERY LINK IN MONEY'S WORDS IS A 44 PX TARGET ON A TOUCH SCREEN (Q59) without changing how it is drawn: an invisible
+   area round it, centred on the word ("Update", "Not filed yet", "All 350 in Ledger"). */
+@media (pointer: coarse) {
+  [data-money] :is(.cell-note, .prop-label, .document, .block-more, .next) a,
+  [data-money] .block-more {
+    position: relative;
+  }
+
+  [data-money] :is(.cell-note, .prop-label, .document, .next) a::after,
+  [data-money] .block-more::after {
+    content: '';
+    position: absolute;
+    inset-block: 50% auto;
+    inset-inline: -6px;
+    min-inline-size: 44px;
+    block-size: 44px;
+    translate: 0 -50%;
+  }
+
+  [data-money] .next .next-act {
+    min-block-size: 36px;
+  }
+}
+
+/* ── what is due: each day a badge ───────────────────────────────────────── */
+
+/* A DUE LINE LEADS WITH ITS DAY AS A BADGE, so a list of bills reads down a column of dates, and a late one's badge is
+   red: "4 days late" is the first thing seen. */
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) {
+  align-items: center;
+  min-block-size: 52px;
+}
+
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > .item-marker:not(:empty) {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 76px;
+  min-block-size: 28px;
+  padding-inline: var(--sp-2);
+  border-radius: var(--r-ctl);
+  background: var(--tile-2);
+  color: var(--ink-2);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-intent='bad']:not([data-rich]) > .item-marker:not(:empty) {
+  background: var(--red-tint);
+  color: var(--red);
+}
+
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > .item-title {
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > .item-detail {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > .item-marker:not(:empty) {
+  margin-inline-end: var(--sp-2);
+}
+
+/* ── the Ledger's filters: a row each, named, as a finance app's filter bar ─ */
+
+/* EACH FIELD ON A ROW OF ITS OWN WITH ITS NAME IN FRONT ("Account", "Category", "Show"), its choices as round chips, the
+   one chosen in ink, not three rows of words with a red "All" at the start of each. Month keeps its segmented track. */
+[data-money] .filters {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-2);
+}
+
+[data-money] .filters-group:not([data-control='segmented']) {
+  gap: 6px;
+}
+
+/* THE FIELD'S NAME IN FRONT OF ITS CHOICES, where the hairline between fields stood. */
+[data-money] .filters-group + .filters-group:not([data-control='segmented'])::before,
+[data-money] .filters-group::before {
+  content: attr(aria-label);
+  position: static;
+  flex: none;
+  inline-size: auto;
+  min-inline-size: 72px;
+  block-size: auto;
+  white-space: nowrap;
+  background: none;
+  translate: none;
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .filters-group[data-control='segmented'] {
+  align-self: flex-start;
+}
+
+/* LEVEL WITH THE CHIPS of the rows named above and below it, not out at the edge under their names. */
+[data-money] .filters:has(> .filters-group:not([data-control='segmented'])) > .filters-group[data-control='segmented'] {
+  margin-inline-start: calc(72px + 6px);
+  max-inline-size: calc(100% - 78px);
+}
+
+[data-money] .filters-group[data-control='segmented']::before {
+  content: none;
+}
+
+[data-money] .filters-group:not([data-control='segmented']) .filters-choice {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-round);
+  background: var(--tile);
+  color: var(--ink-2);
+}
+
+[data-money] .filters-group:not([data-control='segmented']) .filters-choice .filters-count {
+  color: var(--ink-3);
+}
+
+[data-money] .filters-group:not([data-control='segmented']) .filters-choice:is([aria-pressed='true'], [data-on]),
+[data-money] .filters-group:not([data-control='segmented']) button.filters-choice[aria-pressed='true']:hover {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--tile);
+}
+
+[data-money] .filters-group:not([data-control='segmented']) .filters-choice[aria-pressed='true'] .filters-count {
+  color: inherit;
+  opacity: 0.75;
+}
+
+@media (width < 640px) {
+  /* ON THE PHONE EACH FIELD IS A STRIP THAT SCROLLS SIDEWAYS, its name first. */
+  [data-money] .filters {
+    flex-wrap: nowrap;
+    overflow: visible;
+    mask: none;
+    /* THE ROOM THE ONE STRIP KEPT FOR ITS FADE IS EACH STRIP'S OWN HERE (Q35): kept on the whole, it cut every strip
+       short of the edge with no fade, "Studio c", "Between y". */
+    padding-inline-end: var(--sp-1);
+  }
+
+  [data-money] .filters-group:not([data-control='segmented']) {
+    padding-inline-end: 24px;
+    mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
+  }
+
+  [data-money] .filters-group:not([data-control='segmented']):dir(rtl) {
+    mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
+  }
+
+  [data-money] .filters-group:not([data-control='segmented']) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  [data-money] .filters-group::before {
+    inline-size: auto;
+    margin-inline-end: var(--sp-1);
+  }
+
+  [data-money] .filters-group .filters-choice,
+  [data-money] .filters-group .filters-more {
+    flex: none;
+  }
+
+  [data-money] .filters-group[data-control='segmented'] {
+    max-inline-size: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
+
+/* THE RING LEVEL WITH ITS LEGEND, and each part of the legend wearing its category's chip in place of a dot. */
+[data-money] .split[data-form='donut'] {
+  align-items: center;
+}
+
+[data-money] .split-item > .part-chip {
+  inline-size: 28px;
+  block-size: 28px;
+}
+
+[data-money] .split-item > .part-chip > svg {
+  inline-size: 15px;
+  block-size: 15px;
+}
+
+[data-money] .split-item:has(> .part-chip) {
+  align-items: center;
+  min-block-size: 36px;
+}
+
+/* THE CHIP STANDS IN THE DOT'S COLUMN of the donut's legend, which is made as wide as the chip, so a legend line is
+   chip, name, amount and share on one line, not the chip under its name. */
+[data-money] .split[data-form='donut'] .split-item > .part-chip {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+[data-money] .split[data-form='donut'] .split-legend:has(> .split-item > .part-chip) > .split-item > .split-dot {
+  justify-self: center;
+}
+
+@media (width >= 640px) {
+  [data-money] .split[data-form='donut'] .split-legend:has(> .split-item > .part-chip) {
+    grid-template-columns: 28px max-content max-content max-content minmax(0, 1fr);
+  }
+}
+
+[data-money] .split[data-form='donut'] .split-item > .part-chip {
+  grid-column: 1;
+}
+
+/* ── the money over time: a one-figure tile with its line is a chart ─────── */
+
+/* A TILE OF ONE FIGURE AND ITS LINE ("Over time") IS DRAWN AS A CHART: the label and the figure over a line the width of
+   the tile, tall enough to read, in the accent over its wash, as a finance app's net worth card. */
+/* AND WHILE ITS LINE WAITS (`.cell-trend-wait`, "The line fills in from tonight") it is laid the same way, the figure on
+   a line of its own the tile's width and the words under it: side by side on a phone, the figure's "−" wrapped onto its
+   own line and the words ran under Money's "+" (recheck N8). */
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid:has(> .cell:only-child > :is(.cell-trend, .cell-trend-wait)) > .cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label glyph'
+    'figure figure'
+    'trend trend'
+    'axis axis'
+    'note note';
+  align-items: start;
+  inline-size: 100%;
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-trend-days {
+  grid-area: axis;
+  display: flex;
+  justify-content: space-between;
+  margin-block-start: var(--sp-1);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-label {
+  grid-area: label;
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-figure {
+  grid-area: figure;
+  justify-self: start;
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-trend {
+  grid-area: trend;
+  inline-size: 100%;
+  block-size: 140px;
+  margin-block-start: var(--sp-3);
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-note {
+  grid-area: note;
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-trend-wait {
+  grid-area: trend;
+  margin-block-start: var(--sp-2);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+}
+
+/* A FIGURE IS ONE WORD: its sign never wraps away from it. */
+[data-money] .block[data-kind='stat'] .cell-figure {
+  white-space: nowrap;
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .glyph {
+  grid-area: glyph;
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-note:empty {
+  display: none;
+}
+
+/* A BUDGET'S ROW WEARS ITS CATEGORY'S CHIP at the start, across its name and its bar, and its bar its colour. */
+[data-money] .progress-row:has(> .part-chip) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'chip label figure'
+    'chip track track'
+    '. left note';
+  column-gap: var(--sp-3);
+}
+
+[data-money] .progress-row > .part-chip {
+  grid-area: chip;
+  align-self: center;
+  inline-size: 36px;
+  block-size: 36px;
+}
+
+[data-money] .progress-row:has(> .part-chip[data-slot]):not([data-intent]) .progress-fill {
+  background: var(--part-hue, var(--money-bar));
+}
+
+[data-money] .progress-row:has(> .part-chip[data-slot='blue']) { --part-hue: var(--cat-blue); }
+[data-money] .progress-row:has(> .part-chip[data-slot='violet']) { --part-hue: var(--cat-violet); }
+[data-money] .progress-row:has(> .part-chip[data-slot='pink']) { --part-hue: var(--cat-pink); }
+[data-money] .progress-row:has(> .part-chip[data-slot='teal']) { --part-hue: var(--cat-teal); }
+[data-money] .progress-row:has(> .part-chip[data-slot='sky']) { --part-hue: var(--cat-sky); }
+[data-money] .progress-row:has(> .part-chip[data-slot='yellow']) { --part-hue: var(--cat-yellow); }
+[data-money] .progress-row:has(> .part-chip[data-slot='lime']) { --part-hue: var(--cat-lime); }
+[data-money] .progress-row:has(> .part-chip[data-slot='slate']) { --part-hue: var(--cat-slate); }
+
+/* BUDGETS ACROSS THE WHOLE PAGE ARE TWO COLUMNS on a wide screen, as the bars of a month are. */
+@media (width >= 1200px) {
+  [data-money] .block-slot[data-full] .progress:not([data-form='range']):has(> .progress-row + .progress-row + .progress-row) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sp-7);
+  }
+}
+
+/* AN ACCOUNT'S CARD LEADS WITH ITS CHIP (a bank, cash, a card), as a bank's app lists what you hold. */
+[data-money] .cards-head > .part-chip {
+  flex: none;
+  inline-size: 32px;
+  block-size: 32px;
+  margin-inline-end: var(--sp-1);
+}
+
+[data-money] .cards-head:has(> .part-chip) {
+  align-items: center;
+}
+
+/* ITS NAME ON ONE LINE BESIDE THE CHIP and how old its balance is under the name, so "Credit Card (EGP)" is not broken
+   over three lines by the date beside it. */
+[data-money] .cards-head:has(> .part-chip) {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+[data-money] .cards-head:has(> .part-chip) > .cards-title {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-money] .cards-head:has(> .part-chip) > .cards-when {
+  flex-basis: 100%;
+  margin-inline-start: calc(32px + var(--sp-1) + var(--sp-2));
+}
+
+/* ON THE ACCOUNT'S OWN PAGE its name is the page's title and hidden here, so how old its balance is sits on the chip's
+   line, not alone on a line under an empty one. */
+[data-money] .block-slot[data-self] .cards-head:has(> .part-chip) > .cards-when {
+  flex-basis: auto;
+  margin-inline-start: 0;
+}
+
+/* THE TWO WAYS A TABLE OF LINES IS DRAWN, at the tile's top end, small. */
+.lines-view {
+  display: flex;
+  justify-content: flex-end;
+  margin-block: calc(-1 * var(--sp-1)) var(--sp-2);
+}

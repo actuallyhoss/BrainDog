@@ -1,9 +1,9 @@
 {
   "pack": "work",
-  "version": "1.19.0",
+  "version": "1.20.0",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "The Roadmap add-on is a page of Work now, the Timeline. A thread has six states, its moves and a day it aims for. A follow-up takes its parent's project, thread, owner and agent where it left them empty. The Board has the line to add work. Work answers your questions about tasks, lists work with no project, shows Late, Waiting on you, This week and With an agent, narrows to yours or the agents', and folds what has not moved in three months.",
+  "changes": "The project chips, Yours and Agents count what Open counts, so the backlog is no longer in their numbers, and the first line says none of your tasks is late.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -162,10 +162,11 @@
         "action": { "verb": "row.create", "label": "Add" }
       },
       "filters": [
-        { "field": "thing", "control": "chips", "when": { "holds": [ "things" ] } },
+        { "field": "thing", "control": "chips", "counts": "state is not backlog or done or dropped", "when": { "holds": [ "things" ] } },
         {
           "field": "whose",
           "control": "segmented",
+          "counts": "state is not backlog or done or dropped",
           "options": [ { "value": "yours", "label": "Yours", "where": "agent is empty" }, { "value": "agents", "label": "Agents", "where": "agent is set" } ]
         }
       ],
@@ -189,7 +190,7 @@
           "lead": true,
           "span": 12,
           "when": { "metric": "tasks-late-yours", "is": 0 },
-          "body": "Nothing is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you"
+          "body": "None of your tasks is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you"
         },
         { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
         {

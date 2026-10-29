@@ -38,6 +38,9 @@ const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined 
 const GENERAL = [
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit', 'target', 'authored', 'empty',
   'tone', 'body', 'when', 'opening', 'from', 'horizon', 'inherit', 'working', 'area', 'icon', 'key', 'actions',
+  /* A WIDGET'S FRAME ON A BOARD, and the mark on one not yet kept (`kinds/sizes.ts`, the widgets plan §7.1). */
+  'size', 'draft',
+  'until',
 ] as const;
 
 /**
@@ -182,7 +185,6 @@ export const kindsReading = (key: string): readonly string[] | undefined => own(
  * the thing another way.
  */
 const BLOCK_INSTEAD: Readonly<Record<string, string>> = {
-  size: 'A block is made wider with span:, a whole number of twelfths from 1 to 12.',
   width: 'A block is made wider with span:, a whole number of twelfths from 1 to 12.',
   low: 'A progress block draws each row from its low to its high with range: true and four columns: the label, what was spent, the low and the high.',
   high: 'A progress block draws each row from its low to its high with range: true and four columns: the label, what was spent, the low and the high.',
@@ -505,6 +507,8 @@ export function wrongKindKey(key: string, kind: string): string {
 export const PAGE_KEYS: ReadonlySet<string> = new Set([
   'page', 'title', 'nav', 'icon', 'requires', 'blocks', 'for', 'pack', 'origin', 'derived_from', 'placed', 'tone', 'layout',
   'filters', 'header', 'list',
+  /* A BOARD OF WIDGETS (Today first): `board: true`, and the phone's own arrangement once one is made (`board.ts`). */
+  'board', 'phone',
 ]);
 
 /** Published in `06 §1.1` and read by nothing in this build, so the repair is a deploy rather than an edit. None now. */

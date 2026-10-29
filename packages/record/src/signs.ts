@@ -242,6 +242,21 @@ const CLIENTS: Readonly<Record<string, string>> = {
   windsurf: 'Windsurf',
   'braindog-cli': 'The BrainDog command',
 };
+/**
+ * A KEY'S LABEL AS A PERSON SAYS IT (Q12 of 29 October): "SAM-LAPTOP · braindog-cli" is the machine and the command it
+ * signed in with, and was said as it is: "SAM-LAPTOP · braindog-cli has made 10 changes". The command is how agents on
+ * that machine reach the record, so it is said as "Your agents on SAM-LAPTOP"; another app as "Claude Code on SAM-LAPTOP".
+ * A label typed by hand is said as typed.
+ */
+export function agentSaid(label: string | null): string {
+  const said = (label ?? '').trim();
+  if (said === '') return 'Your agent';
+  const parts = said.split(' · ').map((p) => p.trim()).filter((p) => p !== '');
+  if (parts.length < 2) return said;
+  const [machine, app] = parts as [string, string];
+  return app.toLowerCase() === 'braindog-cli' ? `Your agents on ${machine}` : `${clientName(app)} on ${machine}`;
+}
+
 export function clientName(client: string | null): string {
   if (client === null || client.trim() === '') return 'An agent';
   const key = client.trim().toLowerCase().split(/[\s/@]/u)[0]!;

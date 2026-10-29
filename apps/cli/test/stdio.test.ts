@@ -429,6 +429,7 @@ const ANSWERS: Record<string, unknown> = {
   exceptions: { exceptions: [] },
   stale: { lines: [], count: 0 },
   learnings: { rows: [], truncated: false, faded: 0 },
+  widgetGallery: { widgets: [] },
   understandPlan: { dry: true, kinds: [], writes: [], more: 0, questions: [], asks: {}, done: true },
   previewPage: { page: 'handoffs', title: 'Next steps left', blocks: [] },
   instructionsMine: { run: 'S1', stamp: 's1', pending: [], stop: null, lines: ['Nothing new for you.'] },

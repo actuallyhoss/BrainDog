@@ -17,40 +17,40 @@ const MARIAM = person('mariam.json');
 const NOUR = person('nour.json');
 
 const row = (name, href) => ({ role: 'link', name, landmark: 'navigation', href });
-const THREE = [row('Today', '/app/'), row('Decide', '/app/decide'), row('People', '/app/p/people')];
-const MONEY = row('Money', '/app/p/money');
-const DOORS = [row('New list', '/app/r/_new?make'), row('Your account and settings', '/app/settings/account')];
+const THREE = [row('Today', '/'), row('Decide', '/decide'), row('People', '/p/people')];
+const MONEY = row('Money', '/p/money');
+const DOORS = [row('New list', '/r/_new?make'), row('Your account and settings', '/settings/account')];
 const TODAY = [{ role: 'main', name: '', landmark: null }, { role: 'heading', name: 'Today', landmark: 'main' }];
-const SCREEN = (over = {}) => ({ path: '/app/', width: 1440, text: ['Today', 'Nothing needs you right now.'], roles: [...THREE, ...TODAY], counts: { People: [{ name: 'Mariam', tags: [] }] }, behind: {}, signs: 0, owner: true, ...over });
+const SCREEN = (over = {}) => ({ path: '/', width: 1440, text: ['Today', 'Nothing needs you right now.'], roles: [...THREE, ...TODAY], counts: { People: [{ name: 'Mariam', tags: [] }] }, behind: {}, signs: 0, owner: true, ...over });
 const EMPTY = { Accounts: 0, 'Bills and invoices': 0, Ledger: 0, Repeating: 0 };
 
 /* ── the rail, row by row ─────────────────────────────────────────────────────────────────────────────── */
 
 test('rail-has-rows: a place whose page reads only empty lists is red on the first minute', () => {
   const check = firstScreen['rail-has-rows'];
-  const r = check(SCREEN({ roles: [...THREE, MONEY, ...DOORS], behind: { '/app/p/money': EMPTY } }));
+  const r = check(SCREEN({ roles: [...THREE, MONEY, ...DOORS], behind: { '/p/money': EMPTY } }));
   assert.equal(r.pass, false);
   assert.match(r.saw, /^Money \(Accounts, Bills and invoices, Ledger and 1 more hold nothing\) is in the rail with nothing to show$/u);
-  const two = check(SCREEN({ roles: [...THREE, MONEY, row('Work', '/app/p/work')], behind: { '/app/p/money': EMPTY, '/app/p/work': { Tasks: 0 } } }));
+  const two = check(SCREEN({ roles: [...THREE, MONEY, row('Work', '/p/work')], behind: { '/p/money': EMPTY, '/p/work': { Tasks: 0 } } }));
   assert.match(two.saw, /^Money \(.+\) and Work \(Tasks holds nothing\) are in the rail/u);
 });
 
 test('rail-has-rows: a place with one list that holds something, or a page that reads no list, is green', () => {
   const check = firstScreen['rail-has-rows'];
-  const held = check(SCREEN({ roles: [...THREE, MONEY], behind: { '/app/p/money': { ...EMPTY, 'Bills and invoices': 1 } } }));
+  const held = check(SCREEN({ roles: [...THREE, MONEY], behind: { '/p/money': { ...EMPTY, 'Bills and invoices': 1 } } }));
   assert.equal(held.pass, true, held.saw);
   assert.match(held.saw, /^Money is in the rail, each with something in it$/u);
-  assert.equal(check(SCREEN({ roles: [...THREE, row('Notes', '/app/p/notes')], behind: { '/app/p/notes': {} } })).pass, true);
+  assert.equal(check(SCREEN({ roles: [...THREE, row('Notes', '/p/notes')], behind: { '/p/notes': {} } })).pass, true);
   /* The entries themselves, where the rig read them, count as the number does. */
-  assert.equal(check(SCREEN({ roles: [...THREE, MONEY], behind: { '/app/p/money': { Accounts: [{ name: 'Cash', tags: [] }] } } })).pass, true);
+  assert.equal(check(SCREEN({ roles: [...THREE, MONEY], behind: { '/p/money': { Accounts: [{ name: 'Cash', tags: [] }] } } })).pass, true);
 });
 
 test('rail-has-rows: a place the record declares stands empty on day 0, and a side page over nothing is still red', () => {
   const check = firstScreen['rail-has-rows'];
-  const ready = check(SCREEN({ roles: [...THREE, MONEY], behind: { '/app/p/money': EMPTY }, places: ['/app/p/money'] }));
+  const ready = check(SCREEN({ roles: [...THREE, MONEY], behind: { '/p/money': EMPTY }, places: ['/p/money'] }));
   assert.equal(ready.pass, true, ready.saw);
   assert.match(ready.saw, /^in the rail, Money opens on a first entry$/u);
-  const board = check(SCREEN({ roles: [...THREE, MONEY, row('Board', '/app/p/board')], behind: { '/app/p/money': EMPTY, '/app/p/board': { Tasks: 0 } }, places: ['/app/p/money'] }));
+  const board = check(SCREEN({ roles: [...THREE, MONEY, row('Board', '/p/board')], behind: { '/p/money': EMPTY, '/p/board': { Tasks: 0 } }, places: ['/p/money'] }));
   assert.equal(board.pass, false);
   assert.match(board.saw, /^Board \(Tasks holds nothing\) is in the rail with nothing to show$/u);
 });
@@ -63,12 +63,12 @@ test('rail-has-rows: a rail of only Today, Decide and People is read, and green'
 
 test('rail-has-rows: a list is held against its own count, by where its row goes or by its name', () => {
   const check = firstScreen['rail-has-rows'];
-  const orders = row('Orders 2', '/app/r/orders');
-  assert.equal(check(SCREEN({ roles: [...THREE, orders], behind: { '/app/r/orders': { Orders: 2 } } })).pass, true);
-  const named = check(SCREEN({ roles: [...THREE, orders, row('People 1', '/app/r/people')], counts: { Orders: 2 } }));
+  const orders = row('Orders 2', '/r/orders');
+  assert.equal(check(SCREEN({ roles: [...THREE, orders], behind: { '/r/orders': { Orders: 2 } } })).pass, true);
+  const named = check(SCREEN({ roles: [...THREE, orders, row('People 1', '/r/people')], counts: { Orders: 2 } }));
   assert.equal(named.pass, true, named.saw);
   assert.match(named.saw, /^Orders is in the rail/u);
-  const empty = check(SCREEN({ roles: [...THREE, row('Services', '/app/r/services')], behind: { '/app/r/services': { Services: 0 } } }));
+  const empty = check(SCREEN({ roles: [...THREE, row('Services', '/r/services')], behind: { '/r/services': { Services: 0 } } }));
   assert.match(empty.saw, /^Services \(Services holds nothing\) is in the rail with nothing to show$/u);
 });
 
@@ -78,19 +78,19 @@ test('rail-has-rows: a place nothing was read for is not seen, and that is this 
   assert.notEqual(r.applies, false);
   assert.match(r.saw, /did not read what stands behind Money in the rail/u);
   /* Red wins over unread: one place known to be empty is said, whatever else was not read. */
-  const both = firstScreen['rail-has-rows'](SCREEN({ roles: [...THREE, MONEY, row('Work', '/app/p/work')], behind: { '/app/p/work': { Tasks: 0 } } }));
+  const both = firstScreen['rail-has-rows'](SCREEN({ roles: [...THREE, MONEY, row('Work', '/p/work')], behind: { '/p/work': { Tasks: 0 } } }));
   assert.equal(both.pass, false);
 });
 
 test('rail-has-rows: on a phone the tabs are the places', () => {
-  const r = firstScreen['rail-has-rows'](SCREEN({ width: 390, roles: [...TODAY, ...THREE, MONEY], behind: { '/app/p/money': EMPTY } }));
+  const r = firstScreen['rail-has-rows'](SCREEN({ width: 390, roles: [...TODAY, ...THREE, MONEY], behind: { '/p/money': EMPTY } }));
   assert.equal(r.pass, false);
   assert.match(r.saw, /is in the phone's places with nothing to show$/u);
 });
 
 /* ── Today's line on the vital signs ──────────────────────────────────────────────────────────────────── */
 
-const SAID = { role: 'link', name: 'One vital sign needs a look', landmark: 'main', href: '/app/p/health' };
+const SAID = { role: 'link', name: 'One vital sign needs a look', landmark: 'main', href: '/p/health' };
 const told = (words, over = {}) => SCREEN({ text: ['Today', `${words}.`], roles: [...THREE, ...TODAY, { ...SAID, name: words }], ...over });
 
 test('signs-line: a red sign with no line on Today is red for whoever owns the record', () => {
@@ -144,7 +144,7 @@ test('own-lines-you: the owner of a record nobody else writes on is never a stra
 test('own-lines-you: with somebody else on the record, or for somebody who does not own it, the words may be true', () => {
   const check = drawnScreen['own-lines-you'];
   const feed = (over = {}) => SCREEN({ text: ['Today', 'Someone on this record added Nadia just now'], counts: { People: [{ name: 'Mariam', tags: [] }] }, ...over });
-  for (const apart of [feed({ counts: { People: [{ name: 'Mariam', tags: [] }, { name: 'Farid', tags: [] }] } }), feed({ counts: { People: 2 } }), feed({ owner: false }), feed({ path: '/app/r/people' })]) {
+  for (const apart of [feed({ counts: { People: [{ name: 'Mariam', tags: [] }, { name: 'Farid', tags: [] }] } }), feed({ counts: { People: 2 } }), feed({ owner: false }), feed({ path: '/r/people' })]) {
     assert.equal(check(apart, MARIAM).pass, null);
     assert.equal(check(apart, MARIAM).applies, false);
   }
@@ -163,7 +163,7 @@ test('a check with no business on a screen says so, and is told apart from one t
     firstScreen['team-no-task'](SCREEN(), MARIAM),
     firstScreen['people-only-them']({ path: '/start', text: [], roles: [] }, MARIAM),
     drawnScreen['pages-line'](SCREEN({ width: 390 })),
-    drawnScreen['signs-line'](SCREEN({ path: '/app/r/people' })),
+    drawnScreen['signs-line'](SCREEN({ path: '/r/people' })),
   ];
   for (const r of apart) {
     assert.equal(r.pass, null, r.id);
@@ -194,7 +194,7 @@ test('the command leaves with 1 when a check that applies read nothing, and 0 wh
 });
 
 test('no line a check says holds a long dash', () => {
-  const screens = [SCREEN({ roles: [...THREE, MONEY], behind: { '/app/p/money': EMPTY } }), SCREEN({ signs: 2 }), SCREEN({ roles: [...THREE, MONEY] }), SCREEN({ width: 390 })];
+  const screens = [SCREEN({ roles: [...THREE, MONEY], behind: { '/p/money': EMPTY } }), SCREEN({ signs: 2 }), SCREEN({ roles: [...THREE, MONEY] }), SCREEN({ width: 390 })];
   for (const snap of screens) for (const r of checkDrawn(snap, MARIAM)) assert.doesNotMatch(r.saw, /\u2014/u);
 });
 
@@ -208,27 +208,27 @@ const DATA = { me: { owner: true, person: 'p1', prefs: {} }, names: { p1: 'Maria
 const sideAs = async (places) => {
   const { sideModel } = await import('../../../apps/web/src/lib/shell/side.ts');
   const model = sideModel({ places, others: [], projects: null, lists: [], homes: new Map(), views: {}, tools: [], foot: [] });
-  return markupOf('lib/shell/SideBar.svelte', { base: '', lists: [], model, lit: '/', mode: 'full', shown: true }, { data: DATA, path: '/app/' });
+  return markupOf('lib/shell/SideBar.svelte', { base: '', lists: [], model, lit: '/', mode: 'full', shown: true }, { data: DATA, path: '/' });
 };
 
 test('the sidebar as the web draws it says where each row goes, and its rows are read from that', async () => {
   const html = await sideAs(PLACES);
-  const snap = { path: '/app/', width: 1440, ...readMarkup(html), counts: {}, owner: true };
+  const snap = { path: '/', width: 1440, ...readMarkup(html), counts: {}, owner: true };
   const money = snap.roles.find((r) => r.landmark === 'navigation' && r.role === 'link' && r.name === 'Money');
-  assert.equal(money?.href, '/app/p/money');
-  assert.equal(firstScreen['rail-has-rows']({ ...snap, behind: { '/app/p/money': EMPTY } }).pass, false);
-  assert.equal(firstScreen['rail-has-rows']({ ...snap, behind: { '/app/p/money': { ...EMPTY, Ledger: 3 } } }).pass, true);
+  assert.equal(money?.href, '/p/money');
+  assert.equal(firstScreen['rail-has-rows']({ ...snap, behind: { '/p/money': EMPTY } }).pass, false);
+  assert.equal(firstScreen['rail-has-rows']({ ...snap, behind: { '/p/money': { ...EMPTY, Ledger: 3 } } }).pass, true);
   /* With Money gone the sidebar is the three and its own doors, and nothing in it is taken for a place. */
   const three = await sideAs(PLACES.slice(0, 3));
-  const calm = firstScreen['rail-has-rows']({ path: '/app/', width: 1440, ...readMarkup(three), counts: {}, behind: {}, owner: true });
+  const calm = firstScreen['rail-has-rows']({ path: '/', width: 1440, ...readMarkup(three), counts: {}, behind: {}, owner: true });
   assert.equal(calm.pass, true, calm.saw);
   assert.match(calm.saw, /no place besides Today, Decide and People/u);
 });
 
 test('the phone\'s tab bar is a navigation whose tabs say where they go', async () => {
-  const html = await markupOf('lib/shell/TabBar.svelte', { tabs: PLACES, more: false }, { data: DATA, path: '/app/' });
-  const snap = { path: '/app/', width: 390, ...readMarkup(html), counts: {}, behind: { '/app/p/money': EMPTY }, owner: true };
-  assert.deepEqual(snap.roles.filter((r) => r.role === 'link').map((r) => [r.name, r.href, r.landmark]), PLACES.map((p) => [p.label, `/app${p.href}`, 'navigation']));
+  const html = await markupOf('lib/shell/TabBar.svelte', { tabs: PLACES, more: false }, { data: DATA, path: '/' });
+  const snap = { path: '/', width: 390, ...readMarkup(html), counts: {}, behind: { '/p/money': EMPTY }, owner: true };
+  assert.deepEqual(snap.roles.filter((r) => r.role === 'link').map((r) => [r.name, r.href, r.landmark]), PLACES.map((p) => [p.label, `${p.href}`, 'navigation']));
   /* NO MORE TAB since frame B: the rest is under the face at the top of each screen. */
   assert.ok(!snap.roles.some((r) => r.role === 'button' && r.name === 'More' && r.landmark === 'navigation'));
   assert.match(firstScreen['rail-has-rows'](snap).saw, /^Money \(.+\) is in the phone's places with nothing to show$/u);
@@ -251,7 +251,7 @@ test('Mariam: every screen of both moments is drawn at 1440 and at 390, and no c
     /* What stands behind a place is read from the host, under the lists' names. */
     for (const reads of Object.values(s.behind)) for (const [name, n] of Object.entries(reads)) assert.ok(name !== '' && Number.isFinite(n), `${name}: ${n}`);
   }
-  for (const s of drawn.filter((x) => x.path === '/app/')) {
+  for (const s of drawn.filter((x) => x.path === '/')) {
     assert.ok(s.signs === null || Number.isFinite(s.signs), `the vital signs were read: ${s.signs}`);
     assert.ok(s.roles.some((r) => r.landmark === 'main' && r.role === 'heading' && r.name === 'Today'), `Today has its name in main at ${s.width}`);
   }

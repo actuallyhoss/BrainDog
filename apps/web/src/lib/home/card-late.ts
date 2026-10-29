@@ -6,10 +6,8 @@
  * a card, its page's hero and Work say one number. One read of the late rows for every card at once (`rowLates`); a read
  * that fails says nothing, and a card with nothing late draws no flag.
  *
- * AND THE MONEY THAT IS LATE WITH IT (on the sidebar): a bill or a part of a plan that points at
- * the project, open past its day, is late as a task is, so a project whose salary is a fortnight late says so. Read from
- * every list the record keeps that points at the projects list, holds money and declares a day it falls due, one read a
- * list for every project at once, never a list by name.
+ * NOT THE MONEY (audit of 30 October, 6): a late bill pointing at a project made the card say "3 late" where its page
+ * said "1 late". Late money is Money's to say.
  *
  * A SCREEN OF CARDS MAY NOT HOLD THE WORK LIST'S DECLARATION YET (Projects reads only the projects list), so where none
  * is held, the lists pointing at the first projects are named by one `backlinks` each and only their declarations are
@@ -34,15 +32,6 @@ const LATE_READ = 200;
 /** The projects read for their ids at the limit the desk, the sidebar and the pages read them at: their one read. */
 const PROJECTS_READ = 500;
 
-/** The lists that hold money pointing at the projects list, with a day each row falls due, other than the work list. */
-const moneyFor = (projects: string, work: string | undefined): string[] =>
-  Object.keys(REGISTERS).filter((id) => {
-    const decl = REGISTERS[id];
-    if (id === work || id === projects || !decl?.fields.some((f) => f.type === 'money')) return false;
-    const via = viaOf(decl, projects);
-    return via !== null && via.deadline !== null;
-  });
-
 /**
  * HOW MANY ROWS ARE LATE FOR EACH PROJECT, by its number: one read a list of what is still open and past its day, each
  * row counted for the project it points at, for the work list and every money list at once. A link is held as the
@@ -53,7 +42,9 @@ const moneyFor = (projects: string, work: string | undefined): string[] =>
  */
 async function rowLates(client: ReturnType<typeof createClient>, projects: string, work: string | undefined): Promise<Map<number, number>> {
   const out = new Map<number, number>();
-  const lists = [...(work && viaOf(REGISTERS[work], projects)?.deadline ? [work] : []), ...moneyFor(projects, work)];
+  /* LATE WORK ONLY (audit of 30 October, 6): the record's own count (`today.ts` `lateListsOf`) counts tasks alone, so a
+     card, Projects, a project's page and Work say one number; late money is Money's to say. */
+  const lists = work && viaOf(REGISTERS[work], projects)?.deadline ? [work] : [];
   const reads = await Promise.all(
     lists.map(async (id) => {
       const via = viaOf(REGISTERS[id], projects)!;

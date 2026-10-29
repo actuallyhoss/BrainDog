@@ -22,7 +22,7 @@ import type { Call } from './webhook-doors.ts';
 /**
  * The host's VAPID public key, from `GET <apiBase>/api/push/key`, or `null` for every way there is not one.
  *
- * `/api` IS PART OF THE ADDRESS, AS IT IS FOR EVERY METHOD. `apiBase` is the origin or the record's `/app/<slug>`, and the
+ * `/api` IS PART OF THE ADDRESS, AS IT IS FOR EVERY METHOD. `apiBase` is the origin or the record's `/<slug>`, and the
  * Worker's `servesPushKey` matches `/api/push/key` only. This asked `<apiBase>/push/key` at first, which on brain.dog is
  * not the Worker's route, and since every miss below is `null`, the row was drawn for nobody and nothing said so.
  *

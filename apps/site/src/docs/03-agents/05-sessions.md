@@ -54,5 +54,5 @@ When an agent comes across a person in the work (a commit author, a sender, a cl
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

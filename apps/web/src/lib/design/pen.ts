@@ -125,7 +125,7 @@ export function waiting(record: readonly PenItem[], gone: (id: string) => boolea
 }
 
 /** THE HOLDING PEN'S ROW: how many offers wait, in the rail's words and the sidebar's alike. */
-export const suggested = (n: number): string => `${n} suggested`;
+export const suggested = (n: number): string => `${n} page ${n === 1 ? 'idea' : 'ideas'}`;
 
 /**
  * THE ONE COUNT the rail, the Slash page and Settings say: the record's offers still waiting. It is `waiting`'s own

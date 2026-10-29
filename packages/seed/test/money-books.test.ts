@@ -444,7 +444,8 @@ test('sixty entries on one account are all counted, and two books are both named
   const [one, two] = [bank('Acme current'), bank('Northgate current')];
   for (let i = 0; i < 60; i++) r.made('transactions', entry(one, { what: `CEDAR LANE ${i}` }));
   r.made('recurring', repeat(two));
-  await r.turn(4);
+  /* MORE ROUNDS SINCE money-core 3.31.0: every entry also starts the match and the posted-line check. */
+  await r.turn(12);
   value(r.k.update('accounts', one, { book: acme }, OWNER));
   value(r.k.update('accounts', two, { book: long }, OWNER));
   await r.night();
@@ -465,7 +466,8 @@ test('two hundred and five entries are asked two hundred at a time, and the five
   const acme = r.made('books', { name: 'Acme' }).id;
   const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000), as_of: '2026-10-01' }).id;
   for (let i = 0; i < 205; i++) r.made('transactions', entry(account, { what: `CEDAR LANE ${i}` }));
-  await r.turn(6);
+  /* MORE ROUNDS SINCE money-core 3.31.0: every entry also starts the match and the posted-line check. */
+  await r.turn(20);
   value(r.k.update('accounts', account, { book: acme }, OWNER));
   await r.night();
   const q = r.asked('open')[0]!;

@@ -68,14 +68,14 @@ test('A GET TO /api/export IS REFUSED AND DOES NOT SPEND THE GRANT, so the POST 
 test('A GRANT PRESENTED UNDER ANOTHER RECORD\'S NAME, OR A NAME NOBODY HOLDS, IS REFUSED AND NOT SPENT', async () => {
   const { c, bearer } = await granted();
   for (const slug of ['elsewhere', 'nobody-here']) {
-    const wrong = await c.ask(`/app/${slug}/api/export`, { method: 'POST', bearer, body: '{}' });
+    const wrong = await c.ask(`/${slug}/api/export`, { method: 'POST', bearer, body: '{}' });
     /* 401 AND NOT `heldBy`'s 403, for the reason `bearerOf` gives: a 403 before the secret is checked says which names
        are this record's to anybody holding its id. */
-    assert.equal(wrong.status, 401, `/app/${slug}: ${await wrong.clone().text()}`);
+    assert.equal(wrong.status, 401, `/${slug}: ${await wrong.clone().text()}`);
   }
   assert.equal(c.events(REC, 'export'), 0);
   assert.equal(c.events(OTHER, 'export'), 0, 'the other record exported for a bearer it never issued');
-  await exported(await c.ask(`/app/${SLUG}/api/export`, { method: 'POST', bearer, body: '{}' }));
+  await exported(await c.ask(`/${SLUG}/api/export`, { method: 'POST', bearer, body: '{}' }));
 });
 
 test('THE GRANT IS STILL ONE USE: once the right request has spent it, the next is 401', async () => {

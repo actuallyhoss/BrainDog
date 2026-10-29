@@ -64,6 +64,9 @@ export function plansFromNames(parts, plans) {
     named.get(key).push(plan);
   }
   const twinned = new Set([...named].filter(([, rows]) => rows.length > 1).map(([key]) => key));
+  /* HOW MANY PARTS ARE WRITTEN WITH EACH TWIN'S OWN NAME, so a copy with none is asked about as the empty copy it is. */
+  for (const key of twinned)
+    for (const plan of named.get(key)) plan.fields = { ...plan.fields, parts_held: parts.filter((p) => p.fields.plan === plan.fields.name || p.fields.plan_row === plan.id).length };
 
   /* A TWIN'S PARTS ARE GROUPED BY THEIR TEXT AS WRITTEN, as every part was before, so each stays with its own plan until
      he answers. Every other name's parts are one group however they are written. */
@@ -82,7 +85,11 @@ export function plansFromNames(parts, plans) {
     const plan = twinned.has(key) ? named.get(key).find((p) => p.fields.name === text) : named.get(key)?.[0];
     /* NOTHING NEW UNDER A TWIN'S NAME: a part whose text is neither twin's waits for his answer. */
     if (!plan && twinned.has(key)) continue;
-    const state = group.some(open) ? 'open' : group.some((p) => p.fields.state === 'paid') ? 'paid' : 'cancelled';
+    /* A PLAN'S STATE IS READ OVER EVERY PART OF ITS NAME, HOWEVER EACH IS WRITTEN (Q3 of 29 October). Read over the
+       parts written one way alone, "Harbourview" held only the two paid parts written so while 38 open ones were written
+       "harbourview", and was marked paid with 38 parts to go. */
+    const all = parts.filter((p) => keyOf(p.fields.plan) === key);
+    const state = all.some(open) ? 'open' : all.some((p) => p.fields.state === 'paid') ? 'paid' : 'cancelled';
     if (!plan) {
       /* WHO AND THE ACCOUNT ONLY WHEN THE PARTS AGREE: a plan paid from two accounts names neither. */
       const agreed = (field) => {
@@ -91,6 +98,10 @@ export function plansFromNames(parts, plans) {
       };
       out.plans.push({ name: text.trim().replace(/\s+/gu, ' '), state, ...agreed('party'), ...agreed('account') });
       out.waiting += group.length;
+    } else if (plan.fields.state === 'paid' && state === 'open') {
+      /* PAID WITH A PART STILL TO PAY IS NOT PAID: the plan is open again while any part of it is. A plan somebody
+         stopped is cancelled, and that is never undone here. */
+      out.writes.push({ id: plan.spoken, version: plan.version, fields: { state } });
     } else if (plan.fields.state !== state && plan.fields.state !== 'paid' && plan.fields.state !== 'cancelled' && state !== 'cancelled') {
       /* A CLOSED PLAN IS NEVER OPENED HERE. No read says who closed it, and a plan somebody marked paid by hand while a
          part was still open was opened again that night, with a line saying so. */
@@ -251,10 +262,18 @@ export function twinsAsk(twins) {
   const and = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}` : xs.join(''));
   const pairs = twins.map((t) => and([t.keep, ...t.others].map(name)));
   const one = twins.length === 1;
-  const question = one
+  /* AN EMPTY COPY IS SAID AS ONE (Q3 of 29 October): "harbourview" with no part beside "Harbourview" with forty is a plan to
+     close, and the question says so in those words. */
+  const empty = (p) => p.fields.parts_held === 0;
+  const allEmpty = twins.every((t) => t.others.every(empty));
+  const question = allEmpty
+    ? `${and(twins.flatMap((t) => t.others.map(name)))} ${twins.flatMap((t) => t.others).length === 1 ? 'is an empty copy' : 'are empty copies'} of ${and(twins.map((t) => name(t.keep)))}, with no instalments. Close ${twins.flatMap((t) => t.others).length === 1 ? 'it' : 'them'}?`
+    : one
     ? `${pairs[0]} are one plan written ${twins[0].others.length === 1 ? 'two' : 'several'} ways. Make them one plan?`
     : `${and(twins.map((t) => name(t.keep)))} are each one plan written more than one way (${pairs.join('; ')}). Make each one plan?`;
-  const because = one
+  const because = allEmpty
+    ? 'Each copy is closed and kept, linked to the plan that holds the instalments. Nothing is deleted.'
+    : one
     ? `The parts of ${and(twins[0].others.map(name))} move to ${name(twins[0].keep)}, and ${and(twins[0].others.map(name))} is closed and kept, linked to ${name(twins[0].keep)}. Nothing is deleted.`
     : 'The parts of each second plan move to the first, and the second is closed and kept, linked to the first. Nothing is deleted.';
   const patches = twins.flatMap((t) =>
@@ -265,7 +284,7 @@ export function twinsAsk(twins) {
     question,
     about: twins.map((t) => name(t.keep)),
     options: [
-      { id: 'one', label: 'Make them one', because, patches },
+      { id: 'one', label: allEmpty ? 'Close the copies' : 'Make them one', because, patches },
       { id: 'apart', label: 'Keep them apart', because: 'Each plan keeps its own parts, and this is not asked again.' },
     ],
   };

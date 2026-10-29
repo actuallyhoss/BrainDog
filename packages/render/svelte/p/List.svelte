@@ -39,6 +39,7 @@
   import { TODO_META_JOIN, todoLines, todoTitle } from '../../src/todo.ts';
   import {
     TIMELINE_CHIP,
+    TIMELINE_UNDER,
     timelineCell,
     timelineChip,
     timelineDayHead,
@@ -50,7 +51,7 @@
     timelineTitle,
     timelineUnder,
   } from '../../src/timeline.ts';
-  import { glyphPath, glyphWaits } from '../../src/inline.ts';
+  import { glyphName, glyphPath, glyphWaits } from '../../src/inline.ts';
   import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
@@ -180,7 +181,8 @@
   $effect(() => {
     if (!rich) return;
     const waits = block.rows.some((r) => {
-      const glyph = timelineChip(r.cells[TIMELINE_CHIP], '').glyph;
+      const g = timelineChip(r.cells[TIMELINE_CHIP], '').glyph;
+      const glyph = (g && glyphName(g) !== null ? g : null) ?? (opts.partLook?.(text(inline(r.cells[TIMELINE_UNDER[0]] ?? '', opts)))?.glyph ?? null);
       return glyph !== null && glyphWaits(glyph, opts);
     });
     if (waits) void opts.iconSet?.().then(() => landed++, () => {});
@@ -356,11 +358,13 @@
       {#if rich}
         <!-- THE MONEY ROW (`timelineRich`): the chip, the title, the amount, and under them the quiet line and the amount
              restated in the home currency where the host can say it (`opts.approx`). `html.ts` draws the same tree. -->
-        {@const chip = timelineChip(row.cells[TIMELINE_CHIP], text(inline(title.text ?? '', opts)))}
-        {@const art = chip.glyph ? (void landed, glyphPath(chip.glyph, opts)) : null}
+        {@const chip = timelineChip(row.cells[TIMELINE_CHIP], text(inline(title.text ?? '', opts)), text(inline(row.cells[TIMELINE_UNDER[0]] ?? '', opts)))}
+        {@const own = chip.glyph && glyphName(chip.glyph) !== null ? chip.glyph : null}
+        {@const look = !own && !chip.unfiled && opts.partLook ? opts.partLook(text(inline(row.cells[TIMELINE_UNDER[0]] ?? '', opts))) : null}
+        {@const art = (own ?? look?.glyph) ? (void landed, glyphPath((own ?? look?.glyph)!, opts)) : null}
         {@const approx = said && opts.approx ? opts.approx((row.cells[2] ?? '').trim()) : null}
         <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-rich="" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
-          <span class="item-chip" data-slot={chip.colour ?? undefined} data-unfiled={chip.unfiled ? '' : undefined} aria-hidden="true"
+          <span class="item-chip" data-slot={chip.colour ?? look?.slot ?? undefined} data-unfiled={chip.unfiled ? '' : undefined} aria-hidden="true"
             >{#if art}<svg
                 viewBox="0 0 24 24"
                 fill="none"

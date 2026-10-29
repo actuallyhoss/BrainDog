@@ -45,16 +45,16 @@ async function record(...batch: Declaration[]): Promise<{ k: Kernel; sql: NodeSq
 
 /* ── 294 · what configuring covers ───────────────────────────────────────── */
 
-test('ruling 294: a setting is one of the eight types in code, and never a reference, a secret or a file', () => {
-  assert.deepEqual([...CONFIG_TYPES], ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list']);
+test('ruling 294: a setting is one of the nine types in code, a secret is a key\'s label, and never a reference or a file', () => {
+  assert.deepEqual([...CONFIG_TYPES], ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list', 'secret']);
   for (const type of CONFIG_TYPES) {
     const said = type === 'enum' ? { type, values: ['a', 'b'] } : { type };
     assert.ok(readConfig({ pick: said }).ok, `${type} was refused as a setting`);
   }
-  for (const type of ['ref', 'secret', 'file']) {
+  for (const type of ['ref', 'file']) {
     const out = readConfig({ pick: { type } });
     assert.equal(codeOf(out), 'CONFIG_TYPE_UNSUPPORTED', `${type} was taken as a setting`);
-    assert.match(fixOf(out), /A setting is text, enum, bool, money, day, duration, number or list\./);
+    assert.match(fixOf(out), /A setting is text, enum, bool, money, day, duration, number, list or secret\./);
   }
 });
 

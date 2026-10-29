@@ -20,13 +20,16 @@
  *   register, block or entity.
  * - `budget`: it draws in budget, where the caller measured it: under 50 ms composed, and a drawn one alive within
  *   150 ms.
+ * - `sizes`: a widget on a board takes a size its kind draws in (`kinds.ts` `KIND_SIZES`), a board holds at most
+ *   sixteen, and where the caller drew it at its sizes (390 and 1512, light and dark) nothing was clipped mid-word and
+ *   nothing ran sideways (`fitted`). The widgets plan of 29 October, §5.9.
  *
  * PURE. It reads the blocks it is handed and nothing else, so the record (Slash's drafts, the design agent's offers)
  * and the browser (Make a component) hold a draft to the same rules.
  */
 
 import { drawnFault, DRAWN_TOKENS } from './drawn.ts';
-import { isKind, KINDS } from './kinds.ts';
+import { isKind, isWidgetSize, KINDS, sizesOf } from './kinds.ts';
 import { lintPart } from './lint.ts';
 
 /** The phone every design fits, in CSS pixels, and what is left of it inside a page's gutters. */
@@ -39,7 +42,13 @@ export const DESIGN_BUDGET = { composedMs: 50, aliveMs: 150 } as const;
 /** Where a draft is shown. A page holds anything; a decision, a task and a card hold a block of the page's width or less. */
 export type DesignWhere = 'page' | 'decision' | 'task' | 'card';
 
-export type DesignRule = 'reads' | 'fits' | 'phone' | 'tokens' | 'empty' | 'words' | 'budget';
+export type DesignRule = 'reads' | 'fits' | 'phone' | 'tokens' | 'empty' | 'words' | 'budget' | 'sizes';
+
+/** The most widgets a board holds (the kernel's `BOARD_MOST`). */
+export const BOARD_MOST = 16;
+
+/** A widget as the caller drew it at one size and width: whether anything was cut mid-word or ran past its frame. */
+export type DesignFitted = { at: number; size: string; width: number; clipped: boolean; sideways: boolean };
 
 /** One fault, at the block it is in, with the sentence that finishes "This design is not shown, because". */
 export type DesignFinding = { at: number; rule: DesignRule; said: string };
@@ -67,6 +76,10 @@ export type DesignDraft = {
   drewMs?: number;
   /** For a drawn component, how long after its picture it came alive. */
   aliveMs?: number;
+  /** Whether the draft is a board's widgets, each with its `size`. */
+  board?: boolean;
+  /** Each widget as the caller drew it at its sizes, where it measured them (`sizes`). */
+  fitted?: readonly DesignFitted[];
 };
 
 /** The names a drawn component may say a colour by: the theme's tokens, and the two the bridge adds. */
@@ -180,6 +193,13 @@ export function designCheck(draft: DesignDraft): DesignFinding[] {
 
     if (kind === 'drawn' && typeof b.code === 'string' && b.code.trim() !== '') out.push(...codeFindings(b.code, at));
 
+    if (b.size !== undefined || draft.board === true) {
+      const size = b.size;
+      const can = sizesOf(kind);
+      if (size !== undefined && !isWidgetSize(size)) out.push({ at, rule: 'sizes', said: `its size is ${JSON.stringify(size)}, and a widget is small, wide, tall, large or full.` });
+      else if (size !== undefined && !can.includes(size)) out.push({ at, rule: 'sizes', said: `a ${kind} is not drawn ${size}; it can be ${can.join(', ')}.` });
+    }
+
     const heading = said(b.heading);
     if (SYSTEM_WORDS.test(heading)) out.push({ at, rule: 'words', said: `its heading "${heading.trim()}" says the system's word. Name his own things instead.` });
     for (const [name, text] of [
@@ -194,6 +214,14 @@ export function designCheck(draft: DesignDraft): DesignFinding[] {
         break;
       }
     }
+  }
+  if (draft.board === true) {
+    const widgets = draft.blocks.filter((b) => b !== null && typeof b === 'object' && b.size !== undefined).length;
+    if (widgets > BOARD_MOST) out.push({ at: 0, rule: 'sizes', said: `the board holds ${widgets} widgets, and a board holds ${BOARD_MOST} at most.` });
+  }
+  for (const f of draft.fitted ?? []) {
+    if (f.sideways) out.push({ at: f.at, rule: 'sizes', said: `drawn ${f.size} at ${f.width} px it runs past its frame. Draw less at that size, or take the size off.` });
+    else if (f.clipped) out.push({ at: f.at, rule: 'sizes', said: `drawn ${f.size} at ${f.width} px a word or a figure is cut. Show fewer things at that size.` });
   }
   if (draft.drewMs !== undefined && draft.drewMs > DESIGN_BUDGET.composedMs)
     out.push({ at: 0, rule: 'budget', said: `it took ${Math.round(draft.drewMs)} ms to draw, past the ${DESIGN_BUDGET.composedMs} ms a design has.` });

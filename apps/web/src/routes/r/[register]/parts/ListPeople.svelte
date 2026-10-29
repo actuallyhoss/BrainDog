@@ -21,7 +21,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
-  import { foldPeople, folds, orgFieldOf, roleFieldOf, seenWords, type Member } from '../people.ts';
+  import { foldPeople, folds, lastDayOf, letterPeople, meetsOf, orgFieldOf, roleFieldOf, seenWords, type Member } from '../people.ts';
   import { daySaid, localDay } from '../[seq]/said.ts';
 
   let {
@@ -45,7 +45,36 @@
     openCardMenu?: ((seq: number, el: HTMLElement, point?: MenuAt) => void) | undefined;
   } = $props();
 
-  const bands = $derived(foldPeople(entries, decl, localDay(now)));
+  /* RECENT OR A TO Z (29 October): by when you last spoke, which is what People is read for most days, or by name, for
+     finding somebody you know by name. Kept on this device only, as a convenience; nothing on the record changes. */
+  const ORDER_KEY = 'bd_people_order';
+  let order = $state<'recent' | 'az'>((() => {
+    try {
+      return localStorage.getItem(ORDER_KEY) === 'az' ? 'az' : 'recent';
+    } catch {
+      return 'recent';
+    }
+  })());
+  const setOrder = (o: 'recent' | 'az'): void => {
+    order = o;
+    try {
+      localStorage.setItem(ORDER_KEY, o);
+    } catch {
+      /* A browser that keeps nothing opens on Recent next time. */
+    }
+  };
+  /* YOU ARE THE LIST'S FIRST ROW, MARKED You, AND IN NO GROUP (29 October): the record is yours, so you stand above the
+     people you know rather than among them by when you last spoke, and no count of them includes you. */
+  const selfPart = $derived(meetsOf(decl)?.self);
+  const isYou = (e: Entry): boolean => Boolean(selfPart && e.fields[selfPart] === true);
+  const you = $derived.by((): Member | null => {
+    const m = meetsOf(decl);
+    const e = entries.find(isYou);
+    return m && e ? { entry: e, day: lastDayOf(e.fields, m), self: true } : null;
+  });
+  const others = $derived(entries.filter((e) => !isYou(e)));
+  const bands = $derived(foldPeople(others, decl, localDay(now)));
+  const letters = $derived(order === 'az' ? letterPeople(others, decl) : []);
   const org = $derived(orgFieldOf(decl));
   const role = $derived(roleFieldOf(decl));
   /* AN ORGANISATION'S GLYPH IS ITS LIST'S, and where that list declares none, this list's own: a group of its people. */
@@ -72,10 +101,27 @@
     const other = role ? m.entry.fields[role] === 'other' : false;
     const r1 = r && !other ? r.charAt(0).toUpperCase() + r.slice(1) : '';
     const where = at === null ? '' : namedOrg(at);
-    if (!where) return r1;
-    return r1 ? seenWords.roleAt(r1, where) : seenWords.at(where);
+    const what = !where ? r1 : r1 ? seenWords.roleAt(r1, where) : seenWords.at(where);
+    /* AND WHO THEY ARE, IN THE NOTE'S FIRST SENTENCE (29 October): "Engineer on Otters.gg", "Family", where the line said
+       nothing past the name for most people here. One line, cut by the row's width; the whole note is on their page. */
+    const said = whoOf(m.entry);
+    return [what, said].filter(Boolean).join(' · ');
+  };
+  const noteField = $derived(decl.fields.find((f) => f.id === 'note' && !f.retired && (f.type === 'text' || f.type === 'document'))?.id ?? null);
+  const whoOf = (e: Entry): string => {
+    const raw = noteField ? e.fields[noteField] : null;
+    if (typeof raw !== 'string') return '';
+    const first = raw.split(/\n/u).map((l) => l.replace(/^[#>*\-\s]+/u, '').trim()).find(Boolean) ?? '';
+    const sentence = /^(.+?[.!?])(?:\s|$)/u.exec(first)?.[1] ?? first;
+    return sentence.replace(/[.]+$/u, '').replace(/\*\*/gu, '');
   };
   const when = (day: string | null): string => (day ? daySaid(day, now) : '');
+  /* WHO A PERSON IS WITH, by the number their organisation part holds, for the A to Z list where nobody is grouped. */
+  const orgOf = (m: Member): number | null => {
+    const v = org ? m.entry.fields[org.field] : null;
+    const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/u.test(v) ? Number(v) : NaN;
+    return Number.isInteger(n) && n > 0 ? n : null;
+  };
 </script>
 
 {#snippet person(m: Member, at_: number | null)}
@@ -93,6 +139,27 @@
 {/snippet}
 
 <div class="people">
+  <div class="order" role="group" aria-label={seenWords.orderBy}>
+    <button type="button" class="tap" aria-pressed={order === 'recent'} onclick={() => setOrder('recent')}>{seenWords.recent}</button>
+    <button type="button" class="tap" aria-pressed={order === 'az'} onclick={() => setOrder('az')}>{seenWords.az}</button>
+  </div>
+  {#if you}
+    <ul class="ledger ledger-lead">
+      <li>{@render person(you, orgOf(you))}</li>
+    </ul>
+  {/if}
+  {#if order === 'az'}
+    {#each letters as l (l.letter)}
+      <section class="band" aria-labelledby="letter-{l.letter}">
+        <h2 class="band-head" id="letter-{l.letter}">{l.letter}</h2>
+        <ul class="ledger ledger-lead">
+          {#each l.members as m (m.entry.seq)}
+            <li>{@render person(m, orgOf(m))}</li>
+          {/each}
+        </ul>
+      </section>
+    {/each}
+  {:else}
   {#each bands as b (b.band)}
     <section class="band" aria-labelledby="band-{b.band}">
       <h2 class="band-head" id="band-{b.band}">{seenWords.bands[b.band]}</h2>
@@ -138,6 +205,7 @@
       </ul>
     </section>
   {/each}
+  {/if}
 </div>
 
 <!-- A SENTINEL MEANS "THERE MAY BE MORE", as it does under the cards: the page's observer asks for the next page. -->
@@ -152,6 +220,41 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
+  }
+
+  /* RECENT OR A TO Z: two quiet words at the head of the list, the one in use in ink on the tile's tint. */
+  .order {
+    display: inline-flex;
+    gap: 2px;
+    align-self: flex-start;
+    padding: 2px;
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
+  }
+
+  .order button {
+    min-block-size: 32px;
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: calc(var(--r-pop) - 2px);
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-meta);
+    cursor: pointer;
+  }
+
+  .order button[aria-pressed='true'] {
+    background: var(--tile);
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+    box-shadow: 0 0 0 1px var(--rule);
+  }
+
+  @media (pointer: coarse) {
+    .order button {
+      min-block-size: var(--tap);
+    }
   }
 
   .band-head {
@@ -170,6 +273,12 @@
   /* A GROUP'S PEOPLE SIT UNDER ITS NAME, indented to the name's edge so the organisation reads as their heading. */
   .members {
     margin-inline-start: calc(var(--well-l) + var(--sp-3));
+  }
+
+  /* WHO SOMEBODY IS STAYS ONE LINE, so every person is a row of the same height and the list scans down the names. */
+  .people :global(.line-tall .line-detail) {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
   }
 
   /* "YOU" IS A QUIET WORD AFTER THE NAME, no pill: the face is already the ink disc that says it. */

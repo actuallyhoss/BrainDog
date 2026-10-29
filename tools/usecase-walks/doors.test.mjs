@@ -56,7 +56,7 @@ function counting(host) {
     seen,
     async open({ origin, slug, cookie }) {
       const io = (url, init = {}) => host.fetch(url, { ...init, headers: { ...Object.fromEntries(new Headers(init.headers)), cookie } });
-      record = createClient({ base: `${origin}/app/${slug}`, fetch: io });
+      record = createClient({ base: `${origin}/${slug}`, fetch: io });
     },
     rail: async () => [{ name: 'Today', path: '/' }],
     async see(_page, _width, stage) {

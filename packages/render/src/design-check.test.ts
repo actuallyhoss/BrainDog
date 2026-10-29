@@ -86,3 +86,12 @@ test('OVER BUDGET IS REFUSED, and a block another pack laid or one not drawn is 
     [],
   );
 });
+
+test('sizes: a widget takes a size its kind draws in, a board holds sixteen, and a cut or a sideways run is said', () => {
+  const stat = { kind: 'stat', heading: 'Cash', cells: [{ metric: 'cash-now' }] };
+  assert.deepEqual(designCheck({ board: true, blocks: [{ ...stat, size: 'small' }] }), []);
+  assert.match(designCheck({ board: true, blocks: [{ kind: 'cards', heading: 'Projects', source: 'register.projects', empty: 'None yet.', size: 'small' }] })[0]?.said ?? '', /not drawn small; it can be wide, tall, large, full/);
+  assert.match(designCheck({ board: true, blocks: Array.from({ length: 17 }, () => ({ ...stat, size: 'small' })) }).at(-1)?.said ?? '', /16 at most/);
+  const fitted = designCheck({ board: true, blocks: [{ ...stat, size: 'small' }], fitted: [{ at: 0, size: 'small', width: 390, clipped: true, sideways: false }] });
+  assert.equal(fitted[0]?.rule, 'sizes');
+});

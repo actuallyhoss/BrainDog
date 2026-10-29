@@ -31,7 +31,7 @@ export const SERIES_MOST = 4;
  * hundredths, which is what the drawers write as `--y` and `--h`. `end` marks the outermost bar of its stack, the one
  * whose free end is rounded.
  */
-export type SeriesBar = { bucket: number; series: number; dir: SeriesDir; step: number; state: SeriesState; x: string; y: string; width: string; height: string; end: boolean };
+export type SeriesBar = { bucket: number; series: number; dir: SeriesDir; step: number; state: SeriesState; x: string; y: string; width: string; height: string; end: boolean; up?: boolean };
 
 /** A line of the scale: where it sits, in hundredths of the plot's height from the top, and the figure it says. */
 export type SeriesTick = { y: string; label: string; zero: boolean };
@@ -113,11 +113,16 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
     return { label: m ? m[2]! : cell.trim(), dir, step: steps[dir]++ };
   });
   const stateAt = stated ? head.length - 1 : -1;
+  /* A CHART OF MONEY OUT ALONE STANDS UP: with nothing coming in to stand over it, money out hung under a zero line read
+     as below nothing ("−£25" under a week's software, the validator's recheck of 30 October, N1). It keeps money out's
+     colour; only where money in shares the chart does money out hang down. */
+  const stands = series.length > 0 && series.every((x) => x.dir === 'out');
+  const way = (d: SeriesDir): SeriesDir => (stands ? 'in' : d);
 
   const values = body.map((r) => series.map((_, i) => seriesValue(r[i + 1] ?? '')));
   const sums = values.map((v) => ({
-    up: v.reduce<number>((s, x, i) => s + (series[i]!.dir === 'in' ? (x ?? 0) : 0), 0),
-    down: v.reduce<number>((s, x, i) => s + (series[i]!.dir === 'out' ? (x ?? 0) : 0), 0),
+    up: v.reduce<number>((s, x, i) => s + (way(series[i]!.dir) === 'in' ? (x ?? 0) : 0), 0),
+    down: v.reduce<number>((s, x, i) => s + (way(series[i]!.dir) === 'out' ? (x ?? 0) : 0), 0),
     gap: v.every((x) => x === null),
   }));
   const template = body.flatMap((r) => r.slice(1, series.length + 1)).find((c) => seriesValue(c) !== null) ?? '';
@@ -145,12 +150,13 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
       series.forEach((s, k) => {
         const v = values[i]![k];
         if (v === null || v === undefined || v === 0) return;
-        const from = s.dir === 'in' ? up : -down;
-        const to = s.dir === 'in' ? up + v : -down - v;
-        if (s.dir === 'in') up += v;
+        const d = way(s.dir);
+        const from = d === 'in' ? up : -down;
+        const to = d === 'in' ? up + v : -down - v;
+        if (d === 'in') up += v;
         else down += v;
         const top = y(Math.max(from, to));
-        stack.push({ bucket: i, series: k, dir: s.dir, step: s.step, state, x: at(i * slot + (slot - barWidth) / 2), y: at(top), width: at(barWidth), height: at(y(Math.min(from, to)) - top), end: false });
+        stack.push({ bucket: i, series: k, dir: s.dir, step: s.step, state, x: at(i * slot + (slot - barWidth) / 2), y: at(top), width: at(barWidth), height: at(y(Math.min(from, to)) - top), end: false, ...(stands ? { up: true } : {}) });
       });
       /* THE OUTERMOST BAR EACH WAY carries the rounded end, so a stack reads as one bar with one cap. */
       for (const dir of ['in', 'out'] as const) {

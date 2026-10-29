@@ -110,6 +110,7 @@
     resize: 'Sidebar width',
     none: 'No projects yet.',
     more: 'More lists',
+    moreOf: 'More',
     review: 'Review',
     hide: 'Hide the sidebar',
     show: 'Show the sidebar',
@@ -231,8 +232,24 @@
       pins = [];
     }
   });
+  /* THE PIN IS OUT OF THE TAB ORDER (audit Q57: a stop beside every project doubled the walk to the page): the arrow
+     toward the row's end reaches it from its row, and the arrow back returns. */
+  function toPin(e: KeyboardEvent): void {
+    const pinButton = (e.currentTarget as HTMLElement).nextElementSibling;
+    const rtl = getComputedStyle(e.currentTarget as HTMLElement).direction === 'rtl';
+    if (e.key !== (rtl ? 'ArrowLeft' : 'ArrowRight') || !(pinButton instanceof HTMLElement)) return;
+    e.preventDefault();
+    pinButton.focus();
+  }
+  function fromPin(e: KeyboardEvent): void {
+    const row = (e.currentTarget as HTMLElement).previousElementSibling;
+    const rtl = getComputedStyle(e.currentTarget as HTMLElement).direction === 'rtl';
+    if (e.key !== (rtl ? 'ArrowRight' : 'ArrowLeft') || !(row instanceof HTMLElement)) return;
+    e.preventDefault();
+    row.focus();
+  }
   function pin(href: string): void {
-    pins = pins.includes(href) ? pins.filter((h) => h !== href) : [...pins, href];
+    pins =pins.includes(href) ? pins.filter((h) => h !== href) : [...pins, href];
     try {
       localStorage.setItem(PINS_KEY, JSON.stringify(pins));
     } catch {
@@ -261,6 +278,8 @@
   const isLit = (href: string): boolean => (projectLit !== undefined ? href === projectLit : href === lit);
 
   /* WHICH FOLDS ARE OPEN. Parked and Finished are shut on every load, and open by themselves on a project of theirs. */
+  /** Each place's own More, opened or shut by a press; `null` follows the row in view. */
+  let placeMore = $state<Record<string, boolean | null>>({});
   let folds = $state<{ parked: boolean | null; finished: boolean | null; more: boolean | null }>({ parked: null, finished: null, more: null });
   const foldOpen = (key: 'parked' | 'finished', list: readonly SideProject[]): boolean => folds[key] ?? list.some((p) => isLit(p.href));
   const moreOpen = $derived(folds.more ?? model.more.some((l) => isLit(l.href)));
@@ -392,7 +411,7 @@
   {@const here = isLit(p.href)}
   {@const name = shownName(p.name)}
   <li class="s-item">
-    <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined}>
+    <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined} aria-keyshortcuts={phone ? undefined : 'ArrowRight'} onkeydown={phone ? undefined : toPin}>
       {@render mark(p)}
       {#if phone}
         <!-- ITS LANE AND NEXT STEP UNDER ITS NAME ON THE PHONE (Z32 of 25 October), as the laptop's cards say them. -->
@@ -408,7 +427,7 @@
       {/if}
     </a>
     {#if !phone}
-      <button type="button" class="s-pin tap" data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(name) : words.pin(name)} title={p.pinned ? words.unpin(name) : words.pin(name)} onclick={() => pin(p.href)}>
+      <button type="button" class="s-pin tap" tabindex="-1" onkeydown={fromPin} data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(name) : words.pin(name)} title={p.pinned ? words.unpin(name) : words.pin(name)} onclick={() => pin(p.href)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.75h6l-1 5.5 3.25 3.5H6.75L10 10.25zM12 13.75v5.5" /></svg>
       </button>
     {/if}
@@ -472,8 +491,25 @@
       </button>
     {/if}
     {#if open && p.kids.length > 0}
+      {@const lead = p.lead ?? p.kids.length}
+      {@const rest = p.kids.slice(lead)}
+      {@const restOpen = placeMore[p.key] ?? rest.some((k) => isLit(k.href))}
       <ul class="s-list s-nested">
-        {#each p.kids as k (k.href)}{@render link(k, true)}{/each}
+        {#each p.kids.slice(0, lead) as k (k.href)}{@render link(k, true)}{/each}
+        {#if rest.length > 0}
+          <!-- ITS OTHER LISTS UNDER ONE MORE (Money's Snapshots, Books, rates, Categories), open while one of them is. -->
+          <li>
+            <button type="button" class="s-row s-link s-more-kids tap" data-nested="" aria-expanded={restOpen} onclick={() => (placeMore[p.key] = !restOpen)}>
+              <span class="s-name">{words.moreOf}</span>
+              <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+            </button>
+            {#if restOpen}
+              <ul class="s-list s-nested s-nested-more">
+                {#each rest as k (k.href)}{@render link(k, true)}{/each}
+              </ul>
+            {/if}
+          </li>
+        {/if}
       </ul>
     {/if}
   </li>
@@ -906,6 +942,7 @@
   }
 
   .s-item:hover > .s-pin,
+  .s-item:has(> .s-row:focus-visible) > .s-pin,
   .s-pin:focus-visible {
     opacity: 1;
   }
@@ -952,13 +989,31 @@
   }
 
   .s-fold[aria-expanded='false'] .s-fold-caret,
-  .s-open[aria-expanded='false'] .s-fold-caret {
+  .s-open[aria-expanded='false'] .s-fold-caret,
+  .s-more-kids[aria-expanded='false'] .s-fold-caret {
     rotate: -90deg;
   }
 
   .s-fold[aria-expanded='false'] .s-fold-caret:dir(rtl),
-  .s-open[aria-expanded='false'] .s-fold-caret:dir(rtl) {
+  .s-open[aria-expanded='false'] .s-fold-caret:dir(rtl),
+  .s-more-kids[aria-expanded='false'] .s-fold-caret:dir(rtl) {
     rotate: 90deg;
+  }
+
+  /* A PLACE'S OWN MORE: a row like the ones over it, its name in the third ink, a button across the row. */
+  .s-more-kids {
+    inline-size: 100%;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .s-nested-more {
+    margin: 0;
+    padding: 0;
   }
 
   .s-rule {

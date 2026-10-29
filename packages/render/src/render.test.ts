@@ -1669,7 +1669,7 @@ test('A SPARKLINE ROW IS A LABEL, A LINE AND ITS FIGURE, and under two points it
   const html = toHTML(parse('```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```'));
   assert.match(
     html,
-    /<div class="sparkline-row" data-intent="good"><span class="sparkline-label">Cash<\/span><svg class="sparkline-line" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Cash: 18, 20, 19, 24"><path class="trend-line" d="M0 [\d.]+ L[^"]+" vector-effect="non-scaling-stroke"><\/path><path class="trend-end" d="M1000 [\d.]+h0" vector-effect="non-scaling-stroke"><\/path><\/svg><span class="sparkline-figure num">GBP 24.00<\/span><span class="glyph"/u,
+    /<div class="sparkline-row" data-intent="good"><span class="sparkline-label">Cash<\/span><svg class="sparkline-line" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Cash: 18, 20, 19, 24"><path class="trend-area" d="M0 [\d.]+ L[^"]+ Z"><\/path><path class="trend-line" d="M0 [\d.]+ L[^"]+" vector-effect="non-scaling-stroke"><\/path><path class="trend-end" d="M1000 [\d.]+h0" vector-effect="non-scaling-stroke"><\/path><\/svg><span class="sparkline-figure num">GBP 24.00<\/span><span class="glyph"/u,
   );
   assert.match(html, /<span class="sparkline-label">Lonely<\/span><span class="sparkline-figure num">7<\/span>/u, 'one point is the figure only');
   assert.match(html, /<span class="sparkline-label">None<\/span><span class="sparkline-figure num">—<\/span>/u);

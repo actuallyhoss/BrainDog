@@ -68,7 +68,7 @@ function doors(minted: Minted = { ok: true, bearer: 'bd_invented_bearer' }, proo
     store: memoryStore(),
     now: () => Date.now(),
     address: null,
-    consent: (id) => `/app/connect?request=${id}`,
+    consent: (id) => `/connect?request=${id}`,
     child: async () => null,
     approver: async () => ({
       ok: true,

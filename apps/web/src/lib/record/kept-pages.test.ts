@@ -10,8 +10,8 @@ import './fixtures/fill.ts';
 import { kept, keptPages, pageKey } from './kept-pages.ts';
 import { pageReader, type Fetch, type Opened } from './page-live.ts';
 
-const BASE = 'http://record.test/app/orchard';
-const OTHER = 'http://record.test/app/harbour';
+const BASE = 'http://record.test/orchard';
+const OTHER = 'http://record.test/harbour';
 
 const live = (title: string): Opened => ({ from: 'live', now: 0, page: { page: { slug: 'ledger', title } as never, blocks: [] } });
 

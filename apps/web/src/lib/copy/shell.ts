@@ -74,6 +74,8 @@ export const shell = {
   lists: 'Your things',
   packs: 'Add-ons',
   keychain: 'Keychain',
+  /* THE SIDEBAR'S ONE ROW FOR KEYS, which opens the Keychain. */
+  keysPlace: 'Keys',
   settings: 'Settings',
   /* ACTIVITY, AND IT WAS HISTORY: the owner's old tool called the same screen Activity, and it is a row of the flat nav now. */
   audit: 'Activity',
@@ -115,6 +117,9 @@ export const shell = {
   acceptIt: 'Accept',
   rejectIt: 'Reject',
   filter: 'Filter',
+  /* A TILE'S DOOR, SPOKEN: where it goes, not the filter's words. */
+  openThese: (list: string) => `Open these in ${list}`,
+  openList: (list: string) => `Open ${list}`,
   /* WHEN A SCREEN DOES NOT LOAD. What was wrong · where · what to do — and the reassurance is a fact
      about the record rather than an apology: nothing was written, because this screen never got as
      far as writing. */
@@ -450,7 +455,7 @@ export const shell = {
   noQuestions: 'Nothing needs you',
   inboxClear: 'The inbox is clear',
   /* `/search?q=`, `19 §2`'s spine screen; the top bar's field says it, and so does the palette. */
-  searchRecord: 'Search the record',
+  searchRecord: 'Search everything',
   /* The lists', which the record's voice names. */
   newRow: 'New',
   /**

@@ -135,7 +135,8 @@ test('A STEP LEFT EARLIER, A QUESTION THAT WAITED AND AN EMPTY RUN ARE THREE LIN
   assert.ok(question.clear.includes(r.asked.id), 'the call names the question');
 
   const empty = line(got, 'runs-empty');
-  assert.match(empty.said, /wrote nothing/u);
+  /* SAID AS A SENTENCE A PERSON READS since Tidy up said its findings plainly (round 1030). */
+  assert.match(empty.said, /ended without writing anything/u);
   assert.match(empty.clear, /^propose\b/u, 'nothing asks by itself, so the call is to put the question to the owner');
   assert.match(empty.clear, /Delete it\?/u);
   r.sql.close();

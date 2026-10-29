@@ -81,8 +81,8 @@ test('A LIST WITH ROWS AND NO PAGE IS OFFERED ONE WHOLE PAGE, its figure first, 
   assert.equal(parts.kind, 'page');
   assert.equal(parts.register, 'parts');
   assert.equal(parts.title, 'Parts');
-  assert.equal(parts.why, 'Parts has 7 entries and no page yet.');
-  assert.equal(pen[1]!.why, 'Bins has 1 entry and no page yet.');
+  assert.equal(parts.why, 'Parts opens as a plain list of 7 entries. A page of its own would lay them out.');
+  assert.equal(pen[1]!.why, 'Bins opens as a plain list of 1 entry. A page of its own would lay it out.');
   assert.deepEqual(parts.change.to, {
     id: 'page.parts',
     kind: 'page',

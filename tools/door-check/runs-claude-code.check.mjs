@@ -125,7 +125,7 @@ export function tokenIn(home) {
 }
 
 /** The record's address from `--record`: a slug on the host, or a whole address. */
-export const addressOf = (host, record) => (/^https?:\/\//.test(record) ? record.replace(/\/+$/, '') : `${host}/app/${record}`);
+export const addressOf = (host, record) => (/^https?:\/\//.test(record) ? record.replace(/\/+$/, '') : `${host}/${record}`);
 
 /** The command, as a stranger installs it, into one home. */
 export async function installCli(host, home, signal) {

@@ -10,7 +10,28 @@ import { HERO } from './parts/hero.ts';
 import { INSTALMENTS } from './parts/instalments.ts';
 import { LEDGER } from './parts/ledger.ts';
 import { COMING_UP } from './parts/next30.ts';
+import { OVER_TIME } from './parts/over-time.ts';
+import { A_MONTH } from '../figures/budgets2.ts';
+import { BUDGET } from './parts/budget.ts';
 import { SPENDING } from './parts/spending.ts';
+
+/** The budgets tile of Budgets' own page, with no width of its own so it pairs, and its six first. */
+const { span: _span, ...BUDGET_TILE } = BUDGET[0]!;
+/* A MONTH'S BUDGETS ONLY: the bars are set against this month's spending, so a week's or a year's most beside them would
+   read as a month's. Budgets draws those against their own period. */
+const BUDGETS_GLANCE: Record<string, unknown> = { ...BUDGET_TILE, heading: "This month's budgets", where: `${String(BUDGET_TILE.where)}, ${A_MONTH}`, limit: 6 };
+
+/**
+ * AND EVERY BUDGET AS ONE MONTH, SINCE money-core 3.32.0 (recheck of 30 October, N4): the tile above is a month's
+ * budgets, and it said "£0 of £13,550" while Budgets said "£14,633 a month across 7", the week's budget left out of one
+ * and counted as a month in the other. Said only while a week's or a year's budget is kept, which is when they differ.
+ */
+const BUDGETS_ALL: Record<string, unknown> = {
+  kind: 'note',
+  span: 12,
+  when: { all: [{ metric: 'budgets-set', gt: 0 }, { any: [{ metric: 'budgets-weekly', gt: 0 }, { metric: 'budgets-yearly', gt: 0 }] }] },
+  body: 'All {{budgets-set}} budgets come to {{budgets-total}} a month, a week\'s or a year\'s counted as its share of a month. [See them all](/p/money-budgets)',
+};
 
 /**
  * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM. It leads with the money there is, then how long it lasts, then
@@ -53,12 +74,17 @@ export const MONEY_PAGE: SeedPage = {
     /* The box to add a first account, in the hero's place while there is none. */
     ...ADD_ACCOUNT,
     ...HERO,
-    /* The board, in pairs: Coming up and Spent this month, the accounts and the Ledger, then Instalments. */
+    /* The money over time, the whole row under the hero (money-core 3.31.0). */
+    ...OVER_TIME,
+    /* The board, in pairs: Coming up and Spent this month, the accounts and the Ledger, then Instalments beside the
+       budgets at a glance (drawn while a budget is set; money-core 3.31.0). */
     ...COMING_UP,
     ...SPENDING,
     ...ACCOUNTS_TILE,
     ...LEDGER,
     ...INSTALMENTS,
+    BUDGETS_GLANCE,
+    BUDGETS_ALL,
     /* Heads up's heading, then whether Cash now adds up, then its lines: an old balance, and money late in or out. Not
        the line on categories marked the other way, empty on nearly every record, nor the Last confirmed cards and the
        box beside them, whose old balance line opens the same form. */

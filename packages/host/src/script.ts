@@ -455,6 +455,32 @@ export function keyRefused(script: string, grant: ScriptGrant, at: URL): ScriptR
 }
 
 /**
+ * AN ADDRESS HELD IN THE KEYS, READ AND HELD TO THE SCRIPT'S EGRESS (round 1030): what both hosts do with a fetch that
+ * names `address` (`HostRequest.address`), after opening the key and before sending. The secret is read as an https URL,
+ * `webcal://` as `https://` since that is how calendars hand theirs out; its origin must be one the script declares, it
+ * may carry no user name or password, and a key whose entry says what it opens must open that host. The answer is the
+ * URL to send, with no key, or the refusal, which names the host and never the address: the address is the secret.
+ */
+export function addressed(script: string, egress: readonly string[], grant: ScriptGrant, secret: string): { url: URL } | ScriptRefusal {
+  if (grant.label === SLASH_KEY_LABEL) return { code: 'FORBIDDEN', why: `${script} named the keychain's "${SLASH_KEY_LABEL}" key as an address, which it may not.` };
+  let url: URL;
+  try {
+    url = new URL(secret.trim().replace(/^webcal:\/\//iu, 'https://'));
+  } catch {
+    return { code: 'PULL_ORIGIN_REFUSED', why: `The key "${grant.label}" does not hold an address, so ${script} sent nothing. Put the whole link in it.` };
+  }
+  if (url.protocol !== 'https:') return { code: 'PULL_ORIGIN_REFUSED', why: `The key "${grant.label}" holds a ${url.protocol} address; ${script} fetches https:// addresses only.` };
+  if (!egress.includes(url.origin))
+    return { code: 'PULL_ORIGIN_REFUSED', why: `The key "${grant.label}" holds an address at ${url.hostname}, which ${script} does not declare, so nothing was sent.` };
+  if (url.username !== '' || url.password !== '')
+    return { code: 'PULL_ORIGIN_REFUSED', why: `The key "${grant.label}" holds an address with a user name or password in it, which ${script} may not send.` };
+  const opens = hostOpened(grant.opens);
+  if (opens !== null && opens !== '' && opens !== url.hostname.replace(/\.$/, ''))
+    return { code: 'FORBIDDEN', why: `The key "${grant.label}" opens ${opens}, and holds an address at ${url.hostname}, so nothing was sent.` };
+  return { url };
+}
+
+/**
  * The refusal for a script that declares the keychain's `slash` key, asked before its sandbox starts, or `null`.
  *
  * BEFORE THE SANDBOX AND NOT ONLY AT THE FETCH, so a script that names the key and never uses it is refused all the
@@ -486,12 +512,27 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
        does with the same refusal, so one script meets one rule on either host. */
     const kept: { stop: ScriptRefusal | null } = { stop: null };
 
-    const fetch = async (asked: HostRequest): Promise<HostResponse> => {
+    const fetch = async (sent: HostRequest): Promise<HostResponse> => {
+      let asked = sent;
       if (kept.stop !== null) throw new Error(kept.stop.why);
       /* BEFORE THE KEY IS LOOKED UP, so a write by an agent's trial reaches neither the keychain nor the socket. A rejected
          promise like a refused key's: the script may catch it and go on reading. */
       const unread = options.readOnly === true ? readOnlyRefused(asked.method, asked.url, asked.body) : null;
       if (unread !== null) throw new Error(unread);
+      /* AN ADDRESS HELD IN THE KEYS is opened here and read by `addressed`; what it sends is that URL with no key. A rule
+         broken by the address is kept, as a key sent elsewhere is. */
+      if (typeof asked.address === 'string') {
+        const held = options.grantOf(asked.address);
+        if (held === null) throw new Error(`The key "${asked.address}" is not in the keychain, so nothing was sent. Put the link in your keys under that name.`);
+        const secret = options.openKey === null ? null : await options.openKey(held);
+        if (secret === null) throw new Error(`The key "${asked.address}" could not be opened, so nothing was sent.`);
+        const read = addressed(scripted.script, scripted.decl.egress, held, secret);
+        if (!('url' in read)) {
+          kept.stop = read;
+          throw new Error(read.why);
+        }
+        asked = { ...asked, url: read.url.href, key: null, address: null };
+      }
       const grant = asked.key === null ? null : options.grantOf(asked.key);
       if (asked.key !== null && grant === null) throw new Error(`The key "${asked.key}" is not in the keychain, so nothing was sent.`);
       const broken = grant === null ? null : keyRefused(scripted.script, grant, new URL(asked.url));

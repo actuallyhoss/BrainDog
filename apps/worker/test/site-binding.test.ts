@@ -53,7 +53,7 @@ const BOUND: readonly string[] = ENVIRONMENTS;
    editor on this machine saved `index.ts` that way, and a pattern of bare `\n` then found no `route()`
    at all and failed on it, which is the right failure but the wrong reason. What counts as a branch is a call on
    `url.pathname`, a predicate (`servesMcp(url.pathname)`) or a pattern (`HEALTHZ.test(url.pathname)`); `servesApi(app.rest)`
-   is the `/app` branch's own second question and is not one. Measured: a line `if (servesHooks(url.pathname)) ...` put
+   is the app branch's own second question and is not one. Measured: a line `if (servesHooks(url.pathname)) ...` put
    into `route()` failed the first test below with "src/index.ts's route() asks servesHooks(url.pathname), and this file
    has no door for it".
 
@@ -87,16 +87,22 @@ const DOOR_OF: { [asked: string]: string[] } = {
   servesKennel: ['/api/kennel/v1/index.json'],
   servesOAuth: ['/oauth/token', '/oauth/authorize'],
   servesOAuthMeta: ['/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'],
-  /* The drawn components' frame document, under `/app` like the app's own pages. */
-  isDrawnFrame: ['/app/drawn-frame'],
-  appPath: ['/app', '/app/', '/app/acme/r/tasks', '/app/acme/api/boot'],
+  /* The drawn components' frame document, at the root beside the app's own pages. */
+  isDrawnFrame: ['/drawn-frame'],
+  /* THE APP AT THE ROOT OF ITS OWN NAME, and its old address under `/app`, which is the one the site still hands over:
+     a page load there is the Worker's 308 to the root of the app's name, and a CLI's API there is served. */
+  appPath: ['/acme/r/tasks', '/acme/api/boot', '/app', '/app/', '/app/acme/r/tasks', '/app/acme/api/boot'],
   servesApi: ['/api/boot'],
 };
 
-/* AND THE APP'S OWN FILES UNDER `/app`, which the app's assets answer before its script (`!/app/_app/*` in
-   `apps/worker/wrangler.jsonc`), so the router's fallback is what the bundle says for them and they are still the app's. */
+/* THE DOORS ONLY THE APP'S OWN NAME ANSWERS. The app is at the root of `app.brain.dog`, which is this Worker's Custom
+   Domain and no site's, so the site hands none of these over and keeps its own pages at the same paths. */
+const APP_ONLY = new Set(['/drawn-frame', '/acme/r/tasks', '/acme/api/boot']);
+
+/* AND THE OLD FILES UNDER `/app`, which a stale tab asks and the Worker sends on to the root, so the router's fallback
+   is not what the bundle says for them and they are still the Worker's. */
 const APP_FILES = ['/app/_app/version.json'];
-const DOORS = [...Object.values(DOOR_OF).flat(), ...APP_FILES];
+const DOORS = [...Object.values(DOOR_OF).flat(), ...APP_FILES].filter((door) => !APP_ONLY.has(door));
 
 /* THE WORKER AS IT SHIPS, ASKED WITH EVERY BINDING A TRAP. A branch that opens the Directory, a record or the assets
    throws on first touch, and the Worker's own catch answers that with a 500, which is not the fallback, so reaching a
@@ -114,11 +120,13 @@ const answerOf = async (path: string): Promise<string> => {
     console.error = loud;
   }
 };
-const FALLBACK = await answerOf('/no-branch-of-the-router-takes-this');
+/* THE FALLBACK IS ASKED UNDER A DOOR'S WORD NO BRANCH SERVES (`/a`, kept for a door not built). Any other first word is
+   the app's now, a page or a record's name, so a made-up path at the root is the shell and never the router's 404. */
+const FALLBACK = await answerOf('/a/no-branch-of-the-router-takes-this');
 const isDoor = async (path: string): Promise<boolean> => (await answerOf(path)) !== FALLBACK;
 
-/* `/app` AND EVERYTHING UNDER IT IS THE APP BY DEFINITION, its pages, its API and its files; everything else is the app's
-   only when the router answers it. */
+/* `/app` AND EVERYTHING UNDER IT IS THE APP'S OLD ADDRESS BY DEFINITION, its pages, its API and its files; everything else
+   is the app's only when the router answers it. */
 const served = async (path: string): Promise<boolean> => /^\/app(?:\/|$)/.test(path) || (await isDoor(path));
 
 /* A STAR ENTRY IS SAMPLED WITH TWO TAILS, ONE A DOOR NAME AND ONE NOT, so `/.well-known/*` fails on `boot` while

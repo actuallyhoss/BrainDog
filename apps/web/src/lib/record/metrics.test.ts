@@ -19,7 +19,7 @@ import { MISSING } from 'braindog-render';
 
 import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
-import { BARE, currenciesRead, diffRead, format, fxNote, hrefFor, isTemplate, meetsTarget, spokenWindow, targetLine, unreadable, windowMs, type MetricDecl } from './metrics.ts';
+import { BARE, currenciesRead, diffRead, format, fxNote, hrefFor, isTemplate, markOf, meetsTarget, spokenWindow, targetLine, unreadable, windowMs, type MetricDecl } from './metrics.ts';
 import { metric } from './fixtures/readers.ts';
 import { REGISTERS } from './held.ts';
 /* THE SAMPLE'S LISTS, which a live tab learns from the record and the refusal test below asks the mirror about. */
@@ -182,8 +182,15 @@ test('a tile over a list with rows under it carries a verdict', () => {
     const target = (d.target ?? {}) as { lte?: unknown; gte?: unknown };
     return typeof target.lte === 'number' || typeof target.gte === 'number';
   };
+  /* A FLOOR OF NOUGHT MARKS ONLY ITS MISS (`markOf`): met, it carries no tone, so it is held apart below. */
+  const floor = (d: MetricDecl) => {
+    const target = (d.target ?? {}) as { lte?: unknown; gte?: unknown };
+    return typeof target.gte === 'number' && target.gte <= 0 && target.lte === undefined;
+  };
   const over = Object.values(METRICS).filter((d) => !isTemplate(d) && d.source === 'register.obligations');
-  const toned = over.filter(bounded).map((d) => [d.metric, metric(d.metric).tone] as const);
+  const toned = over.filter((d) => bounded(d) && !floor(d)).map((d) => [d.metric, metric(d.metric).tone] as const);
+  const floors = over.filter(floor).map((d) => [d.metric, metric(d.metric).tone] as const);
+  assert.ok(floors.every(([, t]) => t !== 'good'), `a floor of nought drew a good mark: ${JSON.stringify(floors)}`);
   assert.ok(toned.length > 0, 'no obligations metric with a target was reachable to check');
   assert.ok(
     toned.every(([, t]) => t === 'good' || t === 'warn' || t === 'bad'),
@@ -539,4 +546,12 @@ test('A LEAD OF TWO SENTENCES LOSES A SENTENCE WHOLE, and a typed hole stands or
   /* A SENTENCE WITH NO FIGURE LEANS ON THE ONE BEFORE IT. */
   assert.equal(leadOf('It is from {{as-of}}. Update it.', () => null), '');
   assert.equal(leadOf('It is from {{as-of}}. Update it.', () => '3 Sep'), 'It is from {{as-of}}. Update it.');
+});
+
+test('a floor of nought marks only its miss, and every other target both ways', () => {
+  assert.equal(markOf({ target: { gte: 0 } }, true), null, '"To pay on the card £1,240" drew a tick for being at least nothing');
+  assert.equal(markOf({ target: { gte: 0 } }, false), false, 'cash below nought is still a miss');
+  assert.equal(markOf({ target: { gte: 365 } }, true), true, 'a year of runway is a goal met');
+  assert.equal(markOf({ target: { lte: 0 } }, true), true, 'nothing late is the good news the figure exists for');
+  assert.equal(markOf({ target: { gte: 0 } }, null), null);
 });

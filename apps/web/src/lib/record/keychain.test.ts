@@ -46,7 +46,7 @@ test('a malformed code is refused before anything is sent', async () => {
 
 /*
  * WITH NO CLIENT THERE IS NOBODY SIGNED IN TO APPROVE AS, and signing in is the way forward. This answered
- * `{ kind: 'demo' }` and drew "The demo has no account", which was true only while `/app` with no session was
+ * `{ kind: 'demo' }` and drew "The demo has no account", which was true only while `/` with no session was
  * the sample record; with the sample gone the same state is a person who has to sign in.
  */
 test('with no client the answer is to sign in, and nothing is sent', async () => {
@@ -90,14 +90,14 @@ test('signing in again uses a passkey where one works, and goes to /signin where
   assert.deepEqual(went, []);
   assert.equal(await reprove(auth(false, true), go), false);
   /* UNDER THE APP: a bare `/signin` on `brain.dog` is the marketing site's 404 page. */
-  assert.deepEqual(went, ['/app/signin']);
+  assert.deepEqual(went, ['/signin']);
 
   /* AND BACK TO THE SCREEN THAT ASKED, which is the step the person was half way through. */
   const was = globalThis.location;
-  Object.defineProperty(globalThis, 'location', { value: { pathname: '/app/acme/keychain', search: '?reconnect=k' }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'location', { value: { pathname: '/acme/keychain', search: '?reconnect=k' }, configurable: true, writable: true });
   try {
     await reprove(auth(false, true), go);
-    assert.equal(went.at(-1), '/app/signin?next=%2Fapp%2Facme%2Fkeychain%3Freconnect%3Dk');
+    assert.equal(went.at(-1), '/signin?next=%2Facme%2Fkeychain%3Freconnect%3Dk');
   } finally {
     Object.defineProperty(globalThis, 'location', { value: was, configurable: true, writable: true });
   }

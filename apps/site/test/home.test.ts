@@ -6,7 +6,7 @@
  * reads, with no em dash and none of the words a reader never meets (`docs/54-WRITING.md`), but for the one quiet link
  * and the one answer that name the protocol for a developer. No paid plan is named while billing is off.
  *
- * THE BUILT PAGE reads completely with scripting off: one h1, the six bands in order with everything they draw already
+ * THE BUILT PAGE reads completely with scripting off: one h1, the seven bands in order with everything they draw already
  * in the HTML, the makers by name, no picture, and no solid red but the start button. Those checks read
  * `apps/site/build` and skip, saying why, until it has been built.
  */
@@ -34,7 +34,7 @@ const NEVER = /\b(rows?|list items?|entit(?:y|ies)|register|schemas?|slugs?|MCP|
 
 test('home.ts holds the words of site 2a at the key paths the ledger reads', () => {
   assert.equal(home.hero.title, 'Give your business a memory.');
-  assert.equal(home.hero.sub, 'One place that remembers your work and tells you what needs you today. Your AI tools read from it too.');
+  assert.equal(home.hero.sub, 'One place that remembers your work, your money and your life, and tells you what needs you today. Your AI tools read from it too.');
   assert.equal(home.hero.secondary, 'Connect your AI tools');
   assert.equal(home.hero.works, 'Works with');
   assert.deepEqual(
@@ -43,10 +43,10 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
   );
   assert.equal(home.who.title, "Who it's for");
   assert.deepEqual(
-    [home.who.small.title, home.who.build.title, home.who.team.title],
-    ['Run a small business', 'Build with AI', 'Run client work with your agents'],
+    [home.who.small.title, home.who.build.title, home.who.life.title],
+    ['Run a small business', 'Build with AI', 'Keep your own life in order'],
   );
-  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.team.href], ['/for/founders', '/agents', '/agents']);
+  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.life.href], ['/for/founders', '/agents', '/docs/use/money']);
   assert.equal(home.chores.title, 'It does the chores. You make the calls.');
   assert.equal(
     home.chores.say,
@@ -63,12 +63,12 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
     'AI tools use your keys without ever seeing them.',
   ]);
   assert.equal(home.free.title, 'Free while in early access.');
-  assert.equal(home.faq.questions.length, 5);
+  assert.equal(home.faq.questions.length, 6);
   assert.ok(!('closing' in home), 'home has no recap close (site F1)');
 });
 
 /* THE ONE LINK AND THE ONE ANSWER THAT NAME THE PROTOCOL, for the developer who came for it (site 2a sections 4 and 7). */
-const FOR_DEVELOPERS = new Set(['home.tools.dev', 'home.faq.questions.1.a']);
+const FOR_DEVELOPERS = new Set(['home.tools.dev', 'home.faq.questions.2.a']);
 
 test('the home words hold no em dash and none of the never-words', () => {
   for (const [path, said] of strings(home)) {
@@ -113,16 +113,16 @@ test('the hero is section.hero with the slogan and the .sub sentence', when(NO_B
   assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One place that remembers your work/);
 });
 
-test('the six bands, in order, and no close after them', when(NO_BUILD), () => {
+test('the seven bands, in order, and no close after them', when(NO_BUILD), () => {
   const said = text(page());
-  const order = [home.who.title, home.chores.title, home.tools.title, home.slash.title, home.yours.title, home.free.title, home.faq.title];
+  const order = [home.who.title, home.money.title, home.chores.title, home.tools.title, home.slash.title, home.yours.title, home.free.title, home.faq.title];
   let at = 0;
   for (const heading of order) {
     const found = said.indexOf(heading, at);
     assert.ok(found >= 0, `"${heading}" is on the page after the one before it`);
     at = found + heading.length;
   }
-  assert.equal([...page().matchAll(/<section\b[^>]*class="[^"]*\bband--/g)].length, 6, 'six section.band');
+  assert.equal([...page().matchAll(/<section\b[^>]*class="[^"]*\bband--/g)].length, 7, 'seven section.band');
   assert.doesNotMatch(said, /Start your record\./, 'the recap close is gone');
 });
 
@@ -143,9 +143,11 @@ test('the only solid red button in the served page is the start button', when(NO
 });
 
 test('with scripting off, every band says what it draws', when(NO_BUILD), async () => {
-  const { ASKED, EVIDENCE, HANDLED, NEEDS, NOTES, ASKS } = await import('../src/lib/demo/maya.ts');
+  const { ASKED, EVIDENCE, HANDLED, NEEDS, NOTES, ASKS, FOUNDER } = await import('../src/lib/demo/maya.ts');
+  const { DESK } = await import('../src/lib/desk/words.ts');
   const said = text(page());
-  assert.ok(said.includes('2 need you, 2 agents are working, and cash lasts about 14 months.'), "Today's line, in plain text");
+  /* TODAY OPENS ON THE GREETING ALONE since 30 October (DIRECTION §51), where it read a line of counts. */
+  assert.ok(said.includes(DESK.greet(9, FOUNDER.short)), "Today's greeting, in plain text");
   for (const n of NEEDS) assert.ok(said.includes(n.ask), `the desk's ask "${n.ask}"`);
   assert.ok(said.includes(EVIDENCE.inv.head), "the first need's facts are there");
   for (const n of NOTES) assert.ok(said.includes(n.text), `the note "${n.text}"`);

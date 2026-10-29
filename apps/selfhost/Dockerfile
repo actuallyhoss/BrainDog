@@ -27,7 +27,7 @@ WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
 
-# The app the server hands out, at `apps/web/build/app`, where `main.ts` looks for it.
+# The app the server hands out, at `apps/web/build`, where `main.ts` looks for it.
 RUN pnpm --filter @braindog/web build
 
 # THE RECORD LIVES IN THE VOLUME, owned by the user the server runs as, so a copy, a key file and the Directory can all

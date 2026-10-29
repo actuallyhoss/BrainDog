@@ -1,7 +1,7 @@
 /**
  * Sign-in on production, with the canary's own passkey, the way a person signs in.
  *
- *   CANARY_PASSKEY=<credential> DEPLOY_HOST=brain.dog SMOKE_SLUG=ops [CANARY_SESSION=<file>] node tools/gates/signin-live.mjs
+ *   CANARY_PASSKEY=<credential> DEPLOY_HOST=app.brain.dog SMOKE_SLUG=ops [CANARY_SESSION=<file>] node tools/gates/signin-live.mjs
  *   node tools/gates/signin-live.mjs                      (no credential: self-host only)
  *
  * WHY THIS EXISTS. The `passkey` gate proves the ceremony on a record it made a minute ago on localhost. After a deploy
@@ -105,8 +105,8 @@ export async function loadCredential(cdp, credential, now = Date.now()) {
 }
 
 /**
- * THE FOUR STEPS, ON A PAGE WHOSE AUTHENTICATOR ALREADY HOLDS THE CREDENTIAL. `origin` is `https://brain.dog` or the
- * self-host's; `slug` is the canary's record, or `null` where the host answers `/app/` with the one record there is.
+ * THE FOUR STEPS, ON A PAGE WHOSE AUTHENTICATOR ALREADY HOLDS THE CREDENTIAL. `origin` is `https://app.brain.dog` or the
+ * self-host's; `slug` is the canary's record, or `null` where the host answers `/` with the one record there is.
  * Returns the findings, in the order they happened; none is a pass. Every wait carries `STEP_MS`, so it cannot hang.
  *
  * IT ASKS THE PAGE FOR LITTLE: `goto`, `url`, `locator(...).first()` and `getByRole('button', ...)`, which is what

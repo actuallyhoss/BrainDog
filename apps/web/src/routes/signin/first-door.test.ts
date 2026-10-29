@@ -14,8 +14,8 @@
  * first thing the owner of a new record meets and it sends him somewhere that cannot help.
  *
  * THE ONE BUTTON THAT WAS LEFT ON THAT SCREEN IS GONE. It was the demo pill, which opened the sample
- * business at `/app/`, and it was measured to work when this file was written. There is no sample now:
- * `/app/` with no session is sent back here, so the pill is removed and the claim link
+ * business at `/`, and it was measured to work when this file was written. There is no sample now:
+ * `/` with no session is sent back here, so the pill is removed and the claim link
  * sentence is the whole of the first run's screen, which is true, since it is the only way in.
  */
 
@@ -131,8 +131,8 @@ test('the door block is drawn from ways that can act, not from a Ways object tha
 /**
  * THE DEMO PILL IS GONE, AND WITH IT THE ONE BUTTON THE FIRST RUN HAD LEFT.
  *
- * It opened `/app/`, which drew the sample business for anybody not signed in. There is no sample now:
- * `/app/` with no session is this screen, so the pill would have sent a stranger back here. On the first run the claim
+ * It opened `/`, which drew the sample business for anybody not signed in. There is no sample now:
+ * `/` with no session is this screen, so the pill would have sent a stranger back here. On the first run the claim
  * link sentence is what is left to read, which is the only way in there is.
  */
 test('the screen draws no way into a demo, since there is none to open', () => {

@@ -1558,8 +1558,9 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   /* PEOPLE DRAWS NO DOTS, AND SINCE 3.2.0 NO LIST OVER ITS CARDS EITHER, and keeps the figures the chart and the list drew on. */
   const people = blocks('people');
   assert.ok(!people.some((b) => b.kind === 'heat'), 'the twelve weeks of dots are still on People');
-  /* THE ONLY TABLE IS THE ORGANISATIONS, AND EVERYONE THE FACES, SINCE People 3.6.0, the people and not a list over their cards. */
-  assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), ['Organisations']);
+  /* EVERYONE THE FACES, SINCE People 3.6.0, the people and not a list over their cards; AND NO TABLE AT ALL SINCE People
+     4.1.0, where the organisations went to their own list and People says how many in a line. */
+  assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), []);
   assert.deepEqual(people.filter((b) => b.kind === 'cards').map((b) => b.heading), ['Everyone']);
   for (const id of ['metric.people-in-touch-90d', 'metric.people-in-touch-12w']) assert.ok(k.packClaims('people').includes(id), `${id} is not on the record`);
   /* AND PROJECTS HOLDS NO HEADING OVER ITS CARDS (proj F5): what each earns alone, and
@@ -2094,7 +2095,8 @@ test('A RECORD ON PEOPLE 3.x UPDATES TO PEOPLE 4.0.0 AND CORE ON ITS OWN, keeps 
   await api.slashTick();
 
   assert.equal(held('people'), FIRST_PARTY_VERSIONS.people);
-  assert.equal(FIRST_PARTY_VERSIONS.people, '4.0.0');
+  /* 4.0.0 OR A LATER 4.x: People 4.1.0 and 4.2.x (round 1030) changed words and a figure, and handed no page back. */
+  assert.match(FIRST_PARTY_VERSIONS.people, /^4\.\d+\.\d+$/u);
   assert.equal(held('core'), FIRST_PARTY_VERSIONS.core);
   const kept = api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] };
   assert.deepEqual(kept.steps, [`People was updated to ${FIRST_PARTY_VERSIONS.people}.`, `BrainDog was updated to ${FIRST_PARTY_VERSIONS.core}.`]);

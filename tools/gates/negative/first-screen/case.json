@@ -1,7 +1,7 @@
 {
   "gate": "first-screen",
   "rule": "a rail with an empty place on one person's first screen",
-  "expect": "Mariam: rail-has-rows is red on /app/ at 1440 wide",
+  "expect": "Mariam: rail-has-rows is red on / at 1440 wide",
   "findings": 1,
   "total": 1,
   "why": "THE GATE JUDGES NOTHING ITSELF: it runs `tools/people/expect/first-screen.mjs` once a person and reads the exit code and what was printed. So the planted fault is a command, as `typecheck`'s is a package: this tree's command prints the real one's lines and, as Mariam, one red check under the screen it was on, leaving with 1; as Sam it is green and leaves with 0. The gate must be red, name Mariam, the check and the screen, and count one finding for two people walked, which shows a green person does not carry a red one and a red one is not said twice. The checks themselves are held by the command's own tests (`tools/people/test/first-screen.test.mjs` and the two beside the command); a second copy of them here would be the copy that drifts."

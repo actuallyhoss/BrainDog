@@ -25,7 +25,7 @@ export const data = {
   /** A decision in the feed, with the reason it was given when there is one. */
   feedDecided: (title: string, reason: string | null) => (reason ? `Decided: ${title}${/[.?!]$/u.test(title) ? '' : '.'} ${reason}` : `Decided: ${title}`),
   /** Many writes by one writer in a few seconds, such as an import, as one line of the feed: "Added 52 items and asked 8 questions". */
-  feedBulk: (n: { added: number; changed: number; asked: number; removed: number }, more: boolean, why: string | null = null) => {
+  feedBulk: (n: { added: number; changed: number; asked: number; removed: number }, more: boolean, why: string | null = null, list: string | null = null) => {
     const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
     const parts = [
       n.added ? `added ${plural(n.added, 'item', 'items')}` : '',
@@ -35,7 +35,9 @@ export const data = {
     ].filter(Boolean);
     const joined = parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
     const tail = more ? ', and more before these' : '';
-    return why ? `${why}: ${joined}${tail}` : `${joined.charAt(0).toUpperCase()}${joined.slice(1)} at once${tail}`;
+    /* WHERE, WHEN IT WAS ONE LIST (audit of 30 October, 7): "Made 17 changes at once" said nothing of what changed. */
+    const where = list ? ` in ${list}` : '';
+    return why ? `${why}: ${joined}${where}${tail}` : `${joined.charAt(0).toUpperCase()}${joined.slice(1)}${where} at once${tail}`;
   },
   feedYou: 'You',
   feedUseCase: (name: string) => `the ${name} starter`,

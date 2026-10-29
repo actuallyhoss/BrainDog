@@ -51,27 +51,43 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.24.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.26.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.24.0');
+  assert.equal(pack.manifest.version, '1.26.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 /* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
    the add-on's page never draws a version with no notes, and its notes name what the page gained and no word a person
    should not read. */
-test('THE NEWEST CHANGE NOTE IS 1.24.0, and it says what is accepted unchanged', () => {
+test('THE NEWEST CHANGE NOTE IS 1.26.0, the manifest\'s, and says keys past their day plainly', () => {
   const newest = MODULE_CHANGES.agents[0]!;
-  assert.equal(newest.version, '1.24.0');
+  assert.equal(newest.version, '1.26.0');
   assert.equal(newest.version, AGENTS_PACK.manifest.version);
+  assert.match(newest.notes, /Keys past their day/);
+  assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
+  assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
+});
+
+test('THE 1.25.0 NOTE says the first line counts open and quiet runs too', () => {
+  const newest = MODULE_CHANGES.agents[1]!;
+  assert.equal(newest.version, '1.25.0');
+  assert.match(newest.notes, /open and quiet/);
+  assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
+  assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
+});
+
+test('THE 1.24.0 NOTE says what is accepted unchanged', () => {
+  const newest = MODULE_CHANGES.agents[2]!;
+  assert.equal(newest.version, '1.24.0');
   assert.match(newest.notes, /unchanged/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
   assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
 });
 
 test('THE 1.22.0 NOTE says Vault is now Keychain', () => {
-  const newest = MODULE_CHANGES.agents[2]!;
+  const newest = MODULE_CHANGES.agents[4]!;
   assert.equal(newest.version, '1.22.0');
   assert.match(newest.notes, /Keychain/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -79,7 +95,7 @@ test('THE 1.22.0 NOTE says Vault is now Keychain', () => {
 });
 
 test('THE 1.20.0 NOTE says the runs open now are headed Open now', () => {
-  const newest = MODULE_CHANGES.agents[4]!;
+  const newest = MODULE_CHANGES.agents[6]!;
   assert.equal(newest.version, '1.20.0');
   assert.match(newest.notes, /Open now/);
   assert.match(newest.notes, /Quiet/);
@@ -88,7 +104,7 @@ test('THE 1.20.0 NOTE says the runs open now are headed Open now', () => {
 });
 
 test('THE 1.19.0 NOTE says Nobody working right now', () => {
-  const newest = MODULE_CHANGES.agents[5]!;
+  const newest = MODULE_CHANGES.agents[7]!;
   assert.equal(newest.version, '1.19.0');
   assert.match(newest.notes, /Nobody working right now/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -96,7 +112,7 @@ test('THE 1.19.0 NOTE says Nobody working right now', () => {
 });
 
 test('THE 1.18.0 NOTE says a key in the vault says Locked value', () => {
-  const newest = MODULE_CHANGES.agents[6]!;
+  const newest = MODULE_CHANGES.agents[8]!;
   assert.equal(newest.version, '1.18.0');
   assert.match(newest.notes, /Locked value/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -104,7 +120,7 @@ test('THE 1.18.0 NOTE says a key in the vault says Locked value', () => {
 });
 
 test('THE 1.17.0 NOTE says the page reads like a list of runs', () => {
-  const newest = MODULE_CHANGES.agents[7]!;
+  const newest = MODULE_CHANGES.agents[9]!;
   assert.equal(newest.version, '1.17.0');
   assert.match(newest.notes, /At work, Up next and Recent runs/);
   assert.match(newest.notes, /Needs you only/);
@@ -113,7 +129,7 @@ test('THE 1.17.0 NOTE says the page reads like a list of runs', () => {
 });
 
 test('THE 1.16.0 NOTE says the page opens on who is at work on what', () => {
-  const newest = MODULE_CHANGES.agents[8]!;
+  const newest = MODULE_CHANGES.agents[10]!;
   assert.equal(newest.version, '1.16.0');
   assert.match(newest.notes, /who is at work and on what/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -121,7 +137,7 @@ test('THE 1.16.0 NOTE says the page opens on who is at work on what', () => {
 });
 
 test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
-  const newest = MODULE_CHANGES.agents[9]!;
+  const newest = MODULE_CHANGES.agents[11]!;
   assert.equal(newest.version, '1.15.0');
   assert.match(newest.notes, /Your agents asked/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
@@ -129,7 +145,7 @@ test('THE 1.15.0 NOTE says who the questions on Agents were asked by', () => {
 });
 
 test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () => {
-  const newest = MODULE_CHANGES.agents[10]!;
+  const newest = MODULE_CHANGES.agents[12]!;
   assert.equal(newest.version, '1.14.0');
   assert.match(newest.notes, /how many are at work, on how many machines and how many wait on you/);
   assert.match(newest.notes, /At work/);
@@ -144,22 +160,22 @@ test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () 
    1.13.0's as they were written too. */
 test('THE 1.10.0 TO 1.13.0 NOTES ARE AS THEY WERE WRITTEN, with 1.14.0 beside them and not in their place', () => {
   const versions = MODULE_CHANGES.agents.map((c) => c.version);
-  assert.deepEqual(versions.slice(0, 16), ['1.24.0', '1.23.0', '1.22.0', '1.21.0', '1.20.0', '1.19.0', '1.18.0', '1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
+  assert.deepEqual(versions.slice(0, 18), ['1.26.0', '1.25.0', '1.24.0', '1.23.0', '1.22.0', '1.21.0', '1.20.0', '1.19.0', '1.18.0', '1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
   assert.equal(new Set(versions).size, versions.length, 'a version is noted twice');
   assert.equal(
-    MODULE_CHANGES.agents[11]!.notes,
+    MODULE_CHANGES.agents[13]!.notes,
     'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month, how many skills changed and how many have faded, draws both week by week once there are three weeks, and lists what changed with the failure that taught it. Faded lists what nobody confirmed in ninety days. A learning can be a rule, and a skill, tool or key added twice is one. Needs a look says what is here twice, what was tidied this week and what is still stale.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[12]!.notes,
+    MODULE_CHANGES.agents[14]!.notes,
     'A Working card on Agents is titled by the agent, with what it said it is doing under its name, or nothing when it has not said. It no longer shows a next step, which is under Left for the next run. Today and Earlier now list a run that finished, so a run that ended properly is no longer missing from the page. They leave out helpers and runs that wrote nothing, and each card says the agent, what it said it was doing, its project and when it was last heard from.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[13]!.notes,
+    MODULE_CHANGES.agents[15]!.notes,
     'Agents shows Left for the next run under Working: each step a run left that nobody has taken, with who left it and when. A step more than a week old, or one a later run passed over, says it was left earlier. The line at the top counts the same steps, so it no longer counts a step that was already picked up. Runs from before today are folded under Earlier, with how many there are, until you open it.',
   );
   assert.equal(
-    MODULE_CHANGES.agents[14]!.notes,
+    MODULE_CHANGES.agents[16]!.notes,
     'Agents shows Needs a look under the runs when a key holds no value and says nowhere it is kept, a key is past its day, a tool was not seen in a month, or a key is written in plain text where a key should not be. Each line names what it counts, then the number, then what to do. What the brain learned is folded until you open it, and Agents counts how the agent door is used.',
   );
 });
@@ -203,7 +219,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.24.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.26.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -347,7 +363,15 @@ const opened = (k: Kernel, slug: string): Drawn[] => value<{ blocks: Drawn[] }>(
 const BLOCKS_16 = JSON.parse(readFileSync(new URL('./fixtures/agents-page-1.16.0.json', import.meta.url), 'utf8')) as Record<string, unknown>[];
 
 /** The two lines the page declares, one drawn: how many are at work and how many steps are up next, or nobody (1.19.0's words). */
-const LINES = ['{{runs-working}} at work, {{handoffs-open}} step(s) up next', 'Nobody working right now. {{handoffs-open}} step(s) up next'];
+/* THREE SINCE 1.25.0 (Q4 of 29 October): the runs open and quiet are counted beside the ones working, so "Nobody working
+   right now" never stands alone over runs heard just now. */
+const LINES = [
+  '{{runs-working}} working, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next',
+  'Nobody working right now, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next',
+  'Nobody working right now. {{handoffs-open}} step(s) up next',
+];
+/** The line 1.19.0 to 1.24.0 drew with nobody working, which 1.25.0 still draws with no run open. */
+const NOBODY_19 = LINES[2]!;
 const headed = (blocks: Drawn[], heading: string): Drawn => {
   const found = blocks.find((b) => b.heading === heading);
   assert.ok(found, `no block headed ${heading}`);
@@ -451,11 +475,12 @@ test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: At work is the record\'s `presence` 
   assert.equal(working?.where, undefined, 'the working source takes no clause');
   assert.equal(working?.when, undefined, 'a section\'s when: would hide the steps under it');
   const lines = blocks.filter((b) => b.kind === 'note' && b.lead === true);
-  /* TWO SINCE 1.16.0, ON THE RUNS AT WORK, so exactly one is drawn: how many are at work, or nobody. */
-  assert.equal(lines.length, 2);
+  /* THREE SINCE 1.25.0, ON THE RUNS AT WORK AND THE ONES OPEN AND QUIET, so exactly one is drawn. */
+  assert.equal(lines.length, 3);
   assert.deepEqual(lines.map((l) => l.when), [
     { metric: 'runs-working', gt: 0 },
-    { metric: 'runs-working', is: 0 },
+    { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', gt: 0 }] },
+    { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', is: 0 }] },
   ]);
   /* EVERY NUMBER THE RECORD'S: at work by the rail's clock, and up next the steps nobody has taken. NO NAME SINCE 1.17.0:
      "Claude on BrainDog and Claude are at work" said Claude twice, and the rows say who. */
@@ -554,10 +579,11 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
   /* THE LINE AND THE STEPS AGREE: one figure, the record's, and nobody is at work, so the quiet line is the one drawn. */
   assert.equal(reading(k, 'handoffs-open'), 2);
   assert.equal(drawn.matched, 2);
-  const [working, quiet] = lines();
+  const [working, open, quiet] = lines();
   assert.equal(working!.drawn, false);
+  assert.equal(open!.drawn, false, 'every run ended, so none is open and quiet');
   assert.notEqual(quiet!.drawn, false);
-  assert.equal(quiet!.body, LINES[1]);
+  assert.equal(quiet!.body, LINES[2]);
   assert.equal(quiet!.values?.['handoffs-open'], 2);
   sql.close();
 });
@@ -836,9 +862,56 @@ const ADDED_24: [string, string][] = [
   ['agents', 'kept'],
   ['brain', 'timeline'],
 ];
+/** 1.26.0'S WORDS, now and as 1.25.0 said them: keys past their day as a sentence, unused tools in words, and How the
+    brain changed's line saying how many learnings are in use beside how many arrived (round 1030, Q55). */
+const WORDS_26: [string, string][] = [
+  [
+    JSON.stringify({ kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', is: 1 }, body: '1 key is past its day. Renew or retire it.' }) +
+      ',' +
+      JSON.stringify({ kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 1 }, body: '{{keys-expired}} keys are past their day. Renew or retire each.' }),
+    JSON.stringify({ kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: 'Keys past their day: {{keys-expired}}. Renew or retire each.' }),
+  ],
+  ['{{tools-unseen}} tool(s) not used for a month. Retire any you no longer need.', 'Tools not seen in a month: {{tools-unseen}}. Retire any you no longer use.'],
+  [
+    '{{learnings-arrived}} learning(s) arrived this month, {{learnings-active}} in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+    '{{learnings-arrived}} learning(s) arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+  ],
+  [
+    'Nothing new this month, {{learnings-active}} learning(s) in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+    'No learning arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+  ],
+];
+/** 1.25.0'S FIRST LINE, now and as 1.24.0 said it: the runs open and quiet counted beside the ones working (Q4). */
+const LINES_25 = [
+  { kind: 'note', lead: true, span: 12, when: { metric: 'runs-working', gt: 0 }, body: '{{runs-working}} working, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next' },
+  { kind: 'note', lead: true, span: 12, when: { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', gt: 0 }] }, body: 'Nobody working right now, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next' },
+  { kind: 'note', lead: true, span: 12, when: { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', is: 0 }] }, body: 'Nobody working right now. {{handoffs-open}} step(s) up next' },
+];
+const LINES_24 = [
+  { kind: 'note', lead: true, span: 12, when: { metric: 'runs-working', gt: 0 }, body: '{{runs-working}} at work, {{handoffs-open}} step(s) up next' },
+  { kind: 'note', lead: true, span: 12, when: { metric: 'runs-working', is: 0 }, body: 'Nobody working right now. {{handoffs-open}} step(s) up next' },
+];
+/** Agents 1.25.0, which is 1.26.0 in 1.25.0's words. */
+const doc25 = (): { version: string; declarations: Record<string, unknown>[] } => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  let text = JSON.stringify(doc.declarations);
+  for (const [now, was] of WORDS_26) {
+    assert.ok(text.includes(now), `doc25 was handed a document that does not say ${now}`);
+    text = text.split(now).join(was);
+  }
+  return { ...doc, version: '1.25.0', declarations: JSON.parse(text) as Record<string, unknown>[] };
+};
+/** Agents 1.24.0, which is 1.25.0 with the first line as two notes on the runs working alone. */
+const doc24 = (): { version: string; declarations: Record<string, unknown>[] } => {
+  const doc = doc25();
+  const now = LINES_25.map((l) => JSON.stringify(l)).join(',');
+  const text = JSON.stringify(doc.declarations);
+  assert.ok(text.includes(now), 'doc24 was handed a document whose first line is not 1.25.0\'s');
+  return { ...doc, version: '1.24.0', declarations: JSON.parse(text.split(now).join(LINES_24.map((l) => JSON.stringify(l)).join(','))) as Record<string, unknown>[] };
+};
 /** Agents 1.23.0, which is 1.24.0 without Accepted unchanged and Over time. */
 const doc23 = (): { version: string; declarations: Record<string, unknown>[] } => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc24();
   const declarations = doc.declarations.map((d) => {
     const keys = ADDED_24.filter(([page]) => page === d.page).map(([, key]) => key);
     if (keys.length === 0) return d;
@@ -891,8 +964,8 @@ const doc19 = (): { version: string; declarations: Record<string, unknown>[] } =
 };
 const doc18 = (): { version: string; declarations: Record<string, unknown>[] } => {
   const doc = doc19();
-  assert.ok(JSON.stringify(doc.declarations).includes(JSON.stringify(LINES[1])), 'doc18 was handed a document that is not 1.19.0');
-  return { ...doc, version: '1.18.0', declarations: JSON.parse(JSON.stringify(doc.declarations).replace(JSON.stringify(LINES[1]), JSON.stringify(NOBODY_18))) };
+  assert.ok(JSON.stringify(doc.declarations).includes(JSON.stringify(NOBODY_19)), 'doc18 was handed a document that is not 1.19.0');
+  return { ...doc, version: '1.18.0', declarations: JSON.parse(JSON.stringify(doc.declarations).replace(JSON.stringify(NOBODY_19), JSON.stringify(NOBODY_18))) };
 };
 /** AND 1.17.0 AS IT WAS CUT: a key's value headed Sealed value, where 1.18.0 says Locked value. */
 const doc17 = (): { version: string; declarations: Record<string, unknown>[] } => {
@@ -1209,7 +1282,7 @@ test('AGENTS 1.23.0 GIVES A KEY ITS ACCOUNT, and changed the Keys list only', as
    (`doc23` takes both away), each a section the host draws. No list, field or figure goes. */
 const MARK_24 = '8d0db59cbe536d16';
 test('AGENTS 1.24.0 ADDS ACCEPTED UNCHANGED AND OVER TIME, and changed those two pages only', () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc24();
   assert.equal(doc.version, '1.24.0', 'a new version takes a mark of its own beside this one');
   assert.equal(mark(doc.declarations), MARK_24, 'the Agents add-on changed what it declares with no new version');
   const was = doc23().declarations;
@@ -1218,6 +1291,34 @@ test('AGENTS 1.24.0 ADDS ACCEPTED UNCHANGED AND OVER TIME, and changed those two
     doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page ?? d.metric ?? d.register),
     ['agents', 'brain'],
     '1.24.0 changed more than the Agents page and How the brain changed',
+  );
+});
+
+/* WHAT 1.25.0 DECLARES, AS ONE MARK: 1.24.0 with the first line counting the runs open and quiet beside the ones working
+   (`doc24` puts the two old notes back). Words only: no list, field or figure goes. */
+const MARK_25 = 'f5dc972f3a40c3ea';
+test('AGENTS 1.25.0 COUNTS THE RUNS OPEN AND QUIET IN THE FIRST LINE, and changed the Agents page only', () => {
+  const doc = doc25();
+  assert.equal(doc.version, '1.25.0', 'a new version takes a mark of its own beside this one');
+  assert.equal(mark(doc.declarations), MARK_25, 'the Agents add-on changed what it declares with no new version');
+  const was = doc24().declarations;
+  assert.equal(was.length, doc.declarations.length, '1.25.0 put in or took out a declaration');
+  assert.deepEqual(doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page ?? d.metric ?? d.register), ['agents'], '1.25.0 changed more than the Agents page');
+});
+
+/* WHAT 1.26.0 DECLARES, AS ONE MARK: 1.25.0 with keys past their day and unused tools said in sentences, and How the
+   brain changed saying how many learnings are in use (`doc25` puts 1.25.0's words back). No list, field or figure goes. */
+const MARK_26 = 'fa4e81a08546eb82';
+test('AGENTS 1.26.0 SAYS KEYS PAST THEIR DAY AND LEARNINGS IN USE IN WORDS, and changed those two pages only', () => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.equal(doc.version, '1.26.0', 'a new version takes a mark of its own beside this one');
+  assert.equal(mark(doc.declarations), MARK_26, 'the Agents add-on changed what it declares with no new version');
+  const was = doc25().declarations;
+  assert.equal(was.length, doc.declarations.length, '1.26.0 put in or took out a declaration');
+  assert.deepEqual(
+    doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page ?? d.metric ?? d.register),
+    ['agents', 'brain'],
+    '1.26.0 changed more than the Agents page and How the brain changed',
   );
 });
 
@@ -1453,12 +1554,13 @@ test('THE KEYS AND TOOLS TO PUT RIGHT ARE LINES AT THE FOOT, each drawn only whi
      lines of what the record tidies on its own (tidied, stale, here twice) are off the page. */
   assert.equal(declared.filter((b) => b.heading === 'Needs a look').length, 0, 'Needs a look is still a tile');
   const foot = declared.findIndex((b) => b.key === 'brain-link');
-  /* THE KEY LINES ARE A PAIR EACH: one for one and one for many. */
-  const LINES = NOTES.flatMap((m) => (m === 'keys-nowhere' || m === 'keys-in-text' ? [m, m] : [m]));
+  /* THE KEY LINES ARE A PAIR EACH: one for one and one for many. Keys past their day too, since 1.26.0. */
+  const PAIRS: readonly string[] = ['keys-nowhere', 'keys-expired', 'keys-in-text'];
+  const LINES = NOTES.flatMap((m) => (PAIRS.includes(m) ? [m, m] : [m]));
   assert.deepEqual(declared.slice(foot + 1).map((b) => b.when?.metric), LINES, 'the lines are not at the foot, or not in order');
   for (const gone of ['tidied-week', 'gone-stale', 'stale-rows-same']) assert.equal(noteOn(declared as Drawn[], gone), undefined, `${gone} still nags on the page`);
   for (const metric of NOTES) {
-    const pair = metric === 'keys-nowhere' || metric === 'keys-in-text';
+    const pair = PAIRS.includes(metric);
     const note = declared.find((b) => b.kind === 'note' && b.when?.metric === metric && !(b.when as { is?: number }).is)!;
     assert.deepEqual(note.when, { metric, gt: pair ? 1 : 0 });
     assert.equal(note.tone, 'warn', `${metric}'s line is not toned`);
@@ -1468,7 +1570,9 @@ test('THE KEYS AND TOOLS TO PUT RIGHT ARE LINES AT THE FOOT, each drawn only whi
        is never said. Filled as the host fills it, with one and with many. */
     const name = metric === 'keys-in-text' ? KEYS_IN_TEXT.name : String(AGENTS_MODULE.AGENTS_METRICS[metric]?.name);
     /* THE KEY LINES SAY IT PLAINLY SINCE THE UI PASS: "2 keys have no value. Add them in the Keychain", the way a link. */
+    /* UNUSED TOOLS ARE A SENTENCE SINCE 1.26.0 (round 1030): the number, then what it counts, then what to do. */
     if (pair) assert.ok(!note.body?.includes('(s)'), `${metric}'s line says (s)`);
+    else if (metric === 'tools-unseen') assert.ok(note.body?.startsWith(`{{${metric}}} tool(s) `), `${metric}'s line does not lead with its number`);
     else assert.ok(note.body?.startsWith(`${name}: `), `${metric}'s line does not lead with its figure's name`);
     for (const n of [1, 3]) {
       const said = String(note.body).replaceAll(`{{${metric}}}`, String(n));
@@ -1480,6 +1584,10 @@ test('THE KEYS AND TOOLS TO PUT RIGHT ARE LINES AT THE FOOT, each drawn only whi
   assert.deepEqual(bodies('keys-nowhere'), [
     [{ metric: 'keys-nowhere', is: 1 }, '1 key has no value. [Add it in the Keychain](/keychain)'],
     [{ metric: 'keys-nowhere', gt: 1 }, '{{keys-nowhere}} keys have no value. [Add them in the Keychain](/keychain)'],
+  ]);
+  assert.deepEqual(bodies('keys-expired'), [
+    [{ metric: 'keys-expired', is: 1 }, '1 key is past its day. Renew or retire it.'],
+    [{ metric: 'keys-expired', gt: 1 }, '{{keys-expired}} keys are past their day. Renew or retire each.'],
   ]);
   assert.deepEqual(bodies('keys-in-text'), [
     [{ metric: 'keys-in-text', is: 1 }, 'A key is written in plain text in 1 place. Move it to the Keychain.'],

@@ -31,7 +31,7 @@
     A MISTYPED URL IS NOT AN ALARM, AND IT IS ONE SCREEN WHICHEVER DOOR IT CAME THROUGH. `/[id]`
     catches every one-segment address and this catches the rest, and they drew two different
     not-found screens; both draw `NotFound` now, with Search and Home. The address is not its
-    title any more: under `/app/<record>/` it printed the record's slug to a person who typed a
+    title any more: under `/<record>/` it printed the record's slug to a person who typed a
     page name.
 
     THE REQUEST ID BELONGS TO THE FAILURE AND NOT TO THE TYPO. The client mints an `X-Request-Id` on

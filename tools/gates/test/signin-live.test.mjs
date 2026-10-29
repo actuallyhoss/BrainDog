@@ -24,8 +24,8 @@ const MADE_UP = { credentialId: 'Y3JlZA', isResidentCredential: true, rpId: 'bra
 /** The sign-in, Today and Sign out, as a page the gate can drive. `breaks` names the one thing this page gets wrong. */
 function stubPage({ passkey = true, who = 'owner@ops.example', screen = 'ready', landAt = null, signsOut = true } = {}) {
   const state = { url: 'about:blank', signedIn: false, visited: [] };
-  const onSignin = () => state.url.endsWith('/app/signin');
-  const onToday = () => /\/app\/(?:[\w-]+\/)?$/.test(new URL(state.url).pathname);
+  const onSignin = () => state.url.endsWith('/signin');
+  const onToday = () => /^\/(?:[\w-]+\/)?$/.test(new URL(state.url).pathname);
   const absent = (what) => new Error(`waited ${what}, and it never came`);
   const counts = {
     [copy.withPasskey]: () => (onSignin() && !state.signedIn && passkey ? 1 : 0),
@@ -131,8 +131,8 @@ test('the credential goes into a fresh authenticator at the clock\'s count, and 
 
 test('the four steps hold on a sign-in that works: offered, in, Today settled, out', async () => {
   const page = stubPage();
-  assert.deepEqual(await signInLive(page, { origin: 'https://brain.dog', slug: 'ops' }), []);
-  assert.deepEqual(page.visited, ['https://brain.dog/app/signin', 'https://brain.dog/app/ops/', 'https://brain.dog/app/signin']);
+  assert.deepEqual(await signInLive(page, { origin: 'https://app.brain.dog', slug: 'ops' }), []);
+  assert.deepEqual(page.visited, ['https://app.brain.dog/signin', 'https://app.brain.dog/ops/', 'https://app.brain.dog/signin']);
 });
 
 test('each of the four, broken alone, is a finding', async () => {
@@ -141,11 +141,11 @@ test('each of the four, broken alone, is a finding', async () => {
     [{ who: '  ' }, /names nobody/],
     [{ screen: 'refused' }, /settled as refused/],
     [{ screen: null }, /sign-in stopped: waited for main#main/],
-    [{ landAt: '/app/somebody-else/' }, /not on the canary ops/],
+    [{ landAt: '/somebody-else/' }, /not on the canary ops/],
     [{ signsOut: false }, /sign-in stopped: waited for Use a passkey/],
   ];
   for (const [breaks, finding] of cases) {
-    const found = await signInLive(stubPage(breaks), { origin: 'https://brain.dog', slug: 'ops' });
+    const found = await signInLive(stubPage(breaks), { origin: 'https://app.brain.dog', slug: 'ops' });
     assert.ok(found.length > 0, `${JSON.stringify(breaks)} passed`);
     assert.match(found.join('\n'), finding);
   }
@@ -170,7 +170,7 @@ test('with no credential and no build, it is self-host only and a skip, never a 
 
 test('after a green run, a second sign-in is kept for the look, private to this user, and a failed one is a finding', async () => {
   const page = stubPage();
-  await signInLive(page, { origin: 'https://brain.dog', slug: 'ops' });
+  await signInLive(page, { origin: 'https://app.brain.dog', slug: 'ops' });
   const context = { storageState: async () => ({ cookies: [{ name: 'session', domain: 'brain.dog' }], origins: [] }) };
   const wrote = [];
   const write = async (file, text, options) => wrote.push({ file, text, options });

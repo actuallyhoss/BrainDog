@@ -45,6 +45,12 @@
   What `actions` still holds (the arranging controls, which only show while a page is arranged) stays in the page, in
   no box of its own, so nothing it holds is mounted twice.
 
+  THE BAR SAYS THE NAME, AND THE PAGE DOES NOT SAY IT AGAIN (29 October: "the title showing twice"). Wherever a bar is
+  drawn (the desk's top bar, the phone's head) the name is the bar's, with the count as a quiet figure after it, and the
+  `h1` stays here unseen for a screen reader and for the focus a move puts on it. The sentence takes the name's row, the
+  page's actions at its end. `named` is the exception: a page whose name is its content (a question, a row, a run) keeps
+  its name as its heading, and the bar's crumb ends at the place it sits in.
+
   `below` IS WHAT GOES UNDER THE SENTENCE: the line a task is typed into on a phone, or a page-level switch, full width.
   `led` AND `over` ARE KEPT FOR THE PAGES THAT PASS THEM, and change nothing: the header is the same on every page.
 -->
@@ -55,13 +61,12 @@
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
   import Bell from '../shell/Bell.svelte';
-  import { frame } from '../shell/frame.svelte.ts';
+  import { barTitled, frame, narrow } from '../shell/frame.svelte.ts';
   import Brand from '../shell/Brand.svelte';
   import YouMenu from '../shell/YouMenu.svelte';
   import { partsOf, stopped } from '../shell/headline.ts';
   import { settled } from './screen.svelte.ts';
   import { page } from '$app/state';
-  import { MediaQuery } from 'svelte/reactivity';
   import type { Noun } from '$lib/define.svelte.ts';
   import type { IconName } from './icons.ts';
   import type { Snippet } from 'svelte';
@@ -69,6 +74,7 @@
   let {
     title,
     count,
+    countOf,
     total,
     atLeast,
     kicker,
@@ -83,6 +89,7 @@
     well,
     headless = false,
     tiled = false,
+    named = false,
     heldLines = 2,
     heldText,
   }: {
@@ -92,6 +99,8 @@
     /** The frozen hue of the row this page is about, when it is about one: the glyph is drawn in it. */
     hue?: number | undefined;
     count?: number | undefined;
+    /** What the count counts, said after it ("8 changes"), where a bare number beside the name would say nothing. */
+    countOf?: ((n: number) => string) | undefined;
     total?: number | undefined;
     /**
      * Whether `count` is a floor rather than the answer: `Matches n of N` is exact when the grid holds the whole answer,
@@ -124,6 +133,8 @@
     headless?: boolean | undefined;
     /** The name row is the lead tile's: only the phone's bar is drawn here, and `actions` without a box. */
     tiled?: boolean | undefined;
+    /** The name is the page's content (a question, a row, a run): it stays here as the heading, and the bar ends at its place. */
+    named?: boolean | undefined;
     /** How many lines a sentence on its way holds on a phone: Today's says three things, so it holds three. */
     heldLines?: number | undefined;
     /**
@@ -177,7 +188,6 @@
   /* A HEADLESS HEAD'S ACTIONS RIDE IN THE PHONE'S BAR. Below 900px the bar already holds the way back, so the head had
      nothing left but Share and the "⋯", a row of their own over an empty start (Kiln at 390). They go in the bar
      instead, before the search button, the same bare 44 squares, and the head is not drawn. */
-  const narrow = new MediaQuery('(width < 900px)', false);
   const barred = $derived(headless && narrow.current);
 
   /* THE SEARCH BUTTON IS NOT DRAWN ON `/search`, which is the search: two ways to one place side by side read as two. */
@@ -189,19 +199,32 @@
 
   /* THE NAME, A WORD AT A TIME: each is drawn as one piece, so a line never ends inside one (a hyphen is a place a
      browser may break at), and one longer than the row still breaks inside itself rather than running off the screen. */
-  const named = $derived(title.split(/\s+/u).filter((w) => w !== ''));
+  const nameWords = $derived(title.split(/\s+/u).filter((w) => w !== ''));
 
   /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT; without one it carries BrainDog's mark. */
   const wayBack = $derived(Boolean(kicker && back));
 
-  /* THE PAGE'S NAME, FOR THE BAR'S CRUMB: said while this head is drawn, and taken back when it goes. */
+  const counted = $derived(Boolean(count || total));
+
+  /* THE PAGE'S NAME AND ITS COUNT, FOR THE BAR'S CRUMB: said while this head is drawn, and taken back when it goes. A
+     named page says neither, so the crumb ends at the place it sits in. */
+  const figure = $derived(
+    counted ? `${(count ?? 0).toLocaleString('en')}${atLeast ? '+' : ''}${total !== undefined && (atLeast || total !== count) ? ` of ${total.toLocaleString('en')}` : ''}` : '',
+  );
   $effect(() => {
+    if (named) return;
     const said = title;
+    const fig = figure;
     frame.title = said;
+    frame.figure = fig;
     return () => {
       if (frame.title === said) frame.title = '';
+      if (frame.figure === fig) frame.figure = '';
     };
   });
+
+  /* WHETHER THE BAR SAYS THIS PAGE'S NAME, so the name row here is the sentence and the actions, and the `h1` unseen. */
+  const titled = $derived(!named && !headless && !tiled && barTitled());
 
   /* ON A DESK WITH THE CRUMB IN THE BAR, the head draws no way back of its own. */
   const crumbed = $derived(frame.crumbed && !narrow.current);
@@ -215,7 +238,6 @@
      to say gives the line back. */
   const held = $derived(sentence === undefined && settled() === undefined);
 
-  const counted = $derived(Boolean(count || total));
 </script>
 
 <div bind:this={mark} aria-hidden="true"></div>
@@ -224,7 +246,7 @@
   away, and a sticky element sticks only inside its parent's box. Its title repeats the `h1` for the eye once the `h1`
   has gone, so it is hidden from a screen reader, which has already met the heading.
 -->
-<div class="head-bar" bind:this={bar} data-under={under ? '' : undefined} data-past={past ? '' : undefined}>
+<div class="head-bar" bind:this={bar} data-under={under ? '' : undefined} data-past={past && !titled ? '' : undefined}>
   {#if wayBack}
     <a class="back tap" href={at(back!)} aria-label={kicker}>
       <span class="back-mark"><Icon name="chevron" size="l" /></span>
@@ -234,7 +256,7 @@
   {/if}
   <div class="bar-lead">
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
-    <p class="bar-where" dir="auto">{where}</p>
+    <p class="bar-where" dir="auto">{where}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
     <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
   </div>
   <span class="bar-end">
@@ -248,7 +270,7 @@
     <YouMenu phone />
   </span>
 </div>
-{#if crumb && !headless && !tiled && !crumbed}
+{#if crumb && !headless && !tiled && !crumbed && !titled}
   <!-- Over the name and scrolling with the page: the row that stays is the name's. -->
   {#if back}
     <a class="kicker kicker-link tap" href={at(back)}>{crumb}</a>
@@ -257,13 +279,22 @@
   {/if}
 {/if}
 {#if !barred}
-<header class="page-head" data-under={under ? '' : undefined} data-kicked={crumb && !headless ? '' : undefined} data-headless={headless ? '' : undefined} data-tiled={tiled ? '' : undefined}>
+<header class="page-head" data-titled={titled ? '' : undefined} data-under={under ? '' : undefined} data-kicked={crumb && !headless ? '' : undefined} data-headless={headless ? '' : undefined} data-tiled={tiled ? '' : undefined}>
   <div class="head-main">
     {#if tiled}
       <!-- THE NAME IS THE LEAD TILE'S. -->
     {:else if headless}
       {#if back && kicker && !crumbed}
         <a class="head-back tap" href={at(back)}><span class="back-mark"><Icon name="chevron" size="m" /></span>{kicker}</a>
+      {/if}
+    {:else if titled}
+      <!-- THE NAME IS THE BAR'S: the `h1` is here for a screen reader and the focus a move lands, and the sentence stands
+           in the name's row. -->
+      <h1 class="name-unseen" tabindex="-1" dir="auto">{title}</h1>
+      {#if sentence}
+        <p class="page-said head-said">{@render said()}</p>
+      {:else if held}
+        <p class="page-said head-said" data-held aria-hidden="true" style:--held-lines={heldLines}>{#if heldText}<span class="held-words">{heldText}</span>{/if}</p>
       {/if}
     {:else}
       <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from whoever typed it, the glyph
@@ -273,7 +304,7 @@
           >{#if well}<span class="name-well">{@render well()}</span
             >{:else if icon}<span class="name-icon" style={hue === undefined ? undefined : `--hue:${hue}`} data-hue={hue === undefined ? undefined : ''}
               ><Icon name={icon} size="xl" /></span
-            >{/if}<span class="name-words" dir="auto">{#each named as word, n}{n > 0 ? ' ' : ''}<span class="word">{word}</span>{/each}</span>
+            >{/if}<span class="name-words" dir="auto">{#each nameWords as word, n}{n > 0 ? ' ' : ''}<span class="word">{word}</span>{/each}</span>
         </h1>
         <!--
           A COUNT OF NOTHING OVER AN EMPTY STATE IS THE SAME FACT TWICE, so a bare zero goes and a zero with a total beside
@@ -281,7 +312,7 @@
         -->
         {#if counted}
           <p class="count num">
-            {(count ?? 0).toLocaleString('en')}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
+            {(count ?? 0).toLocaleString('en')}{#if countOf}{' '}{countOf(count ?? 0)}{/if}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
                 class="of">&nbsp;of {total.toLocaleString('en')}</span
               >{/if}
           </p>
@@ -295,10 +326,13 @@
   </div>
 </header>
 {/if}
-{#if sentence && !tiled}
-  <p class="page-said">
-    {#if parts}{#each parts as part}{#if part.needs}<span class="needs" data-needs>{part.text}</span>{:else if part.fig}<span class="fig">{part.text}</span>{:else}{part.text}{/if}{/each}{:else if typeof sentence !== 'string'}{@render sentence()}{/if}
-  </p>
+{#snippet said()}
+  {#if parts}{#each parts as part}{#if part.needs}<span class="needs" data-needs>{part.text}</span>{:else if part.fig}<span class="fig">{part.text}</span>{:else}{part.text}{/if}{/each}{:else if typeof sentence !== 'string' && sentence}{@render sentence()}{/if}
+{/snippet}
+{#if titled}
+  <!-- SAID IN THE NAME'S ROW. -->
+{:else if sentence && !tiled}
+  <p class="page-said">{@render said()}</p>
 {:else if held && !tiled}
   <p class="page-said" data-held aria-hidden="true" style:--held-lines={heldLines}>{#if heldText}<span class="held-words">{heldText}</span>{/if}</p>
 {/if}
@@ -440,7 +474,7 @@
     outline: none;
   }
 
-  /* ONE WORD, ONE PIECE (`named`): a box of its own breaks only when it is wider than the row, and then inside itself. */
+  /* ONE WORD, ONE PIECE (`nameWords`): a box of its own breaks only when it is wider than the row, and then inside itself. */
   .word {
     display: inline-block;
     max-inline-size: 100%;
@@ -640,6 +674,49 @@
     font-weight: var(--fw-medium);
   }
 
+  /* THE NAME THE BAR SAYS, kept for a screen reader and the focus a move lands, and drawn nowhere. */
+  .name-unseen {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* THE NAME'S ROW WITHOUT THE NAME: the sentence, and the actions at its end. Nothing in it stays at the top, since the
+     bar above already says where you are. */
+  .page-head[data-titled] {
+    position: static;
+    z-index: auto;
+  }
+
+  .page-head[data-titled]::before {
+    display: none;
+  }
+
+  .page-head[data-titled] .head-main {
+    min-block-size: 0;
+  }
+
+  .page-head[data-titled]:has(.head-actions) .head-main {
+    min-block-size: var(--ctl-h);
+  }
+
+  /* A HEAD WITH NOTHING TO SAY BUT ITS NAME draws no room of its own. */
+  .page-head[data-titled]:not(:has(.head-said, .head-actions)) {
+    padding-block-start: 0;
+  }
+
+  .page-said.head-said {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    max-inline-size: 75ch;
+  }
+
   /* UNDER THE SENTENCE, in the gutter, a step below it. */
   .head-below {
     padding: var(--sp-3) var(--gutter) 0;
@@ -719,6 +796,15 @@
       opacity: 0;
     }
 
+    /* THE PAGE'S COUNT AFTER ITS NAME, quiet. */
+    .bar-figure {
+      margin-inline-start: var(--sp-2);
+      color: var(--ink-3);
+      font-family: var(--font-ui);
+      font-weight: var(--fw-medium);
+      font-variant-numeric: tabular-nums;
+    }
+
     .head-bar[data-past] .bar-where {
       opacity: 0;
     }
@@ -771,8 +857,8 @@
       padding-block-start: var(--sp-3);
     }
 
-    /* The phone's name, 22/28, four lines at most and then an ellipsis (two cut a question to "File..."): a cut name loses its meaning, and two lines never
-       push the count or the actions off the row. THE GLYPH AND THE WORDS IN A GRID (today F9, which the question page
+    /* The phone's name, 22/28, wrapped in full and never cut (a cut question loses its meaning; the audit's Q20 found
+       one cut mid-word). THE GLYPH AND THE WORDS IN A GRID (today F9, which the question page
        drew for itself), so a second line starts under the first and not under the glyph, and the glyph sits on the
        first line. */
     .page-name {
@@ -793,11 +879,8 @@
     }
 
     .name-words {
-      display: -webkit-box;
-      overflow: hidden;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 4;
-      line-clamp: 4;
+      display: block;
+      min-inline-size: 0;
     }
 
     .count {

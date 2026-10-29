@@ -522,14 +522,14 @@ test('a figure longer than a tile holds says its longest amount, as drawn, and a
 /**
  * WHERE THE HOST LIVES IS THE HOST'S TO SAY, and the record's text does not know it. A queue's "N more", a
  * capture's list, a table row, a `[label](/r/x)` note and a `{{ref:}}` are all written record-relative, as
- * `/decide` or `/r/things/1`, and this package drew them exactly so. Under a host served from `/app/<slug>` each
- * of those is outside the app: the web app shipped a `MutationObserver` over its `<main>` that rewrote every
+ * `/decide` or `/r/things/1`, and this package drew them exactly so. Under a host served from `/<slug>` (`/app/<slug>`, as
+ * the Cloud was then) each of those is outside the record on screen: the web app shipped a `MutationObserver` over its `<main>` that rewrote every
  * root-path `href` after the renderer had drawn it, because the renderer had nowhere to be told.
  *
  * THIS STANDS IN FOR THAT HOST, and it is idempotent the way the app's `at()` is, because the renderer passes
  * the host's own answers (`link`, `cellHref`) through it too and some of those are rendered already.
  */
-const under = (p: string): string => (p.startsWith('/') && !p.startsWith('//') && !p.startsWith('/app/') ? `/app/acme${p}` : p);
+const under = (p: string): string => (p.startsWith('/') && !p.startsWith('//') && !p.startsWith('/acme/') ? `/acme${p}` : p);
 const hrefsOf = (t: string): string[] => [...t.matchAll(/ href="([^"]*)"/gu)].map((m) => m[1]!);
 const Hosted = Block as unknown as Component<{ block: BlockSegment; opts: Record<string, unknown> }>;
 
@@ -551,14 +551,14 @@ test('EVERY ADDRESS BOTH RENDERERS DRAW GOES THROUGH THE HOST\'S `href`, and the
   }
   assert.deepEqual(
     [...new Set(seen)].sort(),
-    ['/app/acme/decide', '/app/acme/r/tasks?f=state:is:backlog', '/app/acme/r/things/1', '/app/acme/r/things/4'],
+    ['/acme/decide', '/acme/r/tasks?f=state:is:backlog', '/acme/r/things/1', '/acme/r/things/4'],
   );
 
   /* PROSE, which is where a note's `[label](/r/x)` is, through both markdown drawers. */
   const [prose] = parse('See [the export](/r/tasks/3) first.');
   assert.equal(prose?.type, 'markdown');
-  assert.deepEqual(hrefsOf(tree(render(Markdown, { props: { segment: prose, opts } }).body)), ['/app/acme/r/tasks/3']);
-  assert.deepEqual(hrefsOf(tree(toHTML([prose!], opts))), ['/app/acme/r/tasks/3']);
+  assert.deepEqual(hrefsOf(tree(render(Markdown, { props: { segment: prose, opts } }).body)), ['/acme/r/tasks/3']);
+  assert.deepEqual(hrefsOf(tree(toHTML([prose!], opts))), ['/acme/r/tasks/3']);
 });
 
 test('A HOST WITH NO `href` GETS THE ADDRESS AS WRITTEN, which is every host but the web app', () => {
@@ -570,7 +570,7 @@ test('A HOST WITH NO `href` GETS THE ADDRESS AS WRITTEN, which is every host but
 test('A TILE\'S DOOR GOES THROUGH IT TOO, although only the Svelte drawer draws the tile as a door', () => {
   const block = page('```stat\nCash now | GBP 12,400.00\n```');
   const tile = tree(render(Hosted, { props: { block, opts: { href: under, cellHref: () => '/p/money' } } }).body);
-  assert.deepEqual(hrefsOf(tile), ['/app/acme/p/money']);
+  assert.deepEqual(hrefsOf(tile), ['/acme/p/money']);
 });
 
 /* ── calendar, link, gallery and embed, the two card roles, a path's short view and a board's touch move ───────── */
@@ -751,7 +751,7 @@ test('A LEDGER ROW WEARS ITS CHIP AND THE LINE UNDER ITS TITLE, money in is mark
   assert.equal(items.length, 3);
   assert.match(items[0]!, /^<span aria-hidden="true" class="item-chip" data-slot="pink"><svg[^>]*><path d="M12 3v2">/u, 'a glyph with art on its colour');
   assert.match(items[0]!, /<span class="item-under">Eating out · Card<\/span>/u, 'the two parts joined by a dot');
-  assert.match(items[1]!, /^<span aria-hidden="true" class="item-chip">P<\/span>/u, 'a glyph with no art is the title\'s letter');
+  assert.match(items[1]!, /^<span aria-hidden="true" class="item-chip" data-slot="[a-z]+">P<\/span>/u, 'a glyph with no art is the title\'s letter, on its category\'s colour');
   assert.match(items[1]!, /<span class="item-detail" data-sign="in">/u, 'money in is marked');
   assert.match(items[1]!, /<span class="item-approx num">≈ EGP 51,744<\/span>/u, 'the host restates another currency');
   assert.doesNotMatch(items[0]!, /item-approx/u, 'and not the home one');

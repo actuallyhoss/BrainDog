@@ -25,9 +25,9 @@ const green = (name) =>
   [
     `The first run's own words (118 sentences), as ${name}`,
     '  no-tour: green. no tour, checklist or sample entries',
-    `/app/ at 1440 wide (the rail and Today, just kept, before anything was told), as ${name}`,
+    `/ at 1440 wide (the rail and Today, just kept, before anything was told), as ${name}`,
     '  no-tour: green. no tour, checklist or sample entries',
-    '  nothing-before-press: does not apply. not a first-run page (/app/)',
+    '  nothing-before-press: does not apply. not a first-run page (/)',
     '  rail-has-rows: green. the rail holds no place besides Today, Decide and People',
     '4 checks: 3 green, 0 red, 0 not seen, 1 that do not apply. Exit code 0.',
   ].join('\n');
@@ -37,10 +37,10 @@ const red = (name) =>
   [
     `The first run's own words (118 sentences), as ${name}`,
     '  no-tour: green. no tour, checklist or sample entries',
-    `/app/ at 1440 wide (the rail and Today, just kept, before anything was told), as ${name}`,
+    `/ at 1440 wide (the rail and Today, just kept, before anything was told), as ${name}`,
     '  signs-line: not seen. the snapshot holds no count of vital signs',
     '  rail-has-rows: green. the rail holds no place besides Today, Decide and People',
-    `/app/ at 390 wide (Today and the tab bar, after the first real thing), as ${name}`,
+    `/ at 390 wide (Today and the tab bar, after the first real thing), as ${name}`,
     '  rail-has-rows: \u001b[31mred\u001b[0m. the rail shows Bills, which holds nothing yet',
     '  pages-line: red. "New page" twice',
     '5 checks: 2 green, 2 red, 1 not seen. UNCHECKED: 1 of 5 read nothing, which is not a pass. Exit code 1.',
@@ -91,7 +91,7 @@ test('one leaves with 1: red, and it names who, the first red check, its screen 
   const { code, said } = called(run);
   assert.equal(code, 1);
   assert.deepEqual(asked, PEOPLE, 'the first person passing does not end the run, and neither would her failing');
-  assert.match(said, /Sam: rail-has-rows is red on \/app\/ at 390 wide \(Today and the tab bar, after the first real thing\)\. the rail shows Bills, which holds nothing yet/u);
+  assert.match(said, /Sam: rail-has-rows is red on \/ at 390 wide \(Today and the tab bar, after the first real thing\)\. the rail shows Bills, which holds nothing yet/u);
   assert.doesNotMatch(said, /Mariam:/u, 'the person who passed is not named among the findings');
   assert.doesNotMatch(said, /pages-line/u, 'the first red check, not every one');
   assert.match(said, /1 finding\(s\)/u);
@@ -108,8 +108,8 @@ test('the first person red does not hide the second', () => {
 
 test('a red comes before a check that read nothing, and with no red the unread check is named', () => {
   assert.equal(firstRed(red('Sam')).check, 'rail-has-rows');
-  const unread = ['/app/ at 1440 wide, as Sam', '  signs-line: not seen. the snapshot holds no count of vital signs', '1 checks: 0 green, 0 red, 1 not seen. Exit code 1.'].join('\n');
-  assert.equal(findingOf('Sam', { status: 1, out: unread, err: '' }), 'Sam: signs-line read nothing, which is not a pass on /app/ at 1440 wide. the snapshot holds no count of vital signs');
+  const unread = ['/ at 1440 wide, as Sam', '  signs-line: not seen. the snapshot holds no count of vital signs', '1 checks: 0 green, 0 red, 1 not seen. Exit code 1.'].join('\n');
+  assert.equal(findingOf('Sam', { status: 1, out: unread, err: '' }), 'Sam: signs-line read nothing, which is not a pass on / at 1440 wide. the snapshot holds no count of vital signs');
   assert.equal(firstRed(green('Sam')), null);
 });
 

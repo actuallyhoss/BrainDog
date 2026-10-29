@@ -47,12 +47,15 @@ test('a payment page leaves this tab in a browser and goes to the shell in the a
   delete g.location;
 });
 
-test('goto takes only an address under /app', async () => {
+test('goto takes only an address of the app, and reads one from before the move as the one it names now', async () => {
   const { appPath } = await import('./shell.ts');
-  assert.equal(appPath('/app'), '/app');
-  assert.equal(appPath('/app/decide'), '/app/decide');
-  assert.equal(appPath('/app?x=1'), '/app?x=1');
-  for (const bad of [undefined, '', '/', '/apple', 'https://evil.example/app/x', '//evil.example', '/app/../etc', '/app\\evil', 'javascript:alert(1)'])
+  assert.equal(appPath('/'), '/');
+  assert.equal(appPath('/decide'), '/decide');
+  assert.equal(appPath('/acme/r/tasks?x=1'), '/acme/r/tasks?x=1');
+  assert.equal(appPath('/app'), '/');
+  assert.equal(appPath('/app/decide'), '/decide');
+  assert.equal(appPath('/app?x=1'), '/?x=1');
+  for (const bad of [undefined, '', 'decide', 'https://evil.example/x', '//evil.example', '/../etc', '/app/../etc', '/x\\evil', 'javascript:alert(1)', '/api/export', '/auth/logout', '/oauth/authorize', '/app/api/boot'])
     assert.equal(appPath(bad), null, String(bad));
 });
 

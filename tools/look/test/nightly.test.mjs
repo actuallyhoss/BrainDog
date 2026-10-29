@@ -10,9 +10,9 @@ import { judge, methodOf, parse, plist, recOf } from '../nightly.mjs';
 
 test('A READ IS NAMED BY ITS METHOD under either address, and anything else is not a read', () => {
   assert.equal(methodOf('/api/list'), 'list');
-  assert.equal(methodOf('/app/the-studio/api/boot'), 'boot');
+  assert.equal(methodOf('/the-studio/api/boot'), 'boot');
   assert.equal(methodOf('/api/slash/status'), 'slash/status');
-  assert.equal(methodOf('/app/_app/immutable/x.js'), null);
+  assert.equal(methodOf('/_app/immutable/x.js'), null);
 });
 
 test("THE RECORD'S TIME IS READ OFF Server-Timing, and an answer without it says nothing", () => {

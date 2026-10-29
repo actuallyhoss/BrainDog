@@ -109,6 +109,10 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
      (money-core 3.17.0, spend-figures-63). Thirty-three days back, so no thirty-day figure reads it. */
   make('transactions', { what: `Software last month in ${side.word}`, on: day(-33), direction: 'out', amount: at(600), account: cash.id, state: 'cleared', category: kiln.category });
   make('transactions', { what: `Received in ${side.word}`, on: day(-1), direction: 'in', amount: at(2_500), account: cash.id, state: 'cleared', thing: kiln.thing });
+  /* AND MONEY IN THREE MONTHS BACK, 15 June, for what comes in a month (`received-a-month`, `received-three-months-back`,
+     money-core 3.32.0), and a payment still waiting to clear this month (`pending-out-month`, money-core 3.31.0). */
+  make('transactions', { what: `Received in June in ${side.word}`, on: day(-80), direction: 'in', amount: at(1_800), account: cash.id, state: 'cleared' });
+  make('transactions', { what: `Waiting in ${side.word}`, on: day(0), direction: 'out', amount: at(300), account: cash.id, state: 'pending' });
   make('obligations', { what: `Bill in ${side.word}`, direction: 'owed_by_me', amount: at(2_000), due: day(5), state: 'open' });
   make('obligations', { what: `Late bill in ${side.word}`, direction: 'owed_by_me', amount: at(3_000), due: day(-5), state: 'open' });
   make('obligations', { what: `Invoice in ${side.word}`, direction: 'owed_to_me', amount: at(4_000), due: day(7), state: 'open', thing: kiln.thing });
@@ -130,6 +134,9 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
   /* AND A CATEGORY WITH A BUDGET IN THIS CURRENCY, for what the budgets add up to (`budgets-total`, money-core 3.29.0). A
      category keeps no book, so it is made without one. */
   value(k.create('categories', { name: `Food in ${side.word}`, direction: 'out', state: 'live', budget: at(5_000) }, OWNER));
+  /* AND A WEEK'S BUDGET AND A YEAR'S, for what those add up to a month (money-core 3.31.0). */
+  value(k.create('categories', { name: `Coffee in ${side.word}`, direction: 'out', state: 'live', budget: at(500), budget_period: 'week' }, OWNER));
+  value(k.create('categories', { name: `Travel in ${side.word}`, direction: 'out', state: 'live', budget: at(24_000), budget_period: 'year' }, OWNER));
 }
 
 /** A record holding the rows of each side, standing as `stands` says. */
@@ -158,6 +165,9 @@ const figuresOf = (k: Kernel): Figure[] =>
     /* NOT A FIGURE OF ONE ACCOUNT (money-core 3.29.0's account page): an account holds one currency, so such a figure has
        no second currency to keep apart, and no book or project is an account. `money-account-page.test.ts` holds them. */
     .filter((d) => !/(?:name|account) is \{\{it\}\}|account-(?:now|lines):\{\{it\}\}/u.test(d.body))
+    /* NOR ONE OF ONE PAYEE (money-core 3.32.0's `paid-to-by-week`): `party` names an organisation, and this record holds
+       none, so the payee is no name it could be asked about. Its sum is Spending's, read a category at a time above. */
+    .filter((d) => !/party is \{\{it\}\}/u.test(d.body))
     .map((d) => {
       const body = JSON.parse(d.body) as Figure;
       return (JSON.stringify(body).includes('{{it}}') ? fill(body, null, JSON.stringify(body).includes('category is {{it}}') ? 'Software' : KILN) : body) as Figure;
@@ -287,7 +297,9 @@ test('EVERY MONEY FIGURE IN AN AMOUNT HAS ROWS IN BOTH CURRENCIES HERE, so none 
   const k = await recordOf([POUNDS, DOLLARS], NO_HOME);
   /* A CROSS-CHECK READS NOUGHT BY DESIGN (money-core 3.17.0's `cash-cross-check`): nought is the figure agreeing with the
      ledger, not a figure holding nothing. */
-  const figures = figuresOf(k).filter(isMoney).filter((f) => !/"crosscheck"/.test(JSON.stringify(f.value ?? null)));
+  /* NOR WHAT IS HELD BEYOND CASH (money-core 3.31.0's `held-beyond-cash`): it adds the add-ons' figures, and a record of
+     money-core alone holds no add-on, so it reads nought in each currency by design. */
+  const figures = figuresOf(k).filter(isMoney).filter((f) => !/"crosscheck"/.test(JSON.stringify(f.value ?? null)) && f.metric !== 'held-beyond-cash');
   assert.ok(figures.length >= 30, `only ${figures.length} money figures were found, so the pack was not read`);
   const idle = figures.filter((f) => Object.values(alone).some((reads) => (reads.get(f.metric)?.value ?? 0) === 0)).map((f) => f.metric);
   assert.deepEqual(idle, [], 'these figures read nothing in one currency: give `write` a row each reads');

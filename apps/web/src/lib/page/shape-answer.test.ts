@@ -32,7 +32,8 @@ const via = REGISTERS[work]!.fields.find((f) => f.type === 'ref' && (f as { to?:
 const state = REGISTERS[work]!.state!;
 const states = (REGISTERS[work]!.fields.find((f) => f.id === state) as { values: readonly string[] }).values;
 const done = (REGISTERS[work] as { done?: readonly string[] }).done ?? [];
-const open = states.find((v) => !done.includes(v))!;
+/* WORK KEPT FOR LATER (`backlog`) IS NOT OPEN, as Work counts it (`viaOf`), so the open row is in the first state past it. */
+const open = states.find((v) => !done.includes(v) && v !== 'backlog')!;
 
 const ANSWER: ShapeAnswer = {
   register: projects,

@@ -759,9 +759,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       /**
        * Who a cookie is, and with a slug, which record that request is for.
        *
-       * THE SLUG IS THE PATH'S (`/app/<slug>/api/…`), AND THIS IS THE CHECK THAT RUNS BEFORE THE WORKER ADDRESSES
+       * THE SLUG IS THE PATH'S (`/<slug>/api/…`), AND THIS IS THE CHECK THAT RUNS BEFORE THE WORKER ADDRESSES
        * ANYTHING. It is `switch`'s own question, a live name on an open record this person is on, answered with the
-       * record and never written: the session row's record stays where the last switch put it, so bare `/app` still
+       * record and never written: the session row's record stays where the last switch put it, so the bare app still
        * goes back there, and a read in one tab does not move another tab's.
        *
        * ONE 403 FOR EVERY NAME THAT IS NOT THEIRS, word for word the record's own "You are not on this record.". A

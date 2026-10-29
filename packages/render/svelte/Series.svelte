@@ -45,7 +45,7 @@
         {#each plan.buckets as k, i}
           <li class="series-col" data-state={k.state || undefined} data-under={k.under ? '' : undefined} data-flip={i >= plan.buckets.length / 2 ? '' : undefined}>
             {#each plan.bars.filter((bar) => bar.bucket === i) as bar}
-              <span class="series-bar" data-dir={bar.dir} data-step={bar.step} data-state={bar.state || undefined} data-end={bar.end ? '' : undefined} style="--y:{bar.y};--h:{bar.height}"></span>
+              <span class="series-bar" data-dir={bar.dir} data-step={bar.step} data-state={bar.state || undefined} data-end={bar.end ? '' : undefined} data-up={bar.up ? '' : undefined} style="--y:{bar.y};--h:{bar.height}"></span>
             {/each}
             <span class="series-tip"
               ><span class="series-tip-label">{k.label}{#if k.said}{' '}{k.said}{/if}</span>{#each plan.series as s, j}<span class="series-tip-value"

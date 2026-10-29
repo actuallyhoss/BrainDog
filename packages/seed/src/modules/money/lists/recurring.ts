@@ -95,6 +95,9 @@ export const RECURRING_REGISTER: MoneyRegister = {
     /* NOT INDEXED: this list is one short of `INDEX_CEILING` (`packages/kernel/src/declare.ts`), and the last index
        is left for a field that needs it more. */
     { ...BOOK },
+    /* "POST IT FOR ME", SINCE money-core 3.31.0: the line writes its own Ledger line on the day it is due, on an account no
+       bank feeds (`post-due.ts`), and moves on as if it were paid. */
+    { id: 'post', label: 'Post it for me', type: 'bool', default: false },
     { id: 'state', label: 'Status', type: 'enum', values: ['live', 'paused', 'ended'], default: 'live', index: true, required: true },
     { id: 'note', type: 'text' },
   ],

@@ -320,6 +320,8 @@ export function purge(
     const old = new Date(nowMs - 400 * 86_400_000).toISOString().slice(0, 10);
     const before = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM observation WHERE day < ?', old)?.n ?? 0);
     if (before > 0) sql.exec('DELETE FROM observation WHERE day < ?', old);
+    /* AND EACH PERSON'S COUNT AT THE SAME AGE (migration 47), which no figure here reports: it is the same opens again. */
+    sql.exec('DELETE FROM observation_who WHERE day < ?', old);
 
     if (doomed.length > 0 || before > 0)
       sql.exec(

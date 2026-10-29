@@ -52,7 +52,7 @@ import { USE_CASES, keptLists, useCaseDocument } from '../usecases/index.ts';
 import { moduleName, namesSaid } from '../usecases/names.ts';
 import { AGENTS_PACK, agentsPackDocument } from './agents.ts';
 import { ADDON_LEG_LISTS } from '../modules/held-legs.ts';
-import { CORE_CAME_FROM, FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from './first-party.ts';
+import { CORE_CAME_FROM, FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument, laidWithLink } from './first-party.ts';
 
 type Body = Record<string, unknown>;
 
@@ -389,8 +389,11 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     const diff = planned.value;
     /* CHANGES ONLY. At the version the record holds, a declaration the plan would add is one the person took off, or
        one left out for a list the record lacked; the record cannot always tell which, so a relink never adds. Measured:
-       with adds let through, a figure and a rule the person had taken off People came back the next night. */
-    if (diff.changes.length === 0 || diff.adds.length > 0 || losses(diff, nameOf, tookOff).length > 0 || unready(diff) !== null) continue;
+       with adds let through, a figure and a rule the person had taken off People came back the next night. BUT ONE
+       THAT READS A LINK THIS SAME PLAN LAYS BACK (`laidWithLink`) was left out for the link alone, and goes in with it. */
+    const changed = diff.changes.map((c) => c.id);
+    const adds = diff.adds.filter((a) => !laidWithLink(id, doc, a.id, changed));
+    if (diff.changes.length === 0 || adds.length > 0 || losses(diff, nameOf, tookOff).length > 0 || unready(diff) !== null) continue;
     const put = await port.install(doc, diff.planHash);
     out.push(put.ok ? { pack: id, from: to, to, did: 'updated' } : { pack: id, from: to, to, did: 'refused', why: fixOf(put) });
   }

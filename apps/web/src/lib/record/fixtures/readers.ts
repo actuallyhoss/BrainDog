@@ -59,7 +59,7 @@ import { AUDIT, DECIDED, JOBS, NEWS, NOW, OBSERVED, PEOPLE_ACCESS, QUESTIONS, QU
 import { copy } from '../../copy.ts';
 import { answers, terms, tokensOf, why } from '../find.ts';
 import { METRICS } from '../declared.ts';
-import { fxNote, meetsTarget, offTarget, targetLine, targetSaid, windowMs, type MetricDecl, type Reading } from '../metrics.ts';
+import { fxNote, markOf, meetsTarget, offTarget, targetLine, targetSaid, windowMs, type MetricDecl, type Reading } from '../metrics.ts';
 import { blockOf, tileOf as pageTile } from '../page-live.ts';
 import { entryOf, refMapOf, sentenceOf, type RefMap } from '../remote.ts';
 import { learnRowPages } from '../row-href.ts';
@@ -528,7 +528,7 @@ export function figureTile(id: string, decl: MetricDecl, reading: Reading): Metr
 
   /* A FIGURE CONVERTED OUT OF ITS DECLARED CURRENCY IS JUDGED AGAINST ITS TARGET CONVERTED, and has no verdict without a rate. */
   const off = offTarget(decl, reading.unit);
-  const met = empty || unsaid ? null : off ? (reading.targetIn ? meetsTarget({ ...decl, target: reading.targetIn.target }, reading.value, reading) : null) : meetsTarget(decl, reading.value, reading);
+  const met = empty || unsaid ? null : markOf(decl, off ? (reading.targetIn ? meetsTarget({ ...decl, target: reading.targetIn.target }, reading.value, reading) : null) : meetsTarget(decl, reading.value, reading));
   /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and
      `+18%` beside a target is two numbers a reader has to tell apart. */
   /* AND AN ABSENT COMPARISON SAYS SO. `19 §6`: a surface showing nothing must never be

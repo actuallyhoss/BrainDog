@@ -175,7 +175,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
       }
       /* THE SPA FALLBACK the deployed host serves, for the same reason `a11y.mjs` serves it: without it
          `/decide/<id>` and `/p/agents` 404 on a direct load instead of letting the router decide. */
-      /* The app's shell, which is under `/app` in the build as it is on the host (`lib.mjs`). */
+      /* The app's shell, at the root of the build as it is on the host (`lib.mjs`). */
       const shell = appShell(ROOT);
       const asset = Object.hasOwn(TYPES, extname(rel));
       if (!asset && (await stat(shell).catch(() => null))?.isFile()) {

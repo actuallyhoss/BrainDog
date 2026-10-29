@@ -126,11 +126,11 @@ test('A QUEUE OUTSIDE DECIDE SHOWS AT MOST THREE, and says how many more wait th
 });
 
 /* WHERE A PAGE SERVES A FILE IT HOLDS: the lining's photograph, and nothing for a file the block does not hold. */
-const serves = (row: string, field: string): string | null => (row === 'parts#2' ? `/app/acme/files/${row.replace('#', '/')}/${field}` : null);
+const serves = (row: string, field: string): string | null => (row === 'parts#2' ? `/acme/files/${row.replace('#', '/')}/${field}` : null);
 
 test('AN OPTION THAT IS A PICTURE IS DRAWN FROM THE ADDRESS THE PAGE SERVES IT AT', () => {
   const photo = { file: { row: 'parts#2', field: 'photo' } };
-  assert.deepEqual(visualOf(photo, serves), { file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } });
+  assert.deepEqual(visualOf(photo, serves), { file: { row: 'parts#2', field: 'photo', src: '/acme/files/parts/2/photo' } });
   assert.equal(visualOf(photo), null, 'a card handed no way to an address draws no picture');
   assert.equal(visualOf({ file: { row: 'parts#9', field: 'photo' } }, serves), null, 'a file the page does not hold');
   assert.equal(visualOf({ file: { row: 'parts#2' } }, serves), null, 'a file with no field');
@@ -231,7 +231,7 @@ test('THE WAYS TO ANSWER CARRY THE PICTURE ONLY WHERE THE CARD WAS HANDED THE WA
     ],
   } as Parameters<typeof waysOf>[0];
   assert.deepEqual(waysOf(q).map((w) => w.shows), [null, { swatch: ['#c9a227'] }]);
-  assert.deepEqual(waysOf(q, serves).map((w) => w.shows), [{ file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } }, { swatch: ['#c9a227'] }]);
+  assert.deepEqual(waysOf(q, serves).map((w) => w.shows), [{ file: { row: 'parts#2', field: 'photo', src: '/acme/files/parts/2/photo' } }, { swatch: ['#c9a227'] }]);
 });
 
 test('A RUN THAT ASKED IS NAMED BY THE APP IT RAN IN, never "An agent", once its run is read', () => {

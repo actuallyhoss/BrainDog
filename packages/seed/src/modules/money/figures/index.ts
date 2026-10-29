@@ -22,6 +22,8 @@ import { NEXT_PART_FIGURES, PLAN_FIGURES, PLAN_PAGE_FIGURES, PLANS_FIGURES } fro
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
 import { SPEND_VS_LAST_FIGURES, SPENDING_FIGURES } from './spending.ts';
+import { WORTH_FIGURES } from './worth.ts';
+import { WEEKLY_FIGURES } from './weekly.ts';
 
 const DECLARED_METRICS: Record<string, SeedMetric> = {
   ...CASH_FIGURES,
@@ -92,6 +94,14 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   /* WHAT A PLAN'S PAGE SUMS UP, SINCE money-core 3.29.0: what is late, the parts cancelled, the plan's track with
      its next part, and what was paid each quarter. LAST, so every figure above keeps its place in the document. */
   ...PLAN_PAGE_FIGURES,
+
+  /* NET WORTH WITH WHAT THE ADD-ONS HOLD, SINCE money-core 3.31.0: what is held beyond cash, what is owed over time, and
+     the two with cash and the bills, remembered each night. LAST, so every figure above keeps its place in the document. */
+  ...WORTH_FIGURES,
+
+  /* ONE CATEGORY OR ONE PAYEE BY WEEK, SINCE money-core 3.32.0: what a widget made by saying "by week" draws. LAST, so
+     every figure above keeps its place in the document. */
+  ...WEEKLY_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

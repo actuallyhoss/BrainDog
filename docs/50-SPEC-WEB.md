@@ -54,6 +54,16 @@ itself, and the self-host mounts the build at `/app` (49 §5.19). On the Cloud t
 (push C of the one-domain move; between pushes B and C it was at `brain.dog/app`), and a page load on `brain.dog/app/...`
 is a `308` to the same path on `app.brain.dog`, which the site hands to the Worker through its binding (51 §4.4).
 
+*(Amended October 29th 2026, checked against `apps/web/svelte.config.js` and `src/lib/at.ts`.)* **The app is at the
+root of its name again**, because he did not want `app.brain.dog/app/mara`: `paths.base` is `''`, every file lands at
+the root of `build/`, the shell is `/` and its chunks are `/_app/…`, and a record is `app.brain.dog/<slug>`. The first
+segment is one of the app's own words, which means the record the session is on, one of the host's doors (`DOORS` in
+`at.ts`: `api`, `auth`, `account`, `mcp`, `oauth`, `in`, `a`, `ws`, `healthz`, `drawn-frame`, `app` and the build's
+`_app`), which the app never draws or sends anybody to, or a record's slug. Everything above holds with `/app` taken
+off: `/acme/r/tasks` matches `routes/r/[register]`, and `apiBase()` sends a record call from under a slug to
+`/<slug>/api/…`. Every address under `/app`, on `app.brain.dog` or `brain.dog`, is one `308` to the same address
+without it, query kept, so `onward` and `at` read an old `/app/...` address as the one it names now (`fromLegacy`).
+
 ---
 
 ## 2 · Public API
@@ -668,7 +678,7 @@ mechanism 2, amended in §13 D1). Per device — §10.
 
 1. `export const ssr = false`; the shell mounts its silhouette (`<main aria-busy="true">`) before any call returns.
 2. Fire `boot()`, `GET /api/version` and the route's own call **in parallel**; a page therefore costs one round trip
-   after the shell. `UNAUTHORIZED` from any of them → `location.assign('/app/signin?next=' + path)`. `/app/signin` goes on to `next` only when it is a path on this origin (`safeNext` in `packages/host/src/auth.ts`: no `//`, no backslash, no scheme, nothing that decodes to one), else to `/app/`. *(Since push A, September 23rd 2026, `signInFirst` and `onward` in `lib/at.ts`: `next` must also be an address under `/app`. With nobody signed in, bare `/app` draws the sample as before, and only a 401 under `/app/<slug>/` is sent to sign-in, because the sample there would be dressed as that record.)*
+   after the shell. `UNAUTHORIZED` from any of them → `location.assign('/signin?next=' + path)`. `/signin` goes on to `next` only when it is a path on this origin (`safeNext` in `packages/host/src/auth.ts`: no `//`, no backslash, no scheme, nothing that decodes to one), else to `/`. *(Since push A, September 23rd 2026, `signInFirst` and `onward` in `lib/at.ts`: `next` must also be an address of the app: under `/app` until October 29th 2026, and since then any path that is not one of the host's doors. With nobody signed in, bare `/app` draws the sample as before, and only a 401 under `/app/<slug>/` is sent to sign-in, because the sample there would be dressed as that record.)*
 3. `live.slash = version.slash`; `version.record = max(boot.version, version.version)`; `aria-busy` is set back.
 4. The record switcher's rows come from `GET /account/records` (33 §4), read only when `boot.signIn` is not `false`: a host
    where nobody signs in answers that route 401, the answer an ended session gets, and the switcher would offer a
@@ -694,7 +704,7 @@ The app raises no refusal code of its own; it renders the server's. The one thin
 | `ok` | the overlay entry is dropped; *saved* to the polite live region; an Undo toast |
 | `refusals` (422) | each `fix` verbatim, next to its field; also in the summary when >1 or unplaced. Never a toast — a blocking error must be read (13 §6) |
 | `conflict` (409) | after the rule of §5.3 step 5: either silent re-apply, or *{actor} changed this: {theirs}* with **Keep mine** / **Take theirs**; a toast *Reloaded — {actor} changed this row* |
-| `UNAUTHORIZED` (401) | redirect to `/app/signin?next=<path>`; nothing else is said |
+| `UNAUTHORIZED` (401) | redirect to `/signin?next=<path>`; nothing else is said |
 | `FORBIDDEN` (403) | the `no-permission` state |
 | `NEEDS_BROWSER_SESSION` (403) | cannot occur: the app never sends a bearer. If seen, it is rendered as `error` with its `fix`, and it is a bug in a host |
 | `SCHEMA_MISMATCH` · `SCHEMA_NEWER` (503) | a full-screen `error`: *The record is being updated. Try again in a minute.* |
@@ -799,7 +809,7 @@ pack kind · a deliberately unknown primitive — × widths 390 · 768 · 1024 �
 | `motion` | `--ease-spring` sampled at 1,000 points: last value 1, max ≤ 1.05; no duration token > 300 ms; under `prefers-reduced-motion` every duration is 1 ms and every state still changes something |
 | `bundle` | the §7 rows |
 | `a11y-tree` | for every fixture block and the degraded fence, the accessibility tree of `<Block>`/`<Table>` equals that of `toHTML`'s markup parsed by the browser, and the `--cells` and `--cols` values are equal — 36 §9's stage-3 row |
-| `shell` | `/app/r/obligations` requested directly answers `app/index.html` (drawn by the host since push A, not a fallback) and the grid renders; `/app/_app/version.json` exists and equals the build's |
+| `shell` | `/r/obligations` requested directly answers `index.html` (drawn by the host since push A, not a fallback) and the grid renders; `/_app/version.json` exists and equals the build's |
 | `grid-contract` | the §4.2 checklist; `aria-rowcount` = N or −1 by rule; DOM rows = `min(rows, 2,000)`; the cap line at 2,000; header cell widths === body cell widths exactly; no phantom tracks and an empty tail < 2 px on every grid and flex container (22 §10's assertion) |
 | `page-render` | every declared block appears once, in order; each `empty:` string appears **iff** its query returned zero rows; a failed block renders `role="status"` and the page one `role="alert"`; the unknown-primitive fixture renders *Block "…" needs a newer client.* |
 | `draft-survives-load` | type into a Sheet, then release the gated `schema` load → the typed text is still there; removing the seed guard makes it fail |
@@ -923,7 +933,7 @@ spec's §9), and 36 §9's stage-3 parity row.
 - [ ] Screenshot mode: boxes and page height identical off → on; digits `0` and `8` pixel-identical; `/keychain` absent.
 - [ ] `SLASH_ENDPOINT` unset: every spec green, the word *Slash* nowhere in the DOM.
 - [ ] Leaving Home advances `member.seen_at`; opening it does not.
-- [ ] Both hosts serve `build/` unchanged: `/app/r/obligations` and `/app/<slug>/r/obligations` on either answer `app/index.html` and render the grid, and a page load of `/r/obligations` is a `308` to `/app/r/obligations`; `deploy-parity` matches `/app/` and `/app/_app/version.json` (`/` and `/_app/version.json` before push A).
+- [ ] Both hosts serve `build/` unchanged: `/r/obligations` and `/<slug>/r/obligations` on either answer `index.html` and render the grid, and a page load of `/app/r/obligations` is a `308` to `/r/obligations`; `deploy-parity` matches `/` and `/_app/version.json` (`/app/` and `/app/_app/version.json` from push A until October 29th 2026).
 - [ ] The `a11y-tree` parity gate is green for all sixteen kinds and the degraded fence — 36 §9's stage-3 row.
 - [ ] `node --test` runs the twelve unit tests in under a second; every `ponytail:` line of §10 is a comment at its call site.
 - [ ] Every row of §13 is applied to its design document in the same revision.

@@ -140,8 +140,10 @@ test('the names the rule reaches for are the ones the head and Home draw', () =>
   assert.match(head.markup, /<p class="page-said">/u);
   /* The sentence is the head's last line unless a line to type into is under it, and then the menu keeps its row. */
   assert.match(flat(head.markup), /<\/p> \{\/if\}.*\{#if below\}<div class="head-below">/u);
-  /* The body may hold the desk before the page (`data-board`), and the page is still its own child. */
-  assert.match(flat(home.markup), /<div class="page">.*<div class="body"[^>]*>.*<PageView\b[^>]*mode="home"/u);
+  /* THE READER IS A SNIPPET (`readerPart`), drawn straight into the body when Today is a page laid out by hand, so the
+     page is still the body's own child there; on a board it is drawn inside the board instead. */
+  assert.match(flat(home.markup), /\{#snippet readerPart\(\)\}.*<PageView\b[^>]*mode="home"/u);
+  assert.match(flat(home.markup), /<div class="page">.*<div class="body"[^>]*>.*\{:else\} \{@render readerPart\(\)\} \{\/if\} <\/div>/u);
 });
 
 test('a tablet keeps the row it had, and arranging keeps its own', () => {

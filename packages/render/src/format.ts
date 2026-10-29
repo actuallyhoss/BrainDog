@@ -311,16 +311,35 @@ export function barFigure(text: string, home?: Home): string {
  * and the digits line up down the column. Whole sets stay whole. Never rounded; a cell that is not one figure is left
  * as it was.
  */
-export function barFigures(texts: readonly string[], home?: Home): string[] {
+/**
+ * THE PLACES A CURRENCY IS WRITTEN TO, for a figure that names one: 2 for the pound, 0 for the yen, 3 for the dinar, by
+ * the code where the figure carries one and by its sign where it does not (only `¥` and `₩` are whole). 0 for a figure
+ * that names no currency, which is not money. A host may hand a cell already said in whole units ("−£2,500"), so the
+ * places it was written with are not always there to keep.
+ */
+function minorPlaces(text: string): number {
+  const p = figureParts(text);
+  if (!p) return 0;
+  const code = (p.code || p.unit).trim();
+  /* BY ISO 4217, as a record stores it, never by CLDR (Intl), which differs on IQD and MGA. */
+  if (/^[A-Z]{3}$/u.test(code)) return exponentOf(code);
+  if (code === '') return 0;
+  return /[¥₩]/u.test(code) ? 0 : 2;
+}
+
+export function barFigures(texts: readonly string[], home?: Home, written = false): string[] {
   const out = texts.map((t) => barFigure(t, home));
-  const placesOf = (t: string, s: string): number => (figureParts(t) ? (/\d\.(\d+)/u.exec(s)?.[1]?.length ?? 0) : 0);
+  /* `written`: A SET SAID TO ITS CURRENCY'S PLACES, zeros too, as a ledger's lines are (`timelineDetails`). */
+  const drawnPlaces = (t: string, s: string): number => (figureParts(t) ? (/\d\.(\d+)/u.exec(s)?.[1]?.length ?? 0) : 0);
+  const placesOf = (t: string, s: string): number =>
+    written ? Math.max(drawnPlaces(t, s), figureParts(t)?.minor.length ?? 0, minorPlaces(t)) : drawnPlaces(t, s);
   /* ONE CURRENCY TO A SET: a figure's mark, its words with the numerals taken out, says which set it is in. */
   const markOf = (s: string): string => s.replace(/[\d.,−+-]/gu, '').trim();
   const places = new Map<string, number>();
   out.forEach((s, i) => places.set(markOf(s), Math.max(places.get(markOf(s)) ?? 0, placesOf(texts[i]!, s))));
   return out.map((s, i) => {
     const want = places.get(markOf(s)) ?? 0;
-    if (want === 0 || !figureParts(texts[i]!) || placesOf(texts[i]!, s) === want) return s;
+    if (want === 0 || !figureParts(texts[i]!) || drawnPlaces(texts[i]!, s) === want) return s;
     return s.replace(/(\d)(?![\d,])/u, `$1.${'0'.repeat(want)}`);
   });
 }
@@ -443,9 +462,20 @@ function noon(iso: string): number | null {
  */
 const NUMBER = /(?<![\p{L}\p{N}.,-])-?\d[\d,]*(?:\.\d+)?/u;
 
+/**
+ * A SIGN WRITTEN BEFORE THE CURRENCY IS THE NUMBER'S SIGN. `money()` says a debt as "−EGP 272,371.46" and "−£1,240",
+ * the sign ahead of the code or symbol, and the pattern above only reads a sign glued to the digits: the Accounts
+ * bars drew an overdrawn card as a full bar of money held. The sign counts when nothing but a currency stands
+ * between it and the number.
+ */
+const SIGN_BEFORE_CURRENCY = /(?<![\p{L}\p{N}])-\s*(?:\p{Sc}|[A-Z]{3})\s*$/u;
+
 export function magnitudeOf(cell: string): number {
-  const m = NUMBER.exec(cell.replaceAll(MINUS, '-'));
-  return m ? Number(m[0].replaceAll(',', '')) : NaN;
+  const s = cell.replaceAll(MINUS, '-');
+  const m = NUMBER.exec(s);
+  if (!m) return NaN;
+  const n = Number(m[0].replaceAll(',', ''));
+  return n > 0 && SIGN_BEFORE_CURRENCY.test(s.slice(0, m.index)) ? -n : n;
 }
 
 /**

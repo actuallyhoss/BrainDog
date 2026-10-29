@@ -127,7 +127,7 @@ test('the post-image is checked in the kernel: a move out of the rule unwinds wi
   });
 });
 
-test("a share's narrower write rule holds the write, and the fields any share's condition reads are gate fields", async () => {
+test("a share's narrower write rule holds the write, and a writer is held to the fields her own conditions read", async () => {
   /* LEE VIEWS EVERY TASK AND EDITS KILN'S; RIA VIEWS THE TASKS IN REVIEW, so the stage decides what Ria sees. */
   const lee: Shape = {
     id: 'mixed',
@@ -158,12 +158,14 @@ test("a share's narrower write rule holds the write, and the fields any share's 
   const made = (await ask(h, 'create', { register: 'tasks', fields: { name: 'On Loom', thing: f.built.ids.loom } }, ctx)) as Out;
   assert.equal(made.refusal?.code, 'FORBIDDEN');
   assert.ok(((await ask(h, 'create', { register: 'tasks', fields: { name: 'On Kiln', thing: f.built.ids.kiln } }, ctx)) as Out).ok);
-  /* SHE EDITS A KILN TASK, BUT NOT ITS PROJECT (the project share's scope field) NOR ITS STAGE (Ria's condition). */
+  /* SHE EDITS A KILN TASK, BUT NOT ITS PROJECT (her project share's scope field). HER OWN GATES, NOT EVERYBODY'S, since
+     the household share (round 1030): Ria's stage condition holds Ria's writes, not Lee's, so Lee moves its stage. */
   assert.ok(((await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { notes: 'glazed' } }, ctx)) as Out).ok);
   const moved = (await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { thing: f.built.ids.loom } }, ctx)) as Out;
   assert.deepEqual(moved.refusal, { code: 'FORBIDDEN', fix: 'Only the owner or an Admin can change Project on a shared task.', at: 'thing' });
   const staged = (await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { stage: 'review' } }, ctx)) as Out;
-  assert.equal(staged.refusal?.at, 'stage');
+  assert.ok(staged.ok, JSON.stringify(staged));
+  /* THE LIST STILL KNOWS EVERY FIELD A CONDITION READS, the gate for a writer whose own grant names none. */
   assert.deepEqual(f.api.kernel.gateFields('tasks'), ['stage', 'thing']);
   /* THE OWNER, WHO WRITES THE WHOLE LIST, IS HELD BY NONE OF IT. */
   assert.ok(((await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { stage: 'review' } }, f.owner)) as Out).ok);

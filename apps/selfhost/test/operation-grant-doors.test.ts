@@ -4,7 +4,7 @@
  * MEASURED BEFORE THIS FILE: `contextFor` was handed the path's method name as the
  * door for any HTTP method and under any slug, and `bearerFor` spent the grant as soon as that name was one of the four.
  * `GET /api/export` spent it and then `serveApi` answered 405 "export changes the record, so it is a POST.", and
- * `POST /app/not-this-one/api/export` spent it and then the slug was refused 403 "You are not on this record.". In both
+ * `POST /not-this-one/api/export` spent it and then the slug was refused 403 "You are not on this record.". In both
  * cases the right request that followed was 401, and the person had to approve on their phone again for nothing.
  *
  * THE STACK IS `operation-bearer.test.ts`'s, the device flow as the CLI drives it, so the bearer is the one a real
@@ -99,14 +99,14 @@ test('A NAME THAT IS NOT THIS RECORD’S DOES NOT SPEND IT, and the same bearer 
   const s = await stack();
   try {
     const first = await s.operation('export');
-    const elsewhere = await s.call('/app/not-this-one/api/export', { bearer: first, body: {} });
+    const elsewhere = await s.call('/not-this-one/api/export', { bearer: first, body: {} });
     assert.notEqual(elsewhere.status, 200, elsewhere.raw);
     const root = await s.call('/api/export', { bearer: first, body: {} });
     assert.equal(root.status, 200, `a wrong slug spent the grant: ${root.raw}`);
 
     /* AND UNDER ITS OWN NAME IT IS STILL A DOOR, so the check is the slug and not "any slug at all". */
     const second = await s.operation('export');
-    const named = await s.call('/app/the-studio/api/export', { bearer: second, body: {} });
+    const named = await s.call('/the-studio/api/export', { bearer: second, body: {} });
     assert.equal(named.status, 200, named.raw);
   } finally {
     await s.close();

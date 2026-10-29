@@ -47,5 +47,5 @@ test('nothing rings while focused or switched off, but the item is still counted
 test('only a handoff line is a handoff', () => {
   assert.equal(handoffAlert({ id: '1', kind: 'note' }), null);
   assert.equal(handoffAlert({ id: '1', kind: 'state', to: 'active' }), null);
-  assert.equal(handoffAlert({ id: '1', kind: 'state', to: 'handoff', note: 'Pick up the tests' })?.goto, '/app/p/agents');
+  assert.equal(handoffAlert({ id: '1', kind: 'state', to: 'handoff', note: 'Pick up the tests' })?.goto, '/p/agents');
 });

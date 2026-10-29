@@ -4,8 +4,9 @@
  * MEASURED FIRST. `linkOf` wrote
  * `/app/signin#magic=<token>` with no query whatever the sign-in page had been handed, so a link opened from the mail
  * landed on a page whose `onward()` read an empty search and sent him to `/app/`, not to the record that asked him to
- * sign in. The link carries `?next=` now, and only a path under `/app` on this origin: a `next` is typed by whoever
- * wrote the link that reached the sign-in page, so anything else would make the mail an open redirect with our name on it.
+ * sign in. The link carries `?next=` now, and only a page of the app on this origin (`appNext`): a `next` is typed by
+ * whoever wrote the link that reached the sign-in page, so anything else would make the mail an open redirect with our
+ * name on it. The app is at the root since 29 Oct, so a page is any path that is not one of the host's own doors.
  */
 
 import { test } from 'node:test';
@@ -13,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import { createDirectory } from '@braindog/record/directory';
 
-import { serveAuth, type AuthDoor } from '../src/auth.ts';
+import { appNext, serveAuth, type AuthDoor } from '../src/auth.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 23, 12);
@@ -49,10 +50,10 @@ function setup() {
 
 test('THE MAILED LINK CARRIES THE PAGE HE WAS SENT FROM, and still spends by its fragment', async () => {
   const { call, mailed } = setup();
-  const link = await mailed('/app/the-studio/r/tasks?where=open');
-  const m = /^https:\/\/studio\.example\/app\/signin\?next=([^#]+)#magic=([A-Za-z0-9_-]{43})$/.exec(link);
+  const link = await mailed('/the-studio/r/tasks?where=open');
+  const m = /^https:\/\/studio\.example\/signin\?next=([^#]+)#magic=([A-Za-z0-9_-]{43})$/.exec(link);
   assert.ok(m, `the link is ${link}`);
-  assert.equal(new URLSearchParams(`next=${m[1]}`).get('next'), '/app/the-studio/r/tasks?where=open');
+  assert.equal(new URLSearchParams(`next=${m[1]}`).get('next'), '/the-studio/r/tasks?where=open');
   /* The token is where it always was, so the landing and `takeLink` are unchanged. */
   assert.equal((await call('/auth/magic/redeem', { linkToken: m[2] })).status, 200);
 });
@@ -60,8 +61,15 @@ test('THE MAILED LINK CARRIES THE PAGE HE WAS SENT FROM, and still spends by its
 /* A DIRECTORY FOR EACH, because the first run of this test shared one and answered 429 partway down the list: the
    send lockout reserves per asking address and per address asked about, and fifteen links to Ada from one IP inside
    its window is exactly what it exists to refuse. */
+test('A NEXT FROM BEFORE THE MOVE IS MAILED AS THE ADDRESS IT NAMES NOW', async () => {
+  const link = await setup().mailed('/app/the-studio/r/tasks');
+  const m = /^https:\/\/studio\.example\/signin\?next=([^#]+)#magic=[A-Za-z0-9_-]{43}$/.exec(link);
+  assert.ok(m, `the link is ${link}`);
+  assert.equal(new URLSearchParams(`next=${m[1]}`).get('next'), '/the-studio/r/tasks');
+});
+
 test('A NEXT THAT COULD LEAVE THE APP IS DROPPED, and the link is the bare one', async () => {
-  const bare = /^https:\/\/studio\.example\/app\/signin#magic=[A-Za-z0-9_-]{43}$/;
+  const bare = /^https:\/\/studio\.example\/signin#magic=[A-Za-z0-9_-]{43}$/;
   for (const next of [
     undefined,
     '',
@@ -73,11 +81,17 @@ test('A NEXT THAT COULD LEAVE THE APP IS DROPPED, and the link is the bare one',
     `${ORIGIN}/app/the-studio`,
     'javascript:alert(1)',
     '/app/\n/x',
-    /* Outside the app: `onward()` on the page would drop it too, so the link does not carry it. */
-    '/r/tasks',
+    /* One of the host's doors and not a page: `onward()` on the page would drop it too, so the link does not carry it. */
+    '/auth/session',
+    '/api/export',
+    '/app/../auth/session',
+    '/in/webhook/x',
+    '/mcp',
+    '/.well-known/braindog-build',
+    /* The front door, which is where the bare link lands anyway. */
     '/',
-    '/apple',
-    ['/app/the-studio'],
+    '/app',
+    ['/the-studio'],
     42,
   ]) {
     const link = await setup().mailed(next);
@@ -87,9 +101,24 @@ test('A NEXT THAT COULD LEAVE THE APP IS DROPPED, and the link is the bare one',
 
 test('THE ANSWER SAYS NOTHING OF THE NEXT: a known address and an unknown one still read the same', async () => {
   const { call } = setup();
-  const next = '/app/the-studio/r/tasks';
+  const next = '/the-studio/r/tasks';
   const known = await call('/auth/magic/start', { email: 'ada@example.com', next });
   const unknown = await call('/auth/magic/start', { email: 'nobody@example.com', next });
   assert.deepEqual([known.status, known.raw], [unknown.status, unknown.raw]);
   assert.ok(!known.raw.includes('the-studio'), 'the answer echoed the next');
+});
+
+test('appNext IS A PAGE OF THE APP OR NOTHING: a door is refused, and an address from under `/app` is read as the new one', () => {
+  for (const door of ['/auth/session', '/api/x', '/app/../auth/x', '/app/api/boot', '/account/close', '/oauth/authorize', '/in/x', '/mcp', '/healthz', '/_app/version.json', '/drawn-frame', '/.well-known/oauth-authorization-server'])
+    assert.equal(appNext(door), null, door);
+  assert.equal(appNext('/app/acme/r'), '/acme/r');
+  assert.equal(appNext('/app/acme/r?f=x#b-2'), '/acme/r?f=x#b-2');
+  assert.equal(appNext('/app'), '/');
+  assert.equal(appNext('/app/'), '/');
+  assert.equal(appNext('/acme/r/tasks'), '/acme/r/tasks');
+  assert.equal(appNext('/r/tasks'), '/r/tasks');
+  assert.equal(appNext('/apple'), '/apple', 'only the whole segment is the old prefix');
+  /* What `safeNext` refuses is the front door, and the front door is a page. */
+  assert.equal(appNext('//evil.example/x'), '/');
+  assert.equal(appNext('https://evil.example/'), '/');
 });

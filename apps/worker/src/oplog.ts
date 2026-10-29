@@ -65,15 +65,21 @@ export function op(fields: { op: string } & Record<string, OpValue>, level: 'inf
  * The door a path came through, as a crash's line and a limit name it: `/api/<method>`, `/mcp`, or the first segment.
  *
  * NEVER THE WHOLE PATH. A path can hold a secret (`/in/email/<token>`, `/auth/claim/<token>`) or a name a person chose
- * (`/app/<slug>/...`), and a log line holds neither. A method name is this build's own word, so it is kept; the slug in
- * front of a record's API is dropped, because the door under it is the same one.
+ * (`/<slug>/...`), and a log line holds neither. A method name is this build's own word, so it is kept; the slug in
+ * front of a record's API is dropped, because the door under it is the same one, and so is a slug in front of a page.
  */
+/** The first segments a line may name: the doors at the root, and `app`, the prefix the app had before it moved. */
+const DOOR_WORDS = new Set(['api', 'auth', 'account', 'mcp', 'in', 'oauth', 'a', 'ws', 'healthz', 'app', 's']);
+
 export function doorPath(pathname: string): string {
   if (/^\/+mcp\/*$/u.test(pathname)) return '/mcp';
-  const api = /^\/+(?:app\/+[^/]+\/+)?api(?:\/+([^/]*))?(?:\/|$)/u.exec(pathname);
+  const api = /^\/+(?:app\/+)?(?:[^/]+\/+)?api(?:\/+([^/]*))?(?:\/|$)/u.exec(pathname);
   if (api !== null) return api[1] !== undefined && /^[A-Za-z]{1,64}$/u.test(api[1]) ? `/api/${api[1]}` : '/api';
+  /* A FIRST SEGMENT THAT COULD BE A RECORD'S NAME IS NOT WRITTEN, now that the app is at the root and `/acme/r/tasks`
+     starts with one. Only a door's own word is (`ROOT_DOORS` in `route.ts`, written again here because this file
+     imports nothing), and a page of the app is `/`, which says it was the app without saying whose. */
   const first = /^\/+([^/]+)/u.exec(pathname)?.[1];
-  return first !== undefined && /^[A-Za-z.-]{1,32}$/u.test(first) ? `/${first}` : '/';
+  return first !== undefined && (DOOR_WORDS.has(first) || first.startsWith('.')) && /^[A-Za-z.-]{1,32}$/u.test(first) ? `/${first}` : '/';
 }
 
 /** One outbox row as its ack left it: what the `outbox` line is made of. */

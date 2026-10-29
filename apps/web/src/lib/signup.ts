@@ -882,7 +882,7 @@ export async function checkout(held: Held, io: Io = live()): Promise<Asked<strin
   return url !== null && url.startsWith('https://') ? { ok: true, value: url } : { ok: false, kind: 'refused', fix: null };
 }
 
-/** Open a record in this browser (`/auth/switch`): the session moves to it, and `/app` opens on it from now on. */
+/** Open a record in this browser (`/auth/switch`): the session moves to it, and the bare address opens on it from now on. */
 export async function openOwned(slug: string, io: Io = live()): Promise<Asked<null>> {
   const out = await call(io, '/auth/switch', { slug });
   return out.ok ? { ok: true, value: null } : out;

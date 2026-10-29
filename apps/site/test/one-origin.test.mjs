@@ -109,10 +109,11 @@ test('no _headers rule carries a script policy, which would block the inline sta
  * WHERE "OPEN THE APP" GOES FOLLOWS WHERE THE APP LIVES, READ FROM THE TWO `wrangler.jsonc` FILES.
  *
  * `APP` in `src/lib/copy.ts` is every "Open the app" on the site and the footer's sign-in. It is the app's own name,
- * `https://<PUBLIC_HOST>/app`, because a sign-in on any other name is refused at `origin` and a device start there answers
- * 403. When `PUBLIC_HOST` is the site's own name (the shared-name shape of the one-domain move) the link is the relative
- * `/app`, which the site's script hands to its own environment's app. This test says which of the two it must be, and
- * holds the site's script to handing `/app` over either way, because `brain.dog/app` is the 308 that old links rely on.
+ * `https://<PUBLIC_HOST>`, the app at its root, because a sign-in on any other name is refused at `origin` and a device
+ * start there answers 403. When `PUBLIC_HOST` is the site's own name (the shared-name shape of the one-domain move) the
+ * link is the relative `/app`, which the site's script hands to its own environment's app. This test says which of the
+ * two it must be, and holds the site's script to handing `/app` over either way, because `brain.dog/app` is the 308 that
+ * old links rely on.
  */
 const checker = await import(new URL('../../worker/scripts/provision-check.mjs', import.meta.url).href);
 
@@ -122,7 +123,7 @@ test('"Open the app" goes to the name the app lives on, and the site still hands
   const site = checker.siteConfig();
   const host = worker.env.production.vars.PUBLIC_HOST;
   const shared = (site.env.production.routes ?? []).filter((r) => r.custom_domain).map(checker.hostOf).includes(host);
-  assert.equal(APP, shared ? '/app' : `https://${host}/app`, `production's app is on ${host}, so "Open the app" has to go there`);
+  assert.equal(APP, shared ? '/app' : `https://${host}`, `production's app is on ${host}, so "Open the app" has to go there`);
   for (const env of ['production', 'alpha']) {
     const first = (site.env[env]?.assets ?? site.assets ?? {}).run_worker_first ?? [];
     for (const path of ['/app', '/app/signin']) assert.ok(checker.workerFirst(first, path), `${env}: the site answers ${path} with its 404 page, so an old link goes nowhere`);

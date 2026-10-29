@@ -38,7 +38,7 @@ import type { AuditEvent } from '../../lib/record/schema.ts';
 
 /** The words this file says of its own: a rule is named as one, beside the rule glyph its face wears. */
 export const whoWords = {
-  rule: (name: string): string => `A rule: ${name}`,
+  rule: (name: string): string => (name.trim().toLowerCase() === 'ladder' ? 'Trust rule' : `A rule: ${name}`),
 } as const;
 
 /**

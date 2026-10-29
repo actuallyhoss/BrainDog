@@ -31,9 +31,10 @@
   import { untrack } from 'svelte';
   import { iconFor } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
-  import { listName } from '$lib/record/names.ts';
+  import { listName, ruleNameSaid } from '$lib/record/names.ts';
   import type { IconName } from '$lib/ui/icons.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { Bars, Ring } from '$lib/viz/index.ts';
@@ -47,6 +48,7 @@
     endedSplit,
     hubSentence,
     hubWords as w,
+    isUpkeep,
     rowSaid,
     rowWhat,
     monthBars,
@@ -87,11 +89,37 @@
       from = 'ready';
       oncount(rows.length);
       onsentence?.(hubSentence(rows, listSaid));
+      void readWhy(out.source, rows);
     } else if (out.absent) from = 'absent';
     else {
       fix = out.first.refusal.fix;
       from = 'refused';
     }
+  }
+
+  /**
+   * WHY EACH OF THE MONTH'S FAILED RUNS FAILED, in the run's own words (Q30): read from the few rules that failed this
+   * month, their newest runs, so the tile says the reason and not only a count. A read that fails leaves the count alone.
+   */
+  let why = $state.raw<readonly { name: string; say: string }[]>([]);
+  async function readWhy(s: Source | null, all: readonly AutomationRow[]) {
+    if (s === null) return;
+    const failing = all.filter((r) => (r.month?.failures ?? 0) > 0).slice(0, 4);
+    const month = new Date().toISOString().slice(0, 7);
+    const out: { name: string; say: string }[] = [];
+    for (const r of failing) {
+      const one = await s.automation(r.id, { limit: 20 }).catch(() => null);
+      if (!one?.ok) continue;
+      const said = new Set<string>();
+      for (const run of one.value.runs) {
+        if (run.state !== 'failed' || !run.started.startsWith(month)) continue;
+        const say = run.say?.trim() || w.noReason;
+        if (said.has(say)) continue;
+        said.add(say);
+        out.push({ name: r.name, say });
+      }
+    }
+    why = out;
   }
 
   $effect(() => {
@@ -118,24 +146,29 @@
 
   const rowOf = (r: AutomationRow): HubRow => ({
     key: r.id,
-    name: r.name,
+    /* A FILING RULE NAMED "Gifts: holds AMAZON" IS SHOWN AS "File Amazon under Gifts" (`ruleNameSaid`); it keeps its name. */
+    name: ruleNameSaid(r.name),
     what: rowWhat(rowTrigger(r, listSaid)),
     said: rowSaid(r, now),
     dot: !r.enabled ? 'off' : r.last?.state === 'failed' ? 'bad' : null,
     path: `/automations/${encodeURIComponent(r.id)}`,
     icon: triggerIcon(r.trigger, listIcon(r.register)),
     aside: nextOf(r, now),
-    toggle: owner ? { on: r.enabled, label: w.switchOf(r.name) } : undefined,
+    toggle: owner ? { on: r.enabled, label: w.switchOf(ruleNameSaid(r.name)) } : undefined,
     ...ruleSaid(r, listSaid),
   });
 
-  const on = $derived(rows.filter((r) => placed.get(r.id) ?? r.enabled).map(rowOf));
-  const off = $derived(rows.filter((r) => !(placed.get(r.id) ?? r.enabled)).map(rowOf));
+  /* BRAINDOG'S OWN UPKEEP IS LEFT OUT UNTIL ASKED FOR (`isUpkeep`), so the list is the rules that do his work. */
+  let upkeepShown = $state(false);
+  const upkeep = $derived(rows.filter(isUpkeep).length);
+  const listedRows = $derived(upkeepShown ? rows : rows.filter((r) => !isUpkeep(r)));
+  const on = $derived(listedRows.filter((r) => placed.get(r.id) ?? r.enabled).map(rowOf));
+  const off = $derived(listedRows.filter((r) => !(placed.get(r.id) ?? r.enabled)).map(rowOf));
   /* A GROUP COUNTS WHAT IS IN IT NOW (agents F11c): a row switched off keeps its place until the next visit, and the
      heading says "30" and "1 off" rather than "31". */
-  const onCount = $derived(rows.filter((r) => (placed.get(r.id) ?? r.enabled) && r.enabled).length);
+  const onCount = $derived(listedRows.filter((r) => (placed.get(r.id) ?? r.enabled) && r.enabled).length);
   const onMoved = $derived(on.length - onCount);
-  const offCount = $derived(rows.filter((r) => !(placed.get(r.id) ?? r.enabled) && !r.enabled).length);
+  const offCount = $derived(listedRows.filter((r) => !(placed.get(r.id) ?? r.enabled) && !r.enabled).length);
   const offMoved = $derived(off.length - offCount);
 
   /**
@@ -186,6 +219,11 @@
         <Bars items={bars} subject={w.runsMonthSubject} />
         {#if bars.some((b) => (b.part ?? 0) > 0)}<p class="key">The red part of a bar is its failed runs.</p>{/if}
         <p class="reading">{monthReading(rows)}</p>
+        {#if why.length > 0}
+          <ul class="why" aria-label={w.whyFailed}>
+            {#each why as f, i (i)}<li><span class="why-name">{f.name}</span> {f.say}</li>{/each}
+          </ul>
+        {/if}
       </Tile>
       <Tile icon="check" title={w.endedTitle}>
         <div class="ring">
@@ -205,6 +243,9 @@
     <Tile class="section" data-surface="tile" title={w.off} count={offCount || undefined} meta={offMoved > 0 ? w.turnedOn(offMoved) : undefined}>
       <HubRows rows={off} dim ontoggle={turn} busy={turning} />
     </Tile>
+  {/if}
+  {#if upkeep > 0}
+    <p class="upkeep"><Button weight="bare" size="sm" onclick={() => (upkeepShown = !upkeepShown)}>{upkeepShown ? w.upkeepHide : w.upkeepShow(upkeep)}</Button></p>
   {/if}
 {/if}
 
@@ -226,6 +267,25 @@
   .ring {
     display: flex;
     justify-content: center;
+  }
+
+  .why {
+    display: grid;
+    gap: var(--sp-1);
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    list-style: none;
+  }
+
+  .why-name {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .upkeep {
+    margin: 0;
   }
 
   .key {

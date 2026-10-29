@@ -18,13 +18,13 @@ const MARIAM = JSON.parse(readFileSync(new URL('../mariam.json', import.meta.url
 
 const inNav = (role, name) => ({ role, name, landmark: 'navigation' });
 const RAIL = [inNav('link', 'Today'), inNav('link', 'Decide'), inNav('link', 'People'), inNav('heading', 'Pages'), inNav('button', 'New page')];
-const SHELL = (over = {}) => ({ path: '/app/', width: 1440, text: ['Today', 'Nothing needs you right now.'], roles: [...RAIL, { role: 'heading', name: 'Today', landmark: 'main' }], counts: {}, owner: true, ...over });
+const SHELL = (over = {}) => ({ path: '/', width: 1440, text: ['Today', 'Nothing needs you right now.'], roles: [...RAIL, { role: 'heading', name: 'Today', landmark: 'main' }], counts: {}, owner: true, ...over });
 
 /* ── the markup reader ────────────────────────────────────────────────────────────────────────────────── */
 
 test('markup is read as a person meets it: names, landmarks, and nothing that is hidden', () => {
   const { text, roles } = readMarkup(
-    '<nav aria-label="Record"><a href="/app/">Today</a><ul inert=""><li><a href="/app/r/orders">Orders <span>2</span></a></li></ul>' +
+    '<nav aria-label="Record"><a href="/">Today</a><ul inert=""><li><a href="/r/orders">Orders <span>2</span></a></li></ul>' +
       '<button aria-label="Collapse the sidebar"><svg><path d="M0 0"></path></svg></button><span aria-hidden="true">/</span></nav>' +
       '<main><h1>Today</h1><p>Nadia paid EGP&nbsp;900 &amp; more.</p><dialog><h2>Add to this page</h2></dialog><a>no address</a>' +
       '<span role="gridcell">Nadia</span><span role="gridcell">vanilla jars</span><input type="text" placeholder="Name the page"></main>',
@@ -32,7 +32,7 @@ test('markup is read as a person meets it: names, landmarks, and nothing that is
   assert.deepEqual(text, ['Today', 'Today', 'Nadia paid EGP 900 & more.', 'no address', 'Nadia', 'vanilla jars']);
   assert.deepEqual(roles, [
     { role: 'navigation', name: 'Record', landmark: null },
-    { role: 'link', name: 'Today', landmark: 'navigation', href: '/app/' },
+    { role: 'link', name: 'Today', landmark: 'navigation', href: '/' },
     { role: 'button', name: 'Collapse the sidebar', landmark: 'navigation' },
     { role: 'main', name: '', landmark: null },
     { role: 'heading', name: 'Today', landmark: 'main' },
@@ -79,7 +79,7 @@ test('signs-line: said once, as words that open the page, and only to whoever ow
   assert.match(check(told({ owner: false })).saw, /does not own the record is told "One vital sign needs a look/u);
   assert.match(check(told({ roles: SHELL().roles })).saw, /opens nothing/u);
   assert.match(check(told({ text: [`${said}.`, '2 vital signs need a look.'] })).saw, /says it 2 times/u);
-  assert.equal(check(SHELL({ path: '/app/r/people' })).pass, null);
+  assert.equal(check(SHELL({ path: '/r/people' })).pass, null);
   assert.equal(check(SHELL({ roles: RAIL })).pass, null);
 });
 
@@ -94,7 +94,7 @@ test('Mariam: the sidebar and Today are drawn at both moments, every check that 
   assert.equal(why, null);
   const drawn = screens.filter((s) => s.words !== true && s.width === 1440);
   assert.equal(drawn.length, 4);
-  const todays = drawn.filter((s) => s.path === '/app/');
+  const todays = drawn.filter((s) => s.path === '/');
   assert.equal(todays.length, 2);
   for (const s of drawn) {
     assert.equal(s.owner, true);

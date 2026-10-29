@@ -3,6 +3,8 @@
  * or hear the shell; in a browser each does the web thing, and the Mac app will hook `__BRAINDOG_SHELL__` later.
  */
 
+import { fromLegacy, split } from './at.ts';
+
 export type ShellEvent = 'slash' | 'goto';
 
 /** What the Mac app puts on `window`; every part is optional so a partial shell still works. */
@@ -34,7 +36,7 @@ export function openOutside(url: string, opts: { here?: boolean } = {}): void {
 const local: Record<ShellEvent, Set<(arg?: string) => void>> = { slash: new Set(), goto: new Set() };
 
 /**
- * A notification: the shell's, else a web one only if already granted (never asks here). `goto` is the /app address a
+ * A notification: the shell's, else a web one only if already granted (never asks here). `goto` is the app's address a
  * click takes the window to; the shell focuses the window first.
  */
 export function notify(title: string, body: string, goto?: string): void {
@@ -101,11 +103,13 @@ export function applyInset(): void {
 }
 
 /**
- * Where a shell `goto` may take the window: an address under /app and nothing else. Anything with a scheme, a host,
- * a backslash or a `..` is ignored, so a link from outside cannot steer the app off itself. Null means ignore.
+ * Where a shell `goto` may take the window: an address of the app and nothing else. Anything with a scheme, a host,
+ * a backslash or a `..` is ignored, and so is one of the host's doors (`/api`, `/auth`, `DOORS` in `at.ts`), so a link
+ * from outside cannot steer the app off itself. The app is the root now, and an address from when it was under `/app`
+ * is read as the one it names (`fromLegacy`), because the Mac app's Go menu may still hold one. Null means ignore.
  */
-export function appPath(arg: string | undefined, base = '/app'): string | null {
-  if (typeof arg !== 'string' || arg.length > 512 || /[\\\u0000-\u001f]|\.\./.test(arg)) return null;
-  if (arg !== base && !arg.startsWith(`${base}/`) && !arg.startsWith(`${base}?`)) return null;
-  return arg;
+export function appPath(arg: string | undefined): string | null {
+  if (typeof arg !== 'string' || arg.length > 512 || /[\\\u0000-\u001f]|\.\./.test(arg) || !arg.startsWith('/') || arg.startsWith('//')) return null;
+  const path = fromLegacy(arg);
+  return split(path.replace(/[?#].*$/, '')) === null ? null : path;
 }

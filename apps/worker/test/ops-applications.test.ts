@@ -70,7 +70,7 @@ test('AN INVITATION MAILS ONE LETTER WHOSE LINK SIGNS UP BY INVITATION', async (
     assert.equal(status, 200, JSON.stringify(out));
     assert.equal(out.value?.['mailed'], true);
     const link = String(out.value?.['link']);
-    assert.match(link, /^https:\/\/[^/]+\/app\/signup#code=[A-Za-z0-9_-]{43}$/);
+    assert.match(link, /^https:\/\/[^/]+\/signup#code=[A-Za-z0-9_-]{43}$/);
 
     assert.equal(c.letters().length, 1);
     const letter = c.letters()[0];

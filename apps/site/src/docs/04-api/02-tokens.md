@@ -1,4 +1,4 @@
-# Tokens and their reaches
+# What a key can do
 
 A token is how something that is not a person reaches your record: an agent, a script, a server, a machine. Each kind reaches exactly one thing, and all of them are shown to you once and stored by the record only as a fingerprint.
 
@@ -50,5 +50,5 @@ Each is sent as `Authorization: Bearer <token>`, except a shared link, which is 
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

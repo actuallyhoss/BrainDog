@@ -38,6 +38,8 @@ export type Place = Scope & { id: string; ref: string };
 /** What the move reads and writes, in one place. */
 export const words = {
   everywhere: 'Everywhere',
+  /** What "Everywhere" means, said where the chip is pointed at: it belongs to no one project. */
+  everywhereSaid: 'Not tied to one project: it shows in all of them.',
   /** The chip as a button, for a screen reader: where the row applies now, and what pressing it does. */
   moveLabel: (name: string) => `Where it applies: ${name}. Move it`,
   movedTo: (name: string) => `Moved to ${name}`,

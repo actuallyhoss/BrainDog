@@ -66,6 +66,7 @@ import share0043 from './migrations/0043_share.ts';
 import seat0044 from './migrations/0044_seat.ts';
 import sealed0045 from './migrations/0045_sealed.ts';
 import keyAccess0046 from './migrations/0046_key_access.ts';
+import observationWho0047 from './migrations/0047_observation_who.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -117,6 +118,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 44, slug: 'seat', sql: seat0044 },
   { version: 45, slug: 'sealed', sql: sealed0045 },
   { version: 46, slug: 'key_access', sql: keyAccess0046 },
+  { version: 47, slug: 'observation_who', sql: observationWho0047 },
 ];
 
 /**

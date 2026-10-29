@@ -56,6 +56,9 @@ function before45(sql: NodeSql): void {
   sql.exec('DROP TABLE key_ask');
   sql.exec('DROP TABLE key_access');
   sql.exec("DELETE FROM dog_section WHERE table_name IN ('key_access', 'key_ask')");
+  /* AND 47's. */
+  sql.exec('DROP TABLE observation_who');
+  sql.exec("DELETE FROM dog_section WHERE table_name = 'observation_who'");
 }
 
 /** Migration 42's work taken away, and 45's and 44's before it: the record as migration 41 left it. */
@@ -109,7 +112,7 @@ test('A RECORD THAT RAN 41 TAKES 42, and every row, line, counter and key is as 
 
   const { result } = await applyMigrations(sql, fixedClock(NOW + 3_600_000));
   assert.ok(result.ok);
-  assert.deepEqual(result.value.applied, [42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [42, 43, 44, 45, 46, 47]);
   assert.deepEqual(snapshot(sql), before, 'migration 42 changed a row, a line, a counter or a key');
   const seated = (id: string) =>
     sql.all('SELECT version, superseded_at FROM declaration WHERE id = ? ORDER BY version', id).map((r) => ({ ...r }));
@@ -139,7 +142,7 @@ test('A RECORD THAT RAN 41 TAKES 42, and every row, line, counter and key is as 
   const versions = sql.all('SELECT id, version FROM declaration ORDER BY id, version').map((r) => ({ ...r }));
   before44(sql);
   sql.exec('DELETE FROM migration WHERE version >= 42');
-  assert.deepEqual((await applyMigrations(sql, fixedClock(NOW + 7_200_000))).result, { ok: true, value: { kernel: 46, format: 1, applied: [42, 43, 44, 45, 46] } });
+  assert.deepEqual((await applyMigrations(sql, fixedClock(NOW + 7_200_000))).result, { ok: true, value: { kernel: 47, format: 1, applied: [42, 43, 44, 45, 46, 47] } });
   assert.deepEqual(snapshot(sql), once);
   assert.deepEqual(sql.all('SELECT id, version FROM declaration ORDER BY id, version').map((r) => ({ ...r })), versions);
 

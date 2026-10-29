@@ -13,7 +13,7 @@ import { copy } from '../../lib/copy.ts';
 import type { Approver } from '../../lib/record/keychain.ts';
 import { approverFor, ASK_EVERY, askBuild, connectLines, hostOf, linesFor, makeItMine, waitingBuild, watch, words } from './from-agent.ts';
 
-const BASE = 'https://brain.example/app/wren';
+const BASE = 'https://brain.example/wren';
 
 /** A record with these open questions, keeping every call made of it. */
 function record(open: unknown[], decide: (args: unknown) => unknown = () => ({ ok: true, value: { decided: true } })) {
@@ -52,7 +52,7 @@ test('THE SETUP LINE NAMES THE RECORD THE PAGE IS ON, read off its base, and a b
   assert.deepEqual(hostOf(BASE), { origin: 'https://brain.example', slug: 'wren' });
   assert.deepEqual(hostOf('https://brain.example'), { origin: 'https://brain.example', slug: null });
   const setup = linesFor(BASE).flatMap((w) => w.lines).find((l) => l.id === 'setup');
-  assert.equal(setup?.text, 'braindog setup https://brain.example/app/wren');
+  assert.equal(setup?.text, 'braindog setup https://brain.example/wren');
   const address = linesFor(BASE).flatMap((w) => w.lines).find((l) => l.id === 'other');
   assert.equal(address?.text, 'https://brain.example/mcp');
 });

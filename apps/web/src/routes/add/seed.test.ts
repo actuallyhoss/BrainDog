@@ -19,13 +19,13 @@ const manifest = JSON.parse(readFileSync(new URL('../../../static/manifest.webma
 test('A LONG PRESS OFFERS "Add a task" AND "Ask", each inside the app and opening its add sheet or the palette', () => {
   assert.deepEqual(manifest.shortcuts?.map((s) => s.name), ['Add a task', 'Ask']);
   for (const s of manifest.shortcuts ?? []) assert.ok(s.url.startsWith(manifest.scope), `${s.name} opens outside the app`);
-  /* NO RECORD'S NAME IN THE ADDRESS: a page word under /app is the record the session is on (`appPath`). */
-  assert.equal(manifest.shortcuts?.[0]?.url, '/app/r/tasks?new=1');
-  assert.equal(manifest.shortcuts?.[1]?.url, '/app/add');
+  /* NO RECORD'S NAME IN THE ADDRESS: a page word at the root is the record the session is on (`appPath`). */
+  assert.equal(manifest.shortcuts?.[0]?.url, '/r/tasks?new=1');
+  assert.equal(manifest.shortcuts?.[1]?.url, '/add');
 });
 
 test('A SHARE FROM ANOTHER APP OPENS /add WITH WHAT IT SHARED', () => {
-  assert.deepEqual(manifest.share_target, { action: '/app/add', method: 'GET', params: { title: 'title', text: 'text', url: 'url' } });
+  assert.deepEqual(manifest.share_target, { action: '/add', method: 'GET', params: { title: 'title', text: 'text', url: 'url' } });
 });
 
 test('WHAT A SHARE HANDS IS THE PALETTE\'S FIRST WORDS: each once, in order, and cut short', () => {

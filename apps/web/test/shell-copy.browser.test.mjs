@@ -22,14 +22,14 @@ import { chromium } from '@playwright/test';
 import { answers, forward, forwards, recordsAnswer, startRecord } from '../../../tools/gates/record.mjs';
 
 const BUILD = fileURLToPath(new URL('../build', import.meta.url));
-const SHELL = join(BUILD, 'app', 'index.html');
+const SHELL = join(BUILD, 'index.html');
 const HOLD_MS = 400;
 const PAINT_MS = 150;
-/** The screen opened: one under the app's base with no record name, so its reads go to the gates' record at `/api/`. */
-const SCREEN = '/app/p/money';
+/** The screen opened: one of the app's with no record name, so its reads go to the gates' record at `/api/`. */
+const SCREEN = '/p/money';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
-const KEPT_BY_BROWSER = /^\/app\/(?:_app\/immutable|fonts)\//u;
+const KEPT_BY_BROWSER = /^\/(?:_app\/immutable|fonts)\//u;
 
 const built = existsSync(SHELL);
 let browser = null;
@@ -129,7 +129,7 @@ test('A SECOND OPEN PAINTS FROM THE COPY UNDER 150 MS, with every answer held 40
     await first.page.waitForSelector('main#main[data-screen]', { timeout: 60_000 });
     await first.page.evaluate(() => navigator.serviceWorker.ready);
     await first.page.waitForFunction(() => navigator.serviceWorker.controller !== null, null, { timeout: 15_000 });
-    await first.page.waitForFunction(async () => (await (await caches.open('braindog-copy')).keys()).some((k) => k.url.endsWith('/app/')), null, { timeout: 15_000 });
+    await first.page.waitForFunction(async () => (await (await caches.open('braindog-copy')).keys()).some((k) => new URL(k.url).pathname === '/'), null, { timeout: 15_000 });
     assert.ok(first.paint >= HOLD_MS, `the first open waited the network (${first.paint} ms), so the hold is real`);
 
     /* THREE OPENS, AND THE MIDDLE ONE IS THE MEASURE, ASKED UP TO THREE TIMES. What is under test is where the shell came

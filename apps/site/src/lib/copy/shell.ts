@@ -12,22 +12,22 @@ export const shell = {
     home: {
       title: 'BrainDog · Give your business a memory',
       description:
-        'BrainDog remembers your projects, money and people, tells you each morning what needs you, and works with ' +
-        'Claude, ChatGPT, Cursor and Codex. Free while in early access.',
+        'BrainDog remembers your projects, money and people, shows what needs you on a Today you arrange, and ' +
+        'shares it with Claude and Cursor. Free in early access.',
     },
     slash: {
-      title: 'Slash · BrainDog',
+      title: 'Slash: press / and ask anything · BrainDog',
       description:
-        'Press / anywhere in BrainDog and ask in plain words. Slash reads your record, answers with your numbers, ' +
-        'and makes the changes you ask for, each with an undo.',
+        'Press / anywhere in BrainDog and ask in plain words. Slash answers with your numbers and makes the changes ' +
+        'you ask for, each with an undo.',
     },
     pricing: {
-      title: 'Pricing · BrainDog',
+      title: 'Pricing: free in early access · BrainDog',
       description:
         'BrainDog is free while in early access, with every feature, three AI tools and 20 questions to Slash a month.',
     },
     agents: {
-      title: 'Connect your AI tools · BrainDog',
+      title: 'Connect Claude, ChatGPT and Cursor · BrainDog',
       description:
         'Connect Claude, ChatGPT, Codex, Cursor or VS Code to BrainDog in one line. Each starts from your ' +
         "brief and leaves a note when it's done.",
@@ -95,6 +95,7 @@ export const shell = {
     /* The links that are not a page's own label: who it is for, then the texts. */
     small: 'Small businesses',
     teams: 'Teams and agencies',
+    personal: 'Personal use',
     developers: 'Developers',
     terms: 'Terms',
     privacy: 'Privacy',

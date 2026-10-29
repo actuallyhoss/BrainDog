@@ -167,7 +167,7 @@ test('the lines to copy name the origin and carry no key', () => {
   const lines = connectLines('https://record.example');
   assert.equal(lines.setup, 'braindog setup https://record.example');
   /* THE CLOUD DEVICE FLOW NEEDS A SLUG, and a line with none was refused there. */
-  assert.equal(connectLines('https://brain.dog', 'acme').setup, 'braindog setup https://brain.dog/app/acme');
+  assert.equal(connectLines('https://brain.dog', 'acme').setup, 'braindog setup https://brain.dog/acme');
   /* ANY MCP CLIENT TAKES THE ADDRESS, and Claude Code takes it as an HTTP server: no stdio `braindog` to have installed. */
   assert.equal(lines.mcp, 'https://record.example/mcp');
   assert.equal(lines.claude, 'claude mcp add --transport http braindog https://record.example/mcp');
@@ -179,7 +179,7 @@ test('each app is handed its own line, the address in every one and never a key'
   /* THE THREE LINES THERE WERE ARE UNCHANGED, for the screens that already read them. */
   assert.equal(lines.mcp, 'https://brain.dog/mcp');
   assert.equal(lines.claude, 'claude mcp add --transport http braindog https://brain.dog/mcp');
-  assert.equal(lines.setup, 'braindog setup https://brain.dog/app/acme');
+  assert.equal(lines.setup, 'braindog setup https://brain.dog/acme');
   /* CODEX TAKES AN HTTP SERVER BY ITS OWN COMMAND, and Cursor's server file takes an entry with the address. */
   assert.equal(lines.codex, 'codex mcp add braindog --url https://brain.dog/mcp');
   assert.deepEqual(JSON.parse(lines.cursor), { mcpServers: { braindog: { url: 'https://brain.dog/mcp' } } });

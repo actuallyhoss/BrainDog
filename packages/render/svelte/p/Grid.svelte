@@ -21,7 +21,8 @@
   import { written } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
   import { statChange } from '../../src/hero.ts';
-  import { drawnRows, emptied } from '../../src/html.ts';
+  import { drawnRows, emptied, trendWaits } from '../../src/html.ts';
+  import { TREND_WAIT } from '../../src/cards.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
   import Heat from './Heat.svelte';
@@ -575,7 +576,7 @@
             />{/if}
         </span>
         {#if approx}<span class="cell-approx num">{approx}</span>{/if}
-        <Trend cls="cell-trend" label={row.cells[0] ?? ''} value={row.cells[3] ?? ''} {opts} />
+        {#if trendWaits(row.cells[3] ?? '')}<span class="cell-trend-wait">{TREND_WAIT}</span>{:else}<Trend cls="cell-trend" label={row.cells[0] ?? ''} value={row.cells[3] ?? ''} {opts} dated={shown.length === 1 && block.form !== 'lead'} />{/if}
         {#if change}<span class="cell-note"
             ><span class="cell-change num" data-dir={change.dir}>{change.change}</span>{#if change.rest}{' '}<Text nodes={inline(change.rest, opts)} {opts} />{/if}</span
           >{:else}<span class="cell-note"><Text nodes={inline(note, opts)} {opts} /></span>{/if}

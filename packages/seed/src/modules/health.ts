@@ -75,21 +75,21 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'signs-red', is: 0 },
-        body: 'Nothing on this record needs a look.',
+        body: 'Nothing needs a look.',
       },
       {
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'signs-red', is: 1 },
-        body: 'One thing on this record needs a look.',
+        body: 'One thing needs a look.',
       },
       {
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'signs-red', gt: 1 },
-        body: '{{signs-red}} things on this record need a look.',
+        body: '{{signs-red}} things need a look.',
       },
       /* HOW MUCH THE LINE HAS NOT SEEN, from `signs-unread` (health-words-43): the signs with nothing to judge by yet. Two
          notes, since only a lead note has its `(s)` settled, and none at all while every sign has been read. */
@@ -104,6 +104,13 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         span: 12,
         when: { metric: 'signs-unread', gt: 1 },
         body: '{{signs-unread}} checks have not run yet.',
+      },
+      /* AND WHERE THE TIDYING IS DONE: what went stale and what is here twice is counted in Settings, Tidy up, which
+         links back here, so the two counts are never read as one. */
+      {
+        kind: 'note',
+        span: 12,
+        body: 'What went stale or is here twice is cleared in [Tidy up](/settings/tidy).',
       },
       /* RED FIRST, since that is what the page is opened for, then what is alive, then what has not been read. */
       group('red', 'Needs a look', 'octagon-alert'),

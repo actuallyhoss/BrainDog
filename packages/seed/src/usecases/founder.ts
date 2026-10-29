@@ -505,7 +505,7 @@ export const FOUNDER = {
      parts, the Numbers lines and Where it was seen go from the project page, and Send numbers here is folded last.
      Projects 1.30.0 leads with its board. No id added or taken away, so a minor step.
      3.7.1: the card's summary is one short line. Words only, so a patch step. */
-  version: '3.7.1',
+  version: '3.8.0',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
@@ -606,7 +606,7 @@ export const FOUNDER = {
            somebody has to act on this week, and the latest-numbers and organisations tables went to the Dashboard,
            which already drew both. */
         page: 'home-founder',
-        title: 'Today',
+        title: 'Founder overview',
         icon: 'home',
         requires: ['register.datapoints', 'register.accounts', 'register.obligations', 'register.services', 'register.books'],
         blocks: [
@@ -726,7 +726,19 @@ export const FOUNDER = {
             lead: true,
             span: 12,
             when: { metric: 'datapoints-30d', lt: 1 },
-            body: "No project has reported a number in the last thirty days. A project's page has the key it sends them with.",
+            body: 'No numbers came in the last thirty days.',
+          },
+          /* WHICH FEEDS STOPPED AND WHERE TO FIX THEM, WHILE NONE CAME (Q51 of 29 October): the page was one headline over
+             two folded rows, a dead end in the sidebar. What went quiet is the record's own read, Home's block word for
+             word, and the press opens the feed's setup, as "Fix the feed" does on a project's Numbers. */
+          { ...GONE_QUIET, when: { metric: 'datapoints-30d', lt: 1 } },
+          {
+            kind: 'link',
+            heading: 'Fix the feed',
+            icon: 'send',
+            span: 12,
+            when: { metric: 'datapoints-30d', lt: 1 },
+            authored: [{ cells: ['Fix the numbers feed', SEND_NUMBERS, "Each project sends its numbers to its own address; its page has the key"] }],
           },
           /* ON THE FIGURE THE LINE SAYS, so the chart is drawn exactly while the sentence over it counts something. The
              example number shows under Latest numbers and is left out here. */

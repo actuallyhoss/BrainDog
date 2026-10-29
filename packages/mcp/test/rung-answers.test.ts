@@ -42,7 +42,7 @@ test('A FILED WRITE LINKS THE QUESTION where the host serves the app', async () 
     create: (async () => ({ ok: true, value: { filed: { id: 'Q3', question: 'Add Renew brain.dog?' } } })) as never,
   });
   const said = await tools(surface, 'https://brain.dog').answer('create', { register: 'tasks', fields: {} }, agent);
-  assert.match(said.text ?? '', /^Filed for Mara to decide: Add Renew brain\.dog\? \(Q3\)\nNothing is written until Mara accepts it in BrainDog at https:\/\/brain\.dog\/app\/mara\/decide\/Q3\.\nReceipt: Nothing was written, so there is nothing to undo\.$/u);
+  assert.match(said.text ?? '', /^Filed for Mara to decide: Add Renew brain\.dog\? \(Q3\)\nNothing is written until Mara accepts it in BrainDog at https:\/\/brain\.dog\/mara\/decide\/Q3\.\nReceipt: Nothing was written, so there is nothing to undo\.$/u);
 });
 
 test('A WRITE THE RECORD ANSWERS `asked` IS FILED, with its reason, and never said as written', async () => {

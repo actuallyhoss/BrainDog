@@ -153,7 +153,7 @@ export function fenceChecks(config, name, slug, token = '') {
   /* THE PUTS LAND ON THE CANARY OR NOWHERE. With `OPS_RECORD` set, a key on any other record is refused here. */
   if (ops && minted !== ops) throw new Error(`SMOKE_TOKEN is not a key on ${name}'s canary (OPS_RECORD in apps/worker/wrangler.jsonc), so the fence puts no file on ${slug}`);
   const base = `https://${host}`;
-  const app = `${base}/app/${slug}`;
+  const app = `${base}/${slug}`;
   const wrong = `${minted.startsWith('rec_') ? minted : 'rec_0'}.${randomBytes(24).toString('base64url')}`;
   const file = `${app}/api/files/${PNG_SHA256}`;
   const shown = `${app}/api/files/<the 1x1 picture's SHA-256>`;
@@ -197,7 +197,7 @@ export function fenceChecks(config, name, slug, token = '') {
     fenced({
       key: 'shell',
       method: 'GET',
-      url: `${base}/app/`,
+      url: `${base}/`,
       expects: 'the shell, its script-src held to hashes with no unsafe-inline',
       judge: (a) => {
         if (a.status !== 200 || !isHtml(a)) return `answered ${said(a)} where the shell was expected`;

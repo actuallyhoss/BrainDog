@@ -59,7 +59,7 @@
       const known = new Set(rows.map((r) => r.run));
       if (p.value.some((r: LiveRun) => r.project !== null && !known.has(r.run) && !projects.has(r.project))) projects = await io.projects(p.value);
       const named = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
-      live = { rows: d.liveRows(rows, p.value, threads, named), folds: d.liveFolds(p.value) };
+      live = { rows: d.liveRows(rows, p.value, threads, named), folds: d.liveFolds(p.value, named) };
     } catch {
       /* What is drawn stands. */
     }

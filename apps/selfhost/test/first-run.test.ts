@@ -11,8 +11,8 @@ const dir = (passkey: boolean, email: string | null) =>
 test('THE SETUP LINE CARRIES A CLAIM LINK ONLY UNTIL THE OWNER HAS A PASSKEY', async () => {
   const auth = async () => ({ status: 200, mail: { claimToken: 'tok' } });
   const line = await setupLine({ dir: dir(false, 'ada@example.com'), auth, origin: 'http://localhost:8080', signInOff: null });
-  assert.match(line ?? '', /http:\/\/localhost:8080\/app\/signin#claim=tok/);
-  assert.equal(claimUrl('http://x', 'a'), 'http://x/app/signin#claim=a');
+  assert.match(line ?? '', /http:\/\/localhost:8080\/signin#claim=tok/);
+  assert.equal(claimUrl('http://x', 'a'), 'http://x/signin#claim=a');
   assert.equal(await setupLine({ dir: dir(true, 'ada@example.com'), auth, origin: 'http://x', signInOff: null }), null);
   assert.equal(await setupLine({ dir: dir(false, null), auth, origin: 'http://x', signInOff: null }), null);
 });

@@ -154,9 +154,9 @@ test('A CLOUD COPY BECOMES THE RECORD THIS HOST SERVES, under its own id and own
 
     /* BOTH NAMES REACH IT: the one the record carries, which the app reads from `boot`, and the one it was restored
        under, which the Directory hands the switcher. */
-    assert.equal((await fetch(`${base}/app/the-studio/api/boot`, { headers: bearer })).status, 200);
-    assert.equal((await fetch(`${base}/app/drill/api/boot`, { headers: bearer })).status, 200, 'the name the record was restored under is refused');
-    assert.equal((await fetch(`${base}/app/somebody-else/api/boot`, { headers: bearer })).status, 403);
+    assert.equal((await fetch(`${base}/the-studio/api/boot`, { headers: bearer })).status, 200);
+    assert.equal((await fetch(`${base}/drill/api/boot`, { headers: bearer })).status, 200, 'the name the record was restored under is refused');
+    assert.equal((await fetch(`${base}/somebody-else/api/boot`, { headers: bearer })).status, 403);
 
     const again = await fetch(`${base}/api/export`, {
       method: 'POST',

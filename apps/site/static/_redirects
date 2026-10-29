@@ -1,0 +1,4 @@
+# Cloudflare Workers static assets read this file; it is not served.
+# A typed /privacy or /terms lands on the text at its real address.
+/privacy /legal/privacy 301
+/terms /legal/terms 301

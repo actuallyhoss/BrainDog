@@ -58,7 +58,23 @@ export const timelineCell = (text: string | undefined, now?: number): string =>
  * is the author's, and is left as written.
  */
 export const timelineTitle = (text: string | undefined): string =>
-  text === undefined ? '' : /[[\]{}()`*_<>]/u.test(text) ? text : readable(bankLine(text));
+  text === undefined ? '' : (bankCode(text) ?? (/[[\]{}()`*_<>]/u.test(text) ? text : readable(bankLine(text))));
+
+/**
+ * A BANK'S CODE IS NEVER PRINTED AS A NAME (Q15 of 29 October). A transfer the bank names only by the end of the account
+ * it went to ("0140") reads as that account, and the code HSBC writes for a government payment ("NGOV_INTEGRATED 871606")
+ * as what it is. Any other code in capitals joined by underscores is left off the line. `null` for a line that is words.
+ * The bank's words stay on the entry, under "As the bank wrote it".
+ */
+export function bankCode(text: string): string | null {
+  const bare = text.replace(BANK_STAMP, '').trim();
+  const digits = /^[•*xX#-]*\s*(\d{3,6})$/u.exec(bare);
+  if (digits) return `Account ending ${digits[1]}`;
+  if (/^NGOV_INTEGRATED(?![A-Z0-9])/u.test(bare)) return 'Government payment';
+  if (!/(?<![A-Za-z0-9])[A-Z]{2,}(?:_[A-Z0-9]+)+(?![A-Za-z0-9])/u.test(bare)) return null;
+  const rest = bare.replace(/(?<![A-Za-z0-9])[A-Z]{2,}(?:_[A-Z0-9]+)+(?![A-Za-z0-9])\s*\d*/gu, '').trim();
+  return rest === '' ? 'Bank payment' : readable(bankLine(rest));
+}
 
 /** A bank's own day at the head of its line, "22OCT26 " or "05OCT2026 ", with words after it. */
 const BANK_STAMP = /^\d{1,2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}(?:\d{2})?\s+(?=\S)/u;
@@ -94,6 +110,10 @@ export const timelineDetails = (rows: readonly { cells: readonly string[] }[], n
   barFigures(
     rows.map((r) => timelineCell(r.cells[2], now)),
     home,
+    /* AND A MONEY ROW KEEPS ITS PENCE WHATEVER ITS NEIGHBOURS (audit of 30 October, 20): the Ledger's one line waiting to
+       clear read "−£2,500" over Every line's "−£2,500.00", the same amount said two ways on one page because the
+       first list held no line with pence to pad it to. A ledger line is said to the penny, as `money` writes it. */
+    timelineRich(rows),
   );
 
 /* ---- The money row: a chip, a line under the title, and each day's net ------------------------------------------ */
@@ -114,6 +134,20 @@ export const TIMELINE_JOIN = ' · ';
 const CHIP_COLOURS = ['blue', 'violet', 'pink', 'teal', 'sky', 'yellow', 'lime', 'slate'] as const;
 export type TimelineChipColour = (typeof CHIP_COLOURS)[number];
 const isColour = (w: string): boolean => (CHIP_COLOURS as readonly string[]).includes(w.toLowerCase());
+
+/**
+ * A CHIP WITH NO COLOUR OF ITS OWN TAKES ONE FROM WHAT THE ROW IS KEPT UNDER (its category, the first word of the line
+ * under the title): the same word always the same slot, so every Groceries line wears one colour down a ledger and a
+ * page of grey initials reads as kinds of spending at a glance. A row kept under nothing stays on the quiet fill.
+ */
+export function wordSlot(kept: string | undefined): TimelineChipColour | null {
+  const word = (kept ?? '').trim().toLowerCase();
+  if (word === '') return null;
+  /* FNV-1a, so names that differ by a letter land on different slots rather than neighbours. */
+  let h = 0x811c9dc5;
+  for (const ch of word) h = Math.imul(h ^ (ch.codePointAt(0) ?? 0), 0x01000193) >>> 0;
+  return CHIP_COLOURS[h % CHIP_COLOURS.length]!;
+}
 
 /** A row's chip: the glyph it names, its colour, whether nothing has filed it, and the title's first letter. */
 export type TimelineChip = { glyph: string | null; colour: TimelineChipColour | null; unfiled: boolean; letter: string };
@@ -143,10 +177,10 @@ export function timelineUnder(cells: readonly string[], now: number | undefined,
  * nothing has filed, and any other word a glyph's name (the drawer draws it only where the host has art for it). With
  * no glyph the chip carries the title's first letter or figure, as a person's initial stands where they have no picture.
  */
-export function timelineChip(cell: string | undefined, title: string): TimelineChip {
+export function timelineChip(cell: string | undefined, title: string, kept?: string): TimelineChip {
   const words = (cell ?? '').trim().split(/\s+/u).filter(Boolean);
-  const colour = (words.find(isColour)?.toLowerCase() ?? null) as TimelineChipColour | null;
   const unfiled = words.includes('?');
+  const colour = (words.find(isColour)?.toLowerCase() as TimelineChipColour | undefined) ?? (unfiled ? null : wordSlot(kept));
   const glyph = words.find((w) => w !== '?' && !isColour(w)) ?? null;
   const letter = /[\p{L}\p{N}]/u.exec(title)?.[0]?.toLocaleUpperCase('en') ?? '';
   return { glyph, colour, unfiled, letter };

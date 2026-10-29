@@ -8,7 +8,7 @@ On macOS or Linux, install the command line and point it at your record:
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```
 
 On Windows, in PowerShell, the first line is `irm https://brain.dog/cli/install.ps1 | iex` and the second is the same. The command line needs Node.js 24.13 or later, and nothing needs an administrator.
@@ -64,7 +64,7 @@ braindog mcp --agent codex
 
 ## With a token
 
-A server or a script with no browser uses a token you make in the app, or with `braindog token create`. The command line reads it from `BRAINDOG_TOKEN`, and never takes a token as an argument. Over HTTP it goes in the `Authorization: Bearer` header, at `/mcp` and at `/api` alike. [Tokens and their reaches](/docs/api/tokens) says what each kind can open.
+A server or a script with no browser uses a token you make in the app, or with `braindog token create`. The command line reads it from `BRAINDOG_TOKEN`, and never takes a token as an argument. Over HTTP it goes in the `Authorization: Bearer` header, at `/mcp` and at `/api` alike. [What a key can do](/docs/api/tokens) says what each kind can open.
 
 ## What the agent is told
 

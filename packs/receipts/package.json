@@ -1,0 +1,11 @@
+{
+  "name": "@braindog/pack-receipts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test receipts.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

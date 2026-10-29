@@ -42,8 +42,8 @@ const refusal = (r: unknown) => {
 
 /* ── the declaration ────────────────────────────────────────────────────── */
 
-test('THE SIX TYPES ARE ACCEPTED, AND EACH DEFAULT IS COERCED AS A FIELD OF THAT TYPE WOULD BE', () => {
-  assert.deepEqual([...CONFIG_TYPES], ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list']);
+test('THE NINE TYPES ARE ACCEPTED, AND EACH DEFAULT IS COERCED AS A FIELD OF THAT TYPE WOULD BE', () => {
+  assert.deepEqual([...CONFIG_TYPES], ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list', 'secret']);
   const read = value<Record<string, { type: string; default?: unknown; values?: string[] }>>(
     readConfig({
       heading: { type: 'text', default: 'Sample invoices', label: 'Heading' },
@@ -66,9 +66,9 @@ test('THE SIX TYPES ARE ACCEPTED, AND EACH DEFAULT IS COERCED AS A FIELD OF THAT
   assert.deepEqual(value(readConfig(undefined)), {});
 });
 
-test('A REF, A SECRET, A FILE AND EVERY OTHER TYPE ARE CONFIG_TYPE_UNSUPPORTED, each with its own sentence', () => {
+test('A REF, A FILE AND EVERY OTHER TYPE ARE CONFIG_TYPE_UNSUPPORTED, each with its own sentence', () => {
   const seen = new Set<string>();
-  for (const type of ['ref', 'secret', 'file', 'decimal', 'colour', undefined]) {
+  for (const type of ['ref', 'file', 'decimal', 'colour', undefined]) {
     const r = refusal(readConfig({ billing_contact: { type } }));
     assert.equal(r.code, 'CONFIG_TYPE_UNSUPPORTED');
     assert.equal(r.at, 'config.billing_contact.type');
@@ -77,8 +77,17 @@ test('A REF, A SECRET, A FILE AND EVERY OTHER TYPE ARE CONFIG_TYPE_UNSUPPORTED, 
     seen.add(r.fix.split('.')[0]!);
   }
   assert.ok(refusal(readConfig({ billing_contact: { type: 'ref' } })).fix.includes('never points at a list'));
-  assert.ok(refusal(readConfig({ billing_contact: { type: 'secret' } })).fix.includes('credential'));
-  assert.equal(seen.size, 6);
+  assert.ok(refusal(readConfig({ billing_contact: { type: 'file' } })).fix.includes('credential'));
+  assert.equal(seen.size, 5);
+});
+
+test('A SECRET SETTING HOLDS THE LABEL OF A KEY, never the link or the key itself (round 1030)', () => {
+  assert.equal(value<string>(configValue('feed', { type: 'secret' }, 'Calendar address')), 'Calendar address');
+  for (const typed of ['https://calendar.example/private.ics', 'webcal://calendar.example/x.ics', 'two\nlines', 'x'.repeat(41)]) {
+    const r = refusal(configValue('feed', { type: 'secret' }, typed));
+    assert.equal(r.code, 'VALUE_MALFORMED');
+    assert.equal(r.at, 'config.feed');
+  }
 });
 
 test('THE REST OF THE SHAPE IS CHECKED: the map, the names, the keys, an enum, and a default that is not legal', () => {

@@ -31,9 +31,42 @@ const timeOf = (iso: string): number => Date.parse(iso);
  * a name keeps it.
  */
 export const noteSaid = (note: string): string => {
-  const said = note;
-  return said === 'created' ? 'added this' : /^[A-Z][a-z]+ed\b/u.test(said) ? `${said[0]!.toLowerCase()}${said.slice(1)}` : said;
+  const said = note.trim();
+  if (said === 'created') return 'added this';
+  /* AN IMPORT SAYS IT IMPORTED THIS, and the day is the line's own. The product this record came from by its old name
+     is "your old notes", never that name. */
+  const imported = /^imported (?:again )?from (.+?)\.?$/iu.exec(said);
+  if (imported) return OLD_NAME.test(imported[1]!) ? 'imported this from your old notes' : `imported this from ${imported[1]!}`;
+  if (VERB_FIRST.test(said)) return `${said[0]!.toLowerCase()}${said.slice(1)}`;
+  /* A NOTE WITH NO VERB OF ITS OWN IS WHAT THE AGENT WROTE DOWN: "An agent Partner on Koala." is "An agent noted:
+     Partner on Koala." A note that says what somebody did ("Halden sent this.") keeps its words. */
+  const first = said.split(/(?<=[.!?])\s/u)[0] ?? said;
+  if (/^[A-Z]/u.test(said) && !PAST.test(first)) return `noted: ${said}`;
+  return said;
 };
+
+/**
+ * The name of a notes product a record imported from before BrainDog, which a screen never says: one named a brain (a
+ * "Second Brain", "Mara Brain"). BrainDog itself is one word and does not match.
+ */
+export const OLD_NAME = /\bbrain\b/iu;
+/** A note that opens on a verb in the past: "Imported…", "Moved…", "Set…". */
+const VERB_FIRST = /^(?:[A-Z][a-z]+ed|Set|Put|Took|Gave|Made|Sent|Kept|Left|Met|Wrote|Ran|Undid|Got|Found|Told|Split|Paid|Read|Cut|Drew|Saw|Heard)\b/u;
+/** A verb in the past anywhere in a sentence, which makes it a sentence about something done. */
+const PAST = /\b(?:[a-z]+ed|set|put|took|gave|made|sent|kept|left|met|wrote|ran|undid|got|found|told|split|paid|cut|drew|saw|heard|is|are|was|were|has|have|had)\b/u;
+
+/**
+ * A LINE THAT IS A WHOLE SENTENCE OF ITS OWN, for the rules that meet people and organisations: the bank text that
+ * filed an organisation says "Filed from a bank text", where the line read "Meet payees added this". `null` for any
+ * other line, which is said as who and then what.
+ */
+export function lineWhole(by: string, note: string): string | null {
+  if (note.trim() !== 'created') return null;
+  const rule = /^rule[.:](.+)$/u.exec(by.trim())?.[1];
+  if (rule === 'meet-payees') return 'Filed from a bank text';
+  if (rule === 'meet-senders' || rule === 'meet-sender-organisations') return 'Added from a mail';
+  return null;
+}
 
 /**
  * THE HISTORY AND THE COMMENTS AS ONE LIST, NEWEST FIRST.

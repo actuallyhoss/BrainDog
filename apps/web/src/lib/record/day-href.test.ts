@@ -41,7 +41,7 @@ test('the address is a declared page of the record, which the app serves', () =>
   assert.equal(APP_WORDS.has('p'), true);
   assert.equal(APP_WORDS.has(CALENDAR_PAGE), false);
   const href = dayHref(WITH, '2026-11-03')!;
-  assert.equal(at(href, '/app/acme/p/home'), '/app/acme/p/calendar?day=2026-11-03');
+  assert.equal(at(href, '/acme/p/home'), '/acme/p/calendar?day=2026-11-03');
 });
 
 test('on a page, the renderer draws a link with the page and plain text without it', () => {

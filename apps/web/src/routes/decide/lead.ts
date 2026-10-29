@@ -260,7 +260,9 @@ export function leadOf<B extends Drawn>(blocks: readonly B[], order: readonly st
     if (b.kind !== 'queue' || typeof b.key !== 'string' || !order.includes(b.key)) return b;
     /* THE QUEUE UNDER THE LEAD IS COMPACT: the question, who asked and its answers, and its own page for the rest. */
     if (n !== at) return { ...b, compact: true } as B;
-    const counted = Math.max(0, ((b as { counted?: unknown }).counted as number | undefined ?? b.total) - 1);
+    /* THE TOP CARD COUNTS IN ITS SECTION ON EVERY WIDTH (Q11 of 29 October): the laptop said "Money 2" over a group of
+       three whose first is the card above it, while the phone's tab said "Money 3". The heading says the group whole. */
+    const counted = Math.max(0, ((b as { counted?: unknown }).counted as number | undefined) ?? b.total ?? 0);
     return rest.length === 0 ? ({ ...b, queue: [], shown: 0, total: 0, counted, drawn: false } as B) : ({ ...b, queue: rest, shown: rest.length, total: rest.length, counted, compact: true } as B);
   });
   return { blocks: out, group: from.key ?? null };

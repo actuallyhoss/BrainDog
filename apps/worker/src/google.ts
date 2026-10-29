@@ -22,7 +22,7 @@
  * because the callback is a top-level navigation from Google and a `Strict` cookie would not come with it.
  *
  * AND IT NEVER MAKES ANYBODY, WHATEVER `SIGNUP` SAYS (`launch.ts`). `magic.start` mints nothing for an address nobody
- * has, so a first sign-in with Google is sent back with `unknown` and the person signs up through `/app/signup`, where
+ * has, so a first sign-in with Google is sent back with `unknown` and the person signs up through `/signup`, where
  * the switch, the code in `invite` and the strikes all apply. A Google door that made people would need a sign-up code
  * riding in `state`, and would be a second front door to keep in step with the first; there is none.
  *
@@ -31,7 +31,7 @@
  * cookie the start wrote, with a code Google issued against the verifier inside it.
  */
 
-import { clearCookie, readSid, safeNext, sameKey, sameOrigin, sessionCookie, type CookieMode } from '@braindog/host/auth';
+import { appNext, clearCookie, readSid, sameKey, sameOrigin, sessionCookie, type CookieMode } from '@braindog/host/auth';
 import type { AuthCall, AuthResult } from '@braindog/ports';
 
 /** The two routes and the one method each answers, as `AUTH_ROUTES` declares them. */
@@ -89,10 +89,7 @@ const textOf = (b64: string): string | null => {
 };
 
 /** Where the app is, and so the only place a sign-in may land. */
-const landing = (next: unknown): string => {
-  const to = safeNext(next);
-  return to === '/app' || to.startsWith('/app/') || to.startsWith('/app?') ? to : '/app/';
-};
+const landing = (next: unknown): string => appNext(next) ?? '/';
 
 async function seal(secret: string, text: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -228,7 +225,7 @@ export async function serveGoogle(request: Request, path: keyof typeof GOOGLE_RO
     /* The desktop flavour needs the app's challenge and a secret to seal with; without both it fails here, not at the end. */
     const desktop = url.searchParams.get('desktop') === '1';
     const asked = url.searchParams.get('challenge') ?? '';
-    if (desktop && (!CHALLENGE.test(asked) || (door.secret ?? '').length < 32)) return go(`${door.origin}/app/signin?google=failed`, []);
+    if (desktop && (!CHALLENGE.test(asked) || (door.secret ?? '').length < 32)) return go(`${door.origin}/signin?google=failed`, []);
     const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
     const to = new URL(AUTHORIZE);
     to.search = new URLSearchParams({
@@ -251,8 +248,8 @@ export async function serveGoogle(request: Request, path: keyof typeof GOOGLE_RO
   const held = readState(request, door.mode);
   const next = landing(held?.next);
   const back = (why: GoogleWhy): Response => {
-    const q = new URLSearchParams({ google: why, ...(next === '/app/' ? {} : { next }) });
-    return go(`${door.origin}/app/signin?${q}`, [forget]);
+    const q = new URLSearchParams({ google: why, ...(next === '/' ? {} : { next }) });
+    return go(`${door.origin}/signin?${q}`, [forget]);
   };
 
   if (url.searchParams.has('error')) return back('cancelled');

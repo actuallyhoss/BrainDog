@@ -19,7 +19,7 @@ export async function pkce(): Promise<{ verifier: string; challenge: string }> {
 
 /** The host's start in its desktop flavour, for the default browser. */
 export function desktopStart(goTo: string, origin: string, challenge: string): string {
-  const q = new URLSearchParams({ desktop: '1', challenge, ...(goTo === '/app/' ? {} : { next: goTo }) });
+  const q = new URLSearchParams({ desktop: '1', challenge, ...(goTo === '/' ? {} : { next: goTo }) });
   return `${origin}/auth/google/start?${q}`;
 }
 

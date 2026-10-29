@@ -60,8 +60,12 @@ export type Found = {
   at?: readonly FoundAt[] | undefined;
 };
 
-/** `name` is what the finder counts, in plain words, as its figure is called: "Ended runs that wrote nothing". */
-export type Finder = { id: string; name?: string | undefined; find(sql: Sql, nowMs: number): Found };
+/**
+ * `name` is what the finder counts, in plain words, as its figure is called: "Ended runs that wrote nothing". `counted`
+ * says a count of them as a sentence a person reads ("64 runs ended without writing anything"), where a list of what
+ * went stale says it.
+ */
+export type Finder = { id: string; name?: string | undefined; counted?: ((n: number) => string) | undefined; find(sql: Sql, nowMs: number): Found };
 
 /** What `tidy` needs to file a question: the record's counter and its mint, as the write path holds them. */
 export type TidyDeps = { sql: Sql; nowMs: number; mint: () => string; allocate: (name: string) => number };
@@ -121,6 +125,7 @@ const repo = (t: string): string => `coalesce(json_extract(${t}.fields, '$.repo'
 const runsStopped: Finder = {
   id: 'runs-stopped',
   name: 'Runs that stopped answering',
+  counted: (n) => `${many(n, 'run has', 'runs have')} stopped answering`,
   find(sql, nowMs) {
     /* COUNTED BY THE ONE CLOCK (`presence.ts` `unheardRuns`), which is the only file that compares a run's last seen with the time. */
     const stale = unheardRuns(sql, nowMs, ABANDON_MS, ['active', 'idle']);
@@ -144,6 +149,7 @@ const runsStopped: Finder = {
 const runsEmpty: Finder = {
   id: 'runs-empty',
   name: 'Ended runs that wrote nothing',
+  counted: (n) => `${many(n, 'run', 'runs')} ended without writing anything`,
   find(sql, nowMs) {
     const stale = unheardRuns(sql, nowMs, EMPTY_RUN_MS, ['done', 'abandoned'], "json_extract(fields, '$.wrote') = 0");
     if (stale === 0) return { stale, did: 0, ask: null };
@@ -171,6 +177,7 @@ const runsEmpty: Finder = {
 const stepsOld: Finder = {
   id: 'steps-old',
   name: 'Steps passed over or left too long',
+  counted: (n) => `${many(n, 'step was', 'steps were')} passed over or left too long`,
   find(sql, nowMs) {
     const stale = count(
       sql,
@@ -207,6 +214,7 @@ const stepsOld: Finder = {
 const questionsOld: Finder = {
   id: 'questions-old',
   name: 'Questions open more than 14 days',
+  counted: (n) => `${many(n, 'question has', 'questions have')} been open more than 14 days`,
   find(sql, nowMs) {
     const stale = count(
       sql,
@@ -233,6 +241,7 @@ const MOOTABLE = "status = 'open' AND body_kind IN ('rowset', 'change', 'pack', 
 const questionsMoot: Finder = {
   id: 'questions-moot',
   name: 'Questions that no longer need you',
+  counted: (n) => `${many(n, 'question no longer needs', 'questions no longer need')} you`,
   find(sql, nowMs) {
     const total = count(sql, `SELECT COUNT(*) AS n FROM suggestion WHERE ${MOOTABLE}`);
     if (total === 0) return { stale: 0, did: 0, ask: null };
@@ -253,6 +262,7 @@ const questionsMoot: Finder = {
 const faultsOpen: Finder = {
   id: 'faults-open',
   name: 'Faults still open',
+  counted: (n) => `${many(n, 'fault is', 'faults are')} still open`,
   find: (sql) => ({ stale: openFaults(sql).length, did: 0, ask: null }),
 };
 

@@ -17,7 +17,7 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { listName as declaredName } from '$lib/record/names.ts';
+  import { listName as declaredName, ruleNameSaid } from '$lib/record/names.ts';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import Button from '$lib/ui/Button.svelte';
@@ -533,7 +533,7 @@
   const whole = $derived(tallyOf(kept, me, names, listSaid));
   /* The line under the title, below `whole`, which it reads. */
   const lead = $derived(
-    unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho, { total: whole.total, agents: whole.groups.find((g) => g.group === 'agent')?.count ?? 0 }) : undefined,
+    (unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho, { total: whole.total, agents: whole.groups.find((g) => g.group === 'agent')?.count ?? 0 }) : '') || undefined,
   );
   const busy = $derived(busyOf(kept, clock));
   const topKinds = $derived(
@@ -687,7 +687,7 @@
   {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
   <!-- A RULE OR A SCRIPT THAT RAN LEADS WITH ITS TITLE ("Ran Meet payees"), and says what it is beside its face. -->
   {@const ran = ranOf(e)}
-  {@const ranTitle = ran === null ? null : (names.get(`${ran.kind}:${ran.id}`) ?? actorSaid(e.by, null, new Map()).name.replace(/^A rule: /u, '').replace(/ script$/u, ''))}
+  {@const ranTitle = ran === null ? null : names.has(`${ran.kind}:${ran.id}`) ? ruleNameSaid(names.get(`${ran.kind}:${ran.id}`)!) : actorSaid(e.by, null, new Map()).name.replace(/^A rule: /u, '').replace(/ script$/u, '')}
   <!-- ONE PASS OF BRAINDOG'S OWN UPDATE (`passOf`) says the record's sentence as its whole line, and names nothing of its own. -->
   {@const pass = passOf(e)}
   {@const settled = pass === null ? settledOf(e, me, names) : null}

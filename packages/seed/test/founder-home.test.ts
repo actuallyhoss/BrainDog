@@ -241,6 +241,9 @@ test('WORDS THAT NAME DOMAINS BRING SERVICES ON THE FIRST DAY, and Today keeps L
  * so every field 2.6.0 declared is still on the list. A record on 2.7.0 taking the update with every reading kept is
  * `portfolio-kpis.test.ts`'s.
  */
+/** The Dashboard's line while no number came: 3.8.0's, and 2.6.0's as it was published. */
+const NO_NUMBERS_38 = 'No numbers came in the last thirty days.';
+const NO_NUMBERS_26 = "No project has reported a number in the last thirty days. A project's page has the key it sends them with.";
 test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfolio with its two links laid back', () => {
   type List = { register?: string; fields?: { id: string }[] };
   const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/founder/2.6.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: List[] } };
@@ -295,6 +298,11 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
      gate on the age. */
   const dashboardBefore = (blocks: Block[]): Block[] =>
     blocks.flatMap((b): Block[] => {
+      /* AND 3.8.0 (Q51 of 29 October): while no number came, the line says so shortly, then what went quiet and the way
+         to fix the feed, laid back here as 2.6.0 said it, one line and nothing under it. */
+      const quiet = (b.when as { metric?: string; lt?: number } | undefined)?.metric === 'datapoints-30d' && (b.when as { lt?: number }).lt === 1;
+      if (quiet && b.lead !== true) return [];
+      if (quiet && b.body === NO_NUMBERS_38) return [{ ...b, body: NO_NUMBERS_26 }];
       /* AND 3.5.0: the Organisations table leaves out the ones put away. */
       if (b.kind === 'table' && b.heading === 'Organisations') return [{ ...b, where: 'merged_into is empty' }];
       if (b.kind !== 'lines') return [b];
@@ -312,7 +320,10 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
         ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: inPlace(asBefore(d.blocks as Block[])) }
         : d.page === 'dashboard'
           ? { ...d, blocks: dashboardBefore(d.blocks as Block[]) }
-          : d,
+          : /* AND 3.8.0: the add-on's page is Founder overview, where Today is the app's own board. */
+            d.page === 'home-founder' && (d as { title?: string }).title === 'Founder overview'
+            ? { ...d, title: 'Today' }
+            : d,
     );
   /* THE TWO BLOCKS THAT WENT FOR THE SHAPE (founder 3.3.0): Handed back or blocked, and Money by month. And the three
      that went for its parts (founder 3.7.0): the Numbers lines for the numbers part, What changed for what happened, and

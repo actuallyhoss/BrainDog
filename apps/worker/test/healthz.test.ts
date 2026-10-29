@@ -116,8 +116,8 @@ test('ANY OTHER METHOD IS 405 WITH Allow, and the path is exactly /healthz', asy
   assert.notEqual((await ask('/healthz/x')).status, 200);
 });
 
-test('A BROWSER ON THE OLD HOST IS ANSWERED WHERE IT STANDS, not sent to /app/healthz', async () => {
-  /* `legacyRedirect` sends every page load on a legacy host to `https://<PUBLIC_HOST>/app<path>`. A monitor that sends
+test('A BROWSER ON THE OLD HOST IS ANSWERED WHERE IT STANDS, not sent into the app', async () => {
+  /* `legacyRedirect` sends a page load on a legacy host to `https://<PUBLIC_HOST><path>`. A monitor that sends
      `accept: text/html` would follow a 308 to the app shell and read a 200 from the wrong thing. */
   const out = await ask('/healthz', { host: 'app.brain.example.test', headers: { accept: 'text/html' } });
   assert.equal(out.status, 200);

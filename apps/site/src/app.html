@@ -33,23 +33,15 @@
     <!-- The visit count (src/lib/site/seen.ts): deferred, so it never holds up the first paint. -->
     <script src="/seen.js" defer></script>
     <!--
-      THE SHARED CARD. Pasted into a message, a post or a chat, a page shows this preview rather than
-      a bare URL.
-
-      IN THE SHELL, the parts that do not vary: the site name, the type, the card format and the
-      image. Each page sets its own `og:title` and `og:description` from its own `<title>` and
-      description in its `+page.svelte`, so there is one sentence per page and not two that can
-      disagree.
-
-      `og:image` IS A DRAWN CARD AND NOT A SCREENSHOT: the mark, the wordmark and the slogan on the
-      hero's own ground, 1200 by 630, which `scripts/product.mjs` draws out of the built home page, so
-      its words, faces and colours are the site's. An absolute URL, because a preview is fetched by
-      somebody else's server and a relative one resolves against nothing.
+      THE SHARED CARD. Pasted into a message, a post or a chat, a page shows a preview rather than a bare URL.
+      Here are only the parts that never vary: the site's name and the card's format. Each page's title, description,
+      address and picture (1200 by 630, drawn by `scripts/product.mjs` from that page's own head) come from
+      `lib/site/Seo.svelte`, with its structured data, so there is one sentence per page and not two that can disagree.
     -->
     <meta property="og:site_name" content="BrainDog" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://brain.dog/shots/home-light.png" />
+    <meta property="og:locale" content="en_GB" />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
 
     %sveltekit.head%
   </head>

@@ -21,7 +21,7 @@
  */
 
 import { clausesOf, resolveDay } from '@braindog/where';
-import { KPIS_KIND, MISSING, exponentOf, money, writeAmount } from 'braindog-render';
+import { KPIS_KIND, MISSING, exponentOf, money, writeAmount, type WidgetSize } from 'braindog-render';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
@@ -166,12 +166,21 @@ export const captureHeading = (one: string | undefined): string => lists.capture
  * A page body as `previewPage` takes it. Today's own is one twelve-column board with no rail (`todayHome`); a body kept
  * from an older Today may still carry its rail, four twelfths wide.
  */
-export type HomeBody = { page: string; title: string; layout?: { rail: number; sticky: boolean }; blocks: PageBlock[] };
+export type HomeBody = { page: string; title: string; layout?: { rail: number; sticky: boolean }; board?: boolean; phone?: BoardPhone; blocks: PageBlock[] };
+
+/** A board's phone arrangement (`packages/kernel/src/board.ts`): its order there, its sizes there, what it leaves out. */
+export type BoardPhone = { order?: string[]; sizes?: Record<string, WidgetSize>; hidden?: string[] };
 
 /* THE QUEUE'S TILE FORM AND A BLOCK'S KEY ARE KEYS THE KERNEL ADMITS (`declare.ts`, `block-keys.ts`) AND THE APP'S BLOCK
    TYPE DOES NOT NAME, so they are spread in rather than written as properties the type would refuse. */
 const TILES = { tiles: true } as const;
 const keyed = (key: DeskKey) => ({ key }) as const;
+/**
+ * A WIDGET OF TODAY'S BOARD (the widgets plan of 29 October, §4.1): its key, and the size the desk drew it at. A block
+ * the late band stands in for, and the second line of the vital signs, carry a key and no size: they are not widgets of
+ * their own, and the board's sixteen does not count them.
+ */
+const widget = (key: string, size?: WidgetSize) => ({ key, ...(size ? { size } : {}) }) as const;
 
 /* ── the desk ──────────────────────────────────────────────────────────── */
 
@@ -183,31 +192,12 @@ const keyed = (key: DeskKey) => ({ key }) as const;
  * (`deskOf`), where they were parts it drew around the page. Every other block of Today's
  * own body folds behind one More (`deskFolded`), and so does every tile Home draws around the page.
  */
-export const DESK_KEYS = ['needs-you', 'working', 'cash', 'numbers', 'week-due', 'week-money', 'projects', 'coming-up', 'faces'] as const;
+export const DESK_KEYS = ['needs-you', 'working', 'cash', 'numbers', 'week-due', 'week-money', 'projects', 'coming-up', 'work-due', 'faces', 'arrivals'] as const;
 export type DeskKey = (typeof DESK_KEYS)[number];
 const ON_DESK: ReadonlySet<string> = new Set(DESK_KEYS);
 
 /** Whether a block is one the desk shows at rest, by its declared key. */
 export const onDesk = (b: { key?: string | undefined }): boolean => typeof b.key === 'string' && ON_DESK.has(b.key);
-
-/**
- * TODAY'S BLOCKS WITH THE REST FOLDED: while More is shut, every drawn block the desk does not show at rest is marked
- * not drawn, at its place, so every write still finds its block by index. `folded` is how many that is, which More
- * says. Open, the blocks are as they came. A NEW OBJECT ONLY WHERE ONE FOLDS.
- *
- * A LIST OF TASKS NEVER FOLDS (frame A, 23 October): the urgent tasks and the work handed back are the rows `x` ticks,
- * and with no More to open they would be on no screen a key could reach. They stand under the desk.
- */
-export function deskFolded<B extends { key?: string | undefined; kind?: string; drawn: boolean }>(blocks: readonly B[], open: boolean): { blocks: B[]; folded: number } {
-  let folded = 0;
-  const out = blocks.map((b) => {
-    /* A BLOCK THE DESK DRAWS AS ITS OWN TILE (`desk-part.ts`), what is late among them, is on the desk wherever it is. */
-    if (!b.drawn || onDesk(b) || b.kind === 'todo' || (b as { desk?: unknown }).desk !== undefined) return b;
-    folded += 1;
-    return open ? b : { ...b, drawn: false };
-  });
-  return { blocks: out, folded };
-}
 
 /* ── a record's week ───────────────────────────────────────────────────── */
 
@@ -311,6 +301,7 @@ function peopleTile(p: People): PageBlock {
   return {
     kind: 'cards',
     ...keyed('faces'),
+    size: 'tall',
     heading: p.name,
     icon: p.icon,
     span: 3,
@@ -390,8 +381,8 @@ export const SIGNS_PAGE = 'health';
 export function signsLine(): PageBlock[] {
   const said = (words: string): string => `[${words}](/p/${SIGNS_PAGE}).`;
   return [
-    { kind: 'note', when: { metric: SIGNS_RED, is: 1 }, body: said('One vital sign needs a look') },
-    { kind: 'note', when: { metric: SIGNS_RED, gt: 1 }, body: said(`{{${SIGNS_RED}}} vital signs need a look`) },
+    { kind: 'note', ...widget('signs'), when: { metric: SIGNS_RED, is: 1 }, body: said('One vital sign needs a look') } as PageBlock,
+    { kind: 'note', ...widget('signs-many'), when: { metric: SIGNS_RED, gt: 1 }, body: said(`{{${SIGNS_RED}}} vital signs need a look`) } as PageBlock,
   ];
 }
 
@@ -413,6 +404,7 @@ const QUIET_WORDS = { heading: 'Gone quiet', subject: 'What', since: 'Last seen'
 export function quietTile(): PageBlock {
   return {
     kind: 'table',
+    ...widget('quiet', 'large'),
     heading: QUIET_WORDS.heading,
     icon: 'history',
     source: QUIET,
@@ -449,13 +441,14 @@ export const NUMBERS: string = KPIS_KIND;
  * of the board, under the first one and over the record's week.
  */
 export const numbersTile = (): PageBlock =>
-  ({ kind: KPIS_KIND, ...keyed('numbers'), span: 12, heading: words.numbers, icon: 'gauge', source: NUMBERS, for: 'today', empty: words.noNumbers }) as PageBlock;
+  ({ kind: KPIS_KIND, ...keyed('numbers'), size: 'full', span: 12, heading: words.numbers, icon: 'gauge', source: NUMBERS, for: 'today', empty: words.noNumbers }) as PageBlock;
 
 /** The two blocks a record's week opens Today on: its own words, naming its list ("Orders due this week"). */
 function weekBlocks(w: Week): PageBlock[] {
   const due: PageBlock = {
     kind: 'table',
     ...keyed('week-due'),
+    size: 'large',
     span: 8,
     heading: `${w.due.name} due this week`,
     icon: 'calendar',
@@ -466,7 +459,7 @@ function weekBlocks(w: Week): PageBlock[] {
     limit: 8,
     empty: `No ${w.due.one.toLowerCase()} is due this week.`,
   } as PageBlock;
-  return [due, { ...weekMoney(), ...keyed('week-money'), span: 4 } as PageBlock];
+  return [due, { ...weekMoney(), ...keyed('week-money'), size: 'wide', span: 4 } as PageBlock];
 }
 
 /**
@@ -486,10 +479,11 @@ function weekBlocks(w: Week): PageBlock[] {
  */
 export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
   /* WHAT FELL DUE AND WAS NOT DONE, across every list: what the late tasks above leave is the money. ONE LINE A THING,
-     oldest first as the record answers it, "Legal review, February · −£9,190 · 2 months late": a date heading over
+     oldest first as the record answers it, "Legal review, February · −£9,190 · 64 days late": a date heading over
      each of six rows read as a ledger, and how late it is says more than the day it was due (`homeDrawn`). */
   const lateMoney: PageBlock = {
     kind: 'spec',
+    ...widget('late-money'),
     heading: voice.overdue,
     icon: 'clock',
     source: 'deadlines',
@@ -502,6 +496,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
     ? [
         {
           kind: 'todo',
+          ...widget('late', 'large'),
           heading: voice.overdue,
           icon: 'clock',
           source: `register.${TASKS}`,
@@ -515,6 +510,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
         /* HANDED BACK TO BE CHECKED: an agent finished its part and a person looks before it is done. */
         {
           kind: 'todo',
+          ...widget('to-check'),
           heading: words.toCheck,
           icon: 'hourglass',
           source: `register.${TASKS}`,
@@ -527,6 +523,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
         /* URGENT WITH NO DAY YET COME. One that is also late is drawn once, above (`homeDrawn`). */
         {
           kind: 'todo',
+          ...widget('urgent'),
           heading: words.urgent,
           icon: 'alert',
           source: `register.${TASKS}`,
@@ -538,80 +535,117 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
         },
       ]
     : [];
-  return {
-    page: 'today',
-    title: 'Today',
-    blocks: [
-      /* THE PAGE'S LINE. Its words are the calm one; Home says the line worked out from the blocks over it (`homeDrawn`),
-         and a record's own `home` page that writes its own line keeps it. */
-      { kind: 'note', lead: true, body: TODAY_LEAD },
-      /* THE LINE A TASK IS TYPED INTO, with the light syntax ("tomorrow !urgent #Kiln") the page reader reads. */
-      ...(holds.tasks && holds.adds ? [{ kind: 'capture', heading: captureHeading(holds.one), icon: 'plus', register: TASKS } as PageBlock] : []),
-      /* THE RECORD'S WEEK FIRST, where it keeps one: what is due this week and what came in. Late, what needs you and
-         who is working keep their order after them. */
-      ...(holds.week ? weekBlocks(holds.week) : []),
-      /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
-      /* ASKED FOR WHOLE (`NEEDS_YOU_READ`), so Home can lead with the money (`needsYouOrder`); the tile still shows
-         `NEEDS_YOU_LIMIT` and the rest are its count. */
-      { kind: 'queue', ...keyed('needs-you'), span: 5, heading: voice.needsYou, icon: 'inbox', source: 'governance.open', limit: NEEDS_YOU_READ, empty: voice.nothingWaiting, ...TILES },
-      /* WHAT IS WRONG WITH THE RECORD ITSELF, said only while a vital sign reads red: under what needs you, since it
-         needs a look too, and over the work, which it may be the reason for. */
-      ...(holds.health ? signsLine() : []),
-      /* WHAT STOPPED ARRIVING, where the record reads it for this reader: under the vital signs, which say the record is
-         unwell, and over the work, which a feed that stopped may be the reason for. Not drawn when nothing is quiet. */
-      ...(holds.quiet ? [quietTile()] : []),
-      ...(holds.tasks ? work : [lateMoney]),
-      /* WHO IS WORKING, the record's runs at work by its one clock (`sessions.working`), only while one is (`runs-working`).
-         The desk draws it as Working now, each run with how long it has been at it (`WorkingNow.svelte`). */
-      ...(holds.runs ? [workingTile(voice)] : []),
-      /* CASH AHEAD (today F5): the cash now, how long it lasts, and what comes in and goes out in the next thirty days,
-         read from the Money page's own figures, where that page is. ITS LINE IS THE TWELVE WEEKS AHEAD, the walk the
-         runway counts (`ahead: cash-now`, the fullest walk from the cash now) and Money's Cash ahead draws over the same twelve weeks, with today, the
-         lowest point and both ends marked; it was the twelve weeks behind, under a tile called Cash ahead, and ended in
-         a drop Money's chart did not have. */
-      ...(holds.money
-        ? [
-            {
-              kind: 'stat',
-              ...keyed('cash'),
-              span: 3,
-              heading: words.money,
-              icon: 'wallet',
-              cells: [
-                { metric: 'cash-now', label: words.cashNow, trend: '12w', ahead: 'cash-now', note: words.lastsTo },
-                { metric: 'arriving-30d', label: words.comingIn },
-                { metric: 'leaving-30d', label: words.goingOut },
-              ],
-            } as PageBlock,
-          ]
-        : []),
-      /* THE FEW KEY NUMBERS THAT LEAD, under cash: drawn only where the record keeps one. */
-      numbersTile(),
-      /* THE PROJECTS IN PLAY, as their cards, where the record keeps a list of them. The desk draws them as its row of
-         cards with the lanes over them (`ProjectCards.svelte`). */
-      ...(holds.projects ? [projectsTile(holds.projects)] : []),
-      /* THE NEXT FEW THINGS THAT FALL DUE ACROSS EVERY LIST, from today on, read on their own so what is late never
-         takes their place; a task already drawn in a block above is not drawn again. */
-      {
-        kind: 'timeline',
-        ...keyed('coming-up'),
-        span: 3,
-        heading: voice.comingUp,
-        icon: 'calendar',
-        source: 'deadlines',
-        where: 'day after -1d',
-        horizon: COMING_UP_DAYS,
-        columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
-        limit: COMING_UP_LIMIT,
-        empty: voice.nothingDue,
-      },
-      /* A FEW OF THE PEOPLE THE RECORD KEEPS, beside what is coming up, where it keeps a list of them. */
-      ...(holds.people ? [peopleTile(holds.people)] : []),
-      /* WHAT CHANGED SINCE THE READER'S MARK, which Home stamps when they leave, never when they open it. Folded behind
-         More: the desk's Arrivals says what came in. */
-      { kind: 'feed', heading: voice.sinceAway, icon: 'activity', source: 'activity', since: 'seen', first: 8, empty: words.nothingNew },
-    ],
-  };
+  const blocks: PageBlock[] = [
+    /* THE PAGE'S LINE. Its words are the calm one; Home says the line worked out from the blocks over it (`homeDrawn`),
+       and a record's own `home` page that writes its own line keeps it. THE BOARD'S HEAD, never a widget (Call 5). */
+    { kind: 'note', lead: true, body: TODAY_LEAD },
+    /* THE LINE A TASK IS TYPED INTO, with the light syntax ("tomorrow !urgent #Kiln") the page reader reads. The head too. */
+    ...(holds.tasks && holds.adds ? [{ kind: 'capture', heading: captureHeading(holds.one), icon: 'plus', register: TASKS } as PageBlock] : []),
+    /* NEEDS YOU LEADS THE BOARD ON EVERY WIDTH, as the phone has it (audit Q18): the same morning, read in one order.
+       ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. ASKED FOR WHOLE
+       (`NEEDS_YOU_READ`), so Home can lead with the money (`needsYouOrder`); the size says how many it shows. */
+    { kind: 'queue', ...keyed('needs-you'), size: 'large', span: 5, heading: voice.needsYou, icon: 'inbox', source: 'governance.open', limit: NEEDS_YOU_READ, empty: voice.nothingWaiting, ...TILES } as PageBlock,
+    /* THEN WHAT IS LATE, one widget for the late work, the late money, the work handed back and the urgent
+       (`today-brief.ts` `bandOf`): the four reads are blocks so each is ticked where it is drawn, and the board draws
+       them as the one tile, at the late work's place and size. */
+    ...(holds.tasks ? work : [{ ...lateMoney, size: 'large' } as PageBlock]),
+    /* WHO IS WORKING, the record's runs at work by its one clock (`sessions.working`), only while one is. */
+    ...(holds.runs ? [workingTile(voice)] : []),
+    /* CASH AHEAD (today F5): the cash now, how long it lasts, and what comes in and goes out in the next thirty days,
+       read from the Money page's own figures. ITS LINE IS THE TWELVE WEEKS AHEAD, the walk Money's Cash ahead draws. */
+    ...(holds.money
+      ? [
+          {
+            kind: 'stat',
+            ...keyed('cash'),
+            size: 'wide',
+            span: 3,
+            heading: words.money,
+            icon: 'wallet',
+            cells: [
+              { metric: 'cash-now', label: words.cashNow, trend: '12w', ahead: 'cash-now', note: words.lastsTo },
+              { metric: 'arriving-30d', label: words.comingIn },
+              { metric: 'leaving-30d', label: words.goingOut },
+            ],
+          } as PageBlock,
+        ]
+      : []),
+    /* THE RECORD'S WEEK, where it keeps one: what is due this week and what came in. */
+    ...(holds.week ? weekBlocks(holds.week) : []),
+    /* WHAT IS WRONG WITH THE RECORD ITSELF, only while a vital sign reads red. */
+    ...(holds.health ? signsLine() : []),
+    /* WHAT STOPPED ARRIVING, where the record reads it for this reader. Not drawn when nothing is quiet. */
+    ...(holds.quiet ? [quietTile()] : []),
+    /* THE FEW KEY NUMBERS THAT LEAD: drawn only where the record keeps one. */
+    numbersTile(),
+    /* THE PROJECTS IN PLAY, as their cards, where the record keeps a list of them. */
+    ...(holds.projects ? [projectsTile(holds.projects)] : []),
+    /* WHAT FALLS DUE WITH MONEY ON IT (audit Q10): Money's own due list (`source: deadlines`, `amount is set`, as Money's
+       Coming up reads it), so Today's money tile and Money's name the same bills. A task with a day was mixed in with
+       the salary; the work has its own heading beside it. What is late is Late's. */
+    {
+      kind: 'timeline',
+      ...keyed('coming-up'),
+      size: 'tall',
+      span: 3,
+      heading: voice.comingUp,
+      icon: 'calendar',
+      source: 'deadlines',
+      where: `${DUE_WITH_MONEY}, day after -1d`,
+      horizon: COMING_UP_DAYS,
+      columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+      limit: COMING_UP_LIMIT,
+      empty: voice.nothingDue,
+    } as PageBlock,
+    /* THE WORK THAT FALLS DUE THIS WEEK, under Work's own heading (audit Q10), ticked where it is drawn. Not the late,
+       which Late holds. */
+    ...(holds.tasks
+      ? [
+          {
+            kind: 'todo',
+            ...keyed('work-due'),
+            size: 'tall',
+            heading: words.workDue,
+            icon: 'list-todo',
+            source: `register.${TASKS}`,
+            /* WORK'S OWN THIS WEEK (audit of 30 October, 16): yours, from today to a week out, as Work's This week counts
+               it (`tasks-this-week-yours`), so the tile and Work say one number. */
+            where: 'state is open or doing, agent is empty, by after yesterday, by before +8d',
+            columns: [{ field: 'what' }, { field: 'by' }],
+            order: [{ field: 'by', dir: 'asc' }],
+            limit: COMING_UP_LIMIT,
+            empty: words.nothingDueWork,
+          } as PageBlock,
+        ]
+      : []),
+    /* A FEW OF THE PEOPLE THE RECORD KEEPS, where it keeps a list of them. */
+    ...(holds.people ? [peopleTile(holds.people)] : []),
+    /* WHAT CHANGED SINCE THE READER'S MARK, which Home stamps when they leave, never when they open it. The board draws
+       it as Arrivals (`Landed.svelte`), Home's own reading of what is new, in this widget's place. */
+    { kind: 'feed', ...keyed('arrivals'), size: 'tall', heading: voice.sinceAway, icon: 'activity', source: 'activity', since: 'seen', first: 8, empty: words.nothingNew } as PageBlock,
+  ];
+  return { page: 'today', title: 'Today', board: true, phone: phoneOf(blocks), blocks };
+}
+
+/** What a list falling due carries that makes it money: an amount (Money's Coming up says the same). */
+const DUE_WITH_MONEY = 'amount is set';
+
+/**
+ * THE PHONE'S OWN TODAY (the Bento phone board, now the board's `phone`): what needs you first, then what is late and
+ * urgent, who is at work, cash with its week, and what is next. The few key numbers, the projects, what arrived and the
+ * people are a tab away (Projects, Money, Activity), so the phone's Today is about two screens and not six. The lists
+ * that are a narrow column on the laptop are the phone's whole width.
+ */
+const PHONE_ORDER = ['needs-you', 'late', 'working', 'cash', 'week-money', 'week-due', 'coming-up', 'work-due', 'signs', 'quiet'];
+const PHONE_HIDDEN = ['numbers', 'projects', 'faces', 'arrivals'];
+const PHONE_SIZES: Readonly<Record<string, WidgetSize>> = { 'coming-up': 'large', 'work-due': 'large', cash: 'large', working: 'wide' };
+
+function phoneOf(blocks: readonly PageBlock[]): BoardPhone {
+  const keys = new Set(blocks.flatMap((b) => ((b as { size?: unknown }).size !== undefined && typeof (b as { key?: unknown }).key === 'string' ? [(b as { key: string }).key] : [])));
+  const order = PHONE_ORDER.filter((k) => keys.has(k));
+  const rest = [...keys].filter((k) => !order.includes(k));
+  const sizes = Object.fromEntries(Object.entries(PHONE_SIZES).filter(([k]) => keys.has(k)));
+  return { order: [...order, ...rest], sizes, hidden: PHONE_HIDDEN.filter((k) => keys.has(k)) };
 }
 
 /**
@@ -623,6 +657,7 @@ export function workingTile(voice: HomeVoice = HOUSE): PageBlock {
   return {
     kind: 'table',
     ...keyed('working'),
+    size: 'wide',
     span: 4,
     heading: voice.workingNow,
     icon: 'session',
@@ -647,6 +682,7 @@ export function projectsTile(p: { register: string; title: string; name: string 
   return {
     kind: 'cards',
     ...keyed('projects'),
+    size: 'full',
     span: 12,
     heading: p.name,
     icon: 'grid',
@@ -882,7 +918,11 @@ export function homeDrawn(
   const shaped: LiveBlock[] = [];
   /* WHERE EACH LATE PART OF WHAT FALLS DUE LANDED, which may join the late tasks before it. */
   const lateAt: number[] = [];
-  for (const b of blocks.map((x) => revoiced(x, voice, one))) {
+  const voiced = blocks.map((x) => revoiced(x, voice, one));
+  /* WHAT IS DUE THIS WEEK IS TAKEN FIRST, wherever it stands: on the board Late is drawn above the week, and a row the
+     week's tile holds is still the week's and not Late's, so it is drawn once and counted once. */
+  if (week) for (const b of voiced) if (b.drawn && !says(b) && isWeekDue(b, week) && aligned(b)) for (const e of b.entries) drawn.add(`${week.due.register}#${e.seq}`);
+  for (const b of voiced) {
     /* A BLOCK ITS `when:` LEFT OUT holds no row anybody saw, so it neither takes a row from the next nor counts. */
     if (says(b) || !b.drawn) {
       shaped.push(b);
@@ -908,7 +948,9 @@ export function homeDrawn(
       shaped.push(b);
       continue;
     }
-    if (isTodo(b) && aligned(b)) {
+    /* A WIDGET HE ADDED (or a draft made for him) SHOWS WHAT IT READS, every row, even one another tile already shows:
+       the house's own tiles share their rows, but a widget asked for by name is not emptied by them. */
+    if (isTodo(b) && aligned(b) && !addedWidget(b)) {
       const list = listOf(b);
       const at = where(b, (_, seq) => list === null || !drawn.has(`${list}#${seq}`));
       for (const n of at) if (list !== null) drawn.add(`${list}#${b.entries[n]!.seq}`);
@@ -1187,7 +1229,7 @@ function revoiced(b: LiveBlock, voice: HomeVoice, one: string | undefined): Live
 }
 
 /**
- * LATE ROWS SAY HOW LATE, on a block that draws a row a line: the day each was due becomes "2 months late". A timeline
+ * LATE ROWS SAY HOW LATE, on a block that draws a row a line: the day each was due becomes "64 days late", in days always (`lateSaid`). A timeline
  * keeps its days, because there the day is the heading the rows sit under.
  */
 function howLate(b: LiveBlock, today: string): LiveBlock {
@@ -1304,6 +1346,9 @@ const beyond = (b: LiveBlock): number => Math.max(0, b.total - b.rows.length);
  *
  * THE LIST SAYS WHICH HALF RAN PAST ITS LIMIT (`more`), so "7 more" under it opens the bills when it was the bills.
  */
+/** A widget somebody added to the board (`w-` keys, `add-today.ts`), not one of Today's own. */
+const addedWidget = (b: LiveBlock): boolean => typeof b.key === 'string' && b.key.startsWith('w-');
+
 function lateTile(blocks: LiveBlock[], at: number, today: string, voice: HomeVoice): void {
   const money = blocks[at]!;
   const owes = money.drawn && aligned(money);

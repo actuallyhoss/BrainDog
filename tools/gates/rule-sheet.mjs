@@ -1,7 +1,7 @@
 /**
  * The rule sheet gate: every rule of a block, a value and a layout, read off a real record at 390 and at 1440.
  *
- *   PROOF_RECORD=https://<host>/app PROOF_STATE=<file> node tools/gates/rule-sheet.mjs
+ *   PROOF_RECORD=https://<host>/<record> PROOF_STATE=<file> node tools/gates/rule-sheet.mjs
  *
  * FORTY-FOUR RULES WERE TRUE ONLY IN UNIT TESTS. A ring's scope, a stat's cap of six, a tab strip of twelve and a More:
  * each is held by a test over hand-made input, and every browser gate draws one invented record (`README.md` section 7).
@@ -14,9 +14,10 @@
  *
  * THE RECORD IS THE PROOF HARNESS'S, never one this file makes. A proof record is made through the public sign-up with
  * Rule sheet installed from Add-ons; the harness hands over its app address (`PROOF_RECORD`) and the browser state it
- * signed in with (`PROOF_STATE`). The app is at `/app` on every host (`apps/web/svelte.config.js`), and which record it
- * opens is the signed-in state's, never a segment of the address: `/app/<record>/p/...` is no page. This file signs nobody in and holds no credential. Without a record it is exit 3, a
- * skip the runner names, never a pass.
+ * signed in with (`PROOF_STATE`). The app is at the root of every host (`apps/web/svelte.config.js`), so the address is
+ * `https://<host>/<record>` and a page is `/<record>/p/...` under it; with no record named it is the signed-in state's.
+ * This file signs nobody in and holds no credential. Without a record it is exit 3, a skip the runner names, never a
+ * pass.
  *
  * WHAT A RULE SAYS IT READ is the whole point, so a rule that reads nothing says "nothing" rather than vanishing, and
  * a selector the page does not hold is a rule that is false, with the count it found.

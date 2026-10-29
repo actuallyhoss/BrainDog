@@ -274,7 +274,7 @@ async function door({ host, record, home, signal }) {
   if (!process.env.ANTHROPIC_API_KEY) return { ...pinned, ok: null, saw: 'no key' };
   if (!record) return { ...pinned, ok: null, saw: 'no record, pass --record' };
   if (process.env.CI && !process.env.DOOR_TOKEN) return { ...pinned, ok: null, saw: 'no key for the record, and no one here to approve six digits' };
-  const address = /^https?:\/\//.test(record) ? record.replace(/\/+$/, '') : `${host}/app/${record}`;
+  const address = /^https?:\/\//.test(record) ? record.replace(/\/+$/, '') : `${host}/${record}`;
 
   /* Then Claude Code at its pin, which `setup` needs on the PATH. */
   const plain = keyless(envOf(home, address, []));

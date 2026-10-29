@@ -158,7 +158,7 @@ export const words = {
   once: 'Shown once. Copy it now.',
   copyAddress: 'Copy the address',
   addressCopied: 'Address copied',
-  forwardHow: 'Forward the raw message. Mail that fails DKIM and SPF waits unfiled.',
+  forwardHow: 'Forward the whole message. Mail that fails sender checks waits in the Inbox, unfiled.',
   lost: 'Made. A new one replaces it.',
   /* REVOKING IS THE QUIETER ACT AND THE MORE DAMAGING ONE: a bank's mail silently not arriving. It says what
      stops, in the present tense, rather than congratulating anybody. */

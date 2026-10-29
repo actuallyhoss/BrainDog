@@ -593,9 +593,10 @@ export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './sche
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, KEY_ANSWERS, KEY_RULES, EVERY_MACHINE, KEY_ASK_LIFE_MS, LOCK_AFTER_MINUTES, LOCK_AFTER_DEFAULT, LOCK_AFTER_MOST_MS, spanMs } from './keychain.ts';
 import { GROUP_CAP } from './buckets.ts';
-import { RATE_STALE_DAYS, ratesFrom } from './fx.ts';
+import { convertMinor, RATE_STALE_DAYS, rateFor, ratesFrom } from './fx.ts';
 import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark, markFrozen } from './marks.ts';
 import { laidOf } from './pack-laid.ts';
+import { worthInGrams } from './worth-grams.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measureLines, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureLatest, MeasureLines, MeasureSeries, RawReading } from './measures.ts';
@@ -637,6 +638,8 @@ export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, lead
 export { flowGrammar, type FlowGrammar, type GrammarStep, type Arg as FlowGrammarArg } from './flow-grammar.ts';
 export { ANSWER_KEYS, BLOCK_INSTALLS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
 export { WHEN_READERS, actionsFault, declaredActions, type WhenReader } from './block-keys.ts';
+export { BOARD_MOST, boardFault, headOfBoard, widgetFault } from './board.ts';
+export { WIDGET_SIZES, isWidgetSize, sizeRead, sizesOf as widgetSizesOf, type WidgetSize } from './kinds/sizes.ts';
 /* THE LOOK OVERLAY (`compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
 export { applyLook, composeLook, drewNothing, lookOf, lookPlacesFault, mergeLook, questionsLead, queuesKept, LOOK_AREAS, LOOK_BY, LOOK_SPANS, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
 /* A LOOK'S GROUPING (`compose.ts`): which kinds a look may group, how many, and over how many values. */
@@ -751,6 +754,8 @@ export type {
 } from './lens.ts';
 export { ACCESS_ENDED_AT, accessEndedSaid, dayOf as shareDayOf, sentenceOf as shareSentenceOf, sharedWithYou, subjectOf as shareSubjectOf, type ShareNames, type WordsOpts as ShareWordsOpts } from './share-words.ts';
 export { SHARE_TEMPLATES, type ShareTemplate, type TemplateAsk as ShareTemplateAsk, type TemplateRow as ShareTemplateRow } from './share-templates.ts';
+export { canReadRow, canWriteRow, ROW_GRANT_RUNGS, rowGrantShares, rowGrantsIn, rowGrantsOn, type RowGrant, type RowGrantArgs, type RowGrantBuilt, type RowGrantLines, type RowGrantRung, type RowLike } from './row-grants.ts';
+export { isDay, stillShown as blockStillShown, untilFault } from './until.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { Accepted as InviteAccepted, InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { ChildArgs, ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
@@ -9566,6 +9571,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       net: money(net),
       taken: 'nightly',
       ...(asOf === undefined ? {} : { note: `Converted to ${currency} at rates as of ${asOf}.` }),
+      ...worthOfNight(ctx, currency, night),
     };
 
     const wrote = write(NIGHT_REGISTER, null, fields, { actor: 'system', principal: { kind: 'system' } });
@@ -9574,6 +9580,54 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        this code was written against, and that is worth the ladder and the suggestion it ends in. */
     if (!wrote.ok && refused(wrote) && wrote.refusal.code !== 'UNIQUE_VIOLATION' && wrote.refusal.code !== 'ALREADY_KNOWN')
       throw new TypeError(fixOf(wrote));
+  }
+
+  /**
+   * NET WORTH ON THE NIGHT, SINCE money-core 3.31.0: what is held beyond cash, what is owed over time, and net worth, in
+   * the night's one currency, then net worth again in dollars and in grams of gold.
+   *
+   * ALL OR NOTHING, AND NEVER THE NIGHT ITSELF. A record on an older money-core declares none of these fields, and a row
+   * that names a field its list does not hold is refused whole, so they are written only where `snapshots` declares
+   * them. A figure that cannot be read, or reads in another currency than the night's, leaves all three out: cash and
+   * the bills are still a night worth keeping, and a net worth that adds two currencies is not one.
+   *
+   * THE STABLE UNITS ARE RESTATEMENTS, each left out on its own when the record holds nothing to restate by. Dollars at
+   * the rate the record holds for the night (the same `rateFor` every figure converts with); grams at what a gram of
+   * 24k gold sells for in Holdings' Gold rates, the newest rate in use, converted the same way when it is kept in
+   * another currency.
+   */
+  function worthOfNight(ctx: EvalContext, currency: string, night: string): Record<string, Json> {
+    const declared = new Set((registers.get(NIGHT_REGISTER)?.fields ?? []).map((f) => f.id));
+    if (!declared.has('worth')) return {};
+    const read: Record<string, number> = {};
+    for (const [field, id] of [
+      ['held', 'held-beyond-cash'],
+      ['owed_later', 'owed-over-time'],
+      ['worth', 'net-worth'],
+    ] as const) {
+      const figure = pageDeps().metric(id);
+      if (!figure) return {};
+      const out = evaluateMetric(sql, figure, ctx);
+      if (!out.ok || out.value.value === null) return {};
+      /* A SUM OVER NOTHING HAS NO CURRENCY, and is nought in any of them. */
+      if (out.value.unit !== currency && !(out.value.value === 0 && out.value.unit === null)) return {};
+      read[field] = Math.round(out.value.value);
+    }
+    const said: Record<string, Json> = {};
+    for (const field of ['held', 'owed_later', 'worth'] as const) if (declared.has(field)) said[field] = { amount: read[field]!, currency };
+
+    const rates = ctx.fx?.().rates ?? [];
+    const into = (amount: number, from: string, to: string): number | null => {
+      if (from === to) return amount;
+      const r = rateFor(rates, from, to, night);
+      return r === null ? null : convertMinor(amount, from, to, r.rate);
+    };
+    if (declared.has('worth_usd')) {
+      const usd = into(read.worth!, currency, 'USD');
+      if (usd !== null) said.worth_usd = { amount: usd, currency: 'USD' };
+    }
+    Object.assign(said, worthInGrams(sql, declared, (id) => registers.has(id), read.worth!, currency, into));
+    return said;
   }
 
   const HANDLERS: Partial<Record<ScheduleKind, Handler>> = {

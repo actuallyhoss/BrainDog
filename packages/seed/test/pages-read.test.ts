@@ -323,7 +323,8 @@ test('THE MONEY PAGE READS WHOLE ON A RECORD, and every walk on it starts from C
   assert.ok(rent.length >= 11, `the rent came round ${rent.length} times in a year`);
   assert.equal(forecast.walk!.from, cash.value.value, 'Cash ahead does not start from Cash now');
 
-  const accounts = money.blocks.find((b) => b.source === 'metric.cash-by-account')!;
-  assert.equal(accounts.readings?.[0]?.reading?.groups?.length, 2);
+  /* EVERY OPEN ACCOUNT, THE CARD TOO, SINCE money-core 3.32.0 (`balance-by-account`): the sample's two cash accounts and its card. */
+  const accounts = money.blocks.find((b) => b.source === 'metric.balance-by-account')!;
+  assert.equal(accounts.readings?.[0]?.reading?.groups?.length, 3);
   sql.close();
 });

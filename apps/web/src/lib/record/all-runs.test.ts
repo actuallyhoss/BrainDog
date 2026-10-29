@@ -24,7 +24,7 @@ test('JOBS THAT ARE NOT THIS READER\'S ARE NOT A LIST CUT SHORT, and a source th
   const list = { status: 200, body: { ok: true, value: { rows: [], matched: 0 } } };
   let done = host({ listJobs: noJobs, list });
   try {
-    const out = await readAllRuns('https://record.example/app/r', Date.UTC(2026, 9, 24, 18));
+    const out = await readAllRuns('https://record.example/r', Date.UTC(2026, 9, 24, 18));
     assert.equal(out.from, 'ready');
     assert.equal(out.from === 'ready' && out.short, false, 'the page said some runs could not be read');
   } finally {
@@ -33,7 +33,7 @@ test('JOBS THAT ARE NOT THIS READER\'S ARE NOT A LIST CUT SHORT, and a source th
   /* A SOURCE THE RECORD COULD NOT ANSWER IS STILL SAID. */
   done = host({ listJobs: { status: 500, body: { ok: false, refusal: { code: 'INTERNAL', fix: 'internal' } } }, list });
   try {
-    const out = await readAllRuns('https://record.example/app/r', Date.UTC(2026, 9, 24, 18));
+    const out = await readAllRuns('https://record.example/r', Date.UTC(2026, 9, 24, 18));
     assert.equal(out.from === 'ready' && out.short, true);
   } finally {
     done();

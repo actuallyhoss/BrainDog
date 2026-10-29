@@ -135,7 +135,7 @@ export async function pushHeaders(vapid: Vapid, endpoint: string, subject: strin
 
 /**
  * WHERE A TAP OPENS, AND NOTHING ELSE, ENCRYPTED TO THE PHONE (E44 of 24 October; RFC 8291 over RFC 8188's aes128gcm).
- * The one thing a push now carries is `{ open }`, a path in the app such as `/app/kiln/decide/sg_01J...`: a handle and
+ * The one thing a push now carries is `{ open }`, a path in the app such as `/kiln/decide/sg_01J...`: a handle and
  * never a word, so the push service that relays it learns nothing, and the service worker opens it on a tap.
  *
  * ONE RECORD, AS RFC 8291 §4 SAYS: a fresh P-256 pair for each message, the shared secret with the phone's `p256dh`,

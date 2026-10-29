@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, deskFolded, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -41,13 +41,15 @@ const shown = (blocks: readonly LiveBlock[]): LiveBlock[] => blocks.filter((b) =
 
 test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks, no line to add without the right, no cash without Money', () => {
   const kinds = (b: { blocks: { kind: string; source?: string }[] }) => b.blocks.map((x) => x.source ?? x.kind);
-  /* WHO IS WORKING IS NOT A BLOCK OF TODAY'S OWN BODY (today F1): Home draws it from `boot`, once. */
-  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'stat', 'kpis', 'deadlines', 'activity']);
+  /* WHO IS WORKING IS NOT A BLOCK OF TODAY'S OWN BODY (today F1): Home draws it from `boot`, once. THE WORK DUE THIS
+     WEEK is its own tile beside what comes up with money on it (audit Q10). */
+  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'stat', 'kpis', 'deadlines', 'register.tasks', 'activity']);
   assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'kpis', 'deadlines', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'kpis', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'kpis', 'deadlines', 'register.tasks', 'activity']);
   /* WHAT IS LATE AND WHAT COMES UP ARE TWO READS, so the late ones never use up the next few's rows. */
   const due = DEFAULT_HOME.blocks.filter((b) => b.source === 'deadlines') as unknown as { where?: string; limit?: number }[];
-  assert.deepEqual(due.map((b) => [b.where, b.limit]), [['day before today', 8], ['day after -1d', COMING_UP_LIMIT]]);
+  /* WHAT COMES UP IS WHAT FALLS DUE WITH MONEY ON IT (audit Q10), as Money's Coming up reads it. */
+  assert.deepEqual(due.map((b) => [b.where, b.limit]), [['day before today', 8], ['amount is set, day after -1d', COMING_UP_LIMIT]]);
   /* EVERY TILE WEARS A GLYPH, and every block over a source says what it says when it is empty. */
   for (const b of DEFAULT_HOME.blocks) if (b.kind !== 'note') assert.ok(b.icon, `${b.kind} has an icon`);
   for (const b of DEFAULT_HOME.blocks) if (b.source) assert.ok(b.empty, `${b.source} says its empty line`);
@@ -57,7 +59,11 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   assert.equal(raw.find((b) => b.kind === 'queue')?.tiles, true);
   assert.equal(DEFAULT_HOME.layout, undefined);
   assert.deepEqual(raw.filter((b) => b.area !== undefined), []);
-  assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [['needs-you', 5], ['cash', 3], ['numbers', 12], ['coming-up', 3]]);
+  /* EVERY WIDGET OF THE BOARD IS KEYED (the widgets plan of 29 October, §4.1), and the late band's four reads with it. */
+  assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [
+    ['needs-you', 5], ['late', undefined], ['late-money', undefined], ['to-check', undefined], ['urgent', undefined],
+    ['cash', 3], ['numbers', 12], ['coming-up', 3], ['work-due', undefined], ['arrivals', undefined],
+  ]);
 });
 
 test('TODAY CARRIES THE FEW KEY NUMBERS THAT LEAD, as the record ranks them, a whole row under cash and named Numbers', () => {
@@ -94,21 +100,18 @@ test('NO KEY NUMBER, NO TILE: a record that keeps none answers none and Today dr
   assert.equal(quietHeld([tile([sales])])[0]!.drawn, true);
 });
 
-test('THE DESK FOLDS WHAT IT DOES NOT SHOW AT REST, at its place, and More opens it', () => {
-  const desk = (key: string | undefined, drawn = true) => ({ key, drawn });
-  const blocks = [desk('needs-you'), desk('p7'), desk(undefined), desk('p9', false), desk('coming-up'), desk('coming-up-late')];
-  const shut = deskFolded(blocks, false);
-  assert.equal(shut.folded, 3);
-  assert.deepEqual(shut.blocks.map((b) => b.drawn), [true, false, false, false, true, false]);
-  /* NOTHING MOVES: every block keeps its index, so a write still finds its block. */
-  assert.equal(shut.blocks.length, blocks.length);
-  assert.equal(shut.blocks[0], blocks[0]);
-  const open = deskFolded(blocks, true);
-  assert.equal(open.folded, 3);
-  assert.deepEqual(open.blocks, blocks);
+test('TODAY IS A BOARD: every widget keyed and sized, the phone in its own order, and no more than sixteen', () => {
+  const body = todayHome({ tasks: true, adds: true, money: true, runs: true, health: true, quiet: true });
+  assert.equal(body.board, true);
+  const widgets = body.blocks.filter((b) => (b as { size?: unknown }).size !== undefined);
+  assert.ok(widgets.length <= 16);
+  assert.ok(body.blocks.every((b) => b.kind === 'capture' || (b.kind === 'note' && (b as { lead?: unknown }).lead === true) || typeof (b as { key?: unknown }).key === 'string'));
+  assert.deepEqual(body.phone?.order?.slice(0, 3), ['needs-you', 'late', 'working']);
   assert.ok(DESK_KEYS.every((k) => onDesk({ key: k })));
-  /* A LIST OF TASKS STAYS ON THE DESK, so `x` reaches its rows. */
-  assert.equal(deskFolded([{ key: undefined, kind: 'todo', drawn: true }], false).blocks[0]!.drawn, true);
+  /* AUDIT Q10: the money tile reads Money's own due list, and the work has its own heading. */
+  const coming = body.blocks.find((b) => (b as { key?: unknown }).key === 'coming-up') as { where?: string };
+  assert.match(coming.where ?? '', /^amount is set/);
+  assert.ok(body.blocks.some((b) => (b as { key?: unknown }).key === 'work-due'));
 });
 
 test('THE DESK NAMES A FEW PEOPLE where the record keeps a list of them, by its own words and never by its name', () => {
@@ -174,7 +177,8 @@ test('LATE MONEY IS A LINE A THING, oldest first, saying how late it is rather t
   ];
   const out = shown(homeDrawn([money], NOW).blocks);
   assert.deepEqual(out[0]!.rows.map((r) => r.cells), [
-    ['Legal review, February', '−£9,190', '3 months late'],
+    /* IN DAYS ALWAYS (30 October), as a list's cards and tables say it. */
+    ['Legal review, February', '−£9,190', '93 days late'],
     ['Ledger Post, sending plan', '−£39', '3 days late'],
   ]);
 });
@@ -623,8 +627,8 @@ test('THIS WEEK STARTS TODAY AND LATE IS ITS OWN CLAUSE: an order due yesterday,
   const drawn = homeDrawn(answered([JARS]), NOW, undefined, undefined, null, WEEK);
   assert.deepEqual(drawn.sentence, { text: '1 order is late. 2 more are due this week, the first today.', needs: '1 order is late' });
   assert.doesNotMatch(drawn.sentence!.text, /thing/u, 'the late order is said once, by its own name');
-  /* THE TILE HOLDS THE TWO, AND LATE THE ONE: the three are never one count. */
-  assert.deepEqual(shown(drawn.blocks).map((b) => [b.heading, b.entries.length]), [['Orders due this week', 2], ['Late', 1]]);
+  /* THE TILE HOLDS THE TWO, AND LATE THE ONE: the three are never one count. Late leads the board, the week after it. */
+  assert.deepEqual(shown(drawn.blocks).map((b) => [b.heading, b.entries.length]), [['Late', 1], ['Orders due this week', 2]]);
   /* SOMETHING ELSE LATE IS STILL THE HOUSE'S TO SAY, after the orders and without them. */
   const bill = answered([{ row: 'obligations#4', title: 'Rent', day: '2026-09-30' }, JARS]);
   assert.equal(homeDrawn(bill, NOW, undefined, undefined, null, WEEK).sentence?.text, '1 order is late. 2 more are due this week, the first today. 1 thing is late.');
@@ -745,12 +749,13 @@ async function emptyRecord() {
   return { k: await openRecord(sql, { now: () => Date.parse('2026-10-02T12:00:00Z') }), db };
 }
 
-test('TODAY SAYS HOW MANY VITAL SIGNS NEED A LOOK, after what needs you and before the work, in a person`s grammar', () => {
+test('TODAY SAYS HOW MANY VITAL SIGNS NEED A LOOK, after what needs you, in a person`s grammar', () => {
   const body = todayHome({ tasks: true, adds: true, money: true, health: true });
   const at = body.blocks.flatMap((b, n) => (b.when?.metric === 'signs-red' ? [n] : []));
   assert.equal(at.length, 2, 'one for one sign and one for more, so the count reads as a person says it');
   assert.ok(at[0]! > body.blocks.findIndex((b) => b.kind === 'queue'), 'after the questions');
-  assert.ok(at[1]! < body.blocks.findIndex((b) => b.source === 'register.tasks'), 'before the work');
+  /* ON THE BOARD IT IS SAID IN NEEDS YOU'S OWN TILE, under the questions (`signsSaid` in `Home.svelte`), so where the
+     two notes sit in the body moves nothing on screen. */
   const [one, many] = signNotes();
   assert.deepEqual([one!.kind, one!.when, one!.body], ['note', { metric: 'signs-red', is: 1 }, '[One vital sign needs a look](/p/health).']);
   assert.deepEqual([many!.kind, many!.when, many!.body], ['note', { metric: 'signs-red', gt: 1 }, '[{{signs-red}} vital signs need a look](/p/health).']);

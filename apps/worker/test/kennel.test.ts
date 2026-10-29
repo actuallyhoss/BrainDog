@@ -43,7 +43,7 @@ const BUNDLED: CatalogueIndex = { format: 1, name: 'BrainDog', entries: [PAD] };
 /** The static assets: the bundled index and nothing else, and the app's shell with a 200 for any other path, as they answer. */
 const assets = {
   fetch: async (request: Request): Promise<Response> =>
-    new URL(request.url).pathname === '/app/catalogue/index.json'
+    new URL(request.url).pathname === '/catalogue/index.json'
       ? new Response(JSON.stringify(BUNDLED), { headers: { 'content-type': 'application/json' } })
       : new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } }),
 };
@@ -302,8 +302,8 @@ test('a key asking for its own submissions is told waiting, then declined with t
 test('a private add-on of the bundled catalogue is never in the public index, and its file still downloads by its path', async () => {
   const BANK: CatalogueEntry = { ...PAD, id: 'bank-x', title: 'A bank', private: true };
   const files: Record<string, string> = {
-    '/app/catalogue/index.json': JSON.stringify({ ...BUNDLED, entries: [PAD, BANK] }),
-    '/app/catalogue/packs/bank-x/1.0.0.pack.json': '{"pack":"bank-x"}',
+    '/catalogue/index.json': JSON.stringify({ ...BUNDLED, entries: [PAD, BANK] }),
+    '/catalogue/packs/bank-x/1.0.0.pack.json': '{"pack":"bank-x"}',
   };
   const own = {
     fetch: async (request: Request): Promise<Response> => {

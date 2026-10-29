@@ -9,6 +9,7 @@
   a page the day its folder lands and a reader who arrived by accident is one press from somewhere real.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import { site } from '$lib/copy.ts';
   import Icon from '$lib/Icon.svelte';
   import { PAGES } from '$lib/nav.ts';
@@ -17,12 +18,7 @@
   const n = site.notFound;
 </script>
 
-<svelte:head>
-  <title>{site.meta.notFound.title}</title>
-  <meta name="description" content={site.meta.notFound.description} />
-  <meta name="robots" content="noindex" />
-</svelte:head>
-
+<Seo title={site.meta.notFound.title} description={site.meta.notFound.description} path="/404" noindex />
 <PageHead title={n.title} lead={n.lede} />
 
 <section class="wrap pages" aria-label="The pages">

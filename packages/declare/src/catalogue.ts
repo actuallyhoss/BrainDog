@@ -125,6 +125,8 @@ export type Reach = {
   skills: string[];
   /** Every scheduled action that would leave the record, as the plan says it. */
   calls_out: { host: string | null; line: string; key: string | null }[];
+  /** The widgets it ships for the widget sheet, by title, when it ships any. Nothing is placed on Today by installing. */
+  widgets?: string[];
   /**
    * The lists and roles a part of it waits for (`when: { holds }`, `when.ts`), each once, when any part does. A record
    * that holds none of them gets the add-on without those parts until it does, and a card says so before the install.
@@ -217,7 +219,7 @@ export type CatalogueEntry = {
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
  * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon'] as const;
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon', 'widgets'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -436,6 +438,7 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
       const e = egressOf(d);
       return e ? [{ host: e.host, line: e.line, key: e.key }] : [];
     }),
+    ...(s.pack?.manifest.widgets?.length ? { widgets: s.pack.manifest.widgets.map((w) => w.title) } : {}),
     ...waitsOf(s.pack),
   };
 }

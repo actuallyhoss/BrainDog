@@ -50,7 +50,7 @@ test('THE MAIL COMES ON THE SECOND FAILURE IN A ROW, ONCE, AND ONCE MORE ON THE 
   const { watch } = (await import(script)) as Mod;
   const { env, sent } = rig();
   let up = false;
-  const f = (async (u: string, i?: RequestInit) => (!up && new URL(String(u)).pathname === '/app/signin' ? new Response('no', { status: 502 }) : WELL(String(u), i))) as unknown as typeof fetch;
+  const f = (async (u: string, i?: RequestInit) => (!up && new URL(String(u)).pathname === '/signin' ? new Response('no', { status: 502 }) : WELL(String(u), i))) as unknown as typeof fetch;
   await quietly(async () => {
     await watch(env, new Date(), f);
     assert.equal(sent.length, 0, 'one miss is a blip');

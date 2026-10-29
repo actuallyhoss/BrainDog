@@ -100,7 +100,7 @@ function personal231(): Body {
   /* AND 2.5.0'S FIRST THINGS TO PRESS ON HOME, with the figure and the list they read (personal-and-guide-99). */
   const firstActs = ['Bring your money in', 'Name something you are saving for', 'Name something you are making'];
   const declarations = (now.declarations as Body[]).flatMap((d) =>
-    d.metric === 'savings-held'
+    d.metric === 'savings-held' || d.metric === 'log-streak'
       ? []
       : d.page === 'home-personal'
         ? [{ ...d, requires: (d.requires as string[]).filter((r) => r !== 'register.savings_goals'), blocks: (d.blocks as Body[]).filter((b) => !firstActs.includes(String(b.heading))) }]

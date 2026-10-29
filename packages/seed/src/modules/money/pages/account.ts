@@ -47,32 +47,16 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
     /* THE ACCOUNT'S LINES NARROWED AS THE LEDGER'S ARE: by what each was for, by month and by kind of line. */
     filters: [{ field: 'category', control: 'chips' }, MONTH_FILTER, SHOW_FILTER],
     blocks: [
-      {
-        /* WHICH ACCOUNT, AND HOW OLD WHAT IT HOLDS IS: its name, its kind, the digits the bank prints and its book, and
-           the day the bank or a check last said what it held, marked out of date past a week (`CONFIRMED_STALE`). */
-        kind: 'cards',
-        lead: true,
-        span: 12,
-        source: 'register.accounts',
-        where: 'seq is {{seq}}',
-        columns: [
-          { field: 'name', as: 'title' },
-          ...(both ? [] : [{ field: 'balance', as: 'figure' }]),
-          { field: 'kind', label: 'Type', as: 'fact' },
-          { field: 'last4', label: 'Digits', as: 'fact' },
-          { field: 'book', label: 'Book', as: 'fact' },
-          CONFIRMED_COLUMN,
-        ],
-        stale: CONFIRMED_STALE,
-        limit: 1,
-      },
       ...(both
         ? [
             {
-              /* WHAT IT HOLDS, TWO WAYS, IN ITS OWN CURRENCY: by the bank's newest word, and by its lines alone. */
+              /* THE ACCOUNT AND WHAT IT HOLDS, FIRST, SINCE money-core 3.32.0 (audit of 30 October, 19): the head was a card
+                 whose name the page hides (the title above says it) and whose balance had moved to a tile under it, so it
+                 read "2 Sep · Type Bank · Ending in 2044" and nothing else. The account's name heads its two figures now:
+                 by the bank's newest word, and by its lines alone, in its own currency. */
               kind: 'stat',
-              heading: 'Balance',
-              icon: 'wallet',
+              heading: '{{name}}',
+              icon: 'landmark',
               span: 12,
               cells: [
                 { metric: NOW, label: 'The bank says' },
@@ -81,6 +65,26 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
             },
           ]
         : []),
+      {
+        /* WHICH ACCOUNT, AND HOW OLD WHAT IT HOLDS IS: its kind, the digits the bank prints and its book, and the day the
+           bank or a check last said what it held, marked out of date past a week (`CONFIRMED_STALE`). The head while the
+           two figures are not declared, with the typed balance; under them otherwise, as what the account is. */
+        kind: 'cards',
+        ...(both ? { heading: 'About this account', icon: 'info' } : { lead: true }),
+        span: 12,
+        source: 'register.accounts',
+        where: 'seq is {{seq}}',
+        columns: [
+          { field: 'name', as: 'title' },
+          ...(both ? [] : [{ field: 'balance', as: 'figure' }]),
+          { field: 'kind', label: 'Type', as: 'fact' },
+          { field: 'last4', label: 'Ending in', as: 'fact' },
+          { field: 'book', label: 'Book', as: 'fact' },
+          CONFIRMED_COLUMN,
+        ],
+        stale: CONFIRMED_STALE,
+        limit: 1,
+      },
       ...(has(GAP)
         ? [
             {
@@ -132,22 +136,19 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
           ]
         : []),
       {
-        /* WHAT MOVED THROUGH IT, AS A TABLE, newest first: the day, who it was, what it was for, the amount signed by the
-           way it went, and the balance the bank printed after it where it printed one. Fifty, so the page stays a page;
-           the Ledger holds the rest. */
-        kind: 'table',
+        /* WHAT MOVED THROUGH IT, AS THE LEDGER DRAWS IT, SINCE money-core 3.32.0, newest first, a day at a time: the same
+           kind and the same columns as the Ledger's Every line (`LEDGER_LINE_COLUMNS`), so a line reads the same name and
+           the same money on both. As a table it showed the bank's own words and the currency's code ("GRANGEMOOR EVENTS,
+           STAND DEPOSIT −GBP 2,500.00") where the Ledger said "Grangemoor Events, Stand Deposit −£2,500.00". What the
+           bank printed after each line is on the line's own page. Fifty, so the page stays a page; the Ledger holds the
+           rest. */
+        kind: 'timeline',
         heading: 'What moved',
         icon: 'receipt',
         span: 12,
         source: 'register.transactions',
         where: 'account is {{spoken}}, state is not void',
-        columns: [
-          { field: 'on', label: 'Date', width: '11ch' },
-          { ...LEDGER_LINE_COLUMNS[1]!, label: 'Who', width: 'minmax(14ch,1fr)' },
-          { field: 'category', label: 'For', width: 'minmax(10ch,16ch)' },
-          { ...LEDGER_LINE_COLUMNS[2]!, label: 'Amount', width: '15ch', align: 'end' },
-          { field: 'balance_after', label: 'Bank says', width: '15ch', align: 'end' },
-        ],
+        columns: LEDGER_LINE_COLUMNS,
         order: [{ field: 'on', dir: 'desc' }],
         limit: 50,
         empty: 'Nothing has moved yet.',

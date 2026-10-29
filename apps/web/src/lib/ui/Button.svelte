@@ -59,7 +59,7 @@
   } = $props();
 
   /* THE ONE PLACE A BUTTON'S ADDRESS IS PUT UNDER THE APP. About forty screens hand this `href="/decide"` or a row's
-     `/r/<list>/<seq>`, which since the move to `app.brain.dog/app` is outside the app and would load the marketing site.
+     `/r/<list>/<seq>`, which inside a record would leave it for the record the session is on.
      `at` leaves an address it has already rendered, a query and another origin as they came. */
   const to = $derived(href ? at(href) : href);
 

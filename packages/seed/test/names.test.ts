@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { MODULES } from '@braindog/declare';
-import { RULES } from '../src/index.ts';
+import { FIRST_PARTY, RULES, firstPartyDocument } from '../src/index.ts';
+import { CLOSE_ACCOUNT_AUTOMATIONS } from '../src/modules/money/rules.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
 import { MODULE_NAMES, RULE_ASKED, RULE_DONE, RULE_NAMES, RULE_ROWS, USE_CASE_NAMES, asPartOf, moduleName, namesSaid, ruleAsked, ruleDone, ruleFolded, ruleName, useCaseName } from '../src/usecases/names.ts';
 
@@ -29,7 +30,11 @@ test('every first-party module has a name, and a use case pack is named as its u
 test('every rule the seed declares has a name, and no name is left over', () => {
   /* AND THE RULES TAKEN AWAY, which a record that has not updated still holds: cash-stale, since money-core 3.16.0. */
   const GONE = ['cash-stale'];
-  assert.deepEqual(Object.keys(RULE_NAMES).sort(), [...Object.keys(RULES), ...GONE].sort());
+  /* AND EVERY AUTOMATION A FIRST-PARTY PACK SHIPS, SINCE round 1030 (a screen that cannot read the record's titles still
+     says a sentence), with the two of closing an account that wait to join Money (`CLOSE_ACCOUNT_AUTOMATIONS`). */
+  const automations = FIRST_PARTY.flatMap((id) => ((firstPartyDocument(id)?.declarations ?? []) as { rule?: unknown }[]).filter((d) => typeof d.rule === 'string').map((d) => String(d.rule)));
+  const waiting = CLOSE_ACCOUNT_AUTOMATIONS.flatMap((d) => (typeof d.rule === 'string' ? [d.rule] : []));
+  assert.deepEqual(Object.keys(RULE_NAMES).sort(), [...new Set([...Object.keys(RULES), ...automations, ...waiting, ...GONE])].sort());
   for (const id of GONE) assert.ok(!Object.hasOwn(RULES, id), `${id} is declared again, so it is not gone`);
   assert.equal(ruleName('rule.invoice-late'), 'Chase late payments');
   assert.equal(ruleName('cash-stale'), 'Keep balances current');

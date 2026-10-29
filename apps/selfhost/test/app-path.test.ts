@@ -1,11 +1,12 @@
 /**
- * The record's methods under the app's address, on the self-host: `/app/<slug>/api/<method>` is `/api/<method>` when
- * the slug is this host's record, and a 403 for any other name.
+ * The record's methods under the app's address, on the self-host: `/<slug>/api/<method>` is `/api/<method>` when
+ * the slug is this host's record, and a 403 for any other name. The old `/app/<slug>/api/<method>` is read the same
+ * way, for a CLI whose hosts file was written while the app was under `/app`.
  *
- * WHY THE SELF-HOST ANSWERS IT AT ALL. The web sends every record call under a slug to `${origin}/app/<slug>`
- * (`apps/web/src/lib/at.ts` `apiBase`), so a tab opened at `/app/the-studio/r/tasks` asked this host for
- * `/app/the-studio/api/boot`, and the host handed that path to the shell, which answered it with `index.html` and a 200.
- * The app then read a page as a record and drew nothing.
+ * WHY THE SELF-HOST ANSWERS IT AT ALL. The web sends every record call under a slug to `${origin}/<slug>`
+ * (`apps/web/src/lib/at.ts` `apiBase`), so a tab opened at `/the-studio/r/tasks` asks this host for
+ * `/the-studio/api/boot`, and the host once handed that path to the shell, which answered it with `index.html` and a
+ * 200. The app then read a page as a record and drew nothing.
  *
  * ONE RECORD, SO ONE NAME. A self-host serves the record in its file, and any other slug is refused in the same sentence
  * the Directory uses for a name that is not the caller's, whether or not such a name exists anywhere. A caller with no
@@ -39,15 +40,15 @@ type Body = { ok?: boolean; value?: unknown; refusal?: { code: string; fix: stri
 
 /**
  * A self-host behind a server key, with a Directory holding its owner and the record `the-studio` they own, and with
- * `shell` a built app laid out as `apps/web` writes it, `build/app/index.html`.
+ * `shell` a built app laid out as `apps/web` writes it, `build/index.html`.
  */
 async function stack(o: { shell?: boolean } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-app-path-'));
   const serverKey = randomBytes(32).toString('base64url');
   const shell = join(dir, 'build');
   if (o.shell) {
-    mkdirSync(join(shell, 'app'), { recursive: true });
-    writeFileSync(join(shell, 'app', 'index.html'), PAGE);
+    mkdirSync(shell, { recursive: true });
+    writeFileSync(join(shell, 'index.html'), PAGE);
   }
   const running = await start({
     ...(o.shell ? { shell } : {}),
@@ -114,25 +115,33 @@ test('UNDER ITS OWN SLUG, A SESSION AND A BEARER ARE ANSWERED AS AT /api, reads 
     const sid = await s.signIn();
     const root = await s.call('/api/boot', { sid });
     assert.equal(root.status, 200, root.raw);
-    const under = await s.call('/app/the-studio/api/boot', { sid });
+    const under = await s.call('/the-studio/api/boot', { sid });
     assert.equal(under.status, 200, under.raw);
     assert.notEqual(under.raw, PAGE, 'the shell answered a record method with the page');
     assert.match(under.headers.get('content-type') ?? '', /json/u);
     assert.deepEqual(under.body, root.body);
 
-    const made = await s.call('/app/the-studio/api/create', { sid, body: { register: 'tasks', fields: { what: 'Ship it' } } });
+    const made = await s.call('/the-studio/api/create', { sid, body: { register: 'tasks', fields: { what: 'Ship it' } } });
     assert.equal(made.status, 200, made.raw);
     const seq = (made.body?.value as { seq: number }).seq;
     /* THE QUERY IS THE METHOD'S ARGUMENTS ON A GET, so it has to come through the move. */
-    const got = await s.call(`/app/the-studio/api/get?register=tasks&seq=${seq}`, { bearer: s.serverKey });
+    const got = await s.call(`/the-studio/api/get?register=tasks&seq=${seq}`, { bearer: s.serverKey });
     assert.equal(got.status, 200, got.raw);
     assert.equal((got.body?.value as { fields: { what: string } }).fields.what, 'Ship it');
     /* A DOUBLED SLASH IS THE SAME METHOD, and never a URL whose host is `api`. */
-    const doubled = await s.call('/app/the-studio//api/boot', { sid });
+    const doubled = await s.call('/the-studio//api/boot', { sid });
     assert.equal(doubled.status, 200, doubled.raw);
     assert.deepEqual((doubled.body?.value as { record: unknown }).record, (root.body?.value as { record: unknown }).record);
     /* AND THE APP'S OWN PAGES UNDER THE SLUG ARE STILL THE SHELL'S. */
-    assert.equal((await s.call('/app/the-studio/r/tasks', { sid })).raw, PAGE);
+    assert.equal((await s.call('/the-studio/r/tasks', { sid })).raw, PAGE);
+    /* THE OLD ADDRESS IS STILL THE RECORD'S API, for a CLI that refuses redirects, and its pages are a 308 to the root. */
+    const old = await s.call('/app/the-studio/api/boot', { sid });
+    assert.equal(old.status, 200, old.raw);
+    /* AGAINST THE ROOT AS IT IS NOW, since the task made above moved its counts. */
+    assert.deepEqual(old.body, (await s.call('/api/boot', { sid })).body);
+    const page = await s.call('/app/the-studio/r/tasks', { sid });
+    assert.equal(page.status, 308);
+    assert.equal(page.headers.get('location'), '/the-studio/r/tasks');
   } finally {
     await s.close();
   }
@@ -143,12 +152,12 @@ test('ANY OTHER SLUG IS 403 IN THE DIRECTORY’S SENTENCE, for a session and a b
   try {
     const sid = await s.signIn();
     for (const who of [{ sid }, { bearer: s.serverKey }]) {
-      for (const path of ['/app/someone-else/api/boot', '/app/the-studios/api/boot', '/app/studio/api/list?register=tasks']) {
+      for (const path of ['/someone-else/api/boot', '/the-studios/api/boot', '/studio/api/list?register=tasks']) {
         const out = await s.call(path, who);
         assert.equal(out.status, 403, `${path} ${out.raw}`);
         assert.deepEqual(out.body, { ok: false, refusal: NOT_ON }, path);
       }
-      const write = await s.call('/app/someone-else/api/create', { ...who, body: { register: 'tasks', fields: { what: 'Not here' } } });
+      const write = await s.call('/someone-else/api/create', { ...who, body: { register: 'tasks', fields: { what: 'Not here' } } });
       assert.equal(write.status, 403, write.raw);
     }
     const listed = await s.call('/api/list?register=tasks', { bearer: s.serverKey });
@@ -164,7 +173,7 @@ test('WITH NO CREDENTIAL, EVERY SLUG IS REFUSED AS THE ROOT REFUSES IT, so the a
   try {
     const bare = await s.call('/api/boot');
     assert.equal(bare.status, 401, bare.raw);
-    for (const path of ['/app/the-studio/api/boot', '/app/someone-else/api/boot']) {
+    for (const path of ['/the-studio/api/boot', '/someone-else/api/boot']) {
       const out = await s.call(path);
       assert.equal(out.status, bare.status, path);
       assert.deepEqual(out.body, bare.body, path);
@@ -179,18 +188,18 @@ test('THE KEY DOORS ARE AT THE ROOT ONLY, and /auth, /account and /in are never 
   try {
     /* A grant names its own record, so a slug in front of the keychain would be a second answer to which record. The
        Worker refuses the same path in the same words (`apps/worker/src/index.ts` `recordApi`). */
-    for (const path of ['/app/the-studio/api/vault/open', '/app/the-studio/api/vault/deposit']) {
+    for (const path of ['/the-studio/api/vault/open', '/the-studio/api/vault/deposit']) {
       const out = await s.call(path, { body: {}, bearer: s.serverKey });
       assert.equal(out.status, 404, `${path} ${out.raw}`);
       assert.equal(out.body?.refusal?.code, 'ROUTE_UNKNOWN', path);
     }
     /* No shell is configured here, so a path that is not a door is this host's 404, and no session is minted. */
-    const token = await s.call('/app/the-studio/auth/token', { body: { serverKey: s.serverKey } });
+    const token = await s.call('/the-studio/auth/token', { body: { serverKey: s.serverKey } });
     assert.equal(token.status, 404, token.raw);
     assert.deepEqual(token.headers.getSetCookie(), []);
-    assert.equal((await s.call('/app/the-studio/auth/methods')).status, 404);
-    assert.equal((await s.call('/app/the-studio/account/usage?from=2026-09-01&to=2026-09-30', { sid: await s.signIn() })).status, 404);
-    assert.equal((await s.call('/app/the-studio/in/webhook/x', { body: {} })).status, 404);
+    assert.equal((await s.call('/the-studio/auth/methods')).status, 404);
+    assert.equal((await s.call('/the-studio/account/usage?from=2026-09-01&to=2026-09-30', { sid: await s.signIn() })).status, 404);
+    assert.equal((await s.call('/the-studio/in/webhook/x', { body: {} })).status, 404);
     /* AND `/app/api/*` NAMES NO RECORD: it is not a second copy of the root. */
     assert.equal((await s.call('/app/api/boot', { bearer: s.serverKey })).status, 404);
     /* THE ROOT DOORS ARE WHERE THEY WERE. */
@@ -203,13 +212,13 @@ test('THE KEY DOORS ARE AT THE ROOT ONLY, and /auth, /account and /in are never 
 /* ── the shell `braindog serve` finds on its own ───────────────────────── */
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
-const BUILT = fileURLToPath(new URL('../../web/build/app', import.meta.url));
+const BUILT = fileURLToPath(new URL('../../web/build', import.meta.url));
 
-test('`braindog serve` WITH NO BRAINDOG_SHELL FINDS THE WEB BUILD AT build/app, AND ITS BUNDLED CATALOGUE', { skip: existsSync(join(BUILT, 'index.html')) ? false : 'apps/web is not built, so there is no build/app/index.html for serve to find' }, async () => {
-  /* THE WEB BUILD NOW WRITES EVERYTHING UNDER `build/app` (`apps/web/svelte.config.js`), and `main.ts` looked for
-     `build/index.html`, which is no longer written. So a self-host started the documented way served no app and no
-     catalogue, and said nothing about either: `/app/` was the record's `ROUTE_UNKNOWN`. This is the real entry in a
-     real process, against the real build, because the property is which directory that entry finds. */
+test('`braindog serve` WITH NO BRAINDOG_SHELL FINDS THE WEB BUILD AT build/, AND ITS BUNDLED CATALOGUE', { skip: existsSync(join(BUILT, 'index.html')) ? false : 'apps/web is not built, so there is no build/index.html for serve to find' }, async () => {
+  /* THE WEB BUILD WRITES EVERYTHING AT THE TOP OF `build/` (`apps/web/svelte.config.js`). While it wrote under
+     `build/app`, `main.ts` once looked for `build/index.html`, which was not written, so a self-host started the
+     documented way served no app and no catalogue, and said nothing about either. This is the real entry in a real
+     process, against the real build, because the property is which directory that entry finds. */
   const data = mkdtempSync(join(tmpdir(), 'braindog-serve-shell-'));
   /* Whatever this shell has set for the two is taken out, so the entry has to find both on its own. */
   const { BRAINDOG_SHELL: _shell, BRAINDOG_CATALOGUE: _catalogue, ...inherited } = process.env;
@@ -232,11 +241,11 @@ test('`braindog serve` WITH NO BRAINDOG_SHELL FINDS THE WEB BUILD AT build/app, 
       });
       served.once('exit', (code) => reject(new Error(`serve exited ${code}: ${said}`)));
     });
-    const page = await fetch(`${origin}/app/`);
+    const page = await fetch(`${origin}/`);
     assert.equal(page.status, 200);
     assert.equal(await page.text(), readFileSync(join(BUILT, 'index.html'), 'utf8'));
     if (existsSync(join(BUILT, 'catalogue', 'index.json'))) {
-      const index = await fetch(`${origin}/app/catalogue/index.json`);
+      const index = await fetch(`${origin}/catalogue/index.json`);
       assert.equal(index.status, 200);
       assert.match(index.headers.get('content-type') ?? '', /json/u);
       assert.deepEqual(await index.json(), JSON.parse(readFileSync(join(BUILT, 'catalogue', 'index.json'), 'utf8')));

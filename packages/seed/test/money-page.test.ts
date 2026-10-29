@@ -88,14 +88,15 @@ function drawn(k: Kernel, only?: readonly string[]): Drawn[] {
 }
 
 test('MONEY OPENS ON ITS LINE AND ITS HERO, then one board, then Heads up, with no side column and no walk of its own', () => {
-  assert.ok(BLOCKS.length <= 16, `Money declares ${BLOCKS.length} blocks, and a front door is not a page of them`);
+  /* 19 SINCE money-core 3.31.0: Over time (two, one drawn), the budgets at a glance and its note joined the board. */
+  assert.ok(BLOCKS.length <= 19, `Money declares ${BLOCKS.length} blocks, and a front door is not a page of them`);
   assert.ok(!BLOCKS.some((b) => b.kind === 'bridge' || b.kind === 'forecast'), 'a walk is drawn as a chart on Money again');
   assert.deepEqual(BLOCKS.filter((b) => b.area !== undefined).map((b) => b.heading ?? b.kind), [], 'Money has a side column again');
 
   /* THE HERO IS THE ONE LEAD STAT, WHOLE ROW, and its first cell is Cash now with the walk ahead. */
   const hero = BLOCKS.find((b) => b.kind === 'stat' && b.lead === true)!;
   assert.deepEqual(hero.when, { metric: 'cash-accounts', gt: 0 });
-  assert.deepEqual(hero.cells!.map((c) => c.label), ['Cash now', 'Lasts', 'If nothing comes in', 'Coming in, 30 days', 'Going out, 30 days']);
+  assert.deepEqual(hero.cells!.map((c) => c.label), ['Cash now', 'Lasts', 'If nothing comes in', 'To come in, next 30 days', 'To go out, next 30 days']);
   assert.deepEqual([hero.cells![0]!.metric, (hero.cells![0] as { ahead?: string }).ahead], ['cash-now', 'runway-days']);
   assert.ok(at('Heads up') > at('Instalments') && at('Instalments') > at('Accounts'), 'Heads up does not close the board');
   assert.deepEqual(['Coming up', 'Spent this month', 'Accounts', 'Ledger', 'Instalments'].filter((h) => at(h) < 0), [], 'a tile of the board is missing');

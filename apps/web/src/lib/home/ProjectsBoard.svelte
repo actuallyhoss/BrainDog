@@ -124,12 +124,14 @@
                   {:else if r.number.kind === 'aim'}
                     <div class="n-words"><span class="muted">{r.number.said}</span><span class="small">{r.number.sub}</span></div>
                   {:else}
-                    <span class="muted">{r.number.said}</span>
+                    <span class="muted" title={r.number.said} aria-label={r.number.said}>–</span>
                   {/if}
                 </div>
                 <div class="r-work">
-                  {#if r.work.agent}<AgentFace agent={r.work.agent} run="" live="stopped" size="xs" />{:else}<span class="face-none" aria-hidden="true">–</span>{/if}
-                  <span class="w-words"><span class:muted={r.work.none}>{r.work.said}</span>{#if r.work.sub}<span class="small">{r.work.sub}</span>{/if}</span>
+                  {#if r.work.none}<span class="muted" title={r.work.said} aria-label={r.work.said}>–</span>{:else}
+                    {#if r.work.agent}<AgentFace agent={r.work.agent} run="" live="stopped" size="xs" />{:else}<span class="face-none" aria-hidden="true">–</span>{/if}
+                    <span class="w-words"><span>{r.work.said}</span>{#if r.work.sub}<span class="small">{r.work.sub}</span>{/if}</span>
+                  {/if}
                 </div>
               </li>
             {/each}
@@ -139,10 +141,10 @@
     {/if}
 
     {#if b.parked.length > 0 || b.finished.count > 0}
-      <section class="b-parked" aria-label="Parked and finished">
+      <section class="b-parked" aria-label="Parked and closed">
         <header class="t-head">
           <IconWell name="archive" size="m" /><h2 class="t-title">Parked <span class="t-count num">{b.parked.length}</span></h2>
-          {#if b.finished.count > 0}<span class="t-meta" title={b.finished.names.join(', ')}>Finished {b.finished.count} · {b.finished.names.slice(0, 3).join(', ')}{b.finished.count > 3 ? ` and ${b.finished.count - 3} more` : ''}</span>{/if}
+          {#if b.finished.count > 0}<span class="t-meta" title={b.finished.names.join(', ')}>Closed {b.finished.count} · {b.finished.names.slice(0, 3).join(', ')}{b.finished.count > 3 ? ` and ${b.finished.count - 3} more` : ''}</span>{/if}
         </header>
         {#if b.parked.length > 0}
           <ul class="chips">
@@ -161,7 +163,8 @@
 <ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} send={menuRow?.key ?? null} />
 
 {#snippet week(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'])}
-  <section class="wk" role="listitem" aria-label={title} data-tone={t.count > 0 ? tone : undefined}>
+  <!-- A DIV IN THE LIST'S ROLE, never a section, which axe refuses a listitem role on (Q60 of 29 October). -->
+  <div class="wk" role="listitem" aria-label={title} data-tone={t.count > 0 ? tone : undefined}>
     <header class="t-head"><IconWell name={icon} size="m" /><h3 class="t-title">{title}</h3></header>
     <p class="wk-fig num">{t.count}<span>{t.said}</span></p>
     {#if t.lines.length > 0}
@@ -172,7 +175,7 @@
       </ul>
       {#if t.more > 0}<p class="small wk-more">and {t.more} more</p>{/if}
     {/if}
-  </section>
+  </div>
 {/snippet}
 
 <style>

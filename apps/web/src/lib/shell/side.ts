@@ -52,14 +52,15 @@ export const widthOf = (n: unknown): number => {
 };
 
 /**
- * BY THIS WEEK: pins first, then what is late, then what an agent is at work on, then where money moved, and the rest
- * in the order the record keeps them. A stable sort, so two of a kind keep the record's order.
+ * A STEADY ORDER (Q47 of 29 October): pins first, then by name, whatever happened this week. It was by this week (late,
+ * an agent at work, money moved), so Marsh.gg stood first in one load and 23rd ten minutes later and he hunted for the
+ * same project every time. What is happening now is the row's dot and line, never its place. A stable sort, so two of
+ * one name keep the record's order.
  */
-export function byWeek<P extends Pick<SideProject, 'pinned' | 'late' | 'working' | 'moved'>>(list: readonly P[]): P[] {
-  const rank = (p: P): number => (p.pinned ? 0 : p.late > 0 ? 1 : p.working ? 2 : p.moved ? 3 : 4);
+export function byWeek<P extends Pick<SideProject, 'pinned' | 'name'>>(list: readonly P[]): P[] {
   return list
     .map((p, i) => ({ p, i }))
-    .sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i)
+    .sort((a, b) => Number(b.p.pinned) - Number(a.p.pinned) || shownName(a.p.name).localeCompare(shownName(b.p.name), 'en', { sensitivity: 'base', numeric: true }) || a.i - b.i)
     .map((x) => x.p);
 }
 
@@ -173,10 +174,19 @@ export type SideList = {
   name: string;
   icon: string;
   count: number;
+  /** How many of its rows are still open, on a list whose rows finish; absent on one whose rows never do. */
+  open?: number;
   views: readonly { name: string; href: string }[];
   kernel: boolean;
   facts: ListFacts | null;
 };
+
+/**
+ * THE NUMBER BESIDE A LIST IN THE RAIL IS WHAT IS STILL OPEN ON IT (Q35 of 29 October): "Agent runs 949", "Keys 176"
+ * and "Numbers 2,527" counted every row ever kept, which reads as a database. A list whose rows finish shows its open
+ * ones; a list whose rows never finish (numbers, snapshots) shows none.
+ */
+export const shownCount = (l: Pick<SideList, 'open'>): { count?: number } => (typeof l.open === 'number' && l.open > 0 ? { count: l.open } : {});
 
 /** The home a list has when it is under no place: the projects' part, or More lists. */
 export const IN_PROJECTS = '#projects';
@@ -251,6 +261,11 @@ export type SidePlace = NavPlace & {
   list?: string | undefined;
   /** The lists, views and tools that are this place's own. */
   kids: SideLink[];
+  /**
+   * HOW MANY OF `kids` STAND OPEN, where a place keeps the rest under its own More (Money: its pages first, its lists
+   * folded). Left out, every kid stands open as before.
+   */
+  lead?: number | undefined;
 };
 
 /** The whole sidebar, from the shell's nav and the record's lists: every place, the projects' part, More lists, the foot. */
@@ -282,6 +297,11 @@ export function sideModel(o: {
   foot: readonly SideLink[];
   /** The list a place counts, by the place's key (Work's tasks). */
   counted: Readonly<Record<string, string>>;
+  /**
+   * THE ROWS A PLACE KEEPS OPEN, by the place's key and in this order; every other row of it folds under its More and
+   * carries no count, since a list's size is not something that needs you (Money's Snapshots 31, Categories 15).
+   */
+  leads?: Readonly<Record<string, readonly string[]>>;
 }): SideModel {
   const named = new Map([...o.places, ...o.others].map((p) => [word(p.label), p.key] as const));
   const folded = new Map<string, SideList>();
@@ -294,7 +314,7 @@ export function sideModel(o: {
   const rows = (home: string): SideLink[] =>
     o.lists
       .filter((l) => !taken.has(l.id) && !l.facts?.projects && o.homes.get(l.id) === home)
-      .flatMap((l) => [{ href: `/r/${l.id}`, label: l.name, icon: l.icon, count: l.count }, ...l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' }))]);
+      .flatMap((l) => [{ href: `/r/${l.id}`, label: l.name, icon: l.icon, ...shownCount(l) }, ...l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' }))]);
   const own = (key: string): SideLink[] => o.tools.filter((t) => t.home === key).map(({ home: _, ...t }) => t);
   const viewsOf = (l: SideList | undefined): SideLink[] => (l ? l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })) : []);
   /* ONE ROW FOR ONE WORD UNDER A PLACE: a page the place declares (Money's Accounts, Ledger, Filing rules) and the list
@@ -310,16 +330,21 @@ export function sideModel(o: {
   };
   const places = o.places.map((p): SidePlace => {
     const l = folded.get(p.key);
+    const kids = once([...(o.views[p.key] ?? []), ...viewsOf(l), ...rows(p.key), ...own(p.key)]);
+    const lead = o.leads?.[p.key];
+    const split = lead ? leadFirst(kids, lead) : null;
     return {
       ...p,
-      ...(p.count === undefined && l ? { count: l.count } : {}),
+      /* A PLACE KEEPS ITS LIST'S WHOLE COUNT WHERE THE ROWS NEVER FINISH: People 11 is eleven people. */
+      ...(p.count === undefined && l ? (typeof l.open === 'number' ? shownCount(l) : { count: l.count }) : {}),
       ...(l ? { list: l.id } : {}),
-      kids: once([...(o.views[p.key] ?? []), ...viewsOf(l), ...rows(p.key), ...own(p.key)]),
+      kids: split ? split.kids : kids,
+      ...(split && split.lead < split.kids.length ? { lead: split.lead } : {}),
     };
   });
   const others = o.others.map((p): SideLink => {
     const l = folded.get(p.key);
-    return { href: p.href, label: p.label, icon: p.icon, ...(p.count !== undefined ? { count: p.count } : l ? { count: l.count } : {}) };
+    return { href: p.href, label: p.label, icon: p.icon, ...(p.count !== undefined ? { count: p.count } : l ? shownCount(l) : {}) };
   });
   return {
     places,
@@ -343,7 +368,9 @@ export function litOf(path: string, m: SideModel): string | null {
     ...m.more,
     ...(m.projects ? [...m.projects.things, ...m.projects.kids] : []),
     ...m.places.flatMap((p) => p.kids),
-    ...m.places,
+    /* A PLACE ANSWERS FOR THE ROWS OF THE LIST IT COUNTS (audit of 30 October, 25): a person's page, `/r/people/4`, lit
+       nothing, so the desk's bar was empty over it and the phone's said the name the heading under it said again. */
+    ...m.places.map((p) => (p.list ? { ...p, near: [...(p.near ?? []), `/r/${p.list}`] } : p)),
     ...(m.projects?.href ? [{ href: m.projects.href }] : []),
   ];
   let best: string | null = null;
@@ -368,8 +395,20 @@ export type Crumb = { label: string; href?: string | undefined };
 /**
  * WHERE YOU ARE, IN WORDS (the bar's crumb): the lit row's place, the lit row, and the page's own name when the page is
  * below that row ("Money › Ledger", "Projects › Kiln", "Money › Ledger › Rent"). Each step before the last is a link.
+ *
+ * THE BAR SAYS THE PAGE'S TITLE ONCE, so the last step is the page's own words where it has them: `heading` ends the crumb
+ * in place of the row's word (Today says "Good afternoon, Mara"). A page whose name is its content (a question, a row)
+ * gives no title, and the crumb ends at the place it sits in, still a link back there.
  */
-export function crumbOf(path: string, m: SideModel, lit: string | null, title: string | null): Crumb[] {
+export function crumbOf(path: string, m: SideModel, lit: string | null, title: string | null, heading: string | null = null): Crumb[] {
+  const steps = placed(path, m, lit, title);
+  const h = heading?.trim() ?? '';
+  const last = steps[steps.length - 1];
+  if (h !== '' && last) last.label = h;
+  return h !== '' && !last ? [{ label: h }] : steps;
+}
+
+function placed(path: string, m: SideModel, lit: string | null, title: string | null): Crumb[] {
   const t = title?.trim() ?? '';
   if (lit === null) return t === '' ? [] : [{ label: t }];
   const place = m.places.find((p) => p.href === lit || p.kids.some((k) => k.href === lit));
@@ -381,9 +420,9 @@ export function crumbOf(path: string, m: SideModel, lit: string | null, title: s
   const label = row?.label ?? (m.projects?.href === lit ? m.projects.label : '');
   const steps: Crumb[] = [...head, { label, href: lit }];
   if (path !== lit && t !== '' && word(t) !== word(label)) steps.push({ label: t });
-  /* THE LAST STEP IS WHERE YOU ARE, never a link to itself. */
+  /* THE LAST STEP IS WHERE YOU ARE, never a link to itself; the place a titleless page sits in stays a way back to it. */
   const last = steps[steps.length - 1];
-  if (last) delete last.href;
+  if (last && (t !== '' || path === lit)) delete last.href;
   return steps.filter((s) => s.label !== '');
 }
 
@@ -421,3 +460,16 @@ export function factsKept(raw: string | null, base: string): Record<string, List
     return {};
   }
 }
+
+/**
+ * A place's rows with the ones it keeps open first, in the order asked, and the rest after them without their counts.
+ * `lead` is how many stand open. PURE, so `side.test.ts` can hold it.
+ */
+export function leadFirst(kids: readonly SideLink[], hrefs: readonly string[]): { kids: SideLink[]; lead: number } {
+  const open = hrefs.flatMap((h) => kids.filter((k) => k.href === h));
+  const rest = kids.filter((k) => !hrefs.includes(k.href)).map(({ count: _, ...k }) => k);
+  return { kids: [...open, ...rest], lead: open.length };
+}
+
+/** Money's pages that stand open under it in the sidebar, in this order; its lists and add-on pages fold under More. */
+export const MONEY_LEAD: readonly string[] = ['/p/money-accounts', '/p/money-ledger', '/p/money-budgets', '/p/money-coming', '/p/money-forecast', '/p/money-reports'];

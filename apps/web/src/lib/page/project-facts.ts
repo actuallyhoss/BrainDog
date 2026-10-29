@@ -11,6 +11,7 @@
 
 import { article } from '../copy/english.ts';
 import { nextSplit } from './next-split.ts';
+import { isForecast } from '../home/card-kpi.ts';
 import { ago, dayChip, daysBetween, endedAs, trailOf } from '../home/projects-board.ts';
 
 /* ── what is read ──────────────────────────────────────────────────────── */
@@ -125,7 +126,36 @@ export type Numbers = {
   /** The newest reading's day, and how old it is. */
   newest: string | null;
   age: number;
+  /** What it plans for, said apart from what it measured: "Plan for a year out: bear 80 · base 300 · bull 950". */
+  plan: string | null;
 };
+
+const SCENARIO_ORDER = ['bear', 'base', 'bull'];
+/**
+ * A PLAN IS SAID AS A PLAN (Q33 of 29 October): "Monthly revenue a year out: base", ": bear" and ": bull" stood beside the
+ * measured revenue as three cut-off labels, each "one reading", so a forecast read as revenue. One line: what it plans
+ * for, then each case with its figure, bear to bull.
+ */
+function planOf(plans: readonly Measure[], format: FactsIn['format']): string | null {
+  if (plans.length === 0) return null;
+  const parts = plans.map((m) => {
+    const last = m.points.at(-1)!;
+    const figure = figureOf(last.v, last.money, m.unit, format);
+    const hit = /^(.*?)\s*:\s*(bear|base|bull)\b/iu.exec(m.label);
+    return { head: hit ? hit[1]!.trim() : m.label, word: hit ? hit[2]!.toLowerCase() : '', figure };
+  });
+  const head = parts[0]!.head;
+  if (parts.every((p) => p.word !== '' && p.head === head)) {
+    const said = parts
+      .slice()
+      .sort((a, b) => SCENARIO_ORDER.indexOf(a.word) - SCENARIO_ORDER.indexOf(b.word))
+      .map((p) => `${p.word} ${p.figure}`)
+      .join(' · ');
+    const out = head.replace(/^monthly revenue\s+/iu, '').trim();
+    return `Plan${out ? ` for ${out.charAt(0).toLowerCase()}${out.slice(1)}` : ''}: ${said}`;
+  }
+  return `Plan: ${parts.map((p) => `${p.word ? `${p.head}, ${p.word}` : p.head} ${p.figure}`).join(' · ')}`;
+}
 
 const EVERY_DAYS: Readonly<Record<string, number>> = { '1h': 1, '1d': 1, '1w': 7, '1m': 31 };
 const EVERY_WORD: Readonly<Record<number, string>> = { 1: 'Daily', 7: 'Weekly', 31: 'Monthly' };
@@ -146,7 +176,9 @@ const figureOf = (v: number, money: Money | null, unit: string, format: FactsIn[
 /** How a measure moved over its last month of readings, in words: "up 1,445 since 20 Aug". */
 function movedOf(m: Measure, format: FactsIn['format'], today: string): string {
   if (m.kpi?.change !== null && m.kpi?.change !== undefined && Number.isFinite(m.kpi.change)) {
-    const pct = Math.round(Math.abs(m.kpi.change) * 100);
+    /* ROUNDED AS ITS TILE ON TODAY ROUNDS IT (`changeOf` in the renderer): a whole percent from ten, one place under. */
+    const raw = Math.abs(m.kpi.change) * 100;
+    const pct = raw >= 10 ? Math.round(raw) : Math.round(raw * 10) / 10;
     return pct === 0 ? 'no change' : `${m.kpi.change > 0 ? 'up' : 'down'} ${pct}%`;
   }
   const last = m.points.at(-1);
@@ -195,7 +227,12 @@ export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'form
     })
     .filter((m) => m.points.length > 0)
     .sort((a, b) => b.points.length - a.points.length || (b.points.at(-1)!.at ?? '').localeCompare(a.points.at(-1)!.at ?? ''));
-  const all = [...measures, ...fromReadings];
+  const every0 = [...measures, ...fromReadings];
+  const all = every0.filter((m) => !isForecast(m.label) && !(m.kpi && isForecast(m.kpi.name)));
+  const plan = planOf(
+    every0.filter((m) => !all.includes(m)),
+    f.format,
+  );
   const cells = all.slice(0, most).map((m): NumberCell => {
     const last = m.points.at(-1)!;
     const age = Math.max(0, daysBetween(last.at.slice(0, 10), f.today));
@@ -222,6 +259,7 @@ export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'form
     more: Math.max(0, all.length - most),
     newest,
     age,
+    plan,
   };
 }
 
@@ -285,13 +323,13 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
       ? { said: 'Open the late task', href: late[0]!.href }
       : late.length > 1 && f.hrefs.work
         ? { said: `Open the ${late.length} late tasks`, href: f.hrefs.work }
-        : numbers.banner
-          ? { said: 'Fix the numbers feed', href: f.hrefs.feed }
-          : due.length > 0
-            ? { said: 'Open the next task', href: due[0]!.href }
-            : null;
+        : due.length > 0
+          ? { said: 'Open the next task', href: due[0]!.href }
+          : null;
+  /* FIX THE NUMBERS FEED IS NEVER THE RED BUTTON (Q32 of 29 October): red here and grey on Projects, one act in two
+     weights. It is the quiet one on both, and red is kept for late work. */
   const soft: Act =
-    late.length > 0 && numbers.banner
+    numbers.banner
       ? { said: 'Fix the numbers feed', href: f.hrefs.feed }
       : open.length > 1 && f.hrefs.work && red?.href !== f.hrefs.work
         ? { said: `Open all ${open.length} tasks`, href: f.hrefs.work }
@@ -465,9 +503,9 @@ export function sessionsOf(f: Pick<FactsIn, 'runs' | 'today' | 'name'>, most = 4
     return {
       seq: r.seq,
       agent: r.agent,
-      title: generic ? `${agentName(r.agent)}${r.repo ? ` in ${r.repo}` : ''}` : doing,
+      title: generic ? `${agentName(r.agent)}${r.repo ? ` in ${r.repo}` : ''}` : summarySaid(doing),
       when: from === to ? daySaid(to, f.today) : `${daySaid(from, f.today)} to ${daySaid(to, f.today)}`,
-      said: r.notes[0] ?? (r.next !== '' ? `Next: ${r.next}` : null),
+      said: r.notes[0] ? summarySaid(r.notes[0]) : r.next !== '' ? `Next: ${summarySaid(r.next)}` : null,
       ended: `${ended.said}${r.wrote ? ` · ${plural(r.wrote, 'write', 'writes')}` : ''}`,
       open: ended.open,
     };
@@ -482,6 +520,50 @@ export type HappenedLine = { at: string; day: string; text: string; by: string |
  * WHAT HAPPENED ON IT, IN WORDS, newest first: work finished and added, sessions and what they left, the last numbers
  * that came in, and the edits to its own row folded into one line a day ("its note and next step were rewritten").
  */
+/** A run's own title, "Mara Brain run S87": a source and a run id, never words for a person (Q14 of 29 October). */
+const RUN_TITLE = /^(?:[\p{L}\p{N}][\p{L}\p{N}.-]*(?: [\p{L}\p{N}][\p{L}\p{N}.-]*)*) run(?: S[1-9][0-9]*)?\.?$/u;
+
+/** A path to a file or a folder (`bake/site/docs/reviews/x.md`, `~/Developer/koala`): kept under Show the data, never said. */
+const PATH = /(?:(?:~\/|\.{1,2}\/|(?<![\w.])\/)(?:[\w.-]+\/)*[\w.-]+|(?:[\w.-]+\/){2,}[\w.-]+)\/?/gu;
+
+/**
+ * A LINE OF WHAT HAPPENED AS A PERSON WRITES IT (Q14 of 29 October): an imported run is "Imported from your old notes",
+ * never its source and id; a path is "a file" or "a folder"; and a step that changed is "Next step changed to …", never
+ * "from … to …" with both written out.
+ */
+export function happenedSaid(text: string): string {
+  const t = text.trim();
+  if (RUN_TITLE.test(t)) return 'Imported from your old notes.';
+  const moved = /^(next step|status|lane|due|note)\s+from\s+.+?\s+to\s+(.+)$/isu.exec(t);
+  const said = moved ? `${moved[1]!.charAt(0).toUpperCase()}${moved[1]!.slice(1).toLowerCase()} changed to ${moved[2]!}` : t;
+  return said
+    .replace(PATH, (p) => (/\.[A-Za-z0-9]{1,5}$/u.test(p) ? 'a file' : 'a folder'))
+    /* A COMMIT'S HASH AND A RUN'S ID ARE THE RECORD'S, never the line's: "in 20baee4", "(S148)". */
+    .replace(/\s*\((?:S[1-9][0-9]*|[0-9a-f]{7,40})\)/gu, '')
+    .replace(/\b(?:commit\s+)?(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/gu, 'a commit')
+    .replace(/\brun S[1-9][0-9]*\b/gu, 'a run');
+}
+
+/** How long a summary line runs before it stops at a word. */
+const SUMMARY_MOST = 180;
+
+/**
+ * A RUN'S WORDS AS ONE SUMMARY LINE (Q14 of 29 October): Buff's Drafts drew a run's whole handoff, three thousand words of
+ * env codes (`NODE_USE_ENV_PROXY`), commits and paths, as one line of What happened, and Koala's Agents tile ended on
+ * `~/Developer/koala`. The first sentence, said as `happenedSaid` says it, with a setting's code as "a setting" and
+ * no code marks, cut at a word past `SUMMARY_MOST`. The whole stays on the run, under Show the data.
+ */
+export function summarySaid(text: string): string {
+  const t = text.trim().replace(/\s+/gu, ' ');
+  const first = /^.+?[.!?](?=\s+[A-Z(])/u.exec(t)?.[0] ?? t;
+  const plain = happenedSaid(first)
+    .replace(/`([^`]*)`/gu, '$1')
+    .replace(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/gu, 'a setting');
+  if (plain.length <= SUMMARY_MOST) return plain;
+  const cut = plain.slice(0, SUMMARY_MOST);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), SUMMARY_MOST / 2)).replace(/[\s,;:.\u2013\u2014-]+$/u, '')}…`;
+}
+
 export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine[] {
   const out: HappenedLine[] = [];
   /* TASKS ADDED, ONE LINE A DAY: a plan written in one sitting is one line, its first two named. */
@@ -501,7 +583,10 @@ export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine
     const d = day10(r.at);
     if (!d) continue;
     const what = r.notes[0] ?? (r.doing.trim() !== '' && !/ run$/iu.test(r.doing) ? r.doing : null);
-    out.push({ at: d, day: daySaid(d, f.today), text: what ? `${/[.!?]$/u.test(what) ? what : `${what}.`}` : `A session ${endedAs({ state: r.state, closedAs: r.closedAs, handed: r.next !== '' }).said}.`, by: agentName(r.agent), tone: 'plain' });
+    const text = what ? summarySaid(/[.!?]$/u.test(what) ? what : `${what}.`) : `A run ${endedAs({ state: r.state, closedAs: r.closedAs, handed: r.next !== '' }).said}.`;
+    /* IMPORTED RUNS ARE ONE LINE, on the newest of their days: four of "Mara Brain run S87" read as a story of ids. */
+    if (text === 'Imported from your old notes.' && out.some((o) => o.text === text)) continue;
+    out.push({ at: d, day: daySaid(d, f.today), text, by: text === 'Imported from your old notes.' ? null : agentName(r.agent), tone: 'plain' });
   }
   if (numbers.newest && numbers.banner) out.push({ at: numbers.newest, day: daySaid(numbers.newest, f.today), text: 'The last numbers arrived. Nothing since.', by: null, tone: 'warn' });
   /* THE ROW'S OWN EDITS, ONE LINE A DAY: a tidy that rewrote its note and its next step is one line, not five. */
@@ -513,7 +598,8 @@ export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine
   for (const [d, notes] of edits) {
     const said = notes.find((n) => n !== '') ?? '';
     const first = said.charAt(0).toUpperCase() + said.slice(1);
-    const text = notes.length === 1 && first !== '' ? `${first.replace(/[.]$/u, '')}.` : `${plural(notes.length, 'edit', 'edits')} to its record${first !== '' ? `, among them: ${first.replace(/[.]$/u, '')}` : ''}.`;
+    const plainFirst = first === '' ? '' : happenedSaid(first).replace(/[.]$/u, '');
+    const text = notes.length === 1 && plainFirst !== '' ? `${plainFirst}.` : `${plural(notes.length, 'change', 'changes')} to it${plainFirst !== '' ? `, among them: ${plainFirst}` : ''}.`;
     out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain' });
   }
   return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, most);

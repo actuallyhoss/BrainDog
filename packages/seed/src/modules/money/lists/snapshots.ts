@@ -69,8 +69,22 @@ export const SNAPSHOTS_REGISTER: MoneyRegister = {
     { id: 'owed_to_me', label: 'Receivables', type: 'money' },
     { id: 'owed_by_me', label: 'Payables', type: 'money' },
     /* CASH PLUS WHAT IS OWED TO YOU LESS WHAT YOU OWE. Stored rather than derived, because a snapshot
-       is a reading and a reading recomputed later from rows that have changed is not one. */
-    { id: 'net', label: 'Net', type: 'money' },
+       is a reading and a reading recomputed later from rows that have changed is not one. CALLED WHAT IT IS SINCE
+       money-core 3.32.0: it read "Net" at −£20,264 beside Money's net worth of −£27,764, which also counts what is held
+       beyond the bank and owed over time (`worth` below), so one word named two figures (recheck of 30 October, N2). */
+    { id: 'net', label: 'Cash after bills', type: 'money' },
+    /**
+     * NET WORTH ON THE NIGHT, SINCE money-core 3.31.0: what is held beyond the bank (the add-ons' holdings, property,
+     * certificates and policy funds), what is owed over time (instalments left and debts), and net worth over all of
+     * it, read through `held-beyond-cash`, `owed-over-time` and `net-worth`. Then net worth again in units that do not
+     * move with the home currency: dollars, and grams of 24k gold at the rate in use that night. Not required: a night
+     * that could not read them, or one taken before 3.31.0, leaves them empty (`worthOfNight` in the kernel).
+     */
+    { id: 'held', label: 'Held beyond cash', type: 'money' },
+    { id: 'owed_later', label: 'Still to pay over time', type: 'money' },
+    { id: 'worth', label: 'Net worth', type: 'money' },
+    { id: 'worth_usd', label: 'Net worth in dollars', type: 'money' },
+    { id: 'worth_gold', label: 'Net worth in grams of gold', type: 'decimal' },
     { id: 'taken', label: 'Taken', type: 'enum', values: ['nightly', 'typed'], default: 'nightly', index: true, required: true },
     { id: 'note', type: 'text' },
   ],

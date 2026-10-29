@@ -158,7 +158,24 @@ test('a plan made by hand has the parts that already name it linked at once', as
   assert.equal(m.rowsOf('installments')[0]!.fields.plan_row, m.rowsOf('plans')[0]!.id);
 });
 
-test('a plan closed by hand while a part is open stays closed when a part of it is written', async () => {
+test('a plan cancelled by hand while a part is open stays cancelled when a part of it is written', async () => {
+  /* CANCELLED, NOT PAID (Q3 of 29 October): a plan marked paid with a part to go is open again, so the word a person
+     says about a plan that no count takes back is cancelled. */
+  const m = await money();
+  m.part(1);
+  m.part(2);
+  await m.turn(4);
+  const plan = m.rowsOf('plans')[0]!;
+  value(m.k.update('plans', plan.id, { state: 'cancelled' }, OWNER));
+  await m.turn(2);
+  const second = m.rowsOf('installments').find((p) => p.fields.number === 2)!;
+  value(m.k.update('installments', second.id, { due: '2027-06-01' }, OWNER));
+  await m.turn(3);
+  assert.equal(m.rowsOf('plans')[0]!.fields.state, 'cancelled', m.log.join(' '));
+  assert.equal(m.log.some((l) => /open again|is open/.test(l)), false, m.log.join(' '));
+});
+
+test('a plan marked paid while a part is open is open again when a part of it is written', async () => {
   const m = await money();
   m.part(1);
   m.part(2);
@@ -169,6 +186,5 @@ test('a plan closed by hand while a part is open stays closed when a part of it 
   const second = m.rowsOf('installments').find((p) => p.fields.number === 2)!;
   value(m.k.update('installments', second.id, { due: '2027-06-01' }, OWNER));
   await m.turn(3);
-  assert.equal(m.rowsOf('plans')[0]!.fields.state, 'paid', m.log.join(' '));
-  assert.equal(m.log.some((l) => /open again|is open/.test(l)), false, m.log.join(' '));
+  assert.equal(m.rowsOf('plans')[0]!.fields.state, 'open', m.log.join(' '));
 });

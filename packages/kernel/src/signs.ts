@@ -57,7 +57,18 @@ export type VitalSign = {
 };
 
 /** What a reader answers, and what the record or host files through `fileSignReading`. */
-export type SignReading = { state: SignState; value: number | null; said: string; facts?: string[]; counts?: Readonly<Record<string, number>> };
+export type SignReading = {
+  state: SignState;
+  value: number | null;
+  said: string;
+  facts?: string[];
+  counts?: Readonly<Record<string, number>>;
+  /**
+   * THE HEADING THIS READING IS SAID UNDER, when it is not the check's own name (30 October): the record's own failure
+   * ("The backup on 3 Sep did not run") was headed "Each problem is asked once", the name of the check that caught it.
+   */
+  named?: string;
+};
 
 /**
  * THE COUNTS A FILED SIGN MAY CARRY BESIDE ITS ONE VALUE, a closed list a sign, each with the words a person reads it
@@ -526,7 +537,10 @@ function readCauses(sql: Sql, nowMs: number): SignReading {
         ? sentence(askedIn(sql, faults[0]!.id))
         : `${faults.length} things went wrong. The first: ${joined(askedIn(sql, faults[0]!.id))}`
       : `${uncaused.length} open questions carry no cause.`;
-  return reading('red', biggest?.length ?? (faults.length || uncaused.length), said, facts);
+  const out = reading('red', biggest?.length ?? (faults.length || uncaused.length), said, facts);
+  /* THE RECORD'S OWN FAILURE IS HEADED AS ONE, not under this check's name (30 October): Health read "Each problem is
+     asked once" over "The backup on 3 Sep did not run". */
+  return !biggest && faults.length > 0 ? { ...out, named: faults.length === 1 ? 'Something did not work' : `${faults.length} things did not work` } : out;
 }
 
 function readOldest(sql: Sql, nowMs: number, tz: string): SignReading {
@@ -733,7 +747,7 @@ export function readSigns(sql: Sql, nowMs: number, tz: string, each?: (sign: str
   return VITAL_SIGNS.map((s) => {
     const now = each === undefined ? readNow(sql, s, nowMs, safeZone(tz)) : each(s.sign, () => readNow(sql, s, nowMs, safeZone(tz)));
     const days = Array.from({ length: 14 }, (_, i) => dayBefore(today, 14 - i)).map((day) => ({ day, state: kept.get(`${s.sign} ${day}`) ?? ('none' as const) }));
-    const sign: VitalSign = { sign: s.sign, name: s.name, state: now.state, value: now.value, said: now.said, facts: now.facts ?? [], days };
+    const sign: VitalSign = { sign: s.sign, name: now.named ?? s.name, state: now.state, value: now.value, said: now.said, facts: now.facts ?? [], days };
     if (now.counts !== undefined) sign.counts = { ...now.counts };
     return sign;
   });

@@ -153,8 +153,10 @@ export const PERSONAL = {
      Money's own figures and this pack's lists, and a block or a role over a list the record does not hold is cut at
      install (`fitted`). 2.5.0 is published in the catalogue and frozen, and the file it shares changes (`needs`), so
      this is a version beside it. Nothing is declared, taken away or reworded, so a record on 2.5.0 keeps all it holds.
-     2.6.1: the card's summary is one short line. Words only, so a patch step. */
-  version: '2.6.1',
+     2.6.1: the card's summary is one short line. Words only, so a patch step.
+     2.7.0: one figure is added, how many days in a row something was logged (`log-streak`), which the Days in a row
+     widget draws. Nothing goes, so a minor step. */
+  version: '2.7.0',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -402,6 +404,17 @@ export const PERSONAL = {
         value: { sum: 'amount' },
         group_by: 'goal',
         format: 'decimal',
+        target: { gte: 0 },
+        window: '30d',
+        compare: 'none',
+      },
+      {
+        /* HOW MANY DAYS IN A ROW SOMETHING WAS LOGGED, for the Days in a row widget (2.7.0): today does not break it. */
+        metric: 'log-streak',
+        name: 'Days in a row logged',
+        source: 'register.goal_log',
+        value: { streak: { on: 'on', grain: 'day' } },
+        format: 'int',
         target: { gte: 0 },
         window: '30d',
         compare: 'none',

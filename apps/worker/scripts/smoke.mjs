@@ -11,8 +11,11 @@
  * `wrangler deploy` says nothing about whether the site hands over every door,
  * and `deploy-parity` asks one host. A door the site keeps shows up as the site's 404 page answering an API call, which
  * is a healthy-looking response from the wrong Worker, and every check below is written against that answer as much as
- * against the right one. Before the site binds this Worker (push A) the checks are on the Worker's own name, and the
- * one that matters most is that a page load there reaches `/app` rather than `ROUTE_UNKNOWN`.
+ * against the right one. Before the site binds this Worker (push A) the checks are on the Worker's own name.
+ *
+ * THE APP IS AT THE ROOT OF ITS NAME SINCE 29 OCT, and every address under `/app` is one 308 to the same address without
+ * it, on the app's own name and on the site's. Both are asked, with a query on the address, because a link already
+ * mailed is `…/app/signin?next=…#magic=…` and the query is what sends him back to the page he was on.
  *
  * THE HOSTS COME FROM THE TWO `wrangler.jsonc` FILES, NOT FROM A REPOSITORY VARIABLE. `PUBLIC_HOST`, `LEGACY_HOSTS`, the
  * Worker's Custom Domains and the site's binding are what the two Workers were deployed with, so reading them here asks
@@ -32,7 +35,7 @@
  * browser session and never for a record's token, and its own line says so. Without both, one line says the half
  * was skipped. The token goes in each signed-in request's header and in no line this prints.
  *
- * IT WRITES NOTHING. GETs with no cookie and, but for the canary's, no bearer; one GET that must be redirected; one
+ * IT WRITES NOTHING. GETs with no cookie and, but for the canary's, no bearer; the GETs that must be redirected; one
  * empty POST to an `/in/` door no record has minted, which `serveIngest` refuses with a 404 before any record is named;
  * and the canary's `previewPage`, a POST because its body is long, which draws a page and installs nothing. The one
  * exception is the fence's (`fence.mjs`): on the canary alone, a 1x1 picture put at its own hash, the same
@@ -93,13 +96,15 @@ const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
  * `/pricing` is the Worker's 308 and not the site, so a good dark deploy went red. Now:
  *
  *   - every name the app is on, `PUBLIC_HOST` and each Custom Domain of the site's same environment when that
- *     environment hands this Worker every door (`siteBinding`), is asked for the shell, a 401 at `/api/boot` and
- *     `/healthz` with `kernel` equal to `kernel`, which is this checkout's `migrationCount()` unless a test hands it one;
+ *     environment hands this Worker every door (`siteBinding`), is asked for the shell at `/` and at `/signin`, the
+ *     old `/app/signin` sent on with one 308, a 401 at `/api/boot` and `/healthz` with `kernel` equal to `kernel`,
+ *     which is this checkout's `migrationCount()` unless a test hands it one;
  *   - a name the site hands over is shared with the site, so it is asked `/slash` first (a page the site always shows; `/pricing` is held until BrainDog is priced), which is the check that the
  *     site's `run_worker_first` is not wider than the doors. A name held as this Worker's Custom Domain has no site on
  *     it to ask;
- *   - the old name, `LEGACY_HOSTS`, or before the move the public host itself when it is a Custom Domain, is asked for a
- *     page load's 308 into `/app` on `PUBLIC_HOST`, and for a POST to an `/in/` door that must not be redirected.
+ *   - the old name, `LEGACY_HOSTS`, or with none the public host itself when it is a Custom Domain, is asked for a page
+ *     load under `/app` and its one 308 to the same page at the root of `PUBLIC_HOST`, and for a POST to an `/in/` door
+ *     that must not be redirected.
  *
  * Push A asks `app.brain.dog` alone; an environment whose site binds this Worker before its flip (alpha in push 1,
  * production in push 3) is asked on both names; and its flip, B1 or B2, is asked the design's answers and `/healthz`.
@@ -132,7 +137,8 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
     const shared = handed.has(on);
     /* A SHARED NAME THAT IS A LEGACY HOST (the shared name after the app went back to its own): the site hands it the
        doors, so its page loads reach this Worker and are sent on, and its API doors are served. `/slash` is still the
-       site's, and `/app/` asked as a browser asks is the 308 to the app's name. */
+       site's, and `/app/signin` asked as a browser asks is ONE 308 to `/signin` at the root of the app's name, query
+       kept, and never to `/app/signin` there and then again. */
     const sentOn = shared && legacyNames.has(on) && on !== host;
     if (shared)
       list.push({
@@ -144,27 +150,45 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
           : isJson(a) ? `answered ${a.status} in JSON, which is this Worker and not the site: the site's run_worker_first is wider than the doors and hands a site path to the app`
           : `answered ${a.status}, so the site did not deploy, or ${on} is not its Custom Domain`,
       });
+    const signin = `https://${host}/signin?from=smoke`;
+    const once = (a) => {
+      const to = a.headers.get('location') ?? '';
+      if (a.status === 308 && to === signin) return null;
+      if (a.status === 308 && to === `https://${host}/app/signin?from=smoke`)
+        return `answered a 308 to ${to}, which is the app's old address and a second hop: the Worker serving is older than the app at the root`;
+      if (a.status === 404 && isHtml(a)) return `answered the site's 404 page: the deployed site on ${on} does not hand /app/* to this Worker, so every saved link there is dead`;
+      if (a.status === 200 && isHtml(a)) return `answered the shell where a 308 to ${signin} was expected: the Worker serving still draws the app under /app`;
+      return `answered ${a.status}${to ? ` to ${to}` : ''} where one 308 to ${signin} was expected${sentOn ? '. Is LEGACY_HOSTS in the deployed vars?' : ''}`;
+    };
+    /* THE OLD ADDRESS IS ASKED WHERE IT IS SENT ON: the app's own name and a legacy name the site hands over. A name the
+       site hands over that is neither (the app sharing the site's name, a push of the one-domain move) is the site's at
+       its root, so neither the redirect nor the shell is asked there. */
+    const moves = on === host || sentOn;
     list.push(
-      sentOn ?
-        {
+      ...(moves ?
+        [
+          {
+            method: 'GET',
+            url: `https://${on}/app/signin?from=smoke`,
+            headers: { accept: 'text/html' },
+            expects: `308 to ${signin}`,
+            judge: once,
+          },
+        ]
+      : []),
+      ...(on !== host ?
+        []
+      : ['/', '/signin'].map((path) => ({
           method: 'GET',
-          url: `https://${on}/app/`,
+          url: `https://${on}${path}`,
           headers: { accept: 'text/html' },
-          expects: `308 to https://${host}/app/`,
+          expects: '200, the app shell',
           judge: (a) =>
-            a.status === 308 && a.headers.get('location') === `https://${host}/app/` ? null
-            : a.status === 404 && isHtml(a) ? `answered the site's 404 page: the deployed site on ${on} does not hand /app/* to this Worker, so every saved link there is dead`
-            : `answered ${a.status}${a.headers.get('location') ? ` to ${a.headers.get('location')}` : ''} where a 308 to https://${host}/app/ was expected. Is LEGACY_HOSTS in the deployed vars?`,
-        }
-      : {
-        method: 'GET',
-        url: `https://${on}/app/`,
-        expects: '200, the app shell',
-        judge: (a) =>
-          a.status === 200 && isHtml(a) ? null
-          : shared ? `answered ${a.status}${isHtml(a) ? ' as a page' : ''}: the deployed site on ${on} does not hand /app/* to this Worker, or the Worker is older than the /app shell`
-          : `answered ${a.status}${isHtml(a) ? ' as a page' : ''} on this Worker's own Custom Domain, so the version serving is older than the /app shell or the build it carries has no build/app/index.html`,
-      },
+            a.status === 200 && isHtml(a) ? null
+            : a.status === 308 ? `answered a 308 to ${a.headers.get('location') ?? 'nowhere'}: the Worker serving is older than the app at the root and sends ${path} into /app`
+            : shared ? `answered ${a.status}${isHtml(a) ? ' as a page' : ''}: the deployed site on ${on} does not hand ${path} to this Worker`
+            : `answered ${a.status}${isHtml(a) ? ' as a page' : ''} on this Worker's own Custom Domain, so the build it carries has no build/index.html`,
+        }))),
       {
         method: 'GET',
         url: `https://${on}/api/boot`,
@@ -200,10 +224,11 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
   }
   if (!old) return list;
 
-  /* A LEGACY NAME THE SITE HOLDS has no page outside `/app` that reaches this Worker (the site answers those), so the
-     page load asked is one under `/app`, which keeps its own path. */
-  const target = `https://${host}/app/r/x`;
-  const askedPath = handed.has(old) ? '/app/r/x' : '/r/x';
+  /* THE PAGE LOAD ASKED IS ONE UNDER `/app`, because that is the old address on every name: a legacy name the site
+     holds has no other page that reaches this Worker (the site answers those), and the app's own name moves nothing
+     else. It lands at the root, with the `/app` taken off. */
+  const target = `https://${host}/r/x`;
+  const askedPath = '/app/r/x';
   list.push(
     {
       method: 'GET',
@@ -214,9 +239,9 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
         const to = a.headers.get('location') ?? '';
         if (a.status === 308 && to === target) return null;
         if (a.status === 308 || a.status === 301 || a.status === 302 || a.status === 307)
-          return `answered ${a.status} to ${to || 'nowhere'}. The move is a 308 to ${target}: a temporary redirect is asked again every time, a Location without /app lands on the site, and one to another name before the move is the flip's vars deployed before the site hands that name the doors`;
+          return `answered ${a.status} to ${to || 'nowhere'}. The move is one 308 to ${target}: a temporary redirect is asked again every time, a Location still under /app is a second hop, and one to another name before the move is the flip's vars deployed before the site hands that name the doors`;
         if (old === host)
-          return `answered ${a.status}${isJson(a) ? ' in JSON, which is ROUTE_UNKNOWN' : ''}: a page load outside /app on ${host} is not sent into /app on the same name, so the site's "Open the app" and every magic link already mailed land on an error`;
+          return `answered ${a.status}${isHtml(a) ? ', the shell' : ''}: a page load under /app on ${host} is not sent to the root of the same name, so every link and magic link already mailed opens the old address`;
         return `answered ${a.status}, so ${old} still serves the app instead of sending a browser to ${host}. Is LEGACY_HOSTS in the deployed vars?`;
       },
     },
@@ -248,15 +273,15 @@ export function canary(config, name, slug) {
   if (!SLUG.test(String(slug ?? ''))) throw new Error(`SMOKE_SLUG ${JSON.stringify(slug ?? '')} is not a record's name, so the canary cannot be asked`);
   return {
     method: 'GET',
-    url: `https://${host}/app/${slug}/api/boot`,
+    url: `https://${host}/${slug}/api/boot`,
     canary: true,
     expects: '200 JSON, the canary record signed in',
     judge: (a) => {
       if (a.status === 200 && isJson(a)) return null;
       if (a.status === 401 && isJson(a)) return `answered 401: SMOKE_TOKEN is not a live token on ${slug}, which is most often a lapsed, revoked or mistyped token rather than this deploy, so mint a read token there and set it again`;
       if (a.status === 503 && isJson(a)) return 'answered 503: the canary record did not open on this build, which is what a migration refusing real rows looks like';
-      if (a.status === 200 && isHtml(a)) return `answered the app shell, so /app/${slug}/api/boot fell to the page router rather than the record`;
-      if (a.status === 404 && !isJson(a)) return `answered a 404 page: something other than this Worker answers /app/* on ${host}`;
+      if (a.status === 200 && isHtml(a)) return `answered the app shell, so /${slug}/api/boot fell to the page router rather than the record`;
+      if (a.status === 404 && !isJson(a)) return `answered a 404 page: something other than this Worker answers /${slug}/* on ${host}`;
       return `answered ${a.status}${isJson(a) ? ' in JSON' : ''} where 200 JSON was expected`;
     },
   };
@@ -298,7 +323,7 @@ export function argsFor(read, said) {
 /** One first-draw read on the canary, as the client sends it: a GET's arguments in the address, a POST's in its body. */
 export function readCheck(config, name, slug, read, args = {}) {
   const host = String(config.env?.[name]?.vars?.PUBLIC_HOST ?? '').toLowerCase();
-  const url = new URL(`https://${host}/app/${slug}/api/${read.method}`);
+  const url = new URL(`https://${host}/${slug}/api/${read.method}`);
   if (!read.post) for (const [k, v] of Object.entries(args)) url.searchParams.set(k, typeof v === 'string' ? v : JSON.stringify(v));
   return {
     method: read.post ? 'POST' : 'GET',
@@ -326,7 +351,7 @@ export function refusals(config, name, slug, nowhere, token = '') {
   return [
     {
       method: 'GET',
-      url: `https://${host}/app/${slug}/api/version`,
+      url: `https://${host}/${slug}/api/version`,
       expects: '401 JSON without the bearer',
       judge: (a) =>
         a.status === 401 && isJson(a) ? null
@@ -335,7 +360,7 @@ export function refusals(config, name, slug, nowhere, token = '') {
     },
     {
       method: 'GET',
-      url: `https://${host}/app/${nowhere}/api/boot`,
+      url: `https://${host}/${nowhere}/api/boot`,
       canary: true,
       expects: "refused at a second name, naming nothing of the canary's",
       judge: (a) => {

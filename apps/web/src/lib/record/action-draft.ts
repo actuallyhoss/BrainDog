@@ -11,7 +11,7 @@
  * no address), and every other sentence the person reads about a declaration is the record's own `fix`.
  *
  * THE PRESETS ARE HOW A DECLARED PAGE REACHES THE SHEET. A page links to
- * `/app/<slug>/automations?new=action&preset=<id>`, the hub opens `NewAction.svelte` with that id, and the id is looked
+ * `/<slug>/automations?new=action&preset=<id>`, the hub opens `NewAction.svelte` with that id, and the id is looked
  * up here. A preset is a draft with some boxes filled; it installs nothing on its own.
  */
 

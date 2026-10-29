@@ -589,7 +589,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (!made.ok) return made;
     const refusal = await deps.setPlan(made.value.record, FREE_PLAN.directory);
     if (refusal !== null) op({ op: 'billing', did: 'plan', ok: false, rec: made.value.record, code: refusal.code }, 'error');
-    const link = `${origin.value}/app/${made.value.slug}/start`;
+    const link = `${origin.value}/${made.value.slug}/start`;
     await sendMail(env, 'welcome', who.email, { record: made.value.slug, link });
     op({ op: 'billing', door: 'checkout', ok: true, plan: 'free' });
     return ok({ url: link, record: made.value.record, slug: made.value.slug });
@@ -667,7 +667,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const differs = await packPriceRefused(stripe, id, pack, price);
     if (differs !== null) return differs;
 
-    const back = `${origin.value}/app/${record.slug}/settings/billing`;
+    const back = `${origin.value}/${record.slug}/settings/billing`;
     const started = await startCheckout(stripe, {
       mode: 'payment',
       customer,
@@ -786,14 +786,14 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         const paying = row === null ? await deps.billing({ op: 'for', person: who.person }) : [row];
         customer = payingAs(paying) ?? (await customerFor(stripe, who.person, who.email));
         metadata = { person: who.person, record: free.record, plan: plan.value };
-        back = `${origin.value}/app/${free.slug}/settings/billing`;
+        back = `${origin.value}/${free.slug}/settings/billing`;
       } else {
         if (row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for by that id.', { at: 'record' });
         if (isGift(row)) return no('ALREADY_KNOWN', 'This record is a gift from BrainDog, so there is nothing to pay for.', { at: 'record' });
         if (row.state !== 'lapsed') return no('ALREADY_KNOWN', 'This record is paid for. Manage payment changes the card or the plan.', { at: 'record' });
         customer = row.customer;
         metadata = { person: who.person, record: row.record, plan: plan.value };
-        back = `${origin.value}/app/${row.slug}/settings/billing`;
+        back = `${origin.value}/${row.slug}/settings/billing`;
       }
     } else {
       const asked = await newName(body);
@@ -802,7 +802,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       const paying = await deps.billing({ op: 'for', person: who.person });
       customer = payingAs(paying) ?? (await customerFor(stripe, who.person, who.email));
       metadata = { person: who.person, email: who.email, slug, tz, plan: plan.value, ...(name !== null ? { name } : {}) };
-      back = `${origin.value}/app/signup`;
+      back = `${origin.value}/signup`;
     }
     if (customer === null) {
       op({ op: 'billing', door: 'checkout', ok: false, why: 'customer' }, 'error');
@@ -849,7 +849,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (row === null || row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours with a payment to manage by that id.', { at: 'record' });
     if (isGift(row)) return no('FORBIDDEN', 'This record is a gift from BrainDog, so there is no payment to manage.', { at: 'record' });
     const stripe = deps.stripe(key.value);
-    const back = `${origin.value}/app/${row.slug}/settings/billing`;
+    const back = `${origin.value}/${row.slug}/settings/billing`;
 
     let change: { subscription: string; item: string; price: string } | undefined;
     if (body['plan'] !== undefined) {
@@ -905,7 +905,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const origin = originOf(env);
     await sendMail(env, 'lapse.back', email, {
       ...(slug !== null ? { record: slug } : {}),
-      ...(origin.ok && slug !== null ? { link: `${origin.value}/app/${slug}` } : {}),
+      ...(origin.ok && slug !== null ? { link: `${origin.value}/${slug}` } : {}),
     });
   };
 
@@ -1018,7 +1018,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const origin = originOf(env);
     await sendMail(env, 'welcome', email, {
       record: made.slug,
-      ...(origin.ok ? { link: `${origin.value}/app/${made.slug}/start` } : {}),
+      ...(origin.ok ? { link: `${origin.value}/${made.slug}/start` } : {}),
       ...(made.slug !== asked ? { asked } : {}),
     });
     return made.slug === asked ? 'made' : 'made-renamed';

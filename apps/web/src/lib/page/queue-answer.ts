@@ -59,7 +59,8 @@ export const queueWords = {
    */
   moved: 'Something this would change has changed since it was proposed, so nothing was written.',
   /** A rule that asked, by its name, so a reader knows a person did not. */
-  rule: (name: string) => `A rule: ${name}`,
+  /* THE TRUST LADDER'S OWN QUESTIONS ARE ASKED BY A RULE NAMED `ladder`, said as what it is (Q12 of 29 October). */
+  rule: (name: string) => (name.trim().toLowerCase() === 'ladder' ? 'Trust rule' : `A rule: ${name}`),
   /** The line a card becomes once it is answered: what was chosen, by whom, and when. */
   answered: (option: string, when: string) => `${option} · you, ${when}`,
   /** A question put off (`governance.later`): the day it comes back to the reader. */

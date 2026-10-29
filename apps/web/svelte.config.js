@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, rmSync } from 'node:fs';
 
 import adapter from '@sveltejs/adapter-static';
 
@@ -20,7 +19,7 @@ const inlineHashes = (tag) =>
 
 /* EVERY FRAME A PAGE MAY HOLD. The embeds are the origins of `EMBED_PROVIDERS` in `packages/render/src/embed.ts`,
    which the kernel copies and refuses any other against, and `test/csp.test.ts` holds this list equal to that one.
-   Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/app/signup` and `/app/signin`
+   Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/signup` and `/signin`
    (`asPage` in `apps/worker/src/route.ts`); the self-host has no sign-up, so it takes it out everywhere.
    `'self'` IS FOR ONE DOCUMENT, the frame a drawn block is drawn in (`@braindog/host/drawn-frame`), which both hosts serve
    under its own sandboxing policy. Not `srcdoc`: a `srcdoc` frame takes this page's policy, which runs no inline script,
@@ -29,25 +28,20 @@ const inlineHashes = (tag) =>
 const TURNSTILE = 'https://challenges.cloudflare.com';
 const EMBEDS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'];
 
-/* THE APP LIVES AT `app.brain.dog/app`, AND ITS FILES LIVE AT `build/app`. The Worker's
-   asset directory stays `build/`, so `/app/_app/x.js` is `build/app/_app/x.js` and the marketing site's own `/_app/*`
-   never reaches the product. `lib/at.ts` holds the same word as `BASE`, and a test holds the two equal. */
-const BASE = '/app';
-const PAGES = `${OUT}${BASE}`;
+/* THE APP LIVES AT THE ROOT OF `app.brain.dog`, AND ITS FILES AT THE ROOT OF `build/`. It was built under `/app` while
+   it shared `brain.dog` with the marketing site, and the site is its own Worker on its own name now, so nothing else
+   lives beside it. `lib/at.ts` holds the same base as `BASE`, and a test holds the two equal. */
+const BASE = '';
 
 /**
- * `adapter-static`, with the two things the base path costs it.
+ * `adapter-static`, writing the pages and the files to one folder.
  *
- * THE ROOT IS EMPTIED FIRST. The adapter empties `build/app` and nothing above it, so a tree built before the move kept
- * `build/index.html` and `build/_app/` beside the new build, and the gates' freshness check read that `index.html`.
- *
- * `_headers` GOES BACK TO THE ROOT. Cloudflare reads the file at the top of the asset directory and nowhere else, and
- * `static/` is copied under the base with everything in it, so left where the adapter put it the immutable rule would
- * apply to nothing and every hashed chunk would be served `max-age=0` again.
+ * THE ROOT IS EMPTIED FIRST. The adapter empties only the folder it writes, and a tree built while the app was under
+ * `/app` kept `build/app/` beside the new build, with an `index.html` of its own that nothing serves.
  */
 const shipped = adapter({
-  pages: PAGES,
-  assets: PAGES,
+  pages: OUT,
+  assets: OUT,
   fallback: 'index.html',
   precompress: false,
   strict: false,
@@ -58,8 +52,6 @@ const atBase = {
   async adapt(builder) {
     rmSync(OUT, { recursive: true, force: true });
     await shipped.adapt(builder);
-    const headers = join(PAGES, '_headers');
-    if (existsSync(headers)) renameSync(headers, join(OUT, '_headers'));
   },
 };
 

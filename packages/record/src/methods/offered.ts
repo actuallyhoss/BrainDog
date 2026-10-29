@@ -57,7 +57,7 @@ type Asks = 'record' | 'any' | 'every' | 'runs' | 'inbox';
  * - `record`: `guard(ctx, 'read')`. `whoami`, `actions`, `arrangement` and its grammars, and `version`, which the door
  *   asks before it answers the two grammars it keeps as its own text.
  * - `any`: `scoped(ctx, 'read')`, a read that filters its own answer. `boot`, `context`, `digestToday`, `governance`,
- *   `automations`, `briefing`, `exceptions`, `stale`, `learnings`, and `previewPage`, which draws `handoffs`. The four
+ *   `automations`, `briefing`, `widgetGallery` (`widgets`), `exceptions`, `stale`, `learnings`, and `previewPage`, which draws `handoffs`. The four
  *   before it were each read whole to learn that they answer, about half of `resources/list` on a record his size.
  * - `every`: `understandPlan`, for somebody who reads every list, on a record that can walk what it holds.
  * - `runs`: `sessionsLive`, a read of the list of runs by name.
@@ -70,6 +70,7 @@ const FIXED: readonly (readonly [string, Asks])[] = [
   ['understand', 'every'],
   ['handoffs', 'any'],
   ['briefing', 'any'],
+  ['widgets', 'any'],
   ['exceptions', 'any'],
   ['stale', 'any'],
   ['learnings', 'any'],

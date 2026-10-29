@@ -12,7 +12,7 @@
  *   - nothing under `loop/`, and no `.claude/` folder anywhere;
  *   - no `CLAUDE.md` or `CLAUDE.local.md` anywhere, and no `REPORT.md` or `BUILD.md` at the root;
  *   - no `*.local.json`, no `.env` or `.env.*`, no `.dev.vars`;
- *   - no basename starting `_` but `_headers`, which Cloudflare reads from each app's static folder;
+ *   - no basename starting `_` but `_headers` and `_redirects`, which Cloudflare reads from each app's static folder;
  *   - no `*.brain`, `*.brainl` or `*.sqlite`, which are records;
  * and `.gitignore` still holds each line of `GUARDS`, MATCHED BY ITS TEXT AND NEVER BY ITS LINE NUMBER, so a comment
  * added above them moves nothing and a guard deleted is red.
@@ -55,7 +55,7 @@ const RULES = [
   [(p) => p === 'REPORT.md' || p === 'BUILD.md', "a builder's report, which stays local"],
   [(p) => p.endsWith('.local.json'), 'a local file, which by its name is never shared'],
   [(p) => /(?:^|\/)(?:\.env(?:\..*)?|\.dev\.vars)$/u.test(p), 'an environment file, where keys live'],
-  [(p) => /(?:^|\/)_[^/]*$/u.test(p) && !p.endsWith('/_headers') && p !== '_headers', 'a working file, by its leading underscore'],
+  [(p) => /(?:^|\/)_[^/]*$/u.test(p) && !/(?:^|\/)_(?:headers|redirects)$/u.test(p), 'a working file, by its leading underscore'],
   [(p) => /\.(?:brain|brainl|sqlite)$/u.test(p), "a record or a database, which holds someone's life"],
 ];
 

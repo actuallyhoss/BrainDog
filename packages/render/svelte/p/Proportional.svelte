@@ -28,6 +28,7 @@
   import Progress from '../Progress.svelte';
   import Forecast from '../Forecast.svelte';
   import Ring from './Ring.svelte';
+  import PartChip from './PartChip.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -125,9 +126,14 @@
   {:else}
     <!-- One body, two containers. Written once so the pressable and the plain row cannot drift. -->
     {#snippet cells(row: Row, v: number, drawable: boolean, figure: string)}
+      {@const name = opts.partLook ? text(inline(row.cells[0] ?? '', opts)) : ''}
+      {@const look = name ? opts.partLook?.(name) : null}
+      {#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={name.slice(0, 1).toLocaleUpperCase('en')} {opts} />{/if}
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
       {#if drawable}<span class="prop-track" style="--magnitude:{fixed(v / scale)}"></span>{/if}
       <span class="prop-value num"><Text nodes={inline(figure, opts)} {opts} /></span>
+      <!-- AN ACCOUNT'S BALANCE IN ANOTHER CURRENCY SAYS WHAT IT IS AT HOME under it, where the row wears a chip (Money). -->
+      {#if look && opts.approx}{@const home = opts.approx(text(inline(figure, opts)).trim())}{#if home}<span class="prop-approx num">{home}</span>{/if}{/if}
       <span class="prop-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>

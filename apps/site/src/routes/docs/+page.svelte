@@ -2,8 +2,8 @@
   /docs: the page's head with the search in it, then every section of the docs as a card with its pages.
 
   THE LOOK IS LOOK B'S (LAUNCH 103 job 7): `PageHead` on the night ground, holding the search and the
-  link for agents in its slot, then the sections as flat --paper cards on the page, each with its name, how many pages
-  it holds, its sentence and its pages as a quiet list.
+  link for agents in its slot, then the sections as flat --paper cards on the page, each with its name,
+  its sentence and its pages as a quiet list. No bare page count: a number with no word beside it read as noise.
 
   A SECTION WITH NO PAGE YET IS STILL A CARD, saying so, because the sections are the shape of the docs
   and each fills as its pages are written. Its title links nowhere until it has a page to open, so no card sends a reader
@@ -13,6 +13,7 @@
   person who wants to hand the docs to an agent finds where they are.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import Icon from '$lib/Icon.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
   import Search from '$lib/docs/Search.svelte';
@@ -35,15 +36,7 @@
   });
 </script>
 
-<svelte:head>
-  <title>{w.meta.title}</title>
-  <meta name="description" content={w.meta.description} />
-  <link rel="canonical" href="https://brain.dog/docs" />
-  <meta property="og:url" content="https://brain.dog/docs" />
-  <meta property="og:title" content={w.meta.title} />
-  <meta property="og:description" content={w.meta.description} />
-</svelte:head>
-
+<Seo title={w.meta.title} description={w.meta.description} path="/docs" />
 <PageHead title={w.title} lead={w.lede}>
   <a class="more" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow" size="m" /></a>
   <div class="head-search">
@@ -77,7 +70,6 @@
           <h2 class="sec-title">
             {#if first}<a class="sec-link" href={first}>{section.label}</a>{:else}{section.label}{/if}
           </h2>
-          {#if section.pages.length > 0}<span class="sec-count">{section.pages.length}</span>{/if}
         </div>
         <p class="sec-blurb">{section.blurb}</p>
         {#if section.pages.length > 0}
@@ -209,18 +201,6 @@
   .sec-link:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
-  }
-
-  /* HOW MANY PAGES: the one pill on the card, because it is a count. */
-  .sec-count {
-    margin-inline-start: calc(var(--sp-2) - var(--sp-3));
-    padding: 2px 10px;
-    background: var(--tile);
-    border-radius: 999px;
-    color: var(--ink2);
-    font-size: var(--t-site-15);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
   }
 
   .sec-blurb,

@@ -95,8 +95,8 @@ test('with no host at all, the server answers the handshake and every call says 
   for (const [i, [name]] of FIRST.entries()) {
     const said = refusal(by.get(10 + i));
     assert.equal(said.code, 'UNAUTHORIZED', name);
-    assert.ok(said.fix?.includes(`${SIGN_IN} https://app.brain.dog/app/<slug>`), `${name}: ${said.fix}`);
-    assert.ok(said.text.includes(`${SIGN_IN} https://app.brain.dog/app/<slug>`), `${name}: the text says ${said.text}`);
+    assert.ok(said.fix?.includes(`${SIGN_IN} https://app.brain.dog/<slug>`), `${name}: ${said.fix}`);
+    assert.ok(said.text.includes(`${SIGN_IN} https://app.brain.dog/<slug>`), `${name}: the text says ${said.text}`);
   }
   /* ONE LINE ON STDERR, the reason, for whoever reads the server's log. */
   assert.match(err.trim(), /^No BrainDog host is set\./);

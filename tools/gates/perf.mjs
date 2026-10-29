@@ -191,7 +191,7 @@ async function once(browser, origin, screen, width, { record, ready, reads }) {
     /* A REVISIT: out to another screen of the app by a link in its own navigation, then Back. The move is timed from the
        call to the heading being the first screen's again. */
     const here = new URL(page.url()).pathname + new URL(page.url()).search;
-    const links = page.locator('nav a[href^="/app"]:visible');
+    const links = page.locator('nav a[href^="/"]:not([href^="//"]):visible');
     const hrefs = await links.evaluateAll((as) => as.map((a) => a.getAttribute('href')));
     const at = hrefs.findIndex((h) => h !== here && h !== here.replace(/\?.*$/u, ''));
     if (at < 0) return { never: `${where}  has no other link in its navigation to leave by, so a revisit could not be timed` };

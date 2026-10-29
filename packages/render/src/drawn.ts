@@ -146,8 +146,13 @@ export const DRAWN_GUARD = `(function () {
 
 /**
  * THE BRIDGE, the one script the host writes into every drawn document after the guard and before the author's:
- * `braindog.data`, `braindog.theme`, `braindog.on(fn)` (called now and on every change), `braindog.open(ref)`, the
+ * `braindog.data`, `braindog.theme`, `braindog.size` (the widget frame it is drawn in on a board, or `null` on a page),
+ * `braindog.on(fn)` (called now and on every change, with the data, the theme and the size), `braindog.open(ref)`, the
  * theme painted onto the root as CSS variables, and the height said to the host whenever the body changes size.
+ *
+ * AND ITS PICTURE, when the host asks: the component's styles and its markup as drawn now, with no script, no handler
+ * and every canvas turned into an inline image. The host keeps it on the device and draws it inert
+ * (`drawnPictureDocument`) where the component is not alive (widgets plan §8: three alive at once).
  */
 const BRIDGE = `(function () {
   var start = JSON.parse(document.getElementById('braindog-start').textContent);
@@ -158,10 +163,32 @@ const BRIDGE = `(function () {
     root.style.colorScheme = theme.mode;
     for (var k in theme.tokens) root.style.setProperty('--' + k, theme.tokens[k]);
   }
-  function tell(fn) { try { fn(bd.data, bd.theme); } catch (e) { console.error(e); } }
+  function tell(fn) { try { fn(bd.data, bd.theme, bd.size); } catch (e) { console.error(e); } }
+  function picture() {
+    var css = '';
+    document.querySelectorAll('style').forEach(function (s) { css += s.textContent + ' '; });
+    var body = document.body.cloneNode(true);
+    var live = document.body.querySelectorAll('canvas');
+    body.querySelectorAll('canvas').forEach(function (c, i) {
+      try {
+        var img = document.createElement('img');
+        img.src = live[i].toDataURL();
+        img.className = live[i].className;
+        img.style.cssText = live[i].style.cssText;
+        img.width = live[i].clientWidth || live[i].width;
+        c.replaceWith(img);
+      } catch (e) { c.remove(); }
+    });
+    body.querySelectorAll('script,style,template').forEach(function (n) { n.remove(); });
+    body.querySelectorAll('*').forEach(function (n) {
+      for (var i = n.attributes.length - 1; i >= 0; i--) if (/^on/i.test(n.attributes[i].name)) n.removeAttribute(n.attributes[i].name);
+    });
+    return '<style>' + css + '</style>' + body.innerHTML;
+  }
   var bd = {
     data: start.data,
     theme: start.theme,
+    size: start.size || null,
     on: function (fn) { if (typeof fn === 'function') { handlers.push(fn); tell(fn); } },
     open: function (ref) { if (typeof ref === 'string') parent.postMessage({ braindog: 'open', ref: ref }, '*'); }
   };
@@ -171,8 +198,10 @@ const BRIDGE = `(function () {
     if (e.source !== parent) return;
     var m = e.data;
     if (!m || typeof m !== 'object') return;
+    if (m.braindog === 'picture') { try { parent.postMessage({ braindog: 'picture', picture: picture() }, '*'); } catch (e) {} return; }
     if (m.braindog === 'data') bd.data = m.data;
     else if (m.braindog === 'theme') { bd.theme = m.theme; paint(m.theme); }
+    else if (m.braindog === 'size') bd.size = m.size || null;
     else return;
     handlers.forEach(tell);
   });
@@ -192,7 +221,7 @@ const BASE_STYLE = `html,body{margin:0;padding:0;background:transparent}body{dis
  * The whole document a component is drawn as: the policy, the base style, the guard, the start data, the bridge and the
  * author's code, in that order. The code was checked by `drawnFault` before it got here; the frame's policy holds either way.
  */
-export function drawnDocument(code: string, start: { data: DrawnData; theme: DrawnTheme }): string {
+export function drawnDocument(code: string, start: { data: DrawnData; theme: DrawnTheme; size?: string | null }): string {
   return [
     '<!doctype html><html><head><meta charset="utf-8">',
     `<meta http-equiv="content-security-policy" content="${DRAWN_POLICY}">`,
@@ -206,8 +235,41 @@ export function drawnDocument(code: string, start: { data: DrawnData; theme: Dra
   ].join('');
 }
 
-/** What a frame asked, once checked: to stand at a height, or to open one of the rows it was handed. */
-export type DrawnAsk = { height: number } | { open: string };
+/** What a frame asked, once checked: to stand at a height, to open one of the rows it was handed, or its picture. */
+export type DrawnAsk = { height: number } | { open: string } | { picture: string };
+
+/** The most a component's picture may weigh, in characters: a drawing, not a page. */
+export const DRAWN_PICTURE_MOST = 256 * 1024;
+
+/**
+ * The policy a picture is drawn under: its styles and inline images, and no script at all, so a picture is inert
+ * whatever its markup says. The frame's own header still holds; this is the stricter of the two.
+ */
+export const DRAWN_PICTURE_POLICY = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'; base-uri 'none'";
+
+/** A token's name as the theme hands it. */
+const TOKEN_NAME = /^[a-z0-9-]{1,40}$/u;
+
+/**
+ * THE DOCUMENT A PICTURE IS DRAWN AS: the base style, the theme as CSS variables on the root (no script paints it here),
+ * and the picture the component handed back, under `DRAWN_PICTURE_POLICY`. Nothing in it runs and nothing in it is
+ * pressed: a picture stands in for the component until it comes alive.
+ */
+export function drawnPictureDocument(picture: string, theme: DrawnTheme): string {
+  const mode = theme.mode === 'dark' ? 'dark' : 'light';
+  const vars = Object.entries(theme.tokens)
+    .filter(([k, v]) => TOKEN_NAME.test(k) && SAFE_VALUE.test(v))
+    .map(([k, v]) => `--${k}:${v}`)
+    .join(';');
+  return [
+    `<!doctype html><html data-theme="${mode}" style="color-scheme:${mode}"><head><meta charset="utf-8">`,
+    `<meta http-equiv="content-security-policy" content="${DRAWN_PICTURE_POLICY}">`,
+    `<style>${BASE_STYLE}:root{${vars}}body{pointer-events:none;user-select:none}</style>`,
+    '</head><body>',
+    picture.length > DRAWN_PICTURE_MOST ? '' : picture,
+    '</body></html>',
+  ].join('');
+}
 
 /**
  * A message from a frame, read as one of the two things it may ask, or `null`.
@@ -220,6 +282,7 @@ export function drawnAsk(message: unknown, refs: ReadonlySet<string>): DrawnAsk 
   if (!isBag(message)) return null;
   if (message.braindog === 'height') return typeof message.height === 'number' && Number.isFinite(message.height) ? { height: drawnHeight(message.height) } : null;
   if (message.braindog === 'open') return typeof message.ref === 'string' && refs.has(message.ref) ? { open: message.ref } : null;
+  if (message.braindog === 'picture') return typeof message.picture === 'string' && message.picture.length <= DRAWN_PICTURE_MOST ? { picture: message.picture } : null;
   return null;
 }
 

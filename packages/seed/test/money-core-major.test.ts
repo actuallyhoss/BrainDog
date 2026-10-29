@@ -71,7 +71,10 @@ test('money-core IS ON 2.0.0 OR LATER AND DECLARES NO HOLDINGS, and the 2.0.0 th
  * so a word in a comment is not counted and a word in a `holds:` sentence is.
  */
 test('NOTHING A FIRST-PARTY PACK SHIPS SAYS GOLD, in a kind or in the sentence over a list', () => {
-  for (const id of FIRST_PARTY) assert.doesNotMatch(JSON.stringify(firstPartyDocument(id)), /gold/iu, id);
+  /* BUT NET WORTH IN GRAMS OF GOLD, a unit and not a holding (money-core 3.31.0, the money-parity plan's "net worth in
+     stable units"): Snapshots keeps `worth_gold` beside `worth_usd`, and it is the one word of gold a pack may ship. */
+  const UNIT = '{"id":"worth_gold","label":"Net worth in grams of gold","type":"decimal"}';
+  for (const id of FIRST_PARTY) assert.doesNotMatch(JSON.stringify(firstPartyDocument(id)).replace(UNIT, ''), /gold/iu, id);
 });
 
 /* NO FINGERPRINT TEST FOR THE REBUILT 1.8.0 ANY MORE. It held `asMoneyCore180` to `8bcd20187c61cf1b`, the value

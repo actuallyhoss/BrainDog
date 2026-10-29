@@ -270,8 +270,39 @@ const moneyOf = (amount: number, currency: string): string => {
  * A value as a person reads it, or `null` for one with nothing to say. A figure in several currencies is each of its
  * amounts, never their sum: two currencies are not added.
  */
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * A DAY AS THE APP SAYS ONE (Q34 of 29 October): "13 Jan 2027", and "29 Oct" in the year it is. A line said "the last
+ * due on 2036-04-13" and "cash lasts to 2027-01-13" where every other place reads "13 Jan 2027".
+ */
+export function dayWords(iso: string, now = Date.now()): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(iso);
+  if (!m) return iso;
+  const said = `${Number(m[3])} ${MONTHS_SHORT[Number(m[2]) - 1] ?? m[2]}`;
+  return Number(m[1]) === new Date(now).getUTCFullYear() ? said : `${said} ${m[1]}`;
+}
+
+/**
+ * A LINE AS A PERSON WOULD WRITE IT, whatever the model wrote (Q34 of 29 October): every ISO day as the app says it, no
+ * sign after a word that already says which way ("down −11%" is "down 11%"), and no "The" before the name of one of the
+ * person's own things ("Northwind Premiums is late", never "The Northwind Premiums is late").
+ */
+export function plainLine(line: string, names: readonly string[] = [], now = Date.now()): string {
+  let out = line.replace(/(?<![\d-])(\d{4}-\d{2}-\d{2})(?![\d-])/gu, (d) => dayWords(d, now));
+  out = out.replace(/\b(down|up|fell|rose|dropped|climbed|fallen|risen|lower|higher)( by)?\s+[−+-]\s?(?=\d)/giu, (_, w: string, by: string | undefined) => `${w}${by ?? ''} `);
+  for (const name of names) {
+    const n = name.trim();
+    /* ONLY A NAME, every word of it capitalised ("Northwind Premiums"): "the EDF bill" and "the rent" keep theirs. */
+    if (n === '' || /^the\s/iu.test(n) || !n.split(/\s+/u).every((w) => /^[\p{Lu}\p{N}]/u.test(w))) continue;
+    const esc = n.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    out = out.replace(new RegExp(`(^|[.;:!?]\\s+)The (${esc})`, 'gu'), (_, lead: string, said: string) => `${lead}${said}`).replace(new RegExp(`\\bthe (${esc})`, 'gu'), '$1');
+  }
+  return out;
+}
+
 export function figureText(v: Json | undefined): string | null {
-  if (typeof v === 'string') return v.trim() === '' ? null : v;
+  if (typeof v === 'string') return v.trim() === '' ? null : dayWords(v);
   if (typeof v === 'number') return Number.isFinite(v) ? v.toLocaleString('en-u-nu-latn', { maximumFractionDigits: 2 }) : null;
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   const isMoney = (p: unknown): p is { amount: number; currency: string } =>
@@ -363,7 +394,7 @@ export function filledHeadline(line: string, page: HeadlinePage): string | null 
     if (value === undefined) missing = true;
     return value ?? '';
   });
-  return missing ? null : filled.trim();
+  return missing ? null : plainLine(filled.trim(), namesOf(page));
 }
 
 /**

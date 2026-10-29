@@ -801,6 +801,11 @@
     border-end-end-radius: 4px;
   }
 
+  /* MONEY OUT ALONE STANDS UP (`seriesPlan`), so its free end is its top. */
+  .series-bar[data-dir='out'][data-up][data-end] {
+    border-radius: 4px 4px 0 0;
+  }
+
   /* A MONTH NOT OVER, OR STILL TO COME, IS THE SAME BAR AT HALF STRENGTH: the shape says the height, the strength says
      it is not settled, and its tip says so in words ("so far", "due", "ahead"). Dashed outlines read as a second chart. */
   .series-bar[data-state='partial'],
@@ -1006,8 +1011,20 @@
   }
 
   .progress-row > .progress-share,
-  .progress-row:not([data-intent]) > .progress-left {
+  .progress:not([data-form='budget']) > .progress-row:not([data-intent]) > .progress-left {
     display: none;
+  }
+
+  /* A BUDGET SAYS WHAT IS LEFT ON EVERY LINE ("EGP 1,200.00 left"), as Coin Fish does: how much may still be spent is
+     the reason a budget is opened. And EVERY BUDGET TOGETHER LEADS, its name in the heavier weight, a step above the
+     lines under it. */
+  .progress[data-form='budget'] > .progress-row[data-total] {
+    padding-block-end: var(--sp-3);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .progress[data-form='budget'] > .progress-row[data-total] > .progress-label {
+    font-weight: var(--fw-semi);
   }
 
   /* A RANGE'S WORDS TAKE THE THIRD COLUMN a goal's share gave up (`kinds/progress.css`). */

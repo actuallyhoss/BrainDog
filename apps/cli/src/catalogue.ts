@@ -104,6 +104,7 @@ import { refuse } from './json.ts';
 import { kennelBase, submitToKennel, takeKennel, yankFromKennel } from './kennel.ts';
 import { untilAccepted } from './links.ts';
 import { packFromPage } from './pack-from-page.ts';
+import { firstPartyFor, packFromWidget } from './pack-from-widget.ts';
 import { readPackTest, runPackTest, testFileName } from './pack-test.ts';
 import { checkInScratch } from './scratch.ts';
 import type { AgentIo } from './skills.ts';
@@ -243,27 +244,30 @@ function yamlOf(value: unknown, indent = ''): string {
 }
 
 /**
- * `pack new <id> [--yaml] [--out <folder>] [--from-page <file.dog>]`: a folder shaped like `packs/<id>/`, holding
+ * `pack new <id> [--yaml] [--out <folder>] [--from-page <file.dog> | --from-widget <file.json>]`: a folder shaped like `packs/<id>/`, holding
  * `<id>.pack.json` (or `.pack.yaml`), `<id>.test.json` and a README, where a first `check` and a first `test` both pass.
  *
  * `--from-page` STARTS IT FROM A PAGE PULLED WITH `braindog page pull`: the add-on document is `packFromPage`'s, made
  * from that file and scrubbed of everything of the author's, in place of the blank one, and each thing it took, made or
  * left out is said. The test file and the README are the ones a blank add-on starts with.
  *
+ * `--from-widget` STARTS IT FROM A WIDGET, the file `braindog widget share <name>` writes: an add-on that ships that one
+ * widget for the sheet and nothing else, scrubbed of the author's names (`packFromWidget`).
+ *
  * NEVER OVER A FOLDER ALREADY THERE, as `new` never writes over a file.
  */
 async function createPack(args: string[], io: AgentIo): Promise<number> {
-  let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined; yaml?: boolean | undefined; 'from-page'?: string | undefined };
+  let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined; yaml?: boolean | undefined; 'from-page'?: string | undefined; 'from-widget'?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({
       args,
       allowPositionals: true,
       strict: true,
-      options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' }, yaml: { type: 'boolean' }, 'from-page': { type: 'string' } },
+      options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' }, yaml: { type: 'boolean' }, 'from-page': { type: 'string' }, 'from-widget': { type: 'string' } },
     }));
   } catch {
-    io.say('braindog addon new takes an id, and --title, --author, --out <folder>, --yaml and --from-page <file.dog>.');
+    io.say('braindog addon new takes an id, and --title, --author, --out <folder>, --yaml, --from-page <file.dog> and --from-widget <file.json>.');
     return 1;
   }
   const [id, ...more] = positionals;
@@ -294,6 +298,43 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
     title = String(doc.title);
     taken = made.value.lines;
   }
+  const fromWidget = values['from-widget'];
+  if (fromWidget !== undefined) {
+    if (fromPage !== undefined) {
+      io.say('An add-on starts from a page or from a widget, not both.');
+      return 1;
+    }
+    let text: string;
+    try {
+      text = readFileSync(resolve(io.cwd, fromWidget), 'utf8');
+    } catch {
+      io.say(`${fromWidget} could not be read. Write a widget into a file first, as in braindog widget share "Spending" > spending.json.`);
+      return 1;
+    }
+    /* THE FILE `braindog widget share` WRITES, { title, block, size }, or a bare block. */
+    let given: Record<string, unknown>;
+    try {
+      const doc = JSON.parse(text) as unknown;
+      given = doc !== null && typeof doc === 'object' && !Array.isArray(doc) ? (doc as Record<string, unknown>) : {};
+    } catch {
+      given = {};
+    }
+    const block = given.block !== null && typeof given.block === 'object' && !Array.isArray(given.block) ? (given.block as Record<string, unknown>) : given;
+    const sizes = Array.isArray(given.sizes) ? (given.sizes as string[]) : typeof given.size === 'string' ? [given.size] : undefined;
+    const made = await packFromWidget(id, block, {
+      title: values.title ?? (typeof given.title === 'string' ? given.title : undefined),
+      author: values.author,
+      ...(sizes ? { sizes } : {}),
+      ...firstPartyFor(block),
+    });
+    if (!made.ok) {
+      refuse(io, made, saidWithCode(made));
+      return 1;
+    }
+    doc = made.value.file;
+    title = String(doc.title);
+    taken = made.value.lines;
+  }
   const read = await readCatalogueFile(`${JSON.stringify(doc)}\n`);
   if (!read.ok) {
     refuse(io, read, saidWithCode(read));
@@ -307,9 +348,11 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
   const file = `${id}${values.yaml ? '.pack.yaml' : NOUN.pack.suffix}`;
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, file), values.yaml ? `${yamlOf(doc)}\n` : `${JSON.stringify(doc, null, 2)}\n`);
-  writeFileSync(join(dir, testFileName(id)), `${JSON.stringify(packStarterTest(), null, 2)}\n`);
+  /* A WIDGET-ONLY ADD-ON KEEPS NO ROWS, so its first test only installs it: the record's own sessions, none yet. */
+  const test = fromWidget !== undefined ? { rows: [], expect: [{ list: 'session', count: 0 }] } : packStarterTest();
+  writeFileSync(join(dir, testFileName(id)), `${JSON.stringify(test, null, 2)}\n`);
   writeFileSync(join(dir, 'README.md'), packReadme(id, title, file));
-  const holds = fromPage === undefined ? 'one list, a page over it and two example rows' : `what ${basename(fromPage)} shows`;
+  const holds = fromWidget !== undefined ? `the widget in ${basename(fromWidget)}` : fromPage === undefined ? 'one list, a page over it and two example rows' : `what ${basename(fromPage)} shows`;
   io.out(`${title} 1.0.0 written to ${dir}: ${file} with ${holds}, ${testFileName(id)} and a README. Check it with braindog addon check ${values.out ?? id}, and test it with braindog addon test ${values.out ?? id}.`);
   for (const line of taken) io.out(line);
   return 0;
@@ -462,6 +505,7 @@ export function reachLines(given: Reach): string[] {
     `  Installs first: ${list(reach.modules)}`,
     `  Adds lists: ${list(reach.lists)}; pages: ${list(reach.pages)}; rules: ${list(reach.rules)}`,
     `  Example rows: ${reach.examples}; suggests skills: ${list(reach.skills)}`,
+    ...(reach.widgets?.length ? [`  Widgets for Today: ${list(reach.widgets)}`] : []),
     reach.calls_out.length === 0 ? '  Calls out to: nothing. It reads and writes only this record.' : `  Calls out to: ${reach.calls_out.map((c) => c.line).join('; ')}`,
   ];
 }
@@ -1021,7 +1065,7 @@ export function hostCatalogue(host: string | undefined, io: AgentIo): string {
 }
 
 /**
- * The host's catalogue that holds `id`: its Kennel, or else the bundled folder at `/app/catalogue/`.
+ * The host's catalogue that holds `id`: its Kennel, or else the bundled folder at `/catalogue/`.
  *
  * THE FOLDER IS ASKED ONLY WHEN THE KENNEL DOES NOT HOLD THE ID, for two reasons: a host deployed before its Kennel
  * answers no index there, and the Kennel's public index leaves out an `unlisted` add-on, which installs by its id
@@ -1035,7 +1079,7 @@ export async function hostCatalogueFor(id: string, kind: EntryKind, host: string
     return typeof at !== 'string' && at.index.entries.some((e) => e.id === bare && e.kind === kind);
   };
   if (await holds(kennel)) return kennel;
-  const folder = new URL('/app/catalogue/', kennel).href;
+  const folder = new URL('/catalogue/', kennel).href;
   return (await holds(folder)) ? folder : kennel;
 }
 
@@ -1268,7 +1312,7 @@ async function preview(args: string[], io: AgentIo, kind: EntryKind = 'usecase')
     return 1;
   }
   /* THE FILE'S TITLE IS ITS AUTHOR'S, and `preview` reads a file from an address as readily as `check` does. */
-  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/app/addons/${read.id}?kind=${kind} and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
+  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/addons/${read.id}?kind=${kind} and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
   const code = await run(['serve'], true);
   rmSync(scratch, { recursive: true, force: true });
   return code;

@@ -6,7 +6,7 @@
  * `wrangler.jsonc`. Push A put the app under `/app` with the Worker on
  * `app.brain.dog` alone and no zone route. B1 flipped alpha's two vars (push 2) and B2 production's (push 4), and push C
  * flipped both back, so `wrangler.jsonc` as it stands is C: both environments on the app's own names, the site's names
- * legacy. The two pushes
+ * legacy, and since 29 Oct the app at the root of its name rather than under `/app`. The two pushes
  * that bind the site (1 and 3) change `apps/site/wrangler.jsonc` and nothing here. Nothing is staged in the comment at
  * the top of `wrangler.jsonc` now; `pushes` in `scripts/provision-check.mjs` reads the file's own name from that
  * comment and would apply a fragment staged there, so one that stops parsing, or flips a name nothing reaches, fails
@@ -115,9 +115,11 @@ const siteAt = (push: Push): Config => (push.change === null ? site : SITE_AT[pu
 /**
  * Whether the Worker answers a path itself.
  *
- * `/app` AND EVERYTHING UNDER IT IS THE APP, AND THE APP IS THIS WORKER'S BY DEFINITION. `appPath` in `src/route.ts`
- * answers `null` for `/app/_app/*`, which is a file and still the app's, so it is the wrong predicate here: this question
- * is "does a request here belong to this Worker", not "is it a navigation".
+ * `/app` AND EVERYTHING UNDER IT IS THE APP'S OLD ADDRESS, AND IT IS THIS WORKER'S BY DEFINITION: a page load there is
+ * its 308 to the root, and a CLI's `/app/<slug>/api/*` is served where it stands, so the site has to hand all of it over.
+ * `appPath` in `src/route.ts` answers `null` for `/app/_app/*`, which is a file and still the Worker's to send on, so
+ * it is the wrong predicate here: this question is "does a request here belong to this Worker", not "is it a
+ * navigation". The app's root is this Worker's too, on its own name, but no site hands that over, so it is not asked.
  */
 const served = (path: string): boolean =>
   /^\/app(?:\/|$)/.test(path) || servesApi(path) || servesAuth(path) || servesAccount(path) || servesMcp(path) || servesIn(path) || servesBuild(path) || HEALTHZ.test(path);
@@ -150,10 +152,20 @@ const firstOf = (config: Config, name: string): string[] => {
   return Array.isArray(list) ? list : [];
 };
 
+/**
+ * THE HOST'S PATHS, 33 §4'S LIST. The config said them in `run_worker_first` until the app moved to the root and the list
+ * became `/*`, and wrangler refuses an entry `/*` makes redundant, so they are said here, where the router (`served`)
+ * still decides which of them are built.
+ */
+const HOST_PATHS = ['/api/*', '/mcp', '/a', '/a/*', '/in/*', '/s/*', '/ws', '/ws/*', '/auth/*', '/account/*', '/.well-known/*'];
+
 /** Every door this Worker has built in one environment, one sample path each, with the shell. */
-const builtDoors = (config: Config, name: string): string[] => [
-  ...new Set([...firstOf(config, name).filter((e) => !e.startsWith('!')).flatMap(samples).filter(served), '/app', '/app/']),
-];
+const builtDoors = (config: Config, name: string): string[] => {
+  const first = firstOf(config, name);
+  const named = first.filter((e) => !e.startsWith('!'));
+  const tried = named.includes('/*') ? [...named, ...HOST_PATHS] : named;
+  return [...new Set([...tried.flatMap(samples).filter((p) => served(p) && workerFirst(first, p)), '/app', '/app/'])];
+};
 
 const zoneRoutes = (block: Env): Route[] => (block.routes ?? []).filter((r) => !r.custom_domain);
 const customDomains = (block: Env): string[] => (block.routes ?? []).filter((r) => r.custom_domain).map((r) => r.pattern.toLowerCase());
@@ -284,16 +296,18 @@ test('provision-check\'s own door list is the doors src/route.ts has built, so t
   for (const door of builtDoors(worker, 'production')) assert.ok(workerFirst(SITE_DOORS, door), `the fixture's site keeps ${door}`);
 });
 
-test('the app runs first under /app and its built chunks and catalogue are files', () => {
+test('the app runs first at the root and under the old /app, and its built chunks and catalogue are files', () => {
   for (const name of ENVIRONMENTS) {
     const assets = assetsOf(worker, name);
     const first = firstOf(worker, name);
-    for (const path of ['/app', '/app/acme/r/tasks', '/app/acme/api/boot']) assert.ok(workerFirst(first, path), `${name}: ${path} is not worker-first`);
-    for (const path of ['/app/_app/immutable/entry.js', '/app/catalogue/index.json']) assert.ok(!workerFirst(first, path), `${name}: ${path} runs the Worker before the file`);
+    /* EVERY PAGE OF THE APP, because a record's name in the path is checked by the Directory before any file answers it;
+       and EVERY OLD ADDRESS, the old chunks included, because each is the Worker's 308 or a CLI's API. */
+    for (const path of ['/', '/acme', '/acme/r/tasks', '/acme/api/boot', '/signin', '/app', '/app/acme/r/tasks', '/app/acme/api/boot', '/app/_app/version.json'])
+      assert.ok(workerFirst(first, path), `${name}: ${path} is not worker-first`);
+    for (const path of ['/_app/immutable/entry.js', '/_app/version.json', '/catalogue/index.json']) assert.ok(!workerFirst(first, path), `${name}: ${path} runs the Worker before the file`);
     /* NOT A SHELL FOR EVERY MISS. The Worker draws the shell for an app navigation itself, and a
-       `single-page-application` fallback would answer `index.html` with a 200 to a POST under `/app/<slug>/api/` that
-       the router has no method for. It is also what lets a page load at `app.brain.dog/` reach the Worker's 308 in
-       push A: the build has no root `index.html` for a fallback to find. */
+       `single-page-application` fallback would answer `index.html` with a 200 to a POST under `/<slug>/api/` that
+       the router has no method for. */
     assert.equal(assets.not_found_handling, 'none', `${name}: not_found_handling`);
     /* 100 IS CLOUDFLARE'S CEILING, counted in raw entries (developers.cloudflare.com/workers/static-assets/binding). */
     assert.ok(first.length <= 100);

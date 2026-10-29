@@ -91,8 +91,9 @@ test('A RESTART KEEPS TODAY AS IT WAS LAST DRAWN beside the record: the first re
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAT', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   assert.ok((await installSeed(api.kernel)).ok);
   const drawn = value<TodayAnswer>(await api.today({ body: BODY }, owner));
-  /* The store is written behind the answer. */
-  await new Promise((r) => setTimeout(r, 0));
+  /* The store is written behind the answer: waited for, up to two seconds, since one turn of the loop was not always
+     enough on a busy machine and the test is about what is kept, not how soon. */
+  for (let waited = 0; store.size < 2 && waited < 2_000; waited += 10) await new Promise((r) => setTimeout(r, 10));
   assert.ok(store.size >= 2, 'the drawing and its order are kept');
 
   /* THE OBJECT STARTS AGAIN over the same record and the same store, with nothing in memory. */

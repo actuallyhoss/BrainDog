@@ -71,6 +71,31 @@ export const AGENTS: readonly JobAgent[] = JOB_AGENTS;
 const ID = /^[a-z][a-z0-9_-]{0,31}$/u;
 /** One slot in a prompt, as the kernel reads one. */
 const SLOT = /%([a-z][a-z0-9_]{0,31})%/gu;
+/** One slot as a person writes it on the form, `{client}`, which the kernel's `%client%` is made from. */
+const BRACED = /\{([A-Za-z][A-Za-z0-9_ ]{0,31})\}/gu;
+
+/**
+ * THE PROMPT AS THE KERNEL READS IT: a slot written `{client}` on the form is `%client%` (Q41 of 29 October, "Use
+ * %client%" put a template token on screen). A slot already written the kernel's way stays.
+ */
+export const promptOf = (prompt: string): string =>
+  prompt.replace(BRACED, (_, id: string) => `%${id.trim().toLowerCase().replace(/\s+/gu, '_')}%`);
+
+/**
+ * A LINE THAT SHOWS A SLOT AS IT IS TYPED, cut into its words and its slots, so the screen sets `{client}` as code: a
+ * person is shown what to type, and braces drawn as prose read as a template the screen forgot to fill.
+ */
+export const slotParts = (text: string): { text: string; slot: boolean }[] => {
+  const out: { text: string; slot: boolean }[] = [];
+  let at = 0;
+  for (const m of text.matchAll(BRACED)) {
+    if (m.index > at) out.push({ text: text.slice(at, m.index), slot: false });
+    out.push({ text: m[0], slot: true });
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at), slot: false });
+  return out;
+};
 
 /** An empty draft: eight turns, and the permission that runs only the tools it names. */
 export function blankKind(): KindDraft {
@@ -91,7 +116,7 @@ const labelOf = (id: string): string => {
  */
 export function slotsOf(prompt: string, args: readonly KindArg[] = []): KindArg[] {
   const out: KindArg[] = [];
-  for (const m of prompt.matchAll(SLOT)) {
+  for (const m of promptOf(prompt).matchAll(SLOT)) {
     const id = m[1] ?? '';
     if (id === '' || out.some((a) => a.id === id)) continue;
     out.push(args.find((a) => a.id === id) ?? { id, label: labelOf(id), max: ARG_MOST });
@@ -133,7 +158,7 @@ export function kindBody(d: KindDraft): JobBody {
   return {
     job: kindId(d.title),
     title: d.title.trim(),
-    prompt: d.prompt,
+    prompt: promptOf(d.prompt),
     ...(args.length > 0 ? { args } : {}),
     ...(repo !== '' ? { repo } : {}),
     tools: [...d.tools, ...commandTools(d.commands)],
@@ -204,16 +229,16 @@ export async function fileKind(base: string, d: KindDraft, io?: Fetch): Promise<
 }
 
 export const words = {
-  open: 'New kind',
-  heading: 'New kind',
+  open: 'New job',
+  heading: 'New job',
   parent: 'Agents',
   presets: 'How far it may go',
   more: 'More choices: folder, tools and limits',
   title: 'Title',
   prompt: 'What to do',
-  promptHelp: 'Use %client% for a detail filled in at each run.',
+  promptHelp: 'Write {client} where a name changes each run.',
   slots: 'Filled in at each run',
-  slotLabel: (id: string) => `Words for %${id}%`,
+  slotLabel: (id: string) => `Words for {${id}}`,
   repo: 'Repository',
   repoHelp: 'The folder it works in. Empty for a fresh one.',
   recordTools: 'Connected tools',
@@ -234,7 +259,7 @@ export const words = {
   writes: 'Changes files',
   writesHelp: 'Needs you shows this in red before anybody approves the kind.',
   writesForced: 'Accept edits changes files, so this stays on.',
-  send: 'Save as a job',
+  send: 'Save job',
   busy: 'Filing',
   cancel: 'Cancel',
   sent: 'Saved for your yes',

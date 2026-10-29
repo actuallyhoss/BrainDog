@@ -50,7 +50,7 @@ test('WHAT COUNTS AS A RESET, and what may be said twice', () => {
   assert.equal(wasReset(Object.assign(new Error('Durable Object is overloaded'), { retryable: true, overloaded: true })), false);
   assert.equal(wasReset('no longer active'), false);
   assert.equal(sayableTwice('POST', '/api/pulse'), true);
-  assert.equal(sayableTwice('POST', '/app/kiln/api/pulse'), true);
+  assert.equal(sayableTwice('POST', '/kiln/api/pulse'), true);
   assert.equal(sayableTwice('GET', '/api/boot'), true);
   assert.equal(sayableTwice('POST', '/api/propose'), false);
 });

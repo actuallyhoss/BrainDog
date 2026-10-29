@@ -13,7 +13,7 @@
  * this record, never their id, because inventing a name is worse than admitting the record does not know one.
  */
 
-import { RULE_NAMES } from '@braindog/seed/usecases/names';
+import { RULE_NAMES, SCRIPT_NAMES } from '@braindog/seed/usecases/names';
 
 import { copy } from '../copy/frame.ts';
 import { REGISTERS } from './held.ts';
@@ -41,6 +41,8 @@ export const nameWords = {
   helping: 'helping',
   automation: 'An automation',
   number: 'Number',
+  /* A RULE FROM HIS OLD NOTES, numbered by the import and never named. */
+  importedRule: 'One of your imported rules',
 } as const;
 
 /**
@@ -114,6 +116,28 @@ export function titleOf(decl: { id: string; kind?: string | undefined; title?: s
 function shipped(id: string): string | undefined {
   const bare = id.replace(/^rule[.:]/u, '');
   return Object.hasOwn(RULE_NAMES, bare) ? RULE_NAMES[bare] : undefined;
+}
+
+/**
+ * A FILING RULE NAMED BY ITS MATCH, AS A SENTENCE (Q15 of 29 October): a rule his old notes named "Gifts: holds AMAZON"
+ * reads "File Amazon under Gifts", and its run "Filed Amazon under Gifts". A bank's capitals are put in a name's case.
+ * Any other name is kept as it was written. Only what is shown: the rule keeps its name.
+ */
+export function ruleNameSaid(name: string, past = false): string {
+  const m = /^\s*([^:]{1,60}):\s*(?:holds|contains|has|starts with|starts|is)\s+(.+?)\s*$/iu.exec(name);
+  if (!m) return name;
+  const what = m[2]!.replace(/^["“']|["”']$/gu, '');
+  const cased = /\p{Ll}/u.test(what) ? what : what.toLowerCase().replace(/(^|[\s&/-])(\p{L})/gu, (_, a: string, b: string) => `${a}${b.toUpperCase()}`);
+  return `${past ? 'Filed' : 'File'} ${cased} under ${m[1]!.trim()}`;
+}
+
+/**
+ * A RULE OF HIS OWN WHOSE TITLE THE CALLER DOES NOT HOLD: its id in words, except one numbered by an import ("hb-rule-27"),
+ * which is no name at all and is said as what it is.
+ */
+function ownRule(id: string): string {
+  if (/^hb[-_]/iu.test(id) || /(?:^|[-_])rule[-_]?\d+$/iu.test(id)) return nameWords.importedRule;
+  return humanize(id);
 }
 
 /** An agent's name: the product's spelling for one a person knows, else the name it was given in words. */
@@ -241,20 +265,20 @@ export function actor(by: string, me: string | null = null, names: ReadonlyMap<s
      the sample), before any person is looked up, since no person is keyed like a rule. */
   const ruled = /^rule[.:](.+)$/u.exec(who)?.[1];
   const titled = ruled === undefined ? undefined : names.get(`rule:${ruled}`)?.trim();
-  if (ruled !== undefined && titled) return said(titled, 'rule');
+  if (ruled !== undefined && titled) return said(ruleNameSaid(titled), 'rule');
   const named = names.get(who);
   if (named !== undefined && named.trim() !== '') return { name: named, kind: 'person' };
   /* AN ADDRESS IS NEVER A NAME, in whatever shape it came (`jo@kiln.example`, `Jo <jo@kiln.example>`, `@jo`): a `who`
      with an `@` the caller holds no name for is Someone on this record, never the address itself. */
   /* A SCRIPT IS SIGNED `script:<name>@v<n>`: it is said by its title when the caller holds one, else its name in words, never its version. */
   const script = /^script:([^@]+)@v\d+$/u.exec(who)?.[1];
-  if (script !== undefined) return said(names.get(`script:${script}`) ?? `${humanize(script)} script`, 'automation');
+  if (script !== undefined) return said(names.get(`script:${script}`) ?? (Object.hasOwn(SCRIPT_NAMES, script) ? SCRIPT_NAMES[script]! : `${humanize(script)} script`), 'automation');
   if (who.includes('@')) return { name: copy.feedSomeone, kind: 'person' };
   if (who === 'slash') return said(nameWords.slash, 'slash');
   if (who === 'system') return said(nameWords.brainDog, 'system');
   if (who === SEED) return said(nameWords.brainDog, 'sample');
   const rule = /^rule[.:](.+)$/u.exec(who)?.[1];
-  if (rule !== undefined) return said(shipped(rule) ?? humanize(rule), 'rule');
+  if (rule !== undefined) return said(shipped(rule) ?? ownRule(rule), 'rule');
   const agent = /^agent:(.+)$/u.exec(who)?.[1] ?? (Object.hasOwn(AGENT_NAMES, who) ? who : undefined);
   /* AN AGENT NAMED BY AN ID IS STILL AN AGENT, said by its kind's word rather than the ULID it was minted under. */
   if (agent !== undefined) return said(ULID.test(agent) ? nameWords.agent : agentName(agent), 'agent');

@@ -20,7 +20,7 @@ import { exportFile, type BrainfileIo } from '../src/brainfile.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const NOW = Date.UTC(2026, 9, 9, 12);
-/** As `hostKey` spells the address the app prints, `app.example.test/app/marrowgate`, which is the hosts file's key. */
+/** As `hostKey` spells the address the app prints, `app.example.test/marrowgate`, which is the hosts file's key. */
 const HOST = 'https://app.example.test/marrowgate';
 /** Obviously fake, and long enough that any fragment of it in what the command printed is findable. */
 const SHAPE = `${REC}.stub-shape-bearer-never-printed-9c2e`;

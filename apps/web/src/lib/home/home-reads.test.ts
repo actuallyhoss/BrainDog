@@ -62,7 +62,13 @@ test('NO MORE FOLD AT THE FOOT OF TODAY (frame A): the briefing is neither asked
   assert.doesNotMatch(home, /<PageView [^>]*opens=/u);
   assert.doesNotMatch(home, /<brief\.Part|class="more-body"|moreOpen/u);
   assert.doesNotMatch(home, /import\('\.\/(?:briefing\.ts|Briefing\.svelte)'\)/u);
-  assert.equal(home.split('<PageView').length - 1, 1, 'the page is drawn once');
+  /* ONE READER, in one snippet: the board's and a kept page's props differ, so it is written twice under one `{#if}`,
+     and the snippet is rendered once on each side of the board's `{#if}`. */
+  const reader = /\{#snippet readerPart\(\)\}([\s\S]*?)\{\/snippet\}/u.exec(home)?.[1] ?? '';
+  assert.equal(home.split('<PageView').length - 1, reader.split('<PageView').length - 1, 'the page is drawn only in its snippet');
+  assert.match(reader, /\{#if board\}\s*<PageView [^>]*\/>\s*\{:else\}\s*<PageView [^>]*\/>\s*\{\/if\}/u, 'the page is drawn once');
+  assert.match(home, /\{#if board\}[\s\S]*?<Board [^\n]*>\{@render readerPart\(\)\}<\/Board>[\s\S]*?\{:else\}\s*\{@render readerPart\(\)\}\s*\{\/if\}/u);
+  assert.equal(home.split('{@render readerPart()}').length - 1, 2);
   const body = readFileSync(new URL('../page/PageBody.svelte', import.meta.url), 'utf8');
   /* The reader still takes what a kept page opens its board with, under the headline or over the first block. */
   assert.match(body, /const opensAt = \$derived\(opens && !arranging && headline && reading\[0\] === headline \? headline\.at : -1\);/u);

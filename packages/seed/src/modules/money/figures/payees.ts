@@ -35,6 +35,19 @@ export const PAYEE_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* HOW MANY PAYMENTS OUT IN NINETY DAYS NAME NOBODY (Q15 of 29 October), so Payees asks once to name them while any do. */
+  'unnamed-paid-90d': {
+    metric: 'unnamed-paid-90d',
+    name: 'Paid to nobody named, 90 days',
+    source: 'register.transactions',
+    where: `${LEDGER_90D}, direction is out, payee is empty`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '90d',
+    compare: 'none',
+  },
+
   'paid-times-by-payee-90d': {
     metric: 'paid-times-by-payee-90d',
     name: 'Times paid, by payee, 90 days',

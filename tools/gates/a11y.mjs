@@ -473,7 +473,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
          a genuinely broken asset still fails loudly, and everything else gets the shell. Worth knowing
          when this is deployed, because an SPA fallback that excludes dotted paths (several hosts
          default to exactly that) would 404 every view in production. */
-      /* THE RECORD APP'S SHELL IS `build/app/index.html`, because the app is served under `/app` (`lib.mjs`). */
+      /* THE RECORD APP'S SHELL IS `build/index.html`, because the app is served at the root (`lib.mjs`). */
       const shell = current.spa ? appShell(current.root) : join(current.root, 'index.html');
       const asset = Object.hasOwn(TYPES, extname(rel));
       if (current.spa && !asset && (await stat(shell).catch(() => null))?.isFile()) {
@@ -602,8 +602,8 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
 
             /** Loads a route, waits for it to be real, injects axe, and RETURNS what the screen settled into. */
             const open = async (route) => {
-              /* UNDER `/app` FOR THE RECORD APP, and the route itself as the tree names it, because `MAY_REFUSE` is
-                 written in those words. The site is prerendered at the root. */
+              /* AT THE ROOT FOR THE RECORD APP (`APP_BASE`), and the route itself as the tree names it, because `MAY_REFUSE` is
+                 written in those words. The site is prerendered at the root too. */
               /* The one readiness site in this gate, because every load goes through here (`opened.goto` waits for the
                  screen as `openPage` does, and collects the load's errors afresh). */
               const state = await opened.goto(`http://localhost:${PORT}${app.spa ? APP_BASE : ''}${route}`);

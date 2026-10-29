@@ -98,7 +98,7 @@ export async function askTerminal(question: string, signal?: AbortSignal): Promi
 }
 
 const USAGE =
-  'braindog setup takes the address of one record, as in braindog setup https://app.brain.dog/app/<slug>, with --dry-run or --yes, --only <app>, --profile <folder> and --statusline, and nothing else.';
+  'braindog setup takes the address of one record, as in braindog setup https://app.brain.dog/<slug>, with --dry-run or --yes, --only <app>, --profile <folder> and --statusline, and nothing else.';
 
 /**
  * The real `claude`, run in the profile `env` names. NO SHELL, and its output is not relayed, as `runClaude` in

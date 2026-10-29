@@ -29,7 +29,7 @@ export type PackState = { id: string; version: string | null; disabled_at: strin
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
 
 /** The seven types a setting may take. */
-export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number' | 'list';
+export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number' | 'list' | 'secret';
 
 /** One setting as `packConfig` answers it. `max` bounds a `list`'s item count. */
 export type ConfigDecl = { type: ConfigType; values?: readonly string[]; default?: unknown; label?: string; note?: string; max?: number };

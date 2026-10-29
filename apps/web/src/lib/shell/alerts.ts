@@ -49,16 +49,90 @@ function plain(line: string, year: number): string {
     });
 }
 
-/** WHAT HAPPENED, EACH LINE ONCE: the same line twice is one, with how many times it happened. */
-export function bellLines<N extends { text: string; href: string; asked?: true | undefined }>(news: readonly N[]): { text: string; href: string; n: number }[] {
-  const out: { text: string; href: string; n: number }[] = [];
+type Tone = 'good' | 'warn' | 'bad' | 'info';
+
+/** One line of the bell: what happened, where it goes, how many times, when it last did (`at`) and how it went. */
+export type BellLine = { text: string; href: string; n: number; at: string; tone?: Tone | undefined };
+
+/** WHAT HAPPENED, EACH LINE ONCE: the same line twice is one, with how many times it happened, at its newest time. */
+export function bellLines<N extends { text: string; href: string; asked?: true | undefined; at?: string; tone?: Tone | undefined }>(news: readonly N[]): BellLine[] {
+  const out: BellLine[] = [];
   for (const item of happened(news)) {
     const text = bellSaid(item.text);
+    const at = item.at ?? '';
     const same = out.find((o) => o.text === text);
-    if (same) same.n += 1;
-    else out.push({ text, href: item.href, n: 1 });
+    /* ONE ROW, ONE LINE A DAY (audit of 30 October, 7): an instalment falling due was said as its row's change and again
+       as the rule's "is due today", two lines about one thing. The newest, which comes first, stands for both. */
+    if (!same && /^\/r\/[^/]+\/\d+$/u.test(item.href) && out.some((o) => o.href === item.href && o.at.slice(0, 10) === at.slice(0, 10))) continue;
+    if (same) {
+      same.n += 1;
+      if (Date.parse(at) > Date.parse(same.at)) same.at = at;
+    } else out.push({ text, href: item.href, n: 1, at, ...(item.tone ? { tone: item.tone } : {}) });
   }
   return out;
+}
+
+/** Whether a line is newer than what was last marked read (`readTo`, a time; empty is nothing marked). */
+export const unreadBy =
+  (readTo: string) =>
+  (l: { at: string }): boolean =>
+    readTo === '' || !(Date.parse(l.at) <= Date.parse(readTo));
+
+/** THE DAY A LINE FALLS IN, by the reader's own clock: Today, Yesterday, or Earlier. */
+export type Day = 'today' | 'yesterday' | 'earlier';
+
+export function dayOf(at: string, now: Date = new Date()): Day {
+  const t = Date.parse(at);
+  if (!Number.isFinite(t)) return 'earlier';
+  if (t >= new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) return 'today';
+  return t >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime() ? 'yesterday' : 'earlier';
+}
+
+/** The lines in their days, newest first, each day said once and an empty day not at all. */
+export function bellDays<L extends { at: string }>(lines: readonly L[], now: Date = new Date()): { day: Day; lines: L[] }[] {
+  const sorted = [...lines].sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
+  const out: { day: Day; lines: L[] }[] = [];
+  for (const l of sorted) {
+    const day = dayOf(l.at, now);
+    const last = out[out.length - 1];
+    if (last?.day === day) last.lines.push(l);
+    else out.push({ day, lines: [l] });
+  }
+  return out;
+}
+
+/**
+ * HOW LONG AGO, SHORT, FOR THE END OF A ROW: "now", "5m", "3h", "2d", and a date past a week ("12 Oct"). Written here and
+ * not taken from the renderer's `since`, so the bell, in the shell's first chunk, does not bring the renderer with it.
+ */
+export function agoOf(at: string, now: number = Date.now()): string {
+  const t = Date.parse(at);
+  if (!Number.isFinite(t)) return '';
+  const ms = Math.max(0, now - t);
+  if (ms < 60_000) return 'now';
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h`;
+  if (ms < 7 * 86_400_000) return `${Math.floor(ms / 86_400_000)}d`;
+  const d = new Date(t);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() === new Date(now).getFullYear() ? '' : ` ${d.getFullYear()}`}`;
+}
+
+/** The glyph a line wears, by what it is about: a question, money, work, a project, a person, an agent, or the log. */
+export type BellKind = 'decide' | 'money' | 'task' | 'projects' | 'people' | 'session' | 'alert' | 'activity';
+
+const MONEYISH = /^(?:ledger|entries|transactions|bills|invoices|obligations|accounts|payees|recurring|installments|plans|budgets|categories|snapshots|books|rates)$/u;
+
+export function kindOf(href: string, tone?: Tone): BellKind {
+  if (tone === 'bad') return 'alert';
+  if (href.startsWith('/decide')) return 'decide';
+  if (href.startsWith('/p/agents') || href.startsWith('/jobs')) return 'session';
+  const list = /^\/r\/([^/?#]+)/u.exec(href)?.[1] ?? '';
+  if (MONEYISH.test(list)) return 'money';
+  if (list === 'tasks' || list === 'work') return 'task';
+  if (list === 'things') return 'projects';
+  if (list === 'people' || list === 'orgs' || list === 'organisations') return 'people';
+  if (list === 'sessions' || list === 'runs') return 'session';
+  return 'activity';
 }
 
 /** The first hearing only seeds what is already there, so opening the app never rings for old questions. */
@@ -78,7 +152,7 @@ export const questionAlert = (w: { id: string; question?: string | undefined }):
   id: `q:${w.id}`,
   title: 'Needs you',
   body: w.question || 'A question is waiting',
-  goto: '/app/decide',
+  goto: '/decide',
 });
 
 /**
@@ -92,7 +166,7 @@ export function handoffAlert(e: { id: string; kind: string; to?: unknown; actor?
     id: `h:${e.id}`,
     title: 'Handed off',
     body: e.note || e.title || `${e.actor ?? 'An agent'} handed off a run`,
-    goto: '/app/p/agents',
+    goto: '/p/agents',
   };
 }
 
@@ -107,7 +181,7 @@ export function instructionAlert(i: { id: string; state: string }): Alert | null
     id: `i:${i.id}:${i.state}`,
     title: i.state === 'done' ? 'Done' : 'Needs you',
     body: i.state === 'done' ? 'An agent finished what you told it' : 'An agent needs you on something you told it',
-    goto: i.state === 'done' ? '/app/p/agents' : '/app/decide',
+    goto: i.state === 'done' ? '/p/agents' : '/decide',
   };
 }
 

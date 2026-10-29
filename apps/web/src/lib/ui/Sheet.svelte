@@ -45,6 +45,7 @@
     subtitle,
     kind,
     fit = false,
+    wide = false,
     caret = true,
     onclose,
     children,
@@ -57,6 +58,8 @@
     kind?: 'menu' | undefined;
     /** A short sheet, a choice and a button: from 900 up the drawer is as tall as what it holds, hung from the top. */
     fit?: boolean | undefined;
+    /** A gallery's drawer: from 900 up, 760 wide rather than 480, so what it lays out is seen at the size it will be. */
+    wide?: boolean | undefined;
     /**
      * Whether the caret goes to the first field as it opens (the default). Off for a sheet that is read first and typed
      * into second, the run sheet from Today, whose message box opened in a heavy focus ring.
@@ -257,6 +260,7 @@
   class="sheet"
   data-kind={kind}
   data-fit={fit ? '' : undefined}
+  data-wide={wide ? '' : undefined}
   aria-labelledby={kind === 'menu' ? undefined : `${uid}-title`}
   aria-label={kind === 'menu' ? title : undefined}
   onclick={onbackdrop}
@@ -356,6 +360,13 @@
     inset-block-end: auto;
     block-size: auto;
     max-block-size: calc(100dvh - 2 * var(--inset) - var(--kb));
+  }
+
+  /* A GALLERY'S DRAWER IS WIDER, so a widget is laid out at the size it will take. The phone's sheet is the phone's. */
+  @media (width >= 900px) {
+    .sheet[data-wide] {
+      inline-size: min(760px, calc(100vw - 2 * var(--inset)));
+    }
   }
 
   /* Closed, and on its way out: nothing on it can be pressed. */

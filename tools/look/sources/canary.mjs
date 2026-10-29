@@ -66,7 +66,7 @@ export async function open(arg, { env = process.env, send = fetch, read, routes 
     const kept = await sessionFrom(env, ...(read ? [read] : []));
     const cookie = kept.state ? cookieFor(kept.state, origin) : null;
     if (cookie === null) throw new Error(NO_SESSION);
-    target = { base: origin, origin, slug, api: `/app/${slug}`, cookie };
+    target = { base: origin, origin, slug, api: `/${slug}`, cookie };
   }
 
   const byName = new Map(routes.map((r) => [r.name, r]));

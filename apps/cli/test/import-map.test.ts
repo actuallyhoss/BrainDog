@@ -187,7 +187,7 @@ test('A QUESTION THE IMPORT FILES PRINTS THE LINK THAT OPENS IT ON DECIDE, and w
   const plan: Plan = { key: 'tallybook:', taken: null, rev: null, rows: [], asks: RULES, polls: [], skipped: [], changed: [] };
   const report = await applyPlan(plan, door, { dryRun: false });
   const linked = said(report, { dryRun: false, file: 'export.json', to: { key: 'https://host.example/the-studio' } });
-  assert.ok(linked.some((l) => l.endsWith(' https://host.example/app/the-studio/decide/q_7')), linked.join('\n'));
+  assert.ok(linked.some((l) => l.endsWith(' https://host.example/the-studio/decide/q_7')), linked.join('\n'));
   const bare = said(report, { dryRun: false, file: 'export.json', to: { key: 'https://host.example' } });
   assert.ok(!bare.some((l) => l.includes('/decide/')), 'a host that names no record was handed a guessed link');
 });

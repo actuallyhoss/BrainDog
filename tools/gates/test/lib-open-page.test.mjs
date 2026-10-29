@@ -19,7 +19,7 @@ import { routesFor, routesOf } from '../routes.mjs';
 const WEB = join(import.meta.dirname, '..', '..', '..', 'apps', 'web');
 
 const NOW = Date.UTC(2026, 8, 3, 12);
-const URL_ = 'http://localhost:1/app/today';
+const URL_ = 'http://localhost:1/today';
 
 /** A stand-in record: its clock, and every setting it was asked to keep, in order. Each its own base, as each record is. */
 let bases = 0;
@@ -41,7 +41,7 @@ function fakeBrowser(log, { gotoThrows = false, timeouts = 0, refused = 0, lost 
         throw new Error('page.goto: net::ERR_CONNECTION_REFUSED');
       }
       /* A LOAD THAT LOST ONE OF ITS OWN MODULES and settled anyway, as a loaded runner's first look can. */
-      if (loads++ < refused + lost) handlers.pageerror?.(new Error(`${lostAs}: http://localhost:1/app/_app/immutable/nodes/3.js`));
+      if (loads++ < refused + lost) handlers.pageerror?.(new Error(`${lostAs}: http://localhost:1/_app/immutable/nodes/3.js`));
       if (quiet++ < timeouts) {
         handlers.pageerror?.(new Error('Failed to fetch dynamically imported module'));
         throw Object.assign(new Error('page.goto: Timeout 30000ms exceeded.'), { name: 'TimeoutError' });
@@ -49,8 +49,8 @@ function fakeBrowser(log, { gotoThrows = false, timeouts = 0, refused = 0, lost 
       handlers.pageerror?.(new Error('boom'));
       handlers.console?.({ type: () => 'error', text: () => 'Failed to load resource' });
       handlers.console?.({ type: () => 'log', text: () => 'hello' });
-      handlers.response?.({ ok: () => false, status: () => 404, url: () => 'http://localhost:1/app/api/get?register=jobs' });
-      handlers.response?.({ ok: () => true, status: () => 200, url: () => 'http://localhost:1/app/api/boot' });
+      handlers.response?.({ ok: () => false, status: () => 404, url: () => 'http://localhost:1/api/get?register=jobs' });
+      handlers.response?.({ ok: () => true, status: () => 200, url: () => 'http://localhost:1/api/boot' });
     },
   };
   const context = {
@@ -169,9 +169,9 @@ test('the page errors are collected, console errors only, and a second load star
     { kind: 'uncaught', text: 'boom' },
     { kind: 'console', text: 'Failed to load resource' },
   ]);
-  assert.equal(await opened.goto('http://localhost:1/app/usage'), 'ready');
+  assert.equal(await opened.goto('http://localhost:1/usage'), 'ready');
   assert.equal(opened.errors.length, 2, 'the second load collected its own two, not four');
-  assert.deepEqual(opened.failed, [{ status: 404, path: '/app/api/get' }], 'only an answer that was not ok, by its path, once a load');
+  assert.deepEqual(opened.failed, [{ status: 404, path: '/api/get' }], 'only an answer that was not ok, by its path, once a load');
 });
 
 test('clock: null leaves the page unpinned', async () => {
@@ -267,7 +267,7 @@ test('a load that failed for any other reason is thrown, retry or not', async ()
 test("a screen settled on its second look reports that look's errors, not the first's", async () => {
   /* `readiness` itself, over a page that draws nothing on its first look and draws on the reload. */
   const errors = [{ kind: 'uncaught', text: 'Failed to fetch dynamically imported module' }];
-  const failed = [{ status: 404, path: '/app/_app/immutable/nodes/0.js' }];
+  const failed = [{ status: 404, path: '/_app/immutable/nodes/0.js' }];
   let looks = 0;
   const page = {
     waitForSelector: async () => (looks++ === 0 ? Promise.reject(new Error('timeout')) : {}),

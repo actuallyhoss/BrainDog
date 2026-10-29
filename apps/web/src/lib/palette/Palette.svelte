@@ -54,6 +54,8 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '../at.ts';
+  import { keptRead } from '../shell/side-read.ts';
+  import { isGlyph } from '../ui/icons.ts';
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { moneyWhole, readable, readFigure, since } from 'braindog-render';
@@ -79,6 +81,8 @@
   import type { Shell } from '../record/boot-live.ts';
   import { entryHref, slashEntryWords, slashLine } from '../page/slash-entry.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
+  import { widgetRows } from '../board/palette-rows.ts';
+  import { todayOffer } from '../board/offer.svelte.ts';
   import { FILL, asked as pageAsked, maker as pageMaker, paging, pressed as pagePressed, rowTitle as pageRow, whoOf, type Paging } from './new-page.ts';
   import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
@@ -154,6 +158,8 @@
     folded?: number | undefined;
     /** The group a "Show all" row opens. */
     more?: string | undefined;
+    /** Set on a "what it is" row wearing its project's own mark, which a page's glyph never covers. */
+    marked?: true | undefined;
     /** Set on the row that goes back to the conversation with Slash where it was left. */
     resume?: true | undefined;
   };
@@ -217,7 +223,7 @@
   let behind = $state<PageContext>({ path: '/' });
   const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
   /* THE RECORD ON SCREEN, AT ITS OWN BASE. `page.url.origin` asked `/api/slash/*` at the bare host, which on the Cloud is
-     no record at all: every ask from `/app/<slug>/…` went to the root and never reached the record it was typed on. */
+     no record at all: every ask from `/<slug>/…` went to the root and never reached the record it was typed on. */
   const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: apiBase() }));
 
   /**
@@ -499,7 +505,7 @@
   let lookKept = $state<'record' | 'pending' | 'device'>('device');
 
   /* AT THE RECORD'S OWN BASE, as Slash's asks are: at the bare origin its lists' declarations and figures were a second
-     set of asks beside the screen's own (`/api/schema` and `/app/<slug>/api/schema` both, 23 Oct). One reader a base. */
+     set of asks beside the screen's own (`/api/schema` and `/<slug>/api/schema` both, 23 Oct). One reader a base. */
   let reading: { base: string; reader: Promise<Reader> } | null = null;
   const reader = (): Promise<Reader> => {
     const base = apiBase();
@@ -725,7 +731,24 @@
   /** The name the record is asked about, or `null`: never with no record, and never a sentence the palette acts on. */
   const aboutName = $derived(isLive ? asksAbout({ prefix: parsed.prefix, text: parsed.text, acting: live.creation !== null || live.page !== null }) : null);
   /** What it is, as rows, only while the answer is for the name in the box. */
-  const aboutShown = $derived(known !== null && known.name === aboutName ? aboutRows(known.answer, known.name, shell.now ?? Date.now()) : []);
+  /**
+   * A PROJECT WEARS ITS OWN MARK, the glyph the rail draws beside it (recheck of 30 October, 37): the kind's glyph stood
+   * for every project and was Marlow & Co's own. Read from the rail's kept read, so nothing more is asked of the record.
+   */
+  const markOf = (href: string | null): IconName | null => {
+    const m = href === null ? null : /^\/r\/([^/]+)\/(\d+)$/u.exec(href);
+    if (m === null) return null;
+    const side = keptRead(apiBase());
+    if (side === null || side.list !== decodeURIComponent(m[1]!)) return null;
+    const mark = side.rows.find((r) => r.seq === Number(m[2]))?.mark ?? '';
+    return mark.length > 1 && isGlyph(mark) ? (mark as IconName) : null;
+  };
+  const aboutShown = $derived(
+    (known !== null && known.name === aboutName ? aboutRows(known.answer, known.name, shell.now ?? Date.now()) : []).map((r) => {
+      const mark = markOf(r.href);
+      return mark === null ? r : { ...r, icon: mark, marked: true as const };
+    }),
+  );
 
   $effect(() => {
     const name = aboutName;
@@ -909,6 +932,8 @@
       const pageFound = pageSaid ? null : pageRowOf(paged?.group ?? copy.commands);
       if (pageFound) out.push(pageFound);
     }
+    /* ADD A WIDGET, and the one Slash would add with its reason, for "add", "widget" or "/w" (`board/palette-rows.ts`). */
+    if (isLive) for (const w of widgetRows(q, todayOffer.offer, at('/'))) out.push({ ...w, group: copy.commands });
 
     if ((prefix === null && !blank) || prefix === '/') {
       /* EVERY ROW WEARS ITS OWN GLYPH. The commands each carried a real one and then every other row
@@ -1181,6 +1206,14 @@
       for (const r of items) {
         const key = r.title.trim().toLowerCase();
         const had = seen.get(key);
+        /* WHAT THE NAME IS AND ITS OWN PAGE ARE ONE THING, never "Kiln 2": the row keeps what it is and where it was
+           seen, and takes the page's address and the page's own glyph, the one the rail draws beside it. */
+        if (had && group === BEST && (had.id.startsWith('about-') || r.id.startsWith('about-'))) {
+          const page = had.id.startsWith('about-') ? r : had;
+          const about = had.id.startsWith('about-') ? had : r;
+          Object.assign(had, { ...about, href: page.href ?? about.href, icon: about.marked === true ? about.icon : (page.icon ?? about.icon) });
+          continue;
+        }
         if (had && r.href !== null && had.href !== null && group !== GO_TO) {
           had.folded = (had.folded ?? 1) + 1;
           had.href = `/search?q=${encodeURIComponent(r.title)}`;

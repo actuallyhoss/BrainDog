@@ -8,7 +8,7 @@ import type { Sql } from '@braindog/ports';
 type Auth = (call: { flow: 'claim.mint'; email: string }) => Promise<{ status: number; mail?: { claimToken?: string } }>;
 
 /** The link that spends once to sign the owner in; the app then offers a passkey. Valid a day, like every claim link. */
-export const claimUrl = (origin: string, token: string): string => `${origin}/app/signin#claim=${token}`;
+export const claimUrl = (origin: string, token: string): string => `${origin}/signin#claim=${token}`;
 
 /**
  * The setup line, or null when there is nothing to set up: the owner already has a passkey, or sign-in is off (an open

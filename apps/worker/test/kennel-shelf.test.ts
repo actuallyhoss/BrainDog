@@ -40,11 +40,11 @@ async function catalogue(name: string, texts: readonly string[]): Promise<{ inde
   return { index, files };
 }
 
-/** Static assets as Cloudflare answers them: a file under `/app/catalogue/`, or the shell with a 200. */
+/** Static assets as Cloudflare answers them: a file under `/catalogue/`, or the shell with a 200. */
 const assetsOf = (files: ReadonlyMap<string, string>): Assets => ({
   fetch: async (request) => {
     const path = new URL(request.url).pathname;
-    const text = path.startsWith('/app/catalogue/') ? files.get(path.slice('/app/catalogue/'.length)) : undefined;
+    const text = path.startsWith('/catalogue/') ? files.get(path.slice('/catalogue/'.length)) : undefined;
     return text === undefined ? new Response(SHELL, { headers: { 'content-type': 'text/html' } }) : new Response(text, { headers: { 'content-type': 'application/json' } });
   },
 });

@@ -62,7 +62,7 @@ test('a person reorders, moves, renames and leaves out areas, and the chooser fo
   /* AND ITS ICON IS THE AREA'S, whatever the person named it. */
   assert.equal(groups[0]!.areas[0]!.icon, AREAS.get('appearance')!.icon);
   /* LEFT OUT IS NOT GONE: the address still names the area, and its label is its own. */
-  assert.equal(labelIn(groups, 'delete'), 'Delete this record');
+  assert.equal(labelIn(groups, 'delete'), 'Delete my BrainDog');
 });
 
 test('what is not an area is left out, an area listed twice is drawn once, and a tile not drawn draws nothing', () => {
@@ -81,9 +81,9 @@ test('what is not an area is left out, an area listed twice is drawn once, and a
 });
 
 test('an address with the base path in front, or a query behind, still names its area', () => {
-  assert.deepEqual(ids(groupsOf([link('X', [['Keys', '/app/settings/keyboard?from=rail']])])), [['X', ['keyboard']]]);
+  assert.deepEqual(ids(groupsOf([link('X', [['Keys', '/settings/keyboard?from=rail']])])), [['X', ['keyboard']]]);
   /* AND A MOVED ONE NAMES THE AREA THAT HOLDS IT NOW (UI pass 20 Oct, agents F14): Pages is Navigation's. */
-  assert.deepEqual(ids(groupsOf([link('X', [['Pages', '/app/settings/pages?from=rail']])])), [['X', ['navigation']]]);
+  assert.deepEqual(ids(groupsOf([link('X', [['Pages', '/settings/pages?from=rail']])])), [['X', ['navigation']]]);
 });
 
 test('an index that names no area at all is read as the house one, so nobody is stranded in one area', () => {
@@ -121,7 +121,7 @@ test('YOU, THIS BRAINDOG AND DATA: six rows beside six, Data the whole width und
   const rows = DEFAULT_GROUPS.map((g) => rowsOf(g).map((r) => r.label));
   assert.deepEqual(rows[0], ['Appearance', 'Pages', 'Words and money', 'Notifications', 'Keyboard', 'Signing in']);
   assert.deepEqual(rows[1], ['Agents', 'People & sharing', 'What comes in', 'Keychain', 'Add-ons', 'Health']);
-  assert.deepEqual(rows[2], ['Tidy up', 'Backups', 'Usage', 'Billing', 'Export', 'Delete this record']);
+  assert.deepEqual(rows[2], ['Tidy up', 'Backups', 'Usage', 'Billing', 'Export', 'Delete my BrainDog']);
   assert.equal(rows[0]!.length, rows[1]!.length, 'the two columns side by side end together');
   assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 12]);
   const hrefs = SETTINGS_INDEX.blocks.flatMap((b) => (b.authored ?? []).map((r) => r.cells[1]));

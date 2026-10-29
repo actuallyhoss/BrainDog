@@ -3,7 +3,7 @@ name = "braindog-desktop"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "BrainDog for Mac: a thin window around app.brain.dog/app"
+description = "BrainDog for Mac: a thin window around app.brain.dog"
 
 [lib]
 name = "braindog_desktop_lib"

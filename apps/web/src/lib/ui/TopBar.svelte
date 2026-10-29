@@ -7,6 +7,9 @@
   last a link back; "Ask or change anything" with its "/" key; the bell (what happened, never what was asked); and the
   face (how you sign in, the keyboard keys, Sign out).
 
+  THE LAST STEP IS THE PAGE'S TITLE, AND THE ONLY TIME IT IS SAID (29 October): "Good afternoon, Mara" on Today, "Needs
+  you" with its count as a quiet figure, "Projects › Kiln". The page under it draws no name of its own (`PageHead`).
+
   ITS START IS THE WORK'S START: the bar pads its start by the page's gutter, so the crumb and the first tile under it
   share one edge at every width. BELOW 900px THIS IS NOT DRAWN: each page's head carries the phone's bar. ON `/search`
   THE ASK FIELD IS NOT DRAWN: the page's own field is.
@@ -16,6 +19,7 @@
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import Bell from '../shell/Bell.svelte';
+  import { frame } from '../shell/frame.svelte.ts';
   import type { Crumb } from '../shell/side.ts';
   import YouMenu from '../shell/YouMenu.svelte';
   import Icon from './Icon.svelte';
@@ -45,7 +49,7 @@
           {#if step.href}
             <a class="crumb-up" href={at(step.href)} dir="auto">{step.label}</a>
           {:else}
-            <span class="crumb-here" aria-current="page" dir="auto">{step.label}</span>
+            <span class="crumb-here" aria-current="page" dir="auto">{step.label}</span>{#if i === crumb.length - 1 && frame.figure}<span class="crumb-figure num">{frame.figure}</span>{/if}
           {/if}
         </li>
       {/each}
@@ -105,7 +109,12 @@
 
   .crumb li:last-child {
     flex: 0 1 auto;
+    gap: 0;
     overflow: hidden;
+  }
+
+  .crumb li:last-child > .crumb-sep {
+    margin-inline-end: var(--sp-1);
   }
 
   .crumb-up {
@@ -114,11 +123,25 @@
     text-decoration: none;
   }
 
+  /* THE PAGE'S TITLE: 17 at 600 in the display face, as the page names wear it, on one line and cut at its end. */
   .crumb-here {
     overflow: hidden;
     color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--fs-head);
     font-weight: var(--fw-semi);
+    letter-spacing: -0.01em;
     text-overflow: ellipsis;
+  }
+
+  /* ITS COUNT, quiet, a step after it. */
+  .crumb-figure {
+    flex: none;
+    margin-inline-start: var(--sp-2);
+    color: var(--ink-3);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
   }
 
   .crumb-sep {

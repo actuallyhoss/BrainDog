@@ -80,10 +80,10 @@ export type Opened = { from: 'opened'; to: string } | { from: 'absent' } | { fro
 /**
  * `POST /auth/switch`: open another record this person is on, in this browser.
  *
- * THE SESSION ROW MOVES AND THE COOKIE DOES NOT, and the answer says where to go: `/app/<slug>/`, which names the record
+ * THE SESSION ROW MOVES AND THE COOKIE DOES NOT, and the answer says where to go: `/<slug>/`, which names the record
  * opened in the address. The caller used to reload the page it was on, whose address named no record, so a second tab
  * on the first record silently began reading and writing the second one. The switch
- * still happens, because it is what `/app` with no slug opens next time.
+ * still happens, because it is what the bare address with no slug opens next time.
  *
  * `/auth/switch` AND `/account/records` ARE AT THE ROOT, under no slug: they are the person's, not a record's.
  *

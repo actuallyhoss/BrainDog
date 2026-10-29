@@ -388,8 +388,8 @@ test('the home page counts none of the product own parts at a stranger', when(NO
  * It held a band count and the drawn app in the first band. The page designed on 17 October has
  * its own shape, and this holds that shape:
  *
- *   - THE FIRST SECTION IS THE HERO, AND THE DESK IS IN IT. The live desk's tabs (Today, Projects, Needs you,
- *     Agents) are the `role="tablist"` this reads. The product was once below a band of words and counted figures,
+ *   - THE FIRST SECTION IS THE HERO, AND THE DESK IS IN IT. The live desk's sidebar (Today, Needs you, Money,
+ *     Agents and a project, since 29 October) is the `data-desk` window this reads. The product was once below a band of words and counted figures,
  *     and that was the fault.
  *   - FOUR CARDS, THE FOUR VALUES: the brief, the agents, the chores and Slash, each an `article.card`. A fifth card
  *     is a feature-card grid on its way back, and fewer is a value gone quietly.
@@ -406,15 +406,16 @@ test('the home page opens on the hero with the desk, then its six bands in order
   const hero = html.slice(first.index, sections[1]?.index ?? html.length);
   assert.match(
     hero,
-    /\srole="tablist"/,
+    /\sdata-desk(?:\s|>|=)/,
     'the hero of index.html does not hold the desk and its tabs, so the page opens on words again. The product is ' +
       'the best thing this page has.',
   );
 
-  /* SITE 2a (20 October): one product picture, then six full-bleed bands that each say one new thing, and no close. */
+  /* SITE 2a (20 October): one product picture, then full-bleed bands that each say one new thing, and no close.
+     Money joined as the second band on 29 October (personal use as much as business). */
   const bands = [...html.matchAll(/<section\b[^>]*\sclass="[^"]*\bband--([a-z]+)\b/g)].map((m) => m[1]);
-  assert.equal(bands.length, 6, `index.html draws ${bands.length} bands, where the page holds six: who, chores, tools, slash, yours and the questions`);
-  assert.deepEqual(bands, ['who', 'chores', 'tools', 'slash', 'yours', 'faq'], 'the bands are in the order the page says them');
+  assert.equal(bands.length, 7, `index.html draws ${bands.length} bands, where the page holds seven: who, money, chores, tools, slash, yours and the questions`);
+  assert.deepEqual(bands, ['who', 'money', 'chores', 'tools', 'slash', 'yours', 'faq'], 'the bands are in the order the page says them');
 
   const pictures = [...html.matchAll(/<(?:picture|img)\b[^>]*>/g)].map((m) => m[0]);
   assert.deepEqual(pictures, [], 'index.html draws a photograph again, where the product on this page is drawn in HTML and CSS');

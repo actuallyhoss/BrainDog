@@ -5,7 +5,7 @@
   is there (`signed-in.ts`), and `app.css` shows `.when-in` and hides `.when-out` under it, so nothing flickers and the
   page reads whole with scripting off (as signed out). Every "Start free" on the site is this component.
 
-  `rel="external"` on both, because `/app` is on this site's name and is not a page of it: the prerender crawler would
+  `rel="external"` on both, because the app is not a page of this site: the prerender crawler would
   otherwise follow the link and stop the build.
 -->
 <script lang="ts">

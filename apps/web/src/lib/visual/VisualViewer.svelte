@@ -9,7 +9,7 @@
   LOADED BY `import()` ON THE FIRST PRESS (`VisualStrip.svelte`), so no page that only holds a visual carries this or the
   renderer's frame document in its first load.
 
-  THE FRAME IS THE DRAWN BLOCK'S (`DrawnFrame.svelte`, docs/12-SECURITY.md §8): the hosts' own `/app/drawn-frame`,
+  THE FRAME IS THE DRAWN BLOCK'S (`DrawnFrame.svelte`, docs/12-SECURITY.md §8): the hosts' own `/drawn-frame`,
   `sandbox="allow-scripts"` and nothing else, so it has an origin that holds nothing and a policy with no network. It says
   it is ready, from its own window and no other, and is posted the whole document once (`visualDocument`: the policy,
   the theme, then the page with its pictures inline, which the app read through the file door with its own sign-in).

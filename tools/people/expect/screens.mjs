@@ -156,7 +156,10 @@ async function todayMarkup({ t, base }, shell, path) {
 async function signsOf({ t, base }, shell, body) {
   const [{ SIGNS_PAGE, SIGNS_RED }, { drawnOf }] = await Promise.all([web('lib/home/default-home.ts'), web('routes/decide/[id]/proposed.ts')]);
   if (!(shell.pages ?? []).includes(SIGNS_PAGE)) return null;
-  const drawn = await drawnOf({ ...body, blocks: [{ kind: 'note', body: `{{${SIGNS_RED}}}` }] }, base, t.io);
+  /* A KEY AND NO PHONE ORDER, because Today is a board now: the host refuses a widget on it with no key, and a phone
+     order that names widgets this one-note body does not hold. */
+  const { phone: _phone, ...probe } = body;
+  const drawn = await drawnOf({ ...probe, blocks: [{ kind: 'note', key: 'signs-probe', body: `{{${SIGNS_RED}}}` }] }, base, t.io);
   const n = drawn.from === 'live' ? drawn.blocks[0]?.values?.[SIGNS_RED] : undefined;
   return Number.isFinite(n) ? n : undefined;
 }

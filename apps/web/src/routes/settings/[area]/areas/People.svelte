@@ -477,8 +477,8 @@
   control, and the segments, the exceptions, the two hints and the erasure appear on the day
   a second person exists, which is the day each of them means something.
 -->
+<!-- NOTHING WHILE IT IS READ: an empty tile under its title read as nobody at all. -->
 {#if peopleFrom === 'reading'}
-  <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee}><div class="section-body">{''}</div></Tile>
 {:else if peopleFrom === 'refused' || peopleFrom === 'unrouted'}
   <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee}>
     <div class="section-body">
@@ -487,7 +487,7 @@
   </Tile>
 {:else if alone}
   <!-- ONE PERSON IS THE TILE'S SENTENCE AND NOTHING ELSE: there is nobody to list and nobody to compare. -->
-  <Tile icon="users" title={tileWords.title}>
+  <Tile icon="users" title={copy.whoCanSee}>
     <p class="reading">{copy.onlyPerson}</p>
   </Tile>
 {:else}

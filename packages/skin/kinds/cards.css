@@ -432,6 +432,36 @@
     font-weight: 500;
   }
 
+  /* A PERSON'S CARD READS AS A LINE ABOUT THEM, NOT A FORM (29 October, "fix ui of people"): who they are in two lines
+     at most, set at the name's edge under the face, and what they were met in as one quiet run of words after it, where
+     a note ran to six lines and "Met in" stood a column away from its value. The whole note is on their page. */
+  .cards-item:has(> .cards-head > .cards-face) {
+    gap: var(--sp-1);
+  }
+
+  .cards-item:has(> .cards-head > .cards-face) > :is(.cards-reply, .cards-facts) {
+    padding-inline-start: calc(28px + var(--sp-2));
+  }
+
+  .cards-item:has(> .cards-head > .cards-face) > .cards-reply {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .cards-item:has(> .cards-head > .cards-face) > .cards-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px var(--sp-3);
+  }
+
+  .cards-item:has(> .cards-head > .cards-face) .cards-fact {
+    display: inline-flex;
+    gap: var(--sp-1);
+  }
+
   /* `cards lead`: THE FIRST CARD IS TWO TRACKS WIDE WHERE THE GRID HAS TWO, and one where it has one.
      The renderer only marks the card (05 §4, told and never inferred), so the host has to know how
      many tracks there are, and the grid cannot say. `span 2` in a grid of one track makes an

@@ -105,7 +105,7 @@ export function secondFrom(env, host) {
 /** The invitation's token, from the answer `invite` gives: its `token`, or the fragment of its link. */
 const inviteTokenOf = (value) => (typeof value?.token === 'string' && value.token !== '' ? value.token : (/\/invite#([^&\s]+)/u.exec(String(value?.link ?? ''))?.[1] ?? null));
 
-/** The proof a letter carries beside the invitation it was minted for: `/app/invite#<token>&proof=<proof>`. */
+/** The proof a letter carries beside the invitation it was minted for: `/invite#<token>&proof=<proof>`. */
 export function proofIn(letter, token) {
   const words = `${letter?.text ?? ''} ${letter?.html ?? ''}`.replace(/&amp;/gu, '&');
   const at = words.indexOf(`#${token}&proof=`);
@@ -172,13 +172,13 @@ async function shared(d, second, slug, s) {
     s.cookie = moved.cookie;
     d.secrets.push(moved.cookie);
   }
-  const up = await ask(s, `/app/${slug}/api/files`, { method: 'PUT', raw: PIXEL, type: 'image/png' });
+  const up = await ask(s, `/${slug}/api/files`, { method: 'PUT', raw: PIXEL, type: 'image/png' });
   const sha = up.said?.sha256;
   if (up.status !== 200 || typeof sha !== 'string') return red(d, 'erase', `the second person’s file was not taken: ${fixOf(up)}.`);
   const paper = { sha256: sha, mime: 'image/png', bytes: PIXEL.length, name: `${SECOND_NAME} id.png` };
   const attached = await api(s, 'create', { register: PAPERS.register, fields: { what: `Papers from ${SECOND_NAME}`, paper } });
   if (attached.said?.ok !== true) return red(d, 'erase', `the second person could not attach the file: ${fixOf(attached)}.`);
-  const file = `/app/${slug}/api/files/${sha}`;
+  const file = `/${slug}/api/files/${sha}`;
   const before = await ask(d, file, { method: 'GET' });
   if (before.status !== 200) return red(d, 'erase', `before the erasure the file did not answer at its address (${before.status}), so its silence after would prove nothing.`);
   if (foundBy(await api(d, 'search', { q: SECOND_NAME })) === 0) return red(d, 'erase', 'before the erasure a search for the second person’s name found nothing, so finding nothing after would prove nothing.');
@@ -236,7 +236,7 @@ export function keptOf(value) {
  */
 export async function fileDelete(d) {
   if (!d.made || !d.cookie) return skip(d, 'file-delete', 'there is no record of the drill’s to delete.');
-  const up = await ask(d, `/app/${d.made.slug}/api/files`, { method: 'PUT', raw: PIXEL, type: 'image/png' });
+  const up = await ask(d, `/${d.made.slug}/api/files`, { method: 'PUT', raw: PIXEL, type: 'image/png' });
   if (up.status !== 200 || typeof up.said?.sha256 !== 'string') return red(d, 'file-delete', `the file was not taken: ${fixOf(up)}.`);
   if (d.address) d.soleOwner = await soleOwnerClose(d);
   if (d.soleOwner?.closed) return red(d, 'file-delete', 'the account closed while it alone owned its record, so the record was left with no owner.');

@@ -10,6 +10,7 @@
   words on one flat paper tile at a 68ch reading measure, its sections headed in Lexend like every title on the site.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import { trust } from '$lib/copy/trust.ts';
   import PageHead from '$lib/site/PageHead.svelte';
   import type { PageProps } from './$types';
@@ -21,19 +22,7 @@
   const address = $derived(`https://brain.dog/legal/${data.name}`);
 </script>
 
-<svelte:head>
-  <title>{text.title} · BrainDog</title>
-  <meta name="description" content={text.description} />
-  {#if data.text === null}
-    <meta name="robots" content="noindex" />
-  {:else}
-    <link rel="canonical" href={address} />
-    <meta property="og:url" content={address} />
-    <meta property="og:title" content="{text.title} · BrainDog" />
-    <meta property="og:description" content={text.description} />
-  {/if}
-</svelte:head>
-
+<Seo title="{text.title} · BrainDog" description={text.description} path="/legal/{data.name}" noindex={data.text === null} />
 <PageHead title={text.title} lead={text.description} />
 
 <section class="wrap sheet-band">

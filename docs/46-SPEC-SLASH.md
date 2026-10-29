@@ -1030,7 +1030,7 @@ which the smoke prints, and a model that ignores it answers `PROPOSAL_SCHEMA` or
 printed only on the included model, because an own key's adapter is his provider's.
 
 ```
-BRAINDOG_SESSION=<cookie> node tools/slash-smoke.mjs --base https://<host>/app/<slug> --rule <id> --look
+BRAINDOG_SESSION=<cookie> node tools/slash-smoke.mjs --base https://<host>/<slug> --rule <id> --look
 ```
 
 **The evaluation**, `packages/slash/eval/run.ts`, asks the thirty questions of the shipped engine over a fixture record

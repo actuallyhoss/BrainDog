@@ -5,7 +5,7 @@
  * ONE FIXED LINE, WHATEVER CAME WITH THE PUSH. `09 §3` is that a push carries no content, because it passes through a
  * push service nobody here runs and this record holds money and credentials. THE ONE THING READ IS WHERE A TAP OPENS
  * (E44 of 24 October): the Worker encrypts `{ open }` to this phone, a path in the app such as
- * `/app/kiln/decide/sg_...`, and it is kept only when it is under this worker's scope and made of handle characters.
+ * `/kiln/decide/sg_...`, and it is kept only when it is under this worker's scope and made of handle characters.
  * No word of it is ever drawn: the line stays fixed, and `push.test.ts` fires a push with a title in its payload and a
  * push whose payload throws when touched.
  *
@@ -27,9 +27,9 @@
  * NO WRITE IS KEPT AND NONE WAITS. A write the network does not take is answered at once with a refusal saying it was
  * not sent (`words.notSent`), and nothing is queued to send later: `offline.ts` says why.
  *
- * THE COPY GOES ON A 401 AND ON SIGN-OUT, here, because every request a controlled page makes passes through this file,
- * including the ones outside its scope: the session's record answers at `/api/` and sign-out is `/auth/logout`, and
- * neither is under `/app/`. The page deletes it on a record switch (`keep` in `offline.ts`).
+ * THE COPY GOES ON A 401 AND ON SIGN-OUT, here, because every request a controlled page makes passes through this file:
+ * the session's record answers at `/api/` and sign-out is `/auth/logout`, both inside the scope now that the app is the
+ * root, and `route` passes every other door of the host to the browser untouched. The page deletes it on a record switch (`keep` in `offline.ts`).
  *
  * A MODULE TO TYPESCRIPT, AND NOTHING EXPORTED TO THE BROWSER. With no import and no export the file was a script, and a
  * script's top-level names are globals of the whole program `svelte-check` reads, which includes this file by name.
@@ -95,7 +95,7 @@ sw.addEventListener('push', (e) => {
 });
 
 /* A TAP OPENS WHAT THE PUSH NAMED, the question in Decide on the record it is about, or else THE RECORD'S HOME,
-   the root of the scope, `/app/`, which is the record the session is on. A window already on that address is focused
+   the root of the scope, `/`, which is the record the session is on. A window already on that address is focused
    rather than opened twice, and a window on another screen is left where it is, because navigating it would throw
    away whatever was being typed there. */
 sw.addEventListener('notificationclick', (e) => {

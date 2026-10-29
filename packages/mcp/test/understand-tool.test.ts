@@ -152,7 +152,7 @@ test('CHANGES IS SAID BY LABEL, from what it holds to what it will, the first th
 test('A PROPOSAL\'S ANSWER SAYS WHAT IT MOVES AND CHANGES between the question and who decides, and neither when the record sends none', () => {
   const filed = {
     id: 'SG9',
-    decide: 'https://brain.dog/app/mara/decide/SG9',
+    decide: 'https://brain.dog/mara/decide/SG9',
     money: [{ amount: -1798, currency: 'GBP' }],
     changes: [{ field: 'status', label: 'Status', before: 'open', after: 'paid' }],
   };
@@ -162,7 +162,7 @@ test('A PROPOSAL\'S ANSWER SAYS WHAT IT MOVES AND CHANGES between the question a
       'Asked Mara: Pay the studio rent? (SG9)',
       'Moves GBP -17.98',
       'Changes Status from open to paid',
-      'Mara decides in BrainDog at https://brain.dog/app/mara/decide/SG9.',
+      'Mara decides in BrainDog at https://brain.dog/mara/decide/SG9.',
     ].join('\n'),
   );
   assert.equal(proposedBrief({ id: 'SG9' }, 'Pay the studio rent?', look), 'Asked Mara: Pay the studio rent? (SG9)\nMara decides in BrainDog.');

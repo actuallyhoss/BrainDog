@@ -18,13 +18,13 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
        ONLY WHILE SOMETHING GOES OUT EVERY MONTH. A page condition is one figure or all of several, never either of
        two, so a record whose only repeating line is money coming in reads it on the chart and not here. */
     kind: 'stat',
-    heading: 'Every month',
+    heading: 'Repeating, a month',
     icon: 'refresh',
     span: 12,
     cells: [
-      { metric: 'every-month-in', label: 'Repeats, coming in' },
-      { metric: 'every-month-out', label: 'Repeats, going out' },
-      { metric: 'leaving-30d', label: 'Going out, 30 days' },
+      { metric: 'every-month-in', label: 'In' },
+      { metric: 'every-month-out', label: 'Out' },
+      { metric: 'leaving-30d', label: 'To go out, next 30 days' },
     ],
     when: { metric: 'every-month-out', gt: 0 },
   },
@@ -36,7 +36,7 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
        PLACED SINCE REC-B23 step 7, straight after the cells above, in the block Waiting on you gave up when the
        questions went to Decide (`pages/money.ts`). */
     kind: 'bar',
-    heading: 'Every month, by category',
+    heading: 'Repeating, a month, by category',
     icon: 'chart-bar',
     span: 12,
     source: 'metric.every-month-by-category',

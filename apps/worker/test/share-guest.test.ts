@@ -49,7 +49,7 @@ test('THE LAST SHARE STOPPED: the guest is refused on the next call and the reco
 
   /* TOLD THEIR ACCESS ENDED, IN THE OWNER'S NAME, at the root and under the record's name, with the header the service
      worker deletes its copy on. */
-  for (const path of ['/api/whoami', '/app/studio/api/whoami']) {
+  for (const path of ['/api/whoami', '/studio/api/whoami']) {
     const res = await c.ask(path, { method: 'POST', cookie: guest, body: '{}' });
     assert.equal(res.status, 403, path);
     assert.equal(res.headers.get('x-braindog-access'), 'ended', path);

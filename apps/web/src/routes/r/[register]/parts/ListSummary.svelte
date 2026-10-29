@@ -30,6 +30,7 @@
   £119,124", "In £49,670") at 20, one 6px stacked bar (late, open, part paid, paid) and the late line under it.
 -->
 <script lang="ts">
+  import { dayShort } from 'braindog-render';
   import { labelOf } from '$lib/record/api.ts';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
   import StateDot from '$lib/ui/StateDot.svelte';
@@ -67,6 +68,7 @@
     late: (n: number, said: string | null) => (said ? `${n} late · ${said}` : `${n} late`),
     out: 'Out',
     in: 'In',
+    newest: (what: string, on: string, one: string) => `${what} on ${on}, the newest ${one}.`,
   } as const;
 
   const stateField = $derived(decl.state ? decl.fields.find((x) => x.id === decl.state) : undefined);
@@ -100,6 +102,8 @@
    * part of it. A share is of the side's number where there is one, else of its rows.
    */
   function stateLines(rows: readonly Entry[], total: number | null): Line[] {
+    /* THE NEWEST READING HAS NO PARTS: nights by how they were taken would share out one night's cash. */
+    if (fig?.latest !== undefined) return [];
     const states = byState ? byStateOf(decl, rows) : null;
     if (!states) return [];
     const all = total ?? rows.length;
@@ -124,7 +128,7 @@
       .map((l, at, rest) => ({ ...l, tint: l.stand === 'open' && rest.findIndex((x) => x.stand === 'open') !== at }));
   }
 
-  const split = $derived(fig && !sided && !(byState && byStateOf(decl, entries)) ? figureSplit(decl, fig, entries, stateLabel, titleOf) : null);
+  const split = $derived(fig && fig.latest === undefined && !sided && !(byState && byStateOf(decl, entries)) ? figureSplit(decl, fig, entries, stateLabel, titleOf) : null);
 
   const sides = $derived.by((): Side[] => {
     if (figured && sided) {
@@ -152,7 +156,9 @@
 
   const states = $derived(byState ? byStateOf(decl, entries) : null);
   const reading = $derived(
-    [states ? stateReading(decl, states, entries, now, stateLabel, headSaid) : null, split?.reading ?? null].filter(Boolean).join(' '),
+    fig?.latest !== undefined
+      ? words.newest(labelOf(fig.field), dayShort(fig.latest), decl.one ?? 'row')
+      : [states ? stateReading(decl, states, entries, now, stateLabel, headSaid) : null, split?.reading ?? null].filter(Boolean).join(' '),
   );
   const one = $derived(sides.length === 1 && sides[0]!.label === null ? sides[0]! : null);
   const lead = $derived(fig !== null || reading !== '');

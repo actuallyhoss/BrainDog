@@ -1,7 +1,7 @@
 /**
  * The fonts' addresses carry their hash, and the shell preloads the same addresses the stylesheet asks for.
  *
- * `static/_headers` keeps `/app/fonts/*` for a year, which is only safe while a new file is a new address: each
+ * `static/_headers` keeps `/fonts/*` for a year, which is only safe while a new file is a new address: each
  * `url()` in `packages/skin/tokens.css` ends `?v=` and the first four hex of the file's SHA-256, checked here against
  * both apps' copies, because the site draws from the same sheet. And a preload is used only by a request for the same
  * address, so `src/app.html` preloads exactly the stylesheet's address for each face it names, with `crossorigin`.

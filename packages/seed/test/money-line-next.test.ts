@@ -127,7 +127,8 @@ test('a line a payment fits is found and said, and nothing on it is written: it 
   const before = m.k.get(line.id)!.version;
   m.paid('2026-09-28');
   await m.k.drain();
-  assert.deepEqual(m.queued(), ['match_payment', 'settle_matched_line']);
+  /* AND `replace_posted` SINCE money-core 3.31.0: every cleared line asks whether it is the real charge for one posted. */
+  assert.deepEqual(m.queued(), ['match_payment', 'settle_matched_line', 'replace_posted']);
   await m.turn();
   const f = fieldsOf(m.k, line.id);
   assert.deepEqual([f.next_due, f.last_paid ?? null, f.last_amount ?? null, m.k.get(line.id)!.version], ['2026-10-01', null, null, before], m.log.join(' | '));

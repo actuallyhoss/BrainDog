@@ -87,8 +87,10 @@ test('the keys folded before the refusal are not used: the compare is plain for 
   const tab = bill({ what: 'Chill Out' });
   const none = await ran([tab, bank]);
   const cut = await ran([tab, bank], stopsAt(3).fold);
-  assert.equal(none.out, null);
-  assert.equal(cut.out, null);
+  /* NOT LINKED: the plain compare finds no name, so the same money alone is asked about (Q1 of 29 October), as it is
+     on a host with no fold, and nothing is written. */
+  assert.deepEqual(cut.out, none.out);
+  assert.equal((cut.out as { ask: { question: string } }).ask.question, 'Is the GBP 4,000 that left on 1 October the Chill Out payment?');
   assert.deepEqual(cut.writes, []);
   assert.deepEqual(cut.log, [PLAIN, ...none.log]);
 });

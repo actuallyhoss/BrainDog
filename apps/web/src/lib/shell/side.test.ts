@@ -13,6 +13,7 @@ import {
   factOf,
   factsKept,
   holdsProjects,
+  leadFirst,
   homesOf,
   lanesOf,
   litOf,
@@ -88,7 +89,7 @@ const MODEL = () => {
     list('runs', { name: 'Agent runs', count: 930, kernel: true, facts: null }),
     list('things', { name: 'Projects', facts: facts({ projects: true }) }),
     list('readings', { name: 'Numbers', count: 2527, facts: facts({ ofProjects: true }) }),
-    list('services', { name: 'Services', count: 35 }),
+    list('services', { name: 'Services', count: 35, open: 6 }),
     list('notes', { name: 'Notes', count: 4 }),
   ];
   const places = [TODAY, { ...DECIDE, count: 13 }, WORKS, MONEY, { ...CREW, count: 3, live: true }, GUESTS];
@@ -122,7 +123,8 @@ test('every list lives under its place, a list named as a place is that place, a
   assert.equal(m.places.find((p) => p.label === 'Work')?.list, 'tasks', 'Work counts its tasks and draws no Tasks row');
   assert.equal(m.places.find((p) => p.label === 'Guests')?.count, 11, 'one word is never two rows');
   assert.deepEqual(m.projects?.kids.map((k) => k.label), ['Numbers']);
-  assert.deepEqual(m.more.map((l) => `${l.label} ${String(l.count)}`), ['Services 35', 'Notes 4']);
+  /* THE NUMBER IS WHAT IS STILL OPEN (Q35 of 29 October), and a list whose rows never finish shows none. */
+  assert.deepEqual(m.more.map((l) => `${l.label} ${String(l.count)}`), ['Services 6', 'Notes undefined']);
 });
 
 test('A PAGE A PLACE DECLARES AND THE LIST OF THE SAME NAME ARE ONE ROW: the page, whose list is a tap away on it', () => {
@@ -178,6 +180,8 @@ test('the crumb says the place, then where you are, each step a link back but th
   assert.deepEqual(crumbOf('/settings/navigation', m, '/settings', 'Navigation'), [{ label: 'Settings', href: '/settings' }, { label: 'Navigation' }]);
   assert.deepEqual(crumbOf('/search', m, null, 'Search'), [{ label: 'Search' }]);
   assert.deepEqual(crumbOf('/p/projects', m, '/p/projects', 'Projects'), [{ label: 'Projects' }]);
+  assert.deepEqual(crumbOf('/', m, '/', 'Today', 'Good afternoon, Mara'), [{ label: 'Good afternoon, Mara' }]);
+  assert.deepEqual(crumbOf('/r/ledger/42', m, '/r/ledger', null), [{ label: 'Money', href: '/p/money' }, { label: 'Ledger', href: '/r/ledger' }]);
 });
 
 test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT: "Projects 0 in play" headed a new shop', () => {
@@ -206,20 +210,18 @@ const p = (name: string, o: Partial<{ pinned: boolean; late: number; working: bo
   ...o,
 });
 
-test('by this week: pins, then late, then an agent at work, then money moved, then the record order', () => {
+test('a steady order: pins, then by name, whatever is late, at work or moved this week', () => {
   const list = [p('Quiet'), p('Moved', { moved: true }), p('Busy', { working: true }), p('Late', { late: 2 }), p('Pinned', { pinned: true }), p('Also quiet')];
   assert.deepEqual(
     byWeek(list).map((x) => x.name),
-    ['Pinned', 'Late', 'Busy', 'Moved', 'Quiet', 'Also quiet'],
+    ['Pinned', 'Also quiet', 'Busy', 'Late', 'Moved', 'Quiet'],
   );
 });
 
-test('a late project an agent is on stays with the late ones, and two late ones keep their order', () => {
-  const list = [p('A', { late: 1 }), p('B', { late: 3, working: true }), p('C', { working: true })];
-  assert.deepEqual(
-    byWeek(list).map((x) => x.name),
-    ['A', 'B', 'C'],
-  );
+test('the order does not move when a project turns late or an agent starts on it', () => {
+  const before = [p('A'), p('B'), p('C')];
+  const after = [p('A'), p('B', { late: 3, working: true }), p('C', { working: true })];
+  assert.deepEqual(byWeek(before).map((x) => x.name), byWeek(after).map((x) => x.name));
 });
 
 test('the width stays between 220 and 320, and anything unreadable is the start', () => {
@@ -272,4 +274,17 @@ test('A PROJECT ON THE PHONE SAYS ITS LANE AND ITS NEXT STEP under its name, eit
   assert.equal(phoneLine({ lane: 'earning' }, label), 'Earning');
   assert.equal(phoneLine({ lane: '', next: 'Write the store listing' }, label), 'Write the store listing');
   assert.equal(phoneLine({ lane: '', next: '  ' }, label), null);
+});
+
+test("a place's kept rows stand first and the rest fold under its More without their counts", () => {
+  const kids = [
+    { href: '/r/snapshots', label: 'Snapshots', icon: 'doc', count: 31 },
+    { href: '/p/money-ledger', label: 'Ledger', icon: 'doc' },
+    { href: '/p/money-accounts', label: 'Accounts', icon: 'doc' },
+    { href: '/r/categories', label: 'Categories', icon: 'doc', count: 15 },
+  ];
+  const got = leadFirst(kids, ['/p/money-accounts', '/p/money-ledger', '/p/money-budgets']);
+  assert.equal(got.lead, 2);
+  assert.deepEqual(got.kids.map((k) => k.label), ['Accounts', 'Ledger', 'Snapshots', 'Categories']);
+  assert.equal(got.kids[2]?.count, undefined, 'a list under More carries no count');
 });

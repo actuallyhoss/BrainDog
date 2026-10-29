@@ -113,7 +113,7 @@ export function plist(source, root = ROOT, node = process.execPath) {
 `;
 }
 
-/** The method an address asks, `/api/list` and `/app/<slug>/api/list` alike, or `null` for anything else. */
+/** The method an address asks, `/api/list` and `/<slug>/api/list` alike, or `null` for anything else. */
 export const methodOf = (pathname) => /\/api\/([A-Za-z][A-Za-z0-9/]*)$/u.exec(pathname)?.[1] ?? null;
 
 /** The record's own time in a `Server-Timing` header (`rec;dur=12.3`), or `null`. */

@@ -19,10 +19,10 @@
  */
 
 /**
- * Where both hosts serve it, under the app's base. `drawn-frame` reads as a record's name to `appPath`, so each host
- * answers this exact path before it reads a slug (`isDrawnFrame`).
+ * Where both hosts serve it, at the root beside the app's pages. Each host answers this exact path before it reads a
+ * slug (`isDrawnFrame`), and the Directory refuses `drawn-frame` as a record's name, so no record can stand in front of it.
  */
-export const DRAWN_FRAME_PATH = '/app/drawn-frame';
+export const DRAWN_FRAME_PATH = '/drawn-frame';
 
 /** Its policy: scripts and styles inline, pictures and fonts inline, and nothing fetched, sent or framed. */
 export const DRAWN_FRAME_POLICY = [

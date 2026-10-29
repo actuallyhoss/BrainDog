@@ -42,7 +42,7 @@ import { daySaid } from '@braindog/where';
 import { day as longDay, money, parse, since, sinceWords, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
-import { exponentOf, isPictureMime } from 'braindog-render';
+import { bankCode, exponentOf, isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { decl as fieldDecl, display, homeCurrency, labelOf, ROW_ID, unnamed, walkTable, type BlockResult } from './api.ts';
 /* WHO ASKED A QUEUE'S QUESTION, in the words the card that answers it uses. */
@@ -78,7 +78,7 @@ import { groupCards, meetsOf, mergedAway, seenWords, type CardRun, type GroupKey
 export { seenWords };
 import { declaredValue, registerHref } from './where.ts';
 import { format, fxNow, windowMs } from './metrics.ts';
-import { METRICS } from './declared.ts';
+import { FIGURES_KNOWN as METRICS } from './figures-known.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
 import { allStale, latestText, linesAndLatest, linesText, measuresOf, staleTilesText, tileRows } from './measures.ts';
 
@@ -210,7 +210,8 @@ function barRows(block: BlockResult): string[] {
       unset.push(...valuesOf(e.fields[of]));
       continue;
     }
-    const key = said ?? 'Nobody in particular';
+    /* A PAYEE THAT IS A BANK'S CODE IS SAID AS WHAT IT IS (Q15 of 29 October): "0140" on Payees is a transfer to that account. */
+    const key = (said !== null && (by === 'payee' || by === 'counterparty_text') ? (bankCode(said) ?? said) : said) ?? 'Nobody in particular';
     const hue = tint ? e.fields[tint] : undefined;
     if (!tints.has(key) && typeof hue === 'number' && Number.isFinite(hue)) tints.set(key, String(hue));
     /* A SPLIT BY A LINK TO ROWS THAT WEAR A COLOUR (a category) DRAWS EACH PART IN THAT COLOUR: the last word of the chip. */
@@ -298,13 +299,23 @@ function progressRows(block: BlockResult): string[] {
         /* A LIMIT IN ANOTHER CURRENCY THAN THE FIGURE IS SAID IN THE FIGURE'S, at the rate the record sent (the kernel let it by). */
         const from = currencyOf(own);
         const rate = from !== null && currency !== null && from !== currency && block.fx ? rateFor(block.fx.rates as Rate[], from, currency, recordToday(clockOf(block))) : null;
-        const limit = rate ? intoHome((own as { amount: number }).amount, from!, currency!, rate.rate) : own;
+        const base = rate ? intoHome((own as { amount: number }).amount, from!, currency!, rate.rate) : own;
+        /* WHAT CARRIED OVER INTO THIS PERIOD, a money fourth column in the limit's own currency (money-core's `carried`,
+           written by `budget-watch`): the bar is measured against the budget and it, and the row says how much of the
+           limit carried over. Another currency, or nothing carried, and the limit is the budget as typed. */
+        const extra = note ? e.fields[note] : undefined;
+        const carried =
+          extra && typeof extra === 'object' && typeof (extra as { amount?: unknown }).amount === 'number' && (extra as { amount: number }).amount > 0 && currencyOf(extra) === currencyOf(base)
+            ? (extra as { amount: number; currency: string })
+            : null;
+        const limit = carried && base && typeof base === 'object' ? { ...(base as { amount: number; currency: string }), amount: (base as { amount: number }).amount + carried.amount } : base;
+        const noteSaid = carried ? copy.budgetCarried(money(carried.amount, carried.currency)) : '';
         /* A PART IS KEYED BY WHAT THE FIGURE GROUPS BY: the row itself where that is a link to it (a category's id, which
            Money's spending figures group by), else the words in the label. Matched by the words alone, every budget drew
            nothing spent against a figure grouped by its category. */
         const part = spent.groups.find((g) => (e.id !== undefined && g.key === e.id) || g.key === String(e.fields[label] ?? ''))?.value ?? 0;
         const figure = currency ? money(Math.round(part), currency) : String(part);
-        return `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(figure)} | ${escapeCell(said(value, limit))} | `;
+        return `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(figure)} | ${escapeCell(said(value, limit))} | ${escapeCell(noteSaid)}`;
       }),
     );
   }
@@ -1437,7 +1448,7 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
         )
       : block.metrics
     ? block.metrics.map(
-        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value) || m.ahead !== undefined, m.ahead?.from)}${m.tone ? ` | ${m.tone}` : ''}`,
+        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value) || m.ahead !== undefined, m.ahead?.from) || (m.waits ? ' | -' : '')}${m.tone ? ` | ${m.tone}` : ''}`,
       )
     : block.kind === 'stat' && (block.register || block.measures)
       ? tileRows(measuresFor(block))

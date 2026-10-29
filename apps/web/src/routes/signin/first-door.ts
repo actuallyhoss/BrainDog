@@ -66,9 +66,9 @@ export const mailHeld = (it: Methods, ways: Ways | null, note: Note): boolean =>
   it.me === null && it.firstRun === true && it.magic === 'down' && ways === null && note !== 'out';
 
 /* THE DEMO PILL IS GONE, AND SO IS THE REASON IT WAS KEPT. The second finding on this screen was that
- * the pill never read `methods.demo`, and measuring showed it did not need to: a 401 at the bare `/app`
+ * the pill never read `methods.demo`, and measuring showed it did not need to: a 401 at the bare address
  * drew the shipped sample business, which is what the pill promised. There is no sample now.
- * `/app/` with nobody signed in is sent here like every other address that answers
+ * `/` with nobody signed in is sent here like every other address that answers
  * 401 (`signInFirst` in `lib/at.ts`), so the pill would have been a button back to this screen, and
  * on the first run the claim link sentence is the one way in there is. `methods.demo` went with it.
  */

@@ -54,7 +54,7 @@ test('over the Worker with SHARE_LINKS on: open, read with no session, close, re
   const opened = await call('openShare', { slug: 'plans' });
   assert.equal(opened.status, 200, JSON.stringify(opened.out));
   const { id, token, url } = opened.out.value as { id: string; token: string; url: string };
-  assert.equal(url, `https://app.example.test/app/s#${token}`);
+  assert.equal(url, `https://app.example.test/s#${token}`);
   assert.ok(!JSON.stringify(opened.out).includes(KEK), 'the answer carries no key');
 
   const read = () => c.ask('/api/sharedPage', { method: 'POST', headers: { authorization: `Share ${token}` }, body: '{}' });

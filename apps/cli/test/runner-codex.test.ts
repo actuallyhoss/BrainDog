@@ -69,7 +69,7 @@ test('A CODEX RUN READS AS THE TRANSCRIPT A PERSON READS: its start, each call w
     { type: 'item.started', item: { id: 'item_2', type: 'mcp_tool_call', server: 'braindog', tool: 'propose', arguments: { title: 'Notes' }, status: 'in_progress' } },
     {
       type: 'item.completed',
-      item: { id: 'item_2', type: 'mcp_tool_call', server: 'braindog', tool: 'propose', status: 'completed', result: { content: [{ type: 'text', text: '{"id":"P12","decide":"https://brain.dog/app/acme/decide/P12"}' }] } },
+      item: { id: 'item_2', type: 'mcp_tool_call', server: 'braindog', tool: 'propose', status: 'completed', result: { content: [{ type: 'text', text: '{"id":"P12","decide":"https://app.brain.dog/acme/decide/P12"}' }] } },
     },
     { type: 'item.completed', item: { id: 'item_3', type: 'agent_message', text: 'Proposed the notes as P12.' } },
     { type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 0, output_tokens: 5 } },
@@ -89,7 +89,7 @@ test('A CODEX RUN READS AS THE TRANSCRIPT A PERSON READS: its start, each call w
   assert.equal(lines[2]!.body.name, 'Bash');
   assert.equal(lines[4]!.body.name, 'mcp__braindog__propose');
   assert.equal(s.session, '0199a213-81c0-7800-8aa1-bbab2a035a53');
-  assert.deepEqual(s.filed, [{ id: 'P12', decide: 'https://brain.dog/app/acme/decide/P12' }]);
+  assert.deepEqual(s.filed, [{ id: 'P12', decide: 'https://app.brain.dog/acme/decide/P12' }]);
   assert.deepEqual([s.result?.subtype, s.result?.result, s.result?.num_turns], ['success', 'Proposed the notes as P12.', 2]);
 });
 

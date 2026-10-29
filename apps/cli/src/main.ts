@@ -394,6 +394,10 @@ const fullUsage = () =>
     "  Meet everybody with two or more commits in the repositories your projects list, by remote or folder, grouped by address, each with the project they worked in, at most 200 a run. Only commits since a repository joined its project count, and --whole-history counts every one. Repositories no project lists, bots, machines, coding agents and your own commits are left out, and nobody is met until People says which person is you. With --dry-run it prints who it would meet and sends nothing.",
     'braindog attach <file.html> [pictures...] --on <thing> [--title <title>] [--host <host>]',
     "  Put a page on a task, a project, a question or a decision, so it shows inside BrainDog where that thing shows. The pictures it names beside it go up with it. Attached again under the same title, it is the next version. It answers a receipt and the line that takes it back: braindog attach --undo <batch>.",
+    'braindog today [add "<what it shows>" [--size small|wide|tall|large|full]] [--host <host>]',
+    "  Say the widgets on Today, or put one there made from your words: the record's own rules first, the model only when they cannot. A sign-in that may not arrange Today puts it there as a draft for the owner to keep or throw away.",
+    'braindog widget share <name> [--out <folder>] [--host <host>]',
+    '  Make an add-on of one widget on Today: its file, a test and a README in a folder, with your own names turned into settings whoever installs it picks.',
     'braindog signs [--json] [--strict] [--host <host>]',
     "  Say your record's vital signs now: whether arrivals are filed, numbers arrive, questions pile up on one cause, how old the oldest open question is, and whether runs end as they should. One read: it opens no run. A red sign still exits 0; --strict exits 2 on any red, for scripts.",
     'braindog tidy [--ask] [--json] [--host <host>]',
@@ -524,6 +528,8 @@ const GROUPS: [string, [string, string][]][] = [
     ['scripts resume <id>', 'Start a paused script again'],
     ['people harvest', 'Meet the people who committed to your projects'],
     ['signs', "Say your record's vital signs"],
+    ['today [add "<what>"]', 'Say Today, or put a widget on it'],
+    ['widget share <name>', 'Make an add-on of a widget on Today'],
     ['tidy', 'Say what went stale and the call that clears each'],
     ['understand', 'Say what your record would link'],
     ['private-terms', 'Write your private list from your own record'],
@@ -673,10 +679,10 @@ async function mcp(args: string[]): Promise<void> {
 async function signIn(args: string[]): Promise<void> {
   /* `app.brain.dog` AND NOT `brain.dog`, because the example is the one address a person copies and only production's
      `PUBLIC_HOST` starts a device. The shared name stays a legacy host of the same Worker; with production's vars a
-     device start there answers 403 "This BrainDog signs devices in at https://app.brain.dog, so start there". Tokens
-     minted on the old name keep working there, but a new login does not. `test/login.test.ts` reads the host from
+     device start there answers 403 "This BrainDog signs devices in at https://app.brain.dog, so start there", which
+     is why `hostKey` reads a `brain.dog` address as `app.brain.dog` before anything is asked. `test/login.test.ts` reads the host from
      `apps/worker/wrangler.jsonc`, so a later move fails there rather than in somebody's terminal. */
-  const wrong = 'braindog login takes one host, as in braindog login https://app.brain.dog/app/<slug>, and --keychain <project>, and nothing else.';
+  const wrong = 'braindog login takes one host, as in braindog login https://app.brain.dog/<slug>, and --keychain <project>, and nothing else.';
   let parsed: { values: { vault?: string | undefined; keychain?: string | undefined }; positionals: string[] };
   try {
     parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { vault: { type: 'string' }, keychain: { type: 'string' } } });
@@ -746,7 +752,7 @@ async function keysCommand(args: string[]): Promise<void> {
  * the same `AgentIo`, so swapping where `out` goes is the whole of the flag: not one line in a command
  * body asks whether it was given.
  */
-async function agentCommand(which: 'attach' | 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'kennel' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify' | 'people' | 'understand' | 'signs' | 'tidy' | 'feed' | 'private-terms' | 'actions', args: string[]): Promise<void> {
+async function agentCommand(which: 'attach' | 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'kennel' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify' | 'people' | 'understand' | 'signs' | 'tidy' | 'feed' | 'private-terms' | 'actions' | 'today' | 'widget', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -764,7 +770,7 @@ async function agentCommand(which: 'attach' | 'skills' | 'tools' | 'page' | 'use
      `import { DatabaseSync } from 'node:sqlite'`, and a static import at the top of this file would load
      it, and Node's `ExperimentalWarning`, before every command this CLI runs, not only these four. */
   const code =
-    which === 'attach' ? await (await import('./attach.ts')).attachCommand(args, io) : which === 'actions' ? await (await import('./actions-run.ts')).actionsCommand(args, io) : which === 'feed' ? await (await import('./feed.ts')).feedCommand(args, io) : which === 'private-terms' ? await privateTermsCommand(args, io) : which === 'signs' ? await signsCommand(args, io) : which === 'tidy' ? await (await import('./tidy.ts')).tidyCommand(args, io) : which === 'people' ? await peopleCommand(args, io) : which === 'understand' ? await understandCommand(args, io) : which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await (await import('./import.ts')).importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await (await import('./usecase.ts')).usecase(args, io) : which === 'pack' ? await (await import('./catalogue.ts')).pack(args, io) : which === 'kennel' ? await (await import('./kennel.ts')).kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
+    which === 'attach' ? await (await import('./attach.ts')).attachCommand(args, io) : which === 'today' ? await (await import('./today.ts')).todayCommand(args, io) : which === 'widget' ? await (await import('./today.ts')).widgetCommand(args, io) : which === 'actions' ? await (await import('./actions-run.ts')).actionsCommand(args, io) : which === 'feed' ? await (await import('./feed.ts')).feedCommand(args, io) : which === 'private-terms' ? await privateTermsCommand(args, io) : which === 'signs' ? await signsCommand(args, io) : which === 'tidy' ? await (await import('./tidy.ts')).tidyCommand(args, io) : which === 'people' ? await peopleCommand(args, io) : which === 'understand' ? await understandCommand(args, io) : which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await (await import('./import.ts')).importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await (await import('./usecase.ts')).usecase(args, io) : which === 'pack' ? await (await import('./catalogue.ts')).pack(args, io) : which === 'kennel' ? await (await import('./kennel.ts')).kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -1220,7 +1226,7 @@ function install(args: string[]): void {
  * program reads from stdout, and the first prints for a person while its first step may wait for six digits
  * (`setupCommand`, `48 §5.15`, `§5.16`). Both refuse the flag through their own strict `parseArgs`.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'attach', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'tidy', 'private-terms', 'doctor', 'env', 'sync', 'actions']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'attach', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'tidy', 'private-terms', 'doctor', 'env', 'sync', 'actions', 'today', 'widget']);
 
 /* `pack` IS THE OLD NAME OF `addon`, AND `usecase` OF `starter`, kept working: each pair is the one handler, with the same
    subcommands. */
@@ -1280,7 +1286,7 @@ try {
   /* AN ADAPTER IMPORT TAKES TWO WORDS OR AN OPTION OF ITS OWN, and any other `import` is a .brainl put back
      (`isAdapterImport`). Asked of the whole line rather than of a position, because both take `--host <h>` anywhere. */
   else if (command === 'import' && !(await import('./import.ts')).isAdapterImport(args)) await brainfileCommand('import', args);
-  else if (command === 'attach' || command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people' || command === 'understand' || command === 'signs' || command === 'tidy' || command === 'feed' || command === 'private-terms' || command === 'actions') await agentCommand(command, args);
+  else if (command === 'attach' || command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people' || command === 'understand' || command === 'signs' || command === 'tidy' || command === 'feed' || command === 'private-terms' || command === 'actions' || command === 'today' || command === 'widget') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'statusline') await statuslineCommand(rest);
   else if (command === 'install') install(args);

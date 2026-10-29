@@ -25,7 +25,7 @@ test("THE HEADER GOES ON THIS ORIGIN'S RECORD CALLS ONLY, and only while somebod
   const { f, seen } = host(() => new Response('{"ok":true,"value":1}', { status: 200 }));
   let as: typeof PRIYA | null = PRIYA;
   const wrapped = seeing(f, () => as, () => ORIGIN);
-  await wrapped(`${ORIGIN}/app/kiln/api/list?register=tasks`);
+  await wrapped(`${ORIGIN}/kiln/api/list?register=tasks`);
   await wrapped(`${ORIGIN}/auth/methods`);
   await wrapped('https://elsewhere.example/api/boot');
   as = null;

@@ -112,7 +112,7 @@
   .desk-ask {
     position: relative;
     margin-inline-start: auto;
-    width: 250px;
+    width: 300px;
     flex: none;
     transition: width 0.2s;
   }

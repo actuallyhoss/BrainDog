@@ -19,7 +19,7 @@ import { since } from 'braindog-render';
 
 import { VERB_LABELS, words as flowWords } from '../../lib/flow/flow.ts';
 import { lastSaid, lasted } from '../../lib/flow/source.ts';
-import { humanize } from '../../lib/record/names.ts';
+import { humanize, ruleNameSaid } from '../../lib/record/names.ts';
 
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
 import type { ActionRow, Channel } from '../../lib/record/actions.ts';
@@ -149,6 +149,12 @@ export const hubWords = {
   endedSubject: 'Runs this month that finished',
   endedOf: (n: number) => `of ${n.toLocaleString('en')}`,
   failedNote: (n: number) => `${n.toLocaleString('en')} failed`,
+  /* THE PRESS UNDER THE LIST THAT SHOWS BRAINDOG'S OWN UPKEEP, and hides it again. */
+  upkeepShow: (n: number) => (n === 1 ? 'Show 1 rule BrainDog keeps for itself' : `Show ${n.toLocaleString('en')} rules BrainDog keeps for itself`),
+  upkeepHide: 'Hide the rules BrainDog keeps for itself',
+  /* WHY A RUN FAILED, under the month's bars: the rule, then the run's own words. */
+  whyFailed: 'Why runs failed',
+  noReason: 'It did not say why.',
   nextUp: 'Next up',
   nextUpMeta: (days: number) => `Next ${days} days`,
   nextUpSubject: 'Scheduled actions due, by day',
@@ -225,44 +231,46 @@ export type Sentence = { text: string; needs: string };
 export function hubSentence(rows: readonly AutomationRow[], listSaid?: (id: string) => string): Sentence | null {
   if (rows.length === 0) return null;
   const on = rows.filter((r) => r.enabled);
-  const first = on.length === 0 ? (rows.length === 1 ? 'Off' : 'All off') : (counts(on, listSaid) ?? `${num(on.length)} on`);
+  if (on.length === 0) return { text: rows.length === 1 ? 'Off.' : 'All off.', needs: '' };
   const failing = on.filter((r) => r.last?.state === 'failed').map((r) => r.name);
   const monthly = rows.filter((r) => r.month !== null);
   const failed = monthly.reduce((n, r) => n + (r.month?.failures ?? 0), 0);
 
+  /* PLAIN WORDS, NOT A LOG (Q30 of 29 October): "4 runs failed this month, all on Ledger. 70 rules have never been
+     needed." where it read "106 on, 64 on Ledger · 36 ran, 70 never · 4 runs failed this month". */
   let needs = '';
   if (failing.length === 1) needs = `${failing[0]} is failing`;
   else if (failing.length === 2) needs = `${andList(failing)} are failing`;
-  else if (failing.length > 2) needs = `${num(failing.length)} failing`;
+  else if (failing.length > 2) needs = `${num(failing.length)} are failing`;
   else if (failed > 0) needs = `${num(failed)} ${failed === 1 ? 'run' : 'runs'} failed this month`;
-
-  /* FIGURES, NOT WORDS, between middots: "38 on · 4 ran, 34 never · none failed this month". */
-  const tail = needs || (monthly.length > 0 && on.length > 0 ? 'none failed this month' : '');
-  return { text: [first, tail].filter(Boolean).join(' · '), needs };
+  /* WHERE THE FAILURES ARE, when they are all on one list. */
+  const where = new Set(monthly.filter((r) => (r.month?.failures ?? 0) > 0).map((r) => r.register ?? ''));
+  const one = where.size === 1 ? [...where][0]! : '';
+  const at = failing.length === 0 && failed > 1 && one !== '' && listSaid ? `, all on ${listSaid(one)}` : '';
+  const first = needs ? `${needs}${at}.` : monthly.length > 0 ? 'Nothing failed this month.' : `${num(on.length)} on.`;
+  const never = counted(on);
+  const rest = never === null || never === 0 ? '' : never === 1 ? '1 rule has never been needed.' : `${num(never)} rules have never been needed.`;
+  return { text: [first, rest].filter(Boolean).join(' '), needs };
 }
+
+/** How many of the on rules have never run, from the record's count, or `null` from a host that sends none. */
+function counted(on: readonly AutomationRow[]): number | null {
+  if (on.length === 0 || !on.every((r) => typeof r.fired === 'number')) return null;
+  return on.filter((r) => (r.fired ?? 0) <= 0).length;
+}
+
+/**
+ * BRAINDOG'S OWN UPKEEP, NOT HIS (Q30 of 29 October): the rules that look after the machines a record is copied to,
+ * which nobody set up and nobody needs to switch. Left out of the list by default, and one press shows them.
+ */
+const OWN_PACKS = new Set(['setup-sync']);
+export const isUpkeep = (r: Pick<AutomationRow, 'pack' | 'register'>): boolean =>
+  (r.pack !== null && r.pack !== undefined && OWN_PACKS.has(r.pack)) || (r.register !== null && /^sync_/u.test(r.register));
 
 /** Past this many rules on one list, the sentence names them apart: a record that files by payee grows one a payee. */
 export const ONE_LIST_MANY = 10;
 
 const num = (n: number): string => n.toLocaleString('en');
-
-/**
- * THE ON RULES AS THE RECORD COUNTS THEM: how many are on, the list most of them are
- * rules on when it holds more than `ONE_LIST_MANY`, and how many have run against how many never have. "100 automations
- * run by themselves" stood over 64 Ledger filing rules and 43 that had never run. `null` from a host that sends no count,
- * and the sentence is then said as before.
- */
-function counts(on: readonly AutomationRow[], listSaid?: (id: string) => string): string | null {
-  if (on.length === 0 || !on.every((r) => typeof r.fired === 'number')) return null;
-  const ran = on.filter((r) => (r.fired ?? 0) > 0).length;
-  const never = on.length - ran;
-  const by = new Map<string, number>();
-  for (const r of on) if (r.register) by.set(r.register, (by.get(r.register) ?? 0) + 1);
-  const [list, most] = [...by].sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
-  const many = list !== null && listSaid && most > ONE_LIST_MANY ? `, ${num(most)} on ${listSaid(list)}` : '';
-  const done = never === 0 ? 'all have run' : ran === 0 ? 'none has run' : `${num(ran)} ran, ${num(never)} never`;
-  return `${num(on.length)} on${many} · ${done}`;
-}
 
 /* ── an automation's row ────────────────────────────────────────────────── */
 
@@ -404,12 +412,13 @@ export function monthBars(rows: readonly AutomationRow[], top = 6): Bar[] {
   return ranThisMonth(rows)
     .slice(0, top)
     .map((r) => ({
-      label: r.name,
+      label: ruleNameSaid(r.name),
       value: r.month.runs,
       /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR, red from its start, and the rest of
          the bar is the runs that finished: "3 failed" of 20 drew the whole bar red. */
       part: r.month.failures > 0 ? Math.min(r.month.failures, r.month.runs) : undefined,
-      note: r.month.failures > 0 ? hubWords.failedNote(r.month.failures) : undefined,
+      /* THE FAILED RUNS ARE SAID IN THE NUMBER COLUMN, "34 · 3 failed", never written on the bar's track. */
+      said: r.month.failures > 0 ? `${r.month.runs.toLocaleString('en')} · ${hubWords.failedNote(r.month.failures)}` : undefined,
     }));
 }
 
@@ -713,16 +722,16 @@ export function runLines(
     const own = runs.get(a.id);
     if (own && own.length > 0) {
       for (const r of own) {
-        out.push({ key: `a:${r.id}`, kind: 'automation', name: a.name, at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now), bad: BAD.has(r.state), path, outcome: outcomeOf(r.state) });
+        out.push({ key: `a:${r.id}`, kind: 'automation', name: ruleNameSaid(a.name, true), at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now), bad: BAD.has(r.state), path, outcome: outcomeOf(r.state) });
       }
     } else if (a.last) {
-      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: a.name, at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now), bad: BAD.has(a.last.state), path, outcome: outcomeOf(a.last.state) });
+      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: ruleNameSaid(a.name, true), at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now), bad: BAD.has(a.last.state), path, outcome: outcomeOf(a.last.state) });
     } else {
       /* A RULE THE RECORD COUNTS AND KEEPS NO RUN OF STILL RAN (agents F2): "Ran 17 times, last on 3 Sep" on its row
          beside "Nothing has run yet" here was two answers to one question. Its last firing is its line, with the count. */
       const c = a as Counted;
       if (typeof c.fired === 'number' && c.fired > 0 && typeof c.last_at === 'string' && Number.isFinite(Date.parse(c.last_at)))
-        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: a.name, at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path, counted: true, outcome: outcomeOf('done'), times: c.fired });
+        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: ruleNameSaid(a.name, true), at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path, counted: true, outcome: outcomeOf('done'), times: c.fired });
     }
   }
   for (const s of actions) {

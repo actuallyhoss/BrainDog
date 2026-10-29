@@ -169,12 +169,12 @@ test('PICTURES ARE READ THROUGH THE FILE DOOR AND HANDED IN INLINE; one that doe
     urls.push(String(url));
     return String(url).endsWith(SHA) ? new Response(new Uint8Array([1, 2, 3])) : new Response('', { status: 404 });
   }) as typeof fetch;
-  const out = await readPictures('https://b.example/app/kiln', [
+  const out = await readPictures('https://b.example/kiln', [
     { name: 'img/a.png', sha256: SHA, mime: 'image/png' },
     { name: 'img/b.png', sha256: SHA2, mime: 'image/png' },
   ], io);
   assert.deepEqual(out, { inline: { 'img/a.png': 'data:image/png;base64,AQID' }, missing: 1 });
-  assert.ok(urls.includes(`https://b.example/app/kiln/api/files/${SHA}`));
+  assert.ok(urls.includes(`https://b.example/kiln/api/files/${SHA}`));
 });
 
 test('A PAGE OF STRIPS ASKS ONCE A MINUTE FOR EACH THING, and asks again once told it changed', async () => {

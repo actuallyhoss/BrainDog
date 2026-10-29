@@ -4,7 +4,7 @@
  * WHAT NOBODY HAS FILED, SAID ONCE: the sentence the count `txn-uncategorised` counts by (`figures/spending.ts`), so the
  * bar over those entries and the condition it is drawn on read the same entries, less the money that came in.
  */
-const UNFILED = 'state is cleared, transfer is false, category is empty, parts is empty, on after -91d';
+import { UNFILED } from '../../figures/shared.ts';
 
 /**
  * ONLY WHAT WENT OUT, as the split above it and the heading over both: the count holds money that came in too, and a
@@ -67,7 +67,7 @@ export const WHERE_IT_WENT: Record<string, unknown>[] = [
     source: 'register.transactions',
     where: UNFILED_OUT,
     columns: [{ field: 'payee' }, { field: 'amount' }],
-    unset: 'No name yet',
+    unset: 'Not named yet',
     limit: PAYEE_BARS,
     when: { metric: 'txn-uncategorised', gt: 0 },
     empty: 'Everything paid out in the last 91 days has a category.',

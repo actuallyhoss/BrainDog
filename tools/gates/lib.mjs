@@ -203,12 +203,13 @@ export function buildVariants(root) {
 /**
  * WHERE THE APP IS SERVED, AND WHERE ITS SHELL IS ON DISK.
  *
- * The app is `app.brain.dog/app`, so `svelte.config.js` writes it to `build/app` and the Worker serves `build/` as it did.
- * Every browser gate serves `build/` at the root the same way and opens `/app<route>`; its SPA fallback is this shell,
- * because `build/index.html` no longer exists and a fallback to it would answer every route with a 404.
+ * The app is the root of `app.brain.dog`, so `svelte.config.js` writes it to the root of `build/` and the Worker serves
+ * `build/` as it is. Every browser gate serves `build/` at the root the same way and opens `<route>`; its SPA fallback
+ * is this shell. It was `/app` and `build/app/index.html` until 29 Oct, when the app left `/app`; `APP_BASE` stays, empty,
+ * so every gate that builds an address from it reads the same either way.
  */
-export const APP_BASE = '/app';
-export const appShell = (buildRoot) => join(buildRoot, 'app', 'index.html');
+export const APP_BASE = '';
+export const appShell = (buildRoot) => join(buildRoot, 'index.html');
 
 /**
  * When a build directory was written: the later of the directory and its `index.html`.
@@ -219,9 +220,9 @@ export const appShell = (buildRoot) => join(buildRoot, 'app', 'index.html');
  * tenth of a microsecond on `build/` and on each of the three variants.
  */
 function builtAt(dir) {
-  /* `app/index.html` SINCE THE APP MOVED UNDER `/app`, and the old place too, so a tree built before the move is still
-     read by the same rule rather than by its directory's time alone. */
-  const shells = [appShell(dir), join(dir, 'index.html')].filter((f) => existsSync(f));
+  /* `index.html` AT THE ROOT, where the app is, and `app/index.html` too, so a tree built while the app was under `/app`
+     is still read by the same rule rather than by its directory's time alone. */
+  const shells = [appShell(dir), join(dir, 'app', 'index.html')].filter((f) => existsSync(f));
   return Math.max(statSync(dir).mtimeMs, ...shells.map((f) => statSync(f).mtimeMs));
 }
 

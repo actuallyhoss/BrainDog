@@ -20,7 +20,8 @@ export const home = {
     /* THE SLOGAN, word for word, with its full stop. */
     title: 'Give your business a memory.',
     /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). */
-    sub: 'One place that remembers your work and tells you what needs you today. Your AI tools read from it too.',
+    /* PERSONAL USE AS MUCH AS BUSINESS (29 October), said lightly: your work, your money, your life. */
+    sub: 'One place that remembers your work, your money and your life, and tells you what needs you today. Your AI tools read from it too.',
     secondary: 'Connect your AI tools',
     works: 'Works with',
     /* The makers, once each: Claude, not "Claude Code" (§47 his notes). Their marks are `@braindog/skin/agent-marks.ts`. */
@@ -38,7 +39,7 @@ export const home = {
     title: "Who it's for",
     small: {
       title: 'Run a small business',
-      say: "See who owes you, what's due and how long the cash lasts, in one short brief each morning.",
+      say: "See who owes you, what's due and how long the cash lasts, on one page each morning.",
       figure: '14 months',
       figureSay: 'of cash at this pace',
       link: 'For small businesses',
@@ -51,16 +52,29 @@ export const home = {
       link: 'Connect your tools',
       href: '/agents',
     },
-    /* ONE PERSON AND THEIR AGENTS: "Work as a team or agency" sold what brain.dog
-       holds while invitations wait, and its page is held. One person running client work with Claude, Cursor and Codex
-       is true today. */
-    team: {
-      title: 'Run client work with your agents',
-      say: "Give each client a project. Your agents see what's next, and every change has a name on it.",
-      line: 'Claude moved Onboarding copy to review',
-      link: 'How agents work with you',
-      href: '/agents',
+    /* YOUR OWN LIFE (29 October): personal use as much as business. Money is a whole section of the app now, with
+       budgets, bills and a book of your own beside a company's. The rows in its drawing are Maya's (`MONEY_BAND`). */
+    life: {
+      title: 'Keep your own life in order',
+      say: "Budgets, bills, subscriptions, net worth and trips in a book of your own. It tells you what's due before it's late.",
+      link: 'For your own money',
+      href: '/docs/use/money',
     },
+  },
+
+  /* MONEY, A WHOLE SECTION (the 27 October rebuild): accounts, the ledger, budgets, the forecast, coming up, payees and
+     reports, and the add-ons that hang off it. The add-on names are the catalogue's own (`packs/`). */
+  money: {
+    title: 'Your money, in one place.',
+    say: 'Your net worth, every account, budgets that say what is left, bills and a forecast that says if cash runs short. For a business, for you, or both in separate books.',
+    worth: 'Net worth',
+    accounts: 'Accounts',
+    budgets: 'Budgets',
+    coming: 'Coming up',
+    left: (left: string) => `${left} left`,
+    over: (over: string) => `${over} over`,
+    of: (spent: string, of: string, period: string) => `${spent} of ${of} ${period}`,
+    addons: 'Add what you need: subscriptions, splitting costs with friends, investments and gold, property, insurance, debts, goals, trips, certificates and zakat.',
   },
 
   chores: {
@@ -124,7 +138,12 @@ export const home = {
     questions: [
       {
         q: 'Do I need to be technical?',
-        a: 'No. Write things down, forward bills and receipts, and read your brief each morning. Connecting an AI tool is optional and takes one line.',
+        a: 'No. Write things down, forward bills and receipts, and open Today each morning. Connecting an AI tool is optional and takes one line.',
+      },
+      {
+        q: 'Is it only for businesses?',
+        a: 'No. Keep your own money, bills, trips and plans in it, on their own or beside a business. Each book keeps its money apart.',
+        link: { label: 'How Money works', href: `${DOCS}/use/money` },
       },
       {
         q: 'Which AI tools work with it?',
@@ -143,6 +162,7 @@ export const home = {
       {
         q: 'What does it cost?',
         a: "Nothing while in early access. It is invite only for now: ask for an invite and we'll email you when it's ready.",
+        link: { label: 'Pricing', href: '/pricing' },
       },
     ],
   },

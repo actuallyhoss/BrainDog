@@ -48,6 +48,95 @@ export const HEALTH_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /**
+   * WHAT INSTALMENTS TAKE A MONTH, SINCE money-core 3.31.0: every part still to pay in the next twelve months, a twelfth
+   * of it, so a plan paid each quarter is read at its monthly share as a yearly premium is (`every-month-out`). A part
+   * already late is in it, since it still has to be paid.
+   */
+  'installments-a-month': {
+    metric: 'installments-a-month',
+    name: 'Instalments, a month',
+    source: 'register.installments',
+    where: 'state is open, direction is out, due before +366d',
+    value: { sum: { product: ['amount', { lookup: 'twelfth', by: 'direction' }] } },
+    lookups: { twelfth: { out: 1 / 12 } },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * WHAT ACTUALLY CAME IN A MONTH, SINCE money-core 3.32.0: the money received over the last three whole months, a third
+   * of it, moves between a person's own accounts left out (`MOVED`). Three months and not one, so a pay day either side of
+   * a month's edge does not halve or double it; whole months, so the month under way does not pull it down.
+   */
+  'received-a-month': {
+    metric: 'received-a-month',
+    name: 'Money in, a month',
+    source: 'register.transactions',
+    where: `${MOVED}, direction is in, on at least bom-3m, on before bom`,
+    value: { sum: { product: ['amount', { lookup: 'third', by: 'direction' }] } },
+    lookups: { third: { in: 1 / 3 } },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '90d',
+    compare: 'none',
+  },
+
+  /**
+   * WHETHER THE THREE MONTHS ARE ALL THERE: money in during the first of them. A Ledger started last month holds nothing
+   * there, and a third of one month's money would read as a month's, so the share is not said until it holds some.
+   */
+  'received-three-months-back': {
+    metric: 'received-three-months-back',
+    name: 'Money in, three months back',
+    source: 'register.transactions',
+    where: `${MOVED}, direction is in, on at least bom-3m, on before bom-2m`,
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* WHAT IS SPOKEN FOR A MONTH, AS MONEY, SINCE money-core 3.32.0: the top half of `spoken-for-share`, said when it is
+     more than came in, where a share past a hundred says less than the two amounts do. */
+  'spoken-for-month': {
+    metric: 'spoken-for-month',
+    name: 'Spoken for, a month',
+    source: 'register.recurring',
+    value: { sum_of: [{ metric: 'every-month-out' }, { metric: 'installments-a-month' }] },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * HOW MUCH OF WHAT COMES IN IS SPOKEN FOR, SINCE money-core 3.31.0 (round 1030, over-leverage): what goes out every
+   * month without anybody deciding again, the repeating lines and the instalments, as a share of what actually came in a
+   * month (`received-a-month`, since 3.32.0). It read repeating money in until then, which a real life often keeps
+   * little of or none, and a scratch record said "2,027%". Beside `kept-share-90d`, which is the past, this is what is
+   * already promised. Half or less is the mark: past it, a month with one pay day missing cannot meet what is owed. Both
+   * halves in one currency or no share at all (`ratio_of`, `packages/kernel/src/metrics.ts`).
+   */
+  'spoken-for-share': {
+    metric: 'spoken-for-share',
+    name: 'Spoken for of money in, a month',
+    source: 'register.recurring',
+    value: {
+      ratio_of: {
+        of: [{ metric: 'every-month-out' }, { metric: 'installments-a-month' }],
+        per: [{ metric: 'received-a-month' }],
+      },
+    },
+    format: 'pct',
+    target: { lte: 0.5 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'cash-foreign-share': {
     metric: 'cash-foreign-share',
     name: 'Cash in other currencies',

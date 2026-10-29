@@ -17,7 +17,7 @@ import { at } from '$lib/at.ts';
  * `/p/scripts` TOO: `/scripts` draws the People add-on's own `page.scripts` under a head of
  * its own, so the page's address was a second list of the same scripts, with a line in place of the count.
  */
-export const SCREENS: Readonly<Record<string, string>> = { activity: '/audit', scripts: '/scripts' };
+const SCREENS: Readonly<Record<string, string>> = { activity: '/audit', scripts: '/scripts' };
 
 export function load({ params, url }: Pick<LoadEvent, 'params' | 'url'>): void {
   const to = Object.hasOwn(SCREENS, params.slug ?? '') ? SCREENS[params.slug ?? ''] : undefined;

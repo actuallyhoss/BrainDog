@@ -3,7 +3,7 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "The Mac app: a thin Tauri 2 window around app.brain.dog/app (docs/55-DESKTOP-APP.md). Built with cargo, not pnpm.",
+  "description": "The Mac app: a thin Tauri 2 window around app.brain.dog (docs/55-DESKTOP-APP.md). Built with cargo, not pnpm.",
   "scripts": {
     "test": "node --test test/*.test.mjs"
   }

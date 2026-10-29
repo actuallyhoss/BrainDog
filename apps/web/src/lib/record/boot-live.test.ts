@@ -262,23 +262,23 @@ for (const [what, answer, code] of [
   ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }), 'UNAUTHORIZED'],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), 'UNREACHABLE'],
 ] as const) {
-  test(`${what} at the bare /app: the answer is a refusal, ${code}, and it is asked again`, async () => {
+  test(`${what} at the bare address: the answer is a refusal, ${code}, and it is asked again`, async () => {
     forget();
     const { io, sent } = host(answer);
-    const first = await readBoot(`${BASE}/app`, io);
+    const first = await readBoot(`${BASE}`, io);
     assert.equal(first.from, 'refused', JSON.stringify(first));
     assert.equal(first.from === 'refused' ? first.code : null, code);
-    await readBoot(`${BASE}/app`, io);
+    await readBoot(`${BASE}`, io);
     assert.equal(sent.length, 2, 'a refusal about whether anybody is signed in was kept for the tab');
-    assert.equal(new URL(sent[0]!).pathname, '/app/api/boot');
+    assert.equal(new URL(sent[0]!).pathname, '/api/boot');
     forget();
   });
 }
 
-test('A 401 AT /app ANSWERS THE RECORD\'S OWN REFUSAL, word for word, and the shell drawn over it carries it', async () => {
+test('A 401 AT THE BARE ADDRESS ANSWERS THE RECORD\'S OWN REFUSAL, word for word, and the shell drawn over it carries it', async () => {
   forget();
   const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
-  assert.deepEqual(await readBoot(`${BASE}/app`, io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
+  assert.deepEqual(await readBoot(`${BASE}`, io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
   const shell = refusedShell();
   assert.equal(shell.live, true, 'nothing drawn over a refusal is the in-browser sample');
   assert.equal(shell.index.registers.length, 0);
@@ -294,18 +294,18 @@ test('THE SHELL MODULE NO LONGER CARRIES A SAMPLE SHELL', async () => {
 test('UNDER A SLUG A 401 ASKS FOR SIGN-IN AND IS NEVER THE SAMPLE, which would be drawn dressed as that record', async () => {
   forget();
   const { io, sent } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
-  assert.deepEqual(await readBoot(`${BASE}/app/acme`, io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
-  assert.equal(new URL(sent[0]!).pathname, '/app/acme/api/boot');
+  assert.deepEqual(await readBoot(`${BASE}/acme`, io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
+  assert.equal(new URL(sent[0]!).pathname, '/acme/api/boot');
   forget();
 });
 
 test('A KEPT BOOT IS KEPT FOR ITS OWN RECORD, so a tab that moves to another slug asks that one', async () => {
   forget();
   const { io, sent } = host(() => json(200, { ok: true, value: BOOT }));
-  await readBoot(`${BASE}/app/acme`, io);
-  await readBoot(`${BASE}/app/acme`, io);
-  await readBoot(`${BASE}/app/kiln`, io);
-  assert.deepEqual(sent.map((u) => new URL(u).pathname), ['/app/acme/api/boot', '/app/kiln/api/boot']);
+  await readBoot(`${BASE}/acme`, io);
+  await readBoot(`${BASE}/acme`, io);
+  await readBoot(`${BASE}/kiln`, io);
+  assert.deepEqual(sent.map((u) => new URL(u).pathname), ['/acme/api/boot', '/kiln/api/boot']);
   forget();
 });
 
@@ -508,7 +508,7 @@ test("ONE WRITE'S LINES ARE ONE LINE from three, led by the note they share: cle
     line({ rowid: 20 - i, kind: 'delete', batch: 'b1', note: 'Cleared the examples', register: 'tasks', seq: i + 1, title }),
   );
   const items = newsOf([...cleared, line({ rowid: 5, ts: '2026-09-15T08:00:00.000Z', title: 'Older' , register: 'tasks', seq: 9 })] as never, 'p_1');
-  assert.deepEqual(items.map((i) => i.text), ['Cleared the examples: removed 3 items', 'Added Older']);
+  assert.deepEqual(items.map((i) => i.text), ['Cleared the examples: removed 3 items in Tasks', 'Added Older']);
   assert.equal(items[0]!.href, '/audit?by=you&on=2026-09-15');
   /* Two lines of one write keep their own lines. */
   assert.equal(newsOf(cleared.slice(0, 2) as never, 'p_1').length, 2);

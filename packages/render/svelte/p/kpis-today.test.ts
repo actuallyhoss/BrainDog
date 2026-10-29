@@ -81,7 +81,7 @@ test('KPIS IS ON THE SVELTE ENTRY, as every kind a host draws is', async () => {
 
 test('A TODAY ROW SAYS ITS PROJECT, ITS NAME AND ITS FIGURE IN ITS OWN CURRENCY, its change with no why, and opens where the host says', async () => {
   const { Kpis } = await entry();
-  const { body } = render(Kpis, { props: { kpis: [sales], form: 'today', home: 'GBP', now: NOW, href: () => '/app/p/kiln' } });
+  const { body } = render(Kpis, { props: { kpis: [sales], form: 'today', home: 'GBP', now: NOW, href: () => '/acme/p/kiln' } });
   const [row] = rowsOf(body);
   assert.ok(row);
   const said = textOf(row);
@@ -91,7 +91,7 @@ test('A TODAY ROW SAYS ITS PROJECT, ITS NAME AND ITS FIGURE IN ITS OWN CURRENCY,
   assert.match(said, /Down 5\.4% on Jul/u);
   /* ONE LINK, over the project and the name, to where the row opens. */
   assert.equal((row.match(/<a /gu) ?? []).length, 1);
-  assert.match(row, /<a class="kpi-open" href="\/app\/p\/kiln">/u);
+  assert.match(row, /<a class="kpi-open" href="\/acme\/p\/kiln">/u);
   /* THE PROJECT'S COLOUR IS ITS SLOT, set on the row. */
   assert.match(row, /--chart-1:var\(--cat-blue\)/u);
   assert.ok(!/kpi-stale-said/u.test(row), 'a number that arrived this month is not stale');

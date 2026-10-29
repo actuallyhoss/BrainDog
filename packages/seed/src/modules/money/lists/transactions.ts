@@ -218,6 +218,9 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
     { id: 'stays', label: 'Money stays yours', type: 'bool', derive: { via: { ref: 'category', field: 'transfer' } } },
     /* THE PROMISE THIS PAYMENT DISCHARGED. Reconcile is this field and nothing else. */
     { id: 'settles', label: 'Settles', type: 'ref', to: 'obligations', index: true },
+    /* THE REPEATING LINE THIS WAS POSTED FOR, SINCE money-core 3.31.0: written by `post_due` and by nothing else, so a real
+       charge that comes later knows the line the record wrote and takes its place (`replace_posted`, `post-due.ts`). */
+    { id: 'posted_for', label: 'Posted for you from', type: 'ref', to: 'recurring' },
     { id: 'note', type: 'text' },
     /**
      * ONE PAYMENT OVER SEVERAL CATEGORIES, SINCE money-core 3.29.0: a shop run that was groceries and a gift, each part

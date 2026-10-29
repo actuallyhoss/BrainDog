@@ -70,7 +70,7 @@
 
 <span class="sb" data-size={size === 'sm' ? 'sm' : undefined} bind:this={root} role="group" aria-label={sendWords.sheet}>
   <button type="button" class="sb-main tap" disabled={sending} aria-busy={sending} aria-label={sendWords.sendToFull(last.label)} title={sendWords.sendToFull(last.label)} onclick={() => void now()}>
-    <Icon name="slash" size="s" /><span class="sb-words">{sendWords.sendToFull(last.label)}</span>
+    <Icon name="slash" size="s" /><span class="sb-words">{sendWords.sendToFull(last.label)}</span><span class="sb-short" aria-hidden="true">{sendWords.short}</span>
   </button>
   <button type="button" class="sb-more tap" aria-label={sendWords.more} aria-haspopup="dialog" title={sendWords.more} onclick={() => openHere()}>
     <Icon name="chevronDown" size="s" />
@@ -158,11 +158,19 @@
     }
   }
 
-  /* ON A PHONE THE MAIN HALF IS ITS GLYPH, 44 square, so a head with its primary and its "…" still fits at 320; its name
-     is said to a reader and on a long press. */
+  /* ON A PHONE THE MAIN HALF IS ITS GLYPH AND ONE WORD (Q46 of 29 October: the bare slash told nothing), so a head with
+     its primary and its "…" still fits at 320; its full name is said to a reader and on a long press. */
+  .sb-short {
+    display: none;
+  }
+
   @media (width < 640px) {
     .sb-words {
       display: none;
+    }
+
+    .sb-short {
+      display: inline;
     }
 
     .sb-main {

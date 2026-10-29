@@ -40,7 +40,7 @@
   import Segmented from '$lib/ui/Segmented.svelte';
 
   const words = {
-    title: 'Count cash',
+    title: 'Count the cash',
     account: 'Account',
     notes: 'Notes and coins',
     totalOnly: 'Total counted',
@@ -67,7 +67,7 @@
     addLine: 'Add a line',
     left: 'Left as Discrepancy',
     noCash: 'No cash account to count',
-    notSetUp: 'Needs the Count cash add-on',
+    notSetUp: 'Needs the Count the cash add-on',
     addOn: 'See add-ons',
     saved: 'Count saved',
     savedBody: 'Filing the difference in the Ledger.',

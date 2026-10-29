@@ -18,6 +18,7 @@
  */
 
 import { nextSplit } from '../page/next-split.ts';
+import { shownName } from '../shell/side.ts';
 import { counted, names } from './phrase.ts';
 
 const DAY = 86_400_000;
@@ -226,13 +227,14 @@ export function runProject(run: Pick<BoardRun, 'project' | 'repo' | 'remote' | '
   return null;
 }
 
-/** How a run ended, in words: still open, handed off, dropped, done, or ended without a handoff. */
+/** How a run ended, in words: still open, handed off, dropped, done, or stopped without a note. */
 export function endedAs(run: Pick<BoardRun, 'state' | 'closedAs' | 'handed'>): { said: string; open: boolean } {
   if (run.state === 'active' || run.state === 'idle') return { said: 'still open', open: true };
   if (run.state === 'handoff') return { said: 'handed off', open: false };
   if (run.closedAs === 'dropped') return { said: 'dropped', open: false };
   if (run.handed) return { said: 'done, with a handoff', open: false };
-  return { said: 'ended without a handoff', open: false };
+  /* SAID AS A PERSON WOULD (Q14 of 29 October): "ended without a handoff" stood on every agent line in the record's word. */
+  return { said: 'stopped without a note', open: false };
 }
 
 /* ── the board ─────────────────────────────────────────────────────────── */
@@ -271,6 +273,8 @@ const monthlyOf = (minor: number, every: string): number | null => {
   const f = MONTHLY[k] ?? (k === 'm' ? 1 : k === 'w' ? 52 / 12 : k === 'y' ? 1 / 12 : null);
   return f === null ? null : Math.round(minor * f);
 };
+/** How old a month's money may be and still be added into what the projects earn a month. */
+const EARN_FRESH_DAYS = 45;
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function factsOf(input: BoardInput): Facts[] {
@@ -307,11 +311,16 @@ function factsOf(input: BoardInput): Facts[] {
     const due = [...dueTasks, ...dueSaid].sort((a, b) => a.day.localeCompare(b.day));
     const ks = kpis.get(p.seq) ?? [];
     const kpi = ks[0] ?? null;
-    const q = kpi ? quietOf(kpi, today) : { quiet: false, days: 0 };
+    /* HOW LONG SINCE NUMBERS CAME IS READ FROM THE NEWEST READING OF ANY OF ITS NUMBERS (Q7 of 29 October): read off its
+       first number alone, Crumb.gg "sent no numbers for 89 days" on Projects while its own page said 31. */
+    const newest = ks.filter((k) => !!k.latestAt).sort((a, b) => b.latestAt!.localeCompare(a.latestAt!))[0] ?? kpi;
+    const q = newest ? quietOf(newest, today) : { quiet: false, days: 0 };
     const rs = (runs.get(p.seq) ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
     const ms = (moves.get(p.seq) ?? []).map((m) => m.at).sort();
+    /* THE NAME DRAWN IS THE ONE THE SIDEBAR SAYS (Q31 of 29 October): "mara-site" stood as a slug on Projects while the
+       sidebar said "Mara site". Matched above by the row's own title; only what is drawn changes. */
     return {
-      p,
+      p: { ...p, name: shownName(p.name) },
       late,
       lateDays,
       open: mine.length,
@@ -391,24 +400,35 @@ function ordered(fs: Facts[]): Facts[] {
 
 function earningOf(input: BoardInput, fs: Facts[]): Earning {
   const earning = fs.filter((f) => f.p.lane === 'earning');
-  const lines: (EarnLine & { currency: string })[] = [];
+  const lines: (EarnLine & { currency: string; left?: true })[] = [];
   for (const f of earning) {
+    /*
+     * ONE FIGURE A PROJECT, THE SAME ONE ITS ROW AND TODAY'S TILE SAY (audit of 30 October, 5): what it actually brought
+     * in last month, its headline monthly key number, while that reading is fresh. Only where it keeps none, or the
+     * reading is older than `EARN_FRESH_DAYS`, does what repeats stand in, said as repeating; a planned payout beside a
+     * real month under one "a month" read as two different earnings.
+     */
     const rec = input.recurring.filter((r) => projectOf(r.project, input.projects)?.seq === f.p.seq);
     const live = rec.filter((r) => r.state !== 'ended');
+    const k = f.kpi;
+    const monthly = !!k?.money && (k.every === '1m' || /month/iu.test(k.name));
+    const age = monthly && k!.latestAt ? daysBetween(k!.latestAt.slice(0, 10), input.today) : 0;
+    const old = monthly && age > EARN_FRESH_DAYS;
+    if (monthly && (!old || live.length === 0)) {
+      const when = k!.latestAt ? MONTH_SHORT[Number(k!.latestAt.slice(5, 7)) - 1]! : '';
+      /* A MONTH'S MONEY OLDER THAN 45 DAYS IS SAID AND NOT ADDED (Q7 of 29 October): August's revenue read as this month's
+         and made "about $152,000 a year". The line stays, saying how old it is and that the total leaves it out. */
+      const status = old ? `${when}, ${age} days old, not in the total` : f.quiet ? `made in ${when}, ${f.quietDays} days old` : `made in ${when}`;
+      lines.push({ name: f.p.name, hue: f.p.hue, minor: k!.money!.minor, said: input.format(k!.money!.minor, k!.money!.currency), status, warn: f.quiet || old, href: f.p.href, currency: k!.money!.currency, ...(old ? { left: true } : {}) });
+      continue;
+    }
     if (live.length > 0) {
       const currency = live[0]!.currency;
       const minor = live.filter((r) => r.currency === currency).reduce((s, r) => s + (monthlyOf(r.minor, r.every) ?? 0), 0);
       const paused = live.find((r) => r.state === 'paused');
       const next = live.map((r) => r.nextDue).filter((d): d is string => !!d).sort()[0];
-      const status = paused ? `paused${paused.nextDue ? `, was due ${dayChip(paused.nextDue).slice(4)}` : ''}` : next ? `next pay ${dayChip(next)}` : 'repeats';
+      const status = paused ? `repeats, paused${paused.nextDue ? `, was due ${dayChip(paused.nextDue).slice(4)}` : ''}` : next ? `repeats, next pay ${dayChip(next)}` : 'repeats';
       lines.push({ name: f.p.name, hue: f.p.hue, minor, said: input.format(minor, currency), status, warn: !!paused, href: f.p.href, currency });
-      continue;
-    }
-    const k = f.kpi;
-    if (k?.money && (k.every === '1m' || /month/iu.test(k.name))) {
-      const when = k.latestAt ? MONTH_SHORT[Number(k.latestAt.slice(5, 7)) - 1]! : '';
-      const status = f.quiet ? `${when}, ${f.quietDays} days old` : when;
-      lines.push({ name: f.p.name, hue: f.p.hue, minor: k.money.minor, said: input.format(k.money.minor, k.money.currency), status, warn: f.quiet, href: f.p.href, currency: k.money.currency });
       continue;
     }
     if (f.p.year) {
@@ -429,13 +449,13 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
   const currency = lines.some((l) => l.currency === input.home) && input.home ? input.home : lines[0]!.currency;
   const summed = lines.filter((l) => l.currency === currency).sort((a, b) => b.minor - a.minor);
   const other = lines.filter((l) => l.currency !== currency);
-  const total = summed.reduce((s, l) => s + l.minor, 0);
+  const total = summed.filter((l) => !l.left).reduce((s, l) => s + l.minor, 0);
   const unlinked = earning.length - lines.length;
   return {
-    total: input.format(total, currency),
-    year: `about ${input.format(Math.round((total * 12) / 100_000) * 100_000, currency)} a year`,
+    total: summed.some((l) => !l.left) ? input.format(total, currency) : null,
+    year: summed.some((l) => !l.left) ? `about ${input.format(Math.round((total * 12) / 100_000) * 100_000, currency)} a year` : null,
     currency,
-    lines: [...summed, ...other].map(({ currency: _c, ...l }) => l),
+    lines: [...summed, ...other].map(({ currency: _c, left: _l, ...l }) => l),
     empty: null,
     also: [other.length > 0 ? `${names(other.map((l) => l.name))} in another currency, not added` : '', unlinked > 0 ? `${plural(unlinked, 'project', 'projects')} with no money linked` : '']
       .filter(Boolean)
@@ -540,7 +560,7 @@ export function boardOf(input: BoardInput): Board {
     .sort((a, b) => a.day.localeCompare(b.day))
     .map((r) => {
       const p = r.project ? projectOf(r.project, input.projects) : null;
-      return { day: `${Number(r.day.slice(8, 10))} ${MONTH_SHORT[Number(r.day.slice(5, 7)) - 1]}`, project: r.name, text: p ? `${p.lane === PARKED ? 'parked ' : ''}${p.name}, in ${plural(daysBetween(input.today, r.day), 'day', 'days')}` : `in ${plural(daysBetween(input.today, r.day), 'day', 'days')}`, href: r.href };
+      return { day: `${Number(r.day.slice(8, 10))} ${MONTH_SHORT[Number(r.day.slice(5, 7)) - 1]}`, project: r.name, text: p ? `${p.lane === PARKED ? 'parked ' : ''}${shownName(p.name)}, in ${plural(daysBetween(input.today, r.day), 'day', 'days')}` : `in ${plural(daysBetween(input.today, r.day), 'day', 'days')}`, href: r.href };
     });
 
   const lateCount = lateLines.length;
@@ -553,7 +573,7 @@ export function boardOf(input: BoardInput): Board {
   const asksAll = live.flatMap((f) => f.asks);
 
   return {
-    date: `${dateLine(input.today)} · ${live.length} in play · ${parked.length} parked · ${finished.length} finished`,
+    date: `${dateLine(input.today)} · ${live.length} in play · ${parked.length} parked · ${finished.length} closed`,
     headline,
     lede,
     acts: {

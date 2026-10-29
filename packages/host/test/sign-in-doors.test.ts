@@ -117,7 +117,7 @@ test('A NEW ADDRESS IS MADE NOBODY UNTIL ITS MAILBOX ANSWERS, and the proof then
   assert.equal(s.sent.length, 1);
   assert.equal(s.sent[0]?.to, 'bo@example.com');
   assert.equal(s.sent[0]?.kind, 'invite.prove');
-  const prefix = `${ORIGIN}/app/invite#${INVITE}&proof=`;
+  const prefix = `${ORIGIN}/invite#${INVITE}&proof=`;
   const link = s.sent[0]?.link ?? '';
   assert.ok(link.startsWith(prefix), 'the proof is not mailed to the invitation page');
   const proof = link.slice(prefix.length);

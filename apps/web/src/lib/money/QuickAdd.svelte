@@ -15,7 +15,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { writeAmount } from 'braindog-render';
+  import { wordSlot, writeAmount } from 'braindog-render';
 
   import { homeCurrency } from '$lib/record/api.ts';
   import { recordToday } from '$lib/record/zone.ts';
@@ -372,7 +372,7 @@
                 data-lit={lit === i ? '' : undefined}
                 onpointerdown={(e) => (e.preventDefault(), pick(p))}
               >
-                <span class="qa-chipglyph" style:--chip={chipOf(c?.colour)} style:--chip-tint={tintOf(c?.colour)}><Icon name={glyph(c?.icon, 'tag')} size="s" /></span>
+                <span class="qa-chipglyph" style:--chip={chipOf(c?.colour ?? wordSlot(c?.name))} style:--chip-tint={tintOf(c?.colour ?? wordSlot(c?.name))}><Icon name={glyph(c?.icon, 'tag')} size="s" /></span>
                 <span class="qa-grow"><span class="qa-t">{p.name}</span><span class="qa-d">{words.usual(p.count, c?.name ?? null)}</span></span>
                 {#if lit === i}<kbd class="qa-kbd">↵</kbd>{/if}
               </div>
@@ -409,7 +409,7 @@
                   usualFrom = null;
                 }}
               >
-                <span class="qa-chipglyph" style:--chip={chipOf(c.colour)} style:--chip-tint={tintOf(c.colour)}><Icon name={glyph(c.icon, 'tag')} size="s" /></span>
+                <span class="qa-chipglyph" style:--chip={chipOf(c.colour ?? wordSlot(c.name))} style:--chip-tint={tintOf(c.colour ?? wordSlot(c.name))}><Icon name={glyph(c.icon, 'tag')} size="s" /></span>
                 <span class="qa-catname">{c.name}</span>
               </button>
             {/each}
@@ -573,7 +573,7 @@
     background: none;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--fs-page);
+    font-size: var(--fs-hero);
     font-weight: var(--fw-semi);
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
@@ -821,7 +821,7 @@
     .qa-figure {
       flex: 0 1 auto;
       inline-size: 7ch;
-      font-size: var(--fs-hero-phone);
+      font-size: var(--fs-hero);
       text-align: center;
     }
 

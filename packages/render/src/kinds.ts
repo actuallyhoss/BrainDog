@@ -371,3 +371,101 @@ export const isKind = (s: string): s is Kind => Object.hasOwn(TABLE, s);
 
 /** The two render-time degradations. Neither is a refusal: a document is never refused for its dialect. */
 export type DegradeCode = 'DIALECT_ARITY' | 'DIALECT_KIND_UNKNOWN';
+
+/* ── widget sizes ────────────────────────────────────────────────────────────
+   A WIDGET IS A BLOCK ON A BOARD (the widgets plan of 29 October, §3): the same declared block, given a frame from five
+   and a place in the board's order. Each kind says which frames it draws in and how many of its things (rows, figures,
+   cards) each frame shows; anything past that is "N more". The content fits the frame, never the other way round, so a
+   board never shifts when its rows land.
+
+   MIRRORED IN THE KERNEL (`packages/kernel/src/kinds/sizes.ts`), which refuses a size a kind cannot take and caps a
+   read to what the size shows, and held to this table by `packages/kernel/test/widget-sizes.test.ts`. */
+
+/** The five frames, smallest first. In board cells (laptop four columns, phone two): 1x1, 2x1, 1x2, 2x2, 4x1. */
+export const WIDGET_SIZES = ['small', 'wide', 'tall', 'large', 'full'] as const;
+export type WidgetSize = (typeof WIDGET_SIZES)[number];
+
+/** Each size's cells across and down, on the laptop's four columns and the phone's two (a full is a wide there). */
+export const SIZE_CELLS: Readonly<Record<WidgetSize, { w: number; h: number; phone: { w: number; h: number } }>> = {
+  small: { w: 1, h: 1, phone: { w: 1, h: 1 } },
+  wide: { w: 2, h: 1, phone: { w: 2, h: 1 } },
+  tall: { w: 1, h: 2, phone: { w: 1, h: 2 } },
+  large: { w: 2, h: 2, phone: { w: 2, h: 2 } },
+  full: { w: 4, h: 1, phone: { w: 2, h: 1 } },
+};
+
+/** What a size is called on the screen. */
+export const SIZE_WORDS: Readonly<Record<WidgetSize, string>> = { small: 'Small', wide: 'Wide', tall: 'Tall', large: 'Large', full: 'Full' };
+
+/**
+ * What a kind draws in each size it takes: how many of its things show. A size left out is one the kind cannot take.
+ * `cap` says the read may be cut to that many (and one more, to know there are more), which is true only of a kind
+ * whose rows are drawn as read: a queue reads its questions whole to put the money first, and the projects' cards read
+ * the whole list to choose the ones in play, so neither is cut.
+ */
+export type KindSizes = { shows: Partial<Record<WidgetSize, number>>; cap?: true };
+
+const LIST: KindSizes = { shows: { small: 1, wide: 2, tall: 4, large: 5, full: 2 }, cap: true };
+const FIGURE: KindSizes = { shows: { small: 1, wide: 2, tall: 4, large: 5, full: 6 } };
+const CHART: KindSizes = { shows: { wide: 1, large: 1, full: 1 } };
+
+export const KIND_SIZES: Readonly<Partial<Record<Kind, KindSizes>>> = {
+  note: { shows: { small: 1, wide: 1, tall: 1, large: 1, full: 1 } },
+  stat: { shows: { small: 1, wide: 3, tall: 3, large: 3, full: 5 } },
+  kpis: { shows: { small: 1, wide: 2, tall: 3, large: 4, full: 4 } },
+  ring: FIGURE,
+  progress: FIGURE,
+  gauge: FIGURE,
+  bar: FIGURE,
+  split: FIGURE,
+  sparkline: CHART,
+  series: CHART,
+  lines: CHART,
+  forecast: CHART,
+  todo: LIST,
+  timeline: LIST,
+  table: LIST,
+  spec: LIST,
+  steps: LIST,
+  link: LIST,
+  queue: { shows: { small: 1, wide: 1, tall: 2, large: 2, full: 1 } },
+  cards: { shows: { wide: 2, tall: 5, large: 4, full: 4 } },
+  calendar: { shows: { small: 1, wide: 7, large: 31, full: 84 } },
+  heat: { shows: { small: 1, wide: 7, large: 31, full: 84 } },
+  feed: { shows: { wide: 2, tall: 4, large: 5, full: 2 } },
+  agents: { shows: { wide: 2, tall: 4, large: 5, full: 2 } },
+  drawn: { shows: { small: 1, wide: 1, tall: 1, large: 1, full: 1 } },
+  gallery: { shows: { wide: 2, large: 4, full: 4 } },
+  lanes: { shows: { wide: 2, large: 5, full: 3 } },
+  board: { shows: { large: 5, full: 2 } },
+  roadmap: { shows: { large: 5, full: 2 } },
+};
+
+/** A kind with no row of its own draws as a page block does, in a wide, large or full frame. */
+const ANY: KindSizes = { shows: { wide: 2, large: 5, full: 2 } };
+
+/** The sizes a kind takes, smallest first. */
+export const sizesOf = (kind: string): WidgetSize[] => {
+  const row = (Object.hasOwn(KIND_SIZES, kind) ? KIND_SIZES[kind as Kind] : undefined) ?? ANY;
+  return WIDGET_SIZES.filter((s) => row.shows[s] !== undefined);
+};
+
+/** Whether `s` is one of the five sizes. */
+export const isWidgetSize = (s: unknown): s is WidgetSize => typeof s === 'string' && (WIDGET_SIZES as readonly string[]).includes(s);
+
+/** How many things a kind shows at a size, or `null` where it cannot take it. */
+export const sizeShows = (kind: string, size: WidgetSize): number | null => {
+  const row = (Object.hasOwn(KIND_SIZES, kind) ? KIND_SIZES[kind as Kind] : undefined) ?? ANY;
+  return row.shows[size] ?? null;
+};
+
+/** The size a kind takes nearest to `want`: the same, else the next larger it takes, else the largest. */
+export const nearestSize = (kind: string, want: WidgetSize): WidgetSize => {
+  const can = sizesOf(kind);
+  if (can.includes(want)) return want;
+  const at = WIDGET_SIZES.indexOf(want);
+  return can.find((s) => WIDGET_SIZES.indexOf(s) > at) ?? can[can.length - 1] ?? 'wide';
+};
+
+/** The size a kind is given when its block says none: the first of wide, large, full it takes. */
+export const defaultSize = (kind: string): WidgetSize => nearestSize(kind, 'wide');

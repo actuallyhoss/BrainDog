@@ -375,7 +375,8 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
    */
   estate: {
     page: 'estate',
-    title: 'Renewals',
+    /* ONE NAME IN THE BAR AND ON THE PAGE (Q50 of 29 October): the bar said Services, the page Renewals. */
+    title: 'Services',
     /* `Services`, AND THE SECTION WAS `Estate`. One area of this record had four names: the first
        run's second card said *The estate*, this heading said *Estate*, the pack said *Estate*, the
        register said *Services* and the page said *Renewals*. `Services` is the one the register
@@ -438,7 +439,9 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'register.services',
         where: 'state is lapsing',
-        columns: [{ field: 'name' }, { field: 'provider' }, { field: 'renews' }],
+        /* AND WHY EACH LAPSES (Q50 of 29 October): two domains that "renew" in Aug 2027 stood under Lapsing with no reason.
+           The reason is the row's own note ("Let it lapse at renewal"), and the day is the day it ends. */
+        columns: [{ field: 'name' }, { field: 'provider' }, { field: 'renews', label: 'Lapses' }, { field: 'note', label: 'Why' }],
         order: [{ field: 'renews', dir: 'asc' }],
         limit: 6,
         when: { metric: 'lapsing', gt: 0 },

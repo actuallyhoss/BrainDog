@@ -32,10 +32,12 @@ export const words = {
   cashNow: 'Cash now',
   /** Under the cash figure: the day it runs out on what is due, from the Money page's own figure. */
   lastsTo: 'Lasts to {{runs-out-on}}',
-  comingIn: 'Coming in, 30 days',
+  comingIn: 'To come in, next 30 days',
   /** The weekday on today's date block in Coming up. */
   today: 'Today',
-  goingOut: 'Going out, 30 days',
+  goingOut: 'To go out, next 30 days',
+  /** The work that falls due this week, under Work's own heading (audit Q10). */
+  workDue: 'Work this week',
   /** The tile of the few key numbers that lead Today (`numbersTile`). */
   numbers: 'Numbers',
 
@@ -43,6 +45,7 @@ export const words = {
   nothingWaiting: 'Nothing is waiting on you.',
   nothingDue: 'Nothing falls due in the next two weeks.',
   nothingNew: 'Nothing new since you last looked.',
+  nothingDueWork: 'No work falls due this week.',
   nothingLate: 'Nothing is late or due today.',
   nothingToCheck: 'Nothing is waiting for you to check.',
   nothingUrgent: 'Nothing is marked urgent.',

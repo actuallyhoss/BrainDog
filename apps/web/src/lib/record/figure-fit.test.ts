@@ -425,6 +425,10 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
   const browser = await chromium.launch();
   t.after(() => browser.close());
   const view = await browser.newPage({ viewport: { width: 1180, height: 900 } });
+  /* A BAND'S PROBES ARE ONE PAGE OF EVERY DECLARED STAT AT EVERY WIDTH, and laying it out takes Chromium most of
+     Playwright's default 30 s when the CI runs every leg at once (it failed there on that timeout, never on a cut
+     figure). The wait is the page's to take, not a hang, so it gets three minutes. */
+  view.setDefaultTimeout(180_000);
 
   const tight: Seen[] = [];
   const short: string[] = [];

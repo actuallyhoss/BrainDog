@@ -33,9 +33,12 @@ export function foldSaid(folded: readonly Folded[], lists: readonly { id: string
     .sort((a, b) => b[1] - a[1])
     .map(([id, n]) => {
       const list = known.get(id)!;
-      const one = oneOf(list.name) ?? inSentence(list.name.trim());
-      if (list.count > 1 && n >= list.count) return `every ${one}`;
-      return n === 1 ? `1 ${one}` : `${n} ${inSentence(list.name.trim())}`;
+      /* A NAME OF TWO THINGS HAS NO ONE SINGULAR: "every bills and invoice" was printed for Bills and invoices. */
+      const single = /\band\b/iu.test(list.name) ? null : oneOf(list.name);
+      const one = single ?? inSentence(list.name.trim());
+      /* "EVERY PEOPLE" WAS PRINTED: a name with no singular the voice knows is said whole, "all the people". */
+      if (list.count > 1 && n >= list.count) return single === null ? `all the ${one}` : `every ${single}`;
+      return n === 1 ? (single === null ? `1 of the ${one}` : `1 ${one}`) : `${n} ${inSentence(list.name.trim())}`;
     });
   if (others > 0) kinds.push(others === 1 ? '1 other row' : `${others} other rows`);
   const said = kinds.length === 0 ? '' : kinds.length === 1 ? kinds[0]! : `${kinds.slice(0, -1).join(', ')} and ${kinds.at(-1)!}`;

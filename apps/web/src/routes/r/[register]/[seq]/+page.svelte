@@ -127,7 +127,7 @@
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { reachWords } from '../reach.ts';
   import { OWN_TYPES } from '$lib/ui/own.ts';
-  import { knownOf, lastDayOf, meetsOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../people.ts';
+  import { knownOf, lastDayOf, meetsOf, orgNameSaid, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../people.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -805,6 +805,8 @@
    */
   const facts = $derived(
     shownFields
+      /* "SOURCE · TYPED" SAYS NOTHING: a number somebody typed is how most readings arrive, so only another source is said. */
+      .filter((f) => editing === f.id || !(f.id === 'source' && f.type === 'enum' && row?.fields[f.id] === 'typed'))
       .filter((f) => !evidence.has(f.id) && (editing === f.id || !importKeysOnly(row?.fields[f.id])))
       .sort((a, b) => Number(b.id === decl?.state) - Number(a.id === decl?.state)),
   );
@@ -852,14 +854,15 @@
       const role = roleFieldOf(decl);
       const projects = projectsOf(meets.projects);
       const day = lastDayOf(row.fields, meets);
-      const roleSaid = role ? display(id, role, row.fields[role], clock, names) : null;
+      /* A ROLE OF "Other" SAYS NOTHING (29 October, "Other, on Lanternfish and Copperleaf"), as the list leaves it unsaid. */
+      const roleSaid = role && row.fields[role] !== 'other' ? display(id, role, row.fields[role], clock, names) : null;
       const org = meets.org ? namedRef(fieldTo(meets.org), row.fields[meets.org]) : null;
       return {
         parts: whoParts({ role: roleSaid, org, projects }),
         named: projects.length > 0,
         last: day ? seenWords.lastInTouch(daySaid(day, clock)) : null,
         /* THE FIELDS THE SENTENCE SAYS, so the facts do not say them a second time under it. */
-        said: [roleSaid?.trim() ? role : null, org ? meets.org : null, day ? meets.in_touch : null].filter((x): x is string => Boolean(x)),
+        said: [roleSaid?.trim() || (role && row.fields[role] === 'other') ? role : null, org ? meets.org : null, day ? meets.in_touch : null].filter((x): x is string => Boolean(x)),
       };
     }
     const people = incoming.filter((g) => meetsOf(REGISTERS[g.register]) !== null).reduce((n, g) => n + g.total, 0);
@@ -902,6 +905,12 @@
       return { field, lines };
     });
   });
+  /* THE KIND AN ORGANISATION HAS NOT BEEN GIVEN, offered as its own press while nobody is editing it. */
+  const kindToSet = $derived(
+    orgRole?.kind && changes && row && unsetValue(row.fields[orgRole.kind]) && editing !== orgRole.kind
+      ? (readable.find((f) => f.id === orgRole?.kind && editable(f, id)) ?? null)
+      : null,
+  );
   const knownElsewhere = $derived(knownGroups.filter((g) => g.lines.length === 0 && editing !== g.field.id).map((g) => g.field));
   /* WHAT THE SENTENCE UNDER THE NAME SAYS ("Client at Halden Type Co. Last in touch 28 Aug."), and only while it is the
      sentence drawn: not listed as facts as well, and changed from "Add a field", where its box opens in the list. */
@@ -919,6 +928,15 @@
   );
   /* SAID ABOVE DETAILS, SO NOT AGAIN IN THEM: where they were seen, what they are known by, the projects the line under
      the name names, and the person whose record it is, which is their face's mark. */
+  /* WHO THEY ARE, IN THEIR OWN WORDS, FIRST (29 October, "a person page that reads like a person"): a person's note is
+     the paragraph under their name, in the page's ink, where it stood as a field labelled Note beside their email. The
+     facts under it are then what they are known by. Only on a person's page, and only while nobody is editing it. */
+  const about = $derived.by(() => {
+    if (!meets || !row || !decl) return null;
+    const f = decl.fields.find((x) => x.id === 'note' && !x.retired && x.type === 'text');
+    const v = f ? row.fields[f.id] : null;
+    return f && typeof v === 'string' && v.trim() !== '' && editing !== f.id ? { field: f.id, text: v } : null;
+  });
   const evidence = $derived(
     new Set(
       [
@@ -926,6 +944,7 @@
         ...saidAbove.map((f) => f.id),
         meets?.met ?? orgRole?.met,
         meets?.self,
+        about?.field,
         meets?.merged_into ?? orgRole?.merged_into,
         lead?.named ? (meets?.projects ?? orgRole?.projects) : undefined,
       ].filter((x): x is string => Boolean(x) && editing !== x),
@@ -1309,7 +1328,7 @@
        (`.row-head` below): a name, a chip, a primary and a "…" on one row cut "Chase Halden on 2026-041" to "Chase
        Halden…". -->
   <div class="row-head">
-  <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')} sentence={headLine}>
+  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : String(row.fields[decl.title] ?? '')} sentence={headLine}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
            person saw on an invoice was the one that puts `obligations#1` on the clipboard, ahead of anything that does
@@ -1439,6 +1458,12 @@
                  said here, beside the face their row wears in every list. -->
             <p class="self-line"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={owner} size="m" /><span>{personWords.self}</span></p>
           {/if}
+          {#if about}
+            <div class="about">
+              <NoteText text={about.text} />
+              {#if changes && editable(decl.fields.find((x) => x.id === about.field)!, id)}<div class="about-pencil">{@render pencil(decl.fields.find((x) => x.id === about.field)!)}</div>{/if}
+            </div>
+          {/if}
           {#if figure !== null && figureField}
             <div class="figure">
               <p class="figure-label">{labelOf(figureField)}</p>
@@ -1479,14 +1504,19 @@
               {/each}
             </dl>
             </div>
-          {:else if figure === null && !self}
+          {:else if figure === null && !self && !about}
             <p class="quiet">{rowWords.nothingYet}</p>
           {/if}
 
           <!-- WHAT THE ROW HAS NOT ANSWERED, behind one control: each field by name, and a new field for every row of the
                list last. For somebody who cannot change the list, one sentence says why there is no Edit or Archive. -->
-          {#if addable.length > 0 || (live && proposes) || (live && !changes)}
+          {#if addable.length > 0 || (live && proposes) || (live && !changes) || kindToSet}
             <div class="facts-foot">
+              <!-- AN ORGANISATION WITH NO KIND YET SAYS SO WITH ONE PRESS, where its kind was one name among the fields
+                   under "Add a field": what it is to you decides how the list groups it. -->
+              {#if kindToSet}
+                <Button weight="quiet" size="sm" onclick={() => kindToSet && startEdit(kindToSet)}>{seenWords.setKind}</Button>
+              {/if}
               {#if addable.length > 0 || (live && proposes)}
                 <Menu label={fieldWords.add}>
                   {#snippet trigger()}<span class="add-field"><Icon name="plus" size="s" /><span>{fieldWords.add}</span></span>{/snippet}
@@ -1840,6 +1870,22 @@
   }
 
   /* ── the fields tile ───────────────────────────────────────────────── */
+
+  /* A PERSON'S NOTE LEADS THEIR PAGE as a paragraph in the body's ink, the pencil at its end, with the facts under it. */
+  .about {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-4);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 1.55;
+  }
+
+  .about > :global(:first-child) {
+    flex: 1;
+    min-inline-size: 0;
+  }
 
   .self-line {
     display: flex;

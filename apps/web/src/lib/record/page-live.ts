@@ -29,6 +29,7 @@ import { stopped } from '../shell/headline.ts';
 import { presenceSaid, type RunPresence } from '../ui/presence-words.ts';
 import { factCells } from './card-fact-cells.ts';
 import { lateSaid } from '../home/today-tiles.ts';
+import { isForecast } from '../home/card-kpi.ts';
 import type { WorkedAt } from '../home/project-cards.ts';
 import { ratesPreset } from './action-draft.ts';
 import { live as actionsOf, type ActionRow, type Outcome } from './actions.ts';
@@ -58,7 +59,7 @@ import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { kept as keptAnswers, pageKey } from './kept-pages.ts';
-import { beyondOf, format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
+import { beyondOf, format, fxNote, hrefFor, leadOf, markOf, pluralsIn, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import { REDUCES, SUMS, type Entry, type PageBlock, type PageDecl } from './schema.ts';
@@ -72,6 +73,27 @@ import { learnZone, recordToday, weekdayDaySaid } from './zone.ts';
 import { pathOf } from '../ui/icons.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
+
+/**
+ * MONEY IN A SENTENCE IS SAID IN WHOLE UNITS (30 October, one rule app-wide): a line read "£11,317 a month, more than the
+ * £3,655.20 a month that came in". Lists and tables keep the pence the record holds; a note's sentence rounds each
+ * amount it carries to the whole pound, "£3,655", and leaves every other number as it is.
+ */
+export function wholeMoneyIn(text: string): string {
+  /* A RATE IS NOT AN AMOUNT: "USD 1 = EGP 50.50" keeps its pence, or "GBP 1 = USD 1.35" would read as one to one. */
+  return text.replace(/(?<!\b1 = )((?:[£$€¥₹]|\b[A-Z]{3}\s)[−-]?)(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})(?!\d)/gu, (_, lead: string, units: string, cents: string) => {
+    const whole = Number(units.replace(/,/gu, '')) + (Number(cents) >= 50 ? 1 : 0);
+    return `${lead}${whole.toLocaleString('en')}`;
+  });
+}
+
+/** A block's resolver as `pluralsIn` reads a figure: its words, none for a path that names nothing, `null` unread. */
+const saidFor =
+  (read: Resolve) =>
+  (path: string): string | null => {
+    const v = read(path);
+    return v === UNNAMED ? '' : typeof v === 'string' ? v : null;
+  };
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -898,7 +920,8 @@ export function tileOf(
    * nothing is zero, and it is the verdict on it that was invented.
    */
   const unsaid = !empty && r.rows === 0 && decl !== undefined && overUnsaidField(decl);
-  const met = empty || unsaid ? null : r.met;
+  /* A FLOOR OF NOUGHT MARKS ONLY ITS MISS (`markOf`): "Oldest balance 3 Sep" and "To pay on the card £1,240" drew a tick. */
+  const met = empty || unsaid ? null : markOf(decl, r.met);
   /* NO DOOR OVER NO ROWS, AND NONE FOR A FIGURE THAT READS NO LIST: `hrefFor` answers `null` there, where it used to
      answer Money's page on every record. */
   const door = decl && !empty && !unsaid ? hrefFor(decl) : null;
@@ -1546,7 +1569,7 @@ export function blockOf(
     ...(empty === undefined ? {} : { empty }),
     /* A DAY THE RECORD WROTE INTO A NOTE IS SAID AS A PERSON SAYS IT (`datesIn`): a person's Seen in read
        "2026-08-28 · mail from halden.example". Never in a document, whose words are the person's own. */
-    ...(body === undefined ? {} : { body: kind === 'note' && rest.document !== true && typeof body === 'string' ? datesIn(body, now) : body }),
+    ...(body === undefined ? {} : { body: kind === 'note' && rest.document !== true && typeof body === 'string' ? datesIn(pluralsIn(wholeMoneyIn(body), saidFor(namedResolverOf(values, unnamedOf(b)))), now) : body }),
     ...(target === undefined ? {} : { target }),
     ...(authored === undefined ? {} : { authored }),
     ...(cells === undefined ? {} : { cells }),
@@ -1665,7 +1688,20 @@ export function blockOf(
     return { ...shell, authored: tracks, shown: tracks.length, total: plans.length + (typeof past === 'number' && past > 0 ? past : 0) };
   }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
-  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: onceATile((readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : b.tone === 'info' ? 'info' : 'warn', 'foot'))) };
+  if (b.cells || (kind === 'stat' && !registerOf(b)))
+    return {
+      ...shell,
+      metrics: onceATile(
+        (readings ?? []).map((cell, i) => {
+          const m = tileOf(cell, values, b.tone === 'bad' ? 'bad' : b.tone === 'info' ? 'info' : 'warn', 'foot');
+          /* A LINE ASKED FOR AND NOT KEPT YET (audit of 30 October, 21): Money's "Net worth, the last 12 weeks" drew its
+             number over an empty chart until the nights had kept a line. It says when the line starts instead. */
+          const asked = typeof b.cells?.[i]?.trend === 'string' && b.cells[i]!.ahead === undefined;
+          const kept = (m.trend ?? []).filter((v) => v !== null).length;
+          return asked && kept < 3 && m.value !== MISSING ? { ...m, waits: true as const } : m;
+        }),
+      ),
+    };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read, EACH BY ITS NAME: a part keyed by a ref is the row
      it points at, read from the walk `pageReader` made of that list, and never the ULID the key is. */
   if (typeof source === 'string' && source.startsWith('metric.')) {
@@ -1829,7 +1865,9 @@ export function blockOf(
         const v = r.fields[c.field];
         if (c.field === 'day') return late ? lateSaid(due, today) : typeof v === 'string' ? dateSaid(v, now) : null;
         if (c.field === 'amount') {
-          if (!isObject(v) || typeof v.amount !== 'number' || typeof v.currency !== 'string') return null;
+          /* NO AMOUNT OF NOTHING (30 October): "Wildcard certificate £0.00" said a payment that is none; Today drew it
+             with no amount, and so does every list now. */
+          if (!isObject(v) || typeof v.amount !== 'number' || typeof v.currency !== 'string' || v.amount === 0) return null;
           const said = money(v.amount, v.currency);
           const out = c.sign ? r.fields[c.sign.field] === c.sign.minus : false;
           return `${out ? '−' : '+'}${said}`;
@@ -1951,10 +1989,12 @@ export function blockOf(
   /* THE NUMBERS A PROJECT REPORTED, worked out by the record: one series a measure, drawn as tiles or charts. */
   if (kind === 'stat' || kind === 'lines') {
     if (Array.isArray(measured)) {
-      const measures = measured.filter(isSeries);
+      /* A PLAN IS NOT A READING (Q33 of 29 October): Numbers opened on "Monthly revenue a year out: base, bear, bull", a
+         month old, as if measured. A project's page says its plan apart (`project-facts.ts` `planOf`); here it is left out. */
+      const measures = measured.filter(isSeries).filter((m) => !isForecast(m.name));
       /* A MEASURE READ ONCE IS ITS READING, which a current record answers beside a `lines` block's lines (`latest`), and
          a `stat` has none of: its tiles are each a measure's newest reading already. */
-      const latest = kind === 'lines' ? latestOf(readOnce) : [];
+      const latest = kind === 'lines' ? latestOf(readOnce).filter((m) => !isForecast(m.measure)) : [];
       /* EVERY MEASURE IS DRAWN, so nothing is cut: `matched` counts readings, which no tile or chart is one of. */
       const drawn = measures.length + latest.length;
       return { ...shell, register, measures, ...(latest.length > 0 ? { readOnce: latest } : {}), shown: drawn, total: drawn };

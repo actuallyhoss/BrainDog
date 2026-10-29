@@ -40,7 +40,7 @@ import { readJoined, sealedSeen, type Call } from '../src/sync-record.ts';
 import { syncInventory } from '../src/sync.ts';
 import { dayOf } from '../src/session-start.ts';
 
-const HOST = hostKey('https://brain.example/app/the-bench');
+const HOST = hostKey('https://brain.example/the-bench');
 const PASSPHRASE = 'a lantern by the harbour wall';
 const SIGN_INS = JSON.stringify({ 'tracker|1a2b': { accessToken: 'at-planted-value', refreshToken: 'rt-planted-value', expiresAt: 1 } });
 const KEY_ITEM = 'braindog-sync-key/the-bench';

@@ -305,6 +305,11 @@ export type McpSurface<C> = {
    * `braindog:briefing`. Optional as the reads above are: a surface without it answers `NOT_IN_THIS_BUILD`.
    */
   briefing?(args: Record<string, never>, ctx: C): Answer;
+  /**
+   * Every widget Today can hold, each by name, group and sizes, whether the record can fill it and whether Today shows
+   * it already (the record's `widgetGallery`, READ+). It backs `braindog:widgets`. Optional as the reads above are.
+   */
+  widgetGallery?(args: { board?: unknown[] }, ctx: C): Answer;
   /** What stopped on the record now, the longest quiet first (the record's `exceptions`, READ+). It backs `braindog:exceptions`. */
   exceptions?(args: Record<string, never>, ctx: C): Answer;
   /**
@@ -618,7 +623,8 @@ export const TOOLS: readonly Tool[] = [
     /* WHEN TO REACH FOR IT IS THE INSTRUCTIONS' SECOND RULE, and was said again here: "an agent never decides, lay out
        options with propose" and "to change something you may not change yourself, propose it" were the two clauses
        this description carried, in the same payload, a line apart. Where the person decides is said once, here. */
-    description: 'Ask the person, with what you would do. Nothing changes until they decide in BrainDog.',
+    /* "IN BRAINDOG" WENT TO PAY FOR `widget` IN `body_kind` (round 1030): where they decide is the record, and says so. */
+    description: 'Ask the person, with what you would do. Nothing changes until they decide.',
     /* `cause` AND `withdraw`. A key is asked once: a second proposal with an open question's cause files
        nothing and is answered "Already waiting as SG90.". `withdraw` takes one back, a branch and not an eighteenth tool
        for `script_try`'s reason: the list was at its ceiling to the token, and a tool measured 76 where this is 21.
@@ -628,7 +634,7 @@ export const TOOLS: readonly Tool[] = [
     input: obj(
       {
         question: str('One answerable sentence.'),
-        body_kind: { enum: ['options', 'rowset', 'pattern', 'change', 'pack', 'settings', 'arrange'] },
+        body_kind: { enum: ['options', 'rowset', 'pattern', 'change', 'pack', 'settings', 'arrange', 'widget'] },
         /* THE change EXAMPLE WAS ONE THE RECORD REFUSES. Sent as written it answered `REQUIRED_MISSING` at
            `body.declaration_id`, and it taught the whole-declaration form for adding a field, which meant copying every
            field of the list and racing any other agent doing the same.
@@ -1284,6 +1290,7 @@ const FIXED: readonly Resource[] = [
   resource('understand', 'What the record would link and ask next, in names. Read before meet.'),
   resource('handoffs', 'The next steps runs left and nobody has taken, newest first, each with the app that left it and its project.'),
   resource('briefing', 'What matters here now: what is late, what is due, what stopped and what waits, a line each.'),
+  resource('widgets', 'Every widget Today can hold, by name, and which Today shows. Suggest one with propose, body_kind widget, body {said} or {block,size}, question your reason: it lands on Today as a draft.'),
   resource('exceptions', 'What stopped: what went quiet or has not run, the longest first, each in a sentence.'),
   resource('stale', 'What went stale where you stand, each with the one call that clears it.'),
   /* THE DESCRIPTION IS THE TEST FOR RECORDING ONE (`docs/32-PARITY.md`), said where a session looks before it
@@ -1326,7 +1333,7 @@ const FIXED: readonly Resource[] = [
  * here is read before it is listed, as it always was: who may read it is still the record's to say, and it draws no page.
  */
 export const OFFERED_DECIDES: ReadonlySet<string> = new Set([
-  'whoami', 'boot', 'context', 'understand', 'handoffs', 'briefing', 'exceptions', 'stale', 'learnings', 'sessions/live', 'digest/today', 'decisions', 'inbox', 'inbox/patterns',
+  'whoami', 'boot', 'context', 'understand', 'handoffs', 'briefing', 'widgets', 'exceptions', 'stale', 'learnings', 'sessions/live', 'digest/today', 'decisions', 'inbox', 'inbox/patterns',
   'actions', 'automations', 'arrangement', 'grammar/page', 'grammar/register', 'grammar/metric', 'grammar/proposals',
   'grammar/ingest', 'grammar/kinds', 'grammar/script', 'grammar/automations',
 ]);
@@ -1341,6 +1348,7 @@ const SERVED_BY: Readonly<Record<string, keyof McpSurface<unknown>>> = {
   understand: 'understandPlan',
   handoffs: 'previewPage',
   briefing: 'briefing',
+  widgets: 'widgetGallery',
   exceptions: 'exceptions',
   stale: 'stale',
   learnings: 'learnings',
@@ -2062,7 +2070,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * A filed question with the address where the person answers it: `<origin>/app/<slug>/decide/<id>`.
+   * A filed question with the address where the person answers it: `<origin>/<slug>/decide/<id>`.
    *
    * AN AGENT THAT PROPOSED COULD SAY ONLY "I PUT A QUESTION IN YOUR QUEUE". Deciding is the person's, in the app, and no
    * token reaches it (ADR-060), so the one useful thing to hand them is the link to the question itself, which the agent
@@ -2090,7 +2098,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const record = boot.ok && isObject(boot.value) ? boot.value.record : undefined;
     const slug = isObject(record) && typeof record.slug === 'string' && record.slug !== '' ? record.slug : null;
     if (slug === null) return answer;
-    const at = `${origin.replace(/\/+$/, '')}/app/${encodeURIComponent(slug)}/decide/${encodeURIComponent(id)}`;
+    const at = `${origin.replace(/\/+$/, '')}/${encodeURIComponent(slug)}/decide/${encodeURIComponent(id)}`;
     return { ok: true, value: { ...answer.value, decide: at } };
   };
 
@@ -2890,6 +2898,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * CHANGE THAT SAYS `"try"` IS DRAWN INSTEAD OF FILED by the same branch (`preview` above), answered `page_preview`.
      */
     propose: async (args, ctx, turn) => {
+      /* A WIDGET LANDS ON TODAY AS A DRAFT, NOT A QUESTION (`widgetDraft` in the record), and its receipt's way back is
+         withdrawing that draft by its key while it is still one. */
+      const widgetBack = typeof args.withdraw === 'string' && args.withdraw.startsWith('widget:') ? args.withdraw.slice('widget:'.length) : null;
+      if (widgetBack !== null || args.body_kind === 'widget') {
+        const out = await surface.propose((widgetBack !== null ? { body_kind: 'widget', body: { withdraw: widgetBack } } : args) as never, ctx);
+        if (!out.ok || !isObject(out.value)) return { result: out };
+        const value = out.value;
+        if (widgetBack === null && typeof value.withdraw === 'string') turn.asks = value.withdraw;
+        return { result: { ok: true, value }, say: () => (typeof value.said === 'string' ? value.said : 'Done.') };
+      }
       if (args.withdraw !== undefined) return withdrawn(args, ctx);
       if (args.body_kind === 'change' && isObject(args.body) && args.body.try !== undefined) {
         const tried = await trial(args.body, ctx);
@@ -3566,6 +3584,45 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       },
     };
   };
+  /**
+   * THE WIDGETS, as `braindog:widgets`: the record's gallery, each by its name, group, sizes and whether it fills now,
+   * and the add-on that brings one the record lacks. NO READINGS: an agent picks by name and says why, and the owner sees
+   * the real numbers on the draft. Today's own widgets are read from the kept board, so `on_today` is what he sees.
+   */
+  const widgetsRead = async (ctx: C): Promise<Result<unknown>> => {
+    if (!surface.widgetGallery) return unbuilt('braindog:widgets', 'Read braindog:design for the kinds a page draws.');
+    const today = await surface.page({ slug: 'home' }, ctx);
+    const blocks = today.ok && isObject(today.value) && Array.isArray(today.value.blocks) ? today.value.blocks : [];
+    const board = blocks.flatMap((b: unknown) =>
+      isObject(b) && typeof b.key === 'string'
+        ? [{ key: b.key, ...(typeof b.heading === 'string' ? { heading: b.heading } : {}), ...(typeof b.source === 'string' ? { source: b.source } : {}), ...(typeof b.where === 'string' ? { where: b.where } : {}), ...(Array.isArray(b.cells) && isObject(b.cells[0]) && typeof b.cells[0].metric === 'string' ? { metric: b.cells[0].metric } : {}), empty: false }]
+        : [],
+    );
+    const out = await surface.widgetGallery({ board }, ctx);
+    if (!out.ok) return out;
+    const widgets = isObject(out.value) && Array.isArray(out.value.widgets) ? out.value.widgets : [];
+    return {
+      ok: true,
+      value: {
+        today: board.map((b) => b.heading ?? b.key),
+        widgets: widgets.flatMap((w: unknown) =>
+          isObject(w) && typeof w.title === 'string'
+            ? [
+                {
+                  name: w.title,
+                  ...(typeof w.says === 'string' ? { says: w.says } : {}),
+                  ...(typeof w.group === 'string' ? { group: w.group } : {}),
+                  ...(Array.isArray(w.sizes) ? { sizes: w.sizes } : {}),
+                  fills: w.ready === true,
+                  ...(typeof w.need === 'string' && w.ready !== true ? { needs: w.need } : {}),
+                  ...(w.onBoard === true ? { on_today: true } : {}),
+                },
+              ]
+            : [],
+        ),
+      },
+    };
+  };
   const exceptionsRead = async (ctx: C): Promise<Result<unknown>> => {
     if (!surface.exceptions) return unbuilt('braindog:exceptions', 'Read braindog:actions for what runs on a clock and when it last ran.');
     const out = await surface.exceptions({}, ctx);
@@ -3784,6 +3841,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     }
     if (head === 'handoffs' && !rest) return handoffsRead(ctx);
     if (head === 'briefing' && !rest) return briefingRead(ctx);
+    if (head === 'widgets' && !rest) return widgetsRead(ctx);
     if (head === 'exceptions' && !rest) return exceptionsRead(ctx);
     if (head === 'stale' && !rest) return staleRead(ctx);
     if (head === 'learnings' && !rest) return learningsRead(ctx, lean);

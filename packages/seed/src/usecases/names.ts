@@ -56,6 +56,71 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   'recurring-ended': 'End a schedule on its last day',
   'budget-near': 'Say when a budget is nearly spent',
   'budget-over': 'Say when a budget is over',
+  /* THE OTHERS THE PRODUCT SHIPS, each the name its declaration gives it, so a screen that could not read the record's
+     titles (Activity's fallback, a row's history) still says a sentence and never "Meet payees" or "Entry takes book". */
+  'account-closed': "Ask where a closed account's money goes",
+  'account-moved': 'Move what a closed account holds',
+  'bill-moves-line': 'Ask to move a repeating line on when its bill is paid',
+  'bill-takes-book': "File a bill or an invoice in its account's book",
+  'card-limit-owes': 'Work out what a card owes once its limit is typed',
+  'card-text-owes': 'Work out what a card owes from its text',
+  'category-stays-asks': 'Ask whether a category of moves is money that stays yours',
+  'category-stays-yes': 'Leave a category of moves out of spending',
+  'category-taught': 'Make the filing rule a person said yes to',
+  'category-teaches': 'Offer a filing rule from a category set by hand',
+  'entry-takes-book': "File a Ledger entry in its account's book",
+  'instalment-settles': 'Mark an instalment paid by its payment',
+  'invoice-chased': 'Mark an invoice as chased',
+  'kind-offers-kpis': 'Offer a project the key numbers of its kind',
+  'meet-payees': 'Know who each payment was with',
+  'meet-sender-organisations': 'Know who sends the mail a pattern reads',
+  'meet-senders': 'Note whoever writes in',
+  'part-counts-plan': 'Count what is left of a plan',
+  'part-takes-book': "File an instalment in its account's book",
+  'payment-matches': 'Find what a payment paid',
+  'payment-matches-again': 'Look again for what a recent payment paid',
+  'payment-settles': 'Mark a bill paid by its payment',
+  'payment-unsettles': 'Open a bill again when its payment is deleted',
+  'plan-links-parts': 'Link the parts of a new plan',
+  'plan-made-one': 'Move the parts of a plan made one with another',
+  'posted-replaced': 'Let a real charge take the place of the line posted for it',
+  'recurring-stopped': 'End a repeat that stopped',
+  'recurring-went-through': 'Move a repeat that went through on to its next day',
+  'renew-soon': 'Ask whether to keep a service before it renews',
+  'renewal-cancelled': 'Cancel a service somebody chose to cancel',
+  'renewal-kept': 'Keep a service somebody chose to keep',
+  'renewal-passed': 'Mark a service lapsing once its renewal day has passed',
+  'repeat-takes-book': "File a repeating line in its account's book",
+  'rule-files-back': 'File what a filing rule matches',
+  /* WORK'S TWO, which declare no name of their own: each is called what its script is. */
+  close_follow_ups: 'Close the follow-ups of a finished task',
+  start_with_parent: 'Start a follow-up where its parent is',
+};
+
+/**
+ * WHAT A FIRST-PARTY SCRIPT IS CALLED, by its id, the title it declares: what a screen says when it could not read the
+ * record's own titles, so a run reads "File what an account holds in the account's book" and never "Book from account".
+ */
+export const SCRIPT_NAMES: Readonly<Record<string, string>> = {
+  book_from_account: "File what an account holds in the account's book",
+  budget_watch: 'Mark a budget near or over its most for its week, month or year',
+  card_owed: 'Work out what a card owes from its texts',
+  category_stays: 'Ask whether a category of moves is money that stays yours',
+  close_account: 'Close an account, and ask about what it still holds',
+  file_back: 'File what a filing rule matches',
+  last_day: 'Ask whether a payment on a month end is the last day or that date',
+  learn_category: 'Offer a filing rule from a category set by hand',
+  match_payment: 'Find what a payment paid',
+  move_line: 'Ask to move a repeating line on when its bill is paid',
+  offer_budgets: "Offer a budget for each category from last month's spending",
+  plans_from_names: 'Give each plan a page and count what is left after each part',
+  post_due: 'Post the repeating lines you asked for on their day',
+  replace_posted: 'Let a real charge take the place of the line posted for it',
+  settle: 'Mark what a payment paid',
+  settle_matched_line: 'Mark a repeating line paid by its payment',
+  unsettle: 'Open a bill again when its payment is deleted',
+  close_follow_ups: 'Close the follow-ups of a finished task',
+  start_with_parent: 'Start a follow-up where its parent is',
 };
 
 /**

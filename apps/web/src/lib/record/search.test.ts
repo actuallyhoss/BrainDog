@@ -269,7 +269,8 @@ test('THE HEAD AND THE CAP LINE COUNT AGAINST THE SAME NUMBER', () => {
      row this tab typed is held apart from `result.total`. */
   assert.match(
     REGISTER,
-    /const denominator = \$derived\(narrowed \|\| q \? result\.matched : result\.total\)/u,
+    /* LESS WHO NO COUNT OF PEOPLE INCLUDES (`notCounted`, 29 October): you, and anybody folded into another. */
+    /const denominator = \$derived\(Math\.max\(0, \(narrowed \|\| q \? result\.matched : result\.total\) - notCounted\)\)/u,
   );
   assert.match(REGISTER, /total=\{denominator\}/u);
   assert.doesNotMatch(REGISTER, /total=\{result\.total\}/u, 'the head counts against the register again');

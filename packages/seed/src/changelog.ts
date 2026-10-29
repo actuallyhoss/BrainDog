@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.30.1',
+      notes: 'A project that leaves the board reads Closed, where it read Finished: its status, the fold in the sidebar and the figures that count them.',
+    },
+    {
       version: '1.30.0',
       notes: 'Projects opens on today: what is late, due this week, gone quiet or renewing. One list follows, earning first.',
     },
@@ -129,6 +133,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   core: [
+    { version: '1.2.0', notes: 'Health says what it found more plainly and links to Tidy up.' },
     { version: '1.1.0', notes: "Scripts calls the column that says how each script is doing Status." },
     {
       version: '1.0.0',
@@ -136,6 +141,8 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '4.2.1', notes: 'People says how many organisations and shops you deal with in one count, the one their list shows.' },
+    { version: '4.2.0', notes: 'People says how many organisations you work with, apart from the shops your card texts named.' },
     {
       version: '4.0.0',
       notes: 'Health, Scripts, Calendar and Activity moved to BrainDog itself. Your sidebar stays as it was.',
@@ -192,6 +199,15 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.32.0',
+      notes: 'Reports says how much of what comes in repeating bills and instalments take against the money that actually came in over the last three months, and only once there are three months to read. Budgets opens on its bars, all budgets together first, and every budget says what is left or how far over. An account page lists what moved as the Ledger does, and Coming up counts the same next two weeks on Money, Today and its own page, where what is late is listed first. Money\'s Accounts lists every open account, the card too. Budgets says whether each budget is for a week, a month or a year, and you set the most to spend and its period at the foot of the page. A line still waiting to clear counts in no spending figure until it clears: the Ledger lists it apart, and Budgets says how much is waiting. Accounts counts the accounts it lists, says how many balances are out of date, and a card says which digits it ends in. Over time draws Cash\'s line until net worth has a week of nights kept, then net worth\'s. Snapshots heads its list with the newest night, not thirty nights added up, and calls cash and bills together Cash after bills. Money\'s month of budgets says what every budget comes to as a month. An account\'s page opens on its name and what it holds. Payees no longer says nobody was paid over payments that name nobody, and Last paid lists only money out. Bills and invoices show their amounts signed.',
+    },
+    {
+      version: '3.31.0',
+      notes:
+        'Net worth counts what you hold beyond the bank (investments and gold, property, certificates, policy funds) less what you owe over time, and keeps it each night, in dollars and grams of gold too. A budget can be for a week or a year, and what carries over is shown. A repeating line can post itself on its day on an account no bank feeds, and a real charge later takes its place. Money\'s numbers agree with each other. A payment whose bank words name nothing pays a bill of the exact same money within ten days, or Money asks once whether it was that bill. A category that holds moves between your accounts asks once whether to leave it out of spending. Lines to file are counted the way the list shows them. Spending is called Spent with its period everywhere, repeating money is Repeating, a month, and what is still ahead is To come in and To go out. Reports says how much of what comes in each month repeating bills and instalments take. Each account is read in its own currency, every account drawn is counted, and Accounts says why a Ledger total can differ from the balance. Payees never shows a bank code as a name and asks once to name what names nobody. An empty plan offers no Mark paid, and a plan read paid while parts are left is open again.',
+    },
     {
       version: '3.29.1',
       notes: 'Money says less and shows more: each page opens on one line with a number in it, figures lose the notes that explained them, and an empty list says one short line.',
@@ -327,6 +343,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    { version: '2.6.0', notes: 'The Services page is called Services, as the menu says, and Lapsing says when each service lapses and why, from its own note.' },
     { version: '2.5.0', notes: 'The Vault is now the Keychain. Nothing you keep moved.' },
     { version: '2.4.0', notes: 'Services names what is lapsing: each one by its name, who it is with and the day it was due to renew, where At a glance was, while anything is. How many renew in 30 days is still on Today.' },
     {
@@ -347,6 +364,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.20.0',
+      notes: "Work's project chips, and Yours and Agents, count the same open tasks as Open, kept for later left out, and its first line says none of your tasks is late rather than nothing is late.",
+    },
     {
       version: '1.19.0',
       notes: "Threads can be ideas or planned, with a day they aim for. Work leads with Late, Waiting on you, This week and With an agent, and Board lists every open task.",
@@ -400,6 +421,14 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.26.0',
+      notes: 'Keys past their day are said in a plain sentence, and How the brain changed says how many learnings are in use beside how many arrived.',
+    },
+    {
+      version: '1.25.0',
+      notes: "Agents' first line counts the runs that are open and quiet as well as the ones working, so it agrees with Open now under it.",
+    },
     {
       version: '1.24.0',
       notes: "Shows how much of each agent's suggestions you accept unchanged, and a timeline of how the brain changed.",

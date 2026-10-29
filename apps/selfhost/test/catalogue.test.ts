@@ -1,10 +1,10 @@
 /**
- * A catalogue folder served read-only under `/app/catalogue/`: the index and each version's file, and nothing else in the
+ * A catalogue folder served read-only under `/catalogue/`: the index and each version's file, and nothing else in the
  * folder, whatever the path says.
  *
- * UNDER THE APP'S BASE, BECAUSE THAT IS WHERE THE APP ASKS (`apps/web/src/routes/packs/browse/catalogue.ts`
- * `CATALOGUE_BASE`). Served at `/catalogue/` alone, every catalogue this host held
- * was a 404 to the tab that reads it: the app fetched `/app/catalogue/index.json` and the shell answered that path.
+ * BESIDE THE APP, BECAUSE THAT IS WHERE THE APP ASKS (`apps/web/src/routes/packs/browse/catalogue.ts`
+ * `CATALOGUE_BASE`), and the app is at the root. While it was under `/app` the catalogue was `/app/catalogue/`, and
+ * that address is now the shell's 308 to this one.
  */
 
 import { test } from 'node:test';
@@ -33,30 +33,30 @@ test('the index and a version are answered, and any other path in the folder is 
   const base = `http://127.0.0.1:${(running.server.address() as { port: number }).port}`;
   const get = (path: string, init?: RequestInit) => fetch(`${base}${path}`, init);
 
-  const index = await get('/app/catalogue/index.json');
+  const index = await get('/catalogue/index.json');
   assert.equal(index.status, 200);
   assert.deepEqual(await index.json(), { format: 1, name: 'Test', entries: [] });
-  const file = await get('/app/catalogue/usecases/study/1.0.0.usecase.json');
+  const file = await get('/catalogue/usecases/study/1.0.0.usecase.json');
   assert.equal(file.status, 200);
   assert.equal(await file.text(), '{"usecase":"study"}');
 
-  const pack = await get('/app/catalogue/packs/bookshelf/1.0.0.pack.json');
+  const pack = await get('/catalogue/packs/bookshelf/1.0.0.pack.json');
   assert.equal(pack.status, 200);
   assert.equal(await pack.text(), '{"pack":"bookshelf"}');
 
-  for (const path of ['/app/catalogue/packs/bookshelf/1.0.0.usecase.json', '/app/catalogue/usecases/study/1.0.0.pack.json', '/app/catalogue/notes.txt', '/app/catalogue/usecases/study/1.0.1.usecase.json', '/app/catalogue/%2e%2e/outside.json', '/app/catalogue/usecases/..%2f..%2foutside/1.0.0.usecase.json', '/app/catalogue/']) {
+  for (const path of ['/catalogue/packs/bookshelf/1.0.0.usecase.json', '/catalogue/usecases/study/1.0.0.pack.json', '/catalogue/notes.txt', '/catalogue/usecases/study/1.0.1.usecase.json', '/catalogue/%2e%2e/outside.json', '/catalogue/usecases/..%2f..%2foutside/1.0.0.usecase.json', '/catalogue/']) {
     const res = await get(path);
     assert.equal(res.status, 404, path);
     assert.doesNotMatch(await res.text(), /yours|private/u, path);
   }
-  assert.equal((await get('/app/catalogue/index.json', { method: 'POST', body: '{}' })).status, 405);
-  /* THE ROOT IS NO LONGER A CATALOGUE. With no shell it is a path this host does not serve, like any other. */
-  const root = await get('/catalogue/index.json');
+  assert.equal((await get('/catalogue/index.json', { method: 'POST', body: '{}' })).status, 405);
+  /* THE OLD ADDRESS IS NO LONGER A CATALOGUE. With no shell it is a path this host does not serve, like any other. */
+  const root = await get('/app/catalogue/index.json');
   assert.equal(root.status, 404);
   assert.doesNotMatch(await root.text(), /"Test"/u);
 });
 
-test('a host with no catalogue says so under /app/catalogue/, and answers everything else as before', async (t) => {
+test('a host with no catalogue says so under /catalogue/, and answers everything else as before', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bd-catalogue-'));
   const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0 });
   t.after(async () => {
@@ -64,7 +64,7 @@ test('a host with no catalogue says so under /app/catalogue/, and answers everyt
     rmSync(dir, { recursive: true, force: true });
   });
   const base = `http://127.0.0.1:${(running.server.address() as { port: number }).port}`;
-  const res = await fetch(`${base}/app/catalogue/index.json`);
+  const res = await fetch(`${base}/catalogue/index.json`);
   assert.equal(res.status, 404);
   assert.match(await res.text(), /BRAINDOG_CATALOGUE/u);
   assert.equal((await fetch(`${base}/.well-known/braindog-build`)).status, 200);
@@ -109,18 +109,20 @@ test('the folder offers Slash a newer version of an installed add-on, verified, 
 });
 
 /**
- * A build laid out as `apps/web` writes it now: `_headers` at the root and everything else under `app/`, the bundled
- * catalogue included (`apps/web/svelte.config.js`, `static/` copied under the base).
+ * A build laid out as `apps/web` writes it now: everything at the root, the bundled catalogue included
+ * (`apps/web/svelte.config.js`, `static/` copied to the top), and beside it the `app/` folder a build from before the
+ * move left, which an operator's `BRAINDOG_SHELL` may still name.
  */
 function built(dir: string) {
   const root = join(dir, 'build');
   const app = join(root, 'app');
-  const folder = join(app, 'catalogue');
+  const folder = join(root, 'catalogue');
   mkdirSync(join(folder, 'packs', 'reading-list'), { recursive: true });
+  mkdirSync(app, { recursive: true });
   writeFileSync(join(root, '_headers'), '/*\n  x-frame-options: DENY\n');
-  writeFileSync(join(app, 'index.html'), '<!doctype html><title>BrainDog</title>');
+  writeFileSync(join(root, 'index.html'), '<!doctype html><title>BrainDog</title>');
+  writeFileSync(join(app, 'index.html'), '<!doctype html><title>the build from before the move</title>');
   writeFileSync(join(dir, 'secret.json'), '{"not":"yours"}');
-  writeFileSync(join(root, 'secret.json'), '{"not":"yours either"}');
   writeFileSync(join(folder, 'index.json'), '{"format":1,"name":"Bundled","entries":[]}');
   writeFileSync(join(folder, 'packs', 'reading-list', '1.0.0.pack.json'), '{"pack":"reading-list"}');
   writeFileSync(join(folder, 'notes.txt'), 'private');
@@ -128,9 +130,9 @@ function built(dir: string) {
 }
 
 test('with no BRAINDOG_CATALOGUE, the catalogue bundled in the built shell is served read-only, by the same two shapes', async (t) => {
-  /* THE SHELL IS NAMED BOTH WAYS IT IS NAMED IN PRACTICE: the build directory, which is what BRAINDOG_SHELL said before
-     the move and still says in an operator's environment, and its `app` folder, which is what `main.ts` finds. Named as
-     the build directory, `<shell>/catalogue` is no longer there, and the bundled catalogue was silently not served. */
+  /* THE SHELL IS NAMED BOTH WAYS IT IS NAMED IN PRACTICE: the build directory, which is what `main.ts` finds, and its
+     `app` folder, which BRAINDOG_SHELL said while the app was built under `/app`. Named either way, the bundled catalogue
+     is the build's, and is not silently left unserved. */
   const dir = mkdtempSync(join(tmpdir(), 'bd-bundled-'));
   const b = built(dir);
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -140,24 +142,24 @@ test('with no BRAINDOG_CATALOGUE, the catalogue bundled in the built shell is se
       const base = `http://127.0.0.1:${(running.server.address() as { port: number }).port}`;
       const get = (path: string, init?: RequestInit) => fetch(`${base}${path}`, { redirect: 'manual', ...init });
 
-      const index = await get('/app/catalogue/index.json');
+      const index = await get('/catalogue/index.json');
       assert.equal(index.status, 200, shell);
       assert.match(index.headers.get('content-type') ?? '', /json/u);
       assert.deepEqual(await index.json(), { format: 1, name: 'Bundled', entries: [] });
-      assert.equal(await (await get('/app/catalogue/packs/reading-list/1.0.0.pack.json')).text(), '{"pack":"reading-list"}');
-      for (const path of ['/app/catalogue/notes.txt', '/app/catalogue/..%2f..%2fsecret.json', '/app/catalogue/packs/..%2f..%2f..%2fsecret/1.0.0.pack.json', '/app/catalogue/packs/reading-list/1.0.1.pack.json', '/app/catalogue/']) {
+      assert.equal(await (await get('/catalogue/packs/reading-list/1.0.0.pack.json')).text(), '{"pack":"reading-list"}');
+      for (const path of ['/catalogue/notes.txt', '/catalogue/..%2f..%2fsecret.json', '/catalogue/packs/..%2f..%2f..%2fsecret/1.0.0.pack.json', '/catalogue/packs/reading-list/1.0.1.pack.json', '/catalogue/']) {
         const res = await get(path);
         assert.equal(res.status, 404, path);
         assert.doesNotMatch(await res.text(), /yours|private|doctype/u, path);
       }
-      /* A PATH THE CLIENT FOLDS OUT OF /app/catalogue/ is the shell's to answer, and the shell never reads outside its app. */
-      for (const path of ['/app/catalogue/%2e%2e/%2e%2e/secret.json', '/app/catalogue/../../secret.json', '/app/catalogue/../../../secret.json'])
+      /* A PATH THE CLIENT FOLDS OUT OF /catalogue/ is the shell's to answer, and the shell never reads outside its app. */
+      for (const path of ['/catalogue/%2e%2e/%2e%2e/secret.json', '/catalogue/../../secret.json', '/catalogue/../../../secret.json'])
         assert.doesNotMatch(await (await get(path)).text(), /yours|private/u, path);
-      assert.equal((await get('/app/catalogue/index.json', { method: 'PUT', body: '{}' })).status, 405);
-      /* THE OLD ADDRESS IS THE SHELL'S, which sends a navigation on to where the catalogue is now. */
-      const old = await get('/catalogue/index.json');
+      assert.equal((await get('/catalogue/index.json', { method: 'PUT', body: '{}' })).status, 405);
+      /* THE OLD ADDRESS IS THE SHELL'S, which sends a request on to where the catalogue is now. */
+      const old = await get('/app/catalogue/index.json');
       assert.equal(old.status, 308, shell);
-      assert.equal(old.headers.get('location'), '/app/catalogue/index.json');
+      assert.equal(old.headers.get('location'), '/catalogue/index.json');
     } finally {
       await running.close();
     }
@@ -170,7 +172,7 @@ test('the folder named wins over the bundled one, and a shell with no bundled ca
   try {
     const b = built(dir);
     mkdirSync(join(dir, 'without', 'app'), { recursive: true });
-    writeFileSync(join(dir, 'without', 'app', 'index.html'), '<!doctype html>');
+    writeFileSync(join(dir, 'without', 'index.html'), '<!doctype html>');
     assert.equal(catalogueFolder('/named', b.root), '/named');
     assert.equal(catalogueFolder(undefined, b.root), b.folder);
     assert.equal(catalogueFolder(undefined, b.app), b.folder);

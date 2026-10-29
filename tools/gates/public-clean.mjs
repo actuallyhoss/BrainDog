@@ -9,7 +9,7 @@
  *       repository lives under (`ALLOWED_SPELLING`);
  *   (b) `LICENSE` and `apps/cli/LICENSE` are Apache-2.0 and name Quartz Apps LLC, `packages/render/LICENSE` is MIT and
  *       names it, `LICENSING.md` credits Lucide, and the root holds no `NOTICE` and no `CHANGELOG.md`;
- *   (c) `README.md` has a Licence section naming both licences, no price, and no image but the banner;
+ *   (c) `README.md` has a Licence section naming both licences, no price, and no image but the banner and the screenshot;
  *   (d) when `~/.braindog/private-terms.txt` exists, each of its lines is searched for too, and a hit prints the file and
  *       the line and never the term. CI has no such file and runs (a) to (c).
  *
@@ -25,7 +25,8 @@
  *
  * THE BANNER IS AN IMAGE, AND IT IS ALLOWED BY NAME. (c) refuses every image in the README, because a badge is an image
  * and a rule about badges alone is a rule about one spelling of a URL. The README opens with the product's banner in a
- * light and a dark file, so those two paths are `BANNER`, and any other image is a finding.
+ * light and a dark file, so those two paths are `BANNER`, and any other image is a finding. The one picture of the
+ * product under it, again light and dark, is `SCREENSHOT`, taken on the seed and never on anyone's record.
  *
  * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep rests on.
  */
@@ -43,6 +44,8 @@ export const ALLOWED_SPELLING = 'actually' + WORDS[0];
 
 /** The README's banner, the one image it may carry: the light file and the dark one. */
 export const BANNER = ['.github/media/banner-light.svg', '.github/media/banner-dark.svg'];
+/** The README's one picture of the product, on the seed: the light file and the dark one. */
+export const SCREENSHOT = ['.github/media/screenshot-light.png', '.github/media/screenshot-dark.png'];
 
 /** Where the private list lives on the owner's machine; `BRAINDOG_PRIVATE_TERMS` points a test at its own. */
 export const privateTermsFile = () => process.env.BRAINDOG_PRIVATE_TERMS ?? join(homedir(), '.braindog', 'private-terms.txt');
@@ -148,7 +151,7 @@ export function readmeFindings(text) {
     if (PRICE.test(l)) out.push({ line: i + 1, why: 'prints a price, and the README carries none' });
     for (const p of IMAGES)
       for (const m of l.matchAll(p))
-        if (!BANNER.includes(m[1].replace(/^\.\//u, '')))
+        if (![...BANNER, ...SCREENSHOT].includes(m[1].replace(/^\.\//u, '')))
           out.push({ line: i + 1, why: `shows an image that is not the banner (${m[1]}), and the README carries no badge` });
   });
   return out;
@@ -276,7 +279,7 @@ export default function publicClean(
   console.error(
     `\n  public-clean: ${where}, ${findings.length} finding(s).\n` +
       '  A private word or term goes for an invented one from `fixtures/names.ts`; a licence file says what it must;\n' +
-      '  the README keeps its Licence section and carries no price and no image but the banner.',
+      '  the README keeps its Licence section and carries no price and no image but the banner and the screenshot.',
   );
   return 1;
 }

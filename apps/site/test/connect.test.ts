@@ -17,7 +17,7 @@ import type { Component } from 'svelte';
 import { markOf } from '@braindog/skin/agent-marks.ts';
 import { CONNECT, CONNECT_WORDS, hintParts, hintText } from '../src/lib/connect/apps.ts';
 import { agents } from '../src/lib/copy/agents.ts';
-import { MCP } from '../src/lib/links.ts';
+import { APP, CLI_INSTALL, MCP } from '../src/lib/links.ts';
 import { BUILD, missing, when } from './built.ts';
 
 registerHooks({
@@ -63,7 +63,8 @@ test('every app has its maker mark, the address in its code, and one plain line 
     assert.equal(mark.maker, app.name, `${app.name} wears ${mark.maker}'s mark`);
     for (const way of app.ways) {
       assert.ok(way.code.trim() !== '', `${app.name}, ${way.where}: no code`);
-      assert.ok(way.code.includes(MCP), `${app.name}, ${way.where}: the code does not hold ${MCP}`);
+      /* THE ADDRESS, OR THE COMMAND LINE'S SETUP AGAINST THE APP (Claude in a terminal, 29 October), which registers it. */
+      assert.ok(way.code.includes(MCP) || way.code.includes(`braindog setup ${APP}/`), `${app.name}, ${way.where}: the code does not hold ${MCP}`);
       assert.ok(way.hint.trim() !== '' && !/\n/u.test(way.hint), `${app.name}, ${way.where}: the hint is not one line`);
       assert.ok(!way.hint.includes(EM_DASH) && !way.where.includes(EM_DASH), `${app.name}, ${way.where}: an em dash`);
       assert.equal(way.hint.split('`').length % 2, 1, `${app.name}, ${way.where}: a backtick opens code and never closes it`);
@@ -71,12 +72,12 @@ test('every app has its maker mark, the address in its code, and one plain line 
   }
 });
 
-test("Claude's tab holds both ways in: the app's connector address and the terminal line", () => {
+test("Claude's tab holds both ways in: the app's connector address and the command line's setup", () => {
   const claude = CONNECT.find((a) => a.id === 'claude');
   assert.ok(claude);
   assert.deepEqual(
     claude.ways.map((w) => w.code),
-    [MCP, `claude mcp add --transport http braindog ${MCP}`],
+    [MCP, `${CLI_INSTALL}\nbraindog setup https://app.brain.dog/<your-record>`],
   );
   assert.ok(!strings({ CONNECT, agents }).some((s) => /claude code/iu.test(s)), "the site says 'Claude', never 'Claude Code'");
 });
@@ -116,7 +117,9 @@ test('the box draws every app and every way in the HTML, so it reads with script
     assert.equal((body.match(/<pre\b/gu) ?? []).length, CONNECT.flatMap((a) => a.ways).length, 'a <pre> for each way in');
     for (const app of CONNECT) {
       assert.ok(body.includes(`>${app.name}</h2>`), `${app.name} is headed by its name`);
-      for (const way of app.ways) assert.ok(body.includes(way.code.replaceAll('"', '&quot;')) || body.includes(way.code), `${app.name}: its code`);
+      const escaped = (code: string): string => code.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+      for (const way of app.ways)
+        assert.ok([way.code, way.code.replaceAll('"', '&quot;'), escaped(way.code), escaped(way.code).replaceAll('&gt;', '>')].some((c) => body.includes(c)), `${app.name}: its code`);
     }
     assert.match(body, /aria-selected="true"[^>]*>[\s\S]*?Claude/u, 'Claude is the chosen tab');
     assert.match(body, /<noscript>[\s\S]*cbox-copy[\s\S]*display: none/u, 'with scripting off, Copy is hidden');

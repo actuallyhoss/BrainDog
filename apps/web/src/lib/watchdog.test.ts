@@ -83,8 +83,8 @@ test('a long frame over two seconds is said once, with the route, the drawing an
     entryType: 'long-animation-frame',
     duration: 3_240,
     scripts: [
-      { invoker: 'Response.json.then', sourceFunctionName: 'blockOf', sourceURL: 'https://brain.dog/app/_app/immutable/chunks/page-live.Bq1.js?v=2', sourceCharPosition: 4821, duration: 2_900 },
-      { invoker: 'TimerHandler:setTimeout', sourceURL: 'https://brain.dog/app/_app/immutable/nodes/0.js', duration: 120 },
+      { invoker: 'Response.json.then', sourceFunctionName: 'blockOf', sourceURL: 'https://brain.dog/_app/immutable/chunks/page-live.Bq1.js?v=2', sourceCharPosition: 4821, duration: 2_900 },
+      { invoker: 'TimerHandler:setTimeout', sourceURL: 'https://brain.dog/_app/immutable/nodes/0.js', duration: 120 },
       { invoker: 'click', duration: 0 },
     ],
   });
@@ -234,7 +234,7 @@ test('the sentence names the time, the place, what was drawing and what ran, in 
 });
 
 test('a script is named by its file, never its address', () => {
-  assert.equal(fileOf('https://brain.dog/app/_app/immutable/chunks/x.js?v=1#a'), 'x.js');
+  assert.equal(fileOf('https://brain.dog/_app/immutable/chunks/x.js?v=1#a'), 'x.js');
   assert.equal(fileOf(''), '');
   assert.equal(fileOf(undefined), '');
   assert.deepEqual(culpritsOf({ scripts: [{ invoker: 'click', duration: 50 }] }), [{ what: 'click', ms: 50 }]);

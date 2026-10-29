@@ -15,8 +15,9 @@ build/
 *.sqlite
 _*
 __*
-# Cloudflare reads `_headers` from each app's static directory, so those two are kept.
+# Cloudflare reads `_headers` and `_redirects` from each app's static directory, so those are kept.
 !apps/*/static/_headers
+!apps/*/static/_redirects
 .DS_Store
 
 # Screenshots a person looks at, regenerated on demand and never asserted on: see the site's

@@ -3,7 +3,7 @@
 What you are building, and the plan for each. Every record that runs things starts with it, and it is written here as
 a file anybody can read, the same as any other add-on.
 
-- **The list.** A project is its name, one line about it, its status (building, earning, parked or finished), what it
+- **The list.** A project is its name, one line about it, its status (building, earning, parked or closed), what it
   earned in a year and the year before, how it is going, its next step, how far along it is, the day it aims for and
   the agent on it, with a note, its repositories, folders and domains. Only the name and the status must be said, and
   a project others point at is not deleted out from under them. A project can also say what kind it is: a business,
@@ -15,7 +15,7 @@ a file anybody can read, the same as any other add-on.
   and how often a new value should arrive. Numbers came from the founder setup, which still adds who a reading is
   from and which service it is about.
 - **The page.** Projects opens with how they are going, then each project in play as a card. Under it, folded where
-  they can be: what each one earns, what an agent holds and what is coming up, then what is parked and finished.
+  they can be: what each one earns, what an agent holds and what is coming up, then what is parked and closed.
 - **The figures.** Twenty-five. Twenty-two are over the projects: how many are in play, need you, are on track, have an
   agent, aim within thirty days or are past the day they aimed for, what they earned this year and the year before, how
   many say so, and which shape a project's plan is kept in. One is over the stages, how many a project has. Two are over the numbers: how many key numbers are kept, and how long since a measure was read.

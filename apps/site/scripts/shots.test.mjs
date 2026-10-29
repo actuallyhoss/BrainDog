@@ -40,10 +40,16 @@ function referenced() {
   return names;
 }
 
-/** The one file `product.mjs` writes, by the `FILE` constant it writes it under. */
-function productWrites() {
+/**
+ * The files `product.mjs` writes: one card per page `CARD_PATHS` names, under the file `cardOf` gives it (`lib/site/seo.ts`,
+ * since every key page has its own card). The script is read as text to see it still writes by `cardOf`; the names
+ * come from `seo.ts`, which is plain data and safe to import.
+ */
+async function productWrites() {
   const text = readFileSync(join(import.meta.dirname, 'product.mjs'), 'utf8');
-  return [...text.matchAll(/^const FILE = '([^']+)';$/gm)].map((m) => m[1]);
+  if (!/for \(const path of CARD_PATHS\)/.test(text) || !/cardOf\(path\)/.test(text)) return [];
+  const { CARD_PATHS, cardOf } = await import('../src/lib/site/seo.ts');
+  return [...new Set(CARD_PATHS.map((path) => new URL(cardOf(path)).pathname.split('/').pop()))];
 }
 
 test('the site names its captures as literals, so a literal scan sees all of them', () => {
@@ -66,10 +72,10 @@ test('every capture the site names is in static/shots', () => {
   assert.deepEqual(missing, [], 'the site names a capture that is not there');
 });
 
-test('product.mjs writes nothing the site does not name', () => {
+test('product.mjs writes nothing the site does not name', async () => {
   const names = referenced();
-  const writes = productWrites();
-  assert.equal(writes.length, 1, 'no `const FILE` parsed out of product.mjs');
+  const writes = await productWrites();
+  assert.ok(writes.includes('home-light.png'), 'product.mjs does not write each card `CARD_PATHS` names under `cardOf`, the home card first');
   assert.deepEqual(writes.filter((f) => !names.has(f)), []);
 });
 

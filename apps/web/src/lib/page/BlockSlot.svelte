@@ -25,6 +25,8 @@
   import { EMPTY_KEEP, KINDS, KPIS_KIND, inline, moneyWhole, readFigure, text } from 'braindog-render';
   import { approxOf } from '$lib/money/rates.ts';
   import { held as heldRates } from '$lib/money/rates.svelte.ts';
+  import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
+  import LedgerCards, { cardsOf as linesOf } from '$lib/money/LedgerCards.svelte';
   import { recordToday } from '$lib/record/zone.ts';
   import { kpiHref, kpisIn } from './kpis-in.ts';
   import QueueAnswer from './QueueAnswer.svelte';
@@ -61,7 +63,7 @@
   import { openInPlace, type Opening } from './group-open.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
-  import type { Row } from 'braindog-render';
+  import type { Row, WidgetSize } from 'braindog-render';
   import { refOfHref } from '$lib/send/send.ts';
   import AddStep from './AddStep.svelte';
   import Hole from './Hole.svelte';
@@ -108,6 +110,7 @@
     walk = null,
     compact = false,
     slug = null,
+    widget = null,
   }: {
     block: LiveBlock;
     /** The block's declared index, which its id, its heading's id and its held rows are keyed by. */
@@ -122,6 +125,8 @@
     arranging?: boolean;
     /** The record's clock the page was read against, which "today", "late" and `{{ago:}}` are told against. */
     now: number;
+    /** The size of the board frame this block is drawn in as a widget, or `null` off a board. */
+    widget?: WidgetSize | null;
     /** The block name's heading level: 2 under a page's title, 3 under a preview's own heading. */
     level?: 2 | 3;
     /** Whether a long list folds in place under "N more", as it does on a home (`home.ts` `foldOf`). */
@@ -281,15 +286,39 @@
       const f = home ? readFigure(figure) : null;
       if (!home || !f) return null;
       heldRates.ask();
+      /* A LEAD FIGURE IN THE HOME CURRENCY (Money's Cash now) IS SAID ONCE MORE IN EACH OTHER CURRENCY THE RECORD HOLDS A
+         RATE FOR, under it ("≈ $13,187"), as a finance app restates its headline: the rest of a tile's figures are not. */
+      const b = block as { lead?: unknown; metrics?: { id?: unknown; value?: unknown; trend?: unknown[] }[] };
+      const m = b.lead === true ? b.metrics?.find((x) => x.id === 'cash-now') : undefined;
+      const cash = typeof m?.value === 'number' ? m.value : typeof m?.trend?.[0] === 'number' ? m.trend[0] : undefined;
+      if (typeof cash === 'number' && f.currency.toUpperCase() === home.toUpperCase() && Math.abs(Number(f.minor) - cash) < 100) {
+        const others = [...new Set(heldRates.rates.flatMap((r) => [r.currency, r.base]))].filter((c) => c && c.toUpperCase() !== home.toUpperCase()).sort();
+        const told = others
+          .map((c) => approxOf(Number(f.minor), home, c, heldRates.rates, recordToday()))
+          .map((x) => (x ? moneyWhole(x.minor, x.currency, home)?.text : null))
+          .filter((t): t is string => !!t);
+        return told.length > 0 ? `≈ ${told.join(' · ')}` : null;
+      }
       const at = approxOf(Number(f.minor), f.currency, home, heldRates.rates, recordToday());
       const said = at ? moneyWhole(at.minor, at.currency, home)?.text : null;
       return said ? `≈ ${said}` : null;
+    },
+    /* MONEY'S CHIPS: a bar of categories and a ledger line wear the category's glyph and colour, a bar of accounts the
+       account's (`$lib/money/looks.svelte.ts`). Read off the block's own source, so a bar of anything else draws plain. */
+    partLook: (label: string) => {
+      const s = typeof (block as { source?: unknown }).source === 'string' ? (block as { source: string }).source : '';
+      if (block.kind === 'timeline') return /transactions/u.test(s) ? moneyLooks.category(label) : null;
+      const heading = typeof block.heading === 'string' ? block.heading : '';
+      if (/categor|spent|where-it-went|budget/u.test(s) || (/categor/iu.test(heading) && !/who/iu.test(heading))) return moneyLooks.category(label);
+      if (/account/u.test(s)) return moneyLooks.account(label);
+      if (/paid most|how often|payee|who was paid/iu.test(heading)) return moneyLooks.payee(label);
+      return null;
     },
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,
     /* AND A LENGTH PAST THE WALK'S REACH, which the record is asked to walk (`walkFor`). */
     ...(walk ? { walk: walkFor } : {}),
-    /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
+    /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/<slug>`. */
     href: inApp,
     /* `{{ref:tasks#241}}` IS A LINK TO THAT ROW: its own page where its list made one, else its screen (`row-href.ts`).
        Record-relative, and `href` above puts it under the app. */
@@ -752,25 +781,31 @@
   <!-- A PAGE'S LEAD QUESTION HAS NO VISIBLE BAR outside arranging: the question is the heading a reader sees, and the bar
        ("Waiting on you") is kept for a screen reader, clipped, not removed, so the region keeps its name in the
        heading list. While arranging it shows, since that is the label a block is moved by. -->
-  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && (lanes.length > 1 || board) && !arranging) || (desk && !arranging) || (parts !== null && !arranging) ? '' : undefined}>
+  <!-- A PART THAT DRAWS ITS OWN TITLED TILE (the desk's, the projects' cards, a project's parts) names the region here and
+       is not a second heading: a screen reader heard a hidden "Late 7" beside the tile's "Late and urgent 6" (audit Q11). -->
+  {@const titled = !arranging && ((projectCards && (lanes.length > 1 || board)) || desk !== null || parts !== null)}
+  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || titled ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
     {#if glyph && isGlyph(glyph)}<IconWell name={glyph} />{/if}
-    <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name"
-      ><span id="{ids}h-{i + 1}"><Text nodes={inline(block.heading, { icon })} opts={{ icon }} /></span>{#if count !== null}<span class="block-count num"><Figure value={count} /></span>{/if}</svelte:element
+    <!-- THE HERO'S BAR IS NO HEADING outside arranging (Q60 of 29 October): its "Overview" stood as an H2 before the
+         project's own name, the page's H1. It still names the region. Nor is a titled part's (`titled`, Q11). -->
+    <svelte:element this={parts?.includes('hero') && !arranging ? 'p' : titled ? 'span' : level === 3 ? 'h3' : 'h2'} class="block-name"
+      ><span id="{ids}h-{i + 1}">{#if titled && typeof (desk as { heading?: unknown } | null)?.heading === 'string'}{(desk as { heading: string }).heading}{:else}<Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{/if}</span>{#if count !== null && !titled}<span class="block-count num"><Figure value={count} /></span>{/if}</svelte:element
     >
     {#if source}
       <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (secondary controls appear on
            hover or focus). "Tasks" at the top right of every tile on Work was chrome on every tile, said five times. The
            predicate stays, because without it a reader has no way to know the list is filtered and may take a block of
            four rows for the whole list; the clause that names the page they are on is dropped. AS A GLYPH, AND THE
-           CLAUSE IS STILL THERE: the tooltip and a screen reader get the whole clause. -->
-      <a class="block-source tap" href={inApp(openHref(block) ?? `/r/${block.register}`)} title={whereOf(block) || undefined}>
+           CLAUSE IS STILL THERE for the eye. A SCREEN READER HEARS WHERE THE LINK GOES, "Open these in Tasks", not the
+           filter's own words, which read as code out loud (audit 2026-10-30, 31). -->
+      <a class="block-source tap" href={inApp(openHref(block) ?? `/r/${block.register}`)} aria-label={whereOf(block) ? copy.openThese(source) : copy.openList(source)}>
         {source}
         {#if whereOf(block)}
           <Icon name="filter" size="s" />
-          <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
+          <span class="block-where" aria-hidden="true"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
         {/if}
       </a>
     {/if}
@@ -781,13 +816,13 @@
       {/await}
     {/if}
   </header>
-{:else}
+{:else if block.kind !== 'note' && (block as { lead?: unknown }).lead !== true}
   <!-- A BLOCK WITH NO AUTHORED `heading:` DRAWS NO HEADING. It printed its kind's name, and where the kind had none its
        dialect id, so the lead question in Needs you sat under "queue" and Today's dates under "deadlines": the system's word
-       where the page has nothing to say. The region still has a name, for a screen reader only, in the kind's words. -->
-  <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-unnamed" id="{ids}h-{i + 1}"
-    >{copy.kindNames[block.kind] ?? blockWords.kindNames[block.kind] ?? words.unnamed}</svelte:element
-  >
+       where the page has nothing to say. The region still has a name, for a screen reader only, in the kind's words.
+       NOT A HEADING (Q60 of the 29 Oct audit): an out-of-sight "Note" heading on every unnamed block filled a screen
+       reader's list of headings with "Note, Figures, Note", so it is the name arranging labels the block by, and no more. -->
+  <span class="block-unnamed" id="{ids}h-{i + 1}">{copy.kindNames[block.kind] ?? blockWords.kindNames[block.kind] ?? words.unnamed}</span>
 {/if}
 
 <!-- Never hidden and never centred: the page's shape is information, and a page that silently shrinks teaches that
@@ -829,7 +864,7 @@
   }} />
 {:else if sketch && !block.refusals.length}
   <!-- A DRAWN COMPONENT, in its sandbox: never in the page, and handed only its own rows and the theme. -->
-  {#await import('./DrawnFrame.svelte') then { default: DrawnFrame }}<DrawnFrame code={sketch.code} data={sketch.data} start={sketch.start} title={headingText} onopen={openDrawn} />{/await}
+  {#await import('./DrawnFrame.svelte') then { default: DrawnFrame }}<DrawnFrame code={sketch.code} data={sketch.data} start={sketch.start} title={headingText} onopen={openDrawn} size={widget} picture={widget !== null} />{/await}
 {:else if drawn.refusal}
   {@const act = drawn.refusal.action}
   <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} icon={drawn.refusal.authored ? icon : undefined}>
@@ -849,7 +884,22 @@
 {:else if block.kind === 'table' && !block.answer}
   <!-- THE ROWS THAT ARRIVED SINCE IT WAS LAST DRAWN ARE MARKED, as a list's are, where the page can write. -->
   {@const all = writes ? writes.arrivedTable(i, block.rows, block) : block.rows}
+  <!-- LEDGER LINES AS CARDS OR AS THE LEDGER (Money's account page, as Coin Fish's two views): a day at a time with each
+       line's chip, or the grid with its running balance in a column. The choice is kept on this device. -->
+  {@const linesPlan = /transactions/u.test(String((block as { source?: unknown }).source ?? '')) ? linesOf(block.columns) : null}
+  {#if linesPlan}
+    <div class="lines-view">
+      <Segmented role="group" aria-label={words.linesView}>
+        <button type="button" class="segment" data-on={moneyLooks.view === 'cards' ? '' : undefined} aria-pressed={moneyLooks.view === 'cards'} onclick={() => moneyLooks.choose('cards')}>{words.linesCards}</button>
+        <button type="button" class="segment" data-on={moneyLooks.view === 'ledger' ? '' : undefined} aria-pressed={moneyLooks.view === 'ledger'} onclick={() => moneyLooks.choose('ledger')}>{words.linesLedger}</button>
+      </Segmented>
+    </div>
+  {/if}
+  {#if linesPlan && moneyLooks.view === 'cards'}
+    <LedgerCards columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} plan={linesPlan} />
+  {:else}
   <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} />
+  {/if}
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
@@ -1036,7 +1086,7 @@
     <!-- A LIST'S DOOR SAYS HOW MANY THE LIST HOLDS AND WHERE (P21): "All 36 in Ledger →", where "30 more" left a sum. -->
     <a class="block-more block-all tap" href={inApp(door)}>{copy.allIn(block.total, source)}<Icon name="arrow" size="s" /></a>
   {:else if door}
-    <a class="block-more tap" href={inApp(door)}>{words.more(block.total - block.shown)}</a>
+    <a class="block-more tap" href={inApp(door)}>{words.more(block.total - block.shown)}<Icon name="arrow" size="s" /></a>
   {:else}
     <p class="block-slice" role="status">{words.more(block.total - block.shown)}</p>
   {/if}
@@ -1241,9 +1291,14 @@
     cursor: pointer;
   }
 
-  /* AS A DOOR, it is as wide as its words, so the row beside it is not a link too. */
+  /* AS A DOOR, it is as wide as its words, so the row beside it is not a link too. THE BOARD'S QUIET "MORE" (30 October):
+     the word and its arrow in the second ink, never underlined, as every widget's and "All people →" are. */
   a.block-more {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--sp-1);
+    text-decoration: none;
   }
 
   /* THE LIST'S DOOR, "All people →": the tile link's own look, 13/500 in the second ink with its arrow, no underline. */

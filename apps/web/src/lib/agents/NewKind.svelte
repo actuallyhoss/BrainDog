@@ -18,7 +18,7 @@
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
-  import { AGENTS, FILE_TOOLS, PERMISSIONS, PRESETS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, presetOf, recordToolWords, slotsOf, withPreset, words, writesOf, type KindDraft } from './new-kind.ts';
+  import { AGENTS, FILE_TOOLS, PERMISSIONS, PRESETS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, presetOf, recordToolWords, slotParts, slotsOf, withPreset, words, writesOf, type KindDraft } from './new-kind.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -70,8 +70,10 @@
   }
 </script>
 
+{#snippet slotted(text: string)}{#each slotParts(text) as part, i (i)}{#if part.slot}<code class="code">{part.text}</code>{:else}{part.text}{/if}{/each}{/snippet}
+
 {#snippet help(id: string, field: string, said: string)}
-  {#if (faultAt(field) ?? said) !== ''}<p class="help" id={id} class:wrong={faultAt(field) !== null}>{faultAt(field) ?? said}</p>{/if}
+  {#if (faultAt(field) ?? said) !== ''}<p class="help" id={id} class:wrong={faultAt(field) !== null}>{@render slotted(faultAt(field) ?? said)}</p>{/if}
 {/snippet}
 
 <div class="form">
@@ -105,7 +107,7 @@
           {#if draft.args.length > 0}
             <p class="sub">{words.slots}</p>
             {#each draft.args as a (a.id)}
-              <label class="sub" for={`kind-slot-${a.id}`}>{words.slotLabel(a.id)}</label>
+              <label class="sub" for={`kind-slot-${a.id}`}>{@render slotted(words.slotLabel(a.id))}</label>
               <div class="field">
                 <input id={`kind-slot-${a.id}`} class="field-input" type="text" autocomplete="off" maxlength="40" value={a.label} oninput={(e) => relabel(a.id, e.currentTarget.value)} />
               </div>

@@ -166,7 +166,7 @@ test('decisions pair with the suggestions they name, and one that names none or 
  *
  * `node --test` has no `location`, which `noRecord` read as an empty pathname and so as "no slug", so
  * this is the no-slug case exactly. `noRecord` is gone (`device.test.ts` holds that), and before it
- * went, a 401 or an unreachable host at `/app/decide` answered `{ from: 'sample' }` and both screens
+ * went, a 401 or an unreachable host at `/decide` answered `{ from: 'sample' }` and both screens
  * drew fixture questions nobody had asked. The layout sends a 401 to sign-in; a reader that is asked
  * anyway says the host's own sentence.
  */

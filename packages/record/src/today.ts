@@ -26,7 +26,14 @@ import { KPIS_KIND } from 'braindog-render';
 type Ask = (args: never, ctx: never) => Promise<Result<unknown>>;
 
 /** The methods `today` asks, the record's own after every wrapper is on (`index.ts`). */
-export type TodayAsks = { previewPage: Ask; handled: Ask; sharedOut: Ask; list: Ask };
+export type TodayAsks = {
+  previewPage: Ask;
+  handled: Ask;
+  sharedOut: Ask;
+  list: Ask;
+  /** What Slash would add to Today from use (`methods/widgets.ts`), the one offer the board's last cell shows. */
+  widgetSuggest?: Ask;
+};
 
 /** A list's declaration, as much of it as `today` reads. */
 type Decl = {
@@ -57,14 +64,18 @@ function viaOf(work: Decl | undefined, projects: string): Via | null {
   const field = work.fields.find((f) => f.type === 'ref' && f.to === projects);
   const state = work.fields.find((f) => f.id === work.state);
   if (!field || !state?.values?.length) return null;
-  return { field: field.id, state: state.id, done: work.done ?? [], deadline: work.fields.find((f) => f.deadline === true)?.id ?? null };
+  /* WORK KEPT FOR LATER IS NOT OPEN, as Work's Open counts it (`figures.ts` `viaOf`). */
+  const later = state.values.includes('backlog') && !(work.done ?? []).includes('backlog') ? ['backlog'] : [];
+  return { field: field.id, state: state.id, done: [...(work.done ?? []), ...later], deadline: work.fields.find((f) => f.deadline === true)?.id ?? null };
 }
 
 /** The lists whose open rows past their day are a project's late work: the work list first, then each money list. */
 export function lateListsOf(decls: readonly Decl[], projects: string): { id: string; where: string; field: string }[] {
+  /* LATE IS LATE WORK, ONE DEFINITION EVERYWHERE (audit of 30 October, 6): the open tasks past their day, as Projects,
+     a project's page and Work count them. A late bill pointing at a project is Money's to say, and counting it here made
+     a card say "3 late" over a page that said "1 late". */
   const work = decls.find((d) => handOf(d as unknown as Record<string, unknown>) !== null && viaOf(d, projects) !== null);
-  const money = decls.filter((d) => d.id !== work?.id && d.id !== projects && d.fields.some((f) => f.type === 'money') && viaOf(d, projects)?.deadline != null);
-  return [...(work && viaOf(work, projects)?.deadline ? [work] : []), ...money].map((d) => {
+  return (work && viaOf(work, projects)?.deadline ? [work] : []).map((d) => {
     const via = viaOf(d, projects)!;
     const open = via.done.length > 0 ? `${via.state} is not ${via.done.join(' or ')}, ` : '';
     return { id: d.id, where: `${open}${via.deadline} before today, ${via.field} is set`, field: via.field };
@@ -111,6 +122,11 @@ export type TodayAnswer = {
   cards: TodayCards | null;
   /** Set when this is Today as it was last drawn and the record may have moved since: ask again with `fresh`. */
   behind?: true;
+  /**
+   * THE ONE WIDGET SLASH WOULD ADD FROM USE, for the board's last cell (widgets plan §6.3), or absent when there is none,
+   * the person turned suggestions off, or one was answered today. Asked in this same read, so the cell costs no request.
+   */
+  widget?: unknown;
 };
 
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);
@@ -135,7 +151,42 @@ export async function todayOf(asks: TodayAsks, body: Record<string, unknown>, de
   const handled = valueOf(await asking(asks.handled, {}, ctx));
   const shared = valueOf(await asking(asks.sharedOut, {}, ctx));
   const projects = cardsOver(body, decls);
-  return { ok: true, value: { page: page.value, handled, shared, cards: projects === null ? null : await cardsOf(asks, projects, decls, ctx) } };
+  const cards = projects === null ? null : await cardsOf(asks, projects, decls, ctx);
+  const widget = asks.widgetSuggest === undefined ? null : offerOf(valueOf(await asking(asks.widgetSuggest, { board: boardRead(body, page.value), cell: true }, ctx)));
+  return { ok: true, value: { page: page.value, handled, shared, cards, ...(widget === null ? {} : { widget }) } };
+}
+
+/** The first offer `widgetSuggest` answered, or `null`. */
+const offerOf = (v: unknown): unknown => {
+  const offers = (v as { offers?: unknown } | null)?.offers;
+  return Array.isArray(offers) && offers.length > 0 ? offers[0] : null;
+};
+
+/**
+ * THE BOARD AS THE WIDGET SIGNALS READ IT: each keyed block, what it reads, and whether it drew nothing, from the body and
+ * the page `previewPage` drew of it, block for block.
+ */
+export function boardRead(body: Record<string, unknown>, page: unknown): { key: string; heading?: string; source?: string; where?: string; metric?: string; empty: boolean }[] {
+  const declared = Array.isArray(body.blocks) ? (body.blocks as Record<string, unknown>[]) : [];
+  const drawn = Array.isArray((page as { blocks?: unknown } | null)?.blocks) ? ((page as { blocks: Record<string, unknown>[] }).blocks) : [];
+  return declared.flatMap((b, i) => {
+    if (b === null || typeof b !== 'object' || typeof b.key !== 'string') return [];
+    const d = drawn[i] ?? {};
+    const cells = Array.isArray(b.cells) ? (b.cells as { metric?: unknown }[]) : [];
+    const readings = Array.isArray(d.readings) ? (d.readings as { reading?: { value?: unknown } | null }[]) : [];
+    const listed = ['rows', 'queue', 'feed', 'kpis'].some((k) => Array.isArray(d[k]) && (d[k] as unknown[]).length > 0);
+    const figured = readings.some((r) => typeof r.reading?.value === 'number' && r.reading.value !== 0);
+    return [
+      {
+        key: b.key,
+        ...(typeof b.heading === 'string' ? { heading: b.heading } : {}),
+        ...(typeof b.source === 'string' ? { source: b.source } : {}),
+        ...(typeof b.where === 'string' ? { where: b.where } : {}),
+        ...(typeof cells[0]?.metric === 'string' ? { metric: cells[0].metric } : {}),
+        empty: !listed && !figured,
+      },
+    ];
+  });
 }
 
 async function cardsOf(asks: TodayAsks, projects: string, decls: readonly Decl[], ctx: unknown): Promise<TodayCards> {

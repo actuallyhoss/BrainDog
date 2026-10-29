@@ -263,7 +263,9 @@ export function awaySaid(
     return counted.agents === counted.total ? `${head}. Agents made all of them.` : `${head}. Agents made ${counted.agents === 1 ? 'one' : count(counted.agents)}.`;
   }
   const n = actors.length;
-  if (n === 0) return historyWords.nothingNew;
+  /* NOTHING NEW SAYS NOTHING (Q13 of 29 October): "Nothing changed since you last looked." stood over "Today 28", true of
+     the mark and false to the eye, so the head is the title alone and the days under it say what happened. */
+  if (n === 0) return '';
   /* THE RECORD'S OWN COUNT WHEN IT SENT ONE, so this sentence and an agent asking `whatsNew` read the same number; a host
      older than `byWho` is counted here as before. */
   const agents = byWho ? byWho.agents : actors.filter((by) => isAgent(actor(by, me, names).kind)).length;

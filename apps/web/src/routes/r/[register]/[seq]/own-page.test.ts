@@ -31,7 +31,7 @@ test('THE ROW ASKED FOR BY ITS FIELDS STAYS ON ITS SCREEN, which is where the pa
 
 const loaded = async (path: string): Promise<{ status: number; location: string } | null> => {
   const url = new URL(`http://localhost${path}`);
-  const [, , register = '', seq = ''] = url.pathname.replace(/^\/app\/studio/u, '').split('/');
+  const [, , register = '', seq = ''] = url.pathname.replace(/^\/studio/u, '').split('/');
   try {
     await load({ params: { register, seq }, url, parent: async () => ({}), fetch: async () => new Response('{}', { status: 500 }) });
     return null;
@@ -54,17 +54,17 @@ test('THE ROUTE SENDS A PROJECT ROW TO ITS PAGE INSIDE THE RECORD, after the she
   REGISTERS.people = { meets: {}, fields: [] } as unknown as RegisterDecl;
   REGISTERS.accounts = { fields: [] } as unknown as RegisterDecl;
   try {
-    assert.deepEqual(await loaded('/app/studio/r/things/3'), { status: 307, location: '/app/studio/p/kiln' });
-    assert.equal(await loaded('/app/studio/r/things/3?fields=1'), null, 'the fields stay on the row');
-    assert.equal(await loaded('/app/studio/r/tasks/3'), null, 'a row with no page stays');
-    assert.equal(await loaded('/app/studio/r/people/4'), null, 'a person keeps their own screen');
+    assert.deepEqual(await loaded('/studio/r/things/3'), { status: 307, location: '/studio/p/kiln' });
+    assert.equal(await loaded('/studio/r/things/3?fields=1'), null, 'the fields stay on the row');
+    assert.equal(await loaded('/studio/r/tasks/3'), null, 'a row with no page stays');
+    assert.equal(await loaded('/studio/r/people/4'), null, 'a person keeps their own screen');
     /* AN ACCOUNT, A BILL OR A SERVICE OPENS ON ITS PAGE TOO (things, not rows), and its fields stay one press away. */
-    assert.deepEqual(await loaded('/app/studio/r/accounts/2'), { status: 307, location: '/app/studio/p/hsbc-current' });
-    assert.equal(await loaded('/app/studio/r/accounts/2?fields=1'), null, 'Show the data stays on the row');
-    assert.equal(await loaded('/app/studio/r/skills/1'), null, 'a list not yet declared, and whose declaration was refused, stays');
+    assert.deepEqual(await loaded('/studio/r/accounts/2'), { status: 307, location: '/studio/p/hsbc-current' });
+    assert.equal(await loaded('/studio/r/accounts/2?fields=1'), null, 'Show the data stays on the row');
+    assert.equal(await loaded('/studio/r/skills/1'), null, 'a list not yet declared, and whose declaration was refused, stays');
     /* A RUN'S ROW OPENS ON THE RUN'S OWN PAGE, where what it did is read: there is one page for one run. */
-    assert.deepEqual(await loaded('/app/studio/r/session/20'), { status: 307, location: '/app/studio/p/drafting-the-specimen-page-copy' });
-    assert.equal(await loaded('/app/studio/r/session/20?fields=1'), null, 'its fields stay on the row');
+    assert.deepEqual(await loaded('/studio/r/session/20'), { status: 307, location: '/studio/p/drafting-the-specimen-page-copy' });
+    assert.equal(await loaded('/studio/r/session/20?fields=1'), null, 'its fields stay on the row');
   } finally {
     learnRowPages([]);
     delete REGISTERS.things;

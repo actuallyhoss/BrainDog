@@ -251,13 +251,21 @@ it answers, as zone routes. That goes out in three pushes, and the file carries 
 | **A** | `app.brain.dog` as a Custom Domain, and nothing else | `app.brain.dog` · empty · `brain.dog` | live. The app is under `/app` on `app.brain.dog`; a page load outside `/app` and the host's own paths there is a `308` to `/app<path>` on the same name (`legacyRedirect` in `src/route.ts`) |
 | **A2** | the same, plus eight zone routes on `brain.dog`: `/app`, `/app/*`, `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`, `/.well-known/braindog-build` | unchanged | not made. It is a push of its own because it is the one that needs *Zone > Workers Routes > Edit* on `brain.dog` |
 | **B** | unchanged | `brain.dog` · `app.brain.dog` · `brain.dog` | made through the site's binding instead, and since reversed by C. A page load on `app.brain.dog` became a `308` to `https://brain.dog/app<path>`; `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*` and the build id stayed served there with no redirect |
-| **C** | unchanged | `app.brain.dog` · `brain.dog` · `brain.dog` | **the file as it stands.** The app is at `app.brain.dog/app` again. A page load on `brain.dog/app/...` (handed to the Worker by the site's `APP` binding) is a `308` to `https://app.brain.dog/app<path>`, path and query kept; `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*` and the build id stay served on `brain.dog` with no redirect, for at least the 90 days a token lives. Alpha is the same on `app.alpha.brain.dog` and `alpha.brain.dog` |
+| **C** | unchanged | `app.brain.dog` · `brain.dog` · `brain.dog` | **the file as it stands**, but for where on the name the app is: at its root since October 29th 2026 (below). The app was at `app.brain.dog/app` again. A page load on `brain.dog/app/...` (handed to the Worker by the site's `APP` binding) is a `308` to `https://app.brain.dog/app<path>`, path and query kept; `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*` and the build id stay served on `brain.dog` with no redirect, for at least the 90 days a token lives. Alpha is the same on `app.alpha.brain.dog` and `alpha.brain.dog` |
 
 Alpha is the same on its own names: `app.alpha.brain.dog`, with `RP_ID` `alpha.brain.dog` from push A, and in push B
 `alpha.brain.dog` as the public host with `app.alpha.brain.dog` kept as a legacy host. `RP_ID` must not change between
 pushes: a rollback to a version that does not read it asks for RP ID `app.brain.dog` and strands every passkey made
 since. `assets` in the file is `not_found_handling: 'none'` with 33 §4's `run_worker_first`, `/app`, `/app/*`,
 `!/app/_app/*` and `!/app/catalogue/*` included, so the Worker draws the shell for an app navigation itself (`appPage` in `src/index.ts`).
+
+*(Amended October 29th 2026.)* **The app left `/app` for the root of `app.brain.dog`**, because he did not want
+`app.brain.dog/app/mara`: a record is `app.brain.dog/<slug>`. `run_worker_first` is `/*`, with
+`!/_app/*` and `!/catalogue/*` (wrangler refuses a door listed beside `/*` as redundant, so the doors are not named again). `legacyRedirect` in `src/route.ts` sends a page load on an old address on in one hop:
+on `app.brain.dog` every GET or HEAD under `/app` is a `308` to the same address with the `/app` taken off, and on
+`brain.dog` (through the site's binding) a page load under `/app` is a `308` straight to `https://app.brain.dog<path>`,
+query kept on both. A record's API and key under `/app/<slug>/` are served where they stand, never redirected, for a
+CLI whose hosts file was written before. Alpha is the same on its own names.
 
 ---
 
@@ -272,7 +280,7 @@ since. `assets` in the file is `not_found_handling: 'none'` with 33 §4's `run_w
    the record's own `access(person)` gives the level (none → **403** `FORBIDDEN`), and `provedAt` is
    `who.provedAt`. A rotation's `Set-Cookie` rides on the eventual response. The order is `src/session.ts`'s:
    bearer, cookie, then the demo for a credential-free read, else **401**. *(Since push A, September 23rd 2026.)* A
-   request at `/app/<slug>/api/<method>` is moved to `/api/<method>` and the slug goes with the cookie to the Directory
+   request at `/<slug>/api/<method>` (or the old `/app/<slug>/api/<method>`) is moved to `/api/<method>` and the slug goes with the cookie to the Directory
    as `auth({ flow: 'session', sid, slug })`, which answers the record only for a live name, an open record and a
    `dir_member` row for this person, and otherwise the one **403** `FORBIDDEN` *"You are not on this record."*; the
    session row's record does not move, and `access(person)` is never asked for a refused slug. A bearer under a slug must name the same
@@ -344,7 +352,7 @@ Email:
 
 *Amended. This section named `/a/<sha256>` and `PUT /a`; the site does not forward `/a/*` to the Worker
 (`apps/site/wrangler.jsonc`) and does forward `/api/*`, so the store is reached under `/api/files`, at the root and
-under `/app/<slug>/api/files` alike. `src/files.ts` holds the door and `route()` hands it every such path.*
+under `/<slug>/api/files` alike. `src/files.ts` holds the door and `route()` hands it every such path.*
 
 Who is asking, both ways: the same doors as every record method (`src/session.ts`), in the same order. A share link
 is one 404 with no body; a session cookie names its record, and a write needs the page's own origin (12 §8); a
@@ -383,10 +391,10 @@ against the record's `uploadDay` before it is kept, deleting the record sweeps t
 expiry of a closed record sweeps it again. `sealedPut` is the one `/api` body allowed past a mebibyte: six, in
 `BODY_MOST.sealed` here and `SEALED_BODY_MOST_BYTES` in `@braindog/host`.
 
-### 5.6 · A shared link: `/app/s#<token>` and `Authorization: Share <token>`
+### 5.6 · A shared link: `/s#<token>` and `Authorization: Share <token>`
 
-The page a person opens is `/app/s#<token>`, which is the app's shell like any
-page under `/app`. The token rides in the fragment, which no browser sends, so it never reaches a server's log; the
+The page a person opens is `/s#<token>`, which is the app's shell like any
+page of the app (`/app/s#<token>` until October 29th 2026, which a `308` still lands). The token rides in the fragment, which no browser sends, so it never reaches a server's log; the
 app reads it and wipes it from the address as it opens.
 *(Amended October 14th 2026: the link was `/app/s/<token>`. The app's page still reads the path form, and
 reading the fragment is the next job.)* The shell reads the page with `GET /api/sharedPage` and
@@ -408,7 +416,7 @@ lands, no link is made and every link answers the 404.
    A host with no key makes no link and opens none.
 2. **Opening one.** `POST /api/openShare` `{ slug, days? }` from the owner's session reaches the record, which writes
    `share.open` (`target: 'share:<id>'`, `field: <slug>`, `to_v` the instant it stops opening) and answers
-   `{ id, slug, expires_at }`; the Worker's `recordApi` signs that into `token` and `url` (`https://<PUBLIC_HOST>/app/s#<token>`)
+   `{ id, slug, expires_at }`; the Worker's `recordApi` signs that into `token` and `url` (`https://<PUBLIC_HOST>/s#<token>`)
    on its way out, and the self-host's `withShareLinks` does the same for the origin it serves. With no key it refuses
    `NOT_IN_THIS_BUILD` before the record writes anything. `closeShare { id }` writes `share.close`, which is for good,
    and `shares` lists them, never a token. All three are ADMIN.
@@ -461,7 +469,7 @@ server key, and adds the operator's two.
 |---|---|---|
 | `POST /auth/passkey/register/options` · `/register` | `passkey.register.options` · `passkey.register` | a live session, in place of attestation |
 | `POST /auth/passkey/assert/options` · `/assert` | `passkey.assert.options` · `passkey.assert` | every failure is the one body, 401 "That did not sign you in." (12 §8) |
-| `POST /auth/magic/start` · `/redeem` | `magic.start` · `magic.redeem` | start is always 200 and mails only a live person; the link is `https://<PUBLIC_HOST>/app/signin#magic=` since push A (`/signin#magic=` before it, which still lands through the `308`), redeemed by a POST |
+| `POST /auth/magic/start` · `/redeem` | `magic.start` · `magic.redeem` | start is always 200 and mails only a live person; the link is `https://<PUBLIC_HOST>/signin#magic=` (`/app/signin#magic=` from push A until October 29th 2026, which still lands through the `308`), redeemed by a POST |
 | `GET /auth/methods` · `/session` · `/passkeys`; `POST /auth/passkey/remove` · `/passkey/rename` · `/logout` | as named | a logout deletes the row and clears the cookie |
 | `POST /auth/provision` | (the operator's) | a `PROVISION_KEY` bearer; `{ slug, email, name? }` → the record first, then its Directory rows (D21), then a 24-hour claim link handed back to the operator and never mailed |
 | `POST /auth/claim/mint` | `claim.mint` | a `PROVISION_KEY` bearer; a new claim link for a person already provisioned |
@@ -715,7 +723,9 @@ name ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). With no `KEK` bound no key can b
    `paths.base: '/app'` and, once push A2 routes `brain.dog`, `/` and `/_app/version.json` there are the marketing
    site's. `/app/_app/*` is a negative in `run_worker_first`, so step 2 holds for it; `/app/` is in `/app/*`, so the
    Worker answers it by fetching the same bytes from `ASSETS` unchanged. `DEPLOY_HOST` stays `app.brain.dog` through
-   A and A2, was `brain.dog` from push B, and is `app.brain.dog` again from push C.
+   A and A2, was `brain.dog` from push B, and is `app.brain.dog` again from push C. *(Amended October 29th 2026: the
+   app is at the root of `app.brain.dog` again, so the two paths are `/` and `/_app/version.json`, compared with
+   `build/index.html` and `build/_app/version.json`. With no session `/` answers the shell's bytes unchanged.)*
 
 ### 5.18 · Telemetry and logging
 
@@ -977,7 +987,7 @@ used (31 §3). Files `apps/worker/test/*.test.ts`. Input → expected:
 | 8 | socket read-only | send `"hello"` on the `/ws` socket | close code 1003 |
 | 9 | queue idempotency | `queue()` twice with `{ record }` after one outbox row | one `notify.email` sent (the `EMAIL` mock counts 1); second batch leases nothing |
 | 10 | queue crash | the dispatcher throws for a `notify.webhook` row | `ackOutbox(id, 'failed', sentence)`; a `retry` schedule row exists; the outbox row is `failed`, not re-leased by the consumer |
-| 11 | deploy parity | `SELF.fetch('/app/')` and `/app/_app/version.json` in the plugin's asset mode (`/` and `/_app/version.json` before push A) | bytes equal `apps/web/build/app/*`; the live check runs in `deploy.yml` |
+| 11 | deploy parity | `SELF.fetch('/')` and `/_app/version.json` in the plugin's asset mode (`/app/` and `/app/_app/version.json` from push A until October 29th 2026) | bytes equal `apps/web/build/*`; the live check runs in `deploy.yml` |
 | 12 | customer deletion | a record with one alarm, two attachments, one snapshot | after `deleteCustomer`: `getAlarm() === null`, `BLOBS.list({ prefix })` empty, `DIRECTORY.resolve(slug) === null` |
 | 13 | bearer routing | `Authorization: Bearer rec_X.secret` where the record holds `sha256(secret)` | 200; the same secret against another record → 401 |
 | 14 | browser-only groups | a bearer at `/api/openGrant` | 403 `NEEDS_BROWSER_SESSION` before any RPC (the stub mock records zero calls) |
@@ -1147,7 +1157,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 - [ ] Every route in `index.ts` declares its group; `router-groups` passes; a bearer at `openGrant` is 403 before any RPC.
 - [ ] A browser holds `/ws` for an hour in staging and the object's GB-s stay under 100; a write reaches the tab as `{ version, registers }`.
 - [ ] A redelivered queue message leaves the `EMAIL` mock at one call.
-- [ ] `deploy.yml` passes `deploy-parity` against `https://app.brain.dog/app/` (against `https://app.brain.dog/app/` until push B, §4.4).
+- [ ] `deploy.yml` passes `deploy-parity` against `https://app.brain.dog/` (against `https://app.brain.dog/app/` from push A until October 29th 2026, §4.4).
 - [ ] A staging record is snapshotted, deleted, and restored to a bookmark; the `export` and `restore.pitr` events exist; no alarm and no R2 object survive the deletion.
 - [ ] Every row of §13's amendment column is applied to its design document in the same revision.
 

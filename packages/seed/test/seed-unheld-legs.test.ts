@@ -26,7 +26,10 @@ test('THE CASH WALK NAMES CERTIFICATES, AND THE SAMPLE INSTALLS WITHOUT THEM', a
 
 test('NO DECLARATION THE SEED HANDS OUT CARRIES A LEG OVER A LIST IT DOES NOT HOLD', () => {
   for (const set of [declarations(), pageDeclarations(), metricDeclarations()]) assert.deepEqual(legsOf(set), []);
-  assert.equal(JSON.stringify(METRICS).includes('certificates'), false);
+  /* NO LEG OVER THE LIST; what is held beyond cash (money-core 3.31.0) names the Certificates add-on's own figures, each
+     `optional`, which a record without the add-on reads as nought and which is no leg. */
+  assert.deepEqual(JSON.stringify(METRICS).match(/"register":"certificates"/g) ?? [], []);
+  assert.deepEqual(JSON.stringify(METRICS).replace(/"metric":"certificates-[a-z]+","optional":true/g, '').match(/certificates/g) ?? [], []);
 });
 
 test('heldLegs KEEPS A LEG OVER A HELD LIST, IN A FIGURE AND IN A BLOCK, AND NOTHING ELSE MOVES', () => {

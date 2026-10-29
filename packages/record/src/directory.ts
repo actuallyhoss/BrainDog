@@ -76,12 +76,16 @@ const RESERVED = new Set([
   /* 33 §4's own top-level surface, first: a slug that shadowed one of these would be a name the
      router reaches before the Directory does. `mcp` and `p` were missing. */
   'api', 'auth', 'mcp', 'a', 'p', 's', 'in', 'r', 'ws',
-  /* And the words a name would read as the platform's rather than somebody's. */
+  /* AND THE HOST'S OTHER DOORS AT THE ROOT, now that the app is there beside them (`app.brain.dog/<slug>/…`): a record
+     called `oauth` or `healthz` would be a name the router answers before the Directory is asked, and `drawn-frame` is
+     the frame a drawn block is drawn in. */
+  'account', 'oauth', 'healthz', 'drawn-frame',
+  /* And the words a name would read as the platform's rather than somebody's. `app` is also the prefix the app had
+     before it moved to the root, which the Worker reads as that and never as a name. */
   'admin', 'app', 'assets', 'static', 'www', 'new',
-  /* AND EVERY TOP-LEVEL WORD THE APP ROUTES, because the app now lives at `app.brain.dog/app/<slug>/…` and the first
-     segment after `/app/` is a page or a record's name by this set alone. A record called `settings` would make
-     `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue` are the static folders served under
-     `/app` beside the pages. `test/directory.test.ts` reads the app's route and static folders and fails for any this
+  /* AND EVERY TOP-LEVEL WORD THE APP ROUTES, because the app lives at `app.brain.dog/<slug>/…` and the first segment
+     is a page or a record's name by this set alone. A record called `settings` would make `/settings/agents` two pages
+     at once, for ever. `fonts` and `catalogue` are the static folders served beside the pages. `test/directory.test.ts` reads the app's route and static folders and fails for any this
      set does not hold, so a route added later cannot fall behind it. */
   'activity', 'add', 'addons', 'agents', 'audit', 'automations', 'catalogue', 'connect', 'count', 'decide', 'design', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
   'keychain', 'settings', 'signin', 'signup', 'slash', 'start', 't', 'usage', 'v', 'vault',
@@ -90,7 +94,7 @@ const RESERVED = new Set([
 /**
  * A spoken id: one to three letters and then only digits, as `D41` or `SG31` (`19 §5`).
  *
- * `/app/d41` IS THE APP OPENING DECISION 41, the same shape `apps/web/src/routes/[id]/+page.svelte` matches, so a
+ * `/d41` IS THE APP OPENING DECISION 41, the same shape `apps/web/src/routes/[id]/+page.svelte` matches, so a
  * record named `d41` is a name nobody could ever reach by it. Refused as a name the day it would be claimed, which
  * costs nothing while no record holds one and is permanent afterwards.
  */
@@ -100,7 +104,7 @@ const SPOKEN = /^[a-z]{1,3}[0-9]+$/;
  * Whether a string could be a record's name, and the sentence when it cannot: the grammar, the platform's words and
  * the spoken-id shape. `null` is a name.
  *
- * AT MODULE SCOPE AND EXPORTED, because the Worker asks the same question of every path under `/app/` before any
+ * AT MODULE SCOPE AND EXPORTED, because the Worker asks the same question of every path of the app before any
  * Directory is open: a first segment this calls a name is a record's slug, and anything else is one of the app's own
  * pages (`apps/worker/src/route.ts`, `appPath`). Two copies of the set would be two answers to which one a path is.
  */
@@ -108,7 +112,7 @@ export function badSlug(slug: string): string | null {
   if (!SLUG.test(slug))
     return `${slug} is not a name: it starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one.`;
   if (RESERVED.has(slug)) return `${slug} is a name the platform uses for something else.`;
-  if (SPOKEN.test(slug)) return `${slug} reads as a spoken id, like D41, and app.brain.dog/app/${slug} opens that item rather than a record.`;
+  if (SPOKEN.test(slug)) return `${slug} reads as a spoken id, like D41, and app.brain.dog/${slug} opens that item rather than a record.`;
   return null;
 }
 
@@ -552,7 +556,7 @@ export function switcherAsk(kernel: SwitcherSource, person: string): SwitcherAsk
 
 /**
  * Whether a request is one of the record's sharing methods that can leave somebody holding nothing: `unshare`, and a
- * group changed (`groupMember`, `groupPut`), under either base, `/api/...` or `/app/<slug>/api/...`.
+ * group changed (`groupMember`, `groupPut`), under either base, `/api/...` or `/<slug>/api/...`.
  *
  * THE LAST SHARE ENDED IS A REMOVAL TOO (sharing plan slice 8). A guest holds shares and no member row, so stopping the
  * last of them leaves the Directory's `dir_member` naming somebody the record refuses, as a removal did before the
@@ -1509,7 +1513,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
    * Sign-in, with `lapsed: true` on a `session` answer whose record is lapsed.
    *
    * ON THE ANSWER A BROWSER REQUEST ALREADY WAITS FOR, so a lapsed record costs the Worker no second call to the
-   * Directory: every request under `/app/<slug>` asks `session` before any record is addressed, and the doors that
+   * Directory: every request under `/<slug>` asks `session` before any record is addressed, and the doors that
    * cap a lapsed record read the flag from there. Absent means not lapsed, which is what every other record answers.
    */
   const signIn = createAuth(sql, clock, auth);

@@ -13,18 +13,18 @@ const store = (): Pick<Storage, 'getItem' | 'setItem'> => {
 
 test('the order drawn is kept by record and read back as drawn', () => {
   const s = store();
-  keepOrder('/app/a', ['things#3', 'things#1'], s);
-  keepOrder('/app/b', ['things#9'], s);
-  assert.deepEqual(keptOrder('/app/a', s), ['things#3', 'things#1']);
-  assert.deepEqual(keptOrder('/app/b', s), ['things#9']);
-  assert.deepEqual(keptOrder('/app/c', s), [], 'a record it never drew has no order');
+  keepOrder('/a', ['things#3', 'things#1'], s);
+  keepOrder('/b', ['things#9'], s);
+  assert.deepEqual(keptOrder('/a', s), ['things#3', 'things#1']);
+  assert.deepEqual(keptOrder('/b', s), ['things#9']);
+  assert.deepEqual(keptOrder('/c', s), [], 'a record it never drew has no order');
 });
 
 test('nothing kept, or nothing to keep it in, is no order', () => {
-  assert.deepEqual(keptOrder('/app/a', null), []);
+  assert.deepEqual(keptOrder('/a', null), []);
   const s = store();
   s.setItem('bd_side_order', '{');
-  assert.deepEqual(keptOrder('/app/a', s), []);
+  assert.deepEqual(keptOrder('/a', s), []);
 });
 
 test('the phone’s Menu is a place of its own, and its address draws Today on a desk', () => {

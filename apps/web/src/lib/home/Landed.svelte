@@ -2,7 +2,7 @@
   Arrivals: what arrived since the reader last looked, a line each (Today as the desk, today F10).
 
   WHEN, WHO, WHAT, AND WHERE IT WAS FILED: the name in the heavier weight, its note after it in the quiet ink, and the
-  list at the right with a tick. LINES THAT SHARE WHO, LIST AND HOUR ARE ONE LINE ("BrainDog filed 6 into Tools"),
+  list at the right with a tick. LINES THAT SHARE WHO, LIST AND HOUR ARE ONE LINE ("BrainDog added 6 to Tools"),
   opening in place to the names (`arrivalsOf`). The lines are Home's own read of `whatsNew`, the same read the read mark
   is stamped from, so what is drawn here is what the mark will say was seen.
 
@@ -30,9 +30,9 @@
     all: 'Activity',
     review: (n: number) => `${n.toLocaleString('en-GB')} to review`,
     names: (n: number) => `Show the ${n.toLocaleString('en-GB')}`,
-    /* A GROUPED LINE IN PARTS, so its count and its list stand a step heavier: "BrainDog filed 6 into Tools". */
-    filed: (who: string) => `${who} filed`,
-    into: 'into',
+    /* A GROUPED LINE IN PARTS, so its count and its list stand a step heavier: "BrainDog added 6 to Tools". */
+    filed: (who: string) => `${who} added`,
+    into: 'to',
   } as const;
 
   const lines = $derived(arrivalsOf(rows));

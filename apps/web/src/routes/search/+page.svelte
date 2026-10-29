@@ -56,6 +56,9 @@
   import { isGlyph, type IconName } from '$lib/ui/icons.ts';
   import { createClient } from '@braindog/client';
   import { paletteReader } from '$lib/record/palette-live.ts';
+  import { readSide } from '$lib/shell/side-read.ts';
+  import { shownName, splitOf } from '$lib/shell/side.ts';
+  import { singularOf } from '$lib/voice.ts';
   import type { Recent } from '$lib/record/palette.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { PER_TILE, listsOf, readDeclared, readPeople, thingsOf, type Place } from './jump.ts';
@@ -66,6 +69,7 @@
     best: 'Best match',
     jumpTo: 'Jump to',
     lists: 'Lists',
+    projects: 'Projects',
     recent: 'Changed lately',
     entries: (n: number) => n.toLocaleString('en'),
   } as const;
@@ -75,15 +79,34 @@
   type Registers = { id: string; name: string; count: number; icon: IconName }[];
   const registers = $derived<Registers>(route.data.index?.registers ?? []);
   /* THE BOX NAMES WHAT IT SEARCHES, "Search The Studio" (P28), where it said "Search the record". */
-  const searchSaid = $derived(route.data.index?.name ? copy.searchIn(route.data.index.name) : copy.searchRecord);
-  const nav = $derived<{ title: string; href: string; section: string; row?: boolean; hue?: number; icon: IconName }[]>(route.data.nav ?? []);
+  /* AND NOT "SEARCH MARA" (Q37 of 29 October): the record's name read as searching for a person. */
+  const searchSaid = copy.searchRecord;
+  const nav = $derived<{ title: string; href: string; section: string; row?: boolean; hue?: number; icon: IconName; register?: string }[]>(route.data.nav ?? []);
+  /* EVERY PROJECT IN PLAY, read as the sidebar reads them (`readSide`), by name: the tile drew the 5 of 18 that have a
+     page of their own. `null` until read, and a read that fails keeps the tile the rail's pages make. */
+  let projects = $state.raw<Place[] | null>(null);
+  const projectNames = $derived(new Set((projects ?? []).map((p) => p.title.trim().toLowerCase())));
+  /* A THING NAMED AS A PROJECT, IN ANOTHER SECTION, SAYS WHAT IT IS: "Quartz (book)" under Money beside Quartz the
+     project, by the one word of the list its row is in. */
+  const twinOf = (p: Place): Place => {
+    if (!projectNames.has(p.title.trim().toLowerCase())) return p;
+    const list = registers.find((r) => r.id === nav.find((n) => n.href === p.href)?.register);
+    return list ? { ...p, title: `${p.title} (${singularOf(list.name)})` } : p;
+  };
   /* EACH SECTION OF THINGS WEARS ITS OWN PAGE'S GLYPH, the one the rail draws for it. */
-  const things = $derived(
-    thingsOf(nav).map((t) => {
+  const things = $derived.by(() => {
+    const projectAt = new Set((projects ?? []).map((p) => p.href));
+    const out = thingsOf(nav).map((t) => {
       const page = nav.find((n) => n.section === t.section && n.row !== true);
-      return { ...t, icon: page?.icon ?? ('projects' as IconName), all: page?.href };
-    }),
-  );
+      const ofProjects = projects !== null && (t.section.trim().toLowerCase() === 'projects' || t.items.some((i) => projectAt.has(i.href)));
+      return ofProjects && projects
+        ? { section: t.section, items: projects, total: projects.length, icon: page?.icon ?? ('projects' as IconName), all: page?.href }
+        : { ...t, items: t.items.map(twinOf), icon: page?.icon ?? ('projects' as IconName), all: page?.href };
+    });
+    if (projects && projects.length > 0 && !out.some((t) => t.items === projects))
+      out.unshift({ section: words.projects, items: projects, total: projects.length, icon: 'projects' as IconName, all: undefined });
+    return out;
+  });
   let read = $state.raw<{ icons: ReadonlyMap<string, IconName>; people: Place[]; met: { name: string; icon: IconName } | null; recent: Recent[] } | null>(null);
   const lists = $derived(listsOf(registers, read?.icons ?? new Map()));
   const people = $derived(read?.met ? read.people : []);
@@ -114,6 +137,12 @@
       paletteReader(apiBase()).recent(held, PER_TILE).catch(() => [] as Recent[]),
     ]);
     const met = declared?.people ? await readPeople(client, declared.people).catch(() => [] as Place[]) : [];
+    /* THE PROJECTS IN PLAY, IN A STEADY ORDER (by name), as the sidebar lists them. */
+    const side = await readSide(apiBase(), held).catch(() => null);
+    if (side)
+      projects = splitOf(side.rows, side.lanes)
+        .play.map((r): Place => ({ title: shownName(r.name), href: r.href, ...(r.hue === null ? {} : { hue: r.hue }) }))
+        .sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }));
     /* A CHANGED ROW WEARS ITS LIST'S DECLARED GLYPH TOO, read in the same answers as the lists tile's. */
     const icons = declared?.icons ?? new Map<string, IconName>();
     /* THE PEOPLE TILE IS NAMED AND DRAWN AS THEIR LIST IS, whatever the record calls it. */
@@ -292,7 +321,10 @@
 
 {#snippet second(hit: SearchResult['hits'][number])}
   {@const told = secondFor(hit.href)}
-  <span class="line-detail" dir="auto" data-late={told?.late ? '' : undefined}>{told?.text ?? hit.why ?? (hit.detail || hit.kind)}</span>
+  {@const raw = told?.text ?? hit.why ?? (hit.detail || hit.kind)}
+  <!-- THE SECOND LINE IN WORDS (30 October): a bank's capitals read as words, as the title above it does, and a bare
+       number with nothing to say what it counts gives way to the list's name. -->
+  <span class="line-detail" dir="auto" data-late={told?.late ? '' : undefined}>{raw.trim() !== '' && Number.isInteger(Number(raw.trim())) ? hit.kind : readable(raw)}</span>
 {/snippet}
 
 <!-- THE BEST MATCH'S MARK: a person's face where the hit is somebody, else the well its list draws. -->

@@ -142,7 +142,7 @@ test('WHAT SOMEBODY IS KNOWN BY IS SAID BY KIND, each once, a repository by its 
   assert.equal(keySaid('github:'), null);
   assert.deepEqual(keySaid('phone:+447700900123'), { label: 'Phone', value: '+447700900123' }, 'a number is never taken for a hash');
   assert.deepEqual(keySaid('github:deadbee1'), { label: 'GitHub', value: 'deadbee1' }, 'nor is a login');
-  assert.deepEqual(keySaid('bank:chillout'), { label: 'Bank payee', value: 'chillout' });
+  assert.deepEqual(keySaid('bank:chillout'), { label: 'Bank texts call it', value: 'chillout' });
   assert.deepEqual(keySaid('folder:/Users/mara/Developer/portage'), { label: 'Folder', value: 'portage' }, 'a folder by its name, never its path');
   assert.deepEqual(keySaid('constructor:x'), { label: 'Constructor', value: 'x' });
   assert.deepEqual(
@@ -157,7 +157,7 @@ test('WHAT SOMEBODY IS KNOWN BY IS SAID BY KIND, each once, a repository by its 
     knownOf({ domain: 'halden.example', keys: ['domain:halden.example', 'payee:HALDEN TYPE'], aliases: ['Halden'] }, { domain: 'domain', keys: 'keys', aliases: 'aliases' }),
     [
       { label: 'Website', value: 'halden.example' },
-      { label: 'Bank payee', value: 'HALDEN TYPE' },
+      { label: 'Bank texts call it', value: 'HALDEN TYPE' },
       { label: 'Also called', value: 'Halden' },
     ],
   );

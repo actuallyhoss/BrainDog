@@ -173,6 +173,9 @@
      reads the options once with the page's way to a file (`waysOf` keeps an address of another host off the card).
      Before `inlineOf`, so answers that are pictures are the form's choices and not a row of bare buttons. */
   const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: recordNow(), lead, file: fileAt }));
+  /* THE LEAD'S QUESTION IS A HEADING OF THE PAGE'S OWN RANK, beside the columns' names: it stands in a tile of its own
+     under the page's name, and an h3 there skipped a level wherever no column's name was drawn above it (a phone). */
+  const questionLevel = $derived(lead && !compact ? 'h2' : 'h3');
   /* WHO ASKED IS A NAME AND THE APP, NEVER THE RUN'S TITLE: "Built the big round on master
      lo…" cut at 24 characters said nothing, and on a phone it wrapped. The run is named on the question's own page. */
   const from = $derived([card.by.app].filter((s): s is string => s !== null));
@@ -731,7 +734,7 @@
        (polish 8, VERIFY P7): the late word carries the red, once. -->
   <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl} {@attach heard}>
     <span class="dr-well"><IconWell name={row.owed ? 'arrowDown' : 'money'} size="l" /></span>
-    <h3 class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}><span data-own>{row.title}</span></a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</h3>
+    <svelte:element this={questionLevel} class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}><span data-own>{row.title}</span></a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</svelte:element>
     <span class="dr-amount num">{row.amount}</span>
     <p class="dr-meta"><span class="dr-late">{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
     {#if drawn}
@@ -778,11 +781,11 @@
     <div class="dc-main">
       <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
            is kept on it, unseen, for the keys and the ranking. -->
-      <h3 class="queue-question" dir="auto" data-clamp={readAll ? undefined : ''} bind:this={titleEl}>
+      <svelte:element this={questionLevel} class="queue-question" dir="auto" data-clamp={readAll ? undefined : ''} bind:this={titleEl}>
         {#if link || compact}<a class="dc-open tap" href={at(card.href)}><span data-own>{card.question}</span></a>{:else}<span data-own>{card.question}</span>{/if}{#if card.joined}{' '}<span
             class="qa-joined num">{queueWords.joined(card.joined)}</span
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
-      </h3>
+      </svelte:element>
       <!-- A QUESTION LONGER THAN TWO LINES IS CUT THERE, and read whole on a press. -->
       {#if clamped && !readAll}<button type="button" class="dc-read tap" onclick={() => (readAll = true)}>{cardWords.readAll}</button>{/if}
       <!-- COMPACT, WHO ASKED AND HOW LONG IT HAS WAITED ARE ONE QUIET LINE: the kind of thing, who, and when. -->

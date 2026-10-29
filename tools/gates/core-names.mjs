@@ -253,6 +253,14 @@ const VALUE_KINDS = ['packages/kernel/src/fx.ts'];
 const NAMED_LISTS = { 'packages/kernel/src/govern.ts': ['BODY_KINDS'] };
 
 /**
+ * THE KINDS THAT READ THEMSELVES. `BLOCK_KINDS` in `declare.ts` spreads `Object.keys(BLOCK_KIND_MODULES)` into its list,
+ * and those kinds (`calendar`, `link`, `form` and the rest) are named as keys of an object in `kinds/index.ts`, not as
+ * strings in the list, so reading the list alone missed them: the day an add-on was called `calendar`, the kernel's own
+ * calendar kind and its glyphs read as that add-on's name in 105 places. Each key of that object is a kernel word.
+ */
+const KIND_MODULES = { 'packages/kernel/src/kinds/index.ts': 'BLOCK_KIND_MODULES' };
+
+/**
  * THE WORDS THE KERNEL DECLARES FOR ITSELF, folded, read off its own source under one root. From a grammar file,
  * every one-word string in a list or a set a module-level constant in capitals is given (`const BLOCK_KINDS = [`,
  * `export const FIELD_TYPES = [`, `new Set([`), nested lists and spreads included, to the bracket that closes it. From
@@ -278,6 +286,10 @@ export function kernelWords(root) {
       const m = new RegExp(`^(?:export )?const ${name}\\b[^=\\n]*=\\s*\\[([^\\]]*)\\]`, 'm').exec(text);
       for (const q of (m?.[1] ?? '').matchAll(/'([A-Za-z][A-Za-z0-9_-]*)'/g)) words.add(fold(q[1]));
     }
+  }
+  for (const [path, name] of Object.entries(KIND_MODULES)) {
+    const m = new RegExp(`^(?:export )?const ${name}\\b[^=\\n]*=\\s*\\{([^}]*)\\}`, 'm').exec(textOf(path));
+    for (const q of (m?.[1] ?? '').matchAll(/^\s*'?([A-Za-z][A-Za-z0-9_-]*)'?\s*[,:]/gm)) words.add(fold(q[1]));
   }
   return words;
 }

@@ -43,5 +43,5 @@ What a sync wrote is kept in `skills-lock.json` in the `.braindog` folder in you
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

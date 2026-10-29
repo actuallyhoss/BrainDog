@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.30.0",
+  "version": "1.30.1",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "Projects opens on what is true today: which projects are late, what falls due this week, whose numbers went quiet and what renews, by name, with what the earning ones bring in a month beside it. One list follows, earning first, then what is moving, then what is quiet, and the parked and finished fold into a strip.",
+  "changes": "A project that leaves the board reads Closed, where it read Finished: its status, the fold in the sidebar and the figures that count them.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -38,7 +38,7 @@
           "label": "Status",
           "type": "enum",
           "values": [ "building", "earning", "parked", "retired" ],
-          "labels": { "building": "Building", "earning": "Earning", "parked": "Parked", "retired": "Finished" },
+          "labels": { "building": "Building", "earning": "Earning", "parked": "Parked", "retired": "Closed" },
           "index": true,
           "required": true
         },
@@ -425,7 +425,7 @@
     },
     {
       "metric": "projects-not-in-play",
-      "name": "Parked or finished",
+      "name": "Parked or closed",
       "source": "register.things",
       "where": "lane is parked or retired",
       "value": { "count": "id" },
@@ -458,7 +458,7 @@
     },
     {
       "metric": "projects-retired",
-      "name": "Finished",
+      "name": "Closed",
       "source": "register.things",
       "where": "lane is retired",
       "value": { "count": "id" },

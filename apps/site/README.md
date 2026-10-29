@@ -17,14 +17,15 @@ node scripts/shot.mjs # screenshots of the built site, both schemes
   while you look at it; this site draws sentences that change only when somebody edits this
   repository, so it arrives finished.
 - **One origin.** The site's Worker (`src/worker.ts`, `wrangler.jsonc`) hands `/app`, `/api/*`,
-  `/auth/*`, `/account/*` and `/mcp` to the app's Worker. Every link under `/app` carries
-  `rel="external"`, or the prerender crawler follows it and stops the build.
+  `/auth/*`, `/account/*` and `/mcp` to the app's Worker, which sends an old `/app` link on to
+  `app.brain.dog`. Every link to the app (`https://app.brain.dog/...`) carries `rel="external"`, or
+  the prerender crawler follows it and stops the build.
 - **The same design system as the app**, imported from `@braindog/skin` rather than copied: the
   tokens, the generated palette, the mark. The site's own half is `src/app.css`: the type scale, the
   grounds, the button and the section shapes every page is made of.
 - **One list of pages.** `src/lib/nav.ts` names every page in order, and a page shows only once its
   route folder exists. The header, the footer, the 404 and `/sitemap.xml` all read it.
-- **No photographs.** The product is drawn in HTML and CSS from the seed each use case installs, and
+- **No photographs.** The product is drawn in HTML and CSS from the seed each starter installs, and
   `test/content.test.ts` fails if a `<picture>` or an `<img>` reaches the home page. The one capture
   is the shared card, `static/shots/home-light.png`, which `scripts/product.mjs` draws out of the
   built home page.

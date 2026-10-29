@@ -206,7 +206,21 @@ function braced(body: string, opts: InlineOptions): Inline {
   if (!PATH.test(path)) return { type: 'unresolved', text: path };
   const value = opts.resolve?.(path);
   if (value === UNNAMED) return { type: 'path', path, resolved: null, named: false };
-  return { type: 'path', path, resolved: value === undefined || value === null ? null : value };
+  return { type: 'path', path, resolved: value === undefined || value === null ? null : dayInWords(value) };
+}
+
+const MONTH_WORDS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A FIGURE THAT IS A BARE DAY IS SAID AS A PERSON SAYS ONE: `2027-01-13` in a sentence read "cash lasts to 2027-01-13",
+ * where a tile's cell under it said "Until 13 Jan 2027". Only a value that is a day and nothing else; anything else is
+ * drawn as the record wrote it.
+ */
+export function dayInWords(value: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value.trim());
+  if (m === null) return value;
+  const month = MONTH_WORDS[Number(m[2]) - 1];
+  return month === undefined ? value : `${Number(m[3])} ${month} ${m[1]}`;
 }
 
 /**

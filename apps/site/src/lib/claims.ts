@@ -41,7 +41,7 @@ export type Claim = {
 export const CLAIMS: readonly Claim[] = [
   /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). */
   { id: 'ai-tools-read', said: 'Your AI tools read from it too.', where: 'hero.sub', state: 'true' },
-  { id: 'brief-each-morning', said: 'in one short brief each morning', where: 'who.small.say', state: 'true' },
+  { id: 'today-each-morning', said: 'on one page each morning', where: 'who.small.say', state: 'true' },
   { id: 'agents-leave-a-note', said: "leaves a note when it's done", where: 'tools.say', state: 'true' },
   { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'chores.say', state: 'true' },
   { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'chores.floor', state: 'true' },

@@ -374,13 +374,19 @@ the app's route and static folders and fail for any word their set does not hold
 (`api`, `auth`, `www` and the rest of `RESERVED`'s first two lines) are copied into `APP_WORDS` by hand, and no test
 compares the two sets.
 
+*(Amended October 29th 2026: the app left `/app` for the root.)* The catch-all is `/*` again, with the host's doors
+answered first, and `/<slug>/…` names a record in the path: `app.brain.dog/acme/r/tasks`. The first segment is a page,
+a door of the host or a record's name, so the doors' own words (`account`, `oauth`, `healthz`, `drawn-frame` beside
+`api`, `auth`, `mcp`, `in`, `a`, `ws`) are in `RESERVED` and `APP_WORDS` too, and `DOORS` in `at.ts` is the list of them
+the app never draws. Every address under `/app` is a `308` to the same address without it.
+
 `/<ID>` is resolved by the shell, not a server 302 — no server renders a request
 ([22-FRONTEND](22-FRONTEND.md) §2): `[id]/+page.svelte` reads a question (`SG`, `D`) through `governance`
 as Decide does and a row through `get({ spoken })`, and `replaceState`s to the canonical address
 ([50-SPEC-WEB](50-SPEC-WEB.md) §2.2). It reads the sample only when no record answers (`UNREACHABLE` or
-`UNAUTHORIZED`). `app.brain.dog/app/D41`, or `app.brain.dog/app/<slug>/D41` naming its record, is a sentence one
+`UNAUTHORIZED`). `app.brain.dog/D41`, or `app.brain.dog/<slug>/D41` naming its record, is a sentence one
 person can say to another (a slug shaped like a spoken
-id is refused, so `/app/d41` is always the question) and a string an agent can emit with no lookup. One resolver, and it is the
+id is refused, so `/d41` is always the question) and a string an agent can emit with no lookup. One resolver, and it is the
 cheapest legibility win available.
 
 ### What goes where

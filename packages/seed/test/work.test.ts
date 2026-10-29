@@ -88,11 +88,12 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
     assert.ok(out.ok, sayOf(out));
     return out.value.value;
   };
-  /* THE HEAD COUNTS OPEN WORK, kept for later left out, as the rail does; the project chips count every task the page
-     shows, the folded Later among them. */
+  /* THE HEAD COUNTS OPEN WORK, kept for later left out, as the rail does; and since work 1.20.0 (Q6 of 29 October) the
+     project chips count the same open tasks (`counts:` on the filter), where they counted Later too and read 67 over an
+     Open of 57. */
   assert.equal((opened(k, 'work').head as { count?: { value?: number } } | undefined)?.count?.value, TASKS.filter(open).length, 'the head does not count what the rail counts');
   const chips = (opened(k, 'work') as { filters?: { values: { count: number }[] }[] }).filters?.[0]?.values ?? [];
-  if (chips.length > 0) assert.equal(chips.reduce((n, v) => n + v.count, 0), TASKS.filter(live).length, 'the chips do not add up to what the page shows');
+  if (chips.length > 0) assert.equal(chips.reduce((n, v) => n + v.count, 0), TASKS.filter(open).length, 'the chips do not add up to what Open counts');
   assert.equal(read('tasks-done-7d'), TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length);
   assert.equal(read('open-tasks'), TASKS.filter(open).length);
   assert.equal(read('tasks-waiting'), TASKS.filter((t) => t.state === 'review' || t.state === 'blocked').length);

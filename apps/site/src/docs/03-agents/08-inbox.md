@@ -83,5 +83,5 @@ After three arrivals of the same shape, Slash suggests how to file them. Say yes
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

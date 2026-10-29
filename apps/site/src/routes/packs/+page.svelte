@@ -16,6 +16,7 @@
   link's name rather than every word on the card.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import { PACKS } from '$lib/links.ts';
@@ -43,15 +44,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>{w.meta.title}</title>
-  <meta name="description" content={w.meta.description} />
-  <link rel="canonical" href="https://brain.dog/packs" />
-  <meta property="og:url" content="https://brain.dog/packs" />
-  <meta property="og:title" content={w.meta.title} />
-  <meta property="og:description" content={w.meta.description} />
-</svelte:head>
-
+<Seo title={w.meta.title} description={w.meta.description} path="/packs" />
 <PageHead title={w.title} lead={w.lede}>
   {#if data.cards.length > 0}
     <div class="head-search" role="search">

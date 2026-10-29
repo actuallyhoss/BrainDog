@@ -69,11 +69,14 @@ import { ROUTES as VISUALS } from './visuals.ts';
 import { ROUTES as METRICS } from './metrics.ts';
 import { ROUTES as READS } from './reads.ts';
 import { ROUTES as TODAY } from './today.ts';
+import { ROUTES as WIDGETS } from './widgets.ts';
+import { ROUTES as board } from './board.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
   /* ROUTES: the spreads, one line per file, in the order of the imports above. */
   ...agents,
+  ...board,
   ...automations,
   ...comments,
   ...members,
@@ -129,5 +132,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...METRICS,
   ...READS,
   ...TODAY,
+  ...WIDGETS,
   /* END ROUTES */
 ];

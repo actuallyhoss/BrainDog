@@ -1,7 +1,7 @@
 /**
  * A record's files on the Cloud: `PUT /api/files/<sha256>` keeps the bytes at the address their hash makes, `PUT
  * /api/files` keeps them and answers the name, and `GET /api/files/<sha256>` gives them back (`51 §5.5`, `12 §8` "The
- * asset store"). All three also under `/app/<slug>/api/files`, which is the address the app calls from.
+ * asset store"). All three also under `/<slug>/api/files`, which is the address the app calls from.
  *
  * THE BYTES NEVER CROSS INTO THE RECORD'S OBJECT. A row holds `{ sha256, mime, bytes, name }` (`kernel/src/coerce.ts`
  * `file`) and the bytes sit in `BLOBS` at `rec_<id>/a/<sha256>`, so a photo of a receipt costs the record's single

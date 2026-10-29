@@ -117,9 +117,10 @@ test('MONEY DECLARES THEM, after every figure it already held, and a fresh recor
   for (const id of MONTH) assert.match(String(METRICS[id]!.where), /book is \{\{it\}\}$/, `${id} is not read a book at a time`);
   /* LAST IN THE DOCUMENT, in this order, so no figure a record already holds moves; but for the three of the next unpaid part of
      each plan and the parts late (money-core 3.18.0), which came after them for the same reason,
-     and the eleven of the Budgets, Payees and Reports pages (money-core 3.29.0); a plan's page's own (3.29.0) are left out as an
-     account's are. */
-  assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES) && !(id in PLAN_PAGE_FIGURES)).slice(-ALL.length - 15, -15), ALL);
+     and the eleven of the Budgets, Payees and Reports pages (money-core 3.29.0), and twenty-two more by money-core 3.31.0 and
+     3.32.0 (week and year budgets, pending and unfiled lines, payees, net worth, by week); a plan's page's own (3.29.0) are left
+     out as an account's are. */
+  assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES) && !(id in PLAN_PAGE_FIGURES)).slice(-ALL.length - 37, -37), ALL);
   const { k } = await fresh();
   for (const id of ALL) assert.ok(k.declarations().some((d) => d.id === `metric.${id}`), `money-core installed without ${id}`);
 });

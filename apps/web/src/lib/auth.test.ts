@@ -323,7 +323,7 @@ test('NOTHING THROWS AND NOTHING LOGS, whatever comes back', async () => {
       passkeys(broken),
       removePasskey('x', broken),
       renamePasskey('x', 'Phone', broken),
-      signOutAndLeave('/app/signin', () => assert.fail('a failed sign-out went somewhere'), broken),
+      signOutAndLeave('/signin', () => assert.fail('a failed sign-out went somewhere'), broken),
       passkeySignIn(mixed.io),
     ]);
     for (const out of outs) assert.equal(out.ok, false);
@@ -370,12 +370,12 @@ test("an empty name comes back as the host's own sentence", async () => {
 test("the frame's Sign out ends the session first and only then loads the sign-in screen in full", async () => {
   const went: string[] = [];
   const { io, seen } = host({ '/auth/logout': () => ok({}) });
-  const out = await signOutAndLeave('/app/signin', (to) => went.push(`${seen.length}:${to}`), io);
+  const out = await signOutAndLeave('/signin', (to) => went.push(`${seen.length}:${to}`), io);
   assert.deepEqual(out, { ok: true, value: null });
   assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['POST /auth/logout']);
-  assert.deepEqual(went, ['1:/app/signin'], 'the load comes after the logout answered');
+  assert.deepEqual(went, ['1:/signin'], 'the load comes after the logout answered');
   const down = host({ '/auth/logout': () => json(502, {}) });
   const kept: string[] = [];
-  assert.equal((await signOutAndLeave('/app/signin', (to) => kept.push(to), down.io)).ok, false);
+  assert.equal((await signOutAndLeave('/signin', (to) => kept.push(to), down.io)).ok, false);
   assert.deepEqual(kept, [], 'a session that did not end leaves the page where it is');
 });

@@ -1,13 +1,16 @@
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
+  import { application, faqOf, organization, website } from '$lib/site/seo.ts';
   /**
    * brain.dog's home page, rebuilt in the redesign.
    *
-   * ONE PRODUCT PICTURE, THEN SIX BANDS THAT EACH SAY ONE NEW THING. The dark hero with the slogan, two buttons, the
+   * ONE PRODUCT PICTURE, THEN SEVEN BANDS THAT EACH SAY ONE NEW THING. The dark hero with the slogan, two buttons, the
    * early access line and the makers, then Maya's desk across the hero's edge (`lib/desk/Desk.svelte`), drawn as the
    * app's own Today. Under it, full-bleed bands, each on its own ground in both schemes so two neighbours never share
    * one (`--band-*` in Look B):
    *
-   *   who      Who it's for: three readers, each a tile with its own fill, icon and drawing.
+   *   who      Who it's for: three readers (a small business, building with AI, your own life), each a tile.
+   *   money    Your money, in one place: the app's Money home on Maya's two books, and the add-ons.
    *   chores   red: it does the chores, you make the calls, with questions the desk does not show.
    *   tools    night: your AI tools share one memory, the notes and the connect line.
    *   slash    Press / and ask anything, the bar and its answer.
@@ -30,6 +33,7 @@
   import { home } from '$lib/copy/home.ts';
   import Desk from '$lib/desk/Desk.svelte';
   import Chores from '$lib/home/Chores.svelte';
+  import MoneyBand from '$lib/home/MoneyBand.svelte';
   import Questions from '$lib/home/Questions.svelte';
   import SlashBand from '$lib/home/SlashBand.svelte';
   import Tools from '$lib/home/Tools.svelte';
@@ -38,15 +42,7 @@
   import Start from '$lib/site/Start.svelte';
 </script>
 
-<svelte:head>
-  <title>{site.meta.home.title}</title>
-  <meta name="description" content={site.meta.home.description} />
-  <link rel="canonical" href="https://brain.dog/" />
-  <meta property="og:url" content="https://brain.dog/" />
-  <meta property="og:title" content={site.meta.home.title} />
-  <meta property="og:description" content={site.meta.home.description} />
-</svelte:head>
-
+<Seo title={site.meta.home.title} description={site.meta.home.description} path="/" ld={[organization, website, application, faqOf(home.faq.questions)]} />
 <section class="hero night" aria-labelledby="hero-title">
   <span class="hero-mark" aria-hidden="true"><Mark tone="line" height={731} /></span>
   <div class="wrap copy">
@@ -72,6 +68,7 @@
 </section>
 
 <WhoFor />
+<MoneyBand />
 <Chores />
 <Tools />
 <SlashBand />

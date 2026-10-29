@@ -78,8 +78,12 @@ export function matchPayment(payment, items, opts) {
   if (items.some((i) => i.list === 'installments' && i.fields.paid_by === payment.id)) return { nothing: 'An instalment already names this payment, so nothing else was looked for.' };
   /* WHO IT WAS PAID TO OR FROM: the name a person gave, the bank's words, and the description, each folded. */
   const mine = keysOf([p.payee, p.counterparty_text, p.what]);
-  if (mine.length === 0) return { nothing: 'The payment names nobody, so nothing was looked for.' };
-  const who = [p.payee, p.counterparty_text, p.what].find((t) => typeof t === 'string' && t.trim() !== '').trim();
+  const who = ([p.payee, p.counterparty_text, p.what].find((t) => typeof t === 'string' && t.trim() !== '') ?? 'somebody').trim();
+  /* A PAYMENT WHOSE WORDS NAME NOTHING STILL PAYS A BILL OF THE SAME MONEY (Q1 of 29 October). A bank writes a premium
+     paid by transfer as "Internet Banking Transfer", so a bill named "Northwind Premiums" never matched by name and was
+     read late in five places while the money had left. A candidate found on the money alone must be the exact amount,
+     in the same currency, within the same ten days; a move the record paired between his own accounts is never one. */
+  const loose = p.transfer !== true;
   /* MONEY IN CAME FROM SOMEBODY, and is never said as paid to them. */
   const whom = `${p.direction === 'in' ? 'from' : 'to'} ${who}`;
 
@@ -99,9 +103,10 @@ export function matchPayment(payment, items, opts) {
     if (gap === null || gap > DAYS) continue;
     /* A LINE THAT ALREADY COUNTS A PAYMENT ON OR AFTER THIS DAY has been paid by it or by a later one (`settle`). */
     if (line && typeof f.last_paid === 'string' && on <= f.last_paid) continue;
-    if (!keysOf(bill || line ? [f.what] : [f.what, f.plan]).some((k) => mine.includes(k))) continue;
     const held = bill ? moneyOf(f.paid_so_far) : null;
     const left = held && held.currency === due.currency && held.amount > 0 && held.amount < due.amount ? due.amount - held.amount : due.amount;
+    const named = keysOf(bill || line ? [f.what] : [f.what, f.plan]).some((k) => mine.includes(k));
+    if (!named && !(loose && paid.amount === left)) continue;
     const name = String(f.what ?? '').trim() || 'This';
     const kind = bill ? (way === 'in' ? 'an invoice of' : 'a bill of') : 'an instalment of';
     const some = left === due.amount ? '' : ` with ${words({ amount: left, currency: due.currency })} left,`;
@@ -113,12 +118,17 @@ export function matchPayment(payment, items, opts) {
         ? []
         : [{ id: item.spoken, version: item.version, fields: { paid_by: payment.id } }];
     const expected = { amount: left, currency: due.currency };
-    found.push({ item, name, day, gap, label, writes, agrees: !off(paid.amount, left), expected });
+    /* SURE ON THE MONEY ALONE when the bill says the account it is paid from and this is that account, or when the sum
+       has pennies in it: a round sum on another account is asked about, never linked in silence. */
+    const sure = named || (typeof f.account === 'string' && f.account !== '' && f.account === p.account) || paid.amount % 100 !== 0;
+    found.push({ item, name, day, gap, label, writes, agrees: !off(paid.amount, left), expected, named, sure });
   }
   /* A BILL AND A REPEATING LINE UNDER ONE NAME ARE THE SAME MONEY TWICE (B6 of 24 October): the bill takes the payment,
      and the bill being paid asks to move the line on (`move-line.js`), so the line is no second answer here. */
   const billKeys = found.filter((c) => c.item.list === 'obligations').flatMap((c) => keysOf([c.item.fields.what]));
   for (let i = found.length - 1; i >= 0; i--) if (found[i].item.list === 'recurring' && keysOf([found[i].item.fields.what]).some((k) => billKeys.includes(k))) found.splice(i, 1);
+  /* A NAME THAT AGREES OUTRANKS MONEY THAT AGREES: found by name, the ones found on the money alone are no answer. */
+  if (found.some((c) => c.named)) for (let i = found.length - 1; i >= 0; i--) if (!found[i].named) found.splice(i, 1);
   if (found.length === 0) return { nothing: `Nothing open ${whom} falls within ten days of ${dayWords(on)}, so the ${words(paid)} was left as it is.` };
 
   /* THE SAME MONEY FIRST, THEN THE NEAREST DAY, and a label said twice is numbered so each answer is its own. */
@@ -136,16 +146,20 @@ export function matchPayment(payment, items, opts) {
     const picked = offered.find((c) => c.label === opts.answer || c.item.spoken.replace('#', '-') === opts.answer);
     return picked ? linkOf(picked) : { nothing: `The payment ${whom} was left as it is, linked to nothing.` };
   }
-  if (found.length === 1 && found[0].agrees) return linkOf(found[0]);
+  if (found.length === 1 && found[0].agrees && found[0].sure) return linkOf(found[0]);
 
-  const question = p.direction === 'in' ? `Which of these was the ${words(paid)} from ${who} on ${dayWords(on)} for?` : `Which of these did the ${words(paid)} to ${who} on ${dayWords(on)} pay?`;
+  /* ONE THING FOUND ON THE MONEY ALONE IS ASKED BY ITS NAME: "Is this the Northwind Premiums payment?" */
+  const lone = found.length === 1 && !found[0].named ? found[0] : null;
+  const question = lone
+    ? `Is the ${words(paid)} ${p.direction === 'in' ? 'that came in' : 'that left'} on ${dayWords(on)} the ${lone.name} payment?`
+    : p.direction === 'in' ? `Which of these was the ${words(paid)} from ${who} on ${dayWords(on)} for?` : `Which of these did the ${words(paid)} to ${who} on ${dayWords(on)} pay?`;
   const options = offered.map((c) => ({
     id: c.item.spoken.replace('#', '-'),
     label: c.label,
     because: c.agrees ? 'The amount agrees, and its amount stays as written.' : `It expects ${words(c.expected)} and this was ${words(paid)}. Its amount stays as written.`,
     ...(c.writes.length > 0 ? { patches: c.writes } : {}),
   }));
-  options.push({ id: 'none', label: NONE, because: 'Nothing is linked, and the payment stays as it is.' });
+  options.push({ id: 'none', label: lone ? 'No, it was something else' : NONE, because: 'Nothing is linked, and the payment stays as it is.' });
   return { ask: { cause: `money.match.${payment.spoken}`, question, about: who, options } };
 }
 

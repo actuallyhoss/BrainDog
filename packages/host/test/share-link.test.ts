@@ -3,7 +3,7 @@
  *
  * EVERY LINK THAT DOES NOT OPEN IS ONE 404 WITH NO BODY. A forged token, a good token moved under another record's
  * name, and a good token for a record this host does not hold all answer the same, and none of them wakes the record.
- * The link itself is `<origin>/app/s#<token>`: the token rides in the fragment, which no browser sends to a server.
+ * The link itself is `<origin>/s#<token>`: the token rides in the fragment, which no browser sends to a server.
  */
 
 import { test } from 'node:test';
@@ -92,14 +92,14 @@ test('a link is the token in the fragment, never in the path', async () => {
   const made = await linkOpened(opened, { key, record: HELD, origin: 'https://app.example.test' });
   assert.ok(made.ok);
   const { token, url } = made.value;
-  assert.equal(url, `https://app.example.test/app/s#${token}`);
+  assert.equal(url, `https://app.example.test/s#${token}`);
   const parsed = new URL(url);
-  assert.equal(parsed.pathname, '/app/s');
+  assert.equal(parsed.pathname, '/s');
   assert.equal(parsed.hash, `#${token}`);
   assert.ok(!parsed.pathname.includes(token), 'the secret is in no path a server logs');
   const fromRoot = await linkOpened(opened, { key, record: HELD, origin: '' });
   assert.ok(fromRoot.ok);
-  assert.equal(fromRoot.value.url, `/app/s#${fromRoot.value.token}`);
+  assert.equal(fromRoot.value.url, `/s#${fromRoot.value.token}`);
   assert.equal((await read(token, door().d)).status, 200, 'the link the owner is handed is one this host opens');
 });
 

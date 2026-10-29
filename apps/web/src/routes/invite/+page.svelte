@@ -102,7 +102,7 @@
   }
 
   /**
-   * ACCEPTING SIGNS SOMEBODY IN, SO IT DROPS THE BOOT THIS TAB KEPT. The layout's load asked `boot` for `/app/invite`,
+   * ACCEPTING SIGNS SOMEBODY IN, SO IT DROPS THE BOOT THIS TAB KEPT. The layout's load asked `boot` for `/invite`,
    * which names no record, was refused, and kept the sample for the tab; Accept is a `fetch` that sets a cookie and
    * nothing more. Measured through the real `readBoot`, the next
    * move was handed The Studio, "Nothing you do here is saved.", with no request made, which is what `/signin` drew
@@ -246,10 +246,10 @@
             </Button>
           {/if}
           {#if failed}<p class="status" role="status">{failed}</p>{/if}
-          <!-- A FULL PAGE LOAD, AS ON `/signin`, AND THAT IS THE REPAIR. A client-side move to `/app/` kept everything
+          <!-- A FULL PAGE LOAD, AS ON `/signin`, AND THAT IS THE REPAIR. A client-side move to `/` kept everything
                this tab decided before Accept: the sample boot, the switcher's list, the voice. `/signin` walked it
                twice and drew The Studio with no request made; a reload draws the colleague's record, because the
-               Worker answers `/app/` with a 302 to `/app/<slug>/` once there is a session. -->
+               Worker answers `/` with a 302 to `/<slug>/` once there is a session. -->
           {#if addsOnly}
             <!-- HER KEY SCREEN, BY THE SAME FULL LOAD, so the session Accept just set is the one it reads. -->
             <Button weight={keyAdded || !(here.webauthn && here.secure) ? 'primary' : 'quiet'} href="/settings/agents" data-sveltekit-reload>{copy.inviteMakeAgentKey}</Button>

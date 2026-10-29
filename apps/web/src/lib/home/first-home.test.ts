@@ -113,21 +113,26 @@ test('A RECORD THAT KEEPS NO WEEK reads its Today as it did: bills, tasks and mo
   assert.deepEqual(todayHome({ tasks: true, adds: true, money: true, week: undefined }), DEFAULT_HOME);
 });
 
-test("TODAY'S FIRST BLOCKS ON A SHOP are what is due this week and the money in; late, needs you and working keep their order after them", () => {
+/** Where a shop's two week blocks stand in a body: what is due this week, and the money in beside it. */
+const weekAt = (blocks: readonly { heading?: string }[]): [number, number] => [blocks.findIndex((b) => b.heading === 'Orders due this week'), blocks.findIndex((b) => b.heading === MONEY_WEEK)];
+
+test("ON A SHOP, TODAY'S WEEK is what is due this week and the money in, after what needs you and what is late", () => {
   const body = todayHome({ tasks: false, adds: false, money: false, week: weekOf(SHOP, people)! });
+  /* NEEDS YOU LEADS THE BOARD ON EVERY WIDTH (audit Q18), Late after it, then the week, side by side. */
   const order = body.blocks.map((b) => b.heading ?? b.kind);
-  assert.deepEqual(order.slice(0, 3), ['note', 'Orders due this week', MONEY_WEEK]);
-  const rest = body.blocks.slice(3).map((b) => b.source);
-  assert.deepEqual(rest, ['governance.open', 'deadlines', 'kpis', 'deadlines', 'activity']);
+  assert.deepEqual(order.slice(0, 5), ['note', 'Needs you', 'Late', 'Orders due this week', MONEY_WEEK]);
+  const rest = body.blocks.slice(5).map((b) => b.source);
+  assert.deepEqual(rest, ['kpis', 'deadlines', 'activity']);
+  const [due, money] = weekAt(body.blocks);
   /* THEIR OWN WORDS name their own things, never an id or a list's place. */
-  for (const b of body.blocks.slice(1, 3)) {
+  for (const b of [body.blocks[due]!, body.blocks[money]!]) {
     assert.doesNotMatch(`${b.heading} ${b.empty ?? ''}`, /\brow\b|—|#/u);
     assert.ok(b.icon);
   }
-  assert.equal(body.blocks[1]!.where, 'state is not paid, due after -1d, due before +8d');
+  assert.equal(body.blocks[due]!.where, 'state is not paid, due after -1d, due before +8d');
   /* THE MONEY IS MONEY'S OWN FIGURES, never a list read for it (`money-week.test.ts` holds them). */
-  assert.equal(body.blocks[2]!.kind, 'stat');
-  assert.equal(body.blocks[2]!.source, undefined);
+  assert.equal(body.blocks[money]!.kind, 'stat');
+  assert.equal(body.blocks[money]!.source, undefined);
 });
 
 /* ── a fresh shop record ───────────────────────────────────────────────── */
@@ -166,11 +171,12 @@ test('AFTER A CAPTURE OF THREE ENTRIES the line and the first two blocks read th
   assert.ok(addedByHand(told) <= FIRST_TODAY_MOST, 'still a first Today');
   const week = weekOf(SHOP, people)!;
   const body = todayHome({ tasks: false, adds: false, money: false, week });
+  const [dueAt, moneyAt] = weekAt(body.blocks);
   /* HER PAYMENT IS A PAID INVOICE (no account yet), so `settled-in-7d` reads it; the ledger and what is owed read nought. */
   const live = body.blocks.map((b, n) =>
-    n === 1
+    n === dueAt
       ? answer(b, [{ fields: NADIA, cells: ['Nadia', '3 vanilla jars', 'Fri'] }])
-      : n === 2
+      : n === moneyAt
         ? tile(b, { 'settled-in-7d': 'EGP 900.00', 'received-7d': '0', 'owed-to-you': 'EGP 0.00' })
         : answer(b),
   );
@@ -190,9 +196,9 @@ test('AFTER A CAPTURE OF THREE ENTRIES the line and the first two blocks read th
 test('ON A SHOP THAT KEEPS ITS BOOKS the line reads the tile: one payment by who paid, else the amounts side by side, never added', () => {
   const week = weekOf(SHOP_BOOKS, people)!;
   const body = todayHome({ tasks: false, adds: false, money: true, week });
-  const at = body.blocks.findIndex((b) => b.heading === MONEY_WEEK);
+  const [dueAt, at] = weekAt(body.blocks);
   const lineOf = (cells: Record<string, string>, orders: { fields: Record<string, unknown>; cells: string[] }[] = []) =>
-    homeDrawn(body.blocks.map((b, n) => (n === at ? tile(b, cells) : n === 1 ? answer(b, orders) : answer(b))), NOW, undefined, undefined, null, week).sentence?.text;
+    homeDrawn(body.blocks.map((b, n) => (n === at ? tile(b, cells) : n === dueAt ? answer(b, orders) : answer(b))), NOW, undefined, undefined, null, week).sentence?.text;
   const order = { fields: NADIA, cells: ['Nadia', '3 vanilla jars', 'Fri'] };
   /* WHO PAID ONLY WHERE AN ORDER DUE THIS WEEK WAS PAID THAT VERY AMOUNT: a ledger payment of another amount is just money in. */
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00' }, [order]), '1 order is due Friday. Nadia paid EGP 900.');
@@ -212,21 +218,22 @@ test('A LATE ORDER IS SAID FIRST, in red with its word, as its own count, and dr
   const body = todayHome({ tasks: false, adds: false, money: false, week });
   const late = { ...NADIA, due: '2026-10-05', paid: undefined };
   const due = { ...NADIA, what: '2 cedar candles' };
+  const [dueAt] = weekAt(body.blocks);
   const live = body.blocks.map((b, n) => {
     /* THE TILE COUNTS FROM TODAY (`due after -1d`), so the record answers it with the one not yet past its day. */
-    if (n === 1) return { ...answer(b, [{ fields: due, cells: ['Nadia', '2 cedar candles', 'Fri'] }]), entries: [{ seq: 2, fields: due, version: 1, created: '', by: '' }] } as LiveBlock;
+    if (n === dueAt) return { ...answer(b, [{ fields: due, cells: ['Nadia', '2 cedar candles', 'Fri'] }]), entries: [{ seq: 2, fields: due, version: 1, created: '', by: '' }] } as LiveBlock;
     /* THE RECORD'S DEADLINES NAME THE LATE ORDER BY ITS LIST AND NUMBER, and Late draws it. */
     if (b.source === 'deadlines' && b.where === 'day before today') return answer(b, [{ fields: { row: 'orders#1', title: '3 vanilla jars', day: '2026-10-05' }, cells: ['3 vanilla jars', '', ''] }]);
     return answer(b);
   });
   const drawn = homeDrawn(live, NOW, undefined, undefined, null, week);
-  assert.match(String(body.blocks[1]!.where), /due after -1d, due before \+8d$/u);
+  assert.match(String(body.blocks[dueAt]!.where), /due after -1d, due before \+8d$/u);
   assert.deepEqual(drawn.sentence, { text: '1 order is late. 1 more is due Friday.', needs: '1 order is late' });
   assert.ok(drawn.sentence!.text.includes(drawn.sentence!.needs), 'the red phrase is in the line, with its word');
   assert.doesNotMatch(drawn.sentence!.text, /thing/u, 'and it is said once: the house line does not count it again');
-  assert.deepEqual(drawn.blocks.filter((b) => b.drawn).map((b) => [b.heading, b.entries.length]), [['Orders due this week', 1], ['Late', 1]]);
+  assert.deepEqual(drawn.blocks.filter((b) => b.drawn).map((b) => [b.heading, b.entries.length]), [['Late', 1], ['Orders due this week', 1]]);
   /* A HOME KEPT FROM AN OLDER TODAY, whose tile still reads the late one, says the same line and draws it once. */
-  const older = live.map((b, n) => (n === 1 ? answer(b, [{ fields: late, cells: ['Nadia', '3 vanilla jars', 'Yesterday'] }, { fields: due, cells: ['Nadia', '2 cedar candles', 'Fri'] }]) : b));
+  const older = live.map((b, n) => (n === dueAt ? answer(b, [{ fields: late, cells: ['Nadia', '3 vanilla jars', 'Yesterday'] }, { fields: due, cells: ['Nadia', '2 cedar candles', 'Fri'] }]) : b));
   const kept = homeDrawn(older, NOW, undefined, undefined, null, week);
   assert.deepEqual(kept.sentence, drawn.sentence);
   assert.deepEqual(kept.blocks.filter((b) => b.drawn).map((b) => b.heading), ['Orders due this week']);

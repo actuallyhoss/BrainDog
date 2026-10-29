@@ -42,7 +42,7 @@ test('A BOOT THAT ANSWERS SETS THE CLOCK, so the first screen is already on it',
   forgetNow();
   const boot = { registers: [], now: SEPT, waiting: [], record: { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: 'GBP' }, me: { kind: 'person', person: 'p_1', name: 'Ada', level: 'write' }, pages: [] };
   const io = (async () => new Response(JSON.stringify({ ok: true, value: boot }), { status: 200, headers: { 'content-type': 'application/json' } })) as Fetch;
-  assert.equal((await readBoot('http://record.test/app', io)).from, 'live');
+  assert.equal((await readBoot('http://record.test', io)).from, 'live');
   assert.ok(Math.abs(recordNow() - Date.parse(SEPT)) < 5_000, `the clock read ${new Date(recordNow()).toISOString()}`);
   forget();
   forgetNow();

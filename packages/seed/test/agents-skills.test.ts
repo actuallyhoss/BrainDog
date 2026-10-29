@@ -61,7 +61,7 @@ test('each skill files one question under its own cause, as its step says', () =
 });
 
 /** The product's own words, which a skill may capitalise mid-sentence: lists, lanes, fields and itself. */
-const OWN = new Set(['BrainDog', 'Projects', 'Project', 'About', 'Stage', 'In', 'Earning', 'Building', 'Parked', 'Finished', 'On', 'At', 'Off', 'Skills', 'Tidy', 'Keep']);
+const OWN = new Set(['BrainDog', 'Projects', 'Project', 'About', 'Stage', 'In', 'Earning', 'Building', 'Parked', 'Finished', 'Closed', 'On', 'At', 'Off', 'Skills', 'Tidy', 'Keep']);
 
 test('no skill names a person or a project, so what one record gets every record gets', () => {
   const sample = ['things', 'people', 'organisations']

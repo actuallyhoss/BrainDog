@@ -23,8 +23,8 @@ const OPTIONS = [
 ];
 
 test('a picture option carries the address the page serves its file at', () => {
-  const seen = visualsOf(OPTIONS, (row, field) => (row === 'parts#2' && field === 'photo' ? `/app/ana/api/files/${SHA}` : null));
-  assert.deepEqual(seen.get('photo'), { file: { row: 'parts#2', field: 'photo', src: `/app/ana/api/files/${SHA}` } });
+  const seen = visualsOf(OPTIONS, (row, field) => (row === 'parts#2' && field === 'photo' ? `/ana/api/files/${SHA}` : null));
+  assert.deepEqual(seen.get('photo'), { file: { row: 'parts#2', field: 'photo', src: `/ana/api/files/${SHA}` } });
   assert.deepEqual(seen.get('warm'), { swatch: ['#aa3311', '#ffeecc'] });
   assert.deepEqual(seen.get('cheap'), { figure: '£12' });
   assert.equal(seen.has('plain'), false);
@@ -68,12 +68,12 @@ test('a file is found in what the record holds and placed under the record', asy
     asked.push(`${list}#${seq}`);
     return { ok: true as const, value: { register: 'parts', seq: 2, version: 1, fields: { photo: { sha256: SHA, name: 'oak.png' } } } };
   };
-  const file = await readFiles(get, OPTIONS, (path) => `/app/ana${path}`);
+  const file = await readFiles(get, OPTIONS, (path) => `/ana${path}`);
   assert.deepEqual(asked, ['parts#2']);
-  assert.equal(file('parts#2', 'photo'), `/app/ana/api/files/${SHA}`);
+  assert.equal(file('parts#2', 'photo'), `/ana/api/files/${SHA}`);
   assert.equal(file('parts#2', 'other'), null);
   assert.equal(file('parts#3', 'photo'), null);
-  assert.deepEqual(visualsOf(OPTIONS, file).get('photo'), { file: { row: 'parts#2', field: 'photo', src: `/app/ana/api/files/${SHA}` } });
+  assert.deepEqual(visualsOf(OPTIONS, file).get('photo'), { file: { row: 'parts#2', field: 'photo', src: `/ana/api/files/${SHA}` } });
 });
 
 test('a refused read, another list, and a value that is no file all leave the picture out', async () => {

@@ -64,7 +64,7 @@ export type Verified = {
 export type VerifyIo = Pick<AgentIo, 'cwd' | 'out' | 'say' | 'answer'> & { fetch?: typeof fetch };
 
 const USAGE =
-  'braindog verify takes one file, and --key <pubkey|url> when you name the key it must be signed by, as in braindog verify latest.brainl --key https://app.brain.dog/.well-known/braindog-key.';
+  'braindog verify takes one file, and --key <pubkey|url> when you name the key it must be signed by, as in braindog verify latest.brainl --key https://app.brain.dog/<slug>/.well-known/braindog-key.';
 
 export async function verify(args: string[], io: VerifyIo): Promise<number> {
   let parsed: { values: { key?: string | undefined }; positionals: string[] };

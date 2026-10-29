@@ -218,36 +218,37 @@ const shelf = (): Shelf & { held: Map<string, string> } => {
   };
 };
 
-const ASKED = '?next=%2Fapp%2Facme%2Fr%2Ftasks';
+const ASKED = '?next=%2Facme%2Fr%2Ftasks';
 
 /* MEASURED FIRST: pasting a link over
-   `/app/signin?next=...` changes the query, which is a full navigation, so the page mounted again on
-   `/app/signin#magic=...` and "Open BrainDog" read an empty search and went to `/app/`. */
+   `/signin?next=...` changes the query, which is a full navigation, so the page mounted again on
+   `/signin#magic=...` and "Open BrainDog" read an empty search and went to `/`. */
 test('A PASTED LINK KEEPS THE PAGE HE WAS SENT FROM, held in the tab across the navigation', () => {
   const s = shelf();
-  assert.equal(onwardOf(ASKED, '', s), '/app/acme/r/tasks');
-  assert.equal(onwardOf('', '#magic=t', s), '/app/acme/r/tasks');
-  assert.equal(onwardOf('', '#claim=t', s), '/app/acme/r/tasks');
+  assert.equal(onwardOf(ASKED, '', s), '/acme/r/tasks');
+  assert.equal(onwardOf('', '#magic=t', s), '/acme/r/tasks');
+  assert.equal(onwardOf('', '#claim=t', s), '/acme/r/tasks');
 });
 
 test('A PLAIN VISIT TO SIGN-IN FORGETS IT, because nothing sent him and nothing arrived', () => {
   const s = shelf();
   onwardOf(ASKED, '', s);
-  assert.equal(onwardOf('', '', s), '/app/');
+  assert.equal(onwardOf('', '', s), '/');
   assert.equal(s.held.size, 0);
-  assert.equal(onwardOf('', '#magic=t', s), '/app/', 'a link after a plain visit went to an older page');
+  assert.equal(onwardOf('', '#magic=t', s), '/', 'a link after a plain visit went to an older page');
 });
 
 test('A NEXT THAT COULD LEAVE THE APP IS NEVER KEPT, and a newer one replaces the older', () => {
   const s = shelf();
   onwardOf(ASKED, '', s);
-  for (const bad of ['?next=%2F%2Fevil.example', '?next=https%3A%2F%2Fevil.example%2Fapp%2F', '?next=%2Fapp%5C..%5Cevil', '?next=%2Fr%2Ftasks']) {
-    assert.equal(onwardOf(bad, '', s), '/app/', bad);
-    assert.equal(onwardOf('', '#magic=t', s), '/app/', `${bad} left the older next to follow`);
+  for (const bad of ['?next=%2F%2Fevil.example', '?next=https%3A%2F%2Fevil.example%2Fapp%2F', '?next=%2Fapp%5C..%5Cevil', '?next=%2Fauth%2Fsession']) {
+    assert.equal(onwardOf(bad, '', s), '/', bad);
+    assert.equal(onwardOf('', '#magic=t', s), '/', `${bad} left the older next to follow`);
   }
   onwardOf(ASKED, '', s);
-  assert.equal(onwardOf('?next=%2Fapp%2Fshop', '', s), '/app/shop');
-  assert.equal(onwardOf('', '#magic=t', s), '/app/shop');
+  /* AND A NEXT FROM BEFORE THE MOVE, UNDER `/app`, IS THE ADDRESS IT NAMES NOW. */
+  assert.equal(onwardOf('?next=%2Fapp%2Fshop', '', s), '/shop');
+  assert.equal(onwardOf('', '#magic=t', s), '/shop');
 });
 
 test('WHAT THE TAB HOLDS IS READ AS UNTRUSTED as the address is', () => {
@@ -255,9 +256,9 @@ test('WHAT THE TAB HOLDS IS READ AS UNTRUSTED as the address is', () => {
   onwardOf(ASKED, '', s);
   const [key] = [...s.held.keys()];
   assert.ok(key, 'nothing was kept');
-  for (const planted of ['//evil.example', 'https://evil.example/app/', '/app/\\evil.example', 'javascript:alert(1)']) {
+  for (const planted of ['//evil.example', 'https://evil.example/', '/\\evil.example', 'javascript:alert(1)']) {
     s.held.set(key, planted);
-    assert.equal(onwardOf('', '#magic=t', s), '/app/', planted);
+    assert.equal(onwardOf('', '#magic=t', s), '/', planted);
   }
 });
 
@@ -268,38 +269,38 @@ test('NO STORAGE, OR STORAGE THAT THROWS, IS THE ADDRESS ALONE, and never an exc
     removeItem: () => { throw new Error('SecurityError'); },
   };
   for (const s of [null, refuses]) {
-    assert.equal(onwardOf(ASKED, '', s), '/app/acme/r/tasks');
-    assert.equal(onwardOf('', '#magic=t', s), '/app/');
-    assert.equal(onwardOf('', '', s), '/app/');
+    assert.equal(onwardOf(ASKED, '', s), '/acme/r/tasks');
+    assert.equal(onwardOf('', '#magic=t', s), '/');
+    assert.equal(onwardOf('', '', s), '/');
   }
 });
 
 /* MEASURED FIRST (by a probe that was never kept in the tree): `onward()`
-   checked the spelling of the path, so a dot segment, plain or percent-encoded, passed as `/app/...` and the drawn
+   checked the spelling of the path, so a dot segment, plain or percent-encoded, passed as `/...` and the drawn
    href resolved on this origin outside the app, `/auth/signout`, `/api/export`, `/in/x` and `/`. The mail's
    `safeNext` resolved the same values and dropped every one. */
 test('A NEXT THAT RESOLVES OUTSIDE THE APP IS THE FRONT DOOR, however its dot segments are spelled', () => {
   const s = shelf();
-  for (const bad of ['/app/../auth/session', '/app/%2e%2e/api/export', '/app/../auth/signout', '/app/%2e%2e/auth/signout', '/app/%2E%2E/api/export', '/app/.%2e/in/x', '/app/..', '/app/../']) {
+  for (const bad of ['/../auth/session', '/%2e%2e/api/export', '/../auth/signout', '/%2e%2e/auth/signout', '/%2E%2E/api/export', '/.%2e/in/x', '/..', '/../']) {
     const search = `?${new URLSearchParams({ next: bad })}`;
-    assert.equal(onwardOf(search, '', s), '/app/', bad);
+    assert.equal(onwardOf(search, '', s), '/', bad);
     assert.equal(s.held.size, 0, `${bad} was kept for the tab`);
-    assert.equal(onwardOf('', '#magic=t', s), '/app/', `${bad} was followed from the tab`);
+    assert.equal(onwardOf('', '#magic=t', s), '/', `${bad} was followed from the tab`);
   }
   /* The same planted in the tab's storage, which is read as untrusted as the address is. */
   onwardOf(ASKED, '', s);
   const [key] = [...s.held.keys()];
   assert.ok(key, 'nothing was kept');
-  s.held.set(key, '/app/%2e%2e/api/export');
-  assert.equal(onwardOf('', '#magic=t', s), '/app/');
+  s.held.set(key, '/%2e%2e/api/export');
+  assert.equal(onwardOf('', '#magic=t', s), '/');
 });
 
 test('A NEXT THAT RESOLVES INSIDE THE APP IS FOLLOWED AS IT RESOLVES, not as it was typed', () => {
   const s = shelf();
-  assert.equal(onwardOf(`?${new URLSearchParams({ next: '/app/acme/../shop/./r/tasks?f=a#top' })}`, '', s), '/app/shop/r/tasks?f=a#top');
+  assert.equal(onwardOf(`?${new URLSearchParams({ next: '/acme/../shop/./r/tasks?f=a#top' })}`, '', s), '/shop/r/tasks?f=a#top');
   /* What the tab keeps is the resolved address, so the two halves cannot disagree about it later. */
-  assert.deepEqual([...s.held.values()], ['/app/shop/r/tasks?f=a#top']);
-  assert.equal(onwardOf('', '#magic=t', s), '/app/shop/r/tasks?f=a#top');
+  assert.deepEqual([...s.held.values()], ['/shop/r/tasks?f=a#top']);
+  assert.equal(onwardOf('', '#magic=t', s), '/shop/r/tasks?f=a#top');
 });
 
 /* ── Google ──────────────────────────────────────────────────────────────── */
@@ -314,12 +315,12 @@ test('GOOGLE IS A WAY ONLY WHERE THE HOST SAYS SO, and never the lead', () => {
 
 test('THE WAY BACK FROM GOOGLE SAYS WHY IN FIVE WORDS, and anything else says nothing', () => {
   assert.equal(googleWhy('?google=unknown'), 'unknown');
-  assert.equal(googleWhy('?next=%2Fapp%2Fwork&google=cancelled'), 'cancelled');
+  assert.equal(googleWhy('?next=%2Fwork&google=cancelled'), 'cancelled');
   assert.equal(googleWhy('?google=%3Cscript%3E'), null);
   assert.equal(googleWhy(''), null);
 });
 
 test('THE GOOGLE BUTTON GOES TO THE HOST, carrying where to land only when that is not the front', () => {
-  assert.equal(googleStart('/app/', 'https://brain.dog'), 'https://brain.dog/auth/google/start');
-  assert.equal(googleStart('/app/work', 'https://brain.dog'), 'https://brain.dog/auth/google/start?next=%2Fapp%2Fwork');
+  assert.equal(googleStart('/', 'https://brain.dog'), 'https://brain.dog/auth/google/start');
+  assert.equal(googleStart('/work', 'https://brain.dog'), 'https://brain.dog/auth/google/start?next=%2Fwork');
 });

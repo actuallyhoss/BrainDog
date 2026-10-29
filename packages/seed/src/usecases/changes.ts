@@ -23,6 +23,7 @@ const SUMMARY = 'Its card says what it is for in one short line. Nothing in your
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.7.0', notes: 'Personal counts your streak: how many days running you logged something. Nothing you hold changes.' },
     { version: '2.6.1', notes: SUMMARY },
     { version: '2.6.0', notes: 'A new Personal record starts with Money and the Projects it points at. People comes when you name someone, and anything else when you add it. A record you already have keeps everything it holds, and nothing on its pages changes.' },
     { version: '2.5.0', notes: 'A new Home has something to press. Until an account counts as cash, Bring your money in links to adding one, forwarding a bank message and add-ons for your bank. Until you keep a savings goal or have a project on the go, a line names the first one. Each goes once you have it.' },
@@ -35,6 +36,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.8.0', notes: 'The founder page is called Founder overview, not Today. While no numbers came in thirty days, the Dashboard says so in one line, shows what went quiet and links to fixing the feed.' },
     { version: '3.7.1', notes: SUMMARY },
     { version: '3.7.0', notes: "A project page leads with what is true of the project, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane: what it brings in, its dated path, or what it costs to keep. Its numbers have lines and say their age, and its dates, what it runs on and renews, its agents and what happened sit under them. Projects opens on what needs you and one sorted list." },
     { version: '3.6.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },

@@ -118,7 +118,7 @@
 
   /**
    * SIGNED IN AND ON NO RECORD: a proved mailbox that has not paid yet, or a person whose only record closed.
-   * `/app` sends that session here, and the `boot` under it answered 403, so the screen asks for a name and a payment
+   * `/` sends that session here, and the `boot` under it answered 403, so the screen asks for a name and a payment
    * instead of drawing an empty record that says nothing is here.
    */
   const noRecord = $derived(!page.data.live && onNoRecord((page.data as unknown as Shell).refused));

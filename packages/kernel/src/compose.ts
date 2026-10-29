@@ -610,10 +610,17 @@ export function composeLook(input: ComposeInput): LookBody {
   /* THE ORDER, a group at a time. */
   const order: string[] = [];
   const groupOf = groupsOf(blocks);
+  /* AND SO DOES THE MONEY BEHIND IT: a run of figures straight under the walk (Money's "Over time", net worth over the
+     last weeks) is the walk's other half, the money looked at backwards, and a late bill sorted over it split the two. */
+  const walkAt: boolean[] = [];
+  blocks.forEach((b, i) => {
+    const opens = !asksFirst && opensOnMoney(b) && areaOf(b) === 'main';
+    walkAt[i] = opens || (i > 0 && walkAt[i - 1] === true && b.kind === 'stat' && areaOf(b) === 'main' && b.drawn !== false);
+  });
   const groups: number[][] = [...new Set(groupOf)].map((g) =>
     blocks.flatMap((b, i) => {
       /* THE WALK OF THE MONEY AHEAD KEEPS ITS PLACE in its group as well, so nothing pressing is sorted over it (above). */
-      const walk = !asksFirst && opensOnMoney(b) && areaOf(b) === 'main';
+      const walk = walkAt[i] === true;
       const movable = !STAYS.has(b.kind) && !walk && !pinned.has(keys[i]!) && !keptInPlace(i) && i !== leadAt && !hidden.has(keys[i]!) && b.drawn !== false;
       return groupOf[i] === g && movable ? [i] : [];
     }),

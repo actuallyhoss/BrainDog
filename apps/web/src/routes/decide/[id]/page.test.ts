@@ -255,11 +255,11 @@ test('one press is the answer, and a reason is asked for only when the record as
 
   /* THE SUGGESTED ANSWER IS THE ONE FILLED PRIMARY, "Accept, suggested" on its own button, as on the queue's cards
      (`primaryOf`): of the record's two answers the suggested one is filled, and Accept only where nothing is suggested.
-     The press is still the reader's. A question of options is a card each, and its own button gives it (today F9). */
+     A late payment's own buttons say which leads (`lead`). The press is still the reader's. A question of options is a card each, and its own button gives it (today F9). */
   const snippetAt = page.indexOf('{#snippet answer(');
   const snippet = page.slice(snippetAt, page.indexOf('{/snippet}', snippetAt));
   assert.ok(snippetAt >= 0, 'the one answer button is no longer one snippet');
-  assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={marked || (suggestedKey === undefined && option.key === 'accept') ? 'primary' : undefined}"], 'the filled answer is not the suggested one, or Accept where nothing is suggested');
+  assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={(lead ?? (marked || (suggestedKey === undefined && option.key === 'accept'))) ? 'primary' : undefined}"], 'the filled answer is not the suggested one, or Accept where nothing is suggested');
   const pickAt = page.indexOf('function pick(key: string) {');
   assert.doesNotMatch(page.slice(pickAt, page.indexOf('\n  }\n', pickAt)), /send\(/u, 'a choice sends its answer before Needs you');
   const pressAt = page.indexOf('async function press(key: string) {');
@@ -267,7 +267,7 @@ test('one press is the answer, and a reason is asked for only when the record as
   assert.ok(pressAt >= 0, 'an option card’s button no longer has its own press');
   assert.match(press, /if \(confirming !== key && hardly\(key\)\) \{\n\s+confirming = key;[^]*?return;\n\s+\}\n\s+confirming = null;\n\s+chosenKey = key;\n\s+choose\(key\);$/u, 'a card’s press does not give its answer, or gives one that cannot be undone without asking');
   assert.match(snippet, /data-suggested=\{marked \? '' : undefined\}/u, 'the suggestion is no longer marked on its button');
-  assert.match(snippet, /\{#if marked\}<span class="gate-sug">, \{gate\.suggested\.toLowerCase\(\)\}<\/span>\{\/if\}/u, 'the filled answer no longer says on its button that it is the suggested one');
+  assert.match(snippet, /\{#if marked && lead === undefined\}<span class="gate-sug">, \{gate\.suggested\.toLowerCase\(\)\}<\/span>\{\/if\}/u, 'the filled answer no longer says on its button that it is the suggested one');
   assert.match(snippet, /labelOf\(option, q, moves\)/u, 'an answer no longer says what it does');
 });
 

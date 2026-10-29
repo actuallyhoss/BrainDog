@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
+  import { application, faqOf } from '$lib/site/seo.ts';
   /**
    * Pricing. WHILE BILLING IS OFF it is the one-plan early access page (20 October, `copy/pricing.ts` `early`):
    * the night head, the early access card on the night with its $0 and what it holds, a paper tile that says paid
@@ -25,15 +27,7 @@
   const faq = faqFor(LAUNCH);
 </script>
 
-<svelte:head>
-  <title>{site.meta.pricing.title}</title>
-  <meta name="description" content={site.meta.pricing.description} />
-  <link rel="canonical" href="https://brain.dog/pricing" />
-  <meta property="og:url" content="https://brain.dog/pricing" />
-  <meta property="og:title" content={site.meta.pricing.title} />
-  <meta property="og:description" content={site.meta.pricing.description} />
-</svelte:head>
-
+<Seo title={site.meta.pricing.title} description={site.meta.pricing.description} path="/pricing" ld={[application, faqOf(LAUNCH.billing ? faq : e.faq.questions)]} />
 {#if !LAUNCH.billing}
   <PageHead title={e.title} lead={e.lede} />
 

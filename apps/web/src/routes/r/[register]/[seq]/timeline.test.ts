@@ -48,7 +48,9 @@ test('THE FIRST LINE SAYS WHO ADDED THE ROW, "added this", and any other note is
 /* "An agent Imported again from Kiln Notes." The verb
    follows the name in lower case; a note that opens on a name keeps it. */
 test('A NOTE THAT OPENS ON ITS VERB READS ON FROM THE NAME, and one that opens on a name keeps it', () => {
-  assert.equal(noteSaid('Imported again from Kiln Notes.'), 'imported again from Kiln Notes.');
-  assert.equal(noteSaid('Imported from Kiln Notes.'), 'imported from Kiln Notes.');
+  assert.equal(noteSaid('Imported again from Kiln Notes.'), 'imported this from Kiln Notes');
+  assert.equal(noteSaid('Imported again from Mara Brain'), 'imported this from your old notes');
+  assert.equal(noteSaid('Partner on Koala. Runs Mainichi JP.'), 'noted: Partner on Koala. Runs Mainichi JP.');
+  assert.equal(noteSaid('Imported from Kiln Notes.'), 'imported this from Kiln Notes');
   assert.equal(noteSaid('Halden sent this.'), 'Halden sent this.');
 });

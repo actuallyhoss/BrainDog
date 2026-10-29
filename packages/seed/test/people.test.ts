@@ -329,10 +329,15 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
   assert.match(String(everyone?.where), /self is not true/u);
   assert.deepEqual(everyone?.columns?.map((c) => c.field), ['name', 'note', 'projects', 'in_touch']);
 
-  /* THE PEOPLE PAGE LISTS THE ORGANISATIONS BESIDE EVERYONE. */
-  const list = opened(k, 'people').blocks.find((b) => b.heading === 'Organisations');
-  assert.ok(list && list.drawn !== false);
-  assert.equal(list.rows.length, ORGANISATIONS.length);
+  /* THE PEOPLE PAGE SAYS HOW MANY ORGANISATIONS AND OPENS THEIR LIST, SINCE People 4.1.0: the organisations are their
+     own list under People in the sidebar, and the line says the count that list draws. */
+  const line = opened(k, 'people').blocks.find((b) => b.kind === 'note' && String((b as { body?: unknown }).body ?? '').includes('{{organisations-count}}')) as
+    | (PageResult['blocks'][number] & { body?: string; values?: Record<string, unknown> })
+    | undefined;
+  assert.ok(line && line.drawn !== false, 'People does not say how many organisations');
+  assert.match(String(line.body), /\(\/r\/organisations\)/u);
+  assert.equal(line.values?.['organisations-count'], ORGANISATIONS.length);
+  assert.equal(opened(k, 'people').blocks.find((b) => b.heading === 'Organisations'), undefined, 'People still lists the organisations');
 });
 
 /* ── Somebody held twice: the kernel's built-in `held-twice`, said on the page ─────────────────────── */

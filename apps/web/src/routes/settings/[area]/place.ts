@@ -130,7 +130,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       area('/settings/backups', 'Backups', 'history', 'Nightly copies'),
       area('/settings/billing', 'Billing', 'money', 'Plan'),
       area('/settings/export', 'Export', 'download', 'A signed copy'),
-      area('/settings/delete', 'Delete this record', 'trash', 'For good'),
+      area('/settings/delete', 'Delete my BrainDog', 'trash', 'For good'),
     ],
     outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'This month', before: 'billing' }],
   },

@@ -32,7 +32,7 @@ braindog keys exec deploy-token --as API_TOKEN -- node sync.js
 Reading a key back takes keychain access, which is separate from the sign-in:
 
 ```code | sh
-braindog login https://app.brain.dog/app/<slug> --keychain my-project
+braindog login https://app.brain.dog/<slug> --keychain my-project
 ```
 
 It prints six digits for you to approve in the app. The grant opens the keys of that one project; `--keychain '*'` asks for the keys that belong to no project. It is kept on the machine beside the sign-in, and `braindog logout` removes both. Every time a key is opened the record logs it against the session that asked, so each key's page can say which runs used it, on which machine, and when.
@@ -52,5 +52,5 @@ braindog tools write --scope user
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

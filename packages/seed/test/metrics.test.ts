@@ -302,6 +302,27 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     /* NOR OF A SUM OF FIGURES (`sum_of`, money-core 3.29.0's `account-gap`): it adds two figures this walk checks on
        their own, and holds no entries of its own to add by hand. `money-account-page.test.ts` holds it. */
     if ((decl.value as { sum_of?: unknown }).sum_of !== undefined) continue;
+    /* A SHARE OF FIGURES (`ratio_of`, money-core 3.32.0's `spoken-for-share`) is held to the figures it names, each read
+       by the record and checked on its own here: the sum of `of` over the sum of `per`. */
+    const ratio = (decl.value as { ratio_of?: { of: { metric: string }[]; per: { metric: string }[] } }).ratio_of;
+    if (ratio !== undefined) {
+      const sum = (parts: { metric: string }[]) =>
+        parts.reduce((n, p) => {
+          const r = k.metric(METRICS[p.metric] as MetricDecl);
+          assert.ok(r.ok, `${p.metric} — ${sayOf(r)}`);
+          return n + (r.value.value ?? 0);
+        }, 0);
+      const read = k.metric(decl as MetricDecl);
+      assert.ok(read.ok, `${decl.metric} — ${sayOf(read)}`);
+      const per = sum(ratio.per);
+      assert.ok(read.value.value !== null && per > 0, `${decl.metric} reads nothing on the sample, so this proves nothing`);
+      assert.ok(Math.abs(read.value.value - sum(ratio.of) / per) < 1e-9, `${decl.metric}: ${read.value.value} is not its figures' share`);
+      checked++;
+      continue;
+    }
+    /* NOR OF A FIGURE OF ONE PAYEE (`party is {{it}}`, money-core 3.32.0's `paid-to-by-week`): a project's name is no
+       organisation, and `party` is a link the walk cannot follow by name. `money-two-currencies.test.ts` reads Spending by category. */
+    if (JSON.stringify(decl).includes('party is {{it}}')) continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? paramsOf(decl) : [null];
     for (const it of params) {
       const one = it === null ? (decl as MetricDecl) : filled(decl, it);
@@ -387,6 +408,8 @@ test('THE NINE ARE ALL READABLE, so the record ships with no tile it cannot answ
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
     /* NOR ONE READ ONCE PER CATEGORY, which a project's name does not fill (`money-budget-passed.test.ts` reads it). */
     if (JSON.stringify(decl).includes('category is {{it}}')) continue;
+    /* NOR ONE OF ONE PAYEE (money-core 3.32.0's `paid-to-by-week`): a project's name is no organisation. */
+    if (JSON.stringify(decl).includes('party is {{it}}')) continue;
     const one = JSON.stringify(decl).includes('{{it}}') ? filled(decl, paramsOf(decl)[0]!) : (decl as MetricDecl);
     const read = k.metric(one);
     if (!read.ok) unreadable.push(`${one.metric}: ${sayOf(read)}`);

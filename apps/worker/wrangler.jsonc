@@ -27,15 +27,17 @@
 
   /* ===========================================================================================
      THE APP IS BACK ON ITS OWN NAME: THIS FILE IS PUSH C. It reverses the one-domain move's last
-     step and nothing else. The app lives on `app.brain.dog` (alpha: `app.alpha.brain.dog`), still
-     under `/app`, and `brain.dog` and `alpha.brain.dog` are legacy hosts again.
+     step and nothing else. The app lives on `app.brain.dog` (alpha: `app.alpha.brain.dog`), at its
+     root since 29 Oct (it was under `/app` until then), and `brain.dog` and `alpha.brain.dog` are
+     legacy hosts again.
 
      PUSH C, PRODUCTION HERE: `PUBLIC_HOST` is `app.brain.dog` and `LEGACY_HOSTS` is `brain.dog`, and
      no route changed. `app.brain.dog` has stayed this Worker's Custom Domain throughout, so C is live
      the moment this Worker deploys: every cookie-authenticated write must now carry
      `Origin: https://app.brain.dog`, so everybody signs in once more (the `__Host-` cookie is bound to
      the name that set it). A page load on `brain.dog/app/...` reaches this Worker through the site's
-     binding and is a 308 to `https://app.brain.dog/app/...`, path and query kept, and `/api/*`, `/mcp`
+     binding and is one 308 to `https://app.brain.dog/...`, the `/app` taken off and the rest and the
+     query kept, and `/api/*`, `/mcp`
      and `/in/*` on `brain.dog` are served and never redirected, so tokens and `/in/` addresses handed
      out there keep working. A device start on `brain.dog` is refused and names `app.brain.dog`.
      Passkeys keep `RP_ID` `brain.dog`, which is a registrable suffix of `app.brain.dog`, so none is
@@ -127,42 +129,34 @@
      has it and `braindog verify` reads `/.well-known/braindog-key` offline (03 §4); the SPA shell
      answering there would break verification of every backup.
 
-     THE APP IS UNDER `/app` NOW, AND THE WORKER RUNS FIRST THERE. The app shares `brain.dog` with the marketing site, and `/app/<slug>/...` names the
+     THE APP IS AT THE ROOT, AND THE WORKER RUNS FIRST ON EVERY PATH (`/*`). `/<slug>/...` names the
      record in the path, which the Worker has to check against the Directory before any id is used, so
-     no file lookup may answer an app navigation before the Worker has seen it. Two negatives take
-     precedence over `/app/*` ("Negative patterns have precedence over non-negative patterns",
-     developers.cloudflare.com/workers/static-assets/binding): `_app` is the build's hashed chunks,
-     and `catalogue` is the bundled catalogue, which `test/bundled-catalogue.test.ts` holds to being
-     answered by the file and never by the Worker. The app is built under `app/` inside
-     `directory`, so the path and the folder agree and `directory` itself does not move.
+     no file lookup may answer an app navigation before the Worker has seen it. The doors above are under
+     `/*` and are not listed again: wrangler refuses an entry another one makes redundant ("'/api/*': rule '/*'
+     makes it redundant"), so the host's paths are said by `src/route.ts` and `DOORS` in
+     `scripts/provision-check.mjs`, and the site's list still names each door it hands over. It was `/app`
+     and `/app/*` until 29 Oct, when the app left `/app` because he did not want the second `app`; the
+     Worker answers every address under `/app` with a 308 to the same address without it. Two
+     negatives take precedence over `/*` ("Negative patterns have precedence over non-negative
+     patterns", developers.cloudflare.com/workers/static-assets/binding): `_app` is the build's hashed
+     chunks, and `catalogue` is the bundled catalogue, which `test/bundled-catalogue.test.ts` holds to
+     being answered by the file and never by the Worker. The app is built at the root of `directory`,
+     so the path and the folder agree.
 
      `not_found_handling` IS `none`, AND IT WAS `single-page-application`. That fallback answered
-     every miss with `index.html` and a 200, which on one shared hostname would draw the app shell
-     for a POST under `/app/<slug>/api/` the router has no method for. With `none` a miss reaches the
-     Worker's code, which developers.cloudflare.com/workers/static-assets/routing/worker-script states
-     for a Worker with a script: when no asset is found, the Worker is invoked. The Worker
-     draws the shell for an app navigation itself. `/r/obligations` on the legacy host is also a
-     miss, which is what lets the Worker answer it with the 308 to `brain.dog/app/r/obligations`. */
+     every miss with `index.html` and a 200, which would draw the app shell for a POST under
+     `/<slug>/api/` the router has no method for. With `none` a miss reaches the Worker's code, which
+     developers.cloudflare.com/workers/static-assets/routing/worker-script states for a Worker with a
+     script: when no asset is found, the Worker is invoked. The Worker draws the shell for an app
+     navigation itself. */
   "assets": {
     "directory": "../web/build",
     "binding": "ASSETS",
     "not_found_handling": "none",
     "run_worker_first": [
-      "/api/*",
-      "/mcp",
-      "/a",
-      "/a/*",
-      "/in/*",
-      "/s/*",
-      "/ws",
-      "/ws/*",
-      "/auth/*",
-      "/account/*",
-      "/.well-known/*",
-      "/app",
-      "/app/*",
-      "!/app/_app/*",
-      "!/app/catalogue/*"
+      "/*",
+      "!/_app/*",
+      "!/catalogue/*"
     ]
   },
 
@@ -307,21 +301,9 @@
         "binding": "ASSETS",
         "not_found_handling": "none",
         "run_worker_first": [
-          "/api/*",
-          "/mcp",
-          "/a",
-          "/a/*",
-          "/in/*",
-          "/s/*",
-          "/ws",
-          "/ws/*",
-          "/auth/*",
-          "/account/*",
-          "/.well-known/*",
-          "/app",
-          "/app/*",
-          "!/app/_app/*",
-          "!/app/catalogue/*"
+          "/*",
+          "!/_app/*",
+          "!/catalogue/*"
         ]
       },
 
@@ -346,7 +328,8 @@
       "vars": {
         "PUBLIC_HOST": "app.alpha.brain.dog",
         /* THE OLD NAME, A CUSTOM DOMAIN IN `routes` ABOVE, or nothing reaches the Worker to redirect. A page
-           load there is a 308 to `https://alpha.brain.dog/app<path>`, and `/api/*`, `/mcp` and `/in/*` are
+           load under `/app` there is a 308 to `https://app.alpha.brain.dog<path>` with the `/app` taken
+           off, and `/api/*`, `/mcp` and `/in/*` are
            served, never redirected, for the reasons production's comment gives. */
         "LEGACY_HOSTS": "alpha.brain.dog",
         /* THE PASSKEY'S RELYING PARTY, the parent of the host from the first deploy, so a passkey made on
@@ -546,11 +529,12 @@
        before the first run of `deploy.yml`.
        ----------------------------------------------------------------------------------------- */
     "production": {
-      /* THE APP IS UNDER `/app` ON `brain.dog`, WHICH IS THE SITE'S CUSTOM DOMAIN AND NOT THIS WORKER'S.
-         `app.brain.dog` IS THIS WORKER'S CUSTOM DOMAIN AND THE APP'S ADDRESS. `brain.dog` stays the site's
-         Custom Domain, and the site hands the app's doors to this Worker through its `APP` service binding
-         (`apps/site/wrangler.jsonc`), where a page load is a 308 to `https://app.brain.dog/app<path>`
-         and `/api/*`, `/mcp` and `/in/*` are served and never redirected, because the CLI refuses
+      /* `app.brain.dog` IS THIS WORKER'S CUSTOM DOMAIN AND THE APP'S ADDRESS, AT ITS ROOT: a record is
+         `https://app.brain.dog/<slug>`. `brain.dog` stays the site's Custom Domain, and the site hands the
+         app's doors and the old `/app` to this Worker through its `APP` service binding
+         (`apps/site/wrangler.jsonc`), where a page load under `/app` is one 308 to
+         `https://app.brain.dog<path>` with the `/app` taken off, and `/api/*`, `/mcp` and `/in/*` are
+         served and never redirected, because the CLI refuses
          redirects, a webhook sender does not follow one, and a 301 or 302 turns a POST into a GET.
          `brain.dog` stays a legacy host for at least the 90 days a token lives and until every `/in/`
          address handed out on it is re-minted.

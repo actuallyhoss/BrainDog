@@ -171,7 +171,7 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
         res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
         return createReadStream(file).pipe(res);
       }
-      /* The SPA fallback the deployed host serves, for the same reason `a11y` serves it: the app's shell, under `/app`. */
+      /* The SPA fallback the deployed host serves, for the same reason `a11y` serves it: the app's shell, at the root. */
       if (!Object.hasOwn(TYPES, extname(rel)) && (await stat(appShell(ROOT)).catch(() => null))?.isFile()) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
         return createReadStream(appShell(ROOT)).pipe(res);

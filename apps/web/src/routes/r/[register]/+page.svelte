@@ -84,6 +84,7 @@
     toggleChip,
     viewOf,
     homeViewOf,
+    groupsOf,
     isLate,
     lateFirst,
     weighed,
@@ -102,7 +103,8 @@
   import BulkBar from './parts/BulkBar.svelte';
   import ListCards from './parts/ListCards.svelte';
   import ListPeople from './parts/ListPeople.svelte';
-  import { orgFieldOf } from './people.ts';
+  import ListOrgs from './parts/ListOrgs.svelte';
+  import { meetsOf, mergedAway, orgRoleOf } from './people.ts';
   import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
   import { amountField, signedSaid, wayField, wayOf } from '$lib/record/money-way.ts';
   import ListBoard from './parts/ListBoard.svelte';
@@ -1288,7 +1290,14 @@
    * of them is wrong wherever they are both visible, which is exactly at the cap, the one place the
    * cap line exists for.
    */
-  const denominator = $derived(narrowed || q ? result.matched : result.total);
+  /* NO COUNT OF PEOPLE INCLUDES YOU, NOR ANYBODY FOLDED INTO ANOTHER (29 October: "sidebar 11, list header 12"). You
+     stay on the list, its first row, marked You; the head, the line under it and the sidebar say the people you know. */
+  const notCounted = $derived.by(() => {
+    const m = meetsOf(decl);
+    if (!m) return 0;
+    return result.entries.filter((e) => (m.self && e.fields[m.self] === true) || mergedAway(e.fields, decl)).length;
+  });
+  const denominator = $derived(Math.max(0, (narrowed || q ? result.matched : result.total) - notCounted));
 
   /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
@@ -1302,7 +1311,7 @@
 
   /* THE HEAD SAYS THE LIST'S COUNT, which the record answered with the first page, and never "200+ of 2,527": what
      is drawn so far is the foot's to say (`shownSaid`). */
-  const head = $derived(headCount({ matched: result.matched, drawn }));
+  const head = $derived(Math.max(0, headCount({ matched: result.matched, drawn }) - notCounted));
 
   /**
    * A SORTED LIST THE RECORD STOPPED, which is the one list with no next page that is not whole.
@@ -1326,7 +1335,7 @@
   const boardable = $derived(laneFieldOf(decl) !== undefined);
   /* A LIST OF PEOPLE THAT SAYS WHICH ORGANISATION EACH IS WITH opens grouped by it (`homeViewOf`), so its bare address is
      the groups and its table is `?view=table`. */
-  const groupable = $derived(orgFieldOf(decl) !== null);
+  const groupable = $derived(groupsOf(decl));
   const setView = (v: View) =>
     setParam((p) => {
       if (v === homeViewOf(decl)) p.delete('view');
@@ -1405,14 +1414,19 @@
    * THE ROWS THE LIST'S OWN FIGURES ARE OVER: the rows the record holds, without a line still being typed in and
    * without a row archived on this screen, which the list keeps in its place wearing its receipt but no longer holds.
    */
-  const standing = $derived(result.entries.filter((e) => e.seq > 0 && receipts.get(e.seq)?.mark !== copy.markArchived));
+  const standing = $derived.by(() => {
+    const m = meetsOf(decl);
+    return result.entries.filter(
+      (e) => e.seq > 0 && receipts.get(e.seq)?.mark !== copy.markArchived && !(m && ((m.self && e.fields[m.self] === true) || mergedAway(e.fields, decl))),
+    );
+  });
 
   /**
    * THE SENTENCE UNDER THE TITLE: what is open, what is late in red, and when the next thing falls due
    * (`readingOf`). It counts the rows in hand, so it says nothing while the list is still being paged.
    */
   const reading = $derived(
-    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: result.matched, total: result.total }),
+    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted) }),
   );
 
   /** A row's title as the list says it, for the summary tile's largest rows. */
@@ -3259,7 +3273,16 @@
   {#snippet listBody()}
     <div class="body-slot" bind:this={body}>
     <!-- PEOPLE BY ORGANISATION, at every width: a phone reads the groups as a laptop does, since a group is one line. -->
-    {#if view === 'groups'}
+    {#if view === 'groups' && orgRoleOf(decl)}
+      <ListOrgs
+        register={id}
+        {decl}
+        entries={result.entries.slice(0, DOM_CAP)}
+        {now}
+        more={cursor !== null && loaded < DOM_CAP}
+        {openCardMenu}
+      />
+    {:else if view === 'groups'}
       <ListPeople
         register={id}
         {decl}

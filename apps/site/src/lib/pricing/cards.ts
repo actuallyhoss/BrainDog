@@ -7,7 +7,7 @@
  * off.
  *
  * THE PAID BUTTONS FOLLOW `LAUNCH.billing`. On, "Choose Cloud" and "Choose Cloud Plus" link the plan's
- * own `href` (the app's sign-up with the plan named, `external` because `/app` is the app's). Off, a paid card carries
+ * own `href` (the app's sign-up with the plan named, `external` because it is the app's). Off, a paid card carries
  * the plain words "Coming soon" where its button would be, and links nothing. Free's button is the shell's `Start`
  * either way.
  */

@@ -106,7 +106,8 @@ const CANNOT_WRITE: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Adding a file take
 /**
  * The door: `ctx` is who `contextFor` said is asking, and `folder` is `blobsFolder`'s answer for this record.
  *
- * `request.url` IS THE ROOT'S, with any `/app/<slug>` already taken off by `answer`, so one test reads either address.
+ * `request.url` IS THE ROOT'S, with any `/<slug>` (or the old `/app/<slug>`) already taken off by `answer`, so one test
+ * reads either address.
  */
 export async function serveFiles(request: Request, ctx: CallContext, folder: string | null): Promise<Response> {
   const path = new URL(request.url).pathname;

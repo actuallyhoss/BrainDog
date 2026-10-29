@@ -24,7 +24,7 @@ import { createRow, findLists, isFail, rowsOf, updateRow, type Call, type Lists 
 
 const NOW = Date.UTC(2026, 9, 21, 9);
 const DAY = 86_400_000;
-const HOST = 'https://brain.example/app/the-bench';
+const HOST = 'https://brain.example/the-bench';
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
 
 type Refusal = { code: string; fix: string; at?: string };

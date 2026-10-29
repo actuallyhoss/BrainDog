@@ -74,7 +74,7 @@ export function loginCommand(host: string): string {
  * ON `app.brain.dog`, for the reason at `signIn` in `main.ts`: only production's `PUBLIC_HOST` starts a device, so an
  * agent that passed `brain.dog` would be handing the person a login that answers 403.
  */
-export const ANY_HOST = 'https://app.brain.dog/app/<slug>';
+export const ANY_HOST = 'https://app.brain.dog/<slug>';
 
 /**
  * The host the next command will reach and the expiry of the login this machine keeps for it, found as `target` finds
@@ -276,8 +276,8 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
   const { key, url } = host;
   const { again } = words;
   const now = io.now ?? Date.now;
-  /* THE KEY'S PATH IS THE SLUG, and `hostKey` has already taken `/app` off the front of it, so the address the app
-     prints, `app.brain.dog/app/acme`, posts `acme` and not `app/acme`. */
+  /* THE KEY'S PATH IS THE SLUG, and `hostKey` has already taken any `/app` off the front of it, so an address kept
+     from before the app moved to the root, `app.brain.dog/app/acme`, posts `acme` and not `app/acme`. */
   const slug = url.pathname.replace(/^\/+/, '');
   const where = slug ? { slug } : {};
 

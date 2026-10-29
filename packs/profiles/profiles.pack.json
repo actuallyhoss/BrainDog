@@ -1,10 +1,10 @@
 {
   "pack": "profiles",
-  "version": "1.2.4",
+  "version": "1.3.0",
   "icon": "people",
   "title": "Profiles",
   "summary": "Each setup your agents run under: the app, the account it signs in as, how it is paid for and the projects it serves, with every machine it is on and whether each copy still matches. Kept for you alone, so nobody you share with sees it.",
-  "changes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
+  "changes": "An empty Profiles page says what a profile is and offers Add your first setup, where it said Nothing here yet over an empty At a glance.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -199,6 +199,17 @@
       "compare": "none"
     },
     {
+      "metric": "profiles-held",
+      "name": "Profiles kept",
+      "source": "register.profiles",
+      "where": "state is not retired",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "rule": "profile-drifted",
       "name": "Ask about a machine whose profile has been out of step for two days",
       "register": "profile_places",
@@ -229,10 +240,26 @@
       "requires": ["register.profiles", "register.profile_places", "register.session"],
       "blocks": [
         {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "profiles-held", "is": 0 },
+          "body": "A profile is one setup your agents run under: the app, the account it signs in as, and the machines it is on."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add your first setup",
+          "icon": "plus",
+          "span": 12,
+          "register": "profiles",
+          "when": { "metric": "profiles-held", "is": 0 }
+        },
+        {
           "kind": "stat",
           "heading": "At a glance",
           "icon": "gauge",
           "span": 12,
+          "when": { "metric": "profiles-held", "gt": 0 },
           "cells": [
             { "metric": "profiles-out-of-step", "label": "Out of step" },
             { "metric": "profiles-near-limit", "label": "Near a limit" }

@@ -407,12 +407,12 @@ const NEEDS = {
     built: true,
   },
   /* A PROOF RECORD, the second prerequisite that is not a file: `rule-sheet` reads the pages of a record made through the
-     public sign-up with Rule sheet installed, which only the proof area has after a deploy. The app is at `/app` on every
-     host, and which record opens is the signed-in state's, so the address names no record. */
+     public sign-up with Rule sheet installed, which only the proof area has after a deploy. The app is at the root of every
+     host, so the address is the record's own, `https://<host>/<record>`. */
   proof: {
     unmet: () => (process.env.PROOF_RECORD ? null : 'PROOF_RECORD is not set'),
     what: "PROOF_RECORD naming a proof record's app address with Rule sheet installed, and PROOF_STATE the signed-in browser state the proof harness saved",
-    how: 'PROOF_RECORD=<https://host/app> PROOF_STATE=<file> node tools/gates/run.mjs --only rule-sheet',
+    how: 'PROOF_RECORD=<https://host/record> PROOF_STATE=<file> node tools/gates/run.mjs --only rule-sheet',
     built: false,
   },
 };

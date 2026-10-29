@@ -59,7 +59,7 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   /* THE RECORD THE ADDRESS NAMES. `url` and not `location`: a load runs for the address being opened, and `location`
      is the page being left until the navigation lands, so a move from acme to kiln would read acme's `boot`. */
   const api = apiBase(url);
-  /* Read inside the record: the address is `/app/acme/start` and every rule below is written about `/start`. */
+  /* Read inside the record: the address is `/acme/start` and every rule below is written about `/start`. */
   const inner = here(url.pathname);
   /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway. And
      `/connect/approve`, the page a terminal prints, for the same reason: a machine is waiting on it. */
@@ -113,8 +113,8 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   const reader = tabCopy ? await tabCopy.lastReader(api).catch(() => null) : null;
   void import('$lib/data/local-tab.ts').then((c) => c.offlineLocal(reader !== null), () => undefined);
 
-  /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as
-     `/app/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the
+  /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/` as much as
+     `/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the
      sample business until the sample left the app. */
   const signIn = booted.from === 'refused' ? signInFirst(booted.code, url) : null;
   if (signIn) redirect(307, signIn);

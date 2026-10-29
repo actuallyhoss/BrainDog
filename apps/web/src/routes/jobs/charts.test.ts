@@ -277,10 +277,10 @@ test('the machines enrolled as runners, by the name a person gave them, the one 
 });
 
 test('the enrol command never prints a localhost address on a hosted record', () => {
-  for (const here of ['http://localhost:5190', 'http://localhost:5190/app/studio', 'http://127.0.0.1:8787', 'http://[::1]:3000', 'http://app.localhost:5173', 'http://0.0.0.0:4173', 'not an address']) {
+  for (const here of ['http://localhost:5190', 'http://localhost:5190/studio', 'http://127.0.0.1:8787', 'http://[::1]:3000', 'http://app.localhost:5173', 'http://0.0.0.0:4173', 'not an address']) {
     assert.equal(isLoopback(here), true, here);
     const said = enrolAddress(here, true, 'studio');
-    assert.equal(said, 'https://app.brain.dog/app/studio', here);
+    assert.equal(said, 'https://app.brain.dog/studio', here);
     assert.doesNotMatch(chartWords.enrolCommand(said!), /localhost|127\.|\[::1\]|0\.0\.0\.0/u);
     /* WITH NO NAME TO PUT IN IT, no address is printed at all, and the sentence stands in for the command. */
     assert.equal(enrolAddress(here, true, null), null);
@@ -288,8 +288,8 @@ test('the enrol command never prints a localhost address on a hosted record', ()
   }
   assert.doesNotMatch(chartWords.enrolNoAddress, /localhost|https?:|—/u);
   /* A HOSTED RECORD OPENED AT ITS OWN ADDRESS KEEPS IT, whatever that is. */
-  assert.equal(enrolAddress('https://app.brain.dog/app/studio', true, 'studio'), 'https://app.brain.dog/app/studio');
-  assert.equal(enrolAddress('https://records.example.com/app/studio', true, 'studio'), 'https://records.example.com/app/studio');
+  assert.equal(enrolAddress('https://app.brain.dog/studio', true, 'studio'), 'https://app.brain.dog/studio');
+  assert.equal(enrolAddress('https://records.example.com/studio', true, 'studio'), 'https://records.example.com/studio');
   /* A SELF-HOST IS WHEREVER ITS OWNER RUNS IT, a localhost included: that is the address its own runner enrols at. */
   assert.equal(enrolAddress('http://localhost:8787', false, null), 'http://localhost:8787');
   assert.equal(isLoopback('https://brain.dog'), false);

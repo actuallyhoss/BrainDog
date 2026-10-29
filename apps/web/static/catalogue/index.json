@@ -257,6 +257,61 @@
     },
     {
       "kind": "pack",
+      "id": "calendar",
+      "title": "Calendar",
+      "summary": "Your calendar's next events, read every hour from its secret ICS link in Google Calendar or Outlook, into a list you, your widgets and your agents can read. The link stays in your keys. Nothing is written back to the calendar.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.1.0",
+      "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "e496def15e25ced6bd2dfcf5a9d1833cb3272e2191a9786be6d38ab75639b36c",
+          "bytes": 24650,
+          "published_at": "2026-10-29T14:46:57.825Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Events"
+            ],
+            "pages": [
+              "Calendar"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "calendar.google.com",
+                "line": "CALLS OUT calendar.google.com, outlook.office365.com and outlook.live.com · every 1h · key \"Calendar link\" to the host its keychain entry opens",
+                "key": "Calendar link"
+              }
+            ],
+            "widgets": [
+              "Next meetings",
+              "Today's events"
+            ]
+          },
+          "notes": "The calendar's secret link now stays in your keys: the setting names the key, and the link is never in a setting or seen by the add-on's script."
+        }
+      ],
+      "categories": [
+        "modules",
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "helpers",
+      "icon": "calendar"
+    },
+    {
+      "kind": "pack",
       "id": "card-alerts",
       "title": "Card alerts",
       "summary": "Reads a card alert that names the card's last four digits into Money as a transaction, forwarded by mail or posted as a text message.",
@@ -1028,8 +1083,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.1.0",
       "versions": [
+        {
+          "version": "2.1.0",
+          "checksum": "d157ec257bff0ff8323f6226113701253cf6516663ca3ef38f9c932de83744ec",
+          "bytes": 20622,
+          "published_at": "2026-10-29T19:04:09.537Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Debts",
+              "Payoff plans"
+            ],
+            "pages": [
+              "Debts"
+            ],
+            "rules": [
+              "Work out the plans when a debt changes",
+              "Work out the plans when the extra changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "What is left on your debts is one figure, so net worth takes it away; a debt on an account that counts as cash is already in that account's balance, so it is left out of it.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "b0d2f9ec334e68bd9f09ecbbc5d1afcc08ceb20faff39df3f3c061385fe76c69",
@@ -1654,8 +1737,125 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.1.1",
+      "latest": "3.3.0",
       "versions": [
+        {
+          "version": "3.3.0",
+          "checksum": "711d111a7b38e1169b55fa3a30d53689479e3bdc384326e361f15e400f0adccd",
+          "bytes": 58435,
+          "published_at": "2026-10-29T16:40:10.330Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ]
+          },
+          "notes": "Gold is valued from the first gold rate anybody sets, of any karat, and gold with no price paid is still valued by its grams. Set today's gold rate sits with the gold rates, not beside what you hold.",
+          "preview": true
+        },
+        {
+          "version": "3.2.1",
+          "checksum": "10762e7c01e104157b59c61717341baa69ff00141db50957b8b65c75a9e61373",
+          "bytes": 57490,
+          "published_at": "2026-10-29T14:30:02.883Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ]
+          },
+          "notes": "Can set today's gold rate for you once a day from the world gold price, when you choose a source on this page. Off until you do, and a rate you typed yourself is never written over. Says what a holding is when nothing is held yet, and asks for a gold rate only once there is gold.",
+          "preview": true
+        },
+        {
+          "version": "3.2.0",
+          "checksum": "5d077d4fcb2a5dab9c97b67e9b09afa669a51e5b81af58644af30159174bb5b8",
+          "bytes": 56918,
+          "published_at": "2026-10-29T14:21:27.259Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ]
+          },
+          "notes": "Can set today's gold rate for you once a day from the world gold price, when you choose a source on this page. Off until you do, and a rate you typed yourself is never written over.",
+          "preview": true
+        },
         {
           "version": "3.1.1",
           "checksum": "a81967ab9e76a8d8f191bb8c42882863300e20d31984b1e2da5bac7a32c7a058",
@@ -2003,6 +2203,7 @@
       ],
       "categories": [
         "modules",
+        "connectors",
         "automations",
         "made-by-braindog"
       ],
@@ -3924,8 +4125,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.4",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "93da16daa76128b52b56da525b7142f292758c307dcf2fdcefb43e2cf8dc7265",
+          "bytes": 13018,
+          "published_at": "2026-10-29T19:06:45.846Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "An empty Profiles page says what a profile is and offers Add your first setup, where it said Nothing here yet over an empty At a glance."
+        },
         {
           "version": "1.2.4",
           "checksum": "518a58fa6239be282caf358f47625b096f621dcd61a1fc7d880b57a96f35f259",
@@ -4672,6 +4901,57 @@
     },
     {
       "kind": "pack",
+      "id": "receipts",
+      "title": "Receipts",
+      "summary": "Keep a receipt on each Ledger line. Send one in on its own and it finds its line by amount and day, or asks which one. Mark the categories you keep receipts for, such as work costs or anything with a warranty, and see which lines from this month and last still want one.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "678badeb925705092beae03eb8175ec10dc32373aa82633dcc65d8d450a73f90",
+          "bytes": 17440,
+          "published_at": "2026-10-29T11:29:42.509Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Receipts"
+            ],
+            "pages": [
+              "Receipts"
+            ],
+            "rules": [
+              "Put a receipt on its Ledger line",
+              "Find a waiting receipt for a new Ledger line, or mark it as wanting one"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version: a receipt on each Ledger line, receipts matched to their line by amount and day (and looked for again each night), categories that keep receipts, and the lines still missing one.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "receipt-text"
+    },
+    {
+      "kind": "pack",
       "id": "retainer-hours",
       "title": "Agency",
       "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
@@ -5108,6 +5388,53 @@
     },
     {
       "kind": "pack",
+      "id": "savings-circle",
+      "title": "Savings circle",
+      "summary": "A savings circle (a gam'eya, a tontine, a committee): everyone puts the same part in each month and one person takes the pot each month. Say the people, the part, your turn and the first month, and the months and your payout are written as a plan's parts, so Cash ahead and Coming up count them.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "7456f89542de9ae782f3f935049f0b65865eedecb0efde56b45d3e262d64fd40",
+          "bytes": 12557,
+          "published_at": "2026-10-29T11:29:42.509Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Savings circles"
+            ],
+            "rules": [
+              "Write a savings circle's months and your payout"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version: a circle on a plan, its monthly parts and your payout written for you, and a page of every circle with what goes in each month and the payouts to come.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "piggy-bank"
+    },
+    {
+      "kind": "pack",
       "id": "setup-sync",
       "title": "Setup sync",
       "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, locked on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
@@ -5381,6 +5708,59 @@
       },
       "unlisted": true,
       "icon": "slash"
+    },
+    {
+      "kind": "pack",
+      "id": "splits",
+      "title": "Splits",
+      "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their rows close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "a73c61a342ac4945ecb55f85c8cdae667418c83cc064dae1a54f6b0b04cf84a3",
+          "bytes": 24216,
+          "published_at": "2026-10-29T11:29:42.509Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Splits",
+              "Where each person stands"
+            ],
+            "pages": [
+              "Splits",
+              "{{name}}"
+            ],
+            "rules": [
+              "Write the split of a Ledger line marked shared",
+              "Work out a split and where that person stands"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version: shared costs and settle-ups, where each person stands in each currency, square marked by itself, and a Shared with field on the Ledger that writes the split.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "split"
     },
     {
       "kind": "pack",
@@ -5769,6 +6149,53 @@
     },
     {
       "kind": "pack",
+      "id": "subscriptions",
+      "title": "Subscriptions",
+      "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "5f6d98efd280d7cf4a92db13056245e173c9e3c8fd8d3a92cb6e55ca42fc69d4",
+          "bytes": 19598,
+          "published_at": "2026-10-29T11:29:42.509Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Subscriptions"
+            ],
+            "rules": [
+              "Keep a subscription's old price when its amount changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version: mark a Repeating line as a subscription, with a trial end, a cancel-by day, how to cancel and how much you use it; a page with the month and year cost, renewals, trials and price rises.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "refresh"
+    },
+    {
+      "kind": "pack",
       "id": "task-tiers",
       "title": "Task tiers",
       "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and the record works out its priority and writes the sum as the reason.",
@@ -5831,6 +6258,79 @@
       },
       "shelf": "planning",
       "icon": "list-ordered"
+    },
+    {
+      "kind": "pack",
+      "id": "tax-set-aside",
+      "title": "Tax set aside",
+      "summary": "For freelancers and a small business: give a category of money in a tax rate, and every payment in it says what to put aside. See this year's set aside, what you paid the tax office, what your tax account holds against it, and the tax bills still to pay.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.1",
+      "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "4e92588782e40b2fabe3f9364e71149787454273999c2f2552679193cf31fcb7",
+          "bytes": 17599,
+          "published_at": "2026-10-29T16:40:10.330Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Tax set aside"
+            ],
+            "rules": [
+              "Work out the tax to set aside on a Ledger line",
+              "Work this year's lines out again when a category's tax rate changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Set aside each month draws its bars again; it was refused before.",
+          "preview": true
+        },
+        {
+          "version": "1.0.0",
+          "checksum": "00504dd3b3fcde30aa6d8d7c2f5bb8bd9629f1effd3fe765313a3c910d6a060b",
+          "bytes": 17585,
+          "published_at": "2026-10-29T11:29:42.509Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Tax set aside"
+            ],
+            "rules": [
+              "Work out the tax to set aside on a Ledger line",
+              "Work this year's lines out again when a category's tax rate changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version: a tax rate on categories of money in, the part to set aside on each payment, tax paid from a tax-payments category, a tax account, and the tax bills due.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "piggy-bank"
     },
     {
       "kind": "pack",
@@ -6117,6 +6617,62 @@
       },
       "shelf": "money",
       "icon": "plane"
+    },
+    {
+      "kind": "pack",
+      "id": "weather",
+      "title": "Weather",
+      "summary": "The weather where you are, today and the next six days, from Open-Meteo: free, with no key and no account. Set your town on this page and it is kept in step every three hours.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "f3e5a53f9dab662d9126b30ec44c7843275119121460a4594883c32826ace187",
+          "bytes": 14231,
+          "published_at": "2026-10-29T14:41:07.437Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Weather"
+            ],
+            "pages": [
+              "Weather"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "geocoding-api.open-meteo.com",
+                "line": "CALLS OUT geocoding-api.open-meteo.com and api.open-meteo.com · every 3h · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Weather",
+              "The week's weather"
+            ]
+          },
+          "notes": "First version: today and the next six days for one place, in Celsius or Fahrenheit, with a Weather page and two widgets.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "helpers",
+      "icon": "sun"
     },
     {
       "kind": "pack",
@@ -6489,8 +7045,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "3.7.1",
+      "latest": "3.8.0",
       "versions": [
+        {
+          "version": "3.8.0",
+          "checksum": "5fd2f8d19fb07bde268e19983ce6e255bf1bee4587f1fe8d3d133ddd7f328e4c",
+          "bytes": 43404,
+          "published_at": "2026-10-29T14:52:50.794Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Founder overview",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "3.7.1",
           "checksum": "0c762a3a8fc9e5dc516172df8fdb762aad544ca64cc580eff36a52f40efea4ad",
@@ -7129,8 +7714,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.6.1",
+      "latest": "2.7.0",
       "versions": [
+        {
+          "version": "2.7.0",
+          "checksum": "8f8d2f9b0d9d93dc5af63c9a3d5f2ba5a320534b1c808f763e31aef11ee96103",
+          "bytes": 32402,
+          "published_at": "2026-10-29T14:46:57.825Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Log",
+              "Put by",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.6.1",
           "checksum": "c7f4572d426ccef38bb500d368bfe61c086dc53125e97a032eae6a5d5d6b4945",

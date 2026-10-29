@@ -76,7 +76,7 @@ function drawn() {
 }
 
 /** The parts the mode loads, counted, with the own words above. */
-function parts(path = '/app/fernhill/p/money') {
+function parts(path = '/fernhill/p/money') {
   const loaded = { words: 0, sheet: 0 };
   return {
     loaded,
@@ -140,7 +140,7 @@ test('an off that arrives while the words are still loading starts nothing', asy
 });
 
 test('a shared page for a stranger never takes it, inside a record or not, and loads nothing', async () => {
-  for (const path of ['/app/s', '/app/fernhill/s']) {
+  for (const path of ['/s', '/fernhill/s']) {
     const s = drawn();
     const p = parts(path);
     const stop = await applyShot(true, s.root, { ...p, page: s.at });
@@ -149,8 +149,8 @@ test('a shared page for a stranger never takes it, inside a record or not, and l
     assert.deepEqual(p.loaded, { words: 0, sheet: 0 }, path);
     stop();
   }
-  assert.equal(shared('/app/fernhill/p/money'), false);
-  assert.equal(shared('/app/fernhill/s/k7Qm2'), true);
+  assert.equal(shared('/fernhill/p/money'), false);
+  assert.equal(shared('/fernhill/s/k7Qm2'), true);
 });
 
 test("the tab keeps only the page's own name and the product's", () => {

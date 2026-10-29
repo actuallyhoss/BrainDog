@@ -16,7 +16,7 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { idle } from '$lib/ui/idle.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Empty from '$lib/ui/Empty.svelte';
@@ -40,6 +40,8 @@
     slowBody: 'Nothing was found to tidy yet, and the rest did not answer in time. Open this page again in a moment.',
     clearBodyUnchecked: 'Nothing has gone stale, and nothing else waits to be tidied.',
     lateBody: 'Nothing was found to tidy yet, and the rest is still being read.',
+    health: 'Whether BrainDog itself is running well is on its own page.',
+    healthGo: 'Open Health',
   } as const;
 
   type StalePart = typeof import('$lib/home/Stale.svelte').default;
@@ -195,7 +197,7 @@
   {#if named}<named.Part found={named.found} />{/if}
   {#if hues}<hues.Part found={hues.found} />{/if}
   {#if imported}<imported.Part found={imported.found} />{/if}
-  {#if !heard && !quick && !late}
+  {#if !any && !heard && !quick && !late}
     <p class="health-reading" role="status">{words.reading}</p>
   {:else if !any && !heard && !quick}
     <Empty kind="error" title={words.slow} body={words.lateBody} />
@@ -207,10 +209,15 @@
   {:else if !any}
     <Empty kind="cleared" title={words.clear} body={unchecked ? words.clearBodyUnchecked : words.clearBody} />
   {/if}
-  {#if quick && !heard}
+  <!-- ONCE A PART HAS LANDED THE READING LINE GOES: what is drawn says the record answered, and "Reading the record for
+       anything to tidy." under it read as stuck. Only the long walk of pages and notes is still said while it runs. -->
+  {#if quick && !heard && !any}
     <p class="health-reading" role="status">{words.readingPages}</p>
-  {:else if late && any && !heard}
-    <p class="health-reading" role="status">{words.reading}</p>
+  {/if}
+  <!-- HEALTH COUNTS SOMETHING ELSE, its checks, and the two pages point at each other so neither count is read as the
+       other's. -->
+  {#if shell.pages.includes('health')}
+    <p class="health-reading">{words.health} <a class="tap" href={at('/p/health')}>{words.healthGo}</a></p>
   {/if}
   <!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
        about, a dry look first and then Do it. Tidying the record, so it is here and not in the sharing screen. -->

@@ -30,7 +30,7 @@
   let kindsHeld: Promise<KindsFor> | null = null;
   const none: KindsFor = () => [];
   const loadKinds = (): Promise<KindsFor> =>
-    (kindsHeld ??= import('braindog-render')
+    (kindsHeld ??= import('braindog-render/kinds-for')
       .then((m) => (m as unknown as { kindsFor?: KindsFor }).kindsFor ?? none)
       .catch(() => none));
 
@@ -121,9 +121,10 @@
       hidden: false,
       steps: stepsFor(block.kind, block.columns.length),
       change,
+      today: slug !== 'home' && slug !== 'today',
     }),
   );
-  const LAST: readonly string[] = ['this', 'hide', 'show', 'remove'];
+  const LAST: readonly string[] = ['today', 'this', 'hide', 'show', 'remove'];
   const isKindRow = (a: Action): boolean => a.kind !== undefined || a.id === 'change';
   const moves = $derived(rows.filter((a) => a.span === undefined && !isKindRow(a) && !LAST.includes(a.id)));
   const widths = $derived(rows.filter((a) => a.span !== undefined));
@@ -239,6 +240,7 @@
     if (action.id === 'this') {
       return void (await openChange(takeLine()));
     }
+    if (action.id === 'today') return void (await toToday());
     busy = true;
     try {
       const now = await laid();
@@ -289,6 +291,23 @@
     authored = null;
     if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
     await reread();
+  }
+
+  /**
+   * ADD TO TODAY (the widgets plan of 29 October, §4.3): the block as this page declares it, filled for this page, put on
+   * Today's board at the size its kind draws first, Today kept first where the record keeps none. One press, with Undo.
+   */
+  async function toToday() {
+    if (busy) return;
+    busy = true;
+    try {
+      const [{ bodyOfBlock }, { addToToday }] = await Promise.all([import('$lib/record/pages-live.ts'), import('$lib/board/add-today.ts')]);
+      const out = await addToToday(apiBase(), bodyOfBlock(block as unknown as Record<string, unknown>) as Record<string, unknown>);
+      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+      toasts.push(words.onToday(name), { intent: 'good', undo: () => void out.undo?.() });
+    } finally {
+      busy = false;
+    }
   }
 
   /** Undo: the look before written again, or the look retired where there was none to put back. */

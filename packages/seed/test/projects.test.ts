@@ -334,7 +334,7 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
   const page = PAGES.portfolio!;
   assert.equal(page.title, (page.nav as { section?: string } | undefined)?.section);
   const lane = PORTFOLIO_REGISTERS.things!.fields.find((f) => f.id === 'lane') as unknown as { values: readonly string[]; labels?: Record<string, string> };
-  assert.deepEqual(lane.values.map((v) => lane.labels?.[v]), ['Building', 'Earning', 'Parked', 'Finished']);
+  assert.deepEqual(lane.values.map((v) => lane.labels?.[v]), ['Building', 'Earning', 'Parked', 'Closed']);
   const blocks = page.blocks as { kind: string; heading?: string; span?: number; when?: unknown; lead?: boolean }[];
   assert.ok(!blocks.some((b) => b.heading === 'Right now'), 'Right now is drawn beside the line that says its figure');
   /* SINCE portfolio 1.11.0 the row is one track of how they are going, the whole width: Where they are said the line

@@ -218,13 +218,14 @@ add-on.
   classifier is a control here.
 - Rate limiting that can be bypassed per token or per record.
 
-### 5 · Pack installation (`04 §7`, `42`, [ADR-048](docs/16-DECISIONS.md))
+### 5 · Add-on installation (`04 §7`, `42`, [ADR-048](docs/16-DECISIONS.md))
 
-A pack is data. The safety argument is an **enumeration**, so anything that adds an entry to the
-"a pack CAN" column is a security defect by definition.
+An add-on (a pack, in the code) is data. The safety argument is an **enumeration**, so anything that adds an entry
+to the "a pack CAN" column is a security defect by definition.
 
-- **Any code execution reached from a declaration.** There is no interpreter; finding one is the top
-  of this list.
+- **Any code execution reached from a declaration outside the script sandbox.** An add-on's scripts
+  run in `packages/script`'s QuickJS sandbox with only the calls it hands them; escaping it, or
+  running code from any other declaration, is the top of this list.
 - **The diff lying.** `installPack` must apply the plan `planPack` showed, and refuse a different
   one. An install that adds, changes or retires something the diff did not print, or writes a row
   that is not a declared `example` seed, is in scope.

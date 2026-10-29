@@ -15,11 +15,12 @@ const post = (path: string, body: string | ReadableStream<Uint8Array> | null, he
 
 test('EACH DOOR HAS ITS CEILING, AND A DOOR WITH ITS OWN CAP HAS NONE HERE', () => {
   assert.equal(capFor('/api/create'), BODY_MOST.api.bytes);
+  assert.equal(capFor('/studio/api/create'), BODY_MOST.api.bytes);
   assert.equal(capFor('/app/studio/api/create'), BODY_MOST.api.bytes);
   assert.equal(capFor('/api/import'), BODY_MOST.import.bytes);
-  assert.equal(capFor('/app/studio/api/import'), BODY_MOST.import.bytes);
+  assert.equal(capFor('/studio/api/import'), BODY_MOST.import.bytes);
   assert.equal(capFor('/api/sealedPut'), BODY_MOST.sealed.bytes);
-  assert.equal(capFor('/app/studio/api/sealedPut'), BODY_MOST.sealed.bytes);
+  assert.equal(capFor('/studio/api/sealedPut'), BODY_MOST.sealed.bytes);
   assert.equal(capFor('/api/sealedGet'), BODY_MOST.api.bytes, 'only the put carries a part');
   assert.equal(capFor('/api/seen'), BODY_MOST.seen.bytes);
   assert.equal(capFor('/api/vault/deposit'), BODY_MOST.keychain.bytes);
@@ -29,6 +30,7 @@ test('EACH DOOR HAS ITS CEILING, AND A DOOR WITH ITS OWN CAP HAS NONE HERE', () 
   assert.equal(capFor('/account/usage'), BODY_MOST.account.bytes);
   assert.equal(capFor('/api/files/abc'), null);
   assert.equal(capFor('/in/webhook/rec_x/y'), null);
+  assert.equal(capFor('/studio/'), null);
   assert.equal(capFor('/app/studio/'), null);
 });
 

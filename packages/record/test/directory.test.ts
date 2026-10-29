@@ -128,13 +128,13 @@ test('and a name that is not a name, or is the platform’s, is refused before i
   sql.close();
 });
 
-test('A NAME IS A PATH SEGMENT UNDER /app, SO EVERY WORD THE APP ROUTES AND EVERY SPOKEN ID IS REFUSED', async () => {
-  /* `brain.dog/app/<first segment>/…` is either one of the app's own pages or a record's name, and the Worker tells
-     them apart by this set alone. A record called `settings` would make `/app/settings/agents` two pages at once, and
+test('A NAME IS THE FIRST PATH SEGMENT, SO EVERY WORD THE APP ROUTES, EVERY DOOR AND EVERY SPOKEN ID IS REFUSED', async () => {
+  /* `app.brain.dog/<first segment>/…` is either one of the app's own pages, one of the host's doors or a record's name,
+     and the Worker tells them apart by this set alone. A record called `settings` would make `/settings/agents` two pages at once, and
      the name is permanent, so the refusal has to exist before the first customer claims one. */
   const { d, sql } = directory();
   value<Person>(d.person$('ada@example.com'));
-  for (const slug of ['settings', 'signin', 'start', 'invite', 'catalogue', 'automations', 'decide', 'packs', 'vault', 'fonts'])
+  for (const slug of ['settings', 'signin', 'start', 'invite', 'catalogue', 'automations', 'decide', 'packs', 'vault', 'fonts', 'api', 'auth', 'account', 'mcp', 'oauth', 'healthz', 'drawn-frame', 'app'])
     assert.match(refusal(d.provision({ slug, email: 'ada@example.com' })).fix, /the platform uses/, `${slug} was allowed`);
 
   /* AND READ FROM THE APP ITSELF, because a list typed here is a list that falls behind the day a route is added. Every
@@ -149,13 +149,13 @@ test('A NAME IS A PATH SEGMENT UNDER /app, SO EVERY WORD THE APP ROUTES AND EVER
     .map((e) => e.name)
     .filter((name) => /^[a-z][a-z0-9-]*$/.test(name));
   assert.ok(words.includes('settings') && words.includes('catalogue'), `the app's folders were not read: ${words.join(' ')}`);
-  /* TODAY'S FOLDERS, after sections 36 to 39 moved the app under `/app` and added sign-up and the decide page: if
+  /* TODAY'S FOLDERS, after sections 36 to 39 added sign-up and the decide page: if
      the read found none of them it read the wrong tree, and every assertion under it would pass on nothing. */
   for (const route of ['signup', 'signin', 'start', 'decide', 'slash', 'usage', 'vault', 'fonts'])
-    assert.ok(words.includes(route), `/app/${route} is a folder the read should have found: ${words.join(' ')}`);
-  for (const slug of words) assert.ok(d.bad(slug) !== null, `/app/${slug} is an app route and ${slug} is a legal record name`);
+    assert.ok(words.includes(route), `/${route} is a folder the read should have found: ${words.join(' ')}`);
+  for (const slug of words) assert.ok(d.bad(slug) !== null, `/${slug} is an app route and ${slug} is a legal record name`);
 
-  /* A SPOKEN ID IS `/app/d41`, the same shape the app opens (`apps/web/src/routes/[id]/+page.svelte`), so a record
+  /* A SPOKEN ID IS `/d41`, the same shape the app opens (`apps/web/src/routes/[id]/+page.svelte`), so a record
      named `d41` would be a name the app can never be asked for. One to three letters and then only digits. */
   for (const slug of ['d41', 'sg31', 't7', 'abc123', 'q2'])
     assert.match(refusal(d.provision({ slug, email: 'ada@example.com' })).fix, /spoken id/, `${slug} was allowed`);

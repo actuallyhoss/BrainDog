@@ -1,9 +1,9 @@
 /**
  * Every address the app renders goes through `at()`, and every record call through `apiBase()`.
  *
- * WHY A SOURCE SCAN AND NOT A TEST PER SCREEN. Under `paths.base = '/app'` an `<a href="/decide">` is outside the app,
- * so SvelteKit treats it as another site: a full load of `brain.dog/decide`, which is the marketing site's 404. A `goto`
- * to it does the same. Measured once, the tree held 90 such `href`s and 30 `goto`s, spread over 113 files, and no
+ * WHY A SOURCE SCAN AND NOT A TEST PER SCREEN. Inside a record, `/acme/…`, an `<a href="/decide">` leaves acme for the
+ * record the session is on, which is somebody else's Decide drawn under the same tab. While the app was under `/app` it
+ * was worse: a full load of `brain.dog/decide`, the marketing site's 404. A `goto` to it does the same. Measured once, the tree held 90 such `href`s and 30 `goto`s, spread over 113 files, and no
  * screen test draws more than one of them. So this reads the source the way a reviewer would, and names each one.
  *
  * `inApp` IS `at` WHERE A FILE ALREADY HAS AN `at` OF ITS OWN (an each-block index in `PageView.svelte`).
@@ -38,16 +38,17 @@ const lineOf = (text: string, index: number) => text.slice(0, index).split('\n')
 
 /** Values handed to a navigation that were rendered under the app where they were made, and by what. */
 const RENDERED = new Map([
-  ['out.to', 'the switcher answers `/app/<slug>/` (`record/switcher.ts`)'],
-  ['signIn', '`signInFirst` answers `/app/signin?next=…` (`lib/at.ts`)'],
+  ['out.to', 'the switcher answers `/<slug>/` (`record/switcher.ts`)'],
+  ['signIn', '`signInFirst` answers `/signin?next=…` (`lib/at.ts`)'],
   ['href', 'the sign-in `reprove` hands back is built by `lib/record/keychain.ts`'],
 ]);
 
 /** Navigations made in one file with a value that is already right, and why: `file arg`. */
 const RENDERED_IN = new Map([
   ['lib/page/Arrange.svelte withoutEntry(route.url', 'the page the person is on, with the entry line taken off its query: `route.url` already holds the app base'],
+  ['lib/board/WidgetSheet.svelte url', 'the page the person is on with `?widgets` taken off its query, a replace: `page.url` already holds the record'],
   ['lib/shell.ts url', 'an outside link opened in this tab (a payment page), which is not an address in the app'],
-  ['routes/+layout.svelte path', '`appPath` answers only an address under `/app`, from the Mac app\'s Go menu'],
+  ['routes/+layout.svelte path', '`appPath` answers only an address of the app, from the Mac app\'s Go menu'],
   ['service-worker.ts `${to.href}${url.search}`', 'the start address sent on to the record the copy\'s mark names, an absolute address `keep` wrote from `apiBase`'],
 ]);
 
@@ -60,6 +61,7 @@ const BARE_ORIGIN = new Map([
   ['routes/settings/[area]/settings-state.svelte.ts', 'the login line, the mail door, the invite link and the move to another record are built on the bare host'],
   ['lib/ui/ShareMenu.svelte', 'a read-only page link is copied whole, so the host is written into it'],
   ['lib/sharing/ShareSheet.svelte', 'the link an address is sent to join is built on the bare host, as Settings builds the invite link'],
+  ['lib/money/AccountShare.svelte', 'the invite link for sharing an account is built on the bare host, as the share sheet builds it'],
   ['lib/data/offline.ts', 'the service worker scope is an absolute URL, never a record address `at()` builds'],
   ['routes/signin/+page.svelte', 'the Google button goes to `/auth/google/start`, which is the host\'s and not under the app'],
   ['routes/signin/desktop/+page.svelte', 'the one-time code is swapped at `/auth` on the host, which is not under a record'],
@@ -74,7 +76,7 @@ test('NO ADDRESS IN THE APP IS RENDERED WITHOUT `at()`, and no record call goes 
     const text = blank(readFileSync(file, 'utf8'));
     /* An `<a>`, or a `<svelte:element>` that may be one, whose `href` is a root path, or is computed without `at()`. */
     /* `{href}` IS THE SAME ATTRIBUTE WRITTEN SHORT, and the rail's six utility links were written that way and were the
-       ones this scan missed the first time: found in a browser, `/audit` and five more on a page under `/app/acme`. */
+       ones this scan missed the first time: found in a browser, `/audit` and five more on a page under `/acme`. */
     for (const m of text.matchAll(/<(?:a|svelte:element)\b[^>]*?\s(?:href=(?:"(\/[^"]*)"|\{([^}]*)\})|\{(href)\})/g)) {
       const value = m[1] ?? m[2] ?? m[3] ?? '';
       /* The shorthand is allowed only where the file itself derived `href` through `at()`. */

@@ -14,6 +14,8 @@
   but the owner.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
+  import { crumbsOf, snippetOf } from '$lib/site/seo.ts';
   import Icon from '$lib/Icon.svelte';
   import Body from '$lib/docs/Body.svelte';
   import CopyText from '$lib/docs/CopyText.svelte';
@@ -32,23 +34,17 @@
   const section = $derived(w.sections[doc.section]);
   const address = $derived(`https://brain.dog${doc.path}`);
   const title = $derived(w.meta.page(doc.title));
-  const description = $derived(plainOf(doc.summary) || w.meta.description);
+  const description = $derived(snippetOf(plainOf(doc.summary) || w.meta.description));
 
   /* Widened on purpose: the flag is a literal, and the page is written for both of its values. */
   const repo: string | null = LAUNCH.repo ? SOURCE : null;
   const edit = $derived(repo === null ? null : `${repo}/edit/master/${DOCS_DIR}${doc.file}`);
 </script>
 
+<Seo {title} {description} path={doc.path} type="article" ld={[crumbsOf([{ name: 'Docs', path: '/docs' }, { name: doc.title, path: doc.path }])]} />
 <svelte:head>
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={address} />
   <link rel="alternate" type="text/markdown" href={`${doc.path}.md`} />
-  <meta property="og:url" content={address} />
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
 </svelte:head>
-
 <!-- A header and not a named section: the article below is the region its title names, so a second would repeat it. -->
 <header class="night strip">
   <div class="wrap strip-in">

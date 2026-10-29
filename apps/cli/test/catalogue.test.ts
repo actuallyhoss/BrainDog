@@ -22,7 +22,7 @@ import type { AgentIo } from '../src/skills.ts';
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-44ab'].join('.');
 const CONTEXT = { session: null, ambiguous: [], handoff: null, live: { same_repo: [], elsewhere: [] }, waiting: [], people: [], faded: 0, project: null, registers: [], next: '' };
 
-/** The catalogue the web app ships and every host serves under `/app/catalogue/`, as committed. */
+/** The catalogue the web app ships and every host serves under `/catalogue/`, as committed. */
 const SHIPPED = fileURLToPath(new URL('../../web/static/catalogue/', import.meta.url));
 
 async function setup(t: { after: (fn: () => void | Promise<void>) => void }, answers: Record<string, unknown> = {}, catalogue?: string) {
@@ -30,7 +30,7 @@ async function setup(t: { after: (fn: () => void | Promise<void>) => void }, ans
   const server: Server = createServer((req, res) => {
     const path = new URL(req.url ?? '/', 'http://stub').pathname;
     /* THE HOST'S STATIC CATALOGUE, answered as a host answers it: the folder's file, or a 404. Never counted as a call. */
-    const prefix = path.startsWith('/app/catalogue/') ? '/app/catalogue/' : path.startsWith('/api/kennel/v1/') ? '/api/kennel/v1/' : null;
+    const prefix = path.startsWith('/catalogue/') ? '/catalogue/' : path.startsWith('/api/kennel/v1/') ? '/api/kennel/v1/' : null;
     if (catalogue !== undefined && prefix !== null) {
       const file = join(catalogue, ...path.slice(prefix.length).split('/'));
       if (!existsSync(file)) return void res.writeHead(404).end();

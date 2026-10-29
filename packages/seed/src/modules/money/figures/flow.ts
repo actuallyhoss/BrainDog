@@ -61,7 +61,7 @@ export const FLOW_FIGURES: Record<string, SeedMetric> = {
    */
   'every-month-out': {
     metric: 'every-month-out',
-    name: 'Every month',
+    name: 'Repeating out, a month',
     source: 'register.recurring',
     where: LIVE_LINES('out'),
     value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
@@ -76,7 +76,7 @@ export const FLOW_FIGURES: Record<string, SeedMetric> = {
      The series counts it in every month ahead, as it counts what goes out, and it ends where that one does. */
   'every-month-in': {
     metric: 'every-month-in',
-    name: 'Every month, in',
+    name: 'Repeating in, a month',
     source: 'register.recurring',
     where: LIVE_LINES('in'),
     value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
@@ -91,7 +91,7 @@ export const FLOW_FIGURES: Record<string, SeedMetric> = {
      three on Coming up cannot disagree. */
   'every-month-net': {
     metric: 'every-month-net',
-    name: 'Every month, left over',
+    name: 'Repeating, left over a month',
     source: 'register.recurring',
     value: { sum_of: [{ metric: 'every-month-in' }, { metric: 'every-month-out', minus: true }] },
     format: MONEY,
@@ -145,7 +145,7 @@ export const FLOW_FIGURES: Record<string, SeedMetric> = {
      the list `every-month-out` reads, so the parts and the whole are one set of rows. */
   'every-month-by-category': {
     metric: 'every-month-by-category',
-    name: 'Every month, by category',
+    name: 'Repeating out a month, by category',
     source: 'register.recurring',
     where: LIVE_LINES('out'),
     value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },

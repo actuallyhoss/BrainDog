@@ -6,8 +6,9 @@
  * key is pasted anywhere. Each line was checked against its maker's own docs on 17 October 2026:
  *   - Claude, in the app: support.claude.com, "Getting started with custom connectors": Customize, then Connectors,
  *     then Add custom connector, on every plan (Free holds one).
- *   - Claude, in a terminal: code.claude.com/docs/en/mcp: `claude mcp add --transport http <name> <url>`, then `/mcp`
- *     inside the session runs the sign-in in the browser. Adding it does not open anything by itself.
+ *   - Claude, in a terminal: BrainDog's own `braindog setup` (docs/agents/connect, 29 October), which registers the
+ *     server with Claude Code and adds the start hook that hands it the brief. The bare `claude mcp add` line is in the
+ *     docs for a machine without the command line.
  *   - ChatGPT: help.openai.com's developer mode article, and the guides that follow it: developer mode is turned on in
  *     Settings, under Apps, and an app is made with the address. Not on the free plan.
  *   - Codex: the Codex docs on MCP: `[mcp_servers.<name>]` with `url` in `~/.codex/config.toml`, and
@@ -20,7 +21,7 @@
  * A hint is one line. Words in backticks are code, drawn as code, so a command's own spelling stays as typed.
  */
 import type { AppMark, MarkedAgent } from '@braindog/skin/agent-marks.ts';
-import { MCP } from '../links.ts';
+import { CLI_INSTALL, MCP } from '../links.ts';
 
 /** The five apps the site names, each with its maker's mark. */
 export type ConnectId = Extract<MarkedAgent, 'claude' | 'codex' | 'cursor'> | AppMark;
@@ -43,10 +44,12 @@ export const CONNECT: readonly ConnectApp[] = [
     name: 'Claude',
     ways: [
       { where: 'In the app', code: MCP, hint: 'Customize, then Connectors, then add a custom connector with this address.' },
+      /* THE COMMAND LINE'S SETUP (docs/agents/connect): it signs the machine in, adds the hooks that hand Claude Code
+         your brief at the start of a session, and registers the MCP server, in one go. */
       {
         where: 'In a terminal',
-        code: `claude mcp add --transport http braindog ${MCP}`,
-        hint: 'Run it once, then type `/mcp` in Claude to approve it in BrainDog.',
+        code: `${CLI_INSTALL}\nbraindog setup https://app.brain.dog/<your-record>`,
+        hint: 'Approve the six digits it prints in BrainDog. Claude then starts every session from your brief.',
       },
     ],
   },

@@ -6,7 +6,7 @@ with us. You need Docker with Compose, or Node 24.13 and pnpm.
 ## Zero to working in 5 minutes
 
 ```sh
-git clone https://github.com/actuallyhoss/braindog
+git clone https://github.com/actuallyhoss/BrainDog braindog
 cd braindog
 cp selfhost.env.example .env
 ```

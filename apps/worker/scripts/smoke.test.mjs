@@ -53,10 +53,12 @@ const B1 = unflipped(flipped(wranglerConfig()), ['production']);
 
 test('production in push A\'s shape beside a site that does not bind it asks the app on its own name, and asks nothing of brain.dog, which is still only the site', () => {
   assert.deepEqual(asked(checks(B1, 'production', UNBOUND)), [
-    'GET https://app.brain.dog/app/',
+    'GET https://app.brain.dog/app/signin?from=smoke',
+    'GET https://app.brain.dog/',
+    'GET https://app.brain.dog/signin',
     'GET https://app.brain.dog/api/boot',
     'GET https://app.brain.dog/healthz',
-    'GET https://app.brain.dog/r/x',
+    'GET https://app.brain.dog/app/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
   /* PUSH 1'S SITE BINDS ALPHA ALONE, and production is asked exactly what it was asked beside no binding at all. */
@@ -66,16 +68,17 @@ test('production in push A\'s shape beside a site that does not bind it asks the
 test('once production\'s site binds production\'s app (push 3), production is asked the site and the doors on brain.dog as well, before its flip', () => {
   /* THE WINDOW ALPHA WAS IN BETWEEN PUSH 1 AND PUSH 2, and production is in it between push 3 and push 4: the app on
      both names, its own name still the public host, and `brain.dog` shared with the site, so `/slash` is asked there
-     first. */
+     first. The app is at the root of its own name, so the shared name is asked its doors and no page. */
   assert.deepEqual(asked(checks(B1, 'production', BOTH_BOUND)), [
-    'GET https://app.brain.dog/app/',
+    'GET https://app.brain.dog/app/signin?from=smoke',
+    'GET https://app.brain.dog/',
+    'GET https://app.brain.dog/signin',
     'GET https://app.brain.dog/api/boot',
     'GET https://app.brain.dog/healthz',
     'GET https://brain.dog/slash',
-    'GET https://brain.dog/app/',
     'GET https://brain.dog/api/boot',
     'GET https://brain.dog/healthz',
-    'GET https://app.brain.dog/r/x',
+    'GET https://app.brain.dog/app/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
 });
@@ -83,52 +86,70 @@ test('once production\'s site binds production\'s app (push 3), production is as
 test('each flip is asked the five answers of the design and /healthz, on the two names it holds', () => {
   assert.deepEqual(asked(checks(B1, 'alpha', ALPHA_BOUND)), [
     'GET https://alpha.brain.dog/slash',
-    'GET https://alpha.brain.dog/app/',
+    'GET https://alpha.brain.dog/app/signin?from=smoke',
+    'GET https://alpha.brain.dog/',
+    'GET https://alpha.brain.dog/signin',
     'GET https://alpha.brain.dog/api/boot',
     'GET https://alpha.brain.dog/healthz',
-    'GET https://app.alpha.brain.dog/r/x',
+    'GET https://app.alpha.brain.dog/app/r/x',
     'POST https://app.alpha.brain.dog/in/anything',
   ]);
   assert.deepEqual(asked(checks(staged('B2'), 'production', BOTH_BOUND)), [
     'GET https://brain.dog/slash',
-    'GET https://brain.dog/app/',
+    'GET https://brain.dog/app/signin?from=smoke',
+    'GET https://brain.dog/',
+    'GET https://brain.dog/signin',
     'GET https://brain.dog/api/boot',
     'GET https://brain.dog/healthz',
-    'GET https://app.brain.dog/r/x',
+    'GET https://app.brain.dog/app/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
 });
 
-test('the file as it deploys (push C): the app on its own name, and the shared name asked for the move off it', () => {
+test('the file as it deploys: the app at the root of its own name, and both old addresses asked for their one 308', () => {
   const config = wranglerConfig();
   assert.deepEqual(asked(checks(config, 'production', BOTH_BOUND)), [
-    'GET https://app.brain.dog/app/',
+    'GET https://app.brain.dog/app/signin?from=smoke',
+    'GET https://app.brain.dog/',
+    'GET https://app.brain.dog/signin',
     'GET https://app.brain.dog/api/boot',
     'GET https://app.brain.dog/healthz',
     'GET https://brain.dog/slash',
-    'GET https://brain.dog/app/',
+    'GET https://brain.dog/app/signin?from=smoke',
     'GET https://brain.dog/api/boot',
     'GET https://brain.dog/healthz',
     'GET https://brain.dog/app/r/x',
     'POST https://brain.dog/in/anything',
   ]);
   const list = checks(config, 'production', BOTH_BOUND);
-  const front = list.find((c) => c.url === 'https://brain.dog/app/');
-  assert.equal(front.headers?.accept, 'text/html', 'a page load says it wants a page, or the Worker rightly leaves it alone');
-  assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/app/' })), null);
-  /* THE SHELL SERVED ON THE OLD NAME to a browser, or the site's own 404 page, is not the move. */
-  assert.ok(judge(front, answer(200, html)));
-  assert.match(judge(front, answer(404, html)) ?? '', /does not hand \/app\/\*/);
+  /* BOTH OLD ADDRESSES ARE ONE 308 TO THE ROOT OF THE APP'S NAME, QUERY KEPT: on the site's name, and on the app's own. */
+  for (const url of ['https://brain.dog/app/signin?from=smoke', 'https://app.brain.dog/app/signin?from=smoke']) {
+    const front = list.find((c) => c.url === url);
+    assert.equal(front.headers?.accept, 'text/html', 'a page load says it wants a page, or the Worker rightly leaves it alone');
+    assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/signin?from=smoke' })), null);
+    /* A SECOND HOP, A QUERY DROPPED, OR THE SHELL STILL DRAWN UNDER `/app`, is not the move. */
+    assert.match(judge(front, answer(308, { location: 'https://app.brain.dog/app/signin?from=smoke' })) ?? '', /second hop/);
+    assert.ok(judge(front, answer(308, { location: 'https://app.brain.dog/signin' })));
+    assert.match(judge(front, answer(200, html)) ?? '', /under \/app/);
+  }
+  assert.match(judge(list.find((c) => c.url === 'https://brain.dog/app/signin?from=smoke'), answer(404, html)) ?? '', /does not hand \/app\/\*/);
+  /* THE APP'S OWN PAGES ARE THE SHELL AT THE ROOT, and a Worker that still sends them into `/app` is told apart. */
+  for (const url of ['https://app.brain.dog/', 'https://app.brain.dog/signin']) {
+    const page = list.find((c) => c.url === url);
+    assert.equal(judge(page, answer(200, html)), null);
+    assert.match(judge(page, answer(308, { location: 'https://app.brain.dog/app/' })) ?? '', /older than the app at the root/);
+  }
   const moved = list.find((c) => c.url === 'https://brain.dog/app/r/x');
-  assert.equal(judge(moved, answer(308, { location: 'https://app.brain.dog/app/r/x' })), null);
-  assert.ok(judge(moved, answer(308, { location: 'https://brain.dog/app/r/x' })));
+  assert.equal(judge(moved, answer(308, { location: 'https://app.brain.dog/r/x' })), null);
+  assert.ok(judge(moved, answer(308, { location: 'https://app.brain.dog/app/r/x' })));
+  assert.ok(judge(moved, answer(308, { location: 'https://brain.dog/r/x' })));
   const door = list.find((c) => c.url === 'https://brain.dog/in/anything');
   assert.equal(judge(door, answer(404, json)), null);
-  assert.ok(judge(door, answer(308, { location: 'https://app.brain.dog/app/in/anything' })));
+  assert.ok(judge(door, answer(308, { location: 'https://app.brain.dog/in/anything' })));
 });
 
 test('each check refuses the answer the wrong Worker would give', () => {
-  const [pricing, shell, boot, , legacy, door] = checks(staged('B2'), 'production', BOTH_BOUND);
+  const [pricing, , shell, , boot, , legacy, door] = checks(staged('B2'), 'production', BOTH_BOUND);
 
   assert.equal(judge(pricing, answer(200, html)), null);
   /* THE PRODUCT WORKER'S ANSWER AT A SITE PATH is JSON: the site's `run_worker_first` too wide, handing `/pricing` to
@@ -136,8 +157,8 @@ test('each check refuses the answer the wrong Worker would give', () => {
   assert.match(judge(pricing, answer(404, json)) ?? '', /run_worker_first/);
 
   assert.equal(judge(shell, answer(200, html)), null);
-  /* THE SITE'S 404 PAGE AT `/app/` is the site keeping `/app/*`, or a Worker older than the shell. */
-  assert.match(judge(shell, answer(404, html)) ?? '', /\/app/);
+  /* THE SITE'S 404 PAGE AT `/` on a name the site hands over is the site keeping the page. */
+  assert.match(judge(shell, answer(404, html)) ?? '', /does not hand \//);
 
   assert.equal(judge(boot, answer(401, json)), null);
   /* A 404 PAGE AT `/api/boot` is the marketing site answering an API call. */
@@ -145,34 +166,35 @@ test('each check refuses the answer the wrong Worker would give', () => {
   /* AND A 401 THAT IS NOT JSON is something in front of the Worker, not the Worker refusing. */
   assert.ok(judge(boot, answer(401, html)));
 
-  const moved = answer(308, { location: 'https://brain.dog/app/r/x' });
+  const moved = answer(308, { location: 'https://brain.dog/r/x' });
   assert.equal(judge(legacy, moved), null);
   /* A REDIRECT TO THE WRONG PLACE, or a temporary one, is not the move: a 302 is re-asked every time and a Location
-     without `/app` lands on the site. */
-  assert.ok(judge(legacy, answer(308, { location: 'https://brain.dog/r/x' })));
-  assert.ok(judge(legacy, answer(302, { location: 'https://brain.dog/app/r/x' })));
+     still under `/app` is a second hop. */
+  assert.ok(judge(legacy, answer(308, { location: 'https://brain.dog/app/r/x' })));
+  assert.ok(judge(legacy, answer(302, { location: 'https://brain.dog/r/x' })));
   /* AND THE SHELL WITH A 200 on the old name is a Worker that does not know the name is old. */
   assert.ok(judge(legacy, answer(200, html)));
 
   /* A DOOR ON THE OLD NAME IS SERVED, NEVER MOVED. `serveIngest` answers an unknown door 404, which is a served answer;
      any 3xx is a webhook sender's POST turned into a GET, or dropped. */
   assert.equal(judge(door, answer(404, json)), null);
-  assert.match(judge(door, answer(308, { location: 'https://brain.dog/app/in/anything' })) ?? '', /redirect/);
+  assert.match(judge(door, answer(308, { location: 'https://brain.dog/in/anything' })) ?? '', /redirect/);
 });
 
-test('push A: the front door is a 308 into /app on the same name, and the Worker before that fix is told apart', () => {
-  const [shell, boot, , front, door] = checks(B1, 'production', UNBOUND);
+test('with no old name, the app’s own /app is the one asked to move, and a Worker that does not move it is told apart', () => {
+  const [, shell, , boot, , front, door] = checks(B1, 'production', UNBOUND);
   assert.equal(front.headers?.accept, 'text/html', 'a page load says it wants a page, or the Worker rightly leaves it alone');
-  assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/app/r/x' })), null);
-  /* THE WORKER WITHOUT THE SAME-HOST REDIRECT answers `ROUTE_UNKNOWN` in JSON here, which is the site's "Open the app"
-     and every mailed magic link landing on an error. Measured before the move. */
-  assert.match(judge(front, answer(404, json)) ?? '', /ROUTE_UNKNOWN|same name/);
+  assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/r/x' })), null);
+  /* THE WORKER WITHOUT THE MOVE draws the shell under `/app`, which is every link and magic link already mailed opening
+     the old address. */
+  assert.match(judge(front, answer(200, html)) ?? '', /same name/);
   /* AND A REDIRECT TO brain.dog IN PUSH A is the flip's vars deployed before the site hands that name the doors: the
      site's 404 for everyone. */
-  assert.match(judge(front, answer(308, { location: 'https://brain.dog/app/r/x' })) ?? '', /brain\.dog/);
+  assert.match(judge(front, answer(308, { location: 'https://brain.dog/r/x' })) ?? '', /brain\.dog/);
 
-  /* ON A CUSTOM DOMAIN THE SITE IS NOT IN THE PATH, so a page at `/app/` is a Worker older than the shell, and the
-     sentence must not send anybody to look at a site binding that has nothing to do with this name. */
+  /* ON A CUSTOM DOMAIN THE SITE IS NOT IN THE PATH, so a page at `/` that is not the shell is a Worker whose build has
+     no root `index.html`, and the sentence must not send anybody to look at a site binding that has nothing to do with
+     this name. */
   assert.equal(judge(shell, answer(200, html)), null);
   const old = judge(shell, answer(404, json)) ?? '';
   assert.ok(old.length > 0);
@@ -181,7 +203,7 @@ test('push A: the front door is a 308 into /app on the same name, and the Worker
   assert.doesNotMatch(judge(boot, answer(404, html)) ?? '', /site/);
 
   assert.equal(judge(door, answer(404, json)), null);
-  assert.ok(judge(door, answer(308, { location: 'https://app.brain.dog/app/in/anything' })));
+  assert.ok(judge(door, answer(308, { location: 'https://app.brain.dog/in/anything' })));
 });
 
 test('a public host nothing reaches is refused before anything is asked, and the sentence says which key is missing', () => {
@@ -271,7 +293,7 @@ test('the kernel count is the migration files, and nothing else in their folder'
    rows or a revoked canary token give, and they have to read differently: one is the deploy, the other is not. */
 test('the canary asks the record\'s boot on the public host and tells a refused token from a record that will not open', () => {
   const check = canary(staged('B2'), 'production', 'ops');
-  assert.equal(check.url, 'https://brain.dog/app/ops/api/boot');
+  assert.equal(check.url, 'https://brain.dog/ops/api/boot');
   assert.equal(check.method, 'GET');
   assert.equal(check.canary, true);
   assert.equal(check.headers, undefined, 'the check carries a header, and the token must be added only by smoke()');
@@ -289,7 +311,7 @@ test('the canary asks the record\'s boot on the public host and tells a refused 
 test('without both SMOKE_TOKEN and SMOKE_SLUG no check opens a record', () => {
   for (const name of ['production', 'alpha']) {
     const list = checks(staged('B2'), name, BOTH_BOUND);
-    assert.ok(list.every((c) => !c.canary && !/\/app\/[^/]+\/api\//.test(c.url)), `${name}: an unsigned check reaches a record's API`);
+    assert.ok(list.every((c) => !c.canary && !/^https:\/\/[^/]+\/(?:app\/)?[a-z][a-z0-9-]*[a-z0-9]\/api\//.test(c.url)), `${name}: an unsigned check reaches a record's API`);
   }
 });
 
@@ -301,7 +323,8 @@ const GOOD = [
   answer(200, html, '<!doctype html>'),
   answer(401, json, '{"code":"AUTH_REQUIRED"}'),
   answer(200, json, JSON.stringify({ ok: true, kernel: migrationCount() })),
-  answer(308, { location: 'https://brain.dog/app/r/x' }),
+  answer(308, { location: 'https://brain.dog/signin?from=smoke' }),
+  answer(308, { location: 'https://brain.dog/r/x' }),
   answer(404, json, '{"code":"INGEST_UNKNOWN"}'),
 ];
 const HELD = {
@@ -320,7 +343,7 @@ function host({ faults = {}, held = HELD, stranger = null, elsewhere = null, fen
     const bearer = init.headers?.authorization ?? null;
     sent.push({ method: init.method, url, bearer, body: init.body, origin: init.headers?.origin ?? null });
     if (init.headers?.origin === ELSEWHERE) return fenceHost(url, init, fence);
-    const at = u.pathname.match(/^\/app\/([a-z0-9-]+)\/api\/(\w+)$/);
+    const at = u.pathname.match(/^\/(?!api\/)([a-z0-9-]+)\/api\/(\w+)$/);
     if (!at) {
       const check = unsigned.find((c) => c.url === url && c.method === init.method);
       assert.ok(check, `asked ${init.method} ${url}, which no check names`);
@@ -350,15 +373,15 @@ const run = async (opts = {}, signedIn = { token: TOKEN, slug: 'ops' }, more = {
 test('the canary is opened as a first draw opens it, every read of the list asked with the token, and none of it printed', async () => {
   const { code, out, sent } = await run();
   assert.equal(code, 0, out);
-  const signed = sent.filter((s) => s.url.includes('/app/ops/api/'));
-  for (const read of FIRST_DRAW) assert.ok(signed.some((s) => new URL(s.url).pathname === `/app/ops/api/${read.method}` && s.bearer), read.method);
-  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/version' && s.bearer === null), 'version is not asked without the bearer');
-  assert.ok(sent.some((s) => s.url === `https://brain.dog/app/${NOWHERE}/api/boot` && s.bearer === `Bearer ${TOKEN}`));
+  const signed = sent.filter((s) => s.url.includes('/ops/api/'));
+  for (const read of FIRST_DRAW) assert.ok(signed.some((s) => new URL(s.url).pathname === `/ops/api/${read.method}` && s.bearer), read.method);
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/ops/api/version' && s.bearer === null), 'version is not asked without the bearer');
+  assert.ok(sent.some((s) => s.url === `https://brain.dog/${NOWHERE}/api/boot` && s.bearer === `Bearer ${TOKEN}`));
   /* WHAT EACH IS ABOUT IS READ FROM THE BARE ANSWERS: the first list holding rows, the add-on switched on, the first page. */
-  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/list?register=tasks&limit=1'));
-  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/packConfig?id=money'));
-  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/page?slug=home'));
-  assert.ok(sent.some((s) => s.url === 'https://brain.dog/app/ops/api/get?register=tasks&seq=3'));
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/ops/api/list?register=tasks&limit=1'));
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/ops/api/packConfig?id=money'));
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/ops/api/page?slug=home'));
+  assert.ok(sent.some((s) => s.url === 'https://brain.dog/ops/api/get?register=tasks&seq=3'));
   const preview = sent.find((s) => s.url.endsWith('/api/previewPage'));
   assert.equal(preview.method, 'POST');
   assert.equal(JSON.parse(preview.body).body.blocks[0].source, 'register.tasks');
@@ -370,7 +393,7 @@ test('the canary is opened as a first draw opens it, every read of the list aske
 test('a first-draw read that answers 500 turns the step red by itself, and the line says which screen breaks', async () => {
   const { code, out } = await run({ faults: { pages: () => new Response('{"code":"INTERNAL"}', { status: 500, headers: json }) } });
   assert.equal(code, 1);
-  assert.match(out, /WRONG {2}GET https:\/\/brain\.dog\/app\/ops\/api\/pages[\s\S]*answered 500: Home, finding/);
+  assert.match(out, /WRONG {2}GET https:\/\/brain\.dog\/ops\/api\/pages[\s\S]*answered 500: Home, finding/);
   /* AND A READ NAMED FROM IT IS SAID, NOT GUESSED. */
   assert.match(out, /skip {3}page: the canary has no page/);
 });
@@ -403,7 +426,7 @@ test('a canary that holds nothing to name skips those reads and says so, which i
 test('without the token nothing signed in is asked, and one line says the half was skipped', async () => {
   const { code, out, sent } = await run({}, {});
   assert.equal(code, 0, out);
-  assert.ok(sent.every((s) => !s.url.includes('/app/ops/') && !s.bearer));
+  assert.ok(sent.every((s) => !s.url.includes('/ops/') && !s.bearer));
   assert.match(out, /the signed-in half is skipped/);
 });
 
@@ -417,7 +440,7 @@ test('the pure parts: names, the second name, and how a read is sent', () => {
   assert.deepEqual(argsFor({ method: 'schema', ask: 'list' }, { boot: HELD.boot }), { args: { register: 'tasks' } });
   assert.ok(argsFor({ method: 'x', ask: 'other' }, {}).skip);
   const post = readCheck(staged('B2'), 'production', 'ops', { method: 'previewPage', ask: 'body', post: true, by: 'Home' }, { body: { page: 'p' } });
-  assert.equal(post.url, 'https://brain.dog/app/ops/api/previewPage');
+  assert.equal(post.url, 'https://brain.dog/ops/api/previewPage');
   assert.equal(post.body, '{"body":{"page":"p"}}');
 });
 
@@ -439,14 +462,14 @@ function fenceHost(url, init, wrong) {
   const path = new URL(url).pathname;
   const signed = init.headers?.authorization === `Bearer ${TOKEN}`;
   if (init.method === 'OPTIONS') return new Response(null, { status: 204, headers: { allow: 'GET, POST' } });
-  if (path === '/app/') return new Response('<!doctype html>', { status: 200, headers: SHELL });
+  if (path === '/') return new Response('<!doctype html>', { status: 200, headers: SHELL });
   if (path === '/mcp') return new Response(null, { status: 405, headers: { allow: 'POST' } });
-  if (!path.startsWith('/app/ops/')) return path === '/api/boot' || path === '/account/usage' ? reply(401, UNAUTHORIZED_BODY) : reply(200, { ok: true });
+  if (!path.startsWith('/ops/')) return path === '/api/boot' || path === '/account/usage' ? reply(401, UNAUTHORIZED_BODY) : reply(200, { ok: true });
   if (!signed) return reply(401, UNAUTHORIZED_BODY);
-  if (path === '/app/ops/api/boot') return reply(200, { ok: true, value: HELD.boot });
-  if (path === '/app/ops/api/files/') return refused(405, 'ROUTE_UNKNOWN');
+  if (path === '/ops/api/boot') return reply(200, { ok: true, value: HELD.boot });
+  if (path === '/ops/api/files/') return refused(405, 'ROUTE_UNKNOWN');
   if (init.method === 'GET')
-    return path === `/app/ops/api/files/${PNG_SHA256}` ? new Response(PNG, { status: 200, headers: { ...FILE_HEADERS, 'content-type': 'image/png', 'content-length': String(PNG.length) } }) : refused(404, 'ROUTE_UNKNOWN');
+    return path === `/ops/api/files/${PNG_SHA256}` ? new Response(PNG, { status: 200, headers: { ...FILE_HEADERS, 'content-type': 'image/png', 'content-length': String(PNG.length) } }) : refused(404, 'ROUTE_UNKNOWN');
   const bytes = typeof init.body === 'string' ? new TextEncoder().encode(init.body) : init.body;
   if (bytes.byteLength > WORKER_MOST) return refused(413, 'OUT_OF_BOUNDS');
   const sha256 = createHash('sha256').update(bytes).digest('hex');
@@ -479,7 +502,7 @@ test('the fence: every line green on a host that answers right, the picture put 
   assert.equal(createHash('sha256').update(put.body).digest('hex'), PNG_SHA256);
   assert.ok(fenced.findIndex((s) => s === put) < fenced.findIndex((s) => s.method === 'GET' && s.url.endsWith(PNG_SHA256)), 'read back after the put');
   assert.ok(fenced.some((s) => s.method === 'PUT' && s.body?.byteLength === WORKER_MOST + 1), 'two MB and one byte is put');
-  assert.ok(fenced.every((s) => s.method === 'GET' || s.method === 'OPTIONS' || new URL(s.url).pathname.startsWith('/app/ops/api/files')), 'it writes only files, on the canary');
+  assert.ok(fenced.every((s) => s.method === 'GET' || s.method === 'OPTIONS' || new URL(s.url).pathname.startsWith('/ops/api/files')), 'it writes only files, on the canary');
 });
 
 const OPEN = { ...STORE, 'access-control-allow-origin': ELSEWHERE };

@@ -72,7 +72,7 @@ async function night(plant: (k: { files: Map<string, string>; kennel: CatalogueI
   files.set('kennel/index.json', JSON.stringify(kennel));
   const assets = {
     fetch: async (request: Request): Promise<Response> => {
-      const path = new URL(request.url).pathname.replace(/^\/app\/catalogue\//u, '');
+      const path = new URL(request.url).pathname.replace(/^\/catalogue\//u, '');
       const text = path === 'index.json' ? JSON.stringify(bundled) : bundledFiles.get(path);
       return text === undefined
         ? new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } })

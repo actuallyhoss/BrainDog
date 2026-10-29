@@ -30,7 +30,7 @@
     summary,
     format,
   }: {
-    items: readonly { label: string; value: number; tone?: Tone | undefined; note?: string | undefined; part?: number | undefined; partTone?: Tone | undefined }[];
+    items: readonly { label: string; value: number; said?: string | undefined; tone?: Tone | undefined; note?: string | undefined; part?: number | undefined; partTone?: Tone | undefined }[];
     /** The value a full bar stands for; the largest value by default. */
     max?: number | undefined;
     /** One earlier value per item, for two periods side by side. */

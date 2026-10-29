@@ -90,6 +90,7 @@ import { methods as sealedMethods } from './sealed.ts';
 import { methods as visualsMethods } from './visuals.ts';
 import { methods as metricsMethods } from './metrics.ts';
 import { methods as readsMethods } from './reads.ts';
+import { methods as widgetsMethods } from './widgets.ts';
 /* END METHODS */
 
 /**
@@ -233,6 +234,11 @@ export type RecordDeps = {
   sealed?: import('./sealed.ts').SealedStore | undefined;
   /** Where this host keeps visuals' pages, and the file store their pictures are in (`visuals.ts`). Absent, none are kept. */
   visuals?: import('./visuals.ts').VisualStore | undefined;
+  /**
+   * The record's own `previewPage`, every check it makes, which the widget sheet draws each widget's reading with
+   * (`widgets.ts`). Absent, `widgetGallery` is refused `NOT_IN_THIS_BUILD`.
+   */
+  previewAs?: ((args: { body: Record<string, unknown> }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
   /** Who a write is by, as `index.ts`'s `writerOf` says it: a token by its run. Absent, the caller's own name. */
   writer?: ((ctx: CallContext) => import('@braindog/kernel').WriteContext) | undefined;
 };
@@ -307,6 +313,7 @@ export function methods(deps: RecordDeps) {
     ...visualsMethods(deps),
     ...metricsMethods(deps),
     ...readsMethods(deps),
+    ...widgetsMethods(deps),
     /* END METHODS */
   };
 }

@@ -119,7 +119,8 @@ test("the record's page is drawn from its answer, and only its answer", async ()
   /* A TILE IS THE RECORD'S READING, and one it could not read is a dash with the reason. */
   assert.equal(stat!.metrics?.length, 2);
   assert.notEqual(stat!.metrics![0]!.value, MISSING);
-  assert.equal(stat!.metrics![0]!.tone, 'good');
+  /* `cash-now` is held to a floor of nought, which marks only its miss (`markOf`): three met is no tick. */
+  assert.equal(stat!.metrics![0]!.tone, undefined);
   assert.equal(stat!.metrics![1]!.value, MISSING);
 
   /* A LIST SAYS HOW MUCH OF THE ANSWER IT DRAWS. */
@@ -963,12 +964,13 @@ test('A SUM OVER A FIELD NOBODY HAS FILLED IN DRAWS NO VERDICT AND NO DOOR, and 
      `projects-earning-before` is `revenue is set` and it sums `earned_before`, so its zero is a
      measured zero over the projects that did say. */
   const other = earning({ rows: 0, held: 27 }).metrics?.[1];
-  assert.equal(other?.tone, 'good');
+  /* Its target is a floor of nought, which marks only a miss (`markOf`), so the measured zero carries no tick either. */
+  assert.equal(other?.tone, undefined);
   assert.notEqual(other?.note, liveWords.unsaid);
 
   const said = earning({ rows: 3, held: 27 }).metrics?.[0];
-  assert.equal(said?.tone, 'good', 'rows that said keep their verdict');
-  assert.ok((said as { href?: string } | undefined)?.href, 'and keep their door');
+  assert.equal(said?.tone, undefined, 'a floor of nought met is no mark (`markOf`)');
+  assert.ok((said as { href?: string } | undefined)?.href, 'rows that said keep their door');
 
   /* AND A FIGURE MADE OF TWO HALVES IS ONE TOO, which the first writing of this test did not hold:
      testing measured that `reducedFields`' pair branch could be deleted whole and

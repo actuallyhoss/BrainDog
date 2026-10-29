@@ -113,10 +113,12 @@ test('A BOOK THAT SAYS ITS CURRENCY IS READ IN IT: Harbour’s cash is dollars, 
   assert.equal(harbour.fx?.into, 'USD');
   assert.equal(harbour.fx?.home, 'EGP', 'the home currency is still said beside it');
 
-  /* A BOOK IN THE HOME CURRENCY, AND ONE THAT SAYS NOTHING, are read as every figure is: in the home currency. */
+  /* A BOOK IN THE HOME CURRENCY is read as every figure is: in the home currency. */
   assert.deepEqual([read(k, oneBook(BOOK_CASH, 'Personal')).value, read(k, oneBook(BOOK_CASH, 'Personal')).unit], [7_000_000, 'EGP']);
+  /* A BOOK THAT SAYS NOTHING AND HOLDS ONE ACCOUNT is read in that account's own currency (round 1030): Studio's one
+     account is in dollars, so its cash is $1,000.00, never turned into pounds beside its lines in dollars. */
   const studio = read(k, oneBook(BOOK_CASH, 'Studio'));
-  assert.deepEqual([studio.value, studio.unit], [100_000 * 50, 'EGP']);
+  assert.deepEqual([studio.value, studio.unit], [100_000, 'USD']);
 
   /* A PLAIN SUM ABOUT ONE BOOK IS HELD TO THE SAME RULE. */
   const held = read(k, oneBook(BOOK_HELD, 'Harbour'));

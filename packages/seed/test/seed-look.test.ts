@@ -169,11 +169,13 @@ test('LAPSING DECLARES NO COST COLUMN, and a service renewing ten months on is n
   assert.deepEqual(drawn?.rows?.map((r) => r.fields.name), ['northwind.io']);
 });
 
-test('HOME IS CALLED TODAY, in the voice and as the page title', () => {
+/* THE ADD-ON'S PAGE IS FOUNDER OVERVIEW SINCE founder 3.8.0 (round 1030): Today is the app's own board of widgets, so a
+   second page called Today in the sidebar was two pages with one name. The voice still calls home Today. */
+test('HOME IS CALLED TODAY in the voice, and the founder\'s own page Founder overview', () => {
   const u = useCase('founder')!;
   assert.notEqual((u as { voice?: { home?: string } }).voice?.home, 'Overview');
   assert.equal((u as { voice?: { home?: string } }).voice?.home, 'Today');
-  assert.equal(home().title, 'Today');
+  assert.equal(home().title, 'Founder overview');
 });
 
 /* WHERE IT IS KEPT, SINCE money-core 3.29.0: how much there is is the hero's under the line, and every line ends on the

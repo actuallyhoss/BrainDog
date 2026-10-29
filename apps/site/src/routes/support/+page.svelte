@@ -8,6 +8,7 @@
   width, so the address and the checklist beside it stay a pair.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import { LAUNCH } from '$lib/launch.ts';
   import { SOURCE, SUPPORT_EMAIL } from '$lib/links.ts';
   import { trust } from '$lib/copy/trust.ts';
@@ -41,13 +42,5 @@
   ];
 </script>
 
-<svelte:head>
-  <title>{s.meta.title}</title>
-  <meta name="description" content={s.meta.description} />
-  <link rel="canonical" href="https://brain.dog/support" />
-  <meta property="og:url" content="https://brain.dog/support" />
-  <meta property="og:title" content={s.meta.title} />
-  <meta property="og:description" content={s.meta.description} />
-</svelte:head>
-
+<Seo title={s.meta.title} description={s.meta.description} path="/support" />
 <Parts title={s.title} lede={s.lede} {parts} />

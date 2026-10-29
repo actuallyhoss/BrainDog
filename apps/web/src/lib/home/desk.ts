@@ -42,6 +42,19 @@ export const LIVE_WORDS = { waiting: 'waiting', pause: 'Paused by you', stop: 'S
 /** How many agents the desk names; the rest are counted. */
 export const WORKING_MOST = 4;
 
+/**
+ * WHAT A RUN SAYS IT IS DOING, unless it only says who and where again (audit Q44): a run opened with no line of its own
+ * reads "Claude in Marsh.gg", which the row's name and project already say, so the line is left empty.
+ */
+export function doingSaid(doing: string | null | undefined, agent: string, project: string | null | undefined): string | null {
+  const said = doing?.trim() ?? '';
+  if (said === '') return null;
+  const plain = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const where = project?.trim() ?? '';
+  const echoes = [agent, where, `${agent} in ${where}`, `${agent} on ${where}`, `${agent} · ${where}`, `${agent} ${where}`].filter((x) => x.trim() !== '').map(plain);
+  return echoes.includes(plain(said)) ? null : said;
+}
+
 export function workingRows(working: readonly Working[], hues: ReadonlyMap<string, number | null>, now: number): WorkingRow[] {
   return working.map((w, i) => {
     const hue = w.project ? (hues.get(w.project.trim()) ?? null) : null;
@@ -53,7 +66,7 @@ export function workingRows(working: readonly Working[], hues: ReadonlyMap<strin
       project: w.project && w.project.trim() !== '' ? w.project.trim() : null,
       hue,
       slot: hue === null ? null : slotOf(hue),
-      doing: w.doing && w.doing.trim() !== '' ? w.doing.trim() : null,
+      doing: doingSaid(w.doing, actor(w.agent).name, w.project),
       began: w.since ? (w.quiet ? since(w.since, now) : forSaid(w.since, now)) : '',
     };
   });

@@ -279,7 +279,7 @@ a picture of its own. `height` is where it starts, 48 to 1,600 pixels, until it 
 `body` or `tone`. Its code is refused at install, in words that never repeat it, when it names an address off the page,
 imports a stylesheet or a module, holds a link, meta, frame, object or form tag, is a whole document, calls the network,
 uses storage or reaches for the page around it (`packages/kernel/src/kinds/drawn.ts`, the renderer's `DRAWN_RULES`
-copied). The record never runs it. The app draws it in the hosts' sandboxed frame (`/app/drawn-frame`), where the
+copied). The record never runs it. The app draws it in the hosts' sandboxed frame (`/drawn-frame`), where the
 component reads `braindog.data` (`{ list, columns, rows }`, each row `{ ref, fields }`), `braindog.theme` and the
 theme's colours as CSS variables, calls `braindog.on(fn)` to be told of a change, and `braindog.open(ref)` to open one
 of its rows. Make a component's Draw it writes one as a draft, previewed over the rows the record would hand it; an

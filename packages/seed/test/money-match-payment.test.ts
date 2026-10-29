@@ -93,7 +93,9 @@ test('a bill and a line under one name are one money twice: the bill is linked, 
 
 test('another currency, another payee, the other way, a day too far or a thing already paid is no match', () => {
   nothing(matchPayment(payment(400_000), [bill({ amount: usd(400_000) })]));
-  nothing(matchPayment(payment(400_000), [bill({ what: 'Harbour Dental' })]));
+  nothing(matchPayment(payment(390_000), [bill({ what: 'Harbour Dental' })]));
+  /* THE EXACT MONEY TO ANOTHER PAYEE IS ASKED, NEVER LINKED (Q1 of 29 October): a bank's words may name nobody. */
+  assert.equal(asked(matchPayment(payment(400_000), [bill({ what: 'Harbour Dental' })])).question, 'Is the GBP 4,000 that left on 1 October the Harbour Dental payment?');
   nothing(matchPayment(payment(400_000), [bill({ direction: 'owed_to_me' })]));
   nothing(matchPayment(payment(400_000, '2026-10-12'), [bill()]));
   linked(matchPayment(payment(400_000, '2026-10-11'), [bill()]));
@@ -121,7 +123,8 @@ test('it never changes an amount, linking or asking', () => {
 test('the payee is compared by the key the record folds a bank text to, when a caller hands the fold', () => {
   const bank = payment(400_000, '2026-10-01', { what: 'Card payment', counterparty_text: 'GEIDEA*CHILLOUT 0423 CAIRO EG' });
   const tab = bill({ what: 'Chill Out' });
-  nothing(matchPayment(bank, [tab]));
+  /* UNFOLDED, THE NAME DOES NOT AGREE, so the same money alone is asked about (Q1 of 29 October), never linked. */
+  assert.equal(asked(matchPayment(bank, [tab])).question, 'Is the GBP 4,000 that left on 1 October the Chill Out payment?');
   assert.equal(linked(matchPayment(bank, [tab], { fold: payeeKey })).link.item, 'obligations#4');
 });
 
@@ -227,7 +230,10 @@ test('handed the answer, the script makes that link; handed an instalment that n
 test('a host that hands a fold has the bank\'s spelling matched, and no payment or no match writes nothing', async () => {
   const bank = payment(400_000, '2026-10-01', { what: 'Card payment', counterparty_text: 'GEIDEA*CHILLOUT 0423 CAIRO EG' });
   const tab = bill({ what: 'Chill Out' });
-  assert.equal((await ran([tab, bank], { payment: 'transactions#12' })).out, null);
+  /* UNFOLDED, THE SAME MONEY ALONE IS ASKED ABOUT (Q1 of 29 October), and nothing is written. */
+  const plain = await ran([tab, bank], { payment: 'transactions#12' });
+  assert.equal((plain.out as { ask: { question: string } }).ask.question, 'Is the GBP 4,000 that left on 1 October the Chill Out payment?');
+  assert.deepEqual(plain.writes, []);
   const folded = await ran([tab, bank], { payment: 'transactions#12' }, async (text) => payeeKey(text));
   assert.deepEqual(folded.out, { matched: 'obligations#4', item: 'e_obligations_4', list: 'obligations' });
   const none = await ran([tab], { payment: 'transactions#99' });

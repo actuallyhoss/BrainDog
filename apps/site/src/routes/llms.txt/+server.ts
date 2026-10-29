@@ -13,6 +13,7 @@ import { DOCS } from '$lib/docs/index.ts';
 import { SECTIONS, plainOf } from '$lib/docs/pages.ts';
 import { docsWords } from '$lib/docs/words.ts';
 import { shell } from '$lib/copy/shell.ts';
+import { trust } from '$lib/copy/trust.ts';
 import { MCP } from '$lib/links.ts';
 import { PAGES } from '$lib/nav.ts';
 
@@ -22,7 +23,7 @@ const ORIGIN = 'https://brain.dog';
 
 export const GET = (): Response => {
   const w = docsWords.llms;
-  const lines = [`# ${w.title}`, '', `> ${w.summary}`, '', w.about, ''];
+  const lines = [`# ${w.title}`, '', `> ${w.summary}`, '', `## ${w.factsTitle}`, '', ...w.facts.map((f) => `- ${f}`), '', w.about, ''];
 
   /* The site's pages, each only while it is a page the site has (`PAGES` in `nav.ts`). */
   const site = [
@@ -30,6 +31,9 @@ export const GET = (): Response => {
     { path: '/slash', name: w.pages.slash, says: shell.meta.slash.description },
     { path: '/agents', name: w.pages.agents, says: shell.meta.agents.description },
     { path: '/pricing', name: w.pages.pricing, says: shell.meta.pricing.description },
+    { path: '/security', name: w.pages.security, says: trust.security.meta.description },
+    { path: '/support', name: w.pages.support, says: trust.support.meta.description },
+    { path: '/docs', name: w.pages.docs, says: docsWords.meta.description },
   ].filter((p) => PAGES.some((q) => q.path === p.path));
   if (site.length > 0) {
     lines.push(`## ${w.site}`, '');

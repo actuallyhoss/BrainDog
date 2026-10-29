@@ -57,7 +57,7 @@ test('a line is the installer for the computer chosen, or the record\'s own line
   const lines = connectLines('https://brain.dog', 'acme');
   assert.equal(lineOf('install', lines, 'windows'), INSTALL_LINES.windows);
   assert.equal(lineOf('install', lines, 'unix'), INSTALL_LINES.unix);
-  assert.equal(lineOf('setup', lines, 'unix'), 'braindog setup https://brain.dog/app/acme');
+  assert.equal(lineOf('setup', lines, 'unix'), 'braindog setup https://brain.dog/acme');
   assert.equal(lineOf('web', lines, 'unix'), 'https://brain.dog/mcp');
   assert.equal(copyOf('web'), connectWords.copyAddress);
   assert.equal(copyOf('cursor'), connectWords.copyEntry);

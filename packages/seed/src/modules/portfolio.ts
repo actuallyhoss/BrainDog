@@ -252,7 +252,7 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
     /* A PROJECT OTHER ENTRIES POINT AT STAYS, SINCE portfolio 1.16.0 ("there is no delete"). A task, a bill, a
        service or a person that names it was left pointing at nothing when it went; now the delete is refused and the
        sentence names the lists that still point at it and how many, as Accounts does. A project nothing points at
-       goes, and comes back, as before. Finished is how a project leaves the board. */
+       goes, and comes back, as before. Closed is how a project leaves the board. */
     delete: 'refuse_while_referenced',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
@@ -273,14 +273,14 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
         index: true,
       },
       /* SAID IN SENTENCE CASE, SINCE portfolio 1.9.0: the split under Where they are printed the stored words, "earning"
-         and "building", where every other label on the page starts with a capital. `retired` reads Finished, as the fold
-         of the parked and finished ones already calls it. */
+         and "building", where every other label on the page starts with a capital. `retired` reads Closed (29 October, his
+         word: "instead of finished projects it should say closed"); the stored value stays `retired`. */
       {
         id: 'lane',
         label: 'Status',
         type: 'enum',
         values: ['building', 'earning', 'parked', 'retired'],
-        labels: { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Finished' },
+        labels: { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Closed' },
         index: true,
         required: true,
       },
@@ -550,7 +550,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   /* WHAT THE OVERVIEW'S FOLDED TILES ARE DRAWN ON, SINCE portfolio 1.8.0, each over its tile's own clauses, so a tile is
      never drawn empty and never hidden while it holds a project. */
   'projects-aiming': counted('projects-aiming', 'Aiming for a day', `${LIVE}, aim is set`),
-  'projects-not-in-play': counted('projects-not-in-play', 'Parked or finished', 'lane is parked or retired'),
+  'projects-not-in-play': counted('projects-not-in-play', 'Parked or closed', 'lane is parked or retired'),
   /* WHAT THE FOLD OVER THOSE THREE TILES IS DRAWN ON: a project in play that says what it earns, is held by an agent or
      aims for a day, so a record with none reads no folded heading over nothing. A tree, because it ORs three fields. */
   'projects-looked-up': {
@@ -562,7 +562,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
       ],
     },
   },
-  'projects-retired': counted('projects-retired', 'Finished', 'lane is retired'),
+  'projects-retired': counted('projects-retired', 'Closed', 'lane is retired'),
 
   /* ── the key numbers, since portfolio 1.19.0 ──────────────────────────────
      HOW MANY KEY NUMBERS ARE KEPT, live and not a draft: what a block over them is drawn on, so a record with none

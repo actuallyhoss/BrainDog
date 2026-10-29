@@ -14,8 +14,8 @@ const shell = (over: Record<string, unknown> = {}): Shell =>
 describe('boot copy', () => {
   it('keeps and reads a shell for the same record, drawn only', () => {
     const s = mem();
-    saveCopy('/app/acme', shell(), 1000, s);
-    const got = readCopy('/app/acme', 2000, s)!;
+    saveCopy('/acme', shell(), 1000, s);
+    const got = readCopy('/acme', 2000, s)!;
     assert.equal(got.stale, true);
     assert.equal(got.me.level, 'read');
     assert.equal(got.me.owner, false);
@@ -24,20 +24,20 @@ describe('boot copy', () => {
   });
   it('does not draw another record, an old copy or a bad one', () => {
     const s = mem();
-    saveCopy('/app/acme', shell(), 1000, s);
-    assert.equal(readCopy('/app/kiln', 2000, s), null);
-    assert.equal(readCopy('/app/acme', 1000 + COPY_MS, s), null);
+    saveCopy('/acme', shell(), 1000, s);
+    assert.equal(readCopy('/kiln', 2000, s), null);
+    assert.equal(readCopy('/acme', 1000 + COPY_MS, s), null);
     assert.equal(s.m.has(COPY_KEY), false);
     s.setItem(COPY_KEY, '{nope');
-    assert.equal(readCopy('/app/acme', 2000, s), null);
+    assert.equal(readCopy('/acme', 2000, s), null);
     assert.equal(s.m.has(COPY_KEY), false);
   });
   it('never keeps a refused or unanswered shell, and drops on request', () => {
     const s = mem();
-    saveCopy('/app/acme', shell({ refused: { code: 'X', fix: 'y' } }), 1, s);
-    saveCopy('/app/acme', shell({ live: false }), 1, s);
+    saveCopy('/acme', shell({ refused: { code: 'X', fix: 'y' } }), 1, s);
+    saveCopy('/acme', shell({ live: false }), 1, s);
     assert.equal(s.m.size, 0);
-    saveCopy('/app/acme', shell(), 1, s);
+    saveCopy('/acme', shell(), 1, s);
     dropCopy(s);
     assert.equal(s.m.size, 0);
   });

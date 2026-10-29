@@ -8,7 +8,7 @@
  * record's ADMIN guard decides whether they may. The self-host wires the same doors to its own store.
  *
  * THE APP'S CONSENT ROUTE HAS LANDED, AND `CONSENT_AT` IS WHERE `/oauth/authorize` SENDS THE BROWSER TO IT
- * (`/app/connect`). This Worker's own page, server-rendered, no script, below, stays only as the
+ * (`/connect`). This Worker's own page, server-rendered, no script, below, stays only as the
  * fallback for a link already issued to the old address; it reads the held request, the session and the records the
  * person owns, and posts Allow and Deny to the host's doors, the same as the app's route does.
  *
@@ -46,7 +46,7 @@ import { doorOf, withCookie, type Deps as SessionDeps, type Held } from './sessi
  * Where `/oauth/authorize` sends the browser to answer a held request: the app's own consent route, which
  * reads the same held request this Worker's fallback page below does.
  */
-const CONSENT_AT = '/app/connect';
+const CONSENT_AT = '/connect';
 
 /** How long an app's metadata document may take to answer before it is treated as not answering. */
 const DOCUMENT_WAIT_MS = 5_000;
@@ -161,7 +161,7 @@ function wiring<I>(request: Request, env: OAuthEnv<I>, host: string) {
     access: (id, person) => record(id).access(person),
   };
 
-  /* THE PERSON, ON THE RECORD THEY CHOSE, THROUGH THE SAME DOOR EVERY `/app/<slug>/api` CALL TAKES. The Directory says
+  /* THE PERSON, ON THE RECORD THEY CHOSE, THROUGH THE SAME DOOR EVERY `/<slug>/api` CALL TAKES. The Directory says
      whether the name is theirs before any record is addressed, and `doorOf` holds a POST to this origin (`12 §8`).
      A record's id is turned into its name first, so the one path a slug takes is the only path there is. */
   const approver = async (asked: Request, chosen: string): Promise<Approver> => {
@@ -236,7 +236,7 @@ async function consentPage(request: Request, wired: { session: SessionDeps; dire
   const name = escapeHtml(consent.client_name);
   const asking = `<p><strong>${name}</strong> is asking to reach a record of yours. BrainDog will send it back to <span class="host">${escapeHtml(consent.redirect_host)}</span>.</p>`;
   const signIn = (why: string): string =>
-    `${asking}\n<p>${escapeHtml(why)}</p>\n<div class="acts"><a class="act main-act" href="/app/signin" target="_blank" rel="noopener">Sign in to BrainDog</a>\n${denyForm(consent)}</div>`;
+    `${asking}\n<p>${escapeHtml(why)}</p>\n<div class="acts"><a class="act main-act" href="/signin" target="_blank" rel="noopener">Sign in to BrainDog</a>\n${denyForm(consent)}</div>`;
 
   const door = await doorOf(request, wired.session, null);
   if (door.door !== 'session') {

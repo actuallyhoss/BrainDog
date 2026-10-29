@@ -276,9 +276,11 @@ test('an entry with no other like it asks without a count; a bank\'s new entry w
 test('a Ledger read a page of fifty at a time still files every one of 130 entries', async () => {
   const m = await money();
   const many = Array.from({ length: 130 }, (_, i) => m.paid('TALABAT', 1 + Math.floor(i / 3)));
-  await m.turn();
+  /* MORE ROUNDS SINCE money-core 3.31.0: each payment also starts the match and the posted-line check, two scripts
+     each, so four rounds of fifty no longer reach the filing behind them. */
+  await m.turn(12);
   const rule = talabat(m);
-  await m.turn();
+  await m.turn(12);
   assert.equal(many.filter((e) => m.k.get(e.id)!.fields.filed_by === rule.id).length, 130, m.log.join(' | '));
   assert.ok(m.log.some((l) => l.startsWith('TALABAT filed 130 entries')), m.log.join(' | '));
 });

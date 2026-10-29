@@ -3,9 +3,9 @@
  *
  *   node tools/look/run.mjs --source seed|lived|file:<path>|live:<record> --set six|nine|all [--out <dir>] [--screens a,b,c]
  *
- * ONE SERVER, THE GATES' SHAPE. The built app is served from `apps/web/build` under `/app` exactly as the browser gates
+ * ONE SERVER, THE GATES' SHAPE. The built app is served from `apps/web/build` at the root exactly as the browser gates
  * serve it (`tools/gates/lib.mjs`, `APP_BASE` and `appShell`), with the SPA fallback to the app's shell, and every
- * request the page makes to its record is handed to the source. `/app/<slug>/api/<method>` is the same request as
+ * request the page makes to its record is handed to the source. `/<slug>/api/<method>` is the same request as
  * `/api/<method>`, as the Worker reads it, because a bearer names the record and the path does not.
  *
  * A SOURCE IS ONE FILE UNDER `sources/`, LOADED BY NAME, so a later unit adds one without touching this file. Its
@@ -59,8 +59,8 @@ const TYPES = {
 /** The paths the record answers, handed to the source. Everything else is the build's. */
 const RECORD = /^\/(?:api|auth|account|mcp|in)(?:\/|$)/u;
 
-/** `/app/<slug>/api/<method>` as the record reads it, `/api/<method>`; anything else unchanged. */
-export const recordPath = (pathname) => pathname.replace(/^\/app\/[a-z][a-z0-9-]*[a-z0-9](?=\/api(?:\/|$))/u, '');
+/** `/<slug>/api/<method>` as the record reads it, `/api/<method>`; anything else unchanged. */
+export const recordPath = (pathname) => pathname.replace(/^\/[a-z][a-z0-9-]*[a-z0-9](?=\/api(?:\/|$))/u, '');
 
 /** `--flag value` and `--flag=value`. A flag this command does not take is a refusal, not a silence. */
 export function parse(args) {
@@ -90,7 +90,7 @@ export async function openSource({ name, arg }, options = {}) {
   return mod.open(arg, options);
 }
 
-/** A file of the build, the app's shell for an address under `/app` that is not one, or `null` for a 404. */
+/** A file of the build, the app's shell for an address of the app that is not one, or `null` for a 404. */
 async function fileFor(build, pathname) {
   const rel = normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/u, '');
   if (rel.split(/[/\\]/u).includes('..')) return null;

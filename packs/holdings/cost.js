@@ -8,8 +8,11 @@
  * keeps every number it had. Buys in two currencies are never added: the holding keeps its own count and cost.
  *
  * WHAT IT IS WORTH, in this order: the holding's own price ("Worth each now"), when somebody gave one; for gold, the
- * newest gold rate for its karat, or the 24k rate times the karat over 24 when there is none for that karat; and else
- * what it cost. `valued_by` says which of the three it was, so a page can say a value is only what was paid.
+ * newest gold rate for its karat, or else the newest rate of any karat turned to this one by their purities (the 24k
+ * rate times the karat over 24, a 21k rate times 18 over 21 for 18k gold), so gold is valued from the first rate anybody
+ * sets, feed or no feed; and else what it cost. `valued_by` says which of the three it was, so a page can say a value
+ * is only what was paid. GOLD WITH A COUNT AND A RATE IS VALUED EVEN WITH NO COST: a bracelet nobody knows the price of
+ * is still worth its grams, it only has no gain.
  *
  * WHAT IT GAINED is its worth less its cost, and the gain over the cost as a percent, said only when something other
  * than the cost priced it and both are in one currency. A holding that stands at what it cost has no gain, not a gain
@@ -66,9 +69,13 @@ function currentOf(rates) {
 function rateFor(current, karat) {
   if (typeof karat !== 'string' || PURITY[karat] === undefined) return null;
   if (current[karat]) return current[karat].per_gram;
+  /* THE 24K RATE FIRST, then the newest of any other karat, each turned to this karat by their purities. */
+  const others = Object.entries(current).filter(([k]) => PURITY[k] !== undefined);
   const pure = current['24k'];
-  if (!pure) return null;
-  return { amount: (pure.per_gram.amount * PURITY[karat]) / 24, currency: pure.per_gram.currency };
+  const from = pure ? ['24k', pure] : others.sort(([, a], [, b]) => (b.day > a.day ? 1 : b.day < a.day ? -1 : b.seq - a.seq))[0];
+  if (!from) return null;
+  const [k, rate] = from;
+  return { amount: (rate.per_gram.amount * PURITY[karat]) / PURITY[k], currency: rate.per_gram.currency };
 }
 
 /** Dates a rate nobody dated, and marks the newest a karat current and the rest not. */
@@ -108,14 +115,14 @@ async function work(ctx, row, current, today, repriced) {
   } else if (number(qty) && amount(f.unit_cost)) {
     cost = { amount: Math.round(qty * f.unit_cost.amount), currency: f.unit_cost.currency };
   }
-  if (cost === null || !number(qty)) {
+  const gram = f.kind === 'gold' ? rateFor(current, f.karat) : null;
+  if (!number(qty) || (cost === null && !amount(f.price) && !gram)) {
     if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);
     return;
   }
 
   let value = cost;
   let by = 'cost';
-  const gram = f.kind === 'gold' ? rateFor(current, f.karat) : null;
   if (amount(f.price)) {
     value = { amount: Math.round(qty * f.price.amount), currency: f.price.currency };
     by = 'price';
@@ -123,11 +130,11 @@ async function work(ctx, row, current, today, repriced) {
     value = { amount: Math.round(qty * gram.amount), currency: gram.currency };
     by = 'gold_rate';
   }
-  const gained = by !== 'cost' && value.currency === cost.currency;
+  const gained = cost !== null && by !== 'cost' && value.currency === cost.currency;
   const gain = gained ? { amount: value.amount - cost.amount, currency: cost.currency } : null;
   const pct = gained && cost.amount > 0 ? Math.round(((value.amount - cost.amount) / cost.amount) * 1000) / 10 : null;
 
-  if (!same(f.cost, cost)) next.cost = cost;
+  if (cost !== null && !same(f.cost, cost)) next.cost = cost;
   if (!same(f.value, value)) next.value = value;
   if (f.valued_by !== by) next.valued_by = by;
   if (!same(f.gain, gain)) next.gain = gain;

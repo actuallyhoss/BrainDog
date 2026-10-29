@@ -194,5 +194,6 @@ test('Money holds no more blocks than it did', () => {
   assert.equal(blocks.filter((b) => b.heading === 'Instalments').length, 1);
 });
 
-/** How many blocks Money's home holds since money-core 3.29.0, a page per job: the line, the hero, six tiles and Heads up. */
-const BLOCKS = 15;
+/** How many blocks Money's home holds since money-core 3.31.0, a page per job: the line, the hero, Over time (two, one
+    drawn by how many nights net worth has), six tiles, the budgets at a glance with its note, and Heads up. */
+const BLOCKS = 19;

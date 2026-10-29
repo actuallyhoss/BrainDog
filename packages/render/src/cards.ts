@@ -166,7 +166,7 @@ const NO_VALUE = 'no value';
  * after it, because a dip to zero claims the value was zero (05 §7.4). `said` keeps what the author
  * wrote, so the accessible name reads the same numbers the shape was drawn from.
  */
-export function trendOf(value: string): { d: string; end: string; said: string[]; bars: string | null } | null {
+export function trendOf(value: string): { d: string; area: string; end: string; said: string[]; bars: string | null } | null {
   const tokens = runTokens(value);
   const numbers = tokens.map((t) => {
     const n = t === '' ? Number.NaN : Number(t.replace(/−/gu, '-').replace(/,(?=\d{3}(?!\d))/gu, ''));
@@ -184,13 +184,26 @@ export function trendOf(value: string): { d: string; end: string; said: string[]
   let d = '';
   let pen = false;
   let end = '';
+  /* THE SPACE UNDER THE LINE, one closed shape for each unbroken run, down to the floor at both of its ends: a sheet
+     draws it as a pale wash so the line reads as a level and not a wire. A gap closes the shape before it. */
+  let area = '';
+  let first = '';
+  let lastX = '';
+  const close = () => {
+    if (first !== '') area += ` L${lastX} 100 L${first} 100 Z`;
+    first = '';
+  };
   numbers.forEach((n, i) => {
     if (n === null) {
+      close();
       pen = false;
       return;
     }
     const point = `${at(x(i))} ${at(y(n))}`;
     d += pen ? ` L${point}` : `${d ? ' ' : ''}M${point}`;
+    area += pen ? ` L${point}` : `${area ? ' ' : ''}M${point}`;
+    if (!pen) first = at(x(i));
+    lastX = at(x(i));
     pen = true;
     /* A zero-length segment with a round cap under a non-scaling stroke is a round dot on the last
        point, drawn with attributes alone: a `circle` would stretch with the box. */
@@ -204,7 +217,8 @@ export function trendOf(value: string): { d: string; end: string; said: string[]
     n <= 7 && lo >= 0
       ? numbers.flatMap((v, i) => (v === null ? [] : [`M${at(((i + 0.5) / n) * 1000)} 100V${at(hi === 0 ? 96 : 100 - Math.max(4, (v / hi) * 90))}`])).join(' ')
       : null;
-  return { d, end, said: numbers.map((n, i) => (n === null ? NO_VALUE : tokens[i]!)), bars };
+  close();
+  return { d, area, end, said: numbers.map((n, i) => (n === null ? NO_VALUE : tokens[i]!)), bars };
 }
 
 const AHEAD = /^@(\d{4}-\d{2}-\d{2})\s+/u;
@@ -453,6 +467,11 @@ export const CARDS_NONE = 'Nothing to show.';
 export const FOLD_SHOW = 'Show';
 export const FOLD_HIDE = 'Hide';
 export const TREND = 'Trend';
+/**
+ * WHAT A FIGURE'S LINE SAYS BEFORE IT HAS TWO NIGHTS (audit of 30 October, 21): a figure's past is kept each night, so
+ * a new one asked for its last twelve weeks drew its number over an empty chart. It says when the line starts instead.
+ */
+export const TREND_WAIT = 'The line fills in from tonight.';
 /** The word before a card's next step. */
 export const CARDS_NEXT = 'Next';
 /** The words after a run's count of helpers, one and many. */

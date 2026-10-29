@@ -114,7 +114,8 @@ test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that 
 
 test('MONEY IS ONE HERO AND A BOARD: well under the most a page declares, no word on categories marked the other way, and its figure still declared', async () => {
   const blocks = MONEY_PAGE.blocks as Record<string, unknown>[];
-  assert.ok(blocks.length <= 16, 'a front door, not the most a page declares');
+  /* 19 SINCE money-core 3.31.0: Over time (two, one drawn), the budgets at a glance and its note joined the board. */
+  assert.ok(blocks.length <= 19, 'a front door, not the most a page declares');
   assert.deepEqual(blocks.filter((b) => JSON.stringify(b).includes('categories-against-direction')), []);
   assert.equal(blocks.filter((b) => b.kind === 'note' && b.lead === true).length, 3, 'what there is, that it lasts, and the line for two books');
   const k = await record();

@@ -160,7 +160,7 @@ export type Approver = { deviceApprove(args: { user_code: string }): Promise<Wir
  * The six digits, sent or refused. Nothing malformed is sent.
  *
  * NO CLIENT IS NOBODY SIGNED IN TO APPROVE AS, so the answer is `signin`: the one refusal with a way forward on
- * this screen, drawn with its Sign in again button. It answered `demo` while `/app` with no session was the sample
+ * this screen, drawn with its Sign in again button. It answered `demo` while the bare address with no session was the sample
  * record, and "The demo has no account" would now be said to a person whose only problem is a missing sign-in.
  */
 export async function approve(typed: string, client: Approver | null): Promise<Answer> {

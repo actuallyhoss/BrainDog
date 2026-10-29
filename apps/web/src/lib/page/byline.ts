@@ -99,14 +99,16 @@ export const bylineWords = {
   /** Over the page's own lines of what was changed for the reader since they last looked. */
   heading: 'Changed for you',
   /** The line at the foot of the board: "5 changes by your rules this week". */
-  changes: (n: number, by: string) => `${n} ${n === 1 ? 'change' : 'changes'} ${by} this week`,
+  /* ON THIS PAGE, SAID (audit of 30 October, 17): each page counts the changes to the rows it shows, so Money said 3 and
+     the Ledger 19 in the same week, and read as two answers to one question. */
+  changes: (n: number, by: string) => `${n} ${n === 1 ? 'change' : 'changes'} on this page ${by} this week`,
   byRules: 'by your rules',
   by: (name: string) => `by ${name}`,
   madeForYou: 'made for you',
   /** The line's one action, which opens the list in the panel. */
   review: 'Review',
   /** The panel's title over the week's changes. */
-  panelTitle: 'Changed for you this week',
+  panelTitle: 'Changed on this page this week',
   /** What a screen reader hears for a line's Undo, with the row it is about. */
   undoNamed: (title: string) => `Undo the change to ${title}`,
   /** A change on a record that sends no batch for it, which this page cannot put back. */

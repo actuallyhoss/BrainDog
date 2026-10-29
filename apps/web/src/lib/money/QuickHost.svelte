@@ -62,12 +62,33 @@
     if (!quick.start('out')) return;
     e.preventDefault();
   }
+
+  /* THE + STEPS ASIDE WHILE THE PAGE IS READ DOWNWARDS (30 October, Q35): floating at the end edge it sat on the amounts
+     of every row it passed. It comes back the moment the page moves up, and at the page's foot, which the Money look's
+     padding keeps clear of it. */
+  let away = $state(false);
+  /* THE SHELL SCROLLS ITS OWN BODY, NOT THE WINDOW (`+layout.svelte` `.body`), so the move is heard on the way down
+     from whatever scrolled, each scroller with the last place it stood. */
+  $effect(() => {
+    const last = new WeakMap<EventTarget, number>();
+    const onscroll = (e: Event): void => {
+      const el = e.target instanceof Element ? e.target : document.scrollingElement;
+      if (!el) return;
+      const y = el.scrollTop;
+      const was = last.get(el) ?? y;
+      const foot = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+      away = !foot && y > was + 2 ? true : y < was - 2 || foot ? false : away;
+      last.set(el, y);
+    };
+    document.addEventListener('scroll', onscroll, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', onscroll, { capture: true });
+  });
 </script>
 
 <svelte:window {onkeydown} />
 
 {#if leads && fab && quick.ledger && !quick.open}
-  <button type="button" class="qa-fab" aria-label={words.fab} title={words.fab} aria-keyshortcuts="+" onclick={() => quick.start('out')}>
+  <button type="button" class="qa-fab" data-away={away ? '' : undefined} aria-label={words.fab} title={words.fab} aria-keyshortcuts="+" onclick={() => quick.start('out')}>
     <Icon name="plus" size="l" />
   </button>
 {/if}
@@ -104,6 +125,18 @@
 
     .qa-fab:active {
       background: var(--red-fill-press);
+    }
+
+    .qa-fab {
+      transition:
+        translate var(--d-swap) var(--ease-out),
+        opacity var(--d-swap) var(--ease-out);
+    }
+
+    .qa-fab[data-away] {
+      opacity: 0;
+      translate: 0 calc(56px + var(--sp-4));
+      pointer-events: none;
     }
   }
 </style>

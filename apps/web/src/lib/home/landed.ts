@@ -112,8 +112,8 @@ export const freshOf = (before: ReadonlySet<string> | null, rows: readonly { key
 /** Several arrivals by one hand into one list within one hour, said as one line that opens to their names (today F10). */
 export type LandedGroup = { key: string; group: true; at: string; who: string; kind: ActorKind; run: string; to: string; rows: Landed[] };
 
-/** "BrainDog filed 6 into Tools". */
-export const groupSaid = (g: Pick<LandedGroup, 'who' | 'to' | 'rows'>): string => `${g.who} filed ${g.rows.length.toLocaleString('en-GB')} into ${g.to}`;
+/** "BrainDog added 6 to Tools". */
+export const groupSaid = (g: Pick<LandedGroup, 'who' | 'to' | 'rows'>): string => `${g.who} added ${g.rows.length.toLocaleString('en-GB')} to ${g.to}`;
 
 /**
  * ARRIVALS AS THEY ARE READ (today F10): lines that share who brought them, the list they went into and the hour are one

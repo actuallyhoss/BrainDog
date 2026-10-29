@@ -207,8 +207,8 @@ test('A PACK IS ONE PAYMENT FOR A FREE RECORD: payment mode, the metadata on the
     assert.equal(f.get(`payment_intent_data[metadata][${k}]`), v, `payment_intent_data[metadata][${k}]`);
   }
   assert.ok(![...f.keys()].some((k) => k.startsWith('subscription_data')), 'a pack asked for a subscription');
-  assert.equal(f.get('success_url'), 'https://brain.dog/app/ada/settings/billing#credits={CHECKOUT_SESSION_ID}');
-  assert.equal(f.get('cancel_url'), 'https://brain.dog/app/ada/settings/billing#cancelled');
+  assert.equal(f.get('success_url'), 'https://brain.dog/ada/settings/billing#credits={CHECKOUT_SESSION_ID}');
+  assert.equal(f.get('cancel_url'), 'https://brain.dog/ada/settings/billing#cancelled');
   assert.equal(w.rows.get('rec_ada'), undefined, 'a pack wrote a billing row');
 });
 

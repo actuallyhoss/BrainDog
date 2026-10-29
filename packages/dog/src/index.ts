@@ -39,10 +39,10 @@ type Scalar = string | number | boolean | null;
 /* ── printing ─────────────────────────────────────────────────────────── */
 
 /** The order a page's keys are printed in; any key not named here follows, alphabetically (`docs/06-PAGES.md` §1). */
-const PAGE_ORDER: readonly string[] = ['page', 'title', 'for', 'nav', 'icon', 'tone', 'layout', 'requires', 'blocks'];
+const PAGE_ORDER: readonly string[] = ['page', 'title', 'for', 'nav', 'icon', 'tone', 'board', 'layout', 'requires', 'phone', 'blocks'];
 
 /** The order a block's keys are printed in; any key not named here follows, alphabetically. */
-const BLOCK_ORDER: readonly string[] = ['kind', 'heading', 'area', 'span', 'source', 'register', 'row', 'where', 'when', 'columns', 'cells', 'order', 'limit'];
+const BLOCK_ORDER: readonly string[] = ['kind', 'heading', 'area', 'span', 'size', 'source', 'register', 'row', 'where', 'when', 'columns', 'cells', 'order', 'limit'];
 
 /**
  * The block keys whose items print bare, and the one key a bare item stands for.

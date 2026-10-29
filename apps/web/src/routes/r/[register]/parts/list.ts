@@ -15,7 +15,7 @@ import { seqWidth } from '../../../../lib/record/api.ts';
 import { wayField } from '../../../../lib/record/money-way.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
 import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } from '../../../../lib/record/schema.ts';
-import { orgFieldOf } from '../people.ts';
+import { orgFieldOf, orgRoleOf } from '../people.ts';
 import { presenceOf } from '@braindog/kernel';
 
 /**
@@ -323,12 +323,15 @@ export type View = 'table' | 'board' | 'cards' | 'groups';
  * (`orgFieldOf`), which opens grouped by it, since twenty-four colleagues of one company read as one line and not as
  * twenty-four. That list's table is then `?view=table`, so a link to it still opens the table.
  */
-export const homeViewOf = (decl: RegisterDecl | undefined): View => (orgFieldOf(decl) ? 'groups' : 'table');
+/** A list that draws in groups: people by organisation, and since 29 October organisations by kind. */
+export const groupsOf = (decl: RegisterDecl | undefined): boolean => orgFieldOf(decl) !== null || orgRoleOf(decl) !== null;
+
+export const homeViewOf = (decl: RegisterDecl | undefined): View => (groupsOf(decl) ? 'groups' : 'table');
 
 export const viewOf = (asked: string | null, decl: RegisterDecl | undefined): View => {
   if (asked === 'cards' || asked === 'table') return asked;
   if (asked === 'board' && laneFieldOf(decl)) return 'board';
-  if (asked === 'groups' && orgFieldOf(decl)) return 'groups';
+  if (asked === 'groups' && groupsOf(decl)) return 'groups';
   return homeViewOf(decl);
 };
 
@@ -476,7 +479,7 @@ export function defaultParams(d: ListDefault, decl: RegisterDecl | undefined): {
   if (field && fields.has(field)) params.set('sort', `${field}:${dir === 'desc' ? 'desc' : 'asc'}`);
   /* A KEPT VIEW THE LIST OPENS ON ANYWAY WRITES NOTHING, and one it can no longer draw is dropped: a board with no lanes,
      a grouping with no organisation to group by. */
-  const fits = d.view === 'cards' || d.view === 'table' || (d.view === 'board' && laneFieldOf(decl)) || (d.view === 'groups' && orgFieldOf(decl));
+  const fits = d.view === 'cards' || d.view === 'table' || (d.view === 'board' && laneFieldOf(decl)) || (d.view === 'groups' && groupsOf(decl));
   if (d.view && fits && d.view !== homeViewOf(decl)) params.set('view', d.view);
   if (d.view === 'board' && d.lane && laneChoicesOf(decl).some((f) => f.id === d.lane)) params.set('lane', d.lane);
   return { params, hidden: d.hidden.filter((h) => fields.has(h) && h !== decl?.title) };
@@ -751,7 +754,15 @@ const FIGURES = new Set(['money', 'int', 'decimal']);
  * A list's number column, totalled: the field, the currency a money field is in, the sum, and how many rows hold a value
  * (`seen`), which is what decides whether the figure says anything (`ListSummary`).
  */
-export type Figured = { field: FieldDecl; currency: string | null; total: number; seen: number; valueOf: (e: Entry) => number | null };
+export type Figured = {
+  field: FieldDecl;
+  currency: string | null;
+  total: number;
+  seen: number;
+  valueOf: (e: Entry) => number | null;
+  /** On a list of readings, one a day: the day of the newest, whose value `total` is (`figureOf`). */
+  latest?: string;
+};
 
 /**
  * THE LIST'S NUMBER, WHEN IT HAS ONE, ADDED UP: the first figure its card declares, else the first figure field it
@@ -780,7 +791,22 @@ export function figureOf(decl: RegisterDecl | undefined, entries: readonly Entry
     seen += 1;
   }
   if (seen === 0 || currencies.size > 1) return null;
-  return { field, currency: field.type === 'money' ? ([...currencies][0] ?? null) : null, total, seen, valueOf };
+  const currency = field.type === 'money' ? ([...currencies][0] ?? null) : null;
+  /* A LIST OF READINGS, ONE A DAY, IS SAID BY ITS NEWEST, never added up: Snapshots headed thirty nights of cash with
+     "Nightly £1,039,080", a sum of one balance thirty times (recheck of 30 October, N2). A `day` held unique is what
+     makes a list one reading a day. */
+  const day = decl.fields.find((f) => f.type === 'day' && f.unique === true);
+  if (day) {
+    let newest: { on: string; value: number } | null = null;
+    for (const e of entries) {
+      const on = e.fields[day.id];
+      const n = valueOf(e);
+      if (typeof on !== 'string' || n === null) continue;
+      if (newest === null || on > newest.on) newest = { on, value: n };
+    }
+    if (newest) return { field, currency, total: newest.value, seen, valueOf, latest: newest.on };
+  }
+  return { field, currency, total, seen, valueOf };
 }
 
 /**
@@ -854,6 +880,8 @@ export type FigurePart = { value: string | null; entries: Entry[]; total: number
 export function figureParts(decl: RegisterDecl | undefined, entries: readonly Entry[]): { fig: Figured; by: FieldDecl | undefined; parts: FigurePart[] } | null {
   const fig = figureOf(decl, entries);
   if (!fig) return null;
+  /* A READING IS NOT SPLIT EITHER: the newest night is one figure, whichever way it was taken. */
+  if (fig.latest !== undefined) return { fig, by: undefined, parts: [{ value: null, entries: [...entries], total: fig.total, seen: fig.seen }] };
   const by = directionOf(decl, fig.field);
   const part = (value: string | null, rows: Entry[]): FigurePart => {
     let total = 0;

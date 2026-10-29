@@ -28,7 +28,7 @@ export type SideRead = {
   list: string;
   rows: SideRow[];
   lanes: Lanes;
-  /** Each lane's own word, as the list's state field says it ("Parked", "Finished"). */
+  /** Each lane's own word, as the list's state field says it ("Parked", "Closed"). */
   label: (lane: string) => string;
 };
 

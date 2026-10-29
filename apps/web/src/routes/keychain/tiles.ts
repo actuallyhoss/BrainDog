@@ -16,6 +16,7 @@
 import { relativeWords, since, sinceWords } from 'braindog-render';
 
 import { words as keychain, type KeyRow, type UsedByRun } from '../../lib/record/keychain.ts';
+import { OLD_NAME } from '../r/[register]/[seq]/timeline.ts';
 
 export const words = {
   /* The request tile at the top, while a machine waits for its six digits. */
@@ -42,6 +43,7 @@ export const words = {
   sealValue: 'Add value',
   /* WHERE A KEY APPLIES WHEN IT IS NO PROJECT'S, in the row's meta line. */
   allProjects: 'All projects',
+  oldNotes: 'From your old notes',
   /* Where a key came from, as its row says it, in the row's menu. */
   cameFrom: 'Came from',
   cameFromSaid: (where: string) => `Came from ${where}`,
@@ -215,10 +217,13 @@ export type KeyGroup = { name: string; scope: KeyRow['scope']; services: { provi
 export function groupsOf(keys: readonly KeyRow[]): KeyGroup[] {
   const projects = new Map<string, KeyGroup>();
   for (const k of keys) {
-    const name = k.scope?.name ?? k.project ?? words.allProjects;
+    /* A PROJECT NAMED FOR THE PRODUCT THIS RECORD CAME FROM ("The Mara Brain") is said as what it is: from his old
+       notes. Only the words; the project keeps its name. */
+    const raw = k.scope?.name ?? k.project ?? words.allProjects;
+    const name = OLD_NAME.test(raw) ? words.oldNotes : raw;
     const at = k.scope || k.project ? name : '';
     let g = projects.get(at);
-    if (!g) projects.set(at, (g = { name, scope: k.scope, services: [] }));
+    if (!g) projects.set(at, (g = { name, scope: k.scope ? { ...k.scope, name } : k.scope, services: [] }));
     const provider = k.provider ?? null;
     let s = g.services.find((x) => x.provider === provider);
     if (!s) g.services.push((s = { provider, keys: [] }));

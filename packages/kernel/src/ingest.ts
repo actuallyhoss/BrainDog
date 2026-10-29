@@ -1130,7 +1130,9 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
     /* AND THE ROW KEEPS THAT NAME BESIDE THE BANK'S WORDS, only on a list that declares a text field for it and only
        where the pattern read none itself: another list's `payee` may be a link to somebody, and a name written into
        one would refuse the whole charge. */
-    if (clean !== '' && declaredFields?.[PAYEE]?.type === 'text' && Object.hasOwn(declaredFields, PAYEE) && !Object.hasOwn(extracted, PAYEE))
+    /* A NAME IS WORDS (Q15 of 29 October): "0140", the end of an account number a transfer went to, was written as the
+       payee and read as one on Payees and the Ledger. Text with no letter is kept as the bank's words alone. */
+    if (clean !== '' && /\p{L}/u.test(clean) && declaredFields?.[PAYEE]?.type === 'text' && Object.hasOwn(declaredFields, PAYEE) && !Object.hasOwn(extracted, PAYEE))
       extracted[PAYEE] = clean;
     if (declaredFields !== undefined && !Object.hasOwn(declaredFields, COUNTERPARTY)) {
       delete extracted[COUNTERPARTY];

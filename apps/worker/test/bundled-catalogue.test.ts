@@ -35,5 +35,11 @@ test('the Worker does not run first on /catalogue/, so its static assets answer 
   const config = readFileSync(fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)), 'utf8');
   const lists = [...config.matchAll(/"run_worker_first":\s*\[([^\]]*)\]/gu)].map((m) => m[1] ?? '');
   assert.ok(lists.length > 0);
-  for (const list of lists) assert.doesNotMatch(list, /"\/catalogue|"\/\*"/u);
+  /* THE WORKER RUNS FIRST ON EVERY PATH (`/*`), now the app is at the root, so the catalogue is the files' by a negative,
+     which takes precedence over every other entry, and never by being left off. A list that runs first on `/*` without
+     it answers the catalogue with the Worker. */
+  for (const list of lists) {
+    assert.doesNotMatch(list, /"\/catalogue/u, 'the Worker is named first on /catalogue');
+    assert.ok(!/"\/\*"/u.test(list) || /"!\/catalogue\/\*"/u.test(list), 'the Worker runs first on every path and the catalogue is not taken out');
+  }
 });

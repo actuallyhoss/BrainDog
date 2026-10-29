@@ -218,6 +218,11 @@ export type Manifest = {
    * goes when this pack does. The kernel lays it among the page's blocks each time the page is read (`page-adds.ts`).
    */
   adds?: PageAddition[];
+  /**
+   * The widgets this add-on ships for the widget sheet, templates and never placements (`pack-widgets.ts`). Absent when
+   * it ships none. In the checksum: a widget is drawn as it is written.
+   */
+  widgets?: PackWidget[];
 };
 
 /**
@@ -234,6 +239,9 @@ export type Extension = { fields?: Record<string, Json>[]; values?: Record<strin
 /** One block a pack adds to another pack's page, or one column it adds into a block there (`add-column.ts`). */
 export type PageAddition = { page: string; block: Record<string, Json>; after?: string; note?: string } | PageColumnAddition;
 export { ADD_COLUMNS_MOST, columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
+import type { PackWidget } from './pack-widgets.ts';
+import { readPackWidgets } from './pack-widgets.ts';
+export { PACK_WIDGET_GROUPS, PACK_WIDGET_SIZES, PACK_WIDGETS_MOST, readPackWidgets, type PackWidget } from './pack-widgets.ts';
 
 /* WHO HOLDS A LIST'S ROWS is `hand.ts`'s, so a page that reads it does not carry the planner. */
 export { handOf, type Hand } from './hand.ts';
@@ -542,6 +550,11 @@ export type Diff = {
    * when it gives none. One the record already holds by that name is left as it is.
    */
   skills?: { name: string; trigger: string; what: string | null }[];
+  /**
+   * The widgets this version ships for the widget sheet, each by id and title, so the install can say they are there to
+   * add. Absent when it ships none. Nothing is placed: a widget goes on Today only when somebody adds it.
+   */
+  widgets?: { id: string; title: string }[];
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
   /**
@@ -840,6 +853,9 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   /* SKILLS THE PACK GIVES ITS AGENTS, with their text: read here so the checksum holds them and the plan names them. */
   const skills = readPackSkills(doc.skills);
   if (!skills.ok) return skills as Result<Pack>;
+  /* THE WIDGETS IT SHIPS FOR THE SHEET, read here so the checksum holds them and the plan names them. */
+  const widgets = readPackWidgets(doc.widgets);
+  if (!widgets.ok) return widgets as Result<Pack>;
   const manifest: Manifest = {
     pack: id,
     version,
@@ -858,11 +874,13 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(Object.keys(settings.value).length > 0 ? { config: settings.value } : {}),
     ...(changes.value === null ? {} : { changes: changes.value }),
     ...(skills.value.length === 0 ? {} : { skills: skills.value }),
+    ...(widgets.value.length === 0 ? {} : { widgets: widgets.value }),
   };
 
   /* A PACK WHOSE ONLY CONTENT IS `extends`, `adds` OR `hands` CHANGES SOMETHING (a pack that hands everything it had to another, Roadmap 2.0.0, is the add-on that is part of Work now), so it has no declarations to list and is not
      refused for it here. Whether it lays or adds anything is asked once those are read, below. */
-  const reaches = doc.extends !== undefined || doc.adds !== undefined || doc.hands !== undefined;
+  /* AND ONE THAT ONLY SHIPS WIDGETS, a widget shared as an add-on (`braindog addon new --from-widget`), changes the sheet. */
+  const reaches = doc.extends !== undefined || doc.adds !== undefined || doc.hands !== undefined || manifest.widgets !== undefined;
   const raw = doc.declarations ?? (reaches ? [] : undefined);
   if (!Array.isArray(raw) || (raw.length === 0 && !reaches))
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
@@ -1016,7 +1034,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     if (!read.ok) return read as Result<Pack>;
     if (read.value.length > 0) manifest.adds = read.value;
   }
-  if (declarations.length === 0 && manifest.extends === undefined && manifest.adds === undefined && manifest.hands === undefined)
+  if (declarations.length === 0 && manifest.extends === undefined && manifest.adds === undefined && manifest.hands === undefined && manifest.widgets === undefined)
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
 
   /**
@@ -2185,6 +2203,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     ...(pageAdds === undefined ? {} : { page_adds: pageAdds }),
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     ...(pack.manifest.skills === undefined ? {} : { skills: pack.manifest.skills.map((s) => ({ name: s.name, trigger: s.trigger, what: s.what ?? null })) }),
+    ...(pack.manifest.widgets === undefined ? {} : { widgets: pack.manifest.widgets.map((w) => ({ id: w.id, title: w.title })) }),
     spawns: spawnsOf(pack),
     calls_out: calls,
     scripts,

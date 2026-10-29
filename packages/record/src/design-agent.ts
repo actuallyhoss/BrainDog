@@ -639,3 +639,116 @@ function planWhy(name: string, shape: PlanShape, rows: number): string {
   if (shape === 'timeline') return `${count(rows)} things on ${name} fall on a day without a span, so its plan reads as moments on a timeline.`;
   return `${count(rows)} things on ${name} are open with no day, so its plan reads as a board of what is open, doing and done.`;
 }
+
+/* ── the widget tier: what Today might show, from use (widgets plan §6) ───────────────────────────────────────── */
+
+/**
+ * A WIDGET OFFER IS ITS OWN TIER, apart from the arrangement queue above: it never waits on Decide, never counts in Needs
+ * you, and is one quiet cell at the board's end. What it shares with the tiers above is the pen's rules: rules over what
+ * the record already holds, never a model; a reason in one line; "Not now" and "Never" kept on every device; nothing
+ * placed without a press.
+ *
+ * THE SIGNALS ARE READ BY THE CALLER (`widget-signals.ts`) and handed in as `WidgetSignal`s; what is weighed here is how
+ * strong each is, how fresh, whether the widget would draw anything now, and the brakes.
+ */
+
+/** Which rule a widget offer rests on (§6.1). S7, an agent's own proposal, is W7's. */
+export type WidgetSignalId = 'S1' | 'S2' | 'S3' | 'S4' | 'S5' | 'S6';
+
+/** One reason to offer a widget, as the caller read it from the record. */
+export type WidgetSignal = {
+  signal: WidgetSignalId;
+  /** The catalogue's widget, by id (`braindog-render` `WIDGETS`). */
+  widget: string;
+  /** The blank it would be filled with, where the widget takes one (a project's name). */
+  blank?: { id: string; value: string };
+  /** The reason, one sentence in the record's words. */
+  why: string;
+  /** The newest day the signal was seen, `YYYY-MM-DD`: freshness halves every seven days from it. */
+  seen: string;
+  /** Whether the widget would draw something now, not an empty frame (`fit`). */
+  draws: boolean;
+  /** On S1, how many days the question was asked on. */
+  asked?: number;
+  /** On S6, the key of the widget on the board it suggests taking off. */
+  remove?: string;
+};
+
+/** How strong each signal is (§6.2): a question asked again is the strongest reason, an empty widget the weakest. */
+export const WIDGET_STRENGTH: Readonly<Record<WidgetSignalId, number>> = { S1: 3, S3: 2.5, S2: 2, S4: 2, S5: 1.5, S6: 1 };
+/** Freshness halves every this many days. */
+export const WIDGET_HALF_LIFE_DAYS = 7;
+/** Signals that read how often places are opened wait this many days of use before they count (§6.2). */
+export const WIDGET_YOUNG_DAYS = 14;
+/** At most this many widget offers wait at once, as the pen's three (`WAITING_MOST`). */
+export const WIDGET_WAITING_MOST = 3;
+/** Two "Not now" inside this many days pause offers for `WIDGET_PAUSE_DAYS` (§6.2, Call 11). */
+export const WIDGET_NOT_NOW_WINDOW_DAYS = 7;
+export const WIDGET_PAUSE_DAYS = 14;
+
+/** What the person said to widget offers, kept in their `widgets.held` preference and `pen.dismissed`. */
+export type WidgetHeld = {
+  /** Each "Not now", as `<key>@YYYY-MM-DD`, newest last. */
+  notNow: readonly string[];
+  /** The last day an offer was answered (added, not now or never): no new one is shown on Today that day. */
+  last?: string;
+  /** "Forget what BrainDog learned from my use": signals seen before this day are not counted. */
+  forgot?: string;
+  /** Every key turned down for good (`pen.dismissed`, `widget:<id>`). */
+  never: ReadonlySet<string>;
+};
+
+/** The key an offer is kept under: `widget:<template>` or `widget:<template>:<blank value>`, and `widget-off:<key>` for S6. */
+export const widgetKey = (s: Pick<WidgetSignal, 'widget' | 'blank' | 'remove'>): string =>
+  s.remove !== undefined ? `widget-off:${s.remove}` : `widget:${s.widget}${s.blank ? `:${s.blank.value.toLowerCase()}` : ''}`;
+
+const daysBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / DAY_MS);
+
+/** Whether offers are paused: two "Not now" inside seven days, and fourteen days have not passed since the second. */
+export function widgetsPaused(held: Pick<WidgetHeld, 'notNow'>, today: string): boolean {
+  const days = held.notNow
+    .map((k) => k.slice(k.lastIndexOf('@') + 1))
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/u.test(d))
+    .sort();
+  for (let i = days.length - 1; i > 0; i--) {
+    const second = days[i]!;
+    if (daysBetween(days[i - 1]!, second) <= WIDGET_NOT_NOW_WINDOW_DAYS && daysBetween(second, today) < WIDGET_PAUSE_DAYS) return true;
+  }
+  return false;
+}
+
+/** A widget offer weighed: its key, the signal, and its score. */
+export type WidgetRanked = WidgetSignal & { key: string; score: number };
+
+/**
+ * EVERY WIDGET OFFER THE SIGNALS EARN, strongest first, `WIDGET_WAITING_MOST` at most (§6.2): score is strength times
+ * freshness times fit. Dropped: one already on the board (`onBoard`), one turned down for good, one put off in the last
+ * fortnight, a signal seen before the person said Forget, and every one while offers are paused. One widget is offered
+ * once, by its strongest reason.
+ *
+ * `today` IS ON TODAY'S CELL ONLY: the sheet's "Suggested for you" lists what waits whatever was answered today, and
+ * Today shows nothing new on a day an offer was already answered.
+ */
+export function widgetOffers(signals: readonly WidgetSignal[], held: WidgetHeld, today: string, onBoard: (s: WidgetSignal) => boolean, cell = false): WidgetRanked[] {
+  if (widgetsPaused(held, today)) return [];
+  if (cell && held.last === today) return [];
+  const putOff = new Set(
+    held.notNow.flatMap((k) => {
+      const at = k.lastIndexOf('@');
+      const day = k.slice(at + 1);
+      return at > 0 && daysBetween(day, today) < WIDGET_PAUSE_DAYS ? [k.slice(0, at)] : [];
+    }),
+  );
+  const best = new Map<string, WidgetRanked>();
+  for (const s of signals) {
+    if (held.forgot !== undefined && s.seen < held.forgot) continue;
+    const key = widgetKey(s);
+    if (held.never.has(key) || putOff.has(key)) continue;
+    if (s.remove === undefined && onBoard(s)) continue;
+    const age = Math.max(0, daysBetween(s.seen, today));
+    const score = WIDGET_STRENGTH[s.signal] * 0.5 ** (age / WIDGET_HALF_LIFE_DAYS) * (s.draws ? 1 : 0.25);
+    const was = best.get(key);
+    if (was === undefined || score > was.score) best.set(key, { ...s, key, score });
+  }
+  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, WIDGET_WAITING_MOST);
+}

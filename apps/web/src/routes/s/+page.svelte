@@ -26,6 +26,7 @@
   import { copy } from '$lib/copy.ts';
   import { fieldSaid, readShared, words, type SharedBlock, type SharedColumn, type SharedRead } from '$lib/record/share-write.ts';
   import Mark from '$lib/ui/Mark.svelte';
+  import Lockup from '$lib/ui/Lockup.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -157,10 +158,7 @@
 <div class="shared">
   <!-- FLAT, ON THE BOARD: the mark, the name, and what this link is in words. -->
   <header class="bar">
-    <span class="brand">
-      <Mark height={20} />
-      <span class="wordmark">{copy.product}</span>
-    </span>
+    <Lockup />
     <!-- ONLY OVER A PAGE THAT IS SHARED (today F15): a dead link says so in its body, under no chip saying it is shared. -->
     {#if got?.from === 'live'}<span class="what"><Icon name="eye" size="s" /><span class="what-word">{words.sharedChip}</span></span>{/if}
   </header>
@@ -237,22 +235,6 @@
     align-items: center;
     gap: var(--sp-3);
     min-block-size: 52px;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-  }
-
-  .wordmark {
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--fs-head);
-    font-weight: var(--fw-semi);
-    line-height: 24px;
-    white-space: nowrap;
   }
 
   /* WHAT THE LINK IS, IN WORDS at the bar's end, in the second ink: not a pill, since pills are only for counts. */

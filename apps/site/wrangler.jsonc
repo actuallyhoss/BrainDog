@@ -8,9 +8,11 @@
      answers everything on it: the site's own pages from its assets, and the app's doors (`/app`,
      `/api/*`, `/auth/*`, `/account/*`, `/mcp`, `/in/*` and OAuth's `/oauth/*`, with the build id,
      OAuth's metadata under `/.well-known/` and `/healthz` beside them) handed to the app Worker
-     through the `APP` binding. `run_worker_first` below is the exact list. `app.brain.dog` is the
-     app's legacy name: a browser opening it is sent here, and its API doors still answer there
-     (`apps/worker/wrangler.jsonc`, production's routes).
+     through the `APP` binding. `run_worker_first` below is the exact list. The app itself lives at
+     the root of `app.brain.dog` (`apps/worker/wrangler.jsonc`, production's routes); `/app` here is
+     handed over only so the app Worker can answer an old `brain.dog/app/<rest>` page load with one
+     308 to `app.brain.dog/<rest>`, and its API doors keep answering here for tokens handed out on
+     this name.
 
      IT IS STILL A DEPLOYMENT OF ITS OWN. `apps/web` ships inside the app Worker's version as
      `assets` (33 §7); this does not, because it holds no record and a copy change here must never

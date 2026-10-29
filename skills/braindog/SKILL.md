@@ -11,7 +11,7 @@ BrainDog is one person's record: their work, projects, money and decisions, shar
 
 - **In any app that takes an MCP address:** add `https://app.brain.dog/mcp`, or the address they give you.
   The app opens a sign-in and the person allows it in BrainDog, so no token is copied anywhere.
-- **On their machine:** `braindog setup https://app.brain.dog/app/<slug>` signs in, adds the hooks and this skill, and
+- **On their machine:** `braindog setup https://app.brain.dog/<slug>` signs in, adds the hooks and this skill, and
   registers `braindog mcp`, which serves the record with the sign-in the command keeps.
 - **From a script:** a token they make in the app, or with `braindog token create --scope read|propose|write`, in the
   `Authorization` header:

@@ -19,6 +19,7 @@
  * OUT OF THE COMPONENTS so `node --test` can run it, which is why its imports are relative and type-only.
  */
 
+import { bankCode } from 'braindog-render';
 import type { Entry, Fields, RegisterDecl } from './schema.ts';
 
 /* ── the roles a list declares ──────────────────────────────────────────── */
@@ -39,10 +40,10 @@ export type Meets = {
 };
 
 /** The parts of `org:`, the organisations' role. */
-export type OrgRole = { name: string; keys?: string; kind?: string; domain?: string; merged_into?: string; met?: string; projects?: string };
+export type OrgRole = { name: string; keys?: string; kind?: string; domain?: string; merged_into?: string; met?: string; projects?: string; retired?: string };
 
 const MEETS_PARTS = ['email', 'keys', 'handles', 'org', 'projects', 'met', 'merged_into', 'in_touch', 'self', 'aliases'] as const;
-const ORG_PARTS = ['keys', 'kind', 'domain', 'merged_into', 'met', 'projects'] as const;
+const ORG_PARTS = ['keys', 'kind', 'domain', 'merged_into', 'met', 'projects', 'retired'] as const;
 
 /* A DECLARATION THE RECORD HANDED BACK KEEPS EVERY KEY IT CARRIED (`declOf` spreads it), so the role is read off it as
    it came; `RegisterDecl` names only the keys every screen reads. */
@@ -222,6 +223,103 @@ export function foldPeople(entries: readonly Entry[], decl: RegisterDecl | undef
   return bands;
 }
 
+/* ── the list of people, A to Z ─────────────────────────────────────────── */
+
+/** One letter of the list and the people under it. */
+export type Lettered = { letter: string; members: Member[] };
+
+/**
+ * THE PEOPLE BY THE FIRST LETTER OF THEIR NAME, for finding somebody you know by name rather than by when you last spoke.
+ * A name that starts with no letter (a digit, a mark) is under "#", last. Folded-away people are left out, as above.
+ */
+export function letterPeople(entries: readonly Entry[], decl: RegisterDecl | undefined): Lettered[] {
+  const meets = meetsOf(decl);
+  if (!meets || !decl) return [];
+  const nameOf = (e: Entry): string => String(e.fields[meets.name] ?? e.fields[decl.title] ?? '').trim();
+  const members: Member[] = entries
+    .filter((e) => !mergedAway(e.fields, decl))
+    .map((e) => ({ entry: e, day: lastDayOf(e.fields, meets), self: meets.self ? e.fields[meets.self] === true : false }))
+    .sort((a, b) => nameOf(a.entry).localeCompare(nameOf(b.entry), undefined, { sensitivity: 'base' }));
+  const out: Lettered[] = [];
+  for (const m of members) {
+    const first = nameOf(m.entry).charAt(0).toLocaleUpperCase();
+    const letter = /\p{L}/u.test(first) ? first : '#';
+    const last = out.find((g) => g.letter === letter);
+    if (last) last.members.push(m);
+    else out.push({ letter, members: [m] });
+  }
+  return out.sort((a, b) => (a.letter === '#' ? 1 : b.letter === '#' ? -1 : a.letter.localeCompare(b.letter)));
+}
+
+/* ── the list of organisations, by kind ─────────────────────────────────── */
+
+/**
+ * AN ORGANISATION'S NAME AS IT IS SHOWN: a bank's code is never a name (Q15), so one a card text named by the end of an
+ * account ("0140") reads "Account ending 0140", and a government code "Government payment". The row keeps its name.
+ */
+export const orgNameSaid = (name: string): string => bankCode(name) ?? name;
+
+/** The counts the organisations list's line says: the ones with a kind, and the shops a card text named. */
+export function orgsCounted(groups: readonly OrgGroup[]): { known: number; shops: number } {
+  let known = 0;
+  let shops = 0;
+  for (const g of groups) {
+    if (g.kind !== null) known += g.items.length;
+    else if (g.rest === 'texts' || g.rest === 'unsorted') shops += g.items.length;
+  }
+  return { known, shops };
+}
+
+/** One group of the organisations list: a kind ("Vendors"), the shops a card text named, or the ones put away. */
+export type OrgItem = { entry: Entry; day: string | null };
+export type OrgGroup = { key: string; kind: string | null; rest: 'texts' | 'unsorted' | 'away' | null; items: OrgItem[] };
+
+/**
+ * THE ORGANISATIONS AS THEY ARE READ (29 October): by what kind each is, in the order the list declares its kinds, each
+ * A to Z; then the ones a card text named with no kind yet, which `rule.meet-payees` writes and which are shops nearly
+ * always; then any other with no kind; then the ones folded into another or retired, kept and said last so the list
+ * still counts every row it holds. Every row is somewhere, so the groups add up to the list's own count.
+ */
+export function foldOrgs(entries: readonly Entry[], decl: RegisterDecl | undefined): OrgGroup[] {
+  const role = orgRoleOf(decl);
+  if (!role || !decl) return [];
+  const kinds: readonly string[] = (role.kind ? decl.fields.find((f) => f.id === role.kind)?.values : undefined) ?? [];
+  const nameOf = (e: Entry): string => String(e.fields[role.name] ?? e.fields[decl.title] ?? '').trim();
+  const dayOf = (e: Entry): string | null => {
+    let best: string | null = null;
+    for (const line of role.met ? textsOf(e.fields[role.met]) : []) {
+      const d = MET_LINE.exec(line)?.[1];
+      if (d && (best === null || d > best)) best = d;
+    }
+    return best;
+  };
+  const filled = (v: unknown): boolean => v !== null && v !== undefined && v !== '' && v !== false;
+  const groups = new Map<string, OrgGroup>();
+  const put = (key: string, kind: string | null, rest: OrgGroup['rest'], e: Entry): void => {
+    const g = groups.get(key) ?? { key, kind, rest, items: [] };
+    g.items.push({ entry: e, day: dayOf(e) });
+    groups.set(key, g);
+  };
+  for (const e of entries) {
+    const f = e.fields;
+    const kind = role.kind ? f[role.kind] : undefined;
+    if ((role.merged_into && filled(f[role.merged_into])) || (role.retired && filled(f[role.retired]))) put('away', null, 'away', e);
+    else if (typeof kind === 'string' && kind !== '') put(`k:${kind}`, kind, null, e);
+    else if (role.keys && textsOf(f[role.keys]).some((k) => k.startsWith('bank:'))) put('texts', null, 'texts', e);
+    else put('unsorted', null, 'unsorted', e);
+  }
+  const rank = (g: OrgGroup): number => {
+    if (g.rest === 'texts') return 1000;
+    if (g.rest === 'unsorted') return 1001;
+    if (g.rest === 'away') return 1002;
+    const i = kinds.indexOf(g.kind ?? '');
+    return i === -1 ? 999 : i;
+  };
+  const out = [...groups.values()].sort((a, b) => rank(a) - rank(b));
+  for (const g of out) g.items.sort((a, b) => nameOf(a.entry).localeCompare(nameOf(b.entry), undefined, { sensitivity: 'base' }));
+  return out;
+}
+
 /* ── a page's cards, grouped by what they point at ─────────────────────── */
 
 /** What one card is grouped under: the row its `group:` field points at, by its number when it has one, and its name. */
@@ -338,6 +436,8 @@ function placeOf(said: string): { where: string; kind: Seen['kind']; about: stri
   const mail = /^(?:mail|email)\s*(?::|from\b)\s*(.*)$/iu.exec(said);
   if (mail) return { where: seenWords.mail, kind: 'mail', about: plain(mail[1]!) || null };
   const words = plain(said);
+  /* A BANK TEXT FILED IT: said as what happened, "Filed from a bank text", never "Seen in · Bank text". */
+  if (/^bank (?:texts?|sms|messages?)$/iu.test(words)) return { where: seenWords.filedFromText, kind: 'other', about: null };
   return words ? { where: words.charAt(0).toUpperCase() + words.slice(1), kind: 'other', about: null } : null;
 }
 
@@ -373,7 +473,7 @@ export type Known = { label: string; value: string };
 const KEY_LABELS: Readonly<Record<string, string>> = {
   email: 'Email',
   github: 'GitHub',
-  bank: 'Bank payee',
+  bank: 'Bank texts call it',
   folder: 'Folder',
   git: 'Git',
   gitlab: 'GitLab',
@@ -384,7 +484,7 @@ const KEY_LABELS: Readonly<Record<string, string>> = {
   linkedin: 'LinkedIn',
   phone: 'Phone',
   domain: 'Website',
-  payee: 'Bank payee',
+  payee: 'Bank texts call it',
   remote: 'Repository',
 };
 
@@ -528,6 +628,23 @@ export const seenWords = {
   moreIn: (name: string): string => `More in ${name}`,
   unnamedOrg: 'An organisation with no name yet',
   you: 'You',
+  /* The organisations list's groups and the people list's orders. */
+  kindsOf: (label: string): string => (/^other$/iu.test(label) ? 'Other' : /[^aeiou]y$/iu.test(label) ? `${label.slice(0, -1)}ies` : `${label}s`),
+  fromTexts: 'Shops from card texts',
+  /* THE LIST'S ONE LINE, the same words People says over it: "4 organisations you work with, 13 shops from card texts." */
+  orgsSaid: (known: number, shops: number): string =>
+    [known > 0 ? `${known} ${known === 1 ? 'organisation' : 'organisations'} you work with` : '', shops > 0 ? `${shops} ${shops === 1 ? 'shop' : 'shops'} from card texts` : '']
+      .filter(Boolean)
+      .join(', ') + '.',
+  /* AN ORGANISATION A BANK TEXT FILED, said on its page as a sentence and not as "Seen in · Bank text". */
+  filedFromText: 'Filed from a bank text',
+  /* AN ORGANISATION WITH NO KIND YET: the one press that says what it is to you. */
+  setKind: 'Say what it is to you',
+  noKind: 'No kind yet',
+  putAway: 'Merged or retired',
+  recent: 'Recent',
+  az: 'A to Z',
+  orderBy: 'Order people by',
   /* The person's page. */
   seenIn: 'Seen in',
   knownBy: 'Known by',

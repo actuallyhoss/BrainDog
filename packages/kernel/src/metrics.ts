@@ -135,8 +135,21 @@ export type Value = Aggregation | { ratio: { of: Aggregation; per: Aggregation }
  * A VALUE OF ITS OWN, BESIDE `Value` AND NOT IN IT, as cash rolled forward and a trend are: every reader of `Value`
  * narrows it to an aggregation over one list (`rules.ts` `addsMoney`, `fieldsOf`), and a sum of figures is none.
  * `evaluateMetric` reads it before any of them is reached, and `isSumOf` is how a reader tells.
+ *
+ * `optional: true` IS A PART AN ADD-ON MAY OR MAY NOT HAVE INSTALLED, since money-core 3.31.0: net worth adds Holdings,
+ * Property, Certificates and Insurance when the record holds them. A part nobody installed then adds nothing rather
+ * than refusing the whole sum, at install and when it is read; one that is installed is read like any other part.
  */
-export type SumOf = { sum_of: { metric: string; minus?: boolean | undefined }[] };
+export type SumOf = { sum_of: { metric: string; minus?: boolean | undefined; optional?: boolean | undefined }[] };
+
+/**
+ * ONE SUM OF FIGURES AS A SHARE OF ANOTHER, SINCE 30 October (money's over-leverage, Q-health of round 1030): what goes
+ * out every month on repeating lines and instalments, as a share of what comes in every month. Each half is a `sum_of`
+ * read as one is (`readSumOf`), and the share is taken only when both come back as one number in one currency, or both
+ * as plain numbers: two currencies are never divided, as they are never added. A half of nought reads nothing, never a
+ * share of nothing.
+ */
+export type RatioOf = { ratio_of: { of: SumOf['sum_of']; per: SumOf['sum_of'] } };
 
 export type MetricDecl = {
   metric: string;
@@ -461,7 +474,15 @@ export type Reading = {
    * amount going out, in the walk's currency. Absent when the walk never goes under or opens under (`readWalk`).
    */
   under?: { day: string; label: string; amount: number; currency: string | null };
+  /**
+   * ON A STREAK (`{ streak: { on, grain } }`): the days or weeks in a row that hold an entry, which is `value`, the last
+   * day one was made on, and whether the bucket the clock is in holds one yet. Absent on every other figure.
+   */
+  streak?: StreakSaid;
 };
+
+/** What a streak says beside its count: its grain, the newest day an entry falls on, and whether today's bucket has one. */
+export type StreakSaid = { grain: StreakGrain; last: string | null; today: boolean };
 
 /** The entry a running total reached its line at. `at` is a day or an instant as it is kept, or a number. */
 export type Crossed = { id: string; at: string | number | null; value: number };
@@ -578,7 +599,7 @@ export function windowMs(text: string): number | null {
 /** The published shapes with no consumer here, each named rather than ignored. */
 const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket'] as const;
 /** The two shapes that are a figure of their own: read at the top of a value, refused by name inside one. */
-const WHOLE_SHAPES = ['running', 'trend'] as const;
+const WHOLE_SHAPES = ['running', 'trend', 'streak'] as const;
 
 /**
  * The same clock, one year earlier.
@@ -1429,6 +1450,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return readSumOf(sql, decl, ctx);
   }
+  /* AND ONE SUM AS A SHARE OF ANOTHER, each half read as a sum is (`readRatioOf`). */
+  if (isRatioOf(decl.value)) {
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return readRatioOf(sql, decl, ctx);
+  }
   if (isRolled(decl.value) || isWalked(decl)) {
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return isWalked(decl) ? readWalk(sql, decl, ctx) : readRolled(sql, decl, ctx);
@@ -1442,6 +1468,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (isShape(decl.value, 'trend')) {
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return readTrend(sql, decl, ctx);
+  }
+  /* AND A STREAK, the days or weeks in a row that hold an entry (`readStreak`), for a habit kept up. */
+  if (isShape(decl.value, 'streak')) {
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return readStreak(sql, decl, ctx);
   }
 
   const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
@@ -1961,6 +1992,93 @@ function crossedAt(sql: Sql, schema: Schema, run: Running, line: number | null, 
   return null;
 }
 
+/* ── a streak ────────────────────────────────────────── */
+
+/** What a streak counts in a row: days, or weeks from Monday. */
+export const STREAK_GRAINS = ['day', 'week'] as const;
+export type StreakGrain = (typeof STREAK_GRAINS)[number];
+/** The most distinct days a streak reads back: more than two years of days in a row. */
+export const STREAK_DAYS_MOST = 800;
+
+/** The Monday a day falls in, as `YYYY-MM-DD`, read in UTC as every day here is. */
+const mondayOf = (day: string): string => {
+  const at = Date.parse(`${day}T12:00:00Z`);
+  const back = (new Date(at).getUTCDay() + 6) % 7;
+  return new Date(at - back * DAY).toISOString().slice(0, 10);
+};
+
+/**
+ * A STREAK: how many days (or weeks, from Monday) in a row up to now hold at least one entry the figure's `where` admits,
+ * dated by `on` (a day or an instant the list keeps, or `created_at` when left out). A habit logged every day reads 12
+ * on its twelfth day.
+ *
+ * TODAY DOES NOT BREAK IT. Until the day (or the week) is over, a streak that held yesterday still holds: it is counted
+ * from the bucket before when the one the clock is in has nothing yet, and `streak.today` says which, so a tile can say
+ * "log today to keep it". A gap of one whole bucket ends it, and a list with nothing in its last two buckets reads 0.
+ *
+ * ONE READ OF THE DISTINCT DAYS, newest first and `STREAK_DAYS_MOST` at most, so a list of years of entries costs the
+ * days it holds and never its rows. No currency, no window and no comparison: the run is its own measure.
+ */
+function readStreak(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
+  const mine = (fix: string): string => `${decl.metric}: ${fix}`;
+  const body = (decl.value as unknown as { streak: unknown }).streak;
+  const shape = body !== null && typeof body === 'object' && !Array.isArray(body) ? (body as { on?: unknown; grain?: unknown }) : null;
+  if (shape === null) return no<Reading>('VALUE_MALFORMED', mine('a streak is written { streak: { on: <a day field>, grain: day } }, both parts optional'), { at: 'value' });
+  const grain = shape.grain === undefined ? 'day' : shape.grain;
+  if (!(STREAK_GRAINS as readonly unknown[]).includes(grain)) return no<Reading>('VALUE_MALFORMED', mine(`a streak counts days or weeks in a row, and ${String(grain)} is neither: write grain: day or grain: week`), { at: 'value' });
+  if (decl.group_by !== undefined || decl.bucket !== undefined)
+    return no<Reading>('DECLARATION_INVALID', mine('a streak is one run of days and is never cut in parts: leave group_by and bucket out'), { at: decl.group_by !== undefined ? 'group_by' : 'bucket' });
+  const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
+  if (register === null) return no<Reading>('SOURCE_UNKNOWN', mine(`a streak counts the entries of a list, written source: register.<list>, and ${decl.source} is not one`), { at: 'source' });
+  const schema = ctx.schemaOf(register);
+  if (!schema || (ctx.reads !== undefined && !ctx.reads(register))) return no<Reading>('REGISTER_UNKNOWN', mine(`there is no list called ${register}`), { at: 'source' });
+  const on = shape.on === undefined ? 'created_at' : shape.on;
+  if (typeof on !== 'string' || on === '') return no<Reading>('VALUE_MALFORMED', mine('a streak names the day each entry falls on as on: <a day or instant field>'), { at: 'value' });
+  const type = Object.hasOwn(schema.fields, on) || isStamped(schema, on) ? typeOf(schema, on) : undefined;
+  if (type === undefined) return no<Reading>('FIELD_UNKNOWN', mine(`${register} has no field called ${on}`), { at: 'value' });
+  if (type !== 'day' && type !== 'instant') return no<Reading>('VALUE_MALFORMED', mine(`a streak is dated by a day or an instant, and ${on} is a ${type}`), { at: 'value' });
+  const said = resolvedOf(decl.where, schema, ctx);
+  if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
+  const w = compile(said.predicate, schema);
+  if (w.bad.length) return { ok: false, refusal: w.bad[0]! };
+  const dated = isStamped(schema, on) ? on : `json_extract(fields, '${jsonPath(on)}')`;
+  const days = sql
+    .all<{ d: string | null }>(
+      `SELECT DISTINCT substr(${dated}, 1, 10) AS d FROM entry WHERE register = ? AND deleted_at IS NULL AND ${w.sql} AND ${dated} IS NOT NULL ORDER BY d DESC LIMIT ${STREAK_DAYS_MOST}`,
+      register,
+      ...w.params,
+    )
+    .map((r) => r.d)
+    .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(d));
+  const held = sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', register)?.n ?? 0;
+  const today = new Date(clockOf(ctx)).toISOString().slice(0, 10);
+  const bucketOfDay = (d: string): string => (grain === 'week' ? mondayOf(d) : d);
+  const step = (grain === 'week' ? 7 : 1) * DAY;
+  const back = (b: string): string => new Date(Date.parse(`${b}T12:00:00Z`) - step).toISOString().slice(0, 10);
+  const buckets = new Set(days.filter((d) => d <= today).map(bucketOfDay));
+  const now = bucketOfDay(today);
+  const has = buckets.has(now);
+  let at = has ? now : back(now);
+  let run = 0;
+  while (buckets.has(at)) {
+    run += 1;
+    at = back(at);
+  }
+  const last = days.find((d) => d <= today) ?? null;
+  const { met } = verdictOf({ format: decl.format, target: decl.target }, run, null, [], today);
+  return ok({
+    value: run,
+    unit: null,
+    rows: days.length,
+    held,
+    delta: null,
+    why: 'a streak is its own measure, with no window before',
+    met: heldVerdict(met, held),
+    refusals: [],
+    streak: { grain: grain as StreakGrain, last, today: has },
+  });
+}
+
 /** The most buckets ahead a trend is asked for: a year of months, the bound install holds it to (`declare.ts`). */
 export const TREND_AHEAD_MOST = 12;
 
@@ -2057,6 +2175,9 @@ export const SUM_OF_DEPTH_MOST = 3;
 /** Whether a value is a sum of other figures: `{ sum_of: [...] }` at its top. */
 export const isSumOf = (value: unknown): value is SumOf => isShape(value, 'sum_of');
 
+/** Whether a value is one sum of figures over another: `{ ratio_of: { of, per } }` at its top. */
+export const isRatioOf = (value: unknown): value is RatioOf => isShape(value, 'ratio_of');
+
 /** A part's id and its parameter: THE FIRST COLON SEPARATES, as in a walk's opening (`book-cash:Kiln`). */
 const partOf = (said: string): { named: string; param: string | undefined } => {
   const colon = said.indexOf(':');
@@ -2078,13 +2199,20 @@ export function sumOfFault(value: SumOf, self: string, bodyOf: (id: string) => M
   let money: string | null = null;
   let plain: string | null = null;
   for (const part of parts as unknown[]) {
-    const p = part as { metric?: unknown; minus?: unknown } | null;
-    const shaped = p !== null && typeof p === 'object' && !Array.isArray(p) && keysOf(p).every((k) => k === 'metric' || k === 'minus');
-    if (!shaped || typeof p.metric !== 'string' || p.metric === '' || (p.minus !== undefined && typeof p.minus !== 'boolean'))
-      return 'each part is { metric: <a figure> }, with minus: true when it is taken away';
+    const p = part as { metric?: unknown; minus?: unknown; optional?: unknown } | null;
+    const shaped = p !== null && typeof p === 'object' && !Array.isArray(p) && keysOf(p).every((k) => k === 'metric' || k === 'minus' || k === 'optional');
+    if (
+      !shaped ||
+      typeof p.metric !== 'string' ||
+      p.metric === '' ||
+      (p.minus !== undefined && typeof p.minus !== 'boolean') ||
+      (p.optional !== undefined && typeof p.optional !== 'boolean')
+    )
+      return 'each part is { metric: <a figure> }, with minus: true when it is taken away and optional: true when an add-on may not be there';
     const { named } = partOf(p.metric);
     if (named === self) return `a sum adds other figures, and ${named} is this one`;
     const body = bodyOf(named);
+    if (!body && p.optional === true) continue;
     if (!body) return `there is no figure called ${named} to add`;
     if (isMoneyFormat(body.format)) money ??= named;
     else plain ??= named;
@@ -2123,7 +2251,7 @@ function readSumOf(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading
   const parts = ((decl.value as unknown as SumOf).sum_of ?? []) as SumOf['sum_of'];
   for (const p of Array.isArray(parts) ? parts : []) {
     const named = typeof p?.metric === 'string' && p.metric !== '' ? partOf(p.metric).named : null;
-    if (named !== null && named !== decl.metric && installedFigure(sql, named) === null)
+    if (named !== null && named !== decl.metric && p.optional !== true && installedFigure(sql, named) === null)
       return no<Reading>('METRIC_UNKNOWN', mine(`there is no figure called ${named} to add`), { at: 'value' });
   }
   const fault = sumOfFault(decl.value as unknown as SumOf, decl.metric, (id) => installedFigure(sql, id));
@@ -2148,7 +2276,9 @@ function readSumOf(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading
     /* A HOLE NOBODY FILLED IS NO NAME TO ASK ABOUT, as a walk's opening says (`readWalk`). */
     if (param !== undefined && /\{\{\w+\}\}/.test(param))
       return no<Reading>('REQUIRED_MISSING', mine(`this figure is read once for each of something and adds ${named} for the same one. Ask for it by name, as ${decl.metric}:<name>.`), { at: 'value' });
-    const body = installedFigure(sql, named)!;
+    /* AN OPTIONAL PART NOBODY INSTALLED ADDS NOTHING: the add-on is not here, so neither is what it would hold. */
+    const body = installedFigure(sql, named);
+    if (body === null) continue;
     const figure = param === undefined ? body : (fill(body, null, param) as MetricDecl);
     const read = evaluateMetric(sql, figure, ctx);
     if (!read.ok) return read;
@@ -2189,6 +2319,50 @@ function readSumOf(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading
     held: scope,
     delta: null,
     why: unread !== null ? `${unread} has no number to add` : 'a sum of figures is not compared with a window before',
+    met: heldVerdict(met, scope),
+    refusals: [],
+    ...(targetIn ? { targetIn } : {}),
+  });
+}
+
+/**
+ * ONE SUM OF FIGURES AS A SHARE OF ANOTHER (`RatioOf`): each half read by `readSumOf` as a money figure with no target,
+ * then divided when both are one number in one unit. Anything else, a half in parts by currency, a half with no number or
+ * a half of nought, reads no value and says why; the verdict is the share against the figure's own target.
+ */
+function readRatioOf(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
+  const mine = (fix: string): string => `${decl.metric}: ${fix}`;
+  const r = (decl.value as unknown as RatioOf).ratio_of as Partial<RatioOf['ratio_of']> | null;
+  if (r === null || typeof r !== 'object' || !Array.isArray(r.of) || !Array.isArray(r.per))
+    return no<Reading>('DECLARATION_INVALID', mine('a share of figures names both halves, as ratio_of: { of: [{ metric: a }], per: [{ metric: b }] }'), { at: 'value' });
+  const half = (parts: SumOf['sum_of']): Result<Reading> =>
+    readSumOf(sql, { ...decl, value: { sum_of: parts } as unknown as MetricDecl['value'], format: 'money', target: undefined }, ctx);
+  const of = half(r.of);
+  if (!of.ok) return of;
+  const per = half(r.per);
+  if (!per.ok) return per;
+  const a = of.value;
+  const b = per.value;
+  const held = ctx.fx?.() ?? { home: null, rates: [] };
+  const today = new Date(clockOf(ctx)).toISOString().slice(0, 10);
+  const why =
+    a.value === null || b.value === null
+      ? 'a half has no one number, so no share is taken'
+      : a.unit !== b.unit
+        ? 'the two halves are in different currencies, so no share is taken'
+        : b.value === 0
+          ? 'nothing comes in, so no share is taken'
+          : null;
+  const value = why === null ? a.value! / b.value! : null;
+  const { met, targetIn } = verdictOf({ format: decl.format, target: decl.target }, value, null, held.rates, today);
+  const scope = a.held + b.held;
+  return ok({
+    value,
+    unit: null,
+    rows: a.rows + b.rows,
+    held: scope,
+    delta: null,
+    why: why ?? 'a share of figures is not compared with a window before',
     met: heldVerdict(met, scope),
     refusals: [],
     ...(targetIn ? { targetIn } : {}),
@@ -2268,14 +2442,18 @@ export function pointedRows(sql: Sql, to: string, ids: readonly string[]): Map<s
   const live = (id: string) => fields.find((f) => f?.id === id && f.retired !== true);
   const title = typeof list.title === 'string' && FIELD_ID.test(list.title) && live(list.title) && !NOT_A_NAME.has(live(list.title)?.type) ? list.title : null;
   const kept = live('currency');
-  const currency = kept && (kept.type === 'text' || kept.type === 'enum') ? 'currency' : null;
+  /* A LIST WITH NO CURRENCY FIELD IS KEPT IN THE CURRENCY OF ITS ONE REQUIRED MONEY (round 1030): an account says its
+     currency by its balance, so a figure about one account's lines (`account is Cash (USD)`) is read in dollars and
+     never turned into the home currency. */
+  const held = kept ? undefined : fields.find((f) => f?.type === 'money' && (f as { required?: unknown }).required === true && f.retired !== true && typeof f.id === 'string' && FIELD_ID.test(f.id));
+  const currency = kept && (kept.type === 'text' || kept.type === 'enum') ? jsonPath('currency') : held ? `${jsonPath(held.id as string)}.currency` : null;
   if (title === null && currency === null) return out;
   const said = (v: unknown): string | null =>
     typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' || typeof v === 'boolean' ? String(v) : null;
   /* THE IDS ARE ONE BOUND ARRAY, so the statement binds two values at any number of ids: the Durable Object
      refuses a statement over 100, and one value an id crashed a page of 101. */
   const rows = sql.all<{ id: string; t: unknown; c: unknown }>(
-    `SELECT id, ${title === null ? 'NULL' : `json_extract(fields, '${jsonPath(title)}')`} AS t, ${currency === null ? 'NULL' : `json_extract(fields, '${jsonPath(currency)}')`} AS c
+    `SELECT id, ${title === null ? 'NULL' : `json_extract(fields, '${jsonPath(title)}')`} AS t, ${currency === null ? 'NULL' : `json_extract(fields, '${currency}')`} AS c
        FROM entry WHERE register = ? AND id IN (SELECT value FROM json_each(?))`,
     to,
     JSON.stringify(asked),

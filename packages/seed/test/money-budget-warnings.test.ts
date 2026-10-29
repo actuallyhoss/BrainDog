@@ -33,25 +33,51 @@ const value = <T>(r: unknown): T => {
 
 test('THE MARK IS NEAR PAST THE SHARE, OVER PAST THE MOST, and never made twice in a month or put back', () => {
   const cat = (seq: number, fields: Record<string, unknown>) => ({ id: `ent_${seq}`, spoken: `categories#${seq}`, version: 1, fields });
-  const out = (category: string, amount: { amount: number; currency: string }) => ({ id: 'x', fields: { category, amount } });
+  const out = (category: string, amount: { amount: number; currency: string }, on = '2026-10-20') => ({ id: 'x', fields: { category, amount, on } });
   const food = cat(1, { name: 'Food', budget: egp(1_000), budget_alert: 80 });
   const fun = cat(2, { name: 'Fun', budget: egp(500) });
   const trips = cat(3, { name: 'Trips', budget: egp(2_000), budget_alert: 50 });
   const entries = [out('ent_1', egp(820)), out('ent_2', egp(400)), out('ent_3', egp(2_100)), out('ent_3', usd(5_000))];
-  assert.deepEqual(budgetWarnings([food, fun, trips], entries, '2026-10'), [
-    { id: 'categories#1', version: 1, fields: { budget_warned: 'near', warned_month: '2026-10' } },
-    { id: 'categories#3', version: 1, fields: { budget_warned: 'over', warned_month: '2026-10' } },
+  const month = { warned_month: '2026-10', warned_for: 'this month' };
+  assert.deepEqual(budgetWarnings([food, fun, trips], entries, '2026-10-29'), [
+    { id: 'categories#1', version: 1, fields: { budget_warned: 'near', ...month } },
+    { id: 'categories#3', version: 1, fields: { budget_warned: 'over', ...month } },
   ]);
   /* FUN HAS NO SHARE TO WARN AT, so it is told only once it is over. DOLLARS DO NOT COUNT AGAINST POUNDS. */
-  assert.deepEqual(budgetWarnings([fun], [out('ent_2', egp(501))], '2026-10').map((w) => w.fields.budget_warned), ['over']);
-  assert.deepEqual(budgetWarnings([fun], [out('ent_2', usd(10_000))], '2026-10'), []);
+  assert.deepEqual(budgetWarnings([fun], [out('ent_2', egp(501))], '2026-10-29').map((w) => w.fields.budget_warned), ['over']);
+  assert.deepEqual(budgetWarnings([fun], [out('ent_2', usd(10_000))], '2026-10-29'), []);
   /* ALREADY MARKED THIS MONTH: nothing again, and over is never put back to near. */
   const marked = (c: typeof food, warned: string) => ({ ...c, fields: { ...c.fields, budget_warned: warned, warned_month: '2026-10' } });
-  assert.deepEqual(budgetWarnings([marked(food, 'near')], entries, '2026-10'), []);
-  assert.deepEqual(budgetWarnings([marked(trips, 'over')], [out('ent_3', egp(1_500))], '2026-10'), []);
-  /* NEAR THEN OVER IN ONE MONTH, AND NEAR AGAIN THE NEXT. */
-  assert.equal(budgetWarnings([marked(food, 'near')], [out('ent_1', egp(1_001))], '2026-10')[0]!.fields.budget_warned, 'over');
-  assert.equal(budgetWarnings([marked(trips, 'over')], [out('ent_3', egp(1_500))], '2026-11')[0]!.fields.budget_warned, 'near');
+  assert.deepEqual(budgetWarnings([marked(food, 'near')], entries, '2026-10-29'), []);
+  assert.deepEqual(budgetWarnings([marked(trips, 'over')], [out('ent_3', egp(1_500))], '2026-10-29'), []);
+  /* NEAR THEN OVER IN ONE MONTH, AND NEAR AGAIN THE NEXT, counting only the next month's money. */
+  assert.equal(budgetWarnings([marked(food, 'near')], [out('ent_1', egp(1_001))], '2026-10-29')[0]!.fields.budget_warned, 'over');
+  assert.equal(budgetWarnings([marked(trips, 'over')], [out('ent_3', egp(1_500)), out('ent_3', egp(1_100), '2026-11-05')], '2026-11-06')[0]!.fields.budget_warned, 'near');
+});
+
+test('A BUDGET FOR A WEEK OR A YEAR COUNTS ITS OWN PERIOD, and what was left carries over when the category says so', () => {
+  const cat = (seq: number, fields: Record<string, unknown>) => ({ id: `ent_${seq}`, spoken: `categories#${seq}`, version: 1, fields });
+  const out = (category: string, major: number, on: string) => ({ id: 'x', fields: { category, amount: egp(major), on } });
+  /* THURSDAY 29 OCTOBER: the week began on Monday the 26th. */
+  const week = cat(1, { name: 'Coffee', budget: egp(100), budget_period: 'week' });
+  const lines = [out('ent_1', 90, '2026-10-25'), out('ent_1', 101, '2026-10-27')];
+  assert.deepEqual(budgetWarnings([week], lines, '2026-10-29'), [
+    { id: 'categories#1', version: 1, fields: { budget_warned: 'over', warned_month: '2026-10-26', warned_for: 'this week' } },
+  ]);
+  assert.deepEqual(budgetWarnings([week], [out('ent_1', 150, '2026-10-25')], '2026-10-29'), [], 'last week is not this week');
+
+  const year = cat(2, { name: 'Holidays', budget: egp(10_000), budget_period: 'year', budget_alert: 50 });
+  assert.deepEqual(budgetWarnings([year], [out('ent_2', 3_000, '2026-02-01'), out('ent_2', 2_500, '2026-08-01')], '2026-10-29'), [
+    { id: 'categories#2', version: 1, fields: { budget_warned: 'near', warned_month: '2026', warned_for: 'this year' } },
+  ]);
+
+  /* CARRIES OVER: last week spent 60 of 100, so this week may spend 140, and 120 is not over. */
+  const rolls = cat(3, { name: 'Lunch', budget: egp(100), budget_period: 'week', rollover: true });
+  assert.deepEqual(budgetWarnings([rolls], [out('ent_3', 60, '2026-10-20'), out('ent_3', 120, '2026-10-27')], '2026-10-29'), [
+    { id: 'categories#3', version: 1, fields: { carried: egp(40) } },
+  ]);
+  /* OVER LAST WEEK LEAVES NOTHING TO CARRY, never less than nothing. */
+  assert.deepEqual(budgetWarnings([rolls], [out('ent_3', 160, '2026-10-20')], '2026-10-29'), [{ id: 'categories#3', version: 1, fields: { carried: egp(0) } }]);
 });
 
 test('THE TWO RULES TELL OF THE MARK, once a category a month', () => {

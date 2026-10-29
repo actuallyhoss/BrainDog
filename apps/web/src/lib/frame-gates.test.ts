@@ -66,10 +66,17 @@ test('the walk reads the app, the skin and the renderer', () => {
 
 /* ── 1. No glass ─────────────────────────────────────────────────────────── */
 
+/**
+ * THE ONE GLASS THAT STAYS: the board's edit bar, which floats at the foot of the screen over the tiles while they are
+ * arranged (round 1030's widgets plan, §5.1), so a tile under it still reads as there. By file, how many.
+ */
+const GLASS: Record<string, number> = { 'apps/web/src/lib/board/Board.svelte': 1 };
+
 test('nothing blurs what is behind it', () => {
   const found = PRODUCT.flatMap((file) => {
     const text = code(file);
-    return [...text.matchAll(/backdrop-filter/gu)].map((m) => `${at(file)}:${lineOf(text, m.index)}`);
+    const hits = [...text.matchAll(/backdrop-filter/gu)].map((m) => `${at(file)}:${lineOf(text, m.index)}`);
+    return hits.length <= (GLASS[at(file)] ?? 0) ? [] : hits;
   });
   assert.deepEqual(found, [], `a floating layer is the opaque tile with a 1px edge: ${found.join(', ')}`);
 });
@@ -135,6 +142,8 @@ function flat(value: string): boolean {
  */
 const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/lib/agents/NewKind.svelte': ['.field[data-wrong], .lines[data-wrong]'], // edge
+  'apps/web/src/lib/board/WidgetSheet.svelte': ['.ws-search', '.ws-search:focus-within', '.ws-card .ws-frame', '.ws-open:focus-visible .ws-frame', '.ws-plus', '.ws-stage .ws-frame'], // line over the sticky search, edge, ring
+  'apps/web/src/lib/board/WidgetTile.svelte': ['.wt'], // edge
   'apps/web/src/lib/decide/DecisionCard.svelte': ['.queue-card[data-selected]'], // edge
   'apps/web/src/lib/decide/form.css': ['.dc-btn[data-on]'], // edge
   'apps/web/src/lib/flow/RunView.svelte': ['.rv-card[data-state=\'unreached\']'], // edge
@@ -147,7 +156,7 @@ const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/lib/ui/Count.svelte': ['.badge[data-size=\'s\']'], // ring
   'apps/web/src/lib/ui/NewAction.svelte': ['.field[data-bad]'], // edge
   'apps/web/src/lib/ui/PageHead.svelte': ['.head-bar::before'], // line
-  'apps/web/src/lib/shell/Bell.svelte': ['.bell-dot'], // ring
+  'apps/web/src/lib/shell/Bell.svelte': ['.bell-count'], // ring
   'apps/web/src/lib/ui/StateDot.svelte': ['.dot[data-state=\'open\']', '.dot[data-state=\'part\']'], // edge
   'apps/web/src/routes/automations/AutomationSentence.svelte': ['.row :global(.field:has(input[aria-invalid=\'true\']))'], // edge
   'apps/web/src/routes/automations/SentenceSteps.svelte': ['li[data-over]'], // line
@@ -155,6 +164,7 @@ const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/routes/decide/[id]/Proposed.svelte': ['.swatch'], // edge
   'apps/web/src/routes/addons/+page.svelte': ['.find', '.sort-select'], // edge
   'apps/web/src/routes/addons/[id]/Listing.svelte': ['.narrow-only'], // line
+  'apps/web/src/routes/r/[register]/parts/ListPeople.svelte': ['.order button[aria-pressed=\'true\']'], // edge
   'apps/web/src/routes/r/[register]/parts/ListBoard.svelte': ['.bcard[data-cursor]', '.bcard[data-picked]', '.bcard:not([data-picked], [data-cursor]):hover'], // edge
   'apps/web/src/routes/scripts/[id]/ScriptForm.svelte': ['.field[data-wrong], .lines[data-wrong], .code[data-wrong]'], // edge
   'apps/web/src/routes/settings/[area]/areas/Appearance.svelte': ['.swatch', '.swatch::before', '.tick'], // edge, edge under a thumb, ring
@@ -169,6 +179,19 @@ const SHADOWS: Record<string, readonly string[]> = {
   'packages/skin/kinds/queue.css': ['.queue-card[data-focused]', '.queue-options:has(.queue-because) > .queue-option', '.queue-options:has(.queue-because) > .queue-option:has(> .queue-act[data-on])', '.queue-card[data-selected]:not([data-focused])'], // edge, ring
 };
 
+/**
+ * THE SHADOWS THAT LIFT, the round 1030 design's against the flat frame, by file and selector, and nowhere else:
+ *   lift   a widget picked up on the board, and what floats over the board while it is arranged (the widgets plan,
+ *          §5: "It lifts (shadow, 1.03 scale, 1 degree tilt)"): the edit bar, a tile's remove dot and its size menu
+ *   card   a Money tile, which sits on the page as a card (the Money look, `money/look.css`)
+ */
+const LIFTS: Record<string, readonly string[]> = {
+  'apps/web/src/lib/board/Board.svelte': ['.board :global([data-board-key][data-lifted])', '.edit-bar'], // lift
+  'apps/web/src/lib/board/EditCover.svelte': ['.dot', '.sizes'], // lift
+  'apps/web/src/lib/money/look.css': ['[data-money] .page > .block-slot:not([data-lead]), [data-money] .page > .box'], // card
+};
+const lifts = (s: { file: string; selector: string }): boolean => (LIFTS[s.file] ?? []).includes(s.selector);
+
 test('a box-shadow is a ring or a line, and only where this file lists it', () => {
   const found = PRODUCT.flatMap((file) =>
     shadows(css(file))
@@ -176,9 +199,9 @@ test('a box-shadow is a ring or a line, and only where this file lists it', () =
       .map((s) => ({ file: at(file), ...s })),
   );
   assert.ok(found.length > 0, 'the walk found no shadow at all, so it is not reading the styles');
-  const cast = found.filter((s) => !flat(s.value)).map((s) => `${s.file}:${s.line} ${s.selector} { box-shadow: ${s.value} }`);
+  const cast = found.filter((s) => !flat(s.value) && !lifts(s)).map((s) => `${s.file}:${s.line} ${s.selector} { box-shadow: ${s.value} }`);
   assert.deepEqual(cast, [], `a shadow casts nothing in the frame (SPEC 1.9): ${cast.join('; ')}`);
-  const unlisted = found.filter((s) => !(SHADOWS[s.file] ?? []).includes(s.selector)).map((s) => `'${s.file}': '${s.selector}' (${s.value})`);
+  const unlisted = found.filter((s) => !(SHADOWS[s.file] ?? []).includes(s.selector) && !lifts(s)).map((s) => `'${s.file}': '${s.selector}' (${s.value})`);
   assert.deepEqual(unlisted, [], `a shadow that is not a cut-out ring, an inside edge or a line: ${unlisted.join('; ')}`);
 });
 

@@ -56,7 +56,7 @@ test('SAID GOES THROUGH UNTOUCHED: the letter\'s link carries it after the proof
     [...html.matchAll(/\shref="([^"]*)"/gu)]
       .map((m) => (m[1] ?? '').replace(/&#39;/gu, "'").replace(/&amp;/gu, '&'))
       .find((h) => h.includes('&said=')) ?? '';
-  assert.match(href, new RegExp(`^https://${HOST}/app/signup#verify=[^\\s&]+&said=`));
+  assert.match(href, new RegExp(`^https://${HOST}/signup#verify=[^\\s&]+&said=`));
   const carried = /&said=(.+)$/u.exec(href)?.[1] ?? '';
   assert.doesNotMatch(String(c.sent[0]?.text), /said=/u);
   assert.equal(decodeURIComponent(carried).trim(), SENTENCE);

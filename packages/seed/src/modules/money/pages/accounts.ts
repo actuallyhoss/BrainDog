@@ -7,12 +7,15 @@ import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
 /** The figure that cuts Cash now into its accounts by their lines alone, beside the bank's own (`cash-by-account`). */
 const BY_LINES = 'lines-by-account';
 
-/** An account's card on this page: its name, the digits the bank prints, its book, whether it is cash, and its age. */
+/**
+ * An account's card on this page: its name, the digits the bank prints, its book and its age. The digits read "Ending in
+ * 2044" where they read "Digits 2044", and "Counts as cash yes" is gone (audit of 30 October, 20): the field showed
+ * through, and which accounts count as cash is the Balance bar's list above.
+ */
 const ACCOUNT_CARD = [
   { field: 'name', as: 'title' },
-  { field: 'last4', label: 'Digits', as: 'fact' },
+  { field: 'last4', label: 'Ending in', as: 'fact' },
   { field: 'book', label: 'Book', as: 'fact' },
-  { field: 'liquid', label: 'Counts as cash', as: 'fact' },
   CONFIRMED_COLUMN,
 ];
 
@@ -44,11 +47,21 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
     pack: 'money-core',
     blocks: [
       {
-        /* THE ACCOUNTS IN ONE SENTENCE, from the figures the tiles below draw, so the line and the tiles cannot differ. */
+        /* THE ACCOUNTS IN ONE SENTENCE: how many are open, counted as the cards below are, and what the ones that count
+           as cash hold. It said "in 6 accounts" over 13 cards, the 6 being Cash now's parts (audit of 30 October, 20). */
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{cash-now.apart}} in {{cash-by-account.groups}} account(s).',
+        body: '{{accounts-open}} open account(s), with {{cash-now.apart}} in cash.',
+      },
+      {
+        /* A STRIPE BALANCE BELOW ZERO, SAID (audit Z18): what it is and what happens to it, one line, only while one is. */
+        kind: 'note',
+        tone: 'warn',
+        icon: 'circle-alert',
+        span: 12,
+        when: { metric: 'stripe-below-zero-count', gt: 0 },
+        body: 'Stripe is below zero: fees or refunds Stripe took with no payments in to cover them. If it stays there, Stripe takes it from your bank.',
       },
       {
         /* WHETHER THE BALANCES CAN BE TRUSTED, IN THREE NUMBERS: what the card asks, the oldest balance among them and
@@ -60,7 +73,7 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
         cells: [
           { metric: 'card-to-pay', label: 'To pay on the card' },
           { metric: 'cash-as-of', label: 'Oldest balance' },
-          { metric: 'balances-stale', label: 'Older than a week' },
+          { metric: 'balances-stale', label: 'Out of date', note: 'Balances older than a week' },
         ],
       },
       {
@@ -84,6 +97,14 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
               span: 6,
               source: `metric.${BY_LINES}`,
               limit: 12,
+              when: { metric: 'cash-accounts', gt: 0 },
+            },
+            {
+              /* WHY THE TWO COLUMNS DIFFER, IN ONE PLAIN LINE (Q9 of 29 October): HSBC read EGP 30,624.63 in one and
+                 −EGP 272,371.46 in the other with nothing said, which reads as a bug. */
+              kind: 'note',
+              span: 12,
+              body: 'Ledger total is the balance first typed for an account plus every line since. Where it is not the Balance, the bank counted money the Ledger has no lines for, such as an opening balance not set or lines from before its first statement. Each account says how much.',
               when: { metric: 'cash-accounts', gt: 0 },
             },
           ]

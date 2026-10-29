@@ -154,6 +154,10 @@ export const TODAY: {
   cards: Record<ProjectId, Card>;
   working: Working[];
   heads: { needs: string; working: string; projects: string; all: string };
+  /** WHAT FALLS DUE WITH MONEY ON IT, the next two weeks, as Today's Coming up tile says it (signed by the way it goes). */
+  coming: { day: string; date: string; name: string; cents: number }[];
+  /** A WIDGET AN AGENT MADE, still a draft: dashed, with who made it and Keep or Throw away (the 30 October board). */
+  draft: { title: string; by: AgentId; weeks: { label: string; cents: number }[] };
 } = {
   cash: {
     head: 'Cash ahead',
@@ -198,6 +202,21 @@ export const TODAY: {
     { agent: 'cursor', project: 'pocketlab', what: 'Cursor on Pocketlab', sub: 'onboarding screens · since 10:40' },
   ],
   heads: { needs: 'Needs you', working: 'Working now', projects: 'Projects', all: 'All projects' },
+  coming: [
+    { day: 'Sat', date: '1', name: 'Rent', cents: -210_000 },
+    { day: 'Mon', date: '3', name: 'Tidepool payout', cents: CENTS.tidepoolPayout },
+    { day: 'Wed', date: '5', name: 'Figma', cents: -CENTS.figmaBill },
+  ],
+  draft: {
+    title: 'Software, by week',
+    by: 'claude',
+    weeks: [
+      { label: 'W1', cents: 31_200 },
+      { label: 'W2', cents: 12_800 },
+      { label: 'W3', cents: 45_600 },
+      { label: 'W4', cents: 18_400 },
+    ],
+  },
 };
 
 /** The AI tools Maya has connected, as the desk's Agents place lists them. */
@@ -570,6 +589,46 @@ export const MAKES: Make[] = [
     where: 'Pocketlab',
   },
 ];
+
+/**
+ * THE MONEY BAND ON THE HOME PAGE: Maya's money across her two books, hers and Ferment & Co's, as the app's Money home
+ * draws it (the 27 October rebuild): the accounts, this month's budgets and what is coming up. The two bank balances add
+ * up to the desk's "$48,210 across 2 accounts"; the card is owed, so it is not counted there.
+ */
+export const MONEY_BAND: {
+  accounts: { name: string; book: string; cents: number; icon: IconName }[];
+  /** NET WORTH, SINCE the 30 October Money look: cash, what the add-ons hold (her gold among it) less what is owed, week by week. */
+  worth: { cents: number; change: string; series: number[]; parts: { name: string; cents: number; icon: IconName }[] };
+  budgets: { name: string; spent: number; of: number; icon: IconName; period: string }[];
+  coming: { name: string; when: string; cents: number; icon: IconName }[];
+} = {
+  accounts: [
+    { name: 'Business checking', book: 'Ferment & Co', cents: 4_138_000, icon: 'bank' },
+    { name: 'Everyday checking', book: 'Maya', cents: 683_000, icon: 'bank' },
+    { name: 'Amex', book: 'Maya', cents: -124_000, icon: 'card' },
+  ],
+  worth: {
+    cents: 6_212_000,
+    change: 'Up 4% in 12 weeks',
+    series: [57.1, 57.6, 57.2, 58.4, 58.9, 58.6, 59.8, 60.4, 60.1, 61.2, 61.7, 62.1],
+    parts: [
+      { name: 'Cash', cents: 4_821_000, icon: 'cash' },
+      { name: 'Gold, 40 g', cents: 1_045_000, icon: 'coins' },
+      { name: 'Index fund', cents: 470_000, icon: 'trend-up' },
+      { name: 'Owed on the card', cents: -124_000, icon: 'card' },
+    ],
+  },
+  budgets: [
+    { name: 'Groceries', spent: 41_200, of: 60_000, icon: 'store', period: 'this month' },
+    { name: 'Eating out', spent: 23_800, of: 20_000, icon: 'tag', period: 'this month' },
+    { name: 'Coffee', spent: 2_100, of: 3_500, icon: 'clock', period: 'this week' },
+  ],
+  coming: [
+    { name: 'Rent', when: 'Sat 1', cents: 210_000, icon: 'house' },
+    { name: 'Gym', when: 'Mon 3', cents: 4_500, icon: 'repeat' },
+    { name: 'Car insurance', when: 'Wed 12', cents: 9_600, icon: 'shield' },
+  ],
+};
 
 /** A day as the app's Today says it over its name: "Friday 23 October". */
 export const dateSaid = (now: Date): string => new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);

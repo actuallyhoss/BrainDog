@@ -2,7 +2,7 @@
  * What the shared page reads and says, out of the component so `node --test` can hold it (a Svelte page does not mount
  * there): the link off the address, the page's head, and each typed cell and figure as a stranger reads it.
  *
- * THE LINK IS `/app/s#<token>` (`linkOpened` in `@braindog/host`), so the token is in the fragment, which no browser
+ * THE LINK IS `/s#<token>` (`linkOpened` in `@braindog/host`), so the token is in the fragment, which no browser
  * sends to any host and no log keeps. It is read once and wiped from the address bar at once, as `takeInvite` does
  * (`lib/auth.ts`), so it does not stay on the screen, in a screenshot or in the tab's history.
  *

@@ -17,6 +17,17 @@ const LINES_ONLY = { rolled: { balance: ROLLED.rolled.balance, as_of: ROLLED.rol
 /** The months an account's page draws its money in and out over, the walk's six and the month it is in. */
 const MONTHS = 'on after -7m';
 
+/** The currencies a Stripe balance is read below zero in: a money comparison names its currency. */
+const STRIPE_CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'AED', 'EGP'] as const;
+const STRIPE_BELOW_ZERO = {
+  all: [
+    { field: 'name', contains: 'stripe' },
+    { field: 'liquid', is: true },
+    { field: 'state', not: 'closed' },
+    { any: STRIPE_CURRENCIES.map((currency) => ({ field: 'balance', lt: { amount: 0, currency } })) },
+  ],
+};
+
 export const ACCOUNT_FIGURES: Record<string, SeedMetric> = {
   /**
    * WHAT ONE ACCOUNT HOLDS NOW, BY THE BANK'S NEWEST WORD: Cash now's own roll over the one account the page is about,
@@ -105,6 +116,25 @@ export const ACCOUNT_FIGURES: Record<string, SeedMetric> = {
     bucket: 'month',
     format: MONEY,
     target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * A STRIPE BALANCE BELOW ZERO, SINCE money-core 3.31.0 (audit Z18, Q9): Stripe took fees, a refund or a dispute with no
+   * payments in to cover them, and takes the difference from the bank if it stays there. The Accounts page says so in
+   * one line, so "Stripe available −$9.61" is not a number left to guess at. The amount stays on the account's own
+   * card, in its own currency, and is not converted into the line. An account counted as cash whose name says
+   * Stripe, read in the currencies Stripe pays out in most: a money comparison names its currency, so each is a clause.
+   */
+  'stripe-below-zero-count': {
+    metric: 'stripe-below-zero-count',
+    name: 'Stripe balances below zero',
+    source: 'register.accounts',
+    where: STRIPE_BELOW_ZERO,
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
     window: '30d',
     compare: 'none',
   },

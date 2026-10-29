@@ -5,7 +5,7 @@
  *   node tools/catalogue/from-packs.mjs [--packs <folder>] [--to <catalogue folder>] [--previews] [--check]
  *
  * With no flags it reads `packs/` and writes `apps/web/static/catalogue/`, the folder the Worker's static assets and a
- * self-host both serve under `/app/catalogue/`. Before this, that folder listed one add-on, `reading-list`, and none of
+ * self-host both serve at `/catalogue/`. Before this, that folder listed one add-on, `reading-list`, and none of
  * the four packs in `packs/`, so nothing in `packs/` could be installed from the app or by id from the CLI.
  *
  * THROUGH `publishTo`, THE DOOR `braindog pack publish` USES, and not a copy with an index line written by hand. So each

@@ -182,7 +182,7 @@ function bucket(): { blobs: KennelBucket; files: Map<string, string> } {
 const EMPTY_INDEX: CatalogueIndex = { format: 1, name: 'BrainDog', entries: [] };
 const assets = {
   fetch: async (request: Request): Promise<Response> =>
-    new URL(request.url).pathname === '/app/catalogue/index.json'
+    new URL(request.url).pathname === '/catalogue/index.json'
       ? new Response(JSON.stringify(EMPTY_INDEX), { headers: { 'content-type': 'application/json' } })
       : new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } }),
 };

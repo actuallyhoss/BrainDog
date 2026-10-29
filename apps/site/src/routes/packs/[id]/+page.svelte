@@ -9,12 +9,13 @@
   answers, and one with none is drawn as what it adds, both through `lib/app/Page.svelte` and the renderer the app
   uses. So a list here has the columns the added page has, and nothing on this page is a picture somebody made.
 
-  ADDING GOES TO THE APP (`/app/packs/browse/<id>`), which shows the plan and asks before it writes, so the link
+  ADDING GOES TO THE APP (`app.brain.dog/packs/browse/<id>`), which shows the plan and asks before it writes, so the link
   carries `rel="external"`: the prerender crawler must not follow it into the app.
 
   BELOW 1060PX THE TILES STACK with the drawing first, because the drawing is what the reader came to see.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import { parse } from 'braindog-render';
@@ -45,15 +46,7 @@
   const wide = (src: string): Span[] => parse(src, { page: true }).map((_, at) => ({ at, cols: 12 }));
 </script>
 
-<svelte:head>
-  <title>{d.title(card.title)}</title>
-  <meta name="description" content={card.summary} />
-  <link rel="canonical" href="https://brain.dog/packs/{card.slug}" />
-  <meta property="og:url" content="https://brain.dog/packs/{card.slug}" />
-  <meta property="og:title" content={d.title(card.title)} />
-  <meta property="og:description" content={card.summary} />
-</svelte:head>
-
+<Seo title={d.title(card.title)} description={card.summary} path="/packs/{card.slug}" />
 {#snippet back()}
   <a class="back" href={PACKS}><Icon name="back" size="m" />{d.back}</a>
 {/snippet}

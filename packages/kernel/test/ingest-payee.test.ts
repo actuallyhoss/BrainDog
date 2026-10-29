@@ -129,13 +129,13 @@ test('A payee FIELD THAT IS NOT TEXT IS LEFT ALONE, and one the pattern read its
   own.sql.close();
 });
 
-test('A TEXT WITH NO LETTERS KEEPS ITSELF, on the row and on the arrival', async () => {
+test('A TEXT WITH NO LETTERS KEEPS ITSELF as the bank\'s words, and is never written as a payee (Q15 of 29 October)', async () => {
   const { k, sql } = await record(TRANSACTIONS({ type: 'text' }), CARD());
   for (const [printed, sha] of [['4471', 'n1'], ['*** ###', 'n2']] as const) {
     const out = arrive(k, said(printed), sha);
     assert.equal(out.state, 'matched', out.reason ?? '');
     const row = fieldsOf(sql, out.wrote[0]!);
-    assert.equal(row.payee, printed);
+    assert.equal(row.payee, undefined, 'a name is words: the end of an account number is not one');
     assert.equal(row.counterparty_text, printed);
     assert.equal(out.counterparty, printed);
   }

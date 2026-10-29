@@ -50,6 +50,7 @@ import { theme } from './copy/theme.ts';
 import { hand } from './copy/hand.ts';
 import { sharing } from './copy/sharing.ts';
 import { shareSheet } from './copy/share-sheet.ts';
+import { moneyShare } from './copy/money-share.ts';
 
 export type { Held } from './copy/shell.ts';
 export { INPUTS_SAID } from './copy/pages.ts';
@@ -73,6 +74,7 @@ export const copy = {
   ...hand,
   ...kpis,
   ...sharing,
+  ...moneyShare,
   ...shareSheet,
 } as const;
 

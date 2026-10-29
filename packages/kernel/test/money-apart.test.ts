@@ -100,7 +100,7 @@ test('ONE CURRENCY IS SAID AS ONE AMOUNT: apart is that amount, with nothing con
   sql.close();
 });
 
-test('A GROUPED FIGURE COUNTS THE PARTS THAT HOLD MONEY, the ones a split of it lists, and leaves one at nought out', async () => {
+test('A GROUPED FIGURE COUNTS EVERY PART ITS BAR DRAWS, the one at nought too (Q9 of 29 October)', async () => {
   const { k, sql } = await record([
     { name: 'Bank', balance: { amount: 4_000_000, currency: 'EGP' } },
     { name: 'Wallet', balance: { amount: 0, currency: 'EGP' } },
@@ -111,7 +111,7 @@ test('A GROUPED FIGURE COUNTS THE PARTS THAT HOLD MONEY, the ones a split of it 
   assert.ok((await k.install([{ id: 'metric.cash-by', kind: 'metric', body: BY } as never, page as never])).ok);
   const out = k.page('split') as { ok: boolean; value: { blocks: { values?: Record<string, unknown> }[] } };
   assert.ok(out.ok, JSON.stringify(out));
-  /* THE BANK AND THE CARD, which owes: two parts with money in them, and the wallet at nought is none. */
-  assert.equal(out.value.blocks[0]!.values?.['cash-by.groups'], 2);
+  /* THE BANK, THE WALLET AT NOUGHT AND THE CARD, which owes: three parts, as many as the bar draws. */
+  assert.equal(out.value.blocks[0]!.values?.['cash-by.groups'], 3);
   sql.close();
 });

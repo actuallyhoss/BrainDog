@@ -118,8 +118,8 @@ test('APPROVED: pending twice, then the token kept in the hosts file, the defaul
   assert.equal(host.seen[1]?.body.device_code, POLL_ID);
 });
 
-test('THE APP\'S ADDRESS FOR A RECORD, <host>/app/<slug>, POSTS THE SLUG AND KEEPS THE LOGIN UNDER <host>/<slug>', async (t) => {
-  /* The whole pathname used to be the slug, so the address the app now prints
+test('THE APP\'S OLD ADDRESS FOR A RECORD, <host>/app/<slug>, POSTS THE SLUG AND KEEPS THE LOGIN UNDER <host>/<slug>', async (t) => {
+  /* The whole pathname used to be the slug, so the address the app printed until it moved to the root
      sent `app/acme`, which no Directory holds, and the sign-in failed with "Name a record this BrainDog holds". */
   const host = await stub(t, () => granted);
   const out = await run(t, `${host.base}/app/acme`);
@@ -132,7 +132,7 @@ test('THE APP\'S ADDRESS FOR A RECORD, <host>/app/<slug>, POSTS THE SLUG AND KEE
   hidden(out);
 });
 
-test('THE OLD SHAPE, <host>/<slug>, STILL POSTS THE SLUG', async (t) => {
+test('THE ADDRESS THE APP PRINTS NOW, <host>/<slug>, POSTS THE SLUG', async (t) => {
   const host = await stub(t, () => granted);
   const out = await run(t, `${host.base}/acme/`);
 
@@ -149,14 +149,14 @@ test('A USAGE MISTAKE NAMES THE ADDRESS THE APP LIVES AT NOW, on the host produc
   child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
   assert.equal(await new Promise<number | null>((done) => child.on('close', done)), 1);
   assert.ok(PRODUCTION.length > 0, 'apps/worker/wrangler.jsonc has no PUBLIC_HOST for production');
-  assert.equal(stderr.trim(), `braindog login takes one host, as in braindog login https://${PRODUCTION}/app/<slug>, and --keychain <project>, and nothing else.`);
+  assert.equal(stderr.trim(), `braindog login takes one host, as in braindog login https://${PRODUCTION}/<slug>, and --keychain <project>, and nothing else.`);
 });
 
 test('THE ADDRESS A SIGNED-OUT AGENT PASSES ON IS ON THAT HOST TOO', () => {
   /* `ANY_HOST` is what the MCP server's refusal tells a person to run `login` with (`src/signed-out.ts`), so it is the
      same example in a second place, and it was the same `app.brain.dog`. */
   assert.equal(new URL(ANY_HOST.replace('<slug>', 'acme')).host, PRODUCTION);
-  assert.equal(new URL(ANY_HOST.replace('<slug>', 'acme')).pathname, '/app/acme');
+  assert.equal(new URL(ANY_HOST.replace('<slug>', 'acme')).pathname, '/acme');
 });
 
 test(

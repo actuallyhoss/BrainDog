@@ -39,14 +39,14 @@ function asked(pathname: string): string {
 }
 
 test('it asks at the address the app asks at, for a record, a bare address and the app’s own screens', () => {
-  for (const path of ['/app/acme', '/app/acme/', '/app/acme/decide', '/app', '/app/', '/app/signin', '/app/decide', '/app/d41', '/app/start', '/elsewhere']) {
+  for (const path of ['/acme', '/acme/', '/acme/decide', '/', '/', '/signin', '/decide', '/d41', '/start', '/elsewhere']) {
     const url = new URL(`https://brain.dog${path}`);
     assert.equal(asked(path), `${apiBase(url)}/api/boot`, path);
   }
 });
 
 test('readBoot takes the early answer once, and only at the address it was asked at', async () => {
-  const BASE = 'https://brain.dog/app/acme';
+  const BASE = 'https://brain.dog/acme';
   const value = { registers: [], now: '2026-10-08T09:00:00.000Z', home: null };
   const body = () => new Response(JSON.stringify({ ok: true, value }), { status: 200, headers: { 'content-type': 'application/json' } });
   const held = globalThis as { __bdBoot?: unknown; fetch: typeof globalThis.fetch };
@@ -56,7 +56,7 @@ test('readBoot takes the early answer once, and only at the address it was asked
   try {
     /* AT ANOTHER ADDRESS IT IS LEFT UNREAD, and the app asks the network as it always did. */
     forget();
-    held.__bdBoot = { url: 'https://brain.dog/app/kiln/api/boot', at: Promise.resolve(body()) };
+    held.__bdBoot = { url: 'https://brain.dog/kiln/api/boot', at: Promise.resolve(body()) };
     assert.equal((await readBoot(BASE)).from, 'live');
     assert.deepEqual(network, [`${BASE}/api/boot`]);
 
@@ -90,7 +90,7 @@ function everyAsked(pathname: string): string[] {
 }
 
 test('and beside boot it asks every list the reader may read, at the same address, boot first', () => {
-  for (const path of ['/app/acme', '/app/acme/p/kiln', '/app/', '/app/decide']) {
+  for (const path of ['/acme', '/acme/p/kiln', '/', '/decide']) {
     const base = apiBase(new URL(`https://brain.dog${path}`));
     assert.deepEqual(everyAsked(path), [`${base}/api/boot`, `${base}/api/schemas?every=true`], path);
   }
@@ -99,7 +99,7 @@ test('and beside boot it asks every list the reader may read, at the same addres
 test('firstOpen hands the early declarations to the client once, and only at the address they were asked at', async () => {
   const { firstOpen } = await import('./boot-live.ts');
   const { batchSchemas, createClient, forgetSchemas } = await import('@braindog/client');
-  const BASE = 'https://brain.dog/app/acme';
+  const BASE = 'https://brain.dog/acme';
   const held = globalThis as { __bdSchemas?: unknown };
   const lists = { tasks: { id: 'tasks', name: 'Tasks', title: 'what', fields: [{ id: 'what', type: 'text' }] } };
   const early = () => Promise.resolve(new Response(JSON.stringify({ ok: true, value: { lists, refused: {}, blocks: {} } }), { status: 200 }));
@@ -107,7 +107,7 @@ test('firstOpen hands the early declarations to the client once, and only at the
   const io = (async (url: string | URL | Request) => (sent.push(String(url)), new Response(JSON.stringify({ ok: true, value: { ...lists.tasks, blocks: {} } })))) as typeof globalThis.fetch;
   try {
     forgetSchemas();
-    held.__bdSchemas = { url: 'https://brain.dog/app/kiln/api/schemas?every=true', at: early() };
+    held.__bdSchemas = { url: 'https://brain.dog/kiln/api/schemas?every=true', at: early() };
     firstOpen(BASE);
     assert.notEqual(held.__bdSchemas, undefined, 'another address took it');
     held.__bdSchemas = { url: `${BASE}/api/schemas?every=true`, at: early() };

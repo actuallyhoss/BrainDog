@@ -77,12 +77,12 @@ test('each read is a method the client knows, sent with the verb the list says',
     sent.push(`${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`);
     return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
-  const client = createClient({ base: 'https://example.test/app/acme', fetch: stub });
+  const client = createClient({ base: 'https://example.test/acme', fetch: stub });
   for (const read of FIRST_DRAW) {
     sent.length = 0;
     const out = await client.call(read.method, {});
     assert.ok(out.ok || !('refusal' in out) || out.refusal.code !== 'ROUTE_UNKNOWN', `${read.method} is not a method of the client`);
-    assert.deepEqual(sent, [`${read.post ? 'POST' : 'GET'} /app/acme/api/${read.method}`], read.method);
+    assert.deepEqual(sent, [`${read.post ? 'POST' : 'GET'} /acme/api/${read.method}`], read.method);
   }
 });
 

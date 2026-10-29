@@ -124,12 +124,12 @@ test('readBoot ASKS ONLY WHERE THE RECORD NAMED NO CURRENCY, and the shell over 
   try {
     forget();
     const named = host({ record: { ...RECORD, currency: 'GBP' }, lists: { bills: { fields: [MONEY], money: { amount: ['GBP'] } } } });
-    await readBoot(`${BASE}/app/kiln`, named.io);
+    await readBoot(`${BASE}/kiln`, named.io);
     assert.deepEqual(named.sent, ['boot'], 'a record that named its currency cost more than its boot');
 
     forget();
     const unnamed = host({ record: { ...RECORD, currency: null }, lists: { bills: { fields: [MONEY], money: { amount: ['GBP', 'GBP'] } } } });
-    const got = await readBoot(`${BASE}/app/kiln`, unnamed.io);
+    const got = await readBoot(`${BASE}/kiln`, unnamed.io);
     assert.equal(got.from, 'live');
     if (got.from === 'live') assert.equal(layoutOf(got.boot).index.currency, 'GBP');
     assert.equal(homeCurrency(), 'GBP');
@@ -137,7 +137,7 @@ test('readBoot ASKS ONLY WHERE THE RECORD NAMED NO CURRENCY, and the shell over 
     /* A HOST THAT SENT `money` READ IT ITSELF: its `null` is no currency or two, and asking again would find the same. */
     forget();
     const told = host({ record: { ...RECORD, currency: null, money: ['GBP', 'USD'] }, lists: { bills: { fields: [MONEY], money: { amount: ['GBP', 'USD'] } } } });
-    await readBoot(`${BASE}/app/kiln`, told.io);
+    await readBoot(`${BASE}/kiln`, told.io);
     assert.deepEqual(told.sent, ['boot'], 'a host that read its own money was asked it again');
   } finally {
     forget();

@@ -77,12 +77,12 @@ test('with no session it refuses to start, in one sentence', async () => {
 
 test('a read goes to the canary under its name, with the session and the Origin it checks, and nothing comes back', async () => {
   const before = heard.length;
-  const said = await ask('/app/ops/api/boot');
+  const said = await ask('/ops/api/boot');
   assert.equal(said.status, 200);
   assert.equal(said.cookie, null, 'no cookie is handed back to the look');
   const got = heard.at(-1);
   assert.equal(heard.length, before + 1);
-  assert.equal(got.url, '/app/ops/api/boot');
+  assert.equal(got.url, '/ops/api/boot');
   assert.equal(got.headers.cookie, SESSION, 'the canary’s cookie alone, never one for another host');
   assert.equal(got.headers.origin, origin);
   assert.equal(got.headers.authorization, undefined, 'a session, never a key');
@@ -95,7 +95,7 @@ test('every write, sign-out included, is refused before it leaves', async () => 
   const writes = ROUTES.filter((r) => r.writes && !r.postRead);
   assert.ok(writes.length > 0);
   for (const r of writes) {
-    const said = await ask(`/app/ops/api/${r.name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    const said = await ask(`/ops/api/${r.name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     assert.equal(said.status, 403, r.name);
     assert.match(said.text, /reads and never writes/u, r.name);
   }

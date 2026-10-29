@@ -11,8 +11,8 @@ test('the challenge is the S256 of the verifier, both url-safe', async () => {
 });
 
 test('the start carries the challenge and a landing only when it is not the front', () => {
-  assert.equal(desktopStart('/app/', 'https://brain.dog', 'c'), 'https://brain.dog/auth/google/start?desktop=1&challenge=c');
-  assert.match(desktopStart('/app/work', 'https://brain.dog', 'c'), /next=%2Fapp%2Fwork$/);
+  assert.equal(desktopStart('/', 'https://brain.dog', 'c'), 'https://brain.dog/auth/google/start?desktop=1&challenge=c');
+  assert.match(desktopStart('/work', 'https://brain.dog', 'c'), /next=%2Fwork$/);
 });
 
 test('the verifier is taken once', () => {

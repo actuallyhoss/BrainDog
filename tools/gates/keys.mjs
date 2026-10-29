@@ -537,7 +537,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
           return createReadStream(file).pipe(res);
         }
       }
-      /* The SPA fallback is the app's shell, which is under `/app` in the build as it is on the host (`lib.mjs`). */
+      /* The SPA fallback is the app's shell, at the root of the build as it is on the host (`lib.mjs`). */
       if (!Object.hasOwn(TYPES, extname(rel))) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
         return createReadStream(appShell(ROOT)).pipe(res);

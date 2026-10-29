@@ -659,8 +659,14 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    *
    * `agents.answer_on_word` DRAWS NOTHING: it decides whether an agent's answer on the owner's word is taken, and the
    * record tests that, a refusal naming the switch when it is off: `packages/record/test/on-word.test.ts`.
+   *
+   * `widgets.held` IS EXCUSED BECAUSE IT IS A MEMORY AND THE RECORD APPLIES IT. It keeps the widget offers a person put
+   * off with Not now and the day one was last answered; the brakes it feeds (two Not nows in a week pause offers, one
+   * answer a day) are the record's `widgetOffers`, so two loads that differ only in it draw the same page until an offer
+   * is due, which no fixture loading a URL can stage. The record tests the brakes in
+   * `packages/record/test/widgets-gallery.test.ts`, and the tab's copy in `apps/web/src/lib/board/widget-read.test.ts`.
    */
-  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot', 'packs.known_keys', 'agents.answer_on_word']);
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot', 'packs.known_keys', 'agents.answer_on_word', 'widgets.held']);
   const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
   const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
   const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);
@@ -779,7 +785,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
           return createReadStream(file).pipe(res);
         }
       }
-      /* The SPA fallback is the app's shell, which is under `/app` in the build as it is on the host (`lib.mjs`). */
+      /* The SPA fallback is the app's shell, at the root of the build as it is on the host (`lib.mjs`). */
       if (!Object.hasOwn(TYPES, extname(rel))) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
         return createReadStream(appShell(ROOT)).pipe(res);

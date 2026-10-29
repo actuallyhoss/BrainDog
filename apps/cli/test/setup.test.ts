@@ -437,7 +437,7 @@ test('STEP 6 MAKES ONE TOKEN PER KIND OF AGENT WIRED, keeps it beside the login,
   const { BRAINDOG_TOKEN: _held, ...env } = m.io.env;
   m.io.env = env;
   const file = join(env.XDG_CONFIG_HOME!, 'braindog', 'hosts.json');
-  const key = hostKey('https://brain.example/app/acme');
+  const key = hostKey('https://brain.example/acme');
   saveHosts(file, { default: key, hosts: { [key]: { token: { value: 'bd_machine_login_never_printed', expires: '2099-01-01T00:00:00Z', label: 'MacBook · braindog-cli' } } } });
   const asked: string[] = [];
   m.io.mint = async (_key, label) => {

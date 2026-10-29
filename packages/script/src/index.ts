@@ -105,6 +105,13 @@ export type HostRequest = {
   body: string | null;
   /** A vault label from `keys`, or `null`. The host opens it; the sandbox never holds its bytes. */
   key: string | null;
+  /**
+   * A vault label from `keys` WHOSE SECRET IS THE ADDRESS, or absent (round 1030): `ctx.fetch(null, { address: label })`.
+   * `url` is then empty. The host opens the key, reads it as an https URL (`webcal://` as `https://`), holds its origin
+   * to the script's egress, refuses user info, and sends it with no key; the sandbox never sees the address, and a
+   * refusal names its host and never the rest (`addressed` in `@braindog/host/script`).
+   */
+  address?: string | null;
 };
 
 export type HostResponse = {

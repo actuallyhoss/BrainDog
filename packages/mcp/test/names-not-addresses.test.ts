@@ -78,7 +78,7 @@ test('A FILED OR LANDED ANSWER IS IN NAMES TOO', () => {
   const filed = ruledBrief({ filed: { id: 'SG8', question: `Add jo@kiln.example to people as ${OTHER}?`, why: 'Asked by p_1.' } }, ['people'], look);
   assert.match(filed, /^Filed for Mara to decide: Add someone to people as an entry you cannot open\? \(SG8\)\nAsked by Mara\./u);
   clean(filed, 'a filed answer');
-  clean(proposedBrief({ id: 'SG9', decide: 'https://brain.dog/app/mara/decide/SG9' }, 'Link Jo <jo@kiln.example> to people#3?', look), 'a proposal');
+  clean(proposedBrief({ id: 'SG9', decide: 'https://brain.dog/mara/decide/SG9' }, 'Link Jo <jo@kiln.example> to people#3?', look), 'a proposal');
 });
 
 test('THE BRIEFING SAYS PEOPLE BY NAME, and a step, a question or a learning never carries an address or an id', () => {

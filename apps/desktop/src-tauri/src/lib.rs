@@ -14,7 +14,7 @@ use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
-const HOME: &str = "https://app.brain.dog/app";
+const HOME: &str = "https://app.brain.dog/";
 /// Set once Cmd+Q (or any exit) starts, so a close that arrives during quitting is not turned into a hide.
 static QUITTING: AtomicBool = AtomicBool::new(false);
 
@@ -25,13 +25,14 @@ struct Pending(Mutex<Option<(String, Instant)>>);
 
 const BRIDGE: &str = include_str!("bridge.js");
 
-/// The Go menu: menu id, label, shortcut and the /app path the web is sent. The web ignores anything outside /app.
+/// The Go menu: menu id, label, shortcut and the path in the app the web is sent. The app is the root of app.brain.dog
+/// since 29 Oct; the web still reads an `/app/...` path an older build sends as the same path without it.
 const GO: [(&str, &str, &str, &str); 5] = [
-    ("go-today", "Today", "CmdOrCtrl+1", "/app/"),
-    ("go-needs", "Needs you", "CmdOrCtrl+2", "/app/decide"),
-    ("go-projects", "Projects", "CmdOrCtrl+3", "/app/p/portfolio"),
-    ("go-money", "Money", "CmdOrCtrl+4", "/app/p/money"),
-    ("go-agents", "Agents", "CmdOrCtrl+5", "/app/p/agents"),
+    ("go-today", "Today", "CmdOrCtrl+1", "/"),
+    ("go-needs", "Needs you", "CmdOrCtrl+2", "/decide"),
+    ("go-projects", "Projects", "CmdOrCtrl+3", "/p/portfolio"),
+    ("go-money", "Money", "CmdOrCtrl+4", "/p/money"),
+    ("go-agents", "Agents", "CmdOrCtrl+5", "/p/agents"),
 ];
 
 /// Where the window opens. A debug build may point at a local web app with BRAINDOG_URL; a release never does.
@@ -103,7 +104,7 @@ fn handle_link(app: &AppHandle, raw: &str) {
             if let Some((_, code)) = u.query_pairs().find(|(k, _)| k == "code") {
                 // The worker ends the desktop flavour of Google sign-in here; this page swaps the code for the cookie.
                 let mut to = home();
-                to.set_path("/app/signin/desktop");
+                to.set_path("/signin/desktop");
                 to.query_pairs_mut().append_pair("code", &code);
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.navigate(to);
@@ -205,10 +206,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![open_outside, notify, set_badge, start_drag])
         .menu(|app| build_menu(app))
         .on_menu_event(|app, event| match event.id().as_ref() {
-            // The web decides what "goto" means; /app/settings is the path it is sent.
+            // The web decides what "goto" means; /settings is the path it is sent.
             "settings" | "go-settings" => {
                 focus(app);
-                emit(app, "goto", Some("/app/settings"));
+                emit(app, "goto", Some("/settings"));
             }
             "slash" => {
                 focus(app);

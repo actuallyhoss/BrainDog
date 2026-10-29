@@ -183,7 +183,7 @@ export function googleWhy(search: string): GoogleWhy | null {
  * Where the Google button goes: the host's start, carrying where to land when that is not the app's front.
  *
  * WITH THE ORIGIN, because `/auth/*` is the host's and not under the app, and an address that starts with `/` is one
- * `Button` puts under `/app` (`at()` in `at.ts`).
+ * `Button` puts under the record on screen (`at()` in `at.ts`).
  */
 export function googleStart(goTo: string, origin: string): string {
   const start = `${origin}/auth/google/start`;
@@ -207,8 +207,8 @@ function quietly<T>(work: () => T): T | null {
 /**
  * Where "Open BrainDog" goes: the `next` in the address, or the one this tab was handed before a link replaced it.
  *
- * A PASTE LOST IT. Pasting a sign-in link over `/app/signin?next=...` changes the query, which is a full navigation
- * and not a `hashchange`, so the page mounted again on `/app/signin#magic=...` and `onward()` read an empty search.
+ * A PASTE LOST IT. Pasting a sign-in link over `/signin?next=...` changes the query, which is a full navigation
+ * and not a `hashchange`, so the page mounted again on `/signin#magic=...` and `onward()` read an empty search.
  * So a `next` in the address is kept for the tab, and
  * an arrival carrying a link and no `next` takes the kept one. A mailed link now carries its own, which wins.
  *

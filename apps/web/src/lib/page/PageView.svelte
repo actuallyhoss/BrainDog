@@ -29,6 +29,8 @@
   import '@braindog/skin/blocks-charts.css';
   /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
   import './kinds/styles.ts';
+  /* MONEY'S OWN LOOK, over the same kinds, on the pages its add-on brings (`$lib/money/look.css`). */
+  import '$lib/money/look.css';
   import { setContext, untrack } from 'svelte';
   import { SHAPE_KEY, type ShapeBox } from './shape-key.ts';
   import { MediaQuery } from 'svelte/reactivity';
@@ -88,10 +90,13 @@
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '../at.ts';
+  import { barTitled } from '../shell/frame.svelte.ts';
   import QuickHost from '$lib/money/QuickHost.svelte';
   import { pageOfLedger } from '$lib/money/ledger.ts';
   import { quick } from '$lib/money/quick.svelte.ts';
   import SetupGate from '$lib/money/SetupGate.svelte';
+  import { MONEY_PACKS } from '$lib/money/category-look.ts';
+  import { masonry } from '$lib/money/masonry.ts';
   import { headsSection, SETUP_KEY, type SetupFacts } from '$lib/money/setup.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { arrivedNow, keepLook, keptHere, lookOrder, lookPage, offerKey, offered, offerUndo, placedOf, undoLook } from './look.ts';
@@ -109,6 +114,8 @@
     offer,
     opens,
     between,
+    placed,
+    inside,
     waiting,
     plain = false,
   }: {
@@ -155,6 +162,10 @@
     opens?: Snippet | undefined;
     /** What a home draws between its blocks, before the one at an index (`PageBody`'s `between`). Read only by a `home`. */
     between?: Snippet<[number]> | undefined;
+    /** A board's cells, by declared index (`PageBody`'s `placed`). Read only by a `home`. */
+    placed?: ((i: number) => { key: string; area: string; size: string } | null) | undefined;
+    /** What a home draws inside a block's tile (`PageBody`'s `inside`). */
+    inside?: Snippet<[number]> | undefined;
   } = $props();
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
@@ -298,6 +309,8 @@
   /* WHO MAY SHARE, as `ShareLazy` asks it: an owner or an Admin, and never while the record is seen as somebody. */
   const sharable = $derived(seeingAs() === null && canShare((route.data as { me?: Parameters<typeof canShare>[0] }).me));
   let sharingOpen = $state(false);
+  /** How many times the page's Share asked for the account's sheet. */
+  let accountAsk = $state(0);
   const sharing = $derived.by((): Subject | null => {
     if (!about) return null;
     const projects = (REGISTERS[about.register] as { scopes?: unknown } | undefined)?.scopes !== undefined;
@@ -465,6 +478,11 @@
      ON A PAGE AN ADD-ON BROUGHT: Money on a record whose version of it has no line of its own opened on the filler, a
      line about pages in general, above its cash. Its own blocks say what it is. */
   const fromPack = $derived(!!live && typeof (live.page.page as { pack?: unknown }).pack === 'string');
+  /* A MONEY PAGE wears Money's look: the section's pages, and the pages about one account, bill or plan its add-on brings. */
+  const moneyPage = $derived(
+    !!live &&
+      (MONEY_PACKS.has(String((live.page.page as { pack?: unknown }).pack ?? '')) || live.page.page.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(live.page.page.page ?? '')),
+  );
   const headlined = $derived(!!live && (about !== null || fromPack || judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true)));
 
   /**
@@ -868,7 +886,7 @@
 {:else if mode === 'page'}
   <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
        0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
-  <div class="hosted">
+  <div class="hosted" data-money={moneyPage ? '' : undefined} {@attach moneyPage ? masonry : undefined}>
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
        at one. Not on a page that has its own headline sentence, which says what this page is better than the noun. -->
   <PageHead
@@ -889,6 +907,7 @@
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
+  {#if about?.register === 'accounts' && sharable && !arranging}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="line" seq={about.seq} name={about.title} />{/await}{/if}
 
   <!-- THE PAGE'S OWN BUTTONS, drawn once: at the end of the name's row, or on the lead tile's first row. -->
   {#snippet pageButtons()}
@@ -910,8 +929,12 @@
         <!-- EDIT DETAILS IS THE ⋯ MENU'S FIRST ROW ON A PROJECT (proj F7, VERIFY H13): a button of its own made the phone
              head three controls wide, beside Share and the menu. -->
         <!-- SHARE WITH PEOPLE IS SHARE'S FIRST CHOICE, for an owner or an Admin, so the head stays two. -->
-        <ShareMenu {slug} people={sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={copy.shareWithPeopleOpen} />
-        {#if sharing && sharable}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
+        <!-- ONE SHARE ON AN ACCOUNT (audit of 30 October, 19): its first choice is sharing the account, the sheet
+             `AccountShare.svelte` draws, where Share and "Share this account" stood side by side. -->
+        {@const account = about?.register === 'accounts' && sharable ? about : null}
+        <ShareMenu {slug} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />
+        {#if sharing && sharable && !account}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
+        {#if account}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="sheet" ask={accountAsk} seq={account.seq} name={account.title} />{/await}{/if}
         <ChangePage
           {slug}
           title={live.page.page.title}
@@ -941,7 +964,8 @@
   {#snippet leadRow()}
     {@const crumb = headKicker && headKicker.trim().toLowerCase() !== live.page.page.title.trim().toLowerCase() ? headKicker : undefined}
     {@const backTo = backInKicker ? declared?.back?.href : projectBack}
-    <div class="lead-head">
+    <!-- WHERE A BAR SAYS THE NAME (`barTitled`), its glyph, name, count and parent are the bar's, and the `h1` is unseen. -->
+    <div class="lead-head" data-barred={barTitled() ? '' : undefined}>
       <span class="lead-glyph" aria-hidden="true"><Icon name={iconFor(live.page.page.icon, 'doc')} size="m" /></span>
       <h1 class="lead-name" tabindex="-1" dir="auto">{live.page.page.title}</h1>
       {#if declared?.count?.value}<span class="lead-count num">{declared.count.value.toLocaleString('en')}</span>{/if}
@@ -951,6 +975,17 @@
       <span class="lead-actions">{@render pageButtons()}</span>
     </div>
     {#if headBelow}{@render declaredBelow()}{/if}
+    {@render bookScope()}
+  {/snippet}
+
+  <!-- WHICH BOOK, under the name of Money's home and of each book's page: Everything, then Personal and each business,
+       where the record keeps two or more. -->
+  {#snippet bookScope()}
+    {#if moneyPage && !showSource && (live.page.page.page === 'money' || about?.register === 'books')}
+      {#await import('$lib/money/BookScope.svelte') then { default: BookScope }}
+        <BookScope base={apiBase()} on={about?.register === 'books' ? about.seq : null} />
+      {/await}
+    {/if}
   {/snippet}
 
   <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
@@ -998,6 +1033,8 @@
   {#if strip && !led}
     <div class="page-filters">{@render narrow()}</div>
   {/if}
+  {#if !tiled && moneyPage && about?.register === 'books'}<div class="page-filters">{@render bookScope()}</div>{/if}
+
 
   {#if showSource}
     <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
@@ -1045,6 +1082,8 @@
       {onwalk}
     />
     </div>
+    <!-- BUDGETS SETS ITS BUDGETS, a week's, a month's or a year's, at its foot (`BudgetSet.svelte`), placed as the offer is. -->
+    {#if slug === 'money-budgets' && !shapeWaits && !arranging && writes}<div class="page-offer" data-after="blocks">{#await import('$lib/money/BudgetSet.svelte') then { default: BudgetSet }}<BudgetSet onsaved={() => void reread()} />{/await}</div>{/if}
     <!-- THE OFFER COMES AFTER EVERY BLOCK OF THE PAGE, never before the first. -->
     {#if offer && !shapeWaits}<div class="page-offer" data-after="blocks">{@render offer()}</div>{/if}
     {#if hosting}<BatchBar {picked} />{/if}
@@ -1109,6 +1148,8 @@
       {onwalk}
       opens={opens ?? null}
       between={between ?? null}
+      placed={placed ?? null}
+      inside={inside ?? null}
     />
   </div>
   {#if select && !arranging}<BatchBar {picked} />{/if}
@@ -1194,6 +1235,13 @@
       white-space: normal;
     }
   }
+
+  /* THE LINE IS MORE ABOUT'S ALONE (Q32 of 29 October): "Send numbers here", folded under it, wore the same "Keeping it
+     alive 2 · Key numbers · Notes", so a folded section after the first box says only its heading. */
+  .body-wrap[data-project] :global(.box:has(.sec-fold) ~ * .block[data-kind='section'] .sec:has(.sec-fold)::after) {
+    display: none;
+  }
+
   /* THE OFFER UNDER THE PAGE'S BLOCKS, one tile gap below the last, in the page's own gutter. */
   .page-offer {
     padding-inline: var(--gutter);
@@ -1320,6 +1368,17 @@
     gap: var(--sp-2) var(--sp-3);
     min-inline-size: 0;
     min-block-size: var(--ctl-h);
+  }
+
+  .lead-head[data-barred] :is(.lead-glyph, .lead-count, .lead-crumb) {
+    display: none;
+  }
+
+  .lead-head[data-barred] .lead-name {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    clip-path: inset(50%);
   }
 
   .lead-glyph {

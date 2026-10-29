@@ -165,6 +165,8 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
     /* WHAT MATTERS, WHAT STOPPED, WHAT WENT STALE AND WHAT A NAME IS (batch 85): the record's own reads, which the
        narrow surface has not got. */
     'braindog:briefing',
+    /* EVERY WIDGET TODAY CAN HOLD (round 1030), the record's `widgetGallery`, which the narrow surface has not got. */
+    'braindog:widgets',
     'braindog:exceptions',
     'braindog:stale',
     'braindog:learnings',

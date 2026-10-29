@@ -73,4 +73,4 @@ Declarations belong to the pack, and rows belong to you. Uninstalling retires th
 - [Publishing and review](/docs/packs/publishing): putting a pack on the Kennel, and taking a version back.
 - [The catalogue](/docs/packs/catalogue): where records find packs and install them.
 - [What a pack can and cannot do](/docs/packs/limits): the whole list, and the one thing no check prevents.
-- [Every refusal](/docs/packs/refusals): each sentence a pack can meet, and where.
+- [When an add-on will not install](/docs/packs/refusals): each sentence a pack can meet, and where.

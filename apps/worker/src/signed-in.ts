@@ -23,8 +23,8 @@ const MAX_AGE = 2_592_000;
 /** A record's address as the app's paths carry it. Anything else is written as `1`, so the cookie never carries a stray. */
 const ADDRESS = /^[a-z0-9-]{1,64}$/;
 
-/** A redirect into one record: `/app/<address>/`, absolute or not. `/app/start` has no trailing slash and is not one. */
-const INTO_RECORD = /^\/app\/([^/]+)\/$/;
+/** A redirect into one record: `/<address>/`, absolute or not. `/start` has no trailing slash and is not one. */
+const INTO_RECORD = /^\/([^/]+)\/$/;
 
 type Mode = 'secure' | 'local';
 
@@ -99,7 +99,7 @@ function adding(answer: Response, cookie: string): Response {
  * Every answer as it leaves the Worker, with `bd_in` set or cleared beside the session.
  *
  * Four rules. A session `Set-Cookie` with a value adds `bd_in` holding the address the answer redirects into, else the
- * one the request's `bd_in` holds, else `1`. `GET /app` answering its 302 into a record for a request carrying a session
+ * one the request's `bd_in` holds, else `1`. `GET /` answering its 302 into a record for a request carrying a session
  * (no rotation, so no session cookie in the answer) adds `bd_in` with that address, so the cookie learns it. A cleared
  * session clears `bd_in`. With a `domain` (`cookieDomain`) the cookie is written for that parent name, so the site on
  * `brain.dog` reads one set by the app on `app.brain.dog`. Anything else, and always a 101 or an answer holding a WebSocket, is the answer itself.
@@ -112,7 +112,7 @@ export function withSignedIn(answer: Response, request: Request, domain: string 
   if (moved?.move === 'set') return adding(answer, set(into ?? heldAddress(request) ?? '1', moved.mode, domain));
   if (into === null || request.method !== 'GET') return answer;
   const path = new URL(request.url).pathname;
-  if (path !== '/app' && path !== '/app/') return answer;
+  if (path !== '/') return answer;
   const mode: Mode | null = readSid(request, 'secure') !== undefined ? 'secure' : readSid(request, 'local') !== undefined ? 'local' : null;
   return mode === null ? answer : adding(answer, set(into, mode, domain));
 }

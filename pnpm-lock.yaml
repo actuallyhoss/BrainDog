@@ -421,6 +421,8 @@ importers:
 
   packs/bank-hsbc-eg: {}
 
+  packs/calendar: {}
+
   packs/card-alerts: {}
 
   packs/certificates: {}
@@ -481,15 +483,21 @@ importers:
 
   packs/reading-list: {}
 
+  packs/receipts: {}
+
   packs/retainer-hours: {}
 
   packs/roadmap: {}
 
   packs/rule-sheet: {}
 
+  packs/savings-circle: {}
+
   packs/setup-sync: {}
 
   packs/slash-desk: {}
+
+  packs/splits: {}
 
   packs/standup: {}
 
@@ -497,11 +505,17 @@ importers:
 
   packs/studies: {}
 
+  packs/subscriptions: {}
+
   packs/task-tiers: {}
+
+  packs/tax-set-aside: {}
 
   packs/team-board: {}
 
   packs/trips: {}
+
+  packs/weather: {}
 
   packs/week-in-money: {}
 

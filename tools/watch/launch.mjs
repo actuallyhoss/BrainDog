@@ -6,7 +6,7 @@
  *
  * THE ONLY WATCHDOG BEFORE THIS RAN INSIDE CLOUDFLARE (`apps/site/src/worker.ts`), so a day with the app down at
  * Cloudflare's edge, or a night with no copy, reached him by chance. This runs on GitHub's clock (`watch.yml`), and a red
- * scheduled run is a mail from GitHub. Seven questions, one line each, and every miss printed, never the first only:
+ * scheduled run is a mail from GitHub. Eight questions, one line each (eight asks one line per name), and every miss printed, never the first only:
  *
  *   1. `http://<host>/` is a 301 or 308 to https on the same name.
  *   2. `/healthz` is 200 with `ok: true`.
@@ -21,6 +21,9 @@
  *      stranger signing up (`apps/worker/src/launch.ts`), so `open` in the config and `closed` here is a sign-up that is
  *      switched on and does not work, and its one `why` is printed under the miss. `open` beside any `why` at all, or
  *      `invite` beside more than one, is a miss too: see `reasonsBeside`.
+ *   8. Every old address of a page is one 308 to the new one: `/app/signin?x=1` on the app's own name and on each name of
+ *      `LEGACY_HOSTS`, asked as a browser asks (`Accept: text/html`), answers 308 to `https://<host>/signin?x=1`, query
+ *      kept and never a second hop. The app was under `/app` until 29 Oct; a link mailed or kept from then lands here.
  *
  * THE NAMES COME FROM `apps/worker/wrangler.jsonc`, AS `smoke.mjs` READS THEM: `PUBLIC_HOST`, `LEGACY_HOSTS` and
  * `SIGNUP` are what the Worker was deployed with, so the watch asks the names the deploy claimed.
@@ -34,10 +37,10 @@
  * the product down.
  *
  * ON HIS MAC, HOURLY THROUGH launchd (`tools/watch/mac.mjs`), since `watch.yml` runs by hand only (15 October): the
- * same seven questions, with question 3 read from the deploys `tools/ship/deploy.mjs` logged there (`shipRuns`) and a
+ * same eight questions, with question 3 read from the deploys `tools/ship/deploy.mjs` logged there (`shipRuns`) and a
  * red run a macOS notice.
  *
- * EXIT CODES: 0 when all seven answer as they should, 1 when any does not.
+ * EXIT CODES: 0 when all eight answer as they should, 1 when any does not.
  */
 
 import { readBuild, siteConfig, wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
@@ -184,7 +187,7 @@ const toHttps = (location, host) => {
 };
 
 /**
- * The seven questions, asked in order, each one `{ n, asks, miss, note, more }`: `miss` is `null` on the right answer
+ * The eight questions, asked in order, each one `{ n, asks, miss, note, more }`: `miss` is `null` on the right answer
  * and otherwise the sentence saying what came back; `note` is what a right answer said; `more` is lines printed under a
  * miss. `ask` is `fetch` unless a test hands it the stub; nothing is printed here.
  */
@@ -274,11 +277,24 @@ export async function questions({ names, github = {}, ask = fetch, now = Date.no
     launch?.signup ?? '',
     why,
   );
+
+  /* THE OLD ADDRESSES, ONE HOP EACH: the app's own name first, then each old name, which reaches the Worker through the
+     site's binding. A 308 to `/app/signin` again, or to the old name, is a second hop and a miss. */
+  const moved = `https://${host}/signin?x=1`;
+  for (const name of [host, ...legacy]) {
+    const old = await asked(ask, `https://${name}/app/signin?x=1`, { headers: { accept: 'text/html' } }, ms);
+    const went = old.headers?.get('location') ?? '';
+    say(
+      8,
+      `https://${name}/app/signin?x=1 is one 308 to ${moved}`,
+      failed(old) ?? (old.status === 308 && went === moved ? null : `answered ${old.status}${went ? ` to ${went}` : ''}`),
+    );
+  }
   return out;
 }
 
 /**
- * The whole watch: the seven questions printed one line each, every miss with what came back under it, then when the
+ * The whole watch: the eight questions printed one line each, every miss with what came back under it, then when the
  * watch last ran. Answers the exit code, 1 on any miss.
  */
 export default async function watch({ names, github = {}, ask = fetch, now = Date.now(), ms = ASK_MS, log = console.log }) {

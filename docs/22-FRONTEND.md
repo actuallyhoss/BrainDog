@@ -625,8 +625,13 @@ names the Worker's routes (`/api/*`, `/mcp`, `/auth/*`, `/a/*`, `/in/*`, `/s/*`,
 Worker while an app navigation always does, because under `/app/<slug>/` the slug is checked first
 ([33-CONTRACTS](33-CONTRACTS.md) §4).
 
-**CI asserts the deployed shell matches the build byte for byte**: after `wrangler deploy`, fetch `/app/`
-and `/app/_app/version.json` from the live host (`/` and `/_app/version.json` before push A) and compare their SHA-256 to the `build/` output, failing
+*(Amended October 29th 2026.)* The app is back at the root of its own name, `paths.base: ''`, so its chunks are
+`/_app/immutable/*` and a record is `app.brain.dog/<slug>`. `run_worker_first` names `/*` beside the doors, with
+`!/_app/*` and `!/catalogue/*` taking precedence, so a hashed chunk still never invokes the Worker and an app
+navigation always does. Every address under `/app` is a `308` to the same address without it.
+
+**CI asserts the deployed shell matches the build byte for byte**: after `wrangler deploy`, fetch `/`
+and `/_app/version.json` from the live host (`/app/` and `/app/_app/version.json` from push A until October 29th) and compare their SHA-256 to the `build/` output, failing
 on mismatch; the same gate reads the `app` tuple back and requires it to equal the deploying run's
 `BRAINDOG_BUILD` ([33-CONTRACTS](33-CONTRACTS.md) §8; [52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §5).
 

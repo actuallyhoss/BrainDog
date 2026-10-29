@@ -4,7 +4,7 @@
  * THE SHAPE BEFORE A FLIP IS WHAT A ROLLBACK OF THAT FLIP LANDS ON, SO ITS CHECKS OUTLIVE THE PUSH THAT RETIRED IT.
  * A faulty flip is undone with `wrangler rollback` of the app and a `git revert`, which puts these vars back behind the
  * same site binding. The smoke step and `provision-check` still carry a
- * branch for that shape (the public host is the Worker's own Custom Domain, and its page loads are sent into `/app` on
+ * branch for that shape (the public host is the Worker's own Custom Domain, and its old `/app` page loads are sent to its root on
  * the same name), and once B2 moved production's vars into `wrangler.jsonc` nothing in the file reached that branch:
  * with push 4's vars in place, eight of the scripts' tests that asked the file for production's pre-flip answers
  * failed. Written here, the branch stays tested for the day a revert needs it.

@@ -31,6 +31,7 @@
   import PageView from '$lib/page/PageView.svelte';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
+  import { widgetHeld } from '$lib/board/widget-held.svelte.ts';
   import Pages from './Pages.svelte';
 
   let { shell, area }: AreaProps = $props();
@@ -56,6 +57,12 @@
       forget();
       await invalidateAll();
     }
+  }
+
+  /* FORGET: what was learned from use before today no longer suggests a widget, and nothing put off waits. */
+  async function forgetWidgets() {
+    const saved = await widgetHeld.forget();
+    toasts.push(saved.from === 'refused' ? saved.fix : 'Forgotten. Widget suggestions start again from today.', saved.from === 'refused' ? { intent: 'warn' } : {});
   }
 
   /* NO SHAPE IS OFFERED: one sidebar and one bar are drawn for everyone since nav A, so the pen holds the record's
@@ -188,6 +195,10 @@
   >
 {/snippet}
 
+{#snippet forgetUse()}
+  <Button size="sm" onclick={() => void forgetWidgets()}>Forget</Button>
+{/snippet}
+
 
 <!--
   THE HOLDING PEN. Every offer, whatever its kind, is one row: what it is, one sentence of why, and three presses, "Show
@@ -195,8 +206,10 @@
 -->
 <!-- NO COUNT OVER NOTHING: "Suggestions 0" sat over "Nothing waiting". The number is the
      sidebar's own (`penCount`), so where one is drawn the two agree. -->
-<Tile icon="inbox" title={words.offers} count={waitingCount || undefined}>
+<Tile id="suggestions" icon="inbox" title={words.offers} count={waitingCount || undefined}>
   <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />
+  <!-- FORGET WHAT IT LEARNED (widgets plan §6.4, Call 12): the widgets Slash suggests from use start again from today. -->
+  {#if navPrefs.suggest}<StateRow icon="refresh" title="Forget what BrainDog learned from my use" line="Widget suggestions start again from today. Nothing you added changes." action={forgetUse} />{/if}
   {#if !navPrefs.suggest}
     <!-- NOT `no-data-yet`, WHICH WOULD BE A LIE ABOUT THE RECORD. `19 §6` separates the empty states precisely so that
          "nothing has happened yet" and "you turned this off" cannot read the same. -->

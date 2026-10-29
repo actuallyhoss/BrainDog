@@ -3,7 +3,7 @@
  *
  * A KEPT PAGE WAS KEPT SILENTLY. `plan` leaves a page the owner rearranged out of what is staged, which is right, and
  * named it under `kept` and nothing more. Founder 2.6.0 was written for two things on Home, the Late table and the
- * title Today, and on a record whose owner had moved one block on Home neither arrived and nothing said so.
+ * title Today (Founder overview since round 1030, which the tests below read), and on a record whose owner had moved one block on Home neither arrived and nothing said so.
  *
  * SO THE PLAN NAMES WHAT THE UPDATE ADDS THAT THE OWNER'S PAGE LACKS (`Diff.brings`), and `keptQuestion` says it as
  * the one question Decide asks. The page is still kept and the install still goes through: the owner chooses.
@@ -81,17 +81,17 @@ const host = (log: string[]): Host => ({
 
 const names = (id: string): string => (id === 'usecase-founder' ? 'Founder' : id === HOME ? 'your Home page' : id);
 
-test('Founder 2.6.0 over an edited Home keeps the page and names the Late table and the title Today', async () => {
+test('Founder 2.6.0 over an edited Home keeps the page and names the Late table and the title Founder overview', async () => {
   const next = await founder();
   assert.equal(next.manifest.version, '2.6.0');
   const diff = await plan(next, await recordWith(next, lapsingFirst));
 
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.kept, [{ id: HOME }]);
-  assert.deepEqual(diff.brings, [{ id: HOME, title: 'Today', blocks: [{ kind: 'table', heading: 'Late' }] }]);
+  assert.deepEqual(diff.brings, [{ id: HOME, title: 'Founder overview', blocks: [{ kind: 'table', heading: 'Late' }] }]);
   assert.deepEqual(keptQuestion(diff, names), {
     about: 'Founder 2.6.0 adds to a page you changed',
-    line: "Founder 2.6.0 adds the Late table and the title Today to your Home page, which you changed. Your page is kept as you left it. Take the update's page, or keep yours.",
+    line: "Founder 2.6.0 adds the Late table and the title Founder overview to your Home page, which you changed. Your page is kept as you left it. Take the update's page, or keep yours.",
     pages: [HOME],
   });
 });
@@ -118,11 +118,11 @@ test('one question however many things the page lacks, and it is asked once for 
   assert.ok(!asked.line.includes('page.home-founder') && !asked.line.includes('usecase-founder'), 'an id in words a person reads');
 });
 
-test('an owner who already has a Late table and calls the page Today is asked nothing', async () => {
+test('an owner who already has a Late table and calls the page Founder overview is asked nothing', async () => {
   const next = await founder();
   const late = (next.declarations.find((d) => d.id === HOME)?.body as unknown as Body).blocks.find((b) => b.heading === 'Late');
   assert.ok(late);
-  const theirs = (home: Body): Body => ({ ...lapsingFirst(home), title: 'Today', blocks: [late, ...lapsingFirst(home).blocks] });
+  const theirs = (home: Body): Body => ({ ...lapsingFirst(home), title: 'Founder overview', blocks: [late, ...lapsingFirst(home).blocks] });
   const diff = await plan(next, await recordWith(next, theirs));
 
   assert.deepEqual(diff.kept, [{ id: HOME }]);
@@ -135,7 +135,7 @@ test('a block the owner took off is not offered back, only what the update adds'
   const without = (home: Body): Body => ({ ...home, blocks: home.blocks.filter((b) => b.heading !== 'Lapsing') });
   const diff = await plan(next, await recordWith(next, without));
 
-  assert.deepEqual(diff.brings, [{ id: HOME, title: 'Today', blocks: [{ kind: 'table', heading: 'Late' }] }]);
+  assert.deepEqual(diff.brings, [{ id: HOME, title: 'Founder overview', blocks: [{ kind: 'table', heading: 'Late' }] }]);
 });
 
 test('a page nobody changed is updated as before, with nothing kept and nothing asked', async () => {

@@ -32,6 +32,9 @@ import { recordToday } from '../record/zone.ts';
 export const words = {
   pin: 'Pin',
   pinTo: 'Pin to',
+  /* THE ANSWER ON TODAY IN ONE PRESS, and every other page a press further (the widgets plan of 29 October). */
+  toToday: 'Add to Today',
+  another: 'Add to another page',
   pinned: (page: string) => `Pinned to ${page}.`,
   pinnedOn: (when: string) => `Pinned ${when}`,
   rows: (list: string, where: string | null) =>

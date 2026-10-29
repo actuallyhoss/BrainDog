@@ -62,7 +62,7 @@ test('every route the table marks as a write is refused before it leaves', async
     const said = await ask(`/api/${r.name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     assert.equal(said.status, 403, r.name);
     assert.match(said.text, /reads and never writes/u, r.name);
-    const got = await ask(`/app/acme/api/${r.name}`);
+    const got = await ask(`/acme/api/${r.name}`);
     assert.equal(got.status, 403, `${r.name} as a GET under the slug`);
   }
   assert.equal(heard.length, before, 'no write reached the host');
@@ -91,8 +91,8 @@ test('no write gets through by another spelling of its address, or by a verb or 
     `/api/%${w.charCodeAt(0).toString(16)}${w.slice(1)}`,
     `/api/boot%2F..%2F${w}`,
     `/api/boot%2f${w}`,
-    `/app/acme/api/boot/..%2F${w}`,
-    `/app/acme/api%2F${w}`,
+    `/acme/api/boot/..%2F${w}`,
+    `/acme/api%2F${w}`,
     `/api/${w}%00`,
     `/api/${w};boot`,
     `/api/boot/../${w}`,
@@ -125,7 +125,7 @@ test('it refuses to start under CI, and says what the live look cannot draw', as
 test('a read goes on with the token and nothing else, and its answer comes back without a cookie', async () => {
   assert.ok(allowed().has('boot'));
   heard.length = 0;
-  const said = await ask('/app/acme/api/boot?x=1', { headers: { cookie: 'bd_session=mine', 'x-page': 'secret', origin: 'http://elsewhere' } });
+  const said = await ask('/acme/api/boot?x=1', { headers: { cookie: 'bd_session=mine', 'x-page': 'secret', origin: 'http://elsewhere' } });
   assert.equal(said.status, 200);
   assert.equal(said.cookie, null, 'no cookie from the host reaches the browser');
   assert.equal(heard.length, 1);
@@ -142,7 +142,7 @@ test('a read goes on with the token and nothing else, and its answer comes back 
 
 test('the store catalogue is read as anybody reads it: a GET under /api/kennel/v1/, with no token and nothing of the page', async () => {
   heard.length = 0;
-  const said = await ask('/app/acme/api/kennel/v1/index.json', { headers: { cookie: 'bd_session=mine', 'x-page': 'secret' } });
+  const said = await ask('/acme/api/kennel/v1/index.json', { headers: { cookie: 'bd_session=mine', 'x-page': 'secret' } });
   assert.equal(said.status, 200);
   assert.equal(said.cookie, null);
   assert.equal(heard.length, 1);

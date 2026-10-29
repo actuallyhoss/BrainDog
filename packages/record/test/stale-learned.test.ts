@@ -81,7 +81,7 @@ test('WHAT WAS LEARNED 61 DAYS AGO AND NEVER CONFIRMED IS ONE LINE, in its own w
     assert.deepEqual(Object.keys(l).sort(), ['clear', 'count', 'kind', 'said']);
     assert.equal(l.count, 1);
     assert.match(l.said, /Export the variable font last/u, 'said in its own first words');
-    assert.ok(l.said.includes(name), 'beside the name a person says it by');
+    assert.ok(!l.said.includes(name), 'said by its words, never by its handle');
     assert.match(l.said, /61 days/u);
     assert.equal(l.clear, `update ${name} with confirmed_on ${TODAY}`);
     assert.equal(got.count, 1);
@@ -150,7 +150,7 @@ test('A SKILL BEHIND TWO LEARNINGS IS ONE LINE, with the proposal that brings it
     const got = await stale(r, who);
     assert.deepEqual(kinds(got), ['skills'], JSON.stringify(got.lines));
     const l = line(got, 'skills');
-    assert.equal(l.said, 'The skill deploy is behind 2 learnings');
+    assert.equal(l.said, 'The deploy skill does not take in 2 learnings yet');
     assert.equal(l.count, 1);
     assert.equal(l.clear, `propose a rowset on skills#${String(deploy.seq)} with body, rev 2 and because [LN${String(a.seq)}, LN${String(b.seq)}]`);
     assert.ok(!JSON.stringify(got).includes(deploy.id) && !JSON.stringify(got).includes(a.id), 'never a row id');
@@ -164,7 +164,7 @@ test('A SKILL BEHIND TWO LEARNINGS IS ONE LINE, with the proposal that brings it
   /* A third lesson after that: behind one, and the call says the two it holds are kept. */
   const c = await learned(r, 'Tag the release before the announcement goes out.', { topic: 'deploy' });
   const again = line(await stale(r, owner), 'skills');
-  assert.equal(again.said, 'The skill deploy is behind 1 learning');
+  assert.equal(again.said, 'The deploy skill does not take in 1 learning yet');
   assert.equal(again.clear, `propose a rowset on skills#${String(deploy.seq)} with body, rev 2 and because [LN${String(c.seq)}], after the 2 it holds`);
   r.sql.close();
 });
@@ -185,7 +185,7 @@ test('BOTH ARE IN THE ONE NUMBER, two skills are one line, and reading files no 
   assert.equal(line(got, 'learnings').count, 2);
   const s = line(got, 'skills');
   assert.equal(s.count, 2);
-  assert.equal(s.said, '2 skills are behind what was learned: deploy by 1 learning and review by 1 learning');
+  assert.equal(s.said, '2 skills do not take in what was learned yet: deploy, 1 learning and review, 1 learning');
   assert.equal(
     s.clear,
     `propose a rowset on each: skills#${String(deploy.seq)} with body, rev 2 and because [LN${String(a.seq)}]; skills#${String(review.seq)} with body, rev 2 and because [LN${String(b.seq)}]`,
@@ -211,7 +211,7 @@ test('EVERY SKILL BEHIND IS COUNTED, not only the few a night drafts, and the fi
   r.clock.set(NOW);
   const s = line(await stale(r, owner), 'skills');
   assert.equal(s.count, 10);
-  assert.match(s.said, /^10 skills are behind what was learned: alpha by 1 learning, .*hotel by 1 learning and 2 more$/u);
+  assert.match(s.said, /^10 skills do not take in what was learned yet: alpha, 1 learning, .*hotel, 1 learning and 2 more$/u);
   assert.doesNotMatch(s.said, /india|juliet/u);
   assert.match(s.clear, /; then ask again for the other 2$/u);
   assert.equal(s.clear.split('; ').length, 9);

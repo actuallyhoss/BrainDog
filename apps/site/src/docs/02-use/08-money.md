@@ -1,22 +1,29 @@
 # Money
 
-Money is a finance page, not a ledger of who owes whom. It leads with the money you have, then how long it lasts, then what comes in and goes out, and it keeps the past so you can see where the money went. Agents and rules do the filing and the chasing in view, and every question they raise waits for you in Needs you.
+Money is a section of its own, for a business, for you, or both. It leads with the money you have, then how long it lasts, then what comes in and goes out, and it keeps the past so you can see where the money went. Agents and rules do the filing and the chasing in view, and every question they raise waits for you in Needs you.
 
-## The Money page
+## Money's pages
 
-Money is one page, read from the same lists from top to bottom:
+Money opens on its home: Cash now, with its last twelve weeks as a line, how long it lasts, what is coming in and going out over the next thirty days, and anything that waits on you. Its other pages sit under it in the sidebar:
 
-- **What you have**: Cash now, with its last twelve weeks as a line, then when the money lasts until, what is coming in over the next thirty days, and what is going out.
-- **Accounts**: each one with its type and the day its balance was last set, and a line to add another.
-- **Waiting on you**: the questions Money's rules have asked.
-- **Cash ahead**: a forecast walked forward from Cash now through every bill, invoice and repeating payment you have.
-- **Coming and going**: how Cash now becomes the balance thirty days from now, step by step.
-- **Where this month's money went**: this month's spending, cut by category.
-- **Coming up**, **Being chased**, and what is late to you and late to pay.
-- **In and out, by month**: money in and money out, what has moved and what is due.
-- **Every month**: what repeats, in and out.
-- **Ledger**: the six newest lines of the ledger in a tile of their own, each opening its entry. They are no longer under History.
-- **What agents and rules did**: every change they made to your money, with who made it.
+```comparison | The pages under Money
+Page | What it shows
+Accounts | Each bank account and card, with its balance and the day it was set. Open one for its own ledger
+Ledger | Every payment in and out, newest first
+Budgets | This month against each budget, and budgets offered from last month's pace. Nothing is set for you
+Forecast | Cash walked forward through every bill, invoice, repeat and instalment
+Coming up | What is due this week and after, what repeats every month, and what is paused
+Payees | Who you pay most and how often, and who pays you
+Reports | In and out by month, spending by category, and this month against last
+```
+
+## Add a payment from anywhere
+
+Press **+** anywhere in BrainDog to add money out, money in or a move between your own accounts. It suggests the payee and the category you used last time, and writes the line to the ledger. A move between your accounts is written as two lines, one out and one in, so neither counts as spending.
+
+## Add-ons for the rest
+
+Money keeps accounts, bills, budgets and the forecast. Add the rest from Add-ons when you need it: Investments and gold, Certificates, Property, Insurance, Debts, Goals, Trips and Zakat. Each adds its own pages beside Money's.
 
 Cash now is read from your accounts, rolled forward from each account's newest balance through what has moved since. Every figure after it reads the same walk, so no two of them disagree.
 
@@ -71,7 +78,7 @@ Money comes with rules that ask before they act:
 
 ## Bringing money in
 
-- Type it: add a payment to the Ledger, or an account on the Money page.
+- Type it: press **+** for a payment, or add an account on Accounts.
 - Connect Stripe or Mercury from Add-ons, and balances and transactions arrive on their own. See [The inbox and doors](/docs/use/inbox-and-doors).
 - Forward card alerts or bank texts, and teach a rule to file them.
 - **Count the cash**, an add-on, writes down what is actually in a cash box or account and puts the difference from what the record expected into the ledger.

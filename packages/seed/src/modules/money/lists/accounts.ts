@@ -63,6 +63,9 @@ export const ACCOUNTS_REGISTER: MoneyRegister = {
      * is owed, so the limit is typed once and `card_owed` writes "To pay on it" as the limit less the newest available, with
      * the day of that text (`scripts/card-to-pay.js`). Money's first line says it. Empty on every account that is no card.
      */
+    /* "NO BANK FEED", SINCE money-core 3.31.0: nothing a bank sends writes this account, so a repeating line marked
+       "Post it for me" may write its charge here without it being written twice (`post-due.ts`). Empty says neither. */
+    { id: 'no_feed', label: 'No bank feed', type: 'bool' },
     { id: 'limit', label: 'Credit limit', type: 'money' },
     { id: 'to_pay', label: 'To pay on it', type: 'money' },
     { id: 'to_pay_on', label: 'To pay as of', type: 'day' },

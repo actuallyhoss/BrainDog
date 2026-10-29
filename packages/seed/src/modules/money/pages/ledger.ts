@@ -2,6 +2,7 @@
 
 import type { SeedPage } from '../../base.ts';
 import { MOVED_COLUMNS } from './shared.ts';
+import { UNFILED } from '../figures/shared.ts';
 
 /**
  * A LEDGER LINE, AS EVERY LIST OF THEM ON MONEY'S PAGES DECLARES IT: the day, who it was, and the amount signed by the way
@@ -51,7 +52,7 @@ export const SHOW_FILTER = {
   field: 'show',
   control: 'chips',
   options: [
-    { value: 'unfiled', label: 'Not filed yet', where: 'category is empty, parts is empty, transfer is false' },
+    { value: 'unfiled', label: 'Not filed yet', where: UNFILED },
     { value: 'moves', label: 'Between your accounts', where: 'transfer is true' },
     { value: 'in', label: 'Money in', where: 'direction is in, transfer is false, stays is not true' },
     { value: 'out', label: 'Money out', where: 'direction is out, transfer is false, stays is not true' },
@@ -99,8 +100,8 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       icon: 'coins',
       span: 12,
       cells: [
-        { metric: 'spent-30d', label: 'Out' },
-        { metric: 'received-30d', label: 'In' },
+        { metric: 'spent-30d', label: 'Spent' },
+        { metric: 'received-30d', label: 'Received' },
         { metric: 'filed-for-you-30d', label: 'Filed for you' },
       ],
     },
@@ -112,20 +113,37 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       icon: 'inbox',
       span: 12,
       source: 'register.transactions',
-      where: 'state is not void, transfer is false, category is empty, parts is empty',
+      where: UNFILED,
       columns: LEDGER_LINE_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: 50,
       when: { metric: 'txn-uncategorised', gt: 0 },
     },
     {
-      /* EVERY LINE, A DAY AT A TIME, newest first. A void line is left out, as every figure of the Ledger leaves it. */
+      /* WAITING TO CLEAR, APART, SINCE money-core 3.32.0 (audit of 30 October, 22): a pending line is in no total until the
+         bank settles it, as Spent and every budget leave it out, so it is listed on its own under words that say so and
+         not among the lines that are counted. */
+      kind: 'timeline',
+      heading: 'Waiting to clear',
+      icon: 'clock',
+      span: 12,
+      source: 'register.transactions',
+      where: 'state is pending',
+      columns: LEDGER_LINE_COLUMNS,
+      order: [{ field: 'on', dir: 'desc' }],
+      limit: LEDGER_PAGE_LINES,
+      when: { metric: 'pending-lines', gt: 0 },
+      empty: 'Nothing is waiting to clear.',
+    },
+    {
+      /* EVERY LINE, A DAY AT A TIME, newest first. A void line is left out, as every figure of the Ledger leaves it, and a
+         pending one is above, until it clears. */
       kind: 'timeline',
       heading: 'Every line',
       icon: 'receipt',
       span: 12,
       source: 'register.transactions',
-      where: 'state is not void',
+      where: 'state is cleared',
       columns: LEDGER_LINE_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: LEDGER_PAGE_LINES,

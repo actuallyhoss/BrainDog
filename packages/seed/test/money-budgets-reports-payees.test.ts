@@ -48,7 +48,10 @@ test('EACH PAGE OPENS ON ITS LINE, holds no more than a page may, and stands six
     assert.equal(blocks[0]!.lead, true, `${slug} does not open on a line`);
     assert.ok(blocks.length <= 24, `${slug} declares ${blocks.length} blocks`);
     const fold = blocks.findIndex((b) => b.kind === 'section' && b.fold === true);
-    const above = (fold < 0 ? blocks : blocks.slice(0, fold)).filter((b) => !b.lead && b.kind !== 'section');
+    /* THE BUDGETS BY PERIOD ARE ONE TILE (money-core 3.31.0): a week's and a year's draw only while such a budget is set,
+       beside the month's, as one list of budgets cut by its period. */
+    const period = (b: Block) => b.kind === 'progress' && /^This (week|year)'s budgets$/u.test(b.heading ?? '');
+    const above = (fold < 0 ? blocks : blocks.slice(0, fold)).filter((b) => !b.lead && b.kind !== 'section' && !period(b));
     assert.ok(above.length <= 6, `${slug} stands ${above.length} tiles before its fold`);
     for (const b of blocks) if (b.heading !== undefined) assert.match(String(b.icon), /^[a-z][a-z0-9-]*$/u, `${slug}: ${b.heading} wears no glyph`);
     const read = blocks.flatMap((b) => [b.heading, b.body, b.empty, b.unset, ...(b.cells ?? []).flatMap((c) => [c.label, c.note])]).filter((t): t is string => typeof t === 'string');
@@ -200,7 +203,8 @@ test('BUDGETS SETS EACH BUDGET AGAINST THIS MONTH, and names the money no catego
   assert.equal(lead.body, '{{budgets-total}} a month across {{budgets-set}} categories.');
   assert.deepEqual(lead.values?.['budgets-total'], egp(5_000));
 
-  const each = m.block('money-budgets', 'Each budget');
+  /* HEADED BY ITS PERIOD SINCE money-core 3.32.0: a monthly budget is under This month's budgets. */
+  const each = m.block('money-budgets', "This month's budgets");
   assert.deepEqual(each.rows!.map((r) => [r.fields.name, r.fields.budget_alert]), [['Groceries', 80]]);
 
   const unfiled = m.page('money-budgets').find((b) => b.kind === 'note' && !b.lead && b.drawn !== false)!;
@@ -216,8 +220,9 @@ test('BUDGETS SETS EACH BUDGET AGAINST THIS MONTH, and names the money no catego
   /* KEPT OVER 90 DAYS: EGP 80,000 in, EGP 14,980 out. */
   assert.ok(Math.abs((read('kept-share-90d') as number) - (80_000 - 14_980) / 80_000) < 1e-9);
 
-  /* NO BUDGET YET: Outings, and nothing that is money in. */
-  assert.deepEqual(m.block('money-budgets', 'No budget yet').rows!.map((r) => r.fields.name), ['Outings']);
+  /* NO "NO BUDGET YET" TABLE SINCE money-core 3.32.0 (audit of 30 October, 22): Outings is counted by `budgets-unset`
+     above, and the page draws no column of names for it. */
+  assert.equal(m.page('money-budgets').some((b) => b.heading === 'No budget yet'), false);
 });
 
 test('THE OFFER IS ONE QUESTION, drawn on Budgets: asking writes nothing, and Use these writes the limits', async () => {

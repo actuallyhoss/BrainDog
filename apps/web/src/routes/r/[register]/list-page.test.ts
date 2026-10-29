@@ -33,7 +33,7 @@ test('A READING SAYS WHERE ITS CHART IS: the list page searched for its name', (
 
 const loaded = async (path: string, from: string | null): Promise<string | null> => {
   const url = new URL(`http://localhost${path}`);
-  const register = url.pathname.replace(/^\/app\/studio/u, '').split('/')[2] ?? '';
+  const register = url.pathname.replace(/^\/studio/u, '').split('/')[2] ?? '';
   const was = from === null ? null : new URL(`http://localhost${from}`);
   try {
     await load({ params: { register }, url, parent: async () => ({}), from: was });
@@ -48,12 +48,12 @@ const loaded = async (path: string, from: string | null): Promise<string | null>
 test('THE ROUTE SENDS A VISIT TO THE PAGE, and a move within the list keeps it', async () => {
   learnRowPages([{ slug: 'numbers', about: null, opens: 'datapoints' }]);
   try {
-    assert.equal(await loaded('/app/studio/r/datapoints', null), '/app/studio/p/numbers');
-    assert.equal(await loaded('/app/studio/r/datapoints', '/app/studio/r/datapoints'), '/app/studio/p/numbers', 'opened fresh, the address is its own');
-    assert.equal(await loaded('/app/studio/r/datapoints', '/app/studio/today'), '/app/studio/p/numbers');
-    assert.equal(await loaded('/app/studio/r/datapoints', '/app/studio/r/datapoints?rows=1&row=4'), null, 'a sheet closing on the list stays');
-    assert.equal(await loaded('/app/studio/r/datapoints?rows=1', null), null);
-    assert.equal(await loaded('/app/studio/r/tasks', null), null);
+    assert.equal(await loaded('/studio/r/datapoints', null), '/studio/p/numbers');
+    assert.equal(await loaded('/studio/r/datapoints', '/studio/r/datapoints'), '/studio/p/numbers', 'opened fresh, the address is its own');
+    assert.equal(await loaded('/studio/r/datapoints', '/studio/today'), '/studio/p/numbers');
+    assert.equal(await loaded('/studio/r/datapoints', '/studio/r/datapoints?rows=1&row=4'), null, 'a sheet closing on the list stays');
+    assert.equal(await loaded('/studio/r/datapoints?rows=1', null), null);
+    assert.equal(await loaded('/studio/r/tasks', null), null);
   } finally {
     learnRowPages([]);
   }

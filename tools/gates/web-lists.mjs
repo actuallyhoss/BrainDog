@@ -44,6 +44,7 @@ import { join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { skipDir } from './lib.mjs';
+import { fold, kernelWords } from './core-names.mjs';
 
 /** The repository this file sits in, where the seed is read from whatever the root is. */
 const REPO = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -73,10 +74,6 @@ export const HELD = {
   'apps/web/src/lib/who.ts': {
     ids: ['hello', 'people'],
     why: "onboarding's introduction asks whether the People pack is on before it meets the person, and `hello` is a greeting that opens a sentence without being a name.",
-  },
-  'apps/web/src/routes/inbox/+page.svelte': {
-    ids: ['agents'],
-    why: "the inbox reads the Agents module's lists off its manifest (`@braindog/seed/packs/modules`) by the pack id.",
   },
 
   /* A list the web reads by its id, where the record could say which list plays the part. */
@@ -120,14 +117,6 @@ export const HELD = {
   },
 
   /* NOT A LIST AT ALL: a word the web uses for something else, spelled like one. */
-  'apps/web/src/lib/record/blocks.ts': {
-    ids: ['agents', 'steps'],
-    why: 'block kinds called `agents` and `steps`, which are not the lists.',
-  },
-  'apps/web/src/lib/record/page-live.ts': {
-    ids: ['agents', 'steps'],
-    why: 'block kinds called `agents` and `steps`, which are not the lists.',
-  },
   'apps/web/src/lib/copy/decide.ts': {
     ids: ['choices', 'things', 'updates'],
     why: 'the plural words of three counted sentences, "Drawn from 3 things that came in", "adds 2 choices" and an arrangement\'s "2 updates", which are English and not the lists.',
@@ -142,37 +131,9 @@ export const HELD = {
     ids: ['choices'],
     why: "the `choices` part of an arrangement, drawn and folded by that name, which is not the list.",
   },
-  'apps/web/src/lib/record/block-edit.ts': {
-    ids: ['agents', 'steps'],
-    why: 'block kinds called `agents` and `steps`, which are not the lists.',
-  },
-  'apps/web/src/lib/page/home.ts': {
-    ids: ['agents'],
-    why: 'the block kind called `agents` (which folds), which is not the list.',
-  },
-  'apps/web/src/lib/page/BlockSlot.svelte': {
-    ids: ['steps'],
-    why: 'the block kind called `steps`, which is not the list.',
-  },
-  'apps/web/src/lib/page/page-writes.ts': {
-    ids: ['steps'],
-    why: 'the block kind called `steps`, which is not the list.',
-  },
   'apps/web/src/lib/flow/flow.ts': {
-    ids: ['choices', 'steps'],
+    ids: ['choices'],
     why: "an automation's `steps:` key and an Ask Slash step's `choices:`, which are not the guide's lists.",
-  },
-  'apps/web/src/lib/flow/flow.svelte.ts': {
-    ids: ['steps'],
-    why: "an automation's `steps:` key, which is not the guide's list.",
-  },
-  'apps/web/src/lib/flow/RunView.svelte': {
-    ids: ['steps'],
-    why: "an automation's `steps:` key, which is not the guide's list.",
-  },
-  'apps/web/src/lib/flow/source.ts': {
-    ids: ['steps'],
-    why: "an automation's `steps:` key, which is not the guide's list.",
   },
   'apps/web/src/lib/home/today-tiles.ts': {
     ids: ['people'],
@@ -191,12 +152,8 @@ export const HELD = {
     why: "the section names the nav orders a day by, the Work row's key and glyph, and the `work` word of the Work screen's address `/?work`; the five places the bars draw are read off the rail's order.",
   },
   'apps/web/src/lib/nav/rail.ts': {
-    ids: ['agents', 'orders', 'people', 'work'],
+    ids: ['orders', 'people', 'work'],
     why: "the section names the rail orders its places by (a shop's Orders after Decide, uc6-places-47), and the Work row's key, as `lib/nav.ts` names them.",
-  },
-  'apps/web/src/lib/page/tile-head.ts': {
-    ids: ['roadmap'],
-    why: 'a block kind called `roadmap`, whose tile counts what it holds, which is not the Roadmap pack.',
   },
   'apps/web/src/routes/+page.svelte': {
     ids: ['work'],
@@ -206,40 +163,80 @@ export const HELD = {
     ids: ['work'],
     why: "the declared Work page's slug, `page.work`, which `/?work` draws.",
   },
-  'apps/web/src/routes/automations/[id]/+page.svelte': {
-    ids: ['steps'],
-    why: "the automation screen's Steps tab.",
-  },
   'apps/web/src/routes/audit/+page.svelte': {
     ids: ['people'],
     why: 'the `people` icon on a line that gives or takes access.',
   },
   'apps/web/src/routes/settings/[area]/+page.svelte': {
-    ids: ['agents', 'people'],
+    ids: ['people'],
     why: 'settings areas called `people` and `agents`, and the `people` icon.',
   },
   'apps/web/src/routes/settings/levels.ts': {
-    ids: ['agents', 'people'],
+    ids: ['people'],
     why: 'the settings areas called `people` and `agents` that only an owner is shown.',
   },
 
   /* HELD ON 16 OCTOBER. What this gate, core-names and colour-grep found that day was held rather than renamed
      ("Hold them, deploy tonight"). Each says what its id is, so the change that renames it knows. */
-  'apps/web/src/lib/flow/try-step.ts': {
-    ids: ['steps'],
-    why: "an automation's `steps:` key, which the try sheet walks to place each step, and not the guide's list.",
-  },
   'apps/web/src/lib/home/imported-rules.ts': {
     ids: ['categories', 'filing_rules'],
     why: "Money's filing rules and the categories a rule files under, which Home's offer to make imported automations filing rules writes into by their list ids.",
   },
-  'apps/web/src/lib/record/page-write.ts': {
-    ids: ['agents', 'steps'],
-    why: 'block kinds called `agents` and `steps` in the table of which keys a block takes, which are not the lists.',
-  },
   'apps/web/src/lib/signup.ts': {
     ids: ['things'],
     why: "`things`, what a question back from the reading door may be about (`SetupAbout` in `@braindog/slash`), which is not the list.",
+  },
+  /* HELD ON 30 OCTOBER, at his word to deploy ("yes yes yes go go go"): what round 1030's new web code names. Money's
+     screens, the bell and the Keychain row read a list by its id where the record could say which list plays the part
+     (SHL-A24), the sheet's sample reads Money's ledger (SHL-A22), and two are a word the web uses for something else
+     that a new add-on's plain id now spells (SHL-A23). */
+  'apps/web/src/lib/board/SheetWidgets.svelte': {
+    ids: ['transactions'],
+    why: "the sheet's widgets for a list read Money's ledger by `register.transactions`; SHL-A22 moves them into the pack's `widgets`.",
+  },
+  'apps/web/src/lib/money/BookScope.svelte': {
+    ids: ['books'],
+    why: "the book picker reads Money's books and links into the list by its id; SHL-A24 reads it by its role.",
+  },
+  'apps/web/src/lib/money/BudgetSet.svelte': {
+    ids: ['categories'],
+    why: "Set a budget lists Money's categories by the list's id; SHL-A24 reads it by its role.",
+  },
+  'apps/web/src/lib/money/account-share.ts': {
+    ids: ['accounts', 'books', 'categories', 'organisations', 'transactions'],
+    why: "sharing one account names the lists the share reaches into; SHL-A24 reads each by its role.",
+  },
+  'apps/web/src/lib/money/category-look.ts': {
+    ids: ['certificates', 'count-cash', 'debts', 'goals', 'holdings', 'insurance', 'money-core', 'money-watch', 'property', 'receipts', 'savings-circle', 'splits', 'subscriptions', 'tax-set-aside', 'trips', 'zakat'],
+    why: "`MONEY_PACKS`, the add-ons whose pages wear Money's look though an older install of them says no section; SHL-A24 reads the place off the page or the pack's own declaration.",
+  },
+  'apps/web/src/lib/page/PageView.svelte': {
+    ids: ['accounts', 'books'],
+    why: "Money's pages open their quick add and setup on the accounts and books lists by id; SHL-A24 reads them by their role.",
+  },
+  'apps/web/src/lib/page/row-finish.ts': {
+    ids: ['installments', 'plans'],
+    why: "a plan with nothing left to pay is told by asking its installments list by id; SHL-A24 reads the link off the field.",
+  },
+  'apps/web/src/lib/record/people.ts': {
+    ids: ['organisations'],
+    why: "People's one line counts organisations and shops from the organisations list by id; SHL-A24 reads it by its role.",
+  },
+  'apps/web/src/lib/send/convos.svelte.ts': {
+    ids: ['receipts'],
+    why: "`receipts`, a conversation's own field in a type, which the Receipts add-on's id now spells; SHL-A23 says which of the two the gate reads.",
+  },
+  'apps/web/src/lib/shell/alerts.ts': {
+    ids: ['organisations', 'people', 'tasks', 'things', 'work'],
+    why: "the bell picks a line's glyph by the list its link opens; SHL-A24 reads the list's own place or glyph.",
+  },
+  'apps/web/src/routes/+layout.svelte': {
+    ids: ['credentials'],
+    why: "the sidebar leaves the keys list out because the Keychain row stands for it (Q28 of 29 October); SHL-A24 reads that off the list.",
+  },
+  'apps/web/src/routes/automations/hub.ts': {
+    ids: ['setup-sync'],
+    why: "upkeep the record runs for itself is told by its add-on's id and kept out of the list by default; SHL-A23 has the add-on declare it.",
   },
 };
 
@@ -449,9 +446,15 @@ export function literalsIn(source) {
 const LINK = /^\/r\/([^/?#]+)(?:[/?#]|$)/u;
 const DECLARED = /^register\.(.+)$/u;
 
-/** The first-party id a literal names, or `null`. */
-export function namedIn(text, ids) {
-  if (ids.has(text)) return text;
+/**
+ * The first-party id a literal names, or `null`.
+ *
+ * A BARE WORD THE KERNEL DECLARES FOR ITSELF IS ITS OWN, as `core-names` reads it (`kernelWords`): the day an add-on
+ * was called `calendar`, every `kind: 'calendar'` and calendar glyph in the web read as that add-on, 34 places. A link
+ * into the list or `register.` in front of it still names the list, whatever the word.
+ */
+export function namedIn(text, ids, own = new Set()) {
+  if (ids.has(text)) return own.has(fold(text)) ? null : text;
   const m = LINK.exec(text) ?? DECLARED.exec(text);
   return m && ids.has(m[1]) ? m[1] : null;
 }
@@ -508,6 +511,7 @@ export default async function webLists(
     return 3;
   }
   const every = new Set([...ids.lists, ...ids.packs]);
+  const own = kernelWords(ROOT);
   const currencies = new Set(Intl.supportedValuesOf('currency'));
 
   const findings = [];
@@ -525,7 +529,7 @@ export default async function webLists(
     for (let k = 0; k < source.length; k++) if (source[k] === '\n') starts.push(k + 1);
 
     for (const { text, at } of literals) {
-      const id = namedIn(text, every);
+      const id = namedIn(text, every, own);
       if (id === null) continue;
       /* A STYLE'S NAME IS NOT A LIST'S. `class="updates"` in markup is a class, and nothing the record holds. */
       if (markup && /\bclass\s*=\s*$/u.test(source.slice(Math.max(0, at - CLASS_REACH), at))) continue;

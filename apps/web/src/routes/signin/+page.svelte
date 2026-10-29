@@ -240,7 +240,7 @@
 
   /**
    * A LINK PASTED INTO A TAB ALREADY HERE IS TAKEN TOO. A change to the fragment alone is a same-document navigation,
-   * so nothing mounts again: a claim link pasted over `/app/signin` changed the address, left
+   * so nothing mounts again: a claim link pasted over `/signin` changed the address, left
    * "Sign in to open your record." on screen, made no request, and stayed so until a reload. The owner will very likely
    * have this page open when he pastes it, from the site's own "Sign in". A press that is out keeps its moment; anything
    * else on screen gives way to the landing, which needs the step idle to be drawn.
@@ -274,7 +274,7 @@
   }
 
   /**
-   * SIGNING IN DROPS THE BOOT THIS TAB KEPT. The screen's own load asked `boot` at the bare `/app` with no session, was
+   * SIGNING IN DROPS THE BOOT THIS TAB KEPT. The screen's own load asked `boot` at the bare address with no session, was
    * refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie and nothing more. Walked through,
    * "Open BrainDog" then drew The Studio with no request,
    * after the claim link and again after the passkey. The onward buttons are full page loads, which is the repair.
@@ -524,10 +524,10 @@
             {@render addDoor(true)}
             <p class="small">{copy.addPasskeyWhy(entered?.via ?? null)}</p>
           {/if}
-          <!-- A FULL PAGE LOAD, AND THAT IS THE REPAIR. A client-side move to `/app/` kept everything this tab
+          <!-- A FULL PAGE LOAD, AND THAT IS THE REPAIR. A client-side move to `/` kept everything this tab
                decided before the sign-in: the boot (the sample, then), the switcher's list, the voice. Walked twice, it drew
                The Studio, "Nothing you do here is saved.", with no request made; a reload drew his own record,
-               because the Worker answers `/app/` with a 302 to `/app/<slug>/` once there is a session. -->
+               because the Worker answers `/` with a 302 to `/<slug>/` once there is a session. -->
           <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href={goTo} data-sveltekit-reload>{copy.openBrainDog}</Button>
           {#if view.lead === 'open'}{@render addDoor(false)}{/if}
           <Button weight="bare" onclick={leave} aria-busy={view.out === 'asking'}>
@@ -651,8 +651,8 @@
         </p>
       {/if}
 
-      <!-- NO DEMO PILL. It opened the sample business at `/app/` for anybody not signed in, and there is no
-           sample now: `/app/` with no session is this screen, so the pill led back here. -->
+      <!-- NO DEMO PILL. It opened the sample business at `/` for anybody not signed in, and there is no
+           sample now: `/` with no session is this screen, so the pill led back here. -->
     </div>
   </div>
 </Entry>

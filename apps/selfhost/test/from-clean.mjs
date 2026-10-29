@@ -5,11 +5,11 @@
  *
  *   node apps/selfhost/test/from-clean.mjs [--container] [--dry] [--after-install <script>] [--keep]
  *
- * THE LINES ARE READ OUT OF README.md, NEVER WRITTEN HERE, so the two cannot drift: the fenced block under "On your own
- * machine" and the one under "The container". A line changed there is the line run here; a line this check cannot place
- * (no install, no init, no start) is refused before anything runs. `<record name>` and `<your email>` are filled with an
- * invented record and owner; the container's name, volume, port and env file are this run's own, so a person's real
- * `braindog` volume is never touched.
+ * THE LINES ARE READ OUT OF README.md, NEVER WRITTEN HERE, so the two cannot drift: the first fenced block under "Run it
+ * yourself" (the container, by Compose) and the one after "Without Docker". A line changed there is the line run here; a
+ * line this check cannot place (no install, no init, no start, no .env, no `compose up`) is refused before anything runs.
+ * `<record name>` and `<your email>` are filled with an invented record and owner; the Compose project, image, volume and
+ * port are this run's own, so a person's real `braindog` image and volume are never touched.
  *
  * THE COPY IS `git archive HEAD`, read only. No worktree, no clone, nothing written to the repository: the copy is the
  * commit as a stranger would get it, and an untracked file on this machine cannot make it pass.
@@ -18,9 +18,10 @@
  * one row written and read back over `braindog mcp`, `export` (the key it is wrapped by named by the record's own
  * refusal, as a person learns it), `verify`, `init --from` into a second folder, served, and the row read there.
  *
- * `--container` does the same through `docker build` and `docker run`, the image's health check healthy, and says
- * `skipped: no docker` where there is none. `--after-install <script>` runs that script once what needs the network is
- * in (the install, and the image build), so the workflow can block outbound calls there: a run that then fails needed
+ * `--container` does the same through the README's `.env` and `docker compose up`, the image's health check healthy and
+ * the one-time link in the log, and says `skipped: no docker` where there is none. `--after-install <script>` runs that
+ * script once what needs the network is in (the install, and `compose up`, which builds the image), so the workflow can
+ * block outbound calls there: a run that then fails needed
  * the Cloud by accident (the scope's risk). One line a step, counts only. A token, the server key and the inbound email
  * token never print: every line said is scrubbed of each secret this run made.
  *
@@ -34,7 +35,7 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /* THE CHECKOUT THIS RUN COPIES FROM, a directory. Not called `root`, which in a file that also handles the KEK is
@@ -57,16 +58,17 @@ function fenceAfter(lines, after) {
   if (open < 0) return null;
   const close = lines.findIndex((l, i) => i > open && /^```\s*$/.test(l));
   if (close < 0) return null;
-  return lines.slice(open + 1, close).map((l) => l.trim()).filter((l) => l !== '' && !l.startsWith('#'));
+  /* A COMMENT AFTER A LINE IS FOR THE READER, never a word of the command. */
+  return lines.slice(open + 1, close).map((l) => l.replace(/\s+#\s.*$/, '').trim()).filter((l) => l !== '' && !l.startsWith('#'));
 }
 
 /** The self-host's two blocks out of README.md's text. Throws one sentence when either is missing. */
 export function readmeBlocks(text) {
   const lines = text.split('\n');
-  const selfhost = fenceAfter(lines, /^\*\*On your own machine\.\*\*/);
-  const container = fenceAfter(lines, /^#{2,4} The container\s*$/);
-  if (selfhost === null) throw new Error('README.md has no sh block after **On your own machine.**, so there are no self-host lines to run.');
-  if (container === null) throw new Error('README.md has no sh block under ### The container, so there are no container lines to run.');
+  const selfhost = fenceAfter(lines, /^Without Docker\b/);
+  const container = fenceAfter(lines, /^#{2,4} Run it yourself\s*$/);
+  if (selfhost === null) throw new Error('README.md has no sh block after "Without Docker", so there are no self-host lines to run.');
+  if (container === null) throw new Error('README.md has no sh block under ### Run it yourself, so there are no container lines to run.');
   return { selfhost, container };
 }
 
@@ -83,9 +85,11 @@ export function kindOf(line) {
   if (/^cd\b/.test(line)) return 'cd';
   if (/^pnpm( --[a-z-]+)* install\b/.test(line)) return 'install';
   if (/^pnpm\b.*\bbuild\b/.test(line)) return 'build';
-  if (/^docker build\b/.test(line)) return 'image';
+  if (/^cp \S+\.env\.example \.env$/.test(line)) return 'env';
+  if (/^docker compose up\b.*\s-d\b/.test(line)) return 'up';
+  if (/^docker compose logs\b/.test(line)) return 'logs';
   if (/\bmain\.ts init\b/.test(line)) return 'init';
-  if (/^docker run\b.*\s-d\b/.test(line) || /^node apps\/selfhost\/src\/main\.ts( serve)?$/.test(line)) return 'start';
+  if (/^node apps\/selfhost\/src\/main\.ts( serve)?$/.test(line)) return 'start';
   return 'other';
 }
 
@@ -94,7 +98,7 @@ export const DOES = {
   copy: 'git archive HEAD, unpacked into a scratch folder',
   offline: 'the --after-install script: outbound calls blocked',
   'build the command': 'pnpm --filter braindog-cli build, the braindog command from the same commit',
-  healthy: "the image's health check, until healthy",
+  healthy: "the container's health check, until healthy",
   'sign in': 'braindog token create --scope write, with the server key',
   boot: 'braindog mcp: read braindog:boot',
   write: 'braindog mcp: create one row',
@@ -137,14 +141,18 @@ export function plan(blocks, { container = false, offline = false } = {}) {
     return steps;
   }
   const box = kinds(blocks.container);
-  for (const kind of ['image', 'init', 'start']) need(box, kind, 'container');
+  for (const kind of ['env', 'up']) need(box, kind, 'container');
+  /* THE RESTORE IS THE README'S init LINE WITH --from, run in the image, so the container run needs it too. */
+  need(own, 'init', 'self-host');
   steps.push({ id: 'install', line: own.find((l) => l.kind === 'install').line }, { id: 'build the command' });
   for (const { line, kind } of box) {
+    if (kind === 'clone' || kind === 'cd') continue;
     steps.push({ id: kind === 'other' ? 'readme line' : kind, line });
-    if (kind === 'image' && offline) steps.push({ id: 'offline' });
-    if (kind === 'start') steps.push({ id: 'healthy' });
+    /* `compose up --build` IS THE IMAGE AND THE START IN ONE LINE, so outbound is cut once it is in. */
+    if (kind === 'up' && offline) steps.push({ id: 'offline' });
+    if (kind === 'up') steps.push({ id: 'healthy' });
   }
-  for (const id of CALLS) steps.push({ id });
+  for (const id of CALLS) steps.push(id === 'restore' ? { id, line: own.find((l) => l.kind === 'init').line } : { id });
   steps.push({ id: 'start the copy' }, { id: 'healthy there' }, { id: 'sign in there' }, { id: 'read there' });
   return steps;
 }
@@ -415,15 +423,28 @@ function copyTree(dest) {
 /** README words for this machine: `node` is the Node running this check, so a second Node on the path is never used. */
 const local = (argv) => (argv[0] === 'node' ? [process.execPath, ...argv.slice(1)] : argv);
 
-/** A README container line with this run's own image, volume, port and env file in place of the README's. */
-export function dockerWords(line, { tag, volume, port, envFile }) {
-  return words(line).map((w) =>
-    w === 'braindog' ? tag
-    : w.startsWith('braindog:') ? `${volume}${w.slice('braindog'.length)}`
-    : w === 'braindog.env' ? envFile
-    : /^\d+:8080$/.test(w) ? `127.0.0.1:${String(port)}:8080`
-    : w,
-  );
+/** The image a container run builds, never the README's own `braindog`, which may be a person's real one. */
+export const IMAGE = 'braindog-from-clean';
+
+/**
+ * The Compose file laid over the README's, from the scratch folder and never written into the copy: this run's own image
+ * name, and Docker's default bridge, which the workflow's outbound block (`-i docker0`) covers where a project network
+ * would not be.
+ */
+export const OVERRIDE = `services:\n  braindog:\n    image: ${IMAGE}\n    network_mode: bridge\n`;
+
+/**
+ * The environment a README `docker compose` line runs in: the README's compose file and this run's override, a project
+ * of its own (so the volume is `<project>_braindog`, never a person's `braindog`), and the port it publishes, on this
+ * machine only, through the compose file's own `BRAINDOG_PORT`.
+ */
+export function composeEnv(env, { repo, override, project, port }) {
+  return {
+    ...env,
+    COMPOSE_FILE: `${join(repo, 'docker-compose.yml')}${delimiter}${override}`,
+    COMPOSE_PROJECT_NAME: project,
+    BRAINDOG_PORT: `127.0.0.1:${String(port)}`,
+  };
 }
 
 /** An `init <slug> --owner <email>` line as the restore: the same command, `--from` the copy in place of the owner. */
@@ -449,9 +470,9 @@ async function execute(steps, dir, { container, afterInstall, held }) {
   const serverKey = randomBytes(32).toString('base64url');
   SECRETS.add(serverKey);
   const env = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ''}` };
-  const suffix = randomBytes(4).toString('hex');
-  const box = { tag: 'braindog-from-clean', volume: `braindog-from-clean-${suffix}-a`, envFile: join(dir, 'braindog.env') };
-  const s = { base: '', token: '', spoken: '', initLine: '', startLine: '', children: [], containers: [], volumes: [box.volume, `${box.volume.slice(0, -2)}-b`] };
+  const project = `braindog-from-clean-${randomBytes(4).toString('hex')}`;
+  const override = join(dir, 'compose.override.yml');
+  const s = { base: '', token: '', spoken: '', initLine: '', startLine: '', children: [], containers: [], volumes: [`${project}_braindog`, `${project}-b`], compose: null };
   held.s = s;
 
   const serve = async (id, data, port) => {
@@ -512,28 +533,50 @@ async function execute(steps, dir, { container, afterInstall, held }) {
         if (!existsSync(cli)) throw new Failed(id, 'the build wrote no braindog.mjs');
         say(id, '1 file, braindog.mjs');
         break;
-      case 'image':
-        docker(id, dockerWords(line, { ...box, port: 0 }), DEADLINE.image);
-        say(id, '1 image built');
+      case 'env': {
+        /* THE .env AS THE README SAYS TO FILL IT: the owner and the server key, and nothing else. */
+        run(id, words(line), { cwd: repo, env });
+        const envFile = join(repo, '.env');
+        let text = readFileSync(envFile, 'utf8');
+        for (const [key, value] of [['BRAINDOG_OWNER', OWNER], ['BRAINDOG_TOKEN', serverKey]]) {
+          const at = new RegExp(`^${key}=.*$`, 'm');
+          if (!at.test(text)) throw new Failed(id, `the .env the README line made has no ${key}= line to set`);
+          text = text.replace(at, `${key}=${value}`);
+        }
+        writeFileSync(envFile, text, { mode: 0o600 });
+        say(id, '.env made, the owner and the server key set');
         break;
+      }
+      case 'up': {
+        const port = await freePort();
+        s.base = `http://127.0.0.1:${String(port)}`;
+        writeFileSync(override, OVERRIDE);
+        s.compose = composeEnv(env, { repo, override, project, port });
+        run(id, words(line), { cwd: repo, env: s.compose, timeout: DEADLINE.image });
+        const ps = run(id, ['docker', 'compose', 'ps', '-q', 'braindog'], { cwd: repo, env: s.compose, timeout: DEADLINE.inspect }).trim();
+        if (ps === '') throw new Failed(id, 'docker compose up started no braindog container');
+        s.containers.push(ps);
+        say(id, '1 image built, 1 container');
+        break;
+      }
+      case 'logs': {
+        /* THE ONE-TIME LINK THE README PROMISES, looked for and never said: it signs in as the owner. */
+        const said = run(id, words(line), { cwd: repo, env: s.compose, timeout: DEADLINE.docker });
+        if (!/first time: open \S+/.test(said)) throw new Failed(id, 'the log holds no "first time: open" link', said);
+        say(id, 'the one-time link is in the log');
+        break;
+      }
       case 'init':
         s.initLine = line;
-        if (container) docker(id, dockerWords(line, { ...box, port: 0 }));
-        else run(id, local(words(line)), { cwd: repo, env: { ...env, BRAINDOG_DATA: join(dir, 'data') } });
+        run(id, local(words(line)), { cwd: repo, env: { ...env, BRAINDOG_DATA: join(dir, 'data') } });
         say(id, '1 record, 1 owner');
         break;
       case 'start': {
         s.startLine = line;
         const port = await freePort();
         s.base = `http://127.0.0.1:${String(port)}`;
-        if (!container) {
-          await serve(id, join(dir, 'data'), port);
-          say(id, '1 server, /healthz ok');
-          break;
-        }
-        writeFileSync(box.envFile, `BRAINDOG_TOKEN=${serverKey}\nBRAINDOG_HOST=0.0.0.0\n`, { mode: 0o600 });
-        s.containers.push(docker(id, dockerWords(line, { ...box, port })).trim());
-        say(id, '1 container');
+        await serve(id, join(dir, 'data'), port);
+        say(id, '1 server, /healthz ok');
         break;
       }
       case 'healthy':
@@ -571,10 +614,8 @@ async function execute(steps, dir, { container, afterInstall, held }) {
              its own; the key file is the first volume's, mounted read only, as an operator moving a record would. */
           chmodSync(copies, 0o755);
           chmodSync(file, 0o644);
-          const argv = restoreWords(dockerWords(s.initLine, { ...box, volume: s.volumes[1], port: 0 }), '/copy/record.brainl');
-          const image = argv.lastIndexOf(box.tag);
-          argv.splice(image, 0, '-v', `${s.volumes[0]}:/old:ro`, '-v', `${copies}:/copy:ro`, '-e', 'BRAINDOG_KEK_FILE=/old/kek');
-          docker(id, argv);
+          const mounts = ['-v', `${s.volumes[1]}:/data`, '-v', `${s.volumes[0]}:/old:ro`, '-v', `${copies}:/copy:ro`, '-e', 'BRAINDOG_KEK_FILE=/old/kek'];
+          docker(id, ['docker', 'run', '--rm', ...mounts, IMAGE, ...restoreWords(words(line), '/copy/record.brainl')]);
         }
         say(id, '1 record restored into a second folder');
         break;
@@ -586,8 +627,9 @@ async function execute(steps, dir, { container, afterInstall, held }) {
           say(id, '1 server, /healthz ok');
           break;
         }
-        const argv = dockerWords(s.startLine, { ...box, volume: s.volumes[1], port });
-        argv.splice(argv.lastIndexOf(box.tag), 0, '-v', `${s.volumes[0]}:/old:ro`, '-e', 'BRAINDOG_KEK_FILE=/old/kek');
+        /* THE IMAGE AS COMPOSE STARTS IT, by hand on the second volume: the same .env, this machine only. */
+        const argv = ['docker', 'run', '-d', '-v', `${s.volumes[1]}:/data`, '-p', `127.0.0.1:${String(port)}:8080`, '--env-file', join(repo, '.env')];
+        argv.push('-v', `${s.volumes[0]}:/old:ro`, '-e', 'BRAINDOG_KEK_FILE=/old/kek', IMAGE);
         s.containers.push(docker(id, argv).trim());
         say(id, '1 container');
         break;
@@ -608,10 +650,12 @@ function tidy(s, container, keep) {
   for (const child of s?.children ?? []) child.kill();
   if (!container) return;
   const quiet = { stdio: 'ignore', timeout: DEADLINE.docker, killSignal: 'SIGKILL' };
+  /* THE COMPOSE PROJECT FIRST, with its network and volume: its container restarts unless it is taken down. */
+  if (s?.compose) spawnSync('docker', ['compose', 'down', '-v', '--remove-orphans'], { ...quiet, env: s.compose });
   for (const c of s?.containers ?? []) spawnSync('docker', ['rm', '-f', c], quiet);
   for (const v of s?.volumes ?? []) spawnSync('docker', ['volume', 'rm', '-f', v], quiet);
   /* AND THE IMAGE, so a run on somebody's own machine leaves no gigabyte behind. */
-  if (!keep) spawnSync('docker', ['rmi', '-f', 'braindog-from-clean'], quiet);
+  if (!keep) spawnSync('docker', ['rmi', '-f', IMAGE], quiet);
 }
 
 /* ── THE COMMAND ────────────────────────────────────────────────────────────────────────────────────────────────── */

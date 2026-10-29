@@ -382,7 +382,7 @@ export class ShapeHold {
     [this.status.lane, this.status.since ? `since ${this.status.since}` : '', this.facts?.domains[0] ?? ''].filter((x) => x !== '').join(' · '),
   );
 
-  /** Moves the project to another lane (Bring it back, Finish it): `null` when written, else what to say. */
+  /** Moves the project to another lane (Bring it back, Close it): `null` when written, else what to say. */
   async setLane(lane: string): Promise<string | null> {
     const read = this.read;
     const field = this.decl?.state;
@@ -408,7 +408,7 @@ export class ShapeHold {
     band: this.read !== null && this.band,
     known: this.read !== null,
     side: this.side !== null && (this.side.kind !== 'none' || this.hasMoney),
-    numbers: (this.numbers?.cells.length ?? 0) > 0,
+    numbers: (this.numbers?.cells.length ?? 0) > 0 || !!this.numbers?.plan,
     dates: this.dates.length > 0,
     decisions: (this.read?.decided.length ?? 0) > 0,
     happened: this.happened.length > 0,

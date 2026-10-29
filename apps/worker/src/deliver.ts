@@ -408,7 +408,7 @@ export function makeDeliver(transports: Transports): Deliver {
       /* NOTHING FROM THE PAYLOAD BUT THE ID, AND NOTHING FROM THE RECORD BUT THE ADDRESS, AND WHERE A TAP OPENS: an
          app path the record checked (`pushOpenOf`), encrypted to the phone's keys. A job that names none has no body. */
       const headers = await pushHeaders(vapid, endpoint, subject);
-      const open = found.open && found.keys && /^\/app\/[a-z0-9][a-z0-9-]{0,63}\/[A-Za-z0-9_/-]{0,200}$/u.test(found.open) ? found.open : null;
+      const open = found.open && found.keys && /^\/[a-z0-9][a-z0-9-]{0,63}\/[A-Za-z0-9_/-]{0,200}$/u.test(found.open) ? found.open : null;
       const { status } =
         open && found.keys
           ? await send(endpoint, { ...headers, ...PUSH_BODY_HEADERS }, await encryptPush(found.keys, new TextEncoder().encode(JSON.stringify({ open }))))

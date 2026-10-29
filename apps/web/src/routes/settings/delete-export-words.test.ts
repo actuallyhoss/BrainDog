@@ -17,7 +17,7 @@ import { biggestNames } from './[area]/areas/export-names.ts';
 const strip = (text: string) => text.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 
 test('the delete title says this record, never the name it carries', () => {
-  assert.equal(copy.deleteRecord, 'Delete this record');
+  assert.equal(copy.deleteRecord, 'Delete my BrainDog');
   assert.doesNotMatch(copy.deleteWhat('Marta Quill'), /^Deleting Marta Quill removes/u, 'it reads as deleting her');
   assert.match(copy.deleteWhat('Marta Quill'), /Marta Quill/u, 'the record is still named once');
   assert.match(copy.deleteWhat('Marta Quill'), /cannot be undone/u);

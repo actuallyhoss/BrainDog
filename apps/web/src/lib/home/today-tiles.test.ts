@@ -71,8 +71,9 @@ test('HOW LATE, IN WORDS: a day, then days, weeks and months, counted in words t
 
 test('LATE, WAITED AND RUNNING ARE SAID THE WAY A PERSON SAYS THEM', () => {
   assert.equal(lateSaid('2026-09-28', TODAY), '1 day late');
-  assert.equal(lateSaid('2026-09-01', TODAY), '4 weeks late');
-  assert.equal(lateSaid('2026-06-01', TODAY), '4 months late');
+  /* IN DAYS ALWAYS (30 October), as a list's cards and tables say it on the same screen. */
+  assert.equal(lateSaid('2026-09-01', TODAY), '28 days late');
+  assert.equal(lateSaid('2026-06-01', TODAY), '120 days late');
   assert.equal(ageSaid(30_000), '1 min');
   assert.equal(ageSaid(3 * 3_600_000), '3 hours');
   assert.equal(ageSaid(2 * 86_400_000), '2 days');

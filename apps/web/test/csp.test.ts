@@ -22,7 +22,7 @@ import { EMBED_PROVIDERS } from 'braindog-render';
 const CONFIG = '../svelte.config.js';
 type Csp = { mode?: string; directives?: Partial<Record<'default-src' | 'script-src' | 'style-src-elem' | 'style-src-attr' | 'frame-src', string[]>> };
 
-const SHELL = new URL('../build/app/index.html', import.meta.url);
+const SHELL = new URL('../build/index.html', import.meta.url);
 const TURNSTILE = 'https://challenges.cloudflare.com';
 
 const hash = (text: string): string => `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
@@ -50,7 +50,7 @@ test('THE POLICY FRAMES EXACTLY ITS OWN DRAWN FRAME, THE EMBED PROVIDERS AND TUR
 
 test(
   'THE BUILT SHELL CARRIES A POLICY THAT HASHES EVERY INLINE SCRIPT AND STYLE IN IT',
-  { skip: existsSync(SHELL) ? false : 'apps/web/build/app/index.html is not there; build apps/web to run this' },
+  { skip: existsSync(SHELL) ? false : 'apps/web/build/index.html is not there; build apps/web to run this' },
   () => {
     const html = readFileSync(SHELL, 'utf8');
     const meta = /<meta http-equiv="content-security-policy" content="([^"]*)"/i.exec(html)?.[1];

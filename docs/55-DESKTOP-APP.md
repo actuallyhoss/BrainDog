@@ -8,8 +8,8 @@ similarly to how discord desktop app and discord.com/app works".
 Discord runs one web client in two places: in a browser tab at `discord.com/app`, and inside the desktop app, which is
 a thin native window around that same client with a few native powers added. BrainDog does the same.
 
-- **In a browser:** `app.brain.dog/app/<address>`, as it is today.
-- **On a Mac:** BrainDog.app, a native window that opens `https://app.brain.dog/app` itself. Every deploy of the web app
+- **In a browser:** `app.brain.dog/<address>`, as it is today.
+- **On a Mac:** BrainDog.app, a native window that opens `https://app.brain.dog` itself. Every deploy of the web app
   reaches the Mac app at once, so there is one product to build, one set of tests and one release.
 - **The shell stays thin.** It holds only what a browser tab cannot do (below). Everything a person sees is the web
   app. If the shell ever has to change, the web app does not.

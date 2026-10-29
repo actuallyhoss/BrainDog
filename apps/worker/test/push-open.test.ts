@@ -4,7 +4,7 @@
  * A push carried no body, so the service worker could only open the app's home. Now the record's job names a path in
  * the record ("/decide/sg_..."), the Worker puts the record's name before it, and the one thing the push carries is
  * `{ open }`, encrypted to the phone's keys (RFC 8291). Read here as a phone would: the body the push service is handed
- * decrypts, with the phone's private key and auth secret, to `/app/the-studio/decide/<id>` and to nothing else, and a
+ * decrypts, with the phone's private key and auth secret, to `/the-studio/decide/<id>` and to nothing else, and a
  * job that names no path still goes with no body.
  */
 
@@ -62,14 +62,14 @@ async function throwaway(): Promise<Vapid> {
 
 test('THE BODY IS THE PATH AND NOTHING ELSE, readable by the phone alone', async () => {
   const p = await phone();
-  const body = await encryptPush(p.keys, new TextEncoder().encode('{"open":"/app/kiln/decide/sg_1"}'));
-  assert.equal(await decrypt(p, body), '{"open":"/app/kiln/decide/sg_1"}');
+  const body = await encryptPush(p.keys, new TextEncoder().encode('{"open":"/kiln/decide/sg_1"}'));
+  assert.equal(await decrypt(p, body), '{"open":"/kiln/decide/sg_1"}');
   /* ANOTHER PHONE CANNOT READ IT. */
   await assert.rejects(decrypt(await phone(), body));
   await assert.rejects(encryptPush({ p256dh: 'short', auth: p.keys.auth }, new Uint8Array(1)));
 });
 
-test('A QUESTION\'S PUSH OPENS /app/<record>/decide/<id> ON A TAP, and one that names no path goes with no body', async () => {
+test('A QUESTION\'S PUSH OPENS /<record>/decide/<id> ON A TAP, and one that names no path goes with no body', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW), delivers: ['notify.push'] as never });
   assert.ok((await api.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.com', name: 'Ada' } } as never)).ok);
@@ -82,7 +82,7 @@ test('A QUESTION\'S PUSH OPENS /app/<record>/decide/<id> ON A TAP, and one that 
   const target = leasedTarget(async (args) => {
     const out = api.kernel.pushTarget(args) as { ok: boolean; value: PushAddress | null };
     if (!out.ok || !out.value?.open) return out as never;
-    return { ok: true, value: { ...out.value, open: `/app/the-studio${out.value.open}` } };
+    return { ok: true, value: { ...out.value, open: `/the-studio${out.value.open}` } };
   });
   const deliver = makeDeliver({ from: 'notify@brain.example', push: { vapid: await throwaway(), subject: 'mailto:hello@brain.dog', send: async (_e, headers, body) => (sent.push({ headers, ...(body ? { body } : {}) }), { status: 201 }), target } });
   const record: Leasable = {
@@ -96,7 +96,7 @@ test('A QUESTION\'S PUSH OPENS /app/<record>/decide/<id> ON A TAP, and one that 
   assert.equal(sent.length, 2);
   const opened = sent.find((s) => s.body)!;
   assert.equal(opened.headers['Content-Encoding'], 'aes128gcm');
-  assert.deepEqual(JSON.parse(await decrypt(p, opened.body!)), { open: '/app/the-studio/decide/sg_01JQUESTION' });
+  assert.deepEqual(JSON.parse(await decrypt(p, opened.body!)), { open: '/the-studio/decide/sg_01JQUESTION' });
   const bare = sent.find((s) => !s.body)!;
   assert.equal(bare.headers['Content-Encoding'], undefined);
   sql.close();

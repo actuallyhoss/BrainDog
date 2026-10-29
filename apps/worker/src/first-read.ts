@@ -41,7 +41,7 @@ export type FirstReadEnv = SlashEnv & {
   /** The day's ceiling of readings for all strangers, and the operator's yes to them. Unset or 0 is off. */
   FIRST_READ_DAILY?: string | undefined;
   TURNSTILE_SECRET?: string | undefined;
-  /** The static assets, holding the catalogue bundled with the shell (`/app/catalogue/index.json`); absent in a test. */
+  /** The static assets, holding the catalogue bundled with the shell (`/catalogue/index.json`); absent in a test. */
   ASSETS?: Assets | undefined;
 };
 

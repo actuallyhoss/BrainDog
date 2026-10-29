@@ -41,7 +41,7 @@ test('WITH NO CATALOGUE THE OFFER IS THE COMPILED LISTS, the very ones the first
 test('A CATALOGUE USE CASE HEARD AS "FLATS" IS OFFERED, and with that word taken off it is not', async () => {
   const { sent, send } = serving(200, INDEX);
   const catalogue = await readCatalogueOffer(send);
-  assert.equal(sent[0]?.url, '/app/catalogue/index.json');
+  assert.equal(sent[0]?.url, '/catalogue/index.json');
   assert.equal(sent[0]?.init.credentials, 'omit', 'read with no session');
   assert.deepEqual(catalogue?.usecases.map((u) => u.id), ['letting-desk'], 'an add-on is not a use case');
 

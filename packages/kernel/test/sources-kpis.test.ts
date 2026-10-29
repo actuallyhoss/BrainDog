@@ -265,15 +265,16 @@ test('A NUMBER THAT STOPPED IS STALE after fourteen days with no cadence, says i
   close();
 });
 
-test('ONE POINT A DAY, the day’s last; a level is set against its value a month before', async () => {
+test('ONE POINT A DAY, the day’s last; a level is set against its value one of its own periods before', async () => {
   const { k, close } = await seeded();
   const players = named(read(k, { kind: 'kpis', source: 'kpis', for: 'project', about: 'things#2' }).kpis, 'Players');
   const days = players.points.map((p) => p.at.slice(0, 10));
   assert.equal(new Set(days).size, days.length, 'no day twice');
   assert.equal(players.points.length, 40);
   assert.deepEqual(players.latest, { at: daysAgo(1, 9), value: 299 });
-  /* 299 against the 200 of 28 days before. */
-  assert.ok(Math.abs(players.change! - 99 / 200) < 1e-9, String(players.change));
+  /* 299 against the 300 of the day before: a daily number's change is a day back, as its tile on Today says it
+     (recheck of 30 October, N7), never a month back on its page and a week back on Today. */
+  assert.ok(Math.abs(players.change! - -1 / 300) < 1e-9, String(players.change));
   assert.equal(players.every, '1d');
   assert.equal(players.stale.stale, false);
   close();
@@ -340,7 +341,8 @@ test('TODAY: his pin first, then one a project in play by off target, stale and 
     [
       ['Portage', 'Sign-ups', 'pinned', 'Pinned to Today'],
       ['Kiln', 'Monthly revenue', 'off-target', 'Off target'],
-      ['Portage', 'Players', 'change', 'Up 50%'],
+      /* PLAYERS MOVED A THIRD OF A PERCENT ON THE DAY BEFORE, so Portage's change is its money in, a month back. */
+      ['Portage', 'Money in', 'change', 'Down 33%'],
     ],
   );
   /* EVERY ONE THAT MAY SHOW, counted: Kiln's three, Portage's three, and not Ember's, parked; never hidden, draft or retired. */
@@ -368,7 +370,8 @@ test('THE CARDS: one number a project, the one he marked, else its top one, with
     out.kpis.map((x) => [x.project, x.name, x.rank]),
     [
       ['Kiln', 'Monthly revenue', 'off-target'],
-      ['Portage', 'Players', 'change'],
+      /* THE ONE HE MARKED leads Portage's card, and a third of a percent on the day before is no change worth saying. */
+      ['Portage', 'Players', 'rest'],
       ['Ember', 'Quiet', 'stale'],
     ],
   );

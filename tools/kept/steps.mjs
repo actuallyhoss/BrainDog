@@ -49,9 +49,9 @@ const HERE = new URL('../../apps/web/static/catalogue/', import.meta.url);
 /** The catalogue as the web shell publishes it, read from the folder: `path` to its text, or null. */
 export const diskCatalogue = (root = fileURLToPath(HERE)) => async (path) => readFile(`${root.replace(/\/$/u, '')}/${path}`, 'utf8').catch(() => null);
 
-/** The catalogue a host serves at `/app/catalogue/` (or the root, while the build moves), or null for a file it does not hold. */
+/** The catalogue a host serves at `/catalogue/` (or under `/app`, on a host built before the app left it), or null for a file it does not hold. */
 export const hostCatalogue = (host, send = fetch) => async (path) => {
-  for (const place of ['/app/catalogue/', '/catalogue/']) {
+  for (const place of ['/catalogue/', '/app/catalogue/']) {
     const res = await send(`${new URL(host).origin}${place}${path}`, { redirect: 'manual', signal: AbortSignal.timeout(30_000) }).catch(() => null);
     if (res?.ok && (res.headers.get('content-type') ?? '').includes('json')) return res.text();
   }

@@ -39,7 +39,7 @@ function machine(t: T, base: string) {
   const root = mkdtempSync(join(tmpdir(), 'braindog-behind-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const home = join(root, 'home');
-  return { home, env: { BRAINDOG_HOST: `${base}/app/someone`, XDG_CONFIG_HOME: join(root, 'config') } };
+  return { home, env: { BRAINDOG_HOST: `${base}/someone`, XDG_CONFIG_HOME: join(root, 'config') } };
 }
 
 test('a command from a day before min_cli is told the host needs the update, and the host is named, never its address', async (t) => {

@@ -2332,7 +2332,7 @@ function planFault(plan: unknown, key: string): string | null {
 
 /**
  * The document of each pack the adapter offers, from the catalogue: `--catalogue` when it is named, and the host's own
- * (`/app/catalogue/`) when not, the one the app's Browse lists and `pack install <id>` reads. An offer the catalogue
+ * (`/catalogue/`) when not, the one the app's Browse lists and `pack install <id>` reads. An offer the catalogue
  * cannot give keeps its place with the reason, so the report says it rather than leaving it out.
  */
 async function resolveOffers(offers: readonly Offer[], catalogue: CatalogueRead, known: KnownKeys): Promise<PlannedPack[]> {
@@ -2649,7 +2649,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
   const named = values.catalogue;
   const catalogue: CatalogueRead =
     named === undefined
-      ? addressCatalogue(new URL('/app/catalogue/', to.base).href, io, ms)
+      ? addressCatalogue(new URL('/catalogue/', to.base).href, io, ms)
       : /^[a-z][a-z0-9+.-]*:\/\//iu.test(named)
         ? addressCatalogue(named, io, ms)
         : folderCatalogue(resolve(io.cwd, named));

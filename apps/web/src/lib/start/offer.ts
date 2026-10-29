@@ -7,7 +7,7 @@
  * words it is heard in and the modules it stands on, the `catalogue` hook of `ProposeContext`). The compiled lists stand
  * under both, so a host whose catalogue serves nothing, or one that does not read, offers exactly what this build ships.
  *
- * THE CATALOGUE IS READ ONCE, WITH NO SESSION, from the index the host serves at `/app/catalogue/index.json`: an entry of
+ * THE CATALOGUE IS READ ONCE, WITH NO SESSION, from the index the host serves at `/catalogue/index.json`: an entry of
  * kind `usecase` that says its `signals` and `modules`. One without signals is passed over, since nothing typed could
  * ever point at it, and one whose id this build already ships is too, since the compiled words already listen for it.
  *
@@ -27,7 +27,7 @@ export type CatalogueUsecase = { id: string; title: string; summary: string; sig
 export type CatalogueOffer = { usecases: readonly CatalogueUsecase[] };
 
 /** Where the web build's own catalogue is served, under the app's base. */
-export const CATALOGUE_INDEX_AT = '/app/catalogue/index.json';
+export const CATALOGUE_INDEX_AT = '/catalogue/index.json';
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const SHIPPED: ReadonlySet<string> = new Set([...USE_CASES.map((u) => u.usecase), ...MODULE_ORDER]);

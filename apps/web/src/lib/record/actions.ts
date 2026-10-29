@@ -888,7 +888,7 @@ function drawn(build: () => UsageView): UsageRead {
  * sample's month of 3 September, counted against projects nobody has, until the sample went.
  *
  * TWO BASES SINCE THE RECORD IS IN THE ADDRESS. `base` is the bare host, where `/account/usage` and `/auth/methods` are the
- * person's; `api` is where the record answers, `/app/<slug>` under a slug, so the events counted are the record on screen.
+ * person's; `api` is where the record answers, `/<slug>` under a slug, so the events counted are the record on screen.
  * `home` is the record's home currency (`homeCurrency()`), whose code an amount of extra use then drops, as every screen does.
  */
 export async function readUsage(io: Fetch, now: number, base = '', api: string = base, month?: string, home: string | null = null): Promise<UsageRead> {

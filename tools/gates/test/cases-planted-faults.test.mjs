@@ -80,7 +80,7 @@ test('theme is red on one token pair under contrast, read with --tokens', async 
 
 test('deploy-parity is red on a planted host whose Worker names another build', async () => {
   const said = await red('deploy-parity');
-  assert.doesNotMatch(said, /live \/app\/ differs|live \/app\/_app\/version\.json differs/u);
+  assert.doesNotMatch(said, /live \/ differs|live \/_app\/version\.json differs/u);
 });
 
 test('self-test names the registered gate a tree of its own leaves without a fault', async () => {
@@ -127,7 +127,7 @@ test('theme refuses a token file naming no theme, or a token the theme does not 
 test('the canary look forgives a self-host its snapshots 501, and nothing else', async () => {
   const { judge, productErrors } = await import('../../canary/lane.d/30-look.mjs');
   const E = 'Failed to load resource: the server responded with a status of 501 (Not Implemented)';
-  const backups = { name: 'Backups', width: 390, settled: 'ok', consoleErrors: [E], failedRequests: ['POST /app/ops/api/snapshots: 501'], lint: null, raw: {} };
+  const backups = { name: 'Backups', width: 390, settled: 'ok', consoleErrors: [E], failedRequests: ['POST /ops/api/snapshots: 501'], lint: null, raw: {} };
   assert.deepEqual(productErrors(backups, { selfHost: true }), []);
   assert.deepEqual(judge({ shots: [backups] }, { selfHost: true }), []);
   assert.deepEqual(productErrors(backups), [E], 'on the canary itself a 501 is still the product’s');

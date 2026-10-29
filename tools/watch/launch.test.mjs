@@ -52,13 +52,15 @@ const healthz = (over = {}) =>
 const deploys = (runs) => json({ workflow_runs: runs });
 const green = (sha, ago) => ({ status: 'completed', conclusion: 'success', head_sha: sha, updated_at: iso(NOW - ago) });
 
-/** Production as it should be: seven right answers. */
+/** Production as it should be: eight right answers, the eighth asked of each name. */
 const good = () => ({
   'http://brain.example.test/': { status: 308, headers: { location: 'https://brain.example.test/' } },
   'https://brain.example.test/healthz': healthz(),
   'https://brain.example.test/.well-known/braindog-build': json({ app: `2026.10.09+${LIVE}` }),
   'https://brain.example.test/.well-known/security.txt': { status: 200, body: `Contact: mailto:security@brain.example.test\nExpires: ${iso(NOW + 200 * 24 * HOUR)}\n` },
-  'https://app.brain.example.test/': { status: 308, headers: { location: 'https://brain.example.test/app/' } },
+  'https://app.brain.example.test/': { status: 308, headers: { location: 'https://brain.example.test/' } },
+  'https://brain.example.test/app/signin?x=1': { status: 308, headers: { location: 'https://brain.example.test/signin?x=1' } },
+  'https://app.brain.example.test/app/signin?x=1': { status: 308, headers: { location: 'https://brain.example.test/signin?x=1' } },
   [`${API}/repos/owner/repo/actions/workflows/deploy.yml/runs?branch=master&per_page=30`]: (req) =>
     req.headers.authorization === 'Bearer stub' ? deploys([green(`${LIVE}5678`, 5 * HOUR), green('a1d0000', 30 * HOUR)]) : json({}, 401),
   [`${API}/repos/owner/repo/actions/workflows/watch.yml/runs?per_page=5`]: json({ workflow_runs: [{ id: 99, run_started_at: iso(NOW) }, { id: 98, run_started_at: iso(NOW - 61 * 60_000) }] }),
@@ -71,11 +73,11 @@ async function run(over = {}, opts = {}) {
   return { code, lines, misses: lines.filter((l) => l.startsWith('  MISS')), oks: lines.filter((l) => l.startsWith('  ok  ')) };
 }
 
-test('SEVEN RIGHT ANSWERS ARE SEVEN ok LINES AND EXIT 0, with when the watch last ran', async () => {
+test('EIGHT RIGHT ANSWERS ARE ok LINES, THE EIGHTH ONE A NAME, AND EXIT 0, with when the watch last ran', async () => {
   const { code, lines, oks, misses } = await run();
   assert.equal(code, 0, lines.join('\n'));
   assert.deepEqual(misses, []);
-  assert.deepEqual(oks.map((l) => l.trim().split(/\s+/)[1]), ['1', '2', '3', '4', '5', '6', '7']);
+  assert.deepEqual(oks.map((l) => l.trim().split(/\s+/)[1]), ['1', '2', '3', '4', '5', '6', '7', '8', '8']);
   assert.ok(lines.some((l) => l.includes(`${LIVE}, the last green deploy`)), lines.join('\n'));
   assert.ok(lines.includes('  the watch before this one started 61 minutes ago'), lines.join('\n'));
   assert.equal(lines.at(-1), '  watch: brain.example.test, 0 missed');
@@ -105,7 +107,7 @@ test('A NAME THAT DOES NOT ANSWER IN THE LIMIT IS A MISS, and the questions afte
   assert.equal(code, 1);
   assert.equal(misses.length, 1, lines.join('\n'));
   assert.ok(lines.includes('           did not answer: no answer in 0.3 seconds'), lines.join('\n'));
-  assert.equal(oks.length, 6);
+  assert.equal(oks.length, 8);
 });
 
 test('QUESTION 1: a redirect to http, or to https on another name, is a miss', async () => {
@@ -176,7 +178,18 @@ test('QUESTION 5: an old name answering 5xx or not at all is a miss; a 404 still
   assert.equal((await run({ 'https://app.brain.example.test/': { status: 404 } })).code, 0);
   const many = { ...NAMES, legacy: ['app.brain.example.test', 'old.example.test'] };
   const two = await run({ 'https://old.example.test/': 'hang' }, { names: many, ms: 300 });
-  assert.deepEqual(two.misses.map((l) => l.trim().split(/\s+/)[1]), ['5']);
+  /* The old name that does not answer is asked its old address too, and misses that as well. */
+  assert.deepEqual(two.misses.map((l) => l.trim().split(/\s+/)[1]), ['5', '8']);
+});
+
+test('QUESTION 8: an old address must be one 308 straight to the new one, on the app\'s name and on every old name', async () => {
+  const twice = await run({ 'https://app.brain.example.test/app/signin?x=1': { status: 308, headers: { location: 'https://brain.example.test/app/signin?x=1' } } });
+  assert.deepEqual(twice.misses.map((l) => l.trim().split(/\s+/)[1]), ['8'], twice.lines.join('\n'));
+  assert.ok(twice.lines.includes('           answered 308 to https://brain.example.test/app/signin?x=1'), twice.lines.join('\n'));
+  const shell = await run({ 'https://brain.example.test/app/signin?x=1': { status: 200, body: '<!doctype html>' } });
+  assert.deepEqual(shell.misses.map((l) => l.trim().split(/\s+/)[1]), ['8']);
+  const lost = await run({ 'https://brain.example.test/app/signin?x=1': { status: 308, headers: { location: 'https://brain.example.test/signin' } } });
+  assert.equal(lost.code, 1, 'a 308 that dropped the query passed');
 });
 
 test('QUESTION 6: a copy that failed, a night not told, and a build older than the watch are misses', async () => {

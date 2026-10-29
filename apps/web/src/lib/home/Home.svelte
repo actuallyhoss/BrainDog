@@ -26,7 +26,11 @@
 
   WHAT IS LATE, WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF THE BODY (24 October): declared in `todayHome`,
   answered by the record, and drawn in their slots as the desk's own tiles (`desk-part.ts`, which this file marks the
-  blocks with). Only Arrivals and the foot of Needs you are still Home's own, laid among the tiles (`desk-order.ts`).
+  blocks with). Only Arrivals and the foot of Needs you are still Home's own, each drawn in its widget's cell.
+
+  TODAY IS A BOARD OF WIDGETS (the widgets plan of 29 October): every tile a widget with a size, packed on four columns or
+  two (`lib/board`), in the order the page declares or the phone's own, and rearranged in place by pressing and holding
+  one, or Edit. The hand-written desk order and the phone's `order:` rules are gone.
 
   THE RECORD'S HOUSEKEEPING IS NOT HERE: what went stale, who it matched, what it found
   wrong in its own pages and notes, what the answers taught, what may be one, what has no colour and the imported rules
@@ -53,13 +57,16 @@
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase, at as inApp } from '$lib/at.ts';
+  import { stillShown } from 'braindog-render';
+  import { recordToday } from '$lib/record/zone.ts';
   import { partsOf } from '$lib/shell/headline.ts';
+  import { barTitled, frame } from '$lib/shell/frame.svelte.ts';
   import { onAppendOnly, recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, said } from '$lib/voice.svelte.ts';
   import { homeSlugOf } from '$lib/voice.ts';
-  import type { LiveBlock, Opened } from '$lib/record/page-live.ts';
+  import type { LiveBlock, LivePageDecl, Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
   import { may } from '$lib/record/may.ts';
   import { live as moving } from '$lib/data/live.svelte.ts';
@@ -77,7 +84,6 @@
     FIRST_TODAY_MOST,
     NEEDS_YOU_LIMIT_PHONE,
     TELL_LINE,
-    deskFolded,
     drawsAny,
     homeDrawn,
     peopleOf,
@@ -115,7 +121,12 @@
   import { answeredBy, doneToday, toldNeedOf } from '$lib/record/told-live.ts';
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
-  import { anchorsFor, inPicture, type Placed } from '$lib/home/desk-order.ts';
+  import Board from '$lib/board/Board.svelte';
+  import EditCover from '$lib/board/EditCover.svelte';
+  import DraftMark from '$lib/board/DraftMark.svelte';
+  import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
+  import { fitted, widgetsOf, type Phone } from '$lib/board/items.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
@@ -128,6 +139,7 @@
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
+  import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
 
   let { data }: { data: Shell } = $props();
 
@@ -528,9 +540,52 @@
     });
   });
 
+  /** Today's blocks as declared (kept, or the body it is drawn from), which the Inspector changes a widget from. */
+  let declaredBlocks = $state.raw<Record<string, unknown>[]>([]);
+
+  /** The slug a kept Today is kept at (`board-write.ts` `KEPT_TODAY`). */
+  const KEPT_HOME = 'home';
+  /** The records whose kept Today is read as a page: not a board, or a host without `today` by slug. */
+  const pageKept = new Set<string>();
+
+  /** A kept board drawn from the record's one `today` read, or `null` to read it as a page. */
+  async function keptToday(slug: string, fresh: boolean): Promise<Opened | null> {
+    const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
+    const base = apiBase();
+    let declared: Record<string, unknown> | null = null;
+    let version: number | undefined;
+    const drawn = await m.drawnOf({ page: slug, blocks: [] }, base, undefined, async (client) => {
+      const out = await t.askToday(client, base, {}, fresh, slug);
+      if (out.ok) {
+        const said = out.value as { declared?: unknown; declared_version?: unknown };
+        if (said.declared !== null && typeof said.declared === 'object' && !Array.isArray(said.declared)) declared = said.declared as Record<string, unknown>;
+        if (typeof said.declared_version === 'number') version = said.declared_version;
+      }
+      return out;
+    });
+    const decl = declared as Record<string, unknown> | null;
+    if (drawn.from !== 'live' || decl === null || decl.board !== true) return null;
+    const { blocks: kept, ...declOwn } = decl;
+    declaredBlocks = Array.isArray(kept) ? (kept as Record<string, unknown>[]) : [];
+    tilesBeside(base);
+    return {
+      from: 'live',
+      page: { page: { ...(declOwn as unknown as LivePageDecl), page: slug, ...(version === undefined ? {} : { declared_version: version }) }, blocks: quietHeld(drawn.blocks) },
+      now: drawn.now,
+    };
+  }
+
   /** Home's page, from whichever of the three sources the record holds. */
   async function readBody(slug: string | null, spoken: HomeVoice, held: Holds, fresh = false): Promise<Opened | null> {
     if (slug !== null) {
+      /* A KEPT TODAY IS ONE READ: the record's `today`, by its slug, draws the kept page with every tile's part beside it,
+         as it draws the body. A kept page that is not a board (arranged before boards), or a host without it, is read as
+         any page is, and remembered, so it costs the one read after. */
+      if (slug === KEPT_HOME && !pageKept.has(apiBase())) {
+        const kept = await keptToday(slug, fresh);
+        if (kept !== null) return kept;
+        pageKept.add(apiBase());
+      }
       const m = await import('$lib/record/page-live.ts');
       return m.pageReader(apiBase()).read(slug);
     }
@@ -538,6 +593,7 @@
        one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. A host built
        before it reads what went quiet answers that one tile as a refusal, which is not drawn (`quietHeld`). */
     const body = todayHome(held, spoken);
+    declaredBlocks = body.blocks as unknown as Record<string, unknown>[];
     /* AND THE DESK'S CARDS' OWN CODE WHILE THE RECORD DRAWS, so they are drawn with the page and take their parts from the
        same read: loaded after the page, the cards and their lines landed after the screen said it was ready. FETCHED
        BESIDE THE READ AND NEVER WAITED ON: their code is slower than the read, and waiting held the whole body back until
@@ -546,11 +602,23 @@
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
     const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
     const base = apiBase();
-    const drawn = await m.drawnOf(body, base, undefined, (client) => t.askToday(client, base, body as unknown as Record<string, unknown>, fresh));
+    let drawn = await m.drawnOf(body, base, undefined, (client) => t.askToday(client, base, body as unknown as Record<string, unknown>, fresh));
+    /* A RECORD BUILT BEFORE BOARDS refuses a board's keys (`board: is not a key a page has`): Today is asked without them
+       and laid out from its own body's sizes, so an app ahead of its record still opens Today (audit 30 Oct, item 2). */
+    if (drawn.from === 'refused' && /\b(board|phone|size|draft|until)\b/u.test(drawn.fix)) {
+      const { board: _b, phone: _p, ...plain } = body as unknown as Record<string, unknown>;
+      const blocks = ((plain.blocks ?? []) as Record<string, unknown>[]).map(({ size: _s, draft: _d, until: _u, ...own }) => own);
+      const older = { ...plain, blocks };
+      const again = await m.drawnOf(older as never, base, undefined, (client) => t.askToday(client, base, older, fresh));
+      if (again.from === 'live') {
+        const sizes = new Map(((body as unknown as { blocks: Record<string, unknown>[] }).blocks ?? []).map((b) => [b.key, b.size] as const));
+        drawn = { ...again, blocks: again.blocks.map((b) => (typeof b.key === 'string' && sizes.get(b.key) !== undefined ? { ...b, size: sizes.get(b.key) } : b)) as typeof again.blocks };
+      } else drawn = again;
+    }
     if (drawn.from === 'live')
       return {
         from: 'live',
-        page: { page: { page: body.page, title: body.title, ...(body.layout ? { layout: body.layout } : {}) }, blocks: quietHeld(drawn.blocks) },
+        page: { page: { page: body.page, title: body.title, ...(body.layout ? { layout: body.layout } : {}), ...(body.board ? { board: true } : {}), ...(body.phone ? { phone: body.phone } : {}) } as LivePageDecl, blocks: quietHeld(drawn.blocks) },
         now: drawn.now,
       };
     if (drawn.from === 'refused') return { from: 'refused', fix: drawn.fix };
@@ -603,7 +671,7 @@
     const before = mine === 1 ? newsFirst() : newsNow();
     const first = new Promise<void>((done) => setTimeout(done, HANDLED_WAIT_MS));
     /* TODAY'S OWN BODY BRINGS WHAT WAS HANDLED WITH IT (`tilesBeside`), so it waits for nothing beside it. */
-    void Promise.all([readBody(slug, spoken, held), slug === null ? null : Promise.race([handledLanded, first])])
+    void Promise.all([readBody(slug, spoken, held), slug === null || slug === KEPT_HOME ? null : Promise.race([handledLanded, first])])
       .then(([out]) => {
         if (slug !== declares) return;
         /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`). */
@@ -621,7 +689,7 @@
           void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said, at, stamp));
         }
         /* TODAY AS THE RECORD LAST DREW IT IS DRAWN, AND ASKED FOR AGAIN AT ONCE, drawn now (`fresh`), over it. */
-        if (ok && slug === null) void import('./today-read.ts').then((t) => (t.wasBehind(apiBase()) ? reread() : undefined));
+        if (ok && (slug === null || (slug === KEPT_HOME && !pageKept.has(apiBase())))) void import('./today-read.ts').then((t) => (t.wasBehind(apiBase()) ? reread() : undefined));
       })
       .catch(() => {
         readFailed = true;
@@ -725,11 +793,14 @@
   /**
    * TODAY'S OWN BODY IS THE DESK (roadmap slice 1a, the 19 October look): what needs you, who is working and cash, the
    * projects, then Arrivals, what is coming up and people, on one twelve-column board. The rest of the page's blocks are
-   * not drawn (`deskFolded`): the sidebar and the places hold them.
+   * drawn as widgets of the board, each at its size.
    *
    * A PAGE THE PERSON KEPT IS THEIRS AND IS DRAWN AS THEY LAID IT OUT, every block of it.
    */
-  const board = $derived(declares === null);
+  /* AND TODAY KEPT AS A BOARD (the widgets plan of 29 October, §4): once he adds to it or arranges it, the record keeps it
+     as `home` with `board: true`, and it is drawn as the board it is, not as a page laid out by hand. */
+  const keptBoard = $derived(got?.from === 'live' && declares !== null && (got.page.page as { board?: unknown }).board === true);
+  const board = $derived(declares === null || keptBoard);
 
 
   /**
@@ -749,33 +820,140 @@
   });
 
   /* THE PAGE AS HOME DRAWS IT, handed to the reader whole, so the reader's writes index the blocks it draws. A rail with
-     nothing beside it, or nothing in it, is one column. On the desk, what it does not show at rest is folded. */
-  const desked = $derived.by(() => {
+     nothing beside it, or nothing in it, is one column. */
+  /** The board and its editor, which the screen hands what it reads (`src`), so it follows without a step between. */
+  const boardModel = new BoardModel();
+  const deskedRaw = $derived.by(() => {
     if (!got || got.from !== 'live' || !shaped) return null;
-    /* ON A PHONE NEEDS YOU SHOWS FOUR, the first with its buttons and the rest rows a tap opens (the style below), and
-       its count still says how many wait: the rest are "N more". AND THE LATE LIST IS THE LATE TILE'S on the desk:
-       the first late block of the page is drawn as the desk's late tile, a line a thing with its button, and any other
-       late block is marked not drawn at its place. */
+    /* THE LATE LIST IS THE LATE TILE'S on the board: the first late block of the page is drawn as the late tile, a line a
+       thing with its button, and any other late block is marked not drawn at its place. */
     const lateAt = board ? (late?.at ?? []) : [];
     /* URGENT WORK AND WORK HANDED BACK STAND IN THE LATE BAND, under the late lines, each with its tick: their
        own tiles are not drawn, and with nothing late the first of them carries the band. */
     const bandAt = board ? band.at : [];
     const lateTile = bandShown.length > 0 ? (lateShown.length > 0 ? lateAt[0] : bandAt[0]) : undefined;
     const named = (id: string): string => data.lists.find((l) => l.id === id)?.name ?? '';
-    const blocks: Desked<LiveBlock>[] = deskedOf(
+    const lateMost = DESK_SHOWS[boardModel.sizeNow('late')];
+    const sized = (k: string): number => DESK_SHOWS[boardModel.sizeNow(k)];
+    const desk = deskedOf(
       shaped.blocks.map((b, n): Desked<LiveBlock> => {
-        if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? words.lateAndUrgent : late?.heading || voice.overdue, more: late?.more ?? 0, most: phone.current ? 3 : 5 } };
+        if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? words.lateAndUrgent : late?.heading || voice.overdue, more: late?.more ?? 0, most: board ? lateMost : phone.current ? 3 : 5 } };
         if (lateAt.includes(n) || bandAt.includes(n)) return { ...b, drawn: false };
-        return board && phone.current && b.key === 'needs-you' && b.queue ? { ...b, queue: b.queue.slice(0, NEEDS_YOU_LIMIT_PHONE), most: NEEDS_YOU_LIMIT_PHONE } : b;
+        /* WHAT ARRIVED IS HOME'S OWN READING (`Landed.svelte`), drawn in the place of the feed it stands for. */
+        if (board && b.key === 'arrivals') return { ...b, drawn: false };
+        /* A VITAL SIGN READING RED IS SAID UNDER WHAT NEEDS YOU, in its tile (`signsSaid`), not as a tile of its own. */
+        if (board && (b.key === 'signs' || b.key === 'signs-many')) return { ...b, drawn: false };
+        return b;
       }),
       recordNow(),
       named,
     );
-    /* ON THE DESK THE DOCUMENT HOLDS THE TILES IN THE ORDER THEY ARE SEEN (`desk-order.ts`), so Tab walks the picture. The
-       reader indexes the blocks it is handed, so the order is made here, before it. */
-    if (!board) return { blocks };
-    return { blocks: inPicture(deskFolded(blocks, false).blocks) };
+    /* WHO IS WORKING SHOWS WHAT ITS FRAME HOLDS; All agents has the rest. */
+    if (!board) return desk;
+    return desk.map((b) => (b.desk?.kind === 'working' && b.desk.rows.length > sized('working') ? { ...b, desk: { ...b.desk, rows: b.desk.rows.slice(0, sized('working')) } } : b));
   });
+
+  /** How many lines of the desk's own tiles (what is late, who is working) each frame holds: theirs are tall lines. */
+  const DESK_LAPTOP: Readonly<Record<import('braindog-render').WidgetSize, number>> = { small: 1, wide: 1, tall: 3, large: 3, full: 1 };
+  /* A PHONE'S LINES WRAP, so its frames hold fewer. */
+  const DESK_PHONE: Readonly<Record<import('braindog-render').WidgetSize, number>> = { small: 1, wide: 1, tall: 2, large: 2, full: 1 };
+  const DESK_SHOWS = $derived(boardModel.onPhone ? DESK_PHONE : DESK_LAPTOP);
+
+  /** The line a vital sign reading red says, under Needs you on the board: the note's own words, its link the place. */
+  const signsSaid = $derived.by((): string | null => {
+    if (!board || !shaped) return null;
+    const b = shaped.blocks.find((x) => (x.key === 'signs' || x.key === 'signs-many') && x.drawn);
+    const body = typeof (b as { body?: unknown } | undefined)?.body === 'string' ? (b as { body: string }).body : '';
+    const said = body.replace(/\[([^\]]+)\]\([^)]*\)/u, '$1').replace(/\.$/u, '').trim();
+    return b ? (said && !said.includes('{{') ? said : 'A vital sign needs a look') : null;
+  });
+
+  /** A block's widget on the board: the late band is Late's wherever it stands, the rest by their own key. */
+  const boardKeyOf = (b: { key?: string | undefined; desk?: { kind: string } | undefined } | undefined): string | undefined => (b?.desk?.kind === 'late' ? 'late' : b?.key);
+
+  /* ── the board (the widgets plan of 29 October) ─────────────────────────── */
+
+  /** The reader's day, which a widget with a last day (`until`) is drawn up to and not after. */
+  const boardDay = $derived(recordToday(recordNow()));
+  /** Whether a block is still on the board today (`stillShown`): nothing is deleted, it is only not laid out. */
+  const onBoardToday = (b: unknown): boolean => stillShown(b as Record<string, unknown>, boardDay);
+  const boardWidgets = $derived(board && live ? widgetsOf(live.page.blocks.filter(onBoardToday).map((b) => ({ ...b, kind: b.kind }))) : []);
+  const boardPhone = $derived(board && live ? (((live.page.page as { phone?: unknown }).phone ?? null) as Phone | null) : null);
+  /* WHAT TAKES A CELL: a widget drawn, Needs you always (its foot is the tile when nothing is asked), and Arrivals while
+     anything landed. */
+  const boardShown = $derived.by((): ReadonlySet<string> => {
+    const keys = new Set<string>();
+    for (const b of deskedRaw ?? []) if (b.drawn) keys.add(boardKeyOf(b) ?? '');
+    if (boardWidgets.some((w) => w.key === 'needs-you')) keys.add('needs-you');
+    if (landed.length > 0) keys.add('arrivals');
+    return keys;
+  });
+  const boardNames = $derived.by((): ReadonlyMap<string, string> => {
+    const out = new Map<string, string>();
+    for (const b of deskedRaw ?? []) {
+      const k = boardKeyOf(b);
+      const desk = (b as Desked<LiveBlock>).desk;
+      const name = desk?.kind === 'late' ? desk.heading : typeof b.heading === 'string' ? b.heading : '';
+      if (k && name && !out.has(k)) out.set(k, name);
+    }
+    out.set('arrivals', 'Arrivals');
+    return out;
+  });
+  /** The board's widgets as the sheet reads them (`widgetGallery`'s `board`): what each reads, and whether it drew empty. */
+  const sheetBoard = $derived.by((): Record<string, unknown>[] => {
+    if (!board || !live) return [];
+    const keys = new Set(boardWidgets.map((w) => w.key));
+    return live.page.blocks.flatMap((b) => {
+      const x = b as unknown as Record<string, unknown>;
+      if (typeof x.key !== 'string' || !keys.has(x.key)) return [];
+      /* EMPTY IS A LIST THAT HELD NO ROW, or a widget not drawn at all; a figure's own rows are not what it shows. */
+      const listed = ['list', 'table', 'todo', 'queue', 'feed', 'cards', 'timeline', 'spec'].includes(String(x.kind));
+      const out: Record<string, unknown> = { key: x.key, empty: !boardShown.has(x.key) || (listed && Array.isArray(x.rows) && x.rows.length === 0) };
+      for (const k of ['heading', 'source', 'where', 'metric'] as const) if (typeof x[k] === 'string') out[k] = x[k];
+      /* THE NAME IT IS DRAWN UNDER (Arrivals, not the body's "Since you were away"), so the sheet says what Today says. */
+      const drawnAs = boardNames.get(x.key);
+      if (drawnAs) out.heading = drawnAs;
+      return [out];
+    });
+  });
+  /** The widgets drawn as drafts, with their Keep bar: only for whoever may arrange Today, who alone is shown them. */
+  const boardDrafts = $derived.by((): ReadonlySet<string> => {
+    if (!mayArrange || !board || !live) return new Set();
+    return new Set(
+      live.page.blocks.flatMap((b) => {
+        const x = b as unknown as { key?: unknown; draft?: unknown };
+        return typeof x.key === 'string' && x.draft !== null && typeof x.draft === 'object' ? [x.key] : [];
+      }),
+    );
+  });
+  boardModel.src = { widgets: () => boardWidgets, phone: () => boardPhone, shown: () => boardShown, names: () => boardNames, drafts: () => boardDrafts };
+  /* THE DRAFT IS KEPT ON THIS DEVICE UNDER THE RECORD IT IS FOR. */
+  boardModel.draftKey = `bd_board_draft:${apiBase()}`;
+
+  /* THE BLOCKS AS THE BOARD DRAWS THEM: each cut to what its frame shows, written in the order the board is read in
+     (`pack.ts`), so Tab walks the picture. The reader indexes the blocks it is handed, so the order is made here. */
+  const desked = $derived.by(() => {
+    const raw = deskedRaw;
+    if (!raw) return null;
+    if (!board) return { blocks: raw };
+    /* A WIDGET THE BOARD GIVES NO CELL (hidden on the phone) IS NOT DRAWN, rather than drawn in the first cell free. */
+    const widgetKeys = new Set(boardWidgets.map((w) => w.key));
+    const fit = raw.map((b) => {
+      const k = boardKeyOf(b);
+      if (k && b.drawn && ((widgetKeys.has(k) && boardModel.placeOf(k) === null) || !onBoardToday(b))) return { ...b, drawn: false };
+      return k && b.drawn && b.kind !== undefined ? fitted(b, boardModel.sizeNow(k), boardModel.onPhone) : b;
+    });
+    const rank = new Map(boardModel.keys.map((k, i) => [k, i] as const));
+    const at = (b: Desked<LiveBlock>): number => {
+      const k = boardKeyOf(b);
+      if (b.kind === 'capture' || (b.kind === 'note' && (b as { lead?: unknown }).lead === true)) return -1;
+      return k !== undefined && rank.has(k) ? rank.get(k)! : 1000;
+    };
+    return { blocks: fit.map((b, i) => ({ b, i, r: at(b) })).sort((x, y) => x.r - y.r || x.i - y.i).map((x) => x.b) };
+  });
+
+  /** A block's cell on the board, by its index in what the reader is handed. */
+  const placed = (i: number) => (board ? boardModel.placeOf(boardKeyOf(drawn?.from === 'live' ? (drawn.page.blocks[i] as Desked<LiveBlock>) : undefined)) : null);
   const drawn = $derived.by((): Opened | null => {
     if (!got || got.from !== 'live' || !desked) return got;
     const blocks = desked.blocks;
@@ -849,7 +1027,7 @@
     if (untrack(() => handled) !== null) handledHeard();
     /* ON TODAY'S OWN BODY IT COMES WITH THE BODY, in the record's one read (`tilesBeside`), and is not asked by itself:
        only its code is fetched now, so it is here when the body lands. */
-    if (declares === null) return void import('./handled.ts').catch(() => undefined);
+    if (declares === null || (declares === KEPT_HOME && !pageKept.has(base))) return void import('./handled.ts').catch(() => undefined);
     void import('./handled.ts').then(
       async (m) => {
         const found = await tileOnce('handled', base, ver, () => m.loadHandled(base)).catch(() => null);
@@ -915,8 +1093,101 @@
   /* WHETHER THE PAGE'S READER IS DRAWN. */
   const reader = $derived((drawn !== null && (!calm || Boolean(shaped?.capture))) || !settled);
 
-  /* WHERE THE DESK'S OWN PARTS STAND AMONG THE PAGE'S TILES, so the document is in the picture's order. */
-  const anchors = $derived(anchorsFor(board ? (desked?.blocks ?? []) : [], board && reader));
+  /* ── the board's editor, written ── */
+
+  /** Steps laid on Today at once (a widget taken off, a draft kept or thrown away), said with `said` and its Undo. */
+  async function boardStep(steps: import('$lib/board/steps.ts').Step[], said: string | null): Promise<void> {
+    const { stepToday } = await import('$lib/board/add-today.ts');
+    const out = await stepToday(apiBase(), steps);
+    if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+    if (said !== null) toasts.push(said, { undo: () => void out.undo?.().then(() => reread()) });
+    await reread();
+  }
+
+  /** The words a drafted widget's presses say. */
+  const draftSaid = { kept: 'Kept on Today.', gone: 'Thrown away.', made: 'On Today as a draft. Keep it or throw it away.', again: 'Here is another.' } as const;
+
+  /** A widget from the sheet, on Today at once with its Undo, and the board read again (§5.6). */
+  async function boardAdd(block: Record<string, unknown>, size: import('braindog-render').WidgetSize): Promise<void> {
+    const { addToToday, addWords } = await import('$lib/board/add-today.ts');
+    const out = await addToToday(apiBase(), block, size);
+    if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+    toasts.push(addWords.addedPlain, { intent: 'good', undo: () => void out.undo?.().then(() => reread()) });
+    await reread();
+  }
+
+  /** Make your own (the sheet's W4): what he said, landed on Today as a draft he keeps or throws away. */
+  async function boardMake(made: { block: Record<string, unknown>; size: import('braindog-render').WidgetSize; said: string }): Promise<void> {
+    const { key: _k, ...own } = made.block;
+    const draft = own.draft !== null && typeof own.draft === 'object' ? own.draft : { by: 'Slash', why: made.said };
+    await boardStep([{ add: { ...own, size: made.size, draft }, before: null }], draftSaid.made);
+  }
+
+  /** A draft tried again: another from the same words, set where the first stood. */
+  async function draftAgain(key: string, block: Record<string, unknown>): Promise<void> {
+    const [{ composeOn }, { kept, draftOf }] = await Promise.all([import('$lib/board/compose.ts'), import('braindog-render/widget-compose')]);
+    const mark = draftOf(block);
+    if (mark === null) return;
+    const made = await composeOn(apiBase(), mark.why, undefined, [kept(block)]);
+    if ('fix' in made) return void toasts.push(made.fix, { intent: 'warn' });
+    await boardStep([{ set: key, block: { ...made.block, draft: { ...mark, ...(made.cost ? { cost: made.cost } : {}) } } }], draftSaid.again);
+  }
+
+  /** A widget as Today declares it, with what the Inspector changed in this edit laid over it. */
+  const declaredOf = (key: string): Record<string, unknown> | null => {
+    const b = declaredBlocks.find((x) => x.key === key);
+    return b ? { ...b, ...(boardModel.changed[key] ?? {}) } : null;
+  };
+
+  /** The widget the Inspector is open on, while editing. */
+  const inspectedWidget = $derived.by(() => {
+    const key = boardModel.inspected;
+    if (key === null || !boardModel.editing) return null;
+    const block = declaredOf(key);
+    return block ? { key, block, size: boardModel.sizeNow(key) } : null;
+  });
+  boardModel.inspects = true;
+
+  /**
+   * Whether this reader may arrange Today: whoever keeps the record arranges the record's, and every other person signed
+   * in arranges their own (W8), which the record keeps as theirs. Not while seeing as somebody, which writes nothing.
+   */
+  const mayArrange = $derived((Boolean(data.me?.owner) || (Boolean(data.me?.person) && seeingAs() === null)) && !data.refused && !data.stale);
+
+  /**
+   * DONE (§5.5): the steps between where the edit started and where it ended, written once as a new version of Today, with
+   * "Today is arranged." and a 6 s Undo. The board keeps what was made on screen while the record takes it, so nothing
+   * jumps back. A Today the record does not keep yet is kept from the body it is drawn from.
+   */
+  async function boardDone(): Promise<void> {
+    const steps = boardModel.steps();
+    if (steps.length === 0) return boardModel.cancel();
+    boardModel.close();
+    const base = apiBase();
+    const [w, h] = await Promise.all([import('$lib/board/board-write.ts'), import('$lib/page/home-arrange.ts')]);
+    const kept = declares !== null;
+    const body = kept ? null : { ...h.whileHeld(JSON.parse(JSON.stringify(todayHome(untrack(() => holds), h.HOUSE_VOICE)))), page: w.KEPT_TODAY };
+    const out = await w.writeBoard(base, w.KEPT_TODAY, steps, body, null);
+    if (out.from !== 'written') {
+      boardModel.landed();
+      toasts.push(`${boardWords.editedNot} ${out.fix}`, { intent: 'bad' });
+      return;
+    }
+    const before = out.before;
+    const own = out.own === true;
+    toasts.push(boardWords.edited, {
+      undo: () => {
+        void w.unwriteBoard(base, w.KEPT_TODAY, before, undefined, own).then(async () => {
+          if (before === null) await h.reboot();
+          void reread();
+        });
+      },
+    });
+    /* A TODAY JUST KEPT IS READ FROM WHERE IT IS KEPT: the shell learns the page, and the board draws from it. */
+    if (!kept) await h.reboot();
+    await reread();
+    boardModel.landed();
+  }
 
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
   const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
@@ -935,6 +1206,17 @@
     const id = data.me?.person;
     const named = id && data.names && Object.hasOwn(data.names, id) ? (data.names[id] ?? '').trim() : '';
     return greetingOf(data.now, named || (data.me?.name ?? '').trim());
+  });
+
+  /* THE BAR SAYS THE GREETING, ONCE (29 October): its crumb ends on it in place of "Today", and the greeting here is the
+     unseen `h1` wherever a bar is drawn. */
+  $effect(() => {
+    if (!headed) return;
+    const said = greeting;
+    frame.heading = said;
+    return () => {
+      if (frame.heading === said) frame.heading = '';
+    };
   });
 
   /* TODAY'S LATE LIST, read off the page as Home shaped it: what the brief names, and the Late tile at the top of the
@@ -1059,17 +1341,52 @@
   {/if}
 {/snippet}
 
-<!-- THE DESK'S OWN PARTS, each where the picture shows it (`desk-order.ts`): before a tile of the page, or
-     after the page. -->
-{#snippet placedParts(list: readonly Placed[])}
-  {#each list as part (part)}
-    {#if part === 'needs'}{@render needsFoot()}{:else}{@render landedPart()}{/if}
-  {/each}
+<!-- HOME'S OWN PARTS ON THE BOARD, each in its widget's cell: Needs you's foot when nothing is asked (the whole tile
+     then), and what arrived, in the place of the feed it stands for. -->
+{#snippet amid(i: number)}
+  {@const b = drawn?.from === 'live' ? drawn.page.blocks[i] : undefined}
+  {#if b?.key === 'needs-you' && !b.drawn}
+    {@render part('needs-you', needsFoot)}
+  {:else if b?.key === 'arrivals' && landed.length > 0}
+    {@render part('arrivals', landedPart)}
+  {/if}
 {/snippet}
 
-{#snippet amid(i: number)}
-  {@const here = anchors.at.get(i)}
-  {#if here}{@render placedParts(here)}{/if}
+{#snippet part(key: string, body: import('svelte').Snippet)}
+  {@const cell = boardModel.placeOf(key)}
+  {#if cell}
+    <div class="board-part" data-board-key={key} data-size={cell.size} style="grid-area:{cell.area}">
+      {@render body()}
+      {#if boardModel.editing}<EditCover model={boardModel} {key} />{/if}
+    </div>
+  {/if}
+{/snippet}
+
+<!-- INSIDE A WIDGET'S TILE: Needs you's foot under its questions, and the board's handles while it is edited. -->
+{#snippet inside(i: number)}
+  {@const b = drawn?.from === 'live' ? (drawn.page.blocks[i] as Desked<LiveBlock>) : undefined}
+  {@const key = boardKeyOf(b)}
+  {#if b?.key === 'needs-you'}
+    {#if signsSaid}<a class="signs-line" href={inApp('/p/health')}>{signsSaid}</a>{/if}
+    {@render needsFoot()}
+  {/if}
+  {@const draft = (b as { draft?: unknown } | undefined)?.draft}
+  {#if mayArrange && key && !boardModel.editing && draft !== null && typeof draft === 'object'}
+    {@const own = declaredOf(key)}
+    <DraftMark draft={draft as { by?: unknown; why?: unknown }} name={boardModel.nameOf(key)} onkeep={() => boardStep([{ keep: key }], draftSaid.kept)} ondiscard={() => boardStep([{ remove: key }], draftSaid.gone)} onagain={own ? () => draftAgain(key, own) : undefined} />
+  {/if}
+  {#if boardModel.editing && key && boardModel.placeOf(key)}<EditCover model={boardModel} {key} />{/if}
+{/snippet}
+
+<!-- THE READER, the one for a board and for a page laid out by hand. -->
+{#snippet readerPart()}
+  {#if reader && PageView}
+    {#if board}
+      <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={amid} {placed} {inside} />
+    {:else}
+      <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />
+    {/if}
+  {/if}
 {/snippet}
 
 
@@ -1138,7 +1455,7 @@
       are the tiles under it, said once there and not twice.
     -->
     {#if headed}
-      <header class="today-head">
+      <header class="today-head" data-barred={barTitled() ? '' : undefined}>
         <h1 class="today-hi" tabindex="-1">{greeting}</h1>
       </header>
     {/if}
@@ -1148,15 +1465,29 @@
       each where the 19 October desk puts it. A kept page is its own board.
     -->
     <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
-      <!-- WHAT IS LATE LEADS THE DESK, a line a thing with its button: beside who is working at a desk, and the
-           first thing under the brief on a phone. A block of the page since C27, the first in its order (`desked`). -->
-      <!-- THE FIRST ROW'S RIGHT COLUMN UNDER WHO IS WORKING AND CASH, held so nothing laid out later lands in it. -->
-      {#if board && shaped}<span class="row-one-rest" aria-hidden="true"></span>{/if}
-      <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. On the
-           desk the parts that are the desk's own stand among its tiles, in the order they are seen (`amid`). -->
-      {#if reader && PageView}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={board ? amid : undefined} />{/if}
-      <!-- THE PARTS NO TILE OF THE PAGE COMES AFTER. -->
-      {#if board}{@render placedParts(anchors.tail)}{/if}
+      <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
+      {#if board}
+        <!-- TODAY IS A BOARD OF WIDGETS (the widgets plan of 29 October): each in its cell, and the editor over them. -->
+        <Board model={boardModel} mayEdit={mayArrange} ondone={() => void boardDone()} onadd={boardAdd} onremove={(key) => boardStep([{ remove: key }], null)} onmake={boardMake} widgets={sheetBoard}>{@render readerPart()}</Board>
+        {#if inspectedWidget}
+          <!-- THE INSPECTOR (W4): what a tapped widget shows, in one sentence; its changes are kept with the edit's Done. -->
+          {#await import('$lib/board/Inspector.svelte') then { default: Inspector }}<Inspector
+            bind:open={() => boardModel.inspected !== null, (v) => { if (!v) boardModel.inspected = null; }}
+            widget={inspectedWidget as never}
+            sizes={boardModel.sizesFor(inspectedWidget.key)}
+            phoneHidden={boardModel.phoneHidden(inspectedWidget.key)}
+            onchange={(key, block) => boardModel.setBlock(key, block as Record<string, unknown>)}
+            onsize={(key, size) => boardModel.sizeTo(key, size)}
+            onhidephone={(key, hidden) => boardModel.hideOnPhone(key, hidden)}
+            onremove={inspectedWidget.key === 'needs-you' || inspectedWidget.key === 'late' ? undefined : (key) => boardModel.hide(key)}
+          />{/await}
+        {/if}
+        {#if mayArrange && !boardModel.editing && settled && shaped && drawsAny(shaped.blocks)}
+          <div class="board-foot"><Button weight="quiet" size="sm" onclick={() => boardModel.enter()}>{boardWords.editToday}</Button></div>
+        {/if}
+      {:else}
+        {@render readerPart()}
+      {/if}
     </div>
 
     <!-- AND UNDER TODAY, THE NEXT STEPS, until they are hidden. -->
@@ -1254,6 +1585,16 @@
     letter-spacing: -0.01em;
   }
 
+  /* THE BAR SAYS IT: the greeting stays the screen's `h1` for a screen reader and the focus a move lands, drawn nowhere. */
+  .today-head[data-barred] {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .today-hi:focus:not(:focus-visible) {
     /* focus-ok: the heading takes focus by script after a page change; the ring stays for a keyboard. */
     outline: none;
@@ -1265,84 +1606,8 @@
     }
   }
 
-  /* WHAT IS LATE STANDS IN NEEDS YOU'S PLACE IN THE ORDER, before it, so on a phone it is the first tile under the brief,
-     and nothing the board draws at no height (the page's ⋯ on a phone) stands between them and opens a gap. Its tile
-     fills its cell, so beside a taller Working now it does not end short. */
-  .body[data-board] :global(.home-page > .page > .block-slot:has(> .desk-part[data-desk='late'])) {
-    display: flex;
-    flex-direction: column;
-    order: 1;
-  }
-
-  /* THE PAGE'S ⋯ ROW, which a phone draws in the flow and which holds only closed sheets there, goes to the board's foot
-     rather than over the late tile, where its row and its gap pushed the tile down. */
-  .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .home-tools) {
-    order: 19;
-  }
-
-  /* UNDER A THUMB THE ⋯ IS IN THE HEAD, AS ON A DECLARED PAGE: at the end of the greeting's row, raised over the
-     board as a pointer raises it, and never a row of its own among the tiles, where it stood alone between People and
-     Handed back to you. The greeting keeps a tap of room at its end so no word runs under it. */
-  @media (hover: none) {
-    .today-head + .body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(.home-page > .home-tools) {
-      position: absolute;
-      inset-block-end: 100%;
-      inset-inline-end: 0;
-      margin: 0;
-      padding-block-end: var(--sp-1);
-    }
-
-    .today-head:has(+ .body[data-board] :global(.home-tools :is(button, a))) {
-      padding-inline-end: calc(var(--tap) + var(--sp-2));
-    }
-  }
-
-  /* NOT ON A PHONE'S TODAY AT ALL: the ⋯ stood alone beside the greeting with nothing a thumb arranges there, and
-     Edit layout is offered from 900px. */
+  /* ON A PHONE, the tiles read as the desk's phone board read them. */
   @media (width < 600px) {
-    .today-head + .body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(.home-page > .home-tools) {
-      display: none;
-    }
-
-    .today-head:has(+ .body[data-board] :global(.home-tools :is(button, a))) {
-      padding-inline-end: 0;
-    }
-  }
-
-  /* THE PHONE'S OWN ORDER (the Bento phone board): what needs you first, two of it, then what is late and urgent,
-     who is at work, cash with its week, and what is next. The few key numbers, the projects, what arrived and the
-     people are a tab away (Projects, Money, Activity), so the phone's Today is about two screens and not six. */
-  @media (width < 600px) {
-    .body.body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot])) {
-      order: 1;
-    }
-
-    .body.body[data-board] :global(.home-page > .page > .block-slot:has(> .desk-part[data-desk='late'])) {
-      order: 2;
-    }
-
-    .body.body[data-board] > :global([data-working]),
-    .body.body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
-      order: 3;
-    }
-
-    .body.body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
-      order: 4;
-    }
-
-    .body.body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
-      order: 5;
-    }
-
-    .body.body[data-board] :global(.home-page > .page > .block-slot:is([data-key='week-due'], [data-key='coming-up'])) {
-      order: 6;
-    }
-
-    .body.body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(.home-page > .page > :is(.block-slot:is([data-key='numbers'], [data-key='projects'], [data-key='faces']), [data-landed])),
-    .body.body[data-board]:not(:has(:global(.home-page[data-arranging]))) > :global([data-landed]) {
-      display: none;
-    }
-
     /* AT WORK, TWO SHORT LINES A RUN: who and when, then what it is doing cut at the line's end; the rest is on Agents.
        On one line the name and the time left the work four letters. */
     .body[data-board] :global([data-working] .run :is(.r-doing, .r-holds)) {
@@ -1430,120 +1695,73 @@
     min-inline-size: 0;
   }
 
-  /* ── the desk ─────────────────────────────────────────────────────────────
-     ONE BOARD OF TWELVE COLUMNS that the desk's own parts and the page's blocks share (the 19 October desk). The page's
-     reader and its body give up their boxes (`display: contents`), so each block's tile is a tile of this board, and
-     each is put in its row by `order`: what needs you, who is working and cash; the few key numbers where the record
-     keeps any; the record's week where it keeps one;
-     the projects; Arrivals, what is coming up and people. Not while the page is being
-     arranged, where the body's own layout is what is moved.
-
-     THE ROW'S SHARES ARE THE BOARD'S, by what it holds: five, four and three, and a part that is not there gives its
-     columns to the others, so a row never ends on a hole. Under 960px of board the first of each row takes the whole
-     row and the other two halve the next; on a phone every tile is the whole width, in the same order. */
+  /* ── the board ─────────────────────────────────────────────────────────
+     TODAY IS A BOARD OF WIDGETS (`lib/board/Board.svelte` lays it out, the widgets plan of 29 October): each tile in its
+     cell at its size, the content fitting the cell. What is here is how each of Today's own tiles draws itself in a
+     frame: Needs you with its foot under it, cash as one figure with its line and two beside it, the lists with their
+     "N more" at their foot. */
   .body[data-board] {
-    --n: 7;
-    --a: 6;
-    --u: 3;
-    --p: 3;
-    container: desk / inline-size;
-    position: relative;
     display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    align-items: start;
-    gap: var(--tile-gap);
+    gap: var(--sp-3);
+    position: relative;
   }
 
-  .body[data-board]:has(:global(.home-page[data-arranging])) {
-    display: block;
+  .board-foot {
+    display: flex;
+    justify-content: flex-end;
   }
 
-  .body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(:is(.home-page, .home-page > .page)) {
-    display: contents;
+  /* NEEDS YOU AND ITS FOOT ARE ONE TILE (today F3): the foot under its questions, at the tile's foot. */
+  .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot]) {
+    margin-block-start: auto;
+    padding-block-start: var(--sp-1);
   }
 
-  /* WHAT THE ROWS HOLD, read off the board: who is working is the desk's tile or, without the desk, the page's table.
-     With neither it nor cash, Needs you is the whole first row. */
-  .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'], .block-slot[data-key='cash'])))) {
-    --n: 12;
+  /* NEEDS YOU HOLDS TWO QUESTIONS ON A LAPTOP'S LARGE (Q17): each question without its well, so its buttons sit on its
+     second line, and the foot's lines at a press's height, not a row's. */
+  .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-actions) {
+    grid-row: 2;
+    grid-column: 3;
+    justify-self: end;
+    margin: 0;
   }
 
-  .body[data-board]:not(:has(:global(.block-slot[data-key='faces']))) {
-    --a: 8;
-    --u: 4;
+  .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-meta) {
+    grid-column: 2;
+    align-self: center;
   }
 
-  .body[data-board]:not(:has(:global([data-landed]))) {
-    --u: 6;
-    --p: 6;
+  .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot]) {
+    padding-block-start: 0;
   }
 
-  .body[data-board]:not(:has(:global(.block-slot[data-key='coming-up']))) {
-    --a: 8;
-    --p: 4;
+  /* 32 TALL UNDER A MOUSE ONLY: under a thumb a line of the foot is a target, and keeps its 44. */
+  @media (pointer: fine) {
+    .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot] .nf-line) {
+      min-block-size: 32px;
+    }
   }
 
-  /* EVERYTHING ON THE BOARD IS A WHOLE ROW unless it is one of the desk's (below): bars while the page is read, the
-     page's ⋯ where a pointer cannot hover. Before the desk, so a bar is never under it. */
-  .body[data-board] > :global(*),
-  .body[data-board] :global(.home-page > *),
-  .body[data-board] :global(.home-page > .page > *) {
-    grid-column: 1 / -1;
-    order: 0;
+  .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
+    padding-block-start: 0;
+    font-size: var(--fs-meta);
+    line-height: 20px;
+  }
+
+  .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large']) {
+    padding-block-end: var(--sp-3);
+  }
+
+  .body[data-board] :global(.board-part) {
     min-inline-size: 0;
   }
 
-  /* ANY OTHER BLOCK OF THE PAGE, under the desk's own. */
-  .body[data-board] :global(.home-page > .page > .block-slot) {
-    grid-column: 1 / -1;
-    order: 30;
+  .body[data-board] :global(.board-part > *) {
+    flex: 1;
+    min-block-size: 0;
   }
 
-  .body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot])) {
-    order: 1;
-  }
-
-  /* NEEDS YOU AND ITS FOOT ARE ONE TILE (today F3): the foot butts the queue's lower edge, the corners between them
-     square, and the queue keeps only a step of air under its last line. With nothing to ask the foot is the tile. */
-  .body[data-board]:has(:global([data-needs-foot]:not([data-alone]))) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
-    padding-block-end: var(--sp-3);
-    border-end-start-radius: 0;
-    border-end-end-radius: 0;
-  }
-
-  .body[data-board] :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
-    margin-block-start: calc(var(--tile-gap) * -1);
-  }
-
-  /* NOTHING STRETCHES TO A NEIGHBOUR (Today polish 1): who is working and cash are each as tall as what they hold. Only
-     Needs you fills its own span, so its foot butts it when the column beside it is the taller. */
-  .body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot][data-alone])) {
-    align-self: stretch;
-  }
-
-  /* THE LAST ROW SHARES ONE HEIGHT (Today polish 3): what is coming up and people, each list at the top and its "N more"
-     or "All people" pinned to the foot. NOT ARRIVALS, SINCE batch 4's look on his record: one arrival stretched to the
-     row's height left a tile of empty board, so it ends where its lines end. */
-  .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='coming-up'], [data-key='faces'])) {
-    align-self: stretch;
-  }
-
-  .body[data-board] :global(.home-page > .page > [data-landed]),
-  .body[data-board] > :global([data-landed]) {
-    align-self: start;
-  }
-
-  .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='coming-up'], [data-key='faces'])) {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .body[data-board] :global(.block-slot:is([data-key='coming-up'], [data-key='faces']) > :is(.block-slice, .block-more)) {
-    margin-block-start: auto;
-    padding-block-start: var(--sp-3);
-  }
-
-  /* COMING UP'S "16 MORE" IS A LINK TO WORK (VERIFY P1), said as a link is: 13/500 in ink, as wide as its words. */
+  /* COMING UP'S "16 MORE" IS A LINK, said as a link is: 13/500 in ink, as wide as its words. */
   .body :global(.block-slot[data-key='coming-up'] > a.block-more) {
     align-self: flex-start;
     color: var(--ink);
@@ -1555,239 +1773,170 @@
     text-decoration: underline;
   }
 
-  /* THE REST OF THE FIRST ROW'S RIGHT COLUMN, held empty so nothing laid out later is put in it. */
-  .row-one-rest {
+  /* A VITAL SIGN READING RED, one line in the red under what needs you, the link to the place the signs are. */
+  .signs-line {
+    margin-block-start: auto;
+    padding-block-start: var(--sp-2);
+    color: var(--red);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+  }
+
+  .signs-line:hover {
+    text-decoration: underline;
+  }
+
+  .signs-line + :global([data-needs-foot]) {
+    margin-block-start: 0;
+  }
+
+  /* THE LATE TILE FILLS ITS FRAME, its lines at the top and its count at the foot. */
+  .body[data-board] :global(.block-slot:has(> .desk-part[data-desk='late'])) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* CASH, WIDE (§3.3): the cash now with its line on the left, coming in and going out stacked at the right. */
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid) {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: var(--sp-5);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child) {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+    padding-block-end: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2)) {
+    grid-column: 2;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell + .cell) {
+    border-block-start: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(3)) {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  /* ITS LINE IS THE LARGE CASH'S: in a wide frame the cash now, how long it lasts, and the two beside it. */
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child :is(.cell-trend, .cell-trend-ahead)) {
     display: none;
   }
 
-  .body[data-board] > :global([data-working]),
-  .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
-    order: 2;
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2)) {
+    padding-block: var(--sp-2);
   }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
-    order: 3;
+  /* AND HOW LONG IT LASTS ON ONE LINE, so a laptop's shorter row still holds it. */
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child .cell-note) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
-  /* THE FEW KEY NUMBERS THAT LEAD ARE A WHOLE ROW under the first, at every width (`numbersTile`). */
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='numbers']) {
-    order: 4;
+  .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
+    margin-block-start: var(--sp-1);
   }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
-    order: 5;
-  }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
-    order: 6;
-  }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='projects']) {
-    order: 7;
-  }
-
-  .body[data-board] > :global([data-landed]),
-  .body[data-board] :global(.home-page > .page > [data-landed]) {
-    order: 8;
-  }
-
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='coming-up']) {
-    order: 9;
-  }
-
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='faces']) {
-    order: 10;
-  }
-
-  /* A TILE LEAVING THE BOARD FADES WHERE IT STOOD: the reader lays its copy against the board, which is the box the page
-     has on the desk (`recompose.ts` `frameOf`), so nothing here holds it anywhere. */
-
-  @container desk (inline-size >= 960px) {
-    /* THE FIRST ROW IS PLACED (Today polish 1) ON FOUR TRACKS, two stacks side by side: Needs you over its foot at seven
-       of twelve, and at the right who is working over cash, each its own height. Needs you takes the first two tracks
-       and its foot the third; who is working the first, and cash the second to the fourth. So the second track is what
-       Needs you is taller than who is working by, the fourth is what cash runs on past the foot, and neither column
-       stretches to the other. */
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='needs-you']) {
-      grid-row: 1 / span 2;
-      grid-column: 1 / span var(--n);
-    }
-
-    .body[data-board]:not(:has(:global([data-needs-foot]:not([data-alone])))) :global(.home-page > .page > .block-slot[data-key='needs-you']),
-    .body[data-board] :global(.home-page > .page > [data-needs-foot][data-alone]) {
-      grid-row: 1 / span 3;
-      grid-column: 1 / span var(--n);
-    }
-
-    .body[data-board] :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
-      grid-row: 3;
-      grid-column: 1 / span var(--n);
-    }
-
-    .body[data-board] > :global([data-working]),
-    .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
-      grid-row: 1;
-      grid-column: calc(var(--n) + 1) / -1;
-    }
-
-    /* CASH ENDS ON THE LAST TRACK OF THE LEFT STACK (Needs you and its foot, three tracks) and never on a fourth, which
-       was a band of empty board under both tiles when the right column was the shorter. */
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 2 / span 2;
-      grid-column: calc(var(--n) + 1) / -1;
-    }
-
-    .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 1 / span 3;
-    }
-
-    /* WITH WHAT IS LATE THE LEFT STACK IS FOUR TRACKS: the late tile beside who is working, then Needs you over two and
-       its foot beside cash. The late tile and who is working fill their track together, so neither ends short of the
-       other. THE FOOT STRETCHES TO THE LAST TRACK; CASH ENDS WHERE ITS FIGURES END, SINCE batch 4's look on his record:
-       stretched beside Late and Needs you, Cash ahead was half a column of empty tile under three figures. */
-    .body[data-board] :global(.home-page > .page > .block-slot:has(> .desk-part[data-desk='late'])) {
-      grid-row: 1;
-      grid-column: 1 / span var(--n);
-      align-self: stretch;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])) > :global([data-working]),
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
-      align-self: stretch;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
-      grid-row: 2 / span 2;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])):not(:has(:global([data-needs-foot]:not([data-alone])))) :global(.home-page > .page > .block-slot[data-key='needs-you']),
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > [data-needs-foot][data-alone]) {
-      grid-row: 2 / span 3;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
-      grid-row: 4;
-      align-self: stretch;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 2 / span 3;
-      align-self: start;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])):not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 1 / span 4;
-    }
-
-    /* THE WEEK'S MONEY SITS UNDER CASH, in the right column beside the foot, so the tall Needs you is not beside a hole:
-       cash keeps its own height and the week's money takes the track under it. */
-    .body[data-board]:has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 2;
-    }
-
-    .body[data-board]:has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))):has(:global(.block-slot[data-key='cash'])) :global(.home-page > .page > .block-slot[data-key='week-money']) {
-      grid-row: 3;
-      grid-column: calc(var(--n) + 1) / -1;
-      align-self: start;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])):has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 2 / span 2;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])):has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))):has(:global(.block-slot[data-key='cash'])) :global(.home-page > .page > .block-slot[data-key='week-money']) {
-      grid-row: 4;
-    }
-
-    /* THE WEEK'S MONEY IS THE FOOT OF CASH AHEAD, one tile and not a second one floating under it: cash fills its
-       track, its lower corners square, and the week's money butts it with a hairline between, as Needs you's foot does. */
-    .body[data-board]:has(:global(.block-slot[data-key='week-money'])):has(:global(:is([data-working], .block-slot[data-key='working']))) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      align-self: stretch;
-      border-end-start-radius: 0;
-      border-end-end-radius: 0;
-    }
-
-    .body[data-board]:has(:global(:is([data-working], .block-slot[data-key='working']))):has(:global(.block-slot[data-key='cash'])) :global(.home-page > .page > .block-slot[data-key='week-money']) {
-      margin-block-start: calc(var(--tile-gap) * -1);
-      border-start-start-radius: 0;
-      border-start-end-radius: 0;
-      border-block-start: 1px solid var(--rule);
-    }
-
-    /* TWO LISTS OF TASKS AT THE FOOT (Handed back, Urgent) SIT SIDE BY SIDE, not each a full row of one line; one alone
-       keeps the row. */
-    .body[data-board] :global(.home-page > .page > .block-slot:has(> .block[data-kind='todo']):has(~ .block-slot > .block[data-kind='todo'])),
-    .body[data-board] :global(.home-page > .page > .block-slot:has(> .block[data-kind='todo']) ~ .block-slot:has(> .block[data-kind='todo'])) {
-      grid-column: span 6;
-    }
-
-    /* EVERY CELL OF THE FIRST ROW'S TRACKS IS HELD, the fourth under the foot and the right column where there is no
-       cash, so nothing laid out later lands in one. It is no height and lies under the tiles. */
-    .body[data-board] > .row-one-rest {
-      display: block;
-      grid-row: 2 / span 2;
-      grid-column: 1 / -1;
-    }
-
-    .body[data-board]:has(:global(.desk-part[data-desk='late'])) > .row-one-rest {
-      grid-row: 2 / span 3;
-    }
-
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
-      grid-column: span 8;
-    }
-
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
-      grid-column: 1 / -1;
-    }
-
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']:not([hidden], :has([data-seen-none])) ~ .block-slot[data-key='week-money']) {
-      grid-column: span 4;
-    }
-
-    /* WITHOUT WHAT IS DUE BESIDE IT, the week's money is the whole row, not a lone small tile with a hole beside it. */
-    .body[data-board]:not(:has(:global(.block-slot[data-key='week-due']))) :global(.home-page > .page > .block-slot[data-key='week-money']) {
-      grid-column: 1 / -1;
-    }
-
-    .body[data-board] > :global([data-landed]),
-    .body[data-board] :global(.home-page > .page > [data-landed]) {
-      grid-column: span var(--a);
-    }
-
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='coming-up']) {
-      grid-column: span var(--u);
-    }
-
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='faces']) {
-      grid-column: span var(--p);
+  /* UNDER A THUMB THE RED LINE IS A TARGET: its words centred in a 44 tall row, as the foot's lines under it are. */
+  @media (pointer: coarse) {
+    .signs-line {
+      display: flex;
+      align-items: center;
+      min-block-size: var(--tap);
     }
   }
 
-  @container desk (640px <= inline-size < 960px) {
-    .body[data-board] > :global([data-working]),
-    .body[data-board] :global(.home-page > .page > [data-working]),
-    .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='working'], [data-key='cash'], [data-key='coming-up'], [data-key='faces'])) {
-      grid-column: span 6;
-    }
-
-    /* ONE OF THE PAIR MISSING, the other takes the row. */
-    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) > :global([data-working]),
-    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) :global(.home-page > .page > [data-working]),
-    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) :global(.home-page > .page > .block-slot[data-key='working']),
-    .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']),
-    .body[data-board]:not(:has(:global(.block-slot[data-key='faces']))) :global(.home-page > .page > .block-slot[data-key='coming-up']),
-    .body[data-board]:not(:has(:global(.block-slot[data-key='coming-up']))) :global(.home-page > .page > .block-slot[data-key='faces']) {
-      grid-column: 1 / -1;
-    }
+  /* THE PROJECTS IN A ROW (full): each card its name, its standing and its number, and the rest on Projects. */
+  .body[data-board] :global(.block-slot[data-board-key='projects'][data-size='full'] :is(.pc-c, .pc-next, .pc-foot, .pc-move)) {
+    display: none;
   }
+
+  .body[data-board] :global(.block-slot[data-board-key='projects'] .desk-part) {
+    flex: 1;
+    min-block-size: 0;
+    overflow: hidden;
+  }
+
+  /* THE KEY NUMBERS IN A ROW (full): each its figure and its line, the why under it on Numbers. */
+  .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] svg:not(.kpi-arrow)) {
+    max-block-size: 32px;
+  }
+
+  .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] :is(.kpi-stale, .kpi-stale-said, .kpi-target, .kpi-sofar, .kpi-against, .kpi-row-chart)) {
+    display: none;
+  }
+
+  /* A ROW TALL: whose number, the number and which way it went, so the row fits and is never cut to a blank tile. */
+  .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] .kpi-row) {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-block-size: 0;
+    padding-block: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] .kpi-row) {
+    position: relative;
+  }
+
+  .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] .kpi-menu) {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    margin: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] .kb) {
+    row-gap: var(--sp-2);
+  }
+
+  /* CASH, WIDE: each side figure on its label's line, so both fit a row's frame. */
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2)) {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: var(--sp-2);
+  }
+
+  /* ITS LABEL WRAPS BESIDE ITS FIGURE rather than being cut ("To come in, next 30 d…", audit 30 Oct, item 32). */
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2) .cell-label) {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    font-size: var(--fs-meta);
+    line-height: 16px;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2) .cell-figure) {
+    flex: none;
+    font-size: var(--fs-body);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2) :is(.glyph, .cell-note:empty)) {
+    display: none;
+  }
+
+  /* A SMALL SHOWS ONE FIGURE, and nothing it cannot hold (§3.3). */
+  .body[data-board] :global(.block-slot[data-size='small'] .grid > .cell:nth-child(n + 2)) {
+    display: none;
+  }
+
+  .body[data-board] :global(.block-slot[data-size='small'] :is(.cell-trend, .cell-trend-ahead, .cell-note)) {
+    display: none;
+  }
+
 
   /* ── the tiles, as Today draws them (the Today polish of 20 October) ── */
 
   /* THE TILES COME IN ONCE, on the first load: a fade and a 4px rise, the first six one after another `--d-stagger`
      apart, so the last is still by 450ms (`motion.ts` `ARRIVAL`). A tile past the sixth is simply there. */
-  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)),
-  .body[data-board][data-enter] > :global(:not(.row-one-rest)) {
+  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)) {
     animation: tile-in var(--d-page) var(--ease-out) both;
     animation-delay: calc(var(--arrive, 0) * var(--d-stagger));
   }
@@ -1820,8 +1969,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)),
-    .body[data-board][data-enter] > :global(:not(.row-one-rest)) {
+    .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)) {
       animation: none;
     }
   }

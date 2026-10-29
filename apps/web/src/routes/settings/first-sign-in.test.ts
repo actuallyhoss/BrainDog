@@ -10,7 +10,7 @@
  *      that without a host, and the "Connect an agent" block further down the same area already
  *      printed the line that works, because `connectLines` builds it.
  *   - After Sign out on Settings > Identity, "Signed in as owner@example.test" stayed in the table
- *      beside "You are signed out.", and the Sign in button was `href="/app/signin"` with no
+ *      beside "You are signed out.", and the Sign in button was `href="/signin"` with no
  *      `next`, so the sign-in that followed landed on the kept sample.
  *   - Backups drew "Back up now" under the record's own sentence saying this host keeps no copies
  *      the app can take, and the press answered with that same refusal as a toast.
@@ -49,7 +49,7 @@ function enclosing(markup: string, at: number): string {
    check on the markup went with the markup it read. What stays is the fact the check was about: the line names the
    record, because the Cloud's device flow refuses one that does not. */
 test('the line that signs a machine in names this record', () => {
-  assert.equal(connectLines('https://app.brain.dog', 'studio').setup, 'braindog setup https://app.brain.dog/app/studio');
+  assert.equal(connectLines('https://app.brain.dog', 'studio').setup, 'braindog setup https://app.brain.dog/studio');
 });
 
 test('once signed out, nobody is named as signed in, and Sign in comes back here', () => {

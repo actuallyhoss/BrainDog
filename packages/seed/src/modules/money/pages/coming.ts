@@ -15,8 +15,10 @@ const DUE_COLUMNS = [
 ];
 
 /**
- * One week of what falls due, the whole row, from the first day to the day before the last, both said from this week's Monday
- * (`bow`). Sixty-one days ahead at most, so the weeks reach as far as the page says.
+ * One stretch of what falls due, the whole row. Sixty-one days ahead at most, so the stretches reach as far as the page
+ * says. SINCE money-core 3.32.0 THE STRETCHES ARE COUNTED FROM TODAY, not from Monday: the next seven days and the seven
+ * after them are the fourteen Money's home and Today call Coming up (`COMING_UP_WHERE`, `parts/next30.ts`), so the two
+ * add up to the count those say, and what is already late is its own list first.
  */
 const week = (heading: string, where: string, empty: string): Record<string, unknown> => ({
   kind: 'table',
@@ -58,7 +60,7 @@ export const MONEY_COMING_PAGE: SeedPage = {
     {
       /* WHAT REPEATS AT ITS MONTHLY SHARE, in, out and what is left, beside the line's next thirty days. */
       kind: 'stat',
-      heading: 'Every month',
+      heading: 'Repeating, a month',
       icon: 'calendar',
       span: 12,
       cells: [
@@ -77,17 +79,21 @@ export const MONEY_COMING_PAGE: SeedPage = {
       span: 12,
       source: 'register.obligations',
       where: 'state is open or part, due before +61d',
-      columns: [{ field: 'what' }, { field: 'amount' }, { field: 'due' }, { field: 'party' }],
+      /* SIGNED BY THE WAY IT GOES (30 October), as every money line in the Money look: a bill you pay is "−", an invoice
+         you are owed "+". */
+      columns: [{ field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'owed_by_me' } }, { field: 'due' }, { field: 'party' }],
       order: [{ field: 'due', dir: 'asc' }],
       limit: 12,
       empty: 'Nothing due in 60 days.',
     },
-    /* THE WEEKS, MONDAY TO SUNDAY, EACH THE WHOLE ROW. This week holds what is already late, first and in the late red,
-       since the record reads what is overdue before the rest, and a list with something late in it is drawn above the
-       figures: two weeks side by side would be parted by it and leave half a row empty. */
-    week('This week', 'day before bow+7d', 'Nothing falls due this week.'),
-    week('Next week', 'day after bow+6d, day before bow+14d', 'Nothing falls due next week.'),
-    week('Later', 'day after bow+13d', 'Nothing else due in 60 days.'),
+    /* WHAT IS ALREADY LATE, ITS OWN LIST AND FIRST, in the late red; drawn only while something is. Then the next seven
+       days, the seven after, and the rest of the sixty, each the whole row (a list that drew nothing is left off by the
+       page's look): two side by side would leave half a row
+       empty. */
+    week('Late', 'day before today', 'Nothing is late.'),
+    week('Next 7 days', 'day after -1d, day before +7d', 'Nothing falls due in the next 7 days.'),
+    week('The 7 days after', 'day after +6d, day before +14d', 'Nothing falls due in the 7 days after.'),
+    week('Later', 'day after +13d', 'Nothing else due in 60 days.'),
     {
       /* WHAT IS PAUSED, FOLDED: a paused line is walked by nothing, so it is nowhere above, and still a line to start again. */
       kind: 'section',

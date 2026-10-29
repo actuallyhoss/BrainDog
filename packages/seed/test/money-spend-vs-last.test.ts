@@ -114,8 +114,9 @@ test('MONEY DECLARES THE FOUR, after every figure it already held, and a fresh r
      batch 74, which took `plan-share-left` out again (plan-lead-one-figure-74), and twenty-four by batch 76, with
      `book-lasts-until` (book-lasts-until-76), and twenty-seven, which put the three of the
      next unpaid part of each plan last, and twenty-eight by money-core 3.18.0, with the parts late after them, and
-     thirty-nine by money-core 3.29.0, with the eleven of the Budgets, Payees and Reports pages. */
-  assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES) && !(id in PLAN_PAGE_FIGURES)).slice(-FOUR.length - 39, -39), [...FOUR]);
+     thirty-nine by money-core 3.29.0, with the eleven of the Budgets, Payees and Reports pages, and sixty-one by money-core
+     3.31.0 and 3.32.0, with week and year budgets, pending and unfiled lines, payees, net worth and the figures by week. */
+  assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES) && !(id in PLAN_PAGE_FIGURES)).slice(-FOUR.length - 61, -61), [...FOUR]);
   const { k } = await fresh();
   for (const id of FOUR) assert.ok(k.declarations().some((d) => d.id === `metric.${id}`), `money-core installed without ${id}`);
 });

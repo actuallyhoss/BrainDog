@@ -32,6 +32,8 @@ const TODAY = new Set([
   'addons/Removed.svelte',
   'addons/[id]/Installed.svelte',
   'r/[register]/parts/ListPeople.svelte',
+  /* THE ORGANISATIONS LIST (29 October) draws its rows as People does, the global tall line on purpose. */
+  'r/[register]/parts/ListOrgs.svelte',
   'search/+page.svelte',
   'settings/[area]/areas/Appearance.svelte',
   'settings/[area]/areas/Backups.svelte',

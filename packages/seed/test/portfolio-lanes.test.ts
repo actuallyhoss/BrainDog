@@ -21,7 +21,7 @@ import { USE_CASES } from '../src/usecases/index.ts';
 type Body = Record<string, unknown>;
 
 /** The four, in the order the form offers them, each with the word a person reads. */
-const LANES: Readonly<Record<string, string>> = { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Finished' };
+const LANES: Readonly<Record<string, string>> = { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Closed' };
 
 const laneOf = (fields: unknown): Body => {
   const lane = (Array.isArray(fields) ? (fields as Body[]) : []).find((f) => f.id === 'lane');

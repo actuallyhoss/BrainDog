@@ -59,6 +59,8 @@ export const agents = {
   consentNoneWhy: 'Add BrainDog in an app and it sends you here.',
   /* NOT A DEAD END (first F11): the way into BrainDog's agent settings from this side. */
   consentOpenAgents: 'Open agent settings',
+  /* AND THE ADDRESS ITSELF, for an app that asks for a connector address rather than sending you here. */
+  consentPaste: 'Or paste this connector address into the app:',
   consentGone: 'This sign-in has ended',
   /* THE BRAINDOG IT WOULD REACH IS NAMED, because it is the fact being decided (first F11). */
   consentAsks: (app: string, record: string | null, host: string) =>

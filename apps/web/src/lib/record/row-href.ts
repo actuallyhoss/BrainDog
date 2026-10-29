@@ -16,7 +16,7 @@
  * Record-relative, like every address the record writes: the caller's `href` puts it under the app (`$lib/at.ts`).
  */
 
-import { METRICS } from './declared.ts';
+import { FIGURES_KNOWN as METRICS } from './figures-known.ts';
 import { REGISTERS } from './held.ts';
 import { hrefFor } from './metrics.ts';
 

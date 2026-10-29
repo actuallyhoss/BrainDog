@@ -91,7 +91,7 @@ export {
   type FilterValue,
   type OnFilter,
 } from './filters.ts';
-export { dayThisYear, rowsCell, timelineCell, timelineDays } from './timeline.ts';
+export { bankCode, dayThisYear, rowsCell, timelineCell, timelineDays, wordSlot } from './timeline.ts';
 export {
   TABLE_CHUNK,
   TABLE_ROWS_LABEL,
@@ -224,6 +224,17 @@ export {
   sectionTone,
   isKind,
   KPIS_KIND,
+  WIDGET_SIZES,
+  SIZE_CELLS,
+  SIZE_WORDS,
+  KIND_SIZES,
+  sizesOf,
+  sizeShows,
+  nearestSize,
+  defaultSize,
+  isWidgetSize,
+  type KindSizes,
+  type WidgetSize,
   type DegradeCode,
   type Kind,
   type KindSpec,
@@ -308,6 +319,8 @@ export {
   PHONE_PX,
   designCheck,
   designSentence,
+  BOARD_MOST,
+  type DesignFitted,
   type DesignBlock,
   type DesignDraft,
   type DesignFinding,
@@ -337,6 +350,9 @@ export {
   DRAWN_TOKENS,
   drawnAsk,
   drawnDocument,
+  drawnPictureDocument,
+  DRAWN_PICTURE_MOST,
+  DRAWN_PICTURE_POLICY,
   drawnFault,
   drawnHeight,
   drawnTheme,
@@ -346,3 +362,13 @@ export {
 export { DRAWN_ROWS_MOST, drawnData, type DrawnData, type DrawnRow, type DrawnValue } from './drawn-data.ts';
 /* A visual a thing carries, drawn in the same frame: its page with its pictures inline, whole width. */
 export { pictureData, swapPictures, visualDocument } from './visual.ts';
+/* The widget catalogue (widgets plan §7.2): every widget the sheet offers, its sizes, the starter boards, and a block's
+   reading distilled to what a preview draws. */
+export * from './widgets.ts';
+/* The widgets installed add-ons ship, joined to the catalogue at read time (widgets plan §6.5). */
+export * from './widget-packs.ts';
+/* Making a widget by saying it, rules first, and the mark a draft carries until it is kept (widgets plan §5.7). */
+export * from './widget-compose.ts';
+/* Drawn widgets (W7): frames per size, how many run at once, the model's ask, and whether a widget is still shown (`until`). */
+export { DRAWN_ALIVE_MOST, WIDGET_GAP_PX, WIDGET_ROW_PX, drawWidgetAsk, drawnFrameHeight, drawnSizes, drawnSizesFault, stillShown, untilOf } from './drawn-widget.ts';
+export { TRIP_COUNTDOWN } from './trip-countdown.ts';

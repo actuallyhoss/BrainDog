@@ -67,7 +67,7 @@ const holder = (sql: ReturnType<typeof openSqlite>): string | null =>
   sql.one<{ pack: string | null }>('SELECT pack_id AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', HOME)?.pack ?? null;
 const version = (api: Awaited<ReturnType<typeof createRecordApi>>) => api.kernel.packStates().find((p) => p.id === PACK)?.version;
 
-test('THE NIGHT PUTS THE UPDATE IN, KEEPS THE PAGE, AND ASKS ONE QUESTION that names the Late table and the title Today', async () => {
+test('THE NIGHT PUTS THE UPDATE IN, KEEPS THE PAGE, AND ASKS ONE QUESTION that names the Late table and the page\'s title', async () => {
   const now = { at: Date.UTC(2026, 9, 13, 3) };
   const { api, sql, home } = await record(now);
   await api.slashTick();
@@ -83,7 +83,7 @@ test('THE NIGHT PUTS THE UPDATE IN, KEEPS THE PAGE, AND ASKS ONE QUESTION that n
   assert.equal(open.length, 1);
   assert.equal(
     api.kernel.question(open[0]!.id),
-    `Solo founder ${shippedVersion(PACK)} adds the Late table and the title Today to your Overview page, which you changed. Your page is kept as you left it. Take the update's page, or keep yours.`,
+    `Solo founder ${shippedVersion(PACK)} adds the Late table and the title Founder overview to your Overview page, which you changed. Your page is kept as you left it. Take the update's page, or keep yours.`,
   );
   const body = JSON.parse(open[0]!.body) as { about: string; options: { id: string; label: string; hard?: boolean }[] };
   assert.equal(body.about, `Solo founder ${shippedVersion(PACK)} adds to a page you changed`);
@@ -113,7 +113,8 @@ test("TAKE PUTS THE UPDATE'S PAGE IN UNDER THE ADD-ON, signed by whoever answere
   value(await api.decide({ id: q.id, decide: { option: 'take', reason: 'I want the Late table.' } }, owner));
 
   assert.equal(holder(sql), PACK);
-  assert.equal(home().title, 'Today');
+  /* FOUNDER OVERVIEW, NOT TODAY, since Solo founder 3.8.0: Today is the record's own page (5496c124c). */
+  assert.equal(home().title, 'Founder overview');
   assert.ok(home().blocks.some((b) => b.heading === 'Late'));
   assert.equal(api.kernel.detached().some((d) => d.id === HOME), false);
   const line = sql.one<{ actor: string; note: string | null }>("SELECT actor, note FROM event WHERE kind = 'declare' AND target = ? ORDER BY rowid DESC LIMIT 1", `declaration:${HOME}`);
@@ -136,7 +137,7 @@ test('KEEP LEAVES THE PAGE AS IT WAS AND REMEMBERS WHAT WAS OFFERED, so the same
 
   assert.equal(holder(sql), null);
   assert.equal(home().title, 'Overview');
-  assert.deepEqual(api.kernel.prefsOf('braindog:updates:kept').declined, { [HOME]: ['block:table:Late', 'title:Today'] });
+  assert.deepEqual(api.kernel.prefsOf('braindog:updates:kept').declined, { [HOME]: ['block:table:Late', 'title:Founder overview'] });
   assert.equal(api.kernel.prefsOf('braindog:updates:kept')[q.id], undefined);
   sql.close();
 });

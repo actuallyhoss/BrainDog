@@ -46,7 +46,11 @@ export const SIGNALS = [
 ] as const;
 
 export type Signal = (typeof SIGNALS)[number];
-export type Observation = { kind: Signal; subject: string };
+/**
+ * One thing that happened. `who` is the person it happened to, where one did (a page they opened): the count is raised
+ * for the whole record as always, and for that person beside it (`observation_who`, migration 47).
+ */
+export type Observation = { kind: Signal; subject: string; who?: string | undefined };
 
 /** At most this many in one call. A batch is a request's worth, not a backfill. */
 const BATCH = 200;
@@ -110,6 +114,14 @@ export function observe(sql: Sql, nowMs: number, batch: readonly Observation[]):
       row.subject,
       day,
     );
+    if (typeof row.who === 'string' && row.who !== '')
+      sql.exec(
+        'INSERT INTO observation_who (kind, subject, day, who, n) VALUES (?, ?, ?, ?, 1) ON CONFLICT (kind, who, subject, day) DO UPDATE SET n = n + 1',
+        row.kind,
+        row.subject,
+        day,
+        row.who,
+      );
     n++;
   }
   return ok(n);

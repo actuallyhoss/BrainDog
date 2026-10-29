@@ -21,6 +21,7 @@
   import SheetCharts from '$lib/design/SheetCharts.svelte';
   import DesignBook from '$lib/design/DesignBook.svelte';
   import SheetControls from '$lib/design/SheetControls.svelte';
+  import SheetWidgets from '$lib/board/SheetWidgets.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
@@ -30,7 +31,7 @@
   /* THE SHELL THE LAYOUT ASKED FOR ONCE: the charts sheet reads the record's pages through it; the others read nothing. */
   const shell = $derived(page.data as unknown as Shell);
 
-  const SHEETS = ['controls', 'charts', 'design'] as const;
+  const SHEETS = ['controls', 'charts', 'design', 'widgets'] as const;
   type Sheet = (typeof SHEETS)[number];
 
   const words = {
@@ -41,9 +42,10 @@
     controls: 'Controls and lists',
     charts: 'Charts and marks',
     design: 'Tokens and type',
+    widgets: 'Widgets',
   } as const;
 
-  const named = (): Sheet => (location.hash === '#charts' ? 'charts' : location.hash === '#design' ? 'design' : 'controls');
+  const named = (): Sheet => (location.hash === '#charts' ? 'charts' : location.hash === '#design' ? 'design' : location.hash === '#widgets' ? 'widgets' : 'controls');
   let sheet = $state<Sheet>(named());
 
   function choose(next: Sheet): void {
@@ -83,6 +85,8 @@
       <SheetCharts {shell} />
     {:else if sheet === 'design'}
       <DesignBook />
+    {:else if sheet === 'widgets'}
+      <SheetWidgets />
     {:else}
       <SheetControls />
     {/if}

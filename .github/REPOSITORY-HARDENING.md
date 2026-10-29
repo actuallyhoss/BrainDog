@@ -168,20 +168,26 @@ Target: `master`. Enforcement: active.
 
 ## 11 · Repository surface
 
-- [ ] **Discussions: on.** `.github/ISSUE_TEMPLATE/config.yml` sends questions and arguments about an
-      ADR there. If discussions are off, that link is dead and everything arrives as an issue.
-- [ ] **Blank issues: off** — already set in `config.yml`. Confirm it took effect.
-- [ ] **Wiki: on, restricted to collaborators.** The wiki is documentation for people arriving cold;
-      it is not a public write surface, and an open wiki on a project whose pitch is a checkable
-      source tree is an obvious place to put a plausible lie.
+- [x] **Discussions: off** (`settings.expected.json`). `.github/ISSUE_TEMPLATE/config.yml` sends
+      questions to `support@brain.dog` through brain.dog/support instead, so no link in it is dead.
+- [ ] **Blank issues: off**, already set in `config.yml`. Confirm it took effect.
+- [x] **Wiki: off** (`settings.expected.json`). The docs are `docs/` and brain.dog/docs; a second
+      place for them would drift, and an open wiki is an easy place to put a plausible lie.
 - [ ] **Projects: off** unless one is in use. An empty tab is a place people look for a roadmap that
       is actually in `docs/15-ROADMAP.md`.
-- [ ] **Allow squash merging only**, and set the squash commit message to the pull request title and
-      body. The house commit convention is one declarative subject and an argued body; a merge that
-      concatenates six work-in-progress subjects destroys it.
+- [ ] **Allow squash merging only**, and set the squash commit message to the pull request title
+      alone. The house commit is one plain sentence with no body (`CONTRIBUTING.md`); a merge that
+      concatenates six work-in-progress subjects breaks it.
 - [ ] **Automatically delete head branches after merge.**
 - [ ] **Confirm the licence is detected** as Apache-2.0, and that `packages/render/LICENSE` is
       detected separately as MIT.
+- [ ] **About: the description is the README's first heading**, word for word, which is what
+      `tools/watch/settings.mjs` checks every day. The website is `https://brain.dog`, and the topics
+      say what a person would search for (MCP, agents, Claude, personal finance, self-hosted). Change
+      the heading and the description together.
+- [ ] **Social preview: upload the card.** *Settings → General → Social preview.* GitHub has no API
+      for it, so it is a press. The image is 1280 × 640, the mark, the name and one line on the left
+      and the seed's Money page on the right; never a picture of a real record.
 
 ## 12 · Worth doing, with a caveat
 

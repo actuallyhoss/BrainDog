@@ -142,8 +142,8 @@ test('a zero the predicate does say something about keeps its verdict and its do
   assert.ok(bill.href, 'and its door opens the filter that produced it');
 
   const said = tileOf('projects-earning', { ...matched, rows: 3, held: 27 });
-  assert.equal(said.tone, 'good', 'rows that said keep their verdict');
-  assert.ok(said.href, 'and keep their door');
+  assert.equal(said.tone, undefined, 'a floor of nought met is no mark (`markOf`)');
+  assert.ok(said.href, 'rows that said keep their door');
 
   const nothing = tileOf('projects-earning', { ...matched, rows: 0, held: 0 });
   assert.equal(nothing.tone, undefined, 'and an empty list is still the other zero');

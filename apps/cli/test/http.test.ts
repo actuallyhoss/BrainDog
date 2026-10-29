@@ -14,7 +14,7 @@ import type { AddressInfo } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { BUDGET_MS, budgetOf, clientFor, hostKey, hostsPath, readHosts, saveHosts, target, type HostsFile } from '../src/http.ts';
+import { BUDGET_MS, budgetOf, clientFor, hostKey, hostsPath, readHosts, sameHost, saveHosts, target, type HostsFile } from '../src/http.ts';
 import { normaliseRemote, sessionHeaders, type Position } from '../src/position.ts';
 
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -105,28 +105,44 @@ test('the host is --host, then BRAINDOG_HOST, then the default; the token is BRA
   /* With both from the environment the file is never opened, so a broken one does not matter. */
   assert.equal(target(undefined, { BRAINDOG_HOST: 'a.example', BRAINDOG_TOKEN: 'x' }, join(file, 'not-a-file')).token, 'x');
   /* The slug stays in the key and leaves the address: the token says which record. */
-  assert.deepEqual(target('https://brain.dog/acme', { BRAINDOG_TOKEN: 'x' }, file), { key: 'https://brain.dog/acme', base: 'https://brain.dog', token: 'x' });
+  assert.deepEqual(target('https://app.brain.dog/acme', { BRAINDOG_TOKEN: 'x' }, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: 'x' });
 });
 
-test('THE APP\'S OWN ADDRESS FOR A RECORD, /app/<slug>, IS THE SAME HOST AS /<slug>', (t) => {
+test('THE APP\'S OLD ADDRESS FOR A RECORD, /app/<slug>, IS THE SAME HOST AS /<slug>', (t) => {
   /* `app` is a reserved slug (`packages/record/src/directory.ts`), so a first
-     segment of `app` is never a record and always the app's prefix. Only that whole segment goes: `/apple` is a slug. */
-  assert.equal(hostKey('https://brain.dog/app/acme'), 'https://brain.dog/acme');
-  assert.equal(hostKey('brain.dog/app/acme/'), 'https://brain.dog/acme');
-  assert.equal(hostKey('https://brain.dog/app'), 'https://brain.dog');
-  assert.equal(hostKey('https://brain.dog/app/'), 'https://brain.dog');
-  assert.equal(hostKey('https://brain.dog/apple'), 'https://brain.dog/apple');
-  assert.equal(hostKey('https://app.brain.dog/acme'), 'https://app.brain.dog/acme', 'a key a login kept before the move changes nothing');
+     segment of `app` is never a record and always the app's old prefix. Only that whole segment goes: `/apple` is a slug. */
+  assert.equal(hostKey('https://app.brain.dog/app/acme'), 'https://app.brain.dog/acme');
+  assert.equal(hostKey('app.brain.dog/app/acme/'), 'https://app.brain.dog/acme');
+  assert.equal(hostKey('https://app.brain.dog/app'), 'https://app.brain.dog');
+  assert.equal(hostKey('https://app.brain.dog/app/'), 'https://app.brain.dog');
+  assert.equal(hostKey('https://app.brain.dog/apple'), 'https://app.brain.dog/apple');
+  assert.equal(hostKey('https://app.brain.dog/acme'), 'https://app.brain.dog/acme', 'the address the app prints now changes nothing');
+  assert.equal(hostKey('https://record.example/app/acme'), 'https://record.example/acme', 'a self-host reads the prefix the same way');
 
   /* The token a login kept under `/acme` is the one a command pointed at `/app/acme` sends, and the slug never reaches the address. */
   const file = scratch(t);
-  saveHosts(file, { hosts: { 'https://brain.dog/acme': { token: { value: TOKEN, expires: LATER, label: 'a' } } } });
-  assert.deepEqual(target('https://brain.dog/app/acme', {}, file), { key: 'https://brain.dog/acme', base: 'https://brain.dog', token: TOKEN });
+  saveHosts(file, { hosts: { 'https://app.brain.dog/acme': { token: { value: TOKEN, expires: LATER, label: 'a' } } } });
+  assert.deepEqual(target('https://app.brain.dog/app/acme', {}, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: TOKEN });
 });
 
-test('THE EXAMPLE IN A REFUSAL IS THE ADDRESS THE APP LIVES AT NOW, app.brain.dog/app/<slug>', () => {
-  assert.throws(() => hostKey('not a host'), { message: 'The BrainDog host is not an address. Write it as https://app.brain.dog/app/<slug>.' });
-  assert.throws(() => hostKey('ftp://a.example'), { message: 'The BrainDog host is not an https address. Write it as https://app.brain.dog/app/<slug>.' });
+test('BRAIN.DOG IS THE SITE NOW, SO A RECORD WRITTEN THERE IS THE SAME RECORD ON app.brain.dog', (t) => {
+  /* A hosts file written when the app was `brain.dog/<slug>` keeps working: the key moves to the app's name, and the
+     login kept under the old spelling is the one `target` finds, so nobody has to edit the file. */
+  assert.equal(hostKey('https://brain.dog/acme'), 'https://app.brain.dog/acme');
+  assert.equal(hostKey('brain.dog/app/acme/'), 'https://app.brain.dog/acme');
+  assert.equal(hostKey('https://brain.dog'), 'https://app.brain.dog');
+  assert.equal(hostKey('https://alpha.brain.dog/acme'), 'https://app.alpha.brain.dog/acme');
+  assert.equal(hostKey('https://notbrain.dog/acme'), 'https://notbrain.dog/acme', 'only the two names the site holds move');
+  const file = scratch(t);
+  saveHosts(file, { default: 'https://brain.dog/acme', hosts: { 'https://brain.dog/acme': { token: { value: TOKEN, expires: LATER, label: 'a' } } } });
+  assert.deepEqual(target(undefined, {}, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: TOKEN });
+  assert.ok(sameHost('https://brain.dog/acme', 'https://app.brain.dog/acme'));
+  assert.ok(sameHost('https://app.brain.dog/app/acme', 'https://app.brain.dog/acme'));
+});
+
+test('THE EXAMPLE IN A REFUSAL IS THE ADDRESS THE APP LIVES AT NOW, app.brain.dog/<slug>', () => {
+  assert.throws(() => hostKey('not a host'), { message: 'The BrainDog host is not an address. Write it as https://app.brain.dog/<slug>.' });
+  assert.throws(() => hostKey('ftp://a.example'), { message: 'The BrainDog host is not an https address. Write it as https://app.brain.dog/<slug>.' });
 });
 
 test('nothing to reach is one sentence, and none of them carries a token', (t) => {

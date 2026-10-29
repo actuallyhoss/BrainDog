@@ -1,26 +1,24 @@
 <!--
   "Who it's for" (2a section 2): three readers, three tiles, each with its own fill, a real icon in a 40px
   well, a title, one line, a small drawing that differs per tile, and the way on. Fills are category slots, not status
-  hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for client work. The words are
+  hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for your own life. The words are
   `copy/home.ts`; the names in the drawings are Maya's (`demo/maya.ts`).
 
-  CLIENT WORK IS DRAWN WITH AGENTS: one person and Claude, Cursor and Codex is what
-  brain.dog takes today, so the faces are the makers' marks, never colleagues.
+  YOUR OWN LIFE (29 October, personal use as much as business) is drawn as what is coming up in Maya's own book, the
+  same rows the Money band shows.
 
   ON A PHONE, THREE PLAIN LINES: each tile is its icon and its way on, one line with an arrow, and the title is
   said to a screen reader. The cards and their sentences were most of a screen at 390.
 -->
 <script lang="ts">
-  import AgentMark from '$lib/AgentMark.svelte';
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
+  import { MONEY_BAND, usd } from '$lib/demo/maya.ts';
   import { spark } from '$lib/desk/draw.ts';
 
   const w = home.who;
   /* The small business's drawing: the cash over three months, as a shape and never as money. */
   const cash = spark([48.2, 47.1, 46.4], 220, 56);
-  /* The agents a client's work is done with, by their makers' marks. */
-  const agents = (['claude', 'cursor', 'codex'] as const);
 </script>
 
 <section class="band band--who" aria-labelledby="who-title">
@@ -51,16 +49,15 @@
       </article>
 
       <article class="ftile c4 blue">
-        <span class="fwell"><Icon name="users" /></span>
-        <h3>{w.team.title}</h3>
-        <p class="say">{w.team.say}</p>
+        <span class="fwell"><Icon name="house" /></span>
+        <h3>{w.life.title}</h3>
+        <p class="say">{w.life.say}</p>
         <div class="draw">
-          <p class="faces" aria-hidden="true">
-            {#each agents as id (id)}<span class="face"><AgentMark {id} size={16} /></span>{/each}
-          </p>
-          <p class="moved">{w.team.line}</p>
+          {#each MONEY_BAND.coming as c (c.name)}
+            <p class="due"><span>{c.name}</span><span class="when">{c.when}</span><b class="num">{usd(c.cents)}</b></p>
+          {/each}
         </div>
-        <a class="go" href={w.team.href}>{w.team.link}<Icon name="arrow-right" size="s" /></a>
+        <a class="go" href={w.life.href}>{w.life.link}<Icon name="arrow-right" size="s" /></a>
       </article>
     </div>
   </div>
@@ -184,30 +181,28 @@
     font-weight: 500;
   }
 
-  .faces {
-    display: flex;
-  }
-
-  .face {
+  /* WHAT IS COMING UP IN HER OWN BOOK: three rows, the name, the day and the amount, as the app's Coming up lists them. */
+  .due {
     display: grid;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    border-radius: 50%;
-    background: var(--ph-tint);
-    color: var(--ph);
-    font: 600 12px/1 var(--ui);
-    box-shadow: 0 0 0 2px var(--cat-blue-tint);
-  }
-
-  .face + .face {
-    margin-inline-start: -6px;
-  }
-
-  .moved {
-    margin-block-start: 8px !important;
-    color: var(--ink2);
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 12px;
+    padding: 6px 0;
+    border-block-start: 1px solid color-mix(in srgb, var(--cat-blue) 18%, transparent);
+    color: var(--ink);
     font-size: var(--t-site-14);
+  }
+
+  .due:first-child {
+    border-block-start: 0;
+  }
+
+  .due .when {
+    color: var(--ink2);
+  }
+
+  .due b {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
   .go {

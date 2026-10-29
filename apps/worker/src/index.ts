@@ -293,11 +293,11 @@ type Env = {
    */
   RP_ID?: string;
   /**
-   * The names this Worker answered as before the app moved to `PUBLIC_HOST`, comma-separated: `app.brain.dog`.
+   * The names this Worker answered as before the app moved to `PUBLIC_HOST`, comma-separated: `brain.dog`.
    *
-   * A PAGE LOAD ON ONE IS A 308 TO `https://<PUBLIC_HOST>/app<path>`, and `/api/*`, `/mcp` and `/in/*` on it are served
-   * where they stand and never redirected (`legacyRedirect` in `route.ts`). Unset or empty, and nothing is a legacy
-   * host, which is exactly the Worker before the move.
+   * A PAGE LOAD ON ONE IS A 308 TO `https://<PUBLIC_HOST><path>`, with any `/app` in front taken off, and `/api/*`,
+   * `/mcp` and `/in/*` on it are served where they stand and never redirected (`legacyRedirect` in `route.ts`). Unset
+   * or empty, and nothing is a legacy host, which is exactly the Worker before the move.
    */
   LEGACY_HOSTS?: string;
   /** The built web shell, `wrangler.jsonc`'s `assets`, which holds the bundled catalogue Slash reads (`catalogue.ts`). */
@@ -958,6 +958,7 @@ export class Record$ extends DurableObject<Env> {
                   /* AN AGENT'S TRIAL ONLY READS (`readOnlyExecute`): a GET or a HEAD without a body, as on a self-host. */
                   send: (egress) => (t.readOnly ? readOnlyExecute(actionExecutor(() => egress, { openKey })) : actionExecutor(() => egress, { openKey })),
                   grant: t.grantOf,
+                  openKey: t.readOnly ? null : openKey,
                   read: t.reads,
                   now: () => Date.now(),
                 },
@@ -1664,6 +1665,7 @@ export class Record$ extends DurableObject<Env> {
             runs: this.#scripts,
             send: (egress) => actionExecutor(() => egress, { openKey }),
             grant: grantNamed(() => api.kernel.grants()),
+            openKey,
             read: scriptReads(api),
             /* `ctx.propose`, as on the self-host: tried against the gate now, filed with the run's writes. */
             propose: scriptProposals(api),
@@ -1770,7 +1772,7 @@ export class Record$ extends DurableObject<Env> {
 
   /**
    * The key this record's exports are signed with, `{ key_id, public_key }`, or `null` for a record that signs nothing.
-   * AN RPC AND NEVER A ROUTE: `signingKey` is INTERNAL, and `/app/<slug>/.well-known/braindog-key` is its one caller.
+   * AN RPC AND NEVER A ROUTE: `signingKey` is INTERNAL, and `/<slug>/.well-known/braindog-key` is its one caller.
    */
   async signingKey(): Promise<{ key_id: string; public_key: string } | null> {
     if (this.#gone) return null;
@@ -2100,7 +2102,7 @@ export class Record$ extends DurableObject<Env> {
     const broken = api.kernel.refused();
     if (broken) return { ok: false, refusal: broken };
     const out = api.kernel.pushTarget(args);
-    /* WHERE A TAP OPENS IS UNDER THIS RECORD'S NAME: `/app/<slug>` before the record's own path. A record whose
+    /* WHERE A TAP OPENS IS UNDER THIS RECORD'S NAME: `/<slug>` before the record's own path. A record whose
        name cannot be read rings with no body, as every push did before. */
     if (!out.ok || out.value === null || out.value.open === undefined) return out;
     const { open, keys, ...bare } = out.value;
@@ -2111,7 +2113,7 @@ export class Record$ extends DurableObject<Env> {
     } catch {
       slug = null;
     }
-    return { ok: true, value: slug && keys ? { ...bare, keys, open: `/app/${slug}${open}` } : bare };
+    return { ok: true, value: slug && keys ? { ...bare, keys, open: `/${slug}${open}` } : bare };
   }
 
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
@@ -2316,7 +2318,7 @@ export class Directory$ extends DurableObject<Env> {
 
   /**
    * Sign-in, whole: `/auth/*` arrives as an `AuthCall` and leaves as an `AuthResult`. And `session` with a `slug`, which
-   * is how a request under `/app/<slug>` learns whether that name is this person's before any record is addressed.
+   * is how a request under `/<slug>` learns whether that name is this person's before any record is addressed.
    */
   auth(call: AuthCall | SessionAsk | SignupCall | AccountCall): Promise<AuthResult> {
     return this.#directory().auth(call);
@@ -2353,7 +2355,7 @@ export class Directory$ extends DurableObject<Env> {
     return Number.isNaN(at) ? null : at;
   }
 
-  /** The live name of a record, or `null` for one with none: where `GET /app` sends a session back to. */
+  /** The live name of a record, or `null` for one with none: where `GET /` sends a session back to. */
   slugOf(record: string): string | null {
     return this.#directory().slugOf(record);
   }
@@ -2904,7 +2906,7 @@ function bearerDeps(env: Env): BearerDeps {
     /* THE TWO ABOVE IN ONE TRIP TO THE RECORD, which is what the bearer path asks (`Record$.admit`). */
     admit: (id, bearer, surface, build) =>
       held(env, id, (record) => record.admit(bearer, surface, build)) as ReturnType<NonNullable<BearerDeps['admit']>>,
-    /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
+    /* ASKED ONLY UNDER `/<slug>`, to hold the path to the record the bearer names. */
     named: async (slug) => (await directory.resolve(slug))?.record ?? null,
     /* ASKED ONLY AT THE FOUR PATHS AN OPERATION OPENS, because asking spends it (`session.ts`). An armed record rejects
        before its grant is read, so the ask again after a reset spends it once, and a 503 spends nothing. */
@@ -2924,7 +2926,7 @@ const RUNNER_METHODS: ReadonlySet<string> = new Set(['claimJob', 'postJobEvent',
  *
  * ONLY A POST TO ONE OF `RUNNER_METHODS`, for `operationAsked`'s reason in `session.ts`: a bearer sent anywhere else is
  * not asked about as a runner's, so a CLI's login token at `/api/boot` is never read twice. THE DIRECTORY FIRST, AS
- * `bearerOf` ASKS IT, because naming an object nobody holds creates it; and under `/app/<slug>` the name must be the
+ * `bearerOf` ASKS IT, because naming an object nobody holds creates it; and under `/<slug>` the name must be the
  * record the bearer names, or nothing is asked of any record.
  */
 async function runnerOf(request: Request, env: Env, slug: string | null): Promise<{ record: string; ctx: CallContext } | null> {
@@ -3347,7 +3349,7 @@ async function nightly(env: Env): Promise<void> {
         told: async (record, day) => (await billing({ op: 'told', record, day })).ok,
         lapsed: (record) => billing({ op: 'lapsed', record }),
         destroy: (record) => stub(record).lapseDelete(record),
-        link: (slug) => (origin === '' ? undefined : `https://${origin}/app/${slug}`),
+        link: (slug) => (origin === '' ? undefined : `https://${origin}/${slug}`),
         speak: op,
         now: tonight,
       }),
@@ -3427,7 +3429,7 @@ async function keepNight(directory: { nightDone(night: Night): Promise<void> }, 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     /* LIVENESS BEFORE EVERYTHING, THE OLD HOST'S REDIRECT INCLUDED. Measured at afb3b1b2 `/healthz` was the router's 404
-       on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
+       on `PUBLIC_HOST` and a 308 into the app on a legacy host for a caller sending `accept: text/html`, so a monitor
        either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
     if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD, launchState(env), request.method === 'GET' ? await nightOf(env) : undefined);
     /* NO POST BODY OVER ITS DOOR'S CEILING IS READ BY ANYTHING BELOW (`body-cap.ts`): a 413 with the plain line, here, before
@@ -3517,13 +3519,11 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         limit: (who, cls) => overLimit(env, who, request, cls),
         bytes: (record, n) => abusive(env, 'uploadDay', record, n),
       });
-    /* `/app` IS THE APP, AND `/app/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because no
-       route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
-       addressed. AFTER THE ROOT'S OWN DOORS, which none of its paths can reach: every one of them is a prefix that
-       `/app` is not. THIS IS LIVE, NOT DARK: `app.brain.dog`'s Custom Domain sends every path to this Worker, `/app`
-       included, and production answered `GET https://app.brain.dog/app/` with 200 `text/html`.
-       An earlier line here said nothing reached it until `wrangler.jsonc` listed `/app`, which was true
-       only of `brain.dog`, where the site's assets answer first. */
+    /* EVERY OTHER PATH IS THE APP, AND `/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because
+       no route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
+       addressed. AFTER THE ROOT'S OWN DOORS, which no slug can shadow: every door's word is one the Directory refuses as
+       a name (`packages/record/src/directory.ts`). The old `/app/<slug>/api/*` is read the same way, for a CLI whose
+       hosts file was written before the app moved to the root; a page load there was sent on by `legacyRedirect`. */
     /* THE FRAME A DRAWN BLOCK IS DRAWN IN, before `appPath`, which would read `drawn-frame` as a record's name. It is
        answered from code under its own policy and never through `asPage` (`@braindog/host/drawn-frame`). */
     if (isDrawnFrame(url.pathname)) return drawnFrame(request.method);
@@ -3563,7 +3563,7 @@ export function withServerTiming(out: Response, value: string): Response {
 }
 
 /**
- * A record method, at `/api/<method>` with `slug` null, or at `/app/<slug>/api/<method>` with the request already moved
+ * A record method, at `/api/<method>` with `slug` null, or at `/<slug>/api/<method>` with the request already moved
  * to the root path by `atRoot`.
  *
  * ONE BODY FOR BOTH ADDRESSES, so the slug is one more argument to the same doors rather than a second router that
@@ -3854,7 +3854,7 @@ async function forward(inner: Request, env: Env, record: string, ctx: CallContex
   });
 }
 
-/** Whether a request is the record's `removeMember`, under either base: `/api/...` or `/app/<slug>/api/...`. */
+/** Whether a request is the record's `removeMember`, under either base: `/api/...` or `/<slug>/api/...`. */
 const removalAsked = (method: string, pathname: string): boolean => method === 'POST' && /\/api\/+removeMember\/*$/.test(pathname);
 
 /**
@@ -3917,7 +3917,7 @@ async function renamedEverywhere(answer: Response, env: Env, ctx: CallContext): 
 }
 
 /**
- * `GET /app/<slug>/.well-known/braindog-key`: `{ key_id, public_key }`, the key the record's exports are signed with
+ * `GET /<slug>/.well-known/braindog-key`: `{ key_id, public_key }`, the key the record's exports are signed with
  * (`03 §4`), to anybody, so `braindog verify --key <url>` pins a file to a key it did not come with.
  *
  * THE DIRECTORY FIRST, AND A NAME IT DOES NOT HOLD WAKES NOTHING. `idFromName` on an id nobody has creates the object,
@@ -3942,12 +3942,12 @@ async function recordKey(request: Request, env: Env, slug: string): Promise<Resp
 }
 
 /**
- * A page of the app under `/app`: bare `/app` goes back to the last record, a file beside the pages is that file, and
- * everything else is the shell, which reads the path itself.
+ * A page of the app: bare `/` goes back to the last record, a file beside the pages is that file, and everything else
+ * is the shell, which reads the path itself.
  *
- * THE WORKER DRAWS THE SHELL BECAUSE THE ASSETS NO LONGER DO. With `/app/*` in `run_worker_first` and
+ * THE WORKER DRAWS THE SHELL BECAUSE THE ASSETS DO NOT. With `/*` in `run_worker_first` and
  * `not_found_handling: none`, an app navigation reaches this function and not a
- * fallback, so `/app/acme/r/tasks` has to be answered with `/app/`'s bytes here. Under a slug no file is looked for:
+ * fallback, so `/acme/r/tasks` has to be answered with `/`'s bytes here. Under a slug no file is looked for:
  * a record's page is always the shell, and the shell's `boot` under that slug is where a stranger meets sign-in.
  *
  * A FILE MISSING IS A 404, AND ONLY A PAGE IS THE SHELL. A path whose last segment has an extension is a file, and
@@ -3955,13 +3955,13 @@ async function recordKey(request: Request, env: Env, slug: string): Promise<Resp
  */
 async function appPage(request: Request, env: Env, app: AppPath): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD')
-    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A page of the app is read; a record method is at /app/<slug>/api/<method>.' } }, 405, [['allow', 'GET, HEAD']]);
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A page of the app is read; a record method is at /<slug>/api/<method>.' } }, 405, [['allow', 'GET, HEAD']]);
   const assets = env.ASSETS;
   if (!assets) return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This deployment serves no app, only its API.' } }, 404);
   /* EVERY ANSWER THE ASSETS GIVE HERE IS A PAGE OF THE APP, OR A FILE BESIDE ONE, and leaves with `asPage`'s four
      headers: measured on production, the shell and the sign-in page carried none.
-     The 302 `appEntry` answers for bare `/app` is not wrapped, because a frame follows it to the shell. */
-  const shell = async () => asPage(await assets.fetch(new Request(new URL('/app/', request.url), { method: request.method })), new URL(request.url).pathname);
+     The 302 `appEntry` answers for bare `/` is not wrapped, because a frame follows it to the shell. */
+  const shell = async () => asPage(await assets.fetch(new Request(new URL('/', request.url), { method: request.method })), new URL(request.url).pathname);
   if (app.slug === null && app.rest === '/') {
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
     return appEntry(request, {
@@ -4674,7 +4674,7 @@ const signupRefused = (status: number, refusal: Refusal, extra: readonly (readon
  *
  * THE MAIL GOES OUT WITHOUT BEING WAITED FOR, through `sendMail` inside `waitUntil`, as every `/auth` letter does, so an
  * address that already has an account answers in the time a new one does. A known address is sent a sign-in link
- * (`/app/signin#magic=`), which the sign-in page already spends; a new one the proof (`/app/signup#verify=`).
+ * (`/signin#magic=`), which the sign-in page already spends; a new one the proof (`/signup#verify=`).
  */
 async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: keyof typeof SIGNUP_ROUTES): Promise<Response> {
   const method = SIGNUP_ROUTES[path];
@@ -4757,7 +4757,7 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
   const out = await ask(call);
   const mail = out.status === 200 ? out.mail : undefined;
   if (mail && 'kind' in mail && (mail.kind === 'signup.verify' || mail.kind === 'signup.known') && env.AUTH_MAIL_FROM && env.EMAIL) {
-    const link = mail.kind === 'signup.known' ? `${origin}/app/signin#magic=${mail.link}` : `${origin}/app/signup#verify=${mail.link}`;
+    const link = mail.kind === 'signup.known' ? `${origin}/signin#magic=${mail.link}` : `${origin}/signup#verify=${mail.link}`;
     ctx.waitUntil(signInLetter(env, mail.kind, mail.to, { link }));
   }
   /* AFTER THE MAIL, so a known address is still sent its sign-in link, and the 403 is the one every address gets. */

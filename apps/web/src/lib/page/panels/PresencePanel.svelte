@@ -124,15 +124,22 @@
   /* THE ONE-LINE ROW: who and where ("Claude Code in Lanternfish"), the last thing it did under it,
      how many changes it wrote, and when it was last heard; never "Working now" again on every row. */
   const projectOf = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
-  const lineOf = (r: LiveRun): PresenceView => ({
-    ...viewOf(r),
-    project: null,
-    name: runTitle(r, projectOf(r)),
-    last: lastSaid(r),
-    doing: null,
-    time: typeof r.wrote === 'number' && r.wrote > 0 ? changesSaid(r.wrote) : '',
-    stands: r.stopped ? standsSaid(r) : heardSaid(r),
-  });
+  /* ONE LINE FOR WHO AND WHERE, ONE FOR WHAT IT IS DOING (Q44 of 29 October): "Wrote 2 changes" over "2 changes heard
+     just now" said the count twice, so the count stands beside when it was heard only when the line above says
+     something else (a question, what it is doing). */
+  const lineOf = (r: LiveRun): PresenceView => {
+    const last = lastSaid(r);
+    const counted = typeof r.wrote === 'number' && r.wrote > 0 && !last.startsWith('Wrote ');
+    return {
+      ...viewOf(r),
+      project: null,
+      name: runTitle(r, projectOf(r)),
+      last,
+      doing: null,
+      time: counted ? changesSaid(r.wrote!) : '',
+      stands: r.stopped ? standsSaid(r) : heardSaid(r),
+    };
+  };
 
   /* WHO IS OPEN NOW (`openNow`): the runs that did something, then the ones that wrote nothing folded into a line, then
      each machine silent over an hour as one quiet row; a run whose key only reads is never counted. */

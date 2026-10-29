@@ -32,6 +32,10 @@ export const words = {
   unnamed: 'Part of this page',
   /** A long block folded in place: what is under the fold, one press away. */
   more: (n: number) => `${n} more`,
+  /* A table of ledger lines drawn two ways (`$lib/money/LedgerCards.svelte`). */
+  linesView: 'Show the lines as',
+  linesCards: 'Cards',
+  linesLedger: 'Ledger',
   /** A block of charts folded in place: how many more numbers are under the fold. */
   moreNumbers: (n: number) => (n === 1 ? '1 more number' : `${n} more numbers`),
   /* WHAT A ROW WEARS IN JUST CHANGED after a write the page's own blocks made: a word or two, the list's own words. */

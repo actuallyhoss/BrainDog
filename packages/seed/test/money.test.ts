@@ -441,7 +441,7 @@ test('THE THIRTY-DAY FIGURES AND THE WALK OF THIRTY DAYS ADD UP THE SAME MOVEMEN
   const figure = (metric: string) => ({ value: reading(k, metric), label: String((METRICS[metric] as { name?: unknown }).name) });
   const arriving = figure('arriving-30d');
   const leaving = figure('leaving-30d');
-  assert.deepEqual([arriving.label, leaving.label], ['Coming in, 30 days', 'Going out, 30 days']);
+  assert.deepEqual([arriving.label, leaving.label], ['To come in, next 30 days', 'To go out, next 30 days']);
   /* AND NO TILE ON MONEY SAYS THE LINE'S FIGURES AGAIN, SINCE money-core 3.4.0: What you have went into the line. The one
      figure tile, Runs out since 3.11.0, says when the money runs out, which the line no longer says. */
   const line = (MONEY_PAGES.money!.blocks as { kind: string; lead?: boolean; body?: string }[]).filter((b) => b.kind === 'note' && b.lead).map((b) => String(b.body)).join(' ');
@@ -507,7 +507,7 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
      bridge has been off Money since. */
   assert.deepEqual(
     cells.filter((c) => c.where === 'money-core /money').map((c) => [c.metric, c.label]),
-    [['arriving-30d', 'Coming in, 30 days'], ['leaving-30d', 'Going out, 30 days']],
+    [['arriving-30d', 'To come in, next 30 days'], ['leaving-30d', 'To go out, next 30 days']],
     'the Money page says the thirty days twice again',
   );
   /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0, which drew the walk's two under the cash
@@ -717,12 +717,18 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Add an account',
     /* THE HERO, SINCE money-core 3.29.0: Cash now with the walk ahead drawn small, and the four answers under it. */
     undefined,
+    /* OVER TIME, SINCE money-core 3.31.0: net worth's line once it has a week of nights, cash's until then; one draws. */
+    'Over time',
+    'Over time',
     /* THE BOARD, in pairs: what comes up, what was spent this month, the accounts and the Ledger, then the plans paid in parts. */
     'Coming up',
     'Spent this month',
     'Accounts',
     'Ledger',
     'Instalments',
+    /* AND THE BUDGETS AT A GLANCE, SINCE money-core 3.31.0, with the note that says a week's or a year's as a month. */
+    "This month's budgets",
+    undefined,
     /* HEADS UP CLOSES THE PAGE: whether Cash now adds up, then its lines, each ending on its one way to act. */
     'Heads up',
     'Cash now does not add up',
@@ -795,13 +801,16 @@ test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and its home is the hero and o
 
   /* WHAT LEADS THE PAGE: the line, the box to add an account, the hero, and then the board. */
   assert.deepEqual(
-    blocks.slice(0, 10).map((b) => [b.kind, b.heading, b.area]),
+    blocks.slice(0, 12).map((b) => [b.kind, b.heading, b.area]),
     [
       ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['capture', 'Add an account', undefined],
       ['stat', undefined, undefined],
+      /* OVER TIME, SINCE money-core 3.31.0, in its two forms, one of which draws. */
+      ['stat', 'Over time', undefined],
+      ['stat', 'Over time', undefined],
       ['timeline', 'Coming up', undefined],
       ['bar', 'Spent this month', undefined],
       ['bar', 'Accounts', undefined],
@@ -967,12 +976,14 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
 test('THE ACCOUNTS ADD UP TO CASH NOW, Coming up is the next few things, and what moved is newest first', async () => {
   const k = await seeded();
 
-  /* ONE PART AN ACCOUNT, NAMED AS THE RECORD NAMES IT, and the parts are the headline to the penny. */
+  /* ONE PART AN OPEN ACCOUNT, THE CARD TOO SINCE money-core 3.32.0 (`balance-by-account`), NAMED AS THE RECORD NAMES IT,
+     and the parts of the accounts that count as cash are the headline to the penny. */
   const accounts = blockOf(k, 'money', 'Accounts') as DrawnBlock & { readings?: readonly { reading: { value: number | null; groups?: { key: string; value: number | null }[] } | null }[] };
   const split = accounts.readings?.[0]?.reading;
   assert.ok(split?.groups && split.groups.length > 1, 'the sample keeps two accounts as cash, and the tile draws one part');
-  assert.deepEqual(split.groups.map((g) => g.key).sort(), ACCOUNTS.filter((a) => a.liquid === true).map((a) => String(a.name)).sort());
-  assert.equal(split.groups.reduce((n, g) => n + (g.value ?? 0), 0), reading(k, 'cash-now'), 'the accounts do not add up to Cash now');
+  assert.deepEqual(split.groups.map((g) => g.key).sort(), ACCOUNTS.filter((a) => a.state !== 'closed').map((a) => String(a.name)).sort());
+  const cash = new Set(ACCOUNTS.filter((a) => a.liquid === true).map((a) => String(a.name)));
+  assert.equal(split.groups.filter((g) => cash.has(g.key)).reduce((n, g) => n + (g.value ?? 0), 0), reading(k, 'cash-now'), 'the accounts do not add up to Cash now');
   const out = k.page('money');
   assert.ok(out.ok, sayOf(out));
   const drawn = (heading: string) => (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks.find((b) => b.heading === heading)?.drawn;
@@ -986,16 +997,16 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, Coming up is the next few things, and wha
   assert.ok(stale && stale.drawn !== false, 'an old balance is not said on the page that reads it');
   assert.notEqual(drawn('Heads up'), false, 'the line about an old balance is drawn with no tile round it');
 
-  /* THE NEXT FEW THINGS THAT MOVE MONEY, each with its money: Coming up reads what is late by a month at most and the next
-     two months, six lines, over the one source Today's Due soon reads across every list. */
+  /* THE NEXT FEW THINGS THAT MOVE MONEY, each with its money: Coming up reads from today and the next two weeks, six lines
+     (money-core 3.32.0, `COMING_UP_WHERE`: what is late is Heads up's), over the one source Today's Due soon reads. */
   const due = blockOf(k, 'money', 'Coming up');
   assert.ok(due.rows.length > 0, 'nothing falls due on the sample, so this proves nothing');
   assert.ok(due.rows.length <= 6, 'Coming up holds more than six lines');
   for (const r of due.rows) {
     assert.ok(r.fields.amount !== null && typeof r.fields.amount === 'object', `${String(r.fields.title)} holds no money`);
-    assert.ok(String(r.fields.day) >= day(-31) && String(r.fields.day) <= day(60), `${String(r.fields.title)} falls due on ${String(r.fields.day)}`);
+    assert.ok(String(r.fields.day) >= day(0) && String(r.fields.day) <= day(14), `${String(r.fields.title)} falls due on ${String(r.fields.day)}`);
   }
-  const across = k.block({ kind: 'table', source: 'deadlines', where: 'amount is set, day after -31d', horizon: 60, limit: 6 } as never);
+  const across = k.block({ kind: 'table', source: 'deadlines', where: 'amount is set, day after -1d', horizon: 14, limit: 6 } as never);
   const named = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => `${String(r.fields.day)} ${String(r.fields.row)}`).sort();
   assert.deepEqual(named(due.rows), named(across.rows ?? []));
 

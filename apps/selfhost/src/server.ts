@@ -287,13 +287,16 @@ const CROSS: Refusal = { code: 'FORBIDDEN', fix: 'A change here is accepted only
 const NOT_ON: Refusal = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
 
 /**
- * `/app/<slug>/api/<method>`: the slug a path names and the `/api/…` path the record reads, or `null`.
+ * `/<slug>/api/<method>`, or the old `/app/<slug>/api/<method>`: the slug a path names and the `/api/…` path the record
+ * reads, or `null`.
  *
- * THE DIRECTORY'S `badSlug` SAYS WHAT A NAME IS, as the Worker's `appPath` asks it. So `/app/settings/api/x` and
+ * THE DIRECTORY'S `badSlug` SAYS WHAT A NAME IS, as the Worker's `appPath` asks it. So `/settings/api/x` and
  * `/app/api/boot` name no record and are left to the shell, and nothing here keeps a second list of the app's words.
+ * THE OLD PREFIX IS READ TOO, because a CLI whose hosts file was written while the app was under `/app` calls there,
+ * and it refuses every redirect; `app` is a word the Directory never hands out, so it is never read as the slug.
  */
 function slugApi(pathname: string): { slug: string; rest: string } | null {
-  const m = /^\/+app\/+([^/]+)(\/+api(?:\/.*)?)$/.exec(pathname);
+  const m = /^\/+(?:app\/+)?([^/]+)(\/+api(?:\/.*)?)$/.exec(pathname);
   if (!m || badSlug(m[1]!) !== null) return null;
   /* ONE LEADING SLASH, because `//api/boot` resolved against an origin is a URL whose host is `api`. */
   return { slug: m[1]!, rest: m[2]!.replace(/^\/+/, '/') };
@@ -1135,7 +1138,7 @@ export async function start(options: {
   tls?: { cert: string; key: string } | undefined;
   /** The built app to serve for every path that is not `/api`, `/auth` or `/mcp`. Absent: those paths are 404. */
   shell?: string | undefined;
-  /** A folder of published use cases served read-only under `/app/catalogue/` (`catalogue.ts`), or none. */
+  /** A folder of published use cases served read-only under `/catalogue/` (`catalogue.ts`), or none. */
   catalogue?: string | undefined;
   /** How the public Kennel is read (`kennel.ts` `KennelDeps`), a test's own. Absent: `BRAINDOG_KENNEL` and the network, read at each ask. */
   kennel?: KennelDeps | undefined;
@@ -2226,7 +2229,7 @@ function ipOf(req: IncomingMessage, trustProxy: boolean): string {
  * The door a path came through, for a crash's line: `/api/<method>`, `/mcp`, or its first segment.
  *
  * NEVER THE WHOLE PATH, because a path can carry a token (`/in/email/<token>`, `/auth/claim/<token>`) or a name a person
- * chose (`/app/<slug>/...`), and a log line holds neither. The Worker's `doorPath` (`apps/worker/src/oplog.ts`) draws
+ * chose (`/<slug>/...`), and a log line holds neither. The Worker's `doorPath` (`apps/worker/src/oplog.ts`) draws
  * the same line; an app cannot import another, so each host keeps its own few lines of it.
  */
 function crashDoor(path: string): string {
@@ -2399,8 +2402,8 @@ async function answer(
   const headers = Object.entries(req.headers).map(([k, v]): [string, string] => [k, Array.isArray(v) ? v.join(', ') : (v ?? '')]);
   if (!site) return write(res, json(503, { ok: false }));
 
-  /* `/app/<slug>/api/<method>` IS `/api/<method>`, READ AT THE ROOT. The web sends
-     every record call under a slug there (`apps/web/src/lib/at.ts` `apiBase`), and this handed the path to the shell,
+  /* `/<slug>/api/<method>` IS `/api/<method>`, READ AT THE ROOT, AND SO IS THE OLD `/app/<slug>/api/<method>`. The web
+     sends every record call under a slug there (`apps/web/src/lib/at.ts` `apiBase`), and this handed the path to the shell,
      which answered `index.html` and a 200 to a tab that then read a page as its record (`test/app-path.test.ts`). The
      path is moved before anything else reads it, because `serveApi` takes the method from the path, as the Worker's
      `atRoot` does for the same reason. A slug that is not this record's is `foreign`, and is refused below once the
@@ -2500,7 +2503,7 @@ async function answer(
 
   /* THE DOOR IS NAMED ONLY TO A REQUEST THAT COULD WALK THROUGH IT: a POST, under this record's own name. Reading an
      operation grant spends it, and it was read for any method under any slug, so `GET /api/export` spent the grant and
-     then `serveApi` answered 405, and `POST /app/not-this-one/api/export` spent it and then the slug was refused 403;
+     then `serveApi` answered 405, and `POST /not-this-one/api/export` spent it and then the slug was refused 403;
      either way the right request after it was 401 and the person approved on their phone again for nothing
      (`test/operation-grant-doors.test.ts`). With no door, an operation bearer on
      those requests is a credential this record does not know, 401, and is still good for the one it was minted for. It

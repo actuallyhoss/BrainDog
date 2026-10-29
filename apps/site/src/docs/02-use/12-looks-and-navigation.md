@@ -50,7 +50,9 @@ Top bar | Holds a few entries in one strip, and puts the rest behind More, sayin
 Menu | Keeps nothing on screen, and opens the whole list when you ask for it
 ```
 
-On a phone, BrainDog uses a tab bar whatever the shape, because a narrow screen has room for nothing else. Ctrl and the backslash key (⌘ and backslash on a Mac) collapse the sidebar and bring it back.
+The sidebar holds every place: Today, Needs you, Work, Money, Agents and People, then your projects. The top bar says where you are and lets you ask, with the bell and your face beside it. Press [ to shrink the sidebar to its icons and press it again to bring it back.
+
+On a phone, BrainDog uses a tab bar whatever the shape: Today and three more places you choose, then Menu, which holds the rest.
 
 ## A shape recommended for you
 

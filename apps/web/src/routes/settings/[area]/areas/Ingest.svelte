@@ -18,6 +18,8 @@
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import { callerAt, feedsOf, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
+  import { sinceWords } from 'braindog-render';
+  import type { Source as WaySource } from '../../../inbox/sources.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -170,6 +172,29 @@
   const feeds = $derived(feedsOf(doorList, Date.now()));
 
   /**
+   * AND EVERY WAY IN, read from the Inbox's own arrivals of the fortnight (`readArrivals`, `sourcesOf`): mail, texts and
+   * apps posting in, and agents, each with its last arrival. The doors above need an owner's read, so a reader who
+   * cannot read them still sees what fed the record. Where the doors are listed, their own rows say the texts, so the
+   * channel line for them is not said twice.
+   */
+  let ways = $state.raw<WaySource[] | null>(null);
+  $effect(() => {
+    untrack(() => {
+      void Promise.all([import('../../../inbox/series.ts'), import('../../../inbox/sources.ts')])
+        .then(async ([series, sources]) => {
+          const read = await series.readArrivals(apiBase(), Date.now(), sources.SOURCE_DAYS);
+          ways = read === null ? null : sources.sourcesOf(read.lines, Date.now());
+        })
+        .catch(() => (ways = null));
+    });
+  });
+  const wayRows = $derived(
+    (ways ?? [])
+      .filter((w) => !(w.channel === 'webhook' && feeds.length > 0))
+      .map((w) => ({ id: w.channel, name: w.name, said: w.last === null ? 'Nothing has come in this way yet' : `Last arrival ${sinceWords(w.last, Date.now())}` })),
+  );
+
+  /**
    * THE TITLES OF THE MAIL SECTION'S THREE STEPS, and the one sentence the third adds. The
    * sentences the first two carry are `inbound-write.ts`'s and are read from there.
    */
@@ -226,15 +251,18 @@
          own refusal is already on the screen, so nothing here repeats it. -->
     <!-- AND EVERY WEB ADDRESS THAT FED IT, with its last arrival (`feedsOf`): card texts posted every hour are a source,
          and the tile said nothing fed the record. A reader who cannot read the doors is not told nothing does. -->
-    {#if feeds.length > 0}
+    {#if feeds.length > 0 || wayRows.length > 0}
       <ul class="feeds">
         {#each feeds as feed (feed.id)}
           <li class="feed"><span class="feed-name" dir="auto">{feed.name}</span><span class="feed-said">{feed.said}</span></li>
         {/each}
+        {#each wayRows as way (way.id)}
+          <li class="feed"><span class="feed-name">{way.name}</span><span class="feed-said">{way.said}</span></li>
+        {/each}
       </ul>
     {/if}
     {#if shell.live}
-      <Actions project={null} others={feeds.length > 0 || !anOwner || doors.value === null} />
+      <Actions project={null} others={feeds.length > 0 || wayRows.length > 0 || !anOwner || doors.value === null} />
     {/if}
     <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
          shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if

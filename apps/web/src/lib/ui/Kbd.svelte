@@ -9,6 +9,8 @@
   and there is no cheat sheet to keep in sync (19 §4).
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
+
   let { keys }: { keys: string } = $props();
 
   /**
@@ -25,11 +27,17 @@
    * `navigator.platform` IS DEPRECATED AND STILL THE ONE THAT ANSWERS. `userAgentData` is
    * Chromium-only, so it is tried first and the old property is the fallback rather than the
    * source — and neither exists during prerender, where the answer is the ordinary one.
+   *
+   * ASKED ONCE THE PAGE IS UP, NOT WHILE IT IS BUILT: a page drawn on the server said Ctrl+J and a page drawn in the
+   * browser said ⌘J, and hydration kept whichever came first, so the hint flipped from load to load (audit
+   * 2026-10-30, 30). Now every load starts from the ordinary answer and corrects it in the browser. AND AN EMPTY
+   * `userAgentData.platform`, which Chrome gives where it will not say, falls through to `navigator.platform`: with `??`
+   * it stopped at the empty answer, and a Mac read Ctrl.
    */
-  const mac =
-    typeof navigator === 'undefined'
-      ? false
-      : /mac/i.test((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? '');
+  let mac = $state(false);
+  onMount(() => {
+    mac = /mac/i.test((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || '');
+  });
 
   /** `⌘` is Ctrl, `⌥` is Alt, and a modifier joins its key with a plus, which is the convention. */
   const said = (part: string): string =>

@@ -133,7 +133,7 @@ test('THE WORK THAT POINTS AT A ROW IS FOUND BY THE FIELD THAT POINTS, for a pro
   assert.equal(viaOf({ ...TASKS, state: undefined }, 'things'), null, 'work with no state has nothing open to count');
   const via = viaOf(TASKS, 'things')!;
   assert.equal(via.deadline, 'by');
-  assert.equal(openWhere(via, 'things#3'), 'thing is things#3, state is not done or dropped');
+  assert.equal(openWhere(via, 'things#3'), 'thing is things#3, state is not done or dropped or backlog');
 });
 
 test('OPEN WORK IS COUNTED BY STATE IN THE DECLARED ORDER, with what is past its day', () => {
@@ -169,7 +169,8 @@ test('THE OPEN WORK SAYS HOW MUCH AN AGENT HOLDS, by the field its hand names, a
 test('PAST THREE STATES THE REST ARE COUNTED TOGETHER', () => {
   const via = viaOf(TASKS, 'things')!;
   const w = openWorkOf(['open', 'open', 'doing', 'doing', 'review', 'blocked', 'backlog'].map((state) => ({ fields: { state } })), via, '2026-09-29', false)!;
-  assert.equal(openWorkSaid(w), '2 open, 2 doing, 1 later and 2 more.');
+  /* A TASK KEPT FOR LATER IS NOT OPEN WORK, so the backlog row is left out of the count. */
+  assert.equal(openWorkSaid(w), '2 open, 2 doing, 1 to check and 1 more.');
 });
 
 test('THE READS ASK THE RECORD ONCE EACH, AND A REFUSAL IS NO TILE', async () => {
@@ -182,7 +183,7 @@ test('THE READS ASK THE RECORD ONCE EACH, AND A REFUSAL IS NO TILE', async () =>
       return new Response(JSON.stringify({ ok: true, value: { rows: [{ id: 'a', seq: 1, fields: { state: 'open' } }], matched: 1, cursor: null } }), { status: 200, headers: { 'content-type': 'application/json' } });
     return new Response(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No.' } }), { status: 404, headers: { 'content-type': 'application/json' } });
   };
-  const read = figureReader('http://record.test/app', io);
+  const read = figureReader('http://record.test', io);
   const m = await read.moneyIn('Kiln, the shop');
   assert.equal(m?.total, 250);
   assert.equal(asked[0]?.searchParams.get('metric'), 'project-in-by-month:Kiln, the shop');
@@ -191,16 +192,16 @@ test('THE READS ASK THE RECORD ONCE EACH, AND A REFUSAL IS NO TILE', async () =>
   const w = await read.openWork('tasks', via, 'things#3', '2026-09-29');
   assert.equal(w?.total, 1);
   assert.equal(asked[1]?.searchParams.get('register'), 'tasks');
-  assert.equal(JSON.parse(asked[1]?.searchParams.get('where') ?? 'null'), 'thing is things#3, state is not done or dropped');
+  assert.equal(JSON.parse(asked[1]?.searchParams.get('where') ?? 'null'), 'thing is things#3, state is not done or dropped or backlog');
 
   const refused: Fetch = async () => new Response(JSON.stringify({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'No.' } }), { status: 403, headers: { 'content-type': 'application/json' } });
-  const none = figureReader('http://record.test/app', refused);
+  const none = figureReader('http://record.test', refused);
   assert.equal(await none.moneyIn('Kiln'), null);
   assert.equal(await none.openWork('tasks', via, 'things#3', '2026-09-29'), null);
   const broken: Fetch = async () => {
     throw new Error('offline');
   };
-  assert.equal(await figureReader('http://record.test/app', broken).moneyIn('Kiln'), null);
+  assert.equal(await figureReader('http://record.test', broken).moneyIn('Kiln'), null);
 });
 
 test("A FIGURE IS ABOUT THE LIST ITS PARAMETER'S FIELD POINTS AT, read off its declaration and never named here", () => {

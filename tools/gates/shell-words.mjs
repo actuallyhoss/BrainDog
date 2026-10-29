@@ -270,9 +270,11 @@ const EXEMPT = {
     },
   },
   'apps/site': {
-    why: 'the public site is prose about the product, not code that runs a record (1 hit).',
+    why: 'the public site is prose about the product, not code that runs a record (9 hits).',
     words: {
       egypt: 'the changelog entry at `routes/changelog/entries.ts:569` says `Egyptian pounds` about a currency fix that shipped.',
+      gold: 'the copy and the demo say what a person can add to Money, "investments and gold" and the demo\'s "Gold, 40 g": the add-on as a visitor reads it, never a branch on one.',
+      quartz: '`legalName` in `lib/site/seo.ts` and the docs\' line "BrainDog is made by Quartz Apps LLC": the company that makes BrainDog, as the mail footer names it.',
     },
   },
   'apps/worker/src/mail.ts': {
@@ -282,9 +284,10 @@ const EXEMPT = {
     },
   },
   'packages/seed/src/changelog.ts': {
-    why: 'a module\'s own changelog, read on its detail page: prose about what shipped, not a branch on a use case (2 hits).',
+    why: 'a module\'s own changelog, read on its detail page: prose about what shipped, not a branch on a use case (4 hits).',
     words: {
       registrar: 'people 2.0.0\'s and estate 1.3.0\'s notes name the role value People stopped offering, the same way the site\'s changelog names history.',
+      gold: 'money-core\'s note says net worth is kept "in dollars and grams of gold too": what shipped, said to the person reading it.',
     },
   },
 };
@@ -296,8 +299,9 @@ export { EXEMPT };
 /**
  * WHAT IS HELD UNTIL A UNIT TAKES IT OUT, AND WHICH UNIT. `EXEMPT` is what may stay: prose, a sender's name, a word a
  * stranger types. `HELD` is what may not, and stands only because the unit that moves it has not run: the nine
- * `PUBLIC_WORDS`, in the six files that spell one in code today. Every entry names its words, as an `EXEMPT`
- * entry does, and `until` names the unit that ends it.
+ * `PUBLIC_WORDS`, in the six files that spell one in code today, and since 30 October six files round 1030 wrote,
+ * held at his word to deploy. Every entry names its words, as an `EXEMPT` entry does, and `until` names the unit that
+ * ends it.
  *
  * ONE ENTRY SITS UNDER AN `EXEMPT` PATH, the site's changelog under `apps/site`, and a file is read against every
  * entry that covers it. The word could not go into `apps/site`'s own words: an entry's word that exempts nothing is a
@@ -358,6 +362,46 @@ export const HELD = {
     why: 'the grammar an agent reads gives an example of a zone (1 hit).',
     until: 'SHL-A07',
     words: { cairo: 'the `tz` line at 379 gives `Africa/Cairo` as its example, the same one the kernel\'s refusal gives.' },
+  },
+  /* HELD ON 30 OCTOBER, at his word to deploy ("yes yes yes go go go"): what round 1030's code spelled of one use case.
+     Each goes with the unit its `until` names: SHL-A22 moves the widget templates into each pack's `widgets`
+     declaration, and SHL-A23 puts money-core's words behind pack declarations. */
+  'packages/kernel/src/worth-grams.ts': {
+    why: 'net worth in grams of gold, worked out in the kernel from the gold rates list, in a file of its own so the hold names nothing else (4 hits).',
+    until: 'SHL-A23',
+    words: { gold: '`worth_gold` and `gold_rates` in the nightly snapshot: a figure the holdings add-on should declare, read off its declaration.' },
+  },
+  'packages/render/src/widgets.ts': {
+    why: 'the widget catalogue offers a gold price widget and scales its rate sample to the home currency (10 hits).',
+    until: 'SHL-A22',
+    words: {
+      gold: 'the `gold-price` template over `register.gold_rates`, which goes into the holdings pack\'s `widgets`.',
+      egp: 'one row of `SAMPLE_DOLLARS`, the example rate a record in that currency is shown.',
+    },
+  },
+  'packages/seed/src/modules/money/figures/accounts.ts': {
+    why: 'the currencies a Stripe balance is checked below zero in (1 hit).',
+    until: 'SHL-A23',
+    words: { egp: '`STRIPE_CURRENCIES`, which the Stripe add-on should declare with its balance.' },
+  },
+  'packages/seed/src/modules/money/lists/snapshots.ts': {
+    why: 'the nightly snapshot keeps net worth in grams of gold (2 hits).',
+    until: 'SHL-A23',
+    words: { gold: 'the `worth_gold` field, which the holdings add-on should add to the list it extends.' },
+  },
+  'packages/seed/src/modules/money/scripts/post-due.js': {
+    why: 'a repeating line is not posted to an account a bank feed keeps, told by the feed\'s own field (1 hit).',
+    until: 'SHL-A23',
+    words: { mercury: '`mercury_account`, the Mercury add-on\'s field, which a feed should declare as the mark of a fed account.' },
+  },
+  'apps/web/src/lib/money/category-look.ts': {
+    why: 'a category with no glyph of its own takes one by the words in its name (3 hits).',
+    until: 'SHL-A23',
+    words: {
+      salary: 'a word in the name that draws the briefcase glyph.',
+      payroll: 'a word in the name that draws the briefcase glyph.',
+      gold: 'a word in the name that draws the bank glyph, which money-core should declare as a hint beside its categories.',
+    },
   },
 };
 

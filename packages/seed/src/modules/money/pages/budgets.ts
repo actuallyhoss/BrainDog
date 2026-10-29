@@ -1,6 +1,7 @@
 /** Budgets: this month's spending by category against the most a month each holds. A limit is offered from last month's pace and set only by the person. */
 
 import type { SeedPage } from '../../base.ts';
+import { A_MONTH } from '../figures/budgets2.ts';
 
 /** The categories that hold a budget, as `budgets-set` counts them (`figures/budgets.ts`). */
 const BUDGETED = 'state is live, direction is out, budget is set';
@@ -54,19 +55,6 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       body: 'No budgets yet.',
     },
     {
-      /* THE MONTH IN TWO FIGURES: spent so far, and last month whole beside it. What is budgeted is the line's, and what
-         no budget can count yet is the note under this, with the way to file it: a cell for it said the same twice. */
-      kind: 'stat',
-      heading: 'This month',
-      icon: 'calendar',
-      span: 12,
-      cells: [
-        { metric: 'spent-by-category-month', label: 'Spent so far' },
-        { metric: 'spent-last-month', label: 'Last month' },
-      ],
-      when: { metric: 'spent-by-category-month', gt: 0 },
-    },
-    {
       /* WHAT NOBODY FILED, AS ITS OWN LINE WITH THE WAY TO FILE IT. A warning and not the danger colour: nothing is late,
          and the words say it. */
       kind: 'note',
@@ -76,20 +64,77 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       body: `{{unfiled-spent-month}} this month has no category. [File them](${FILE_THEM})`,
     },
     {
-      /* EACH BUDGET, AGAINST THIS MONTH. Columns: the name, the most a month, the share it warns at and whether what is
-         left carries over, in the order the kind reads its four cells. Drawn only while a budget is set. */
+      /* WHAT WAITS TO CLEAR IS SAID AND NOT COUNTED, SINCE money-core 3.32.0 (`pending-out-month`): a budget counts what
+         the bank settled, as Spent does, and this line says how much is on its way. */
+      kind: 'note',
+      tone: 'info',
+      span: 12,
+      when: { metric: 'pending-out-month-count', gt: 0 },
+      body: '{{pending-out-month}} is waiting to clear, and counts in these budgets once it does. [See it](/p/money-ledger)',
+    },
+    {
+      /* EACH BUDGET, AGAINST THIS MONTH, LED BY ALL OF THEM TOGETHER (since money-core 3.32.0, as Coin Fish opens its
+         budgets): the drawer adds a first row of what every budget here spent against all they allow, and each line
+         says what is left of it or how far over. Columns: the name, the most a month, the share it warns at and whether what is
+         left carries over, in the order the kind reads its four cells. Drawn only while a budget is set. SINCE money-core
+         3.31.0 THE FOURTH IS WHAT CARRIED OVER (`carried`): the bar is set against the budget and it, and says so. */
       kind: 'progress',
-      heading: 'Each budget',
+      /* SAID BY ITS PERIOD, SINCE money-core 3.32.0 (audit of 30 October, 22), as a week's and a year's are. */
+      heading: "This month's budgets",
       icon: 'wallet',
       span: 12,
       when: { metric: 'budgets-set', gt: 0 },
       source: 'register.categories',
-      where: BUDGETED,
-      columns: [{ field: 'name' }, { field: 'budget' }, { field: 'budget_alert' }, { field: 'rollover' }],
+      /* A MONTH'S BUDGETS, SINCE money-core 3.31.0: a week's and a year's are drawn against their own period below. */
+      where: `${BUDGETED}, ${A_MONTH}`,
+      columns: [{ field: 'name' }, { field: 'budget' }, { field: 'budget_alert' }, { field: 'carried' }],
       spent: 'spent-by-category-month',
       order: [{ field: 'seq', dir: 'asc' }],
       limit: 30,
       empty: 'No budgets yet.',
+    },
+    {
+      /* A WEEK'S BUDGETS, SINCE money-core 3.31.0: each against what it spent since Monday. */
+      kind: 'progress',
+      heading: "This week's budgets",
+      icon: 'calendar',
+      span: 12,
+      when: { metric: 'budgets-weekly', gt: 0 },
+      source: 'register.categories',
+      where: `${BUDGETED}, budget_period is week`,
+      columns: [{ field: 'name' }, { field: 'budget' }, { field: 'budget_alert' }, { field: 'carried' }],
+      spent: 'spent-by-category-week',
+      order: [{ field: 'seq', dir: 'asc' }],
+      limit: 30,
+      empty: 'No weekly budgets.',
+    },
+    {
+      /* A YEAR'S BUDGETS, SINCE money-core 3.31.0: each against what it spent since 1 January. */
+      kind: 'progress',
+      heading: "This year's budgets",
+      icon: 'calendar',
+      span: 12,
+      when: { metric: 'budgets-yearly', gt: 0 },
+      source: 'register.categories',
+      where: `${BUDGETED}, budget_period is year`,
+      columns: [{ field: 'name' }, { field: 'budget' }, { field: 'budget_alert' }, { field: 'carried' }],
+      spent: 'spent-by-category-year',
+      order: [{ field: 'seq', dir: 'asc' }],
+      limit: 30,
+      empty: 'No yearly budgets.',
+    },
+    {
+      /* THE MONTH IN TWO FIGURES, UNDER THE BUDGETS SINCE money-core 3.32.0 (the bars lead, every budget together first): spent so far, and last month whole beside it. What is budgeted is the line's, and what
+         no budget can count yet is the note under this, with the way to file it: a cell for it said the same twice. */
+      kind: 'stat',
+      heading: 'This month',
+      icon: 'calendar',
+      span: 12,
+      cells: [
+        { metric: 'spent-by-category-month', label: 'Spent this month' },
+        { metric: 'spent-last-month', label: 'Spent last month' },
+      ],
+      when: { metric: 'spent-by-category-month', gt: 0 },
     },
     {
       /* THE ONE OFFER, WHERE IT CAN BE ANSWERED: the question `offer_budgets` files once a month, "Use these" or "Not
@@ -114,20 +159,8 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       when: { metric: 'spent-last-month', gt: 0 },
       empty: 'Nothing spent last month.',
     },
-    {
-      /* THE CATEGORIES WITH NO BUDGET, each a press from its page, where a most a month is typed by hand. THE NAME
-         ALONE: a column for the most a month on the rows that have none was empty on every row, by its own `where`. */
-      kind: 'table',
-      heading: 'No budget yet',
-      icon: 'tag',
-      span: 12,
-      source: 'register.categories',
-      where: 'state is live, direction is out, budget is empty',
-      columns: [{ field: 'name', label: 'Category', width: 'minmax(14ch,1fr)' }],
-      order: [{ field: 'name', dir: 'asc' }],
-      limit: 30,
-      when: { metric: 'budgets-unset', gt: 0 },
-      empty: 'Every category has a budget.',
-    },
+    /* NO "NO BUDGET YET" TABLE, SINCE money-core 3.32.0 (audit of 30 October, 22): a bare column of names that set
+       nothing. The app's Set a budget tile at the page's foot lists every category you spend in, with the most to spend
+       and whether that is a week's, a month's or a year's, each set where it stands (`BudgetSet.svelte`). */
   ],
 };

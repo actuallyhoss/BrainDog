@@ -40,11 +40,14 @@ if (!deploy.ok) done(false, 'the deploy went red and rolled back (lines above)')
 const health = step('live', 'curl', ['-s', 'https://app.brain.dog/healthz']);
 const app = /"app":"([^"]+)"/.exec(health.out)?.[1] ?? 'unknown';
 const head = readFileSync(join(ROOT, '.ship', 'pass.json'), 'utf8').match(/"sha": "(\w{7})/)?.[1] ?? '';
-/* THE OLD HOST STILL SENDS A BROWSER ON (the scope of 24 October): brain.dog/app/ answers a page with 308 to
-   app.brain.dog/app/ while `LEGACY_HOSTS` keeps it, and a deploy that broke that would leave a saved tab on nothing. */
-const legacy = step('legacy', 'curl', ['-s', '-o', '/dev/null', '-w', '%{http_code} %{redirect_url}', '-H', 'Accept: text/html', 'https://brain.dog/app/']);
-const moved = /^308 https:\/\/app\.brain\.dog\/app\/?$/u.test(legacy.out.trim());
+/* EVERY OLD ADDRESS STILL SENDS A BROWSER ON, IN ONE HOP (the scopes of 24 and 29 October): `brain.dog/app/<rest>` and
+   `app.brain.dog/app/<rest>` each answer a page with one 308 to `app.brain.dog/<rest>`, query kept, and a deploy that
+   broke either would leave a saved tab or a mailed link on nothing. */
+const OLD = ['https://brain.dog/app/signin?x=1', 'https://app.brain.dog/app/signin?x=1'];
+const NEW = 'https://app.brain.dog/signin?x=1';
+const legacy = OLD.map((url) => [url, step('legacy', 'curl', ['-s', '-o', '/dev/null', '-w', '%{http_code} %{redirect_url}', '-H', 'Accept: text/html', url]).out.trim()]);
+const wrong = legacy.filter(([, said]) => said !== `308 ${NEW}`);
 done(
-  app.endsWith(head) && moved,
-  `live app ${app}${app.endsWith(head) ? '' : `, but HEAD is ${head}`}${moved ? '' : `; brain.dog/app/ answered "${legacy.out.trim()}", not 308 to app.brain.dog/app/`}`,
+  app.endsWith(head) && wrong.length === 0,
+  `live app ${app}${app.endsWith(head) ? '' : `, but HEAD is ${head}`}${wrong.map(([url, said]) => `; ${url} answered "${said}", not 308 to ${NEW}`).join('')}`,
 );

@@ -63,7 +63,7 @@ const base = (more: Partial<BoardInput> = {}): BoardInput => ({
 test('nothing late, due or quiet says so, never that nothing needs a push', () => {
   const b = boardOf(base({ projects: base().projects.map((p) => ({ ...p, next: '' })) }));
   assert.equal(b.headline, 'Nothing is late, due this week or gone quiet.');
-  assert.equal(b.date, 'Tuesday 27 October · 4 in play · 1 parked · 1 finished');
+  assert.equal(b.date, 'Tuesday 27 October · 4 in play · 1 parked · 1 closed');
 });
 
 test('the headline names the late projects and the quiet numbers, and the button opens the late work', () => {
@@ -115,7 +115,7 @@ test('last real work is a tagged run or a task change, never an edit of the proj
   const run = { seq: 7, agent: 'claude', project: '', repo: 'kiln-app', remote: '', cwd: '/home/dev/kiln-app', at: new Date(NOW - 30 * 60_000).toISOString(), state: 'done', closedAs: '', handed: false };
   const b = boardOf(base({ runs: [run], moves: [{ project: 'things#3', at: new Date(NOW - 2 * 86_400_000).toISOString() }] }));
   const kiln = b.groups[0]!.rows[0]!;
-  assert.deepEqual(kiln.work, { agent: 'claude', said: '30 min ago', sub: 'ended without a handoff', none: false });
+  assert.deepEqual(kiln.work, { agent: 'claude', said: '30 min ago', sub: 'stopped without a note', none: false });
   const lantern = b.groups.find((g) => g.id === 'moving')!.rows.find((r) => r.name === 'Lantern')!;
   assert.equal(lantern.work.said, 'Tasks changed 2 days ago');
   const tide = b.groups.find((g) => g.id === 'quiet')!.rows[0]!;
@@ -134,7 +134,7 @@ test('how a run ended is said in words', () => {
   assert.equal(endedAs({ state: 'active', closedAs: '', handed: false }).said, 'still open');
   assert.equal(endedAs({ state: 'handoff', closedAs: '', handed: true }).said, 'handed off');
   assert.equal(endedAs({ state: 'done', closedAs: 'dropped', handed: false }).said, 'dropped');
-  assert.equal(endedAs({ state: 'done', closedAs: '', handed: false }).said, 'ended without a handoff');
+  assert.equal(endedAs({ state: 'done', closedAs: '', handed: false }).said, 'stopped without a note');
 });
 
 test('earning a month adds linked repeating money, else a monthly key number, in one currency', () => {
@@ -150,8 +150,8 @@ test('earning a month adds linked repeating money, else a monthly key number, in
   assert.deepEqual(
     b.earning.lines.map((l) => [l.name, l.said, l.status]),
     [
-      ['Kiln', '$8,750', 'next pay Sat 31 Oct'],
-      ['Marlow', '$4,815', 'Sep'],
+      ['Kiln', '$8,750', 'repeats, next pay Sat 31 Oct'],
+      ['Marlow', '$4,815', 'made in Sep'],
     ],
   );
   assert.equal(b.earning.also, '1 project with no money linked');

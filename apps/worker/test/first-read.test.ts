@@ -164,14 +164,14 @@ const INDEX = {
   ],
 };
 
-/** The static assets with the landlord front at `/app/catalogue/index.json`, and the shell, as HTML, for any other path. */
+/** The static assets with the landlord front at `/catalogue/index.json`, and the shell, as HTML, for any other path. */
 const landlordAssets = () => {
   const asked: string[] = [];
   const assets: Assets = {
     fetch: async (request) => {
       const path = new URL(request.url).pathname;
       asked.push(path);
-      if (path === '/app/catalogue/index.json') return new Response(JSON.stringify(INDEX), { headers: { 'content-type': 'application/json' } });
+      if (path === '/catalogue/index.json') return new Response(JSON.stringify(INDEX), { headers: { 'content-type': 'application/json' } });
       return new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } });
     },
   };

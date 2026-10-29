@@ -87,7 +87,9 @@ test('numbers stopped: the banner says so once, every cell is stale, and the hea
   assert.match(n.cells[0]!.sub, /^up 29 since/u);
   const hero = heroFactsOf(base({ readings }), n);
   assert.equal(hero.headline, 'No numbers have come from Lantern since 28 Sep.');
-  assert.deepEqual(hero.red, { said: 'Fix the numbers feed', href: '/feed' });
+  /* THE FEED'S FIX IS THE QUIET BUTTON (Q32 of 29 October), and red is kept for late work. */
+  assert.equal(hero.red, null);
+  assert.deepEqual(hero.soft, { said: 'Fix the numbers feed', href: '/feed' });
 });
 
 test('late work leads the headline and the red button opens it', () => {
@@ -218,7 +220,7 @@ test('sessions say how each ended, and what happened folds the record edits into
     { note: 'Note rewritten', by: 'Claude', at: '2026-10-25T08:01:00Z' },
   ];
   const lines = happenedOf(base({ history }), numbersOf(base()));
-  assert.deepEqual(lines, [{ at: '2026-10-25', day: '25 Oct', text: '2 edits to its record, among them: Next step changed.', by: null, tone: 'plain' }]);
+  assert.deepEqual(lines, [{ at: '2026-10-25', day: '25 Oct', text: '2 changes to it, among them: Next step changed.', by: null, tone: 'plain' }]);
   /* A PLAN WRITTEN IN ONE SITTING IS ONE LINE, its first two tasks named. */
   const at = '2026-10-24T09:00:00Z';
   const tasks = ['Wave one', 'Wave two', 'Wave three', 'Wave four'].map((t, n) => task(n + 1, t, { created: at }));

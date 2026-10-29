@@ -36,7 +36,7 @@ const EXPIRES = new Date(NOW + 24 * 3_600_000).toISOString();
 const ORIGIN = 'https://studio.example';
 const CONFIG: AuthConfig = { mac: new Uint8Array(32).fill(7), rp: { id: 'studio.example', origin: ORIGIN }, magic: true };
 
-/** The proof in a mailed link, `<origin>/app/invite#<invitation>&proof=<proof>`, or `''` when no link went out. */
+/** The proof in a mailed link, `<origin>/invite#<invitation>&proof=<proof>`, or `''` when no link went out. */
 const proofOf = (link: string | undefined): string => /&proof=([A-Za-z0-9_-]+)$/.exec(link ?? '')?.[1] ?? '';
 
 /** The Worker's own rule for an address that can already sign in (`apps/worker/src/index.ts:58`). */

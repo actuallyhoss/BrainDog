@@ -38,7 +38,9 @@ export const suggestWords = {
   ratesCue: 'Set up',
   /** Where the rates feed is set up: the scheduled action for rates, filled in. */
   ratesAt: KEEP_RATES_AT,
-  asked: (question: string): string => `Needs you asks: "${question}"`,
+  /* ITS OWN REASON, NEVER THE QUESTION QUOTED: the Stripe card quoted a question about InstaPay lines that only named
+     Stripe in passing. The reason says what the connector would do for this record. */
+  asked: (title: string): string => `Needs you asks for a ${title} balance by hand. This brings it in by itself.`,
   add: 'Add',
 } as const;
 
@@ -48,13 +50,8 @@ const isRatesSign = (s: SignRead): boolean => /\brates?\b/iu.test(s.sign) && /cu
 /** The first sentence of a sign's line: "The newest exchange rate is 28 days old." */
 const firstSentence = (said: string): string => /^[^.!?]*[.!?]/u.exec(said.trim())?.[0] ?? said.trim();
 
-/** A question said short enough for one card: its first eighty characters, cut at a word. */
-const short = (q: string): string => {
-  const one = q.replace(/\s+/gu, ' ').trim();
-  if (one.length <= 80) return one;
-  const cut = one.slice(0, 80);
-  return `${cut.slice(0, cut.lastIndexOf(' ') > 40 ? cut.lastIndexOf(' ') : 80)}…`;
-};
+/** A question that asks for a balance. */
+const BALANCE = /\bbalances?\b/iu;
 
 /** Whether a question names a title as a whole word, case aside. */
 const names = (question: string, title: string): boolean => {
@@ -89,9 +86,11 @@ export function suggestionsOf(input: {
     for (const l of input.listings) {
       if (l.kind !== 'pack' || !l.categories.includes('connectors') || shelfOf(l) !== 'money') continue;
       if (actionOf(l, states).kind !== 'install') continue;
-      const q = (input.questions ?? []).find((x) => names(x, l.title));
+      /* ONLY A QUESTION ABOUT A BALANCE: a connector brings balances in, so a question that names it for another reason
+         (who some lines are, what a payment was) is no reason to suggest it. */
+      const q = (input.questions ?? []).find((x) => names(x, l.title) && BALANCE.test(x));
       if (q === undefined) continue;
-      out.push({ key: l.key, title: l.title, line: l.summary, why: suggestWords.asked(short(q)), href: input.href(l), cue: suggestWords.add, listing: l });
+      out.push({ key: l.key, title: l.title, line: l.summary, why: suggestWords.asked(l.title.trim()), href: input.href(l), cue: suggestWords.add, listing: l });
     }
   return out.slice(0, SUGGESTED_MOST);
 }

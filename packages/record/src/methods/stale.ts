@@ -250,14 +250,18 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
     const longest = aged[0]!;
     const title = longest.row.fields[decl.title];
     const said = typeof title === 'string' ? scrubbed(title) : null;
-    const tail = said === null ? '.' : `: ${firstWords(said)}`;
     const { one, many } = wordsOf(decl);
     lines.push({
       kind: id,
       said:
+        /* SAID BY ITS TITLE AND NEVER BY ITS HANDLE: "LN1" is the record's word, and the title is what a person knows. */
         total === 1
-          ? `1 ${one ?? `of the ${many}`} has not been confirmed in ${waited(longest.age)}, ${longest.name}${tail}`
-          : `${total} ${many} have not been confirmed in ${UNCONFIRMED_DAYS} days. The oldest is ${longest.name}, not confirmed in ${waited(longest.age)}${tail}`,
+          ? said === null
+            ? `1 ${one ?? `of the ${many}`} has not been confirmed in ${waited(longest.age)}.`
+            : `1 ${one ?? `of the ${many}`} has not been confirmed in ${waited(longest.age)}: ${firstWords(said)}`
+          : said === null
+            ? `${total} ${many} have not been confirmed in ${UNCONFIRMED_DAYS} days. The oldest has waited ${waited(longest.age)}.`
+            : `${total} ${many} have not been confirmed in ${UNCONFIRMED_DAYS} days. The oldest has waited ${waited(longest.age)}: ${firstWords(said)}`,
       count: total,
       clear: each(aged.map((a) => a.name), (name) => `update ${name} with ${FADES} ${today}`, `update with ${FADES} ${today}`, STALE_NAMED_MOST, total),
     });
@@ -294,8 +298,8 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
       kind: skillsIn,
       said:
         everyBehind.length === 1
-          ? `The ${skill.one ?? skill.many} ${called(behind[0]!.name)} is behind ${lessons(behind[0]!.learnings.length)}`
-          : `${everyBehind.length} ${skill.many} are behind what was learned: ${listed([...behind.map((b) => `${called(b.name)} by ${lessons(b.learnings.length)}`), ...(unnamed > 0 ? [`${unnamed} more`] : [])])}`,
+          ? `The ${called(behind[0]!.name)} ${skill.one ?? skill.many} does not take in ${lessons(behind[0]!.learnings.length)} yet`
+          : `${everyBehind.length} ${skill.many} do not take in what was learned yet: ${listed([...behind.map((b) => `${called(b.name)}, ${lessons(b.learnings.length)}`), ...(unnamed > 0 ? [`${unnamed} more`] : [])])}`,
       count: everyBehind.length,
       clear:
         everyBehind.length === 1
@@ -322,7 +326,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
         }
         lines.push({
           kind: finder.id,
-          said: `${finder.name ?? finder.id.replace(/-/gu, ' ')}: ${found.stale}`,
+          said: finder.counted?.(found.stale) ?? `${finder.name ?? finder.id.replace(/-/gu, ' ')}: ${found.stale}`,
           count: found.stale,
           clear:
             asked !== undefined

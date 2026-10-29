@@ -363,14 +363,14 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
 };
 
 /** A month is how the page's line counts who you are in touch with. */
-const IN_TOUCH_30D = 'in_touch after -31d';
+const IN_TOUCH_30D = 'merged_into is empty, self is not true, in_touch after -31d';
 
 /**
  * Three months is where somebody has gone quiet, and the two sentences cut at the same day: quiet is a last day before
  * ninety days ago, and in touch is that day or any after it. A person with no day at all is in neither.
  */
-const QUIET = 'in_touch before -90d';
-const IN_TOUCH_90D = 'in_touch after -91d';
+const QUIET = 'merged_into is empty, self is not true, in_touch before -90d';
+const IN_TOUCH_90D = 'merged_into is empty, self is not true, in_touch after -91d';
 
 /**
  * PEOPLE'S FIGURES, since People 2.4.0: how many people the record keeps, how many were in touch lately, and how many
@@ -413,7 +413,7 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'people-in-touch-12w',
     name: 'In touch, 12 weeks',
     source: 'register.people',
-    where: 'in_touch after -84d',
+    where: 'merged_into is empty, self is not true, in_touch after -84d',
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -440,9 +440,23 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'organisations-count',
     name: 'Organisations',
     source: 'register.organisations',
-    /* AND NEVER A SHOP MET ON A CARD TEXT, SINCE People 3.9.0: a payee a bank text named is
-       met with no kind (`rule.meet-payees` gives none), so "Organisations 13" listed nine cut-off shop names beside the
-       four companies he deals with. Those are counted apart, below. */
+    /* EVERY ORGANISATION THE LIST HOLDS, SHOPS FROM CARD TEXTS TOO, SINCE People 4.1.0. From 3.9.0 to 4.0.0 this left
+       out the ones with no kind, so People said "Organisations 4" over a list, a sidebar and a page that said 17, and
+       nobody could tell why. One meaning now: the organisations not folded into another and not retired, the rows the
+       Organisations list draws. The shops are still counted apart (below), as part of it. */
+    where: 'merged_into is empty, retired_on is empty',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* THE ONES YOU WORK WITH: an organisation given a kind (a client, a vendor, your employer), so People says "4
+     organisations you work with, 13 shops from card texts" and the two add up to the list's count. */
+  'organisations-known': {
+    metric: 'organisations-known',
+    name: 'Organisations you work with',
+    source: 'register.organisations',
     where: 'merged_into is empty, retired_on is empty, kind is set',
     value: { count: 'id' },
     format: 'int',
@@ -603,10 +617,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         kind: 'cards',
         heading: 'Everyone',
         icon: 'people',
-        /* HALF, WITH THE ORGANISATIONS BESIDE IT (money F13): two lists a page wide left a
-           third of each row empty at 1512. Half and not two thirds, since a table's floor is half a row (`floorFor`
-           in apps/web), so two thirds and a third drew the organisations under it. On a phone each takes the width. */
-        span: 6,
+        /* THE PAGE'S WIDTH, SINCE People 4.1.0: the organisations beside it went to their own list, so the people take
+           the row and stand in columns, each a face, a name, one line of who they are and when you last spoke. */
+        span: 12,
         source: 'register.people',
         /* NEVER SOMEBODY FOLDED INTO ANOTHER, as the organisations below: a merge leaves one line, not two. AND NEVER THE
            OWNER, SINCE People 3.6.0 (the look of 24 October found him in his own list): the row marked as you is who the
@@ -637,32 +650,15 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         empty: 'Nobody yet. Add someone, or an agent adds whoever it meets in a commit or a mail.',
       },
       {
-        /* THE ORGANISATIONS, SINCE People 3.0.0, under the people and as a list of names, each opening its own page: the
-           companies people are with and the ones the money moves through. Drawn only while there is one, and never one
-           folded into another. */
-        kind: 'table',
-        heading: 'Organisations',
-        icon: 'building',
-        span: 6,
-        source: 'register.organisations',
-        /* AND NEVER ONE RETIRED, SINCE People 3.8.0, NOR A SHOP A CARD TEXT NAMED, SINCE 3.9.0 (`organisations-count`). */
-        where: 'merged_into is empty, retired_on is empty, kind is set',
-        when: { metric: 'organisations-count', gt: 0 },
-        /* THE NAME AND WHAT KIND, in a third of the page: the website, which most shops have none of, is on the
-           organisation's own page. */
-        columns: [
-          { field: 'name', label: 'Organisation', width: 'minmax(14ch,2fr)' },
-          { field: 'kind', label: 'Kind', width: '10ch' },
-        ],
-        order: [{ field: 'name', dir: 'asc' }],
-      },
-      {
-        /* THE SHOPS CARD TEXTS NAMED, IN ONE LINE, SINCE People 3.9.0: how many and the
-           first few by name, and the list to look them over, where nine half names stood in Organisations. */
+        /* THE ORGANISATIONS ARE ONE PLACE, SINCE People 4.1.0: their own list, under People in the sidebar, grouped by
+           kind with the people in each. A table of four here (kind set) beside a list of seventeen there read as two
+           lists that disagreed, so People says how many and opens the list, with the same figure the sidebar says. */
         kind: 'note',
-        span: 6,
-        when: { metric: 'organisations-from-card-texts', gt: 0 },
-        body: '{{organisations-from-card-texts}} shop(s) from card texts, {{organisations-from-card-texts.names}}, kept apart from the organisations. [See them](/r/organisations).',
+        span: 12,
+        when: { metric: 'organisations-count', gt: 0 },
+        /* ONE COUNT, THE LIST'S, SINCE People 4.2.1 (audit of 30 October, 23): "6 organisation(s) you work with, 0 shop(s)
+           from card texts" sat over a list that grouped one shop, since a shop given a kind is one you work with. */
+        body: 'Organisations and shops you deal with: {{organisations-count}}. [See them](/r/organisations).',
       },
       {
         /* WHAT AGENTS DID HERE, SINCE People 3.4.0: who an agent met, merged or wrote down, one group per run,

@@ -94,8 +94,6 @@ const DAY = 86_400_000;
 const BACK_DAYS = 90;
 /** How far back a flow's, or a monthly number's, points reach: thirteen months, so a year's change has its month. */
 const BACK_LONG_DAYS = 396;
-/** A level's change is against its value this many days before its newest, a month as "Up 34% on last month" says. */
-const CHANGE_DAYS = 28;
 /** The most key numbers a block answers, and how many it answers when it says no `limit:`. */
 const MOST = 200;
 const FALLBACK = 50;
@@ -255,6 +253,19 @@ function nextOf(t: number, p: Period): number {
   const d = new Date(t);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
 }
+/**
+ * ONE PERIOD BACK FROM `t`, a month back to the same day where it has one: the render's `backOf`, so a level's change is
+ * against the reading one of its own periods before, as its tile on Today says it (recheck of 30 October, N7: Kiln's
+ * downloads read "up 5%" on its page, a month back, and "Down 8.7%" on Today, a week back).
+ */
+function backOf(t: number, p: Period): number {
+  if (p !== 'month') return t - (p === 'day' ? DAY : 7 * DAY);
+  const d = new Date(t);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() - 1;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return Date.UTC(y, m, Math.min(d.getUTCDate(), last), d.getUTCHours(), d.getUTCMinutes());
+}
 
 /** A point's number as a line draws it: a plain value, or money in whole units when it is in `currency`, else `null`. */
 function pointNumber(p: KpiPoint, currency: string | null): number | null {
@@ -375,7 +386,7 @@ function readSeries(k: Kpi, kind: KpiKind, project: Project, readings: Map<strin
     count = [...sums.keys()].filter((s) => nextOf(s, p) > from).length;
   } else if (latestDay) {
     judged = latestDay.n;
-    const was = [...days].reverse().find((c) => c.t <= latestDay.t - CHANGE_DAYS * DAY);
+    const was = [...days].reverse().find((c) => c.t <= backOf(latestDay.t, periodOf(k.every)));
     change = shareOf(judged, was?.n);
   }
   return { unit: currency ?? unit, points, latest: latestDay ? say(latestDay) : (points.at(-1) ?? null), judged, change, newest, count };
@@ -424,7 +435,7 @@ function figureSeries(k: Kpi, project: Project, deps: PageDeps, kit: SourceKit):
   const yesterday = new Date(now - DAY).toISOString().slice(0, 10);
   const kept = waits || !deps.points ? [] : deps.points(decl.metric, back, yesterday).filter((p) => Number.isFinite(p.value));
   const points = [...kept.map((p) => say(p.at, p.value)), say(at, r.value)];
-  const was = [...kept].reverse().find((p) => (instantOf(p.at) ?? now) <= now - CHANGE_DAYS * DAY);
+  const was = [...kept].reverse().find((p) => (instantOf(p.at) ?? now) <= backOf(now, periodOf(k.every)));
   const change = typeof r.delta === 'number' && Number.isFinite(r.delta) ? r.delta : shareOf(r.value, was?.value);
   return { unit, points, latest: points.at(-1)!, judged: r.value, change, newest: now, count: points.length, met };
 }

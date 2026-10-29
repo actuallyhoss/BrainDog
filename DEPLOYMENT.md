@@ -12,19 +12,22 @@ One label per surface, with the environment in front of it.
 
 | Host | What runs there | Deployed by | State |
 |---|---|---|---|
-| **`brain.dog`** | `apps/site`, the marketing site; and the app's old address, handed to `apps/worker` on the doors `run_worker_first` lists in `apps/site/wrangler.jsonc` by the site's `APP` service binding: a page load under `/app` is a 308 to `app.brain.dog`, and `/api/*`, `/mcp` and `/in/*` are served where they stand | `.github/workflows/deploy.yml`, after a green `ci` on `master` and the reviewer's press | **live** |
+| **`brain.dog`** | `apps/site`, the marketing site; and the app's old address, handed to `apps/worker` on the doors `run_worker_first` lists in `apps/site/wrangler.jsonc` by the site's `APP` service binding: a page load under `/app` is one 308 to the same page at the root of `app.brain.dog`, and `/api/*`, `/mcp` and `/in/*` are served where they stand | `.github/workflows/deploy.yml`, after a green `ci` on `master` and the reviewer's press | **live** |
 | **`www.brain.dog`** | nothing: a 301 to the apex | a Redirect Rule, not a Worker | live |
-| **`app.brain.dog`** | the production app Worker, `apps/worker` with `apps/web`'s `build/` as its asset directory; the app is at `app.brain.dog/app` | the same `deploy.yml` run, since it is a Custom Domain of that Worker | **live** |
+| **`app.brain.dog`** | the production app Worker, `apps/worker` with `apps/web`'s `build/` as its asset directory; the app is at the root, a record at `app.brain.dog/<slug>` | the same `deploy.yml` run, since it is a Custom Domain of that Worker | **live** |
 | **`mcp.brain.dog`** | reserved | nothing | not claimed |
 | **`alpha.brain.dog`** | `apps/site`, the same bytes; and alpha's app's old address, handed over by the alpha site's `APP` binding the same way | `deploy.yml`'s alpha steps when the variable `DEPLOY_ALPHA` is `true`, otherwise by hand | live |
 | **`app.alpha.brain.dog`** | alpha's app Worker, built as **BrainDog Alpha** | the same | live |
 | **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
 
-**The app lives on `app.brain.dog`** (alpha: `app.alpha.brain.dog`), under `/app`, as it did before the one-domain
-move and again since push C. `PUBLIC_HOST` is `app.brain.dog`, so sign-in, the CSRF origin and the device flow are
-all there, and `LEGACY_HOSTS` is `brain.dog`: the site keeps `brain.dog` as its Custom Domain and runs its script first
-on the app's doors, which it hands to `braindog-production` through a service binding, so no zone route is written.
-A page load on `brain.dog/app/...` is a 308 to `https://app.brain.dog/app/...` with the path and query kept, and
+**The app lives on `app.brain.dog`** (alpha: `app.alpha.brain.dog`), at its root: a record is
+`https://app.brain.dog/<slug>`. It was under `/app` from the one-domain move until 29 Oct, and on this name since push
+C. `PUBLIC_HOST` is `app.brain.dog`, so sign-in, the CSRF origin and the device flow are all there, and `LEGACY_HOSTS`
+is `brain.dog`: the site keeps `brain.dog` as its Custom Domain and runs its script first on the app's doors and on
+`/app`, which it hands to `braindog-production` through a service binding, so no zone route is written. A page load on
+`brain.dog/app/...` or `app.brain.dog/app/...` is one 308 to `https://app.brain.dog/...`, the `/app` taken off and the
+rest and the query kept (never two hops). A record's API under the old address, `/app/<slug>/api/*`, is still served
+where it stands for a hosts file written before the move, and
 `/api/*`, `/mcp` and `/in/*` on `brain.dog` are served and never redirected, so a token or an `/in/` address handed out
 there keeps working for at least the 90 days a token lives and until every `/in/` address is re-minted. A device start on
 `brain.dog` is refused and names `app.brain.dog`. Everybody signs in once more after the push, because a session cookie
@@ -234,7 +237,9 @@ Durable Object migrations are in `wrangler.jsonc` and apply themselves on deploy
 ## Checking a deployment without opening a browser
 
 ```
-curl -s -o /dev/null -w '%{http_code}\n' https://app.brain.dog/app/           # 200, the shell
+curl -s -o /dev/null -w '%{http_code}\n' https://app.brain.dog/               # 200, the shell
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H 'Accept: text/html' https://brain.dog/app/signin?x=1      # 308 https://app.brain.dog/signin?x=1
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H 'Accept: text/html' https://app.brain.dog/app/signin?x=1  # 308 https://app.brain.dog/signin?x=1
 curl -s https://app.brain.dog/healthz                                      # {"ok":true,"app":...,"format":...,"kernel":...,"primitives":...}
 curl -s https://app.brain.dog/api/health                                       # a typed refusal, not a 500
 curl -s -H 'authorization: Bearer rec_0000000000000000000000000.x' https://app.brain.dog/api/boot
@@ -305,7 +310,7 @@ that sees a migration refusing real rows, and the sandbox smoke runs one script 
 only witness that the Worker Loader is bound. Both are off until the operator sets up the canary
 once: make a record for it (for example `ops`), put its `rec_...` id in `OPS_RECORD` in
 `env.production.vars` (the nightly note goes there too), mint a token on it with
-`braindog token create --name smoke --scope propose --host https://app.brain.dog/app/ops` (`propose`,
+`braindog token create --name smoke --scope propose --host https://app.brain.dog/ops` (`propose`,
 because the sandbox smoke's `scriptTry` refuses a read token), and store the token as the GitHub
 secret `SMOKE_TOKEN` and the record's slug as the variable `SMOKE_SLUG`. Unset, each prints that it
 was skipped. A token that expires turns Smoke red with a 401 that names `SMOKE_TOKEN`, and that red
@@ -398,8 +403,8 @@ ones also reach the ops record, where the walk writes its summary as a note once
   storage key per kind in the Directory (`alertDue`); if the Directory cannot be asked, the isolate's
   own window is the cap.
 - **Uptime.** `apps/watchdog` is a Worker of its own (cron every five minutes, no route, no binding to the app), so it
-  still runs when brain.dog's Workers do not. It asks the public name for `/`, `/app`, `/healthz` (200 and `"ok":true`),
-  `/mcp` with no token (the 401 carrying the OAuth `resource_metadata`) and `/app/signin`. The second failing run in a row
+  still runs when brain.dog's Workers do not. It asks the public names for the site's `/`, the app's `/`, `/healthz` (200 and `"ok":true`),
+  `/mcp` with no token (the 401 carrying the OAuth `resource_metadata`) and `/signin`. The second failing run in a row
   mails "BrainDog is down" once, naming the probes, and the first clean run after it mails "BrainDog is up again". The
   count is kept in KV. Each probe's latency goes to the `braindog_probes` Analytics Engine dataset (name, ok, status,
   milliseconds) and to the log, with `slow` set over three seconds. Not deployed until its KV id is filled in

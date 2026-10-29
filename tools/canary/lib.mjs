@@ -121,7 +121,7 @@ export function unpackCredential(text) {
 }
 
 /**
- * One call to a record's method, the way the app makes it: POST `/app/<slug>/api/<method>` with a JSON body, and with
+ * One call to a record's method, the way the app makes it: POST `/<slug>/api/<method>` with a JSON body, and with
  * either a bearer or a session cookie and the `Origin` the record checks. The answer as `{ status, said }`; a host that
  * did not answer is status 0 and a sentence, never the error's own text, which could quote the request.
  */
@@ -129,7 +129,7 @@ export async function call(at, method, body = {}, { send = fetch } = {}) {
   const headers = { 'content-type': 'application/json', accept: 'application/json' };
   if (at.bearer) headers.authorization = `Bearer ${at.bearer}`;
   if (at.cookie) Object.assign(headers, { cookie: at.cookie, origin: at.origin });
-  const url = `${at.base ?? at.origin}${at.slug && at.live ? `/app/${at.slug}` : ''}/api/${method}`;
+  const url = `${at.base ?? at.origin}${at.slug && at.live ? `/${at.slug}` : ''}/api/${method}`;
   try {
     const res = await send(url, { method: 'POST', headers, body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(600_000) });
     return { status: res.status, said: await res.json().catch(() => null) };
@@ -195,7 +195,7 @@ export async function appSelfHost(build) {
     }
     if (!Object.hasOwn(TYPES, extname(rel))) {
       res.writeHead(200, { 'content-type': TYPES['.html'] });
-      return createReadStream(join(build, 'app', 'index.html')).pipe(res);
+      return createReadStream(join(build, 'index.html')).pipe(res);
     }
     res.writeHead(404).end();
   });

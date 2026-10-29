@@ -9,6 +9,8 @@
   by its own route beside this page.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
+  import { crumbsOf } from '$lib/site/seo.ts';
   import ConnectBox from '$lib/connect/ConnectBox.svelte';
   import { agents } from '$lib/copy/agents.ts';
   import { site } from '$lib/copy.ts';
@@ -42,15 +44,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>{site.meta.agents.title}</title>
-  <meta name="description" content={site.meta.agents.description} />
-  <link rel="canonical" href="https://brain.dog/agents" />
-  <meta property="og:url" content="https://brain.dog/agents" />
-  <meta property="og:title" content={site.meta.agents.title} />
-  <meta property="og:description" content={site.meta.agents.description} />
-</svelte:head>
-
+<Seo title={site.meta.agents.title} description={site.meta.agents.description} path="/agents" ld={[crumbsOf([{ name: 'BrainDog', path: '/' }, { name: site.nav.agents, path: '/agents' }])]} />
 <PageHead title={a.title} lead={a.lead}>
   <div class="connect">
     <ConnectBox />

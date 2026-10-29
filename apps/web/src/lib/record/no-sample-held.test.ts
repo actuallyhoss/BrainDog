@@ -64,7 +64,7 @@ test("a page looked up by its slug is called what the record's `boot` calls it, 
   forget();
   const body = { registers: [], now: '2026-09-25T12:00:00.000Z', pages: [{ slug: 'money', title: 'Cash and bills', nav: null, icon: null }] };
   const io = (async () => new Response(JSON.stringify({ ok: true, value: body }), { status: 200, headers: { 'content-type': 'application/json' } })) as Fetch;
-  assert.equal((await readBoot('http://record.test/app', io)).from, 'live');
+  assert.equal((await readBoot('http://record.test', io)).from, 'live');
   forget();
   assert.equal(held.PAGES.money?.title, 'Cash and bills', "the audit log names this record's money page with the sample's title");
 });

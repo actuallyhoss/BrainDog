@@ -1169,6 +1169,35 @@ const DECLARED: Record<string, Version> = {
     declares: '32aff23db88fea96',
     history: ["The card's summary is one short line, a word outside the pack; `page.home-personal` and every other declaration are 2.6.0's word for word -> 32aff23db88fea96"],
   },
+  /* 2.7.0: HOW MANY DAYS IN A ROW SOMETHING WAS LOGGED, for the Days in a row widget. 2.6.1 IS IN THE CATALOGUE, so a version of its own. */
+  'personal@2.7.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson hands.metric.budgets-set.money-core
+      metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active metric.log-streak metric.logged-by-goal
+      metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held metric.saved-toward-goals
+      metric.savings-active metric.savings-held metric.steps-done metric.steps-left page.goals page.home-personal
+      page.my-project register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_accounts setting.label_books
+      setting.label_categories setting.label_goal_log setting.label_goals setting.label_installments
+      setting.label_obligations setting.label_people setting.label_people__role__accountant
+      setting.label_people__role__client setting.label_people__role__collaborator setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_recurring setting.label_savings_goals
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts
+      setting.one_books setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by setting.one_recurring
+      setting.one_savings_goals setting.one_things setting.one_transactions setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty setting.voice_right_now
+      setting.voice_since_away
+    `,
+    declares: '35a0ceab0f8545ed',
+    history: ['`metric.log-streak` is added, the days in a row `register.goal_log` holds an entry, which the Days in a row widget draws; one id added and none taken away -> 35a0ceab0f8545ed'],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -1639,6 +1668,28 @@ const DECLARED: Record<string, Version> = {
     ],
   },
   /* 3.7.1: THE CARD'S SUMMARY IS ONE SHORT LINE. 3.7.0 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'founder@3.8.0': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
+      extends.register.datapoints.organisation extends.register.datapoints.about_service
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
+      metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
+      metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '49b914b6f4ae95e6',
+    history: ["`page.home-founder` is called Founder overview, not Today, beside the real Today; the Dashboard says in one line when no numbers came in thirty days, shows what went quiet and links to fixing the feed. No id added or taken away -> 49b914b6f4ae95e6"],
+  },
   'founder@3.7.1': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3

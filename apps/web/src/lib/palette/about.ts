@@ -16,7 +16,7 @@
  * The list's id and the number in it are in the address the row opens and nowhere a person reads.
  */
 
-import { since } from 'braindog-render';
+import { readable, since } from 'braindog-render';
 import type { About } from '@braindog/client';
 
 /** The fewest characters asked about. Two letters are the start of a word, and the search already answers those. */
@@ -84,6 +84,12 @@ function calledBy(name: string, also: readonly string[], typed: string): string 
   return also.find((a) => key(a).includes(t)) ?? null;
 }
 
+/** A place as a person reads it: the list's name, then the row's title cased as a person writes it, never bank capitals. */
+function placed(where: string): string {
+  const at = where.indexOf(': ');
+  return at === -1 ? readable(where) : `${where.slice(0, at + 2)}${readable(where.slice(at + 2))}`;
+}
+
 function line(kind: Kind, called: string | null, place: string | null): string {
   const what = called === null ? KINDS[kind].word : `${KINDS[kind].word}, ${aboutWords.also} ${called}`;
   return place === null ? what : `${what}. ${aboutWords.seen} ${place}`;
@@ -113,9 +119,9 @@ export function aboutRows(answer: About | null | undefined, typed: string, now: 
   if (is !== null) {
     /* THE NEWEST PLACE, whatever order they came in, with how long ago. */
     const last = [...is.seen].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0];
-    return [row(is, last === undefined ? null : `${last.where}, ${since(last.at, now)}`)];
+    return [row(is, last === undefined ? null : `${placed(last.where)}, ${since(last.at, now)}`)];
   }
-  return answer.candidates.slice(0, ABOUT_SHOWN).map((c) => row(c, c.seen[0] ?? null));
+  return answer.candidates.slice(0, ABOUT_SHOWN).map((c) => row(c, c.seen[0] === undefined ? null : placed(c.seen[0])));
 }
 
 /** A row as one sentence: "Northbank, a project. Seen in Notes: Kickoff, 2d ago". What a screen reader is told. */

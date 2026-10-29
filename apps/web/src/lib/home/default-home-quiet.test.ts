@@ -37,32 +37,36 @@ test('TODAY CARRIES ONE TILE OF WHAT WENT QUIET: what it is, since when and what
   assert.notEqual(b.lead, true);
 });
 
-test('IT STANDS AFTER THE VITAL SIGNS AND BEFORE THE WORK, with tasks or without', () => {
+/* THE BOARD'S ORDER (the widgets plan of 29 October): Needs you leads, then Late, then cash and the week; the record's
+   own state, its vital signs and what went quiet, follows them, before the key numbers. */
+const keyOf = (b: { key?: unknown } | undefined): unknown => b?.key;
+
+test('IT STANDS AFTER THE VITAL SIGNS AND BEFORE THE KEY NUMBERS, with tasks or without', () => {
   for (const holds of [{ ...ALL, health: true, quiet: true }, { tasks: false, adds: false, money: false, health: true, quiet: true }] as Holds[]) {
     const blocks = todayHome(holds).blocks;
     const at = blocks.findIndex((b) => b.source === 'exceptions');
     const signs = blocks.map((b, n) => (b.when?.metric === 'signs-red' ? n : -1)).filter((n) => n >= 0);
     assert.equal(signs.length, 2);
     assert.equal(at, signs[1]! + 1, 'straight after the line on the vital signs');
-    /* THE WORK: the first block that reads tasks or what fell due, which is Late on either record. */
-    const work = blocks.findIndex((b, n) => n > at && (b.source === 'deadlines' || b.source?.startsWith('register.')));
-    assert.equal(work, at + 1, 'straight before the work');
+    assert.equal(keyOf(blocks[at + 1]), 'numbers', 'straight before the key numbers');
     assert.ok(at > blocks.findIndex((b) => b.source === 'governance.open'), 'after what needs you');
+    assert.ok(at > blocks.findIndex((b) => b.heading === 'Late'), 'after what is late');
   }
-  /* WITHOUT THE HEALTH PAGE it still stands between what needs you and the work. */
+  /* WITHOUT THE HEALTH PAGE it stands straight after the cash, still before the key numbers. */
   const bare = todayHome({ ...ALL, quiet: true }).blocks;
   const at = bare.findIndex((b) => b.source === 'exceptions');
-  assert.equal(bare[at - 1]!.source, 'governance.open');
-  assert.equal(bare[at + 1]!.heading, 'Late');
+  assert.equal(keyOf(bare[at - 1]), 'cash');
+  assert.equal(keyOf(bare[at + 1]), 'numbers');
 });
 
 test('A RECORD THAT DOES NOT READ IT ONTO A PAGE DRAWS NO SUCH BLOCK, and is block for block as it was', () => {
   for (const holds of [ALL, { ...ALL, quiet: false }, { tasks: false, adds: false, money: false }] as Holds[]) assert.deepEqual(quietOf(holds), []);
   assert.deepEqual(todayHome({ ...ALL, quiet: false }), DEFAULT_HOME);
   assert.deepEqual(DEFAULT_HOME.blocks.filter((b) => b.source === 'exceptions'), []);
-  /* WITH IT, the one tile is all that is added. */
+  /* WITH IT, the one tile is all that is added, and its key on the phone's board. */
   const held = todayHome({ ...ALL, quiet: true });
-  assert.deepEqual({ ...held, blocks: held.blocks.filter((b) => b.source !== 'exceptions') }, DEFAULT_HOME);
+  assert.deepEqual({ ...held, phone: DEFAULT_HOME.phone, blocks: held.blocks.filter((b) => b.source !== 'exceptions') }, DEFAULT_HOME);
+  assert.deepEqual(held.phone?.order?.filter((k) => k !== 'quiet'), DEFAULT_HOME.phone?.order);
 });
 
 test('NO LIST AND NO ADD-ON IS NAMED IN IT: the tile is the same on every record, and its words are plain', () => {

@@ -183,7 +183,7 @@ const PROOF_GONE = 'That link from your mail has been used, has run out, or is f
  * a log or a link scanner's request. The page reads the two, clears the address, and posts them together on a press.
  * `&proof=` cannot appear inside either value, which are base64url.
  */
-const proofLink = (origin: string, inviteToken: string, proof: string): string => `${origin}/app/invite#${inviteToken}&proof=${proof}`;
+const proofLink = (origin: string, inviteToken: string, proof: string): string => `${origin}/invite#${inviteToken}&proof=${proof}`;
 
 type Header = readonly [string, string];
 

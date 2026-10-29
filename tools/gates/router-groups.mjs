@@ -256,7 +256,7 @@ export default function routerGroups(
    * checked by its signature. A row in another shape is a row this
    * gate cannot read, and that is a finding too.
    *
-   * AND THE PREFIX HAS TO REACH THE WORKER. Off `run_worker_first`, `/account/usage` is answered by the app shell with
+   * AND THE PREFIX HAS TO REACH THE WORKER, by name or under `/*`. Off `run_worker_first`, `/account/usage` is answered by the app shell with
    * a 200 and `index.html`, which looks like a route and is not one. `33 §4` names the prefix and every path.
    */
   let accountRoutes = [];
@@ -293,7 +293,7 @@ export default function routerGroups(
       }
 
       const wrangler = join(root, 'apps', 'worker', 'wrangler.jsonc');
-      if (accountRoutes.length > 0 && existsSync(wrangler) && !/"run_worker_first"\s*:\s*\[[^\]]*"\/account\/\*"/.test(readFileSync(wrangler, 'utf8')))
+      if (accountRoutes.length > 0 && existsSync(wrangler) && !/"run_worker_first"\s*:\s*\[[^\]]*"\/(?:account\/)?\*"/.test(readFileSync(wrangler, 'utf8')))
         findings.push("apps/worker/wrangler.jsonc does not send /account/* to the Worker first, so the app shell answers every account route");
 
       const contracts = join(root, 'docs', '33-CONTRACTS.md');

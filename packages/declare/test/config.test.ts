@@ -93,7 +93,8 @@ const bodyOf = (k: Kernel, id: string) => JSON.parse(k.declarations().find((d) =
 /* ── reading the settings ───────────────────────────────────────────────── */
 
 test('A SETTING OF A TYPE NO SETTING TAKES IS REFUSED WHEN THE PACK IS READ', async () => {
-  for (const type of ['ref', 'secret', 'file']) {
+  /* `secret` is a setting since round 1030 (it holds a key's label, never the secret), so ref and file are left. */
+  for (const type of ['ref', 'file']) {
     const r = refusal(await normalise(DOC({ config: { billing_contact: { type } } })));
     assert.deepEqual([r.code, r.at], ['CONFIG_TYPE_UNSUPPORTED', 'config.billing_contact.type']);
   }

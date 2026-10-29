@@ -5,6 +5,8 @@
  * version undoes this first, so a record two versions back is rebuilt as it was.
  */
 
+import { before1030 } from './first-party-1030.ts';
+
 type Body = Record<string, unknown>;
 
 /** Everyone as People 3.5.0 drew it: a table of the name, what they are and when you last spoke. */
@@ -35,7 +37,9 @@ const inPlay = (d: Body): Body => {
 /** A use case's document as the version before things, not rows declared it: its project pages for those in play alone. */
 export const useCaseThingsUndone = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).map(inPlay) });
 
-export function thingsUndone(id: string, doc: Body): Body {
+export function thingsUndone(id: string, now: Body): Body {
+  /* ROUND 1030 COMES OFF FIRST OF ALL, newer than every step below (`first-party-1030.ts`). */
+  const doc = before1030(id, now);
   const added = PAGES_ADDED[id];
   if (added) return { ...doc, declarations: (doc.declarations as Body[]).filter((d) => !added.has(String(d.page))) };
   if (id !== 'people') return doc;

@@ -89,12 +89,35 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       span: 12,
       cells: [
         { metric: 'kept-share-90d', label: 'Kept, 90 days' },
-        { metric: 'spent-30d', label: 'Spent, 30 days' },
-        { metric: 'received-30d', label: 'Came in, 30 days' },
+        { metric: 'spent-30d', label: 'Spent, last 30 days' },
+        { metric: 'received-30d', label: 'Received, last 30 days' },
         { metric: 'lasts-no-income', label: 'Lasts with no income' },
         { metric: 'cash-foreign-share', label: 'In other currencies' },
       ],
       when: { metric: 'out-by-month', gt: 0 },
+    },
+    {
+      /* WHAT IS ALREADY PROMISED, IN ONE PLAIN LINE UNDER HEALTH (round 1030): repeating bills and instalments as a share
+         of what comes in each month, with what it means past half, where one missed pay day leaves a month short. EACH PART
+         NAMED, SINCE money-core 3.32.0 (recheck of 30 October, N7): the sum read £11,317 beside Coming up's repeating out
+         of £10,692, which is the bills alone, with nothing saying the instalments were the difference. */
+      kind: 'note',
+      span: 12,
+      says: [
+        {
+          /* PAST ALL OF IT THE TWO AMOUNTS SAY IT, and not a share past a hundred. */
+          when: { metric: 'spoken-for-share', gt: 1 },
+          body: 'Repeating bills ({{every-month-out}}) and instalments ({{installments-a-month}}) come to {{spoken-for-month}} a month, more than the {{received-a-month}} a month that came in over the last three months.',
+        },
+        {
+          when: { metric: 'spoken-for-share', gt: 0.5 },
+          body: 'Repeating bills and instalments take {{spoken-for-share}} of what comes in each month, more than half, so one missed pay day leaves a month short.',
+        },
+        { body: 'Repeating bills and instalments take {{spoken-for-share}} of what comes in each month.' },
+      ],
+      /* NOT SAID UNTIL THE THREE MONTHS ARE THERE (`received-three-months-back`), so a new Ledger is not told a share of
+         one month read as three. */
+      when: { all: [{ metric: 'spoken-for-share', gt: 0 }, { metric: 'received-three-months-back', gt: 0 }] },
     },
     {
       /* SPENDING BY CATEGORY, IN THE MONTHS PICKED, one part a category in its own colour, with what nobody filed named
@@ -120,7 +143,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       source: 'register.transactions',
       where: `${MOVED}, direction is out, ${BACK}`,
       columns: [{ field: 'payee' }, { field: 'amount' }],
-      unset: 'No name yet',
+      unset: 'Not named yet',
       limit: 10,
       when: { metric: 'out-by-month', gt: 0 },
       empty: 'Nobody was paid.',
@@ -134,7 +157,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       source: 'register.transactions',
       where: `${MOVED}, direction is in, ${BACK}`,
       columns: [{ field: 'payee' }, { field: 'amount' }],
-      unset: 'No name yet',
+      unset: 'Not named yet',
       limit: 8,
       when: { metric: 'in-by-month', gt: 0 },
       empty: 'Nothing came in.',

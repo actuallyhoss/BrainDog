@@ -80,7 +80,7 @@ export function shipLogs(ship = SHIP) {
 /** What the notice says for one run: null when nothing needs saying. */
 export function noticeOf(lines, code, before) {
   const host = /watch: (\S+), from outside/.exec(lines.join('\n'))?.[1] ?? 'brain.dog';
-  if (code === 0) return before?.missed ? { title: `${host} is back`, body: 'The watch asked again and all seven answered.' } : null;
+  if (code === 0) return before?.missed ? { title: `${host} is back`, body: 'The watch asked again and all eight answered.' } : null;
   const at = lines.findIndex((l) => /^\s+MISS\s/.test(l));
   const first = at === -1 ? 'the watch could not run' : `${lines[at].trim().replace(/^MISS\s+/, '')}: ${(lines[at + 1] ?? '').trim()}`;
   const missed = /, (\d+) missed$/.exec(lines.at(-1) ?? '')?.[1] ?? '';

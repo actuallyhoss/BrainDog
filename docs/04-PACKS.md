@@ -246,7 +246,7 @@ Four properties of that screen, each deliberate:
 | Source | In the app | From a terminal |
 |---|---|---|
 | The Kennel ([14-KENNEL](14-KENNEL-AND-COMMUNITY.md) §1) | Add-ons, browsed and searched (`apps/web/src/lib/market/listing.ts`) | `braindog pack install freelancer-uk --from https://app.brain.dog/api/kennel/v1/`; `braindog pack search` reads the Kennel when no `--from` is named |
-| BrainDog's own catalogue, bundled with the build | Add-ons, beside the Kennel's | `braindog pack install freelancer-uk`, which reads the host's `/app/catalogue/` |
+| BrainDog's own catalogue, bundled with the build | Add-ons, beside the Kennel's | `braindog pack install freelancer-uk`, which reads the host's `/catalogue/` |
 | Any https address | "Install from anywhere" at `/packs`; the host fetches it (`fetchShared`), and refuses a private or local address | not yet: the terminal takes an id or a file |
 | A git ref | the same box, as `git:<owner>/<repo>@<ref>:<path>`, read as that file raw on GitHub | not yet |
 | A file | the same box, a file on this computer | `braindog pack install ./my.pack.json`, JSON or YAML |
@@ -561,7 +561,7 @@ The column "Meets" marks the six rulings that change what a person sees or is as
 | Ruling | The question | The ruling | Why | Taken | Whose | Meets | Held by |
 |---|---|---|---|---|---|---|---|
 | 285 | The eight things a spec review called overbuilt: cut or kept? | One line each in §9.1: seven kept with a reason, one cut. | He never asked for the cut, and keeping a thing on purpose is a different act from never deciding. | 9 October 2026 | by default | no | `packages/record/test/rulings.test.ts` |
-| 294 | What does configuring an add-on cover? | A setting is one of the eight types the code holds: text, enum, bool, money, day, duration, number or list. Never a reference, a secret or a file. | A manifest is a file people share, so it never holds a key or a file, and a setting never points into a list it did not declare. | 9 October 2026 | by default | no | `packages/kernel/test/rulings.test.ts` |
+| 294 | What does configuring an add-on cover? | A setting is one of the nine types the code holds: text, enum, bool, money, day, duration, number, list or secret, where a secret is only the label of a key in the record's keys (round 1030). Never a reference or a file. | A manifest is a file people share, so it never holds a key or a file, and a setting never points into a list it did not declare. | 9 October 2026 | by default | no | `packages/kernel/test/rulings.test.ts` |
 | 296 | Can Projects be switched off? | Yes, but only when no live field elsewhere points at the projects. | Money, Estate and Agents lean on Projects; a field left pointing at nothing names projects nobody can find. | 9 October 2026 | by default | no | `packages/kernel/test/rulings.test.ts` |
 | 297 | What happens to a switched-off add-on's scheduled work? | Its automations stop at once, in the same step that switches it off. Nothing is refunded, and nothing is armed again until it is switched on. | Left to the next wake, an add-on switched off and on again acted for an owner who had said stop. | 9 October 2026 | by default | no | `packages/kernel/test/rulings.test.ts` |
 | 298 | What may a key do once its add-on is switched off? | A call on that add-on's list is refused with a sentence that names the add-on; the rest of its reach still works. | A refusal that says "no such list" sends a person looking for a list that is only asleep. | 9 October 2026 | by default | yes | `packages/record/test/rulings.test.ts` |

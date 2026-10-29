@@ -15,7 +15,9 @@ export const ACCOUNTS_TILE: Record<string, unknown>[] = [
     icon: 'landmark',
     /* NO WIDTH OF ITS OWN, SINCE money-core 3.29.0, where it stood in a side column from 3.11.0: Money's home is one
        board of even pairs under the hero, and the app sets this beside the Ledger, or across the row alone. */
-    source: 'metric.cash-by-account',
+    /* EVERY OPEN ACCOUNT, THE CARD TOO, SINCE money-core 3.32.0 (`balance-by-account`): the card Money's first line
+       is about was missing from the tile under it. */
+    source: 'metric.balance-by-account',
     /* EVERY ACCOUNT CASH NOW ADDS UP, SINCE money-core 3.24.0: the line says "7 accounts" and the tile stopped at six. */
     limit: 12,
     /* ONLY WHILE THERE IS CASH TO CUT, SINCE money-core 3.8.0. An account at nought, or overdrawn, cuts no length of

@@ -801,7 +801,7 @@ test('A SWITCH ASKS THE RECORD ITSELF, and a name that only folds to a slug open
 /* ── a request that names its record ──────────────────────────────────── */
 
 test('A SESSION ASKED WITH A SLUG ANSWERS THAT RECORD FOR A MEMBER, the same 403 for everybody else, and writes no row', async () => {
-  /* THE BROWSER NOW NAMES ITS RECORD IN THE PATH (`/app/<slug>/api/…`), and this is the check that runs before the
+  /* THE BROWSER NOW NAMES ITS RECORD IN THE PATH (`/<slug>/api/…`), and this is the check that runs before the
      Worker addresses anything. It is `switch`'s own question without `switch`'s write: it runs on every request, and
      the Directory is the one writer the whole installation signs in through. */
   const raw = openSqlite();
@@ -832,7 +832,7 @@ test('A SESSION ASKED WITH A SLUG ANSWERS THAT RECORD FOR A MEMBER, the same 403
   assert.deepEqual(named.body, { person: ada, email: 'ada@example.com', record: shop, provedAt: NOW, passkey: false });
   assert.equal(named.session, undefined, 'a named read minted a cookie');
   assert.deepEqual(writes, [], 'asking which record a slug names wrote the session row');
-  /* THE ROW STILL SAYS WHERE THE SESSION WAS OPENED, so bare `/app` goes back there and not to the last tab read. */
+  /* THE ROW STILL SAYS WHERE THE SESSION WAS OPENED, so the bare app goes back there and not to the last tab read. */
   assert.equal(ok(await d.auth({ flow: 'session', sid })).body.record, studio);
 
   /* SOMEBODY ELSE'S RECORD, A CLOSED ONE, A NAME NOBODY HOLDS, A SPOKEN ID AND GARBAGE: ONE ANSWER, WORD FOR WORD. A

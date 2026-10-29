@@ -85,5 +85,5 @@ Each token may make 600 reads and 120 writes a minute. Past either, the answer i
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

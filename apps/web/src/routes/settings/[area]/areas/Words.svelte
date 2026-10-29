@@ -100,6 +100,7 @@
     one: 'One is called',
     says: 'What it says',
     whose: (name: string) => `From your ${name} starter. Clear a box to put its word back.`,
+    from: (name: string) => `From your ${name} starter.`,
     ownerOnly: (name: string) => `From your ${name} starter. Only the owner changes them.`,
     more: (n: number) => (n === 1 ? 'Show 1 more line' : `Show ${n} more lines`),
     fewer: 'Show fewer',
@@ -422,13 +423,17 @@
   </Tile>
 
   {#if spoken && voice && all.length > 0}
-    <p class="hint">{owner ? words.whose(voiceName) : words.ownerOnly(voiceName)}</p>
+    <!-- WHERE THE WORDS CAME FROM IS SAID INSIDE THE FIRST TILE (Q19 of 29 October): between the tiles it floated as a
+         stray line. Only a page with no list tile keeps it on its own. -->
+    {#if !owner || spoken.lists.length + others.length === 0}
+      <p class="hint">{owner ? words.whose(voiceName) : words.ownerOnly(voiceName)}</p>
+    {/if}
 
     {#if owner}
       <form class="words" bind:this={form} onsubmit={submit} novalidate>
         {#if spoken.lists.length + others.length > 0}
           <Tile icon="rows" title={words.lists} count={spoken.lists.length + others.length}>
-            <p class="hint">{words.listsHint}</p>
+            <p class="hint">{words.from(voiceName)} {words.listsHint}</p>
             <div class="lists">
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">

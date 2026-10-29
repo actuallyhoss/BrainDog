@@ -41,3 +41,8 @@ test('Needs you comes second, after Today, as the bar draws it', () => {
   assert.deepEqual(decideSecond(main).map((i) => i.key), ['today', 'decide', 'work', 'money', 'activity', 'people']);
   assert.deepEqual(decideSecond(main.filter((i) => i.key !== 'decide')).map((i) => i.key), ['today', 'work', 'money', 'activity', 'people']);
 });
+
+test('a list with no singular the voice knows is said whole, never "every people"', () => {
+  const said = foldSaid(Array.from({ length: 3 }, () => ({ row: true, register: 'people' })), [{ id: 'people', name: 'People', count: 3 }]);
+  assert.equal(said, 'Pages of all the people');
+});

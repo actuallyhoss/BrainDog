@@ -39,6 +39,7 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import Tile from '$lib/ui/Tile.svelte';
+  import ShipsWidgets from '$lib/board/ShipsWidgets.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
@@ -561,6 +562,7 @@
       {/if}
       <p class="turn-said" role="status">{turnSaid}</p>
       {#if waits}<p class="waits">{waits}</p>{/if}
+      <ShipsWidgets pack={id} {name} on={!installed?.disabled_at} />
      </Tile>
     </div>
 
@@ -736,6 +738,7 @@
 
                   {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
                   {#if decl.note && !shared.includes(decl.note)}<p class="setting-note">{decl.note}</p>{/if}
+                  {#if decl.type === 'secret'}<p class="setting-note">{copy.settingSecretSaid(d.text || String(decl.default ?? ''))} <a href={at('/keychain')}>{copy.settingSecretOpen}</a></p>{/if}
                   {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{why}</p>{/if}
                 </div>
               {/if}

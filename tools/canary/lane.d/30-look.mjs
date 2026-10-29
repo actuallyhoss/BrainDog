@@ -30,10 +30,10 @@ export const onRed = 'finding';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 
-/** A failed request's record path, `/app/<slug>` taken off as the look's server takes it, and its status. */
+/** A failed request's record path, `/<slug>` taken off as the look's server takes it, and its status. */
 const failed = (line) => {
   const m = /^[A-Z]+ (\S+): (\d{3})$/u.exec(String(line));
-  return m === null ? null : { path: m[1].replace(/^\/app\/[a-z][a-z0-9-]*[a-z0-9](?=\/api(?:\/|$))/u, ''), status: Number(m[2]) };
+  return m === null ? null : { path: m[1].replace(/^\/[a-z][a-z0-9-]*[a-z0-9](?=\/api(?:\/|$))/u, ''), status: Number(m[2]) };
 };
 
 /**

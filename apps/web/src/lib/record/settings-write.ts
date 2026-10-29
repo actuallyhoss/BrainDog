@@ -215,7 +215,7 @@ export async function removeAccess(base: string, p: Person, io?: Fetch): Promise
  * The link an invitation is opened at. The token rides in the fragment, so it never reaches a server log, a proxy or a
  * `Referer`: `/invite` reads it and clears it before anything else.
  *
- * `/app/invite` AND NO SLUG. The token names its record, and the person opening it is on no record yet, or on another.
+ * `/invite` AND NO SLUG. The token names its record, and the person opening it is on no record yet, or on another.
  */
 export const inviteLink = (origin: string, token: string): string => `${origin.replace(/\/+$/, '')}${BASE}/invite#${token}`;
 

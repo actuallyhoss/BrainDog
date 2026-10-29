@@ -19,5 +19,7 @@ test('Browse and Installed say one count of the add-ons in this BrainDog', () =>
   const browse = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   const installed = readFileSync(new URL('./Installed.svelte', import.meta.url), 'utf8');
   assert.doesNotMatch(browse, /words\.sentence\(|states\.length|\.filter\([^)]*installed/u, 'the store counts what the record holds its own way');
-  assert.match(installed, /words\.sentence\(installedCount\(states\) \?\? 0,/u);
+  /* AND THE HEADLINE COUNTS THE ADD-ONS ITS LIST SHOWS (`addons`), the built-ins and the starter left out, once the record
+     has answered at all (29 October). */
+  assert.match(installed, /words\.sentence\(installedCount\(states\) === null \? 0 : addons\.length,/u);
 });

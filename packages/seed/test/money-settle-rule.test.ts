@@ -123,7 +123,9 @@ test('a Ledger entry written with its bill in Settles starts the script once, ha
   const theBill = m.bill();
   const pay = m.paid(150_000, '2026-09-28', { settles: theBill.id });
   await m.k.drain();
-  assert.deepEqual(m.queued(), [{ script: 'settle', version: 1, input: { id: pay.id, register: 'transactions', seq: pay.seq, payment: pay.id, item: theBill.id } }]);
+  /* `settle` ONCE; BESIDE IT SINCE money-core 3.31.0, the check every cleared line starts for a line posted for it. */
+  assert.deepEqual(m.queued().filter((q) => q.script === 'settle'), [{ script: 'settle', version: 1, input: { id: pay.id, register: 'transactions', seq: pay.seq, payment: pay.id, item: theBill.id } }]);
+  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'replace_posted']);
 });
 
 test('an entry that gains Settles later starts it then, and an edit to its words starts nothing more', async () => {
@@ -169,6 +171,8 @@ test('a bill paid short stays part paid with the sum, and the payment that reach
   await m.turn();
   const short = m.k.get(theBill.id)!.fields;
   assert.deepEqual([short.state, short.paid_so_far, short.settled], ['part', gbp(150_000), undefined], m.log.join(' '));
+  /* AND THE POSTED-LINE CHECK'S ONE LINE, SINCE money-core 3.31.0: no line posted for this payment. */
+  /* THE POSTED-LINE CHECK SAYS NOTHING when no line posted for you is the same money: an ordinary payment leaves no note. */
   assert.deepEqual(m.log, ['Studio rent is part paid: GBP 1,500 of GBP 4,000.']);
 
   m.paid(250_000, '2026-10-02', { settles: theBill.id });

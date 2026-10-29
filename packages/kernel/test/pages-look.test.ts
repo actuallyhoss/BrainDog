@@ -294,7 +294,7 @@ test("THE READER'S OWN MARK SAYS WHAT CHANGED SINCE THEY LOOKED, not the record'
 test('A BLOCK ALREADY REFUSED AND THEN HELD STILL COUNTS AS HELD: the shell answers its one sentence in place of the old', async () => {
   const k = await record();
   const now = defaultBlockKey(DESK.blocks[3]);
-  const odd: PageDecl = { ...DESK, blocks: DESK.blocks.map((b, i) => (i === 3 ? ({ ...b, size: 2 } as PageBlock) : b)) };
+  const odd: PageDecl = { ...DESK, blocks: DESK.blocks.map((b, i) => (i === 3 ? ({ ...b, width: 2 } as unknown as PageBlock) : b)) };
   const slash = { look: 'desk', basis: 'b', by: 'slash', lead: now, next: { row: 'tasks#1', text: 'Pay HSBC' } };
   const shell = (b: BlockResult): BlockResult => (b.heading === 'Now' ? { ...holdFrom('tasks')(b), refusals: [{ code: 'FORBIDDEN', fix: 'You may not open this list.' }] } : b);
   assert.equal(read(depsOver(k, { pages: () => [odd] })).blocks.find((b) => b.heading === 'Now')?.refusals.length, 1, 'refused before the hold');

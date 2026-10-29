@@ -40,7 +40,11 @@ test('EVERY ACCOUNT, BILL AND SERVICE HAS A PAGE, its lead card drawn from its o
     for (const p of pages.slice(0, 4)) {
       const blocks = blocksOf(k, p.slug);
       assert.deepEqual(refusalsOf(blocks), [], `${p.slug} refuses nothing`);
-      const lead = blocks[0]!;
+      /* AN ACCOUNT'S PAGE OPENS ON ITS NAME AND WHAT IT HOLDS SINCE money-core 3.32.0 (audit of 30 October, 19), its two
+         figures of its own row, and the card of its row stands under them. */
+      const opens = register === 'accounts' ? blocks[0]!.kind === 'stat' : true;
+      assert.ok(opens, `${p.slug} does not open on what the account holds`);
+      const lead = blocks.find((b) => b.kind === 'cards')!;
       assert.equal(lead.kind, 'cards');
       assert.equal(lead.rows?.length, 1, `${p.slug} leads with its own row, and only it`);
     }

@@ -38,8 +38,8 @@
 
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
-import type { ActionRequest, Execute } from '@braindog/host/actions';
-import { CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads } from '@braindog/host/script';
+import type { ActionRequest, Execute, OpenKey } from '@braindog/host/actions';
+import { addressed, CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
@@ -72,6 +72,13 @@ export const KEY_HEADER = 'x-braindog-key';
  * need not be. Read for the user name only (`ScriptRuns.answer` says why), and stripped like the other two.
  */
 export const URL_HEADER = 'x-braindog-url';
+/**
+ * The header `ctx.fetch(null, { address })` names the key holding the address in (round 1030). The module sends such a
+ * request to `ADDRESS_STAND_IN`, which never leaves this gateway: the address is opened here, held to the egress by
+ * `addressed`, and sent with no key. Stripped like the others.
+ */
+export const ADDRESS_HEADER = 'x-braindog-address';
+export const ADDRESS_STAND_IN = 'https://address.braindog.invalid/';
 
 /** A provider gets ten seconds and two megabytes, as a `call` does. */
 const TIMEOUT_MS = 10_000;
@@ -100,6 +107,8 @@ export type ScriptCall =
       headers: Record<string, string>;
       body: string | null;
       key: string | null;
+      /** The key whose secret is the address to fetch, or absent: `HostRequest.address`. */
+      address?: string | null;
     }
   /** `options` is `ctx.record.list`'s third argument as the script wrote it, or `null`: `scriptReads` reads it. */
   | { op: 'list'; register: string; where: Json; options: Json }
@@ -142,7 +151,7 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
     const run = request.headers.get(RUN_HEADER);
     if (run === null) throw new Error(BARE);
     const headers: Record<string, string> = {};
-    for (const [name, value] of request.headers) if (name !== RUN_HEADER && name !== KEY_HEADER && name !== URL_HEADER) headers[name] = value;
+    for (const [name, value] of request.headers) if (name !== RUN_HEADER && name !== KEY_HEADER && name !== URL_HEADER && name !== ADDRESS_HEADER) headers[name] = value;
     const body = request.method === 'GET' || request.method === 'HEAD' ? null : await request.text();
     const stamped = request.headers.get(URL_HEADER);
     let asked: string | null = null;
@@ -160,6 +169,7 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
       headers,
       body,
       key: request.headers.get(KEY_HEADER),
+      address: request.headers.get(ADDRESS_HEADER),
     });
     if ('error' in reply) throw new Error(reply.error);
     return Response.json(reply.ok);
@@ -263,6 +273,8 @@ type Turn = {
   job: string;
   send: Execute;
   grant: (label: string) => ScriptGrant | null;
+  /** Opens a key's secret for an address held in the keys (`addressed`); absent or `null`, such a fetch is told no. */
+  openKey?: OpenKey | null | undefined;
   read: ScriptReads | undefined;
   /** `ctx.fold` for this run and no other: `scriptFold` counts what one run asks, as the self-host's runner does. */
   fold: ScriptFold;
@@ -398,6 +410,19 @@ export class ScriptRuns {
       return { ok: await turn.propose.propose(call.proposal) };
     }
 
+    /* AN ADDRESS HELD IN THE KEYS: the label held to `keys`, the key opened here and read by `addressed`, as on the
+       self-host, and the request it names sent in place of the stand-in with no key. Every check below then runs on it. */
+    if (typeof call.address === 'string' && call.address !== '') {
+      if (!decl.keys.includes(call.address))
+        return refuse({ code: 'FORBIDDEN', why: `${decl.id} asked for the address in the key ${JSON.stringify(call.address)}, which it does not declare.` });
+      const held = turn.grant(call.address);
+      if (held === null) return { error: `The key "${call.address}" is not in the keychain, so nothing was sent. Put the link in your keys under that name.` };
+      const secret = turn.openKey ? await turn.openKey(held) : null;
+      if (secret === null) return { error: `The key "${call.address}" could not be opened, so nothing was sent.` };
+      const read = addressed(decl.id, decl.egress, held, secret);
+      if (!('url' in read)) return refuse(read);
+      call = { ...call, url: read.url.href, asked: null, method: 'GET', headers: {}, body: null, key: null, address: null };
+    }
     let url: URL;
     try {
       url = new URL(call.url);
@@ -502,6 +527,11 @@ export default class extends WorkerEntrypoint {
         if (given.headers !== null && typeof given.headers === 'object')
           for (const [name, value] of Object.entries(given.headers)) headers.set(name, String(value));
         headers.set('${RUN_HEADER}', run);
+        if (typeof given.address === 'string') {
+          headers.set('${ADDRESS_HEADER}', given.address);
+          const r = await fetch('${ADDRESS_STAND_IN}', { method: 'GET', headers });
+          return r.text();
+        }
         headers.set('${URL_HEADER}', encodeURIComponent(String(url)));
         if (typeof given.key === 'string') headers.set('${KEY_HEADER}', given.key);
         const method = typeof given.method === 'string' ? given.method.toUpperCase() : 'GET';
@@ -564,6 +594,8 @@ export type ScriptWiring = {
    * with what it opens, which decides where the key may go.
    */
   grant: (label: string) => ScriptGrant | null;
+  /** Opens a key's secret, for a fetch whose address is held in the keys. Absent: such a fetch is told no. */
+  openKey?: OpenKey | null | undefined;
   /** Live reads, scoped to a run's `reads` and signed as its actor. Absent: `ctx.record` refuses. */
   read?: ((scripted: Scripted) => ScriptReads) | ScriptReads | undefined;
   /** `ctx.propose` for a run, its queue and count (`scriptProposals`). Absent: the script is handed no `ctx.propose`. */
@@ -654,7 +686,7 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
 
   const read = typeof wiring.read === 'function' ? wiring.read(s) : wiring.read;
   const propose = wiring.propose?.(s);
-  const run = wiring.runs.open({ decl: full, limits, job: s.job.id, send: wiring.send(decl.egress), grant: wiring.grant, read, propose });
+  const run = wiring.runs.open({ decl: full, limits, job: s.job.id, send: wiring.send(decl.egress), grant: wiring.grant, openKey: wiring.openKey ?? null, read, propose });
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     /* `load`, NOT `get`: A FRESH WORKER FOR EVERY RUN. `get` caches by id, and the id was `<record>:<script>:v<n>`, so

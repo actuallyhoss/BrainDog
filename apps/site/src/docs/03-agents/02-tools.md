@@ -90,5 +90,5 @@ A refusal names the field and the fix, such as "A note is at most 280 characters
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

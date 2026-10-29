@@ -274,7 +274,9 @@ function pagesOffered(deps: PenDeps): Made[] {
       kind: 'page',
       register: list.id,
       title: list.name,
-      why: `${list.name} has ${list.rows.toLocaleString('en')} ${list.rows === 1 ? 'entry' : 'entries'} and no page yet.`,
+      /* IT OPENS AS A LIST ALREADY, from the sidebar or More lists, so "no page yet" read as false beside it (30 October):
+         what is offered is a page of its own over the list. */
+      why: `${list.name} opens as a plain list of ${list.rows.toLocaleString('en')} ${list.rows === 1 ? 'entry' : 'entries'}. A page of its own would lay ${list.rows === 1 ? 'it' : 'them'} out.`,
       change: { to: { id: `page.${slug}`, kind: 'page', body } },
       list: list.id,
       draft: { id: `page.${slug}`, kind: 'page', body },

@@ -13,7 +13,7 @@ const url = (rest: string) => new URL(`https://brain.example${rest}`);
 
 test('the address asks only with the mark set to 1', () => {
   assert.equal(describeAsked(url('/p/wedding?describe=1')), true);
-  assert.equal(describeAsked(url('/app/mara/p/wedding?src=0&describe=1#guests')), true);
+  assert.equal(describeAsked(url('/mara/p/wedding?src=0&describe=1#guests')), true);
   assert.equal(describeAsked(url('/p/wedding')), false);
   assert.equal(describeAsked(url('/p/wedding?src=1')), false);
   assert.equal(describeAsked(url('/p/wedding?describe=0')), false);
@@ -28,7 +28,7 @@ test('the same address with the mark gone, and every other part kept', () => {
   assert.equal(withoutDescribe(url('/p/wedding?src=1&describe=1')), '/p/wedding?src=1');
   assert.equal(withoutDescribe(url('/p/wedding?describe=1&src=1&tab=guests')), '/p/wedding?src=1&tab=guests');
   assert.equal(withoutDescribe(url('/p/wedding?describe=1#guests')), '/p/wedding#guests');
-  assert.equal(withoutDescribe(url('/app/mara/p/wedding?describe=1&src=1#guests')), '/app/mara/p/wedding?src=1#guests');
+  assert.equal(withoutDescribe(url('/mara/p/wedding?describe=1&src=1#guests')), '/mara/p/wedding?src=1#guests');
   /* An address that never asked is answered as it is. */
   assert.equal(withoutDescribe(url('/p/wedding?src=1#guests')), '/p/wedding?src=1#guests');
   assert.equal(withoutDescribe(url('/p/wedding')), '/p/wedding');

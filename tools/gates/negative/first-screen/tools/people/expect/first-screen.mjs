@@ -9,7 +9,7 @@ const file = process.argv[process.argv.indexOf('--as') + 1];
 const name = JSON.parse(readFileSync(file, 'utf8')).name;
 const red = name === 'Mariam';
 
-console.log(`/app/ at 1440 wide (the rail and Today, just kept, before anything was told), as ${name}`);
+console.log(`/ at 1440 wide (the rail and Today, just kept, before anything was told), as ${name}`);
 console.log('  no-tour: green. no tour, checklist or sample entries');
 console.log(red ? '  rail-has-rows: red. the rail holds Money, and Money holds nothing yet' : '  rail-has-rows: green. the rail holds no place besides Today, Decide and People');
 console.log('  pages-line: green. "New page" once, under the rail\'s own "Pages"');

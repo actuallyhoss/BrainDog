@@ -159,7 +159,8 @@ function aboveTheFold(blocks: readonly Block[]): string[] {
 }
 
 test('AT MOST SIX TILES BEFORE EACH FOLD AT 1440, in the order each page names', () => {
-  assert.deepEqual(aboveTheFold(blocksOf('people')), ['Waiting on you', 'note', 'Everyone', 'Organisations', 'note', 'What agents did']);
+  /* NO ORGANISATIONS TABLE SINCE People 4.1.0: the organisations are their own list, and People says how many in a line. */
+  assert.deepEqual(aboveTheFold(blocksOf('people')), ['Waiting on you', 'note', 'Everyone', 'note', 'What agents did']);
   assert.deepEqual(aboveTheFold(blocksOf('estate')), ['Points at nothing', 'Lapsing', 'Waiting on you', 'Each month, by type', 'Next ninety days']);
   /* AND WITH THE SERVER AND PROVIDER NUMBERS A FOUNDER'S RECORD LAYS UNDER WHAT RENEWS, the sixth and not a seventh. */
   const estate = [...blocksOf('estate')];

@@ -102,7 +102,7 @@ test('THE KEY NUMBERS LIST IS THE CONTRACT: every field and every enum value is 
 });
 
 test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and founder 3.0.0 hands Numbers to it and lays its two links', () => {
-  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.30.0');
+  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.30.1');
   const m = firstPartyManifest('portfolio');
   assert.deepEqual(m.requires, []);
   for (const id of ['register.datapoints', 'register.kpis', 'metric.kpis-held', 'metric.kpi-stale']) assert.ok(m.provides.includes(id), id);
@@ -111,8 +111,9 @@ test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and found
      3.2.0 since its project page draws Portfolio 1.23.0's stages, and 3.3.0 since it declares the project's shape as
      blocks, and 3.4.0 since Last worked reads the runs too and the Dashboard says how old its numbers are, and 3.6.0
      beside Portfolio 1.27.0's Add a project box, and 3.7.0 since its project page draws the page of 27 October, and
-     3.7.1 since its card's summary is one short line. */
-  assert.equal(doc.version, '3.7.1');
+     3.7.1 since its card's summary is one short line, and 3.8.0 since its page is Founder overview and the Dashboard
+     says what went quiet with the way to fix the feed. */
+  assert.equal(doc.version, '3.8.0');
   assert.equal(doc.hands['register.datapoints'], 'portfolio');
   assert.ok(!doc.declarations.some((d) => d.register === 'datapoints'), 'founder declares Numbers no more');
   assert.ok(!(doc.seeds ?? []).some((s) => s.register === 'datapoints'), 'and seeds no list it does not own');

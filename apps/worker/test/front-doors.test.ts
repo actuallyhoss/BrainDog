@@ -50,7 +50,7 @@ test('A THROW AT THE FRONT DOOR ANSWERS A REFERENCE AND NOTHING OF WHAT WAS THRO
   const env = { PUBLIC_HOST: HOST, BRAINDOG_BUILD: '', DIRECTORY: throwing, RECORD: throwing, INGRESS: { send: async () => {} } };
   const asks: [string, RequestInit][] = [
     ['/api/boot', {}],
-    ['/app/acme/api/boot', {}],
+    ['/acme/api/boot', {}],
     [
       '/mcp',
       {
@@ -158,7 +158,11 @@ test('A CRASH LINE NAMES THE DOOR, NEVER A TOKEN OR A NAME IN THE PATH', () => {
   assert.equal(doorPath('/in/email/abc123secret'), '/in');
   assert.equal(doorPath('/auth/claim/abc123secret'), '/auth');
   assert.equal(doorPath('/app/acme/r/tasks'), '/app');
-  assert.equal(doorPath('/apiary'), '/apiary');
+  assert.equal(doorPath('/apiary'), '/');
+  /* THE APP IS AT THE ROOT NOW, SO A SLUG IS THE FIRST SEGMENT, and the line drops it there as it did after `/app`. */
+  assert.equal(doorPath('/acme/api/list'), '/api/list');
+  for (const path of ['/acme/r/tasks', '/acme', '/acme/', '/the-studio/settings/agents'])
+    assert.ok(!/acme|studio/u.test(doorPath(path)), `${path} logs a record's name as ${doorPath(path)}`);
 });
 
 test('AN ACK\'S outbox LINE: its state and attempts, and for a connector the ingest and the status the provider answered', () => {

@@ -21,7 +21,7 @@ const SCREEN = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
 const optsFor = (pages: readonly string[] | undefined) => ({
   link: rowHref,
   dayHref: (iso: string) => dayHref(pages, iso),
-  href: (path: string) => at(path, '/app/acme/r/tasks/7'),
+  href: (path: string) => at(path, '/acme/r/tasks/7'),
 });
 
 const NOTE = parse('Send it by {{date:2026-11-03}}.');
@@ -41,7 +41,7 @@ test('THE SCREEN HANDS THE RENDERER WHERE A DAY OPENS, read from the pages the r
 
 test('WITH A CALENDAR PAGE, a date in the note links to that day on it, under the app', () => {
   const html = toHTML(NOTE, optsFor(['home', 'calendar']));
-  assert.match(html, /<a href="\/app\/acme\/p\/calendar\?day=2026-11-03">/);
+  assert.match(html, /<a href="\/acme\/p\/calendar\?day=2026-11-03">/);
 });
 
 test('WITHOUT ONE, the date is plain text and the words are the same', () => {

@@ -33,8 +33,8 @@ test('LATE IS ONE LIST: tasks then money, how late each is, an amount where ther
     { cells: ['Send the proofs', '2 Oct 2026'], fields: { by: '2026-10-02' } },
   ]);
   const money = block('spec', ['title', 'amount', 'day'], [
-    { cells: ['Legal review', '−GBP 9,190.00', '3 months late'], fields: { day: '2026-07-01', amount: gbp(919000), direction: 'out' }, href: '/r/obligations/2' },
-    { cells: ['Invoice 2026-041', '+GBP 4,800.00', '5 weeks late'], fields: { day: '2026-08-28', amount: gbp(480000), direction: 'in' } },
+    { cells: ['Legal review', '−GBP 9,190.00', '93 days late'], fields: { day: '2026-07-01', amount: gbp(919000), direction: 'out' }, href: '/r/obligations/2' },
+    { cells: ['Invoice 2026-041', '+GBP 4,800.00', '35 days late'], fields: { day: '2026-08-28', amount: gbp(480000), direction: 'in' } },
     { cells: ['Certificate', '−GBP 0.00', '1 day late'], fields: { day: '2026-10-01', amount: gbp(0), direction: 'out' } },
   ]);
   const lines = lateLines([tasks, money], TODAY);
@@ -43,8 +43,8 @@ test('LATE IS ONE LIST: tasks then money, how late each is, an amount where ther
     [
       ['Renew the domain', '2 days late', null, true, 1, '/r/tasks/4'],
       ['Send the proofs', 'Due today', null, false, 2, null],
-      ['Legal review', '3 months late', { text: '−GBP 9,190.00', dir: 'out' }, true, null, '/r/obligations/2'],
-      ['Invoice 2026-041', '5 weeks late', { text: '+GBP 4,800.00', dir: 'in' }, true, null, null],
+      ['Legal review', '93 days late', { text: '−GBP 9,190.00', dir: 'out' }, true, null, '/r/obligations/2'],
+      ['Invoice 2026-041', '35 days late', { text: '+GBP 4,800.00', dir: 'in' }, true, null, null],
       /* NOTHING TO PAY IS NO AMOUNT. */
       ['Certificate', '1 day late', null, true, null, null],
     ],

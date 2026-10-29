@@ -14,5 +14,12 @@
  */
 export const MONEY = 'money';
 
+/**
+ * WHAT IS LEFT TO FILE, ONE SENTENCE FOR EVERY COUNT AND LIST OF IT (Q2 of 29 October): the Ledger said "82 lines to
+ * file" over a "Not filed yet" list of 88, because the count read cleared lines of the last 91 days and the list every
+ * line not void. A line still pending can be filed as well as a cleared one, and an old one is as unfiled as a new one.
+ */
+export const UNFILED = 'state is not void, transfer is false, category is empty, parts is empty';
+
 /** The first of 2100 as whole days since 1970: a day no walk of a year reaches, which `runs-out-on` is held to. */
 export const RUNS_OUT_NEVER = Date.UTC(2100, 0, 1) / 86_400_000;

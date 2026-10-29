@@ -140,7 +140,7 @@ test('A STRANGER’S WHOLE PAID LIFE, FREE TO DELETED, THROUGH THE REAL DOORS AN
     /* free: a record made there and then, on Free, with no Stripe call. */
     const made = value<{ record: string; slug: string; url: string }>(await w.doors.checkout!(w.who, { plan: 'free', slug: 'kiln-diary', name: 'Wren Hollis' }));
     record = made.record;
-    assert.equal(made.url, 'https://alpha.example.test/app/kiln-diary/start');
+    assert.equal(made.url, 'https://alpha.example.test/kiln-diary/start');
     assert.deepEqual([(await w.listed(record))?.plan, (await w.listed(record))?.state], ['free', 'unbilled']);
     assert.equal(w.usageOf(record)?.slash.included, PLAN_TABLE.free.credits);
     assert.equal(w.stripe.asked.length, 0, 'Free asked Stripe something');

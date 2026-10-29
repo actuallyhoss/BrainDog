@@ -25,7 +25,7 @@
   import { runOf } from '$lib/ui/face.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { agoSaid, daysOf, whenSaid } from './said.ts';
-  import { momentsOf, noteSaid, timelineWords as words } from './timeline.ts';
+  import { lineWhole, momentsOf, noteSaid, timelineWords as words } from './timeline.ts';
 
   let {
     on,
@@ -190,9 +190,10 @@
           <!-- WHO, BY `actor`, SO THE FACE IS DRAWN BY KIND: a rule wears the automations glyph and BrainDog its mark,
                and an agent's line wears its run. -->
           {@const w = who(m.event.by)}
+          {@const whole = m.event.settled ? null : lineWhole(m.event.by, m.event.note)}
           <li class="event">
             <Face name={w.name} kind={w.kind} run={runOf(m.event.by)} size="s" />
-            <p class="event-line"><span class="by">{m.event.settled ?? w.name}</span> {noteSaid(m.event.note)}</p>
+            <p class="event-line">{#if whole}{whole}{:else}<span class="by">{m.event.settled ?? w.name}</span> {noteSaid(m.event.note)}{/if}</p>
             <time class="when" datetime={m.event.at}>{whenSaid(m.event.at, now)}</time>
           </li>
         {:else if m.thread.comment.resolved}

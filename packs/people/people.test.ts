@@ -187,14 +187,15 @@ function waits(doc: File): { at: string; holds: unknown }[] {
 
 const kindOf = (d: Body): string => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else';
 
-test('THE FILE IS DATA AND ONLY ITS OWN: no script, two lists, three pages, seven figures over those lists, three rules', () => {
+test('THE FILE IS DATA AND ONLY ITS OWN: no script, two lists, three pages, eight figures over those lists, three rules', () => {
   const doc = file();
   assert.equal(doc.pack, 'people');
   const kinds = doc.declarations.map(kindOf);
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 2, page: 3, metric: 7, rule: 3 },
-    'two lists, three pages, seven figures and three rules',
+    /* EIGHT SINCE 4.2.0: organisations you work with apart from shops from card texts (`organisations-known`). */
+    { register: 2, page: 3, metric: 8, rule: 3 },
+    'two lists, three pages, eight figures and three rules',
   );
   assert.ok(!kinds.includes('script') && !kinds.includes('something else'), 'the file declares a script, or something that is none of the four');
   assert.doesNotMatch(JSON.stringify(doc.declarations), /"script":|"egress"|"hosts"/u, 'a step that runs a script or reaches out');
@@ -219,8 +220,9 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
   /* 3.6.0 SINCE 24 October (things, not rows): Everyone as faces, the owner left off. 3.5.0 is released. 3.7.0
      SINCE 24 October: Scripts is a page. 3.8.0 SINCE 25 October: an organisation can be retired. 3.9.0
      SINCE 27 October: one line a person, and shops from card texts apart. 4.0.0 SINCE 27 October: Health, Scripts,
-     Calendar and Activity leave for core. */
-  assert.equal(doc.version, '4.0.0');
+     Calendar and Activity leave for core. 4.1.0 SINCE 29 October: organisations are one place and one count. 4.2.0
+     SINCE 29 October: organisations you work with apart from shops. 4.2.1 SINCE 29 October: one organisations count. */
+  assert.equal(doc.version, '4.2.1');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -353,14 +355,14 @@ function project(api: Api, name: string): string {
 const PERSON = { name: 'Ines Varga', email: 'ines@kiln.example', note: 'Draws the plans.' };
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same fifteen parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same sixteen parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const people = await ours();
-    assert.equal(people.length, 15);
+    assert.equal(people.length, 16);
     for (const id of people) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

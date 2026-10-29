@@ -62,7 +62,7 @@ export const account = {
      the two disagreeing about what the record is called. */
   /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE: a record named after its owner read "Delete Marta". */
   deleteWhat: (record: string): string => `Deletes every list and page in ${record}, and all they hold. It cannot be undone.`,
-  deleteRecord: 'Delete this record',
+  deleteRecord: 'Delete my BrainDog',
   holdingPen: 'Not placed. Nothing moved.',
 
   /* settings */
@@ -126,7 +126,7 @@ export const account = {
      invitation that has not been accepted, at level `append`, which reads nothing — so three of the
      four could see the record and the fourth could not, for two independent reasons, both printed
      within two hundred pixels of the heading counting them. */
-  whoCanSee: 'People on this record',
+  whoCanSee: 'Who can see this BrainDog',
   /* `19 §9` bans `ceiling` and `scope` by name and says: say WHAT THEY CAN SEE. And it says the
      thing this line exists for — a level here is over the whole record, not one list. */
   /**

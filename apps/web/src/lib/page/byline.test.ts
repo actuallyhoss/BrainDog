@@ -130,11 +130,11 @@ const line = (by: Byline['by'], name: string, h: number): Byline => ({
 
 test('THE WEEK’S CHANGES ARE ONE LINE, said by who made them when it is one kind, and nothing when there are none', () => {
   const rules = [1, 2, 3, 4, 5].map((h) => line('rule', `Rule ${h}`, h));
-  assert.deepEqual(changedLine(rules, now), { count: 5, text: '5 changes by your rules this week' });
-  assert.deepEqual(changedLine([line('agent', 'Claude', 2)], now), { count: 1, text: '1 change by Claude this week' });
-  assert.deepEqual(changedLine([line('slash', 'Slash', 2), line('slash', 'Slash', 3)], now), { count: 2, text: '2 changes by Slash this week' });
-  assert.equal(changedLine([line('agent', 'Claude', 2), line('agent', 'Cursor', 3)], now)?.text, '2 changes made for you this week');
-  assert.equal(changedLine([line('rule', 'Late reply', 2), line('agent', 'Claude', 3)], now)?.text, '2 changes made for you this week');
+  assert.deepEqual(changedLine(rules, now), { count: 5, text: '5 changes on this page by your rules this week' });
+  assert.deepEqual(changedLine([line('agent', 'Claude', 2)], now), { count: 1, text: '1 change on this page by Claude this week' });
+  assert.deepEqual(changedLine([line('slash', 'Slash', 2), line('slash', 'Slash', 3)], now), { count: 2, text: '2 changes on this page by Slash this week' });
+  assert.equal(changedLine([line('agent', 'Claude', 2), line('agent', 'Cursor', 3)], now)?.text, '2 changes on this page made for you this week');
+  assert.equal(changedLine([line('rule', 'Late reply', 2), line('agent', 'Claude', 3)], now)?.text, '2 changes on this page made for you this week');
   assert.equal(changedLine([line('rule', 'Late reply', 24 * 8)], now), null, 'a change older than the week is not this week’s');
   assert.equal(changedLine([], now), null);
 });

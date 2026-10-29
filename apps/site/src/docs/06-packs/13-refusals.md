@@ -1,4 +1,4 @@
-# Every refusal
+# When an add-on will not install
 
 A pack that cannot install is refused with one sentence saying what is wrong and what to do, and a code in capitals naming the kind of fault. `braindog addon check` says the same sentence a record would, so you meet each of these on your own machine first. This page lists them by where you meet them, each with its sentence.
 
@@ -22,7 +22,7 @@ This file holds what looks like a credential at seeds[0].fields.name. An add-on 
 ```
 
 ```code | A name BrainDog keeps (PROVIDES_CONFLICT)
-money-core is a name BrainDog keeps for its own modules and use cases. Give this add-on another id.
+money-core is a name BrainDog keeps for its own modules and starters. Give this add-on another id.
 This add-on declares a list called tasks, which belongs to BrainDog's Work module. Name the list something else.
 ```
 

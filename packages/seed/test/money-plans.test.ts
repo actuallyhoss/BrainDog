@@ -228,14 +228,15 @@ test('run again on what it left, it makes nothing and changes nothing', () => {
   assert.deepEqual(two.plans.map((p) => p.fields.name), ['Desk', 'Car']);
 });
 
-test('a plan is paid once no part of it is open, and a plan that reads paid or cancelled is left as it is', () => {
+test('a plan is paid once no part of it is open, a plan marked paid with a part open is open again, and cancelled is left as it is', () => {
   const paid = () => desk(() => ({ state: 'paid' }));
   assert.deepEqual(plansFromNames(paid(), []).plans, [{ name: 'Desk', state: 'paid' }]);
   assert.deepEqual(plansFromNames(desk(() => ({ state: 'cancelled' })), []).plans, [{ name: 'Desk', state: 'cancelled' }]);
   assert.deepEqual(written(plansFromNames(paid(), [planRow(1, 'Desk')]), 'plans#1'), { state: 'paid' });
-  /* A CLOSED PLAN IS NOT OPENED BY A COUNT: he marked it paid with parts still open, and it stays paid. */
-  assert.equal(written(plansFromNames(desk(), [planRow(1, 'Desk', { state: 'paid' })]), 'plans#1'), undefined);
-  assert.equal(written(plansFromNames(desk((n) => (n === 1 ? { state: 'paid' } : {})), [planRow(1, 'Desk', { state: 'paid' })]), 'plans#1'), undefined);
+  /* PAID WITH A PART STILL TO PAY IS NOT PAID (Q3 of 29 October): "Harbourview" read paid with 38 parts to go, so a plan
+     marked paid while any part is open is open again. */
+  assert.deepEqual(written(plansFromNames(desk(), [planRow(1, 'Desk', { state: 'paid' })]), 'plans#1'), { state: 'open' });
+  assert.deepEqual(written(plansFromNames(desk((n) => (n === 1 ? { state: 'paid' } : {})), [planRow(1, 'Desk', { state: 'paid' })]), 'plans#1'), { state: 'open' });
   /* CANCELLED IS A PERSON'S WORD ABOUT THE PLAN, and no count of its parts takes it back. */
   assert.equal(written(plansFromNames(desk(), [planRow(1, 'Desk', { state: 'cancelled' })]), 'plans#1'), undefined);
   assert.equal(written(plansFromNames(desk(() => ({ state: 'cancelled' })), [planRow(1, 'Desk')]), 'plans#1'), undefined);
@@ -370,13 +371,18 @@ test('handed one part by a rule, the script reads and writes that part\'s plan a
   assert.deepEqual([gone.out, gone.updates, gone.log], [null, [], ['The part is no longer in the record, so no plan was counted.']]);
 });
 
-test('a plan closed by hand with parts still open stays closed night after night, and nothing is said', async () => {
-  const record = recordOf([...desk((n) => ({ plan_row: 'e_plans_1', left_after: gbp((3 - n) * 10_000) })), planRow(1, 'Desk', { state: 'paid' })]);
+test('a plan marked paid with parts still open is open again that night, and one cancelled by hand stays cancelled night after night', async () => {
+  /* PAID WITH A PART STILL TO PAY IS NOT PAID (Q3 of 29 October): the night opens it again and says so. */
+  const marked = recordOf([...desk((n) => ({ plan_row: 'e_plans_1', left_after: gbp((3 - n) * 10_000) })), planRow(1, 'Desk', { state: 'paid' })]);
+  const opened = await marked.run();
+  assert.deepEqual([opened.updates.map((u) => [u.spoken, u.patch]), opened.log], [[['plans#1', { state: 'open' }]], ['Desk is open.']]);
+  /* CANCELLED IS A PERSON'S WORD ABOUT THE PLAN, and no night takes it back. */
+  const record = recordOf([...desk((n) => ({ plan_row: 'e_plans_1', left_after: gbp((3 - n) * 10_000) })), planRow(1, 'Desk', { state: 'cancelled' })]);
   for (const night of [1, 2, 3]) {
     const { out, updates, added, log } = await record.run();
     assert.deepEqual([out, updates, added, log], [null, [], [], []], `night ${night}`);
   }
-  assert.equal(record.rows('plans')[0]!.fields.state, 'paid');
+  assert.equal(record.rows('plans')[0]!.fields.state, 'cancelled');
   /* AND A PART WRITTEN UNDER IT DOES NOT OPEN IT EITHER, which is what a rule hands the script. */
   const handed = await record.run({ register: 'installments', seq: 2 });
   assert.deepEqual([handed.out, handed.updates], [null, []]);

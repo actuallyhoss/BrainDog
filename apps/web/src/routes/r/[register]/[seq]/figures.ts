@@ -175,7 +175,11 @@ export function viaOf(work: WorkDecl | undefined, register: string): Via | null 
   if (!field || !state?.values?.length) return null;
   const hand = typeof work.hand === 'object' && work.hand !== null ? (work.hand as { agent?: unknown }).agent : undefined;
   const agent = typeof hand === 'string' && work.fields.some((f) => f.id === hand) ? hand : null;
-  return { field: field.id, state, done: work.done ?? [], deadline: work.fields.find((f) => f.deadline === true)?.id ?? null, agent };
+  /* WORK KEPT FOR LATER (`backlog`, "Later") IS NOT OPEN, as Work's Open and its project chips count it (audit of 30
+     October, 6): Projects and a project's page said "8 open" for Kiln where Work said 7. Put after the finished states,
+     so `done[0]` is still the one a tick writes. */
+  const later = state.values.includes('backlog') && !(work.done ?? []).includes('backlog') ? ['backlog'] : [];
+  return { field: field.id, state, done: [...(work.done ?? []), ...later], deadline: work.fields.find((f) => f.deadline === true)?.id ?? null, agent };
 }
 
 /** The predicate one read of the open work asks: pointing here by its spoken id, and not finished. */

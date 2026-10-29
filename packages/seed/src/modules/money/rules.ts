@@ -183,21 +183,24 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * category `near` or `over` with the month; these tell of the mark. `once_per: [entry, warned_month]` is once a
    * category a month for each, so the warning is not said again the next day, and next month's says it afresh. A
    * category that goes over without passing its warning first is told it is over and nothing else.
+   *
+   * A WEEK OR A YEAR SINCE money-core 3.31.0: the mark carries the period's words (`warned_for`, "this week"), which the
+   * warning says where it said "this month", and `warned_month` holds the period's key, so `once_per` is once a period.
    */
   'budget-near': {
     rule: 'budget-near',
     pack: 'money-core',
     register: 'categories',
-    when: 'budget_warned is near, warned_month is set',
-    then: [{ notify: { say: '{{name}} is past {{budget_alert}}% of its {{money:budget}} budget this month.' } }],
+    when: 'budget_warned is near, warned_month is set, warned_for is set',
+    then: [{ notify: { say: '{{name}} is past {{budget_alert}}% of its {{money:budget}} budget {{warned_for}}.' } }],
     once_per: ['entry', 'warned_month'],
   },
   'budget-over': {
     rule: 'budget-over',
     pack: 'money-core',
     register: 'categories',
-    when: 'budget_warned is over, warned_month is set',
-    then: [{ notify: { say: '{{name}} is over its {{money:budget}} budget this month.' } }],
+    when: 'budget_warned is over, warned_month is set, warned_for is set',
+    then: [{ notify: { say: '{{name}} is over its {{money:budget}} budget {{warned_for}}.' } }],
     once_per: ['entry', 'warned_month'],
   },
   'recurring-ended': {
@@ -259,6 +262,8 @@ const DRAFT_DECLARED = OBLIGATIONS_REGISTER.fields.some((f) => f.id === CHASE_DR
 
 export { SETTLE_LINE_SCRIPT } from './settle-line.ts';
 import { SETTLE_LINE_SCRIPT } from './settle-line.ts';
+import { POST_DUE_RULES } from './post-due.ts';
+import { CATEGORY_STAYS_RULES } from './category-stays.ts';
 
 /**
  * WHAT HAPPENS WHEN A PERSON ANSWERS ONE OF MONEY'S QUESTIONS, SINCE money-core 3.1.0: automations started by a
@@ -383,8 +388,29 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
       { script: { id: SETTLE_LINE_SCRIPT.script, as: 'moving', input: { payment: '{{trigger.entry}}' } } },
     ],
   },
+  /**
+   * AND LOOKED FOR AGAIN AS THE DAYS PASS, ONCE AN ENTRY (Q1 of 29 October): a payment written before a bill it pays
+   * could be found, or before a match on the money alone was made, is read again by the hourly sweep while it is ten
+   * days old or less (`onTime` in `packages/kernel/src/flow.ts` sweeps a run-path rule whose `when:` names a relative
+   * day and which says `once_per`). The writes that start it are only an unlinking, so a fresh payment is not looked
+   * for twice by this and `payment-matches` at once.
+   */
+  {
+    rule: 'payment-matches-again',
+    name: 'Look again for what a recent payment paid',
+    pack: 'money-core',
+    on: { written: { register: 'transactions', op: ['update'], fields: ['settles'] } },
+    when: 'state is cleared, settles is empty, on after -11d',
+    once_per: ['entry'],
+    steps: [
+      { script: { id: 'match_payment', as: 'matching', input: { payment: '{{trigger.entry}}', asks: 'linked' } } },
+      { script: { id: SETTLE_LINE_SCRIPT.script, as: 'moving', input: { payment: '{{trigger.entry}}' } } },
+    ],
+  },
   MATCH_PAYMENT_SCRIPT,
   SETTLE_LINE_SCRIPT,
+  /* A REPEATING LINE THAT POSTS ITSELF, AND THE REAL CHARGE THAT TAKES ITS PLACE, SINCE money-core 3.31.0 (`post-due.ts`). */
+  ...POST_DUE_RULES,
   {
     rule: 'instalment-settles',
     name: 'Mark an instalment paid by its payment',
@@ -499,6 +525,8 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'learn_category', as: 'making', input: { answer: '{{trigger.option}}' } } }],
   },
   LEARN_CATEGORY_SCRIPT,
+  /* A CATEGORY OF MOVES ASKS ONCE WHETHER ITS MONEY STAYS YOURS, SINCE money-core 3.31.0 (`category-stays.ts`). */
+  ...CATEGORY_STAYS_RULES,
   OFFER_BUDGETS_SCRIPT,
   /* AND THE DAILY MARK THE TWO BUDGET RULES ABOVE TELL OF (`scripts/budget-watch.js`). */
   BUDGET_WATCH_SCRIPT,

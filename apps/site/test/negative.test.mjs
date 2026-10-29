@@ -44,7 +44,7 @@ const REPO = 'every page links /legal, and links the repository only when LAUNCH
 const RULES = [
   { seed: 'img', file: 'content.test.ts', name: HOME, says: /draws a photograph again/ },
   { seed: 'no-desk', file: 'content.test.ts', name: HOME, says: /the hero of index\.html does not hold the desk/ },
-  { seed: 'fifth-card', file: 'content.test.ts', name: HOME, says: /index\.html draws 7 bands/ },
+  { seed: 'fifth-card', file: 'content.test.ts', name: HOME, says: /index\.html draws 8 bands/ },
   /* A planted link to the private repository, while it is private. Once `LAUNCH.repo` is on the rule asks for the
      link instead, and this seed would be the clean site's shape, so it stands down with the flag. */
   ...(LAUNCH.repo ? [] : [{ seed: 'repo-link', file: 'content.test.ts', name: REPO, says: /support\.html links the repository, and LAUNCH\.repo is off/ }]),

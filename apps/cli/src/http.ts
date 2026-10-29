@@ -115,19 +115,30 @@ export const isLoopback = (hostname: string): boolean => LOOPBACK.has(hostname);
 export const inTheClear = (url: URL): boolean => url.protocol === 'http:' && !LOOPBACK.has(url.hostname);
 
 /**
+ * The names the app answered on before it came back to its own, and the name it answers on now. The marketing site
+ * holds `brain.dog` and `alpha.brain.dog` and hands only the doors on to the app, so a record there is a record on
+ * `app.brain.dog` or `app.alpha.brain.dog` (`apps/worker/wrangler.jsonc`).
+ */
+const MOVED: Readonly<Record<string, string>> = {
+  'https://brain.dog': 'https://app.brain.dog',
+  'https://alpha.brain.dog': 'https://app.alpha.brain.dog',
+};
+
+/**
  * A host as the hosts file keys it: `https://origin[/slug]`, no trailing slash. A bare name means https.
  *
  * NO SENTENCE HERE REPEATS WHAT WAS TYPED. Somebody who pasted a token into the address would find it
  * in the log of every agent session.
  *
- * `/app/<slug>` IS KEPT AS `/<slug>`. The app moved to
- * `app.brain.dog/app/<slug>` and its connect screen prints that address, so it is what people paste; before
- * this line the whole of `app/acme` went to the Directory as the slug and the sign-in was refused. `app`
- * is a reserved slug (`packages/record/src/directory.ts`), so a first segment of `app` is always the
- * prefix and never a record. It is done here and not in `login` because `logout` and `target` key by
- * this same function: a login kept under `/acme` has to be the entry a `logout .../app/acme` removes,
- * or the logout says there was nothing to remove over a live bearer. Keys kept before the move are
- * `/<slug>` already, so none of them changes.
+ * THE RECORD'S ADDRESS IS `https://app.brain.dog/<slug>`, AND TWO OLDER SPELLINGS OF IT ARE READ AS IT. The app was
+ * at `app.brain.dog/app/<slug>` until 29 Oct and its connect screen printed that, so `/app/<slug>` is kept as
+ * `/<slug>`: `app` is a reserved slug (`packages/record/src/directory.ts`), so a first segment of `app` is always
+ * the prefix and never a record. And before that it was `brain.dog/<slug>`, which is the marketing site now, so that
+ * origin is read as `app.brain.dog` (`MOVED`): a device start there is refused, and the bearer is the record's and not
+ * the name's, so the same login answers on the new name. It is done here and not in `login` because `logout` and
+ * `target` key by this same function, and `sameHost` reads a written key through it too: a login kept under
+ * `https://brain.dog/acme` or `https://app.brain.dog/app/acme` is the entry `target` finds for `app.brain.dog/acme`,
+ * and the one a `logout` of any of the three removes, so no hosts file already on a machine has to be edited.
  */
 export function hostKey(raw: string): string {
   const text = raw.trim();
@@ -135,13 +146,13 @@ export function hostKey(raw: string): string {
   try {
     url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`);
   } catch {
-    throw new Error('The BrainDog host is not an address. Write it as https://app.brain.dog/app/<slug>.');
+    throw new Error('The BrainDog host is not an address. Write it as https://app.brain.dog/<slug>.');
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:')
-    throw new Error('The BrainDog host is not an https address. Write it as https://app.brain.dog/app/<slug>.');
+    throw new Error('The BrainDog host is not an https address. Write it as https://app.brain.dog/<slug>.');
   if (url.username || url.password)
     throw new Error('The BrainDog host address carries a name or a password. A token goes in the hosts file or BRAINDOG_TOKEN, never in an address.');
-  return `${url.origin}${url.pathname.replace(/\/+$/, '').replace(/^\/app(?=\/|$)/, '')}`;
+  return `${MOVED[url.origin] ?? url.origin}${url.pathname.replace(/\/+$/, '').replace(/^\/app(?=\/|$)/, '')}`;
 }
 
 /**
@@ -246,7 +257,7 @@ export function runnerTarget(flag: string | undefined, env: Env, file: string, n
     throw new Error(
       enrolled.length > 1
         ? 'This machine is enrolled as a runner on more than one BrainDog. Name one with --host.'
-        : 'This machine is not enrolled as a runner. Run braindog runner enrol https://app.brain.dog/app/<slug>.',
+        : 'This machine is not enrolled as a runner. Run braindog runner enrol https://app.brain.dog/<slug>.',
     );
   const key = hostKey(named);
   const url = new URL(key);

@@ -119,8 +119,8 @@ test('at read, the module checks again, a key nobody reads is still said, and a 
   assert.ok(loud.refusals.some((r) => r.fix === 'A shade is warm or cool.'), 'the module was not asked at read');
   assert.equal(loud.rows.length, 0);
 
-  const misspelt = k.block({ kind: 'stub', source: 'register.obligations', size: 2 } as never);
-  assert.ok(misspelt.refusals.some((r) => r.at === 'size'), 'a key nobody reads went unsaid on a registered kind');
+  const misspelt = k.block({ kind: 'stub', source: 'register.obligations', width: 2 } as never);
+  assert.ok(misspelt.refusals.some((r) => r.at === 'width'), 'a key nobody reads went unsaid on a registered kind');
   assert.equal(misspelt.heading, READ_BY_STUB(3), 'the refusals the read already had stopped the module');
 
   const unmet = k.block({ kind: 'stub', source: 'register.obligations', when: { metric: 'no-such-figure', gt: 0 } } as never);

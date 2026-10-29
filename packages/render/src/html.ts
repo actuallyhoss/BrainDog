@@ -26,7 +26,7 @@ import { kindSpec } from './kind-spec.ts';
 import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, barFigures, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, trendAhead, TREND_TODAY, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, trendAhead, TREND_TODAY, TREND_WAIT, type RunCell, type RunFace } from './cards.ts';
 import { FEED_DAY, FEED_EARLIER, feedBurst, feedCasedNodes, feedFold, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -37,6 +37,7 @@ import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TODO_META_JOIN, boardMeta, todoLines, todoTitle } from './todo.ts';
 import {
   TIMELINE_CHIP,
+  TIMELINE_UNDER,
   rowsCell,
   timelineCell,
   timelineChip,
@@ -58,7 +59,7 @@ import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten
 import { SERIES_NET, SERIES_NONE, SERIES_PALER, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPlan } from './lines.ts';
 import { linesTrend } from './lines-trend.ts';
-import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
+import { PROGRESS_ALL_BUDGETS, PROGRESS_NONE, budgetTotal, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
 import {
   FORECAST_AXIS_BREAK,
@@ -116,6 +117,12 @@ export type RenderOptions = InlineOptions & {
    * draws each amount alone, as it always did. A ledger's line, a card's figure and the lead figure read it.
    */
   approx?: (figure: string) => string | null;
+  /**
+   * A PART'S CHIP, WHERE THE HOST KNOWS ONE: the glyph and colour slot of the category or account a bar's row or a
+   * timeline line names (`Groceries`, `HSBC (EGP)`). The app answers it on Money's pages alone; a host that passes
+   * nothing draws each row as it always did, so the HTML twin needs nothing.
+   */
+  partLook?: (label: string) => { glyph: string; slot: string | null } | null;
   /** The day a link opened a calendar on (`?day=`, `YYYY-MM-DD`): its cell is marked `aria-current="date"`. */
   day?: string | null;
   /** Turn a spoken id into an address. A link the host cannot resolve renders as plain text. */
@@ -168,9 +175,10 @@ export type RenderOptions = InlineOptions & {
   /**
    * Where an address this renderer draws goes, as the host serves it. Absent, it is drawn as written.
    *
-   * THE RECORD WRITES ITS ADDRESSES RECORD-RELATIVE AND THE HOST MAY NOT LIVE AT THE ROOT. A queue's "N more"
+   * THE RECORD WRITES ITS ADDRESSES RECORD-RELATIVE AND THE HOST NAMES THE RECORD IN THE PATH. A queue's "N more"
    * is `/decide`, a capture's list is `/r/tasks?…`, a note's link is `/r/things/1`, and under a host served
-   * from `/app/<slug>` every one of those left the app: a press loaded the marketing site's 404. The web app
+   * from `/app/<slug>`, as the Cloud was then, every one of those left the app: a press loaded the marketing site's
+   * 404. Under `/<slug>` today they would open the session's record and not the one on screen. The web app
    * repaired it with a `MutationObserver` over `<main>` that rewrote each `href` after this package drew it,
    * because nothing here asked. Now every `href` either renderer draws passes through this last, the host's
    * own answers from `link`, `dayHref` and `cellHref` included, so a host whose answers are record-relative
@@ -453,6 +461,14 @@ function panel(b: Block, o: RenderOptions): string {
   return `<div class="panel measure">${body}</div>`;
 }
 
+/** Whether a stat's trend cell is a run of gaps alone: a line asked for and not kept yet (`Grid.svelte` reads it too). */
+export const trendWaits = (value: string): boolean => value.trim() !== '' && /^[-\s]+$/u.test(value);
+
+/** A stat cell's line, or, where it asked for one and its past holds fewer than two nights, when the line starts. */
+function trendOrWait(label: string, value: string, o: RenderOptions): string {
+  return trendWaits(value) ? `<span class="cell-trend-wait">${escape(TREND_WAIT)}</span>` : trendSvg('cell-trend', label, value, o);
+}
+
 /**
  * A run of numbers as a small line, named by the numbers it was drawn from, or nothing when the run
  * has fewer than two. `stat`'s trend cell and `sparkline` draw it; `Trend.svelte` is its twin.
@@ -464,7 +480,7 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
   if (ahead) {
     const run = trendOf(ahead.run)!;
     const named = `${plain(inline(label, o)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${run.said.join(', ')}`;
-    return `<span class="${cls}-ahead"><svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(named)}"><path class="trend-line" d="${run.d}" vector-effect="non-scaling-stroke"></path><path class="trend-today" d="${ahead.today}" vector-effect="non-scaling-stroke"></path><path class="trend-low" d="${ahead.low}" vector-effect="non-scaling-stroke"></path></svg><span class="trend-days" aria-hidden="true"><span>${escape(TREND_TODAY)}</span><span>${escape(ahead.to)}</span></span></span>`;
+    return `<span class="${cls}-ahead"><svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(named)}"><path class="trend-area" d="${run.area}"></path><path class="trend-line" d="${run.d}" vector-effect="non-scaling-stroke"></path><path class="trend-today" d="${ahead.today}" vector-effect="non-scaling-stroke"></path><path class="trend-low" d="${ahead.low}" vector-effect="non-scaling-stroke"></path></svg><span class="trend-days" aria-hidden="true"><span>${escape(TREND_TODAY)}</span><span>${escape(ahead.to)}</span></span></span>`;
   }
   const t = trendOf(plain(inline(value, o)));
   if (!t) return '';
@@ -472,7 +488,7 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
   /* A STAT'S SHORT RUN IS BARS; a `sparkline` keeps its line. */
   if (cls === 'cell-trend' && t.bars)
     return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-bar" d="${t.bars}" vector-effect="non-scaling-stroke"></path></svg>`;
-  return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg>`;
+  return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-area" d="${t.area}"></path><path class="trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg>`;
 }
 
 /**
@@ -597,7 +613,7 @@ function grid(b: Block, o: RenderOptions): string {
            code at full size, and the two trees differed on every stat with an amount in it. A stat's
            figure is a headline, so it is said the way `headlineFigure` says one: `£33,850`, not `£33,850.00`. */
         r.cells[1] ? amount(r.cells[1], o) : MISSING
-      }</span>${approx ? `<span class="cell-approx num">${escape(approx)}</span>` : ''}${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${noted}${toneGlyph(r.tone)}</div>`;
+      }</span>${approx ? `<span class="cell-approx num">${escape(approx)}</span>` : ''}${trendOrWait(r.cells[0] ?? '', r.cells[3] ?? '', o)}${noted}${toneGlyph(r.tone)}</div>`;
     })
     .join('');
   return `<div class="grid" style="--cells:${shown.length}">${body}</div>`;
@@ -761,7 +777,7 @@ function list(b: Block, o: RenderOptions): string {
         if (rich) {
           const title = timelineTitle(r.cells[1]);
           const approx = said && o.approx ? o.approx((r.cells[2] ?? '').trim()) : null;
-          return `${head}<li class="item" data-rich=""${toneAttrs(r.tone)}${key}>${chipHtml(timelineChip(r.cells[TIMELINE_CHIP], plain(inline(title, o))), o)}${cell('item-title', title, o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, sign)}${cell('item-under', timelineUnder(r.cells, o.now, grouped), o)}${approx ? `<span class="item-approx num">${escape(approx)}</span>` : ''}</li>`;
+          return `${head}<li class="item" data-rich=""${toneAttrs(r.tone)}${key}>${chipHtml(timelineChip(r.cells[TIMELINE_CHIP], plain(inline(title, o)), plain(inline(r.cells[TIMELINE_UNDER[0]] ?? '', o))), o)}${cell('item-title', title, o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, sign)}${cell('item-under', timelineUnder(r.cells, o.now, grouped), o)}${approx ? `<span class="item-approx num">${escape(approx)}</span>` : ''}</li>`;
         }
         /* THE GLYPH SITS WITH THE TITLE, as `List.svelte` has drawn it since a tone five hundred pixels
            from the thing it qualifies was found to qualify nothing (13 §2.3). This drew it after the
@@ -1583,8 +1599,17 @@ function progress(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number) => plain(inline(r.cells[i] ?? '', o));
   const plan = progressPlan(b.rows.map((r) => ({ value: said(r, 1), target: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })), form, o.home);
   const drawn = (v: string | undefined): string => renderInline(inline(v || MISSING, o), o);
+  /* EVERY BUDGET TOGETHER, AS THE FIRST ROW (`budgetTotal`), as `Progress.svelte` draws it. */
+  const total = form === 'budget' ? budgetTotal(b.rows.map((r) => ({ value: said(r, 1), target: said(r, 2) })), o.home) : null;
+  const tp = total ? progressPlan([total], 'budget', o.home)[0]! : null;
+  const head =
+    total && tp
+      ? `<div class="progress-row" data-total=""${toneAttrs(tp.intent)}><span class="progress-label">${escape(PROGRESS_ALL_BUDGETS)}</span><span class="progress-figure num"><span class="progress-value">${escape(total.value)}</span><span class="progress-of">${PROGRESS_OF}</span><span class="progress-target">${escape(total.target)}</span></span><span class="progress-share num">${escape(tp.share)}</span><span class="progress-track" role="img" aria-label="${escape(progressSentence(PROGRESS_ALL_BUDGETS, total.value, total.target, tp.share))}" style="--fill:${tp.fill}"><span class="progress-fill"></span>${
+          tp.limit === null ? '' : `<span class="progress-over" style="--limit:${tp.limit}"></span>`
+        }</span>${tp.left ? `<span class="progress-left num">${escape(tp.left)}</span>` : ''}${toneGlyph(tp.intent)}</div>`
+      : '';
   const body = b.rows.length
-    ? b.rows
+    ? head + b.rows
         .map((r, i) => {
           const p = plan[i]!;
           const track = p.drawable

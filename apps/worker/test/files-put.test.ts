@@ -121,7 +121,7 @@ test('a file read back says noindex, nosniff and the sandbox policy', async () =
     assert.equal(res.headers.get('content-security-policy'), "default-src 'none'; sandbox", method);
     assert.equal(res.headers.get('content-type'), 'image/png', method);
   }
-  const res = await serveFiles(get(`/app/ada/api/files/${sha}`), { ...depsOf(blobs), bearer: { ...depsOf(blobs).bearer, named: async () => REC } });
+  const res = await serveFiles(get(`/ada/api/files/${sha}`), { ...depsOf(blobs), bearer: { ...depsOf(blobs).bearer, named: async () => REC } });
   assert.equal(res.headers.get('x-robots-tag'), 'noindex', 'under a record name as well');
 });
 

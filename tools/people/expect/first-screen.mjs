@@ -4,7 +4,7 @@
  *
  * THE SNAPSHOT is what the rig saw on one screen, at one width, as one person:
  *
- * - `path`: the page's path, such as `/signup`, `/start` or `/app/laylas-studies/today`.
+ * - `path`: the page's path, such as `/signup`, `/start` or `/laylas-studies/today`.
  * - `width`: 390 or 1440.
  * - `text`: every sentence drawn, as one string or a list of strings.
  * - `roles`: the page's accessibility tree, flattened, as `{ role, name, landmark }`, where `landmark` is the role of
@@ -47,8 +47,11 @@ const SAMPLE = /\bsample (record|data|entries|entry|rows?)\b/iu;
 /** Today's line on the vital signs, in either of its two wordings (`signsLine` in `lib/home/default-home.ts`). */
 export const SIGNS = /\b(?:one|\d+) vital signs? needs? a look\b/iu;
 
-/** Today's own path: the app's front door, with or without the record's name and the word. */
-const TODAY = /^\/app(\/[^/]+)?(\/today)?\/?$/u;
+/**
+ * Today's own path: the app's front door, with or without the record's name and the word. The app is the root, so a
+ * record's name is told from the app's own pages by the words those pages are, which no record can be called.
+ */
+const TODAY = /^(?:\/(?!(?:signin|signup|start|invite|settings|decide|inbox|search|activity|agents|connect|usage|jobs|r|p|s|v)(?:\/|$))[a-z](?:[a-z0-9-]*[a-z0-9])?)?(?:\/today)?\/?$/u;
 
 /** The narrowest screen that draws the rail with its names; under it the places are behind a press. */
 const RAIL_FROM = 900;

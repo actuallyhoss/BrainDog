@@ -1,10 +1,10 @@
 /**
  * THE HERO'S LIVE DESK (`src/lib/desk/`), as a reader with scripting off receives it, and the shared asks it moves.
  *
- * ALL FIVE PLACES ARE IN THE HTML (20 October). The desk is a real tablist over five panels, and only the
- * chosen one shows once the script runs; with scripting off a <noscript> rule lays all five out one under another. So
- * the served page must hold the tablist with its five names, five panels, Today's line as plain words, and
- * that rule. No <img>: every band is the product's own parts, never a picture of them (§23, §47).
+ * ALL FIVE PLACES ARE IN THE HTML (20 October). Since 29 October the desk is drawn in the app's frame: a sidebar
+ * whose buttons open five panes (Today, Needs you, Money, Agents and a project), and only the chosen one shows once the
+ * script runs; with scripting off a <noscript> rule lays all five out one under another. So the served page must hold
+ * the sidebar with its places, five panes, Today's greeting, and that rule. No <img>: every band is the product's own parts, never a picture of them (§23, §47).
  *
  * THE SAME CHECKS RUN TWICE. Once over the desk rendered on the server here, which needs no build, and once over the
  * built `index.html`, which waits for a build newer than the desk (`built.ts`): an older build holds someone else's
@@ -77,38 +77,38 @@ const words = (html: string): string =>
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
 
-/** Today's line as it reads on load, with both of the desk's asks open. */
-const SENTENCE = '2 need you, 2 agents are working, and cash lasts about 14 months.';
+/** Today's head as it reads before the script tells the hour: the greeting alone (DIRECTION §51). */
+const GREETING = 'Good morning, Maya';
 
 /** The desk's promises over one page of HTML, whichever way it was made. */
 function holdsTheDesk(html: string, where: string): void {
-  const tablist = html.match(/<[^>]+role="tablist"[^>]*>([\s\S]*?)<\/div>/);
-  assert.ok(tablist, `${where} has no tablist`);
-  const tabs = [...tablist[1]!.matchAll(/<button[^>]*role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((m) =>
-    words(m[1]!).replace(/\d+/g, '').trim(),
-  );
-  assert.deepEqual(tabs, TABS.map((t) => DESK.tabs[t]), `${where}: the five places, by name, in order`);
-  assert.deepEqual(tabs, ['Today', 'Needs you', 'Projects', 'Money', 'Agents'], `${where}: the app's five places`);
-  assert.match(tablist[1]!, /<button[^>]*role="tab"[^>]*aria-selected="true"[^>]*>(?:(?!<\/button>)[\s\S])*?Today/, `${where}: Today is chosen`);
+  const side = html.match(/<nav class="places[^"]*"[^>]*>([\s\S]*?)<\/nav>/);
+  assert.ok(side, `${where} has no sidebar`);
+  const opens = [...side[1]!.matchAll(/<button[^>]*id="desk-tab-([a-z]+)"[^>]*>/g)].map((m) => m[1]);
+  assert.deepEqual(opens, ['today', 'needs', 'money', 'agents', 'projects'], `${where}: the five places that open, in the sidebar's order`);
+  assert.deepEqual([...opens].sort(), [...TABS].sort(), `${where}: every pane has its place`);
+  const named = words(side[1]!);
+  for (const t of TABS) if (t !== 'projects') assert.ok(named.includes(DESK.tabs[t]), `${where}: the sidebar names ${DESK.tabs[t]}`);
+  assert.ok(named.includes(DESK.more.work) && named.includes(DESK.more.people), `${where}: Work and People are in the frame`);
+  assert.match(side[1]!, /<button[^>]*id="desk-tab-today"[^>]*aria-current="page"|<button[^>]*aria-current="page"[^>]*id="desk-tab-today"/, `${where}: Today is chosen`);
 
-  /* The desk's own panels: the connect box and the Slash card hold tab panels of their own on the same page. */
-  const panels = html.match(/id="desk-pane-[a-z]+"[^>]*role="tabpanel"|role="tabpanel"[^>]*id="desk-pane-[a-z]+"/g) ?? [];
-  assert.equal(panels.length, 5, `${where} holds five panels`);
-  for (const t of TABS) assert.match(html, new RegExp(`id="desk-pane-${t}"`), `${where} has the ${t} panel`);
+  const panels = html.match(/id="desk-pane-[a-z]+"/g) ?? [];
+  assert.equal(panels.length, 5, `${where} holds five panes`);
+  for (const t of TABS) assert.match(html, new RegExp(`id="desk-pane-${t}"`), `${where} has the ${t} pane`);
   assert.ok(html.indexOf('id="desk-pane-today"') < html.indexOf('id="desk-pane-needs"'), 'Today comes first');
-  assert.ok(words(html).includes(SENTENCE), `${where}: Today's line is plain words: "${SENTENCE}"`);
+  assert.ok(words(html).includes(GREETING), `${where}: Today opens on the greeting "${GREETING}"`);
 
   const rule = html.match(/<noscript>\s*<style[^>]*>([\s\S]*?)<\/style>\s*<\/noscript>/);
   assert.ok(rule, `${where} has no <noscript><style> rule`);
   assert.match(rule[1]!, /\.desk-pane\s*\{\s*display:\s*block\s*!important/, 'every place shows with scripting off');
   assert.match(rule[1]!, /\.desk-pane-name\s*\{\s*display:\s*block/, 'each place is headed by its name');
-  assert.match(rule[1]!, /aria-selected='true'\]/, 'the bar stops marking a place as chosen');
+  assert.match(rule[1]!, /aria-current='page'\]/, 'the sidebar stops marking a place as chosen');
 
   assert.doesNotMatch(html, /<img\b/i, `${where} draws no picture of the product`);
   assert.ok(!words(html).includes(EM_DASH), `${where} has an em dash a person reads`);
 }
 
-test('the desk rendered on the server holds every place, the line under Today in plain words and the noscript rule', () => {
+test('the desk rendered on the server holds every place, Today\'s greeting and the noscript rule', () => {
   const { body, head } = render(Desk, { props: {} });
   const html = head + body;
   holdsTheDesk(html, 'the server-rendered desk');

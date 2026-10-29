@@ -105,6 +105,24 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
+   * EVERY OPEN ACCOUNT BY NAME, THE CARD TOO, SINCE money-core 3.32.0 (audit of 30 October, 21): Money's Accounts tile
+   * read Cash now's parts alone, so the card its first line was about was not on it. What each holds, by the same
+   * arithmetic; a card's is what it owes, below nought. Cash now itself still adds up the accounts that count as cash.
+   */
+  'balance-by-account': {
+    metric: 'balance-by-account',
+    name: 'What each account holds',
+    source: 'register.accounts',
+    where: 'state is not closed',
+    value: ROLLED,
+    group_by: 'name',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
    * CASH NOW IN ONE BOOK, read once per book as a project's figures are read once per project: `book-cash:Personal`
    * fills `{{it}}` with the book's name. The figure a book's page leads with and its walk starts from.
    */
@@ -174,6 +192,20 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     value: { max: 'to_pay_on' },
     format: 'day',
     target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* EVERY OPEN ACCOUNT, COUNTED AS THE ACCOUNTS PAGE LISTS THEM, SINCE money-core 3.32.0 (audit of 30 October, 20): its
+     lead line said "in 6 accounts" (Cash now's parts) over 13 cards. One count, the list's. */
+  'accounts-open': {
+    metric: 'accounts-open',
+    name: 'Open accounts',
+    source: 'register.accounts',
+    where: 'state is not closed',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 1 },
     window: '30d',
     compare: 'none',
   },

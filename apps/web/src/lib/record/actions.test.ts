@@ -327,11 +327,11 @@ test('A LEDGER THAT ANSWERS 404 FALLS BACK TO THE RECORD\'S EVENTS, which say no
 test("UNDER A SLUG THE RECORD'S EVENTS ARE THAT RECORD'S, and the ledger and sign-in stay the person's, at the root", async () => {
   const { io, sent } = host({
     '/account/usage': () => json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no route here.' } }),
-    '/app/acme/api/actions': () => json(200, { ok: true, value: [row({ days: [{ day: '2026-09-02', ...totals, runs: 7 }] })] }),
+    '/acme/api/actions': () => json(200, { ok: true, value: [row({ days: [{ day: '2026-09-02', ...totals, runs: 7 }] })] }),
   });
-  const read = await readUsage(io, NOW_MS, '', '/app/acme');
+  const read = await readUsage(io, NOW_MS, '', '/acme');
   assert.ok(read.ok === true && read.view.from === 'events' && read.view.weeks[0]?.runs === 7);
-  assert.deepEqual(sent.map((x) => x.url.split('?')[0]), ['/auth/methods', '/account/usage', '/app/acme/api/actions', '/app/acme/api/automations']);
+  assert.deepEqual(sent.map((x) => x.url.split('?')[0]), ['/auth/methods', '/account/usage', '/acme/api/actions', '/acme/api/automations']);
 });
 
 test('no host at all says so; a ledger refusal is its sentence; a record with neither read draws none', async () => {

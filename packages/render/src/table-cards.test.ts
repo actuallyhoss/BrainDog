@@ -44,7 +44,7 @@ const { default: Table } = (await import(new URL('../svelte/p/Table.svelte', imp
   default: Component<{ columns: unknown[]; rows: unknown[]; total: number; href?: (path: string) => string }>;
 };
 
-const under = (p: string): string => (p.startsWith('/') && !p.startsWith('//') && !p.startsWith('/app/') ? `/app/acme${p}` : p);
+const under = (p: string): string => (p.startsWith('/') && !p.startsWith('//') && !p.startsWith('/acme/') ? `/acme${p}` : p);
 const hrefsOf = (html: string): string[] => [...html.matchAll(/ href="([^"]*)"/gu)].map((m) => m[1]!);
 const props = { columns: [{ field: 'title', label: 'Title', width: '1fr' }], rows: [{ key: '1', cells: ['Kiln'], href: '/r/things/1' }], total: 1 };
 
@@ -52,5 +52,5 @@ test('A PHONE CARD\'S LINK GOES THROUGH THE HOST\'S `href`, and without one it i
   const drawn = render(Table, { props }).body;
   assert.match(drawn, /class="table-cards"/u, 'the card arm is the one drawn, or the rest of this proves nothing');
   assert.deepEqual(hrefsOf(drawn), ['/r/things/1']);
-  assert.deepEqual(hrefsOf(render(Table, { props: { ...props, href: under } }).body), ['/app/acme/r/things/1']);
+  assert.deepEqual(hrefsOf(render(Table, { props: { ...props, href: under } }).body), ['/acme/r/things/1']);
 });

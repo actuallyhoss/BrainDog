@@ -127,10 +127,10 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 const JSON_FILE = { httpMetadata: { contentType: 'application/json; charset=utf-8' } };
 
 /**
- * Where the build puts the bundled catalogue: under the app's base, and at the root before the app had one. The same
- * two places `catalogue.ts` reads, asked here because a preview is not one of the shapes that reader answers.
+ * Where the build puts the bundled catalogue: at the root, where the app is. The same place `catalogue.ts` reads,
+ * asked here because a preview is not one of the shapes that reader answers.
  */
-const PLACES = ['/app/catalogue/', '/catalogue/'] as const;
+const PLACES = ['/catalogue/'] as const;
 
 export const servesKennel = (pathname: string): boolean => pathname === KENNEL_BASE.slice(0, -1) || pathname.startsWith(KENNEL_BASE);
 

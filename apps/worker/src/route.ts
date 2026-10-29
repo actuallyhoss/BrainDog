@@ -116,7 +116,7 @@ export const servesOAuthMeta = (pathname: string): boolean =>
  * it meant carrying a bearer for a question with no record in it. The build id is a property of the
  * Worker version, so it is answered where nothing has to be opened to read it. `33 §4` puts the
  * `/.well-known/braindog-key` that `braindog verify` reads beside it, under the same rule and with no
- * credential. This Worker answers that one per record, at `/app/<slug>/.well-known/braindog-key`
+ * credential. This Worker answers that one per record, at `/<slug>/.well-known/braindog-key`
  * (`servesKey` below), and `test/build.test.ts` pins this prefix to `braindog-build` alone.
  *
  * `/.well-known/*` IS IN `run_worker_first`, which is what makes this path the Worker's at all. Off
@@ -130,8 +130,8 @@ export const servesBuild = (pathname: string): boolean => /^\/+\.well-known\/+br
  *
  * A PATH AFTER THE SLUG AND NOT AT THE ROOT, BECAUSE ONE WORKER SERVES MANY RECORDS. `03 §4` puts the key at the host's
  * root, which on a self-host is one record and here is every record on the deployment, each signing with its own key.
- * So the router asks this of `appPath`'s `rest` alone, and `/app/*` is already
- * the Worker's in the site's `run_worker_first`. THE ROOT IS LEFT TO THE ROUTER'S 404: the site forwards no
+ * So the router asks this of `appPath`'s `rest` alone, at `/<slug>/...` and at the old `/app/<slug>/...`, which the site
+ * still forwards for a key fetched before the move. THE ROOT IS LEFT TO THE ROUTER'S 404: the site forwards no
  * `/.well-known/braindog-key`, so an answer there would be one `app.brain.dog` gives and `brain.dog` never does, and
  * `test/site-binding.test.ts` holds every root branch of `route()` to a door the site forwards.
  */
@@ -317,39 +317,64 @@ export async function recoverRestore(o: {
 const NOT_A_PAGE = new Set(['auth', 'mcp', 'a', 'in', 'ws', 'admin', 'app', 'assets', 'static', 'www', 'new']);
 
 /**
- * A path under `/app`: the record it names, if any, and the path the app or the record reads once `/app/<slug>` is gone.
+ * THE FIRST SEGMENTS THIS WORKER ANSWERS ITSELF AT THE ROOT, OR KEEPS FOR A DOOR NOT YET BUILT, and the app never draws.
+ * `route()` hands the built ones to their doors before `appPath` is asked, so what reaches `appPath` with one of these in
+ * front is a path no door serves, and the router's own 404 is its answer: the shell's 200 to an agent's `/a/x` or a
+ * monitor's `/ws` would look like a working endpoint. The web app keeps the same list as `DOORS` (`apps/web/src/lib/at.ts`).
+ */
+const ROOT_DOORS = new Set(['api', 'auth', 'account', 'mcp', 'in', 'oauth', 'a', 'ws', 'healthz', 'app']);
+
+/**
+ * An address from before the app moved to the root, with `/app` taken off the front: `/app/acme/r` is `/acme/r` and
+ * `/app` is `/`. `null` for an address that never had it.
+ */
+export function unprefixed(pathname: string): string | null {
+  const m = /^\/+app(?:\/+(.*))?$/.exec(pathname);
+  return m === null ? null : `/${m[1] ?? ''}`;
+}
+
+/**
+ * A path of the app: the record it names, if any, and the path the app or the record reads once `/<slug>` is gone.
  *
- * THE FIRST SEGMENT IS A PAGE OR A RECORD'S NAME, AND THE DIRECTORY'S `badSlug` ALONE SAYS WHICH. A string it would accept as a name is a slug; a word the app routes (`settings`, `signin`, `catalogue`), a
- * spoken id (`d41`) and a file (`mark.svg`) are all refused as names there, so here they are the app's own paths with no
- * record named, which means the record the session is on. A zone route takes a wildcard only at the end of its path,
- * so no route can pick out the API under a slug, which is why the Worker takes all of `/app` and strips the slug itself.
+ * THE APP IS AT THE ROOT, AND `/app` IN FRONT IS THE ADDRESS IT HAD BEFORE. A page load under `/app` is a 308 to the same
+ * address without it (`legacyRedirect`), so what still reaches here with the prefix is what may not be redirected: a
+ * CLI's or an agent's `/app/<slug>/api/<method>`, whose hosts file was written before the move and which refuses every
+ * redirect. Both spellings are read the same way, so a token handed out on either address keeps working.
+ *
+ * THE FIRST SEGMENT IS A PAGE OR A RECORD'S NAME, AND THE DIRECTORY'S `badSlug` ALONE SAYS WHICH. A string it would
+ * accept as a name is a slug; a word the app routes (`settings`, `signin`, `catalogue`), a spoken id (`d41`) and a file
+ * (`mark.svg`) are all refused as names there, so here they are the app's own paths with no record named, which means
+ * the record the session is on. A zone route takes a wildcard only at the end of its path, so no route can pick out the
+ * API under a slug, which is why the Worker takes every path and strips the slug itself.
  *
  * WHAT COMES BACK AS `slug` IS A CLAIM AND NOT A RECORD. `doorOf` has the Directory say whether it is this person's
- * before anything is addressed. `/app/_app/*` is the build's chunks, which the static assets serve and
- * `run_worker_first` keeps away from this Worker, so it is not an app path at all.
+ * before anything is addressed. `/_app/*` is the build's chunks, which the static assets serve and `run_worker_first`
+ * keeps away from this Worker, and `/.well-known/*` is the host's, so neither is an app path at all; nor is a door's
+ * word (`ROOT_DOORS`).
  */
 export type AppPath = { slug: string | null; rest: string };
 
 export function appPath(pathname: string): AppPath | null {
-  const m = /^\/+app(?:\/+([^/]*)(.*))?$/.exec(pathname);
+  const m = /^\/+([^/]*)([\s\S]*)$/.exec(unprefixed(pathname) ?? pathname);
   if (!m) return null;
   const segment = m[1] ?? '';
   const tail = m[2] ?? '';
   if (segment === '') return { slug: null, rest: tail === '' ? '/' : tail };
-  if (segment.startsWith('_')) return null;
-  /* `/app/api/*` NAMES NO RECORD AND NO PAGE, SO IT IS NOT AN APP PATH, and the router's own `ROUTE_UNKNOWN` answers it.
-     `api` is a word the Directory never hands out, so it fell to the line below as a page, the rest was `/api/boot`,
-     and the Worker served a second copy of the root `/api`. Measured through the bundle in `test/slug-api.test.ts`: a
-     GET with no credential answered 200 from the public demo's record (the demo is gone since), a cookie
-     reached its session's record, and `/app/api/vault/deposit` with a grant went past the key doors' own check,
-     which reads the slug and saw none, into `doorOf` and the record's `verify`. The web never renders the address (`apiBase` is the bare origin with no slug). */
-  if (segment === 'api') return null;
+  if (segment.startsWith('_') || segment.startsWith('.')) return null;
+  /* `/api/*` AND `/app/api/*` NAME NO RECORD AND NO PAGE, SO THEY ARE NOT AN APP PATH: the root's is the record the
+     bearer or the session names, which `route()` answers below this, and the old prefix's is the router's own
+     `ROUTE_UNKNOWN`. `api` is a word the Directory never hands out, so it fell to the line below as a page, the rest was
+     `/api/boot`, and the Worker served a second copy of the root `/api`. Measured through the bundle in
+     `test/slug-api.test.ts`: a GET with no credential answered 200 from the public demo's record (the demo is gone
+     since), a cookie reached its session's record, and `/app/api/vault/deposit` with a grant went past the key doors' own
+     check, which reads the slug and saw none, into `doorOf` and the record's `verify`. */
+  if (ROOT_DOORS.has(segment)) return null;
   if (badSlug(segment) === null) return { slug: segment, rest: tail === '' ? '/' : tail };
   /* NOR AN API PATH UNDER A WORD THAT CAN ONLY BE A MISTAKE. Measured on
      production: `/app/Acme/api/boot`, `/app/admin/api/boot` and `/app/www/api/boot` fell to the line below as pages and
      answered the shell with a 200, which a JSON client with a mistyped slug reads as success. NOT EVERY WORD THAT IS
      NOT A NAME: ten of the app's routes take a parameter as their second segment (`r/[register]`, `settings/[area]`
-     and eight more under `apps/web/src/routes/`), so `/app/r/api` is a register page. Only the upper-case spelling of
+     and eight more under `apps/web/src/routes/`), so `/r/api` is a register page. Only the upper-case spelling of
      a name and a reserved word the app does not route are certainly not pages. */
   if (/^\/+api(?:\/|$)/.test(tail) && (NOT_A_PAGE.has(segment) || badSlug(segment.toLowerCase()) === null)) return null;
   return { slug: null, rest: `/${segment}${tail}` };
@@ -385,6 +410,10 @@ export async function asPage(out: Response, path?: string): Promise<Response> {
   page.headers.set('x-frame-options', 'DENY');
   page.headers.set('x-content-type-options', 'nosniff');
   page.headers.set('referrer-policy', 'same-origin');
+  /* NO PAGE OF THE APP IS FOR A SEARCH ENGINE: every one is a record, a sign-in or a door to one, and the site at
+     brain.dog is what is indexed. A header and not a `robots.txt` disallow, because a crawler kept out never reads
+     the noindex and may still list the bare address. */
+  page.headers.set('x-robots-tag', 'noindex, nofollow');
   return page;
 }
 
@@ -392,7 +421,7 @@ export async function asPage(out: Response, path?: string): Promise<Response> {
 const TURNSTILE = 'https://challenges.cloudflare.com';
 
 /** The pages that may keep Turnstile: sign-up and sign-in take no record name, so they have no slug in front. */
-const SIGNUP = /^\/app\/(signup|signin)\/?$/;
+const SIGNUP = /^\/(signup|signin)\/?$/;
 
 /**
  * The policy on a file beside the pages: a script, a stylesheet, a font or an image. Nothing inline runs in any of
@@ -422,7 +451,8 @@ export function pagePolicy(html: string, turnstile: boolean): string {
 }
 
 /**
- * The same request at the root path the record reads: `/app/acme/api/create` becomes `/api/create`, query and all.
+ * The same request at the root path the record reads: `/acme/api/create` becomes `/api/create`, query and all, and so
+ * does the old `/app/acme/api/create`.
  *
  * BECAUSE THE RECORD ROUTES ON ITS OWN URL. `Record$.fetch` reads `/mcp`, `/api/snapshots/<id>` and `/api/slash/*` from
  * the pathname and `serveApi` takes the method from it, so a request forwarded with the slug still in front answered
@@ -434,40 +464,33 @@ export function atRoot(request: Request, rest: string): Request {
 }
 
 /**
- * A page load on a host the app used to live at: a 308 to the same page under `https://<PUBLIC_HOST>/app`, or `null`.
+ * A page load at an address the app used to have: a 308 to the same page at `https://<PUBLIC_HOST>/<path>`, or `null`.
  *
- * `LEGACY_HOSTS` IS A LIST OF NAMES THIS WORKER STILL ANSWERS FOR: `app.brain.dog`,
- * for at least the ninety days a token lives. Unset or empty and nothing is legacy, which is the Worker before the move;
- * a public host that is also listed is never redirected, because that would be a redirect to itself for ever.
+ * TWO OLD ADDRESSES, ONE HOP EACH. `app.brain.dog/app/<rest>` was the app until 29 Oct, when it moved to the root
+ * because he did not want the second `app`; it is a 308 to `app.brain.dog/<rest>`. And `brain.dog/app/<rest>`, which
+ * reaches this Worker through the site's binding, was the app before that: it is a 308 straight to
+ * `app.brain.dog/<rest>`, and not to `app.brain.dog/app/<rest>` and then again. Query kept, and the fragment of an
+ * already-mailed `…/app/signin#magic=` survives, because a browser keeps it across a redirect whose `Location` has none.
+ * 308 and not 301, because a HEAD stays a HEAD and nothing caches a guess about it.
  *
- * ONLY A GET OR A HEAD, AND NEVER A PATH THIS WORKER ANSWERS ITSELF. `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`
- * and the build id are served where they stand: the CLI refuses every redirect, a webhook sender does not follow a 3xx, a
- * 301 or 302 turns a POST into a GET, and a stale tab's fetch does not follow a redirect to another origin. A token is
- * record-scoped and not host-scoped, so an agent keeps working on the old name until its hosts file is edited.
+ * `LEGACY_HOSTS` IS A LIST OF NAMES THIS WORKER STILL ANSWERS FOR: `brain.dog`, for at least the ninety days a token
+ * lives. Unset or empty and nothing is legacy; a public host that is also listed is never redirected off itself, because
+ * that would be a redirect to itself for ever.
  *
- * `/` BECOMES `/app/`, AND `/r/tasks` BECOMES `/app/r/tasks`, which is the record the session is on, so no lookup is
- * needed to send somebody on. A path already under `/app` is not prefixed twice. The fragment of an already-mailed
- * `…/signin#magic=` survives, because a browser keeps it across a redirect whose `Location` has none. 308 and not 301,
- * because a HEAD stays a HEAD and nothing caches a guess about it.
+ * ONLY A GET OR A HEAD, AND NEVER A PATH THIS WORKER ANSWERS ITSELF. `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`,
+ * OAuth and the build id are served where they stand, and so is a record's API and its key under `/app/<slug>`: the CLI
+ * refuses every redirect, a webhook sender does not follow a 3xx, a 301 or 302 turns a POST into a GET, and a stale tab's
+ * fetch does not follow a redirect to another origin. A token is record-scoped and not host-scoped, so an agent keeps
+ * working on the old address until its hosts file is edited, and the CLI reads an old one as the new (`hostKey`).
  *
- * AND THE PUBLIC HOST ITSELF, FOR A BROWSER'S PAGE LOAD OUTSIDE `/app`: a 308 to `/app<path>` on the same name, which is
- * the one-domain design's promise that "legacy bare paths redirect within the same host" and was not built. It is what makes
- * the dark deploy dark. With the app built under `build/app` and the Worker
- * still on `app.brain.dog`, `/`, `/signin` and `/r/tasks` there were measured answering a JSON `ROUTE_UNKNOWN` 404: the
- * site's "Open the app" and every magic link already mailed would have landed on it. After the flip this branch does
- * not fire, because the zone routes on `brain.dog` deliver only the doors and `/app`, and the site answers the rest.
+ * ON THE PUBLIC HOST, EVERY GET UNDER `/app`, whatever it accepts. It is the same origin, so a tab's fetch follows it:
+ * a stale tab's `/app/_app/version.json` lands on the new build's and the tab learns it is old. Nothing else on the
+ * public host is redirected, because everything else is the app's own address.
  *
- * ONLY WHEN THE BROWSER ASKS FOR HTML, ON EITHER HOST. A navigation always says `text/html`; an old shell's poll of
- * `/_app/version.json`, a favicon and a script's GET do not, and for those the router's own answer is the true one
- * where a redirect into the app would be a page handed to something that cannot draw one. The old host once asked no
- * `Accept`: with push B's vars, a stale tab's `/app/_app/version.json` and
- * `/app/fonts/geist.woff2` under a wildcard `Accept` were measured going to `brain.dog`, another origin, which a
- * same-origin fetch cannot follow.
- *
- * AND A SLUG'S `/api` IS A DOOR TOO, WHICH THE ROOT'S LIST DOES NOT SEE. `/app/<slug>/api/<method>` is none of the doors'
- * prefixes, so on the old host it was a 308 whatever the `Accept`, and `hostGet`'s `GET /api/slash/status`, which
- * `apiBase()` sends under the slug, would have failed in every tab left open across push B. The public host never
- * showed it only because it spares all of `/app`.
+ * ON A LEGACY HOST, ONLY WHEN THE BROWSER ASKS FOR HTML. A navigation always says `text/html`; a favicon and a script's
+ * GET do not, and for those the router's own answer is the true one where a redirect to another origin would be a page
+ * handed to something that cannot follow it. And only under `/app`, since the site answers every other page on that
+ * name and forwards nothing else here but the doors; a bare path that does arrive is sent to the same path on the app.
  */
 export function legacyRedirect(request: Request, legacy: string | undefined, publicHost: string | undefined): Response | null {
   const home = (publicHost ?? '').trim().toLowerCase();
@@ -476,20 +499,19 @@ export function legacyRedirect(request: Request, legacy: string | undefined, pub
   const host = url.host.toLowerCase();
   const path = url.pathname;
   /* OAUTH IS A DOOR, AND ITS AUTHORIZE AND CONSENT ARE PAGE LOADS: a browser sent there by an app asks for HTML, and a
-     308 to `/app/oauth/...` would hand the person the app shell instead of the sign-in they came for. */
+     308 to the app would hand the person the app shell instead of the sign-in they came for. */
   if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path) || servesOAuth(path) || servesOAuthMeta(path)) return null;
+  /* AND A SLUG'S `/api` AND ITS KEY ARE DOORS TOO, WHICH THE ROOT'S LIST DOES NOT SEE. `/app/<slug>/api/<method>` is
+     none of the doors' prefixes, so on the old host it was a 308 whatever the `Accept`, and `hostGet`'s
+     `GET /api/slash/status`, which `apiBase()` sends under the slug, would have failed in every tab left open. */
   const app = appPath(path);
-  if (app !== null && servesApi(app.rest)) return null;
-  if (!/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
-  const inApp = /^\/+app(?:\/|$)/.test(path);
-  if (host === home) {
-    if (inApp) return null;
-    return new Response(null, { status: 308, headers: { location: `https://${home}/app${path}${url.search}`, 'cache-control': 'no-store' } });
-  }
+  if (app !== null && (servesApi(app.rest) || (app.slug !== null && servesKey(app.rest)))) return null;
+  const moved = unprefixed(path);
+  const to = (rest: string) => new Response(null, { status: 308, headers: { location: `https://${home}${rest}${url.search}`, 'cache-control': 'no-store' } });
+  if (host === home) return moved === null ? null : to(moved);
   const hosts = (legacy ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
-  if (!hosts.includes(host)) return null;
-  const under = inApp ? path : `/app${path}`;
-  return new Response(null, { status: 308, headers: { location: `https://${home}${under}${url.search}`, 'cache-control': 'no-store' } });
+  if (!hosts.includes(host) || !/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
+  return to(moved ?? path);
 }
 
 /** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */

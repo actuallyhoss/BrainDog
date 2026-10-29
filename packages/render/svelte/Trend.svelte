@@ -7,18 +7,26 @@
 <script lang="ts">
   import { inline, text, trendAhead, trendOf, TREND, TREND_TODAY, type RenderOptions } from '../src/index.ts';
 
-  let { cls, label, value, opts = {} }: { cls: string; label: string; value: string; opts?: RenderOptions } = $props();
+  let { cls, label, value, opts = {}, dated = false }: { cls: string; label: string; value: string; opts?: RenderOptions; dated?: boolean } = $props();
 
   const ahead = $derived(trendAhead(text(inline(value, opts))));
   const run = $derived(ahead ? trendOf(ahead.run) : null);
   const named = $derived(ahead && run ? `${text(inline(label, opts)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${run.said.join(', ')}` : '');
   const t = $derived(ahead ? null : trendOf(text(inline(value, opts))));
   const name = $derived(t ? `${text(inline(label, opts)) || TREND}: ${t.said.join(', ')}` : '');
+  /* A RUN BEHIND, ONE READING A DAY TO TODAY, SAYS ITS TWO ENDS UNDER IT where the host asks (`dated`): the day its
+     first reading was taken and today, as the walk ahead says its own. */
+  const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const from = $derived.by(() => {
+    if (!dated || !t || t.said.length < 2) return null;
+    const now = typeof opts.now === 'number' ? opts.now : Date.now();
+    return DAY.format(now - (t.said.length - 1) * 86_400_000);
+  });
 </script>
 
 {#if ahead && run}<span class="{cls}-ahead"
     ><svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={named}
-      ><path class="trend-line" d={run.d} vector-effect="non-scaling-stroke"></path><path
+      ><path class="trend-area" d={run.area}></path><path class="trend-line" d={run.d} vector-effect="non-scaling-stroke"></path><path
         class="trend-today"
         d={ahead.today}
         vector-effect="non-scaling-stroke"
@@ -27,9 +35,9 @@
   >{:else if t && cls === 'cell-trend' && t.bars}<svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}
     ><path class="trend-bar" d={t.bars} vector-effect="non-scaling-stroke"></path></svg
   >{:else if t}<svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}
-    ><path class="trend-line" d={t.d} vector-effect="non-scaling-stroke"></path><path
+    ><path class="trend-area" d={t.area}></path><path class="trend-line" d={t.d} vector-effect="non-scaling-stroke"></path><path
       class="trend-end"
       d={t.end}
       vector-effect="non-scaling-stroke"
     ></path></svg
-  >{/if}
+  >{#if from}<span class="trend-days {cls}-days" aria-hidden="true"><span>{from}</span><span>{TREND_TODAY}</span></span>{/if}{/if}

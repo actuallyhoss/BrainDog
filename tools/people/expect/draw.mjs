@@ -48,9 +48,10 @@ export async function hooks() {
   registerHooks({
     resolve(specifier, context, next) {
       if (Object.hasOwn(STAND_INS, specifier)) return { url: `${STAND_IN}${specifier}`, format: 'module', shortCircuit: true };
-      if (specifier === '$lib' || specifier.startsWith('$lib/')) return next(new URL(specifier.slice(5) || 'index.ts', LIB).href, context);
-      /* A style sheet is nothing here, and so is the one module that only gathers them through the bundler's glob. */
+      /* A style sheet is nothing here, and so is the one module that only gathers them through the bundler's glob. Before
+         `$lib`, so a sheet imported by its `$lib` path (Money's `look.css`) is nothing too. */
       if (/\.(css|scss)(\?.*)?$/u.test(specifier) || /(^|\/)kinds\/styles\.ts$/u.test(specifier)) return { url: `${STAND_IN}style`, format: 'module', shortCircuit: true };
+      if (specifier === '$lib' || specifier.startsWith('$lib/')) return next(new URL(specifier.slice(5) || 'index.ts', LIB).href, context);
       return next(specifier, context);
     },
     load(url, context, next) {

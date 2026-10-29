@@ -42,7 +42,7 @@
       <li class="kept-agent">
         <details>
           <summary>
-            <span class="kept-name" dir="auto">{r.agent}</span>
+            <span class="kept-name" dir="auto">{r.label}</span>
             <span class="kept-num" aria-hidden={r.pct === null ? 'true' : undefined}>{r.pct ?? '–'}</span>
             <span class="kept-counts">{r.counts}</span>
           </summary>

@@ -15,7 +15,7 @@ test('A RECORD ANSWER CARRIES rec AND door IN Server-Timing, at either address',
   const c = await cloud();
   await c.provision(REC, 'studio', OWNER);
   const cookie = await c.signIn(OWNER);
-  for (const path of ['/app/studio/api/version', '/api/version']) {
+  for (const path of ['/studio/api/version', '/app/studio/api/version', '/api/version']) {
     const res = await c.ask(path, { cookie });
     assert.equal(res.status, 200, path);
     const timing = res.headers.get('server-timing') ?? '';

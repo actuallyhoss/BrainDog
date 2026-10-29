@@ -192,6 +192,22 @@
     overflow: visible;
   }
 
+  /* A LINE NOT KEPT FOR TWO NIGHTS YET SAYS WHEN IT STARTS, quiet, where the line would be (`TREND_WAIT`). */
+  .cell:has(> .cell-trend-wait) {
+    grid-template-areas:
+      'label glyph trend'
+      'figure figure figure'
+      'note note note';
+    grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+  }
+
+  .cell-trend-wait {
+    grid-area: trend;
+    align-self: center;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
   /* One line and one dot, for every small trend the renderer draws (`stat`, `sparkline`, and a card's in `cards.css`):
      2px of the first series (`--chart-1`: ink, or a project's colour inside one) with round joins and a 3px dot on the
      last point, today, in the same ink (Today's cash tile, today F5). Only a figure the page found missed (`bad`, the
@@ -202,6 +218,13 @@
     stroke-width: 2px;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+
+  /* THE WASH UNDER A LINE IS DRAWN NOWHERE BY DEFAULT: a sheet that wants the level read as a filled area turns it on
+     (Money's, `apps/web/src/lib/money/look.css`). */
+  .trend-area {
+    fill: none;
+    stroke: none;
   }
 
   .trend-end {

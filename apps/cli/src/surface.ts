@@ -88,6 +88,7 @@ const LATER = [
   'tryAutomation',
   'understandPlan',
   'briefing',
+  'widgetGallery',
   'exceptions',
   'stale',
   'about',

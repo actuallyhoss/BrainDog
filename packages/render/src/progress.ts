@@ -83,6 +83,29 @@ export const PROGRESS_TOTAL = 'Total';
 export const progressSpentSaid = (figure: string): string => `${figure} spent`;
 export const progressRangeSaid = (low: string, high: string): string => `${low || MISSING} to ${high || MISSING}`;
 
+/** The budget form's first line, over every row under it. */
+export const PROGRESS_ALL_BUDGETS = 'All budgets';
+
+/**
+ * WHAT EVERY BUDGET UNDER IT COMES TO, AS ONE MORE ROW AT THE TOP, SINCE 30 October (budgets as Coin Fish draws them):
+ * what was spent of all of them against all they allow, so the page answers "how is the month going" before any one
+ * category. Added up here from the rows as drawn, as the range form's total is (`rangePlan`), so it cannot disagree
+ * with them; a row not yet spent adds nothing. Two rows or more, every limit a number, and every figure in one unit, or
+ * no total: money in two currencies is never added, and one row is its own total.
+ */
+export function budgetTotal(rows: readonly ProgressInput[], home?: string | null): ProgressInput | null {
+  if (rows.length < 2) return null;
+  const figures = rows.flatMap((r) => [r.value, r.target]).filter((c) => Number.isFinite(signedOf(c)));
+  if (new Set(figures.map(unitOf)).size > 1) return null;
+  const targets = rows.map((r) => signedOf(r.target));
+  const values = rows.map((r) => (Number.isFinite(signedOf(r.value)) ? signedOf(r.value) : 0));
+  if (!targets.every(Number.isFinite)) return null;
+  const places = Math.max(0, ...figures.map(placesOf));
+  const shape = figures.find((c) => placesOf(c) === places) ?? '';
+  const units = (vs: number[]): number => vs.reduce((a, v) => a + Math.sign(v) * Math.round(Math.abs(v) * 10 ** places), 0) / 10 ** places;
+  return { value: amountLike(shape, units(values), home, 'read'), target: amountLike(shape, units(targets), home, 'read') };
+}
+
 /* ── the range form ───────────────────────────────────────────────────────── */
 
 /** One row of a range as the plan reads it: the three figures as drawn, and a tone the host wrote. */

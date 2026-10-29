@@ -120,14 +120,14 @@ const hueOf = (row: Record<string, unknown>, fields: Record<string, unknown>): n
 };
 
 /* The portfolio pack's `lane` values and the labels it shows for them. */
-const LANES: Record<string, string> = { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Finished' };
+const LANES: Record<string, string> = { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Closed' };
 
 /**
  * The app's address for the card's link: the record's own page when the server knows the record's slug (`boot`'s
  * `record.slug`), else the app's front door, or null when the host did not say where it serves the app.
  */
 const appLink = (origin: string | undefined, slug?: string | null): string | null =>
-  origin === undefined ? null : `${origin.replace(/\/+$/, '')}/app${slug ? `/${encodeURIComponent(slug)}` : ''}`;
+  origin === undefined ? null : `${origin.replace(/\/+$/, '')}${slug ? `/${encodeURIComponent(slug)}` : ''}`;
 
 /**
  * A `get` answer for a projects row as a project card, or null for anything else (a figure, another list's row, a

@@ -447,7 +447,8 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     const lanes = kind === 'lanes' ? lanesFault(rows.map((r) => r.cells)) : null;
     /* A STAT'S FOURTH CELL IS A TREND, and a word there is a note in the wrong column rather than a
        line with no points: before the trend it was a fifth cell and degraded, and it still does. */
-    const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!)) : undefined;
+    /* A RUN OF GAPS ALONE IS A LINE NOT KEPT YET, which says when it starts (`TREND_WAIT`), and is not a word. */
+    const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!) && !/^[-\s]+$/u.test(r.cells[3]!)) : undefined;
     const fault = trend
       ? `A stat row's fourth cell is a trend, a run of numbers like "18 20 19 24", and "${trend.cells[3]}" has none.`
       : card

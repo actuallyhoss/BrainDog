@@ -100,7 +100,7 @@ test('NOTHING PRESENTED IS THE ORDINARY 401, for a read and for anything else', 
   assert.deepEqual(asked, [], 'the Directory was asked about a request with no cookie');
 });
 
-/* ── a request that names its record: /app/<slug>/api/… ─────────────── */
+/* ── a request that names its record: /<slug>/api/… ─────────────────── */
 
 const DIR_NOW = Date.UTC(2026, 8, 23, 9);
 const serverKey = 'a-throwaway-server-key-for-these-tests-only';

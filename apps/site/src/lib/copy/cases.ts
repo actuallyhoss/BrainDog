@@ -14,8 +14,6 @@ export const cases = {
     view: 'Show this page as',
     page: 'Page',
     source: 'Source',
-    /* What a screen reader hears beside the count on Needs you, the screen once called Decide (LAUNCH.md 103). */
-    needYou: (n: number) => (n === 1 ? '1 needs you' : `${n} need you`),
     /* THE ANSWERS ON NEEDS YOU, as `apps/web`'s Needs you screen says them. Nothing is sent anywhere: the
        answer changes this drawing and nothing else. `chose` is for a question whose options are
        not Accept and Reject. */

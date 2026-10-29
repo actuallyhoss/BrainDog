@@ -24,6 +24,12 @@
   what it is and why.
 -->
 <script lang="ts">
+  /** A day from the picker as the app says one: `2026-11-12` is "12 Nov 2026". */
+  const WAKE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const wakeSaid = (iso: string): string => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(iso);
+    return m ? `${Number(m[3])} ${WAKE_MONTHS[Number(m[2]) - 1] ?? ''} ${m[1]}` : iso;
+  };
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { day, since, symbolText } from 'braindog-render';
@@ -74,7 +80,7 @@
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import { aboutLine, aboutOf, sideOf, words as sideWords } from './side.ts';
-  import { moneyRowOf } from '$lib/decide/money-row.ts';
+  import { amountAnswer, moneyRowOf } from '$lib/decide/money-row.ts';
   import { rowHref } from '$lib/record/row-href.ts';
   import { listName, nameWords, runByIn, type RunBy } from '$lib/record/names.ts';
   import { readFiles, visualsOf } from './option-visual.ts';
@@ -372,6 +378,20 @@
 
   /* THE RECORD'S TWO ANSWERS, Accept and Decline, which are buttons and not cards (`press.ts` `twoWords`). */
   const two = $derived(question ? twoWords(question) : false);
+  /*
+   * A QUESTION ABOUT MONEY THAT FELL DUE IS ANSWERED AS ITS CARD ANSWERS IT (audit of 30 October, 24): Needs you's card
+   * offers a red "Chase £4,800" beside "Not yet", and this page offered a grey "Choose" under a card titled "Chase it".
+   * The same buttons, the same words and the same weight here, from the same reading of the question (`money-row.ts`).
+   */
+  const moneyRow = $derived(question && !merge ? moneyRowOf(spoken(question.title), question.options.map((o) => o.title)) : null);
+  /** "Your rule Chase late payments", as the card's foot says who asked, where a rule asked. */
+  const askerSaid = $derived.by(() => {
+    if (!asker) return '';
+    if (asker.kind === 'automation') return nameWords.automation;
+    if (asker.kind !== 'rule') return asker.name;
+    const rule = asker.name.replace(/^A rule: /u, '');
+    return `Your rule ${rule.charAt(0).toUpperCase()}${rule.slice(1)}`;
+  });
   /* THE MONEY ACCEPTING WOULD WRITE, in each currency it is in, for the rows that are ticked: the button names it. */
   const moves = $derived(question && live ? movesOf(live.rowset, live.registers, picked) : []);
   /* AND THE SUGGESTION, the first one an agent marked, on every question: where it is hard to undo or money moves, the
@@ -1034,7 +1054,7 @@
   <div class="q-head">
     <!-- NO SENTENCE, SO NONE IS HELD: the head's empty line held while the page read and then went, moving the question up
          56px on a phone. -->
-    <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} sentence="" actions={!settled && me.owner ? whoMore : undefined} />
+    <PageHead icon="decide" named kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} countOf={(n) => (n === 1 ? 'change' : 'changes')} sentence="" actions={!settled && me.owner ? whoMore : undefined} />
   </div>
   {#snippet whoMore()}
     <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
@@ -1117,7 +1137,7 @@
         <!-- WHO ASKED AND WHEN, the quiet line over the answers, as a card's by-line is over its question. -->
         <p class="gate-by">
           <span class="dc-sr">{cardWords.askedBy}</span>
-          {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.kind === 'automation' ? nameWords.automation : asker.name}</span>{/if}
+          {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{askerSaid}</span>{/if}
           <span class="gate-when">{since(question.opened, now)}</span>
         </p>
         <!-- WHAT IT IS ASKED WITH TO LOOK AT, above the answers: a still or a quiet card, opened full width on a press. -->
@@ -1128,7 +1148,7 @@
 
                  OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the answers that says why.
                  `aria-describedby` rather than a title, so the reason is read out with the control and not only seen. -->
-            {#snippet answer(option: { key: string; title: string }, q: { options: readonly { key: string; title: string }[] })}
+            {#snippet answer(option: { key: string; title: string }, q: { options: readonly { key: string; title: string }[] }, label?: string, lead?: boolean)}
               {@const marked = suggestedKey === option.key}
               <button
                 type="button"
@@ -1136,15 +1156,22 @@
                 id="opt-{option.key}"
                 data-answer={option.key}
                 data-suggested={marked ? '' : undefined}
-                data-weight={marked || (suggestedKey === undefined && option.key === 'accept') ? 'primary' : undefined}
+                data-weight={(lead ?? (marked || (suggestedKey === undefined && option.key === 'accept'))) ? 'primary' : undefined}
                 data-on={asked === option.key ? '' : undefined}
                 aria-pressed={asked === null ? undefined : asked === option.key}
                 disabled={!answerable || holding !== null}
                 aria-describedby={answerable ? undefined : 'cannot-decide'}
                 onclick={() => choose(option.key)}
               >
-                {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : hardOption(option.key) ? queueWords.hard(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="gate-sug">, {gate.suggested.toLowerCase()}</span>{/if}
+                <!-- THE ANSWER'S NAME ALONE ON ITS BUTTON (Q20 of 29 October): "Accept EGP 74,092.16 and $9,074.01 USD, can't
+                     be undone easily" wrapped to two lines on a phone. The care is the line under the answers, as the Needs
+                     you card says it, and is read with the button. -->
+                {label ?? labelOf(option, q, moves)}{#if marked && lead === undefined}<span class="gate-sug">, {gate.suggested.toLowerCase()}</span>{/if}
               </button>
+            {/snippet}
+            {#snippet hardUnder(q: { options: readonly { key: string; title: string }[] })}
+              {@const hard = q.options.filter((o) => (o.key === 'accept' && pressSaid('x') !== 'x') || hardOption(o.key))}
+              {#if hard.length > 0}<p class="dc-hard-line" id="hard-line">{queueWords.hardOf(hard.map((o) => labelOf(o, q, moves).split(' ')[0]).join(' and '))}.</p>{/if}
             {/snippet}
 
             <!-- NAMED BY A HEADING OF ITS OWN, one level under the question, so each option's name under it is the level
@@ -1161,12 +1188,20 @@
                   titleOf={(key) => spoken(question.options.find((o) => o.key === key)?.title ?? '')}
                   onpress={pressMerge}
                 />
+              {:else if moneyRow}
+                <!-- MONEY THAT FELL DUE: its answers as the card's buttons, "Chase £4,800" leading, then Not yet. -->
+                <div class="dc-actions">
+                  {#each question.options as option (option.key)}{@render answer(option, question, amountAnswer(option.title, moneyRow.amount), /^chase\b/iu.test(option.title.trim()) || (!question.options.some((o) => /^chase\b/iu.test(o.title.trim())) && suggestedKey === option.key))}{/each}
+                  {@render later()}
+                </div>
+                {@render hardUnder(question)}
               {:else if two}
                 <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, with Not now beside them. -->
                 <div class="dc-actions">
                   {#each question.options as option (option.key)}{@render answer(option, question)}{/each}
                   {@render later()}
                 </div>
+                {@render hardUnder(question)}
               {:else}
                 <!-- THE ANSWERS AS CARDS (today F9), two or three side by side on a wide tile and stacked on a phone: each its name,
                      what it does, its drawing, and its own button at the foot. The suggested one's button is the primary, the
@@ -1291,7 +1326,12 @@
                 ></textarea>
                 <label class="commit-wake">
                   {copy.wakeOn}
-                  <input class="commit-date" type="date" bind:value={wake} />
+                  <!-- THE DAY SAID AS THE APP SAYS DAYS, "12 Nov 2026", over the browser's own picker, which wrote it 12/11/2026
+                       (Q34 of 29 October). The picker stays the control and is what a screen reader reads. -->
+                  <span class="commit-date-box">
+                    <input class="commit-date" type="date" bind:value={wake} data-said={wake ? '' : undefined} />
+                    {#if wake}<span class="commit-date-said" aria-hidden="true">{wakeSaid(wake)}</span>{/if}
+                  </span>
                 </label>
                 <div class="commit-actions">
                   <Button weight="primary" disabled={!parkWhy.trim() || !wake || sending !== null} onclick={deferIt}>
@@ -1880,6 +1920,33 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
+  }
+
+  .dc-hard-line {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .commit-date-box {
+    position: relative;
+    display: inline-grid;
+  }
+
+  /* THE PICKER'S OWN DIGITS ARE HIDDEN WHILE A DAY IS CHOSEN, and the day is said in words over them. */
+  .commit-date[data-said] {
+    color: transparent;
+  }
+
+  .commit-date-said {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--sp-3);
+    display: flex;
+    align-items: center;
+    color: var(--ink);
+    font-size: var(--fs-ctl);
+    pointer-events: none;
   }
 
   /* A FIELD IS THE FIELD FILL AT THE CONTROL RADIUS, no border: the fill is its edge. */

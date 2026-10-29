@@ -1,7 +1,7 @@
 /** Money's figures over the ledger: what was spent and received, and what has no category. */
 
 import type { SeedMetric } from '../../base.ts';
-import { MONEY } from './shared.ts';
+import { MONEY, UNFILED } from './shared.ts';
 
 export const SPENDING_FIGURES: Record<string, SeedMetric> = {
   /* ── what actually moved ─────────────────────────────────────────────────
@@ -19,7 +19,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
 
   'spent-30d': {
     metric: 'spent-30d',
-    name: 'Spent, 30 days',
+    name: 'Spent, last 30 days',
     source: 'register.transactions',
     where: 'state is cleared, transfer is false, stays is not true, direction is out, on after -30d',
     value: { sum: 'amount' },
@@ -31,7 +31,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
 
   'received-30d': {
     metric: 'received-30d',
-    name: 'Received, 30 days',
+    name: 'Received, last 30 days',
     source: 'register.transactions',
     where: 'state is cleared, transfer is false, stays is not true, direction is in, on after -30d',
     value: { sum: 'amount' },
@@ -55,7 +55,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
    */
   'received-7d': {
     metric: 'received-7d',
-    name: 'Received, 7 days',
+    name: 'Received, last 7 days',
     source: 'register.transactions',
     where: 'state is cleared, transfer is false, stays is not true, direction is in, settles is empty, on after -7d, on before +1d',
     value: { sum: 'amount' },
@@ -72,7 +72,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
     metric: 'txn-uncategorised',
     name: 'Without a category',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, category is empty, parts is empty, on after -91d',
+    where: UNFILED,
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },

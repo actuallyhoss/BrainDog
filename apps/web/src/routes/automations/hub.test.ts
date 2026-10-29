@@ -97,11 +97,11 @@ test('WITH THE RECORD\'S COUNT, THE SENTENCE SAYS HOW MANY RAN, HOW MANY NEVER D
   const rows = [...ledger, auto('Standup', { register: 'tasks', fired: 9, month: { runs: 9, failures: 2 } }), auto('Old one', { enabled: false, fired: 0 })];
   const s = hubSentence(rows, (id) => (id === 'transactions' ? 'Ledger' : id));
   assert.deepEqual(s, {
-    text: '13 on, 12 on Ledger · 6 ran, 7 never · 2 runs failed this month',
+    text: '2 runs failed this month, all on tasks. 7 rules have never been needed.',
     needs: '2 runs failed this month',
   });
   /* A HOST THAT SENDS NO COUNT IS SAID AS BEFORE. */
-  assert.equal(hubSentence([auto('Standup', { month: { runs: 3, failures: 0 } })])?.text, '1 on · none failed this month');
+  assert.equal(hubSentence([auto('Standup', { month: { runs: 3, failures: 0 } })])?.text, 'Nothing failed this month.');
 });
 
 test('THE SENTENCE NAMES THE ONE THAT IS FAILING, AND ONLY THAT PHRASE NEEDS HIM', () => {
@@ -110,20 +110,20 @@ test('THE SENTENCE NAMES THE ONE THAT IS FAILING, AND ONLY THAT PHRASE NEEDS HIM
     auto('Chase invoices', { last: { at: iso(NOW - 3_600_000), state: 'failed', say: null }, month: { runs: 12, failures: 3 } }),
     auto('Old one', { enabled: false }),
   ]);
-  assert.deepEqual(s, { text: '2 on · Chase invoices is failing', needs: 'Chase invoices is failing' });
+  assert.deepEqual(s, { text: 'Chase invoices is failing.', needs: 'Chase invoices is failing' });
   assert.ok(s && s.text.includes(s.needs));
 });
 
 test('WITH NOTHING FAILING NOW, THE MONTH IS COUNTED, AND A MONTH WITH NO FAILURE IS NOT RED', () => {
   assert.deepEqual(hubSentence([auto('A', { month: { runs: 4, failures: 2 } })]), {
-    text: '1 on · 2 runs failed this month',
+    text: '2 runs failed this month.',
     needs: '2 runs failed this month',
   });
-  assert.deepEqual(hubSentence([auto('A', { month: { runs: 4, failures: 0 } })]), { text: '1 on · none failed this month', needs: '' });
+  assert.deepEqual(hubSentence([auto('A', { month: { runs: 4, failures: 0 } })]), { text: 'Nothing failed this month.', needs: '' });
   /* A HOST THAT SENDS NO MONTH IS NOT TOLD "NONE FAILED". */
-  assert.deepEqual(hubSentence([auto('A')]), { text: '1 on', needs: '' });
+  assert.deepEqual(hubSentence([auto('A')]), { text: '1 on.', needs: '' });
   assert.equal(hubSentence([]), null);
-  assert.equal(hubSentence([auto('A', { enabled: false }), auto('B', { enabled: false })])?.text, 'All off');
+  assert.equal(hubSentence([auto('A', { enabled: false }), auto('B', { enabled: false })])?.text, 'All off.');
 });
 
 test('A ROW SAYS ITS LAST RUN ON ITS SECOND LINE AND ITS NEXT IN THE COLUMN, NEVER BOTH IN ONE', () => {
@@ -227,7 +227,8 @@ test('AN OWNER\'S ROW ENDS IN A SWITCH, a row is a link only without one, and th
   const controls = readFileSync(new URL('../../lib/ui/controls.css', import.meta.url), 'utf8');
   assert.match(controls, /@media \(pointer: coarse\) \{\s*\.switch \{\s*min-inline-size: var\(--tap\);\s*min-block-size: var\(--tap\);/u);
   const tab = readFileSync(new URL('./AutomationsTab.svelte', import.meta.url), 'utf8');
-  assert.match(tab, /toggle: owner \? \{ on: r\.enabled, label: w\.switchOf\(r\.name\) \} : undefined/u, 'the switch is drawn for somebody the record would refuse');
+  /* THE SWITCH'S LABEL SAYS THE RULE AS ITS ROW DOES (`ruleNameSaid`). */
+  assert.match(tab, /toggle: owner \? \{ on: r\.enabled, label: w\.switchOf\(ruleNameSaid\(r\.name\)\) \} : undefined/u, 'the switch is drawn for somebody the record would refuse');
   assert.match(tab, /openAutomations\(\(url, init\) => fetch\(url, init\), apiBase\(\), \{ acted: true \}\)/u);
 });
 
@@ -240,9 +241,9 @@ test('THE BARS ARE THE BUSIEST SIX, THE TOP ONE INK, AND ONE WITH A FAILURE RED 
   ];
   const bars = monthBars(rows);
   assert.equal(bars.length, 6);
-  assert.deepEqual(bars[0], { label: 'Standup', value: 30, part: undefined, note: undefined });
+  assert.deepEqual(bars[0], { label: 'Standup', value: 30, part: undefined, said: undefined });
   /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR, never the whole bar red. */
-  assert.deepEqual(bars[1], { label: 'Chase invoices', value: 12, part: 3, note: '3 failed' });
+  assert.deepEqual(bars[1], { label: 'Chase invoices', value: 12, part: 3, said: '12 · 3 failed' });
   assert.equal(bars.some((b) => b.label === 'Quiet'), false, 'an automation that did not run is not a bar');
   assert.equal(monthReading(rows), 'Standup ran 30 times, the most this month; Chase invoices failed three of 12.');
 });

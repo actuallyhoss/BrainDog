@@ -131,7 +131,7 @@ export async function catalogueLines(index: CatalogueIndex | null): Promise<Map<
 }
 
 /** Where this build's own catalogue is served, under the app's base, as `lib/start/offer.ts` reads it. */
-export const SHIPPED_INDEX_AT = '/app/catalogue/index.json';
+export const SHIPPED_INDEX_AT = '/catalogue/index.json';
 
 /**
  * THE CATALOGUE THIS BUILD SHIPS, for naming what is installed when the Kennel does not answer. Every pack in `packs/` is

@@ -38,6 +38,7 @@ import { compile, declaredValue } from './where.ts';
 import type { MetricDecl } from './metrics.ts';
 import type { Entry, Fields, Filter, FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 import { listLine } from './tags.ts';
+import { shownName } from '../shell/side.ts';
 import { largestPart, partsOf, splitAtOf, splitSaid } from './split.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
 import { actor, nameWords, runByIn, type RunBy } from './names.ts';
@@ -262,6 +263,9 @@ function undeclared(value: unknown): string | null {
   /* AN ID IS NOT WORDS: a ULID in a field no declaration types is a ref this build cannot name, and is not drawn. */
   if (typeof value === 'string' && ROW_ID.test(value)) return null;
   if (typeof value === 'object') return null;
+  /* A CHOICE THE RECORD KEEPS AS A CODE, said as words where no declaration names it (audit of 30 October, 7): the bell
+     read "health set to at_risk" before the projects list was learnt. */
+  if (typeof value === 'string' && /^[a-z]+(?:_[a-z]+)+$/u.test(value)) return value.replace(/_/gu, ' ');
   return String(value);
 }
 
@@ -454,17 +458,23 @@ export function display(
     default:
       /* A RUN'S PROJECT IS HELD AS A SPOKEN ID, and reads as the project's name. */
       if (register === 'session' && field === 'project') return spokenRow(value, names)?.label ?? String(value);
+      /* A PROJECT TYPED AS A SLUG IS NAMED AS THE SIDEBAR NAMES IT (Q31 of 29 October): "mara-site" in the list,
+         "Mara site" in the rail. Only the title of a list whose rows carry a mark, so a project or an organisation. */
+      if (REGISTERS[register]?.identity && REGISTERS[register]?.title === field) return shownName(String(value));
       return String(value);
   }
 }
 
 /** The name of the row one link of `f` points at, by the record's names where a screen has them. */
 function refName(f: FieldDecl, register: string, value: unknown, names?: Names): string {
-  if (names) return names.get(`${f.to}#${value}`) || unnamed(f.to ?? register, String(value), f.label);
+  if (names) {
+    const known = names.get(`${f.to}#${value}`);
+    return known ? (f.to && REGISTERS[f.to]?.identity ? shownName(known) : known) : unnamed(f.to ?? register, String(value), f.label);
+  }
   /* AND WITHOUT `names`, THE NAMES THIS TAB HAS LEARNT (`held.ts` `TITLES`). This read the sample's rows, so a
      caller that handed none drew the sample's name for whatever number the record's ref held. */
   const said = f.to ? TITLES.get(f.to)?.get(Number(value)) : undefined;
-  return said === undefined || said === '' ? unnamed(f.to ?? register, String(value), f.label) : said;
+  return said === undefined || said === '' ? unnamed(f.to ?? register, String(value), f.label) : f.to && REGISTERS[f.to]?.identity ? shownName(said) : said;
 }
 
 /**
@@ -1264,6 +1274,8 @@ export type Metric = {
   label: string;
   /** How the figure moved, one value a day, oldest first; `null` is a day nothing was recorded. */
   trend?: (number | null)[] | undefined;
+  /** The block asked for its line and the record has kept fewer than three nights of it: the line says when it starts. */
+  waits?: true | undefined;
   /**
    * Set when `trend` is the walk AHEAD from today rather than the days behind (`cells[].ahead`): the day it starts on,
    * the walk's currency, and the lowest it reaches and the first day it does, in minor units.
@@ -1405,6 +1417,8 @@ export type NavEntry = {
   hue?: number | undefined;
   /** A page made from a template, one per row (a project's own page): the flat nav leaves it to its list's page. */
   row?: true | undefined;
+  /** The list that row is in, on a page one row made: Search says a book named as a project "Quartz (book)". */
+  register?: string | undefined;
 };
 
 /**

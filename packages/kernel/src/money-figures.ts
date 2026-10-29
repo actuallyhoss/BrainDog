@@ -40,6 +40,7 @@ import {
   groupNames,
   heldVerdict,
   isSumOf,
+  isRatioOf,
   largestFirst,
   predicateOf,
   scopeCurrency,
@@ -454,7 +455,11 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
       const kept = aged.slice(0, GROUP_CAP);
       return { whole, since, groups: names ? withLabels(kept, names) : kept, more: Math.max(0, aged.length - GROUP_CAP) };
     }
-    const whole = summed(all, into ?? home.home, home.home, home.rates, on, ctx.point === true);
+    /* ONE ACCOUNT IS READ IN ITS OWN CURRENCY (round 1030): "This account now" for Cash (USD) read EGP 51,740 on its own
+       page, converted into the home currency, beside its lines in dollars. A figure over several accounts is the home
+       currency's as before. */
+    const one = decl.group_by === undefined && accountsRead.length === 1 ? ownCurrency(all) : null;
+    const whole = summed(all, into ?? one ?? home.home, home.home, home.rates, on, ctx.point === true);
     if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };
     /* A GROUP HOLDING TWO CURRENCIES IS EACH CURRENCY APART, never one converted into the other ("What you have, by book" said E£571,340 for a book of E£11,905 and $10,826 beside an Accounts tile that said each
        currency on its own, and nothing on the page reconciled them). Only the whole, Cash now itself, is converted. */
@@ -1073,9 +1078,11 @@ export function figureLists(
   /* A SUM OF FIGURES READS EVERY LIST ITS PARTS READ. Named by its source alone, Not in the ledger (`account-gap`, an
      account's balance less its Ledger lines) was answered to a member invited to Accounts alone, who may read neither
      part. A part this record does not hold names the whole record; eight sums deep at most, as `where` is read. */
-  if (isSumOf(decl.value))
-    for (const p of decl.value.sum_of) {
+  if (isSumOf(decl.value) || isRatioOf(decl.value))
+    for (const p of isSumOf(decl.value) ? decl.value.sum_of : [...decl.value.ratio_of.of, ...decl.value.ratio_of.per]) {
       const part = typeof p?.metric === 'string' ? figure?.(p.metric.split(':')[0] ?? '') : null;
+      /* AN OPTIONAL PART NOBODY INSTALLED READS NO LIST, so it names none. */
+      if (!part && p?.optional === true && figure !== undefined) continue;
       if (!part || depth >= 8) out.add('*');
       else for (const list of figureLists(part, figure, pointsAt, depth + 1)) out.add(list);
     }

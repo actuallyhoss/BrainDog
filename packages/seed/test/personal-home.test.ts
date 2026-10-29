@@ -79,7 +79,9 @@ async function personal(version?: string): Promise<Kernel> {
     await put(k, moduleDocument(u, m, { today: TODAY, holds }));
   }
   const carried = carriedDocument(u, TODAY, null);
-  if (carried) await put(k, version === undefined ? carried : { ...carried, version });
+  /* AN OLDER VERSION IS THE ONE PUBLISHED: 2.5.0 has none of the figure 2.7.0 adds (`log-streak`). */
+  const older = (doc: NonNullable<typeof carried>) => ({ ...doc, version, declarations: (doc.declarations as { metric?: string }[]).filter((d) => d.metric !== 'log-streak') });
+  if (carried) await put(k, version === undefined ? carried : older(carried));
   return k;
 }
 
@@ -239,13 +241,18 @@ test("WORDS THAT POINT AT PEOPLE BRING PEOPLE, with Personal's own roles laid on
  * record plans an update (`planFile` in `packages/record/src/usecase.ts`): what it stands on and lacks, then its pack cut
  * to what the record holds.
  */
-test('A RECORD ON 2.5.0 TAKES 2.6.0 AND LOSES NOTHING, in the order the record plans an update', async () => {
+test('A RECORD ON 2.5.0 TAKES 2.7.0 AND LOSES NOTHING, in the order the record plans an update', async () => {
   const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/personal/2.5.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: unknown; extends: unknown } };
   const u = useCase('personal')!;
   const next = carriedDocument(u, TODAY, null)!;
   assert.equal(frozen.version, '2.5.0');
-  assert.deepEqual([next.declarations, next.extends], [frozen.pack.declarations, frozen.pack.extends], '2.6.0 declares what the published 2.5.0 declares');
-  assert.equal(useCaseDocument('personal', TODAY)?.version, '2.6.1');
+  /* AND 2.7.0 ADDS ONE FIGURE (round 1030): how many days in a row something was logged, for the Days in a row widget.
+     Taken out here, the rest is what the published 2.5.0 declares, word for word. */
+  const ADDED_27 = 'log-streak';
+  const before27 = (next.declarations as { metric?: string }[]).filter((d) => d.metric !== ADDED_27);
+  assert.equal(before27.length, (next.declarations as unknown[]).length - 1, `2.7.0 declares no ${ADDED_27}`);
+  assert.deepEqual([before27, next.extends], [frozen.pack.declarations, frozen.pack.extends], '2.7.0 declares what the published 2.5.0 declares, and one figure');
+  assert.equal(useCaseDocument('personal', TODAY)?.version, '2.7.0');
 
   const k = await personal('2.5.0');
   const lists = held(k).sort();
@@ -258,10 +265,10 @@ test('A RECORD ON 2.5.0 TAKES 2.6.0 AND LOSES NOTHING, in the order the record p
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
   const diff = await plan(pack, stateOf(k));
   assert.equal(diff.installed_version, '2.5.0');
-  assert.deepEqual({ adds: diff.adds.length, changes: diff.changes.length, retires: diff.retires.length, conflicts: diff.conflicts.length }, { adds: 0, changes: 0, retires: 0, conflicts: 0 });
+  assert.deepEqual({ adds: diff.adds.length, changes: diff.changes.length, retires: diff.retires.length, conflicts: diff.conflicts.length }, { adds: 1, changes: 0, retires: 0, conflicts: 0 });
   value(await install(pack, diff, hostFor(k), diff.planHash));
 
-  assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, '2.6.1');
+  assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, '2.7.0');
   assert.deepEqual(held(k).sort(), lists, 'every list is still held');
   assert.deepEqual(k.declarations().filter((d) => d.kind === 'page').map((d) => d.id).sort(), pages, 'every page is still there');
   assert.equal(k.count('savings_goals'), 1, 'the goal is still there');

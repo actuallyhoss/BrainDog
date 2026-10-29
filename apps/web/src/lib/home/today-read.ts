@@ -18,9 +18,10 @@ import { wrote, type Client } from '@braindog/client';
 
 import { versionKept } from '../data/local-tab.ts';
 import { onForgetToday } from './today-kept.ts';
+import { hearOffer } from '../board/offer-heard.ts';
 
 /** The body as the record draws it. */
-export type PageAnswer = { read_at?: unknown; blocks?: unknown };
+export type PageAnswer = { read_at?: unknown; blocks?: unknown; declared_version?: unknown; declared?: unknown };
 declare const said: Client;
 /** What a client says of a read of the body: its answer, or why not. */
 export type PageSaid = Awaited<ReturnType<typeof said.call<PageAnswer>>>;
@@ -46,6 +47,9 @@ export type TodayAnswer = { page: PageAnswer; handled: unknown; shared: unknown;
 
 /** How long a held answer is read from, whatever the version says, as a kept read is (`KEPT_READ_MS`). */
 export const TODAY_HELD_MS = 300_000;
+
+/** What a host without `today` answers a kept Today: the caller reads the page by `page` instead. */
+const UNKEPT = { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Today is not answered by this record yet.' } } as const;
 
 /** Refusals that say the host has no `today` at all. */
 const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
@@ -77,13 +81,18 @@ export function wasBehind(base: string): boolean {
  * over a second on a lived-in record; `fresh` asks for it drawn now, which every read after the screen's first does.
  * The tiles take their parts from it as from any answer, so they say what the body says, and the fresh one replaces it.
  */
-export async function askToday(client: Pick<Client, 'call'>, base: string, body: Record<string, unknown>, fresh = false): Promise<PageSaid> {
-  if (without.has(base)) return client.call<PageAnswer>('previewPage', { body });
-  const out = client.call<TodayAnswer>('today', fresh ? { body, fresh: true } : { body });
+export async function askToday(client: Pick<Client, 'call'>, base: string, body: Record<string, unknown>, fresh = false, kept: string | null = null): Promise<PageSaid> {
+  /* A KEPT TODAY (`kept`, its slug) IS ASKED BY ITS SLUG, and a host without `today` has no such read: the caller reads the
+     page itself. */
+  if (without.has(base)) return kept === null ? client.call<PageAnswer>('previewPage', { body }) : (UNKEPT as PageSaid);
+  const asked = kept === null ? { body } : { page: kept };
+  const out = client.call<TodayAnswer>('today', fresh ? { ...asked, fresh: true } : asked);
   const entry: Held = { base, token: tokenNow(), at: Date.now(), answer: out.then((o) => (o.ok ? o.value : null), () => null) };
   held = entry;
   const got = await out;
   if (got.ok) {
+    /* THE WIDGET SLASH WOULD ADD, which Today's read carries, held for the board's last cell and the palette. */
+    hearOffer((got.value as { widget?: unknown }).widget);
     if (got.value.behind === true) behindAt = base;
     else if (behindAt === base) behindAt = null;
     return { ...got, value: got.value.page };
@@ -91,7 +100,7 @@ export async function askToday(client: Pick<Client, 'call'>, base: string, body:
   if (held === entry) held = null;
   if ('refusal' in got && UNSERVED.has(got.refusal.code)) {
     without.add(base);
-    return client.call<PageAnswer>('previewPage', { body });
+    return kept === null ? client.call<PageAnswer>('previewPage', { body }) : (UNKEPT as PageSaid);
   }
   return got as PageSaid;
 }

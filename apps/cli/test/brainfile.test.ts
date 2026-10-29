@@ -37,7 +37,7 @@ const GRANT = `${REC}.stub-operation-bearer-never-printed-7f3e`;
 const POLL_ID = 'stub-poll-id-never-printed-5b1c';
 const SERVER_KEY = 'stub-server-key-never-printed-0d9a';
 const LOCAL = 'http://127.0.0.1:5870';
-const CLOUD = 'https://app.example.test/app/the-studio';
+const CLOUD = 'https://app.example.test/the-studio';
 
 /** A signed export of a record called "The Studio", with one more row than the empty record has. */
 async function exported(id = REC): Promise<string[]> {

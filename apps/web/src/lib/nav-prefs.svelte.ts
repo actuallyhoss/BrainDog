@@ -20,7 +20,7 @@
  */
 
 import * as pref from './pref.ts';
-import { shelve, shelvedOf, unshelve, shelfId, type Declared, type Shelved } from './page/shelf.ts';
+import { putBackVersion, shelve, shelvedOf, unshelve, shelfId, type Declared, type Shelved, type ShelveMore } from './page/shelf.ts';
 
 const HIDDEN = 'bd_nav_hidden';
 /* THE DEVICE'S COPY OF THE PHONE BAR, so a reload draws it before `boot` answers. */
@@ -488,9 +488,16 @@ export class NavPrefs {
   }
 
   /** A drawn component put on the shelf under a name, or refused when the shelf is full. */
-  shelve(name: string, block: Declared): Promise<Saved> {
-    const next = shelve(this.shelf, name, block, shelfId(Date.now()));
+  shelve(name: string, block: Declared, more: ShelveMore = {}): Promise<Saved> {
+    const next = shelve(this.shelf, name, block, shelfId(Date.now()), { at: new Date().toISOString().slice(0, 10), ...more });
     if (next === null) return Promise.resolve({ from: 'refused', fix: 'The shelf is full, or the name is empty.' });
+    return this.#setShelf(next);
+  }
+
+  /** An earlier version of a kept component put back, itself a new version (`putBackVersion`). */
+  putBack(id: string, version: number): Promise<Saved> {
+    const next = putBackVersion(this.shelf, id, version, new Date().toISOString().slice(0, 10));
+    if (next === null) return Promise.resolve({ from: 'refused', fix: 'That version is not kept any more.' });
     return this.#setShelf(next);
   }
 

@@ -1,9 +1,9 @@
 /**
  * Every page of the app says it may not be framed, may not be sniffed, and sends no referrer off the site.
  *
- * MEASURED ON PRODUCTION BEFORE THIS: NOT ONE OF THEM ON ANY ANSWER. `/app/`, `/app/signin`, `/app/acme/`
- * and every other page of `app.brain.dog` came back with a `Cache-Control` and a content type and nothing that says who
- * may frame it. The four headers here are the ones that are safe to ship without touching the build: a full
+ * MEASURED ON PRODUCTION BEFORE THIS: NOT ONE OF THEM ON ANY ANSWER. `/app/`, `/app/signin`, `/app/acme/` (the app was
+ * under `/app` then) and every other page of `app.brain.dog` came back with a `Cache-Control` and a content type and
+ * nothing that says who may frame it. The four headers here are the ones that are safe to ship without touching the build: a full
  * `script-src` needs the shell's two inline scripts hashed through `kit.csp`, and HSTS is a zone setting that browsers
  * never forget, so both are somebody's decision and not a line in a Worker.
  *
@@ -48,8 +48,8 @@ async function world() {
   const ASSETS = {
     fetch: async (request: Request) => {
       const path = new URL(request.url).pathname;
-      if (path === '/app/') return immutable(new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } }));
-      if (path === '/app/fonts/geist.woff2') return immutable(new Response(new Uint8Array([119, 79, 70, 50]), { headers: { 'content-type': 'font/woff2' } }));
+      if (path === '/') return immutable(new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } }));
+      if (path === '/fonts/geist.woff2') return immutable(new Response(new Uint8Array([119, 79, 70, 50]), { headers: { 'content-type': 'font/woff2' } }));
       return immutable(new Response(null, { status: 404 }));
     },
   };
@@ -75,7 +75,7 @@ const pageHeaders = (out: Response) => Object.fromEntries(Object.keys(PAGE).map(
 
 test('THE SHELL AND THE SIGN-IN PAGE CARRY ALL FOUR, and so does a page under a slug and a file beside the pages', async () => {
   const { ask } = await world();
-  for (const path of ['/app/', '/app/signin', '/app/acme/r/tasks', '/app/settings/agents']) {
+  for (const path of ['/', '/signin', '/acme/r/tasks', '/settings/agents']) {
     const out = await ask(path, { headers: { accept: 'text/html' } });
     assert.equal(out.status, 200, path);
     assert.deepEqual(pageHeaders(out), PAGE, path);
@@ -85,16 +85,20 @@ test('THE SHELL AND THE SIGN-IN PAGE CARRY ALL FOUR, and so does a page under a 
   }
   /* THE FONTS ARE SERVED THROUGH `appPage` TOO, and `nosniff` only blocks a script or a style whose type is wrong
      (the Fetch standard's "should response to request be blocked due to nosniff"), so a `font/woff2` is untouched. */
-  const font = await ask('/app/fonts/geist.woff2');
+  const font = await ask('/fonts/geist.woff2');
   assert.equal(font.status, 200);
   assert.equal(font.headers.get('content-type'), 'font/woff2');
   assert.deepEqual([...new Uint8Array(await font.arrayBuffer())], [119, 79, 70, 50]);
   /* A FILE BESIDE THE PAGES GETS THE STRICT POLICY: nothing inline runs in a font, a script or an image. */
   assert.deepEqual(pageHeaders(font), { ...PAGE, 'content-security-policy': FILE_POLICY });
   /* A HEAD IS ANSWERED WITH THE SAME HEADERS AND NO BODY. */
-  const head = await ask('/app/signin', { method: 'HEAD' });
+  const head = await ask('/signin', { method: 'HEAD' });
   assert.equal(head.status, 200);
   assert.deepEqual(pageHeaders(head), PAGE);
+  /* AND THE OLD ADDRESS IS NO PAGE AT ALL: one 308 to the same page at the root, query kept, and the shell never drawn. */
+  const old = await ask('/app/signin?next=%2Facme', { headers: { accept: 'text/html' } });
+  assert.equal(old.status, 308);
+  assert.equal(old.headers.get('location'), `${ORIGIN}/signin?next=%2Facme`);
 });
 
 test('/api, /mcp AND /in/* CARRY NONE OF THE FRAMING HEADERS, because nothing that reads them draws a page', async () => {
@@ -118,40 +122,40 @@ test('/api, /mcp AND /in/* CARRY NONE OF THE FRAMING HEADERS, because nothing th
 test('AN API PATH UNDER A WORD THAT IS NOT A NAME IS THE ROUTER’S 404 JSON, and a page whose second segment is `api` is still a page', async () => {
   const { ask, asked } = await world();
   const answers: string[] = [];
-  for (const path of ['/app/Acme/api/boot', '/app/admin/api/boot', '/app/www/api/boot', '/app/ACME/api', '/app/r/api', '/app/settings/api/boot']) {
+  for (const path of ['/Acme/api/boot', '/admin/api/boot', '/www/api/boot', '/ACME/api', '/r/api', '/settings/api/boot']) {
     const out = await ask(path);
     const text = await out.text();
     answers.push(`${path} ${out.status} ${/"code":"([A-Z_]+)"/.exec(text)?.[1] ?? out.headers.get('content-type')}`);
   }
   assert.deepEqual(answers, [
-    '/app/Acme/api/boot 404 ROUTE_UNKNOWN',
-    '/app/admin/api/boot 404 ROUTE_UNKNOWN',
-    '/app/www/api/boot 404 ROUTE_UNKNOWN',
-    '/app/ACME/api 404 ROUTE_UNKNOWN',
+    '/Acme/api/boot 404 ROUTE_UNKNOWN',
+    '/admin/api/boot 404 ROUTE_UNKNOWN',
+    '/www/api/boot 404 ROUTE_UNKNOWN',
+    '/ACME/api 404 ROUTE_UNKNOWN',
     /* `r/[register]` AND `settings/[area]` ARE PAGES, so a register called `api` and an area called `api` are the shell. */
-    '/app/r/api 200 text/html',
-    '/app/settings/api/boot 200 text/html',
+    '/r/api 200 text/html',
+    '/settings/api/boot 200 text/html',
   ]);
   assert.deepEqual(asked, [], 'the Directory was asked about a path that names no record');
 });
 
 /* THE HEADER IS THE PAGE'S OWN META POLICY, so the hashes in it are the build's own: a header `script-src`
    that lacked them would refuse the shell's inline scripts and draw an empty screen (`apps/site/test/one-origin.test.mjs`
-   measured exactly that on the site). Turnstile stays on `/app/signup` and `/app/signin` alone. */
-test('A PAGE IS SENT THE POLICY IN ITS OWN META WITH FRAME-ANCESTORS, AND TURNSTILE ONLY ON /app/signup AND /app/signin', async () => {
+   measured exactly that on the site). Turnstile stays on `/signup` and `/signin` alone. */
+test('A PAGE IS SENT THE POLICY IN ITS OWN META WITH FRAME-ANCESTORS, AND TURNSTILE ONLY ON /signup AND /signin', async () => {
   const meta = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; style-src-attr 'unsafe-inline'; frame-src https://www.loom.com https://challenges.cloudflare.com";
   const shell = `<!doctype html><head><meta http-equiv="content-security-policy" content="${meta}"></head>`;
   const answer = (body: string | null) => immutable(new Response(body, { headers: { 'content-type': 'text/html' } }));
   const policy = async (path: string | undefined, body: string | null = shell) => (await asPage(answer(body), path)).headers.get('content-security-policy');
 
-  assert.equal(await policy('/app/signup'), `${meta}; frame-ancestors 'none'`);
-  assert.equal(await policy('/app/signin'), `${meta}; frame-ancestors 'none'`);
+  assert.equal(await policy('/signup'), `${meta}; frame-ancestors 'none'`);
+  assert.equal(await policy('/signin'), `${meta}; frame-ancestors 'none'`);
   assert.equal(await policy(undefined), `${meta}; frame-ancestors 'none'`, 'an answer with no address keeps the page policy whole');
   const narrowed = "default-src 'self'; script-src 'self' 'sha256-abc='; style-src-attr 'unsafe-inline'; frame-src https://www.loom.com; frame-ancestors 'none'";
-  for (const path of ['/app/', '/app/acme/r/tasks', '/app/signup/extra']) assert.equal(await policy(path), narrowed, path);
+  for (const path of ['/', '/acme/r/tasks', '/signup/extra', '/app/signin']) assert.equal(await policy(path), narrowed, path);
 
   /* A HEAD OR A 304 HAS NO BODY TO READ, and a policy without the hashes would blank the page a browser kept. */
-  assert.equal(await policy('/app/signin', null), "frame-ancestors 'none'");
+  assert.equal(await policy('/signin', null), "frame-ancestors 'none'");
   /* THE PAGE IS SENT UNCHANGED. */
-  assert.equal(await (await asPage(answer(shell), '/app/')).text(), shell);
+  assert.equal(await (await asPage(answer(shell), '/')).text(), shell);
 });

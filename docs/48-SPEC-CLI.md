@@ -138,7 +138,7 @@ A new machine needs two lines, the install and then `setup`:
 
 ```sh
 curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux; on Windows: irm https://brain.dog/cli/install.ps1 | iex
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```
 
 `login` and `install` stay commands of their own, and `setup` runs both (§5.15).
@@ -366,10 +366,12 @@ Keychain access is kept under its scope, so one host can hold grants for several
 or the only one held.
 
 *(Amended September 23rd 2026 for push A of the one-domain move, checked against `hostKey` in
-`apps/cli/src/http.ts`.)* The app's connect screen prints `braindog login <origin>/app/<slug>` when it knows the
-record's slug, because the app is under `/app` now, and `hostKey` keeps that as `<origin>/<slug>`: `app` is a reserved slug, so a first segment of
+`apps/cli/src/http.ts`.)* The app's connect screen prints `braindog login <origin>/<slug>` when it knows the
+record's slug, and `hostKey` keeps that as `<origin>/<slug>`. *(Amended October 29th 2026: the app left `/app` for the
+root, so the screen prints `<origin>/<slug>`; it printed `<origin>/app/<slug>` until then.)* An address with `/app` in
+front, as people pasted it before, is kept as `<origin>/<slug>` too: `app` is a reserved slug, so a first segment of
 `app` is always the prefix. `login`, `logout` and `--host` key through the same function, so a login written with or
-without `/app` is one entry, and keys written before the move do not change. The CLI has no default host. On the
+without `/app` is one entry, and keys written before either move do not change. The CLI has no default host. On the
 Cloud the origin is `https://app.brain.dog` (it was `https://brain.dog` between pushes B and C of the one-domain move); the API calls go to the
 origin's root, `/auth/device` and `/api/*`, which the other name keeps serving with no redirect. That matters
 because every request here is sent with `redirect: 'error'`, so a redirect on either would fail every command.

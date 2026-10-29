@@ -1,4 +1,4 @@
-# The page dialect
+# How a page is written
 
 Every page in BrainDog is text in one small format: Markdown for the words, and fenced blocks for the figures, lists and charts. This section draws each kind you can write in a fence live, with the text that drew it underneath, through the same renderer a record uses.
 
@@ -71,4 +71,4 @@ The pages after this one take the kinds a family at a time:
 - [Code, trees and changes](/docs/dialect/code): verbatim text, folders and before-and-after.
 - [Live values](/docs/dialect/values): figures read from the record as the page is drawn.
 - [Declared pages and layouts](/docs/dialect/pages): a page as a record stores it.
-- [.dog files](/docs/dialect/dog-files): a page's source as a file you edit.
+- [Editing a page as a text file](/docs/dialect/dog-files): a page's source as a file you edit.

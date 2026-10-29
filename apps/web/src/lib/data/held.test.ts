@@ -35,7 +35,7 @@ test('A BUTTON, A CHOICE AND A MENU ROW ARE HELD; A LINK, TEXT AND A BOX TYPED I
   assert.equal(heldControl(el('INPUT', { type: 'checkbox' }, card), main)?.nodeName, 'INPUT');
   assert.equal(heldControl(el('SELECT', {}, card), main)?.nodeName, 'SELECT');
 
-  const link = el('A', { href: '/app/p/kiln' }, card);
+  const link = el('A', { href: '/p/kiln' }, card);
   assert.equal(heldControl(el('SPAN', {}, link), main), null, 'a link still goes');
   assert.equal(heldControl(el('P', {}, card), main), null, 'text is not a press');
   assert.equal(heldControl(el('INPUT', { type: 'text' }, card), main), null, 'typing is never held');

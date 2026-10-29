@@ -40,11 +40,29 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       body: '{{payees-paid-90d}} payee(s) paid in 90 days.',
     },
     {
+      /* AND WHEN EVERY PAYMENT OUT NAMES NOBODY, the page still opens on its line: with the lead above and the one
+         below both held back, Payees opened on no line at all (round 1030's recheck left this case without one). */
       kind: 'note',
       lead: true,
       span: 12,
-      when: { metric: 'payees-paid-90d', lt: 1 },
-      body: 'No payees paid in 90 days.',
+      when: { all: [{ metric: 'payees-paid-90d', lt: 1 }, { metric: 'unnamed-paid-90d', gt: 0 }] },
+      body: 'No payee named yet on {{unnamed-paid-90d}} payment(s) in 90 days.',
+    },
+    {
+      /* WHAT NAMES NOBODY, WITH ITS ONE WAY TO NAME IT (Q15 of 29 October): the lines open with the name box first. */
+      kind: 'note',
+      span: 12,
+      when: { metric: 'unnamed-paid-90d', gt: 0 },
+      body: 'Not named yet: {{unnamed-paid-90d}} payment(s) in 90 days. [Name them](/r/transactions?f=payee:empty&f=direction:is:out&f=transfer:is:false)',
+    },
+    {
+      kind: 'note',
+      lead: true,
+      span: 12,
+      /* ONLY WHEN NOTHING WENT OUT AT ALL (recheck of 30 October, N5): payments naming nobody are still payments, and
+         "No payees paid" over a list of them said the page was empty while it was not. The line above asks to name them. */
+      when: { all: [{ metric: 'payees-paid-90d', lt: 1 }, { metric: 'unnamed-paid-90d', lt: 1 }] },
+      body: 'Nothing paid out in 90 days.',
     },
     {
       /* HOW MUCH EACH WAS PAID, THE MOST FIRST, added up where it is drawn, so two currencies are two amounts. */
@@ -55,7 +73,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       source: 'register.transactions',
       where: `${LEDGER_90D}, direction is out`,
       columns: [{ field: 'payee' }, { field: 'amount' }],
-      unset: 'No name yet',
+      unset: 'Not named yet',
       limit: 15,
       empty: 'Nobody paid in 90 days.',
     },
@@ -66,7 +84,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       icon: 'repeat',
       span: 12,
       source: 'metric.paid-times-by-payee-90d',
-      unset: 'No name yet',
+      unset: 'Not named yet',
       /* THE TEN PAID MOST OFTEN, as Paid most is cut: uncut, a record with thirty payees drew thirty bars of ones and twos. */
       limit: 10,
       when: { metric: 'payees-paid-90d', gt: 0 },
@@ -92,7 +110,8 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       icon: 'receipt',
       span: 12,
       source: 'register.transactions',
-      where: 'state is not void, transfer is false, stays is not true',
+      /* PAID, SO MONEY OUT: a payout coming in is under Money in, never under Last paid. */
+      where: 'state is not void, transfer is false, stays is not true, direction is out',
       columns: LEDGER_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: 10,
@@ -132,7 +151,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       source: 'register.transactions',
       where: `${LEDGER_90D}, direction is in`,
       columns: [{ field: 'payee' }, { field: 'amount' }],
-      unset: 'No name yet',
+      unset: 'Not named yet',
       limit: 10,
       empty: 'Nothing in for 90 days.',
     },

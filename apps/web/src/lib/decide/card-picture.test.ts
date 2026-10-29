@@ -28,7 +28,7 @@ const ask = (options: Record<string, unknown>[]): QueueQuestion =>
   }) as QueueQuestion;
 
 /* WHERE A PAGE SERVES A FILE IT HOLDS: the second part's photograph, and nothing for a file the page does not hold. */
-const serves = (row: string, field: string): string | null => (row === 'parts#2' ? `/app/acme/files/parts/2/${field}` : null);
+const serves = (row: string, field: string): string | null => (row === 'parts#2' ? `/acme/files/parts/2/${field}` : null);
 
 test('A COLOUR AND A FIGURE ARE THE WAY\'S VISUAL, as the option said them', () => {
   const card = cardOf(ask([{ shows: { swatch: ['#1f3a5f', '#c9a227'] } }, { shows: { figure: '3' } }, {}]), { now });
@@ -70,7 +70,7 @@ test('A PICTURE IS THE WAY\'S VISUAL ONLY WHERE THE PAGE SERVES IT, from this ho
   const q = ask([photo, { shows: { file: { row: 'parts#9', field: 'photo' } } }]);
 
   const held = cardOf(q, { now, file: serves });
-  assert.deepEqual(held.ways[0]?.shows, { file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } });
+  assert.deepEqual(held.ways[0]?.shows, { file: { row: 'parts#2', field: 'photo', src: '/acme/files/parts/2/photo' } });
   assert.equal(held.ways[1]?.shows, null, 'a file the page does not hold');
   assert.equal(inlineOf(held), false, 'answers that are pictures are choices in the list');
 

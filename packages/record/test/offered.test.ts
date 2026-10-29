@@ -170,6 +170,8 @@ const READS: Record<string, (api: Api, ctx: CallContext) => Promise<{ ok: boolea
   understand: (api, ctx) => api.understandPlan({}, ctx),
   handoffs: (api, ctx) => api.previewPage({ body: HANDOFFS }, ctx),
   briefing: (api, ctx) => api.briefing({}, ctx),
+  /* EVERY WIDGET TODAY CAN HOLD (round 1030), a read filtered by the caller's sight, as briefing is. */
+  widgets: (api, ctx) => api.widgetGallery({}, ctx),
   exceptions: (api, ctx) => api.exceptions({}, ctx),
   stale: (api, ctx) => api.stale({}, ctx),
   learnings: (api, ctx) => api.learnings({}, ctx),

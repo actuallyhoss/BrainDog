@@ -1,9 +1,9 @@
 {
   "pack": "estate",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "title": "Services",
   "summary": "Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.",
-  "changes": "The Vault is now the Keychain, and a service page says its keys are kept there. Nothing you keep is moved or changed.",
+  "changes": "The Services page is called Services, as the menu calls it, and its Lapsing table says the day each service lapses and why, from its own note. Nothing you keep is moved or changed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -116,7 +116,7 @@
     },
     {
       "page": "estate",
-      "title": "Renewals",
+      "title": "Services",
       "nav": { "section": "Services", "order": 10 },
       "icon": "calendar",
       "requires": [ "register.services" ],
@@ -147,7 +147,7 @@
           "span": 12,
           "source": "register.services",
           "where": "state is lapsing",
-          "columns": [ { "field": "name" }, { "field": "provider" }, { "field": "renews" } ],
+          "columns": [ { "field": "name" }, { "field": "provider" }, { "field": "renews", "label": "Lapses" }, { "field": "note", "label": "Why" } ],
           "order": [ { "field": "renews", "dir": "asc" } ],
           "limit": 6,
           "when": { "metric": "lapsing", "gt": 0 }

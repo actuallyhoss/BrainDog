@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 46, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46] });
+  assert.deepEqual(result.value, { kernel: 47, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -49,8 +49,8 @@ test('an empty database becomes a record', async () => {
   // Migration 36 takes a field off some runs and 37 adds an index, and neither adds a table.
   // Migration 42 adds `instruction_seen` and `agent_profile`, and 43 adds six: `share`, `share_group`,
   // `share_group_member`, `token_lens`, `access_via`, `access_seen`. Migration 44 adds `job_place`, and 45 adds
-  // `sealed_file` and `sealed_part`. Migration 46 adds `key_access` and `key_ask`.
-  assert.equal(tables.length, 61, `tables: ${tables.join(', ')}`);
+  // `sealed_file` and `sealed_part`. Migration 46 adds `key_access` and `key_ask`, and 47 `observation_who`.
+  assert.equal(tables.length, 62, `tables: ${tables.join(', ')}`);
   for (const wanted of ['record', 'declaration', 'migration', 'counter', 'entry', 'event', 'schedule', 'outbox'])
     assert.ok(tables.includes(wanted), `${wanted} is missing`);
   sql.close();
@@ -62,9 +62,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 46);
+  assert.equal(sql.all('SELECT version FROM migration').length, 47);
   sql.close();
 });
 
@@ -148,7 +148,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -254,7 +254,7 @@ test('MIGRATION 22 GIVES A RECORD THAT RAN 21 THE NEXT session REGISTER, every r
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a run changed');
   assert.deepEqual(after.event, before.event, 'the history changed');
@@ -319,7 +319,7 @@ test('MIGRATION 26 GIVES A RECORD THAT RAN 25 WHEN EACH RUN STARTED, from its ow
 
   const { result } = await applyMigrations(sql, fixedClock(NOW + 86_400_000));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
   const after = snapshot(sql);
   /* EACH RUN'S OWN START AND NOT THE DAY THE MIGRATION RAN: the instant its row was made, the live run and the binned. */
   const started = runsOf(after.entry).map((r) => JSON.parse(r.fields).started as string);
@@ -353,7 +353,7 @@ test('MIGRATION 26 GIVES A RECORD THAT RAN 25 WHEN EACH RUN STARTED, from its ow
   sql.exec('DELETE FROM migration WHERE version >= 44');
   const again = await applyMigrations(sql, fixedClock(NOW + 2 * 86_400_000));
   assert.ok(again.result.ok, fixOf(again.result));
-  assert.deepEqual(again.result.value.applied, [44, 45, 46]);
+  assert.deepEqual(again.result.value.applied, [44, 45, 46, 47]);
   const { migration: _then, ...second } = snapshot(sql);
   const { migration: _now, ...first } = after;
   assert.deepEqual(second, first, 'applying migration 44 a second time changed the record');
@@ -380,7 +380,7 @@ test('every table is placed in a section, and every section holds tables', async
   // in code: a table nobody placed would travel or not travel by accident.
   const { sql } = await open();
   const rows = sql.all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section');
-  assert.equal(rows.length, 61);
+  assert.equal(rows.length, 62);
   /* FIVE, not four: `origin` is its own section because a `.brain` can be exported without the raw
      inbound material an ingest kept — an email body is a customer's mail, not their record. */
   assert.deepEqual(
@@ -500,6 +500,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     'ca4c846cd796b620b1a62ddc8d32412fd55fe13a4032990af6094e097b307117',
     'f1ef4ba3b49675bb1f2282f2e2238e27ce2660cfd26b8be9dd93e108e9120393',
     '9e39c3b4eeb9e2487d0c19ba934ae3a942601b213e39f2709121e3caa6edb898',
+    '0c35a6495cac2bb2545f1125b8c366b12f400d202f4902143a7293caf4841c0e',
   ]);
 });
 
@@ -525,7 +526,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },
@@ -553,7 +554,7 @@ test('MIGRATION 33 REBUILDS device_grant: every row copied with its scope, and a
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, scope, label, tries FROM device_grant') },
     { id: 'poll', code_hash: 'hash', status: 'active', reach: 'vault', scope: '*', label: 'laptop', tries: 1 },
@@ -587,7 +588,7 @@ test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', a
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, kind, state, attempts FROM outbox') },
     { id: 'j1', kind: 'script.run', state: 'failed', attempts: 3 },
@@ -716,7 +717,7 @@ test('MIGRATION 37 FINDS A CLOSED QUESTION BY ITS CAUSE, and 36 and 37 rewound a
   sql.exec('DELETE FROM migration WHERE version >= 36');
   const { result } = await applyMigrations(sql, fixedClock(NOW + 86_400_000));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46]);
+  assert.deepEqual(result.value.applied, [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
   const { migration: _then, ...after } = snapshot(sql);
   const { migration: _now, ...first } = before;
   assert.deepEqual(after, first, 'applying 36 and 37 a second time changed the record');

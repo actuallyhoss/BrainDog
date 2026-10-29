@@ -70,6 +70,8 @@ export const urls = {
 export const sendWords = {
   sendTo: 'Send to',
   sendToFull: (label: string) => `Send to ${label}`,
+  /** The main half's word on a phone, where the full name does not fit beside the glyph. */
+  short: 'Send',
   more: 'More ways to send',
   sheet: 'Send to…',
   sendMany: (n: number) => `Send ${n} to…`,

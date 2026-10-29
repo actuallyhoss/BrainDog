@@ -12,7 +12,7 @@
  * it (twelve hours behind UTC, and never after now): a reading this calls old is old in every zone. `CANARY_TZ`, when
  * set, makes it exact.
  *
- * ASKED WITH THE SMOKE'S KEY, `GET /app/<canary>/api/signs`, a read that files nothing. Until the owner's sitting, a fresh
+ * ASKED WITH THE SMOKE'S KEY, `GET /<canary>/api/signs`, a read that files nothing. Until the owner's sitting, a fresh
  * self-host is asked with its server key: the route answers and every sign is there, and a record made a minute ago
  * has had no night, so the age is asked only of the canary, and the line says "self-host only".
  *
@@ -78,7 +78,7 @@ async function main(env = process.env) {
   const place = where({ ...env, CANARY_ORIGIN: env.CANARY_ORIGIN || (env.DEPLOY_HOST ? `https://${env.DEPLOY_HOST}` : '') });
   if (place.live) {
     if (!String(env.SMOKE_TOKEN ?? '').trim()) throw new Error(`SMOKE_SLUG names the canary ${place.slug} and SMOKE_TOKEN is not set, so its signs cannot be read.`);
-    const verdict = judge(await askSigns(`${place.origin}/app/${place.slug}`, env.SMOKE_TOKEN.trim()), { tz: env.CANARY_TZ || undefined });
+    const verdict = judge(await askSigns(`${place.origin}/${place.slug}`, env.SMOKE_TOKEN.trim()), { tz: env.CANARY_TZ || undefined });
     (verdict.red ? console.error : console.log)(`  signs, on the canary ${place.slug}: ${verdict.line}`);
     return verdict.red ? 1 : 0;
   }

@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { letterOf } from '../src/mail.ts';
 
 const TOKEN = 'p'.repeat(43);
-const BARE = `https://brain.dog/app/signup#verify=${TOKEN}`;
+const BARE = `https://app.brain.dog/signup#verify=${TOKEN}`;
 const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer.";
 const ARABIC = 'أنا مريم وأدير متجرا صغيرا للشموع في الإسكندرية وأعمل مصممة حرة';
 const linkOf = (said: string): string => `${BARE}&said=${encodeURIComponent(JSON.stringify({ said, currency: 'EGP' }))}`;
@@ -56,6 +56,6 @@ test('A LINK WITH NOTHING SAID IS SHOWN AS IT ALWAYS WAS, and so is a sign-in li
   const plain = letterOf('signup.verify', { link: BARE });
   assert.ok(plain.text.split('\n').includes(BARE));
   assert.ok(plain.html.includes(`>${BARE}</a>`));
-  const signin = 'https://brain.dog/app/signin#magic=abc&said=kept';
+  const signin = 'https://app.brain.dog/signin#magic=abc&said=kept';
   assert.ok(letterOf('signin', { link: signin }).text.includes(signin), 'only a proof that makes a record is followed by a sentence');
 });

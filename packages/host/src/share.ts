@@ -272,7 +272,7 @@ const isOpened = (x: unknown): x is ShareOpened => {
 };
 
 /**
- * The record's `openShare` answer with the link signed into it: `token`, and `url`, which is `<origin>/app/s#<token>`.
+ * The record's `openShare` answer with the link signed into it: `token`, and `url`, which is `<origin>/s#<token>`.
  *
  * THE TOKEN RIDES IN THE FRAGMENT, NEVER THE PATH. A browser sends no fragment to any server, so the secret is in no
  * access log, no proxy's and no Worker's, and the page reads it and wipes it from the address bar, as an invite does;
@@ -280,14 +280,14 @@ const isOpened = (x: unknown): x is ShareOpened => {
  *
  * A REFUSAL PASSES THROUGH UNCHANGED, and the link expires when the record's `share.open` says it does, to the second
  * below it, so the host and the record never disagree about the day a link stops. An empty origin writes the address
- * from the root, `/app/s#<token>`, which the app reads against its own.
+ * from the root, `/s#<token>`, which the app reads against its own.
  */
 export async function linkOpened(out: Result<unknown>, by: ShareSigner): Promise<Result<ShareLink>> {
   if (!out.ok) return out;
   if (!isOpened(out.value)) return { ok: false, refusal: UNSIGNED };
   const { id, slug, expires_at } = out.value;
   const token = await shareToken(by.key, by.record, { id, slug, exp: Math.floor(Date.parse(expires_at) / 1000) });
-  return { ok: true, value: { id, slug, expires_at, token, url: `${by.origin}/app/s#${token}` } };
+  return { ok: true, value: { id, slug, expires_at, token, url: `${by.origin}/s#${token}` } };
 }
 
 /**

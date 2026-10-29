@@ -17,7 +17,7 @@
  * it imports only a relative `.ts` file, and every browser global is read inside a function, never at the top.
  */
 
-import { BASE } from '../at.ts';
+import { BASE, DOORS } from '../at.ts';
 
 /** The one cache: the app's shell, its files and the record's answers, deleted together. */
 export const COPY = 'braindog-copy';
@@ -70,11 +70,16 @@ export type Route = 'pass' | 'out' | 'read' | 'write' | 'door' | 'shell' | 'asse
 export type Asked = { url: string; method: string; mode: string; authorised: boolean };
 
 /**
- * Which kind of request this is, for the worker registered at `scope` (the app's root, `https://app.brain.dog/app/`).
+ * Which kind of request this is, for the worker registered at `scope` (the app's root, `https://app.brain.dog/`).
  *
  * THE RECORD ANSWERS AT TWO KINDS OF ADDRESS (`apiBase` in `lib/at.ts`): `/api/<method>` for the session's record and
- * `/app/<slug>/api/<method>` for a named one. A controlled page's requests reach the worker wherever they go, so the
- * first is seen although it is outside the scope.
+ * `/<slug>/api/<method>` for a named one.
+ *
+ * THE SCOPE IS THE WHOLE ORIGIN NOW, AND THE HOST'S DOORS ARE IN IT. While the app was under `/app` the scope kept
+ * `/auth/*`, `/oauth/*` and the rest outside it; at the root they are inside, so a door's first segment (`DOORS` in
+ * `lib/at.ts`) is passed to the browser untouched before anything else is decided, as it was when it was outside: a
+ * sign-in's answer is never kept, and OAuth's consent page is never answered with the app's shell. An address from
+ * before the move, under `/app`, is a door too, and the Worker answers it with a 308.
  *
  * A REQUEST CARRYING ITS OWN AUTHORIZATION IS NEVER KEPT. The browser's cookie is the session this copy belongs to; a
  * request that brings a bearer or a share link is somebody else's access and its answer is not his to keep.
@@ -85,6 +90,9 @@ export function route(asked: Asked, scope: string): Route {
   if (u.origin !== root.origin) return 'pass';
   const path = u.pathname;
   if (asked.method === 'POST' && (path === '/auth/logout' || path === '/auth/logout/all')) return 'out';
+  const first = /^\/([^/]*)/.exec(path)?.[1] ?? '';
+  /* `_app` IS A DOOR TO AN ADDRESS, never a record's name, but its files are the app's own and kept like any other. */
+  if (first !== 'api' && first !== '_app' && DOORS.has(first)) return 'pass';
   const at = path.indexOf('/api/');
   const before = at < 0 ? null : path.slice(0, at);
   /* THE SESSION'S RECORD AT THE ORIGIN'S ROOT, or a named one exactly one segment under the app's root. */

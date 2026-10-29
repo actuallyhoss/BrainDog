@@ -24,7 +24,7 @@ const script = '../src/worker.ts' as string;
 test('the site script passes the request itself to the app and returns what the app answered', async () => {
   const { default: worker } = (await import(script)) as { default: { fetch: (r: Request, env: unknown) => Promise<Response> } };
   const request = new Request('https://brain.dog/app/acme/api/propose?x=1', { method: 'POST', headers: { origin: 'https://brain.dog', cookie: '__Host-bd_s=abc' }, body: '{}' });
-  const answer = new Response(null, { status: 308, headers: { location: 'https://brain.dog/app/' } });
+  const answer = new Response(null, { status: 308, headers: { location: 'https://app.brain.dog/acme/' } });
   let seen: Request | null = null;
   const out = await worker.fetch(request, { APP: { fetch: async (r: Request) => ((seen = r), answer) } });
   assert.equal(seen, request, 'the app was handed a different request from the one the site received');

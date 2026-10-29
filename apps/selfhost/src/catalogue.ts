@@ -1,11 +1,11 @@
 /**
- * A catalogue of shared use cases and add-ons served from a folder, read-only: `/app/catalogue/index.json` and each version's
- * file at `/app/catalogue/usecases/<id>/<version>.usecase.json` or `/app/catalogue/packs/<id>/<version>.pack.json` (`@braindog/declare/catalogue`).
+ * A catalogue of shared use cases and add-ons served from a folder, read-only: `/catalogue/index.json` and each version's
+ * file at `/catalogue/usecases/<id>/<version>.usecase.json` or `/catalogue/packs/<id>/<version>.pack.json` (`@braindog/declare/catalogue`).
  *
- * UNDER THE APP'S BASE, BECAUSE THAT IS WHERE THE APP ASKS. `apps/web` fetches `${BASE}/catalogue/` (`routes/packs/browse/catalogue.ts`),
- * and while this answered `/catalogue/` alone the request fell through to the shell,
- * which served the bundled folder's files as static files, `notes.txt` and all, and the operator's named folder not at all.
- * The old address is not answered here: the shell sends a navigation to it on to `/app/catalogue/`.
+ * BESIDE THE APP, BECAUSE THAT IS WHERE THE APP ASKS. `apps/web` fetches `${BASE}/catalogue/` (`routes/packs/browse/catalogue.ts`),
+ * and its base is the root. Answered here and not by the shell, which would serve the bundled folder's files as static
+ * files, `notes.txt` and all, and the operator's named folder not at all. The old `/app/catalogue/` is not answered
+ * here: the shell sends a request for it on to `/catalogue/` with a 308.
  *
  * THE OPERATOR NAMES THE FOLDER (`BRAINDOG_CATALOGUE`), or the built shell's bundled one is served (`catalogueFolder`), and `braindog usecase publish --to` writes into it. Nothing else
  * in it is reachable: a path is matched whole against the two shapes, so no `..`, no other file and no listing. The files
@@ -24,9 +24,9 @@ import { offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@
 
 import { kennelReader, type KennelDeps } from './kennel.ts';
 
-const PREFIX = '/app/catalogue/';
-const INDEX = /^\/app\/catalogue\/index\.json$/u;
-const FILE = /^\/app\/catalogue\/(?:usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack)\.json$/u;
+const PREFIX = '/catalogue/';
+const INDEX = /^\/catalogue\/index\.json$/u;
+const FILE = /^\/catalogue\/(?:usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack)\.json$/u;
 
 export type Answer = { status: number; headers: Record<string, string>; body: string };
 
@@ -36,9 +36,9 @@ const said = (status: number, body: string): Answer => ({
   body,
 });
 
-/** The answer for a request under `/app/catalogue/`, or `null` for any other path, which the caller answers as before. */
+/** The answer for a request under `/catalogue/`, or `null` for any other path, which the caller answers as before. */
 export function catalogueAnswer(dir: string | undefined, method: string, pathname: string): Answer | null {
-  if (!pathname.startsWith(PREFIX) && pathname !== '/app/catalogue') return null;
+  if (!pathname.startsWith(PREFIX) && pathname !== '/catalogue') return null;
   const refusal = (status: number, fix: string) => said(status, JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix } }));
   if (dir === undefined) return refusal(404, 'This BrainDog serves no catalogue. Name a folder with BRAINDOG_CATALOGUE.');
   if (method !== 'GET' && method !== 'HEAD') return refusal(405, 'A catalogue is read with GET.');
@@ -56,15 +56,15 @@ export function catalogueAnswer(dir: string | undefined, method: string, pathnam
  * the one the hosted app serves), so a self-host started with no `BRAINDOG_CATALOGUE` shows what its own shell ships
  * instead of hiding it behind a 404. Served by the same two path shapes, read-only.
  *
- * THE SHELL IS THE BUILD DIRECTORY OR ITS `app` FOLDER, AND BOTH ARE LOOKED IN. The web build now writes `static/` under
- * its base, so the bundled catalogue is `build/app/catalogue`. `BRAINDOG_SHELL` named `build/` before the move and still
- * does in an operator's environment, and there `<shell>/catalogue` is no longer anything: measured, a shell named that
- * way offered no catalogue and said nothing. `shell.ts` reads either name the same way (`appFolder`), and so does this.
+ * THE SHELL IS THE BUILD DIRECTORY, OR THE `app` FOLDER INSIDE IT, AND BOTH ARE LOOKED IN. The web build writes
+ * `static/` at its root, so the bundled catalogue is `build/catalogue`; while the app was built under `/app` it was
+ * `build/app/catalogue`, and an operator's `BRAINDOG_SHELL` may still name either. Measured once, a shell named the
+ * way the build no longer wrote offered no catalogue and said nothing. `shell.ts` reads either name (`appFolder`).
  */
 export function catalogueFolder(named: string | undefined, shell: string | undefined): string | undefined {
   if (named !== undefined) return named;
   if (shell === undefined) return undefined;
-  for (const bundled of [join(shell, 'app', 'catalogue'), join(shell, 'catalogue')]) if (existsSync(join(bundled, CATALOGUE_INDEX))) return bundled;
+  for (const bundled of [join(shell, 'catalogue'), join(shell, '..', 'catalogue'), join(shell, 'app', 'catalogue')]) if (existsSync(join(bundled, CATALOGUE_INDEX))) return bundled;
   return undefined;
 }
 

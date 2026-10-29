@@ -43,7 +43,7 @@ export const lookKey = (key: unknown): key is string => typeof key === 'string' 
 export type MenuBlock = { key: string; kind: string; columns: number; span: number; name: string; kindName?: string };
 
 /** Where the block stands: who is reading, its column (`null` on a page with no side column), its ends, and the widths it may take. */
-export type MenuAt = { owner: boolean; area: Area | null; first: boolean; last: boolean; hidden: boolean; steps?: readonly number[]; change?: ChangeAt | undefined };
+export type MenuAt = { owner: boolean; area: Area | null; first: boolean; last: boolean; hidden: boolean; steps?: readonly number[]; change?: ChangeAt | undefined; today?: boolean | undefined };
 
 /**
  * Where a block stands, and whether Change to and Remove are offered: `mine` is a page the person wrote, `false` one an
@@ -52,7 +52,7 @@ export type MenuAt = { owner: boolean; area: Area | null; first: boolean; last: 
  */
 export type ChangeAt = { mine?: boolean | undefined; kinds?: readonly string[] | undefined; kindName?: ((kind: string) => string) | undefined };
 
-export type ActionId = 'up' | 'down' | 'rail' | 'main' | `width-${number}` | 'hide' | 'show' | `kind-${string}` | 'change' | 'this' | 'remove';
+export type ActionId = 'up' | 'down' | 'rail' | 'main' | `width-${number}` | 'hide' | 'show' | `kind-${string}` | 'change' | 'this' | 'remove' | 'today';
 
 /**
  * One row of the menu. A width carries its `span`, and the width the block has now is `current`. A kind to change to
@@ -79,6 +79,9 @@ export const words = {
   show: 'Show',
   change: 'Change to',
   changeThis: 'Change this',
+  /* ANY BLOCK ON ANY PAGE GOES ON TODAY AS A WIDGET (the widgets plan of 29 October, §4.3). */
+  toToday: 'Add to Today',
+  onToday: (name: string) => `${name} is on Today.`,
   remove: 'Remove',
   changeElsewhere: 'Change to is on pages you made',
   tooNarrow: (kind: string) => `Too narrow for this ${kind}`,
@@ -135,6 +138,8 @@ export function actionsFor(block: MenuBlock, at: MenuAt): Action[] {
     out.push(row);
   }
   out.push(...changesFor(block, at.change));
+  /* ADD TO TODAY, on every page but Today itself, where the block already is. */
+  if (at.today === true) out.push({ id: 'today', label: words.toToday });
   /* ONE LINE ASKED ABOUT THIS BLOCK, on a page he wrote: it edits the page's own source (`change-this.ts`). */
   if (at.change?.mine === true) out.push({ id: 'this', label: words.changeThis });
   out.push(at.hidden ? { id: 'show', label: words.show } : { id: 'hide', label: words.hide });
@@ -177,7 +182,7 @@ export function editOf(action: Action, block: MenuBlock, page: { laid: readonly 
   if (action.id === 'rail' || action.id === 'main') return (page.laid[at]!.area ?? 'main') === action.id ? null : { area: action.id };
   if (action.id === 'hide' || action.id === 'show') return { hide: action.id === 'hide' };
   if (action.id === 'remove') return { remove: true };
-  if (action.id === 'change' || action.id === 'this') return null;
+  if (action.id === 'change' || action.id === 'this' || action.id === 'today') return null;
   if (action.kind !== undefined) return action.kind === block.kind ? null : { kind: action.kind };
   if (action.span === undefined || action.current || page.laid[at]!.span === action.span) return null;
   return { span: action.span };

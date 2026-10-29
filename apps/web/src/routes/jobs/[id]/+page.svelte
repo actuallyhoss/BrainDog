@@ -219,7 +219,7 @@
      going or went well has nothing to hand on. -->
 {#snippet sendRun()}<SendButton kind="run" attach={[{ ref: sendRefs.run(id), label: title }]} fallback={`Why did “${title}” fail, and what would fix it?`} />{/snippet}
 
-<PageHead {title} kicker={words.heading} back="/jobs" sentence={status !== null && said !== null ? sentence : undefined} actions={outcome === 'failed' ? sendRun : undefined} />
+<PageHead {title} named kicker={words.heading} back="/jobs" sentence={status !== null && said !== null ? sentence : undefined} actions={outcome === 'failed' ? sendRun : undefined} />
 
 <div class="page">
   {#if route.data.refused}

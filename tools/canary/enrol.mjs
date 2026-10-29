@@ -113,7 +113,7 @@ export function handOver(plan, { run = gh, environment = ENVIRONMENT } = {}) {
 }
 
 /** The app's address for a screen of the canary: under its name live, at the root on a self-host's one record. */
-const appAt = (origin, slug, path = '') => `${origin}/app/${slug ? `${slug}/` : ''}${path}`;
+const appAt = (origin, slug, path = '') => `${origin}/${slug ? `${slug}/` : ''}${path}`;
 
 /** A virtual authenticator on `page`, unlocked, as the passkey gate makes one. `{ cdp, authenticatorId }`. */
 export async function authenticatorOn(context, page) {
@@ -144,7 +144,7 @@ export async function waitForOwner(ask, slug, { waitMs = WAIT_MS, everyMs = 2_00
 
 /** STEP 2 UNDER `--dry`: in by the self-host's server key, the only door open on its first run. */
 async function inByKey(page, origin, key) {
-  await page.goto(`${origin}/app/signin`, { waitUntil: 'networkidle', timeout: STEP_MS });
+  await page.goto(`${origin}/signin`, { waitUntil: 'networkidle', timeout: STEP_MS });
   await page.locator('#in-key').fill(key);
   await page.locator('#in-key').press('Enter');
   await page.locator('.calm-who').first().waitFor({ timeout: STEP_MS });
@@ -162,7 +162,7 @@ async function addPasskey(page, { cdp, authenticatorId }, origin, slug) {
 
 /** STEP 4: the smoke's key, from the record's own `createToken` in the signed-in tab. `{ bearer, ends }`. */
 async function makeKey(page, origin, slug) {
-  const url = `${origin}${slug ? `/app/${slug}` : ''}/api/createToken`;
+  const url = `${origin}${slug ? `/${slug}` : ''}/api/createToken`;
   const out = await page.evaluate(
     async ({ url, body }) => {
       const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' });
@@ -176,14 +176,14 @@ async function makeKey(page, origin, slug) {
 
 /** And the key opens the canary: `boot` with it alone, as the smoke asks. */
 async function keyOpens(origin, slug, bearer, send = fetch) {
-  const res = await send(`${origin}${slug ? `/app/${slug}` : ''}/api/boot`, { headers: { authorization: `Bearer ${bearer}`, accept: 'application/json' }, redirect: 'error' }).catch(() => null);
+  const res = await send(`${origin}${slug ? `/${slug}` : ''}/api/boot`, { headers: { authorization: `Bearer ${bearer}`, accept: 'application/json' }, redirect: 'error' }).catch(() => null);
   if (res?.status !== 200) throw new Error(`The smoke's key was made and ${slug ?? 'the record'} answered ${res?.status ?? 'nothing'} to it, so it would not open the canary.`);
 }
 
 /** The sitting, live or `--dry`. Answers the exit code; every line goes to `say`. */
 export async function enrol({ dry, slug, origin }, { say = console.log, run = gh, root = join(import.meta.dirname, '..', '..') } = {}) {
   const build = join(root, 'apps', 'web', 'build');
-  if (dry && !existsSync(join(build, 'app', 'index.html'))) {
+  if (dry && !existsSync(join(build, 'index.html'))) {
     say(`  enrol --dry, ${SELF_HOST_ONLY}: there is no apps/web/build to serve, so nothing was driven. Run pnpm --filter @braindog/web build first.`);
     return 3;
   }
@@ -199,7 +199,7 @@ export async function enrol({ dry, slug, origin }, { say = console.log, run = gh
     const authenticator = await authenticatorOn(context, page);
     if (dry) await inByKey(page, at, host.key);
     else {
-      await page.goto(`${at}/app/signup`, { waitUntil: 'domcontentloaded', timeout: STEP_MS });
+      await page.goto(`${at}/signup`, { waitUntil: 'domcontentloaded', timeout: STEP_MS });
       say(`  In the window: sign up for a free record named ${slug} with an address you read, then paste the one link the mail brings into the same tab.`);
       await waitForOwner(async () => (await context.request.get(`${at}/account/records`, { headers: { accept: 'application/json' } })).json(), slug);
       say(`  signed in as the owner of ${slug}.`);

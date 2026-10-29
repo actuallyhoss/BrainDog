@@ -2,13 +2,15 @@
  * The app, served by the self-host: one built directory, a fallback for every screen the app draws, and no
  * file outside it.
  *
- * WHY THE SELF-HOST SERVES IT AT ALL. Sign-in is a cookie, and a cookie is per origin: `/app/signin` has to come
+ * WHY THE SELF-HOST SERVES IT AT ALL. Sign-in is a cookie, and a cookie is per origin: `/signin` has to come
  * from the same process as `/auth/*` and `/api/*`, or the browser holds the session for a host that never
  * reads it. The Worker has this from its assets binding; this is the same `build/`, served the same way.
  *
- * THE APP IS MOUNTED AT `/app`. `apps/web` is built with
- * `paths.base: '/app'` and writes every file under `build/app/`, so its pages ask for `/app/_app/…`. `/api`,
- * `/auth`, `/mcp` and `/in` stay at the root, where `server.ts` answers them before this file is reached.
+ * THE APP IS AT THE ROOT, AS ON `app.brain.dog`. `apps/web` is built with no base and writes every file at the top of
+ * `build/`, so its pages ask for `/_app/…`. `/api`, `/auth`, `/mcp`, `/oauth` and `/in` are at the root beside it, where
+ * `server.ts` answers them before this file is reached, and a path whose first word is one of the host's doors is
+ * never the app here either. It was mounted at `/app` until 29 Oct; every address under `/app` is a 308 to the same
+ * address without it, so a bookmark or a link mailed before then still opens.
  *
  * `realpath` CONTAINMENT, NOT A STRING CHECK. A path is resolved against the root and then its real path is
  * resolved again, so neither `..` in the URL nor a symlink inside the build can reach a file outside it.
@@ -42,8 +44,19 @@ const TYPES: Readonly<Record<string, string>> = {
   '.woff': 'font/woff',
 };
 
-/** The app's base, as `apps/web/svelte.config.js` sets `paths.base`. */
-const BASE = '/app';
+/** The prefix the app was mounted at before it moved to the root, which a page load is now sent on from. */
+const LEGACY = '/app';
+
+/**
+ * THE FIRST WORDS THAT ARE THE HOST'S AND NEVER A PAGE: its doors, the build's chunks, and the old prefix. `server.ts`
+ * answers the built doors before this file is reached, so what arrives here under one of these is a path nobody serves,
+ * and a 404 says so where the shell's 200 would look like a working endpoint. The Worker keeps the same list
+ * (`ROOT_DOORS` in `apps/worker/src/route.ts`), and the web app as `DOORS` (`apps/web/src/lib/at.ts`).
+ */
+const DOORS = new Set(['api', 'auth', 'account', 'mcp', 'in', 'oauth', 'a', 'ws', 'healthz', 'app', '.well-known']);
+
+/** The first word of a path. */
+const firstOf = (pathname: string): string => /^\/+([^/]*)/.exec(pathname)?.[1] ?? '';
 
 /** Cloudflare Turnstile's origin. The self-host has no sign-up (`on: 'worker'`), so no page of it keeps it. */
 const TURNSTILE = 'https://challenges.cloudflare.com';
@@ -88,36 +101,37 @@ function find(root: string, pathname: string): string | null {
 }
 
 /**
- * THE BUILD DIRECTORY OR ITS `app` FOLDER, EITHER ONE. `BRAINDOG_SHELL` named the build directory before the
- * move and still does in every operator's environment; `main.ts` and `catalogueFolder` name the folder that
- * holds `index.html`. The app folder is the root either way, so nothing above it is served.
+ * THE BUILD DIRECTORY, OR THE `app` FOLDER AN OPERATOR NAMED WHILE THE APP WAS BUILT UNDER `/app`. The build writes
+ * `index.html` at its top again, so the directory itself is the root; a `BRAINDOG_SHELL` that still names
+ * `build/app` from those weeks holds a stale build, and is served from its parent once that holds the new one.
  */
 function appFolder(dir: string): string {
   const named = realpathSync(dir);
-  return existsSync(join(named, 'app', 'index.html')) ? realpathSync(join(named, 'app')) : named;
+  const parent = resolve(named, '..');
+  return named.endsWith(`${sep}app`) && existsSync(join(parent, 'index.html')) ? realpathSync(parent) : named;
 }
 
 /**
  * A handler over one built directory. It throws now, at start, when the directory is not there, rather than
  * answering 404 for every screen of a server that says it started.
  *
- * A MISSING FILE UNDER `/app/_app/` OR `/fonts/` IS A 404, AND ANY OTHER MISSING PATH UNDER `/app` IS THE APP.
- * `/app/r/tasks` and `/app/signin` are screens the app draws from one `index.html`; a missing script is a
+ * A MISSING FILE UNDER `/_app/` OR `/fonts/` IS A 404, AND ANY OTHER MISSING PATH IS THE APP.
+ * `/r/tasks` and `/signin` are screens the app draws from one `index.html`; a missing script is a
  * missing script, and answering it with a page would be a 200 the browser then fails to run.
  *
- * `/fonts/*` IS SERVED FROM THE APP FOLDER because `packages/skin/tokens.css` asks for `url('/fonts/…')` at the
- * root. On `brain.dog` the site answers that path with the same bytes; here there is no site.
+ * `/fonts/*` IS THE BUILD'S OWN FOLDER, because `packages/skin/tokens.css` asks for `url('/fonts/…')` at the root,
+ * which is where the app is now.
  *
- * EVERY OTHER PATH IS A 308 INTO `/app`: `/` because that is where a person types the address, and `/signin` or
- * `/r/tasks` because that is where a bookmark or a mailed link from before the move points. Serving the page
- * there instead would load `/_app/…` scripts that are no longer anywhere. The fragment of a `#magic=` link
- * survives, because a `Location` with no fragment keeps the one the browser had.
+ * EVERY PATH UNDER `/app` IS A 308 TO THE SAME PATH WITHOUT IT: `/app/signin#magic=…` and `/app/r/tasks` are where a
+ * bookmark or a mailed link from before the move points. Serving the page there instead would hand the app an
+ * address it reads as nobody's. The fragment of a `#magic=` link survives, because a `Location` with no fragment keeps
+ * the one the browser had. A path whose first word is one of the host's doors is a 404, under `/app` or not.
  */
 export function shellOf(dir: string): (request: Request) => Response {
   const root = appFolder(dir);
   const fallback = join(root, 'index.html');
   if (!existsSync(fallback))
-    throw new Error(`${dir} has no app/index.html, so it is not a built app. Build apps/web, or point BRAINDOG_SHELL at its build directory.`);
+    throw new Error(`${dir} has no index.html, so it is not a built app. Build apps/web, or point BRAINDOG_SHELL at its build directory.`);
 
   return (request) => {
     /* THE FRAME A DRAWN BLOCK IS DRAWN IN is answered from code under its own policy, as the Worker answers it, and is
@@ -141,17 +155,20 @@ export function shellOf(dir: string): (request: Request) => Response {
       return new Response(null, { status: 400, headers });
     }
 
-    const mounted = pathname === BASE || pathname.startsWith(`${BASE}/`);
-    const font = pathname.startsWith('/fonts/');
-    if (!mounted && !font) {
+    const legacy = pathname === LEGACY || pathname.startsWith(`${LEGACY}/`);
+    const within = legacy ? pathname.slice(LEGACY.length) || '/' : pathname;
+    if (DOORS.has(firstOf(within))) {
+      headers.set('cache-control', 'no-store');
+      return new Response(null, { status: 404, headers });
+    }
+    if (legacy) {
       /* The raw path and not the decoded one, so what was sent is what the browser is sent back to. */
-      headers.set('location', `${BASE}${url.pathname}${url.search}`);
+      headers.set('location', `${url.pathname.slice(LEGACY.length) || '/'}${url.search}`);
       headers.set('cache-control', 'no-store');
       return new Response(null, { status: 308, headers });
     }
 
-    const within = mounted ? pathname.slice(BASE.length) || '/' : pathname;
-    const file = find(root, within) ?? (font || within.startsWith('/_app/') ? null : fallback);
+    const file = find(root, within) ?? (within.startsWith('/fonts/') || within.startsWith('/_app/') ? null : fallback);
     if (!file) {
       headers.set('cache-control', 'no-store');
       return new Response(null, { status: 404, headers });

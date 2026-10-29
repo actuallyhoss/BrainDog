@@ -36,6 +36,7 @@
   import Button from '$lib/ui/Button.svelte';
   import type { ShapeHold } from './shape-hold.svelte.ts';
   import { rowLaid } from './project-parts.ts';
+  import { happenedSaid } from './project-facts.ts';
 
   let { hold, parts }: { hold: ShapeHold; parts: readonly string[] } = $props();
 
@@ -60,9 +61,15 @@
     });
   };
   /* AN OLD IMPORT SOURCE IS NEVER NAMED ON SCREEN: a run it made is an imported one. */
+  /* AND NEVER ITS RUN'S ID (Q14 of 29 October): "Imported run S87" is "Imported from your old notes", an agent's own run
+     is "<agent> run", and a path in a title is said as a file or a folder. */
   const unsourced = (t: string, agent: string): string => {
-    const m = /^([A-Z][\w-]*(?: [A-Z][\w-]*)*)( run(?: S[1-9][0-9]*)?)$/u.exec(t);
-    return m && m[1] !== 'Imported' && m[1]!.toLowerCase() !== agent.toLowerCase() ? `Imported${m[2]}` : t;
+    const m = /^([A-Z][\w-]*(?: [A-Z][\w-]*)*) run(?: S[1-9][0-9]*)?$/u.exec(t);
+    /* AN AGENT NAMED BY THE FOLDER IT RAN IN ("Claude in site") is named by the project it ran for. */
+    const folder = /^(\S.*?) in ([a-z0-9][\w.-]*)$/u.exec(t);
+    if (folder && hold.name) return `${folder[1]} on ${hold.name}`;
+    if (!m) return happenedSaid(t);
+    return m[1]!.toLowerCase() === agent.toLowerCase() ? `${m[1]} run` : 'Imported from your old notes';
   };
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
   /* THE BARS OF ITS MONTHS, in a 336 by 72 box, the last one in the project's colour. */
@@ -122,7 +129,8 @@
         <div class="h-top">
           <span class="h-well"><ProjectWell mark={hold.mark} {name} hue={hold.hue} size="l" /></span>
           <div class="h-name">
-            <p class="h-title" dir="auto">{name}</p>
+            <!-- THE PROJECT'S NAME IS THE PAGE'S HEADING, and the sentence under it a paragraph (Q60 of 29 October). -->
+            <h1 class="h-title" dir="auto">{name}</h1>
             {#if hold.dateLine || status.health}
               <p class="h-status">
                 {hold.dateLine}{#if status.health}{#if hold.dateLine}{' · '}{/if}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span>{/if}
@@ -130,7 +138,7 @@
             {/if}
           </div>
         </div>
-        <h1 class="h-head" dir="auto">{facts.headline}</h1>
+        <p class="h-head" dir="auto">{facts.headline}</p>
         {#if hold.modelLine}
           <p class="h-say" title={WROTE} dir="auto">{hold.modelLine}</p>
         {:else if facts.lede}
@@ -218,7 +226,7 @@
         {#if hold.owner}
           <div class="s-acts">
             <Button size="sm" disabled={moving} onclick={() => void moveTo('building')}>Bring it back</Button>
-            {#if hold.lane !== 'retired'}<Button size="sm" disabled={moving} onclick={() => void moveTo('retired')}>Finish it</Button>{/if}
+            {#if hold.lane !== 'retired'}<Button size="sm" disabled={moving} onclick={() => void moveTo('retired')}>Close it</Button>{/if}
             {#if side.domain}<Button size="sm" weight="bare" href={side.domain.href}>Let the domain go</Button>{/if}
           </div>
           {#if moveSaid}<p class="s-said" role="status">{moveSaid}</p>{/if}
@@ -242,7 +250,7 @@
       moneyRows={hold.moneyRows}
       {arrived}
     />
-  {:else if part === 'numbers' && hold.numbers && hold.numbers.cells.length > 0}
+  {:else if part === 'numbers' && hold.numbers && (hold.numbers.cells.length > 0 || hold.numbers.plan)}
     {@const nums = hold.numbers}
     <Tile icon="chart-line" title="Numbers" count={nums.more > 0 ? `${nums.cells.length} of ${nums.cells.length + nums.more}` : nums.cells.length} meta={nums.cadence || undefined} class="t-numbers" id="part-numbers" data-part="Numbers" data-part-icon="chart-line">
       {#if nums.banner}
@@ -265,6 +273,7 @@
           </li>
         {/each}
       </ul>
+      {#if nums.plan}<p class="n-plan num" dir="auto">{nums.plan}</p>{/if}
     </Tile>
   {:else if part === 'what-is-open' && hold.workLists}
     {@const w = hold.workLists}
@@ -361,8 +370,8 @@
       </div>
     {/snippet}
     <!-- THE AGENTS ON IT: today's day bar where one was here today, each session with how it ended and what it left, who
-         is on it now (`PresencePanel`, the Agents page's run rows scoped here), and the box to tell them at the foot, in
-         ink, never the page's red. For a reader who may not tell and no session yet, the runs are read unseen. -->
+         is on it now (`PresencePanel`, the Agents page's run rows scoped here), and the box to tell them at the foot,
+         its Send in the one primary look it has on Agents. For a reader who may not tell and no session yet, the runs are read unseen. -->
     {#key read.key}
       {#if hold.band || hold.sessionLines.length > 0 || hold.sessions.length > 0}
         <Tile icon="session" title="Agents" count={hold.here > 0 ? `${hold.here} on it now` : hold.sessionLines.length > 0 ? `${hold.sessionLines.length} recent` : undefined} class="t-agents" id="part-agents" data-part="Agents" data-part-icon="session" data-part-live={hold.here > 0 ? '' : undefined}>
@@ -563,7 +572,7 @@
     inline-size: 16px;
     block-size: 16px;
     border: 1.5px solid var(--rule-strong);
-    border-radius: 4px;
+    border-radius: 50%;
     background: var(--tile);
   }
 
@@ -872,14 +881,13 @@
     min-inline-size: 0;
   }
 
+  /* A LABEL WRAPS, never cut (Q33 of 29 October): three "Monthly revenue a year out: …" hid which was which. */
   .n-label {
     max-inline-size: 100%;
-    overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .n-fig {
@@ -923,6 +931,16 @@
 
   .n-sub {
     color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  /* WHAT IT PLANS FOR, under what it measured and apart from it. */
+  .n-plan {
+    margin: 12px 0 0;
+    padding-block-start: 10px;
+    border-block-start: 1px solid var(--rule);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: 18px;
   }
@@ -1031,6 +1049,15 @@
 
     .shape-part > :global(:last-child) {
       flex-grow: 1;
+    }
+
+    /* DATES IS AS TALL AS ITS DATES (Q32 of 29 October): two lines stood in a tile stretched to Runs on's height. */
+    .shape-part[data-shape='dates'] {
+      align-self: start;
+    }
+
+    .shape-part[data-shape='dates'] > :global(:last-child) {
+      flex-grow: 0;
     }
 
     .shape-part {
@@ -1275,20 +1302,7 @@
     margin-block-start: 8px;
   }
 
-  .a-tell :global(.ins-send) {
-    background: var(--ink);
-    color: var(--tile);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .a-tell :global(.ins-send:hover:not(:active)) {
-      background: var(--ink-2);
-    }
-  }
-
-  .a-tell :global(.ins-send:active) {
-    background: var(--ink-2);
-  }
+  /* SEND KEEPS ITS ONE PRIMARY LOOK, as on Agents (Q32 of 29 October): it was drawn in ink here and red there. */
 
   .a-when {
     color: var(--ink-3);

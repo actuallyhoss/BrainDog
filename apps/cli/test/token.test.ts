@@ -114,7 +114,7 @@ test('ON A HOST ELSEWHERE THE OWNER APPROVES THIS ONE MINT, and the grant is sen
   const out: string[] = [];
   const said: string[] = [];
   const code = await tokenCommand(['create', '--scope', 'read,propose', '--days', '30'], {
-    env: { BRAINDOG_HOST: 'https://brain.dog/app/the-studio' },
+    env: { BRAINDOG_HOST: 'https://app.brain.dog/app/the-studio' },
     cwd: tmpdir(),
     file: join(tmpdir(), 'braindog-token-no-hosts.json'),
     out: (l) => void out.push(l),
@@ -124,8 +124,8 @@ test('ON A HOST ELSEWHERE THE OWNER APPROVES THIS ONE MINT, and the grant is sen
   });
   assert.equal(code, 0, said.join('\n'));
   /* NOTHING WAS SENT BEFORE THE APPROVAL: no server key, and not this machine, so a first try could only be refused. */
-  assert.deepEqual(asked, ['https://brain.dog/the-studio']);
-  assert.deepEqual(host.sent, [{ url: 'https://brain.dog/api/createToken', auth: 'Bearer rec_x.operation', body: { scope: 'propose', days: 30 } }]);
+  assert.deepEqual(asked, ['https://app.brain.dog/the-studio']);
+  assert.deepEqual(host.sent, [{ url: 'https://app.brain.dog/api/createToken', auth: 'Bearer rec_x.operation', body: { scope: 'propose', days: 30 } }]);
   assert.equal(out[2], MINTED.bearer);
 });
 

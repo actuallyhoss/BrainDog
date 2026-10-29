@@ -1,15 +1,16 @@
 /**
  * The addresses the command prints for a person to open in the app.
  *
- * THE APP LIVES UNDER `/app/<slug>`, and a target's `base` is the origin alone (`target`, http.ts), because the API is
- * served from the origin. A link built from `base` landed on `<origin>/decide/<id>`, which is no page. The record is
+ * THE APP LIVES AT `/<slug>`, and a target's `base` is the origin alone (`target`, http.ts), because the API is
+ * served from the origin. A link built from `base` landed on `<origin>/decide/<id>`, which is the record the browser's
+ * session is on and not always this one. The record is
  * in the target's `key`, `https://origin[/slug]`, so a link is built from the key and never from the base.
  */
 
 import type { Target } from './http.ts';
 
 /**
- * Where the person answers a filed question: `<origin>/app/<slug>/decide/<id>`, or null when there is no such address.
+ * Where the person answers a filed question: `<origin>/<slug>/decide/<id>`, or null when there is no such address.
  *
  * THE SAME STRING THE AGENT DOOR HANDS AN AGENT (`decideAt`, packages/mcp/src/index.ts), so a question filed from the
  * command and one filed through the door send the person to one place. links.test.ts holds that line word for word.
@@ -26,7 +27,7 @@ export function decideLink(to: Pick<Target, 'key'>, id: string): string | null {
   } catch {
     return null;
   }
-  /* ONE SEGMENT IS A SLUG. `hostKey` has already dropped the `/app` prefix and the trailing slash. */
+  /* ONE SEGMENT IS A SLUG. `hostKey` has already dropped any old `/app` prefix and the trailing slash. */
   const path = url.pathname.replace(/^\/+|\/+$/g, '');
   if (path === '' || path.includes('/')) return null;
   let slug: string;
@@ -36,7 +37,7 @@ export function decideLink(to: Pick<Target, 'key'>, id: string): string | null {
   } catch {
     return null;
   }
-  return `${url.origin}/app/${encodeURIComponent(slug)}/decide/${encodeURIComponent(id)}`;
+  return `${url.origin}/${encodeURIComponent(slug)}/decide/${encodeURIComponent(id)}`;
 }
 
 /** The sentence a filing ends on: the link to the question, or where to find it when the host names no record. */

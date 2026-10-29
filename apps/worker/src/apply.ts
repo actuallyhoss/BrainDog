@@ -167,7 +167,7 @@ async function guarded(request: Request, deps: OpsApplyDeps, door: string): Prom
 }
 
 /** A code as the link a person opens. The fragment never reaches a server, and the page wipes it as it reads it. */
-const linkOf = (origin: string, code: string): string => `${origin}/app/signup#code=${code}`;
+const linkOf = (origin: string, code: string): string => `${origin}/signup#code=${code}`;
 
 /** The whole days a code has left, as the letter says them, or nothing for a code that never ends. */
 const daysOf = (ends_at: number | null, now: number): string | undefined =>
@@ -219,7 +219,7 @@ export async function opsApplications(request: Request, deps: OpsApplyDeps): Pro
  * `/account/ops/invite`: the sign-up codes, behind the provision key, beside `/auth/provision`.
  *
  * `POST { note?, days?, count? }` MINTS, at most fifty a call (`INVITE_MINT_MOST`), and answers each as the link a person
- * opens, `https://<host>/app/signup#code=<code>`. No `days` is a code that never ends, which is the lane's. `POST { end }`
+ * opens, `https://<host>/signup#code=<code>`. No `days` is a code that never ends, which is the lane's. `POST { end }`
  * ends one by the `ref` the list shows or by the code, and `GET` lists them, newest first, never with the code. A code
  * is answered once, at minting.
  *

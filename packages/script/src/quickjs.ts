@@ -310,6 +310,24 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
       const asked = json(arg) as { url: string; init: Record<string, Json> | null };
       charge();
       const init = asked.init ?? {};
+      /* AN ADDRESS HELD IN THE KEYS: the label is checked here, as a key's is, and everything about the URL is the
+         host's, which opens it (`HostRequest.address`). Nothing else rides with it: no key, no body, a GET. */
+      if (typeof init['address'] === 'string') {
+        const address = init['address'];
+        if (!decl.keys.includes(address))
+          throw refuse({ code: 'FORBIDDEN', why: `${decl.id} asked for the address in the key ${JSON.stringify(address)}, which it does not declare.` });
+        if (typeof init['key'] === 'string' || (typeof init['method'] === 'string' && init['method'].toUpperCase() !== 'GET'))
+          throw refuse({ code: 'FORBIDDEN', why: `${decl.id} fetches an address from its keys with a plain GET and no other key.` });
+        if (usage.fetches >= limits.fetches)
+          throw refuse({ code: 'OUT_OF_BOUNDS', why: `${decl.id} made more than its ${limits.fetches} fetches.` });
+        usage.fetches += 1;
+        const request: HostRequest = { url: '', method: 'GET', headers: {}, body: null, key: null, address };
+        return deferred(async () => {
+          const res = await host.fetch(request);
+          usage.bytes += utf8.encode(res.body).length;
+          return JSON.stringify({ status: res.status, headers: res.headers, body: res.body });
+        });
+      }
       let url: URL;
       try {
         url = new URL(asked.url);

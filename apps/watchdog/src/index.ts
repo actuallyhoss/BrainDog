@@ -4,7 +4,10 @@
  * WHY A WORKER OF ITS OWN. A check run by the site Worker or the app Worker goes down with it. This one goes through
  * the public name, so DNS, the edge, the site Worker and the app Worker are all in the path it measures.
  *
- * FIVE PROBES: the site (`/`), the app shell (`/app`), `/healthz` with `"ok":true`, the MCP door, and the sign-in page.
+ * FIVE PROBES: the site (`/`), the app shell (`/` on the app's own name), `/healthz` with `"ok":true`, the MCP door,
+ * and the sign-in page (`/signin` on the app's name). The app left `brain.dog/app` for the root of `app.brain.dog` on
+ * 29 Oct, so its two probes ask that name (`APP_HOST`) and not the old address, which would pass on a 308 and say
+ * nothing about where the app is now.
  * The MCP probe sends no token and wants the 401 that points an agent at OAuth (RFC 9728), because a 200 there would
  * mean the door is open and a 5xx that it is broken.
  *
@@ -26,17 +29,20 @@ export type Env = {
   OPS_ALERT_TO?: string;
   MAIL_FROM?: string;
   WATCH_HOST?: string;
+  /** The app's own name, where its shell and its sign-in are: `app.brain.dog` when unset. */
+  APP_HOST?: string;
 };
 
 export type Result = { name: string; ok: boolean; status: number; ms: number; why: string | null };
 
-type Probe = { name: string; method: 'GET' | 'POST'; path: string; body?: string; judge: (res: Response) => Promise<string | null> };
+/** `on: 'app'` is a probe of the app's own name; every other probe asks the public name. */
+type Probe = { name: string; method: 'GET' | 'POST'; path: string; on?: 'app'; body?: string; judge: (res: Response) => Promise<string | null> };
 
 const status200 = async (res: Response): Promise<string | null> => (res.status === 200 ? null : `status ${res.status}`);
 
 export const PROBES: Probe[] = [
   { name: 'site', method: 'GET', path: '/', judge: status200 },
-  { name: 'app', method: 'GET', path: '/app', judge: status200 },
+  { name: 'app', method: 'GET', path: '/', on: 'app', judge: status200 },
   {
     name: 'healthz',
     method: 'GET',
@@ -57,7 +63,7 @@ export const PROBES: Probe[] = [
       return (res.headers.get('www-authenticate') ?? '').includes('resource_metadata') ? null : '401 without the OAuth metadata header';
     },
   },
-  { name: 'signin', method: 'GET', path: '/app/signin', judge: status200 },
+  { name: 'signin', method: 'GET', path: '/signin', on: 'app', judge: status200 },
 ];
 
 /** One probe: how long it took and why it failed, if it did. A thrown fetch or a timeout is a failure, never an exception. */
@@ -115,7 +121,8 @@ async function tell(env: Env, subject: string, text: string): Promise<void> {
 
 export async function watch(env: Env, now = new Date(), fetcher: typeof fetch = fetch): Promise<Result[]> {
   const host = env.WATCH_HOST?.trim() || 'brain.dog';
-  const results = await Promise.all(PROBES.map((p) => run(p, host, fetcher)));
+  const app = env.APP_HOST?.trim() || 'app.brain.dog';
+  const results = await Promise.all(PROBES.map((p) => run(p, p.on === 'app' ? app : host, fetcher)));
   for (const r of results) {
     console.log(JSON.stringify({ op: 'probe', name: r.name, ok: r.ok, status: r.status, ms: r.ms, slow: r.ms > SLOW_MS, ...(r.why ? { why: r.why } : {}) }));
   }

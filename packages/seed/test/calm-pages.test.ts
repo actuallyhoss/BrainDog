@@ -41,7 +41,15 @@ const ABOVE_THE_FOLD = 6;
  * goes under, in place of the cell Money lasts until. Whether it stays a tile of its own, becomes the page's line or
  * takes another tile's place is the owner's; nothing else is let over, and this page by no more than the one line.
  */
-const OVER: Record<string, number> = { 'money-book': 1 };
+/* AND MONEY'S HOME BY THREE, SINCE ROUND 1030 (the money parity plan of 29 October, his "finish all the money stuff"):
+   Over time the whole row under the hero, This month's budgets beside Instalments, and the line under it saying every
+   budget as one month, on a board the app packs by each tile's height. The board is his ask; whether it folds after six
+   is the owner's to rule on, as money-book's line is. */
+/* AND ACCOUNTS BY ONE, SINCE ROUND 1030 (audit Z18 and Q9 of 29 October): the line saying what a Stripe balance below
+   zero is, drawn only while one is, and the line under the two balance columns saying why they differ. */
+/* AND BUDGETS BY TWO, SINCE ROUND 1030 (a budget for a week or a year, money-core 3.32.0): This week's budgets and This
+   year's budgets, each drawn only while such a budget is kept, beside the month's. */
+const OVER: Record<string, number> = { 'money-book': 1, money: 3, 'money-accounts': 1, 'money-budgets': 2 };
 
 test('THE SWEEP READS EVERY DECLARED PAGE, so a page left out is not a page passed', () => {
   assert.ok(pages.length >= 25, `only ${pages.length} pages were read`);
@@ -72,9 +80,12 @@ test(`NO PAGE SHOWS MORE THAN ${ABOVE_THE_FOLD} TILES BEFORE THE REST IS FOLDED 
       b.kind === 'note' &&
       b.when?.gt !== undefined &&
       page.blocks.some((o) => o !== b && o.kind === 'note' && o.when?.metric === b.when!.metric && o.when?.is === b.when!.gt);
+    /* A WHEN THAT HOLDS ALL OF SEVERAL is drawn only while something is missing if any one of them is (`lt`): Money's Over
+       time draws Cash's line in net worth's place until net worth has a week of nights. */
+    const missing = (w: When & { all?: When[] }): boolean => w.lt !== undefined || (w.all ?? []).some((c) => c.lt !== undefined);
     const standsIn = (b: Block): boolean =>
       b.when !== undefined &&
-      (b.when.lt !== undefined || twinOf(b) || leads.some((w) => w.metric === b.when!.metric && w.lt !== undefined && b.when!.gte === w.lt));
+      (missing(b.when) || twinOf(b) || leads.some((w) => w.metric === b.when!.metric && w.lt !== undefined && b.when!.gte === w.lt));
     /* THE CAPTURE LINE RIGHT AFTER THE SENTENCE IS IN THE HEADER, NOT A TILE (`captured` in apps/web/src/lib/page/PageBody.svelte). */
     const opening = page.blocks.find((b) => !b.lead);
     const main = page.blocks.filter((b) => b.area !== 'rail' && !(b === opening && b.kind === 'capture'));

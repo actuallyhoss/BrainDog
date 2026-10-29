@@ -19,7 +19,7 @@
   import { at as inApp } from '../at.ts';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import type { Row } from 'braindog-render';
+  import type { Row, WidgetSize } from 'braindog-render';
   import { doorOf } from './door.ts';
   import type { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropInto, nearestInArea, setAreaAt, type Slot } from '$lib/record/arrange.ts';
@@ -76,6 +76,8 @@
     under = null,
     opens = null,
     between = null,
+    placed = null,
+    inside = null,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
@@ -144,6 +146,14 @@
      * for every block of the list, drawn or not, with its index; a screen that draws nothing there draws nothing.
      */
     between?: Snippet<[number]> | null;
+    /**
+     * WHERE EACH BLOCK STANDS ON A BOARD (`lib/board`): its widget's key, its grid area and its size, by declared index,
+     * or `null` for a block that takes no cell. Given, the page is a board: its blocks are drawn in the order handed and
+     * each in its own cell, and the look's order is the board's.
+     */
+    placed?: ((i: number) => { key: string; area: string; size: string } | null) | null;
+    /** What the screen draws inside a block's tile, at its foot: Needs you's foot, a board's editing handles. */
+    inside?: Snippet<[number]> | null;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -216,6 +226,7 @@
   /** The work column's width, measured below (`twoUp`); declared here, as the questions' place reads it. */
   let workWidth = $state<number | null>(null);
   const asks = $derived.by(() => {
+    if (placed) return { order: blocks.map((_, i) => i), rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
     if (mode !== 'page' || arranging) return { order: looked, rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
     const read = blocks.map((b, i) => {
       const at = tiled[i] as (LiveBlock & { box?: unknown; joins?: unknown; lead?: unknown }) | undefined;
@@ -1176,6 +1187,7 @@
   <!-- A PAGE ABOUT ONE ROW THAT LEADS WITH THAT ROW'S OWN CARD names it once, in its title: the card said it twice. -->
   {@const self = block.kind === 'cards' && page.param !== undefined && block.register === page.param.register && block.entries?.length === 1 && block.entries[0]?.seq === page.param.seq}
   {#if between}{@render between(slot.i)}{/if}
+  {@const cell = placed ? placed(slot.i) : null}
   <!-- `drawn: false` means the record evaluated `when:` and said no. A page that shows a warning that does not apply
        teaches people to ignore warnings (06 §1). -->
   {#if block.drawn}
@@ -1192,8 +1204,11 @@
       id="{ids}b-{slot.i + 1}"
       data-menu-host
       data-key={keys[slot.i]}
+      data-source={typeof (block as { source?: unknown }).source === 'string' ? (block as { source: string }).source : undefined}
       aria-labelledby={arranging || block.heading ? `${ids}h-${slot.i + 1}` : undefined}
-      style="--span:{spans.get(slot.i) ?? slot.span}"
+      style="--span:{spans.get(slot.i) ?? slot.span}{cell ? `;grid-area:${cell.area}` : ''}"
+      data-board-key={cell?.key}
+      data-size={cell?.size}
       data-full={(spans.get(slot.i) ?? slot.span) >= COLUMNS ? '' : undefined}
       data-arranging={arranging ? '' : undefined}
       data-cursor={!arranging && mode === 'page' && reading[cursor]?.slot.i === slot.i ? '' : undefined}
@@ -1284,12 +1299,16 @@
       {/if}
       <!-- IN THE LEAD TILE, UNDER ITS SENTENCE: the line the page opens on and what narrows it, as the boards draw them. -->
       {#if leadTile && lifted?.at === at}
+        <!-- THE NEXT ACTION INSIDE THE HEADER TILE, as its second sentence (Q19 of 29 October): under the tile it floated
+             between the header and the first tile as a stray line. -->
+        {#if next && !arranging && headline?.at === at}<div class="lead-under"><NextStep {next} host={mode === 'page' ? host : null} /></div>{/if}
         {#if under}<div class="lead-under">{@render under()}</div>{/if}
         {#if strip}<div class="lead-under">{@render strip()}</div>{/if}
       {/if}
+      {#if inside}{@render inside(slot.i)}{/if}
     </div>
     <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->
-    {#if next && !arranging && headline?.at === at}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
+    {#if next && !arranging && headline?.at === at && !(leadTile && lifted?.at === at)}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
     <!-- AND WHAT THE SCREEN OPENS THE BOARD WITH, a row of its own under the page's sentence and over the first tile. -->
     {#if opens && opensAt === at}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
     {#if lifted?.at === at}
@@ -1320,6 +1339,7 @@
     pick={mode === 'preview' ? null : pick}
     walk={mode === 'preview' ? null : onwalk}
     slug={mode === 'home' ? page.page : null}
+    widget={placed ? ((placed(slot.i)?.size ?? null) as WidgetSize | null) : null}
   />
 {/snippet}
 
@@ -1698,6 +1718,10 @@
 
   .lead-under {
     min-inline-size: 0;
+  }
+
+  .lead-under :global(.next) {
+    margin-block-start: 0;
   }
 
   /* THE LINE TO TYPE INTO, IN THE TILE: the row's width, on the tile's second fill so it reads as a field there. */

@@ -10,9 +10,9 @@
  * SO THE QUESTION IS NOT "did the command succeed" BUT "is the thing I built the thing being
  * served", and it is asked of two files and one route:
  *
- *   1. `/app/`: the app's shell. A request with no session is answered with the shell as `ASSETS`
+ *   1. `/`: the app's shell. A request with no session is answered with the shell as `ASSETS`
  *      holds it, and this comparison is what holds the Worker to that.
- *   2. `/app/_app/version.json`: SvelteKit's build id, which changes on every build (50 §53).
+ *   2. `/_app/version.json`: SvelteKit's build id, which changes on every build (50 §53).
  *   3. `/.well-known/braindog-build`, whose `app` field is the `BRAINDOG_BUILD` tuple this run
  *      passed to the deploy (33 §4). The two hashes prove the ASSETS are current; this proves the
  *      WORKER is. They deploy as one version (51's `assets` carries `apps/web/build` into the
@@ -69,12 +69,12 @@ export const needs = ['web-build', 'host'];
 /**
  * 52 §181: the live shell and the build id, compared as bytes rather than as text.
  *
- * UNDER `/app` SINCE THE APP MOVED THERE. On `brain.dog` the root is the marketing
- * site and `/_app/version.json` is the site's build id, so comparing those would measure the other Worker and pass or
- * fail for a reason that is not this deploy; on `app.brain.dog` the root becomes a 308, which `redirect: 'manual'`
- * reports as a finding. The app's own shell is `/app/` and its build id is under the same base.
+ * AT THE ROOT OF `app.brain.dog`, WHERE THE APP IS. `DEPLOY_HOST` must be that name and never `brain.dog`, whose root is
+ * the marketing site and whose `/_app/version.json` is the site's build id, so comparing those would measure the other
+ * Worker. A request with no session is answered `/` with the shell. Until 29 Oct the app was under `/app`, and these
+ * were `/app/` and `/app/_app/version.json`, which now answer a 308 that `redirect: 'manual'` reports as a finding.
  */
-const PATHS = ['/app/', '/app/_app/version.json'];
+const PATHS = ['/', '/_app/version.json'];
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
@@ -96,7 +96,7 @@ const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 export default async function deployParity(root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')) {
   const build = join(root, 'apps', 'web', 'build');
 
-  /** `/app/` on the host is `app/index.html` in the build; the other path is itself. */
+  /** `/` on the host is `index.html` in the build; the other path is itself. */
   const localOf = (path) => join(build, path.endsWith('/') ? `${path.slice(1)}index.html` : path.slice(1));
 
   const host = process.env.DEPLOY_HOST;

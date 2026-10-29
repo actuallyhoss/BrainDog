@@ -4,12 +4,12 @@
  * WALKED, NOT READ. A walk of the first sign-in drove the Worker as production runs it, with a passkey made by
  * Chrome's own WebAuthn stack, and ranked what it met. This file holds four of those, by their rank:
  *
- *   1. After a sign-in that starts at the bare `/app/signin`, "Open BrainDog" drew The Studio, the sample business,
+ *   1. After a sign-in that starts at the bare `/signin`, "Open BrainDog" drew The Studio, the sample business,
  *      and said "Nothing you do here is saved." Measured twice on the laptop (after the claim link and after the
- *      passkey), and the phone made the same move with no request. A reload drew his own record at `/app/walk`.
+ *      passkey), and the phone made the same move with no request. A reload drew his own record at `/walk`.
  *   7. The icons over "Your record is ready to claim." and "You are signed in" were 6 by 6 grey dots around a
  *      20-pixel icon, because `blocks.css` draws every `.glyph` as an intent dot and these screens reused the name.
- *   8. A claim link pasted into a tab already on `/app/signin` changed the address and nothing else, for 1.5 s and
+ *   8. A claim link pasted into a tab already on `/signin` changed the address and nothing else, for 1.5 s and
  *      until a reload: a fragment-only change is a same-document navigation, and the link was read only on mount.
  *   9. After the claim link the screen said a passkey lets him sign in "without the key", a key he never used.
  *
@@ -60,7 +60,7 @@ function host(): { io: Fetch; signIn: () => void; asked: () => number } {
 /**
  * THE 401 ON THE SIGN-IN SCREEN IS NOT KEPT, SO THE FIRST LOAD AFTER SIGNING IN ASKS THE RECORD.
  *
- * THIS TEST HELD ITEM 1 AS IT WAS. The sign-in screen's own load asked `boot` at the bare `/app` with no session,
+ * THIS TEST HELD ITEM 1 AS IT WAS. The sign-in screen's own load asked `boot` at the bare `/` with no session,
  * was refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie, so the next load was
  * handed The Studio with no request made, and only `forget` put it right. With the sample gone that
  * 401 is a refusal like any other, and a refusal is never kept, so the read after the cookie asks and answers his
@@ -70,9 +70,9 @@ function host(): { io: Fetch; signIn: () => void; asked: () => number } {
 test('THE 401 ON THE SIGN-IN SCREEN IS NOT KEPT, so the first read after signing in answers his record', async () => {
   forget();
   const { io, signIn, asked } = host();
-  assert.deepEqual(await readBoot('https://localhost:4403/app', io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
+  assert.deepEqual(await readBoot('https://localhost:4403', io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
   signIn();
-  const after = await readBoot('https://localhost:4403/app', io);
+  const after = await readBoot('https://localhost:4403', io);
   assert.equal(after.from, 'live', 'the refusal from before the sign-in was handed back after it');
   assert.equal(asked(), 2);
   forget();
@@ -82,7 +82,7 @@ test('THE 401 ON THE SIGN-IN SCREEN IS NOT KEPT, so the first read after signing
  * AND THE SIGN-IN SCREEN DOES NOT POLL A RECORD NOBODY IS SIGNED IN TO.
  *
  * THE SAMPLE WAS WHAT KEPT IT QUIET. The layout polls `/api/version` whenever `data.live` is true, and the sample's
- * shell was the one that said false, so a stranger on the bare `/app/signin` was never polled. The shell over a
+ * shell was the one that said false, so a stranger on the bare `/signin` was never polled. The shell over a
  * refusal says true, and `version` is `READ+`: with the sample gone every stranger's sign-in screen asked it, was
  * answered 401, and turned the hairline across the top of the screen to `offline`, a solid warning bar on the first
  * thing a new person sees, with another 401 on every tick after it.
@@ -102,7 +102,7 @@ function buttonFor(src: string, key: string): string | null {
 }
 
 /* THE INVITATION IS THE SAME DOOR FOR THE FIRST COLLEAGUE. Testing drove
-   the mechanism through the real `readBoot` for `/app/invite`: the layout kept the sample with nobody signed in,
+   the mechanism through the real `readBoot` for `/invite`: the layout kept the sample with nobody signed in,
    Accept set a cookie and nothing more, and "Open BrainDog" was `href="/"` with no reload, so the next move was handed
    `{"from":"sample"}` with one request made in all. The repair of 6959cf06 had been made on `/signin` alone. */
 for (const [where, src, key] of [
@@ -112,7 +112,7 @@ for (const [where, src, key] of [
 ] as const) {
   test(`"${copy[key]}" ON THE ${where.toUpperCase()} SCREEN IS A FULL PAGE LOAD, so nothing the tab kept before signing in is drawn after it`, () => {
     /* A full load drops every tab-kept answer at once (the boot, the switcher's `reach`, the voice) and lets the
-       Worker's 302 put `/app/<slug>/` in the address. A client-side move keeps all of them, which was the bug. */
+       Worker's 302 put `/<slug>/` in the address. A client-side move keeps all of them, which was the bug. */
     const tag = buttonFor(src, key);
     assert.ok(tag, `no Button labelled copy.${key} on the ${where} screen`);
     /* THE VALUE IS READ TOO, not just the name. SvelteKit takes "" and "true" as a reload and "off" or "false" as

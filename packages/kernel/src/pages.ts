@@ -17,6 +17,7 @@
  * every heading. The slug comes from the row's title, so `/p/kiln` survives a re-ordering.
  */
 
+import { sizeRead } from './kinds/sizes.ts';
 import type { Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { evaluate, type Leaf, type Predicate, type Schema } from '@braindog/where';
@@ -139,6 +140,10 @@ export type PageBlock = {
   lead?: boolean;
   /** Which of the page's two columns the block sits in, on a page with a `layout`. `main` when absent. */
   area?: 'main' | 'rail';
+  /** A widget's frame on a board (`board.ts`): small, wide, tall, large or full. */
+  size?: 'small' | 'wide' | 'tall' | 'large' | 'full';
+  /** A widget not yet kept: who put it on the board and why (`board.ts`). */
+  draft?: { by: string; why?: string; cost?: string };
   /** A `progress` block's: each row a band from its low to its high, columns `label | spent | low | high`. */
   range?: boolean;
   /** A `queue`'s: one tile per question, drawn with its recommended option's visual. */
@@ -1697,7 +1702,9 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
   });
   /* HELD BEFORE THE LOOK IS COMPOSED, so the look is the one this reader's page answers and not the record's (`heldFor`). */
   const shown = deps.reader ? heldFor(blocks, deps.reader.hold) : null;
-  const looked = lookedAt(deps, found.decl.page, shown?.blocks ?? blocks, shown, found.decl.layout !== undefined);
+  /* A BOARD IS LAID OUT BY ITS OWN ORDER AND SIZES (`board.ts`), never reordered by a look: what he arranged on Today is
+     where it stays, and nothing moves under him (Call 19). */
+  const looked = (found.decl as { board?: unknown }).board === true ? null : lookedAt(deps, found.decl.page, shown?.blocks ?? blocks, shown, found.decl.layout !== undefined);
   const head = pageHead(deps, found.decl, every, read_at, zone);
   /* AND THE HEAD SAYS HOW MANY THE WORD FOUND, across the page's lists, as this reader is shown them: "3 found". */
   const kept = head && word !== null ? { word, found: foundAcross(shown?.blocks ?? blocks, searched) } : null;
@@ -2092,13 +2099,15 @@ function readerFilters(
   filter: Readonly<Record<string, string>> | undefined,
 ): { answer: PageFilter[]; clauses: Map<string, Predicate[]>; log: ((e: ActivityEvent) => boolean) | null } | null {
   const said = Array.isArray(decl.filters) ? (decl.filters as unknown[]) : [];
-  const all = said.flatMap((f): { field: string; control: PageFilter['control']; options?: Choice[] }[] => {
-    const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown; options?: unknown }) : {};
+  const all = said.flatMap((f): { field: string; control: PageFilter['control']; options?: Choice[]; counts?: string }[] => {
+    const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown; options?: unknown; counts?: unknown }) : {};
     const control = one.control === 'chips' || one.control === 'segmented' ? one.control : null;
     if (typeof one.field !== 'string' || control === null) return [];
-    if (one.options === undefined) return [{ field: one.field, control }];
+    /* `counts:`, A SENTENCE THE COUNTED ROWS MUST ALSO HOLD (Q6 of 29 October): Work's project chips counted every task
+       not finished, the backlog with them, and read 67 over an Open of 57. Said, the chips count what Open counts. */
+    if (one.options === undefined) return [{ field: one.field, control, ...(typeof one.counts === 'string' && one.counts.trim() !== '' ? { counts: one.counts } : {}) }];
     const options = optionsOf(one.options);
-    return options.length > 0 ? [{ field: one.field, control, options }] : [];
+    return options.length > 0 ? [{ field: one.field, control, options, ...(typeof one.counts === 'string' && one.counts.trim() !== '' ? { counts: one.counts } : {}) }] : [];
   });
   if (all.length === 0) return null;
   /* A FILTER OF ITS OWN CHOICES IS NO FIELD'S (`options:`), and is answered beside the fields' filters below. */
@@ -2139,7 +2148,7 @@ function readerFilters(
   }
   /* EACH CHOICE OF ITS OWN IS ITS SENTENCE, read against each list: a list whose fields the sentence does not name is left
      as it is, as a list without a field is under a field's filter. */
-  const own = all.filter((d): d is { field: string; control: PageFilter['control']; options: Choice[] } => d.options !== undefined);
+  const own = all.filter((d): d is { field: string; control: PageFilter['control']; options: Choice[]; counts?: string } => d.options !== undefined);
   const sentenceOn = (register: string, where: string): Predicate | null => {
     const schema = schemas.get(register) ?? deps.schemaOf(register);
     if (!schema) return null;
@@ -2169,7 +2178,7 @@ function readerFilters(
   };
   const clauses = new Map(lists.map((r) => [r, clausesOn(r)] as const));
 
-  const answer = declared.map(({ field, control }): PageFilter => {
+  const answer = declared.map(({ field, control, counts: countsSaid }): PageFilter => {
     const fromLog = logged?.answers.get(field);
     if (fromLog) return { ...fromLog, control };
     const holding = lists.filter((r) => filterable(schemas.get(r) ?? null, field));
@@ -2189,7 +2198,8 @@ function readerFilters(
       const other = s.fields[field]!;
       if (other.type !== spec.type || other.to !== spec.to) continue;
       reads.push(r);
-      const parts = [...(showing.get(r) ?? []), ...clausesOn(r, field)];
+      const own = countsSaid === undefined ? null : predicateOf(countsSaid, s, deps.ctx);
+      const parts = [...(showing.get(r) ?? []), ...clausesOn(r, field), ...(own && own.bad.length === 0 && own.predicate !== undefined ? [own.predicate] : [])];
       const where: Predicate | undefined = parts.length === 0 ? undefined : parts.length === 1 ? parts[0] : { all: parts };
       for (const [v, n] of tallied(deps, r, field, where)) counts.set(v, (counts.get(v) ?? 0) + n);
     }
@@ -2250,7 +2260,9 @@ function readerFilters(
       const sentences = d.options.map((c) => sentenceOn(r, c.where));
       if (sentences.every((p) => p === null)) continue;
       reads.push(r);
-      const base = [...(showing.get(r) ?? []), ...clausesOn(r, d.field)];
+      /* AND THE SENTENCE ITS COUNTS ARE HELD TO (`counts:`), as a field's chips are: what is counted, not what is picked. */
+      const held = d.counts === undefined ? null : predicateOf(d.counts, s, deps.ctx);
+      const base = [...(showing.get(r) ?? []), ...clausesOn(r, d.field), ...(held && held.bad.length === 0 && held.predicate !== undefined ? [held.predicate] : [])];
       sentences.forEach((p, i) => {
         if (p === null) return;
         const parts = [...base, p];
@@ -2567,6 +2579,12 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (block !== null && typeof block === 'object' && Object.hasOwn(block, 'says_at') && Object.hasOwn(block, 'says')) {
     const { says_at: _said, body: _words, ...rest } = block as PageBlock & { says_at?: unknown; body?: unknown };
     block = rest as PageBlock;
+  }
+  /* A WIDGET READS WHAT ITS FRAME SHOWS AND ONE MORE (`kinds/sizes.ts`), so a small list on a board never reads fifty
+     rows to draw one, and its "N more" is still known. Only a kind that draws its rows as it reads them is cut. */
+  if (block !== null && typeof block === 'object') {
+    const most = sizeRead(String(block.kind), (block as { size?: unknown }).size);
+    if (most !== null) block = { ...block, limit: Math.min(typeof block.limit === 'number' ? block.limit : 50, most) };
   }
   try {
     return { ...leanRows(deps, readBlockAsWritten(deps, renamed(block))), key };
@@ -5527,6 +5545,9 @@ function figureValue(deps: PageDeps, decl: MetricDecl, how?: { fx?: FxRead; asOf
   /* A FIGURE THAT IS A DAY (the latest `due`) is held as whole days since 1970, and a sentence says the day: the ISO day
      goes out, which a host writes as it writes any other day. */
   if (decl.format === 'day') return new Date(read.value.value * 86_400_000).toISOString().slice(0, 10);
+  /* A FIGURE THAT IS A SHARE (`format: 'pct'`, held as a fraction) is said as its tile says it, "62%", not as the
+     fraction's every digit: "take 20.268978494623656 of what comes in" was Reports' line under Health. */
+  if (decl.format === 'pct' && !read.value.unit) return `${Math.round(read.value.value * 100).toLocaleString('en-GB')}%`;
   /* AND HOW ONE AMOUNT WAS CONVERTED, for a caller that asks (`values_fx`): only where a rate was used. */
   if (how && read.value.fx?.asOf) how.fx = read.value.fx;
   return read.value.unit ? { amount: read.value.value, currency: read.value.unit } : read.value.value;
@@ -5890,12 +5911,12 @@ type ConvertedPart = (typeof CONVERTED_PARTS)[number];
  */
 function convertedValue(deps: PageDeps, decl: MetricDecl, part: ConvertedPart): Json | undefined {
   if (!mayRead(deps, decl)) return undefined;
-  /* `groups` IS HOW MANY OF A GROUPED FIGURE'S PARTS HOLD ANY MONEY, the ones a split of it lists: "across 6 accounts"
-     beside a tile of six, where the count of every account said seven over one at nought the tile leaves out. */
+  /* `groups` IS HOW MANY PARTS A GROUPED FIGURE HAS, every one its bar draws (Q9 of 29 October): "Spread over 6
+     accounts" stood over a tile of seven rows, since an account at nought is drawn, at nought, and was not counted. */
   if (part === 'groups') {
     const read = deps.read(decl);
     if (!read.ok || !read.value.groups) return undefined;
-    return read.value.groups.filter((g) => (g.value !== null && g.value !== 0) || (g.parts ?? []).some((p) => p.amount !== 0)).length;
+    return read.value.groups.length;
   }
   if (part === 'apart') {
     const apart = deps.readApart?.(decl);

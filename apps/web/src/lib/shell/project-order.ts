@@ -1,5 +1,5 @@
 /**
- * ONE ORDER FOR THE PROJECTS, WHEREVER THEY ARE DRAWN: the sidebar's, by this week (`side.ts` `byWeek`). The sidebar
+ * ONE ORDER FOR THE PROJECTS, WHEREVER THEY ARE DRAWN: the sidebar's, pins and then by name (`side.ts` `byWeek`). The sidebar
  * keeps the order it drew on this device, by record, and Today's cards read it (`project-cards.ts` `cardsOf`), so the
  * same projects never stand in two orders side by side. Read safely: a browser that keeps nothing, or a test with no
  * browser, reads no order, and the cards keep their own.

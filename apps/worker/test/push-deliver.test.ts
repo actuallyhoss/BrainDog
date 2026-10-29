@@ -242,7 +242,7 @@ test('GET /api/push/key ANSWERS THE PUBLIC KEY ONLY WHEN THE PAIR IS SET AND IS 
   touched.length = 0;
   const pair = await throwaway();
   const other = await throwaway();
-  for (const path of ['/api/push/key', '/app/the-studio/api/push/key']) {
+  for (const path of ['/api/push/key', '/the-studio/api/push/key', '/app/the-studio/api/push/key']) {
     const keyed = await askKey(path, { VAPID_PUBLIC: pair.publicKey, VAPID_PRIVATE: pair.privateKey });
     assert.equal(keyed.status, 200, await keyed.clone().text());
     assert.deepEqual(await keyed.json(), { key: pair.publicKey }, path);

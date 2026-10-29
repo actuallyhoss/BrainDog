@@ -127,7 +127,7 @@ test('THE BASH FORM, RUN, POSTS WHAT WAS TYPED, a name with quotes and a letter 
     req.on('end', () => {
       seen.push({ authorization: req.headers.authorization, type: req.headers['content-type'], body: Buffer.concat(chunks).toString('utf8') });
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end('{"ok":true,"value":{"claim":"https://app.example.test/app/signin#claim=x"}}');
+      res.end('{"ok":true,"value":{"claim":"https://app.example.test/signin#claim=x"}}');
     });
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));

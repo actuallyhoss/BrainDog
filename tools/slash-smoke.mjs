@@ -1,10 +1,10 @@
 /**
  * Slash asked once on a real host, as a signed-in person, with what each ask cost in time and whether it came back readable.
  *
- *   BRAINDOG_SESSION=<cookie value> node tools/slash-smoke.mjs --base https://app.brain.dog/app/<slug>
+ *   BRAINDOG_SESSION=<cookie value> node tools/slash-smoke.mjs --base https://app.brain.dog/<slug>
  *   BRAINDOG_SESSION=<cookie value> node tools/slash-smoke.mjs --base http://localhost:8787 --rule <automation id> --look
  *
- *   --base      the record's address, as the app's `apiBase()` builds it: the origin, and `/app/<slug>` where the host
+ *   --base      the record's address, as the app's `apiBase()` builds it: the origin, and `/<slug>` where the host
  *               keeps more than one record
  *   --ask       the question the read and the propose are asked (default: what is due in the next thirty days)
  *   --rule      an automation with a Run now button and an `ask_slash` step: it is run once and its step is watched

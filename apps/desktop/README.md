@@ -1,6 +1,6 @@
 # BrainDog for Mac
 
-A thin Tauri 2 window around `https://app.brain.dog/app` (plan: `docs/55-DESKTOP-APP.md`). The web app is the product; this
+A thin Tauri 2 window around `https://app.brain.dog` (plan: `docs/55-DESKTOP-APP.md`). The web app is the product; this
 shell only adds what a tab cannot do:
 
 - Option+Space from anywhere brings the window forward and opens Slash.
@@ -25,8 +25,8 @@ cargo install tauri-cli --version "^2" --locked
 
 cd apps/desktop/src-tauri
 cargo tauri icon icons/icon.png   # makes the full icon set from the web app's 512 px icon
-cargo tauri dev                   # opens the window on app.brain.dog/app
-BRAINDOG_URL=http://localhost:5173/app cargo tauri dev   # a debug build only: against a local web app
+cargo tauri dev                   # opens the window on app.brain.dog
+BRAINDOG_URL=http://localhost:5173 cargo tauri dev   # a debug build only: against a local web app
 cargo tauri build --target universal-apple-darwin        # Apple silicon and Intel; needs both rust targets
 # Build outside the tree (CARGO_TARGET_DIR): an in-tree target/ is 1.6 GB the repo's gates would read file by file.
 ```
@@ -44,11 +44,11 @@ password). Export the real values in the shell that runs `cargo tauri build`; th
 
 - **Google sign-in.** The sign-in page, inside the app, opens `/auth/google/start?desktop=1&challenge=` in the default
   browser (the window keeps the PKCE verifier). The worker ends on `braindog://auth?code=`, a sealed one-time code
-  (two minutes, the unspent sign-in link inside it); the shell loads `/app/signin/desktop?code=`, which posts the code and
+  (two minutes, the unspent sign-in link inside it); the shell loads `/signin/desktop?code=`, which posts the code and
   verifier to `/auth/google/desktop` and gets the session cookie in the window. Passkey and email link are unchanged.
 - **Go menu.** Today, Needs you, Projects, Money, Agents (Cmd+1 to 5), Settings (Cmd+,) and Slash (Cmd+K) send `goto`
-  with an `/app/...` path; the web layout follows it and ignores any other address. Projects, Money and Agents use
-  `/app/p/portfolio`, `/app/p/money` and `/app/p/agents`; change `GO` in `lib.rs` if those pages are named otherwise.
+  with a path in the app; the web layout follows it and ignores one of the host's doors. Projects, Money and Agents use
+  `/p/portfolio`, `/p/money` and `/p/agents`; change `GO` in `lib.rs` if those pages are named otherwise.
 - **Updater.** `tauri-plugin-updater` reads `https://brain.dog/desktop/latest.json` at launch and installs a signed
   update. `plugins.updater.pubkey` in `tauri.conf.json` is a placeholder until the key is made (see
   `signing.example.env`). The download page `/download` on the site is held until `LAUNCH.public`.

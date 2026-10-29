@@ -1,13 +1,14 @@
 # Contributing
 
-Read this before you write anything. Most of it is not the usual formalities — the clean-room rule
-and the house style are load-bearing, and a pull request that ignores them is rejected on sight
-rather than reviewed.
+Thanks for wanting to help. Read this before you write anything: most of it is not the usual
+formalities. The clean-room rule and the house style are load-bearing, and a pull request that ignores
+them is sent back rather than reviewed.
 
-**The design is the source of truth.** [`docs/`](docs/) is 54 numbered documents and they decide what
-BrainDog is. Code that disagrees with them is a defect in one of the two, and the change fixes one
-and says which. Do not design in a pull request: if you think a document is
-wrong, amend the document in the same change and argue it there.
+**Read the design first.** [`docs/`](docs/) holds the numbered design documents, and
+[docs/00-README.md](docs/00-README.md) says which of them are contracts the code is held to, which are
+reference and which are history. Where a contract and the code disagree, that is a defect in one of
+the two, and the change fixes one and says which. Do not design in a pull request: if you think a
+document is wrong, amend it in the same change and argue it there.
 
 ---
 
@@ -18,7 +19,7 @@ wrong, amend the document in the same change and argue it there.
 | Report a defect | [Bug report](../../issues/new?template=bug.yml). Say what you expected, what happened, and which document says so |
 | Propose a feature | [Feature request](../../issues/new?template=feature.yml). It must cite the document it belongs in, or argue for a new section |
 | Report a vulnerability | **Not an issue.** [`SECURITY.md`](SECURITY.md) |
-| Ask a question | A discussion, not an issue |
+| Ask a question | Email [support@brain.dog](mailto:support@brain.dog), or open an issue if it is about the code |
 | Send a large change | Open an issue first. There is one maintainer, and an unreviewed 2,000-line branch is a week nobody has |
 
 ---
@@ -38,7 +39,7 @@ pnpm install --frozen-lockfile
 ```
 
 `--frozen-lockfile` is not optional, in CI or locally. `pnpm-workspace.yaml` also sets
-`minimumReleaseAge: 1440`, so **a package published less than 24 hours ago will not resolve** — that
+`minimumReleaseAge: 1440`, so **a package published less than 24 hours ago will not resolve**. That
 is deliberate supply-chain quarantine, not a broken install.
 
 ### The commands
@@ -52,7 +53,7 @@ is deliberate supply-chain quarantine, not a broken install.
 | `pnpm build` | every package and app that has a build |
 | `pnpm shots` | screenshots of every route, both schemes, into `apps/web/shots/` |
 
-**Do not run `pnpm gates` and a dev server at once** — `layout` and `a11y` drive a real browser and
+**Do not run `pnpm gates` and a dev server at once:** `layout` and `a11y` drive a real browser and
 bind a port.
 
 A full gate run takes about half an hour, most of it `layout` and `a11y`. Run one gate with
@@ -78,7 +79,7 @@ specification.
 |---:|---|---|
 | 1 | `typecheck` | first, because a type error invalidates every gate under it |
 | 2 | `self-test` | **the gates' own test.** Runs each gate against a seeded violation in `tools/gates/negative/<gate>/` and is red when one of them passes it. A gate that has never failed is a gate that may not work |
-| 3 | `clean-room` | no predecessor identifier anywhere in the tree — see below |
+| 3 | `clean-room` | no predecessor identifier anywhere in the tree, see below |
 | 4 | `stack` | the banned surface: no `node:`, `cloudflare:`, `process.`, `Buffer`, `__dirname` or bare `fetch(` under `packages/*/src` |
 | 5 | `secret-grep` | a credential never reaches a log, a telemetry blob, a push payload or a prompt |
 | 6 | `event-kinds` | the forty event kinds agree across the migration's `CHECK`, `30 §1`, `30 §2`'s table and its prose, and `EVENT_KINDS` |
@@ -119,7 +120,7 @@ evidence you followed it, and an empty list is red, because a tripwire nobody ma
 findings" over a repository nobody checked.
 
 The list is maintained by the maintainer alone. Do not add to it, do not remove from it, and do not
-work around a hit by renaming — a hit means you read something you should not have.
+work around a hit by renaming: a hit means you read something you should not have.
 
 If you have worked on the predecessor, say so in your pull request. It does not disqualify you; it
 changes what review looks for.
@@ -134,10 +135,10 @@ about 28% of `index.ts` is prose. That is intended.
 
 **The form.** Block comments (`/* … */`), not `//`. Three positions and no others:
 
-1. **A file header block on every file** — 10 to 45 lines. What the module is for, then the one or
+1. **A file header block on every file**, 10 to 45 lines. What the module is for, then the one or
    two design invariants that are load-bearing. A gate's header carries its invocation line as an
    indented code line under the first sentence.
-2. **A doc block above an exported const, type or function** — the same shape, shorter.
+2. **A doc block above an exported const, type or function**, the same shape, shorter.
 3. **A block immediately above the statement it defends**, indented to the code, wrapped at about
    100 columns, continuation lines aligned under the opening text.
 
@@ -150,14 +151,14 @@ argument:
    other gate in this directory that passed by examining nothing. */
 ```
 
-**What goes in one.** Not what the code does — why it is this and not the obvious thing:
+**What goes in one.** Not what the code does, but why it is this and not the obvious thing:
 
 - **The defect that existed, in the past tense, with a number attached.** This is the single most
   distinctive trait. `"39 emitted, 60 by nothing, 22 outside the registry"`. `"0 of 182 elements
   moved on Home"`. If a comment describes a fix and never says what going wrong looked like, it is
   not finished.
-- **A citation of the document that settles it**, by number and section, in backticks — `` `30 §6` ``,
-  `` `04 §5` ``, `` `52 §5.2` `` — and the sentence quoted verbatim where the wording is the point.
+- **A citation of the document that settles it**, by number and section, in backticks (`` `30 §6` ``,
+  `` `04 §5` ``, `` `52 §5.2` ``), and the sentence quoted verbatim where the wording is the point.
   There are over two hundred of these in `tools/gates` and `packages/kernel/src`.
 - **The rejected alternative and why**, where one was rejected. "`now` AND NOT `now + every`,
   because …".
@@ -169,8 +170,8 @@ argument:
    that accepts one teaches people that answering is a formality. */
 ```
 
-**`ponytail:` marks a deliberate ceiling.** The build mode is *ponytail* — standard library before
-dependencies, fewest files, no unrequested abstraction — and every simplification that leaves a
+**`ponytail:` marks a deliberate ceiling.** The build mode is *ponytail* (standard library before
+dependencies, fewest files, no unrequested abstraction), and every simplification that leaves a
 ceiling is named in a `ponytail:` line so it is a decision rather than an oversight.
 
 **There are no `TODO`, `FIXME` or `HACK` markers**, anywhere. Zero in the kernel. If it is deferred,
@@ -187,12 +188,12 @@ Three rules, and they are enforced at review:
    compiled to one IN of 130 params (was TOO_MANY_PARAMS)'`, not `'compiles not_in'`. **A regression
    test carries the old wrong number in its name**, so a reviewer sees what it protects.
 2. **Assert on something only the real branch produces.** `rows >= 4`, a mark per row,
-   `aria-rowcount === page.expect.rows` — never `childElementCount > 0`. A test whose first assertion
+   `aria-rowcount === page.expect.rows`, never `childElementCount > 0`. A test whose first assertion
    could pass on the error path is rejected. Three tests on this tree have shipped asserting the
    defect they were named for.
 3. **Break it on purpose after it goes green.** Change the line the test is about and watch it go
    red. If it does not, the test is decoration. Mutating a file and counting survivors is a good
-   habit — but a mutation score is a claim about the mutations somebody thought of, never a property
+   habit, but a mutation score is a claim about the mutations somebody thought of, never a property
    of the tests, so do not quote one as if it were coverage.
 
 ---
@@ -232,8 +233,8 @@ code.
 
 ### Things that will be sent back
 
-- A new **runtime dependency**. They are enumerated in [ADR-046](docs/16-DECISIONS.md) — `valibot` in
-  `declare`, one YAML parser on the CLI and self-host paths — and adding one needs an ADR, not a
+- A new **runtime dependency**. They are enumerated in [ADR-046](docs/16-DECISIONS.md) (`valibot` in
+  `declare`, one YAML parser on the CLI and self-host paths), and adding one needs an ADR, not a
   line in `package.json`.
 - A `node:` or `cloudflare:` import, `process.`, `Buffer` or a bare `fetch(` under `packages/*/src`.
   `packages/record` refuses `fetch(` unconditionally: the record makes no outbound calls, and that is
@@ -256,7 +257,7 @@ Two licences, by path ([`LICENSING.md`](LICENSING.md), [ADR-041](docs/16-DECISIO
 | Path | Licence |
 |---|---|
 | everything not listed below | **Apache-2.0**, the root `LICENSE` |
-| `packages/render/**` | **MIT** — `packages/render/LICENSE`, and an SPDX header on the first line of every source file |
+| `packages/render/**` | **MIT**: `packages/render/LICENSE`, and an SPDX header on the first line of every source file |
 
 By opening a pull request you agree your contribution is licensed under the licence of the path it
 touches. Nothing under `packages/render` may import from another package in this repository; a gate

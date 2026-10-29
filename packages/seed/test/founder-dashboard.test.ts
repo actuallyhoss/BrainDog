@@ -82,19 +82,22 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
      and no tile a measure over the chart of the same measure. */
   /* TWO CHARTS AND NEVER BOTH SINCE founder 3.4.0 (Z20 of 25 October): one headed thirty days while the newest number
      is from this week, and one headed with how long ago it came in once it is not. */
-  assert.deepEqual(dashboard.map((b) => b.kind), ['note', 'note', 'lines', 'lines', 'section', 'table', 'table']);
-  assert.equal(dashboard[3]!.drawn, false, 'a number from today is headed with how long ago the last one came in');
+  /* AND WHAT WENT QUIET WITH THE WAY TO FIX THE FEED SINCE founder 3.8.0 (Q51 of 29 October), drawn only while no number
+     came in thirty days, so not here. */
+  assert.deepEqual(dashboard.map((b) => b.kind), ['note', 'note', 'table', 'link', 'lines', 'lines', 'section', 'table', 'table']);
+  assert.deepEqual([dashboard[2]!.drawn, dashboard[3]!.drawn], [false, false], 'what went quiet is said while numbers came');
+  assert.equal(dashboard[5]!.drawn, false, 'a number from today is headed with how long ago the last one came in');
   for (const b of dashboard) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   /* THE OPENING SENTENCE IS THE ONE THE NUMBERS ANSWER: forty were reported, so it counts them, and the one for a
      month with none does not draw. */
   assert.notEqual(dashboard[0]!.drawn, false, 'the sentence that counts the numbers is drawn');
   assert.equal(dashboard[1]!.drawn, false, 'and the one for no numbers is not');
-  assert.notEqual(dashboard[2]!.drawn, false, 'the chart is drawn while the sentence counts a number');
-  assert.equal(dashboard[2]!.readings, undefined, 'the numbers are series, not figures');
-  assert.deepEqual(dashboard[2]!.measures?.map((m) => m.name), ['Sign-ups'], 'the example datapoint is in no chart');
-  assert.equal(dashboard[2]!.measures?.[0]?.now.at(-1), 10, 'today is the last day, and its reading the newest');
-  assert.ok((dashboard[5]!.rows ?? []).some((r) => r.fields.source === 'example'), 'the latest numbers still list it, marked');
-  assert.equal(dashboard[6]!.rows?.length, 2, 'the example organisation and Harbour Studio');
+  assert.notEqual(dashboard[4]!.drawn, false, 'the chart is drawn while the sentence counts a number');
+  assert.equal(dashboard[4]!.readings, undefined, 'the numbers are series, not figures');
+  assert.deepEqual(dashboard[4]!.measures?.map((m) => m.name), ['Sign-ups'], 'the example datapoint is in no chart');
+  assert.equal(dashboard[4]!.measures?.[0]?.now.at(-1), 10, 'today is the last day, and its reading the newest');
+  assert.ok((dashboard[7]!.rows ?? []).some((r) => r.fields.source === 'example'), 'the latest numbers still list it, marked');
+  assert.equal(dashboard[8]!.rows?.length, 2, 'the example organisation and Harbour Studio');
   const said = dashboard.flatMap((b) => [...((b as { cells?: { metric: string }[] }).cells ?? []).map((c) => c.metric), ...(b.heading ? [b.heading] : [])]);
   for (const home of ['cash-now', 'runway-days', 'Balance by organisation', 'Across your organisations', 'The numbers'])
     assert.ok(!said.includes(home), `the Dashboard says ${home} again`);

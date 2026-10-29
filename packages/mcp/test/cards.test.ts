@@ -23,14 +23,14 @@ test('a projects row becomes a project card from the fields the list declares', 
     next: 'Ship the iOS build',
     money: 'GBP 1,200',
     working: 'Claude',
-    href: 'https://brain.dog/app/mara',
+    href: 'https://brain.dog/mara',
   });
 });
 
-test('the brief is the clean first lines of the note when there is no about, and the link falls back to /app', () => {
+test('the brief is the clean first lines of the note when there is no about, and the link falls back to the app\'s front door', () => {
   const card = projectCard({ spoken: 'projects#5', fields: { name: 'Harbour', note: '# Harbour\nStatus: building · Lane: ship\nA tool for sites. It builds them nightly.\nMore later.' } }, 'https://brain.dog');
   assert.equal(card?.brief, 'A tool for sites. It builds them nightly.');
-  assert.equal(card?.href, 'https://brain.dog/app');
+  assert.equal(card?.href, 'https://brain.dog');
   assert.equal(card?.hue, null);
 });
 
@@ -108,7 +108,7 @@ test('a rule proposal draws a rule card: what it would do, what it was tried aga
   assert.equal(card?.tried, 'Tried against a sample: 12 matched, and it would take 9 of them.');
   assert.equal(card?.options[0]?.suggested, true);
   assert.equal(card?.answerTool, null);
-  assert.equal(card?.href, 'https://brain.dog/app/mara');
+  assert.equal(card?.href, 'https://brain.dog/mara');
   assert.equal(cardOf('governance', { id: 'SG7' }, rows)?.kind, 'rule');
 });
 

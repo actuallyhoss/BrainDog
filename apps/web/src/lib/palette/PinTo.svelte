@@ -63,7 +63,31 @@
     void look(pin.kind === 'rows' ? pin.register : null);
   });
 
-  const pages = $derived(sheet?.from === 'live' ? sheet.pages : []);
+  /* TODAY HAS ITS OWN PRESS (Add to Today, below), so the sheet is every other page. */
+  const pages = $derived(sheet?.from === 'live' ? sheet.pages.filter((p) => p.slug !== 'home') : []);
+
+  /**
+   * ADD TO TODAY, ONE PRESS (the widgets plan of 29 October, §4.3): the answer as a widget at the end of Today's board,
+   * a list's answer as a table it reads again each time and prose as a dated note. Works on every record: one whose
+   * Today is kept nowhere has it kept on this first add.
+   */
+  let adding = $state(false);
+  async function toToday() {
+    if (pin === null || pin.kind === 'refused' || adding) return;
+    adding = true;
+    try {
+      const [m, a, w] = await Promise.all([import('./pin.ts'), import('../board/add-today.ts'), import('../record/page-write.ts')]);
+      const declared = pin.kind === 'rows' ? ((await w.schemaOf(apiBase(), pin.register).catch(() => null)) as Parameters<typeof m.pinBlock>[2]) : null;
+      const block = m.pinBlock(pin, Date.now(), declared) as Record<string, unknown>;
+      const out = await a.addToToday(apiBase(), block, pin.kind === 'rows' ? 'large' : 'wide');
+      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+      toasts.push(a.addWords.addedPlain, { intent: 'good', undo: () => void out.undo?.() });
+    } catch {
+      toasts.push(words.failed, { intent: 'warn' });
+    } finally {
+      adding = false;
+    }
+  }
 
   /* WHAT THE PIN WILL BE, said before the press: the list and its filter by the names a person reads, or a dated note. */
   const what = $derived(
@@ -109,9 +133,10 @@
 
 {#if pin}
   <div class="pin-at">
-    <Button size="sm" onclick={() => (open = true)}>{words.pin}</Button>
+    {#if pin.kind !== 'refused'}<Button size="sm" weight="primary" disabled={adding} onclick={() => void toToday()}>{words.toToday}</Button>{/if}
+    <Button size="sm" onclick={() => (open = true)}>{pin.kind === 'refused' ? words.pin : words.another}</Button>
   </div>
-  <Sheet bind:open title={words.pinTo}>
+  <Sheet bind:open title={words.another}>
     <div class="form">
       {#if pin.kind === 'refused'}
         <p class="none" role="status">{pin.fix}</p>
@@ -140,6 +165,7 @@
 <style>
   .pin-at {
     display: flex;
+    gap: var(--sp-2);
     justify-content: flex-end;
     padding: var(--sp-2) var(--sp-3);
   }

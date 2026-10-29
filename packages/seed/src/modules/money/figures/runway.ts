@@ -99,7 +99,7 @@ export const RUNWAY_FIGURES: Record<string, SeedMetric> = {
    */
   'arriving-30d': {
     metric: 'arriving-30d',
-    name: 'Coming in, 30 days',
+    name: 'To come in, next 30 days',
     pack: 'money-core',
     source: 'forecast.runway',
     legs: CASH_LEGS,
@@ -114,7 +114,7 @@ export const RUNWAY_FIGURES: Record<string, SeedMetric> = {
 
   'leaving-30d': {
     metric: 'leaving-30d',
-    name: 'Going out, 30 days',
+    name: 'To go out, next 30 days',
     pack: 'money-core',
     source: 'forecast.runway',
     legs: CASH_LEGS,

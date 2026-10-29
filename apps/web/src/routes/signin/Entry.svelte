@@ -20,8 +20,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { copy } from '$lib/copy.ts';
-  import Mark from '$lib/ui/Mark.svelte';
+  import Lockup from '$lib/ui/Lockup.svelte';
 
   let {
     wide = false,
@@ -33,10 +32,7 @@
 
 <div class="entry" data-shape={wide ? 'wide' : 'sheet'}>
   <header class="entry-brand">
-    <span class="entry-mark">
-      <Mark height={24} />
-      <span class="entry-word">{copy.product}</span>
-    </span>
+    <Lockup />
     {#if end}<span class="entry-end">{@render end()}</span>{/if}
   </header>
   {#if wide}
@@ -70,20 +66,6 @@
     gap: var(--sp-3);
     min-block-size: var(--tap);
     min-inline-size: 0;
-  }
-
-  .entry-mark {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  .entry-word {
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--fs-head);
-    font-weight: 600;
-    line-height: 24px;
   }
 
   .entry-end {

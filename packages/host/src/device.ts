@@ -137,16 +137,15 @@ export async function serveDevice(request: Request, route: AuthRoute, door: Door
   /* THE PAGE IS THE SIX DIGITS AND NOTHING ELSE, `/connect/approve`: the code focused at the top, who is waiting under
      it, and what was approved once it is. It was `/settings/agents`, where the field stood among every agent setting;
      that page still takes a code, so an address printed before the move still works.
-     THE APP IS UNDER `/app`. `${origin}/connect/approve` is a marketing
-     page's address once the site and the app share `brain.dog`, so the six digits would be sent to a 404. With a
-     slug the page is that record's, because under `/app/<slug>` the app reads that record and no other; without
-     one it is `/app/connect/approve`, the record the session is on.
+     THE APP IS AT THE ROOT, AND IT WAS UNDER `/app` UNTIL 29 OCT. With a slug the page is that record's,
+     `/<slug>/connect/approve`, because under `/<slug>` the app reads that record and no other; without one it is
+     `/connect/approve`, the record the session is on.
      ONLY THE WORKER PUTS THE SLUG IN THE PATH. The self-host holds one record, never reads the slug, and serves no
-     `/app/<slug>/api/*`, so a page there under a slug would ask its shell for its own data and get `index.html`.
+     `/<slug>/api/*`, so a page there under a slug would ask its shell for its own data and get `index.html`.
      AND ONLY A SLUG OF THE DIRECTORY'S GRAMMAR. The Worker refuses one the Directory does not hold before this line,
      so this is the second lock and not the first; it is a grammar and not `encodeURIComponent` because a URL parser
      reads an encoded `%2e%2e` as `..`, and a slug of `..` would turn the address into one of the site's pages. */
-  const at = door.on === 'worker' && typeof body.slug === 'string' && SLUG.test(body.slug) ? `/app/${body.slug}` : '/app';
+  const at = door.on === 'worker' && typeof body.slug === 'string' && SLUG.test(body.slug) ? `/${body.slug}` : '';
   const started: DeviceStarted = {
     device_code: out.value.device_code,
     user_code: out.value.user_code,

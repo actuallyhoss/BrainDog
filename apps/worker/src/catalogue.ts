@@ -1,7 +1,7 @@
 /**
  * The hosted app's catalogue, read by the Worker for Slash and the arranger: the Kennel this Worker hosts (`kennel.ts`,
  * `kennelReader`), which is the folder bundled with the web shell (`apps/web/static/catalogue`, served by the static
- * assets at `/app/catalogue/`) merged with what authors published to the Kennel's bucket. With no bucket bound, the
+ * assets at `/catalogue/`) merged with what authors published to the Kennel's bucket. With no bucket bound, the
  * bundled folder alone.
  *
  * THE SAME OFFERS A SELF-HOST GIVES (`@braindog/record/catalogue-offers`): a newer version of what a record holds, held to its
@@ -23,15 +23,13 @@ export type Assets = { fetch(request: Request): Promise<Response> };
 const PATH = /^(?:index\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase\.json|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack\.json)$/u;
 
 /**
- * Where the build puts the catalogue: at the root today, and under `/app` once the web app has its base path.
+ * Where the build puts the catalogue: at the root, where the app is.
  *
- * BOTH, WHILE THE BUILD MOVES. `paths.base: '/app'` puts
- * `apps/web/static/catalogue` at `build/app/catalogue`, and this Worker and that build deploy as separate commits, so a
- * reader that knew only one place offered nothing from Slash for as long as the other was live: the shell, or a 404,
- * is read as no file. The root is asked first because it is where every deployed build holds it today, and it costs
- * one local asset read once it is gone; it leaves this list when no deployed build has it.
+ * ONE PLACE AGAIN. While the app was built under `/app` the catalogue was at `build/app/catalogue`, and this list held
+ * that and the root together for the deploys between. The app is at the root now (`apps/web/svelte.config.js`), and the
+ * build ships inside this Worker's version, so no deployed Worker reads a build that holds it anywhere else.
  */
-const PLACES = ['/catalogue/', '/app/catalogue/'] as const;
+const PLACES = ['/catalogue/'] as const;
 
 /** A catalogue path read from the static assets: its text, or `null` when it is not there or is not one of the two shapes. */
 export function assetsReader(assets: Assets): CatalogueReader {

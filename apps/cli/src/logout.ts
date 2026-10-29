@@ -37,7 +37,7 @@ export type LogoutIo = {
 /** `48 §4.4`. This command reaches nothing, so it is never 2 and never 3. */
 const REFUSED = 1;
 
-const WRONG = 'braindog logout takes one host, as in braindog logout https://app.brain.dog/app/<slug>, or --host <host>, and nothing else.';
+const WRONG = 'braindog logout takes one host, as in braindog logout https://app.brain.dog/<slug>, or --host <host>, and nothing else.';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 

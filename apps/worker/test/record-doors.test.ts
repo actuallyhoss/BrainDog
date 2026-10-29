@@ -1,5 +1,5 @@
 /**
- * Two doors a file needs from the Cloud: the record's public key at `/app/<slug>/.well-known/braindog-key`,
+ * Two doors a file needs from the Cloud: the record's public key at `/<slug>/.well-known/braindog-key`,
  * and an operation bearer, which opens its one method once.
  *
  * MEASURED BEFORE THIS FILE, AT 07ba6dbd, through the bundle. `GET /app/studio/.well-known/braindog-key` fell to
@@ -42,9 +42,9 @@ const sigOf = (lines: readonly string[]): { key_id: unknown; public_key: unknown
   return { key_id: row[columns.indexOf('key_id')], public_key: row[columns.indexOf('public_key')] };
 };
 
-test('A RECORD\'S KEY IS AT /app/<slug>/.well-known/braindog-key, to anybody, and it is the key its exports are signed with', async () => {
+test('A RECORD\'S KEY IS AT /<slug>/.well-known/braindog-key, to anybody, and it is the key its exports are signed with', async () => {
   const c = await keyed();
-  const res = await c.ask(`/app/${SLUG}/.well-known/braindog-key`);
+  const res = await c.ask(`/${SLUG}/.well-known/braindog-key`);
   const body = await res.text();
   assert.equal(res.status, 200, body);
   assert.equal(res.headers.get('cache-control'), 'no-store');
@@ -61,13 +61,13 @@ test('A RECORD\'S KEY IS AT /app/<slug>/.well-known/braindog-key, to anybody, an
 test('A NAME NO RECORD HOLDS IS 404 AND WAKES NO OBJECT, and one released is the same 404', async () => {
   const c = await keyed();
   const before = c.objects.size;
-  const res = await c.ask('/app/nobody-here/.well-known/braindog-key');
+  const res = await c.ask('/nobody-here/.well-known/braindog-key');
   const said = (await res.json()) as Out;
   assert.equal(res.status, 404, JSON.stringify(said));
   assert.equal(c.objects.size, before, 'an object was addressed for a name nobody holds, and on this platform that creates it');
 
   assert.equal(c.directory.close(REC), null);
-  const released = (await (await c.ask(`/app/${SLUG}/.well-known/braindog-key`)).json()) as Out;
+  const released = (await (await c.ask(`/${SLUG}/.well-known/braindog-key`)).json()) as Out;
   assert.equal(released.refusal?.code, said.refusal?.code);
   assert.equal(released.refusal?.fix.replace(SLUG, 'x'), said.refusal?.fix.replace('nobody-here', 'x'), 'a released name answers differently from one never given');
 });

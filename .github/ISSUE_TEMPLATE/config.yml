@@ -1,6 +1,6 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Report a security vulnerability — privately
+  - name: Report a security vulnerability, privately
     url: https://github.com/actuallyhoss/BrainDog/security/advisories/new
     about: >
       Never in a public issue. This record holds credentials, and a public report is a working
@@ -11,18 +11,24 @@ contact_links:
     url: https://github.com/actuallyhoss/BrainDog/blob/master/docs/12-SECURITY.md
     about: >
       The threat model, the key hierarchy, and the list of things this project deliberately does not
-      do — the operator can read a Cloud record with the vault passphrase off, the rows are not
+      do: the operator can read a Cloud record with the vault passphrase off, the rows are not
       end-to-end encrypted, and there is no bug bounty. Each is a decision with its reasoning, not an
       oversight.
 
-  - name: Ask a question, or argue with a decision
-    url: https://github.com/actuallyhoss/BrainDog/discussions
+  - name: Ask a question about using BrainDog
+    url: https://brain.dog/support
     about: >
-      Questions, half-formed ideas, and cases against an ADR belong in a discussion. Issues are for
-      defects and for specified work.
+      How to do something, your account, an invite or a bill. Write to support@brain.dog and a person
+      answers. Issues here are for defects in the code and for work on it.
 
-  - name: Read the design first
+  - name: Read the docs
+    url: https://brain.dog/docs
+    about: >
+      Using BrainDog, connecting Claude and other agents over MCP or the command line, the HTTP API,
+      and writing add-ons.
+
+  - name: Read the design
     url: https://github.com/actuallyhoss/BrainDog/tree/master/docs
     about: >
-      The numbered documents that decide what BrainDog is. Most questions are answered there, and a
-      request that cites the document it belongs in gets a far better answer.
+      The numbered design documents. A request that cites the document it belongs in gets a far
+      better answer.

@@ -76,6 +76,8 @@ export type AutomationRow = {
   path: 'inline' | 'run';
   register: string | null;
   enabled: boolean;
+  /** The add-on that brought it, or `null` for one somebody made. */
+  pack?: string | null | undefined;
   next: string | null;
   last: { at: string; state: RunState; say: string | null } | null;
   month: { runs: number; failures: number } | null;
@@ -274,6 +276,7 @@ export function rowOf(r: unknown): AutomationRow | null {
     path,
     register: text(r.register) ?? (body ? subjectOfBody(body) : null),
     enabled: typeof r.enabled === 'boolean' ? r.enabled : body?.enabled !== false,
+    pack: text(r.pack),
     next: text(r.next) ?? text(r.next_at),
     last,
     month,

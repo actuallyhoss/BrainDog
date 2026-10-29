@@ -24,10 +24,10 @@
  *   503      `{ ok: false }`: the lockout's store failed, and a lockout that cannot count refuses.
  *   Cookie   `__Host-bd_s` on https, `bd_s` on http at a loopback name, and none on any other http
  *            origin, where `/auth/methods` says `why: 'insecure'`. One opaque id; the record is on the row.
- *   Links    `${origin}/app/signin#magic=<token>` and `#claim=<token>`, redeemed by `POST /auth/magic/redeem`.
+ *   Links    `${origin}/signin#magic=<token>` and `#claim=<token>`, redeemed by `POST /auth/magic/redeem`.
  *            A fragment never reaches a server, a log or a link pre-fetcher, and a press is what spends it.
  *            `/auth/magic/start` also reads `next`, the one field that is the host's and not the call's: a
- *            path under `/app` on this origin goes in the link as `?next=<path>`, before the fragment.
+ *            path of the app on this origin (`appNext`) goes in the link as `?next=<path>`, before the fragment.
  *
  * STANDARD `Request`, `Response` AND WEBCRYPTO, like the rest of this package, so the Worker and the
  * self-host run this file unchanged. Neither adds a sign-in route, and neither answers one differently.
@@ -193,7 +193,7 @@ export async function mirrorEverywhere(records: readonly string[], mirror: (reco
   return { reached, unreached };
 }
 
-/** Whether a request is the record's `renamePerson`, under either base: `/api/...` or `/app/<slug>/api/...`. */
+/** Whether a request is the record's `renamePerson`, under either base: `/api/...` or `/<slug>/api/...`. */
 export const renameAsked = (method: string, pathname: string): boolean => method === 'POST' && /\/api\/+renamePerson\/*$/.test(pathname);
 
 /**
@@ -222,9 +222,9 @@ async function emailAsked(door: EmailDoor, origin: string, who: Who, body: Recor
   if (typed === '') return { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Type the new address you want to sign in with.', at: 'email' } };
   const out = await door.ask(who.person, typed);
   if (!out.ok) return out;
-  /* THE LANDING IS IDENTITY, IN WHICHEVER RECORD THE SESSION IS ON (`/app/settings/...` names none), and the token is
+  /* THE LANDING IS IDENTITY, IN WHICHEVER RECORD THE SESSION IS ON (`/settings/...` names none), and the token is
      in the fragment, which no server, proxy or `Referer` ever reads, as a sign-in link's is. */
-  door.mail('email.change', out.value.to, `${origin}/app/settings/identity#email=${out.value.token}`);
+  door.mail('email.change', out.value.to, `${origin}/settings/identity#email=${out.value.token}`);
   return { ok: true, value: {} };
 }
 
@@ -637,6 +637,29 @@ export function safeNext(next: unknown): string {
 }
 
 /**
+ * THE FIRST SEGMENTS A HOST ANSWERS ITSELF, AND NO PAGE OF THE APP IS AT: its doors, the build's chunks, the frame a
+ * drawn block is drawn in, and `app`, the prefix the app had before it moved to the root. The web app keeps the same
+ * list as `DOORS` in `apps/web/src/lib/at.ts`, and the Worker its built half as `ROOT_DOORS` in `route.ts`.
+ */
+export const HOST_DOORS: ReadonlySet<string> = new Set(['api', 'auth', 'account', 'mcp', 'in', 'oauth', 'a', 'ws', 'healthz', 'app', '_app', '.well-known', 'drawn-frame']);
+
+/**
+ * A `next` that is a page of the app on this origin, or `null`: `safeNext`, and then not one of the host's doors.
+ *
+ * THE APP IS THE ROOT, SO A PATH ON THIS ORIGIN IS NOT YET A PAGE. `/auth/session` and `/api/export` are this origin and
+ * no page, and sending somebody there after sign-in is the open door `safeNext` exists to close, one step further in.
+ * AN ADDRESS FROM BEFORE THE MOVE IS READ AS THE ONE IT NAMES NOW: `/app/acme/r/tasks` is `/acme/r/tasks`, so a sign-in
+ * page opened from a link mailed before 29 Oct still sends him back to the page he was on. It is taken off after
+ * `safeNext` has resolved the path, so `/app/../auth/session` is `/auth/session` and refused.
+ */
+export function appNext(next: unknown): string | null {
+  const safe = safeNext(next);
+  const path = /^\/app(?=[/?#]|$)/.test(safe) ? `/${safe.slice(4).replace(/^\//, '')}` : safe;
+  const first = /^\/([^/?#]*)/.exec(path)?.[1] ?? '';
+  return HOST_DOORS.has(first) ? null : path;
+}
+
+/**
  * Two secrets compared in time that does not depend on either: SHA-256 of both, then every byte.
  *
  * DIGESTED FIRST, so the lengths are always 32 and a length that differed cannot answer early.
@@ -868,32 +891,32 @@ const off = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'This Bra
 /**
  * The link a person is sent or handed. The fragment is the whole of the design: see the header.
  *
- * UNDER `/app`, BECAUSE THAT IS WHERE THE APP IS NOW SERVED. On `brain.dog`
- * the root is the marketing site, so `https://brain.dog/signin` is the site's 404 page and a link to it signs
- * nobody in. A link already mailed at `app.brain.dog/signin#…` still works: that host 308s a page load to
- * `/app/signin`, and a browser keeps the fragment across a redirect whose `Location` carries none.
+ * AT THE ROOT, BECAUSE THAT IS WHERE THE APP IS SERVED: `app.brain.dog/signin`. A link already mailed at
+ * `app.brain.dog/app/signin#…` or `brain.dog/app/signin#…` still works: the Worker answers a page load there with one
+ * 308 to `/signin`, and a browser keeps the fragment across a redirect whose `Location` carries none.
  */
 const linkOf = (origin: string, mail: LinkMail, next: unknown = undefined): string => {
   const back = mailedNext(next);
-  const page = back ? `${origin}/app/signin?next=${encodeURIComponent(back)}` : `${origin}/app/signin`;
+  const page = back ? `${origin}/signin?next=${encodeURIComponent(back)}` : `${origin}/signin`;
   return 'linkToken' in mail ? `${page}#magic=${mail.linkToken}` : `${page}#claim=${mail.claimToken}`;
 };
 
 /**
  * The page a mailed link sends him back to, or `null` for the bare link.
  *
- * THE LINK WROTE NO QUERY, AND THE PAGE HE WAS SENT FROM WAS LOST. Sign-in at `/app/signin?next=/app/acme/r/tasks`
- * mailed `/app/signin#magic=...`, so the tab the mail opened read an empty search and "Open BrainDog" went to `/app/`
+ * THE LINK WROTE NO QUERY, AND THE PAGE HE WAS SENT FROM WAS LOST. Sign-in at `/signin?next=/acme/r/tasks`
+ * mailed `/signin#magic=...`, so the tab the mail opened read an empty search and "Open BrainDog" went to `/`
  * (`test/auth-next.test.ts`).
  *
- * `safeNext` FIRST, THEN UNDER `/app` ONLY. The value is whatever query reached the sign-in page, so a scheme, `//`, a
- * backslash or a control character is dropped before it is ever in a mail with this origin on it; and a path outside
- * the app is dropped too, because the page's own `onward()` would send it to `/app/` anyway. It is a path and never a
- * secret, so the query reaching a server or a link scanner costs nothing the fragment was protecting.
+ * `appNext` AND NOTHING ELSE. The value is whatever query reached the sign-in page, so a scheme, `//`, a backslash or a
+ * control character is dropped before it is ever in a mail with this origin on it; and a door of the host is dropped
+ * too, because the page's own `onward()` would send it to `/` anyway, and so is `/`, which is where a bare link lands.
+ * It is a path and never a secret, so the query reaching a server or a link scanner costs nothing the fragment was
+ * protecting.
  */
 function mailedNext(next: unknown): string | null {
-  const path = safeNext(next);
-  return path.startsWith('/app/') ? path : null;
+  const path = appNext(next);
+  return path === null || path === '/' ? null : path;
 }
 
 const isJson = (request: Request): boolean =>

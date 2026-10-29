@@ -11,7 +11,7 @@ export const hand = {
   handTo: 'Hand to',
   handSheetTitle: (title: string): string => (title ? `Hand "${title}" to` : 'Hand this to'),
   handYou: 'You',
-  handPeople: 'People on this record',
+  handPeople: 'People on this BrainDog',
   handAgents: 'Agents',
   /* SAID WHEN THE SHEET HAS NOBODY BUT YOU TO OFFER, so an empty list is not read as a list that failed. */
   handNobody: 'Nobody else is on this record yet, and no agent has run here.',

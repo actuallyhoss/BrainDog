@@ -110,9 +110,9 @@ test('A PAGE NAMING A PACK KIND NOBODY INSTALLED IS REFUSED AT INSTALL, and one 
 });
 
 test('A BLOCK KEY NOBODY READS IS REFUSED AT INSTALL, by name, with what to write instead', () => {
-  const size = lint(blocks({ kind: 'note', body: 'Hello.', size: 2 }));
+  const size = lint(blocks({ kind: 'note', body: 'Hello.', width: 2 }));
   assert.equal(size?.code, 'DECLARATION_INVALID');
-  assert.match(size?.fix ?? '', /^page\.desk\.blocks\[0\]: size: is not a key a block has\. A block is made wider with span:/);
+  assert.match(size?.fix ?? '', /^page\.desk\.blocks\[0\]: width: is not a key a block has\. A block is made wider with span:/);
   const low = lint(blocks({ kind: 'progress', source: 'register.lines', columns: [{ field: 'item' }, { field: 'spent' }], low: 'low', empty: 'No lines.' }));
   assert.match(low?.fix ?? '', /low: is not a key a block has\. .*range: true/);
   const shows = lint(blocks({ kind: 'queue', source: 'governance.open', shows: 'tiles', empty: 'Nothing waits.' }));

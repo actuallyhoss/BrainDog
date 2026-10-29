@@ -20,7 +20,7 @@ const gates = join(import.meta.dirname, '..');
 const repo = join(gates, '..', '..');
 const negatives = join(gates, 'negative');
 const IGNORE = `${GUARDS.map(([line]) => line).join('\n')}\n`;
-const GOOD = ['README.md', 'apps/web/static/_headers', 'apps/site/static/_headers', 'packages/kernel/src/index.ts', 'tools/gates/hygiene.mjs'];
+const GOOD = ['README.md', 'apps/web/static/_headers', 'apps/site/static/_headers', 'apps/site/static/_redirects', 'packages/kernel/src/index.ts', 'tools/gates/hygiene.mjs'];
 
 test('a clean tree with every guard is green', () => {
   assert.deepEqual(checkHygiene(GOOD, IGNORE), []);

@@ -16,7 +16,7 @@
  */
 
 import { createClient } from '@braindog/client';
-import { DRAWN_EXAMPLE, designCheck, designSentence, drawnData, drawnFault, type DesignWhere, type DrawnData } from 'braindog-render';
+import { DRAWN_EXAMPLE, designCheck, designSentence, drawnData, drawnFault, drawnSizes, drawnSizesFault, type DesignWhere, type DrawnData, type WidgetSize } from 'braindog-render';
 
 import type { Composed, ComposeList } from './compose.ts';
 
@@ -38,6 +38,7 @@ export const drawWords = {
   bad: (fix: string) => `This component cannot be drawn because ${fix}`,
   said: (name: string, list: string | null) => (list ? `${name}, drawn over ${list}.` : `${name}, drawn.`),
   untitled: 'A drawn component',
+  badWidget: (fix: string) => `This widget cannot be kept because ${fix}`,
 };
 
 /** The most fields a component is handed, as the record holds it (the kernel's `DRAWN_COLUMNS_MOST`). */
@@ -81,6 +82,21 @@ export function drawnDraft(i: { name: string; list: ComposeList | null; fields: 
   if (design) return { fix: design };
   const name = String(block.heading);
   return { block, list: i.list?.id ?? '', name, said: drawWords.said(name, i.list?.name ?? null) };
+}
+
+/**
+ * "DRAW IT" ON A BOARD (widgets plan §5.7 step 3, W7): the draft of a drawn widget, a drawn block like any other, held to
+ * the same checks, and to one more: a widget that claims more than one size reads `braindog.size` and draws what fits each
+ * frame (`drawnSizesFault`). The sizes ride with the draft so Keep puts it on the shelf with them (`shelve`'s `sizes`) and
+ * the board adds it at the first. The model is asked with `drawWidgetAsk` (`braindog-render`), which names the frames.
+ */
+export function drawnWidgetDraft(i: { name: string; list: ComposeList | null; fields: readonly string[]; code: string; sizes: readonly WidgetSize[] }): (Composed & { sizes: WidgetSize[] }) | { fix: string } {
+  const draft = drawnDraft(i);
+  if ('fix' in draft) return draft;
+  const sizes = drawnSizes(i.sizes);
+  const sized = drawnSizesFault(i.code, sizes);
+  if (sized) return { fix: drawWords.badWidget(sized) };
+  return { ...draft, sizes };
 }
 
 /** What a preview is handed, or the record's sentence for why it cannot be read. */

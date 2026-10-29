@@ -15,6 +15,9 @@ import { registerHref } from '../record/where.ts';
 export function doorOf(b: { register?: string | undefined; where?: string | undefined; source?: string | undefined }): string | null {
   /* WHAT FALLS DUE ACROSS THE LISTS (Today's Coming up) opens Work, where the rest of it is (VERIFY P1). Its live
      block names `deadlines` as its list, which is no list: `/r/deadlines` opened nothing. */
+  /* WHAT FALLS DUE WITH MONEY ON IT (`amount is set`, Money's and Today's Coming up) opens Money's Coming up page, which
+     holds the rest of that same list; Work holds what falls due without money (30 October: "30 more" opened Work). */
+  if ((b.source === 'deadlines' || b.register === 'deadlines') && /\bamount is set\b/u.test(b.where ?? '')) return '/p/money-coming';
   if (b.source === 'deadlines' || b.register === 'deadlines') return WORK;
   if (b.register) return registerHref(b.register, b.where);
   if (b.source?.startsWith('governance.')) return '/decide';

@@ -303,6 +303,8 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   for (const s of subjects) {
     const n = sql.one<{ n: number }>('SELECT count(*) AS n FROM observation WHERE lower(subject) = ?', s)?.n ?? 0;
     if (n > 0) sql.exec('DELETE FROM observation WHERE lower(subject) = ?', s);
+    /* AND THE SAME SUBJECT COUNTED PER PERSON (migration 47): the same value, so it goes with them. */
+    sql.exec('DELETE FROM observation_who WHERE lower(subject) = ?', s);
     observed += Number(n);
   }
   bump('observation', observed);
@@ -316,6 +318,8 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
     sql.exec('DELETE FROM member WHERE person_id = ?', person);
     /* AND WHAT THEY ARRANGED FOR THEMSELVES, which names them by id and is nobody else's. */
     sql.exec('DELETE FROM pref WHERE person_id = ?', person);
+    /* AND WHAT THEY OPENED, counted as theirs (`observation_who`, migration 47). */
+    sql.exec('DELETE FROM observation_who WHERE who = ?', person);
     /* AND EVERY PHONE THAT ASKED TO BE TOLD ON THEIR BEHALF (`push_sub`, migration 14). The substring scan above never
        reaches it, because an endpoint is a push service's address and names nobody; kept, it was a live way to ring a
        person the record had just erased, measured by `push.test.ts` before this line. Counted, because a deleted row

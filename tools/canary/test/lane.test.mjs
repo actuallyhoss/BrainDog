@@ -86,7 +86,7 @@ test('the look is red on a refused screen, a console error or a lint finding, an
 
 test('a 403 the look gave itself is not the product’s error, and a 403 the canary gave still is', () => {
   const FORBIDDEN = 'Failed to load resource: the server responded with a status of 403 (Forbidden)';
-  const own = shot({ consoleErrors: [FORBIDDEN], failedRequests: ['POST /app/ops/api/previewPage: 403', 'GET /api/kennel/v1/index.json: 403'], refused: { refused: 2, blocked: { previewPage: 1, '/api/kennel/v1/index.json': 1 } } });
+  const own = shot({ consoleErrors: [FORBIDDEN], failedRequests: ['POST /ops/api/previewPage: 403', 'GET /api/kennel/v1/index.json: 403'], refused: { refused: 2, blocked: { previewPage: 1, '/api/kennel/v1/index.json': 1 } } });
   assert.deepEqual(productErrors(own), []);
   assert.deepEqual(judgeLook({ shots: [own] }), []);
   const theirs = shot({ consoleErrors: [FORBIDDEN], failedRequests: ['POST /api/previewPage: 403', 'GET /api/boot: 403'], refused: { refused: 1, blocked: { previewPage: 1 } } });

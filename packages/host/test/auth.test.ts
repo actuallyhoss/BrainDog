@@ -406,7 +406,7 @@ test('THE LINK IS MAILED AS A FRAGMENT, NEVER ANSWERED, and an unknown address l
   assert.deepEqual([known.status, known.raw], [unknown.status, unknown.raw]);
   assert.equal(sent.length, 1);
   assert.equal(sent[0]?.to, 'ada@example.com');
-  const token = /^https:\/\/studio\.example\/app\/signin#magic=([A-Za-z0-9_-]{43})$/.exec(sent[0]?.link ?? '')?.[1];
+  const token = /^https:\/\/studio\.example\/signin#magic=([A-Za-z0-9_-]{43})$/.exec(sent[0]?.link ?? '')?.[1];
   assert.ok(token, `the link is ${sent[0]?.link}`);
 
   const redeemed = await call('/auth/magic/redeem', { body: { linkToken: token } });
@@ -473,7 +473,7 @@ test('THE OPERATOR: no key is no route, a wrong key is 401, and the claim link c
   const out = await call('/auth/provision', { body: { slug: 'the-studio', email: 'Ada@Example.com' }, headers: { authorization: `Bearer ${KEY}` } });
   assert.equal(out.status, 200);
   assert.deepEqual(made, [{ slug: 'the-studio', email: 'ada@example.com' }]);
-  assert.match(String(out.body.value?.claim), /^https:\/\/studio\.example\/app\/signin#claim=[A-Za-z0-9_-]{43}$/);
+  assert.match(String(out.body.value?.claim), /^https:\/\/studio\.example\/signin#claim=[A-Za-z0-9_-]{43}$/);
   assert.equal(out.body.value?.expires, NOW + 24 * 3_600_000);
   assert.equal(sent.length, 0, 'the operator route mailed the claim');
 

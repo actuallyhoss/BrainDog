@@ -799,6 +799,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   a headline said from late work, dates, quiet numbers, questions and renewals, in place of the line read off health;
  *   Where they are and What each one earns go, the board saying both. Blocks taken away and one keyed, no id added or
  *   taken away, so a minor step.
+ * - portfolio 1.30.1 (29 October, his word: "instead of finished projects it should say closed"): the status `retired`
+ *   reads Closed, and the two figures that count it say Closed. The stored value stays `retired`. Words inside
+ *   declarations already there, nothing added or taken away, so a patch step.
  * - people 3.9.0: each person on `page.people` is one line, what the note says
  *   they are under the name, with the projects they are on and when you last spoke; and the shops a card text named are
  *   one line under Organisations, counted by the new `metric.organisations-from-card-texts`, where they were listed as
@@ -807,6 +810,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   holds (`CORE_PAGES`), under the same page ids, so the navigation order and hides that name them stay as they are.
  *   People hands the four to core in the same plan (`hands`), which the quiet updater reads as not lost. A page leaves, so
  *   People's step is a major one. Core is 1.0.0, and a record that never held it takes it in the same pass.
+ * - people 4.1.0 (29 October, "organizations under people (4) and organizations page, showing (17)"): one meaning of an
+ *   organisation, the rows not merged and not retired, so `metric.organisations-count` counts the shops from card texts
+ *   too and says what the sidebar and the list say. `page.people` loses its table of organisations with a kind and the
+ *   line about the shops, and says how many there are as a link to their list; Everyone takes the page's width. Two
+ *   blocks taken away and one added, a figure's filter widened, no id added or taken away, so a minor step.
  * - core 1.1.0: `page.scripts` heads the column of where each script stands "Status". Words on a column, no id added or
  *   taken away, so a minor step.
  * - money-core 3.29.1: fewer words on every Money page. Notes that said what a figure is go, leads are one line with a
@@ -818,14 +826,68 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   cash taken out or a move whose other leg is not in the Ledger is counted in neither. And Money's line says how many
  *   accounts the money is spread over and no longer how many books, and the hero's notes are one short line each. Two
  *   fields added and nothing taken away, so a minor step.
+ * - work 1.20.0 (round 1030): the project chips count what Open counts (`counts:` on a filter), and the first line says
+ *   none of your tasks is late. A key added to a filter and words, so a minor step.
+ * - money-core 3.31.0 (29 October, "finish all the money stuff"): net worth with what the add-ons hold
+ *   (`metric.net-worth`, kept night by night in `series.net-worth`, over `metric.held-beyond-cash` and
+ *   `metric.owed-over-time`, whose add-on parts are `optional`), and the night's Snapshots row carries it, in dollars and
+ *   in grams of gold too; a budget for a week or a year (`budget_period` on `register.categories`, with what carried over
+ *   in `carried`, figures and bars a period, and `script.budget_watch` reading each budget's own period); and a repeating
+ *   line marked "Post it for me" posts itself on its day on an account no bank feeds (`script.post_due`), a real charge
+ *   later taking its place (`script.replace_posted`, `rule.posted-replaced`). Fields, figures, scripts and a rule added,
+ *   `metric.budgets-total` a sum of three, and nothing taken away, so a minor step.
+ * - money-core 3.31.0 (also): every money figure agrees with the others and means what it says (round 1030). A payment whose
+ *   words name nothing pays a bill of the exact same money within ten days, or asks once "Is this the Northwind Premiums
+ *   payment?", and recent payments are looked at again (`payment-matches-again`). A category of moves asks once whether
+ *   its money stays yours (`category-stays-asks`, `script.category_stays`). Lines to file are counted as the list lists
+ *   them. Spending is called Spent with its period everywhere, repeating money "Repeating, a month", and what the walk
+ *   holds ahead "To come in" and "To go out". Two figures, `installments-a-month` and `spoken-for-share`, say how much of
+ *   what comes in each month repeating bills and instalments take, and `unnamed-paid-90d` how many payments name nobody.
+ *   Rules, a script and figures added and nothing taken away, so a minor step.
+ * - money-core 3.31.0 (also): Money's home draws the money over time (cash's own last twelve weeks, a whole row under the hero)
+ *   and the budgets at a glance beside Instalments while a budget is set. Two blocks added and nothing taken away, so a
+ *   minor step.
+ * - money-core 3.31.0 (also): Accounts' Stripe line is a warning, with its sign, where it was a plain note. A tone and an
+ *   icon on a block, so no step of its own. Money's budgets at a glance draw a month's budgets only, as Budgets' own
+ *   first tile does.
+ * - money-core 3.32.0 (round 1030, the audit of 30 October): Money's Accounts tile lists every open account, the card
+ *   too, over the new `metric.balance-by-account`; Budgets heads each list by its period and leaves the bare "No budget
+ *   yet" table to the app's Set a budget tile. A figure added and a table taken off a page, so a minor step.
+ * - estate 2.6.0 (round 1030): the Services page says Services as the bar does, and its Lapsing table says when each
+ *   service lapses and why, from the service's own note. Columns added and nothing taken away, so a minor step.
+ * - people 4.2.0 (round 1030): People says how many organisations you work with apart from the shops card texts named,
+ *   over the new `metric.organisations-known` (organisations with a kind). A figure added and nothing taken away, so a
+ *   minor step.
+ * - people 4.2.1 (round 1030, the audit of 30 October): People's line under everyone says one count, the organisations
+ *   and shops the list holds, where it split them by kind and the split disagreed with the list's own groups. Words only.
+ * - core 1.2.0 (round 1030): Health's first line no longer says "on this record", and a line links to Tidy up. Words and
+ *   a note added, nothing taken away, so a minor step.
+ * - money-core 3.32.0 (round 1030): how much of what comes in is spoken for is read against the money that actually
+ *   came in, a third of the last three whole months (`metric.received-a-month`), and Reports says it only once those
+ *   three months hold money in (`metric.received-three-months-back`); repeating money in, which a real life often keeps
+ *   none of, made a scratch record say 2,027%; past all of it the line says the two amounts (`metric.spoken-for-month`).
+ *   Budgets opens on its bars, every budget together first, each line saying what is left or how far over. An account's
+ *   What moved is drawn as the Ledger draws its lines. Coming up is one sentence everywhere, what falls due with money
+ *   from today and fourteen days ahead (`COMING_UP_WHERE`): Money's home reads it, and the Coming up page lists what is
+ *   late, the next seven days, the seven after and later. Three figures added, a cell taken off Reports' Health, so a
+ *   minor step.
+ * - money-core 3.32.0 (also): what went out in a category, or to one payee, summed week by week (`spent-in-category-by-week`,
+ *   `paid-to-by-week`), for a widget asked for "by week". Two figures added and nothing taken away, so no step of its own.
+ * - people 4.2.1 (round 1030): the organisations line on People says the shops only when a card text named one, with no
+ *   "(s)". Words inside a declaration already there, nothing added or taken away, so a patch step.
+ * - money-core 3.32.0 (also, the recheck of 30 October): Payees says "Nothing paid out in 90 days" only when nothing went
+ *   out, never over payments that name nobody, and its Last paid lists money out only; Coming up's Bills and invoices
+ *   sign each amount by which way it goes. Words, a `when` and a `where`, so no step of its own.
+ * - work 1.20.0 (also, the recheck of 30 October): Yours and Agents count what Open counts too (`counts:` on a filter of
+ *   its own choices, which the kernel now reads). A key on a filter, so no step of its own.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  core: '1.1.0',
-  portfolio: '1.30.0',
-  people: '4.0.0',
-  'money-core': '3.30.0',
-  estate: '2.5.0',
-  work: '1.19.0',
+  core: '1.2.0',
+  portfolio: '1.30.1',
+  people: '4.2.1',
+  'money-core': '3.32.0',
+  estate: '2.6.0',
+  work: '1.20.0',
 };
 
 type Body = Record<string, unknown>;
@@ -999,6 +1061,31 @@ function without(d: Body, gone: ReadonlySet<string>): Body | null {
       .filter((b) => !(typeof b.where === 'string' && [...gone].some((f) => new RegExp(`(?:^|,\\s*)${f}\\s`, 'u').test(b.where as string))))
       .map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => !gone.has(String(c.field))) } : b));
   return out;
+}
+
+/**
+ * WHETHER A DECLARATION A RELINK WOULD ADD WAS LEFT OUT ONLY FOR A LINK THE RECORD LACKED, and the same plan lays that
+ * link back (round 1030). money-core 3.32.0's `paid-to-by-week` reads the ledger's `party`, so a record that gained
+ * organisations after Money held a Money with neither, and the relink, which never adds, left the ledger naming nobody
+ * for good. Such an add is not one the person took off: it reads a link field of this pack (`LINKS`), and a list of
+ * this document that declares that field is among the plan's changes, the link going in. What the person took off is
+ * still kept off by the caller (`losses` reads `tookOff`).
+ */
+export function laidWithLink(id: string, doc: Record<string, unknown>, add: string, changed: readonly string[]): boolean {
+  const links = new Set(LINKS[id as FirstPartyId] ?? []);
+  if (links.size === 0) return false;
+  const declarations = (doc.declarations ?? []) as Body[];
+  const idOf = (d: Body): string | null => {
+    for (const kind of ['register', 'metric', 'page', 'rule'] as const) if (typeof d[kind] === 'string') return `${kind}.${String(d[kind])}`;
+    return null;
+  };
+  const added = declarations.find((d) => idOf(d) === add);
+  if (added === undefined) return false;
+  const cut = without(added, links);
+  if (cut !== null && JSON.stringify(cut) === JSON.stringify(added)) return false;
+  return declarations.some(
+    (d) => typeof d.register === 'string' && changed.includes(`register.${d.register}`) && Array.isArray(d.fields) && (d.fields as Body[]).some((f) => links.has(String(f.id))),
+  );
 }
 
 export type DocumentOptions = {

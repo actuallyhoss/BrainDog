@@ -22,7 +22,7 @@ export const dated = (shown: string | null): string | null => (shown !== null &&
 export const LONG = 120;
 
 export const words = {
-  heading: 'What changes',
+  heading: 'Before and after',
   before: 'Before',
   after: 'After',
   empty: 'Empty',

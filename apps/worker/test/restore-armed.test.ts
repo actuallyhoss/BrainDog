@@ -66,7 +66,7 @@ type Ready = Awaited<ReturnType<typeof ready>>;
 const DOORS: [string, (c: Ready) => Promise<Response>][] = [
   ['a signed-in owner (access)', (c) => c.ask('/api/boot', { cookie: c.cookie })],
   ['an operation bearer (operationGrant)', (c) => c.ask('/api/export', { method: 'POST', bearer: c.bearer, body: '{}' })],
-  ['the record\'s key (signingKey)', (c) => c.ask(`/app/${SLUG}/.well-known/braindog-key`)],
+  ['the record\'s key (signingKey)', (c) => c.ask(`/${SLUG}/.well-known/braindog-key`)],
 ];
 
 for (const [door, knock] of DOORS)

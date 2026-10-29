@@ -32,7 +32,7 @@ test('AN OVERLOADED RECORD IS A 503 WITH RETRY-AFTER, never a crash to quote', a
   const was = console.error;
   console.error = (line: string) => void errors.push(String(line));
   try {
-    for (const path of ['/app/studio/api/schemas?every=true', '/api/boot']) {
+    for (const path of ['/studio/api/schemas?every=true', '/api/boot']) {
       const res = await c.ask(path, { cookie });
       assert.equal(res.status, 503, path);
       assert.equal(res.headers.get('retry-after'), '1', path);
@@ -41,7 +41,7 @@ test('AN OVERLOADED RECORD IS A 503 WITH RETRY-AFTER, never a crash to quote', a
       assert.doesNotMatch(body.refusal.fix, /Quote that/u);
     }
     /* THE DOOR THE OWNER MET IT AT: Slash's read. */
-    const slash = await c.ask('/app/studio/api/slash/read', { method: 'POST', cookie, body: JSON.stringify({ q: 'what is late' }) });
+    const slash = await c.ask('/studio/api/slash/read', { method: 'POST', cookie, body: JSON.stringify({ q: 'what is late' }) });
     assert.equal(slash.status, 503, await slash.clone().text());
     assert.equal(slash.headers.get('retry-after'), '1');
   } finally {

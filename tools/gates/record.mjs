@@ -393,8 +393,15 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
  * EVERY DOOR A HOST ANSWERS AND THE BUILD DOES NOT. It was `api`, `auth` and `account/billing`, so the build's
  * own fallback answered `/account/usage` and no gate had drawn Usage from a host's answer. The same six names are the
  * Worker's root doors (`apps/worker/src/route.ts`) and the self-host's.
+ *
+ * AND A RECORD'S `/api` UNDER ITS NAME, `/<slug>/api/<method>`, which is where a page opened at `/<slug>/...` asks
+ * (`apiBase` in `apps/web/src/lib/at.ts`) now the app is the root. `forward` takes the name off, because a gate's server
+ * holds one record and the name has done its work by then, as it has in the Worker (`atRoot`).
  */
-export const forwards = (pathname) => /^\/+(?:api|auth|account|oauth|mcp|in)(?:\/|$)/.test(pathname);
+export const forwards = (pathname) => /^\/+(?:api|auth|account|oauth|mcp|in)(?:\/|$)/.test(unslugged(pathname));
+
+/** `/<slug>/api/...` as the record reads it, `/api/...`; any other path unchanged. */
+const unslugged = (pathname) => pathname.replace(/^\/+[a-z][a-z0-9-]*[a-z0-9](?=\/+api(?:\/|$))/u, '');
 
 /**
  * `GET /account/records` as the host's envelope (`readRecordsForSwitcher` in `apps/web/src/lib/record/switcher.ts`):
@@ -543,6 +550,7 @@ export async function forward(req, res, base, { bearer = true } = {}) {
   const headers = {};
   for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && v !== undefined) headers[k] = Array.isArray(v) ? v.join(', ') : v;
   const url = new URL(req.url ?? '/', base);
+  url.pathname = unslugged(url.pathname);
   const key = KEYS.get(base);
   if (bearer && key !== undefined && /^\/+api(?:\/|$)/.test(url.pathname) && headers.authorization === undefined) headers.authorization = `Bearer ${key}`;
   if (bearer && cookie !== undefined) headers.cookie = headers.cookie === undefined ? cookie : `${headers.cookie}; ${cookie}`;

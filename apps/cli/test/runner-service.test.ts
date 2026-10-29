@@ -145,9 +145,9 @@ test('a unit enabled that would not start is disabled again', async () => {
 
 test('on --host writes the address into the unit, and a word that is no address is refused before anything is written', async () => {
   const m = machine('linux');
-  assert.equal(await service(['on', '--host', 'https://record.example/app/sample'], m.io), 0);
+  assert.equal(await service(['on', '--host', 'https://record.example/sample'], m.io), 0);
   const [text] = [...m.files.values()];
-  assert.match(text ?? '', /"runner" "run" "--host" "https:\/\/record.example\/app\/sample"$/m);
+  assert.match(text ?? '', /"runner" "run" "--host" "https:\/\/record.example\/sample"$/m);
 
   for (const host of [TOKEN, `https://sample:${TOKEN}@record.example`, `https://record.example/?token=${TOKEN}`]) {
     const n = machine('linux');

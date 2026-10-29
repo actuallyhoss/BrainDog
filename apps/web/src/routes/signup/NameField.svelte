@@ -58,7 +58,7 @@
   const help = $derived(checking ? copy.signupNameChecking : why !== null ? why : free ? copy.signupNameFree : copy.signupNameHint);
   /** Which dot the line carries: a free name, a name that cannot be had, or none while checking or before typing. */
   const tone = $derived(checking ? undefined : why !== null ? 'no' : free ? 'free' : undefined);
-  /** The record's address this name becomes: the app's own host, then `/app/<name>` (where sign-up lands it). */
+  /** The record's address this name becomes: the app's own host, then `/<name>` (where sign-up lands it). */
   const address = $derived(value === '' ? null : `${globalThis.location?.host ?? ''}${BASE}/${value}`);
 </script>
 

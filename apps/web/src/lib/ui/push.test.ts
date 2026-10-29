@@ -191,24 +191,24 @@ function getter(answer: (() => Response) | Error): { get: (url: string) => Promi
 test('THE KEY IS ASKED OF `<apiBase>/api/push/key` AND IS WHAT ITS `key` SAYS', async () => {
   const { key } = await vapidPublic();
   const { get, asked } = getter(() => Response.json({ key }));
-  assert.equal(await hostKey('https://brain.dog/app/acme', get), key);
-  assert.deepEqual(asked, ['https://brain.dog/app/acme/api/push/key']);
+  assert.equal(await hostKey('https://brain.dog/acme', get), key);
+  assert.deepEqual(asked, ['https://brain.dog/acme/api/push/key']);
 });
 
 test('THE ADDRESS THE KEY IS ASKED AT IS ONE THE WORKER ANSWERS, read out of the Worker rather than typed again here', async () => {
   /* THIS ROW ONCE ASKED `<apiBase>/push/key`, WITH NO `/api`, and this file held that same wrong address, so every test
      here passed while the Worker, which answers `/api/push/key` and nothing else, was never asked. On brain.dog that
      address is not the Worker's and the answer is not a key, so the row was never drawn for anybody. The Worker's own
-     test asks `/app/the-studio/api/push/key` and gets the key: it moves the slug to the root before it matches, which is
+     test asks `/the-studio/api/push/key` and gets the key: it moves the slug to the root before it matches, which is
      why the slug is taken off below. Read as text, because `graph` refuses an import across the two apps. */
   const vapid = readFileSync(join(WEB, '../worker/src/vapid.ts'), 'utf8');
   const source = /servesPushKey = \(pathname: string\): boolean => \/(.+)\/\.test\(pathname\)/u.exec(vapid)?.[1];
   assert.ok(source, '`servesPushKey` is no longer spelled as this test reads it; read it again and fix the pattern');
   const serves = new RegExp(source);
-  for (const base of ['https://brain.dog', 'https://brain.dog/app/acme']) {
+  for (const base of ['https://brain.dog', 'https://brain.dog/acme']) {
     const { get, asked } = getter(() => Response.json({ key: null }));
     await hostKey(base, get);
-    const path = new URL(asked[0] ?? '').pathname.replace(/^\/app\/acme(?=\/)/u, '');
+    const path = new URL(asked[0] ?? '').pathname.replace(/^\/acme(?=\/)/u, '');
     assert.equal(serves.test(path), true, `${asked[0]} is not an address the Worker answers`);
   }
 });
@@ -427,9 +427,10 @@ test('A PUSH WITH A PATH SHOWS THE SAME LINE AND A TAP OPENS THAT PATH, never a 
   assert.doesNotMatch(JSON.stringify(w.shown), /Invoice/u, 'a word that came with the push was drawn');
   await w.fire('notificationclick', { notification: { close: () => {}, data: w.shown[0]?.[1] && (w.shown[0][1] as { data: unknown }).data } });
   assert.deepEqual(w.opened, [`https://brain.dog${BASE}/kiln/decide/sg_01JQ`]);
-  /* A PATH OUT OF THE SCOPE OPENS HOME. */
+  /* AN ADDRESS OUT OF THE SCOPE OPENS HOME. The scope is the whole origin since the app moved to the root, so out of it
+     is another origin. */
   const other = await worker();
-  await other.fire('push', { data: { json: () => ({ open: '/elsewhere/x' }) } });
+  await other.fire('push', { data: { json: () => ({ open: 'https://elsewhere.example/x' }) } });
   assert.deepEqual(other.shown[0]?.[1], { tag: 'braindog' });
 });
 
@@ -493,7 +494,7 @@ test('THE MANIFEST IS STANDALONE AND SCOPED TO THE APP, which is what iOS needs 
   assert.equal(manifest.start_url, `${BASE}/`);
   assert.equal(manifest.id, `${BASE}/`);
   assert.equal(manifest.name, 'BrainDog');
-  /* EVERY ICON IS A FILE THAT SHIPS. `static/` is copied under the base, so `/app/x` is `static/x`. */
+  /* EVERY ICON IS A FILE THAT SHIPS. `static/` is copied under the base, so `/x` is `static/x`. */
   assert.ok(manifest.icons.length > 0);
   for (const icon of manifest.icons) {
     assert.ok(icon.src.startsWith(`${BASE}/`), icon.src);

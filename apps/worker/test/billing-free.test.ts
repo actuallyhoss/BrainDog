@@ -84,7 +84,7 @@ const refusal = (r: Result<unknown>): Refusal => {
 test('FREE IS MADE, NOT SOLD: a record on the free plan, no Stripe call, no row, and its /start to land on', async () => {
   const w = world();
   const made = value<{ url: string; record: string; slug: string }>(await w.doors.checkout(w.who, { slug: 'ada', plan: 'free', tz: 'Europe/London' }));
-  assert.equal(made.url, 'https://brain.dog/app/ada/start');
+  assert.equal(made.url, 'https://brain.dog/ada/start');
   assert.equal(made.slug, 'ada');
   assert.equal(w.planOf(made.record), FREE_PLAN.directory);
   assert.deepEqual(w.asked, [], 'making a free record asked Stripe something');
@@ -161,7 +161,7 @@ test('A FREE RECORD IS UPGRADED BY PAYING FOR IT: a checkout for the record, and
   const sent = w.asked.find((a) => a.path === '/v1/checkout/sessions' && a.verb === 'create')?.form ?? {};
   assert.equal(sent['metadata[record]'], made.record);
   assert.equal(sent['line_items[0][price]'], 'price_cloud');
-  assert.equal(sent['success_url'], 'https://brain.dog/app/ada/settings/billing#paid={CHECKOUT_SESSION_ID}');
+  assert.equal(sent['success_url'], 'https://brain.dog/ada/settings/billing#paid={CHECKOUT_SESSION_ID}');
 
   /* Somebody else's free record is not Ada's to pay for. */
   assert.equal(refusal(await w.doors.checkout(w.who, { record: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', plan: 'cloud' })).code, 'OUT_OF_BOUNDS');

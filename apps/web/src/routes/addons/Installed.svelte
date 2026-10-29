@@ -645,7 +645,9 @@
 <!-- SETTINGS › ADD-ONS DRAWS THE HEAD: this is the area's body. Its sentence, then the two things the page's "⋯" held,
      installing from a file or a link and sharing your starter, and the way to the store. -->
 <div class="area-head">
-  {#if live}<p class="area-said">{words.sentence(installedCount(states) ?? 0, updates ? updates.length : null)}</p>{/if}
+  <!-- THE SENTENCE COUNTS WHAT "YOUR ADD-ONS" LISTS, so the two agree on one screen: it said 11 over a list of 6, counting
+       the starter and BrainDog's own parts, which have a tile and a line of their own. -->
+  {#if live}<p class="area-said">{words.sentence(installedCount(states) === null ? 0 : addons.length, updates ? updates.length : null)}</p>{/if}
   <div class="area-acts">
     <Menu label={words.more} align="end">
       {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{words.more}</span></span>{/snippet}

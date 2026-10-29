@@ -13,6 +13,7 @@
   reading measure inside them (`Parts.svelte`).
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import { site } from '$lib/copy.ts';
   import { LAUNCH } from '$lib/launch.ts';
   import { trust } from '$lib/copy/trust.ts';
@@ -39,13 +40,5 @@
   ];
 </script>
 
-<svelte:head>
-  <title>{site.meta.legal.title}</title>
-  <meta name="description" content={site.meta.legal.description} />
-  <link rel="canonical" href="https://brain.dog/legal" />
-  <meta property="og:url" content="https://brain.dog/legal" />
-  <meta property="og:title" content={site.meta.legal.title} />
-  <meta property="og:description" content={site.meta.legal.description} />
-</svelte:head>
-
+<Seo title={site.meta.legal.title} description={site.meta.legal.description} path="/legal" />
 <Parts title={l.title} lede={l.lede} {parts} />

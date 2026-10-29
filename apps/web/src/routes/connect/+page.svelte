@@ -3,7 +3,7 @@
 
   WHO IS ASKING, WHERE THE ANSWER GOES, WHAT IT MAY DO, ON WHICH RECORD, AND ONE ALLOW. The app's name and the host its
   code is sent back to come from the held request (`GET /oauth/request`); what it may do is a sentence, never the bare
-  word; the record is the one the address names (`/app/<slug>/connect`) or, at `/app/connect`, one of the records this
+  word; the record is the one the address names (`/<slug>/connect`) or, at `/connect`, one of the records this
   person owns. Allow and Deny post to the host's own doors, and the host answers with the app's address, which is where
   the browser goes next: that is the whole of finishing the sign-in.
 
@@ -37,6 +37,7 @@
   import { markedOf } from '@braindog/skin/agent-marks.ts';
   import AgentMark from '$lib/ui/AgentMark.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Face from '$lib/ui/Face.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -144,6 +145,12 @@
             <Button weight="primary" href="/settings/agents">{copy.consentOpenAgents}</Button>
           {/snippet}
         </Empty>
+        <!-- AND THE ADDRESS TO PASTE, for someone who came here to connect an app and found nothing asking: the
+             connector address any app takes (`connectLines` in `device.ts`), with its copy button. -->
+        <div class="paste">
+          <p class="paste-said">{copy.consentPaste}</p>
+          <CodeLine text={`${page.url.origin}/mcp`} label="Connector address" />
+        </div>
       </div>
     {:else if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
@@ -411,5 +418,19 @@
   /* EMPTY, IT TAKES NO ROOM: the column's gap above it is taken back, so the sheet ends 24 under Allow. */
   .said:empty {
     margin-block-start: calc(-1 * var(--sp-4));
+  }
+
+  /* THE CONNECTOR ADDRESS UNDER THE EMPTY STATE: one line of words, then the address to copy. */
+  .paste {
+    display: grid;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  .paste-said {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 </style>

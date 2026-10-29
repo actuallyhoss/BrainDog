@@ -3,6 +3,8 @@
  * bell, the phone's head, and the crumb. The shell writes most of it (`+layout.svelte`); the page's head says the page's
  * own name (`PageHead.svelte`), and the sidebar says what each list declares once it has read it (`SideBar.svelte`).
  */
+import { MediaQuery } from 'svelte/reactivity';
+import type { Cursor } from '@braindog/client';
 import type { NewsItem } from '../record/schema.ts';
 import type { SwitcherRow } from '../record/switcher.ts';
 import type { ListFacts } from './side.ts';
@@ -24,12 +26,32 @@ export const frame = $state({
   open: null as ((r: Reachable) => void) | null,
   /** What arrived since the reader last looked, which the bell opens. */
   news: [] as readonly NewsItem[],
+  /** The cursor of the newest line in `news`, which "Mark all read" sends. */
+  upTo: null as Cursor | null,
+  /** How many things wait on Needs you, the count the rail says, which the bell says too. */
+  asks: 0,
+  /** The newest line marked read from the bell, by its time: a line at or before it is read. */
+  readTo: '',
   /** Where you are, in one word or name: the lit row of the sidebar, which the phone's head says. */
   here: '',
   /** The page's own name, as its head says it, for the last step of the crumb. */
   title: '',
+  /** What the bar says in place of the page's name where the page greets rather than names: Today's "Good afternoon, Mara". */
+  heading: '',
+  /** The page's count, said quietly after its name in the bar ("Needs you 4"). */
+  figure: '',
   /** The bar carries the crumb, so a page's head on a desk draws no way back of its own. */
   crumbed: false,
   /** What each list declares about where it belongs, by id, as the sidebar learnt it. */
   facts: {} as Readonly<Record<string, ListFacts>>,
 });
+
+/** Below 900px a page's head draws the phone's bar, which says where you are at its start. */
+export const narrow = new MediaQuery('(width < 900px)', false);
+
+/**
+ * WHETHER THE BAR SAYS THE PAGE'S NAME, which is then not said a second time on the page (29 October, his word: "the
+ * title showing twice"). On a phone the head's own bar always does; on a desk the top bar does, and the menu shape has
+ * no bar, so there the page keeps its name.
+ */
+export const barTitled = (): boolean => narrow.current || frame.crumbed;

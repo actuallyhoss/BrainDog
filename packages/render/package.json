@@ -10,7 +10,9 @@
     ".": "./src/index.ts",
     "./svelte": "./svelte/index.ts",
     "./glyphs": "./src/glyphs/index.ts",
-    "./glyphs/names": "./src/glyphs/names.ts"
+    "./glyphs/names": "./src/glyphs/names.ts",
+    "./widget-compose": "./src/widget-compose.ts",
+    "./kinds-for": "./src/kinds-for.ts"
   },
   "publishConfig": {
     "access": "public",

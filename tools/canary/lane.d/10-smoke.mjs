@@ -30,7 +30,7 @@ const STAND_IN = 'canary.invalid';
 /** The self-host half: every first-draw read on a fresh self-host, judged as the smoke judges it. Answers wrong lines. */
 export async function selfHostSmoke(host, { send = fetch, say = console.log } = {}) {
   const config = { env: { canary: { vars: { PUBLIC_HOST: STAND_IN } } } };
-  const to = (url) => url.replace(`https://${STAND_IN}/app/${host.slug}`, host.base);
+  const to = (url) => url.replace(`https://${STAND_IN}/${host.slug}`, host.base);
   const wrong = [];
   const said = {};
   async function ask(check) {
@@ -41,7 +41,7 @@ export async function selfHostSmoke(host, { send = fetch, say = console.log } = 
     });
     const answer = { status: got.status, headers: got.headers, text: await got.text() };
     const verdict = check.judge(answer);
-    say(`  ${verdict ? 'WRONG' : 'ok   '}  ${check.method} ${new URL(check.url).pathname.replace(`/app/${host.slug}`, '')}${verdict ? `: ${verdict}` : ''}`);
+    say(`  ${verdict ? 'WRONG' : 'ok   '}  ${check.method} ${new URL(check.url).pathname.replace(`/${host.slug}`, '')}${verdict ? `: ${verdict}` : ''}`);
     if (verdict) wrong.push(verdict);
     try {
       const body = JSON.parse(answer.text);

@@ -144,7 +144,7 @@ export const isPublic = (e: Entry): boolean => !e.unlisted && offered(e) !== nul
  */
 export const slugOf = (e: Pick<Entry, 'kind' | 'id'>): string => (e.kind === 'usecase' ? `usecase-${e.id}` : e.id);
 
-/** Where the app installs it: `/app/packs/browse/<id>?kind=...`, opened in the signed-in person's record. */
+/** Where the app installs it: `/packs/browse/<id>?kind=...` on the app's name, opened in the signed-in person's record. */
 export const installPath = (app: string, e: Pick<Entry, 'kind' | 'id'>): string => `${app}/packs/browse/${encodeURIComponent(e.id)}?kind=${e.kind}`;
 
 /* ── Install counts ─────────────────────────────────────────────────────────────────────────── */

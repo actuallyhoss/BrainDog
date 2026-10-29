@@ -36,6 +36,7 @@ import { forgetToday } from '../home/today-kept.ts';
 import { dropCopy } from './boot-copy.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
+import { listName, titleOf } from './names.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import { levelsFrom, type HeldLevel } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
@@ -103,7 +104,7 @@ type ShellBase = {
      */
     currency: string | null;
     /** `guessed`: drawn offline from the local copy, which kept no count for the list, so the rail draws none. */
-    registers: { id: string; name: string; count: number; icon: IconName; views: { key: string; name: string; href: string }[]; guessed?: true }[];
+    registers: { id: string; name: string; count: number; open?: number; icon: IconName; views: { key: string; name: string; href: string }[]; guessed?: true }[];
   };
   /**
    * The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs, and `cut` on a
@@ -289,7 +290,7 @@ export function forgetNow(): void {
 
 let kept: Promise<Booted> | null = null;
 
-/* WHICH RECORD `kept` IS. Since the record is in the address (`/app/<slug>/api/boot`), one tab can ask two records, and
+/* WHICH RECORD `kept` IS. Since the record is in the address (`/<slug>/api/boot`), one tab can ask two records, and
    an answer kept for acme handed to a screen on kiln is kiln's rail drawn from acme's lists. */
 let keptFor = '';
 
@@ -376,7 +377,7 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
       return { from: 'live', boot: out.value };
     }
     const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
-    /* NOT KEPT, THE 401 LEAST OF ALL. This line used to keep a 401 or an unreached host at the bare `/app` as the
+    /* NOT KEPT, THE 401 LEAST OF ALL. This line used to keep a 401 or an unreached host at the bare address as the
        sample, for the tab, and so the first load after signing in was handed The Studio with no request made.
        A refusal kept nothing then either; now it is every such answer. */
     kept = null;
@@ -763,6 +764,9 @@ function textOf(e: EventLine): string {
   }
   const pack = packText(e) ?? exportText(e) ?? accessText(e);
   if (pack) return pack;
+  /* A RULE'S RUN BY THE RULE'S NAME (audit of 30 October, 7): the record notes a run "rule.weekly-review ran." */
+  const ran = /^rule\.([a-z0-9][a-z0-9_-]*) ran\.?$/u.exec(e.note ?? '');
+  if (ran) return `${titleOf({ id: `rule.${ran[1]!}`, kind: 'rule' })} ran`;
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
 }
 
@@ -856,6 +860,10 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
     if (folded.has(e)) return [];
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
+    /* A RUN'S OWN ROW MOVING IS THE RUN KEEPING ITS PLACE, NOT NEWS (recheck of 30 October, N6): his bell read
+       "attached: compact · 9 times" and "Made 4 changes in Session at once" for an agent picking a run back up. Where a run
+       stands (its state) is still said; the Agents page holds the rest. */
+    if (e.register === 'session' && e.kind === 'edit' && e.field !== 'state') return [];
     if (reasons.folded.has(e)) return [];
     const reason = reasons.byDecision.get(e);
     const text = voice.has(i) ? voice.get(i) : reason !== undefined && e.title ? copy.feedDecided(e.title, reason) : textOf(e);
@@ -899,7 +907,11 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
     out.push({
       at: first.item.at,
       by: first.item.by,
-      text: copy.feedBulk(counts, run.some((r) => r.last), why),
+      text: copy.feedBulk(counts, run.some((r) => r.last), why, (() => {
+        const lists = new Set(run.map((r) => r.e.register));
+        const only = lists.size === 1 ? [...lists][0] : null;
+        return only ? listName(only) : null;
+      })()),
       href: `/audit?${new URLSearchParams({ by: actorFor(first.e.actor, me), on })}`,
     });
     i = j + 1;
@@ -1048,7 +1060,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
             ...((p.nav as { tabs?: unknown }).tabs === true ? { tabs: true as const } : {}),
             ...(kept.has(p) ? {} : { cut: true as const }),
             /* A PAGE ONE ROW MADE, which the flat nav leaves to its list's own page (`flatNav`). */
-            ...(p.about ? { row: true as const } : {}),
+            ...(p.about ? { row: true as const, register: p.about.register } : {}),
             /* AND IT DRAWS AS THAT THING'S OWN COLOURED DOT in the rail, so each project is told from its neighbours:
                the hue `boot` sends with the row (`about.hue`), else the row's frozen hue where this tab holds the row,
                else the hue its name is always drawn in (`hueFor`), which is the colour Today gives the same project. */
@@ -1077,7 +1089,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
          bookkeeper with a rail of nothing and the list reachable only by typing `/r/expenses`. */
       registers: b.registers
         .filter((r) => r.count > 0 || views.has(r.id) || theirs.has(r.id))
-        .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(iconSent(r) ?? REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
+        .map((r) => ({ id: r.id, name: r.name, count: r.count, ...(typeof r.open === 'number' ? { open: r.open } : {}), icon: iconFor(iconSent(r) ?? REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
     },
     /* A LIST THE KERNEL DECLARES SAYS SO, so Arrivals leaves the runs and his instructions out by declaration. */
     lists: b.registers.map((r) => ({ id: r.id, name: r.name, ...(r.kernel === true ? { kernel: true as const } : {}) })),

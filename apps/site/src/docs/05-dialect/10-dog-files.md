@@ -1,4 +1,4 @@
-# .dog files
+# Editing a page as a text file
 
 A `.dog` file is one page's source as text: exactly what the record stores for the page, printed so a person can read it and edit it. Change the text, apply it, and the page changes by exactly what you changed.
 

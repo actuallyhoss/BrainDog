@@ -54,7 +54,7 @@ test('OPEN, WITH NO CODE AND NO BOT CHECK, IS 200 AND A LETTER', async () => {
   assert.equal(status, 200, JSON.stringify(out));
   assert.equal(c.sent.length, 1);
   assert.equal(c.sent[0]?.to, 'sami@example.test');
-  assert.match(String(c.sent[0]?.text), new RegExp(`https://${HOST}/app/signup#verify=`));
+  assert.match(String(c.sent[0]?.text), new RegExp(`https://${HOST}/signup#verify=`));
 });
 
 test('OPEN, A KNOWN ADDRESS IS MAILED ITS SIGN-IN LINK, and answered exactly as a new one is', async () => {
@@ -66,7 +66,7 @@ test('OPEN, A KNOWN ADDRESS IS MAILED ITS SIGN-IN LINK, and answered exactly as 
   assert.deepEqual(known.out, fresh.out, 'the answer says who has an account');
   assert.equal(c.sent.length, 2);
   assert.equal(c.sent[1]?.to, 'ada@example.test');
-  assert.match(String(c.sent[1]?.text), new RegExp(`https://${HOST}/app/signin#magic=`));
+  assert.match(String(c.sent[1]?.text), new RegExp(`https://${HOST}/signin#magic=`));
 });
 
 test('CLOSED, UNSET OR UNKNOWN, IS 403 WITH THE SENTENCE, and the name answer says closed', async () => {

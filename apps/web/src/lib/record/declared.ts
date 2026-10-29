@@ -14,6 +14,10 @@
 
 import { METRICS as SEED_METRICS } from '@braindog/seed/packs/metrics';
 
+import { knowFigures } from './figures-known.ts';
 import type { MetricDecl } from './metrics.ts';
 
 export const METRICS = SEED_METRICS as unknown as Record<string, MetricDecl>;
+
+/* AND SO DO THE FILES ON TODAY'S FIRST LOAD, which read them through `figures-known.ts` once this has loaded. */
+knowFigures(METRICS);

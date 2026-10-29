@@ -48,7 +48,7 @@ adds the hooks and, with them, the Agent Skill, and registers `braindog mcp` ([4
 
 ```sh
 curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux; on Windows: irm https://brain.dog/cli/install.ps1 | iex
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```
 
 **OAuth, as built** (`packages/host/src/oauth.ts`, the protocol; `packages/record/src/oauth.ts`, its
@@ -69,7 +69,7 @@ it is the one a client reached.
   `127.0.0.1` or `localhost` at any port (RFC 8252).
 - `GET /oauth/authorize` checks the client and its redirect address, answering anything wrong with
   either on a BrainDog page and never at the client's address, then holds the request ten minutes and
-  sends the browser to the consent screen. On the Cloud that is the app's own `/app/connect`
+  sends the browser to the consent screen. On the Cloud that is the app's own `/connect`
   (`CONSENT_AT` in `apps/worker/src/oauth.ts`), and the Worker keeps a plain page at `/oauth/consent`
   as its fallback; a self-host serves that plain page. `GET /oauth/request?request=<id>` is that screen's read of
   it: the client's name, its redirect host, and the scopes it may be given.
@@ -305,7 +305,7 @@ device never moves it back and a read is never a write.
 This is the most consequential find in this research pass.
 
 **As built: the link, and the shape behind a switch.** `propose` answers like every other tool, with the
-suggestion's id and a `decide` link, `<origin>/app/<slug>/decide/<id>`, the address where the person answers that
+suggestion's id and a `decide` link, `<origin>/<slug>/decide/<id>`, the address where the person answers that
 one question, so an agent can hand it on in its own reply (`decideAt` in `packages/mcp/src/index.ts`). A transport
 that does not hand the core its origin answers without the link. The input-required answer is written in `rpc.ts`
 and held off by `const MRTR = false`, because the client capability the revision names for it could not be confirmed

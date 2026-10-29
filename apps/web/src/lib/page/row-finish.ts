@@ -26,5 +26,18 @@ export async function finishFor(base: string, register: string, seq: number): Pr
   const fields = (got.value as { fields?: Record<string, unknown> } | null)?.fields ?? {};
   const now = fields[decl.state];
   const to = finishOf(decl, typeof now === 'string' ? now : '');
-  return to === null ? null : { said: to.said };
+  if (to === null) return null;
+  /* A PLAN WITH NOTHING LEFT TO PAY HAS NOTHING TO MARK PAID (Q3 of 29 October): an empty plan, such as a second
+     "harbourview" written beside "Harbourview", wore a red "Mark paid" over "No instalments yet". Its open parts are asked for by
+     the link the script writes and by the name a part was written with. */
+  if (register === 'plans') {
+    const id = (got.value as { id?: unknown } | null)?.id;
+    const name = fields.name;
+    const ways = [...(typeof id === 'string' ? [{ field: 'plan_row', is: id }] : []), ...(typeof name === 'string' && name !== '' ? [{ field: 'plan', is: name }] : [])];
+    if (ways.length === 0) return null;
+    const parts = await client.list({ register: 'installments', where: { all: [{ field: 'state', is: 'open' }, { any: ways }] } as never, limit: 1 }).catch(() => null);
+    const rows = parts?.ok ? ((parts.value as { rows?: unknown[] } | null)?.rows ?? []) : [];
+    if (rows.length === 0) return null;
+  }
+  return { said: to.said };
 }

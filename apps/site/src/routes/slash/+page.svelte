@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
+  import { faqOf } from '$lib/site/seo.ts';
   /**
    * /slash: Slash on a page of its own, for a reader who wants to know more ("have a separate page for
    * Slash ... make it super readable and neat"). The prototype's `#slash`:
@@ -25,15 +27,7 @@
   ];
 </script>
 
-<svelte:head>
-  <title>{site.meta.slash.title}</title>
-  <meta name="description" content={site.meta.slash.description} />
-  <link rel="canonical" href="https://brain.dog/slash" />
-  <meta property="og:url" content="https://brain.dog/slash" />
-  <meta property="og:title" content={site.meta.slash.title} />
-  <meta property="og:description" content={site.meta.slash.description} />
-</svelte:head>
-
+<Seo title={site.meta.slash.title} description={site.meta.slash.description} path="/slash" ld={[faqOf(s.faq.questions)]} />
 <PageHead title={s.head.title} lead={s.head.lead}>
   {#snippet before()}<span class="keycap" aria-hidden="true">/</span>{/snippet}
 </PageHead>

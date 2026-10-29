@@ -127,7 +127,7 @@ export type Plan = {
   unit: string;
   /** One sentence: who it is for. */
   for: string;
-  /** Where the button goes; `external` because `/app` is the app's, served on this site's name. */
+  /** Where the button goes; `external` because it is the app's, on `app.brain.dog`. */
   href: string;
   external: boolean;
   /** What the plan includes each month, and the agents it connects at once. */

@@ -85,11 +85,11 @@ test('THE START SENDS THE BROWSER TO GOOGLE and keeps the state in a cookie no s
 
 test('AN ADDRESS SOMEBODY HAS IS SIGNED IN, through a link minted and spent on the spot', async () => {
   const first = door();
-  const s = await started(first.d, '/app/work');
+  const s = await started(first.d, '/work');
   const { d, asked, sent } = door({ claims: { nonce: s.nonce } });
   const res = await back(d, `code=abc&state=${s.state}`, s.cookie);
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), `${ORIGIN}/app/work`);
+  assert.equal(res.headers.get('location'), `${ORIGIN}/work`);
   const cookies = res.headers.getSetCookie();
   assert.ok(cookies.some((c) => c.startsWith('__Host-bd_g=; ') && c.includes('Max-Age=0')), 'the state cookie is cleared');
   assert.ok(cookies.some((c) => c.startsWith(`__Host-bd_s=${SID}; `)), 'the session cookie is set');
@@ -133,7 +133,7 @@ test('NOBODY IS LET IN ON A CALLBACK THE START DID NOT MAKE', async () => {
   }
   /* An address nobody here has. */
   const unknown = await ends({ ...good, known: false }, `code=abc&state=${s.state}`, s.cookie);
-  assert.equal(unknown.to.pathname, '/app/signin');
+  assert.equal(unknown.to.pathname, '/signin');
   assert.equal(unknown.to.searchParams.get('google'), 'unknown');
   assert.equal(unknown.asked.length, 1);
 });
@@ -143,11 +143,15 @@ test('A HOSTED DOMAIN IS TAKEN, and `next` never leaves the app', async () => {
   const s = await started(first.d, 'https://evil.example/app/');
   const { d, asked } = door({ claims: { nonce: s.nonce, email: 'ada@example.com', hd: 'example.com' } });
   const res = await back(d, `code=abc&state=${s.state}`, s.cookie);
-  assert.equal(res.headers.get('location'), `${ORIGIN}/app/`);
+  assert.equal(res.headers.get('location'), `${ORIGIN}/`);
   assert.equal((asked[0] as { email?: string }).email, 'ada@example.com');
   const outside = await started(first.d, '/auth/provision');
   const landed = await back(door({ claims: { nonce: outside.nonce } }).d, `code=abc&state=${outside.state}`, outside.cookie);
-  assert.equal(landed.headers.get('location'), `${ORIGIN}/app/`);
+  assert.equal(landed.headers.get('location'), `${ORIGIN}/`);
+  /* A `next` FROM BEFORE THE APP MOVED TO THE ROOT lands on the page it names now, and never on the old address. */
+  const old = await started(first.d, '/app/work');
+  const moved = await back(door({ claims: { nonce: old.nonce } }).d, `code=abc&state=${old.state}`, old.cookie);
+  assert.equal(moved.headers.get('location'), `${ORIGIN}/work`);
 });
 
 test('A NEW ADDRESS THROUGH GOOGLE MAKES NOBODY, against a real Directory: sign-up is the only door that makes a person', async () => {

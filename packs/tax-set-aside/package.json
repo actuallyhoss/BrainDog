@@ -1,0 +1,11 @@
+{
+  "name": "@braindog/pack-tax-set-aside",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test tax-set-aside.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

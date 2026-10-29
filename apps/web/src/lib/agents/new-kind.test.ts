@@ -25,6 +25,7 @@ import {
   kindProposal,
   PRESETS,
   presetOf,
+  slotParts,
   slotsOf,
   withPreset,
   words,
@@ -165,5 +166,14 @@ test('EACH OF THE THREE WAYS TO START IS A KIND THE RECORD TAKES, and a choice c
   }
   const looked = withPreset(blankKind(), PRESETS[0]!);
   assert.equal(presetOf({ ...looked, permission: 'acceptEdits' }), null);
-  assert.equal(words.send, 'Save as a job');
+  assert.equal(words.send, 'Save job');
+});
+
+test('a slot shown as it is typed is set apart from the words round it, so it reads as code and not a lost template', () => {
+  assert.deepEqual(slotParts(words.promptHelp), [
+    { text: 'Write ', slot: false },
+    { text: '{client}', slot: true },
+    { text: ' where a name changes each run.', slot: false },
+  ]);
+  assert.deepEqual(slotParts('No slot here.'), [{ text: 'No slot here.', slot: false }]);
 });

@@ -113,3 +113,9 @@ test('a paused or stopped run says so in the time’s place, a helper is no row,
   assert.equal(rows[0]?.live, 'quiet');
   assert.equal(liveRows(drawn, [presence({ state: 'waiting' })], [])[0]?.word, 'heard just now', 'a run waiting on him says when it was heard');
 });
+
+test('a quiet machine is said by its project, never by a path (recheck N3)', () => {
+  const root = presence({ run: 'S3', project: 'P1', doing: 'Claude run', machine: 'Teo', cwd: 'D:\\', wrote: 0, state: 'waiting', heard_s: 9 * 3600, quiet_s: 9 * 3600 });
+  assert.deepEqual(liveFolds([root]), ['Windows PC: 1 Claude session, quiet']);
+  assert.deepEqual(liveFolds([root], () => 'BrainDog'), ['Windows PC: 1 Claude session on BrainDog, quiet']);
+});

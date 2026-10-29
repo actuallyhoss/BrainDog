@@ -142,7 +142,7 @@ test('A LIST THAT HOLDS ENTRIES AND DOES NOT GROW IS STILL OFFERED, below every 
   value(await api.create({ register: 'flasks', fields: { what: 'One flask' } }, OWNER));
   const ranked = penRanked(deps(api, sql, clock.now()));
   assert.equal(ranked.at(-1)?.id, 'page:flasks', 'a list that does not grow outranked one that does');
-  assert.equal(ranked.at(-1)?.why, 'Flasks has 1 entry and no page yet.');
+  assert.equal(ranked.at(-1)?.why, 'Flasks opens as a plain list of 1 entry. A page of its own would lay it out.');
   assert.ok(!(await penOf(api)).some((i) => i.id === 'page:flasks'));
   sql.close();
 });

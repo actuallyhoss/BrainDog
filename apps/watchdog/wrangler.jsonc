@@ -16,7 +16,7 @@
   "preview_urls": false,
   "observability": { "enabled": true },
   "triggers": { "crons": ["*/5 * * * *"] },
-  "vars": { "OPS_ALERT_TO": "admin@brain.dog", "MAIL_FROM": "hello@brain.dog", "WATCH_HOST": "brain.dog" },
+  "vars": { "OPS_ALERT_TO": "admin@brain.dog", "MAIL_FROM": "hello@brain.dog", "WATCH_HOST": "brain.dog", "APP_HOST": "app.brain.dog" },
   "send_email": [{ "name": "EMAIL" }],
   /* Each probe is one log line a run (name, ok, status, ms, slow), so a slow day is a search of the Worker's logs. */
   "kv_namespaces": [{ "binding": "STATE", "id": "13420cc4d4c54df7b282fb781b9128bb" }]

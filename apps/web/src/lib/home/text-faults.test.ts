@@ -212,7 +212,7 @@ test('THE WALK IS ASKED ONCE FOR THE TAB: a second ask while it is out, or insid
     asked += 1;
     return json(200, answer([NOTE]));
   };
-  const base = 'http://kept.test/app/acme';
+  const base = 'http://kept.test/acme';
   const first = textFaultsOnce(base, io, 1_000);
   /* WHILE IT IS OUT, and after it landed, the same read: the record is not asked to walk its words twice. */
   assert.equal(textFaultsOnce(base, io, 2_000), first);
@@ -220,14 +220,14 @@ test('THE WALK IS ASKED ONCE FOR THE TAB: a second ask while it is out, or insid
   assert.equal(textFaultsOnce(base, io, 1_000 + TEXT_FAULTS_KEPT_MS - 1), first);
   assert.ok(asked <= 1, `asked ${String(asked)} times`);
   /* ANOTHER RECORD IS ITS OWN, and past the keeping time the record is asked again. */
-  assert.notEqual(textFaultsOnce('http://kept.test/app/other', io, 2_000), first);
+  assert.notEqual(textFaultsOnce('http://kept.test/other', io, 2_000), first);
   const later = textFaultsOnce(base, io, 1_000 + TEXT_FAULTS_KEPT_MS);
   assert.notEqual(later, first);
   assert.deepEqual(await later, got);
 });
 
 test('NONE IS NOT KEPT: a host that refused is asked again at the next visit', async () => {
-  const base = 'http://refused.test/app/acme';
+  const base = 'http://refused.test/acme';
   const refused = async () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } });
   const first = textFaultsOnce(base, refused, 1_000);
   assert.equal(await first, null);

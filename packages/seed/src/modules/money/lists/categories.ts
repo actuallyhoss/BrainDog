@@ -58,7 +58,8 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
        each field's label, and the sentence grammar splits clauses on commas, so a label with a
        comma in it could not be typed or pasted back: `no more than: categories has no field called
        no`. The test that says every field is reachable by the name the screen shows caught it. */
-    { id: 'budget', label: 'Most a month', type: 'money' },
+    /* `Most to spend` SINCE money-core 3.31.0, when a budget could be for a week or a year (`budget_period`). */
+    { id: 'budget', label: 'Most to spend', type: 'money' },
     /* HOW A CATEGORY IS DRAWN AND HOW ITS BUDGET IS KEPT, SINCE money-core 3.29.0. A glyph from a fixed set and a colour
        from the category hues (`--cat-*`), so a ledger line, a budget bar and a share of the month wear the same chip
        for the same category; nothing is fetched from the web for it. `budget_alert` is the share of the most a month
@@ -119,6 +120,24 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
       labels: { near: 'Near its most', over: 'Over its most' },
     },
     { id: 'warned_month', label: 'Warned for', type: 'text' },
+    /**
+     * A BUDGET FOR A WEEK OR A YEAR, SINCE money-core 3.31.0 (money parity, "Left": weekly and yearly budgets). Empty is
+     * a month, as every budget set before this was: the Budgets page, `budget-watch` and what carries over all read an
+     * empty one as a month, so nothing set before changes. `budget` is the most for that period.
+     *
+     * `carried` IS WHAT WAS LEFT OF THE PERIOD BEFORE, written by `budget-watch` on a category that carries over, so this
+     * period's most is the budget and that. `warned_for` says which period a warning is about, in the words it is told in.
+     */
+    {
+      id: 'budget_period',
+      label: 'Budget for',
+      type: 'enum',
+      values: ['month', 'week', 'year'],
+      labels: { month: 'A month', week: 'A week', year: 'A year' },
+      default: 'month',
+    },
+    { id: 'carried', label: 'Carried over', type: 'money' },
+    { id: 'warned_for', label: 'Warned about', type: 'text' },
     /**
      * MONEY THAT STAYS YOURS, SINCE money-core 3.30.0: a move between your own accounts, a card paid off from the bank,
      * cash taken out, money put into savings. A person who files such entries under a category of their own says so here

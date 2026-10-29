@@ -340,9 +340,9 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* WHICH BUILD IS ON THE PORT. One server, pointed at the record under measurement. A second server
        would be a second port, and this file already knows what a port collision costs. */
     let serving = ROOT;
-    /* AND THE ADDRESS IT IS OPENED UNDER. The record app is `/app` (`svelte.config.js`), so its routes are opened as
-       `/app<route>` and its fallback is `build/app/index.html`; the marketing site is prerendered at the root. The
-       route itself stays as the tree names it, because `MAY_REFUSE` is written in those words. */
+    /* AND THE ADDRESS IT IS OPENED UNDER. The record app is the root (`svelte.config.js`, `APP_BASE` in `lib.mjs`), so its
+       routes are opened as `<route>` and its fallback is `build/index.html`; the marketing site is prerendered at the
+       root too. The route itself stays as the tree names it, because `MAY_REFUSE` is written in those words. */
     let base = APP_BASE;
     /* AND WHICH RECORD `/api` REACHES: the gates' own, or the variant a pass names. */
     let asking = null;

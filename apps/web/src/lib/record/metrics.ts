@@ -208,6 +208,21 @@ export function withFx(source: () => { home: string | null; rates: readonly Rate
 export const fxNow = (): { home: string | null; rates: readonly Rate[] } => fxSource();
 
 /**
+ * THE MARK A VERDICT EARNS ON A TILE, which is not always the verdict (2026-10-29, after audit of 30 October, 20).
+ *
+ * A FLOOR OF NOUGHT IS A GUARD, NOT A GOAL. `target: { gte: 0 }` is on a hundred figures because a figure must have a
+ * target, and it is met by every count, every day and every sum of amounts there is: "To pay on the card £1,240" and
+ * "Oldest balance 3 Sep" drew a tick for being at least nothing. So a floor of nought says only when it is crossed: a
+ * miss is still a miss (cash below nought, a net worth that went under), and being above it draws no mark. Every other
+ * target, a ceiling, a goal of a year's runway, a share to keep, is marked both ways as before.
+ */
+export function markOf(decl: Pick<MetricDecl, 'target'> | undefined, met: boolean | null): boolean | null {
+  if (met !== true) return met;
+  const t = decl?.target as { gte?: unknown; lte?: unknown } | undefined;
+  return t !== undefined && typeof t.gte === 'number' && t.gte <= 0 && t.lte === undefined ? null : met;
+}
+
+/**
  * A figure's target line, in the currency the figure is written in: the declared one, or converted into the one it was
  * added up in and saying so. Empty when the figure is in another currency and no rate converts its target.
  */
@@ -403,7 +418,8 @@ export function format(shape: string | undefined, n: number | string | null, now
     case 'int':
       return integer(Math.round(n));
     case 'pct':
-      return `${(n * 100).toLocaleString('en', { maximumFractionDigits: 1 })}%`;
+      /* A MINUS SIGN, NOT A HYPHEN, as every money figure writes one ("Kept, 90 days −69.7%"). */
+      return `${(n * 100).toLocaleString('en', { maximumFractionDigits: 1 }).replace(/^-/u, '−')}%`;
     case 'days':
       return Math.round(n) === 1 ? '1 day' : `${Math.round(n)} days`;
     case 'decimal':
@@ -972,9 +988,20 @@ function leadSentence(template: string, readAs: (path: string) => string | null 
      short, for a reader who may see Orders and not People (shop-owed-53-54's checker). */
   let before = true;
   const kept = template.split(/,\s+/u).filter((clause) => (before = stands(clause) && (before || !/^with\b/iu.test(clause))));
+  return pluralsIn(kept.join(', '), said)
+    /* A LEAD WHOSE OPENING CLAUSE DROPPED starts on the next one's "and" (uc6-shop-49): "and Salma still owes EGP 1,350"
+       says "Salma still owes EGP 1,350". */
+    .replace(/^and\s+/u, '');
+}
+
+/**
+ * THE PLURALS OF A TEMPLATE SETTLED BY ITS FIGURES, with every `{{path}}` kept for the renderer (`leadOf`'s rules, apart
+ * from its clauses): `{{n}} payment(s)` is "payment" for one and "payments" for more, and a verb after it agrees. Every
+ * note says it so, not only a lead (recheck of 30 October, N5: "27 payment(s)" on Payees).
+ */
+export function pluralsIn(template: string, said: (path: string) => string | null): string {
   const one = (count: string): boolean => count.trim() === '1';
-  return kept
-    .join(', ')
+  return template
     /* A VERB AFTER A FIGURE'S NAMES AGREES WITH HOW MANY IT NAMED (`{{projects-need-you.names}} need(s) a push`): "Kiln
        needs a push", "Kiln and Portage need a push". The `(s)` after names is a verb's, so it is kept for one and dropped
        for several, the other way round from a noun's; `is` and its kind take `VERB`'s forms. */
@@ -995,10 +1022,7 @@ function leadSentence(template: string, readAs: (path: string) => string | null 
         return `${figure}${between} ${single ? word : `${word}s`}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
       },
     )
-    .replace(/([A-Za-z]+)\(s\)/gu, '$1s')
-    /* A LEAD WHOSE OPENING CLAUSE DROPPED starts on the next one's "and" (uc6-shop-49): "and Salma still owes EGP 1,350"
-       says "Salma still owes EGP 1,350". */
-    .replace(/^and\s+/u, '');
+    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
 }
 
 /** A figure as `resolverOf` writes it, `0`, `0.0`, `0%` or `GBP 0.00`, one part or several joined by ` · `. */

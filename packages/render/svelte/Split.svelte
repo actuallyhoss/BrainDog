@@ -6,6 +6,7 @@
   `Proportional.svelte`: a button when the host passes `hole`, a marked row otherwise.
 -->
 <script lang="ts">
+  import PartChip from './p/PartChip.svelte';
   import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
   import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
@@ -19,6 +20,12 @@
   const values = $derived(rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts)))));
   const plan = $derived(splitPlan(values));
   const said = (r: Row | undefined) => text(inline(r?.cells[0] ?? '', opts));
+  /* A PART'S OWN COLOUR WHERE THE HOST KNOWS ITS CHIP (`opts.partLook`, Money's categories), so the ring, the bar and the
+     legend wear the colour its ledger lines wear. */
+  const hueOf = (r: Row | undefined): string => {
+    const slot = r && opts.partLook ? opts.partLook(said(r))?.slot : null;
+    return slot ? `--part: var(--cat-${slot});` : '';
+  };
   /* THE DONUT FORM (`split donut`): the parts as a thin ring with their total in the middle, as `html.ts` draws it. */
   const donut = $derived(block.form === 'donut' && !plan.empty ? partsRing(rows.map((r) => ({ label: said(r), value: text(inline(r.cells[1] ?? '', opts)), third: '' })), opts.home) : null);
   const name = $derived(splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]), share: p.share }))));
@@ -70,7 +77,7 @@
             fill="none"
             stroke="currentColor"
             stroke-width="4"
-            style={tone === 'bad' ? `stroke:url(#${late}) var(--chart-late, currentColor)` : undefined}
+            style={tone === 'bad' ? `stroke:url(#${late}) var(--chart-late, currentColor)` : hueOf(rows[a.row]) || undefined}
             stroke-dasharray={a.dash}
             stroke-dashoffset={a.offset}
             transform="rotate(-90 18 18)"
@@ -98,7 +105,7 @@
       {/if}
       {#each plan.parts as p}
         {@const tone = rows[p.at]?.tone}
-        <rect class="split-seg" data-step={p.step} data-slot={splitSlot(rows[p.at]?.cells[3])} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late}) var(--chart-late, currentColor)` : undefined} x={p.x} y="0" width={p.width} height="100"
+        <rect class="split-seg" data-step={p.step} data-slot={splitSlot(rows[p.at]?.cells[3])} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late}) var(--chart-late, currentColor)` : hueOf(rows[p.at]) || undefined} x={p.x} y="0" width={p.width} height="100"
         ></rect>
       {/each}
       {#if plan.cuts}<path class="split-cut" d={plan.cuts} vector-effect="non-scaling-stroke"></path>{/if}
@@ -111,8 +118,9 @@
         {@const share = splitShare(plan, i, values[i] ?? NaN, text(inline(row.cells[1] ?? '', opts)))}
         <!-- A part at nought is left out of the legend (`splitListed`); the fold below still says it. -->
         {#if splitListed(plan, values[i] ?? NaN)}
+        {@const look = opts.partLook ? opts.partLook(said(row)) : null}
         <li class="split-item" data-intent={row.tone}>
-          <span class="split-dot" data-step={part?.step} data-slot={splitSlot(row.cells[3])} aria-hidden="true"></span>
+          {#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={said(row).slice(0, 1).toLocaleUpperCase('en')} {opts} />{:else}<span class="split-dot" data-step={part?.step} data-slot={splitSlot(row.cells[3])} aria-hidden="true"></span>{/if}
           <span class="split-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
           <span class="split-value num"><Text nodes={inline(headlineFigure(row.cells[1] || MISSING, opts.home), opts)} {opts} /></span>
           {#if share}<span class="split-share num">{share}</span>{/if}

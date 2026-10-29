@@ -368,7 +368,7 @@ export async function walk(person, { origin, doors, seer, out = null, say = () =
 
 /**
  * The proof area's browser, pointed at a signed-in record: `openPage` and `readiness` from `tools/gates/lib.mjs`, the
- * look's `rawIn`, and Chromium as the gates launch it. A page opens under the record's own name (`/app/<name>/...`)
+ * look's `rawIn`, and Chromium as the gates launch it. A page opens under the record's own name (`/<name>/...`)
  * with the tab's session, on the real clock.
  */
 export async function lookSeer() {

@@ -1,9 +1,9 @@
 {
   "pack": "people",
-  "version": "4.0.0",
+  "version": "4.2.1",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "Health, Scripts, Calendar and Activity moved out of People into the pages BrainDog itself keeps. Nothing you see changes, and your sidebar order and hides stay as they were.",
+  "changes": "People says how many organisations and shops you deal with in one count, the one their list shows.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -161,7 +161,7 @@
           "kind": "cards",
           "heading": "Everyone",
           "icon": "people",
-          "span": 6,
+          "span": 12,
           "source": "register.people",
           "where": "merged_into is empty, self is not true",
           "columns": [
@@ -175,24 +175,10 @@
           "empty": "Nobody yet. Add someone, or an agent adds whoever it meets in a commit or a mail."
         },
         {
-          "kind": "table",
-          "heading": "Organisations",
-          "icon": "building",
-          "span": 6,
-          "source": "register.organisations",
-          "where": "merged_into is empty, retired_on is empty, kind is set",
-          "when": { "metric": "organisations-count", "gt": 0 },
-          "columns": [
-            { "field": "name", "label": "Organisation", "width": "minmax(14ch,2fr)" },
-            { "field": "kind", "label": "Kind", "width": "10ch" }
-          ],
-          "order": [ { "field": "name", "dir": "asc" } ]
-        },
-        {
           "kind": "note",
-          "span": 6,
-          "when": { "metric": "organisations-from-card-texts", "gt": 0 },
-          "body": "{{organisations-from-card-texts}} shop(s) from card texts, {{organisations-from-card-texts.names}}, kept apart from the organisations. [See them](/r/organisations)."
+          "span": 12,
+          "when": { "metric": "organisations-count", "gt": 0 },
+          "body": "Organisations and shops you deal with: {{organisations-count}}. [See them](/r/organisations)."
         },
         {
           "kind": "agents",
@@ -346,7 +332,7 @@
       "metric": "people-in-touch-30d",
       "name": "In touch, 30 days",
       "source": "register.people",
-      "where": "in_touch after -31d",
+      "where": "merged_into is empty, self is not true, in_touch after -31d",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
@@ -358,7 +344,7 @@
       "metric": "people-in-touch-12w",
       "name": "In touch, 12 weeks",
       "source": "register.people",
-      "where": "in_touch after -84d",
+      "where": "merged_into is empty, self is not true, in_touch after -84d",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
@@ -369,7 +355,7 @@
       "metric": "people-in-touch-90d",
       "name": "In touch, 3 months",
       "source": "register.people",
-      "where": "in_touch after -91d",
+      "where": "merged_into is empty, self is not true, in_touch after -91d",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
@@ -379,6 +365,17 @@
     {
       "metric": "organisations-count",
       "name": "Organisations",
+      "source": "register.organisations",
+      "where": "merged_into is empty, retired_on is empty",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "organisations-known",
+      "name": "Organisations you work with",
       "source": "register.organisations",
       "where": "merged_into is empty, retired_on is empty, kind is set",
       "value": { "count": "id" },
@@ -402,7 +399,7 @@
       "metric": "people-quiet",
       "name": "Quiet for three months",
       "source": "register.people",
-      "where": "in_touch before -90d",
+      "where": "merged_into is empty, self is not true, in_touch before -90d",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },

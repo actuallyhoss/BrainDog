@@ -30,6 +30,8 @@
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { WORK, arrange, flatNav } from '$lib/nav.ts';
+  import { agentsHref, railOf } from '$lib/nav/rail.ts';
+  import { sideOrder } from '$lib/shell/side.ts';
   import { said as voiced } from '$lib/voice.svelte.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { LABEL_MOST, navPrefs, type Saved } from '$lib/nav-prefs.svelte.ts';
@@ -47,7 +49,7 @@
   import { moduleName } from '@braindog/seed/usecases/names';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
-  import { decideSecond, foldSaid } from './pages-fold.ts';
+  import { foldSaid } from './pages-fold.ts';
 
   /**
    * PAGES IS FOLDED INTO NAVIGATION (UI pass 20 Oct, agents F14): Navigation draws this file three times, one `part` each,
@@ -107,6 +109,7 @@
     addonsOn: (on: number, off: number) =>
       `${on === 0 ? 'No add-ons on' : on === 1 ? '1 add-on on' : `${on} add-ons on`}${off === 0 ? '' : `, ${off} off`}`,
     manage: 'Manage',
+    moreLists: 'More lists',
   };
 
   /** A refusal is the record's own sentence; a change it kept says what it came to. */
@@ -174,8 +177,25 @@
     const bySection = new Map(groups.map(([section, list]) => [section.trim().toLocaleLowerCase(), { section, list }] as const));
     const app = (href: string, own: string, icon: IconName): Listed => ({ href, slug: null, own, icon, inNav: true, row: false, app: true });
     const out: Listed[] = [];
-    /* NEEDS YOU SECOND, AS THE BAR DRAWS IT: it was ninth, under Activity. */
-    for (const item of [...decideSecond(flat.main), ...flat.more]) {
+    /* IN THE SIDEBAR'S ORDER, AND ONLY WHAT IT DRAWS (Q42 of 29 October): this list held Dashboard and Renewals at the
+       top level and Activity, none of which the sidebar shows there. The sidebar is the rail (`railOf`): Today, Needs
+       you, the places with Agents after Money, then Projects, then whatever it folds under More lists, which each say
+       so. Activity is not a row of the sidebar, so it is not one here. */
+    const rail = railOf(flat, voiced('decide'));
+    const all = [...rail.places, ...rail.rest];
+    const plain = (i: { key: string }): string => i.key.replace(/^section:/u, '').trim().toLocaleLowerCase();
+    const projectsAt = all.find((i) => rail.things.some(([section]) => section === i.label)) ?? all.find((i) => plain(i) === 'projects') ?? null;
+    const agentsKey = all.find((i) => i.href === agentsHref(all))?.key ?? null;
+    const moneyKey = all.find((i) => plain(i) === 'money')?.key ?? null;
+    const placesIn = sideOrder(
+      all.filter((i) => i !== projectsAt && i.key !== 'activity' && (rail.places.includes(i) || i.key === agentsKey)),
+      { agents: agentsKey, money: moneyKey },
+    );
+    const restIn = rail.rest.filter((i) => i !== projectsAt && i.key !== 'activity' && i.key !== agentsKey);
+    const folded = new Set(restIn.map((i) => i.key));
+    for (const item of [...placesIn, ...(projectsAt ? [projectsAt] : []), ...restIn]) {
+      const atMore = folded.has(item.key);
+      const start = out.length;
       if (item.key === 'today') out.push(app('/', item.label, 'today'));
       else if (item.key === 'activity') out.push(app('/audit', item.label, 'activity'));
       else if (item.key === 'decide') out.push(app('/decide', item.label, 'decide'));
@@ -193,6 +213,8 @@
           out.push(same(p.own, held.section) && !twin ? p : { ...p, section: held.section });
         }
       }
+      /* WHAT THE SIDEBAR FOLDS UNDER MORE LISTS SAYS SO, as a page under a section says its section. */
+      if (atMore) for (let i = start; i < out.length; i++) out[i] = { ...out[i]!, section: words.moreLists };
     }
     return out;
   });

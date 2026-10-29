@@ -1,5 +1,6 @@
 /**
- * A record method under a slug, `/app/<slug>/api/<method>`, through `export default`'s own `fetch` and a real `Directory$`.
+ * A record method under a slug, `/<slug>/api/<method>`, through `export default`'s own `fetch` and a real `Directory$`, and
+ * the same under the old `/app/<slug>/api/<method>`, which a CLI whose hosts file was written before the move still asks.
  *
  * THE WEB SENDS EVERY RECORD CALL THERE ONCE A PAGE IS UNDER A SLUG (`apiBase` in `apps/web/src/lib/at.ts`), so the
  * pieces `app-path.test.ts` and `session.test.ts` hold one at a time have to meet in `route()`: the slug read off the
@@ -12,8 +13,9 @@
  * first segment was read as one of the app's pages, the rest was `/api/boot`, and the Worker served it as a second
  * copy of the root `/api`: the public demo to a caller with no credential (the demo is gone since),
  * a cookie's record to a signed-in caller, and the key doors past their own check, which
- * reads the slug and saw none. The web never renders that address, so it
- * is refused, as `ROUTE_UNKNOWN`, the way any other path this Worker does not serve is.
+ * reads the slug and saw none. The web never renders that address, so it is never served: a write is refused, as
+ * `ROUTE_UNKNOWN`, the way any other path this Worker does not serve is, and a GET is the old address's one 308 to the
+ * root's own `/api`, which asks the caller's credential again at the real door.
  */
 
 import { test } from 'node:test';
@@ -48,7 +50,7 @@ async function world() {
   /* THE SHELL IS THERE, so a path the Worker reads as a page of the app answers 200 with it rather than "no app". */
   const ASSETS = {
     fetch: async (request: Request) =>
-      new URL(request.url).pathname === '/app/' ? new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } }) : new Response(null, { status: 404 }),
+      new URL(request.url).pathname === '/' ? new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } }) : new Response(null, { status: 404 }),
   };
   const env: Record<string, unknown> = { PUBLIC_HOST: HOST, SESSION_SECRET: 'fake-session-secret-for-tests-only-0123456789', RECORD: records, ASSETS };
   /* THE KEY IS DERIVED UNDER THE BLOCK, asynchronously, so the test waits for it as the platform would. */
@@ -77,17 +79,21 @@ async function world() {
 
 test('A MEMBER UNDER A SLUG REACHES THAT RECORD AT /api/<method>, a read and a write alike, and not the one the session was on', async () => {
   const { ask, cookie, other, reached } = await world();
-  const read = await ask(`/app/${other.slug}/api/boot`, { headers: cookie });
+  const read = await ask(`/${other.slug}/api/boot`, { headers: cookie });
   assert.equal(read.status, 200, await read.clone().text());
-  const write = await ask(`/app/${other.slug}/api/create`, {
+  const write = await ask(`/${other.slug}/api/create`, {
     method: 'POST',
     headers: { ...cookie, origin: ORIGIN, 'content-type': 'application/json' },
     body: '{"register":"tasks","fields":{"title":"x"}}',
   });
   assert.equal(write.status, 200, await write.clone().text());
+  /* THE OLD ADDRESS, SERVED WHERE IT STANDS AND NEVER REDIRECTED: a CLI refuses every redirect. */
+  const old = await ask(`/app/${other.slug}/api/boot`, { headers: cookie });
+  assert.equal(old.status, 200, await old.clone().text());
   assert.deepEqual(reached, [
     { record: other.record, path: '/api/boot', method: 'GET', body: '' },
     { record: other.record, path: '/api/create', method: 'POST', body: '{"register":"tasks","fields":{"title":"x"}}' },
+    { record: other.record, path: '/api/boot', method: 'GET', body: '' },
   ]);
 });
 
@@ -95,7 +101,7 @@ test('A SLUG SHE IS NOT ON AND ONE NOBODY HOLDS ARE THE SAME 403, AND NO RECORD 
   const { ask, cookie, addressed, reached } = await world();
   const bodies: unknown[] = [];
   for (const slug of ['bobs-books', 'nobody-has-this']) {
-    const out = await ask(`/app/${slug}/api/boot`, { headers: cookie });
+    const out = await ask(`/${slug}/api/boot`, { headers: cookie });
     assert.equal(out.status, 403, slug);
     bodies.push(await out.json());
   }
@@ -131,10 +137,14 @@ test('/app/api/<method> IS NOT A SECOND /api: no session record, and the key doo
   for (const [path, init] of asks) {
     const out = await ask(path, init);
     const text = await out.text();
-    const code = /"code":"([A-Z_]+)"/.exec(text)?.[1] ?? '-';
+    const code = /"code":"([A-Z_]+)"/.exec(text)?.[1] ?? out.headers.get('location') ?? '-';
     answered.push(`${init.method ?? 'GET'} ${path} ${out.status} ${code}`);
   }
-  assert.deepEqual(answered, asks.map(([path, init]) => `${init.method ?? 'GET'} ${path} 404 ROUTE_UNKNOWN`));
+  /* A GET IS THE OLD ADDRESS'S 308 TO THE ROOT'S OWN DOOR, and the 308 itself reaches no record; a write is refused. */
+  assert.deepEqual(
+    answered,
+    asks.map(([path, init]) => (init.method === 'POST' ? `POST ${path} 404 ROUTE_UNKNOWN` : `GET ${path} 308 ${ORIGIN}${path.slice(4)}`)),
+  );
   assert.deepEqual(addressed, [], 'a record was addressed for a path that names none');
   assert.deepEqual(reached, []);
 });

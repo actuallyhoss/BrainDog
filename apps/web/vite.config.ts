@@ -144,21 +144,21 @@ const layoutCssPlugin: Plugin = {
 };
 
 /**
- * AND `/app/<slug>/api/*`, AS WRITTEN, TO THE SAME PLACE. Under a slug `apiBase()` (`lib/at.ts`) sends every record
- * call to `/app/<slug>/api/<method>`, and with only `/api` here nothing forwarded it, so a dev tab on
- * `/app/acme/r/tasks` asked Vite for the record and Vite has none. The path is NOT rewritten to `/api`: the record
+ * AND `/<slug>/api/*`, AS WRITTEN, TO THE SAME PLACE. Under a slug `apiBase()` (`lib/at.ts`) sends every record
+ * call to `/<slug>/api/<method>`, and with only `/api` here nothing forwarded it, so a dev tab on
+ * `/acme/r/tasks` asked Vite for the record and Vite has none. The path is NOT rewritten to `/api`: the record
  * answers it for its own slug and refuses any other, and a proxy that cut the slug off
  * would answer every slug with whichever record is listening, which is the check the path exists to make. A key that
  * opens with `^` is a pattern to Vite (`doesProxyContextMatchUrl`), and every other key is a prefix.
  *
  * THE SEGMENT IS A SLUG BY `SLUG`'S GRAMMAR IN `lib/at.ts`, AND NOT ANY SEGMENT. `api` is a legal register id
- * (`REGISTER_ID` in the kernel), so with `[^/]+` a reload of `/app/r/api/3`, row 3 of that register on a tab with no
+ * (`REGISTER_ID` in the kernel), so with `[^/]+` a reload of `/r/api/3`, row 3 of that register on a tab with no
  * slug, matched and was sent to the record instead of the app. A slug is at least two characters, so `r`, `p`, `v`
  * and the other one-letter routes can never be one.
  */
-/* `/app/drawn-frame` IS THE HOSTS' TOO: the frame a drawn block is drawn in is answered from code under its own policy
+/* `/drawn-frame` IS THE HOSTS' TOO: the frame a drawn block is drawn in is answered from code under its own policy
    (`@braindog/host/drawn-frame`), and Vite would answer it with the shell, which in that sandbox posts nothing. */
-const PROXY = { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API, '^/app/drawn-frame$': API, '^/app/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
+const PROXY = { '/api': API, '/auth': API, '/account': API, '/oauth': API, '/catalogue': API, '^/drawn-frame$': API, '^/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
 
 /**
  * `virtual:own-words` IS THE SET OF TEXTS THE COPY FILES TYPE WHOLE, which is what screenshot mode needs
@@ -228,9 +228,9 @@ export default defineConfig({
      which compares nothing. */
   define: { __BRAINDOG_ENV__: JSON.stringify(ENV), __BRAINDOG_BUILD__: JSON.stringify(process.env.BRAINDOG_BUILD ?? '') },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
-  /* `/app/catalogue` AND NOT `/catalogue`: the app is served under `/app` (`svelte.config.js`) and asks for the catalogue
-     there (`routes/packs/browse/catalogue.ts`), so a proxy on the old path forwarded nothing. The sign-in and the
-     account stay at the root, and so does the record for a tab with no slug. */
+  /* `/catalogue` AT THE ROOT, beside the pages: the app is served at the root (`svelte.config.js`) and asks for the
+     catalogue there (`routes/packs/browse/catalogue.ts`). It was `/app/catalogue` while the app was under `/app`. The
+     sign-in, the account and OAuth are the host's doors at the root, and so is the record for a tab with no slug. */
   server: { port: 5183, strictPort: true, proxy: PROXY },
   preview: { port: 5183, strictPort: true, proxy: PROXY },
   build: { target: 'es2022', cssMinify: 'lightningcss', modulePreload: { resolveDependencies } },

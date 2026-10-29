@@ -67,5 +67,5 @@ The inbox states are `untriaged`, `review`, `skipped`, `matched`, `proposed`, `i
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

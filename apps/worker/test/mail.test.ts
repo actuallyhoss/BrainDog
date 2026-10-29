@@ -37,7 +37,7 @@ const KINDS: MailKind[] = [
 const LINKED: MailKind[] = ['signin', 'signup.verify', 'signup.known', 'invite.prove', 'invite.ready', 'email.change', 'lapse.0', 'lapse.60', 'lapse.83', 'lapse.back', 'welcome'];
 
 const ADDRESS = 'ada@example.test';
-const LINK = 'https://brain.dog/app/signin#magic=abc';
+const LINK = 'https://app.brain.dog/signin#magic=abc';
 
 /* BUILT FROM ITS CODE POINT, so this file holds no em dash of its own for the `em-dash` gate to weigh. */
 const EM_DASH = String.fromCharCode(0x2014);
@@ -125,7 +125,7 @@ test('EVERY LETTER WEARS THE ONE PAGE: the mark from brain.dog, a card of at mos
     /* One prominent button where the letter is a link, drawn for Outlook too, and none where it is not. */
     const buttons = [...html.matchAll(/class="bd-btn"/gu)].length;
     assert.equal(buttons, LINKED.includes(kind) ? 1 : 0, kind);
-    if (LINKED.includes(kind)) assert.match(html, /<v:roundrect [^>]*href="https:\/\/brain\.dog\/app\/signin#magic=abc"/u, kind);
+    if (LINKED.includes(kind)) assert.match(html, /<v:roundrect [^>]*href="https:\/\/app\.brain\.dog\/signin#magic=abc"/u, kind);
   }
   assert.ok(existsSync(new URL('../../site/static/email/mark.png', import.meta.url)), 'apps/site/static/email/mark.png is served as https://brain.dog/email/mark.png');
 });
@@ -138,13 +138,13 @@ test('THE BUTTON SAYS WHAT IT DOES, and a link that works once also shows itself
   assert.equal(button('email.change'), 'Confirm this address');
   assert.equal(button('welcome', { record: 'Acme' }), 'Open Acme');
   assert.equal(button('lapse.0'), 'Open your record');
-  assert.match(letterOf('signin', { link: LINK }).html, /Or paste this link into your browser:<br><a href="https:\/\/brain\.dog\/app\/signin#magic=abc"/u);
+  assert.match(letterOf('signin', { link: LINK }).html, /Or paste this link into your browser:<br><a href="https:\/\/app\.brain\.dog\/signin#magic=abc"/u);
   assert.doesNotMatch(letterOf('welcome', { link: LINK, record: 'Acme' }).html, /Or paste this link/u);
 });
 
 test('THE INVITE LETTER GREETS BY NAME, SAYS WHEN IT ENDS, AND ONLY ITS LINK CARRIES THE CODE', () => {
   const CODE = 'Q'.repeat(43);
-  const link = `https://brain.dog/app/signup#code=${CODE}`;
+  const link = `https://app.brain.dog/signup#code=${CODE}`;
   const letter = letterOf('invite.ready', { name: 'Dana Reyes', link, days: '30' });
   assert.equal(letter.subject, 'Your BrainDog invite');
   for (const said of ['Hi Dana Reyes,', 'Your invite to BrainDog is ready. Open this link to make your account:', 'It works once, and it ends in 30 days.', SENDER]) {
@@ -172,7 +172,7 @@ test('THE INVITE LETTER GREETS BY NAME, SAYS WHEN IT ENDS, AND ONLY ITS LINK CAR
 test('THE INVITE LETTER GOES FROM AUTH_MAIL_FROM, and not without a link', async () => {
   const email = binding();
   const env = { EMAIL: email, AUTH_MAIL_FROM: 'signin@brain.dog', MAIL_FROM: 'hello@brain.dog' };
-  assert.equal(await sendMail(env, 'invite.ready', ADDRESS, { name: 'Dana', link: 'https://brain.dog/app/signup#code=abc', days: '30' }), true);
+  assert.equal(await sendMail(env, 'invite.ready', ADDRESS, { name: 'Dana', link: 'https://app.brain.dog/signup#code=abc', days: '30' }), true);
   assert.deepEqual(email.sent[0]?.from, { email: 'signin@brain.dog', name: 'BrainDog' });
   assert.equal(email.sent[0]?.subject, 'Your BrainDog invite');
   assert.equal(await sendMail(env, 'invite.ready', ADDRESS, { name: 'Dana' }), false);
@@ -180,8 +180,8 @@ test('THE INVITE LETTER GOES FROM AUTH_MAIL_FROM, and not without a link', async
 });
 
 test('THE WELCOME READS WITHOUT "OPEN IT HERE": the button says it, and the text puts the link on its own line', () => {
-  const letter = letterOf('welcome', { record: 'Acme', link: 'https://brain.dog/app/acme/start' });
-  assert.ok(letter.text.startsWith('Acme is ready.\n\nhttps://brain.dog/app/acme/start\n\n'), letter.text);
+  const letter = letterOf('welcome', { record: 'Acme', link: 'https://app.brain.dog/acme/start' });
+  assert.ok(letter.text.startsWith('Acme is ready.\n\nhttps://app.brain.dog/acme/start\n\n'), letter.text);
   assert.doesNotMatch(letter.html, /Open it here/u);
 });
 
@@ -246,7 +246,7 @@ test('A SIGN-IN KIND GOES FROM AUTH_MAIL_FROM, EVERYTHING ELSE FROM MAIL_FROM, e
   const email = binding();
   const env = { EMAIL: email, AUTH_MAIL_FROM: 'signin@brain.dog', MAIL_FROM: 'hello@brain.dog' };
   assert.equal(await sendMail(env, 'signin', ADDRESS, { link: LINK }), true);
-  assert.equal(await sendMail(env, 'welcome', ADDRESS, { record: 'Acme', link: 'https://brain.dog/app/acme' }), true);
+  assert.equal(await sendMail(env, 'welcome', ADDRESS, { record: 'Acme', link: 'https://app.brain.dog/acme' }), true);
   assert.deepEqual(email.sent[0]?.from, { email: 'signin@brain.dog', name: 'BrainDog' });
   assert.deepEqual(email.sent[1]?.from, { email: 'hello@brain.dog', name: 'BrainDog' });
   assert.equal(email.sent[0]?.to, ADDRESS);

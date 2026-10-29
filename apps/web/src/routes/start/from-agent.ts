@@ -83,7 +83,7 @@ export function connectLines(settingsAgents: ConnectLines, os: Os = 'unix'): Way
 }
 
 /**
- * The host and the record a page's API base names: `https://brain.dog/app/mara` is `https://brain.dog` and `mara`, and
+ * The host and the record a page's API base names: `https://app.brain.dog/mara` is `https://app.brain.dog` and `mara`, and
  * a base with no record is the host alone. So the setup line names the record, as Settings' does, without this page
  * reading the bare origin itself (`lib/at-sites.test.ts`).
  */

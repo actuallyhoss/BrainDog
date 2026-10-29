@@ -873,10 +873,14 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     /* WHOSE WORK, SINCE work 1.19.0: Yours, Agents or All, as the old Work screen's toolbar picked, narrowing every
        band. Yours is what no agent holds and Agents what one does, the cut every band already makes by `agent`. */
     filters: [
-      { field: 'thing', control: 'chips' },
+      /* THE CHIPS COUNT WHAT OPEN COUNTS (Q6 of 29 October): every task not finished read one project 55, another 7 and
+         a third 5 over "Open 57", the backlog among them. */
+      { field: 'thing', control: 'chips', counts: OPEN },
       {
         field: 'whose',
         control: 'segmented',
+        /* AND YOURS AND AGENTS COUNT WHAT OPEN COUNTS TOO (recheck of 30 October, N7): 12 and 4 stood under "Work 15". */
+        counts: OPEN,
         options: [
           { value: 'yours', label: 'Yours', where: 'agent is empty' },
           { value: 'agents', label: 'Agents', where: 'agent is set' },
@@ -928,7 +932,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'tasks-late-yours', is: 0 },
         /* THE QUESTIONS SECOND HERE, SINCE work 1.19.0: first they would put "Nothing" in the middle of the line, and
            the writer leaves a clause at nought out and never mends a capital. */
-        body: 'Nothing is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you',
+        /* SAID OF WHAT IT COUNTS (Q6 of 29 October): "Nothing late" stood beside Today's "Late and urgent 6", which
+           counts an agent's late work and late money too. This line counts your own tasks, and says so. */
+        body: 'None of your tasks is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you',
       },
       {
         /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the

@@ -95,8 +95,8 @@ export async function ask(d, path, { method = 'POST', body, cookie = d.cookie, b
   }
 }
 
-/** A record's method, as the app calls it: `/app/<slug>/api/<method>`. */
-export const api = (d, method, body = {}, opts = {}) => ask(d, `/app/${d.made?.slug ?? d.slug}/api/${method}`, { body, ...opts });
+/** A record's method, as the app calls it: `/<slug>/api/<method>`. */
+export const api = (d, method, body = {}, opts = {}) => ask(d, `/${d.made?.slug ?? d.slug}/api/${method}`, { body, ...opts });
 
 /* ---- The mail port: `{ kind, mark(), next(mark, { to, ms }) }`, a letter being `{ from, subject, text, html }`. ---- */
 
@@ -135,7 +135,7 @@ export function inboxMail({ origin, slug, key, send = fetch, every = 3_000 }) {
   const read = async () => {
     const out = [];
     for (const state of ['untriaged', 'review']) {
-      const res = await send(`${new URL(origin).origin}/app/${slug}/api/inbox`, {
+      const res = await send(`${new URL(origin).origin}/${slug}/api/inbox`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
         body: JSON.stringify({ state, limit: 50 }),
@@ -163,7 +163,7 @@ export function inboxMail({ origin, slug, key, send = fetch, every = 3_000 }) {
     next: async (mark, { ms = MAIL_MOST_MS } = {}) => {
       const until = Date.now() + ms;
       for (;;) {
-        const found = (await read()).filter((a) => !mark?.has(a.id)).map(shape).find((l) => /\/app\/sign(up|in)#(verify|magic)=|\/app\/invite#[^&\s]+&proof=/u.test(`${l.text} ${l.html}`));
+        const found = (await read()).filter((a) => !mark?.has(a.id)).map(shape).find((l) => /\/(?:app\/)?sign(up|in)#(verify|magic)=|\/(?:app\/)?invite#[^&\s]+&proof=/u.test(`${l.text} ${l.html}`));
         if (found) return found;
         if (Date.now() >= until) return null;
         await pause(every);
@@ -280,7 +280,7 @@ export async function verifyBuild(d) {
   const homePage = home ? await api(d, 'page', { slug: 'home' }) : null;
   if (homePage && homePage.said?.ok !== true) return red(d, 'verify-build', `the record's Home page did not answer: ${fixOf(homePage)}.`);
   /* THE SHELL, WHERE THE HOST SERVES ONE: its words, outside its scripts and styles. A host that serves only its API says so. */
-  const shell = await ask(d, `/app/${d.made.slug}/`, { method: 'GET' });
+  const shell = await ask(d, `/${d.made.slug}/`, { method: 'GET' });
   const shellWords = shell.type.includes('text/html') ? shell.text.replace(/<(script|style)[\s\S]*?<\/\1>/giu, ' ').replace(/<[^>]+>/gu, ' ') : '';
   const printed = bracesIn(pages.said.value, homePage?.said?.value ?? null, shellWords);
   if (unresolved !== 0 || printed !== null) return red(d, 'verify-build', `a page prints braces: ${printed !== null ? `“${printed.slice(0, 80)}”` : `${unresolved ?? 'an unknown number of'} placeholders name nothing`}.`);

@@ -23,7 +23,7 @@ import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
 import { actorFor, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noteOf, settlingOf } from './history-live.ts';
-import { beyondOf, format, fxNote, hrefFor, partsText, targetSaid } from './metrics.ts';
+import { beyondOf, format, fxNote, hrefFor, markOf, partsText, targetSaid } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { runByIn } from './names.ts';
 
@@ -95,7 +95,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
   if (!r || r.value === null || r.refusals.length) return { id, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const empty = (r.held ?? r.rows) === 0;
   const unsaid = unsaidFigure(decl, r);
-  const met = empty || unsaid ? null : r.met;
+  const met = empty || unsaid ? null : markOf(decl, r.met);
   /* NO DOOR OVER NO ROWS, AND NONE FOR A FIGURE THAT READS NO LIST: `hrefFor` answers `null` there, where it used to
      answer Money's page on every record. */
   const door = decl && !empty && !unsaid ? hrefFor(decl) : null;

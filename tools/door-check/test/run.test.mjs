@@ -190,7 +190,7 @@ test('a record named by an address on another host is handed no key either', () 
   const report = join(dir, 'report.json');
   const env = { ...process.env, ...keyed };
   for (const name of ['GITHUB_ACTIONS', 'CI', 'DOOR_HOST']) delete env[name];
-  const got = spawnSync(process.execPath, [RUN, '--dir', dir, '--record', 'https://other.example/app/x', '--report', report], { env, encoding: 'utf8' });
+  const got = spawnSync(process.execPath, [RUN, '--dir', dir, '--record', 'https://other.example/x', '--report', report], { env, encoding: 'utf8' });
   rmSync(dir, { recursive: true, force: true });
   assert.match(got.stdout, /^ok\s+sees: keys: none$/m);
   assert.match(got.stderr, /No key is handed to https:\/\/other\.example/);

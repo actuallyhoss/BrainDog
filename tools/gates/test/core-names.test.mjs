@@ -298,6 +298,8 @@ test('a word the kernel declares is not a place, and after register. it still is
   const own = kernelWords(repo);
   /* READ OFF THE KERNEL, never listed: block kinds, a list's keys, an answer's keys, and what a money value is answered as. */
   for (const word of ['lines', 'roadmap', 'progress', 'steps', 'source', 'parts']) assert.ok(own.has(word), word);
+  /* AND THE KINDS THAT READ THEMSELVES, keys of `BLOCK_KIND_MODULES` that `BLOCK_KINDS` spreads in. */
+  for (const word of ['calendar', 'gallery', 'embed', 'form']) assert.ok(own.has(word), word);
   /* AND NOTHING AN ADD-ON ALONE DECLARES: a list the kernel's grammar never says stays a name. */
   for (const word of ['tasks', 'orders', 'transactions', 'making']) assert.ok(!own.has(word), word);
   assert.deepEqual(kernelWords(join(gates, 'negative', 'core-names-string')), new Set(), 'a tree with no kernel grammar declares no word');
@@ -385,7 +387,8 @@ test('each of the nine is held where it stands, under a unit, and the exempt lis
   assert.equal(book.held['shell-words.HELD']?.lines.at(-1).count, Object.keys(WORDS_HELD).length);
   for (const [path, e] of Object.entries(WORDS_HELD)) {
     assert.match(e.until, /^SHL-A\d\d$/u, path);
-    for (const w of Object.keys(e.words)) assert.ok(PUBLIC_WORDS.includes(w), `${path} holds ${w}`);
+    /* THE NINE PUBLIC WORDS, AND SINCE 30 OCTOBER A TRACKED WORD ROUND 1030 WROTE, held at his word to deploy. */
+    for (const w of Object.keys(e.words)) assert.ok(PUBLIC_WORDS.includes(w) || WORDS.includes(w), `${path} holds ${w}`);
     assert.ok(!Object.hasOwn(EXEMPT, path), path);
   }
   for (const e of Object.values(EXEMPT)) for (const w of Object.keys(e.words)) assert.ok(!PUBLIC_WORDS.includes(w), w);

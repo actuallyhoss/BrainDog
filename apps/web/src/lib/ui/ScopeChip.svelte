@@ -43,6 +43,8 @@
   /* ONLY A NAME LONGER THAN TWELVE CHARACTERS IS HELD AT TWELVE: a shorter one is as wide as its words. */
   const long = $derived(name.length > 12);
   const slot = $derived(scope === null ? null : slotOf(scope.hue));
+  /* "EVERYWHERE" SAYS WHAT IT MEANS when a pointer rests on it: a row tied to no one project. */
+  const hint = $derived(scope === null ? words.everywhereSaid : undefined);
 </script>
 
 {#snippet body()}
@@ -53,11 +55,11 @@
 {/snippet}
 
 {#if onmove}
-  <button type="button" class="scope-chip scope-move tap" data-size={size} aria-label={words.moveLabel(name)} onclick={onmove}>
+  <button type="button" class="scope-chip scope-move tap" title={hint} data-size={size} aria-label={words.moveLabel(name)} onclick={onmove}>
     {@render body()}<Icon name="chevronDown" size="s" />
   </button>
 {:else}
-  <span class="scope-chip" data-size={size} data-inline={inline ? '' : undefined}>{@render body()}</span>
+  <span class="scope-chip" title={hint} data-size={size} data-inline={inline ? '' : undefined}>{@render body()}</span>
 {/if}
 
 <style>

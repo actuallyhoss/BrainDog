@@ -18,7 +18,7 @@
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { keptRound, lintRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, unworded } from './page-lint.ts';
-import { SIGNS_KEPT, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
+import { SIGNS_KEPT, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
 import { appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
 import {
@@ -38,9 +38,10 @@ import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scan
 import { fixOf, no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
+import { boardStepsOn, stepsOf, type BoardBody, type BoardStep } from './board-steps.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { BLOCK_INSTALLS, NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
+import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
@@ -225,6 +226,7 @@ import { historyCursors, type HistoryCursors } from './history-cursor.ts';
 import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { withSettling } from './settling.ts';
 import { dropPushSub, readPushSub, savePushSub } from './push.ts';
+import { shelfFault, shelfKept, type ShelfItem } from './shelf.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
@@ -1222,8 +1224,20 @@ export const PREF_KEYS = [
   'agents.answer_in_chat',
   'agents.answer_on_word',
   'decide.agents_apart',
+  'widgets.held',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
+/**
+ * A MEMBER'S OWN TODAY (widgets plan §4.5, W8), kept among that person's own preferences as `{ version, body }`: the board
+ * they arranged for themselves, a page body as `page.home`'s is. Written by the record alone (`boardSteps` on `home`), never
+ * by `setPref`, which is why it is not in `PREF_KEYS`: a value a caller could set would let them name any page as their
+ * board. The owner's Today is the record's `page.home`, as before; a record one person uses never writes this.
+ */
+export const OWN_TODAY = 'home.today';
+/** The most a member's own Today may weigh, as JSON: sixteen widgets and their phone arrangement are a few kilobytes. */
+export const OWN_TODAY_MOST = 64_000;
+/** The most "Not now" answers to widget offers a person's `widgets.held` keeps, the oldest let go first. */
+export const WIDGETS_NOT_NOW_MOST = 40;
 /** "Agents may answer when you tell them": the owner's own switch, on unless it is `false` (`wordOf`). */
 export const ON_WORD_PREF = 'agents.answer_on_word' satisfies PrefKey;
 /** "Agents' suggestions wait apart": the owner's own switch, on unless it is `false` (`apartOn` in the kernel). */
@@ -1285,7 +1299,13 @@ export type Prefs = {
   /** Whether agents' suggestions wait on their own shelf on Decide, out of Needs you's count. Absent is on. */
   'decide.agents_apart'?: boolean;
   /** The person's shelf: drawn components they kept, each a name and a block declaration (`shelfFault`). */
-  'shelf.kept'?: { id: string; name: string; block: Record<string, unknown> }[];
+  'shelf.kept'?: ShelfItem[];
+  /**
+   * What the person said to widgets offered from use (`methods/widgets.ts`): each Not now as `<key>@<day>`, newest last,
+   * the last day one was answered, and the day they asked BrainDog to forget what it learned from their use. Never, like
+   * every turned-down offer, is in `pen.dismissed`.
+   */
+  'widgets.held'?: { notNow: string[]; last?: string; forgot?: string };
 };
 
 /** The words each `look.*` key takes. `look.accent` takes `LOOK_ACCENTS`, which follows the suggested accents. */
@@ -1298,35 +1318,6 @@ export type LookDensity = (typeof LOOK_DENSITIES)[number];
 /* THE SWATCHES BY NAME, READ FROM `ACCENTS` and not written again here, so a swatch added or taken out in
    `@braindog/theme` is one the record takes or refuses the same day. `House` is the control beside them. */
 export const LOOK_ACCENTS: readonly string[] = ['House', ...ACCENTS.map((a) => a.name)];
-
-/** The most components on one shelf, the longest name, and the most a kept declaration may weigh written out. */
-const SHELF_MOST = 50;
-const SHELF_NAME_MOST = 60;
-const SHELF_BLOCK_MOST = 4000;
-
-/**
- * WHAT A SHELF MAY HOLD: a name and a block's declaration, never data. Only keys a block may declare are kept, and
- * `authored` (rows written into the block) is refused, so a shelf item draws whatever its list holds today and carries
- * no rows of its own. Returns the sentence that refuses it, or `null`.
- */
-function shelfFault(value: unknown): string | null {
-  const say = `shelf.kept is a list of at most ${SHELF_MOST} components, each an id, a name of 1 to ${SHELF_NAME_MOST} characters and a block declaration, or null to take it away.`;
-  if (!Array.isArray(value) || value.length > SHELF_MOST) return say;
-  const seen = new Set<string>();
-  for (const item of value) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return say;
-    const { id, name, block, ...rest } = item as Record<string, unknown>;
-    if (Object.keys(rest).length > 0) return say;
-    if (typeof id !== 'string' || !/^[a-z0-9_-]{1,40}$/iu.test(id) || seen.has(id)) return say;
-    seen.add(id);
-    if (typeof name !== 'string' || name.trim() === '' || name.length > SHELF_NAME_MOST) return say;
-    if (!block || typeof block !== 'object' || Array.isArray(block) || typeof (block as { kind?: unknown }).kind !== 'string') return say;
-    const stray = Object.keys(block).find((k) => !BLOCK_INSTALLS.has(k) || k === 'authored');
-    if (stray !== undefined) return `A shelf keeps how a block is built, not data: ${stray} is not kept.`;
-    if (JSON.stringify(block).length > SHELF_BLOCK_MOST) return `A shelf item is at most ${SHELF_BLOCK_MOST} characters written out.`;
-  }
-  return null;
-}
 
 /** How many rules one person may mute: more than any record declares, and few enough that the list stays a list. */
 const MUTED_MOST = 200;
@@ -1355,7 +1346,7 @@ export type Boot = {
    * The lists the caller reads, each with its row count and the glyph its declaration names (`icon`), so the rail draws
    * the list's own mark rather than one the web guesses from its id. `null` for a list that names none.
    */
-  registers: { id: string; name: string; count: number; icon: string | null; kernel?: true }[];
+  registers: { id: string; name: string; count: number; open?: number; icon: string | null; kernel?: true }[];
   /** ISO 8601, UTC. The instant the record answered as of. */
   now: string;
   /** The runs that are live now, as `sessionsLive` answers. Empty for a caller who may not read them. */
@@ -6935,6 +6926,103 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
 
   /**
+   * A board's steps written on top of the page as it stands, one new version (`boardSteps`, and an agent's draft through
+   * `widgetDraft`). Who may is the caller's to have checked.
+   */
+  const boardWrite = async (page: string, steps: readonly BoardStep[], base: unknown, ctx: CallContext) => {
+      const at = pageDeclaredAt(page);
+      const row = at ? sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', at.id) : undefined;
+      let before: Record<string, unknown> | null = null;
+      let start: Record<string, unknown>;
+      if (row) {
+        before = JSON.parse(row.body) as Record<string, unknown>;
+        start = before;
+      } else {
+        const b = base;
+        if (b === null || typeof b !== 'object' || Array.isArray(b) || !Array.isArray((b as { blocks?: unknown }).blocks))
+          return no('REQUIRED_MISSING', `${page} is not kept yet, so its first edit sends base: the body it is drawn from.`, { at: 'base' });
+        start = { ...(b as Record<string, unknown>), page: page };
+      }
+      const { pack: _pack, origin: _origin, ...own } = start;
+      const applied = boardStepsOn(own as BoardBody, steps);
+      if (!applied.ok) return no(applied.fault.code, applied.fault.fix, { at: `steps[${applied.fault.at}]` });
+      const one = await normaliseChecked(
+        { pack: 'in-app', version: '0.0.0', summary: 'One board, arranged in the app.', author: 'this record', license: 'none', declarations: [applied.body] },
+        { kind: 'local' },
+      );
+      if (!one.ok) return one;
+      const decl = one.value.declarations[0]!;
+      const id = at?.id ?? decl.id;
+      const out = await kernel.install([{ id, kind: decl.kind, body: { ...(decl.body as object), page: id.slice('page.'.length) } as never }], at ? { id, version: at.version } : { id, version: 0 }, { actor: actorOf(ctx) });
+      await tail(out);
+      if (!out.ok) return out;
+      const now = pageDeclaredAt(page);
+      return ok({ version: now?.version ?? null, before });
+  };
+
+
+  /**
+   * THE PERSON WHOSE OWN TODAY THIS CALLER ARRANGES (widgets plan §4.5, W8): a signed-in person who is not the owner, on
+   * their own and not seeing as somebody, pressing in a chat or approved for one call. The owner arranges the record's
+   * Today (`page.home`) and is answered `null` here, so a record one person uses goes the way it always went. A token, a
+   * link and a runner arrange nothing of their own.
+   */
+  const ownTodayFor = (ctx: CallContext): string | null => {
+    const p = ctx.principal;
+    if (p.kind !== 'person' || allows(ctx, 'owner') === null) return null;
+    if (ctx.preview !== undefined || ctx.pressedIn !== undefined || ctx.ordered !== undefined || ctx.onWord !== undefined || ctx.operation !== undefined) return null;
+    return scoped(ctx, 'read') === null ? p.id : null;
+  };
+
+  /** A member's own Today as kept, or `null` where they keep none. */
+  const ownTodayOf = (person: string): { version: number; body: Record<string, unknown> } | null => {
+    const v = kernel.prefsOf(person)[OWN_TODAY] as { version?: unknown; body?: unknown } | undefined;
+    return v !== null && typeof v === 'object' && typeof v.version === 'number' && v.body !== null && typeof v.body === 'object' && !Array.isArray(v.body)
+      ? { version: v.version, body: v.body as Record<string, unknown> }
+      : null;
+  };
+
+  /** The record's own kept Today as a member starts from it: its own keys, no draft (the owner's alone to keep). */
+  const ownerTodayBody = (): Record<string, unknown> | null => {
+    const at = pageDeclaredAt('home');
+    const row = at ? sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', at.id) : undefined;
+    if (!row) return null;
+    const { pack: _pack, origin: _origin, derived_from: _from, placed: _placed, ...own } = JSON.parse(row.body) as Record<string, unknown>;
+    return Array.isArray(own.blocks) ? { ...own, blocks: (own.blocks as Record<string, unknown>[]).filter((b) => b?.draft === undefined) } : own;
+  };
+
+  /**
+   * A MEMBER'S EDITS, KEPT AS THEIR OWN TODAY: the steps laid on the board they keep, else on the body the screen drew
+   * (`base`), else on the record's own kept Today. The body is checked as a page is checked, and kept as theirs alone.
+   * `put` sets the board to a body they had (Undo), and `null` lets their Today go back to the record's.
+   */
+  const ownTodayWrite = async (person: string, steps: readonly BoardStep[], base: unknown, put?: Record<string, unknown> | null) => {
+    const was = ownTodayOf(person);
+    const before = was?.body ?? null;
+    if (put === null) {
+      kernel.setPref(person, OWN_TODAY, null);
+      return ok({ version: null as number | null, before, own: true as const });
+    }
+    const given = base !== null && typeof base === 'object' && !Array.isArray(base) && Array.isArray((base as { blocks?: unknown }).blocks) ? (base as Record<string, unknown>) : null;
+    const start = put ?? was?.body ?? given ?? ownerTodayBody();
+    if (start === null) return no('REQUIRED_MISSING', 'Today is not kept yet, so its first edit sends base: the body it is drawn from.', { at: 'base' });
+    const { pack: _pack, origin: _origin, derived_from: _from, placed: _placed, ...own } = { ...start, page: 'home' } as Record<string, unknown>;
+    const applied = boardStepsOn(own as unknown as BoardBody, steps);
+    if (!applied.ok) return no(applied.fault.code, applied.fault.fix, { at: `steps[${applied.fault.at}]` });
+    const one = await normaliseChecked(
+      { pack: 'in-app', version: '0.0.0', summary: 'One person\'s own Today.', author: 'this record', license: 'none', declarations: [{ ...applied.body, page: 'home' }] },
+      { kind: 'local' },
+    );
+    if (!one.ok) return one;
+    const body = { ...(one.value.declarations[0]!.body as Record<string, unknown>), page: 'home' };
+    if (JSON.stringify(body).length > OWN_TODAY_MOST) return no('OUT_OF_BOUNDS', 'Your Today has grown past what one board holds. Take a widget off first.', { at: 'steps' });
+    const version = (was?.version ?? 0) + 1;
+    kernel.setPref(person, OWN_TODAY, { version, body });
+    /* `own`: the screen's Undo puts this back through `put`, a member having no `setDeclaration`. */
+    return ok({ version: version as number | null, before, own: true as const });
+  };
+
+  /**
    * `agent:claude`: a token's name, when its write has no run to sign it (`30 §3`). The kind the caller named, or the one
    * its client's own name says (`clientInfo`), as the ladder reads it for a run (`agentOf` in the kernel).
    */
@@ -7009,7 +7097,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     agent:
       agent === SLASH
         ? 'Slash'
-        : ((sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', agent)?.label ?? '').trim() || 'Your agent'),
+        : agentSaid(sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', agent)?.label ?? null),
     list: (id: string) => kernel.register(id)?.name ?? id,
   });
 
@@ -9181,7 +9269,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        a page this caller may open: a member held to one list is never handed a slug she would be refused. */
     const speaker = speakingNow(kernel);
     const voiced = speaker === null ? null : `home-${speaker.replace(/^usecase-/u, '')}`;
-    const home = voiced !== null && opens.some((page) => page.slug === voiced) ? voiced : opens.some((page) => page.slug === 'home') ? 'home' : null;
+    const home = voiced !== null && opens.some((page) => page.slug === voiced) ? voiced : opens.some((page) => page.slug === 'home') || (p.kind === 'person' && Object.hasOwn(prefs, OWN_TODAY)) ? 'home' : null;
     const { accentOf, hueOf } = pageHues();
     /* A LIST THAT HOLDS ONLY WHAT AN ADD-ON PLANTED IS NOT YET THE PERSON'S, so no page is said to read it: a starter set
        nobody has touched would otherwise bring its place into the rail on the first day. One row of their own, or one
@@ -9227,7 +9315,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AND OF THE ROWS' PAGES WITH A PLACE IN THE RAIL, THE ONES THE RAIL DRAWS (`railKept`): his 27 projects' pages were
        sent whole and the rail draws the five touched last. The rest open by the row, as above. */
     const kept = railKept(listed, (list) => countNow(ctx, list));
-    const pages = listed.filter((page) => kept.has(page));
+    const railedPages = listed.filter((page) => kept.has(page));
+    /* A MEMBER WHO KEEPS THEIR OWN TODAY (W8) IS TOLD SO AS THE OWNER IS, by Today's slug, so the app reads it kept even
+       where the record's own Today is not kept yet. It has no place in the rail. */
+    const ownToday = person !== null && p.kind === 'person' && Object.hasOwn(prefs, OWN_TODAY) && ownTodayFor(ctx) !== null;
+    const pages: Boot['pages'] =
+      ownToday && !railedPages.some((page) => page.slug === 'home')
+        ? [...railedPages, { slug: 'home', title: 'Today', nav: null, icon: null, list: null, lists: [], about: null }]
+        : railedPages;
     const pagesByRow: NonNullable<Boot['pagesByRow']> = [
       ...new Set([...opens.filter(fleeting), ...listed.filter((page) => !kept.has(page))].map((page) => page.about!.register)),
     ];
@@ -9250,7 +9345,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         levels: levelsOf(ctx),
         ...(ctx.grant === undefined ? {} : { grant: { ...ctx.grant } }),
         ...((lens) => (lens === null ? {} : { lens }))(lensMark(ctx)),
-        ...(p.kind === 'person' ? { prefs } : {}),
+        /* NOT THEIR OWN TODAY'S BODY, which `today` draws: a few kilobytes on every boot, and no screen reads it here. */
+        ...(p.kind === 'person' ? { prefs: ((own) => (Object.hasOwn(own, OWN_TODAY) ? Object.fromEntries(Object.entries(own).filter(([k]) => k !== OWN_TODAY)) : own))(prefs as Record<string, unknown>) as Prefs } : {}),
       },
       pages,
       pagesByRow,
@@ -10138,7 +10234,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -10792,7 +10888,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (readable(ctx, id)) continue;
           /* THE GLYPH THE LIST DECLARES, as `icon` is checked at install (`declare.ts`): one the rail can draw by name. */
           const icon = (decl as { icon?: unknown }).icon;
-          out.push({ id, name: decl.name, count: countNow(ctx, id), icon: typeof icon === 'string' && icon !== '' ? icon : null, ...(own.has(id) ? { kernel: true as const } : {}) });
+          /* AND HOW MANY ARE OPEN, ON A LIST WHOSE ROWS FINISH (Q35 of 29 October): the rail said "Agent runs 949" and
+             "Keys 176", every row ever kept, where a person counts what is still open. A list whose rows never finish
+             says no number there (`open` absent), and the rail draws none. */
+          const done = Array.isArray(decl.done) ? decl.done.filter((d): d is string => typeof d === 'string') : [];
+          const state = typeof decl.state === 'string' ? decl.state : null;
+          let open: number | undefined;
+          /* NOT ON THE KERNEL'S OWN LISTS (30 October): "Agent runs 3" in the rail sat over "All 5 agent runs" on the
+             page. What of them is live is the Agents place's own to say (its dot and Working now), once. */
+          if (state !== null && done.length > 0 && !own.has(id)) {
+            const finished = { field: state, not_in: done } as unknown as JsonValue;
+            const sc = kernel.scope(ctx, id);
+            try {
+              open = kernel.count(id, sc === undefined ? finished : ({ all: [sc, finished] } as unknown as JsonValue));
+            } catch {
+              open = undefined;
+            }
+          }
+          out.push({ id, name: decl.name, count: countNow(ctx, id), ...(open === undefined ? {} : { open }), icon: typeof icon === 'string' && icon !== '' ? icon : null, ...(own.has(id) ? { kernel: true as const } : {}) });
         }
         const shell = shellFor(ctx);
         const waits = waitsFor(ctx);
@@ -11803,10 +11916,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          It is also the wrong signal. "A page nobody opens" (24 §4.2) is a question about the pages
          this record DECLARES, and a row for a page that does not exist answers nothing while
          diluting the count that does. */
-      if (out.ok) kernel.observe([{ kind: 'page.render', subject: args.slug }]);
+      /* AND WHOSE OPEN IT WAS, a person's alone (migration 47), so a shared record's suggestions read each person's own
+         opens (widgets plan §6.4). The record-wide count is raised as it always was. */
+      if (out.ok) kernel.observe([{ kind: 'page.render', subject: args.slug, ...(ctx.principal.kind === 'person' && ctx.preview === undefined ? { who: ctx.principal.id } : {}) }]);
       if (!out.ok) return out;
       /* THE VERSION A WRITE OVER THIS PAGE CARRIES (`setDeclaration`). A page declared `for:` rows has none of its own slug. */
       const declared = pageDeclaredAt(args.slug);
+      /* A WIDGET AN AGENT DRAFTED ONTO A BOARD (`draft`) IS THE OWNER'S TO KEEP OR THROW AWAY, and nobody else is shown it. */
+      if (allows(ctx, 'owner') !== null && out.value.blocks.some((b) => (b as { draft?: unknown }).draft !== undefined))
+        out = { ...out, value: { ...out.value, blocks: out.value.blocks.filter((b) => (b as { draft?: unknown }).draft === undefined) } };
       const blocks = partedKeys(
         out.value.blocks,
         out.value.blocks.map((b) => heldBlock(ctx, b)),
@@ -12122,19 +12240,48 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * READ+, and it changes nothing. Each part is its own method's answer to this caller; one refused is `null`.
      * To the owner, a read may be answered Today as it was last drawn, marked `behind` (`todayKept`); `fresh` is never.
      */
-    async today(args: { body?: unknown; fresh?: boolean } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
+    async today(args: { body?: unknown; fresh?: boolean; page?: string } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
-      const extra = stray(said, ['body', 'fresh']);
+      const extra = stray(said, ['body', 'fresh', 'page']);
       if (extra) return { ok: false as const, refusal: extra };
-      const body = said.body;
+      /* `{ page: 'home' }`: TODAY AS IT IS KEPT, once somebody has added to it or arranged it (a board, the widgets plan
+         §4.3), drawn in the same one read as the body Today is built from, with the version it was read at so the board's
+         editor writes against it (`boardSteps`). A page this reader may not open is no page. */
+      let keptVersion: number | null = null;
+      let body = said.body;
+      if (said.page !== undefined) {
+        if (typeof said.page !== 'string' || said.page === '' || body !== undefined) return no('VALUE_MALFORMED', "page is the slug of the kept Today, such as home, given instead of body.", { at: 'page' });
+        const slug = said.page;
+        /* A MEMBER'S OWN TODAY, where they keep one (W8), drawn in place of the record's. */
+        const member = slug === 'home' ? ownTodayFor(ctx) : null;
+        const mine = member === null ? null : ownTodayOf(member);
+        if (mine !== null) {
+          body = mine.body;
+          keptVersion = mine.version;
+        } else {
+          const listed = kernel.pages().find((p) => p.slug === slug);
+          const at = listed && seesPage(ctx, listed) ? pageDeclaredAt(slug) : null;
+          const row = at ? sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', at.id) : undefined;
+          if (!at || !row) return no('PAGE_UNKNOWN', `There is no page at ${slug} to draw Today from.`, { at: 'page' });
+          const { pack: _pack, origin: _origin, derived_from: _from, placed: _placed, ...drawn } = JSON.parse(row.body) as Record<string, unknown>;
+          /* A DRAFTED WIDGET IS DRAWN FOR THE OWNER ALONE. */
+          body = allows(ctx, 'owner') === null || !Array.isArray(drawn.blocks) ? drawn : { ...drawn, blocks: (drawn.blocks as Record<string, unknown>[]).filter((b) => b?.draft === undefined) };
+          keptVersion = at.version;
+        }
+      }
       if (body === null || typeof body !== 'object' || Array.isArray(body))
         return no('REQUIRED_MISSING', "body is Today's body, a page declaration's body as braindog:grammar/page says.", { at: 'body' });
       if (said.fresh !== undefined && typeof said.fresh !== 'boolean') return no('VALUE_MALFORMED', 'fresh is true to have Today drawn now, never as it was last drawn.', { at: 'fresh' });
       if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'Today is not answered by this record yet.');
       const asks = todayAsks;
-      const draw = () => todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx);
+      const drawOf = () => todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx);
+      /* AND THE PAGE AS IT IS DECLARED (its title, `board`, the phone's arrangement), so the screen draws a kept Today from
+         this one read and asks `page` for nothing. */
+      /* ITS BLOCKS AS DECLARED TOO, for the board's Inspector, which changes a widget as it is kept and not as it is drawn. */
+      const declared = keptVersion === null ? null : (body as Record<string, unknown>);
+      const draw = keptVersion === null ? drawOf : () => drawOf().then((r) => (r.ok ? ok({ ...r.value, page: { ...(r.value.page as object), declared_version: keptVersion, declared } }) : r));
       /* HELD ONLY FOR THE OWNER, who opens Today the most and whose answer nobody else is handed; anybody else is drawn now. */
       if (allows(ctx, 'owner') !== null) return draw();
       const { batch: _batch, provedAt: _proved, ...caller } = ctx;
@@ -12635,7 +12782,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       } else if (value !== null && key === 'shelf.kept') {
         const fault = shelfFault(value);
         if (fault) return no('VALUE_MALFORMED', fault, { at: 'value' });
-        kept = (value as { id: string; name: string; block: Record<string, unknown> }[]).map((i) => ({ id: i.id, name: i.name.trim(), block: i.block }));
+        kept = shelfKept(value as Record<string, unknown>[]);
+      } else if (value !== null && key === 'widgets.held') {
+        const held = typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+        const day = (v: unknown): boolean => v === undefined || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v));
+        if (
+          held === null ||
+          Object.keys(held).some((k) => k !== 'notNow' && k !== 'last' && k !== 'forgot') ||
+          !texts(held.notNow ?? [], Number.POSITIVE_INFINITY, (s) => /^widget[a-z-]*:.+@\d{4}-\d{2}-\d{2}$/u.test(s)) ||
+          !day(held.last) ||
+          !day(held.forgot)
+        )
+          return no('VALUE_MALFORMED', 'widgets.held is { notNow: [<key>@<day>], last: <day>, forgot: <day> }, each part optional, or null to take it away.', { at: 'value' });
+        kept = {
+          notNow: [...new Set((held.notNow as string[] | undefined) ?? [])].slice(-WIDGETS_NOT_NOW_MOST),
+          ...(typeof held.last === 'string' ? { last: held.last } : {}),
+          ...(typeof held.forgot === 'string' ? { forgot: held.forgot } : {}),
+        };
       } else if (value !== null && key === 'packs.known_keys') {
         const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
         if (!entries || entries.length > 200 || !entries.every(([k, v]) => k.length > 0 && k.length <= 300 && texts(v, 8, (s) => /^[0-9a-f]{16}$/u.test(s))))
@@ -13262,6 +13425,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const question: unknown = (args as { question?: unknown } | undefined)?.question;
       if (question !== undefined && question !== null && typeof question !== 'string')
         return no('VALUE_MALFORMED', 'question is the sentence a person answers, as text.', { at: 'question' });
+      /* A WIDGET LANDS ON TODAY AS A DRAFT rather than as a question (`widgetDraft`): the draft is the asking. */
+      if ((args as { body_kind?: unknown } | undefined)?.body_kind === 'widget') return this.widgetDraft(args as never, ctx);
       /* AN AUTOMATION IN A SENTENCE: a `change` whose whole body is `{ sentence }` is turned into the rule it means by the
          same parser the app uses, and filed as the ordinary change, so the person decides it in Decide as any other. */
       const sentence = args?.body_kind === 'change' && args.body !== null && typeof args.body === 'object' && Object.keys(args.body).join() === 'sentence' ? (args.body as { sentence?: unknown }).sentence : undefined;
@@ -14039,6 +14204,98 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const expect = args.version === undefined ? undefined : { id: decl.id, version: args.version };
       return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }], expect, { actor: actorOf(ctx) }));
     },
+
+    /**
+     * `{ page, version, steps, base? }`: a board's edits, applied on top of the page as it stands, written as one version
+     * (the widgets plan of 29 October, §5.5 and §7.3). The editor sends what he did (move, size, add, remove, keep a draft,
+     * the phone's arrangement) on Done, or one step at once from a widget's menu; each lands on the page as the record
+     * holds it now, so a draft an agent added meanwhile stays, and a step is refused only when its widget is gone
+     * (`board-steps.ts`). A page not kept yet (Today, drawn from what the record holds) is kept from `base` on its first
+     * edit, so Add to Today works on every record. The owner's, as `setDeclaration` is. Answers the version written and
+     * the body before it, `null` where there was none, which Undo puts back.
+     */
+    async boardSteps(args: { page?: unknown; version?: unknown; steps?: unknown; base?: unknown; put?: unknown } | undefined, ctx: CallContext) {
+      /* DATA, SO THE LADDER FIRST (30 §10): a caller who reads nothing of the record arranges nothing, a report key
+         included. The owner's session is asked below for anything but a member's own Today. */
+      const asked = guard(ctx, 'read');
+      if (asked) return { ok: false as const, refusal: asked };
+      const said = (args ?? {}) as Record<string, unknown>;
+      /* A MEMBER ARRANGES THEIR OWN TODAY (W8), kept as theirs: Today alone, and nothing anybody else opens. Everybody
+         else is asked what they always were, the owner's session. */
+      const member = said.page === 'home' ? ownTodayFor(ctx) : null;
+      if (member === null) {
+        const stop = admin(ctx, 'arrange a board');
+        if (stop) return { ok: false as const, refusal: stop };
+      }
+      const extra = stray(said, ['page', 'version', 'steps', 'base', ...(member === null ? [] : ['put'])]);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof said.page !== 'string' || !/^[a-z][a-z0-9-]{0,47}$/u.test(said.page)) return no('REQUIRED_MISSING', 'page is the slug of the board, such as home.', { at: 'page' });
+      /* UNDO OF A MEMBER'S OWN EDIT: the board they had put back, or `null` for the record's Today again. */
+      if (member !== null && said.put !== undefined) {
+        const put = said.put;
+        if (put !== null && (typeof put !== 'object' || Array.isArray(put) || !Array.isArray((put as { blocks?: unknown }).blocks)))
+          return no('VALUE_MALFORMED', 'put is the board to put back, a page body with its blocks, or null to go back to the record\'s Today.', { at: 'put' });
+        return ownTodayWrite(member, [], undefined, put as Record<string, unknown> | null);
+      }
+      const steps = stepsOf(said.steps);
+      if (!steps) return no('VALUE_MALFORMED', 'steps is a list of the board\'s edits: { move, before }, { size, to }, { add }, { remove }, { keep } or { phone }.', { at: 'steps' });
+      return member !== null ? ownTodayWrite(member, steps, said.base) : boardWrite(said.page, steps, said.base, ctx);
+    },
+
+    /**
+     * AN AGENT'S WIDGET, LANDED ON TODAY AS A DRAFT (widgets plan §7.5): `propose` with `body_kind: widget` and `{ block,
+     * size? }` or `{ said }` (made by the rules, as Make your own makes one), its `question` the reason. It lands at the
+     * board's end with `draft: { by, why }`, the agent's name and its reason, for the owner to Keep or Throw away; one
+     * draft per agent at a time, and only on a Today that is kept. `{ withdraw: <key> }` takes the agent's own draft back
+     * while it is still a draft, which is the receipt's Undo.
+     */
+    async widgetDraft(args: { question?: unknown; body?: unknown } | undefined, ctx: CallContext) {
+      const stop = guard(ctx, 'propose');
+      if (stop) return { ok: false as const, refusal: stop };
+      const body = (args?.body ?? {}) as Record<string, unknown>;
+      if (body === null || typeof body !== 'object' || Array.isArray(body)) return no('VALUE_MALFORMED', 'body is { block, size } or { said }: the widget, or what it shows in words.', { at: 'body' });
+      /* WHO MADE IT, AS THE RECORD NAMES AGENTS ELSEWHERE: the kind its run says, else the app its client says, else its
+         key's label ("Claude Code on Sam's Mac"), never "other". A person in a browser is named by the record. */
+      const kind = kindOf(ctx.session ?? {}).agent;
+      const client = typeof ctx.session?.client === 'string' && ctx.session.client.trim() !== '' ? ctx.session.client.trim() : null;
+      const by =
+        (kind !== undefined && kind !== 'other' ? agentName(kind) : null) ??
+        (client !== null ? clientName(client) : null) ??
+        (ctx.principal.kind === 'token'
+          ? agentSaid(sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', ctx.principal.id)?.label ?? null)
+          : (kernel.members().find((m) => m.person_id === actorOf(ctx))?.name?.trim() || 'A member'));
+      const at = pageDeclaredAt('home');
+      const row = at ? sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', at.id) : undefined;
+      if (!row) return no('NOT_FOUND', 'Today is not kept as a board yet, so there is nowhere to put a draft. Ask the owner to add one widget to Today first.', { at: 'body' });
+      const blocks = ((JSON.parse(row.body) as { blocks?: unknown }).blocks ?? []) as Record<string, unknown>[];
+      const draftOf = (b: Record<string, unknown>) => (b.draft !== null && typeof b.draft === 'object' ? (b.draft as { by?: unknown }) : null);
+      if (typeof body.withdraw === 'string') {
+        const mine = blocks.find((b) => b.key === body.withdraw && draftOf(b)?.by === by);
+        if (!mine) return no('NOT_FOUND', `There is no draft of yours on Today called ${body.withdraw}: it was kept, thrown away, or never yours.`, { at: 'body.withdraw' });
+        const out = await boardWrite('home', [{ remove: body.withdraw }], undefined, ctx);
+        return out.ok ? ok({ withdrawn: body.withdraw, said: `Took your draft off Today.` }) : out;
+      }
+      if (blocks.some((b) => draftOf(b)?.by === by))
+        return no('ALREADY_KNOWN', 'You already have a draft on Today. It waits for the owner to keep it or throw it away; withdraw it to put another.', { at: 'body' });
+      const why = typeof args?.question === 'string' && args.question.trim() !== '' ? args.question.trim().slice(0, 300) : typeof body.said === 'string' ? body.said.slice(0, 300) : '';
+      if (why === '') return no('REQUIRED_MISSING', 'question is why the widget would help, in a sentence the owner reads beside it.', { at: 'question' });
+      let block: Record<string, unknown> | null = body.block !== null && typeof body.block === 'object' && !Array.isArray(body.block) ? { ...(body.block as Record<string, unknown>) } : null;
+      let size = typeof body.size === 'string' ? body.size : undefined;
+      if (block === null && typeof body.said === 'string') {
+        const made = await (this as unknown as { widgetCompose: (a: { said: string }, c: CallContext) => Promise<Result<{ block: Record<string, unknown>; size: string }>> }).widgetCompose({ said: body.said }, ctx);
+        if (!made.ok) return made;
+        block = made.value.block;
+        size ??= made.value.size;
+      }
+      if (block === null || typeof block.kind !== 'string') return no('REQUIRED_MISSING', 'body.block is the widget, a block with its kind, or body.said says what it shows.', { at: 'body.block' });
+      const { key: _k, draft: _d, span: _s, area: _a, ...own } = block;
+      const key = `w-${Math.random().toString(36).slice(2, 6)}`;
+      const out = await boardWrite('home', [{ add: { ...own, key, ...(size ? { size } : {}), draft: { by, why } } as never }], undefined, ctx);
+      if (!out.ok) return out;
+      const title = typeof own.heading === 'string' && own.heading !== '' ? own.heading : 'A widget';
+      return ok({ landed: true, key, said: `Put ${title} on Today as a draft, with your reason. The owner keeps it or throws it away.`, withdraw: `widget:${key}` });
+    },
+
 
     /**
      * Put back how a page was arranged: one step back, whoever wrote the look and at any time. Slash's own 6-second Undo
@@ -15726,7 +15983,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     };
   }
   /* TODAY ASKS EACH PART AS IT IS ASKED ALONE, wrappers and all (`today.ts`). */
-  todayAsks = { previewPage: api.previewPage as never, handled: api.handled as never, sharedOut: api.sharedOut as never, list: api.list as never };
+  todayAsks = { previewPage: api.previewPage as never, handled: api.handled as never, sharedOut: api.sharedOut as never, list: api.list as never, widgetSuggest: (api as unknown as { widgetSuggest: never }).widgetSuggest };
   /* AND A PROJECT'S PAGE ASKS EACH PART OF ITS SHAPE THE SAME WAY (`project-shape.ts`). */
   shapeAsks = {
     get: api.get as never,

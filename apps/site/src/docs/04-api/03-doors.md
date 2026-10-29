@@ -1,4 +1,4 @@
-# Doors: webhooks, mail and report keys
+# Webhooks and mail-in addresses
 
 A door is how something outside gets into your record without being an agent: a service that calls a webhook, a bank text or receipt you forward by mail, or a project that reports its own numbers. Each door writes, and none of them can read anything back.
 
@@ -57,5 +57,5 @@ Limit | What happens past it
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://app.brain.dog/app/<slug>
+braindog setup https://app.brain.dog/<slug>
 ```

@@ -161,7 +161,7 @@
 
 {#if people}
   <Menu label={words.shareOpen} align="end">
-    {#snippet trigger()}<span class="share-trigger"><Icon name="link" size="s" />{words.shareOpen}</span>{/snippet}
+    {#snippet trigger()}<span class="share-trigger"><Icon name="link" size="s" /><span class="share-word">{words.shareOpen}</span></span>{/snippet}
     <button type="button" role="menuitem" data-share-people onclick={() => people?.()}><Icon name="user-plus" size="s" />{peopleLabel ?? words.shareOpen}</button>
     <button type="button" role="menuitem" onclick={show}><Icon name="link" size="s" />{words.shareTitle}</button>
     <button type="button" role="menuitem" onclick={() => { show(); void asTemplate(); }}><Icon name="doc" size="s" />{templateWords.open}</button>
@@ -290,19 +290,36 @@
     }
   }
 
+  /* ON A PHONE THE GLYPH KEEPS ITS WORD (Q46 of 29 October): a bare link glyph did not say it shares the page. */
   @media (width < 900px) {
     .share-trigger {
-      inline-size: var(--tap);
       min-block-size: var(--tap);
-      padding: 0;
-      gap: 0;
+      padding-inline: var(--sp-2);
       background: none;
-      font-size: 0em;
     }
 
     .share-trigger :global(.icon[data-size]) {
       inline-size: var(--icon-l);
       block-size: var(--icon-l);
+    }
+  }
+
+  /* UNDER 360PX THE WORD IS THE GLYPH'S NAME AND NOT DRAWN. At 320 the bar holds the way back, Share with its word, the
+     page's more, search, the bell and the face, 326px of it, and the page's name had none; the glyph alone is the 44
+     square it was before Q46, and a screen reader still reads Share. */
+  @media (width < 360px) {
+    .share-trigger {
+      inline-size: var(--tap);
+      padding-inline: 0;
+    }
+
+    .share-word {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 

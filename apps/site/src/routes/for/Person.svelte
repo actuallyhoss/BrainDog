@@ -8,6 +8,7 @@
   text by its span in the parse and drawn by the renderer a record uses, so no figure here is written twice.
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import { parse } from 'braindog-render';
   import Icon from '$lib/Icon.svelte';
   import Page from '$lib/app/Page.svelte';
@@ -41,15 +42,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>{person.title}</title>
-  <meta name="description" content={person.description} />
-  <link rel="canonical" href="https://brain.dog{here}" />
-  <meta property="og:url" content="https://brain.dog{here}" />
-  <meta property="og:title" content={person.title} />
-  <meta property="og:description" content={person.description} />
-</svelte:head>
-
+<Seo title={person.title} description={person.description} path={here} />
 <PageHead title={person.tag} lead={person.said}>
   <p class="sub">{person.sub}</p>
   <div class="actions">

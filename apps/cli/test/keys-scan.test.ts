@@ -218,7 +218,7 @@ async function keysHost(t: { after: (fn: () => Promise<void>) => void }, held: R
 /** `io` pointed at a host by the environment, with the record's slug, so a filed question has a link. */
 function asking(cwd: string, base: string) {
   const run = io(cwd, join(cwd, 'hosts.json'));
-  run.io.env = { BRAINDOG_HOST: `${base}/app/${PROJECTS[1].toLowerCase()}`, BRAINDOG_TOKEN: 'rec_01TESTTESTTESTTESTTESTTEST.keys' };
+  run.io.env = { BRAINDOG_HOST: `${base}/${PROJECTS[1].toLowerCase()}`, BRAINDOG_TOKEN: 'rec_01TESTTESTTESTTESTTESTTEST.keys' };
   return run;
 }
 
@@ -245,7 +245,7 @@ test('--ask FILES ONE QUESTION WITH A ROW A KEY: name, kind, what it opens, wher
     ],
   );
   assert.ok(run.printed.includes('Asked on Decide: Add these 5 keys to Keys? They are kept in files on this machine.'), run.printed.join('\n'));
-  assert.ok(run.printed.includes(`  ${h.base}/app/${repoName}/decide/01JQUESTIONQUESTIONQUESTIO`));
+  assert.ok(run.printed.includes(`  ${h.base}/${repoName}/decide/01JQUESTIONQUESTIONQUESTIO`));
   /* SIGNED BY THE LOGIN AND NAMING NO RUN, and the planted values nowhere: not printed, said, answered or sent. */
   nowhere([...run.printed, ...run.said, JSON.stringify(run.answered), ...h.seen.map((s) => `${s.url} ${s.body}`)], values);
   assert.equal(run.answered.length, 1, 'one answer, after the question');

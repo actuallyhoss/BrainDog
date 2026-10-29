@@ -72,7 +72,7 @@
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
-  import { FACTS_KEY, IN_MORE, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
+  import { FACTS_KEY, IN_MORE, MONEY_LEAD, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
@@ -98,7 +98,7 @@
   import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
   import { PRODUCT } from '$lib/title.ts';
   import { navigating, page } from '$app/state';
-  /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
+  /* The Mac app's Go menu and braindog://goto: only an address of the app moves the window (`appPath`). */
   $effect(() => onShell('goto', (to) => {
     const path = appPath(to);
     if (path !== null) void goto(path);
@@ -146,7 +146,7 @@
      terminal prints, come before any work in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach. AND EVERY SCREEN UNDER
      `/signin/`: the desktop app's return drew inside the shell, the top bar's counts over a "Signing in" (first F12). */
   const bare = $derived.by(() => {
-    /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
+    /* Read inside the record: the address is `/acme/start` and the rule is about `/start`. */
     const at = here(page.url.pathname);
     return at === '/start' || at === '/signin' || at.startsWith('/signin/') || at === '/signup' || at === '/invite' || at === '/connect' || at === '/connect/approve' || at === '/s' || at.startsWith('/s/');
   });
@@ -309,11 +309,14 @@
     };
   });
   const sideLists = $derived<SideList[]>(
-    orderLists(data.index.registers, navPrefs.order).map((r) => ({
+    /* ONE ENTRY FOR THE KEYS (Q28 of 29 October): the Keychain below is where keys are, so the list of them is not a
+       second row ("Keys 176" over "Keychain"). The list still opens from the Keychain. */
+    orderLists(data.index.registers.filter((r) => r.id !== 'credentials'), navPrefs.order).map((r) => ({
       id: r.id,
       name: r.name,
       icon: r.icon,
       count: r.count,
+      ...(typeof r.open === 'number' ? { open: r.open } : {}),
       views: r.views,
       kernel: kernelLists.has(r.id),
       facts: frame.facts[r.id] ?? keptFacts[r.id] ?? null,
@@ -443,10 +446,13 @@
       /* THE AGENTS' TOOLS ARE THE AGENTS': what runs by itself, and the keys they use. */
       tools: [
         { href: '/automations', label: copy.automations, icon: 'refresh', home: placed.at.agents ?? IN_MORE },
-        { href: '/keychain', label: copy.keychain, icon: 'vault', home: placed.at.agents ?? IN_MORE },
+        { href: '/keychain', label: copy.keysPlace, icon: 'vault', home: placed.at.agents ?? IN_MORE },
       ],
       foot,
       counted: holdsTasks ? { work: TASKS } : {},
+      /* MONEY KEEPS ITS PAGES OPEN AND ITS LISTS FOLDED (Q35 of the 29 Oct audit): the places he goes stand under it,
+         and Snapshots, Books, Exchange rates, Categories and the rest wait under its More. */
+      leads: placed.at.money ? { [placed.at.money]: MONEY_LEAD } : {},
     }),
   );
   /* A TAB IS LIT ON ITS PLACE'S OWN LISTS TOO, as the sidebar's place unfolds there: Money's tab on its ledger. */
@@ -459,13 +465,13 @@
   /* THE ONE LIT ROW, and the crumb the bar says it in. */
   const spot = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
   const lit = $derived(litOf(spot, model));
-  const crumb = $derived(crumbOf(spot, model, lit, frame.title || null));
+  const crumb = $derived(crumbOf(spot, model, lit, frame.title || null, frame.heading || null));
   $effect.pre(() => {
     frame.here = crumb.at(-1)?.label ?? '';
   });
   /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT: an update that adds a page lands hidden. */
   const penWaits = $derived(penCount(data.pen, (id) => navPrefs.isDismissed(id)));
-  const sidePen = $derived(penWaits > 0 ? { label: suggested(penWaits), href: '/settings/navigation' } : null);
+  const sidePen = $derived(penWaits > 0 ? { label: suggested(penWaits), href: '/settings/navigation#suggestions' } : null);
 
   /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the sidebar's places, the projects, and Settings. */
   const sidePlaces = $derived<FlatItem[]>([...model.places.map((p) => ({ key: p.key, href: p.href, label: p.label, icon: p.icon, near: p.near })), ...(projectsPlace ? [projectsPlace] : [])]);
@@ -1072,6 +1078,8 @@
     frame.person = personName;
     frame.open = (r) => void openOther(r);
     frame.news = data.whatsNew ?? [];
+    frame.asks = open;
+    frame.upTo = data.upTo ?? null;
     frame.crumbed = shape === 'bar';
   });
 

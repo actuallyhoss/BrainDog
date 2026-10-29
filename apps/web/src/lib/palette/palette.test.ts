@@ -226,6 +226,9 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
     const read = metric(id);
     assert.equal(read.label, decl.name, `${id} draws under a name that is not its own`);
     assert.ok(read.value.trim().length > 0, `${id} has no reading to print`);
+    /* A SUM OVER ROWS THE SAMPLE HOLDS NONE OF IS UNSAID (`unsaidFigure`): the sample keeps no weekly or yearly budget,
+       so Money's weekly and yearly totals read "nothing matched" and have no door, as a page draws them. */
+    if (read.unsaid === true) continue;
     assert.match(read.href ?? '', /^\//u, `${id} has nowhere to go, so the palette would drop it`);
     /* A MONEY CEILING STARTS EMPTY SINCE money-core 3.0.0 (`MONEY_TARGET_SETTINGS`), and empty is no target: until a
        person types a sum the figure has no line to hold it to and no verdict, so a bare figure there is the truth. */

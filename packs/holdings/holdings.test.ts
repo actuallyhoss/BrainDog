@@ -9,7 +9,7 @@
  *
  * WHY 2.0.0. The add-on becomes Investments and gold. A holding can be gold with a karat, a fund or shares; each buy of
  * it is a row of its own (`holding_buys`: the day, how many, the price each and the fees); a gold rate a gram a karat
- * is a row too (`gold_rates`), set by hand or by a feed a later add-on brings, never fetched by this one; and the script
+ * is a row too (`gold_rates`), set by hand or by a feed (since 3.2.0 this add-on's own, off until chosen); and the script
  * works out what each holding cost from its buys, what it is worth from its own price or the gold rate, and its gain.
  * Two lists and a page are added, a holding can no longer be deleted while a buy points at it, its count and cost each
  * stop being required because buys can say them, and the value of every gold holding now moves with a rate: a change a
@@ -39,6 +39,7 @@ import { scriptReads, scriptRunner } from '../../packages/host/src/script.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
+import type { CtxHost, Json, ScriptDecl } from '../../packages/script/src/index.ts';
 import { FIRST_PARTY, firstPartyDocument } from '../../packages/seed/src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 25, 9);
@@ -64,6 +65,7 @@ const PACK_FILE = new URL('./holdings.pack.json', import.meta.url);
 const file = (): Doc => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as never;
 const COST_FILE = new URL('./cost.js', import.meta.url);
 const TWIN_FILE = new URL('./twin.js', import.meta.url);
+const FEED_FILE = new URL('./feed.js', import.meta.url);
 
 /** 1.0.0 as the builder in `packages/seed` shipped it, and 1.4.2 as the catalogue published it. */
 const v100 = (): Doc => JSON.parse(readFileSync(new URL('./holdings-1.0.0.json', import.meta.url), 'utf8')) as never;
@@ -140,7 +142,7 @@ const SPREAD_MS = 15 * 60_000;
 test('THE FILE IS 2.0.0, Investments and gold, and every field and kind 1.4.2 held is still there as it was', () => {
   const doc = file();
   const old = v142();
-  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.1.1', 'Investments and gold']);
+  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.3.0', 'Investments and gold']);
   assert.equal(old.version, '1.4.2', 'the frozen 1.4.2 moved');
   assert.equal(v100().version, '1.0.0', 'the frozen 1.0.0 moved');
   assert.deepEqual(doc.requires, old.requires);
@@ -181,7 +183,7 @@ test('BEFORE THE PACK: a record with every first-party pack has no holdings, buy
   close();
 });
 
-test('THE SCRIPTS IN THE FILE ARE cost.js AND twin.js, byte for byte, each reaching only what it says', () => {
+test('THE SCRIPTS IN THE FILE ARE cost.js, twin.js AND feed.js, byte for byte, each reaching only what it says', () => {
   const doc = file();
   const cost = decl(doc, 'script', 'holdings_cost');
   assert.equal(cost.source, readFileSync(COST_FILE, 'utf8'), 'holdings.pack.json and cost.js disagree; copy cost.js into the source');
@@ -189,8 +191,16 @@ test('THE SCRIPTS IN THE FILE ARE cost.js AND twin.js, byte for byte, each reach
   const twin = decl(doc, 'script', 'holdings_twin');
   assert.equal(twin.source, readFileSync(TWIN_FILE, 'utf8'), 'holdings.pack.json and twin.js disagree; copy twin.js into the source');
   assert.deepEqual([twin.egress, twin.keys, twin.reads, twin.writes, twin.runs], [[], [], ['holdings', 'accounts'], ['accounts'], { every: '1d' }]);
-  /* NOTHING CALLS OUT: the gold rate is typed or written by another add-on, never fetched by this one. */
+  /* ONLY THE FEED CALLS OUT (3.2.0), daily, with no key, writing gold rates and nothing else. The cost and the question
+     fetch nothing. */
   assert.doesNotMatch(readFileSync(COST_FILE, 'utf8'), /ctx\.fetch/u);
+  assert.doesNotMatch(readFileSync(TWIN_FILE, 'utf8'), /ctx\.fetch/u);
+  const feed = decl(doc, 'script', 'holdings_gold_feed');
+  assert.equal(feed.source, readFileSync(FEED_FILE, 'utf8'), 'holdings.pack.json and feed.js disagree; copy feed.js into the source');
+  assert.deepEqual(
+    [feed.egress, feed.keys, feed.reads, feed.writes, feed.runs, feed.limits],
+    [['https://latest.currency-api.pages.dev', 'https://cdn.jsdelivr.net', 'https://api.gold-api.com'], [], ['gold_rates', 'holdings', 'fx'], ['gold_rates'], { every: '1d' }, { fetches: 2, writes: 8 }],
+  );
   /* THREE RULES START THE COST SCRIPT, one a list, and none starts the question: a question a write opened would come mid-edit. */
   assert.deepEqual(doc.declarations.filter((d) => d.rule !== undefined && d.on !== undefined).map((d) => [d.rule, (d.on as { written: { register: string } }).written.register]), [
     ['holdings_cost', 'holdings'],
@@ -213,22 +223,23 @@ const ADDS = [
   'metric.holdings-at-cost', 'metric.holdings-by-kind', 'metric.holdings-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-gain',
   'metric.holdings-gain-pct', 'metric.holdings-gained', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value',
   'page.holding', 'page.holdings', 'register.gold_rates', 'register.holding_buys', 'register.holdings',
-  'rule.gold_rate_old', 'rule.holdings_buy', 'rule.holdings_cost', 'rule.holdings_price_old', 'rule.holdings_rate', 'script.holdings_cost', 'script.holdings_twin',
+  'rule.gold_rate_old', 'rule.holdings_buy', 'rule.holdings_cost', 'rule.holdings_price_old', 'rule.holdings_rate', 'script.holdings_cost', 'script.holdings_gold_feed',
+  'script.holdings_twin',
 ];
 
-test('INSTALLED FROM THE FILE: three lists, five rules, two scripts, eighteen figures and two pages, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: three lists, five rules, three scripts, eighteen figures and two pages, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ADDS);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.3.0');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.1.1']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.3.0']);
 });
 
 test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so every amount reads in the money somebody chose', () => {
@@ -542,7 +553,8 @@ test('A FRESH PAGE SAYS WHAT GOES HERE AND OFFERS THE FIRST HOLDING, and draws n
   const { api, close } = await inPounds();
   const on = (await pageOf(api)).blocks.filter(drawn);
   assert.deepEqual(on.map((b) => [b.kind, b.heading ?? null]).slice(0, 2), [['note', null], ['capture', 'Add a holding']]);
-  assert.equal(String(on[0]!.body), 'Nothing held yet.');
+  /* AND SAYS WHAT A HOLDING IS (holdings 3.2.1): an empty page names the kinds you can add. */
+  assert.equal(String(on[0]!.body), 'Nothing held yet. Add a fund, a certificate or gold you own.');
   assert.ok(!on.some((b) => b.heading === 'What you hold' || b.kind === 'split'), 'a tile was drawn over nothing held');
   close();
 });
@@ -595,7 +607,7 @@ async function upgraded(doc: Doc, rows: readonly Body[] = HELD): Promise<Awaited
   const diff = await planOf(made.api, file());
   assert.deepEqual(diff.conflicts, [], 'the update met a conflict');
   said(await put(made.api, file()));
-  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.1');
+  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.3.0');
   return { ...made, ids, before };
 }
 
@@ -841,4 +853,107 @@ test('ON A RECORD: "Stop counting it" takes the account out of cash and keeps it
   await settle(api);
   assert.deepEqual([fields(api, account).liquid, fields(api, account).balance], [false, egp(3_000_000)]);
   close();
+});
+
+/* ── the gold rate feed (3.2.0) ──────────────────────────────────────────────────────────────────────────────────────── */
+
+type FeedRow = { id: string; seq: number; version: number; fields: Body };
+type FeedLists = { gold_rates?: FeedRow[]; holdings?: FeedRow[]; fx?: FeedRow[] };
+
+/** The feed as the file declares it, run in QuickJS against lists held in memory and a web that answers `answers`. */
+async function feed(set: Record<string, Json>, lists: FeedLists, answers: Record<string, { status?: number; body: unknown }> = {}) {
+  const script = decl(file(), 'script', 'holdings_gold_feed') as Body & ScriptDecl & { script: string };
+  const asked: string[] = [];
+  const matches = (row: FeedRow, where: Json): boolean => {
+    if (where === null) return true;
+    const w = where as Record<string, Json>;
+    if (Array.isArray(w.all)) return (w.all as Json[]).every((x) => matches(row, x));
+    const v = row.fields[w.field as string];
+    if ('is' in w) return v === w.is;
+    if ('present' in w) return (v !== undefined && v !== null) === w.present;
+    if ('gte' in w) return typeof v === 'string' && v >= (w.gte as string);
+    return true;
+  };
+  const host: CtxHost = {
+    fetch: async (request) => {
+      asked.push(request.url);
+      const a = answers[new URL(request.url).host];
+      return a === undefined ? { status: 503, headers: {}, body: '' } : { status: a.status ?? 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(a.body) };
+    },
+    list: async (register, where) => ((lists[register as keyof FeedLists] ?? []).filter((r) => matches(r, where)) as unknown as Json[]),
+    get: async () => null,
+    now: () => new Date(NOW).toISOString(),
+    tz: 'UTC',
+    input: null,
+    /* THE DEFAULTS THE FILE DECLARES, under what the test sets, as the record hands a run its pack's settings. */
+    config: { ...Object.fromEntries(Object.entries((file().config ?? {}) as Record<string, { default: Json }>).map(([k, d]) => [k, d.default])), ...set },
+  };
+  const answer = await runInQuickJs(
+    { id: script.script, version: 1, egress: script.egress, keys: script.keys, reads: script.reads, writes: script.writes, ...(script.limits ? { limits: script.limits } : {}), source: script.source } as ScriptDecl,
+    host,
+  );
+  assert.ok('writes' in answer, `the feed was refused: ${JSON.stringify(answer)}`);
+  return { writes: answer.writes, log: answer.log, asked };
+}
+
+const row = (seq: number, fields: Body): FeedRow => ({ id: `r_${seq}`, seq, version: 1, fields });
+const WORLD_HOST = 'latest.currency-api.pages.dev';
+/* AN OUNCE AT 200,000 POUNDS IS 6,430.15 A GRAM OF 24k, and 21k is 21 of its 24 parts. Invented figures. */
+const WORLD = { [WORLD_HOST]: { body: { date: TODAY, xau: { egp: 200_000, usd: 4_000 } } } };
+const GOLD_21K = row(1, { label: 'Ring', kind: 'gold', karat: '21k', qty: 10, unit_cost: egp(500_000) });
+
+test('THE FEED IS OFF UNTIL CHOSEN: a record that never picks a source fetches nothing and is written nothing', async () => {
+  const config = file().config as Record<string, { default?: unknown; values?: unknown }>;
+  assert.equal(config.gold_source!.default, 'off');
+  assert.deepEqual(config.gold_source!.values, ['off', 'world_price', 'spot_in_dollars']);
+  const ran = await feed({}, { holdings: [GOLD_21K] }, WORLD);
+  assert.deepEqual([ran.writes, ran.asked], [[], []]);
+});
+
+test('THE WORLD PRICE WRITES 24k AND THE KARATS HELD, a gram each in pounds, marked as the feed\'s', async () => {
+  const ran = await feed({ gold_source: 'world_price' }, { holdings: [GOLD_21K] }, WORLD);
+  assert.deepEqual(ran.asked.map((u) => new URL(u).host), [WORLD_HOST]);
+  assert.deepEqual(ran.writes, [
+    { op: 'create', register: 'gold_rates', fields: { karat: '24k', per_gram: egp(643_015), on: TODAY, from: 'feed', note: 'World price' } },
+    { op: 'create', register: 'gold_rates', fields: { karat: '21k', per_gram: egp(562_638), on: TODAY, from: 'feed', note: 'World price' } },
+  ]);
+});
+
+test('THE PREMIUM IS ADDED OVER THE WORLD PRICE, and the second address is asked when the first does not answer', async () => {
+  const mirror = { 'cdn.jsdelivr.net': WORLD[WORLD_HOST] };
+  const ran = await feed({ gold_source: 'world_price', gold_premium: 2 }, { holdings: [GOLD_21K] }, mirror);
+  assert.deepEqual(ran.asked.map((u) => new URL(u).host), [WORLD_HOST, 'cdn.jsdelivr.net']);
+  assert.deepEqual(ran.writes.map((w) => (w as { fields: Body }).fields.per_gram), [egp(655_875), egp(573_891)]);
+  assert.equal((ran.writes[0] as { fields: Body }).fields.note, 'World price, plus 2%');
+});
+
+test('A RATE TYPED BY HAND FOR THE DAY IS KEPT, and the feed\'s own rate that day is updated in place, never doubled', async () => {
+  const rates = [
+    row(5, { karat: '21k', per_gram: egp(600_000), on: TODAY, from: 'hand' }),
+    row(6, { karat: '24k', per_gram: egp(640_000), on: TODAY, from: 'feed', note: 'World price' }),
+  ];
+  const ran = await feed({ gold_source: 'world_price' }, { holdings: [GOLD_21K], gold_rates: rates }, WORLD);
+  assert.deepEqual(ran.writes, [{ op: 'update', spoken: 'gold_rates#6', patch: { per_gram: egp(643_015), note: 'World price' }, version: 1 }]);
+  assert.match(ran.log, /Left the 21k gold rate as it was typed by hand\./u);
+  /* AND RUN AGAIN AT THE SAME PRICE, NOTHING IS WRITTEN. */
+  const again = await feed({ gold_source: 'world_price' }, { holdings: [GOLD_21K], gold_rates: [rates[0]!, row(6, { ...rates[1]!.fields, per_gram: egp(643_015) })] }, WORLD);
+  assert.deepEqual(again.writes, []);
+});
+
+test('SPOT IN DOLLARS IS TURNED INTO POUNDS BY MONEY\'S OWN RATE, and with no rate it writes nothing and asks nobody', async () => {
+  const spot = { 'api.gold-api.com': { body: { currency: 'USD', price: 4_000, symbol: 'XAU', updatedAt: `${TODAY}T08:00:00Z` } } };
+  /* ONE POUND IS 0.02 DOLLARS, read the other way round: fifty pounds a dollar. */
+  const fx = [row(9, { currency: 'EGP', base: 'USD', rate: 0.02, as_of: TODAY })];
+  const ran = await feed({ gold_source: 'spot_in_dollars', gold_currency: 'egp' }, { holdings: [GOLD_21K], fx }, spot);
+  assert.deepEqual(ran.asked.map((u) => new URL(u).host), ['api.gold-api.com']);
+  assert.deepEqual(ran.writes.map((w) => (w as { fields: Body }).fields.per_gram), [egp(643_015), egp(562_638)]);
+  const none = await feed({ gold_source: 'spot_in_dollars' }, { holdings: [GOLD_21K] }, spot);
+  assert.deepEqual([none.writes, none.asked], [[], []]);
+  assert.match(none.log, /no exchange rate between dollars and EGP/u);
+});
+
+test('WITH NO MONEY TO SET IT IN, the feed writes nothing and says which setting to fill', async () => {
+  const ran = await feed({ gold_source: 'world_price' }, {}, WORLD);
+  assert.deepEqual([ran.writes, ran.asked], [[], []]);
+  assert.match(ran.log, /Gold rate in/u);
 });

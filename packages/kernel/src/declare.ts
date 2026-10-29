@@ -57,6 +57,8 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './keychain.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
+import { boardFault, widgetFault } from './board.ts';
+import { untilFault } from './until.ts';
 import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_OPTIONS_FEWEST, FILTER_OPTIONS_MOST, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, actionsFault, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, kpisFault, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
 import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, lookPlacesFault, withoutHoles } from './compose.ts';
 /* A GLYPH NAMED THAT THE RENDERER HAS NOT, refused with the nearest names it has (`glyph-names.ts`). */
@@ -70,7 +72,7 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 import { alsoFault, linkFault } from './rule-link.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
-import { clockOf, isMoneyFormat, isSumOf, kindOf, pastFault, sumOfFault, TREND_AHEAD_MOST, windowMs, type EvalContext, type MetricDecl } from './metrics.ts';
+import { clockOf, isMoneyFormat, isRatioOf, isSumOf, kindOf, pastFault, sumOfFault, TREND_AHEAD_MOST, windowMs, type EvalContext, type MetricDecl, type SumOf } from './metrics.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
@@ -364,6 +366,17 @@ function shapeFault(id: string, value: unknown, groupBy?: unknown): Refusal | nu
     if (groupBy !== undefined)
       return bad('DECLARATION_INVALID', `${id} is a running total grouped by ${String(groupBy)}, and a running total is one number walked in one order. Leave group_by out, and narrow it with where.`, 'group_by');
   }
+  /* A STREAK NAMES THE DAY EACH ENTRY FALLS ON AND WHAT IT COUNTS IN A ROW, both optional, and is one run, never cut. */
+  const streak = (value as { streak?: unknown }).streak;
+  if (streak !== undefined) {
+    const k = streak as { on?: unknown; grain?: unknown } | null;
+    const written = 'streak: { on: <a day or instant field>, grain: day or week }';
+    if (k === null || typeof k !== 'object' || Array.isArray(k) || Object.keys(k).some((key) => key !== 'on' && key !== 'grain'))
+      return bad('VALUE_MALFORMED', `${id}'s streak names the day each entry falls on and what it counts in a row: ${written}.`, 'value');
+    if (k.on !== undefined && (typeof k.on !== 'string' || k.on === '')) return bad('VALUE_MALFORMED', `${id}'s streak names its day field by its id: ${written}.`, 'value');
+    if (k.grain !== undefined && k.grain !== 'day' && k.grain !== 'week') return bad('VALUE_MALFORMED', `${id}'s streak counts days or weeks in a row: write grain: day or grain: week.`, 'value');
+    if (groupBy !== undefined) return bad('DECLARATION_INVALID', `${id} is a streak grouped by ${String(groupBy)}, and a streak is one run of days. Leave group_by out, and narrow it with where.`, 'group_by');
+  }
   if (v.trend !== undefined) {
     const t = v.trend as { of?: unknown; ahead?: unknown } | null;
     if (t === null || typeof t !== 'object' || Array.isArray(t) || typeof t.of !== 'string' || !METRIC_ID.test(t.of))
@@ -554,6 +567,17 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
     const self = String((decl.body as { metric?: unknown }).metric ?? id.replace(/^metric\./u, ''));
     const fault = sumOfFault(body.value, self, (part) => (installed.get(`metric.${part}`) as unknown as MetricDecl | undefined) ?? null);
     if (fault) return bad('DECLARATION_INVALID', `${id}: ${fault}`, 'value');
+  }
+  /* AND EACH HALF OF A SHARE OF FIGURES, the same check, since each is read as a sum (`readRatioOf`). */
+  if (isRatioOf(body.value) && installed !== undefined) {
+    const self = String((decl.body as { metric?: unknown }).metric ?? id.replace(/^metric\./u, ''));
+    const r = (body.value as { ratio_of?: { of?: unknown; per?: unknown } }).ratio_of;
+    for (const half of [r?.of, r?.per]) {
+      const fault = Array.isArray(half)
+        ? sumOfFault({ sum_of: half } as SumOf, self, (part) => (installed.get(`metric.${part}`) as unknown as MetricDecl | undefined) ?? null)
+        : 'a share of figures names both halves, as ratio_of: { of: [{ metric: a }], per: [{ metric: b }] }';
+      if (fault) return bad('DECLARATION_INVALID', `${id}: ${fault}`, 'value');
+    }
   }
   if (isRolled(body.value)) {
     if (walks || !String(body.source).startsWith('register.'))
@@ -1429,9 +1453,13 @@ function filtersFault(id: string, filters: unknown, requires: unknown, installed
   for (const [i, raw] of filters.entries()) {
     const at = `filters[${i}]`;
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return bad('DECLARATION_INVALID', shape, at);
-    const f = raw as { field?: unknown; control?: unknown; options?: unknown };
-    const stray = Object.keys(f).find((k) => k !== 'field' && k !== 'control' && k !== 'options');
-    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}.${at} has ${stray}:, and a filter is { field, control } or { field, control, options }.`, at, ['field', 'control', 'options']);
+    const f = raw as { field?: unknown; control?: unknown; options?: unknown; counts?: unknown };
+    const stray = Object.keys(f).find((k) => k !== 'field' && k !== 'control' && k !== 'options' && k !== 'counts');
+    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}.${at} has ${stray}:, and a filter is { field, control } or { field, control, options }, with counts: a sentence of the rows its chips count.`, at, ['field', 'control', 'options', 'counts']);
+    /* ON A FILTER OF ITS OWN CHOICES TOO (recheck of 30 October, N7): Work's Yours and Agents counted the backlog with
+       them and made 16 against the Open of 15 beside them. */
+    if (f.counts !== undefined && (typeof f.counts !== 'string' || f.counts.trim() === ''))
+      return bad('DECLARATION_INVALID', `${id}.${at}'s counts is a sentence of the rows its chips count, such as state is not backlog.`, at);
     if (typeof f.field !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(f.field))
       return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(f.field ?? null)} as its field; a filter names one field of the page's lists.`, at);
     if (!(FILTER_CONTROLS as readonly unknown[]).includes(f.control))
@@ -1687,6 +1715,10 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
   if (body.tone !== undefined && !(TONES as readonly unknown[]).includes(body.tone))
     return bad('DECLARATION_INVALID', `${String(body.tone)} is not an intent.`, 'tone', TONES as unknown as string[]);
 
+  /* A BOARD OF WIDGETS (`board.ts`): no rail, a key on every widget, at most sixteen, and the phone's own arrangement. */
+  const boarded = boardFault(id, body as Record<string, unknown>);
+  if (boarded) return boarded;
+
   const filtered = filtersFault(id, (body as { filters?: unknown }).filters, body.requires, installed);
   if (filtered) return filtered;
 
@@ -1864,6 +1896,10 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        nothing else — no x, no y, no height. A span of 0 is a block with no width and a span of 13 is
        a row that wraps and leaves a hole; the size control refuses rather than clamping, because a
        declaration silently clamped is a number that never reached the screen (`21 §11`). */
+    /* A WIDGET'S FRAME, only on a board and only a size its kind draws in (`board.ts`, `kinds/sizes.ts`). */
+    const framed = widgetFault(id, at, raw as Record<string, unknown>, (body as { board?: unknown }).board === true);
+    if (framed) return framed;
+
     if (block.span !== undefined && !isInt(block.span, 1, SPAN_MAX))
       return bad(
         'OUT_OF_BOUNDS',
@@ -1957,6 +1993,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        icon that names no glyph draws an empty well. */
     /* A FEED'S `group` AND `fold` ARE ONE WORD EACH (`day`, `run`), checked apart from a cards block's, which name a
        link field and a count, and from a section's, which is shut or not (`feedSaysFault`). */
+    /* A BLOCK'S `until` IS THE LAST DAY IT SHOWS (`until.ts`), a real day or nothing. */
+    const ended = untilFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`);
+    if (ended) return bad('DECLARATION_INVALID', ended.fix, `${at}.${ended.at}`);
     const fed = kind === 'feed' ? feedSaysFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
     if (fed) return bad('DECLARATION_INVALID', fed.fix, `${at}.${fed.at}`, fed.allowed);
     /* WHAT MAY BE PRESSED ON A BLOCK (`actions`, `row_actions`), checked as the read checks it (`block-keys.ts`
@@ -6980,16 +7019,24 @@ export async function enablePack(
 /**
  * The field types a setting may take.
  *
- * A CLOSED SUBSET, AND THE THREE LEFT OUT ARE THE POINT. A `ref` would let a pack configure its way
- * into reading a list it did not declare, and a `secret` or a `file` would put a credential or a
- * document in a manifest people share. What is left is a value a person can read on a settings
- * screen, so `04 §7`'s enumeration of what a pack can do does not grow.
+ * A CLOSED SUBSET, AND THE TWO LEFT OUT ARE THE POINT. A `ref` would let a pack configure its way
+ * into reading a list it did not declare, and a `file` would put a document in a manifest people
+ * share. A `secret` setting holds only a key's label, never the secret (below). What is left is a
+ * value a person can read on a settings screen, so `04 §7`'s enumeration of what a pack can do does
+ * not grow.
  *
  * A `list` IS A FEW LINES OF TEXT, NOT ONE OF THE RECORD'S LISTS: the words a script matches a bank
  * line against, the labels a rule reads. Each line is checked as a text setting is, and there are at
  * most `LIST_ITEMS_CEILING` of them, so a person still reads the whole value on the settings screen.
  */
-export const CONFIG_TYPES = ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list'] as const;
+/**
+ * `secret` IS THE LABEL OF A KEY IN THE RECORD'S KEYS, NEVER THE SECRET (round 1030). An add-on that needs a private
+ * address, a calendar's secret ICS link, names the label here and its script fetches it with `ctx.fetch(null, {
+ * address: <label> })`: the host opens the key, checks its host against the script's egress and sends, and the script
+ * never holds the address (`addressed` in `@braindog/host/script`). The value is checked as a label: a link or a key
+ * typed into it is refused, so the secret itself never lands in a setting.
+ */
+export const CONFIG_TYPES = ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number', 'list', 'secret'] as const;
 export type ConfigType = (typeof CONFIG_TYPES)[number];
 
 /**
@@ -7005,6 +7052,8 @@ const CONFIG_NAME = /^[a-z][a-z0-9_]{0,31}$/;
 const CONFIG_KEYS = ['type', 'values', 'max', 'default', 'label', 'note'];
 const CONFIG_CEILING = 64;
 const CONFIG_TEXT_BYTES = 1024;
+/** The longest key label a `secret` setting holds, a script's key label's own ceiling (`script.ts`). */
+const SECRET_LABEL_BYTES = 40;
 const CONFIG_VALUES_CEILING = 64;
 /** The most lines a `list` setting holds whatever its `max` says, and the most bytes in one line. */
 const LIST_ITEMS_CEILING = 20;
@@ -7023,7 +7072,7 @@ const PLACEHOLDER = /\{\{config:([^{}]*)\}\}/g;
 export function configValue(key: string, decl: ConfigDecl, value: unknown, at = `config.${key}`): Result<Json> {
   if (decl.type === 'list') return listValue(key, decl, value, at);
   /* A NUMBER IS A DECIMAL FIELD'S VALUE, the one type a setting names in its own word, because a setting is not a column. */
-  const field = { id: key, type: decl.type === 'number' ? 'decimal' : decl.type, ...(decl.values === undefined ? {} : { values: decl.values }) } as FieldDecl;
+  const field = { id: key, type: decl.type === 'number' ? 'decimal' : decl.type === 'secret' ? 'text' : decl.type, ...(decl.values === undefined ? {} : { values: decl.values }) } as FieldDecl;
   const out = coerce(field, value, {}, at);
   if (!out.ok) return { ok: false, refusal: out.refusal };
   const values = decl.values ?? [];
@@ -7034,6 +7083,16 @@ export function configValue(key: string, decl: ConfigDecl, value: unknown, at = 
     });
   if (decl.type === 'text' && byteLength(out.value as string) > CONFIG_TEXT_BYTES)
     return no<Json>('OUT_OF_BOUNDS', `The setting ${key} holds at most ${CONFIG_TEXT_BYTES} bytes of text.`, { at });
+  /* A SECRET SETTING HOLDS A LABEL: short, one line, and never a link or anything that looks like one. */
+  if (decl.type === 'secret') {
+    const label = String(out.value ?? '');
+    if (byteLength(label) > SECRET_LABEL_BYTES || /[\n\r]/u.test(label) || /:\/\/|^(webcal|https?):/iu.test(label.trim()))
+      return no<Json>(
+        'VALUE_MALFORMED',
+        `The setting ${key} is the name of a key in your keys, such as "Calendar address", never the link itself. Put the link in your keys under that name.`,
+        { at },
+      );
+  }
   return ok(out.value);
 }
 

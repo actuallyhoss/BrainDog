@@ -15,6 +15,7 @@
   address is a plain outlined button and never red: the one solid red a page carries is "Start free".
 -->
 <script lang="ts">
+  import Seo from '$lib/site/Seo.svelte';
   import Icon from '$lib/Icon.svelte';
   import type { IconName } from '$lib/icons.ts';
   import { SUPPORT_EMAIL } from '$lib/links.ts';
@@ -32,15 +33,7 @@
   const NIGHTS = Array.from({ length: 30 }, (_, i) => i);
 </script>
 
-<svelte:head>
-  <title>{s.meta.title}</title>
-  <meta name="description" content={s.meta.description} />
-  <link rel="canonical" href="https://brain.dog/security" />
-  <meta property="og:url" content="https://brain.dog/security" />
-  <meta property="og:title" content={s.meta.title} />
-  <meta property="og:description" content={s.meta.description} />
-</svelte:head>
-
+<Seo title={s.meta.title} description={s.meta.description} path="/security" />
 {#snippet head(id: string, name: string, title: string)}
   <h2 class="fact-head">
     <span class="glyph"><Icon name={glyph(name)} /></span>

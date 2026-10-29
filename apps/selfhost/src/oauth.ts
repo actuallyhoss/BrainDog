@@ -246,7 +246,7 @@ async function consentPage(request: Request, here: OAuthHereOptions, store: OAut
   const name = escapeHtml(consent.client_name);
   const asking = `<p><strong>${name}</strong> is asking to reach a record of yours. BrainDog will send it back to <span class="host">${escapeHtml(consent.redirect_host)}</span>.</p>`;
   const signIn = (why: string): string =>
-    `${asking}\n<p>${escapeHtml(why)}</p>\n<div class="acts"><a class="act main-act" href="/app/signin" target="_blank" rel="noopener">Sign in to BrainDog</a>\n${denyForm(consent)}</div>`;
+    `${asking}\n<p>${escapeHtml(why)}</p>\n<div class="acts"><a class="act main-act" href="/signin" target="_blank" rel="noopener">Sign in to BrainDog</a>\n${denyForm(consent)}</div>`;
 
   const who = await personOf(request, here);
   if (!who.ok)

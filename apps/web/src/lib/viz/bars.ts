@@ -49,6 +49,8 @@ export interface BarsInput {
   label: string;
   value: number;
   note?: string | undefined;
+  /** The value column's words where the figure alone does not say it: "34 · 3 failed". */
+  said?: string | undefined;
 }
 
 export interface BarsOptions {
@@ -77,7 +79,7 @@ export function barRect(x: number, y: number, value: number, max: number, space:
 export function bars(items: readonly BarsInput[], o: BarsOptions): BarsGeometry {
   const format = o.format ?? figure;
   const paired = o.paired !== undefined;
-  const values = items.map((it) => format(it.value));
+  const values = items.map((it) => it.said ?? format(it.value));
 
   /* The label column is the longest label, and never more than two fifths of the chart. */
   /* AT 13, the size the labels are drawn at (P29): at 12 a bar's name was the smallest words on its page. */

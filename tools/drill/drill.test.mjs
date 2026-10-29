@@ -198,10 +198,10 @@ const ALONE = { status: 403, body: { ok: false, refusal: { code: 'LEVEL_REQUIRED
 
 /** The doors `file-delete` asks, with the delete answering `value`. */
 const deleting = (value) => ({
-  [`PUT /app/${SLUG}/api/files`]: { body: { sha256: 'a'.repeat(64) } },
+  [`PUT /${SLUG}/api/files`]: { body: { sha256: 'a'.repeat(64) } },
   'POST /account/close': ALONE,
-  [`POST /app/${SLUG}/api/deleteRecord`]: { body: { ok: true, value } },
-  [`POST /app/${SLUG}/api/boot`]: { status: 404, body: { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted.' } } },
+  [`POST /${SLUG}/api/deleteRecord`]: { body: { ok: true, value } },
+  [`POST /${SLUG}/api/boot`]: { status: 404, body: { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted.' } } },
   'GET /account/records': { body: { ok: true, value: [] } },
 });
 

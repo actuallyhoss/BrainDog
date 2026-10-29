@@ -1,0 +1,106 @@
+/**
+ * EACH WIDGET'S CONTENT FITS ITS FRAME (the widgets plan of 29 October, §3.3, Call 3): a frame is fixed, and a line that
+ * would be cut by its foot is not drawn at all, rather than drawn in half. The frame's own "N more", wherever it is, stays.
+ *
+ * Measured, not guessed: after the board lays out, each widget's rows are checked against the bottom of its frame less
+ * its foot, and a row that runs past it is marked `data-cut` (not drawn, so the foot under it rises into view). Run on a frame,
+ * never inside a layout pass of its own: one read of every rect, then one write of every mark.
+ */
+
+/** What is a row of a widget: a late line, a question, a run, a list's line, a card, a feed's line. */
+const ROWS = '.ln, .qa, .run, li, tr, .cards-item, .feed-row, [data-row]';
+/** What is a widget's foot, which always shows. */
+const FOOT = '.late-more, .block-more, .block-slice, .queue-more, .p-more, [data-needs-foot], .signs-line, .t-more, .more, .r-more, [data-draft-mark]';
+/** A foot that is the widget's own "N more" or "All …" link, which already says there is more. */
+const SAYS_MORE = /\b(?:more|all)\b/iu;
+/**
+ * A CHART'S OWN PARTS ARE NOT ROWS: its bars, scale, ticks and legend are list items and its numbers a table, and read as
+ * rows they were hidden one by one and counted, a weekly chart drawn as its title and "36 more" (the validator's recheck
+ * of 30 October, N1). A chart is drawn whole and the frame clips it, as any picture is.
+ */
+const CHART = '.series, [role="img"], svg';
+
+export function fitBoard(board: HTMLElement): void {
+  const frames = [...board.querySelectorAll<HTMLElement>('[data-board-key]')].filter((f) => f.dataset.lifted === undefined);
+  /* MEASURED WHOLE: every row put back first, in the same task, so nothing is painted between and the measure is of the
+     widget as it would draw with room. */
+  for (const frame of frames) {
+    for (const row of frame.querySelectorAll<HTMLElement>('[data-cut]')) delete row.dataset.cut;
+    for (const foot of frame.querySelectorAll<HTMLElement>('[data-more-before]')) delete foot.dataset.moreBefore;
+  }
+  const marks: [HTMLElement, number][] = [];
+  const before: [HTMLElement, string][] = [];
+  for (const frame of frames) {
+    const box = frame.getBoundingClientRect();
+    const pad = parseFloat(getComputedStyle(frame).paddingBlockEnd) || 0;
+    const room = box.bottom - pad;
+    /* THE OUTERMOST ROWS ONLY: a card's own list is the card's, and goes with it. */
+    const rows = [...frame.querySelectorAll<HTMLElement>(ROWS)].filter((row) => {
+      if (row.closest(FOOT)) return false;
+      const chart = row.closest<HTMLElement>(CHART);
+      if (chart && frame.contains(chart)) return false;
+      const outer = row.parentElement?.closest<HTMLElement>(ROWS);
+      return !outer || !frame.contains(outer);
+    });
+    const rects = rows.map((row) => row.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom, height: r.height }));
+    /* EACH FOOT AS IT IS DRAWN: its hit area reaches past it (a negative margin, `Board.svelte`). One laid over the
+       frame (the draft's answers) caps the rows wherever it is; the rest follow the rows in the flow. */
+    let over = Infinity;
+    const feet: { top: number; bottom: number; el: HTMLElement }[] = [];
+    for (const foot of frame.querySelectorAll<HTMLElement>(FOOT)) {
+      const r = foot.getBoundingClientRect();
+      if (r.height === 0) continue;
+      /* A FOOT INSIDE A FOOT IS THAT FOOT'S. */
+      if (foot.parentElement?.closest(FOOT) && frame.contains(foot.parentElement.closest(FOOT))) continue;
+      const css = getComputedStyle(foot);
+      const top = r.top + Math.max(0, -(parseFloat(css.marginBlockStart) || 0));
+      const bottom = r.bottom - Math.max(0, -(parseFloat(css.marginBlockEnd) || 0));
+      if (css.position === 'absolute') over = Math.min(over, top);
+      else if (r.top > box.top + box.height / 3) feet.push({ top, bottom, el: foot });
+    }
+    feet.sort((a, b) => a.top - b.top);
+    const past = (at: number) => rects.filter((r) => r.height > 0 && r.bottom > at + 1).length;
+    /* WHERE THE ROWS STOP, given the feet that stay. */
+    const plan = (kept: typeof feet) => {
+      const end = Math.max(kept.at(-1)?.bottom ?? -Infinity, ...rects.filter((r) => r.height > 0).map((r) => r.bottom));
+      /* WHAT FITS IS LEFT WHOLE. Past the frame, the rows give way to the feet: the room is the frame's, less the feet as
+         they stack under the rows (their own gaps kept). */
+      let limit = Math.min(room, over);
+      if (end > room + 1 && kept.length > 0) {
+        const first = kept[0]!;
+        const above = rects.filter((r) => r.height > 0 && r.bottom <= first.top + 1).reduce((m, r) => Math.max(m, r.bottom), -Infinity);
+        const gap = Number.isFinite(above) ? Math.max(0, first.top - above) : 8;
+        limit = Math.min(limit, room - (kept.at(-1)!.bottom - first.top) - gap);
+      }
+      /* A WIDGET THAT HAS NO "N MORE" OF ITS OWN SAYS HOW MANY IT LEFT OUT, under what it shows: at the frame's foot where
+         nothing else is there, and just above its first foot where one is (a quiet line such as "Windows PC: 1 Claude
+         session, quiet"), so the two never sit on each other (recheck N3). A foot that says more already says it. */
+      const says = over === Infinity && !kept.some((f) => SAYS_MORE.test(f.el.textContent ?? ''));
+      const cutAt = says && past(limit) > 0 ? limit - MORE_PX : limit;
+      return { says, cutAt, shown: rects.some((r) => r.height > 0 && r.bottom <= cutAt + 1) };
+    };
+    let kept = feet;
+    let p = plan(kept);
+    /* A QUIET FOOT GIVES WAY BEFORE THE LAST ROW DOES: where the rows, the count and the quiet lines cannot all fit, the
+       quiet lines go and one row at least stays (a one-row Working now). */
+    const quiet = feet.filter((f) => !SAYS_MORE.test(f.el.textContent ?? ''));
+    if (!p.shown && rects.some((r) => r.height > 0) && quiet.length > 0) {
+      kept = feet.filter((f) => !quiet.includes(f));
+      p = plan(kept);
+      for (const f of quiet) marks.push([f.el, 1]);
+    }
+    const { says, cutAt } = p;
+    rows.forEach((row, i) => marks.push([row, rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1 ? 1 : 0]));
+    const left = says ? past(cutAt) : 0;
+    if (left > 0 && kept.length > 0) {
+      delete frame.dataset.more;
+      before.push([kept[0]!.el, `${left} more`]);
+    } else if (left > 0) frame.dataset.more = `${left} more`;
+    else delete frame.dataset.more;
+  }
+  for (const [row, cut] of marks) if (cut) row.dataset.cut = '';
+  for (const [foot, said] of before) foot.dataset.moreBefore = said;
+}
+
+/** The room the "N more" a widget with none of its own is given (`Board.svelte` draws it). */
+const MORE_PX = 24;

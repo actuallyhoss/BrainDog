@@ -458,7 +458,7 @@ And what `propose` does before and after it files:
 - **A `rowset`** that leaves out `register` is given the one register every row's `at` names, and a new `body` for a
   row of `skills` that does not raise `rev` is given `rev + 1`, so `skills sync` picks it up.
 - **A filing** that succeeds gains `decide`, the address where the person answers it:
-  `<origin>/app/<slug>/decide/<id>`. The origin is the host's, handed to `handle` as its fourth argument, and the slug is `boot`'s
+  `<origin>/<slug>/decide/<id>`. The origin is the host's, handed to `handle` as its fourth argument, and the slug is `boot`'s
   `record`, read after the filing; a transport that hands no origin, or a record that names no slug, answers without
   it. An answer that already carries `decide` keeps its own. A `try` is filed nowhere, so it has none.
 - **A `change`** that leaves out `declaration_id` takes it from `to.id`.

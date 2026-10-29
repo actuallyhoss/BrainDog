@@ -1,27 +1,27 @@
 <!--
-  The live desk in the hero: the app's own window on Maya's made-up record, drawn as the app's 19 October Today
-  (SPEC 4.7): the top bar with the five places and their icons, the count on Needs you, the "Ask or change
-  anything" bar, who is working, and Maya's face. Five places to press through (§23: the product's own parts, never a
-  screenshot).
+  The live desk in the hero: the app's own window on Maya's made-up record, drawn in the app's frame of 27 October
+  (DIRECTION, "27 October, later"): the sidebar holds every place and the top bar says where you are and lets you ask.
+  The sidebar opens on BrainDog's mark and name with the button that hides it, then the places (Today, Needs you with its count, Work, Money, Agents,
+  People), then her projects. The top bar runs across the work only: the crumb, "Ask or change anything", the bell
+  and her face. Five places press through (§23: the product's own parts, never a screenshot); Work and People are
+  drawn so the frame is the app's, and open nothing.
 
-  ALL FIVE PLACES ARE IN THE HTML. With scripting on, only the chosen one shows and the bar is a real tablist (arrows,
-  Home and End move). With scripting off, the <noscript> rule below lays every place out one under another, each
-  headed by its name, and the bar no longer marks one as chosen. A style element is not held by the page's script
-  policy, so the rule needs no hash.
+  ALL FIVE PANES ARE IN THE HTML. With scripting on, only the chosen one shows. With scripting off, the <noscript>
+  rule below lays every pane out one under another, each headed by its name. A style element is not held by the page's
+  script policy, so the rule needs no hash.
 
-  ON A PHONE IT IS THE APP'S PHONE LAYOUT: the date and the search on top, the places as the five-icon bar pinned at
-  the foot of a 540px frame that clips. The window draws on the app's own surfaces (`--desk-*` in Look B), so its dark
-  board and tiles are the app's.
+  BETWEEN 761 AND 1060 THE SIDEBAR SHRINKS TO ITS ICONS, as the app's does under 1,280. ON A PHONE it is the app's phone
+  Today: the date, the search, the bell and her face on top, the app's tab bar along the foot (Today, Needs you,
+  Projects, Money, Menu), in a 440px frame that clips, with no sidebar. The window draws on the app's
+  own surfaces (`--desk-*` in Look B).
 
-  THE COUNT ON NEEDS YOU reads the desk's asks (`needs.svelte.ts`), so answering one on Today or in Needs you moves it,
-  and the line's "2 need you" with it.
+  THE COUNT ON NEEDS YOU reads the desk's asks (`needs.svelte.ts`), so answering one on Today or in Needs you moves it.
 -->
 <script lang="ts">
-  import AgentMark from '../AgentMark.svelte';
   import Icon from '../Icon.svelte';
   import Mark from '../Mark.svelte';
   import { onMount } from 'svelte';
-  import { FOUNDER, TODAY, dateSaid, slotVars } from '../demo/maya.ts';
+  import { FOUNDER, PROJECT, PROJECTS, PROJECT_ORDER, TODAY, dateSaid, slotVars } from '../demo/maya.ts';
   import Agents from './Agents.svelte';
   import Ask from './Ask.svelte';
   import Money from './Money.svelte';
@@ -30,6 +30,7 @@
   import Today from './Today.svelte';
   import { needs } from './needs.svelte.ts';
   import { DESK, TABS, type Tab } from './words.ts';
+  import type { IconName } from '../icons.ts';
 
   let chosen = $state<Tab>('today');
   let asking = $state(false);
@@ -45,17 +46,38 @@
     if (focus) tabs[tab]?.focus();
   }
 
-  function move(e: KeyboardEvent, at: number): void {
-    const to =
-      e.key === 'ArrowRight' ? (at + 1) % TABS.length
-      : e.key === 'ArrowLeft' ? (at - 1 + TABS.length) % TABS.length
-      : e.key === 'Home' ? 0
-      : e.key === 'End' ? TABS.length - 1
-      : -1;
+  /* THE SIDEBAR'S ROWS IN THE APP'S ORDER: a row with a tab opens its pane, a row without one is drawn and opens
+     nothing. Up and Down move between the five that open, as in a list of links. */
+  type Row = { tab?: Tab; label: string; icon: IconName; n?: string };
+  const ROWS: Row[] = [
+    { tab: 'today', label: DESK.tabs.today, icon: DESK.icons.today! },
+    { tab: 'needs', label: DESK.tabs.needs, icon: DESK.icons.needs! },
+    { label: DESK.more.work, icon: 'work', n: '12' },
+    { tab: 'money', label: DESK.tabs.money, icon: DESK.icons.money! },
+    { tab: 'agents', label: DESK.tabs.agents, icon: DESK.icons.agents!, n: String(TODAY.working.length) },
+    { label: DESK.more.people, icon: 'people', n: '6' },
+  ];
+  const ORDER: Tab[] = ['today', 'needs', 'money', 'agents', 'projects'];
+
+  /* THE PHONE'S BAR: the app's four tabs (`tabsOf`) and Menu, which wears the live dot while an agent works. */
+  const PHONE_TABS: { label: string; icon: IconName; on?: boolean; count?: boolean; live?: boolean }[] = [
+    { label: DESK.tabs.today, icon: DESK.icons.today!, on: true },
+    { label: DESK.tabs.needs, icon: DESK.icons.needs!, count: true },
+    { label: DESK.tabs.projects, icon: DESK.icons.projects! },
+    { label: DESK.tabs.money, icon: DESK.icons.money! },
+    { label: DESK.menu, icon: 'rows', live: TODAY.working.length > 0 },
+  ];
+
+  function move(e: KeyboardEvent, tab: Tab): void {
+    const at = ORDER.indexOf(tab);
+    const to = e.key === 'ArrowDown' ? (at + 1) % ORDER.length : e.key === 'ArrowUp' ? (at - 1 + ORDER.length) % ORDER.length : -1;
     if (to < 0) return;
     e.preventDefault();
-    show(TABS[to]!, true);
+    show(ORDER[to]!, true);
   }
+
+  /* THE CRUMB: the place, and on a project its parent first. */
+  const crumb = $derived(chosen === 'projects' ? [DESK.more.projects, PROJECTS[PROJECT.id].name] : [DESK.tabs[chosen]]);
 </script>
 
 <noscript>
@@ -63,58 +85,96 @@
     .desk .desk-pane { display: block !important; }
     .desk .desk-pane + .desk-pane { border-block-start: 1px solid var(--rule); }
     .desk .desk-pane-name { display: block !important; }
-    .desk .desk-tab[aria-selected='true'] { background: none !important; color: var(--muted) !important; }
+    .desk .desk-tab[aria-current='page'] { background: none !important; font-weight: 500 !important; }
     .desk .desk-tab, .desk [class~='desk-ask-bar'], .desk [class~='lead'] { pointer-events: none; }
     .desk [class~='desk-js'] { display: none !important; }
     .desk { block-size: auto !important; }
+    .desk .ptabs { display: none !important; }
   </style>
 </noscript>
 
 <div class="win desk" class:slashing={asking} data-desk>
-  <div class="app-top">
-    <span class="who"><Mark height={20} tone="inherit" /><span class="who-name">{DESK.brand}</span></span>
-    <span class="phone-date">{date}</span>
-    <div class="places" role="tablist" aria-label={DESK.places}>
-      {#each TABS as tab, i}
-        <button
-          type="button"
-          role="tab"
-          class="desk-tab"
-          id="desk-tab-{tab}"
-          aria-controls="desk-pane-{tab}"
-          aria-selected={chosen === tab}
-          tabindex={chosen === tab ? 0 : -1}
-          bind:this={tabs[tab]}
-          onclick={() => show(tab)}
-          onkeydown={(e) => move(e, i)}
-        >
-          <span class="tab-icon"><Icon name={DESK.icons[tab]!} /></span><span class="cap">{DESK.tabs[tab]}</span>
-          {#if tab === 'needs'}<span class="count num" hidden={count === 0}>{count}</span>{/if}
-        </button>
+  <aside class="side">
+    <p class="side-head">
+      <Mark height={20} tone="inherit" /><span class="rec">{DESK.brand}</span>
+      <svg class="hide-side" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2.5" /><path d="M6 2.5v11" /></svg>
+    </p>
+    <nav class="places" aria-label={DESK.places}>
+      {#each ROWS as row}
+        {#if row.tab}
+          {@const tab = row.tab}
+          <button
+            type="button"
+            class="desk-tab srow"
+            id="desk-tab-{tab}"
+            aria-controls="desk-pane-{tab}"
+            aria-current={chosen === tab ? 'page' : undefined}
+            bind:this={tabs[tab]}
+            onclick={() => show(tab)}
+            onkeydown={(e) => move(e, tab)}
+          >
+            <span class="tab-icon"><Icon name={row.icon} /></span><span class="cap">{row.label}</span>
+            {#if tab === 'needs'}<span class="count num" hidden={count === 0}>{count}</span>{/if}
+            {#if tab === 'agents'}<span class="live" aria-hidden="true"></span>{/if}
+            {#if row.n}<span class="n num">{row.n}</span>{/if}
+          </button>
+        {:else}
+          <span class="srow still">
+            <span class="tab-icon"><Icon name={row.icon} /></span><span class="cap">{row.label}</span>
+            {#if row.n}<span class="n num">{row.n}</span>{/if}
+          </span>
+        {/if}
       {/each}
-    </div>
+      <p class="side-sh"><span>{DESK.more.projects}</span><span class="n">{DESK.more.inPlay}</span></p>
+      {#each PROJECT_ORDER as id}
+        {@const p = PROJECTS[id]}
+        {#if id === PROJECT.id}
+          <button
+            type="button"
+            class="desk-tab srow proj"
+            id="desk-tab-projects"
+            aria-controls="desk-pane-projects"
+            aria-current={chosen === 'projects' ? 'page' : undefined}
+            style={slotVars(p.slot)}
+            bind:this={tabs.projects}
+            onclick={() => show('projects')}
+            onkeydown={(e) => move(e, 'projects')}
+          >
+            <span class="pm">{p.name.charAt(0)}</span><span class="cap">{p.name}</span>
+          </button>
+        {:else}
+          <span class="srow still proj" style={slotVars(p.slot)}>
+            <span class="pm">{p.name.charAt(0)}</span><span class="cap">{p.name}</span>
+          </span>
+        {/if}
+      {/each}
+    </nav>
+  </aside>
+  <div class="app-top">
+    <span class="phone-date">{date}</span>
+    <p class="crumb">
+      {#each crumb as part, i}{#if i > 0}<Icon name="chevron-right" size="s" />{/if}<span class:here={i === crumb.length - 1}
+          >{part}</span
+        >{/each}
+    </p>
     <Ask bind:open={asking} />
-    <span class="working">
-      <span class="marks">
-        {#each TODAY.working as w (w.agent)}<span class="disc"><AgentMark id={w.agent} size={14} /></span>{/each}
-      </span>
-      {DESK.working(TODAY.working.length)}<span class="live" aria-hidden="true"></span>
-    </span>
+    <span class="bell" role="img" aria-label={DESK.bell}><Icon name="bell" /><i></i></span>
     <span class="face" style={slotVars(FOUNDER.slot)} aria-hidden="true">{FOUNDER.initials}</span>
   </div>
+  <div class="work">
   {#each TABS as tab}
     <div
       class="desk-pane"
       class:on={chosen === tab}
       id="desk-pane-{tab}"
-      role="tabpanel"
-      aria-labelledby="desk-tab-{tab}"
-      tabindex="0"
+      role="region"
+      aria-label={DESK.tabs[tab]}
+      tabindex="-1"
     >
       <!-- TODAY NAMES ITSELF in its greeting, an h2 that shows with scripts on; the others' names show only without. -->
       {#if tab !== 'today'}<h2 class="desk-pane-name">{DESK.tabs[tab]}</h2>{/if}
       {#if tab === 'today'}
-        <Today ongo={(t) => show(t, true)} />
+        <Today />
       {:else if tab === 'needs'}
         <Needs />
       {:else if tab === 'projects'}
@@ -126,6 +186,17 @@
       {/if}
     </div>
   {/each}
+  </div>
+  <!-- THE PHONE'S TAB BAR, as the app's (`TabBar.svelte`): four places and Menu, Today lit. Drawn only on a phone, and
+       only a picture: the panes above are what a visitor presses. -->
+  <div class="ptabs" aria-hidden="true">
+    {#each PHONE_TABS as t (t.label)}
+      <span class="ptab" class:on={t.on}>
+        <span class="pt-ic"><Icon name={t.icon} />{#if t.count && count > 0}<b class="pt-n num">{count}</b>{/if}{#if t.live}<i class="pt-live"></i>{/if}</span>
+        <span class="pt-w">{t.label}</span>
+      </span>
+    {/each}
+  </div>
 </div>
 
 <style>
@@ -138,6 +209,9 @@
     --rule2: var(--desk-rule);
     --muted: var(--desk-ink-3);
     position: relative;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     border-radius: 16px;
     background: var(--board);
     box-shadow: var(--win-shadow);
@@ -148,60 +222,95 @@
     text-align: start;
   }
 
-  .app-top {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-block-size: 56px;
-    padding: 0 16px;
+  /* THE SIDEBAR: the record's name in a head as tall as the bar, the places, then the projects (the app's 27 October
+     frame). It and the top bar share one surface; only the work sits on the board. */
+  .side {
+    grid-row: 1 / -1;
+    grid-column: 1;
+    min-inline-size: 0;
     background: var(--desk-nav);
-    border-block-end: 1px solid var(--rule);
-    z-index: var(--z-raise);
+    border-inline-end: 1px solid var(--rule);
   }
 
-  .who {
+  .side-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-inline-end: 8px;
-    font: 600 15px/1 var(--head);
-    letter-spacing: -0.01em;
-    white-space: nowrap;
+    block-size: 56px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0 16px;
+    border-block-end: 1px solid var(--rule);
+    color: var(--muted);
   }
 
-  .who :global(.mark) {
+  .side-head :global(.mark) {
     color: var(--red-fill);
   }
 
-  .phone-date {
-    display: none;
+  .rec {
+    flex: 1;
+    color: var(--ink);
+    font: 600 15px/1 var(--head);
+    letter-spacing: -0.01em;
+  }
+
+  /* THE BUTTON THAT HIDES THE SIDEBAR, drawn as the app's: a panel with its edge. */
+  .hide-side {
+    flex: none;
+    inline-size: 16px;
+    block-size: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
   }
 
   .places {
+    display: grid;
+    padding: 8px 0 16px;
+  }
+
+  .srow {
+    box-sizing: border-box;
     display: flex;
-    gap: 4px;
+    align-items: center;
+    gap: 10px;
+    block-size: 32px;
+    margin: 0 8px;
+    padding: 0 8px;
+    border-radius: 8px;
+    color: var(--ink2);
+    font: 500 14px/1 var(--ui);
+    white-space: nowrap;
   }
 
   .desk-tab {
     all: unset;
     box-sizing: border-box;
-    position: relative;
-    cursor: pointer;
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 8px;
-    block-size: 36px;
-    padding: 0 12px;
+    gap: 10px;
+    block-size: 32px;
+    margin: 0 8px;
+    padding: 0 8px;
     border-radius: 8px;
-    font: 500 14px/1 var(--ui);
     color: var(--ink2);
+    font: 500 14px/1 var(--ui);
     white-space: nowrap;
+    cursor: pointer;
     transition: background var(--d-state, 90ms) ease-out;
+  }
+
+  .cap {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tab-icon {
     display: inline-flex;
+    color: var(--muted);
   }
 
   .tab-icon :global(.icon) {
@@ -214,14 +323,25 @@
     background: var(--desk-hover);
   }
 
-  .desk-tab[aria-selected='true'] {
+  .desk-tab[aria-current='page'] {
     background: var(--desk-nav-on);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .desk-tab[aria-current='page'] .tab-icon {
     color: var(--ink);
   }
 
   .desk-tab:focus-visible {
     outline: 2px solid var(--ink);
-    outline-offset: 2px;
+    outline-offset: -2px;
+  }
+
+  .n {
+    color: var(--muted);
+    font-size: var(--t-site-12);
+    font-weight: 400;
   }
 
   /* THE COUNT (SPEC 2.A.2): the one red pill, white figure, on the place that waits on her. */
@@ -241,44 +361,99 @@
     display: none;
   }
 
-  .working {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
+  .live {
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: var(--live);
+  }
+
+  .side-sh {
+    display: flex;
+    align-items: baseline;
     gap: 8px;
-    block-size: 32px;
-    padding: 0 10px 0 6px;
-    border-radius: 8px;
-    background: var(--soft);
-    color: var(--ink2);
-    font: 500 13px/1 var(--ui);
+    margin: 16px 0 4px;
+    padding: 0 16px;
+    color: var(--ink);
+    font: 600 14px/1.2 var(--ui);
+  }
+
+  /* A PROJECT'S MARK: its initial on its own hue, 20px, as the app's sidebar draws it. */
+  .pm {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 20px;
+    block-size: 20px;
+    border-radius: 5px;
+    background: var(--ph-tint);
+    color: var(--ph);
+    font: 600 11px/1 var(--ui);
+  }
+
+  /* THE TOP BAR, across the work only: the crumb, Ask, the bell and her face. */
+  .app-top {
+    position: relative;
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-block-size: 56px;
+    padding: 0 20px;
+    background: var(--desk-nav);
+    border-block-end: 1px solid var(--rule);
+    z-index: var(--z-raise);
+  }
+
+  .phone-date {
+    display: none;
+  }
+
+  .crumb {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 6px;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--muted);
+    font: 500 14px/1 var(--ui);
     white-space: nowrap;
   }
 
-  .marks {
-    display: inline-flex;
+  .crumb :global(.icon) {
+    inline-size: 14px;
+    block-size: 14px;
   }
 
-  .disc {
-    display: grid;
-    place-items: center;
-    inline-size: 22px;
-    block-size: 22px;
-    border-radius: 50%;
-    background: var(--tile);
+  .crumb .here {
     color: var(--ink);
+    font-weight: 600;
   }
 
-  .disc + .disc {
-    margin-inline-start: -6px;
-    box-shadow: 0 0 0 2px var(--soft);
+  .bell {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    color: var(--ink2);
   }
 
-  .live {
+  .bell :global(.icon) {
+    inline-size: 18px;
+    block-size: 18px;
+  }
+
+  .bell i {
+    position: absolute;
+    inset-block-start: 6px;
+    inset-inline-end: 7px;
     inline-size: 6px;
     block-size: 6px;
     border-radius: 50%;
-    background: var(--live);
+    background: var(--ink);
   }
 
   .face {
@@ -291,6 +466,82 @@
     background: var(--ph-tint);
     color: var(--ph);
     font: 600 13px/1 var(--ui);
+  }
+
+  .work {
+    grid-column: 2;
+    min-inline-size: 0;
+  }
+
+  .ptabs {
+    display: none;
+  }
+
+  .ptab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-inline-size: 0;
+    color: var(--muted);
+  }
+
+  .pt-ic {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 26px;
+    border-radius: 999px;
+  }
+
+  .pt-ic :global(.icon) {
+    inline-size: 20px;
+    block-size: 20px;
+  }
+
+  .ptab.on {
+    color: var(--ink);
+  }
+
+  .ptab.on .pt-ic {
+    background: var(--desk-nav-on);
+  }
+
+  .pt-w {
+    max-inline-size: 100%;
+    overflow: hidden;
+    font: 500 11px/1.1 var(--ui);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* THE ONE RED: what waits on her, on the tray's corner. */
+  .pt-n {
+    position: absolute;
+    inset-block-start: -4px;
+    inset-inline-end: 0;
+    min-inline-size: 16px;
+    block-size: 16px;
+    padding-inline: 4px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: var(--red-fill);
+    color: var(--on-red);
+    font: 600 10px/16px var(--ui);
+    text-align: center;
+  }
+
+  .pt-live {
+    position: absolute;
+    inset-block-start: 1px;
+    inset-inline-end: 8px;
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: var(--live);
+    box-shadow: 0 0 0 2px var(--desk-nav);
   }
 
   .desk-pane {
@@ -577,19 +828,53 @@
     fill: color-mix(in srgb, var(--ink) 6%, transparent);
   }
 
-  @media (max-width: 1180px) {
-    .working {
+  /* THE ICON RAIL: the sidebar keeps its icons and the projects their marks, as the app's does when it is narrow. */
+  @media (max-width: 1060px) {
+    .win {
+      grid-template-columns: 56px minmax(0, 1fr);
+    }
+
+    .cap,
+    .n,
+    .rec,
+    .hide-side,
+    .side-sh {
       display: none;
     }
-  }
 
-  @media (max-width: 1060px) {
-    .cap {
-      display: none;
+    .side-head {
+      justify-content: center;
+      padding: 0;
+    }
+
+    .srow,
+    .desk-tab {
+      justify-content: center;
+      margin: 0 8px;
+      padding: 0;
+    }
+
+    .count {
+      position: absolute;
+      margin: -18px -22px 0 0;
+      min-inline-size: 16px;
+      block-size: 16px;
+      padding-inline: 4px;
+      font-size: var(--t-app-xs);
+      line-height: 16px;
     }
 
     .desk-tab {
-      padding: 0 10px;
+      position: relative;
+    }
+
+    .live {
+      position: absolute;
+      margin: -16px -18px 0 0;
+    }
+
+    .proj:first-of-type {
+      margin-block-start: 12px;
     }
 
     .win :global(.grid) {
@@ -610,12 +895,25 @@
     }
   }
 
-  /* THE PHONE: Today alone, in a 380px frame that clips. The places pinned as its
-     bottom bar and the frame's 540px made the hero a screen and a half before the first band; the desk at 760 and up
-     keeps its five places. */
+  /* THE PHONE: Today alone, in a 440px frame that clips, with the app's tab bar drawn along its foot. The frame's 540px
+     made the hero a screen and a half before the first band; the desk at 760 and up keeps its five places. */
   @media (max-width: 760px) {
     .win {
-      block-size: 380px;
+      block-size: 440px;
+    }
+
+    .win {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .side,
+    .crumb {
+      display: none;
+    }
+
+    .app-top,
+    .work {
+      grid-column: 1;
     }
 
     .app-top {
@@ -625,19 +923,11 @@
       border-block-end: 0;
     }
 
-    .who {
-      display: none;
-    }
-
     .phone-date {
       display: block;
+      flex: 1;
       color: var(--muted);
       font-size: var(--t-site-13);
-    }
-
-    .working,
-    .places {
-      display: none;
     }
 
     .face {
@@ -645,7 +935,19 @@
     }
 
     .desk-pane {
-      padding: 4px 12px 16px;
+      padding: 4px 12px 76px;
+    }
+
+    .ptabs {
+      position: absolute;
+      inset-block-end: 0;
+      inset-inline: 0;
+      z-index: var(--z-raise);
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      block-size: 60px;
+      background: var(--desk-nav);
+      border-block-start: 1px solid var(--rule);
     }
 
     .win :global(.grid) {

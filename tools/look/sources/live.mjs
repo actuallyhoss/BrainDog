@@ -79,7 +79,7 @@ export async function open(record, { env = process.env, now = Date.now(), send =
   if (!record) throw new Error('Name the record to read: --source live:<record>, as the sign-in file keeps it.');
   const file = hostsPath(env);
   const found = entryFor(record, readHosts(file));
-  if (found === undefined) throw new Error(`No sign-in for a record called ${record} is kept on this machine. Run braindog login https://app.brain.dog/app/${record}.`);
+  if (found === undefined) throw new Error(`No sign-in for a record called ${record} is kept on this machine. Run braindog login https://app.brain.dog/${record}.`);
   const [written, entry] = found;
   const key = hostKey(written);
   const url = new URL(key);
@@ -101,7 +101,7 @@ export async function open(record, { env = process.env, now = Date.now(), send =
     res.end(JSON.stringify(refusal(fix)));
   };
 
-  /** One request from the page: `at` is its address with any `/app/<slug>` taken off, as `run.mjs` hands it. */
+  /** One request from the page: `at` is its address with any `/<slug>` taken off, as `run.mjs` hands it. */
   async function handle(req, res, at) {
     const method = req.method ?? 'GET';
     if (STORE.test(at.pathname)) return store(req, res, at, method);

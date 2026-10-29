@@ -45,7 +45,7 @@ Read \`braindog:grammar/proposals\` for its shape. Put in it, as parts:
 - For each project, lift out of its note: the line that says what it is into About; the stage it says it is at into Stage; what it says is in the way into In the way, one item a line; and each line of its plan into a plan step, in order, with what the step gains.
 - Write the note again with what was lifted taken out and every other word kept.
 - Call \`checkPaths\` with the note as \`document\` and \`things\` as \`register\`. Each placeholder that names nothing goes in a code span, so the page prints it as text. Where your client cannot reach it, call \`record_index\` and treat as naming nothing every placeholder whose first word it does not name.
-- A project marked Earning with nothing coming in for 90 days moves to the lane its note bears out: Building while work goes on, Parked if not. Never Finished. The figure \`projects-earning-silent\` counts them where the record has it; otherwise read its money in over the last 90 days.
+- A project marked Earning with nothing coming in for 90 days moves to the lane its note bears out: Building while work goes on, Parked if not. Never Closed. The figure \`projects-earning-silent\` counts them where the record has it; otherwise read its money in over the last 90 days.
 - Propose a health (On track, At risk or Off track) from what is in the way, and an aim (a day) where the note names one. Where the note says nothing, leave both out.
 - Call \`pagesCensus\`. A project whose page heading names a glyph no host draws (\`glyphs_unknown\`) has its mark cleared.
 - A choice the note leaves open goes in the same arrangement as a choice, never as a question of its own.

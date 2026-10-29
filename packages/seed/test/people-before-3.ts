@@ -23,6 +23,9 @@ const withWhere = (d: Body, where: unknown): Body => {
 /** The rules People 3.0.0 added, each meeting an organisation, which a People with no list of them could not. */
 const LATER_RULES = new Set(['meet-sender-organisations', 'meet-payees']);
 
+/** The figures over the organisations, and the lines drawn on them: `organisations-known` since People 4.2.0. */
+const ORG_FIGURES = new Set(['organisations-count', 'organisations-from-card-texts', 'organisations-known']);
+
 /** A `where` without the clause about who is you, which a People with no `self` cannot read (People 3.6.0 added it). */
 const unselfed = (where: unknown): unknown =>
   typeof where === 'string' ? where.split(',').map((c) => c.trim()).filter((c) => c !== '' && !/^self\b/u.test(c)).join(', ') || undefined : where;
@@ -30,7 +33,7 @@ const unselfed = (where: unknown): unknown =>
 export function peopleBefore3(doc: Body): Body {
   const declarations = (doc.declarations as Body[])
     .map((d) => (typeof d.metric === 'string' && typeof d.where === 'string' && /\bself\b/u.test(d.where) ? withWhere(d, unselfed(d.where)) : d))
-    .filter((d) => d.register !== 'organisations' && d.page !== 'relation' && d.metric !== 'organisations-count' && d.metric !== 'organisations-from-card-texts' && !LATER_RULES.has(String(d.rule)))
+    .filter((d) => d.register !== 'organisations' && d.page !== 'relation' && !ORG_FIGURES.has(String(d.metric)) && !LATER_RULES.has(String(d.rule)))
     .map((d) => {
       if (d.register === 'people')
         return {
@@ -43,7 +46,7 @@ export function peopleBefore3(doc: Body): Body {
           ...d,
           requires: ['register.people'],
           blocks: (d.blocks as Body[])
-            .filter((b) => b.heading !== 'Organisations' && b.heading !== 'Known by')
+            .filter((b) => b.heading !== 'Organisations' && b.heading !== 'Known by' && !ORG_FIGURES.has(String((b.when as { metric?: unknown } | undefined)?.metric)))
             .map((b) => {
               const { group: _group, fold: _fold, ...kept } = b;
               const rest = typeof b.where === 'string' && /\bself\b/u.test(b.where) ? withWhere(kept, unselfed(b.where)) : kept;

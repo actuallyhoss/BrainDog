@@ -39,6 +39,7 @@
   import { CARD_EDIT_PAUSE, editAfter, type CardEdit } from '../src/card-edit.ts';
   import { mostOf, showAllSaid, type MostKeys } from '../src/most.ts';
   import Text from './Text.svelte';
+  import PartChip from './p/PartChip.svelte';
 
   /**
    * What a scope cell draws its chip from, as `p/Table.svelte` takes it, written out here for the reason given there.
@@ -390,7 +391,8 @@
             >
           {:else if L.nameIsWho && run}{@render runFace(run)}
           {:else if nameMark}{@render agentFace(nameMark, 'cards-face')}
-          {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}
+          {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>
+          {:else if opts.partLook && L.name >= 0 && r.cells[L.name]}{@const look = opts.partLook(said(r, L.name))}{#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={said(r, L.name).slice(0, 1).toLocaleUpperCase('en')} {opts} />{/if}{/if}
           {#if L.name >= 0}{@const te = boxOf(r, L.name)}<h3 class="cards-title">{#if te}{@render box(r, n, L.name, te, EMPTY_NAME)}{:else if r.cells[L.name]}<Text nodes={nodes(r, L.name)} {opts} />{:else}{MISSING}{/if}</h3>{/if}
           {#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}
           {#if L.when >= 0 && r.cells[L.when]}<span class="cards-when"><Text nodes={nodes(r, L.when)} {opts} /></span>{/if}
@@ -532,8 +534,8 @@
     }
   }
 
-  /* "SHOW ALL" IS A RECTANGLE A THUMB CAN HIT, in the one red the product's links take, under the grid. Global, as the
-     rules above are, so the scoped hash marks no card. */
+  /* "SHOW ALL" IS A RECTANGLE A THUMB CAN HIT, under the grid, in the body's ink as every "more" is (Q36 of 29
+     October: red read as a warning). Global, as the rules above are, so the scoped hash marks no card. */
   :global(.cards-all) {
     display: block;
     min-block-size: var(--tap);
@@ -542,7 +544,7 @@
     border: 0;
     border-radius: var(--r-ctl);
     background: none;
-    color: var(--red);
+    color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;

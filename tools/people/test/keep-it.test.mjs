@@ -98,7 +98,7 @@ test('THE SENTENCE IN A LOG LINE IS RED, even encoded as a link carries it', asy
 });
 
 test('the judge names each broken door, and a green line is only a whole walk', () => {
-  const whole = { started: { ok: true }, link: 'https://x.test/app/signup#verify=a', carried: MARIAM.said, verified: { ok: true }, made: { ok: true }, opened: { ok: true }, name: TITLE, kept: [] };
+  const whole = { started: { ok: true }, link: 'https://x.test/signup#verify=a', carried: MARIAM.said, verified: { ok: true }, made: { ok: true }, opened: { ok: true }, name: TITLE, kept: [] };
   assert.equal(judge(whole, MARIAM, TITLE).pass, true);
   const red = (change) => judge({ ...whole, ...change }, MARIAM, TITLE);
   assert.match(red({ started: { ok: false, why: 'closed' }, link: null }).saw, /sign-up was refused: closed/u);

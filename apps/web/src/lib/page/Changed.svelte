@@ -1,5 +1,5 @@
 <!--
-  Changed for you, as one line at the foot of the board: "5 changes by your rules this week", and
+  Changed for you, as one line at the foot of the board: "5 changes on this page by your rules this week", and
   Review, which opens the list in the docked panel (`ChangesPanel.svelte`). It was five lines over the page's questions,
   each with a bank's name in capitals and "Categorise what cleared · 5w ago Undo", and it was noise above the work.
 

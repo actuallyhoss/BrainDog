@@ -463,13 +463,22 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         lead: true,
         span: 12,
         when: { metric: 'runs-working', gt: 0 },
-        body: '{{runs-working}} at work, {{handoffs-open}} step(s) up next',
+        body: '{{runs-working}} working, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next',
+      },
+      /* THE LINE COUNTS WHAT OPEN NOW DRAWS (Q4 of 29 October): "Nobody working right now" stood over two runs heard
+         just now, and the laptop said "1 at work" over the same two. The quiet ones are counted as what they are. */
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', gt: 0 }] },
+        body: 'Nobody working right now, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next',
       },
       {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'runs-working', is: 0 },
+        when: { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', is: 0 }] },
         body: 'Nobody working right now. {{handoffs-open}} step(s) up next',
       },
       /* THE CONTROL ROOM'S BOX (agents and MCP plan §2.1, §7.1): one field to tell an agent, to a named run, a kind of
@@ -563,8 +572,9 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          nobody took. Those are the lists' own (`?twice=1` on each), and the page no longer nags with them. */
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', is: 1 }, body: '1 key has no value. [Add it in the Keychain](/keychain)' },
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 1 }, body: '{{keys-nowhere}} keys have no value. [Add them in the Keychain](/keychain)' },
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: 'Keys past their day: {{keys-expired}}. Renew or retire each.' },
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: 'Tools not seen in a month: {{tools-unseen}}. Retire any you no longer use.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', is: 1 }, body: '1 key is past its day. Renew or retire it.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 1 }, body: '{{keys-expired}} keys are past their day. Renew or retire each.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: '{{tools-unseen}} tool(s) not used for a month. Retire any you no longer need.' },
       /* KEYS WRITTEN WHERE A KEY SHOULD NOT BE (the kernel's built-in `keys-in-text`, read a slice a night by its key
          scan): a count of places, and the first one's list and number in the reading's why, never the key. */
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', is: 1 }, body: 'A key is written in plain text in 1 place. Move it to the Keychain.' },
@@ -649,6 +659,8 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
 
      A SKILL'S TEXT BEFORE AND AFTER, SINCE 1.24.0, is on the timeline (`panel: evolution`), each version against the
      one before; a skill's own page still draws its versions too. */
+  /* AND HOW MANY ARE IN USE, SINCE 29 OCTOBER (Q55): "1 learning arrived this month." stood over five, four of them dated
+     August, and read as a count of the list. The line says the whole too, so the two never read as one number. */
   brain: {
     page: 'brain',
     title: 'How the brain changed',
@@ -661,7 +673,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         lead: true,
         span: 12,
         when: { metric: 'learnings-arrived', gt: 0 },
-        body: '{{learnings-arrived}} learning(s) arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+        body: '{{learnings-arrived}} learning(s) arrived this month, {{learnings-active}} in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
       },
       {
         kind: 'note',
@@ -669,7 +681,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         lead: true,
         span: 12,
         when: { metric: 'learnings-arrived', is: 0 },
-        body: 'No learning arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+        body: 'Nothing new this month, {{learnings-active}} learning(s) in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
       },
       {
         kind: 'series',
@@ -836,8 +848,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.23.0 ADDS A FIELD, SO IT IS MINOR (Keychain works like a keychain): a key says which account it is for, as a
      keychain item does, in a text field that is never secret. No list, field or figure goes.
      1.24.0 ADDS TWO SECTIONS, SO IT IS MINOR: Accepted unchanged on the agents home (`panel: kept`), and Over time on
-     How the brain changed (`panel: evolution`), the timeline of learnings and skills. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.24.0', requires: ['register.things'] },
+     How the brain changed (`panel: evolution`), the timeline of learnings and skills. No list, field or figure goes.
+     1.25.0 IS WORDS, SO IT IS MINOR (round 1030): the first line counts the runs Open now draws, working and open and
+     quiet, where "Nobody working right now" stood over runs heard just now. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.26.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

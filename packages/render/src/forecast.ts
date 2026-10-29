@@ -1014,7 +1014,7 @@ export function forecastNext(model: ForecastModel, shown: Scenario, plan: Pick<F
   return {
     rows: [
       ...(said ? [{ everyday: true as const, said }] : []),
-      ...kept.map((s) => ({ n: numbered.get(s) ?? null, dir: s.delta > 0 ? ('in' as const) : ('out' as const), day: shortDay(s.day, model.today), label: s.label, amount: forecastFigure(model, s.delta) })),
+      ...kept.map((s) => ({ n: numbered.get(s) ?? null, dir: s.delta > 0 ? ('in' as const) : ('out' as const), day: shortDay(s.day, model.today), label: s.label, amount: `${s.delta > 0 ? '+' : ''}${forecastFigure(model, s.delta)}` })),
     ],
     more: listed.length - kept.length,
   };

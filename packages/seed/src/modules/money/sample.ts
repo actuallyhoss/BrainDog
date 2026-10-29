@@ -388,23 +388,34 @@ export const SNAPSHOTS: Fields[] = snapshotRows();
 /**
  * Ninety days of `cash-now`, one point a day, as the daily snapshot would have written them.
  *
- * WORKED BACK FROM THE ROWS, NOT INVENTED. Each day's balance is today's cash less every payment
- * settled after that day, in and out, so the line moves on the days the paid rows say money moved and
+ * WORKED BACK FROM THE ROWS, NOT INVENTED. Each day's balance is today's cash less every cleared Ledger line on a cash
+ * account after that day, in and out (`cashLines`), so the line moves on the days the bank says money moved and
  * nowhere else. A live record has no such history to show: its snapshot starts on the day the figure
  * is declared, and its line grows from there.
  */
 export function cashSeries(days = 90): { at: string; value: number }[] {
   const liquid = ACCOUNTS.filter((a) => a.liquid === true).reduce((n, a) => n + (a.balance as { amount: number }).amount, 0);
-  const paid = OBLIGATIONS.filter((o) => o.state === 'paid' && typeof o.settled === 'string');
+  const lines = cashLines();
   const out: { at: string; value: number }[] = [];
   for (let offset = -days; offset <= -1; offset++) {
     const at = day(offset);
-    const since = paid
-      .filter((o) => (o.settled as string) > at)
-      .reduce((n, o) => n + (o.direction === 'owed_to_me' ? 1 : -1) * (o.amount as { amount: number }).amount, 0);
+    const since = lines
+      .filter((t) => (t.on as string) > at)
+      .reduce((n, t) => n + (t.direction === 'in' ? 1 : -1) * (t.amount as { amount: number }).amount, 0);
     out.push({ at, value: liquid - since });
   }
   return out;
+}
+
+/**
+ * THE LINES THAT MOVED CASH: every cleared Ledger line on an account that counts as cash, a move between two of them
+ * cancelling itself. THE WALK READ THE PAID BILLS AND INVOICES, AND NOT THE LEDGER (recheck of 30 October, N2): none was
+ * settled in the last month, so thirty nights of Snapshots read £33,850 while rent, a contractor and the card bill went
+ * out of the bank. A paid invoice is a Ledger line too, so reading both would count it twice.
+ */
+function cashLines(): Fields[] {
+  const cash = new Set(ACCOUNTS.flatMap((a, i) => (a.liquid === true ? [i + 1] : [])));
+  return TRANSACTIONS.filter((t) => t.state === 'cleared' && cash.has(t.account as number));
 }
 
 /**
@@ -424,8 +435,7 @@ export function cashSeries(days = 90): { at: string; value: number }[] {
  */
 export function cashPoints(days = 90): { series: string; grain: string; at: string; value: number; unit: string; n: number }[] {
   const liquid = ACCOUNTS.filter((a) => a.liquid === true);
-  const paid = OBLIGATIONS.filter((o) => o.state === 'paid' && typeof o.settled === 'string');
-  const currencies = new Set([...liquid.map((a) => a.balance), ...paid.map((o) => o.amount)].map((m) => (m as { currency: string }).currency));
+  const currencies = new Set([...liquid.map((a) => a.balance), ...cashLines().map((t) => t.amount)].map((m) => (m as { currency: string }).currency));
   if (currencies.size !== 1) return [];
   const [unit] = [...currencies] as [string];
   return cashSeries(days).map((p) => ({ series: 'cash-now', grain: 'day', at: p.at, value: p.value, unit, n: liquid.length }));
