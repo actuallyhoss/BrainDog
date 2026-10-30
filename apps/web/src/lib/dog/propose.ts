@@ -33,9 +33,9 @@ export const proposeWords = {
   onDecide: 'In Needs you',
   /** Said beside the link, for a screen reader and for whoever wonders what the link is. */
   onDecideNote: 'Nothing is changed until it is accepted.',
-  unreached: 'The record could not be reached, so nothing was sent. Try again.',
-  conflict: 'The record changed while this was sent. Try again.',
-  unnamed: 'The record did not say which question it filed. Look for it in Needs you.',
+  unreached: 'BrainDog could not be reached, so nothing was sent. Try again.',
+  conflict: 'Something changed while this was sent. Try again.',
+  unnamed: 'BrainDog did not say which question it filed. Look for it in Needs you.',
 } as const;
 
 const isMap = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);

@@ -1960,7 +1960,7 @@ export function draw(
       segments: [],
       refusal: {
         kind: 'error',
-        title: 'This part of the page drew nothing, and the record says why.',
+        title: 'This part of the page drew nothing, and BrainDog says why.',
         lines: block.refusals,
       },
     };

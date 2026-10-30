@@ -52,7 +52,7 @@ export const palette = {
   /* WHILE A BUSY RECORD IS ASKED AGAIN (the client's 503 retry): calm, and never the crash sentence to quote. */
   slashBusy: 'BrainDog is busy. Trying again.',
   slashWhere: 'Slash looked for',
-  slashSearched: (q: string) => `Slash searched the record for “${q}”`,
+  slashSearched: (q: string) => `Slash searched your BrainDog for “${q}”`,
   slashNothing: 'Nothing in your BrainDog answers that.',
   slashFold: 'What Slash read',
   slashFoldLine: (register: string, rows: number, predicate: string) => `${register}: ${rows === 1 ? '1 item' : `${rows.toLocaleString('en')} items`}, ${predicate}`,

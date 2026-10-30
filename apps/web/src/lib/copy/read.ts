@@ -24,7 +24,7 @@ export const read = {
    */
   readFault: 'This screen could not be drawn',
   /** The line under it, naming the screen, so whoever reports it says which one. */
-  readFaultOn: (screen: string) => `The record answered, and BrainDog could not draw ${screen} from it. Nothing in the record changed.`,
+  readFaultOn: (screen: string) => `BrainDog answered, and this screen could not draw ${screen} from it. Nothing in your BrainDog changed.`,
   /** The one action an offline read offers. */
   readRetry: 'Try again',
   /** The fold that holds the technical reason, so it is there for whoever asks and never the content. */

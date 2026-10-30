@@ -246,7 +246,7 @@ export function searcher(base: string, io?: Fetch): Searcher {
         const value = groupsOf(q, answer.hits, await others, answer.matched);
         return { from: 'live', value, ...(answer.meaning ? { meaning: answer.meaning } : {}) };
       }
-      return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The record changed while it was being read.' };
+      return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'Something changed while it was being read.' };
     },
   };
 }

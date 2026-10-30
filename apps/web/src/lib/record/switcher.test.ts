@@ -38,7 +38,7 @@ test('every open record the person can reach, exactly as the host answered it', 
 test('a 401 is read as sign in again, never a record refusal, whatever the body says', async () => {
   const { io } = host(() => json(401, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'something else entirely' } }));
   const out = await readRecordsForSwitcher(io);
-  assert.deepEqual(out, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again to see the records you can reach.' } });
+  assert.deepEqual(out, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again to see the BrainDogs you can reach.' } });
 });
 
 test('nothing listening, or a page that is not an envelope, is UNREACHABLE and never thrown', async () => {

@@ -226,7 +226,7 @@ export const words = {
   /* WHAT A DRAW FAULT'S DETAILS SAY, in words and never the thrown message, which named a field or a line of code to a
      person who can do nothing with either. The first is an answer missing a part, the second the page itself. */
   usageShape: "This month's answer was missing a part this page needs, so the page stopped before drawing it.",
-  usageThrew: "A part of this page stopped while drawing the month. The fault is in BrainDog, not in the record.",
+  usageThrew: "A part of this page stopped while drawing the month. The fault is in the app, not in your BrainDog.",
   byProject: 'By project',
   byAction: 'By action',
   overTime: 'Runs by week',

@@ -235,7 +235,7 @@ export const words = {
   log: 'Log',
   showLog: (when: string) => `Log of the run ${when}`,
   versions: 'Versions',
-  versionsFrom: "From the record's recent history. An older version with no recent runs is not listed.",
+  versionsFrom: "From recent history. An older version with no recent runs is not listed.",
   version: (n: number) => `Version ${n}`,
   now: 'Installed now',
   installed: (when: string) => `Installed ${when}`,

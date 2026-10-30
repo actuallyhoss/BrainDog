@@ -46,7 +46,7 @@ export async function readInbox(base: string, io?: Fetch, cursor?: number): Prom
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.inbox({ limit: INBOX_PAGE, ...(cursor === undefined ? {} : { cursor }) });
   if (!out.ok) {
-    const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+    const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while it was being read.' };
     if (refusal.code === 'ROUTE_UNKNOWN') return { from: 'unrouted' };
     return { from: 'refused', fix: refusal.fix };
   }

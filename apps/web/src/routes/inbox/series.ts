@@ -55,7 +55,7 @@ export function tallyOf(page: InboxPage): Tally | null {
 export async function readSeries(base: string, state: Series, cursor?: number): Promise<SeriesRead> {
   const out = await createClient({ base }).inbox({ state, limit: INBOX_PAGE, ...(cursor === undefined ? {} : { cursor }) });
   if (!out.ok) {
-    const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+    const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while it was being read.' };
     return refusal.code === 'ROUTE_UNKNOWN' ? { from: 'unrouted' } : { from: 'refused', fix: refusal.fix };
   }
   return {

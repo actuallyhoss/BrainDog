@@ -51,7 +51,7 @@ export const words = {
   handed: 'already here, under another add-on',
   changes: 'Changes',
   retires: 'Takes away',
-  keepsRows: (n: number) => (n === 0 ? 'holds nothing' : n === 1 ? 'the 1 item in it stays in the record' : `the ${n.toLocaleString('en-GB')} items in it stay in the record`),
+  keepsRows: (n: number) => (n === 0 ? 'holds nothing' : n === 1 ? 'the 1 item in it stays in your BrainDog' : `the ${n.toLocaleString('en-GB')} items in it stay in your BrainDog`),
   moves: 'Hands on',
   movesTo: (to: string) => `stays, now under ${to}`,
   kept: 'Your edits it carries over',

@@ -69,7 +69,7 @@ export async function readRecordsForSwitcher(io: Fetch, base = ''): Promise<Answ
   } catch {
     return unreachable();
   }
-  if (res.status === 401) return { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again to see the records you can reach.' } };
+  if (res.status === 401) return { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again to see the BrainDogs you can reach.' } };
   const said: unknown = await res.json().catch(() => undefined);
   return (isAnswer(said) ? said : unreachable()) as Answer<SwitcherRow[]>;
 }

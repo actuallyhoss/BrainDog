@@ -32,7 +32,7 @@ export const sheetWords = {
   forBusiness: 'For work',
   forBoth: 'For you and for work',
   which: 'Which one',
-  notReached: 'The record could not be reached, so nothing was added.',
+  notReached: 'BrainDog could not be reached, so nothing was added.',
   onToday: 'Today already shows this.',
   /** The same, where Today's tile has another name. */
   onTodayAs: (heading: string): string => `Today shows this as ${heading}.`,

@@ -36,8 +36,8 @@ export const pageWords = {
   waiting: (page: string): string => `Waiting for your machine: composing ${page}`,
   pick: 'Page',
   started: 'Started. It waits for your machine, and what it would change comes to Needs you.',
-  unreached: 'The record could not be reached. Try again in a moment.',
-  conflict: 'The record changed while this was asked. Try again.',
+  unreached: 'BrainDog could not be reached. Try again in a moment.',
+  conflict: 'Something changed while this was asked. Try again.',
 } as const;
 
 const isRow = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);

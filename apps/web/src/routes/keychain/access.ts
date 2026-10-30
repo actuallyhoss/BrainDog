@@ -40,7 +40,7 @@ export const accessWords = {
   lockAfter: 'Lock after',
   minutes: (n: number) => `${n} min`,
   answered: 'That ask was already answered.',
-  answerRefused: 'The record did not take that answer. Try again.',
+  answerRefused: 'BrainDog did not take that answer. Try again.',
   accessRefused: 'Keychain access could not be changed. Try again.',
   close: 'Done',
   followDefault: (rule: Rule) => `Key default: ${ruleName(rule)}`,

@@ -26,7 +26,7 @@ async function send(value: Held): Promise<Saved> {
     if (out.ok) return { from: 'kept' };
     return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'This was not kept.' };
   } catch {
-    return { from: 'refused', fix: 'The record could not be reached, so this was not kept.' };
+    return { from: 'refused', fix: 'BrainDog could not be reached, so this was not kept.' };
   }
 }
 

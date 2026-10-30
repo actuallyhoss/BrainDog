@@ -264,7 +264,7 @@ export const words = {
   cancel: 'Cancel',
   sent: 'Saved for your yes',
   sentLine: 'Say yes to it once, and Run a job offers it.',
-  notSent: 'The record did not answer, so nothing was sent. Try again.',
+  notSent: 'BrainDog did not answer, so nothing was sent. Try again.',
   needTitle: 'Give it a title that starts with a letter.',
   thisKind: 'This kind',
   ask: (title: string) => `Approve the job ${title}?`,

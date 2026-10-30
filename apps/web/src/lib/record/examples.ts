@@ -49,7 +49,7 @@ export function offerOf(e: Examples | null): Offer | null {
   };
 }
 
-const fixOf = (out: Refused): string => ('refusal' in out ? out.refusal.fix : 'The record changed while this was open. Try again.');
+const fixOf = (out: Refused): string => ('refusal' in out ? out.refusal.fix : 'Something changed while this was open. Try again.');
 
 /** What the record counts, or `null` on a refusal (a record the reader does not own has nothing to offer). */
 export async function readExamples(client: ExamplesClient): Promise<Examples | null> {

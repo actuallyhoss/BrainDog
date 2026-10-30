@@ -40,7 +40,7 @@ export async function readShaped(base: string, cursor?: number): Promise<ShapedR
   const client = createClient({ base });
   const out = await client.inbox({ limit: INBOX_PAGE, ...(cursor === undefined ? {} : { cursor }) });
   if (!out.ok) {
-    const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+    const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while it was being read.' };
     return { read: refusal.code === 'ROUTE_UNKNOWN' ? { from: 'unrouted' } : { from: 'refused', fix: refusal.fix }, shapes: new Map() };
   }
   const { arrivals } = out.value;

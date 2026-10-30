@@ -386,7 +386,7 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
       }
       return { from: 'live', boot: out.value };
     }
-    const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+    const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while it was being read.' };
     /* NOT KEPT, THE 401 LEAST OF ALL. This line used to keep a 401 or an unreached host at the bare address as the
        sample, for the tab, and so the first load after signing in was handed The Studio with no request made.
        A refusal kept nothing then either; now it is every such answer. */
@@ -727,9 +727,9 @@ function voiceTexts(events: readonly EventLine[]): Map<number, string | null> {
  */
 function exportText(e: EventLine): string | null {
   if (e.kind !== 'export' || !e.note) return null;
-  if (/^snapshot /u.test(e.note)) return 'Took a copy of the record';
-  if (/^sections all(?:,|$)/u.test(e.note)) return 'Exported the whole record';
-  if (/^sections /u.test(e.note)) return 'Exported part of the record';
+  if (/^snapshot /u.test(e.note)) return 'Took a copy of your BrainDog';
+  if (/^sections all(?:,|$)/u.test(e.note)) return 'Exported all of your BrainDog';
+  if (/^sections /u.test(e.note)) return 'Exported part of your BrainDog';
   return null;
 }
 

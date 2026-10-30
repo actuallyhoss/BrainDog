@@ -129,7 +129,7 @@ test('a colleague on some lists is told who answers, not a level they do not hol
     const said = whyNotAnswering('read', lists);
     assert.doesNotMatch(said, /you have read access/u, 'the hint claims a level the colleague does not hold');
     assert.doesNotMatch(said, /token/iu, 'the hint talks about a token nobody gave them');
-    assert.match(said, /whole record/u);
+    assert.match(said, /all of this BrainDog/u);
     assert.match(said, /stays open to you\.$/u);
   }
   assert.match(whyNotAnswering('read', ['expenses']), /your list\b/u);

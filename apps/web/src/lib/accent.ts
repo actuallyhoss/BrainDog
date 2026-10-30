@@ -182,6 +182,6 @@ export function restore(): { ok: true } | { ok: false; refusals: string[]; codes
      nobody pressed anything and a load lost a colour. Both are what the returned result is for, and
      the console line stays because it is the only one of the three that carries the ratio. */
   const why = out.refusals[0] ?? `${out.codes.join(', ')}.`;
-  console.warn(`${held} can no longer be this record's colour. ${why} It is back to the house colour.`);
+  console.warn(`${held} can no longer be this BrainDog's colour. ${why} It is back to the house colour.`);
   return { ...out, dropped: held };
 }

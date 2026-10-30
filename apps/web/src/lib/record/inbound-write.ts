@@ -168,6 +168,6 @@ export const words = {
   freshWhy: 'Needs a sign-in from the last 15 minutes.',
   /* THE FILE'S NAME ON A LINE OF ITS OWN: in the middle of the sentence it read as a name from the code (the printed
      gate's `dev-name`), and set apart it is the thing a person types. */
-  unrouted: 'On a self-host the address is a file beside the record:',
+  unrouted: 'On a self-host the address is a file beside your BrainDog:',
   tokenFile: 'inbound.token',
 } as const;

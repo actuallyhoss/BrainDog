@@ -50,7 +50,7 @@ test('A REFUSED BLOCK, A SENTENCE AND A WAY TO ADD THE FIRST THING ARE NEVER HID
 });
 
 test('A BLOCK THIS BUILD CANNOT DRAW IS NOT DRAWN, nor a section over only that, and a refused one that also cannot still is', () => {
-  const cannot = block({ kind: 'todo', source: 'sessions.live', cannot: 'This part of the page cannot be drawn from the record yet.' });
+  const cannot = block({ kind: 'todo', source: 'sessions.live', cannot: 'This part of the page cannot be drawn yet.' });
   assert.equal(emptyHidden([cannot])[0]!.drawn, false);
   assert.equal(emptyHidden([{ ...cannot, refusals: ['sessions has no field "who".'] }])[0]!.drawn, true, 'a refusal names a fix somebody has to see');
   assert.deepEqual(
@@ -203,7 +203,7 @@ test('A PAGE AT ITS OWN ADDRESS SAYS ONE SENTENCE WHERE IT WOULD SAY NOTHING, an
   const runs = block({ kind: 'table', source: 'sessions.live' });
   assert.deepEqual(emptyHidden([block({ kind: 'section', heading: 'Today' }), tasks, runs], true).map((b) => b.drawn), [true, true, false], 'the first block says the list holds nothing yet, under its heading');
   assert.deepEqual(emptyHidden([tasks, runs]).map((b) => b.drawn), [false, false]);
-  const cannot = block({ kind: 'todo', source: 'sessions.live', cannot: 'This part of the page cannot be drawn from the record yet.' });
+  const cannot = block({ kind: 'todo', source: 'sessions.live', cannot: 'This part of the page cannot be drawn yet.' });
   assert.deepEqual(emptyHidden([cannot, tasks], true).map((b) => b.drawn), [false, true], 'a block this build cannot draw is never the one kept');
 });
 
@@ -223,7 +223,7 @@ test('EACH WHY: a list of nothing is empty, a chart of a field nobody filled is 
     block({ kind: 'todo', empty: 'Nothing due today.' }),
     chips,
     block({ kind: 'note', body: 'Heads up', drawn: false }),
-    block({ kind: 'todo', cannot: 'This part of the page cannot be drawn from the record yet.' }),
+    block({ kind: 'todo', cannot: 'This part of the page cannot be drawn yet.' }),
   ]);
   assert.deepEqual(whys(out), ['drawn', 'empty', 'unsaid', 'when', 'cannot']);
 });
@@ -413,7 +413,7 @@ test('THE KERNEL: EACH WHY, a list of nothing is empty, a chart of a field nobod
 });
 
 test('THE KERNEL: CANNOT, a block the reader cannot draw goes, and one the record refused stays to say its fix', () => {
-  const cannot = { ...rec({ kind: 'table' }), cannot: 'This part of the page cannot be drawn from the record yet.' };
+  const cannot = { ...rec({ kind: 'table' }), cannot: 'This part of the page cannot be drawn yet.' };
   const refused = rec({ kind: 'table', refusals: [{ code: 'DECLARATION_INVALID', fix: 'Name a list.' }] });
   const out = emptyHidden([rec({ kind: 'table', rows: [line({ title: 'a' })], matched: 1 }), cannot, refused]);
   assert.deepEqual(out.map((b) => whyOf(b) ?? 'drawn'), ['drawn', 'cannot', 'drawn']);

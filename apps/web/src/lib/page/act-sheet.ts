@@ -28,7 +28,7 @@ export type StepOf = { step: Step; said?: string };
  * the record lifts (`hard` in `ACTION_VERBS`), so it is asked every time, in words that say what is lost.
  */
 export const HARD_SAID: Readonly<Record<string, string>> = Object.freeze({
-  'row.delete': 'This takes it off your record. Undo is offered for a few seconds, and after that it stays gone.',
+  'row.delete': 'This takes it off your BrainDog. Undo is offered for a few seconds, and after that it stays gone.',
   'rule.from_arrivals': 'This files them and writes a rule, and from then on the rule files what arrives without asking you.',
 });
 
