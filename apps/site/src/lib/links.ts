@@ -18,6 +18,11 @@ export const DOCS = '/docs';
 export const PACKS = '/packs';
 export const SUPPORT = '/support';
 export const SECURITY = '/security';
+/**
+ * The owner's texts, each a page of `routes/legal/[name]` (its `NAMES`), drawn once `LAUNCH.legal` is on. The sitemap
+ * names them then, as the footer links two of them.
+ */
+export const LEGAL_TEXTS: readonly string[] = ['/legal/terms', '/legal/privacy', '/legal/processing'];
 /** A status page, which the owner has not named yet, so nothing links to one. */
 export const STATUS: string | null = null;
 

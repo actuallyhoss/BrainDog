@@ -4,8 +4,8 @@
  *
  * NO APP. The record app is on its own name, `app.brain.dog`, and the old `/app/`, `/api/`, `/auth/` and `/account/`
  * here only hand on to it behind authentication; `robots.txt` disallows the four, and a sitemap naming one would ask a
- * crawler for an address the same site forbids it. `/legal/*` is out too, unlinked until its texts arrive, and so is
- * the 404.
+ * crawler for an address the same site forbids it. The 404 is out too. The three legal texts are in once
+ * `LAUNCH.legal` says they are in force, and not before: until then each page is one sentence with `noindex`.
  *
  * LASTMOD IS THE DAY THE WORDS LAST CHANGED, read from git while the site prerenders: a docs page's own file, and for
  * the site's pages the newest commit under `src/` other than the docs. Without git (a copy of the tree with no
@@ -15,6 +15,8 @@ import { execFileSync } from 'node:child_process';
 
 import { PAGES } from '$lib/nav.ts';
 import { DOCS } from '$lib/docs/index.ts';
+import { LAUNCH } from '$lib/launch.ts';
+import { LEGAL_TEXTS } from '$lib/links.ts';
 
 export const prerender = true;
 
@@ -35,6 +37,8 @@ export const GET = (): Response => {
   const site = changed('src', ':(exclude)src/docs');
   const entries = [
     ...PAGES.map((p) => ({ path: p.path, at: site })),
+    /* A TEXT CHANGES IN `legal/`, beside `src`, so its day is that folder's. */
+    ...(LAUNCH.legal ? LEGAL_TEXTS.map((path) => ({ path, at: changed(`legal/${path.slice('/legal/'.length)}.md`) })) : []),
     ...DOCS.map((d) => ({ path: d.path, at: changed(`src/docs/${d.file}`) })),
   ];
   const urls = entries.map((e) => `  <url><loc>${ORIGIN}${e.path}</loc><lastmod>${e.at}</lastmod></url>`).join('\n');

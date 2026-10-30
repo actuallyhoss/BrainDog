@@ -1,6 +1,6 @@
-# Usage and limits
+# API and MCP limits
 
-What a caller of the API or of MCP is held to: a budget per minute that stops a loop, a size for each request, and the ceilings on each read. None of them depends on your plan. What your plan counts is the work your record does on its own.
+What a caller of the API or of MCP is held to: a budget per minute that stops a loop, a size for each request, and the ceilings on each read. None of them depends on your plan. What your plan counts is the work your BrainDog does on its own.
 
 ## Per minute
 
@@ -11,7 +11,7 @@ Writes | 120 a minute | Each token, or each person signed in to the app
 Report rows | 600 a minute | Each report key
 ```
 
-A webhook door has a budget of its own, and a sender past it is answered 429 with the seconds to wait. Reads and writes are separate budgets, so a burst of writes never starves reads. Two tokens on one record have a budget each, so a script that loops cannot lock you out of your own app.
+A webhook door has a budget of its own, and a sender past it is answered 429 with the seconds to wait. Reads and writes are separate budgets, so a burst of writes never starves reads. Two tokens on one BrainDog have a budget each, so a script that loops cannot lock you out of your own app.
 
 An MCP call counts as a read, whichever tool it calls, because the host counts it before it opens the request. What the tool may do is still decided by the token's scope.
 
@@ -28,7 +28,7 @@ The same number is in the `Retry-After` header. Wait that long and send the same
 ```comparison | Sizes
 What | The most
 An API request body | One megabyte
-A record put back from a file | Sixteen megabytes
+A BrainDog put back from a file | Sixteen megabytes
 An MCP message | One megabyte
 A report key's call | 100 rows, and 256 KB of rows
 A webhook arrival | One megabyte
@@ -39,17 +39,17 @@ A note on a row | 280 characters
 ## Per read
 
 ```comparison | Ceilings on a read
-Read | Default | The most
-list | 20 rows | 500 rows
-search | 20 rows | 100 rows
-activity | 50 changes | 200 changes
+Read | Over HTTP: default, the most | Over MCP: default, the most
+list | 50 rows, 500 | 20 rows (a list of 60 or fewer comes whole), 100
+search | 20 rows, 100 | 20 rows, 100
+recentHistory, or activity over MCP | 50 changes, 200 | 20 changes, 100
 ```
 
-A long text field in a `list` answer is cut at 280 characters, and the row says it was. Name the field in `fields` to have it whole, or read the row with `get`.
+An answer that stops short gives a `cursor` for the next page. Over MCP, a long text field in a `list` answer is cut at 280 characters, and the row says it was. Name the field in `fields` to have it whole, or read the row with `get`.
 
 ## What your plan counts
 
-Your plan's monthly allowance is spent by the work your record does by itself: the scheduled actions and scripts that fetch from other services, counted as runs, requests, data fetched and running time. Your own calls to the API and to MCP are not counted against it. Trying a draft script with `scriptTry` is the one call that is, as a run, because it fetches for real.
+Your plan's monthly allowance is spent by the work your BrainDog does by itself: the scheduled actions and scripts that fetch from other services, counted as runs, requests, data fetched and running time. Your own calls to the API and to MCP are not counted against it. Trying a draft script with `scriptTry` is the one call that is, as a run, because it fetches for real.
 
 Past the allowance, an action waits for the first of next month, and failures are never held against it.
 
