@@ -404,6 +404,8 @@ test('and the whole route table is reachable from the client', async () => {
     for (const route of ROUTES) {
       const out = await c.client.call(route.name, { register: 'obligations', seq: 1, fields: { what: 'x' }, patch: {}, q: 'x' });
       const answer = out as { ok: boolean; refusal?: { code: string } };
+      /* A WRITE SENT AS A GET IS 405 `ROUTE_UNKNOWN`, so the sentence below says which it was when this fails. */
+      if (/so it is a POST/.test((answer as { refusal?: { fix?: string } }).refusal?.fix ?? '')) assert.fail(`${route.name} writes and the client sent it as a GET`);
       assert.notEqual(answer.refusal?.code, 'ROUTE_UNKNOWN', `${route.name} is in the table and the client cannot call it`);
       assert.notEqual(answer.refusal?.code, 'UNREACHABLE', `${route.name} did not reach the server`);
       /* AND THE VERB SURVIVED THE TRIP. The test above proves the client picks it from the table;

@@ -593,12 +593,17 @@ export async function serveApi(
     });
 
   /* A WRITE IS A POST. Not decoration: a GET that changes something is a change a browser can make
-     by prefetching a link, and a proxy may retry it. */
+     by prefetching a link, and a proxy may retry it. `ROUTE_UNKNOWN` AT 405, as every other door answers a method it
+     does not take: nobody is refused here, the address takes another method, and `Allow` names it. */
   if (route.writes && request.method !== 'POST')
-    return json(405, {
-      ok: false,
-      refusal: { code: 'FORBIDDEN', fix: `${name} changes the record, so it is a POST.` },
-    });
+    return json(
+      405,
+      {
+        ok: false,
+        refusal: { code: 'ROUTE_UNKNOWN', fix: `${name} changes the record, so it is a POST.` },
+      },
+      [['allow', 'POST']],
+    );
 
   /* SEEING AS SOMEBODY IS READ-ONLY, AND THE ROUTER IS THE FIRST LOCK (sharing plan T11): every route that writes is
      refused before its handler runs, and the record's `allows` refuses every need above `read` as the second. A read
@@ -921,11 +926,16 @@ const notText = (key: string, seen: unknown): Refusal => ({
   at: key,
 });
 
-const json = (status: number, body: { ok: boolean; value?: unknown; refusal?: Refusal; conflict?: Conflict }): Response => {
+const json = (
+  status: number,
+  body: { ok: boolean; value?: unknown; refusal?: Refusal; conflict?: Conflict },
+  extra: readonly (readonly [string, string])[] = [],
+): Response => {
   const wait = body.refusal?.retry_after;
   return new Response(JSON.stringify(body), {
     status,
     headers: {
+      ...Object.fromEntries(extra),
       'content-type': 'application/json; charset=utf-8',
       /* A record is never a shared cache's business: one customer's answer must never be another's. */
       'cache-control': 'no-store',

@@ -322,7 +322,7 @@ test('THE BOOT LINE NAMES THE WAYS IN AND NEVER THE KEY, on stdout or stderr', a
       return port !== undefined && (await answers(`http://127.0.0.1:${port}/healthz`));
     });
     const said = `${served.stdout ?? ''}${served.stderr ?? ''}`;
-    assert.match(served.stderr ?? '', /behind BRAINDOG_TOKEN; sign in at http:\/\/localhost:\d+\/signin with a passkey or the server key/);
+    assert.match(served.stderr ?? '', /behind BRAINDOG_SERVER_KEY; sign in at http:\/\/localhost:\d+\/signin with a passkey or the server key/);
     assert.equal(served.stdout ?? '', '', 'serve wrote to stdout, which belongs to the CLI');
     assert.ok(!said.includes(serverKey), 'the boot printed the server key');
   } finally {

@@ -15148,7 +15148,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             ok: false as const,
             refusal: {
               code: 'NEEDS_BROWSER_SESSION',
-              fix: 'An invitation link works from anywhere, so minting one needs a credential. Sign in, or send BRAINDOG_TOKEN.',
+              fix: 'An invitation link works from anywhere, so minting one needs a credential. Sign in, or send the server key as the bearer.',
               at: 'principal',
             },
           };
@@ -15292,7 +15292,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ok: false as const,
           refusal: {
             code: 'NEEDS_BROWSER_SESSION',
-            fix: 'A bearer works from anywhere, so minting one needs a credential. Set BRAINDOG_TOKEN and send it, or open this from the app.',
+            fix: 'A bearer works from anywhere, so minting one needs a credential. Start this BrainDog with BRAINDOG_SERVER_KEY and send that key, or open this from the app.',
             at: 'principal',
           },
         };
@@ -15325,7 +15325,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ok: false as const,
           refusal: {
             code: 'NEEDS_BROWSER_SESSION',
-            fix: 'A report key works from anywhere, so minting one needs a credential. Set BRAINDOG_TOKEN and send it, or open this from the app.',
+            fix: 'A report key works from anywhere, so minting one needs a credential. Start this BrainDog with BRAINDOG_SERVER_KEY and send that key, or open this from the app.',
             at: 'principal',
           },
         };
@@ -15420,7 +15420,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ok: false as const,
           refusal: {
             code: 'NEEDS_BROWSER_SESSION',
-            fix: 'Approving a device hands out a bearer that works from anywhere, so it needs a credential. Sign in, or send BRAINDOG_TOKEN.',
+            fix: 'Approving a device hands out a bearer that works from anywhere, so it needs a credential. Sign in, or send the server key as the bearer.',
             at: 'principal',
           },
         };
@@ -15846,7 +15846,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ok: false as const,
           refusal: {
             code: 'NEEDS_BROWSER_SESSION',
-            fix: 'A webhook token works from anywhere, and this BrainDog was started without BRAINDOG_TOKEN, so nothing here can prove who is asking. Start it with BRAINDOG_TOKEN set, then sign in from the app or send that same value as the bearer. An agent token is refused either way.',
+            fix: 'A webhook token works from anywhere, and this BrainDog was started without BRAINDOG_SERVER_KEY, so nothing here can prove who is asking. Start it with BRAINDOG_SERVER_KEY set, then sign in from the app or send that same value as the bearer. An agent token is refused either way.',
             at: 'principal',
           },
         };

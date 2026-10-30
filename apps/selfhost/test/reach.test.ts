@@ -387,7 +387,7 @@ test('a served-at that cannot be written does not take the host down with it', a
     mkdirSync(join(data, 'served-at'));
     const out = await serveUntil({ ...process.env, BRAINDOG_DATA: data, PORT: '0', BRAINDOG_HOST: '127.0.0.1' }, async (said) => {
       const port = /http:\/\/localhost:(\d+)/.exec(said)?.[1];
-      return port !== undefined && /^ {2}(loopback only|behind BRAINDOG_TOKEN)/m.test(said) && (await answers(`http://127.0.0.1:${port}/healthz`));
+      return port !== undefined && /^ {2}(loopback only|behind BRAINDOG_SERVER_KEY)/m.test(said) && (await answers(`http://127.0.0.1:${port}/healthz`));
     });
     assert.notEqual(out.status, 1, out.stderr);
     assert.ok(!(out.stderr ?? '').includes('EISDIR'), out.stderr);

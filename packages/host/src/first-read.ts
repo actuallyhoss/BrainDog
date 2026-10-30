@@ -73,7 +73,7 @@ export function firstReadIp(request: Request): string {
 const statusOf = (code: string): number => (code === 'UNREACHABLE' ? 503 : code === 'SLASH_BUDGET_SPENT' || code === 'RATE_LIMITED' ? 429 : 422);
 
 export async function serveFirstRead(request: Request, door: FirstReadDoor, now = Date.now()): Promise<Response> {
-  if (request.method !== 'POST') return refused(405, 'FORBIDDEN', 'This door takes a POST.', undefined, [['allow', 'POST']]);
+  if (request.method !== 'POST') return refused(405, 'ROUTE_UNKNOWN', 'This door takes a POST.', undefined, [['allow', 'POST']]);
   if (!sameOrigin(request, door.origin)) return refused(403, 'FORBIDDEN', `A sign-up is read only for pages on ${door.origin}.`, 'origin');
   if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json'))
     return refused(415, 'BODY_MALFORMED', 'This door takes a JSON object, sent as application/json.');

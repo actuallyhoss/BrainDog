@@ -9,7 +9,16 @@
 .wrangler
 **/.wrangler
 
-# A record, a key file or a copy on this machine is somebody's data, never the image's.
+# A record, a key file or a copy on this machine is somebody's data, never the image's. `apps/selfhost/src/baked.ts`
+# holds the same list: the build stops, and the image refuses to start, if any of these got in some other way.
+# A backup folder holds the key file, the records and each record's inbound mail token, so it is kept out whole.
+**/backups
+**/braindog-backups
+**/braindog-2*
+**/inbound.token
+**/claim-link
+**/*.pem
+**/*.key
 **/*.sqlite
 **/*.sqlite-*
 **/*.brain

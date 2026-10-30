@@ -142,7 +142,7 @@ export function methods(deps: RecordDeps) {
           ok: false as const,
           refusal: {
             code: 'NEEDS_BROWSER_SESSION',
-            fix: 'This BrainDog was started without BRAINDOG_TOKEN, so nothing here can prove who is asking. Start it with BRAINDOG_TOKEN set, then sign in from the app.',
+            fix: 'This BrainDog was started without BRAINDOG_SERVER_KEY, so nothing here can prove who is asking. Start it with BRAINDOG_SERVER_KEY set, then sign in from the app.',
             at: 'principal',
           },
         };

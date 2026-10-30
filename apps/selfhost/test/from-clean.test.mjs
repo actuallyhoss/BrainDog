@@ -38,7 +38,7 @@ test('the plain run: the README lines in their order, then the real command agai
 test('the container run, and outbound blocked once the install and the image are in', () => {
   const steps = plan(readmeBlocks(README), { container: true, offline: true });
   assert.deepEqual(ids(steps), [
-    'copy', 'install', 'build the command', 'env', 'up', 'offline', 'healthy', 'logs',
+    'copy', 'install', 'build the command', 'env', 'up', 'offline', 'healthy', 'logs', 'claim',
     'sign in', 'boot', 'write', 'read', 'export', 'verify', 'restore', 'start the copy', 'healthy there', 'sign in there', 'read there',
   ]);
   /* THE RESTORE IS THE README'S OWN init LINE, with --from in place of the owner. */

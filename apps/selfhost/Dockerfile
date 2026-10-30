@@ -25,6 +25,9 @@ WORKDIR /app
 # THE WHOLE WORKSPACE, INSTALLED AS IT IS IN CI, and never `pnpm deploy`: the self-host imports the workspace packages
 # as TypeScript source through their `exports`, so the tree is what runs.
 COPY . .
+# AND NOTHING SECRET CAME WITH IT. `.dockerignore` keeps backups, key files, records, inbound mail tokens and `.env` out
+# of the context; this stops the build if one got in anyway, before a layer holding it is built on.
+RUN node apps/selfhost/src/baked.ts
 RUN pnpm install --frozen-lockfile
 
 # The app the server hands out, at `apps/web/build`, where `main.ts` looks for it.
@@ -33,7 +36,9 @@ RUN pnpm --filter @braindog/web build
 # THE RECORD LIVES IN THE VOLUME, owned by the user the server runs as, so a copy, a key file and the Directory can all
 # be written there and nowhere else.
 RUN mkdir -p /data && chown node:node /data
-ENV NODE_ENV=production PORT=8080 BRAINDOG_DATA=/data
+# BRAINDOG_IMAGE says the process runs in this image: it checks the tree for baked secrets at every start, never prints
+# the one-time sign-in link (a container's output is its log), and names its commands as `docker compose run`.
+ENV NODE_ENV=production PORT=8080 BRAINDOG_DATA=/data BRAINDOG_IMAGE=1
 USER node
 VOLUME /data
 EXPOSE 8080

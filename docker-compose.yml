@@ -1,5 +1,7 @@
 # One command: `cp selfhost.env.example .env`, fill in the two values it asks for, then `docker compose up -d`.
 # The record lives in the named volume, so `docker compose down` keeps it; `down -v` deletes it.
+# BRAINDOG_PORT in .env moves the port on your machine, and the address the server names follows it.
+# The build context is this folder: keep backups out of it (apps/selfhost/README.md, Backups).
 services:
   braindog:
     build:

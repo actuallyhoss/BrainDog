@@ -31,6 +31,7 @@ import { fixOf } from '@braindog/ports';
 import { createRecordApi } from '@braindog/record';
 import { createDirectory } from '@braindog/record/directory';
 
+import { commandFor, inImage } from './how.ts';
 import { lockDown, openKeyStore, unwrap, type Purpose } from './keys.ts';
 import { openSqlite } from './server.ts';
 
@@ -82,13 +83,24 @@ export async function initFrom(o: {
   try {
     bytes = readFileSync(o.from);
   } catch (e) {
-    return refused(`${o.from} could not be read: ${e instanceof Error ? e.message : String(e)}`);
+    /* NODE'S SENTENCE IS NOT THE PERSON'S. "ENOENT: no such file or directory, open …" said the path twice and nothing
+       to do; a missing file is the common case (a path from the host typed into a container), so it is said plainly. */
+    const code = (e as { code?: string }).code;
+    if (code === 'ENOENT')
+      return refused(
+        inImage()
+          ? `${o.from} is not there. A file on your machine is not in the container until its folder is mounted: add -v "<its folder>:/import:ro" to docker compose run and name it as /import/<file>.`
+          : `${o.from} is not there. Name the .brainl file by its path from this folder, or by its whole path.`,
+      );
+    if (code === 'EISDIR')
+      return refused(`${o.from} is a folder. init --from takes one .brainl file; a backup folder goes in with ${commandFor(`restore ${o.from}`)}.`);
+    return refused(`${o.from} could not be read (${code ?? (e instanceof Error ? e.message : String(e))}). Check that the server's user can read it.`);
   }
   const head = bytes.subarray(0, 32).toString('latin1');
   if (head.startsWith(AGE))
     return refused(`${o.from} is sealed with age. Open it first, age -d -i <your identity> ${o.from} > latest.brainl, and restore from that.`);
   if (head.startsWith(SQLITE))
-    return refused(`${o.from} is a SQLite file, which is a self-host's own copy of a record and not a .brainl. Serve it where it is with braindog serve ${o.from}, or export a .brainl from the host that made it.`);
+    return refused(`${o.from} is a SQLite file, which is a self-host's own copy of a record and not a .brainl. Serve it where it is with ${commandFor(`serve ${o.from}`)}, or export a .brainl from the host that made it.`);
   const lines = bytes.toString('utf8').replace(/^﻿/u, '').split(/\r?\n/u);
   const checked = await checkBrainl(lines, o.key === undefined ? {} : { key: o.key });
   if (!checked.ok) return refused(`${o.from} was not restored (${checked.refusal.code}): ${checked.refusal.fix}`);
@@ -154,7 +166,7 @@ export async function initFrom(o: {
   const wrong = directory.bad(o.slug);
   if (wrong) return refuse(wrong);
   const held = directory.claimed(o.slug);
-  if (held === 'taken') return refuse(`${o.slug} is already somebody's record here.`);
+  if (held === 'taken') return refuse(`${o.slug} is already somebody's record here. A copy goes into an empty data folder.`);
   if (held === 'released')
     return refuse(`${o.slug} was the name of another record and cannot be given out again. Every link that still says it would read the wrong record.`);
   /* ONE RECORD, ONE FILE. Two names reaching two files that each say they are one record id is the tenant map lying, and

@@ -99,6 +99,8 @@ export type OAuthHereOptions = {
 
 /** The OAuth door this process keeps, built once in `start`. */
 export type OAuthHere = {
+  /** Why OAuth is off here, in the sentence its doors answer with, or `null` while it is on. `serve` says it at start. */
+  off: string | null;
   /**
    * The origin a request reached this process by, from the `Host` the socket got: one of `origins` when that name is a
    * resource here, and the issuer otherwise. `server.ts` builds the OAuth request at it, so the host package reads the
@@ -298,7 +300,7 @@ export function oauthHere(here: OAuthHereOptions): OAuthHere {
     here.auth === null || here.mode === null
       ? 'OAuth is off on this BrainDog: nobody can sign in to it from a browser, so nobody could allow an app. The line about signing in that it printed when it started says why.'
       : issuer.protocol !== 'https:' && !listensHere
-        ? `OAuth is off on this BrainDog: it signs in at ${here.origin}, which is not encrypted, and that is safe only while it listens on this machine alone. Set BRAINDOG_HOST=127.0.0.1, or serve it at an https address with BRAINDOG_ORIGIN.`
+        ? `OAuth is off on this BrainDog: it signs in at ${here.origin}, which is not encrypted, and that is safe only while it listens on this machine alone. Serve it at an https address and set BRAINDOG_ORIGIN to it, or, outside a container, set BRAINDOG_LISTEN=127.0.0.1.`
         : null;
 
   /* EVERY NAME A REQUEST MAY REACH `/mcp` BY, TO THE ORIGIN IT IS AT, and the issuer's own name last, so it wins its own. */
@@ -347,6 +349,7 @@ export function oauthHere(here: OAuthHereOptions): OAuthHere {
   });
 
   return {
+    off,
     originAt,
     metadata: (host) => (off === null ? `${originAt(host)}/.well-known/oauth-protected-resource` : undefined),
     serve: async (request, address) => {

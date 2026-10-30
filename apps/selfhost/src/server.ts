@@ -93,6 +93,7 @@ import { outboundHeld, scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
 import { selfhostFacts, selfhostProbeWire, slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, slashModelJobs, type SlashConfig } from './slash.ts';
 import { unwrap, type KeyStore } from './keys.ts';
+import { commandFor } from './how.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, keychainDoor } from './keychain.ts';
@@ -315,7 +316,7 @@ function slugApi(pathname: string): { slug: string; rest: string } | null {
 }
 
 /** Why an owner cannot invite anybody here: nobody but the owner can sign in, so the link would lead nowhere. */
-const INVITES_OFF = 'Nobody else can sign in to this BrainDog yet, so an invitation link would lead nowhere. Start it with BRAINDOG_TOKEN, a session key and a directory first.';
+const INVITES_OFF = 'Nobody else can sign in to this BrainDog yet, so an invitation link would lead nowhere. Start it with BRAINDOG_SERVER_KEY, a session key and a directory first.';
 
 /**
  * AN ADDRESS THAT CAN ALREADY SIGN IN: a person with a passkey, or with a record. Somebody made here and never
@@ -1884,14 +1885,18 @@ export async function start(options: {
 
   /* LOOPBACK UNLESS THERE IS A TOKEN. `listen(port)` with no host binds every interface, and the
      no-token case above hands `p_self` at `owner` to whoever asks, so a self-host started with no
-     `BRAINDOG_TOKEN`, which is the documented way to start one, served the credential index and the
+     `BRAINDOG_SERVER_KEY`, which is the documented way to start one, served the credential index and the
      whole export to anything that could reach the machine. The two decisions are only safe
      together: no token means one person on one machine, and one machine is `127.0.0.1`.
 
      A deployment that wants a wider bind says so by setting a token, which is the same sentence
-     read from the other end. `BRAINDOG_HOST` is the explicit override for the case in between: a
+     read from the other end. `BRAINDOG_LISTEN` is the explicit override for the case in between: a
      container that has a token and needs `0.0.0.0` to be reachable at all. */
-  const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '0.0.0.0');
+  /* AND "EVERY INTERFACE" IS BOTH FAMILIES. `0.0.0.0` is IPv4 alone, while every link this prints says `localhost`, which
+     a machine may resolve to `::1` first: with another program on `[::]:<port>`, `curl localhost:<port>` reached that
+     program and not this one (measured). `::` takes both where the machine has IPv6, and Node falls back to `0.0.0.0`
+     where it has none. */
+  const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '::');
   const trustProxy = options.trustProxy === true;
   /* SET THE MOMENT THE PORT IS KNOWN, and nothing is answered before: see below. */
   let site: Site | null = null;
@@ -1955,7 +1960,7 @@ export async function start(options: {
     /* A DELETED RECORD ANSWERS NOTHING BUT THAT, and never reads a file that is no longer there. */
     if (gone) {
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This BrainDog was deleted. Make another with braindog init.' } }));
+      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: `This BrainDog was deleted. Stop the server and make another with ${commandFor('init <name> --owner <your email>')}.` } }));
       return;
     }
     /* `/.well-known/braindog-key` (`03 §4`): the key this record's exports are signed with, `{ key_id, public_key }`, to
@@ -1997,9 +2002,45 @@ export async function start(options: {
   const inboundMail = options.file === ':memory:' ? null : inboundDigest(joinPath(dirOf(options.file), 'inbound.token'), clock.now);
 
   const names = options.tls === undefined ? [] : certificateNames(options.tls.cert);
-  const server =
+  const serverOf = () =>
     options.tls === undefined ? createServer(answering) : createTlsServer({ cert: options.tls.cert, key: options.tls.key }, answering);
-  await new Promise<void>((resolve) => server.listen(options.port, host, resolve));
+  const server = serverOf();
+  /* A PORT THAT IS TAKEN IS A SENTENCE, not an unhandled `error` event that ended the process with a stack. */
+  const listening = (on: typeof server, at: string | undefined, port: number): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      const failed = (e: Error): void => reject(e);
+      on.once('error', failed);
+      on.listen(port, at, () => {
+        on.off('error', failed);
+        resolve();
+      });
+    });
+  try {
+    /* THE DEFAULT WILDCARD IS NODE'S OWN, `::` with its fall back to `0.0.0.0`; one the operator named is bound as named. */
+    await listening(server, options.host === undefined && host === '::' ? undefined : host, options.port);
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === 'EADDRINUSE') throw new Error(`Port ${String(options.port)} is taken by another program, so this BrainDog did not start. Stop that program, or set PORT (and BRAINDOG_PORT under Compose) to another one.`);
+    if (code === 'EADDRNOTAVAIL') throw new Error(`${host} is not an address of this machine, so this BrainDog did not start. Set BRAINDOG_LISTEN to one it has, or unset it.`);
+    throw e;
+  }
+  /* AND LOOPBACK IS BOTH LOOPBACKS. `127.0.0.1` alone left `localhost` free to resolve to `::1` and reach whatever else
+     listens there; a second socket on `[::1]` closes that. A machine with no IPv6 has nothing to close, and a program
+     already on `[::1]:<port>` is said once, since this one cannot move it. */
+  let second: typeof server | null = null;
+  if (options.host === undefined && host === '127.0.0.1') {
+    const also = serverOf();
+    try {
+      await listening(also, '::1', (server.address() as AddressInfo).port);
+      second = also;
+    } catch (e) {
+      also.close();
+      if ((e as { code?: string }).code === 'EADDRINUSE')
+        console.error(
+          `listen: another program holds [::1]:${String((server.address() as AddressInfo).port)}, so localhost may reach it rather than this BrainDog. Open it at 127.0.0.1, or stop that program.`,
+        );
+    }
+  }
 
   /* THE ORIGIN IS KNOWN ONLY NOW, when the port is, and `port: 0` is how every test starts one. Nothing
      between here and `site = …` awaits, so no request is answered before it is set. */
@@ -2208,14 +2249,42 @@ export async function start(options: {
        handle this process already holds and closes, and never through a second one somebody has to remember. */
     directorySql: dirSql,
     signIn: { origin, ways, off },
+    /* WHY OAUTH IS OFF HERE, OR NULL WHILE IT IS ON, so the start can say it: only its metadata said so before, and a
+       connector that failed to connect was the first anybody heard of it. */
+    oauthOff: site.oauth.off,
     close: () =>
       new Promise<void>((r) => {
         scheduler.stop();
         if (ticker) clearInterval(ticker);
         if (slashTicker) clearInterval(slashTicker);
+        second?.close();
         server.close(() => (gone || (sql.close(), slashSql.close()), dirSql.close(), r()));
       }),
   };
+}
+
+/**
+ * Whether a request with no app to answer it is a person at a browser: a read of the root or the sign-in page, or any
+ * read that asks for HTML. A script asking anything else gets the JSON 404 it always did.
+ */
+const wantsPage = (method: string, path: string, headers: Headers): boolean =>
+  (method === 'GET' || method === 'HEAD') && (/^\/*(?:signin\/*)?$/u.test(path) || (headers.get('accept') ?? '').includes('text/html'));
+
+/**
+ * The page a browser gets when the app was never built. The server started, the start line printed a sign-in address,
+ * and that address answered a JSON 404 about record methods, which looks like a broken link rather than a missing step.
+ * 503 because the address is right and the app behind it is not there yet.
+ */
+function unbuilt(method: string): Response {
+  const page =
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>BrainDog is not built yet</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:36rem;margin:15vh auto;padding:0 16px}code{font-size:.95em}</style></head><body>' +
+    '<h1>The app is not built yet</h1><p>This BrainDog is running, and its record answers, but the app it serves was never built.</p>' +
+    '<p>In the repository folder run <code>pnpm --filter @braindog/web build</code>, then start the server again.</p></body></html>';
+  return new Response(method === 'HEAD' ? null : page, {
+    status: 503,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' },
+  });
 }
 
 const json = (status: number, body: object, extra: readonly (readonly [string, string])[] = []): Response => {
@@ -2481,7 +2550,14 @@ async function answer(
   if (/^\/+in(?:\/|$)/.test(path)) return write(res, await serveIngest(request, site.arrivals));
 
   if (!/^\/+api(?:\/|$)/.test(path))
-    return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
+    return write(
+      res,
+      shell
+        ? shell(request)
+        : wantsPage(method, path, request.headers)
+          ? unbuilt(method)
+          : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }),
+    );
 
   /* THE KEY DOORS, BEFORE ANY OTHER CREDENTIAL IS READ: their bearer is a keychain grant, which `contextFor` would
      not know, and a cookie or a login token must not reach them at all. AND ONLY AT THE ROOT: a grant names its own
