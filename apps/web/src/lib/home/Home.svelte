@@ -1840,8 +1840,10 @@
   }
 
   /* CASH, WIDE (§3.3): the cash now with its line on the left, coming in and going out stacked at the right. */
+  /* THE SIDE A LITTLE WIDER (finish F49): at a third "To come in, next 30 days" wrapped beside its figure by a few pixels
+     at 1512; now it holds one line there, and the cash's line wraps under its figure, where the frame has room. */
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid) {
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     grid-template-rows: auto auto;
     column-gap: var(--sp-5);
   }
@@ -1873,11 +1875,11 @@
     padding-block: var(--sp-2);
   }
 
-  /* AND HOW LONG IT LASTS ON ONE LINE, so a laptop's shorter row still holds it. */
+  /* AND HOW LONG IT LASTS, WHOLE (finish F49): one line cut it to "Lowest in the next 12 weeks: −£16,…", and a money
+     figure is never cut. It wraps under the figure, where the frame has room for a second line. */
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child .cell-note) {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    white-space: normal;
+    text-wrap: pretty;
   }
 
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
@@ -1945,7 +1947,8 @@
     row-gap: var(--sp-2);
   }
 
-  /* CASH, WIDE: each side figure on its label's line, so both fit a row's frame. */
+  /* CASH, WIDE: each side figure on its label's line, so both fit a row's frame. Under its label, the two did not fit a
+     laptop's shorter frame (tried for finish F49). */
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2)) {
     display: flex;
     flex-wrap: nowrap;

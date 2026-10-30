@@ -186,10 +186,10 @@
     display: none;
   }
 
+  /* THE NOTE UNDER THE FIGURE WRAPS, never cut (finish F49): "Lowest in the next 12 weeks: −£16,…" lost its money. */
   .wt[data-size='wide'] :global(.block-grid > .grid:has(> .cell:nth-child(3)) > .cell:first-child .cell-note) {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    white-space: normal;
+    text-wrap: pretty;
   }
 
   .wt-wait {
