@@ -26,7 +26,7 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
-import { existingRow, routeTo, type Confidence, type IngestDeps } from './ingest.ts';
+import { existingRow, nearFill, routeTo, type Confidence, type IngestDeps } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { keepCursor } from './pull.ts';
 import { attempt } from './tx.ts';
@@ -159,7 +159,15 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
       const register = routed.to;
 
       const existing = existingRow(deps, register, key, row.fields);
-      if (existing && conflict === 'skip') { kept += 1; continue; }
+      if (existing && conflict === 'skip') {
+        /* THE KEPT ROW TAKES WHAT IT NEVER HELD OF THIS ONE (`nearFill`), as a text's skip does, so two lines of one
+           amount on one page meeting one alert are one claimed and one written, not both dropped (review of 30 Oct, R11).
+           A refusal leaves the row as it was: the skip stands. */
+        const fill = nearFill(deps, register, existing, key, row.fields);
+        if (fill !== null) deps.write(register, existing.id, fill, `ingest:${ingest}`);
+        kept += 1;
+        continue;
+      }
 
       const written = deps.write(
         register,

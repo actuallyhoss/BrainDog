@@ -220,3 +220,14 @@ test('two day stamps that differ are two days, though the balance after them is 
   assert.equal(isDuplicate({ ...first, what: '17AUG26 ATM Cash Withdrawal', on: '2026-08-17' }, first, key), false);
   assert.equal(isDuplicate({ ...first, what: 'ATM Cash Withdrawal' }, first, key), true, 'a stamp on one side only is no day');
 });
+
+test('one payment leaves one balance: two balances after, under a key that does not name it, are two payments', () => {
+  /* R11 (review of 30 Oct): a line that took the first alert's balance is not the second alert's, whose reference it lacks. */
+  const line: Fields = { what: 'COFFEE HOUSE', amount: egp(340), account: 'card', on: '2026-10-07', available: egp(90_000) };
+  const second: Fields = { what: 'COFFEE HOUSE', amount: egp(340), account: 'card', on: '2026-10-07', hsbc_reference: 'bbbb', available: egp(89_660) };
+  assert.equal(isDuplicate(line, second, IPN), false);
+  assert.equal(isDuplicate(line, { ...second, available: egp(90_000) }, IPN), true);
+  const { available: _a, ...unsaid } = second;
+  assert.equal(isDuplicate(line, unsaid, IPN), true, 'a balance one side never said is unknown');
+  assert.equal(isDuplicate({ ...line, balance_after: egp(1) }, { ...unsaid, balance_after: egp(2) }, IPN), false);
+});
