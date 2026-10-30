@@ -67,8 +67,12 @@ const HOUSE: HomeVoice = {
 /** Today's lead note as `todayHome` declares it: words with no figure in them, which the rules never rewrite. */
 export const TODAY_LEAD = words.nothingNow;
 
-/** Today's line while it opens on the card to tell it one real thing (use case 6, step 5). */
-export const TELL_LINE = 'Tell it one real thing, and watch where it goes.';
+/**
+ * Today's line while it opens on the card to tell it one real thing (use case 6, step 5). NOT THE CARD'S OWN WORDS
+ * (first-hour audit E24): "Tell it one real thing, and watch where it goes." stood over a card titled "Tell it one real
+ * thing".
+ */
+export const TELL_LINE = 'Your BrainDog is ready. Start with something from today, and watch where it goes.';
 
 /**
  * HOW MUCH A FIRST TODAY HOLDS: what one sentence becomes at most (`tell/read.ts` makes eight entries at most). The next
