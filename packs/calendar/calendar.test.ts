@@ -65,7 +65,7 @@ test('THE PACK CARRIES calendar.js, CALLS ONLY GOOGLE AND OUTLOOK, AND KEEPS THE
   assert.deepEqual(PACK.widgets.map((w) => w.id), ['calendar-next', 'calendar-today']);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(PACK.version, '2.0.0');
+  assert.equal(PACK.version, '2.0.1');
   /* ITS PAGE IS `events`: BrainDog's own Calendar is `page.calendar` on every record, and 1.x declared the same id, so the
      plan said "Calendar is already here, from BrainDog" and the add-on could never be installed. */
   assert.deepEqual(PACK.declarations.filter((d) => typeof d.page === 'string').map((d) => d.page), ['events']);

@@ -67,7 +67,7 @@
   import { byBrainDog, callSaid, catalogueText, keepFirstKey, readHostCatalogue, signedLine, trustForEntry, trustSaid, trustThisKey } from '../catalogue.ts';
   import { recordKeys } from '../known-keys.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
-  import { askOnDecide, diffOf, firstPageOf, install, notOwner, planFor, sheetWords, turnOn, turnWords, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
+  import { askOnDecide, diffOf, firstPageOf, install, keysWanted, notOwner, planFor, sheetWords, turnOn, turnWords, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
 
   const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
   const kind = $derived<ListingKind>(KINDS.find((k) => k === page.url.searchParams.get('kind')) ?? 'usecase');
@@ -374,6 +374,19 @@
   }
 
   /**
+   * A KEY IT SENDS IS NOT IN THE KEYS YET, so the sheet reads the plan again while it is open (`PlanSheet` `onrecheck`):
+   * once the key is put in from a terminal the fresh plan, with its fresh hash, takes the old one's place and Install
+   * opens. Only a plan whose missing keys changed is swapped, so the sheet does not redraw every few seconds.
+   */
+  async function again() {
+    const was = planned;
+    if (!listing || !client || !states || !file || !was) return;
+    const held = states;
+    const out = await planFor(client, listing, file, held, copy.writeRaced, () => waitingOf(fetch, kennel, held));
+    if (out.ok && planned === was && keysWanted(out.planned) !== keysWanted(was)) planned = out.planned;
+  }
+
+  /**
    * THE OWNER'S PRESS ON A KEY THAT CHANGED: the new key is kept beside the ones seen before, on the record, and the
    * version is read again, so the line says "as before" and the button is offered. Nothing is kept by itself.
    */
@@ -651,6 +664,7 @@
         {busy}
         onapprove={() => void approve()}
         oncancel={() => (planned = null)}
+        onrecheck={again}
         extra={waits.length > 0 ? told : undefined}
       />
     {/if}

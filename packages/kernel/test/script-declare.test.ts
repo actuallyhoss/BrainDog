@@ -124,7 +124,7 @@ test('THE EGRESS IS PRINTED FROM THE SCRIPT BODY, with every origin and every ke
   assert.equal(e.host, 'api.goldapi.io');
   assert.equal(e.key, 'goldapi');
   assert.equal(e.line, 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its keychain entry opens');
-  assert.equal(e.key_line, 'gold-rate reads obligations and may send what it reads to api.goldapi.io.');
+  assert.equal(e.key_line, '“Gold price, 24k, per gram in EGP” reads obligations and may send what it reads to api.goldapi.io.');
   assert.equal(egressOf(GOLD({ egress: [] }).body), null, 'a script that fetches nothing calls nothing out');
 });
 
