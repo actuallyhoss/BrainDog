@@ -124,6 +124,19 @@ export function dropIndex(packed: Packed, key: string, x: number, y: number): nu
   return after < 0 ? others.length : after;
 }
 
+/** A frame on the screen, as `getBoundingClientRect` gives it. */
+export type Frame = { left: number; top: number; width: number; height: number };
+
+/**
+ * WHERE A WIDGET IS HELD, from its top left, once its frame has changed at pickup (review 30 Oct, R9). At rest a widget
+ * beside a hole is drawn across it; held, it is drawn at its own size. The point under the pointer is kept as the same
+ * share of the widget across and down, so the widget stays under the finger and does not jump away from it.
+ */
+export function heldAt(was: Frame, now: Frame, x: number, y: number): { dx: number; dy: number } {
+  const share = (at: number, from: number, size: number): number => (size > 0 ? Math.max(0, Math.min(1, (at - from) / size)) : 0);
+  return { dx: share(x, was.left, was.width) * now.width, dy: share(y, was.top, was.height) * now.height };
+}
+
 /** `order` with `key` moved to `to` among the others. */
 export function moved(order: readonly string[], key: string, to: number): string[] {
   const rest = order.filter((k) => k !== key);

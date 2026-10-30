@@ -15,11 +15,11 @@
  * reduced motion nothing slides: things are where they go at once.
  */
 
-import { tick } from 'svelte';
+import { flushSync, tick } from 'svelte';
 import { SIZE_WORDS, WIDGET_SIZES, sizesOf, type WidgetSize } from 'braindog-render';
 
 import { still } from '../ui/motion.ts';
-import { areaOf, cellsOf, dropIndex, filled, moved, pack, type Laid, type Packed } from './pack.ts';
+import { areaOf, cellsOf, dropIndex, filled, heldAt, moved, pack, type Laid, type Packed } from './pack.ts';
 import { phoneWidgets, type Phone, type Widget } from './board-widgets.ts';
 import { stepsBetween, type Arranged, type Step } from './steps.ts';
 
@@ -609,11 +609,17 @@ export class BoardModel {
    */
   startDrag(key: string, e: PointerEvent, node: HTMLElement): void {
     if (!this.editing || e.button > 0) return;
-    const r = node.getBoundingClientRect();
-    this.held = key;
-    this.heldBy = 'pointer';
+    /* HELD, THE BOARD IS DRAWN PACKED, so a widget drawn across a hole takes its own size at once (`places`). The board is
+       drawn that way now, before the grip is measured, and the grip is kept as the same share of the widget as the
+       pointer was over, so the widget stays under the finger (review 30 Oct, R9). */
+    const was = node.getBoundingClientRect();
+    flushSync(() => {
+      this.held = key;
+      this.heldBy = 'pointer';
+    });
+    const { dx, dy } = heldAt(was, node.getBoundingClientRect(), e.clientX, e.clientY);
     const scroller = node.closest('main') as HTMLElement | null;
-    this.drag = { key, node, dx: e.clientX - r.left, dy: e.clientY - r.top, lastAt: this.packed.laid.findIndex((l) => l.key === key), frame: 0, px: e.clientX, py: e.clientY, scroller, sx: e.clientX, sy: e.clientY };
+    this.drag = { key, node, dx, dy, lastAt: this.packed.laid.findIndex((l) => l.key === key), frame: 0, px: e.clientX, py: e.clientY, scroller, sx: e.clientX, sy: e.clientY };
     try {
       node.setPointerCapture(e.pointerId);
     } catch {
