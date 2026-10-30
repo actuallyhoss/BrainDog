@@ -264,4 +264,11 @@ test("an enum's words for its values are not a credential, and a secret-named ke
   const kinds = { register: 'keys', fields: [{ id: 'kind', type: 'enum', values: ['api_token', 'note'], labels: { api_token: 'API token', note: 'Note' } }] };
   assert.equal(credentialKey(kinds), null);
   assert.equal(credentialKey({ fields: [{ id: 'kind', type: 'enum', values: ['note'], labels: { api_token: 'sk-live' } }] }), 'api_token');
+  /* NAMING ITS OWN KEY IN `values` EXEMPTS NOTHING but an enum's words (review 3, P2). */
+  assert.equal(credentialKey({ values: ['password'], labels: { password: 'hunter2' } }), 'password');
+  assert.equal(credentialKey({ values: ['password'], labels: { password: 'Password' } }), 'password', 'not an enum field');
+  assert.equal(credentialKey({ id: 'kind', type: 'enum', values: ['password'], labels: { password: 'hunter2' } }), 'password');
+  assert.equal(credentialKey({ id: 'kind', type: 'enum', values: ['token'], labels: { token: 'Xk9f2LmQ7rT4vB8nW1zA' } }), 'token');
+  assert.equal(credentialKey({ id: 'kind', type: 'enum', values: ['secret'], labels: { secret: 'a'.repeat(41) } }), 'secret');
+  assert.equal(credentialKey({ id: 'kind', type: 'enum', values: ['password', 'ssh_key'], labels: { password: 'Password', ssh_key: 'SSH key' } }), null);
 });
