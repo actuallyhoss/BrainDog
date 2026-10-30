@@ -1863,6 +1863,12 @@
       align-items: center;
       min-block-size: var(--tap);
     }
+
+    /* AND IT STARTS WHERE "7 MORE IN NEEDS YOU" ENDS: that link's 44 reaches 12 under its words, and the red line began 8
+       inside it, so the more was 36 tall to a thumb (F34). */
+    .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
+      margin-block-start: var(--sp-3);
+    }
   }
 
   /* THE PROJECTS IN A ROW (full): each card its name, its standing and its number, and the rest on Projects. */

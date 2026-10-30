@@ -44,7 +44,12 @@ export const whoWords = {
   ruleIn: (name: string): string => (name.trim().toLowerCase() === 'ladder' ? 'The trust rule' : `The rule “${name.trim()}”`),
   /* WHO DID IT AND WHAT, where the line's title already said what was done (`lineSaid`'s `done`): "BrainDog closed it",
      and not "A rule: Handled · closed". A verb with its own object ("gave access") takes no "it". */
-  did: (who: string, done: string): string => (/\s/u.test(done.trim()) ? `${who} ${done.trim()}` : `${who} ${done.trim()} it`),
+  did: (who: string, done: string): string => {
+    const verb = done.trim();
+    if (/\s/u.test(verb)) return `${who} ${verb}`;
+    /* A QUESTION IS ASKED ABOUT WHAT IT NAMES: "The rule … asked about it", never "asked it". */
+    return verb === 'asked' ? `${who} asked about it` : `${who} ${verb} it`;
+  },
 } as const;
 
 /**

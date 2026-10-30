@@ -169,3 +169,7 @@ test('BRAINDOG UNDER ANY OF ITS NAMES IS ONE CHIP, and that chip keeps all of it
   assert.equal(byMatches('rule:handled', 'system'), true);
   assert.equal(byMatches('slash', 'system'), false);
 });
+
+test('A QUESTION IS ASKED ABOUT WHAT IT NAMES', () => {
+  assert.equal(didSaid('rule:txn-categorise', null, NO_NAMES, null, 'asked'), 'The rule “Categorise what cleared” asked about it');
+});
