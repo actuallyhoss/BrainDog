@@ -21,16 +21,26 @@ const SECRET = 'a-session-secret-of-thirty-two-bytes-or-more';
 
 type Kept = { bytes: Uint8Array; uploaded: Date; meta?: Record<string, string> };
 
-function bucket(): HeldBucket & { objects: Map<string, Kept> } {
+/** The bytes' own tag, as R2's etag is the content's hash: a put of the same bytes keeps it, new bytes change it. */
+const etagOf = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
+
+/** A bucket in memory that keeps what R2 keeps; `etags: false` is one that says no etag and takes no condition. */
+function bucket({ etags = true }: { etags?: boolean } = {}): HeldBucket & { objects: Map<string, Kept> } {
   const objects = new Map<string, Kept>();
   return {
     objects,
     get: async (key) => {
       const o = objects.get(key);
-      return o === undefined ? null : { arrayBuffer: async () => o.bytes.slice().buffer };
+      return o === undefined ? null : { arrayBuffer: async () => o.bytes.slice().buffer, ...(etags ? { etag: etagOf(o.bytes) } : {}) };
     },
     put: async (key, value, options) => {
+      /* A CONDITION THAT DOES NOT HOLD WRITES NOTHING AND ANSWERS NULL, as R2's does: an object gone since fails it too. */
+      if (options?.onlyIf?.etagMatches !== undefined) {
+        const o = objects.get(key);
+        if (o === undefined || etagOf(o.bytes) !== options.onlyIf.etagMatches) return null;
+      }
       objects.set(key, { bytes: value.slice(), uploaded: new Date(), ...(options?.customMetadata ? { meta: { ...options.customMetadata } } : {}) });
+      return { key };
     },
     delete: async (key) => {
       objects.delete(key);
@@ -228,4 +238,51 @@ test('AN ARRIVAL STILL REFUSED A WEEK AFTER IT WAS KEPT IS GIVEN UP ON, WITH A M
   assert.equal(out, 'gave-up');
   assert.ok([...b.objects.keys()].every((k) => k.startsWith(HELD_GAVE_UP)));
   assert.deepEqual(told, ['gave-up too-old']);
+});
+
+/* Q3 (second review of 30 October): his two devices post the same text while the record is down, so two chains ring one
+   key. Ring A reads the object and gets 503; ring B lands it a moment later and deletes it; ring A then put it back with
+   its metadata, and it rang for a week for an arrival already stored. */
+for (const etags of [true, false])
+  test(`A RING REFUSED WHILE ANOTHER LANDED IT DOES NOT PUT THE DELIVERED ARRIVAL BACK${etags ? '' : ', in a bucket with no etags'}`, async () => {
+    const b = bucket({ etags });
+    const first: { body: HeldMessage; delay: number | undefined }[] = [];
+    await serveHeld(post(), deps(['throw'], [], b, first).d);
+    const held = first[0]?.body.held ?? '';
+    assert.equal(b.objects.size, 1);
+
+    /* RING B LANDS IT AND DELETES IT AFTER RING A READ IT, while A's next ring is being queued. */
+    const seen: IngestArrival[] = [];
+    const { d } = deps(['throw'], [], b);
+    const ringA: HeldDeps = {
+      ...d,
+      queue: {
+        send: async () => {
+          assert.equal(await redeliver({ held, tries: 0 }, deps(['ok'], seen, b).d), 'delivered');
+        },
+      },
+    };
+    assert.equal(await redeliver({ held, tries: 0 }, ringA), 'gone');
+    assert.equal(seen.length, 1, 'the arrival was not stored once');
+    assert.equal(b.objects.size, 0, 'the delivered arrival was put back to ring again');
+  });
+
+test('A RING REFUSED OVER AN OBJECT KEPT AGAIN SINCE LEAVES THE NEW ONE AS IT IS, and a ring over its own object marks it', async () => {
+  const b = bucket();
+  const first: { body: HeldMessage; delay: number | undefined }[] = [];
+  await serveHeld(post(), deps(['throw'], [], b, first).d);
+  const held = first[0]?.body.held ?? '';
+
+  /* THE SAME TEXT KEPT AGAIN WHILE A RING WAS OUT: new seal, new ring of its own, and A's mark does not land on it. */
+  const { d } = deps(['throw'], [], b);
+  const ringA: HeldDeps = { ...d, queue: { send: async () => void (await serveHeld(post(), deps(['throw'], [], b).d)) } };
+  assert.equal(await redeliver({ held, tries: 3 }, ringA), 'gone');
+  assert.equal(b.objects.size, 1);
+  assert.equal(b.objects.get(held)?.meta?.['tries'], '0', 'the object kept again was marked by the older ring');
+
+  /* NOTHING IN BETWEEN: the ring marks its object when its next ring is due, as before. */
+  const again: { body: HeldMessage; delay: number | undefined }[] = [];
+  assert.equal(await redeliver({ held, tries: 3 }, deps(['throw'], [], b, again).d), 'waiting');
+  assert.equal(again.length, 1);
+  assert.equal(b.objects.size, 1);
 });

@@ -66,10 +66,13 @@ export type HeldMessage = { held: string; tries: number };
 export const isHeld = (body: unknown): body is HeldMessage =>
   typeof body === 'object' && body !== null && typeof (body as { held?: unknown }).held === 'string' && (body as { held: string }).held.startsWith(HELD_WAIT);
 
-/** The bucket calls this file makes. Structural, as `snapshots.ts`'s `Blobs` is, so the tests' fake fits. */
+/**
+ * The bucket calls this file makes. Structural, as `snapshots.ts`'s `Blobs` is, so the tests' fake fits. A put with
+ * `onlyIf` that does not hold writes nothing and answers `null`, as R2's does.
+ */
 export type HeldBucket = {
-  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
-  put(key: string, value: Uint8Array, options?: { customMetadata?: Record<string, string> }): Promise<unknown>;
+  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer>; etag?: string } | null>;
+  put(key: string, value: Uint8Array, options?: { customMetadata?: Record<string, string>; onlyIf?: { etagMatches?: string } }): Promise<unknown>;
   delete(key: string): Promise<void>;
   list(options: {
     prefix: string;
@@ -242,11 +245,28 @@ export async function redeliver(message: HeldMessage, deps: HeldDeps): Promise<R
     const delay = Math.min(Math.max(1, Math.round(answer.status === 429 && Number.isFinite(after) && after > 0 ? after : stepOf(tries))), 43_200);
     await deps.queue.send({ held: message.held, tries }, { delaySeconds: delay });
     /* THE OBJECT SAYS WHEN ITS NEXT RING IS DUE, so the sweep leaves a live chain alone. Put after the ring is queued:
-       a put that fails costs at most one extra ring from the sweep, which the door's dedupe stores once. */
+       a put that fails costs at most one extra ring from the sweep, which the door's dedupe stores once.
+
+       ONLY OVER THE OBJECT THIS RING READ (second review of 30 October, Q3): his two devices post the same text, so two
+       chains ring one key, and a ring that got 503 while the other landed it and deleted the object put it back here,
+       to ring for a week and end as a mail about nothing. The put holds only while the object is the one read (R2's
+       `etagMatches`, which fails on an object deleted since); one gone or kept again since is left as it is, and the
+       ring just queued finds it gone or rings the new one. A bucket that says no etag is read again first. */
+    const meta = ringing({ next: now + delay * 1000, tries, kept: Number.isFinite(kept) ? kept : now });
+    let marked: unknown;
     try {
-      await bucket.put(message.held, sealed, { customMetadata: ringing({ next: now + delay * 1000, tries, kept: Number.isFinite(kept) ? kept : now }) });
+      marked =
+        typeof object.etag === 'string' && object.etag !== ''
+          ? await bucket.put(message.held, sealed, { customMetadata: meta, onlyIf: { etagMatches: object.etag } })
+          : (await bucket.get(message.held)) === null
+            ? null
+            : await bucket.put(message.held, sealed, { customMetadata: meta });
     } catch (e) {
       op({ op: 'door', marked: false, rec, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
+    if (marked === null) {
+      op({ op: 'door', marked: false, rec, why: 'gone' });
+      return 'gone';
     }
     op({ op: 'door', waiting: true, rec, tries, status: answer.status }, 'error');
     if (tries === HELD_TELL_AFTER) await deps.tell?.({ why: 'waiting', rec });
