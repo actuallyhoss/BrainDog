@@ -33,6 +33,7 @@
     onopen = null,
     size = null,
     picture = false,
+    whose = null,
   }: {
     /** The component, as the block declares it. A new one draws a new frame. */
     code: string;
@@ -48,6 +49,8 @@
     size?: WidgetSize | null;
     /** On a board: run only while on screen and one of the few places is free, else draw its last picture. */
     picture?: boolean;
+    /** Who the pictures are kept for, the person and the BrainDog (`whoseOf`); `null` keeps and draws none. */
+    whose?: string | null;
   } = $props();
 
   /** The hosts' frame document (`DRAWN_FRAME_PATH`), under the app's base. */
@@ -134,7 +137,7 @@
       if ('height' in asked) height = asked.height;
       else if ('open' in asked) onopen?.(asked.open);
       else if (picture && alive) {
-        keepPicture(pictureKey(code, size, themeNow().mode), asked.picture, tall);
+        if (whose !== null) keepPicture(pictureKey(whose, code, size, themeNow().mode), asked.picture, tall);
         kept = { picture: asked.picture, height: tall };
       }
     };
@@ -173,10 +176,10 @@
     }, 900);
   }
 
-  /* THE PICTURE THIS DEVICE KEPT, read once for this code, size and theme. */
+  /* THE PICTURE THIS DEVICE KEPT, read once for this code, size and theme, and for this person on this BrainDog alone. */
   $effect(() => {
     if (!picture) return;
-    kept = keptPicture(pictureKey(code, size, themeNow().mode));
+    kept = whose === null ? null : keptPicture(pictureKey(whose, code, size, themeNow().mode));
   });
 
   /*

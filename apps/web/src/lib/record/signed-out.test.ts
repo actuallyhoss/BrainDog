@@ -39,13 +39,21 @@ test('A SIGN-OUT DROPS EVERY KEY OF WHAT THE PERSON READ, and keeps what is the 
     bd_money_lines_view: 'ledger',
     'braindog.macNotifications': 'on',
     'bd.list-default:r:p_1:tasks': '{}',
-    /* A DRAWN WIDGET'S PICTURE showed the last person's figures to the next one before their own component ran. */
-    'bd.drawn.pics': '["abc.page.light"]',
-    'bd.drawn.pic.abc.page.light': '{"p":"<svg/>","h":120}',
+    /* A DRAWN WIDGET'S PICTURE IS KEPT under who it was drawn for and where (`drawn-pictures.ts`, sec-follow M3), so it
+       stays through a sign-out and is drawn to that person alone. */
+    'bd.drawn.pics': '["w1.abc.page.light"]',
+    'bd.drawn.pic.w1.abc.page.light': '{"p":"<svg/>","h":120}',
   });
   const session = store({ 'braindog.see-as': '{"id":"p_2","name":"Ana"}', bd_look_fix: '{}' });
   forgetSignedOut(local, session);
-  assert.deepEqual([...local.held.keys()].sort(), ['bd.list-default:r:p_1:tasks', 'bd_look_fix', 'bd_money_lines_view', 'braindog.macNotifications']);
+  assert.deepEqual([...local.held.keys()].sort(), [
+    'bd.drawn.pic.w1.abc.page.light',
+    'bd.drawn.pics',
+    'bd.list-default:r:p_1:tasks',
+    'bd_look_fix',
+    'bd_money_lines_view',
+    'braindog.macNotifications',
+  ]);
   assert.deepEqual([...session.held.keys()], ['bd_look_fix']);
 });
 
@@ -79,15 +87,13 @@ test('EACH KEY IS THE ONE ITS OWN MODULE KEEPS, so a renamed key is not left beh
     'today-late-aside': '../home/late-verb.ts',
     'braindog:slot:aside': '../page/slot.ts',
     'braindog.inbox.into': '../../routes/inbox/+page.svelte',
-    'bd.drawn.pics': '../page/drawn-pictures.ts',
   };
   assert.deepEqual(Object.keys(owners).sort(), [...SIGNED_OUT_KEYS].sort());
   for (const [key, path] of Object.entries(owners)) assert.ok(src(path).includes(`'${key}'`), `${key} is not kept in ${path}`);
   assert.ok(src('../page/byline.ts').includes('`braindog.seen.${slug}`'));
   assert.ok(src('../sharing/sharing.ts').includes("'braindog.welcomed'") && src('../sharing/sharing.ts').includes('`${WELCOMED}:${base}`'));
   assert.ok(src('../home/Home.svelte').includes('`bd_board_draft:${apiBase()}`'));
-  assert.ok(src('../page/drawn-pictures.ts').includes("const PREFIX = 'bd.drawn.pic.';"));
-  assert.deepEqual([...SIGNED_OUT_PREFIXES], ['braindog.seen.', 'braindog.welcomed:', 'bd_board_draft:', 'bd.drawn.pic.']);
+  assert.deepEqual([...SIGNED_OUT_PREFIXES], ['braindog.seen.', 'braindog.welcomed:', 'bd_board_draft:']);
   assert.ok(src('../sharing/see-as.svelte.ts').includes(`'${SIGNED_OUT_SESSION_KEYS[0]}'`));
 });
 

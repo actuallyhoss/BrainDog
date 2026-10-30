@@ -20,6 +20,7 @@
   import { tick, untrack } from 'svelte';
   import { live as liveRecord } from '$lib/data/live.svelte.ts';
   import { apiBase, at as inApp } from '../at.ts';
+  import { whoseOf } from './drawn-pictures.ts';
   import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
   import { EMPTY_KEEP, KINDS, KPIS_KIND, inline, moneyWhole, readFigure, text } from 'braindog-render';
@@ -447,6 +448,8 @@
   const panel = $derived(panelOf(block));
   /* WHETHER THE READER OWNS THE RECORD, as the shell says it (`me.owner`), the flag the block's own menu reads too. */
   const owns = $derived((route.data as { me?: { owner?: unknown } }).me?.owner === true);
+  /* WHO A BOARD WIDGET'S PICTURES ARE KEPT FOR: the person the shell names, on this BrainDog (`drawn-pictures.ts`). */
+  const drawnWhose = $derived(whoseOf(apiBase(), (route.data as { me?: { person?: unknown } }).me?.person as string | null | undefined));
   /* A PANEL ABOUT THE RECORD AND NO ROW (`needs: none`, the look editor, the model Slash uses) stands under its section
      on any page, for the people its level names: anyone for `read`, a page that writes for `write`, the owner alone for
      `owner`. Never while arranging, since a panel is not a block to move. */
@@ -874,7 +877,7 @@
   }} />
 {:else if sketch && !block.refusals.length}
   <!-- A DRAWN COMPONENT, in its sandbox: never in the page, and handed only its own rows and the theme. -->
-  {#await import('./DrawnFrame.svelte') then { default: DrawnFrame }}<DrawnFrame code={sketch.code} data={sketch.data} start={sketch.start} title={headingText} onopen={openDrawn} size={widget} picture={widget !== null} />{/await}
+  {#await import('./DrawnFrame.svelte') then { default: DrawnFrame }}<DrawnFrame code={sketch.code} data={sketch.data} start={sketch.start} title={headingText} onopen={openDrawn} size={widget} picture={widget !== null} whose={drawnWhose} />{/await}
 {:else if drawn.refusal}
   {@const act = drawn.refusal.action}
   <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} icon={drawn.refusal.authored ? icon : undefined}>
