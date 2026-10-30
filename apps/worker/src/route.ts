@@ -126,6 +126,13 @@ export const servesOAuthMeta = (pathname: string): boolean =>
 export const servesBuild = (pathname: string): boolean => /^\/+\.well-known\/+braindog-build\/*$/.test(pathname);
 
 /**
+ * `/.well-known/apple-app-site-association`: which Apple apps may use this name's passkeys (`webcredentials`), the Mac
+ * app's (`apple.ts`). Apple's servers fetch it from each name the app lists, `app.brain.dog` here and `brain.dog`
+ * through the site, so the site forwards it too (`apps/site/wrangler.jsonc`). One name, as `servesBuild` is.
+ */
+export const servesAppleAssociation = (pathname: string): boolean => /^\/+\.well-known\/+apple-app-site-association\/*$/.test(pathname);
+
+/**
  * `/.well-known/braindog-key`: the key a record's exports are signed with (`03 §4`), under a slug on this Worker.
  *
  * A PATH AFTER THE SLUG AND NOT AT THE ROOT, BECAUSE ONE WORKER SERVES MANY RECORDS. `03 §4` puts the key at the host's
@@ -500,7 +507,7 @@ export function legacyRedirect(request: Request, legacy: string | undefined, pub
   const path = url.pathname;
   /* OAUTH IS A DOOR, AND ITS AUTHORIZE AND CONSENT ARE PAGE LOADS: a browser sent there by an app asks for HTML, and a
      308 to the app would hand the person the app shell instead of the sign-in they came for. */
-  if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path) || servesOAuth(path) || servesOAuthMeta(path)) return null;
+  if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path) || servesAppleAssociation(path) || servesOAuth(path) || servesOAuthMeta(path)) return null;
   /* AND A SLUG'S `/api` AND ITS KEY ARE DOORS TOO, WHICH THE ROOT'S LIST DOES NOT SEE. `/app/<slug>/api/<method>` is
      none of the doors' prefixes, so on the old host it was a 308 whatever the `Accept`, and `hostGet`'s
      `GET /api/slash/status`, which `apiBase()` sends under the slug, would have failed in every tab left open. */

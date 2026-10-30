@@ -423,8 +423,15 @@ export async function exchangeKey(serverKey: string, io: Io = live()): Promise<S
  * `next` IS THE PAGE HE WAS SENT FROM, so the link in the mail brings him back to it. The host holds it to a path
  * under the app and drops anything else (`packages/host/src/auth.ts`), so this sends it as it is.
  */
-export async function requestLink(email: string, next: string | null = null, io: Io = live(), turnstile: string | null = null): Promise<Said<null>> {
-  return done(call(io, '/auth/magic/start', { email: email.trim(), ...(next ? { next } : {}), ...(turnstile ? { turnstile } : {}) }));
+export async function requestLink(
+  email: string,
+  next: string | null = null,
+  io: Io = live(),
+  turnstile: string | null = null,
+  /** The Mac app's PKCE challenge: the link then carries it, and its page hands the link back to the app. */
+  app: string | null = null,
+): Promise<Said<null>> {
+  return done(call(io, '/auth/magic/start', { email: email.trim(), ...(next ? { next } : {}), ...(turnstile ? { turnstile } : {}), ...(app ? { app } : {}) }));
 }
 
 /** Spend a link that arrived in the address. */

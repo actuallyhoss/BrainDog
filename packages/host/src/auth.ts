@@ -27,7 +27,8 @@
  *   Links    `${origin}/signin#magic=<token>` and `#claim=<token>`, redeemed by `POST /auth/magic/redeem`.
  *            A fragment never reaches a server, a log or a link pre-fetcher, and a press is what spends it.
  *            `/auth/magic/start` also reads `next`, the one field that is the host's and not the call's: a
- *            path of the app on this origin (`appNext`) goes in the link as `?next=<path>`, before the fragment.
+ *            path of the app on this origin (`appNext`) goes in the link as `?next=<path>`, before the fragment;
+ *            and `app`, the Mac app's PKCE challenge, goes in as `?app=` so the page hands the link back to it.
  *
  * STANDARD `Request`, `Response` AND WEBCRYPTO, like the rest of this package, so the Worker and the
  * self-host run this file unchanged. Neither adds a sign-in route, and neither answers one differently.
@@ -415,6 +416,22 @@ export type GoogleFlow = 'google.start' | 'google.callback' | 'google.desktop';
 
 const GOOGLE: ReadonlySet<string> = new Set<GoogleFlow>(['google.start', 'google.callback', 'google.desktop']);
 
+/**
+ * The Mac app's way back from a sign-in finished in the browser, which are routes and never Directory flows.
+ *
+ * AN EMAILED LINK OPENS IN THE DEFAULT BROWSER, not in the app that asked for it. The app sends its PKCE challenge with
+ * `magic.start` (`app` beside `next`), the link carries it (`?app=`), and the page the link opens hands the unspent link
+ * to `desktop.handoff`, which seals it to that challenge as a one-time code for `braindog://auth?code=`. The app's
+ * window then posts the code and its verifier to `desktop`, which spends the link and sets the cookie there. The
+ * Worker answers both (`apps/worker/src/desktop-signin.ts`); a self-host has no Mac app to hand back to.
+ */
+export type DesktopFlow = 'desktop' | 'desktop.handoff';
+
+const DESKTOP: ReadonlySet<string> = new Set<DesktopFlow>(['desktop', 'desktop.handoff']);
+
+/** A PKCE S256 challenge, as the Mac app sends one: 43 characters of base64url, and nothing else is carried. */
+const APP_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
+
 
 /** One sign-in route: where it is, who serves it, and what it needs. */
 export type AuthRoute = {
@@ -424,7 +441,7 @@ export type AuthRoute = {
    * The `AuthCall` it becomes. `provision` is the one that is not a flow: it makes a record, then mints a claim.
    * The two device flows reach a record and never the Directory, and `device.ts` answers them.
    */
-  flow: AuthFlow | 'provision' | DeviceFlow | InviteFlow | SignupFlow | GoogleFlow;
+  flow: AuthFlow | 'provision' | DeviceFlow | InviteFlow | SignupFlow | GoogleFlow | DesktopFlow;
   /** The server key is the self-host's; provisioning and sign-up are the Worker's; everything else is both. */
   on: 'both' | 'selfhost' | 'worker';
   /** Nothing, the session cookie, or the operator's key. A route that needs a session still answers without one: 401. */
@@ -469,6 +486,8 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/google/start', method: 'GET', flow: 'google.start', on: 'worker', needs: 'nothing', what: 'Send the browser to Google to say which address it is signed in as. `?next=` is where to land afterwards.' },
   { path: '/auth/google/callback', method: 'GET', flow: 'google.callback', on: 'worker', needs: 'nothing', what: 'Back from Google: an address somebody here has is signed in, and any other is sent to the sign-in page told why.' },
   { path: '/auth/google/desktop', method: 'POST', flow: 'google.desktop', on: 'worker', needs: 'nothing', what: 'The Mac app swaps the one-time code from `braindog://auth` and its PKCE verifier for the session cookie. `?desktop=1&challenge=` on the start asks for that flavour.' },
+  { path: '/auth/desktop', method: 'POST', flow: 'desktop', on: 'worker', needs: 'nothing', what: 'The Mac app swaps a one-time code from `braindog://auth` and its PKCE verifier for the session cookie.' },
+  { path: '/auth/desktop/handoff', method: 'POST', flow: 'desktop.handoff', on: 'worker', needs: 'nothing', what: 'A sign-in link the Mac app asked for, opened in a browser: sealed to the app\'s challenge as a one-time code, and not spent. `{ linkToken, challenge }`.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
   { path: '/auth/suspend', method: 'POST', flow: 'suspend', on: 'worker', needs: 'operator', what: 'Stop somebody signing in, `{ email }`, ending every session they hold, or let them in again, `{ email, suspended: false }`.' },
@@ -901,9 +920,13 @@ const off = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'This Bra
  * `app.brain.dog/app/signin#…` or `brain.dog/app/signin#…` still works: the Worker answers a page load there with one
  * 308 to `/signin`, and a browser keeps the fragment across a redirect whose `Location` carries none.
  */
-const linkOf = (origin: string, mail: LinkMail, next: unknown = undefined): string => {
+const linkOf = (origin: string, mail: LinkMail, next: unknown = undefined, app: unknown = undefined): string => {
   const back = mailedNext(next);
-  const page = back ? `${origin}/signin?next=${encodeURIComponent(back)}` : `${origin}/signin`;
+  /* THE MAC APP'S CHALLENGE, when the app asked for this link: the page it opens in a browser hands it back to the app
+     (`DesktopFlow`). A hash and never a secret, so the query reaching a server costs nothing. */
+  const handoff = 'linkToken' in mail && typeof app === 'string' && APP_CHALLENGE.test(app) ? app : null;
+  const query = [...(back ? [`next=${encodeURIComponent(back)}`] : []), ...(handoff ? [`app=${handoff}`] : [])];
+  const page = query.length > 0 ? `${origin}/signin?${query.join('&')}` : `${origin}/signin`;
   return 'linkToken' in mail ? `${page}#magic=${mail.linkToken}` : `${page}#claim=${mail.claimToken}`;
 };
 
@@ -1094,7 +1117,7 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
 
   /* A SIGN-UP ROW IS DECLARED AND NOT YET SERVED: the Directory has no such flow to hand it to. The unit that adds
      the three flows to `AuthCall` removes this line, and `callOf`'s `never` then asks it for their three cases. */
-  if (SIGNUP.has(route.flow) || GOOGLE.has(route.flow)) return off();
+  if (SIGNUP.has(route.flow) || GOOGLE.has(route.flow) || DESKTOP.has(route.flow)) return off();
 
   const call = callOf(route.flow as AuthFlow, body, sid, door.ip);
   if (!call) return off();
@@ -1107,7 +1130,7 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
   if (out.status === 200 && out.mail && door.mail) {
     const mail = out.mail;
     try {
-      if (!('kind' in mail)) door.mail(mail.to, linkOf(door.origin, mail, body.next));
+      if (!('kind' in mail)) door.mail(mail.to, linkOf(door.origin, mail, body.next, body.app));
       else if (mail.kind !== 'invite.prove') door.mail(mail.to, '', mail.kind);
     } catch {
       /* A failed send is the host's to report; the answer is the same either way. */

@@ -76,6 +76,8 @@ const BARE = routeSource.replace(CALL, '').match(/[^\n]*url\.pathname[^\n]*/g) ?
 const DOOR_OF: { [asked: string]: string[] } = {
   'HEALTHZ.test': ['/healthz'],
   servesBuild: ['/.well-known/braindog-build'],
+  /* Which Apple app may use the name's passkeys (`apple.ts`), on both names: the passkeys' relying party is `brain.dog`. */
+  servesAppleAssociation: ['/.well-known/apple-app-site-association'],
   servesAuth: ['/auth/methods'],
   servesAccount: ['/account/usage'],
   servesMcp: ['/mcp', '/mcp/'],

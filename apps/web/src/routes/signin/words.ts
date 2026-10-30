@@ -16,4 +16,17 @@ export const words = {
   desktopFailed: 'That sign-in did not finish',
   desktopFailedWhy: 'It may have timed out. Start again from the app.',
   desktopBack: 'Back to sign in',
+
+  /* AN EMAILED LINK THE MAC APP ASKED FOR, opened in a browser: it goes back to the app rather than signing in here. */
+  /** Under "Check your email" in the app: where the link finishes. */
+  appLinkSent: 'Open the link on this Mac. It brings you back here, signed in.',
+  handoffTitle: 'Finish signing in on your Mac',
+  handoffWhy: 'You asked for this link in BrainDog for Mac. Open the app to finish there.',
+  handoffOpen: 'Open BrainDog for Mac',
+  handoffOpening: 'Opening BrainDog for Mac',
+  handoffSentTitle: 'Back to BrainDog for Mac',
+  handoffSentWhy: 'The app is signing you in. You can close this tab.',
+  handoffAgain: 'Open the app again',
+  handoffFailed: 'The link could not be handed to the app. Sign in here instead, or ask for a new link in the app.',
+  handoffHere: 'Sign in in this browser instead',
 } as const;

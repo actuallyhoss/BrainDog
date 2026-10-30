@@ -27,6 +27,8 @@ import { accessHeaders, clearCookie, cookieMode, mirrorEverywhere, readSid, rena
 import type { AccountCall, SignupCall } from '@braindog/ports';
 /* GOOGLE: its two routes are answered in `signIn()` before `serveAuth`, as sign-up's are. */
 import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
+import { DESKTOP_ROUTES, serveDesktop } from './desktop-signin.ts';
+import { appleAssociation } from './apple.ts';
 /* CLOSING AN ACCOUNT: the door is the host package's, and `account()` hands it this Worker's halves. */
 import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
 import type { AccountClosed } from '@braindog/ports';
@@ -93,7 +95,7 @@ import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@brain
 import { shareKeyOf, sharesOf } from './share.ts';
 import { firstReadDoorOf } from './first-read.ts';
 import { consume, pump } from './pump.ts';
-import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyRedirect, mcpMetadataAt, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
+import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyRedirect, mcpMetadataAt, restoreAsked, servesAccount, servesApi, servesAppleAssociation, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { cookieDomain, withSignedIn } from './signed-in.ts';
@@ -297,6 +299,8 @@ type Env = {
    * under switches passkeys off (`relyingParty`), which is a refusal an operator can read and not a broken button.
    */
   RP_ID?: string;
+  /** The owner's Apple Developer team, which `/.well-known/apple-app-site-association` names the Mac app under (`apple.ts`). */
+  APPLE_TEAM_ID?: string;
   /**
    * The names this Worker answered as before the app moved to `PUBLIC_HOST`, comma-separated: `brain.dog`.
    *
@@ -3607,6 +3611,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* THE DEPLOYMENT'S OWN BUILD ID, BEFORE ANYTHING ELSE, because it asks nothing of the Directory,
        of a record or of whoever is calling. */
     if (servesBuild(url.pathname)) return buildId(env);
+    /* WHICH APPLE APP MAY USE THIS NAME'S PASSKEYS (`apple.ts`): asks nothing of anybody, like the build id. */
+    if (servesAppleAssociation(url.pathname)) return appleAssociation(env.APPLE_TEAM_ID);
     /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. LIMITED BY ADDRESS BEFORE THE
        DIRECTORY IS ASKED, on top of its own lockouts, because nobody at this door has proved who they are yet: the
        address is the one thing a caller cannot choose here (`cf-connecting-ip`). */
@@ -4698,6 +4704,17 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
       mode,
       clientId: (env.GOOGLE_CLIENT_ID ?? '').trim(),
       clientSecret: (env.GOOGLE_CLIENT_SECRET ?? '').trim(),
+      secret: env.SESSION_SECRET ?? '',
+      ip: request.headers.get('cf-connecting-ip') ?? '',
+      ask: (call) => directory.auth(call) as unknown as Promise<AuthResult>,
+    });
+  /* THE MAC APP'S WAY BACK FROM A BROWSER (`desktop-signin.ts`): an emailed link handed back as a one-time code, and the
+     code swapped in the app's window. Wherever sign-in is on, whatever Google says; off, the rows fall through to
+     `serveAuth`, which answers each as a way in this host does not offer. */
+  if ((env.SESSION_SECRET ?? '').length >= 32 && mode !== null && Object.hasOwn(DESKTOP_ROUTES, signupPath))
+    return serveDesktop(request, signupPath as keyof typeof DESKTOP_ROUTES, {
+      origin,
+      mode,
       secret: env.SESSION_SECRET ?? '',
       ip: request.headers.get('cf-connecting-ip') ?? '',
       ask: (call) => directory.auth(call) as unknown as Promise<AuthResult>,

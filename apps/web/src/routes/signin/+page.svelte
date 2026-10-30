@@ -39,7 +39,7 @@
     type Who,
   } from '$lib/auth.ts';
   import { at, BASE } from '$lib/at.ts';
-  import { desktopStart, keepVerifier, pkce } from '$lib/desktop-signin.ts';
+  import { appLink, CHALLENGE, desktopStart, handOff, keepVerifier, pkce } from '$lib/desktop-signin.ts';
   import { isApp, openOutside } from '$lib/shell.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
@@ -53,6 +53,7 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
   import Human from './Human.svelte';
+  import { words } from './words.ts';
   import { signupMode, type SignupMode } from '$lib/signup.ts';
 
   const here = support();
@@ -61,7 +62,28 @@
   async function openGoogleInBrowser(e: MouseEvent): Promise<void> {
     e.preventDefault();
     const { verifier, challenge } = await pkce();
-    if (keepVerifier(verifier)) openOutside(desktopStart(goTo, origin, challenge));
+    if (keepVerifier(verifier, undefined, goTo)) openOutside(desktopStart(goTo, origin, challenge));
+  }
+
+  /* AN EMAILED LINK THE MAC APP ASKED FOR, opened here in a browser (`?app=` beside the link): handed back to the app as
+     a one-time code on a press, rather than spent in this browser. The press is what hands it, as a press is what spends
+     a link, so a mail scanner that opens it hands nothing. */
+  let handoff = $state<string | null>(null);
+  let handing = $state<'idle' | 'asking' | 'sent' | 'failed'>('idle');
+  let handed = '';
+  async function handBack(): Promise<void> {
+    const l = link;
+    if (handoff === null || l === null || l.kind !== 'magic' || handing === 'asking') return;
+    if (handed === '') {
+      handing = 'asking';
+      handed = (await handOff(l.token, handoff, origin)) ?? '';
+    }
+    if (handed === '') {
+      handing = 'failed';
+      return;
+    }
+    location.href = appLink(handed);
+    handing = 'sent';
   }
 
   let asked = $state<Said<Methods> | null>(null);
@@ -215,6 +237,15 @@
       kept.delete('google');
       history.replaceState(history.state, '', `${location.pathname}${kept.size > 0 ? `?${kept}` : ''}${location.hash}`);
     }
+    /* THE MAC APP'S CHALLENGE, read before the link leaves the address and taken out of it too. Only in a browser: a
+       link opened in the app itself is spent where it is. */
+    const query = new URLSearchParams(location.search);
+    const app = query.get('app');
+    if (app !== null) {
+      if (!isApp && CHALLENGE.test(app)) handoff = app;
+      query.delete('app');
+      history.replaceState(history.state, '', `${location.pathname}${query.size > 0 ? `?${query}` : ''}${location.hash}`);
+    }
     link = takeLink(location.hash, clearHash);
     void load();
     if (here.secure && here.webauthn) void canAutofill().then((yes) => (autofill = yes));
@@ -331,8 +362,19 @@
   }
 
   /** `when` starts the sent screen's minute, after which it says what fixes a letter that did not come (`SENT_LATE`). */
+  /* IN THE MAC APP THE LINK CARRIES THIS WINDOW'S CHALLENGE, so the browser the mail opens it in hands it back here. */
+  const appChallenge = async (): Promise<string | null> => {
+    if (!isApp) return null;
+    const { verifier, challenge } = await pkce();
+    return keepVerifier(verifier, undefined, goTo) ? challenge : null;
+  };
+
   const sendTo = (to: string) =>
-    void run('send', () => requestLink(to, goTo === `${BASE}/` ? null : goTo, undefined, human), () => (step = { at: 'sent', email: to, when: Date.now() })).then(() => {
+    void run(
+      'send',
+      async () => requestLink(to, goTo === `${BASE}/` ? null : goTo, undefined, human, await appChallenge()),
+      () => (step = { at: 'sent', email: to, when: Date.now() }),
+    ).then(() => {
       /* THE ANSWER IS GOOD ONCE, so the check is asked again whatever came back. */
       humanBox?.reset();
     });
@@ -495,6 +537,7 @@
           <IconWell name="check" size="card" tone="earn" />
           <h1 class="entry-title">{copy.linkSentTitle}</h1>
           <p class="calm-body">{copy.linkSentBody(view.email)}</p>
+          {#if isApp}<p class="calm-body">{words.appLinkSent}</p>{/if}
           <!-- THE SECOND LINE, a minute on (`SENT_LATE`): the screen cannot know a letter failed, so it says what fixes one. -->
           {#if view.late}<p class="calm-body">{copy.linkSentLater}</p>{/if}
         </div>
@@ -504,6 +547,29 @@
             <Button weight="primary" onclick={() => (siteKey === null ? sendTo(to) : void mail())} aria-busy={asking === 'send'}>{copy.sendAgain}</Button>
           {/if}
           <Button onclick={mail}>{copy.useAnotherEmail}</Button>
+        </div>
+      {:else if handoff !== null && link?.kind === 'magic' && (view.name === 'link-landing' || view.name === 'signed-in')}
+        <!-- THE LINK GOES BACK TO THE MAC APP THAT ASKED FOR IT (`handBack`), whether or not this browser is signed in
+             already, and this browser is offered as the other way while it is not. -->
+        <div class="calm" role={handing === 'sent' ? 'status' : undefined}>
+          <IconWell name={handing === 'sent' ? 'check' : 'link'} size="card" tone={handing === 'sent' ? 'earn' : undefined} />
+          <h1 class="entry-title">{handing === 'sent' ? words.handoffSentTitle : words.handoffTitle}</h1>
+          <p class="calm-body">{handing === 'sent' ? words.handoffSentWhy : words.handoffWhy}</p>
+        </div>
+        {#if handing === 'failed'}<p class="status" role="status">{words.handoffFailed}</p>{/if}
+        <div class="doors">
+          {#if handing !== 'failed'}
+            <Button weight={handing === 'sent' ? 'quiet' : 'primary'} onclick={handBack} aria-busy={handing === 'asking'}>
+              {handing === 'asking' ? words.handoffOpening : handing === 'sent' ? words.handoffAgain : words.handoffOpen}
+            </Button>
+          {/if}
+          {#if view.name === 'link-landing'}
+            <Button weight={handing === 'failed' ? 'primary' : 'bare'} onclick={spend} aria-busy={view.asking}>
+              {view.asking ? copy.signingIn : words.handoffHere}
+            </Button>
+          {:else if view.name === 'signed-in'}
+            <Button weight={handing === 'failed' ? 'primary' : 'bare'} href={goTo} data-sveltekit-reload>{copy.openBrainDog}</Button>
+          {/if}
         </div>
       {:else if view.name === 'link-landing'}
         <div class="calm">

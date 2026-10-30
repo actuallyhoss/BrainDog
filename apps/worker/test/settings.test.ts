@@ -96,6 +96,7 @@ const CASES: Record<string, Case> = {
   },
   LEGACY_HOSTS: { kind: 'quiet', door: HEALTH, why: 'unset, no name is a legacy one, which is the Worker before the move' },
   RP_ID: { kind: 'quiet', door: METHODS, why: 'unset, the passkeys’ relying party is PUBLIC_HOST' },
+  APPLE_TEAM_ID: { kind: 'refuses', door: { path: '/.well-known/apple-app-site-association' } },
   AI_GATEWAY: { kind: 'quiet', door: HEALTH, why: 'unset, a model call goes to Workers AI with no gateway' },
   AGE_RECIPIENT: { kind: 'quiet', door: HEALTH, why: 'empty takes unsealed copies, which the config names as the choice' },
   COUNT_VISITS: { kind: 'quiet', door: HEALTH, why: 'anything but yes counts nothing, and /api/seen answers 204' },

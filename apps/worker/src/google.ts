@@ -302,8 +302,15 @@ export async function serveGoogle(request: Request, path: keyof typeof GOOGLE_RO
   return go(`${door.origin}${next}`, [forget, cookie]);
 }
 
-/** The app's window swaps its code for the session cookie: a same-site POST carrying the code and the PKCE verifier. */
-async function exchange(request: Request, door: GoogleDoor, now: number): Promise<Response> {
+/** What swapping a code needs: the host's origin and cookie, the Directory, the caller's address and the seal's secret. */
+export type SwapDoor = Pick<GoogleDoor, 'origin' | 'mode' | 'ip' | 'ask' | 'secret'>;
+
+/**
+ * The app's window swaps its code for the session cookie: a same-site POST carrying the code and the PKCE verifier. The
+ * code may come from Google's callback or from an emailed link handed back by its page (`desktop-signin.ts`); both are
+ * the same sealed link, so both are spent here.
+ */
+export async function exchange(request: Request, door: SwapDoor, now: number): Promise<Response> {
   const reply = (status: number, ok: boolean, cookies: readonly string[] = []): Response => {
     const headers = new Headers({ 'content-type': 'application/json', 'cache-control': 'no-store' });
     for (const c of cookies) headers.append('set-cookie', c);

@@ -38,9 +38,9 @@ function setup() {
     return { status: res.status, raw: await res.text() };
   };
   /* One send, and the link it mailed. */
-  const mailed = async (next: unknown): Promise<string> => {
+  const mailed = async (next: unknown, app?: unknown): Promise<string> => {
     const before = sent.length;
-    const out = await call('/auth/magic/start', { email: 'ada@example.com', next });
+    const out = await call('/auth/magic/start', { email: 'ada@example.com', next, ...(app === undefined ? {} : { app }) });
     assert.equal(out.status, 200);
     assert.equal(sent.length, before + 1, 'no link was mailed');
     return sent[sent.length - 1] ?? '';
@@ -121,4 +121,14 @@ test('appNext IS A PAGE OF THE APP OR NOTHING: a door is refused, and an address
   /* What `safeNext` refuses is the front door, and the front door is a page. */
   assert.equal(appNext('//evil.example/x'), '/');
   assert.equal(appNext('https://evil.example/'), '/');
+});
+
+test("THE MAC APP'S CHALLENGE RIDES IN THE LINK AS ?app=, beside next, and only in the shape of a challenge", async () => {
+  const { mailed } = setup();
+  const challenge = 'c'.repeat(43);
+  const both = await mailed('/the-studio/r/tasks', challenge);
+  assert.match(both, new RegExp(`^https://studio\\.example/signin\\?next=%2Fthe-studio%2Fr%2Ftasks&app=${challenge}#magic=[A-Za-z0-9_-]{43}$`));
+  assert.match(await mailed(undefined, challenge), new RegExp(`^https://studio\\.example/signin\\?app=${challenge}#magic=`));
+  for (const bad of ['short', `${challenge}x`, `${'c'.repeat(42)}/`, 7])
+    assert.match(await mailed(undefined, bad), /^https:\/\/studio\.example\/signin#magic=/, `${String(bad)} rode in the link`);
 });
