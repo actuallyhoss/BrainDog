@@ -89,7 +89,8 @@ export function wholeSentence(start: string, steps: readonly string[]): string {
   if (start.trim() === '' || said.length === 0) return '';
   const lower = (s: string): string => (/^[A-Z][a-z]/u.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
   const then = said.length === 1 ? lower(said[0]!) : `${said.slice(0, -1).map(lower).join(', ')}, then ${lower(said.at(-1)!)}`;
-  return `${start.trim().replace(/[.,]$/u, '')}, ${then}.`;
+  /* A STEP THAT ENDS ASKING ENDS THE SENTENCE AS IT ASKED: "Chase it?" and never "Chase it?." (audit 6g, AG3). */
+  return `${start.trim().replace(/[.,]$/u, '')}, ${then}${/[?!]$/u.test(then) ? '' : '.'}`;
 }
 
 /* ── the sentence in pieces you can press ──────────────────────────── */
