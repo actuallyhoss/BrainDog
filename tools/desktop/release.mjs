@@ -6,6 +6,8 @@
  *   node tools/desktop/release.mjs                    build for this Mac's chip
  *   node tools/desktop/release.mjs --universal        Apple silicon and Intel in one app (needs both Rust targets)
  *   node tools/desktop/release.mjs --publish          and, once it is notarised, upload it and open /download
+ *   node tools/desktop/release.mjs --upload-only      upload what apps/desktop/dist holds, building nothing: how a
+ *                                                     --publish that stopped after its build is finished
  *   node tools/desktop/release.mjs --version 0.2.0    set the app's version first (tauri.conf.json and Cargo.toml)
  *   node tools/desktop/release.mjs --dry-run          say what it would do, and build nothing
  *
@@ -35,6 +37,12 @@
  *
  * A VERSION ALREADY LIVE IS REFUSED: the app offers only a newer version than its own, so a second release under the
  * same number would reach nobody. `--version` raises it in both files.
+ *
+ * EXCEPT TO FINISH ONE (`--upload-only`, RD9). A publish whose check after the upload failed (the dmg not answering yet
+ * while `latest.json` already did) said "run --publish again", and the run again read that `latest.json`, found its own
+ * version live and stopped, after twenty minutes of building and notarising. `--upload-only` builds nothing: it sends
+ * the files `apps/desktop/dist` holds for this version, once Gatekeeper accepts the dmg there as notarised, and the
+ * version may be the one already live.
  *
  * WHAT `--publish` NEEDS: Cloudflare credentials that may write the bucket, `CLOUDFLARE_API_TOKEN` (Workers R2 Storage:
  * Edit) and `CLOUDFLARE_ACCOUNT_ID` in the environment or in `signing.env`, or `wrangler login` on this Mac. This
@@ -73,7 +81,8 @@ const args = new Set(argv);
 const DRY = args.has('--dry-run');
 const UNIVERSAL = args.has('--universal');
 /* `--stage` WAS THE OLD NAME, when the files were laid in the site's folder; it means the same now. */
-const PUBLISH = args.has('--publish') || args.has('--stage');
+const UPLOAD_ONLY = args.has('--upload-only');
+const PUBLISH = args.has('--publish') || args.has('--stage') || UPLOAD_ONLY;
 const asked = argv.indexOf('--version') >= 0 ? (argv[argv.indexOf('--version') + 1] ?? '') : null;
 const say = (line) => console.log(`  ${line}`);
 const stop = (line) => {
@@ -145,6 +154,28 @@ export function uploadsOf(version) {
   ];
 }
 
+/**
+ * What a live version says about this run, or `null` to go on. A build must be newer than what is live; files already
+ * built (`--upload-only`) may be the same version, since that is a publish that stopped part way being finished.
+ */
+export function liveRefusal(version, live, uploadOnly) {
+  if (live === null) return null;
+  const order = compareVersions(version, live);
+  if (order > 0 || (uploadOnly && order === 0)) return null;
+  if (uploadOnly) return `${version} is older than ${live}, which is live: there is nothing of it to finish.`;
+  return order === 0
+    ? `${version} is already live. To finish a publish of it that stopped part way, run with --upload-only, which builds nothing. For a new release, run again with --version and a higher number.`
+    : `${version} is not newer than ${live}, which is live: run again with --version and a higher number.`;
+}
+
+/** The files `--upload-only` needs in `dist` for a version and does not find there, by name; `[]` when it holds them all. */
+export function distMissing(names, feedVersion, version) {
+  const wanted = [...new Set(uploadsOf(version).map((u) => u.from))];
+  const gone = wanted.filter((name) => !names.includes(name));
+  if (!gone.includes('latest.json') && feedVersion !== version) gone.push(`latest.json for ${version} (it is for ${feedVersion ?? 'no version'})`);
+  return gone;
+}
+
 /** The first file in a folder ending so, or `null`. */
 const found = (dir, end) => (existsSync(dir) ? (readdirSync(dir).find((f) => f.endsWith(end)) ?? null) : null);
 
@@ -181,6 +212,7 @@ async function main() {
   }
   const conf = JSON.parse(readFileSync(CONF, 'utf8'));
   const version = asked !== null && DRY ? asked : conf.version;
+  if (UPLOAD_ONLY) return uploadOnly(version);
   if (!configPubkey()) stop('the updater key is not made yet: run node tools/desktop/updater-key.mjs first.');
   const key = fromKeychain(KEYCHAIN.key);
   const keyPassword = fromKeychain(KEYCHAIN.password);
@@ -189,15 +221,14 @@ async function main() {
     stop('Rust is not installed: see apps/desktop/README.md, Build.');
 
   /* BEFORE THE BUILD, so twenty minutes are not spent on a release nobody would be offered. */
-  const live = await liveVersion();
-  if (live !== null && compareVersions(version, live) <= 0) {
-    const line = `${version} is not newer than ${live}, which is live: run again with --version and a higher number.`;
-    if (PUBLISH) stop(line);
-    say(`note: ${line}`);
+  const refused = liveRefusal(version, await liveVersion(), false);
+  if (refused !== null) {
+    if (PUBLISH) stop(refused);
+    say(`note: ${refused}`);
   }
 
   const identity = developerId(spawnSync('security', ['find-identity', '-v', '-p', 'codesigning'], { encoding: 'utf8' }).stdout ?? '');
-  const notary = { ...(existsSync(SIGNING_ENV) ? envFile(readFileSync(SIGNING_ENV, 'utf8')) : {}), ...process.env };
+  const notary = settings();
   const notarises = identity !== null && Boolean(notary.APPLE_ID && notary.APPLE_PASSWORD && notary.APPLE_TEAM_ID);
   const team = notary.APPLE_TEAM_ID || teamOf(identity);
   const provisioned = identity !== null && team !== null && existsSync(PROFILE);
@@ -265,7 +296,42 @@ async function main() {
   say('accepted: notarised Developer ID');
   if (!PUBLISH) return;
 
-  /* UP TO THE BUCKET, with wrangler from the repository, the Cloudflare account from the environment or signing.env. */
+  await upload(version, notary);
+}
+
+/** What `signing.env` sets, under what the environment sets. */
+const settings = () => ({ ...(existsSync(SIGNING_ENV) ? envFile(readFileSync(SIGNING_ENV, 'utf8')) : {}), ...process.env });
+
+/**
+ * `--upload-only`: the files `dist` holds for this version go up as `--publish` sends them, and nothing is built. The
+ * dmg there must be one Gatekeeper accepts as notarised, since `dist` is written before that check is made.
+ */
+async function uploadOnly(version) {
+  if (asked !== null) stop('--upload-only sends files already built, so it takes no --version.');
+  const refused = liveRefusal(version, await liveVersion(), true);
+  if (refused !== null) stop(refused);
+  let feedVersion = null;
+  try {
+    feedVersion = String(JSON.parse(readFileSync(join(DIST, 'latest.json'), 'utf8')).version ?? '') || null;
+  } catch {
+    feedVersion = null;
+  }
+  const missing = distMissing(existsSync(DIST) ? readdirSync(DIST) : [], feedVersion, version);
+  if (missing.length > 0) stop(`apps/desktop/dist does not hold ${version}'s files (${missing.join(', ')}): run --publish to build them.`);
+  const checked = spawnSync('spctl', ['-a', '-t', 'open', '--context', 'context:primary-signature', '-vv', join(DIST, 'BrainDog.dmg')], { encoding: 'utf8' });
+  const verdict = `${checked.stdout ?? ''}${checked.stderr ?? ''}`;
+  if (!(checked.status === 0 && /accepted/u.test(verdict) && /Notarized Developer ID/u.test(verdict)))
+    stop('the dmg in apps/desktop/dist is not one Gatekeeper accepts as notarised: run --publish to build and notarise it. /download stays held.');
+  say(`BrainDog ${version}: sending the files apps/desktop/dist holds, building nothing`);
+  if (DRY) {
+    say(`would upload ${uploadsOf(version).map((u) => u.key).join(', ')} to the bucket ${BUCKET}, then open /download`);
+    return;
+  }
+  await upload(version, settings());
+}
+
+/** UP TO THE BUCKET, with wrangler from the repository, the Cloudflare account from the environment or signing.env. */
+async function upload(version, notary) {
   const cloud = {
     ...process.env,
     ...(notary.CLOUDFLARE_API_TOKEN ? { CLOUDFLARE_API_TOKEN: notary.CLOUDFLARE_API_TOKEN } : {}),
@@ -277,13 +343,13 @@ async function main() {
       ['--filter', './apps/site', 'exec', 'wrangler', 'r2', 'object', 'put', `${BUCKET}/${u.key}`, '--file', join(DIST, u.from), '--content-type', u.type, '--cache-control', u.cache, '--remote'],
       { cwd: ROOT, env: cloud, stdio: ['ignore', 'ignore', 'inherit'] },
     );
-    if (put.status !== 0) stop(`${u.key} did not upload (exit ${put.status}). Nothing is opened; run --publish again once the bucket can be written.`);
+    if (put.status !== 0) stop(`${u.key} did not upload (exit ${put.status}). Nothing is opened; once the bucket can be written, run with --upload-only, which builds nothing.`);
     say(`uploaded ${u.key}`);
   }
 
   /* OPEN /download ONLY WHEN THE FILES REALLY ANSWER from the address the redirect sends a visitor to. */
   const there = (await answers(`${BUCKET_PUBLIC}/BrainDog.dmg`)) && (await answers(`${BUCKET_PUBLIC}/${archiveOf(version)}`)) && (await liveVersion()) === version;
-  if (!there) stop(`the files are uploaded but ${BUCKET_PUBLIC} does not answer them yet: check the bucket's custom domain, then run --publish again. /download stays held.`);
+  if (!there) stop(`the files are uploaded but ${BUCKET_PUBLIC} does not answer them yet: check the bucket's custom domain, then run with --upload-only, which builds nothing. /download stays held.`);
   writeFileSync(MARK, readFileSync(MARK, 'utf8').replace(/DESKTOP_NOTARIZED: boolean = false/u, 'DESKTOP_NOTARIZED: boolean = true'));
   say(`published to ${BUCKET_PUBLIC} (brain.dog/desktop/ redirects there) and marked notarised in apps/site/src/lib/desktop.ts.`);
   say('commit desktop.ts with a changelog entry saying the Mac app can be downloaded; the next site deploy opens /download.');

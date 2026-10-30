@@ -58,6 +58,7 @@ export type OAuthCall =
   | { op: 'family'; row: RefreshRow }
   | { op: 'refresh_get'; hash: string }
   | { op: 'refresh_rotate'; id: string; expect_cur: string; next: Pick<RefreshRow, 'cur_hash' | 'cur_sealed' | 'prev_hash' | 'prev_sealed' | 'prev_until' | 'expires'> }
+  | { op: 'refresh_retry'; id: string; hash: string }
   | { op: 'refresh_drop'; id: string }
   | { op: 'client'; client_id: string }
   | { op: 'register'; client: OAuthClient }
@@ -73,6 +74,7 @@ export type OAuthAnswers = {
   family: 'ok' | 'full';
   refresh_get: (RefreshRow & { which: 'current' | 'previous' }) | null;
   refresh_rotate: boolean;
+  refresh_retry: boolean;
   refresh_drop: 'ok';
   client: OAuthClient | null;
   register: 'ok' | 'full';
@@ -145,7 +147,38 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS oauth_request_client ON oauth_request(client_id)',
   /* WHEN A CLIENT LAST STARTED A FAMILY, so a client that connected is told apart from junk that never did (SEC8). */
   'CREATE TABLE IF NOT EXISTS oauth_client_used (client_id TEXT PRIMARY KEY, at INTEGER NOT NULL)',
+  /* THE TOKENS A FAMILY HAS LEFT BEHIND (SEC11, RD4), by hash only: the last `OLD_KEPT` of them, so one that comes back
+     ends the family however many times the family has moved on since. */
+  'CREATE TABLE IF NOT EXISTS oauth_refresh_old (hash TEXT PRIMARY KEY, id TEXT NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS oauth_refresh_old_id ON oauth_refresh_old(id)',
+  /* WHAT THIS STORE HAS DONE ONCE, by name: today only `client_used`, below. */
+  'CREATE TABLE IF NOT EXISTS oauth_once (what TEXT PRIMARY KEY)',
 ];
+
+/**
+ * THE CLIENTS REGISTERED BEFORE `oauth_client_used` WAS KEPT COUNT AS USED WHEN THEY REGISTERED, once (RD10). The table
+ * started empty, so the first registration after it shipped pruned every month-old client with no live family, and a
+ * connector whose family had ended (removed, or idle) was told `invalid_client` and had to be added again. Done once
+ * and not on every prune, because doing it every time would keep a junk registration half a year instead of a month.
+ */
+function seedClientUsed(sql: Sql): void {
+  if (sql.one<{ one: number }>("SELECT 1 AS one FROM oauth_once WHERE what = 'client_used'") !== undefined) return;
+  sql.exec("INSERT INTO oauth_client_used (client_id, at) SELECT client_id, created_at FROM oauth_client WHERE source = 'dcr' ON CONFLICT (client_id) DO NOTHING");
+  sql.exec("INSERT INTO oauth_once (what) VALUES ('client_used') ON CONFLICT (what) DO NOTHING");
+}
+
+/**
+ * How many tokens a family remembers past the one just replaced. Remembering only that one let a thief roll past it: a
+ * replay inside the grace handed over the current token, two quick refreshes pushed the app's copy out of the previous
+ * slot, and the app's next refresh was a plain `invalid_grant` that left the thief holding the family.
+ */
+const OLD_KEPT = 8;
+
+/** A family gone, with the tokens it left behind. */
+function dropFamily(sql: Sql, id: string): void {
+  sql.exec('DELETE FROM oauth_refresh_old WHERE id = ?', id);
+  sql.exec('DELETE FROM oauth_refresh WHERE id = ?', id);
+}
 
 /**
  * The clients nothing holds on to: a registration that never connected and is a month old, one that last connected half
@@ -223,6 +256,7 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
     case 'family': {
       const r = call.row;
       return sql.transactionSync(() => {
+        sql.exec('DELETE FROM oauth_refresh_old WHERE id IN (SELECT id FROM oauth_refresh WHERE expires <= ?)', now);
         sql.exec('DELETE FROM oauth_refresh WHERE expires <= ?', now);
         if (Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM oauth_refresh')?.n ?? 0) >= FAMILIES_MOST) return 'full' as const;
         sql.exec(
@@ -235,25 +269,49 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
     }
     case 'refresh_get': {
       const row = sql.one<RefreshRow>('SELECT id, client_id, record, scope, cur_hash, cur_sealed, prev_hash, prev_sealed, prev_until, expires, ends FROM oauth_refresh WHERE (cur_hash = ?1 OR prev_hash = ?1) AND expires > ?2 AND ends > ?2', call.hash, now);
-      if (row === undefined) return null;
+      if (row === undefined) {
+        /* A TOKEN THE FAMILY LEFT BEHIND, BACK AGAIN, is a copy in somebody else's hands: the family goes (SEC11). */
+        const left = sql.one<{ id: string }>('SELECT id FROM oauth_refresh_old WHERE hash = ?', call.hash);
+        if (left !== undefined) dropFamily(sql, left.id);
+        return null;
+      }
       if (row.cur_hash === call.hash) return { ...row, which: 'current' as const };
       /* THE PREVIOUS TOKEN AFTER ITS GRACE IS A REPLAY, so the whole family goes: whoever holds a copy loses it, and the
          app signs in again. Inside the grace it is a client that never saw our answer and is retrying. */
       if (row.prev_until > now) return { ...row, which: 'previous' as const };
-      sql.exec('DELETE FROM oauth_refresh WHERE id = ?', row.id);
+      dropFamily(sql, row.id);
       return null;
     }
     case 'refresh_rotate': {
       const n = call.next;
-      /* COMPARE-AND-SET ON THE CURRENT HASH, so two retries racing make one new token and the loser looks again. */
-      const moved = sql.one<{ id: string }>(
-        'UPDATE oauth_refresh SET cur_hash = ?, cur_sealed = ?, prev_hash = ?, prev_sealed = ?, prev_until = ?, expires = MIN(?, ends) WHERE id = ? AND cur_hash = ? RETURNING id',
-        n.cur_hash, n.cur_sealed, n.prev_hash, n.prev_sealed, n.prev_until, n.expires, call.id, call.expect_cur,
-      );
-      return moved !== undefined;
+      return sql.transactionSync(() => {
+        const was = sql.one<{ cur_hash: string; prev_hash: string | null }>('SELECT cur_hash, prev_hash FROM oauth_refresh WHERE id = ?', call.id);
+        /* COMPARE-AND-SET ON THE CURRENT HASH, so two retries racing make one new token and the loser looks again. */
+        const moved = sql.one<{ id: string }>(
+          'UPDATE oauth_refresh SET cur_hash = ?, cur_sealed = ?, prev_hash = ?, prev_sealed = ?, prev_until = ?, expires = MIN(?, ends) WHERE id = ? AND cur_hash = ? RETURNING id',
+          n.cur_hash, n.cur_sealed, n.prev_hash, n.prev_sealed, n.prev_until, n.expires, call.id, call.expect_cur,
+        );
+        if (moved === undefined || was === undefined) return false;
+        /* WHAT THE ROTATION PUSHED OUT is remembered, the newest `OLD_KEPT` of it, so its return ends the family. */
+        for (const left of [was.prev_hash, was.cur_hash]) {
+          if (left === null || left === n.cur_hash || left === n.prev_hash) continue;
+          sql.exec('INSERT INTO oauth_refresh_old (hash, id) VALUES (?, ?) ON CONFLICT (hash) DO NOTHING', left, call.id);
+        }
+        sql.exec(
+          'DELETE FROM oauth_refresh_old WHERE id = ?1 AND rowid NOT IN (SELECT rowid FROM oauth_refresh_old WHERE id = ?1 ORDER BY rowid DESC LIMIT ?2)',
+          call.id, OLD_KEPT,
+        );
+        return true;
+      });
+    }
+    case 'refresh_retry': {
+      /* A RETRY INSIDE THE GRACE IS ANSWERED ONCE (RD4). Its grace ends here, so the replaced token presented a second
+         time is a replay after the grace, and `refresh_get` ends the family for it. */
+      const spent = sql.one<{ id: string }>('UPDATE oauth_refresh SET prev_until = 0 WHERE id = ? AND prev_hash = ? AND prev_until > ? RETURNING id', call.id, call.hash, now);
+      return spent !== undefined;
     }
     case 'refresh_drop':
-      sql.exec('DELETE FROM oauth_refresh WHERE id = ?', call.id);
+      dropFamily(sql, call.id);
       return 'ok';
     case 'client':
       return clientOf(sql.one<ClientRow>('SELECT client_id, name, redirect_uris, source, created_at FROM oauth_client WHERE client_id = ?', call.client_id));
@@ -263,6 +321,7 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
          client's id is minted fresh by the host, so for one of those the conflict never happens. */
       const known = sql.one<{ one: number }>('SELECT 1 AS one FROM oauth_client WHERE client_id = ?', c.client_id) !== undefined;
       if (!known) {
+        seedClientUsed(sql);
         sql.exec(PRUNE, now - CLIENT_UNUSED_KEEP, now - DOCUMENT_KEEP, now - CLIENT_USED_KEEP, PRUNE_MOST);
         sql.exec('DELETE FROM oauth_client_used WHERE at <= ? AND client_id NOT IN (SELECT client_id FROM oauth_client)', now - CLIENT_USED_KEEP);
       }

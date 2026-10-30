@@ -56,7 +56,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
-import { keyLockout, type KeyLockout } from './key-lockout.ts';
+import { keyLockout, ONE_PLACE, proxied, type KeyLockout } from './key-lockout.ts';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
@@ -2357,6 +2357,9 @@ const json = (status: number, body: object, extra: readonly (readonly [string, s
  * than replacing it, so counting the first would let anybody lock anybody out by naming them. Without the
  * setting the header is ignored, for the same reason.
  */
+/** Whether `ONE_PLACE` was said, so a proxied host says it once and not on every request. */
+let proxyTold = false;
+
 function ipOf(req: IncomingMessage, trustProxy: boolean): string {
   const forwarded = trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',').pop()?.trim() : '';
   return forwarded || req.socket.remoteAddress || '';
@@ -2534,6 +2537,11 @@ async function answer(
   shell: ((request: Request, origin: string) => Response) | null,
   trustProxy: boolean,
 ): Promise<void> {
+  /* A PROXY IN FRONT, NOT TRUSTED, IS SAID ONCE (RD7): the lockout then counts the proxy and nobody else. */
+  if (!trustProxy && !proxyTold && site?.token !== undefined && proxied(req.socket.remoteAddress ?? '', req.headers)) {
+    proxyTold = true;
+    console.error(ONE_PLACE);
+  }
   const asked = new URL(`http://localhost${req.url ?? '/'}`);
   const method = req.method ?? 'GET';
   const headers = Object.entries(req.headers).map(([k, v]): [string, string] => [k, Array.isArray(v) ? v.join(', ') : (v ?? '')]);

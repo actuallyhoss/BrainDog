@@ -51,6 +51,7 @@ import { degradeLines, setupLine } from './first-run.ts';
 import { commandFor, inImage, listenOf, originOf, plainLine, serverKeyOf } from './how.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
+import { ONE_PLACE } from './key-lockout.ts';
 import { initFrom } from './restore.ts';
 import { openSqlite, signedWebhooks, start } from './server.ts';
 import { rewrapAtStart } from './rewrap.ts';
@@ -829,6 +830,9 @@ async function serve(): Promise<void> {
      `ways: []` and the equally unhelpful "has no way in to offer yet". One line, under both. */
   const wrong = reachLine(reachOf(running.signIn.origin));
   if (wrong) say(`  ${wrong}`);
+  /* AND A PROXY IN FRONT THAT THE LOCKOUT CANNOT SEE PAST (RD7): an https name served as plain http here is the proxy
+     shape, and without the setting every wrong key counts against the proxy, which locks everybody out at once. */
+  if (serverKey.value !== undefined && env.BRAINDOG_TRUST_PROXY !== '1' && tls === undefined && running.signIn.origin.startsWith('https:')) say(`  ${ONE_PLACE}`);
 
   /* AND WHETHER THE NAME MOVED SINCE LAST TIME, which nothing anywhere used to say. A passkey is bound to
      the hostname it was made at, so changing `BRAINDOG_ORIGIN` or swapping the certificate for one naming

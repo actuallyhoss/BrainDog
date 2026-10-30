@@ -144,16 +144,31 @@ export function indexedStore(person: string): KeyStore | null {
 }
 
 /**
+ * The one person of a self-host in OPEN MODE (no server key, one person on one machine), whose key is kept under this
+ * name: such a host holds no sessions, so `/auth/session` answers nobody, and the key was never made (RD13). Every add-on
+ * published from it went out unsigned, and an update to one already pinned to a key was refused.
+ */
+export const OPEN_PERSON = 'open';
+
+/**
  * Who is signed in to this browser now, by the session (`GET /auth/session`), or `null` for nobody or a session that
  * could not be read, which keeps no key. Asked at each press, so a sign-out and another sign-in between two presses
  * reach the second person's key and never the first's.
+ *
+ * ON AN OPEN SELF-HOST, ITS ONE PERSON (`OPEN_PERSON`), and only where the host itself says it is open
+ * (`/auth/methods` answering `open: true`), which the Cloud never does: there, nobody signed in still keeps no key.
  */
-async function signedInNow(): Promise<string | null> {
+export async function signedInNow(fetcher: typeof fetch = globalThis.fetch): Promise<string | null> {
+  const asked = (path: string) => fetcher(path, { headers: { accept: 'application/json' }, credentials: 'same-origin' });
   try {
-    const res = await globalThis.fetch('/auth/session', { headers: { accept: 'application/json' }, credentials: 'same-origin' });
-    if (!res.ok) return null;
-    const person = ((await res.json()) as { value?: { person?: unknown } } | null)?.value?.person;
-    return typeof person === 'string' && person !== '' ? person : null;
+    const res = await asked('/auth/session');
+    if (res.ok) {
+      const person = ((await res.json()) as { value?: { person?: unknown } } | null)?.value?.person;
+      return typeof person === 'string' && person !== '' ? person : null;
+    }
+    const methods = await asked('/auth/methods');
+    if (!methods.ok) return null;
+    return ((await methods.json()) as { value?: { open?: unknown } } | null)?.value?.open === true ? OPEN_PERSON : null;
   } catch {
     return null;
   }
@@ -163,7 +178,7 @@ async function signedInNow(): Promise<string | null> {
  * The store of whoever is signed in at each ask: each person's made at their first press and kept, so every press of
  * theirs in a page shares one key in the making, and `null` while nobody is. The two halves are injectable for tests.
  */
-export function personStores(who: () => Promise<string | null> = signedInNow, make: (person: string) => KeyStore | null = indexedStore): () => Promise<KeyStore | null> {
+export function personStores(who: () => Promise<string | null> = () => signedInNow(), make: (person: string) => KeyStore | null = indexedStore): () => Promise<KeyStore | null> {
   const stores = new Map<string, KeyStore | null>();
   return async () => {
     const person = await who();

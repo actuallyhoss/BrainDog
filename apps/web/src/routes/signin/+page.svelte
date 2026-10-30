@@ -592,6 +592,8 @@
           <IconWell name={handing === 'sent' ? 'check' : 'link'} size="card" tone={handing === 'sent' ? 'earn' : undefined} />
           <h1 class="entry-title">{handing === 'sent' ? words.handoffSentTitle : words.handoffTitle}</h1>
           <p class="calm-body">{handing === 'sent' ? words.handoffSentWhy : words.handoffWhy}</p>
+          <!-- WHOSE ACCOUNT, here too: `?app=` must not be a way past the line a stranger's link is read by. -->
+          {#if linkEmail !== null && linkEmail.token === link.token}<p class="calm-who">{copy.linkOpens(link.kind, linkEmail.email)}</p>{/if}
         </div>
         {#if handing === 'failed'}<p class="status" role="status">{words.handoffFailed}</p>{/if}
         <div class="doors">

@@ -86,3 +86,36 @@ test('SEC3: A PAGE TAKEN OUT AND WRITTEN AGAIN UNDER ITS NAME IS NOT THE PAGE TH
   assert.equal((await read(id, 'notes')).ok, false);
   sql.close();
 });
+
+/* RD11: A ROW OF A `series: true` LIST HAS NO NUMBER, and once links were bound its page could not be shared at all. */
+test("RD11: A PAGE OF A ROW WITH NO NUMBER IS SHARED, BOUND BY THE ROW'S ID, AND FOLLOWS THAT ROW", async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 9, 30, 12));
+  const api = await createRecordApi({ sql, clock });
+  sql.exec("INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, 'rec_1', 'studio', 'Studio', 'en-GB', 'UTC', 1, '2026-10-01T00:00:00.000Z')");
+  const READINGS = {
+    id: 'register.readings',
+    kind: 'register',
+    body: { id: 'readings', name: 'Readings', title: 'name', series: true, fields: [{ id: 'name', type: 'text', required: true }, { id: 'plan', type: 'text' }] },
+  } as never;
+  const EACH_READING = {
+    id: 'page.reading',
+    kind: 'page',
+    body: { page: 'reading', title: '{{name}}', for: { register: 'readings' }, requires: ['register.readings'], blocks: [{ kind: 'note', body: 'About {{name}}: {{plan}}' }] },
+  } as never;
+  value(await api.kernel.install([READINGS, EACH_READING]));
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  const direct = shareMethods({ kernel: api.kernel, sql, clock, no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
+  const kiln = value<{ id: string }>(api.kernel.create('readings', { name: 'Kiln', plan: 'kiln-plan' }, { actor: 'p_owner' }));
+  const page = api.kernel.pages().find((p) => p.slug === 'kiln');
+  assert.ok(page, 'no page for the row');
+  assert.equal(page.row, kiln.id);
+  const id = value<{ id: string }>(await direct.openShare({ slug: 'kiln' }, owner)).id;
+  const opened = sql.one<{ bound: string }>("SELECT from_v AS bound FROM event WHERE target = ? AND kind = 'share.open'", `share:${id}`);
+  assert.equal((JSON.parse(opened!.bound) as { row?: string }).row, kiln.id);
+  const read = (await api.sharedPage(undefined, link(id, 'kiln'))) as { ok: boolean; value?: SharedPage };
+  assert.equal(read.ok, true, 'the link to a row with no number did not open');
+  assert.match(JSON.stringify(read.value), /kiln-plan/u);
+  sql.close();
+});

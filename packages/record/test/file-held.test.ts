@@ -60,3 +60,20 @@ test('WHOEVER READS THE WHOLE RECORD IS ANSWERED AS BEFORE, and a name that is n
   assert.equal(api.fileHeld(sha('a'), { principal: { kind: 'person', id: 'p_admin', level: 'decide' } }), false);
   assert.equal(api.fileHeld('../etc', owner), true);
 });
+
+/* RD6: A CALLER WHO READS THE WHOLE RECORD WAS ANSWERED BEFORE ANY ROW WAS LOOKED AT, so a full member who held the same
+   PDF read, or confirmed, a file on somebody else's private row. */
+test('RD6: A FILE ON A PRIVATE ROW IS KEPT FROM EVERYBODY BUT ITS MAKER, AND A COPY ON A ROW THEY READ STILL OPENS', async () => {
+  const api = await record();
+  const ada: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' }, credentialed: true };
+  const bo: CallContext = { principal: { kind: 'person', id: 'p_bo', level: 'write' }, credentialed: true };
+  const kept = await api.create({ register: 'notes', fields: { what: 'Private scan', scan: file('e') } } as never, ada);
+  assert.ok(kept.ok);
+  const seq = (kept as { value: { seq: number } }).value.seq;
+  assert.ok((await api.makePrivate({ ref: `notes#${seq}` }, ada)).ok);
+  assert.equal(api.fileHeld(sha('e'), bo), true, 'a full member read a file on somebody else\'s private row');
+  assert.equal(api.fileHeld(sha('e'), ada), false, 'the maker lost her own file');
+  /* The same bytes on a row Bo reads are his to open. */
+  assert.ok((await api.create({ register: 'notes', fields: { what: 'Same scan', scan: file('e') } } as never, ada)).ok);
+  assert.equal(api.fileHeld(sha('e'), bo), false);
+});

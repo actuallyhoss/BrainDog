@@ -584,6 +584,25 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     return null;
   };
 
+  /**
+   * Whether `key` is locked now, counting nothing: for a question whose answer to the rightful asker must not cost them
+   * a strike (`magic.whose`). Fails closed, as `reserve` does.
+   */
+  const lockedNow = (flow: Flow, key: string, now: number): AuthResult | null => {
+    let row: { until: number | null } | undefined;
+    try {
+      row = sql.one<{ until: number | null }>('SELECT until FROM dir_fail WHERE key = ?', key);
+    } catch {
+      say(flow, 'reserve');
+      return { status: 503 };
+    }
+    if (row !== undefined && row.until !== null && Number(row.until) > now) {
+      say(flow, 'locked');
+      return { status: 429, retryAfter: Math.ceil((Number(row.until) - now) / 1000) };
+    }
+    return null;
+  };
+
   const persons = (): number => Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_person')?.n ?? 0);
 
   const livePerson = (id: string): Person | undefined =>
@@ -1030,19 +1049,26 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        * CSRF). The screen now says the address before the button, so the reader sees it is not theirs.
        *
        * THE ADDRESS IS ANSWERED ONLY TO THE LINK'S HOLDER, who could spend it and read it anyway; every miss strikes the
-       * asking address as a redeem does, so the question is no cheaper way to try tokens.
+       * asking address as a redeem does, so the question is no cheaper way to try tokens. A locked address is refused
+       * before anything is looked up.
+       *
+       * ONLY A MISS STRIKES (RD5). Every answer used to, on the same count as every sign-in, and only a sign-in clears
+       * it: ten loads of the link page from one address (reloads, a few tabs, an office behind one address) locked every
+       * way in from there for fifteen minutes, before anybody had pressed anything.
        */
       case 'magic.whose': {
         const claim = 'claimToken' in call;
         const token = 'claimToken' in call ? call.claimToken : call.linkToken;
         const hash = typeof token === 'string' && MINTED.test(token) ? await hmac('l:', token) : null;
-        const stop = reserve(flow, `ip:${text(call.ip)}`, now);
+        const strike = `ip:${text(call.ip)}`;
+        const stop = lockedNow(flow, strike, now);
         if (stop) return stop;
-        if (hash === null) return rejected(flow, 'shape');
+        const miss = (reason: Reason): AuthResult => reserve(flow, strike, now) ?? rejected(flow, reason);
+        if (hash === null) return miss('shape');
         const link = sql.one<{ person: string }>('SELECT person FROM dir_link WHERE hash = ? AND purpose = ? AND expires > ?', hash, claim ? 'claim' : 'magic', now);
-        if (!link) return rejected(flow, 'link');
+        if (!link) return miss('link');
         const person = livePerson(link.person);
-        if (!person) return rejected(flow, 'suspended');
+        if (!person) return miss('suspended');
         return { status: 200, body: { email: person.email } };
       }
 

@@ -63,7 +63,7 @@ double click).
    hours, since closing the window only hides it. The product updates with every deploy. The release
    (`tools/desktop/release.mjs --publish`) uploads the dmg, the versioned update archive and `latest.json` to the R2
    bucket `braindog-desktop` (at `download.brain.dog`); `brain.dog/desktop/*` redirects there, and a version already
-   live is refused.
+   live is refused, except by `--upload-only`, which builds nothing and finishes a publish that stopped part way.
 
 ## What the web app does now, so the Mac app is easy (small, during launch)
 

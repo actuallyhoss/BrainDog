@@ -55,7 +55,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 
-import { verdictValue, type TxtLookup } from './dkim.ts';
+import { AUTHSERV, verdictValue, type TxtLookup } from './dkim.ts';
 import { verifyStripe } from './stripe-sign.ts';
 
 /** The two channels this route terminates. `30 §1`'s five, minus the three that do not arrive over HTTP. */
@@ -603,6 +603,14 @@ function results(value: string): Resinfo[] {
  * where this function cannot say which address the alignment was against and the record cannot say
  * which one its `match:` read. An absent verdict is `false` too, and the row is stored either way.
  */
+/** The host an `Authentication-Results` value names as its author (RFC 8601 `authserv-id`), lower-cased, comments dropped. */
+const authservOf = (value: string): string =>
+  (value.split(';')[0] ?? '')
+    .replace(/\([^)]*\)/gu, ' ')
+    .trim()
+    .split(/\s+/u)[0]
+    ?.toLowerCase() ?? '';
+
 const forwarderPassed = (head: (readonly [string, string])[], said: string): boolean => {
   const from = head.filter(([name]) => name === 'from');
   const claimed = from.length === 1 && from[0] !== undefined ? fromDomains(from[0][1]) : [];
@@ -785,8 +793,14 @@ async function mail(request: Request, door: IngestDoor, hash: string, stamp: Mai
   const read = readMime(bytes, text);
   const files = read === null ? [] : await keepAll(door, rec, read.files);
   /* A VERDICT THIS HOST REACHED OVER HTTP IS PUT FIRST IN THE ROW'S HEAD, as the Email Routing handler puts its own on top
-     of the bytes, so whoever reads the row reads this host's finding before anything the message says about itself. */
-  const shown = stamp === undefined && said !== null ? [['authentication-results', said] as const, ...head] : head;
+     of the bytes, so whoever reads the row reads this host's finding before anything the message says about itself.
+     A HOST THAT CHECKED NOTHING SAYS SO THERE TOO, and A SENDER'S OWN LINE IN THIS HOST'S NAME IS DROPPED (SEC1, RD8):
+     `Authentication-Results: braindog; dkim=pass header.d=bank.example` typed into a posted message was the first line
+     of the row's head, or sat right under the host's real one, and an agent reading the row over MCP read a pass in
+     BrainDog's own name. The Email Routing handler's own line goes too, and its verdict, handed over beside the bytes,
+     is put back on top, so the one line in this host's name is always the one this host wrote. */
+  const kept = head.filter(([name, value]) => name !== 'authentication-results' || authservOf(value) !== AUTHSERV);
+  const shown = [['authentication-results', said ?? `${AUTHSERV}; dkim=none (not checked)`] as const, ...kept];
   const headers = joinHead(shown.filter(([name]) => name !== FILES_HEADER));
   if (files.length > 0) headers[FILES_HEADER] = JSON.stringify(files);
   return store(door, {

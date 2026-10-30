@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { KEY_TRIES, keyLockout } from '../src/key-lockout.ts';
+import { KEY_TRIES, keyLockout, nearPeer, proxied } from '../src/key-lockout.ts';
 import { start } from '../src/server.ts';
 
 test('SEC5: TEN MISSES ARE COMPARED, THE ELEVENTH IS NOT, AND THE LOCK OUTLASTS A RIGHT KEY UNTIL IT ENDS', () => {
@@ -66,4 +66,14 @@ test('SEC5: OVER HTTP, THE ELEVENTH GUESS AT /api AND /mcp IS 429 AND NEVER COMP
     await running.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/* RD7: BEHIND A PROXY THE HOST WAS NOT TOLD TO TRUST, every request is the proxy's address, and nothing said so. */
+test('RD7: A FORWARDING HEADER FROM A PEER ON THIS MACHINE OR ITS NETWORK READS AS A PROXY; ONE FROM OUTSIDE DOES NOT', () => {
+  for (const peer of ['127.0.0.1', '::1', '::ffff:127.0.0.1', '10.0.0.4', '172.18.0.2', '192.168.1.20', 'fd00::5']) {
+    assert.equal(nearPeer(peer), true, peer);
+    assert.equal(proxied(peer, { 'x-forwarded-for': '198.51.100.7' }), true, peer);
+    assert.equal(proxied(peer, {}), false, `${peer} with no forwarding header`);
+  }
+  for (const peer of ['198.51.100.7', '172.32.0.1', '2001:db8::1']) assert.equal(proxied(peer, { 'x-forwarded-for': '203.0.113.9' }), false, peer);
 });

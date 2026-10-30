@@ -28,6 +28,12 @@ const DAY = 86_400_000;
 function store(clock: { now: () => number }): OAuthStore {
   const codes = new Map<string, { request: { client_id: string; redirect_uri: string; challenge: string; scope: string }; record: string; bearer_sealed: string; expires: number; code_hash: string }>();
   const families = new Map<string, RefreshRow>();
+  /* The tokens a family left behind, newest last, as `oauth_refresh_old` keeps them. */
+  const left = new Map<string, string[]>();
+  const drop = (id: string) => {
+    families.delete(id);
+    left.delete(id);
+  };
   const answer = (call: OAuthCall): OAuthAnswers[OAuthCall['op']] => {
     switch (call.op) {
       case 'code':
@@ -47,20 +53,29 @@ function store(clock: { now: () => number }): OAuthStore {
           if (row.cur_hash === call.hash) return { ...row, which: 'current' as const };
           if (row.prev_hash === call.hash) {
             if (row.prev_until > clock.now()) return { ...row, which: 'previous' as const };
-            families.delete(row.id);
+            drop(row.id);
             return null;
           }
         }
+        for (const [id, hashes] of left) if (hashes.includes(call.hash)) drop(id);
         return null;
       }
       case 'refresh_rotate': {
         const row = families.get(call.id);
         if (row === undefined || row.cur_hash !== call.expect_cur) return false;
         families.set(call.id, { ...row, ...call.next, expires: Math.min(call.next.expires, row.ends) });
+        const pushed = [row.prev_hash, row.cur_hash].filter((h): h is string => h !== null && h !== call.next.cur_hash && h !== call.next.prev_hash);
+        left.set(call.id, [...(left.get(call.id) ?? []), ...pushed].slice(-8));
+        return true;
+      }
+      case 'refresh_retry': {
+        const row = families.get(call.id);
+        if (row === undefined || row.prev_hash !== call.hash || row.prev_until <= clock.now()) return false;
+        families.set(call.id, { ...row, prev_until: 0 });
         return true;
       }
       case 'refresh_drop':
-        families.delete(call.id);
+        drop(call.id);
         return 'ok';
       default:
         return null;
@@ -224,9 +239,40 @@ test('A REPLAY OF THE TOKEN JUST REPLACED does not take the family over, and the
   const next = await t.token({ grant_type: 'refresh_token', refresh_token: app.body.refresh_token! });
   assert.equal(next.status, 200, JSON.stringify(next.body));
   assert.ok(await t.works(next.body.access_token));
-  /* And the old token, presented once more, answers what the family holds now only if it is still the one it replaced. */
+  /* And the old token, presented once more after the family moved on, is a copy in two hands: refused, and the family
+     ends with it (RD4). */
   t.clock.advance(10_000);
   assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 400);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: next.body.refresh_token! })).status, 400, 'the family outlived a replay');
+});
+
+/* RD4: A REPLAY INSIDE THE GRACE HANDS OVER THE CURRENT TOKEN, so the thief refreshed twice to push the app's copy out of
+   the one remembered slot, and the app's next refresh was a plain refusal that left the thief the family. */
+test('RD4: A THIEF WHO ROLLS PAST THE REPLACED TOKEN LOSES THE FAMILY when the app comes back with its copy', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  const app = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  assert.equal(app.status, 200);
+  t.clock.advance(20_000);
+  const stolen = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  assert.equal(stolen.status, 200);
+  const r3 = await t.token({ grant_type: 'refresh_token', refresh_token: stolen.body.refresh_token! });
+  const r4 = await t.token({ grant_type: 'refresh_token', refresh_token: r3.body.refresh_token! });
+  assert.equal(r4.status, 200);
+  t.clock.advance(10 * 60_000);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: app.body.refresh_token! })).status, 400);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: r4.body.refresh_token! })).status, 400, 'the thief kept the family');
+});
+
+test('RD4: A RETRY INSIDE THE GRACE IS ANSWERED ONCE; the replaced token a second time ends the family', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  const app = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  t.clock.advance(10_000);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 200);
+  t.clock.advance(10_000);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 400);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: app.body.refresh_token! })).status, 400, 'a second retry left the family alive');
 });
 
 /* TWO TABS OF ONE APP REFRESHING AT THE SAME MOMENT both hold the same token; neither is signed out, and both carry on

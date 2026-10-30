@@ -956,6 +956,11 @@ const secondsLeft = (instant: string, now: number): number => Math.max(1, Math.f
  * parent and the new token), and a retry is handed that same token and a child of its own; the current token stays where
  * it is. It used to rotate the family again for whoever presented the old token, which displaced the token the app
  * held: anyone who replayed a stolen copy within the two minutes took the family over, and the app was signed out.
+ *
+ * A RETRY IS ANSWERED ONCE, AND A TOKEN THE FAMILY LEFT BEHIND ENDS IT (RD4). A replay inside the grace still hands over
+ * the current token, so the thief could refresh twice, push the app's copy out of the one slot that was remembered, and
+ * keep the family while the app got a plain refusal. The store now remembers the last few tokens each family left
+ * behind; any of them presented again, or the replaced token presented a second time, ends the family for everybody.
  */
 async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<Response> {
   const gone = 'This refresh token is not one BrainDog gave, was replaced, or has not been used for ninety days. Sign in again.';
@@ -978,7 +983,12 @@ async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<R
       /* THE ANSWER THE FIRST PRESENTATION GOT, if the current token is still the one it handed out. Anything else is a
          family that has moved on since, which the old token has no claim to. */
       if (held.next !== null) {
-        if ((await digest(held.next)) !== row.cur_hash) return oauthError(400, 'invalid_grant', gone);
+        /* ONCE (RD4): a second retry of the same token, or one after the family moved past its answer, is a copy in
+           two hands, and the family goes, so whoever replayed it is signed out along with the app. */
+        if ((await digest(held.next)) !== row.cur_hash || !(await deps.store({ op: 'refresh_retry', id: row.id, hash }))) {
+          await deps.store({ op: 'refresh_drop', id: row.id });
+          return oauthError(400, 'invalid_grant', gone);
+        }
         return childAnswer(row, held.parent, held.next, now, deps);
       }
       /* A ROW SEALED BEFORE THE RETRY WAS KEPT has only the parent, and lives at most the two-minute grace: it is answered
