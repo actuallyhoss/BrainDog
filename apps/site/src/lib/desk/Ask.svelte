@@ -1,6 +1,6 @@
 <!--
   The desk's "Ask or change anything" bar, which opens in place the way the app's does (§47 his notes: "extend on the
-  'ask or change anything' instead of being a centered modal"). Pressing it, or "/" while the desk is on screen and
+  'ask or change anything' instead of being a centered modal"). Pressing it, or ⌘J (Ctrl J off a Mac) while the desk is on screen and
   no field has the keys, widens the bar where it stands and drops the answer under it at the same width, with three
   Ask questions to try. Pick one and it types itself in and answers; under reduced motion it is all there at once.
   Escape or a press outside closes it, and the keys go back to the bar.
@@ -60,7 +60,8 @@
       void show(false, true);
       return;
     }
-    if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey || open) return;
+    /* ⌘J, OR CTRL J OFF A MAC, as the app opens Ask (`TopBar.svelte`). */
+    if (e.key.toLowerCase() !== 'j' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || open) return;
     const at = document.activeElement as HTMLElement | null;
     if (at && (/^(INPUT|TEXTAREA|SELECT)$/.test(at.tagName) || at.isContentEditable)) return;
     if (!onscreen()) return;
@@ -86,7 +87,7 @@
     aria-label={DESK.ask.bar}
     aria-expanded={open}
     aria-controls="desk-drop"
-    aria-keyshortcuts="/"
+    aria-keyshortcuts="Meta+J Control+J"
     bind:this={bar}
     onclick={() => show(!open)}
   >
