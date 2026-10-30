@@ -745,7 +745,15 @@
 
   async function ask(): Promise<void> {
     step = 'loading';
-    const [out, who] = await Promise.all([checkName(''), methods()]);
+    /* WHO MAY SIGN UP IS ASKED ONLY OF A HOST THAT SERVES SIGN-UP (`signup` on `/auth/methods`): a self-host has no such
+       door, and asking it printed a 404 in the console. A host that says nothing of it has not opened sign-up, which is
+       the closed page; one nobody reached is still asked, so it says "did not answer" as it did. */
+    const who = await methods();
+    if (who.ok && who.value.signup !== true) {
+      step = 'closed';
+      return;
+    }
+    const out = await checkName('');
     /* A HOST THAT REFUSES THE QUESTION ANSWERED IT: one with no sign-up door (a self-host has none) has not opened
        sign-up, which is the closed page and its way to sign in. Only a host nobody reached is "did not answer". */
     if (!out.ok) {

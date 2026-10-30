@@ -1,5 +1,5 @@
 <!--
-  A new job kind: `/agents/new-kind`, opened from "Run a job" on `/jobs`.
+  A new job kind: `/agents/new-kind`, opened from "Run a job" on `/jobs`; its way back and its Cancel go to Agents, `/p/agents`.
 
   THE FORM IS `NewKind`, and this screen is its header and its room. It reads nothing: every choice the form offers is
   the kernel's or the record's own tools, so it draws at once. The route is its own chunk, loaded when it is opened, so

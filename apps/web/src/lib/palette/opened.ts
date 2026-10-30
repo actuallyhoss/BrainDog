@@ -100,7 +100,7 @@ export type Asked = { title: string; href: string | null; ask: string | null };
  */
 export const TODAY_QUESTIONS = [
   { title: 'What needs me today?', href: '/decide' },
-  { title: 'What did my agents do today?', href: '/agents' },
+  { title: 'What did my agents do today?', href: '/p/agents' },
   { title: 'What changed today?', href: '/audit' },
 ] as const;
 

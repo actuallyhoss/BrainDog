@@ -218,6 +218,24 @@
   let backTo = $state<string | null>(null);
   /* THE MODE THE PALETTE LAST DREW, so a move made from outside it (⌘K, ⌘J) is told from one made here. */
   let modeWas: 'find' | 'ask' = 'find';
+  /**
+   * WHERE FOCUS GOES BACK TO WHEN THE PALETTE IS PUT AWAY, rather than the page's body (audit 31 Oct A34): what held it as
+   * the palette opened, or, opened by its key from nothing, the field it opens out of. Only when it is put away (Esc, the
+   * scrim, Cancel): a row chosen goes somewhere, and the screen it lands on places focus itself.
+   */
+  let returnTo: HTMLElement | null = null;
+  let dismissed = false;
+  function dismiss(): void {
+    dismissed = true;
+    open = false;
+  }
+  function focusBack(): void {
+    const to = returnTo;
+    returnTo = null;
+    if (!to || !to.isConnected || !to.checkVisibility()) return;
+    const now = document.activeElement;
+    if (now === null || now === document.body || el?.contains(now)) to.focus({ preventScroll: true });
+  }
   let threadView = $state<ReturnType<typeof SlashThread> | null>(null);
   /** The page behind the palette, read each time it opens: what an ask is sent with and what the starters fit. */
   let behind = $state<PageContext>({ path: '/' });
@@ -1309,6 +1327,12 @@
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
+      const had = document.activeElement;
+      returnTo =
+        had instanceof HTMLElement && had !== document.body
+          ? had
+          : ([...document.querySelectorAll<HTMLElement>('[data-palette-from], .launcher')].find((f) => f.checkVisibility()) ?? null);
+      dismissed = false;
       placeOn(el);
       el.showModal();
       overlays.open();
@@ -1330,6 +1354,8 @@
     } else if (!open && el.open) {
       el.close();
       overlays.close();
+      if (dismissed) queueMicrotask(focusBack);
+      else returnTo = null;
     }
   });
 
@@ -1566,11 +1592,11 @@
    */
   function oncancel(e: Event) {
     e.preventDefault();
-    if (!inAsk) return void (open = false);
+    if (!inAsk) return dismiss();
     if (q === '' && threadView?.escape()) return;
     if (q !== '') return void (q = '');
     if (backTo !== null) return toFind();
-    open = false;
+    dismiss();
   }
 
   /**
@@ -1592,7 +1618,7 @@
     const r = el.getBoundingClientRect();
     const outside =
       e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-    if (outside) open = false;
+    if (outside) dismiss();
   }
 </script>
 
@@ -1655,7 +1681,7 @@
          can see the list still benefits from knowing twelve of forty-eight are on screen, and a
          reader who cannot has nothing else to tell them the list changed. -->
     <p class="p-count" role="status">{announced}</p>
-    <button type="button" class="p-close tap" onclick={() => (open = false)}>{words.cancel}</button>
+    <button type="button" class="p-close tap" onclick={dismiss}>{words.cancel}</button>
   </div>
   <!-- WHAT THE PLAIN LINE WAS READ AS: a chip for each, under the field, drawn only while the line makes a row. -->
   {#if plainMade && plainMade.chips.length > 0}

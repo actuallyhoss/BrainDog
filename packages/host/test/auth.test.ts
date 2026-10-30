@@ -454,6 +454,15 @@ test("MAIL THAT IS NOT GOING OUT IS SAID: `magic: 'down'`, and never for a host 
   assert.equal(down?.passkey, true);
 });
 
+test('ONLY THE WORKER SAYS IT SERVES SIGN-UP, so a self-host is never asked /auth/signup/name (audit 31 Oct A29)', async () => {
+  const worker = (await setup({ door: { on: 'worker' } }).call('/auth/methods')).body.value;
+  assert.equal(worker?.signup, true);
+  const self = (await setup().call('/auth/methods')).body.value;
+  assert.equal(self?.signup, undefined);
+  const open = (await setup({ door: { open: true } }).call('/auth/methods')).body.value;
+  assert.equal(open?.signup, undefined);
+});
+
 test('THE OPERATOR: no key is no route, a wrong key is 401, and the claim link comes back and is never mailed', async () => {
   const made: { slug: string; email: string }[] = [];
   const provision = async (args: { slug: string; email: string }) => {

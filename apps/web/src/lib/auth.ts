@@ -39,6 +39,11 @@ export type Methods = {
   google?: true | undefined;
   /** The Turnstile site key, only where the host checks sign-in link requests (secret and key both set). Absent is no check. */
   turnstile?: string | undefined;
+  /**
+   * The host serves sign-up (`/auth/signup/*`), which only the hosted app does. Absent is no, and who may sign up is then
+   * never asked: a self-host answers that door 404, which the browser printed as an error on every sign-in.
+   */
+  signup?: true | undefined;
 };
 
 /** A passkey as Settings lists it. */
@@ -195,6 +200,7 @@ function methodsOf(v: unknown): Methods | null {
     ...(typeof v.firstRun === 'boolean' ? { firstRun: v.firstRun } : {}),
     ...(v.google === true ? { google: true as const } : {}),
     ...(typeof v.turnstile === 'string' && v.turnstile !== '' ? { turnstile: v.turnstile } : {}),
+    ...(v.signup === true ? { signup: true as const } : {}),
   };
 }
 

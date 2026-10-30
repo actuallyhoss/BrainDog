@@ -77,6 +77,19 @@ export function closed(ok: boolean, at: number): void {
 }
 
 /**
+ * `closed`, a task later: for a call whose answer mounts the next reads (a list keyed on the first answer, a lazy area's
+ * chunk), so the count does not touch nothing between the two and `data-screen` does not flash on over a screen still
+ * arriving. Svelte draws an answer in a microtask, and the reads that drawing starts are open before this runs.
+ *
+ * THE FLASH WAS WHAT THE GATES MEASURED (audit 31 Oct A31): Settings › Agents, People & sharing, Tidy up and Add-ons said
+ * `ready` over the bare shell, took it back as their own reads went out, then said it again, and a look that waited for
+ * the mark read the screen in between as carrying none. A navigation in between makes it a no-op, as `closed` is.
+ */
+export function closedAfter(ok: boolean, at: number): void {
+  setTimeout(() => closed(ok, at), 0);
+}
+
+/**
  * A route saying it drew, and an `Empty` saying what it is.
  *
  * THE EMPTY AND THE REFUSAL ARE COUNTED, NOT LATCHED, and the first version latched them. It ranked

@@ -35,7 +35,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import PageView from '$lib/page/PageView.svelte';
-  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { closed, closedAfter, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../billing.ts';
   import { createClient } from '@braindog/client';
   import Tile from '$lib/ui/Tile.svelte';
@@ -250,6 +250,31 @@
    * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
    * this line says.
    */
+  /**
+   * AN AREA DRAWN FROM A CHUNK OF ITS OWN IS NOT DRAWN UNTIL THE CHUNK HAS COME AND THE AREA HAS ASKED WHAT IT READS.
+   * The claim below was made over the bare shell while `import()` was out, then taken back as the area's reads went, then
+   * made again, and a look that waited for the mark read the screen in between as carrying none (audit 31 Oct A31,
+   * Agents, People & sharing, Tidy up, Add-ons). So the chunk is held as a call out, closed a task after it lands
+   * (`closedAfter`), by when the area is mounted and its own reads are out. The same module the template imports, so
+   * it is fetched once.
+   */
+  const CHUNKS: Readonly<Record<string, () => Promise<unknown>>> = {
+    people: () => import('./areas/Sharing.svelte'),
+    agents: () => import('./areas/Agents.svelte'),
+    addons: () => import('./areas/Addons.svelte'),
+    tidy: () => import('./areas/Health.svelte'),
+  };
+  $effect(() => {
+    const load = area === undefined ? undefined : CHUNKS[area];
+    if (!load) return;
+    untrack(() => {
+      const at = opened();
+      load().then(
+        () => closedAfter(true, at),
+        () => closed(true, at),
+      );
+    });
+  });
   $effect(() => drew('ready'));
 
   /**

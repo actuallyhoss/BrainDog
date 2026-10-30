@@ -16,7 +16,7 @@
 
 import { untrack } from 'svelte';
 
-import { closed, drew, opened, undrew } from '../ui/screen.svelte.ts';
+import { closed, closedAfter, drew, opened, undrew } from '../ui/screen.svelte.ts';
 import { keep, keptAnswer } from './kept.ts';
 import { live } from './live.svelte.ts';
 import { holdCopyMark } from './copy-mark.svelte.ts';
@@ -73,7 +73,22 @@ export function read<T>(
   const out = new Map<number, number>();
   let gone = false;
 
+  /**
+   * THE SCREEN IS NOT DRAWN WHILE IT LOOKS FOR ITS ANSWER, so a question asked out loud is a call out from the moment it is
+   * asked, not only once it goes to the record: the local copy is awaited first, and a screen that had said it drew was
+   * read as settled in that gap and then as carrying no mark at all once the call went (audit 31 Oct A31). Closed a task
+   * after the answer is drawn (`closedAfter`), so a read the answer starts is open by then.
+   */
   async function ask(k: string | null, quiet = false): Promise<void> {
+    const asked = quiet || k === null ? null : opened();
+    try {
+      await asking_(k, quiet);
+    } finally {
+      if (asked !== null) closedAfter(true, asked);
+    }
+  }
+
+  async function asking_(k: string | null, quiet: boolean): Promise<void> {
     /* A KEPT ANSWER IS DRAWN AT ONCE (`kept.ts`): at this version nothing is asked, at another it is asked quietly. */
     const version = untrack(() => live.version);
     /* A NEW QUESTION, or the same one asked out loud, starts unmarked: only drawing it from the copy marks it. */
@@ -138,7 +153,7 @@ export function read<T>(
     /* ONLY THE ANSWER ON SCREEN CAN REFUSE THE SCREEN. An answer for a key the screen already left counts for
        nothing, so it closes as fine: a stale refusal marking the new question's screen `refused` is the exact
        cross-talk `screen.svelte.ts`'s epoch exists to stop between routes. */
-    closed(!took || (said.state !== 'refused' && said.state !== 'offline'), at);
+    closedAfter(!took || (said.state !== 'refused' && said.state !== 'offline'), at);
   }
 
   $effect(() => {
