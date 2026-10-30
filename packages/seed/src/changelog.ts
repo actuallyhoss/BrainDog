@@ -376,7 +376,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
-    { version: '1.20.1', notes: 'No due day lists the newest tasks first.' },
+    { version: '1.20.1', notes: 'No due day lists the newest tasks first, and Later lists tasks by their due day, then the newest first.' },
     {
       version: '1.20.0',
       notes: "Work's project chips, and Yours and Agents, count the same open tasks as Open, kept for later left out, and its first line says none of your tasks is late rather than nothing is late.",

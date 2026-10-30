@@ -3095,9 +3095,10 @@ const DECLARED: Record<string, Version> = {
       rule.close_follow_ups rule.start_with_parent
       script.close_follow_ups script.start_with_parent
     `,
-    declares: '3a5fc3181fd352f1',
+    declares: 'ab20ffa843fb893f',
     history: [
       'Work 1.20.1 of 30 October: `page.work` lists No due day newest first; an order, no id added or taken away -> 3a5fc3181fd352f1',
+      'Before 1.20.1 shipped, `page.work` lists Later by due day, then newest first; an order, no id added or taken away -> ab20ffa843fb893f',
     ],
   },
 

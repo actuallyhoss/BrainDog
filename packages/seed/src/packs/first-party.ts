@@ -884,7 +884,7 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   Before it shipped, Snapshots was also marked as written by automations alone (`register.snapshots` `kept_by`), so
  *   BrainDog no longer offers it a page.
  * - work 1.20.1 (finish loop, 30 Oct): Work's "No due day" lists the newest first (`page.work`), not by a due day none of
- *   them has. An order, nothing added or taken away, so a patch step.
+ *   them has, and "Later" by due day, then newest first. An order, nothing added or taken away, so a patch step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.0',
