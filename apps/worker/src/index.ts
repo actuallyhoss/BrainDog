@@ -3554,8 +3554,9 @@ export default {
  * The `/in/*` door with its hold (`held.ts`): this deployment's bucket, secret and queue, and the door `serveIngest` was
  * handed before the hold, built fresh for each ask.
  */
-function heldDeps(env: Env): HeldDeps {
+function heldDeps(env: Env, ctx?: ExecutionContext): HeldDeps {
   return {
+    ...(ctx === undefined ? {} : { later: (work: Promise<unknown>) => ctx.waitUntil(work) }),
     holds: (rec, ingest, sign) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).doorHolds(rec, ingest, sign),
     learn: (rec, ingest, sign) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).door$(rec, ingest, sign),
     bucket: env.BLOBS,
@@ -3767,7 +3768,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        returns for everything it does not recognise, and before the app shell, which would answer a bank's
        webhook with `index.html` and a 200 that its retry logic reads as delivered. `serveIngest` holds the
        whole order from here, including the 404 for the shape this host does not serve. */
-    if (servesIn(url.pathname)) return serveHeld(request, heldDeps(env));
+    if (servesIn(url.pathname)) return serveHeld(request, heldDeps(env, ctx));
     /* THE KEY DOORS, before any door is asked: their bearer is a keychain grant, no cookie may reach them, and a login
        token reaches only the deposit door, to add a new key (`keyDoor`). */
     if (servesKeychain(url.pathname)) return keyDoor(request, env);

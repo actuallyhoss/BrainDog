@@ -25,7 +25,9 @@
  * mail, which is the one way a kept arrival can be lost, and it says so.
  *
  * BOUNDED: only a POST to `/in/webhook/<rec>/<ingest>[/<token>]` whose record id is well formed, at most the door's own
- * size, at most `HELD_PER_RECORD` waiting for one record and `HELD_MOST` for the deployment. Past either, 503 as before.
+ * size, at most `HELD_PER_RECORD` waiting for one record, `HELD_PER_DOOR` for one door, `HELD_PER_PLACE` from one place
+ * for one record, `HELD_PER_PLACE_MOST` from one place in all and `HELD_MOST` for the deployment. Past any, 503 as
+ * before, and nothing already waiting is ever pushed out for a new arrival (RE1).
  * AND ONLY AT A DOOR THE DIRECTORY KNOWS, WITH THAT DOOR'S OWN TOKEN (`holds`, RD1): the Directory learns what verifies
  * each door from the record's own answers while it is up (`learning`), so junk at a made-up door is never kept.
  * A request signed with its time (Stripe's `t=`) is never kept: its sender retries a 503, and a late replay would fail
@@ -58,8 +60,16 @@ export const HELD_MOST = 500;
 export const HELD_PER_PLACE = 10;
 
 /**
- * The most kept arrivals waiting at one door of a record (sec-follow M6): a token that leaked for one door fills that
- * door's share and never the whole record's, so his bank door keeps room while another door is flooded.
+ * The most kept arrivals waiting from one place across every record (RE1 of the review of 30 Oct, e): a tenth of the
+ * deployment's room, so one address that knows fifty records' doors cannot fill all of it, and a gateway posting for five
+ * people through a long outage still fits.
+ */
+export const HELD_PER_PLACE_MOST = 50;
+
+/**
+ * The most kept arrivals waiting at one door of a record (sec-follow M6): a token that leaked for one door, or a door
+ * signed in a header that anybody can claim to sign, fills that door's share and never the whole record's, so his bank
+ * door keeps room while another door is flooded.
  */
 export const HELD_PER_DOOR = 30;
 
@@ -122,8 +132,8 @@ type Ringing = { next: number; tries: number; kept: number; from?: string | unde
 
 /**
  * `from` is the place it came from, as a digest (`placeOf`), so the bucket counts by place and never holds an address;
- * `door` the door it came to, as a digest (`doorOf`); `signed` that it came signed in a header, which a crowded record
- * makes room for first (`hold`).
+ * `door` the door it came to, as a digest (`doorOf`); `signed` that it came signed in a header, for the operator's reading
+ * only: the hold cannot check the signature, so it earns the arrival nothing (RE1).
  */
 const ringing = (r: Ringing): Record<string, string> => ({
   next: String(r.next),
@@ -161,6 +171,8 @@ export type HeldDeps = {
    * once a deploy and after a mint (`Record$` `#doors`, DR1), so a door is known before its first arrival.
    */
   learn?: (rec: string, ingest: string, sign: string | null) => Promise<unknown>;
+  /** The request's `waitUntil`, so the Directory is told after the arrival is answered and never before (RE8). */
+  later?: (work: Promise<unknown>) => void;
   bucket: HeldBucket | undefined;
   /** `SESSION_SECRET`; the seal's key is derived from it and never stored. */
   secret: string | undefined;
@@ -263,10 +275,19 @@ const headerSigned = (headers: Headers): boolean => {
   return false;
 };
 
-/** What the Directory was last told of each door from this isolate, so a door's every arrival is not one more call. */
-const told = new Map<string, string | null>();
+/**
+ * What the Directory was last told of each door from this isolate, and when, so a door's every arrival is not one more
+ * call. Each is good for `TOLD_FOR_MS` only (RE8): it was kept for the isolate's life, so a door whose row another isolate
+ * dropped (gone, `close`, a Directory restore) and that came back with the same digest was never taught again here, and
+ * the hold kept nothing for it through an outage.
+ */
+const told = new Map<string, { sign: string | null; at: number }>();
 /** At most this many doors remembered in one isolate; past it the memory starts again. */
 const TOLD_MOST = 1000;
+/** How long one telling is trusted before the Directory is told again. */
+export const TOLD_FOR_MS = 5 * 60_000;
+/** How long a door with no `waitUntil` waits on the Directory before it goes on without it. */
+const LEARN_WAIT_MS = 300;
 
 /** What verifies a door, as the Directory keeps it (`door$`): a token's digest, `SIGNED_DOOR`, or `null` for nothing. */
 async function signOf(v: Awaited<ReturnType<IngestDoor['verify']>>): Promise<string | null | undefined> {
@@ -295,10 +316,20 @@ function learning(door: IngestDoor, deps: HeldDeps): IngestDoor {
       try {
         const sign = await signOf(v);
         const key = `${rec}/${ask.ingest}`;
-        if (sign !== undefined && told.get(key) !== sign) {
-          await learn(rec, ask.ingest, sign);
+        const now = (deps.now ?? Date.now)();
+        const last = told.get(key);
+        if (sign !== undefined && (last === undefined || last.sign !== sign || now - last.at > TOLD_FOR_MS)) {
           if (told.size >= TOLD_MOST) told.clear();
-          told.set(key, sign);
+          told.set(key, { sign, at: now });
+          /* NEVER ON THE ARRIVAL'S PATH (RE8): a Directory that is slow or hung held up the real webhook while it was
+             told. Handed to `waitUntil` where there is one, and otherwise waited on for a moment at most. A telling that
+             fails is forgotten, so the next arrival tells it again. */
+          const telling = learn(rec, ask.ingest, sign).catch((e: unknown) => {
+            if (told.get(key)?.at === now) told.delete(key);
+            op({ op: 'door', learned: false, rec, error: e instanceof Error ? e.message : String(e) }, 'error');
+          });
+          if (deps.later !== undefined) deps.later(telling);
+          else await Promise.race([telling, sleep(LEARN_WAIT_MS)]);
         }
       } catch (e) {
         op({ op: 'door', learned: false, rec, error: e instanceof Error ? e.message : String(e) }, 'error');
@@ -332,34 +363,44 @@ async function hold(
   if (bucket === undefined || !deps.secret) return false;
   const now = (deps.now ?? Date.now)();
   try {
+    /* THE SAME REQUEST KEPT TWICE IS ONE KEY: his two devices post every text, and the second one is the same arrival. */
+    const key = `${HELD_WAIT}${rec}/${await digest(concat(utf8(url), bytes))}.held`;
     /* A LISTING SHORTER THAN ITS LIMIT IS THE WHOLE OF IT, so the record's own count is read off the same page. */
     const waiting = await bucket.list({ prefix: HELD_WAIT, limit: HELD_MOST, include: ['customMetadata'] });
+    /* ONE ALREADY KEPT IS TAKEN, AND LEFT AS IT IS (RE2 of the review of 30 Oct, e): its chain is still ringing, so the
+       second device hears 202 even when the record is full, and the kept one's ring is not started again. */
+    if (waiting.objects.some((o) => o.key === key)) {
+      op({ op: 'door', held: true, rec, again: true }, 'error');
+      return true;
+    }
     if (waiting.objects.length >= HELD_MOST) {
       op({ op: 'door', held: false, rec, why: 'full' }, 'error');
       return false;
     }
+    /* A FULL RECORD, DOOR OR PLACE REFUSES THE NEW ARRIVAL, AND NOTHING WAITING IS EVER PUSHED OUT (RE1, RE2). A full one
+       made room for an arrival "signed in a header" by moving his oldest unsigned one to `gave-up` (sec-follow M6), but
+       the hold cannot check a signature, because the record that holds the secret is the one that is down: any header
+       named `*signature*` passed, so a stranger with his record id pushed his bank texts out one post at a time, a mail
+       each. And it made room before the place cap refused the post, so the cap stopped nothing. Every refusal is now
+       checked before anything is kept, and what is kept stays until the door takes it or says it never will. */
     const mine = waiting.objects.filter((o) => o.key.startsWith(`${HELD_WAIT}${rec}/`));
-    const atDoor = mine.filter((o) => o.customMetadata?.['door'] === at.door);
-    /* A RECORD OR A DOOR THAT IS FULL MAKES ROOM ONLY FOR AN ARRIVAL SIGNED IN A HEADER, by moving its oldest unsigned
-       one to `gave-up`, with the mail every give-up sends (sec-follow M6). Never for an unsigned one: then a token that
-       leaked could push his own waiting bank texts out, one new post at a time. */
-    const crowded = mine.length >= HELD_PER_RECORD ? mine : atDoor.length >= HELD_PER_DOOR ? atDoor : null;
-    if (crowded !== null) {
-      const oldest = at.signed
-        ? crowded
-            .filter((o) => o.customMetadata?.['signed'] !== '1')
-            .sort((a, b) => (Number(a.customMetadata?.['kept']) || a.uploaded.getTime()) - (Number(b.customMetadata?.['kept']) || b.uploaded.getTime()))[0]
-        : undefined;
-      const sealed = oldest === undefined ? null : await bucket.get(oldest.key);
-      if (oldest === undefined || sealed === null) {
-        op({ op: 'door', held: false, rec, why: crowded === mine ? 'record-full' : 'door-full' }, 'error');
-        return false;
-      }
-      await giveUp(deps, bucket, oldest.key, new Uint8Array(await sealed.arrayBuffer()), rec, 'crowded');
+    if (mine.length >= HELD_PER_RECORD) {
+      op({ op: 'door', held: false, rec, why: 'record-full' }, 'error');
+      return false;
+    }
+    if (mine.filter((o) => o.customMetadata?.['door'] === at.door).length >= HELD_PER_DOOR) {
+      op({ op: 'door', held: false, rec, why: 'door-full' }, 'error');
+      return false;
     }
     /* ONE PLACE, ONE RECORD (RD14): a gateway posting for many people fills only each person's own share. */
-    if (waiting.objects.filter((o) => o.key.startsWith(`${HELD_WAIT}${rec}/`) && o.customMetadata?.['from'] === from).length >= HELD_PER_PLACE) {
+    if (mine.filter((o) => o.customMetadata?.['from'] === from).length >= HELD_PER_PLACE) {
       op({ op: 'door', held: false, rec, why: 'place-full' }, 'error');
+      return false;
+    }
+    /* AND ONE PLACE, THE DEPLOYMENT (RE1): counted per record alone, one address filled the whole room across fifty
+       records' signed doors. */
+    if (waiting.objects.filter((o) => o.customMetadata?.['from'] === from).length >= HELD_PER_PLACE_MOST) {
+      op({ op: 'door', held: false, rec, why: 'place-most' }, 'error');
       return false;
     }
     const envelope: Envelope = {
@@ -371,8 +412,6 @@ async function hold(
       door: at.door,
       ...(at.signed ? { signed: true } : {}),
     };
-    /* THE SAME REQUEST KEPT TWICE IS ONE KEY: his two devices post every text, and the second one is the same arrival. */
-    const key = `${HELD_WAIT}${rec}/${await digest(concat(utf8(url), bytes))}.held`;
     await bucket.put(key, await seal(deps.secret, utf8(JSON.stringify(envelope))), {
       customMetadata: ringing({ next: now + stepOf(0) * 1000, tries: 0, kept: now, from, door: at.door, signed: at.signed }),
     });

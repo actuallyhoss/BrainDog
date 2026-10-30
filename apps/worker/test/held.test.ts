@@ -13,7 +13,7 @@ import type { Result } from '@braindog/ports';
 
 import { createHash } from 'node:crypto';
 
-import { HELD_GAVE_UP, HELD_OLDEST_MS, HELD_PER_DOOR, HELD_PER_PLACE, HELD_PER_RECORD, HELD_STEPS_S, HELD_WAIT, SIGNED_DOOR, open, redeliver, serveHeld, sweepHeld, timeSigned, type HeldBucket, type HeldDeps, type HeldMessage } from '../src/held.ts';
+import { HELD_GAVE_UP, HELD_MOST, HELD_OLDEST_MS, HELD_PER_DOOR, HELD_PER_PLACE, HELD_PER_PLACE_MOST, HELD_PER_RECORD, HELD_STEPS_S, HELD_WAIT, SIGNED_DOOR, open, redeliver, seal, serveHeld, sweepHeld, timeSigned, TOLD_FOR_MS, type HeldBucket, type HeldDeps, type HeldMessage } from '../src/held.ts';
 
 const REC = 'rec_01J8ZC0000000000000000000A';
 const TOKEN = 'tok-123';
@@ -282,12 +282,19 @@ test('A RING REFUSED OVER AN OBJECT KEPT AGAIN SINCE LEAVES THE NEW ONE AS IT IS
   await serveHeld(post(), deps(['throw'], [], b, first).d);
   const held = first[0]?.body.held ?? '';
 
-  /* THE SAME TEXT KEPT AGAIN WHILE A RING WAS OUT: new seal, new ring of its own, and A's mark does not land on it. */
+  /* THE SAME TEXT KEPT AGAIN WHILE A RING WAS OUT (two posts that both listed before either was put): new seal, new
+     ring of its own, and A's mark does not land on it. */
   const { d } = deps(['throw'], [], b);
-  const ringA: HeldDeps = { ...d, queue: { send: async () => void (await serveHeld(post(), deps(['throw'], [], b).d)) } };
+  const resealed = await seal(SECRET, await open(SECRET, b.objects.get(held)?.bytes ?? new Uint8Array()));
+  const ringA: HeldDeps = { ...d, queue: { send: async () => void (await b.put(held, resealed, { customMetadata: { next: '0', tries: '0', kept: '0' } })) } };
   assert.equal(await redeliver({ held, tries: 3 }, ringA), 'gone');
   assert.equal(b.objects.size, 1);
   assert.equal(b.objects.get(held)?.meta?.['tries'], '0', 'the object kept again was marked by the older ring');
+
+  /* A POST OF THE SAME TEXT ONCE IT IS KEPT LEAVES IT AS IT IS (RE2), so the ring's mark is the one that holds. */
+  const sealedNow = b.objects.get(held)?.bytes;
+  assert.equal((await serveHeld(post(), deps(['throw'], [], b).d)).status, 202);
+  assert.equal(b.objects.get(held)?.bytes, sealedNow);
 
   /* NOTHING IN BETWEEN: the ring marks its object when its next ring is due, as before. */
   const again: { body: HeldMessage; delay: number | undefined }[] = [];
@@ -374,7 +381,7 @@ test('SEC7: A BODY WITH NO LENGTH IS READ ONLY UP TO THE CEILING, and past it is
   assert.ok(sent < 4 * 1024 * 1024, `read ${sent} bytes of a body past the ceiling`);
 });
 
-/* ── sec-follow M6: one door's share, and room made only for a signed arrival ─────────────────────────────── */
+/* ── sec-follow M6 and RE1/RE2: one door's share, and nothing waiting pushed out ─────────────────────────────── */
 
 test('M6: ONE DOOR KEEPS AT MOST HELD_PER_DOOR, so another door of the record still has room', async () => {
   const b = bucket();
@@ -387,17 +394,86 @@ test('M6: ONE DOOR KEEPS AT MOST HELD_PER_DOOR, so another door of the record st
   assert.equal(mine.status, 202);
 });
 
-test('M6: A FULL DOOR MOVES ITS OLDEST UNSIGNED ARRIVAL TO GAVE-UP FOR A SIGNED ONE, AND NEVER FOR AN UNSIGNED ONE', async () => {
+test('RE1: A FULL DOOR REFUSES A NEW ARRIVAL, SIGNED OR NOT, AND NEVER PUSHES A WAITING ONE OUT', async () => {
   const b = bucket();
   const either: HeldDeps['holds'] = async (rec, ingest, sign) => rec === REC && ingest === 'bank-from-out-sms' && (sign === SIGN || sign === SIGNED_DOOR);
   const text = (n: number): Request => new Request(URL_, { method: 'POST', headers: { 'cf-connecting-ip': `198.51.100.${n + 1}` }, body: `text ${n}` });
   let now = NOW_M6;
-  const at = (): HeldDeps => ({ ...deps(['throw'], [], b, [], either).d, now: () => (now += 1000) });
+  const told: string[] = [];
+  const at = (): HeldDeps => ({ ...deps(['throw'], [], b, [], either).d, now: () => (now += 1000), tell: async (f) => void told.push(f.why) });
   for (let i = 0; i < HELD_PER_DOOR; i++) assert.equal((await serveHeld(text(i), at())).status, 202);
   assert.equal((await serveHeld(text(150), at())).status, 503, 'an unsigned arrival pushed a waiting one out');
-  const signed = new Request(`https://brain.dog/in/webhook/${REC}/bank-from-out-sms`, { method: 'POST', headers: { 'x-hub-signature-256': 'sha256=abc' }, body: 'signed' });
-  assert.equal((await serveHeld(signed, at())).status, 202);
-  const gave = [...b.objects.keys()].filter((k) => k.startsWith(HELD_GAVE_UP));
-  assert.equal(gave.length, 1);
+  /* A HEADER NAMED LIKE A SIGNATURE IS NO SIGNATURE THE HOLD CAN CHECK, so it earns no room. */
+  const forged = new Request(`https://brain.dog/in/webhook/${REC}/bank-from-out-sms`, { method: 'POST', headers: { 'x-signature': 'x', 'cf-connecting-ip': '203.0.113.9' }, body: 'forged' });
+  assert.equal((await serveHeld(forged, at())).status, 503, 'a forged signed arrival was kept');
+  assert.equal([...b.objects.keys()].filter((k) => k.startsWith(HELD_GAVE_UP)).length, 0, 'a waiting arrival was moved to gave-up');
   assert.equal([...b.objects.keys()].filter((k) => k.startsWith(HELD_WAIT)).length, HELD_PER_DOOR);
+  assert.deepEqual(told, []);
+});
+
+test('RE2: A PLACE OVER ITS SHARE IS REFUSED BEFORE ANYTHING ELSE MOVES, and the same request kept again is taken as it is', async () => {
+  const b = bucket();
+  const doors: HeldDeps['holds'] = async (rec, ingest, sign) => rec === REC && ingest.startsWith('d') && sign === SIGN;
+  /* THE RECORD FILLED FROM MANY PLACES ACROSS TWO DOORS, and one place at its share of it. */
+  const at = (door: string, n: number, ip: string): Request =>
+    new Request(`https://brain.dog/in/webhook/${REC}/${door}/${TOKEN}`, { method: 'POST', headers: { 'cf-connecting-ip': ip }, body: `text ${n}` });
+  for (let i = 0; i < HELD_PER_PLACE; i++) assert.equal((await serveHeld(at('d1', i, '203.0.113.7'), deps(['throw'], [], b, [], doors).d)).status, 202);
+  for (let i = HELD_PER_PLACE; i < HELD_PER_RECORD; i++)
+    assert.equal((await serveHeld(at(i % 2 === 0 ? 'd1' : 'd2', i, `198.51.${Math.floor(i / 200)}.${(i % 200) + 1}`), deps(['throw'], [], b, [], doors).d)).status, 202);
+  const before = [...b.objects.keys()].sort();
+  const sent: { body: HeldMessage; delay: number | undefined }[] = [];
+  const told: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    const d = { ...deps(['throw'], [], b, sent, doors).d, tell: async (f: { why: string }) => void told.push(f.why) };
+    assert.equal((await serveHeld(at('d3', 500 + i, '203.0.113.7'), d)).status, 503);
+  }
+  assert.deepEqual([...b.objects.keys()].sort(), before, 'a refused post moved a waiting arrival');
+  assert.deepEqual(told, []);
+  /* HIS SECOND DEVICE POSTS THE SAME TEXT: it is already kept, so it is taken, and its ring is not started again. */
+  assert.equal((await serveHeld(at('d1', 0, '203.0.113.7'), deps(['throw'], [], b, sent, doors).d)).status, 202);
+  assert.deepEqual([...b.objects.keys()].sort(), before);
+  assert.equal(sent.length, 0, 'the same arrival was rung a second time');
+});
+
+test('RE1: ONE PLACE KEEPS AT MOST HELD_PER_PLACE_MOST ACROSS EVERY RECORD', async () => {
+  const b = bucket();
+  const many = (n: number): string => `rec_01J8ZC00000000000000000${String(n).padStart(3, '0')}`;
+  const any: HeldDeps['holds'] = async (_rec, ingest, sign) => ingest === 'bank' && sign === SIGNED_DOOR;
+  const forged = (rec: string, n: number): Request =>
+    new Request(`https://brain.dog/in/webhook/${rec}/bank`, { method: 'POST', headers: { 'x-signature': 'x', 'cf-connecting-ip': '203.0.113.66' }, body: `forged ${n}` });
+  for (let r = 0; r < 10; r++) for (let i = 0; i < HELD_PER_PLACE; i++) await serveHeld(forged(many(r), i), deps(['throw'], [], b, [], any).d);
+  assert.equal(b.objects.size, HELD_PER_PLACE_MOST, 'one address filled more than its share of the deployment');
+  assert.ok(HELD_PER_PLACE_MOST < HELD_MOST);
+});
+
+test('RE8: A DIRECTORY THAT HANGS DOES NOT HOLD UP THE DOOR, and with waitUntil it is told after the answer', async () => {
+  const later: Promise<unknown>[] = [];
+  const { d } = deps(['ok'], []);
+  const hung: HeldDeps['learn'] = () => new Promise(() => {});
+  const started = Date.now();
+  const res = await serveHeld(
+    new Request(`https://brain.dog/in/webhook/${REC}/hung-door/${TOKEN}`, { method: 'POST', body: TEXT }),
+    { ...d, learn: hung, later: (w) => void later.push(w) },
+  );
+  assert.equal(res.status, 202);
+  assert.equal(later.length, 1);
+  assert.ok(Date.now() - started < 250);
+  /* WITH NO waitUntil, THE DOOR WAITS A MOMENT AT MOST. */
+  const alone = Date.now();
+  assert.equal((await serveHeld(new Request(`https://brain.dog/in/webhook/${REC}/hung-door-2/${TOKEN}`, { method: 'POST', body: TEXT }), { ...d, learn: hung })).status, 202);
+  assert.ok(Date.now() - alone < 2000);
+});
+
+test('RE8: A DOOR IS TOLD AGAIN ONCE ITS TELLING IS OLD, so a row dropped elsewhere comes back', async () => {
+  const learned: string[] = [];
+  let now = NOW_M6;
+  const { d } = deps(['ok'], []);
+  const at: HeldDeps = { ...d, now: () => now, learn: async (_rec, ingest) => void learned.push(ingest) };
+  const ask = (): Request => new Request(`https://brain.dog/in/webhook/${REC}/told-door/${TOKEN}`, { method: 'POST', body: TEXT });
+  await serveHeld(ask(), at);
+  await serveHeld(ask(), at);
+  assert.deepEqual(learned, ['told-door']);
+  now += TOLD_FOR_MS + 1;
+  await serveHeld(ask(), at);
+  assert.deepEqual(learned, ['told-door', 'told-door']);
 });
