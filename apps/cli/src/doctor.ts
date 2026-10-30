@@ -458,6 +458,9 @@ export function profileName(dir: string, home?: string, ccenv: string | undefine
 const serverWords = (server: 'this' | 'other' | 'none'): string =>
   server === 'this' ? "BrainDog's server is registered and runs this command" : server === 'other' ? "BrainDog's server is registered and runs another copy of the command" : "BrainDog's server is not registered";
 
+/** Whether doctor found nothing to read at all: no Claude Code profile and no other app. */
+export const notSetUp = (report: Pick<Report, 'profiles' | 'apps'>): boolean => report.profiles.length === 0 && report.apps.length === 0;
+
 /**
  * The plan as lines: each profile and each other app in a sentence, then the places under three headings, then each
  * app to restart, then how many there are. `home` is the folder shown as `~`, so a line names a file a person can open,
@@ -487,7 +490,9 @@ export function printDoctor(report: Report, home?: string, ccenv?: string): stri
   for (const place of report.places) if (place.kind === 'process') stale.set(place.file, (stale.get(place.file) ?? 0) + 1);
   for (const [app, n] of stale) lines.push(`Started before this command was updated: restart ${app}${n > 1 ? ` (${String(n)} servers)` : ''}.`);
   const n = report.places.length;
-  lines.push(n === 0 ? `Nothing to fix${report.replaced === null ? '' : `, and nothing names ${report.replaced}`}.` : `${count(n, 'place', 'places')} to fix.`);
+  /* NO PROFILE AND NO APP IS NOT "NOTHING TO FIX": BrainDog is not set up here at all (D24), and the one line is how. */
+  if (notSetUp(report)) lines.push('BrainDog is not set up on this machine: no Claude Code profile or other app was found. Run braindog setup <the address of your BrainDog> to set it up.');
+  else lines.push(n === 0 ? `Nothing to fix${report.replaced === null ? '' : `, and nothing names ${report.replaced}`}.` : `${count(n, 'place', 'places')} to fix.`);
   return lines;
 }
 
@@ -607,5 +612,5 @@ export function doctor(args: string[], io: DoctorIo = {}): { lines: string[]; re
     processes: (io.ps ?? psOf)(),
     installed: (io.installed ?? installedOf)(),
   });
-  return { lines: printDoctor(report, home, ccenvHome(home, env)), report, json: values.json === true, code: report.places.length > 0 ? 1 : 0 };
+  return { lines: printDoctor(report, home, ccenvHome(home, env)), report, json: values.json === true, code: report.places.length > 0 || notSetUp(report) ? 1 : 0 };
 }
