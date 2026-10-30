@@ -41,7 +41,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import ShipsWidgets from '$lib/board/ShipsWidgets.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
-  import { currencyChoices } from '$lib/record/currencies.ts';
+  import { currencyOptions } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
   import { heldNames, holdName, waitingIn, waitingLine } from './waiting.ts';
   import { answersIn, declarationsOf, holdsFoot, savedSaid, type TakesHold } from './takes-hold.ts';
@@ -656,11 +656,11 @@
                            reached a third code. A saved code the picker does not offer still draws, because the draft
                            starts as the saved value and every pick is an offered one. -->
                       {@const saved = settings?.values[key]}
-                      {@const choices = currencyChoices(typeof saved === 'string' ? saved : '')}
+                      {@const choices = currencyOptions(typeof saved === 'string' ? saved : '')}
                       <select class="setting-select" id="set-{key}" value={d.text.trim().toUpperCase()} onchange={(e) => (d.text = typed(e))}>
                         <option value="">{copy.currencyNone}</option>
-                        <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
-                        <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+                        <optgroup label={copy.currencyCommon}>{#each choices.common as c (c.code)}<option value={c.code}>{c.label}</option>{/each}</optgroup>
+                        <optgroup label={copy.currencyAll}>{#each choices.other as c (c.code)}<option value={c.code}>{c.label}</option>{/each}</optgroup>
                       </select>
                     {:else if decl.type === 'day'}
                       <input

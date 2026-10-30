@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COMMON_CURRENCIES, OFFERED_CURRENCIES, OTHER_CURRENCIES, currencyChoices } from './currencies.ts';
+import { COMMON_CURRENCIES, OFFERED_CURRENCIES, OTHER_CURRENCIES, currencyChoices, currencyLabel, currencyOptions } from './currencies.ts';
 
 const TENDER: readonly string[] = Intl.supportedValuesOf('currency');
 
@@ -73,4 +73,20 @@ test('A CODE THE PICKER DOES NOT OFFER IS STILL DRAWN WHEN THE SETTING HOLDS IT,
   assert.equal(currencyChoices('gbp').other, OTHER_CURRENCIES);
   assert.equal(currencyChoices('').other, OTHER_CURRENCIES);
   assert.equal(currencyChoices('not a code').other, OTHER_CURRENCIES);
+});
+
+test('a currency is named as a person says it, with its symbol where it has one (audit 2 B3)', () => {
+  assert.equal(currencyLabel('GBP'), 'British pound, £');
+  assert.equal(currencyLabel('eur'), 'Euro, €');
+  assert.equal(currencyLabel('AED'), 'UAE dirham');
+  assert.equal(currencyLabel('QQQ'), 'QQQ');
+});
+
+test('the picker leads with the held currency and names the rest in name order', () => {
+  const { common, other } = currencyOptions('GBP');
+  assert.equal(common[0]?.code, 'GBP');
+  const rest = common.slice(1).map((o) => o.label);
+  assert.deepEqual(rest, [...rest].sort((a, b) => a.localeCompare(b, 'en-GB')));
+  assert.equal(other.length, OTHER_CURRENCIES.length);
+  assert.ok(other.every((o) => o.label !== ''));
 });

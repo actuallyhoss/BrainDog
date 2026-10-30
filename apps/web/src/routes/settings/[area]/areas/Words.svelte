@@ -27,7 +27,7 @@
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { live, type PackConfig, type Source } from '$lib/record/packs.ts';
-  import { currencyChoices } from '$lib/record/currencies.ts';
+  import { currencyLabel, currencyOptions } from '$lib/record/currencies.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { speaking, withSpeaks } from '$lib/voice.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -67,19 +67,8 @@
   const owner = $derived(ownsRecord(shell.me));
 
   /* THIS AREA'S OWN WORDS. They name the person's things: their currency, their lists, what the record says. */
-  /** "British pounds (£)" for GBP, as a person says it (P43); the code where Intl cannot. */
-  function currencySaid(code: string): string {
-    try {
-      const part = (display: 'name' | 'narrowSymbol') =>
-        new Intl.NumberFormat('en-GB', { style: 'currency', currency: code, currencyDisplay: display }).formatToParts(2).find((p) => p.type === 'currency')?.value;
-      const name = part('name');
-      const symbol = part('narrowSymbol');
-      if (!name) return code;
-      return symbol && symbol !== code && symbol !== name ? `${name} (${symbol})` : name;
-    } catch {
-      return code;
-    }
-  }
+  /** "British pound, £" for GBP, as a person says it (P43, audit 2 B3); the code where Intl cannot. */
+  const currencySaid = (code: string): string => currencyLabel(code);
 
   const words = {
     /* THE LISTS TILE IS "Your lists" (SPEC agents F4): this is the page where lists are named, so it says the word the
@@ -94,7 +83,7 @@
     kept: (code: string) => currencySaid(code),
     renameWith: 'Rename them with a starter.',
     browse: 'Browse starters',
-    currencyNow: (code: string) => (code ? `Home currency is now ${code}.` : 'No home currency now.'),
+    currencyNow: (code: string) => (code ? `Home currency is now ${currencySaid(code)}.` : 'No home currency now.'),
     called: 'Called',
     /* NO "a" OR "an" BEFORE A WORD NOBODY HAS TYPED YET: "One is a update" and "One is a item" were on this screen. */
     one: 'One is called',
@@ -112,13 +101,13 @@
     stranded: (names: readonly string[], from: string, to: string) => {
       const one = names.length === 1;
       return to
-        ? `${one ? 'A limit' : 'Limits'} set in ${from} will be counted in ${to} at the day's rate, where there is one: ${listed(names)}.`
+        ? `${one ? 'A limit' : 'Limits'} set in ${currencySaid(from)} will be counted in ${currencySaid(to)} at the day's rate, where there is one: ${listed(names)}.`
         : `With no home currency, ${one ? 'this limit stops' : 'these limits stop'} counting: ${listed(names)}.`;
     },
-    change: (to: string) => (to ? `Change to ${to}` : 'Choose none'),
+    change: (to: string) => (to ? `Change to ${currencySaid(to)}` : 'Choose none'),
     renamed: (was: string, now: string) => `${was} is called ${now} now.`,
     renameFiled: (now: string) => `The new name ${now} is waiting in Needs you.`,
-    keep: (code: string) => `Keep ${code}`,
+    keep: (code: string) => `Keep ${code ? currencySaid(code) : copy.currencyNone}`,
   } as const;
 
   /* ── reading ───────────────────────────────────────────────────────────── */
@@ -189,9 +178,18 @@
   /** A money add-on is on, whether or not it keeps a currency setting of its own. */
   const on = $derived(moneyOn(packs));
   /** What the money is in where no add-on keeps the code: the record's own read of its money (`api.ts`). */
-  const keptIn = $derived(code || homeCurrency() || '');
+  /* READ FROM THE SHELL, which a save asks again, so an Undo back to none draws the money the record is in once more. */
+  const keptIn = $derived(code || shell.index.currency || homeCurrency() || '');
+  /**
+   * WHAT THE PICKER SHOWS AS CHOSEN: the code the add-on keeps, else the one the record's money is in (audit 2 B3). The
+   * seed keeps no code and every screen is in pounds, and the picker said "None chosen" over them. Picking that same one
+   * is no change, so the select starts on it and nothing is written until a different one is picked.
+   */
+  const heldIn = $derived(code || keptIn);
+  /* NONE IS OFFERED ONLY WHERE IT MEANS SOMETHING: a code is kept and could be cleared, or the record reads none. */
+  const offersNone = $derived(code !== '' || heldIn === '');
   /* THE ORDER IS THE SAVED CODE'S, as on the add-on's page: handed the draft, every pick moved itself to the front. */
-  const choices = $derived(currencyChoices(code));
+  const choices = $derived(currencyOptions(heldIn));
   let busy = $state(false);
   let fix = $state('');
 
@@ -205,11 +203,11 @@
 
   function pickCurrency(next: string): void {
     /* BACK TO THE ONE IT IS, while a pick waited: nothing to change. */
-    if (next === code) {
+    if (next === heldIn) {
       asking = null;
       return;
     }
-    const names = strandedBy(packs, code, next);
+    const names = strandedBy(packs, heldIn, next);
     if (names.length === 0) {
       asking = null;
       void putCurrency(next, false, picker);
@@ -219,7 +217,7 @@
   }
 
   function keepCurrency(): void {
-    if (picker) picker.value = code;
+    if (picker) picker.value = heldIn;
     asking = null;
   }
 
@@ -235,6 +233,7 @@
     const pack = money;
     if (!s || !pack || busy) return;
     const was = code;
+    const showing = heldIn;
     busy = true;
     fix = '';
     const at = opened();
@@ -243,7 +242,7 @@
     busy = false;
     if (!out.ok) {
       /* A REFUSED PICK GOES BACK: `value` is one-way, and nothing changed for it to redraw from. */
-      if (select) select.value = was;
+      if (select) select.value = showing;
       fix = out.refusal.fix;
       return;
     }
@@ -400,25 +399,25 @@
       <div class="pick">
         <IconWell name="money" />
         <label class="pick-label" for="w-currency">{words.currency}</label>
-        <select id="w-currency" bind:this={picker} value={code} disabled={busy} aria-describedby={asking ? 'w-stranded' : undefined} onchange={(e) => pickCurrency(e.currentTarget.value)}>
-          <option value="">{copy.currencyNone}</option>
-          <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
-          <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+        <select id="w-currency" bind:this={picker} value={heldIn} disabled={busy} aria-describedby={asking ? 'w-stranded' : undefined} onchange={(e) => pickCurrency(e.currentTarget.value)}>
+          {#if offersNone}<option value="">{copy.currencyNone}</option>{/if}
+          <optgroup label={copy.currencyCommon}>{#each choices.common as c (c.code)}<option value={c.code}>{c.label}</option>{/each}</optgroup>
+          <optgroup label={copy.currencyAll}>{#each choices.other as c (c.code)}<option value={c.code}>{c.label}</option>{/each}</optgroup>
         </select>
       </div>
       {#if asking}
         <div class="stranded" id="w-stranded">
-          <p class="stranded-line">{words.stranded(asking.names, code, asking.to)}</p>
+          <p class="stranded-line">{words.stranded(asking.names, heldIn, asking.to)}</p>
           <div class="stranded-acts">
             <Button weight="primary" onclick={confirmCurrency}>{words.change(asking.to)}</Button>
-            <Button weight="bare" onclick={keepCurrency}>{words.keep(code || copy.currencyNone)}</Button>
+            <Button weight="bare" onclick={keepCurrency}>{words.keep(heldIn)}</Button>
           </div>
         </div>
       {:else}
         <p class="hint">{words.currencyWhy}</p>
       {/if}
     {:else}
-      <StateRow icon="money" title={words.currency} line={money ? code || copy.currencyNone : !on ? words.noMoney : keptIn ? words.kept(keptIn) : copy.currencyNone} />
+      <StateRow icon="money" title={words.currency} line={money ? (heldIn ? currencySaid(heldIn) : copy.currencyNone) : !on ? words.noMoney : keptIn ? words.kept(keptIn) : copy.currencyNone} />
     {/if}
   </Tile>
 
