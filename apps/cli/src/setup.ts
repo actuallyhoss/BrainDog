@@ -362,8 +362,24 @@ function whatIsLeft(rows: ToolRow[], conn: Connected, key: string, io: SetupIo):
   return lines;
 }
 
+/**
+ * A step's number on its first line only (D23): the lines after it for the same step, one per app or profile, start
+ * with as many spaces instead, so a dry run reads 3. once and not five times. Any other line goes out as it is.
+ */
+export function stepsOnce(out: (line: string) => void): (line: string) => void {
+  let last: string | null = null;
+  return (line) => {
+    const m = /^(\d+[a-z]?)\. /u.exec(line);
+    if (m === null) return out(line);
+    if (m[1] === last) return out(`${' '.repeat(m[0].length)}${line.slice(m[0].length)}`);
+    last = m[1]!;
+    out(line);
+  };
+}
+
 /** `braindog setup <url> [--dry-run | --yes] [--only <app>] [--profile <folder>]`, and the exit code: the first failing step's, or 0. */
-export async function setup(args: string[], io: SetupIo): Promise<number> {
+export async function setup(args: string[], given: SetupIo): Promise<number> {
+  const io: SetupIo = { ...given, out: stepsOnce(given.out) };
   let parsed: { values: { 'dry-run'?: boolean | undefined; yes?: boolean | undefined; statusline?: boolean | undefined; only?: string[] | undefined; profile?: string[] | undefined }; positionals: string[] };
   try {
     parsed = parseArgs({

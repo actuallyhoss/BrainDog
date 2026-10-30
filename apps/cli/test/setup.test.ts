@@ -30,6 +30,12 @@ import { keepPin, pinOf, pinsFile } from '../src/pins.ts';
 import { renderEntry } from '../src/tools.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-setup-'));
+
+/** Whether setup said a step's line, numbered or under its step's number: `stepsOnce` numbers a step's first line only. */
+const saidStep = (out: readonly string[], line: string): boolean => {
+  const m = /^(\d+[a-z]?\. )(.*)$/su.exec(line);
+  return m !== null && out.some((l) => l === line || l === `${' '.repeat(m[1]!.length)}${m[2]!}`);
+};
 after(() => rmSync(scratch, { recursive: true, force: true }));
 const HOST = 'http://127.0.0.1:9';
 let n = 0;
@@ -73,7 +79,7 @@ test('the plan is printed, then asked about, before the settings file exists; a 
   const hooks = (JSON.parse(readFileSync(m.settings, 'utf8')) as { hooks: Record<string, unknown> }).hooks;
   assert.deepEqual(Object.keys(hooks), ['SessionStart', 'SessionEnd', 'PostToolUse', 'UserPromptSubmit', 'PreToolUse', 'Stop']);
   assert.ok(m.out.includes("   Written: the BrainDog hooks and Agent Skill are in Claude Code's settings."), m.out.join('\n'));
-  assert.ok(m.out.some((l) => l.startsWith('3. MCP server, Claude Code in ~/.claude: braindog is registered')), m.out.join('\n'));
+  assert.ok(m.out.some((l) => /^(?:3\.| {2}) MCP server, Claude Code in ~\/\.claude: braindog is registered/u.test(l)), m.out.join('\n'));
 });
 
 test('a no writes nothing and stops at step 2', async () => {
@@ -287,7 +293,9 @@ test('a dry run says one line per app and profile, and the two things left, and 
     '4. Tools, Fake App: what would be written at user scope, from the tools the record applies everywhere:',
     '   Tool old was not written, because it starts from a Windows path and this machine is not Windows.',
   ])
-    assert.ok(text.includes(line), `missing: ${line}\n${text}`);
+    assert.ok(saidStep(m.out, line) || text.includes(line), `missing: ${line}\n${text}`);
+  /* EACH STEP'S NUMBER ONCE (D23): a dry run with an app or profile a line said 3. on every one of them. */
+  for (const step of ['1.', '2.', '3.', '4.', '5.', '6.']) assert.ok(m.out.filter((l) => l.startsWith(`${step} `)).length <= 1, `${step} said twice\n${text}`);
   const key = hostKey(host);
   const tail = [
     'This repository has 2 tools of its own. Write them with braindog tools write --scope project.',
@@ -323,7 +331,7 @@ test('apply registers the server in both profiles and the other app, keeps a .pr
     '3. MCP server, Claude Code in ~/.claude-work: braindog is registered, running this command.',
     '3. MCP server, Fake App: braindog is registered, running this command.',
   ])
-    assert.ok(text.includes(line), `missing: ${line}\n${text}`);
+    assert.ok(saidStep(m.out, line) || text.includes(line), `missing: ${line}\n${text}`);
   assert.equal(readFileSync(join(m.home, '.claude.json.pre-braindog'), 'utf8'), before.claudeJson);
   assert.equal(readFileSync(join(m.home, '.fakeapp', 'mcp.json.pre-braindog'), 'utf8'), before.fake);
   const fake = JSON.parse(readFileSync(join(m.home, '.fakeapp', 'mcp.json'), 'utf8')) as { mcpServers: Record<string, { args?: string[] }> };
@@ -346,7 +354,7 @@ test('apply registers the server in both profiles and the other app, keeps a .pr
   const settled = snapshot(m.home);
   const calls = m.calls.length;
   assert.equal(await setup([host, '--yes'], again.io), 0, again.out.join('\n'));
-  assert.ok(again.out.includes('3. MCP server, Claude Code in ~/.claude-work: braindog is already registered, running this command.'), again.out.join('\n'));
+  assert.ok(saidStep(again.out, '3. MCP server, Claude Code in ~/.claude-work: braindog is already registered, running this command.'), again.out.join('\n'));
   assert.equal(again.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
   assert.equal(m.calls.length, calls, 'the second run ran claude');
   assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
@@ -359,9 +367,9 @@ test('an app not on this machine is one line and is left alone; --only names the
   mkdirSync(join(m.home, '.braindog'), { recursive: true });
   writeFileSync(profilesFile(m.home), `${JSON.stringify({ profiles: [m.work, join(m.home, '.claude-gone')] })}\n`);
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
-  assert.ok(m.out.includes('3. MCP server, Fake App: not on this machine, so setup leaves it.'), m.out.join('\n'));
+  assert.ok(saidStep(m.out, '3. MCP server, Fake App: not on this machine, so setup leaves it.'), m.out.join('\n'));
   assert.ok(m.out.includes('   The profile ~/.claude-gone was set up before and is no longer on this machine, so it is left out.'), m.out.join('\n'));
-  assert.ok(m.out.includes('3. MCP server, Claude Code in ~/.claude-work: braindog is registered, running this command.'), m.out.join('\n'));
+  assert.ok(saidStep(m.out, '3. MCP server, Claude Code in ~/.claude-work: braindog is registered, running this command.'), m.out.join('\n'));
   assert.ok(!existsSync(join(m.home, '.fakeapp')) && !existsSync(join(m.home, '.claude-gone')));
   assert.deepEqual(JSON.parse(readFileSync(profilesFile(m.home), 'utf8')), { profiles: [join(m.home, '.claude'), m.work] });
 
@@ -371,7 +379,7 @@ test('an app not on this machine is one line and is left alone; --only names the
   assert.deepEqual(only.calls, []);
   assert.ok(only.out.includes('2. Hooks: --only leaves Claude Code out, so no hooks were placed.'), only.out.join('\n'));
   assert.ok(!existsSync(join(only.home, '.claude', 'settings.json')), 'hooks were written with --only fakeapp');
-  assert.ok(only.out.includes('3. MCP server, Fake App: braindog is registered, running this command.'), only.out.join('\n'));
+  assert.ok(saidStep(only.out, '3. MCP server, Fake App: braindog is registered, running this command.'), only.out.join('\n'));
 
   const wrong = home2(true);
   assert.equal(await setup([host, '--only', 'nope'], wrong.io), 1);
@@ -387,10 +395,10 @@ test('with Codex and Cursor in the table, a home holding both gets the server in
   mkdirSync(join(m.home, '.cursor'));
   m.io.env.CODEX_HOME = join(m.home, '.codex');
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
-  for (const title of ['Codex', 'Cursor']) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
+  for (const title of ['Codex', 'Cursor']) assert.ok(saidStep(m.out, `3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
   assert.ok(readFileSync(join(m.home, '.codex', 'config.toml'), 'utf8').includes('[mcp_servers.braindog]'));
   /* AND CODEX'S TURN END AND AGENTS.md BLOCK, shown first and written with the --yes given ahead. */
-  assert.ok(m.out.includes("2. Hooks, Codex: these changes to Codex's files come next, with a copy of each file kept first:"), m.out.join('\n'));
+  assert.ok(saidStep(m.out, "2. Hooks, Codex: these changes to Codex's files come next, with a copy of each file kept first:"), m.out.join('\n'));
   assert.match(readFileSync(join(m.home, '.codex', 'config.toml'), 'utf8'), /^# braindog: the notify line below is BrainDog's/u);
   assert.match(readFileSync(join(m.home, '.codex', 'AGENTS.md'), 'utf8'), /^## BrainDog$/mu);
   for (const [file, body] of Object.entries(snapshot(m.home))) assert.deepEqual(tokensIn(body), [], `${file} holds a token shape`);
@@ -398,8 +406,8 @@ test('with Codex and Cursor in the table, a home holding both gets the server in
   const settled = snapshot(m.home);
   m.out.length = 0;
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
-  assert.ok(m.out.includes("2. Hooks, Codex: its config already runs BrainDog's turn end, and its AGENTS.md holds BrainDog's block."), m.out.join('\n'));
-  for (const title of ['Codex', 'Cursor']) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
+  assert.ok(saidStep(m.out, "2. Hooks, Codex: its config already runs BrainDog's turn end, and its AGENTS.md holds BrainDog's block."), m.out.join('\n'));
+  for (const title of ['Codex', 'Cursor']) assert.ok(saidStep(m.out, `3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
   assert.equal(m.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
   assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
 });
@@ -418,7 +426,7 @@ test('with Claude Desktop and VS Code on the machine, each gets the server in it
   const titles = [...(desktop !== null ? ['Claude Desktop'] : []), 'VS Code'];
   pinTools(m.home, m.io.cli);
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
-  for (const title of titles) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
+  for (const title of titles) assert.ok(saidStep(m.out, `3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
   const vs = JSON.parse(readFileSync(join(code, 'mcp.json'), 'utf8')) as { servers: Record<string, { args: string[] }> };
   assert.deepEqual(vs.servers.braindog!.args.slice(-3), ['mcp', '--agent', 'other']);
   if (desktop !== null) {
@@ -433,7 +441,7 @@ test('with Claude Desktop and VS Code on the machine, each gets the server in it
   const settled = snapshot(m.home);
   m.out.length = 0;
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
-  for (const title of titles) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
+  for (const title of titles) assert.ok(saidStep(m.out, `3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
   assert.equal(m.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
   assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
 });
