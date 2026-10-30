@@ -2706,7 +2706,8 @@ const DECLARED: Record<string, Version> = {
     history: [
       "People 4.2.1 (round 1030): `metric.organisations-count` counts every organisation not folded into another and not retired, `metric.organisations-known` is added for the ones you work with, the people figures leave you and merged rows out (`metric.people-in-touch-30d`, `metric.people-quiet`), and `page.people` says one organisations line in place of the Organisations table; one id added, none taken away -> e1e0f171a698aca0",
     ],
-  },  'people@4.2.2': {
+  },
+  'people@4.2.2': {
     holds: `
       metric.organisations-count metric.organisations-from-card-texts metric.organisations-known metric.people-count
       metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d metric.people-quiet
@@ -2739,7 +2740,8 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`page.health` says what needs a look without \"on this record\", and links to Tidy up for what went stale or is here twice; words and one note added, no id added or taken away -> f7944da78d446954",
     ],
-  },  'core@1.2.1': {
+  },
+  'core@1.2.1': {
     holds: `
       page.activity page.calendar page.health page.scripts
     `,
@@ -3126,7 +3128,8 @@ const DECLARED: Record<string, Version> = {
     history: [
       "Work 1.20.0 (Q6 of 29 October): `page.work`'s project chips and Yours and Agents count what Open counts, and its line says none of your tasks is late; no id added or taken away -> 0aef6cf7e6d779f5",
     ],
-  },  'work@1.20.1': {
+  },
+  'work@1.20.1': {
     holds: `
       metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
       metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open
@@ -3139,11 +3142,12 @@ const DECLARED: Record<string, Version> = {
       rule.close_follow_ups rule.start_with_parent
       script.close_follow_ups script.start_with_parent
     `,
-    declares: '048d50723d738f45',
+    declares: '43e75f17c96ed2fb',
     history: [
       'Work 1.20.1 of 30 October: `page.work` lists No due day newest first; an order, no id added or taken away -> 3a5fc3181fd352f1',
       'Before 1.20.1 shipped, `page.work` lists Later by due day, then newest first; an order, no id added or taken away -> ab20ffa843fb893f',
       'Before 1.20.1 shipped, `page.work` says "Your work this week" and `page.work-timeline` "Tasks by due day", keys kept; no id added or taken away -> 048d50723d738f45',
+      'Before 1.20.1 shipped, `page.work` counts its folded groups (Not this week, Needs a project, Not moved in three months, Done lately) from `register.tasks`; no id added or taken away -> 43e75f17c96ed2fb',
     ],
   },
 

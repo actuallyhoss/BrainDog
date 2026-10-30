@@ -898,6 +898,7 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   them as their reasons. Words and a condition, nothing added or taken away, so a patch step.
  * - money-core 3.33.0, before it shipped (audit 31 Oct f, AF4): Money's first line leads with late bills, or the low
  *   point when cash goes under within 12 weeks, the card second (`page.money`).
+ * - work 1.20.1, before it shipped (audit 31 Oct f, AF20): Work's folded groups say how many they hold (`page.work`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.1',
