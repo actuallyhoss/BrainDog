@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { existingRow, type Dedupe } from '../src/ingest.ts';
+import { existingRow, moneyUnsaid, type Dedupe } from '../src/ingest.ts';
 import { openSqlite } from './sqlite.ts';
 
 /* The two keys HSBC's add-on declares: an InstaPay text by its reference, a card text by what is available after it. */
@@ -116,4 +116,17 @@ test('an archived row is never a candidate, nor does it claim a line', () => {
     ['gone', { ...WOPLEK, ref: 'aaaa' }, '2026-10-29T10:00:00Z'],
   ]);
   assert.equal(find({ ...WOPLEK, ref: 'bbbb' }), 'line');
+});
+
+test("the second sighting's money the kept row never said goes onto it: a statement's balance after, onto the alert's line", () => {
+  const sql = openSqlite();
+  sql.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT NOT NULL, seq INTEGER, fields TEXT NOT NULL, deleted_at TEXT)');
+  const alert = { amount: { amount: 101587, currency: 'EGP' }, available: { amount: 900, currency: 'EGP' }, on: '2026-10-28', what: 'Talabat' };
+  sql.exec('INSERT INTO entry (id, register, seq, fields, deleted_at) VALUES (?, ?, ?, ?, ?)', 'a1', 'transactions', 1, JSON.stringify(alert), null);
+  const types = { ...TYPES, balance_after: { type: 'money' } };
+  const deps = { sql, schemaOf: () => ({ fields: types }) } as never;
+  const statement = { amount: { amount: 101587, currency: 'EGP' }, balance_after: { amount: 560564, currency: 'EGP' }, on: '2026-10-29', what: 'TALABAT CAIRO' };
+  assert.deepEqual(moneyUnsaid(deps, 'transactions', 'a1', statement), { balance_after: { amount: 560564, currency: 'EGP' } });
+  /* WHAT IT HOLDS ALREADY IS NEVER WRITTEN OVER, and nothing new is nothing. */
+  assert.equal(moneyUnsaid(deps, 'transactions', 'a1', { ...alert, available: { amount: 1, currency: 'EGP' } }), null);
 });

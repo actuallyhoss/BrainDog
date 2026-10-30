@@ -17,8 +17,8 @@
   import { money } from 'braindog-render';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { BYTES_MOST, type Export } from '$lib/start/export.ts';
-  import { freshOf, guessRoles, linesOf, readStatement, rolesMissing, fieldsOf, ROLES, words, type Held, type Roles, type Sign } from '$lib/money/statement.ts';
-  import { addLines, heldFor, loadStatement, type Added, type Into, type Loaded } from '$lib/money/statement-live.ts';
+  import { balancesOf, freshOf, guessRoles, linesOf, readStatement, rolesMissing, fieldsOf, ROLES, words, type Held, type Roles, type Sign } from '$lib/money/statement.ts';
+  import { addLines, fillBalances, heldFor, loadStatement, type Added, type Into, type Loaded } from '$lib/money/statement-live.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -115,21 +115,25 @@
 
   const split = $derived(reading && held !== null ? freshOf(reading.lines, held) : null);
   const already = $derived(new Set(split?.already.map((l) => l.at) ?? []));
+  /* THE BALANCE A LINE ALREADY THERE NEVER SAID, written with the same press (`balancesOf`). */
+  const fills = $derived(split ? balancesOf(split.matched, loader.value?.balance ?? null) : []);
   const SHOWN = 40;
   const shown = $derived(reading?.lines.slice(0, SHOWN) ?? []);
 
   /* ── the press ── */
   let adding = $state<{ done: number; of: number } | null>(null);
-  let result = $state<(Added & { account: string }) | null>(null);
+  let result = $state<(Added & { account: string; filled: number }) | null>(null);
 
   async function add(): Promise<void> {
     const l = loader.value;
-    if (!l || !account || !split || split.fresh.length === 0 || adding) return;
+    if (!l || !account || !split || (split.fresh.length === 0 && fills.length === 0) || adding) return;
     const rows = split.fresh.map((line) => fieldsOf(line, l.ledger, account.id, l.balance));
+    const balances = fills;
     adding = { done: 0, of: rows.length };
     const out = await addLines(base, l.ledger.list, rows, (done) => (adding = { done, of: rows.length }));
+    const filled = balances.length > 0 ? await fillBalances(base, l.ledger.list, balances) : 0;
     adding = null;
-    result = { ...out, account: account.name };
+    result = { ...out, account: account.name, filled };
     heldKey = '';
   }
 
@@ -147,7 +151,8 @@
     <Empty kind="no-data-yet" glyph="money" title={words.noAccounts} />
   {:else if result}
     <div class="st-done" role="status">
-      <h2>{words.added(result.added, result.account)}</h2>
+      <h2>{result.added === 0 && result.filled > 0 ? words.filled(result.filled) : words.added(result.added, result.account)}</h2>
+      {#if result.added > 0 && result.filled > 0}<p class="st-quiet">{words.filled(result.filled)}</p>{/if}
       {#if result.missed > 0}<p class="st-warn">{words.missed(result.missed)} {result.why}</p>{/if}
       <div class="st-actions">
         <Button weight="primary" onclick={again}>{words.again}</Button>
@@ -255,8 +260,10 @@
           </div>
           {#if reading.lines.length > SHOWN}<p class="st-quiet">{words.more(reading.lines.length - SHOWN)}</p>{/if}
           <div class="st-actions">
-            {#if split && split.fresh.length === 0}
+            {#if split && split.fresh.length === 0 && fills.length === 0}
               <p class="st-quiet">{words.nothingNew}</p>
+            {:else if split && split.fresh.length === 0}
+              <Button weight="primary" disabled={adding !== null} onclick={() => void add()}>{words.fill(fills.length)}</Button>
             {:else}
               <Button weight="primary" disabled={!split || adding !== null} onclick={() => void add()}>
                 {adding ? words.adding(adding.done, adding.of) : words.add(split?.fresh.length ?? 0)}

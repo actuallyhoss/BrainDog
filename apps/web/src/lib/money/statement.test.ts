@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { balanceFieldOf, bankless, dayPlus, fieldsOf, freshOf, guessRoles, heldOf, linesOf, readStatement, rolesMissing, sameLine, spanOf, type Held, type Roles } from './statement.ts';
+import { balanceFieldOf, balancesOf, bankless, dayPlus, fieldsOf, freshOf, guessRoles, heldOf, linesOf, readStatement, rolesMissing, sameLine, spanOf, type Held, type Roles } from './statement.ts';
 import type { Export } from '../start/export.ts';
 
 const read = (text: string, name = 'statement.csv'): Export => {
@@ -176,4 +176,19 @@ test('a line is written as the Ledger stores it, its balance only where the Ledg
 test('two descriptions that start with two different days are two lines', () => {
   assert.ok(!sameLine(line('2026-08-16', '16AUG26 ATM Cash Withdrawal', 250000), line('2026-08-17', '17AUG26 ATM Cash Withdrawal', 250000)));
   assert.ok(sameLine(line('2026-08-16', '16AUG26 ATM Cash Withdrawal', 250000), line('2026-08-16', 'ATM Cash Withdrawal', 250000)));
+});
+
+test("a statement's balance goes onto the alert's line it merges into, when that line kept none", () => {
+  const l = { title: 'what', amount: 'amount', day: 'on', way: { field: 'direction', in: 'in', out: 'out' } };
+  const alert = heldOf({ what: 'Talabat', amount: { amount: 101587, currency: 'EGP' }, on: '2026-10-28', direction: 'out' }, l, 'balance_after')!;
+  assert.equal(alert.balance, null);
+  const kept = { ...alert, seq: 41 };
+  const said = { at: 0, day: '2026-10-29', what: '28OCT26 TALABAT CAIRO EG Purchase', amount: 101587, currency: 'EGP', way: 'out' as const, balance: 560564 };
+  const { already, matched } = freshOf([said], [kept]);
+  assert.equal(already.length, 1);
+  assert.deepEqual(balancesOf(matched, 'balance_after'), [{ seq: 41, patch: { balance_after: { amount: 560564, currency: 'EGP' } } }]);
+  /* A LINE THAT SAYS ITS BALANCE ALREADY, OR A LEDGER WITH NO BALANCE FIELD, IS LEFT AS IT IS. */
+  assert.deepEqual(balancesOf([{ line: said, held: { ...kept, balance: 560564 } }], 'balance_after'), []);
+  assert.deepEqual(balancesOf(matched, null), []);
+  assert.deepEqual(balancesOf([{ line: { ...said, balance: null }, held: kept }], 'balance_after'), []);
 });

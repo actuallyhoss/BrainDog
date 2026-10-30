@@ -1413,6 +1413,12 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       /* A SKIP IS NEVER SILENT: it keeps the row it repeats, on its `match` line, and says it by its name,
          amount and day, so the Inbox can offer "It is a second one" on the text itself. */
       const reason = repeatSaid(deps, register, existing, matched.dedupe);
+      /* AND WHAT THE KEPT ROW NEVER SAID OF ITS MONEY, the second sighting says onto it: a statement line merged into the
+         alert that wrote the payment first brought the balance after it, and the alert's line kept none (recheck of 30
+         October). Only under a near key, which is one payment seen by two roads, and only a money field the kept row
+         holds nothing in. A refusal leaves the row as it was: the skip stands. */
+      const fill = Array.isArray(matched.dedupe) ? null : moneyUnsaid(deps, register, existing.id, extracted);
+      if (fill !== null) deps.write(register, existing.id, fill, `ingest:${matched.ingest}`);
       store('skipped', reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'skipped', { field: 'repeats', from: existing.id });
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason, repeats: existing.id });
@@ -3512,6 +3518,22 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
  * Its title, its first money field and the day it moved, each left out where the row has none. Never a list's id or a
  * row's number.
  */
+/**
+ * The money fields an arrival says that the row it repeats holds nothing in, as a patch, or `null` when there are none:
+ * what a second sighting of one payment adds to the first (a statement's balance after it, an alert's available).
+ */
+export function moneyUnsaid(deps: Pick<IngestDeps, 'sql' | 'schemaOf'>, register: string, id: string, extracted: Record<string, unknown>): Record<string, unknown> | null {
+  const fields = deps.schemaOf(register)?.fields ?? {};
+  const row = parsed(deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', id)?.fields) ?? {};
+  const patch: Record<string, unknown> = {};
+  for (const [field, v] of Object.entries(extracted)) {
+    if (fields[field]?.type !== 'money' || (row[field] !== undefined && row[field] !== null)) continue;
+    const m = v as { amount?: unknown; currency?: unknown } | null;
+    if (m !== null && typeof m === 'object' && Number.isInteger(m.amount) && typeof m.currency === 'string') patch[field] = { amount: m.amount, currency: m.currency };
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
 function repeatSaid(deps: IngestDeps, register: string, existing: { id: string }, dedupe: Dedupe | undefined): string {
   const fields = deps.schemaOf(register)?.fields ?? {};
   const row = parsed(deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', existing.id)?.fields) ?? {};

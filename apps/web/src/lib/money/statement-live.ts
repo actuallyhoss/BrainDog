@@ -5,7 +5,8 @@
  * READS: the ledger and its accounts, found from the declarations the tab holds as the quick-add sheet finds them
  * (`read.ts` `findLedger`), and the account's own lines over the days the file covers, a day either side, for the dedupe.
  *
- * WRITES: one ordinary `create` a line, a few at a time, as the first run writes a file it was pointed at.
+ * WRITES: one ordinary `create` a line, a few at a time, as the first run writes a file it was pointed at; and onto a
+ * line already there that kept no balance, the one the file says beside it (`fillBalances`).
  */
 
 import { createClient, type Client } from '@braindog/client';
@@ -76,7 +77,25 @@ export async function heldFor(base: string, ledger: Ledger, account: string, lin
   };
   const rows = await every(createClient({ base }), ledger.list, where, HELD_MOST);
   if (rows === null) return null;
-  return rows.map((r) => heldOf(r.fields, ledger, balance)).filter((h): h is Held => h !== null);
+  return rows.flatMap((r) => {
+    const h = heldOf(r.fields, ledger, balance);
+    return h === null ? [] : [r.seq === null ? h : { ...h, seq: r.seq }];
+  });
+}
+
+/** Write each balance a line already there never said (`balancesOf`), a few at a time: how many took it. */
+export async function fillBalances(base: string, list: string, fills: readonly { seq: number; patch: Record<string, unknown> }[]): Promise<number> {
+  const client = createClient({ base });
+  const queue = [...fills];
+  let done = 0;
+  const worker = async (): Promise<void> => {
+    for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
+      const out = await client.update({ register: list, seq: f.seq, patch: f.patch }).catch(() => null);
+      if (out?.ok) done++;
+    }
+  };
+  await Promise.all(Array.from({ length: AT_ONCE }, worker));
+  return done;
 }
 
 /** What the write came to: how many went in, how many the record refused, and its first sentence why. */

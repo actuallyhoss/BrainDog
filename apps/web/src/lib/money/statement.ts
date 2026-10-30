@@ -38,7 +38,7 @@ export type Line = { at: number; day: string; what: string; amount: number; curr
  * Ledger's other words for the payee (as the bank wrote it, and as a person named it), and `balance` what it says the
  * account held after, in minor units, when it says.
  */
-export type Held = { day: string; what: string; amount: number; currency: string; way: 'in' | 'out'; also?: string[]; balance?: number | null };
+export type Held = { day: string; what: string; amount: number; currency: string; way: 'in' | 'out'; also?: string[]; balance?: number | null; seq?: number };
 
 /** The file read as lines, and what was left out: lines in another currency, and lines with no day, amount or words. */
 export type Read = { lines: Line[]; other: number; unread: number };
@@ -77,6 +77,9 @@ export const words = {
   nothingNew: 'Every line is already in the Ledger.',
   added: (n: number, account: string) => `Added ${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`} to ${account}.`,
   missed: (n: number) => `${n === 1 ? '1 line was' : `${n.toLocaleString('en')} lines were`} not added.`,
+  /** The press when every line is there already and some of them still lack the balance the file says. */
+  fill: (n: number) => (n === 1 ? 'Add the balance to 1 line' : `Add the balance to ${n.toLocaleString('en')} lines`),
+  filled: (n: number) => `Added the balance to ${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`} already in the Ledger.`,
   again: 'Import another',
   open: 'Open the account',
   notRead: 'That file has no lines to read. Export the statement as CSV and try again.',
@@ -291,19 +294,34 @@ export function sameLine(a: Held, b: Held): boolean {
  * and the nearest pairs are made first, whatever order the file is in: a statement listed newest first does not let a
  * coffee on the 5th take the Ledger's coffee of the 3rd from the file's own coffee of the 3rd.
  */
-export function freshOf<L extends Held>(lines: readonly L[], held: readonly Held[]): { fresh: L[]; already: L[] } {
+export function freshOf<L extends Held>(lines: readonly L[], held: readonly Held[]): { fresh: L[]; already: L[]; matched: { line: L; held: Held }[] } {
   const pairs: { l: number; h: number; gap: number }[] = [];
   for (const [li, l] of lines.entries())
     for (const [hi, h] of held.entries()) if (sameLine(l, h)) pairs.push({ l: li, h: hi, gap: Math.abs(utc(l.day) - utc(h.day)) });
   pairs.sort((x, y) => x.gap - y.gap || x.l - y.l || x.h - y.h);
   const usedLine = new Set<number>();
   const usedHeld = new Set<number>();
+  const matched: { line: L; held: Held }[] = [];
   for (const p of pairs) {
     if (usedLine.has(p.l) || usedHeld.has(p.h)) continue;
     usedLine.add(p.l);
     usedHeld.add(p.h);
+    matched.push({ line: lines[p.l]!, held: held[p.h]! });
   }
-  return { fresh: lines.filter((_, i) => !usedLine.has(i)), already: lines.filter((_, i) => usedLine.has(i)) };
+  return { fresh: lines.filter((_, i) => !usedLine.has(i)), already: lines.filter((_, i) => usedLine.has(i)), matched };
+}
+
+/**
+ * THE BALANCE A LINE ALREADY THERE NEVER SAID, from the statement line it is (recheck of 30 October): an alert wrote the
+ * payment first and kept no balance after it, and the statement prints one beside the same payment. Each as the Ledger
+ * row's number and what to write on it; only where the Ledger has a balance field, the row's is empty (`heldOf` reads it
+ * as `null`), and the line says one.
+ */
+export function balancesOf(matched: readonly { line: Line; held: Held }[], balance: string | null): { seq: number; patch: Record<string, unknown> }[] {
+  if (balance === null) return [];
+  return matched.flatMap(({ line, held }) =>
+    typeof held.seq === 'number' && held.balance === null && line.balance !== null ? [{ seq: held.seq, patch: { [balance]: { amount: line.balance, currency: line.currency } } }] : [],
+  );
 }
 
 /** The Ledger's other words for a payee: as the bank wrote it, and as a person named it (money-core's field ids). */
@@ -323,6 +341,8 @@ export function heldOf(fields: Readonly<Record<string, unknown>>, l: Pick<Ledger
   if (also.length > 0) out.also = also;
   const after = balance === null ? null : (fields[balance] as { amount?: unknown; currency?: unknown } | null | undefined);
   if (typeof after?.amount === 'number' && after.currency === money.currency) out.balance = after.amount;
+  /* NONE SAID IS `null`, not left out, so a statement's balance may be written onto it (`balancesOf`). */
+  else if (balance !== null && (after === null || after === undefined)) out.balance = null;
   return out;
 }
 
