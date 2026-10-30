@@ -42,7 +42,7 @@ test('a file goes in again, a part at a time, each its own POST', async () => {
 });
 
 test('a refusal from the record is a value, as every other answer is', async () => {
-  const refusal = { code: 'LEVEL_REQUIRED', fix: 'Only an owner sets this record up.', at: 'principal' };
+  const refusal = { code: 'LEVEL_REQUIRED', fix: 'Only an owner sets this BrainDog up.', at: 'principal' };
   const out = await client(host(403, { ok: false, refusal })).setup({ me: { name: 'Sam' } });
   assert.equal(out.ok, false);
   assert.equal(!out.ok && 'refusal' in out && out.refusal.code, 'LEVEL_REQUIRED');

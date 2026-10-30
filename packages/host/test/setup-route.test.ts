@@ -63,7 +63,7 @@ test('SOMEBODY WHO IS NOT THE OWNER IS REFUSED BY THE RECORD, and the host hands
     if (ctx.principal.kind === 'token')
       return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot set this BrainDog up.', at: 'principal' } };
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
-      return { ok: false as const, refusal: { code: 'LEVEL_REQUIRED', fix: 'Only an owner sets this record up.', at: 'principal' } };
+      return { ok: false as const, refusal: { code: 'LEVEL_REQUIRED', fix: 'Only an owner sets this BrainDog up.', at: 'principal' } };
     return ok({ done: [], failed: [] });
   };
   const handlers = handlersFor(Object.assign(Object.create(api) as typeof api, { setup }));

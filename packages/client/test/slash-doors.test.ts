@@ -112,7 +112,7 @@ test('slashPattern POSTS THE ARRIVALS BY ID to its own door', async () => {
 
 test("EACH DOOR'S REFUSAL COMES BACK VERBATIM, because Settings and the palette draw it as the host wrote it", async () => {
   /* Each body is the one `packages/host/src/slash-ask.ts` or `packages/slash/src/index.ts` writes, copied rather than invented. */
-  const owner = { code: 'FORBIDDEN', fix: 'Only the record owner changes how Slash is set up.' };
+  const owner = { code: 'FORBIDDEN', fix: 'Only the owner of this BrainDog changes how Slash is set up.' };
   assert.deepEqual(await answering(403, { ok: false, refusal: owner }).client.slashSettings({ ask_cap: 0 }), { ok: false, refusal: owner });
 
   const stray = {
@@ -123,7 +123,7 @@ test("EACH DOOR'S REFUSAL COMES BACK VERBATIM, because Settings and the palette 
   };
   assert.deepEqual(await answering(422, { ok: false, refusal: stray }).client.slashSettings({ bogus: 1 } as never), { ok: false, refusal: stray });
 
-  const none = { code: 'NOT_IN_THIS_BUILD', fix: 'No model is configured behind Slash on this host, so it cannot read the record for you.' };
+  const none = { code: 'NOT_IN_THIS_BUILD', fix: 'No model is configured behind Slash on this host, so it cannot read your BrainDog for you.' };
   assert.deepEqual(await answering(501, { ok: false, refusal: none }).client.slashStatus(), { ok: false, refusal: none });
 
   const spent = { code: 'SLASH_BUDGET_SPENT', fix: 'Slash is out of asks until 2026-10-01. Add your own key, or wait.' };

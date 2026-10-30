@@ -593,7 +593,7 @@ test('A MEMBER WHO IS NOT THE OWNER IS REFUSED BY THE PACKAGE, which is where th
   const host = await listen(t, () => Promise.resolve(spy.engine), it.api, member);
   const out = await ask(host.origin, { ask_cap: 0 }, {}, '/api/slash/settings');
   assert.equal(out.status, 403, JSON.stringify(out.body));
-  assert.equal(out.body.refusal?.fix, 'Only the record owner changes how Slash is set up.');
+  assert.equal(out.body.refusal?.fix, 'Only the owner of this BrainDog changes how Slash is set up.');
 });
 
 test('POST /api/slash/propose HANDS THE ENGINE THE ask_id PASS 1 ANSWERED, and refuses one that is not text', async (t) => {

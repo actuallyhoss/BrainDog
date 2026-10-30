@@ -57,7 +57,7 @@ test('AN ABSENT KEY IS NOT SENT, and a key no mark has is dropped rather than re
 });
 
 test('A HOST WITHOUT heard ANSWERS ITS REFUSAL AS A VALUE, so a command on an older record carries on', async () => {
-  const { client } = recording({ ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This record cannot do that yet.' } }, 501);
+  const { client } = recording({ ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot do that yet.' } }, 501);
   const out = await client.heard({ kind: 'hello', build: 'dev+0000000' });
   assert.equal(out.ok, false);
   assert.equal((out as { refusal: { code: string } }).refusal.code, 'NOT_IN_THIS_BUILD');
