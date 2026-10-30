@@ -24,6 +24,7 @@
 import {
   consentFor,
   DOCUMENT_MOST_BYTES,
+  isJsonType,
   escapeHtml,
   oauthError,
   oauthPage,
@@ -133,7 +134,8 @@ async function readDocument(url: string, send: Send, pin: ReturnType<typeof pinF
     const pinned = await pin(at, signal);
     if (typeof pinned === 'string') return null;
     const out = await send(at, { method: 'GET', headers: { accept: 'application/json' }, redirect: 'manual', signal }, pinned);
-    if (out.status !== 200 || out.body === null) {
+    /* AS JSON, OR NOT AT ALL: a file host answers an upload as `text/plain` (`isJsonType`). */
+    if (out.status !== 200 || out.body === null || !isJsonType(out.headers.get('content-type'))) {
       await out.body?.cancel().catch(() => undefined);
       return null;
     }

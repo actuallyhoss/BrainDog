@@ -27,6 +27,7 @@ import {
   serveOAuthDoor,
   TOKEN_DAYS,
   DOCUMENT_MOST_BYTES,
+  isJsonType,
   type Approver,
   type Consent,
   type Minted,
@@ -90,7 +91,8 @@ const RECORD_NAME_MOST = 64;
 async function readDocument(url: string): Promise<string | null> {
   try {
     const out = await fetch(url, { method: 'GET', redirect: 'manual', headers: [['accept', 'application/json']], signal: AbortSignal.timeout(DOCUMENT_WAIT_MS) });
-    if (out.status !== 200 || out.body === null) {
+    /* AS JSON, OR NOT AT ALL: a file host answers an upload as `text/plain` (`isJsonType`). */
+    if (out.status !== 200 || out.body === null || !isJsonType(out.headers.get('content-type'))) {
       await out.body?.cancel();
       return null;
     }

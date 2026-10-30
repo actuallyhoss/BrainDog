@@ -518,12 +518,51 @@ function resourceAt(request: Request, deps: OAuthDeps): string {
   return deps.resources?.includes(reached) === true ? reached : `${deps.issuer}/mcp`;
 }
 
-/** Whether a client id is an address a metadata document may be read from: `https:`, a path, no fragment, no user. */
+/**
+ * Hosts where anybody can put a file under the host's own name: GitHub's raw and gist files, paste sites, and the public
+ * buckets of the big stores. A document served there proves only that somebody uploaded it, and the consent screen
+ * would say "BrainDog checked that this app is raw.githubusercontent.com", so an app is never read from one. Each is
+ * matched as the host or any name under it.
+ */
+const USER_CONTENT_HOSTS = [
+  'githubusercontent.com',
+  'gist.github.com',
+  'gitlab.io',
+  'pastebin.com',
+  'paste.ee',
+  'hastebin.com',
+  'dropboxusercontent.com',
+  'storage.googleapis.com',
+  'firebasestorage.googleapis.com',
+  's3.amazonaws.com',
+  'blob.core.windows.net',
+  'r2.dev',
+  'jsdelivr.net',
+  'unpkg.com',
+] as const;
+
+/** Whether a host is one where anybody can serve a file (`USER_CONTENT_HOSTS`), including a bucket's own name under S3. */
+export function isUserContentHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/\.$/u, '');
+  if (/(^|\.)s3[.-][a-z0-9-]+\.amazonaws\.com$/u.test(h)) return true;
+  return USER_CONTENT_HOSTS.some((d) => h === d || h.endsWith(`.${d}`));
+}
+
+/**
+ * Whether a metadata document came as JSON: `application/json` or a `+json` type, with any parameters. A file host that
+ * answers `text/plain` is serving somebody's upload, not an app's own document.
+ */
+export function isJsonType(type: string | null): boolean {
+  const essence = (type ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  return essence === 'application/json' || /^application\/[a-z0-9.+-]+\+json$/u.test(essence);
+}
+
+/** Whether a client id is an address a metadata document may be read from: `https:`, a path, no fragment, no user, and a host that is no file host. */
 function isDocumentUrl(id: string): boolean {
   if (id.length > URI_MOST || id.includes('#')) return false;
   try {
     const url = new URL(id);
-    return url.protocol === 'https:' && url.pathname !== '/' && url.username === '' && url.password === '';
+    return url.protocol === 'https:' && url.pathname !== '/' && url.username === '' && url.password === '' && !isUserContentHost(url.hostname);
   } catch {
     return false;
   }
