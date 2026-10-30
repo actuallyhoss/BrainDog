@@ -370,7 +370,7 @@ Every line the Worker writes is one JSON object with `op` first (`apps/worker/sr
 Workers Logs keeps them (`observability.enabled` in `apps/worker/wrangler.jsonc`). A line carries a
 code, an id and a shape, never a value, so each alert below is a saved query over fields: in the
 dashboard, Workers & Pages > `braindog-production` > Observability > Query Builder, set the
-filters, pick the window, and save it under the alert's name. Nine, and each names the runbook in
+filters, pick the window, and save it under the alert's name. Eleven, and each names the runbook in
 `docs/53-SPEC-OPERATIONS.md` that answers it.
 
 | Alert | Filters | Fires when | Runbook |
@@ -384,6 +384,8 @@ filters, pick the window, and save it under the alert's name. Nine, and each nam
 | KEK straggler | `op` = `walk.done`, `stragglers` > 0 | two nights in a row | 53 §5.6 |
 | Model | `op` = `model` | any row in 15 min (mailed as BrainDog model) | read `raw`: one that names the model means the route table (`MODELS` in `apps/worker/src/inference.ts`), one that names the account or gateway means the provider's console; from the model-checks workflow, read `model-checks.json` in that run's artifacts |
 | Night | `op` = `walk.done` with `backups_failed` > 0, or `op` = `walk`, `backup` = `failed` (mailed as BrainDog night) | the night's run | 53 §5.4 |
+| Held alarm step | `op` = `alarm-step`, `held` = true (mailed as BrainDog step when the hold starts) | any row | a record's object was reset in the same alarm step two alarms in a row, so that step is skipped for six hours (`apps/worker/src/alarm-cuts.ts`); read the `cut` lines (`step`, `times`) and the `Record$` alarm events' CPU time beside them; `act:<script>` names the script whose calls into the record were running |
+| Kept arrival | `op` = `door`, `waiting` = true or `gave_up` = true (mailed as BrainDog door after six failed tries, and on giving up) | any row | a webhook the record could not take was kept sealed in `BLOBS` under `held/wait/` and is sent again on a ladder to twelve hours (`apps/worker/src/held.ts`); `waiting` for hours means the record is refusing arrivals, so read its `Record$` errors; `gave_up` means the door will never take it (gone, off, too big, or sealed under a rotated `SESSION_SECRET`), and the request stays under `held/gave-up/` |
 
 `erase.r2` has its own row rather than riding "Dead outbox row", because 53 §2.3 asked only for a
 dead one, and a deletion that sits pending for days is the same broken promise to a person who

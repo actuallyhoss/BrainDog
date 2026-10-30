@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type KeychainGrantSeen } from '@braindog/host';
+import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type KeychainGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { accessHeaders, clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -81,6 +81,8 @@ import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { cloudSealed } from './sealed.ts';
 import { cloudVisuals, pagesPrefix } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
+import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, type Cuts } from './alarm-cuts.ts';
+import { isHeld, redeliver, serveHeld, sweepHeld, type HeldDeps, type HeldMessage } from './held.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
@@ -103,7 +105,7 @@ import { opsFunnel } from './funnel.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { LAPSED_FIX, lapseDrops } from './lapse.ts';
-import type { OutboxKind } from '@braindog/kernel';
+import type { OutboxKind, ScriptAnswer, Scripted } from '@braindog/kernel';
 import { httpFor } from './http.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { keylessRefusal } from './keyless.ts';
@@ -213,8 +215,11 @@ type EmailBinding = { send(message: Mail): Promise<void> };
 type Env = {
   RECORD: DurableObjectNamespace<Record$>;
   DIRECTORY: DurableObjectNamespace<Directory$>;
-  /** The doorbell. Its message is `{ record }` and never a payload — 51 §13 D16. */
-  INGRESS: Queue<{ record: string }>;
+  /**
+   * The doorbell. Its message is `{ record }` and never a payload — 51 §13 D16. AND A KEPT ARRIVAL'S RING, `{ held, tries }`,
+   * which names a sealed object in `BLOBS` and not a payload either (`held.ts`).
+   */
+  INGRESS: Queue<{ record: string } | HeldMessage>;
   EMAIL?: EmailBinding;
   /**
    * `<date>+<sha>`, overwritten at deploy time by `--var`, declared empty in `wrangler.jsonc`.
@@ -454,6 +459,9 @@ const KEPT_PREFIX = 'braindog.kept.';
 
 /** Where an object keeps the alarm step it is in, so an alarm cut off by the runtime is named by the next one (`#step`). */
 const ALARM_STEP = 'braindog.alarm-step';
+
+/** Where an object keeps how many alarms in a row were cut in one step (`alarm-cuts.ts`). */
+const ALARM_CUTS = 'braindog.alarm-cuts';
 
 /** A step slower than this writes an `alarm-step` line with its time. */
 const SLOW_STEP_MS = 5_000;
@@ -1125,15 +1133,17 @@ export class Record$ extends DurableObject<Env> {
     }
     await this.#cutOff(api);
     await this.#step(api, 'drain', () => api.kernel.drain(this.#alarm));
-    const more = await this.#step(api, 'act', () => this.#act(api));
-    const asked = await this.#step(api, 'ask', () => this.#ask(api));
-    const modelled = await this.#step(api, 'model', () => this.#model(api));
-    await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore }));
+    /* EVERY STEP BUT THE DRAIN MAY BE HELD after two alarms in a row were cut in it (`alarm-cuts.ts`), and then answers
+       what a pass with nothing to do answers. */
+    const more = await this.#step(api, 'act', () => this.#act(api), false);
+    const asked = await this.#step(api, 'ask', () => this.#ask(api), false);
+    const modelled = await this.#step(api, 'model', () => this.#model(api), false);
+    await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore }), undefined);
     /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
-    await this.#step(api, 'lint', () => api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e))));
+    await this.#step(api, 'lint', () => api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e))), undefined);
     /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
        replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
-    await this.#step(api, 'signs', () => {
+    await this.#step(api, 'signs', (): void => {
       try {
         fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now());
       } catch (e) {
@@ -1156,17 +1166,56 @@ export class Record$ extends DurableObject<Env> {
    * included, so the only way to learn which step it was is to have written it down first. The next alarm reads it back
    * (`#cutOff`). A slow step says so too, from wall time, which counts what the step waited on and not its pure CPU.
    */
-  async #step<T>(api: RecordApi, step: string, run: () => T | Promise<T>): Promise<T> {
+  async #step<T>(api: RecordApi, step: string, run: () => T | Promise<T>, ...held: [] | [T]): Promise<T> {
+    /* A STEP CUT IN TWO ALARMS IN A ROW IS SKIPPED UNTIL ITS HOLD ENDS, with a line each time (`alarm-cuts.ts`). */
+    if (held.length === 1) {
+      const until = heldUntil(await this.#cutsRead(), step, Date.now());
+      if (until !== null) {
+        op({ op: 'alarm-step', rec: recOf(api), step, held: true, until: new Date(until).toISOString() }, 'error');
+        return held[0];
+      }
+    }
+    await this.#stepNote(step);
+    const started = Date.now();
+    const out = await run();
+    const ms = Date.now() - started;
+    if (ms >= SLOW_STEP_MS) op({ op: 'alarm-step', rec: recOf(api), step, ms });
+    /* A STEP THAT FINISHED CLEARS ITS COUNT: the next cut in it starts again at one. */
+    const cuts = await this.#cutsRead();
+    if (cuts !== null && cuts.step === step) await this.#cutsKeep(null);
+    return out;
+  }
+
+  /** Write down the step running now, or `act:<script>` while a script runs in `act`, so a cut names it. */
+  async #stepNote(step: string): Promise<void> {
     try {
       await this.ctx.storage.put(ALARM_STEP, step);
     } catch {
       /* A step not written down still runs. */
     }
-    const started = Date.now();
-    const out = await run();
-    const ms = Date.now() - started;
-    if (ms >= SLOW_STEP_MS) op({ op: 'alarm-step', rec: recOf(api), step, ms });
-    return out;
+  }
+
+  /** The object's count of alarms cut in one step, read once per object and kept beside the storage. */
+  #cuts: Cuts | null | undefined;
+  async #cutsRead(): Promise<Cuts | null> {
+    if (this.#cuts === undefined) {
+      try {
+        this.#cuts = cutsOf(await this.ctx.storage.get(ALARM_CUTS));
+      } catch {
+        /* A COUNT THAT CANNOT BE READ HOLDS NOTHING, and is asked again next time. */
+        return null;
+      }
+    }
+    return this.#cuts;
+  }
+  async #cutsKeep(cuts: Cuts | null): Promise<void> {
+    this.#cuts = cuts;
+    try {
+      if (cuts === null) await this.ctx.storage.delete(ALARM_CUTS);
+      else await this.ctx.storage.put(ALARM_CUTS, cuts);
+    } catch {
+      /* Kept in memory for this object's life; the next one counts from what storage has. */
+    }
   }
 
   /** The alarm finished: no step is left running. */
@@ -1178,7 +1227,10 @@ export class Record$ extends DurableObject<Env> {
     }
   }
 
-  /** A step left written down by an alarm that never finished: the line that names it, once. */
+  /**
+   * A step left written down by an alarm that never finished: the line that names it, once, and the count of alarms in a
+   * row cut in that step. The count reaching `CUTS_TO_HOLD` holds the step and mails the operator, once.
+   */
   async #cutOff(api: RecordApi): Promise<void> {
     let left: unknown;
     try {
@@ -1186,7 +1238,16 @@ export class Record$ extends DurableObject<Env> {
     } catch {
       return;
     }
-    if (typeof left === 'string') op({ op: 'alarm-step', rec: recOf(api), step: left, cut: true }, 'error');
+    if (typeof left !== 'string') return;
+    const now = Date.now();
+    const cuts = cutAgain(await this.#cutsRead(), left, now);
+    await this.#cutsKeep(cuts);
+    /* AND THE STEP IS CLEARED, so an alarm that is held in it and finishes cleanly does not count it again. */
+    await this.#stepDone();
+    const rec = recOf(api);
+    op({ op: 'alarm-step', rec, step: left, cut: true, times: cuts.times }, 'error');
+    if (cuts.times === CUTS_TO_HOLD)
+      this.ctx.waitUntil(opsAlert(this.env, { op: 'step', rec, why: `${left} cut ${String(cuts.times)} alarms in a row, held ${String(CUT_HOLD_MS / 3_600_000)} h` }, alertClaim(this.env)));
   }
 
   /**
@@ -1655,8 +1716,17 @@ export class Record$ extends DurableObject<Env> {
   #scriptRunner(api: RecordApi, record: string, openKey: OpenKey | null, mayRun: Ledger['mayRun'], admissions: Admissions) {
     const loader = this.env.LOADER;
     if (!loader) return undefined;
-    return holdingScript(
-      (s) =>
+    /* EACH RUN WRITES ITS SCRIPT'S NAME AS THE STEP, `act:<script>`, and `act` again after it, so an object reset while
+       a script's calls run in it names that script on the next alarm's cut line, not the whole of `act`. */
+    const noted = async (s: Scripted): Promise<ScriptAnswer> => {
+      await this.#stepNote(`act:${s.scripted.script}`);
+      try {
+        return await run(s);
+      } finally {
+        await this.#stepNote('act');
+      }
+    };
+    const run = (s: Scripted): Promise<ScriptAnswer> =>
         runScript(
           {
             loader,
@@ -1672,11 +1742,8 @@ export class Record$ extends DurableObject<Env> {
             now: () => Date.now(),
           },
           s,
-        ),
-      record,
-      mayRun,
-      admissions,
-    );
+        );
+    return holdingScript(noted, record, mayRun, admissions);
   }
 
   /**
@@ -3233,8 +3300,24 @@ export default {
    * finds nothing — which is why the queue can be at-least-once and the notification is still
    * sent once.
    */
-  async queue(batch: MessageBatch<{ record: string }>, env: Env): Promise<void> {
-    await consume(batch.messages, (id) => drainOutbox(env, id));
+  async queue(batch: MessageBatch<{ record: string } | HeldMessage>, env: Env): Promise<void> {
+    /* A KEPT ARRIVAL'S RING IS TRIED HERE, one at a time; every other message is a doorbell, as before. A try that could
+       not queue its next one is retried by the queue, and past its retries the nightly sweep finds the object. */
+    const rings: Message<{ record: string }>[] = [];
+    for (const m of batch.messages) {
+      if (!isHeld(m.body)) {
+        rings.push(m as Message<{ record: string }>);
+        continue;
+      }
+      try {
+        await redeliver(m.body, heldDeps(env));
+        m.ack();
+      } catch (e) {
+        op({ op: 'door', redelivered: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+        m.retry({ delaySeconds: 300 });
+      }
+    }
+    await consume(rings, (id) => drainOutbox(env, id));
   },
 
   /**
@@ -3250,6 +3333,12 @@ export default {
    * the operator's record when `OPS_RECORD` is set.
    */
   async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    /* FIRST, AND NEVER IN THE WAY OF THE WALK: arrivals kept at the door and not yet landed are rung again (`held.ts`). */
+    try {
+      await sweepHeld(heldDeps(env));
+    } catch (e) {
+      op({ op: 'door', swept: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
     await nightly(env);
   },
 
@@ -3273,6 +3362,20 @@ export default {
     await takeMail(message, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) });
   },
 };
+
+/**
+ * The `/in/*` door with its hold (`held.ts`): this deployment's bucket, secret and queue, and the door `serveIngest` was
+ * handed before the hold, built fresh for each ask.
+ */
+function heldDeps(env: Env): HeldDeps {
+  return {
+    bucket: env.BLOBS,
+    secret: env.SESSION_SECRET,
+    queue: env.INGRESS,
+    door: () => ({ ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) }),
+    tell: (fields) => opsAlert(env, { op: 'door', ...fields }, alertClaim(env)),
+  };
+}
 
 /** The walk, wired to the Directory, the objects and the bucket. Exported from nowhere: the cron is its one caller. */
 async function nightly(env: Env): Promise<void> {
@@ -3473,7 +3576,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        returns for everything it does not recognise, and before the app shell, which would answer a bank's
        webhook with `index.html` and a 200 that its retry logic reads as delivered. `serveIngest` holds the
        whole order from here, including the 404 for the shape this host does not serve. */
-    if (servesIn(url.pathname)) return serveIngest(request, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) });
+    if (servesIn(url.pathname)) return serveHeld(request, heldDeps(env));
     /* THE KEY DOORS, before any door is asked: their bearer is a keychain grant, no cookie may reach them, and a login
        token reaches only the deposit door, to add a new key (`keyDoor`). */
     if (servesKeychain(url.pathname)) return keyDoor(request, env);

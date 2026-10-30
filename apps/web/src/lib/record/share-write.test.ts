@@ -95,3 +95,17 @@ test('a link that does not open is one answer, shut', async () => {
   assert.deepEqual(await readShared('https://bakery.example', 'tok', gone), { from: 'shut' });
   assert.deepEqual(await readShared('https://bakery.example', '', gone), { from: 'shut' });
 });
+
+test('a figure keeps its trend, a point that is not a number a gap, and one with no points none', () => {
+  const b = blockShared({
+    kind: 'stat',
+    readings: [
+      { metric: 'cash', label: 'Cash', reading: { value: 8_000_00, unit: 'EGP' }, trend: [7_000_00, null, 7_500_00, 'x', 8_000_00] },
+      { metric: 'loaves', label: 'Loaves', reading: { value: 12, unit: null }, trend: [null, null] },
+      { metric: 'orders', reading: { value: 3, unit: null } },
+    ],
+  });
+  assert.deepEqual(b.readings[0]?.trend, [7_000_00, null, 7_500_00, null, 8_000_00]);
+  assert.equal(b.readings[1]?.trend, undefined);
+  assert.equal(b.readings[2]?.trend, undefined);
+});
