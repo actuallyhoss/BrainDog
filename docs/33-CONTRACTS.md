@@ -452,7 +452,7 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 |---|---|---|---|
 | `/auth/methods` | GET | both | which ways in this host offers, and who the cookie belongs to: `{ passkey, magic, key, open, why?, me, firstRun?, google? }`; `magic` is `'down'` on a host that offers links while its mail is not going out (no sender, or the last five sign-in letters failed within the quarter hour), and the sign-in page then offers no link and says so |
 | `/auth/session` | GET | both | who the cookie belongs to, or 401 and the cookie cleared |
-| `/auth/token` | POST | self-host | `{ serverKey }`: `BRAINDOG_TOKEN` for a session, where the Directory holds one person |
+| `/auth/token` | POST | self-host | `{ serverKey }`: the server key (`BRAINDOG_SERVER_KEY`, formerly `BRAINDOG_TOKEN`) for a session, where the Directory holds one person |
 | `/auth/passkey/register/options` · `/auth/passkey/register` | POST | both | the registration ceremony, behind a session |
 | `/auth/passkey/assert/options` · `/auth/passkey/assert` | POST | both | signing in with a passkey |
 | `/auth/magic/start` | POST | both | `{ email }`: a link, mailed as `<origin>/signin#magic=<token>` (`linkOf` in `packages/host/src/auth.ts`; a claim link is `#claim=` on the same page); an unknown address gets the same 200 and no mail. A link mailed from push A until October 29th 2026 as `<origin>/app/signin#magic=` still works, because that page load is a `308` to `/signin` and a browser keeps the fragment |
@@ -465,7 +465,7 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 | `/auth/signup/start` · `/auth/signup/verify` · `/auth/signup/name` | POST · POST · GET | Cloud | declared for sign-up: a mailed link proves the address, spending it once makes the person and signs them in, and `?slug=` asks whether a name is free; until the `AuthCall` union names the three flows each answers as a way in this host does not offer |
 | `/auth/google/start` · `/auth/google/callback` | GET · GET | Cloud | signing in with Google, served only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set and mail is on, which `/auth/methods` says as `google: true`. `start` takes `?next=`, a path of the app on this origin and not one of its doors (`appNext` in `packages/host/src/auth.ts`; an old `/app/...` is read as the path without it), writes a ten-minute state cookie and redirects to Google asking for `openid email`; `callback` checks the state, trades the code with the client secret and a PKCE verifier, and reads the address from the ID token. Only a verified `@gmail.com` address or one with an `hd` claim is taken. An address somebody here has is signed in through a link minted and spent on the spot (`magic.start`, `magic.redeem`) and redirected to `next`; anything else is a redirect to `/signin?google=` with `cancelled`, `unknown`, `unverified`, `locked` or `failed`. The only GETs that sign anybody in |
 | `/auth/device` | POST | both | `{ slug?, reach, label, scope? }` with no credential, and no `Origin` needed because a CLI sends none: `{ device_code, user_code, verification_uri, expires_in, expires, interval }`, where `verification_uri` is always on `<origin>`: `<origin>/<slug>/connect/approve` on the Cloud when the start named a slug, and `<origin>/connect/approve`, the record the session is on, otherwise and on the self-host (`packages/host/src/device.ts`, since push A). `403` when the host was reached by another name or a page on another origin sent it; ten starts per address in 15 minutes, then `429` |
-| `/auth/device/token` | POST | both | `{ slug?, device_code }`: `{ pending: true, interval }` until approved, then the bearer once. `slug` names the record on Cloud; the self-host holds one, and answers both routes only when `BRAINDOG_TOKEN` is set |
+| `/auth/device/token` | POST | both | `{ slug?, device_code }`: `{ pending: true, interval }` until approved, then the bearer once. `slug` names the record on Cloud; the self-host holds one, and answers both routes only when its server key (`BRAINDOG_SERVER_KEY`, or `BRAINDOG_TOKEN`) is set |
 | `/auth/invite` | POST | both | `{ inviteToken, accept? }`, the token from the link's fragment: without `accept` it looks and spends nothing, answering `{ email, expires_at, signedInAs }`. With it, somebody signed in at that address goes on the record; an address that can already sign in here is 401 and signs in first; a new address proves its mailbox first: the host mails `<origin>/invite#<token>&proof=<proof>` to the invited address and answers `202 { proving: true, to }`, and only when that link comes back, as `{ inviteToken, accept, proof }`, is the person made, put on the record and given a session. A proof spent, run out, or minted for another invitation or address is 401. A self-host whose owner has no passkey is 409, because its server key stops working at the second person |
 | `/auth/switch` | POST | both | `{ slug }` with the session cookie, as JSON, from a page on this origin (`sameOrigin`: `Origin` exactly this origin, or without it `Sec-Fetch-Site: same-origin`; a cross-site form or link moves nothing). No session is 401. The session row's record moves to that one and `Who` comes back; the cookie is not rewritten. The slug must be ASCII, `^[A-Za-z][A-Za-z0-9-]{1,31}$`, before it is lowered, so a character that folds to a letter (the Kelvin sign) opens nothing. The record must be open, under a live name, listed with the person in the Directory, **and** say so itself: the host's `admits(record, person)` asks the record's own `member` table, because the Directory keeps listing somebody `removeMember` took off. The update re-asks the same question in its own statement and finds the row by its current or previous id, so a cookie rotated on this request or a name released meanwhile moves nothing. Anything else is one `403 FORBIDDEN` at `slug`, *"You are on no open record by that name."*, the same for a record that does not exist and one the person is not on. A self-host admits only the record its process serves, asked after the session, so a caller with no cookie cannot learn which name that is; what a person may do inside is still the record's own table |
 | `/auth/provision` · `/auth/claim/mint` | POST | Cloud | the operator's, behind `PROVISION_KEY`: a record, its Directory rows and a 24-hour claim link handed back, never mailed |
@@ -515,53 +515,68 @@ session row's record is then the one last opened, which only `/auth/switch` move
 ## 5 · The CLI — `braindog`
 
 One bundled file (`esbuild`), the `braindog-cli` package (Apache-2.0); `yaml` and `valibot` ride inside it through `declare`
-([ADR-046](16-DECISIONS.md), [ADR-063](16-DECISIONS.md)) and nothing else does. `--json` is not built: it is specified
-in [48-SPEC-CLI](48-SPEC-CLI.md) §4.5, which also records what building it would take, and no command accepts the flag today.
+([ADR-046](16-DECISIONS.md), [ADR-063](16-DECISIONS.md)) and nothing else does. `--json` is built
+([48-SPEC-CLI](48-SPEC-CLI.md) §4.5): it answers with one JSON document on stdout and moves every other line to stderr.
+`mcp`, `keys exec`, `keys headers`, `keys helper`, `run`, `hook`, `setup`, `env apply`, the `sync` verbs but
+`inventory`, `addon preview`, `starter preview`, `init` and `serve` do not take it, since each hands stdout to
+something else or asks at the terminal.
+
+The table is the families of commands, as `braindog --help` names them on October 30th 2026 (`fullUsage` in
+`apps/cli/src/main.ts`); each command's own `--help` prints its lines, and 48 §2 has every flag. `addon` was `pack`
+and `starter` was `usecase`, and the old names still answer.
 
 | Command | Does |
 |---|---|
-| `braindog login <host>` | the RFC 8628 device flow of [12-SECURITY](12-SECURITY.md) §6.1 with `reach = login`: prints a six-digit code, the owner approves in the browser, the CLI receives a **`read`+`write` agent token** and stores it in `hosts.json` (0600) — under `$XDG_CONFIG_HOME/braindog/`, `~/.config/braindog/` when unset, `%APPDATA%\braindog\` on Windows unless `XDG_CONFIG_HOME` is set. `BRAINDOG_HOST` / `BRAINDOG_TOKEN` override. That token never reaches ADMIN. `<host>` is what the app's connect screen prints, `<origin>/<slug>` (on the Cloud today `https://app.brain.dog/<slug>`); the CLI keeps it as `<origin>/<slug>`, and an address written with `/app` before October 29th 2026 the same way, taking `/app` off, so a login written either way is one entry. There is no default host |
-| `braindog init <slug> [--owner]` · `braindog dev [--port]` | self-host only; both spawn the self-host entry with `process.execPath` (`BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` in a checkout) — the CLI never imports `apps/selfhost` and never links `packages/record`. `init` creates `<data>/<slug>/record.brain`, runs migration 0001, writes the owner into the Directory and mints `<slug>/inbound.token` (0600). `dev` runs against a scratch data dir with real ports over `:memory:` and prints its mail and a throwaway `BRAINDOG_TOKEN` to stderr |
-| `braindog export [--with-attachments] [--redact-grants] [--sections data,origin,governance] [--mirror] [-o file]` | streams the `.brainl` (41 §5.10's line format) from the record and materialises a signed `.brain`; `--mirror` also writes rendered markdown in the layout of 32 §2 |
-| `braindog import <file.brain \| file.brainl>` | one `text/plain` body into an empty record only (`IMPORT_NOT_EMPTY`), §9 |
-| `braindog verify <file> [--key <pubkey \| url>]` | offline: `application_id`, format, manifest hashes, signature; without `--key` the output says `unpinned`, with it the key must match `dog_sig.key_id` |
-| `braindog pack lint <dir>` · `pack plan <dir>` · `pack install <dir \| url \| git ref> [--with-deps]` · `pack uninstall <id>` | lint is offline, through `declare`'s `parsePack(files) → Pack \| Refusal[]`, `lint(pack, installed)` and `checksum(pack)` (42 §2 — the CLI uses those names); plan prints the diff; install applies it under `PLAN_STALE` |
-| `braindog rule test <id> --against <raw \| register>` · `rule apply <id> [--dry]` | `ruleTest` (READ+) and `ruleApply` (ADMIN, §2); the dry run reports `won / lost / takenBy` and is also the undo |
-| `braindog ingest test <id> --against <raw ids \| file>` | prints the extraction `Report` in 23 §4's shape; exit 1 when any field is `0 of n` |
-| `braindog token create --scope read,propose --name <n>` · `token list` · `token revoke <id>` | agent tokens; `--scope` is a list on the command line and one word on the wire — the ladder's top; a browser session may also do all three |
-| `braindog runner enroll` · `runner run` | tier C: the device grant with `reach = runner`, then the loop of §11 |
+| `braindog setup <host> [--dry-run \| --yes] [--only <app>] [--profile <folder>] [--statusline]` | sets a machine up from one record in six steps, one line each, stopping at the first that fails: sign in unless already signed in; BrainDog's hooks and Agent Skill in every Claude Code profile (and Codex's turn end and its `AGENTS.md` block where Codex is); the `braindog` MCP server in every app it finds; the record's global tools; `skills sync`; one token for each kind of agent it wired, each approved in the app |
+| `braindog login <host> [--keychain <project\|*>]` · `logout [<host>]` | the RFC 8628 device flow of [12-SECURITY](12-SECURITY.md) §6.1 with `reach = login`: prints a six-digit code, the owner approves in the browser, the CLI receives a **`read`+`write` agent token** and stores it in `hosts.json` (0600) — under `$XDG_CONFIG_HOME/braindog/`, `~/.config/braindog/` when unset, `%APPDATA%\braindog\` on Windows unless `XDG_CONFIG_HOME` is set. `BRAINDOG_HOST` / `BRAINDOG_TOKEN` override. That token never reaches ADMIN. `<host>` is what the app's connect screen prints, `<origin>/<slug>` (on the Cloud today `https://app.brain.dog/<slug>`); the CLI keeps it as `<origin>/<slug>`, and an address written with `/app` before October 29th 2026 the same way, taking `/app` off, so a login written either way is one entry. There is no default host. `logout` removes the host's tokens from the file and tells nobody |
+| `braindog keys list\|put\|scan\|exec\|headers\|helper` · `braindog run` | the Keychain from a terminal: list (never a value), deposit from standard input or a file of `NAME=value` lines, name keys lying in a repository's files, run a command with one key in its environment (`run` is `keys exec`), or print one header or the key alone to a program, never to a terminal |
+| `braindog skills sync` · `tools scan\|write` · `session …` · `context` | the agent's side: skills into Claude Code's folders, MCP servers recorded and written, the run this folder is in, and the card again |
+| `braindog page pull\|push\|check` | a page as a `.dog` file; `push` from a token files a `propose` change and waits on Decide (48 §2) |
+| `braindog starter …` · `addon …` · `kennel review` | starters and add-ons: `new`, `check`, `test`, `preview`, `diff`, `search`, `install` (a proposal the owner accepts, never an install from a token), `uninstall`, `publish`, `yank`, author keys; the Kennel operator's review |
+| `braindog automations list\|show\|run\|cancel` · `actions run` · `scripts resume` | automations, scheduled actions and paused scripts; starting, cancelling and resuming are ADMIN and refused to a token |
+| `braindog export [--kek <id> \| --redact-grants] [--sections …] [-o file] [--mirror <folder>] [--shape]` | the `.brainl` (41 §5.10's line format), checked on this machine; `--mirror` writes the record as plain files, only what changed; `--shape` a copy with every value made up |
+| `braindog import <file.brainl> [--key <pubkey\|url>]` · `import <adapter> <export.json> …` · `import --map …` | a `.brainl` put back in place of everything the record holds (§9); or another tool's export moved in through an adapter or a map |
+| `braindog verify <file> [--key <pubkey \| url>]` | offline: format, every table against its manifest, signature; without `--key` the output says `unpinned`, with it the key must match `dog_sig.key_id` |
+| `braindog token create [--name <n>] [--scope read\|propose\|write] [--days <n>] [--inbox]` | an agent token, printed once; `--scope` is one word on the wire — the ladder's top. There is no `token list` or `token revoke`: listing and ending tokens is the app's (Settings) |
+| `braindog people harvest` · `attach` · `today` · `widget share` · `signs` · `tidy` · `understand --dry-run` · `feed propose` · `private-terms` | reads and writes an agent or a person runs by hand: meet commit authors, put a page on a thing, Today's widgets, the vital signs, what went stale, what a pass would link, live feeds asked on Decide, the private list the public-clean check reads |
+| `braindog mcp [--agent …] [--local]` · `hook start\|end\|beat\|prompt\|tool\|stop\|watch\|notify` · `statusline` | what an agent app runs: the stdio bridge to the host's `/mcp`, the session hooks, Claude Code's status line |
+| `braindog install [--apply]` · `doctor` · `env diff\|apply\|pins\|check` · `update [--check]` | this machine's Claude Code profiles: hooks and the Agent Skill, what still names a replaced tool, profiles compared and set up, approved programs, the command replaced by the build that is out |
+| `braindog sync inventory\|join\|push\|pull\|patches\|drill\|retire` | setup sync between machines, sealed under a key kept in the machine's own keychain |
+| `braindog runner enrol <host>` · `runner repos add\|list` · `runner allow <kind>` · `runner run [--once]` · `runner service on\|off\|status` | tier C: the device grant with `reach = runner`, then the loop of §11 |
+| `braindog init <slug> --owner <email>` · `braindog serve [<record file>]` | self-host only; both spawn the self-host entry with `process.execPath` (`BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` in a checkout) — the CLI never imports `apps/selfhost` and never links `packages/record`. `init` creates `<data>/<slug>/record.brain`, runs the migrations, writes the owner into the Directory and mints `<slug>/inbound.token` (0600), and refuses a data folder that already holds another record ([49](49-SPEC-SELFHOST.md) §5.22). There is no `dev` |
 | `braindog --version` | `app <date>+<sha> · format 1 · kernel <n> · primitives 1` |
 
-**ADMIN from the CLI is an operation grant** ([ADR-060](16-DECISIONS.md) as amended). Every ADMIN command —
-`pack install`, `pack uninstall`, `export`, `import`, `token create`, `token revoke`, `rule apply` — starts a device
-grant whose `reach` names the operation: `pack install <id> planHash <h>`, `export <scope>`, `import <file sha256>`,
-`token create <name> <scope>`, `token revoke <id>`. The owner approves that one operation in the browser after seeing
-its summary — the plan diff, the export scope, the token's scope — and the bearer reaches exactly that method once,
-within ten minutes, with `ctx.op` set. Nothing is written down, and `login`'s token is never widened.
+**ADMIN from the CLI is an operation grant** ([ADR-060](16-DECISIONS.md) as amended). The three commands that reach
+an ADMIN method from a terminal — `export`, `import <file.brainl>` and `token create` (and `setup`'s tokens, which are
+`token create` per agent) — start a device grant whose `reach` names the operation: `export`, `import`, `token`
+(`OperationReach` in `apps/cli/src/login.ts`). The owner approves that one operation in the browser after seeing its
+summary, and the bearer reaches exactly that method once, within ten minutes, with `ctx.op` set. Nothing is written
+down, and `login`'s token is never widened. On a self-host, the command line's `BRAINDOG_TOKEN` set to the server's key skips the
+approval. Installing an add-on or a starter from the CLI is a proposal the owner accepts in the app, not a grant.
 
 Refusals print as one sentence: `register.invoices.fields[4].type 'currency' — did you mean 'money'?`
-(`FIELD_TYPE_UNKNOWN`). A local error — a missing file, a bad flag — has no refusal code; `--json` would carry it as a
-fourth envelope variant, and that flag is not built ([48-SPEC-CLI](48-SPEC-CLI.md) §4.5). Exit codes: 0 ok ·
-1 refused, or a local error · 2 conflict · 3 unreachable, or the host is the cause.
+(`FIELD_TYPE_UNKNOWN`). A local error — a missing file, a bad flag — has no refusal code; under `--json` it is the
+envelope's fourth variant ([48-SPEC-CLI](48-SPEC-CLI.md) §4.5). Exit codes: 0 ok · 1 refused, or a local error ·
+2 conflict · 3 unreachable, or the host is the cause.
 
 ---
 
 ## 6 · The self-host process
 
-One Node process, one artefact, `docker run`, no build step. Phase 2 ships it with the magic link and `BRAINDOG_TOKEN`,
+One Node process, one artefact, `docker run`, no build step. Phase 2 ships it with the magic link and the server key,
 polling in place of `/ws`, and inbound email through a forwarding webhook; passkeys are phase 3.
 
 | Setting | Value |
 |---|---|
 | Runtime | Node **24.13.0**, pinned to the minor; `node:sqlite` is the only driver (FTS5 and JSON measured present) — no `better-sqlite3`, which is not built under the pin |
-| Entry | `BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` relative to a checkout — what `braindog init` and `dev` spawn (§5) |
+| Entry | `BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` relative to a checkout — what `braindog init` and `serve` spawn (§5); run directly as `node apps/selfhost/src/main.ts serve\|init\|backup\|restore` |
 | Data | `BRAINDOG_DATA=/data` — `<slug>/record.brain` per record, plus `directory.sqlite` (§10); a request names its record by its session row, the bearer's hash, or its own path (§4) |
 | Root key | `BRAINDOG_KEK_FILE=/data/kek` — 32 random bytes, 0600, created on first run; `BRAINDOG_KEK_PREV_FILE` is the second slot of the rotation ladder (§1) |
 | Secrets | `BRAINDOG_SESSION_SECRET`, optional: what the Directory's session key is derived from by HKDF instead of the key file (§10); `BRAINDOG_ORIGIN`: the origin the app is served from, which names the cookie and the passkeys' relying party; `BRAINDOG_TRUST_PROXY=1`: count the lockout against the last `X-Forwarded-For` entry; `BRAINDOG_TOKENS_VALID_FROM` — the fleet lever that invalidates every bearer minted before an instant |
 | Origin | `BRAINDOG_ORIGIN` — the public origin for magic-link URLs, the CSRF origin check and (phase 3) the WebAuthn `rpId`; default `http://localhost:<PORT>` |
-| Auth | the magic link, and `BRAINDOG_TOKEN` as an owner-level bearer for a private single-user instance; passkeys in phase 3; sign-up is closed — `init` and invitations create people |
+| Auth | the magic link, and the server key `BRAINDOG_SERVER_KEY` (its old name `BRAINDOG_TOKEN` still read when it is unset) as an owner-level bearer for a private single-user instance; the owner's first sign-in is a one-time claim link written to `/data/claim-link` (0600), never to the log; passkeys in phase 3; sign-up is closed — `init` and invitations create people |
 | Mail | outbound through `BRAINDOG_SMTP_URL` and `BRAINDOG_SMTP_FROM` — one small client over `node:tls` (implicit TLS on 465 or STARTTLS on 587, `AUTH PLAIN`), no dependency (49 §5); inbound through `POST /in/email/<token>` from a forwarding webhook, raw RFC 5322 in the body — the token lives at `<slug>/inbound.token` |
-| Port | `PORT=8080`; TLS is the reverse proxy's job |
+| Port | `PORT=8080` inside; Compose publishes it on `BRAINDOG_PORT` (default 8080). The interface is `BRAINDOG_LISTEN` (its old name `BRAINDOG_HOST` still read when it holds no `://`), loopback with no server key and every interface with one. TLS is the reverse proxy's job, or `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY` |
 | Per open | the adapter applies `journal_mode=WAL` · `synchronous=NORMAL` · `busy_timeout=5000` · `foreign_keys=OFF`, asserts `foreign_keys = 0`, and runs `measureCaps` and the boot probe (37 §13 D10) |
 | Scheduler | one `setTimeout` over `MIN(due_at)` per record; one outbox poller per record, which `wake()` kicks (`setImmediate`); one nightly timer per process |
 | Snapshots | nightly `VACUUM INTO` (permitted here) → keep 30, under `<slug>/snapshots/`. **A snapshot is a full copy that keeps the six `local` tables and never leaves the host** — disaster recovery, restored offline by putting the file back; **an export is the portable `.brain` without them** (§9) |

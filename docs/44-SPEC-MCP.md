@@ -392,7 +392,7 @@ keeping its money in any other pack could only be told to install ours. Nothing 
 draws a pack's figures is `braindog:page/<slug>`, each figure it draws is `braindog:metric/<id>` (§4.7), and both
 answer the record's whole reading, where the tool relayed eight keys of it. Two currencies with no rate between them
 still come back as one amount each and no sum, because that was always the kernel's doing and never the tool's
-(`test/money-out.test.ts`). The first rule of the instructions now says to read the Home page for what leads (§4.6).
+(`test/money-out.test.ts`). The first rule of the instructions says to call `context` first, whose answer names what leads (§4.6).
 The 91 tokens it cost stay paid: the list measured 2,597 with it and 2,520 without.
 
 **AND THAT LEFT A CLIENT WITH TOOLS ALONE NO FIGURE AT ALL.** Over a record with money-core installed as it ships, the nine reads, each called with its most helpful
@@ -486,64 +486,74 @@ And what `propose` does before and after it files:
 
 Each says when to reach for the tool, never how the server works (10 §7 rule 1). No tool description names a
 register, and the list is one constant, so it is the same text for every record and a client's cached list does not
-go stale on an install. One argument description carries two examples that name one, as a shape to copy: `propose`'s
-`body` shows a `rowset` over `skills` and a `change` to `register.things`. `governance`'s `register` argument names the
-three it reads: `suggestion`, `decision` and `prediction`. Plain ASCII, with no dash standing in for a
-sentence break; `budget.test.ts` asserts both. `index.ts` is the source, and these are copied from it:
+go stale on an install. One argument description carries examples that name one, as a shape to copy: `propose`'s
+`body` shows a `rowset` at `skills#3` and a `change` to `register.things`. `governance`'s `register` argument is an
+enum of the three it reads: `suggestion`, `decision` and `prediction`. Plain ASCII, with no dash standing in for a
+sentence break. `index.ts` is the source, and these are copied from it as it stands on 30 October 2026:
 
 ```
-record_index  What this record holds: its registers, how many rows in each, its figures, and its version. The cheap way to learn
-              register names.
-context       Your session, your project, its open work, questions waiting on the person, people, the keys and servers you may
-              use (by name, never a value), skills and learnings, and everything global. Call it again after a long pause.
-schema        The fields of one register, their types and what each may take. Read before writing.
-get           One row or figure, by the id a person says out loud.
-list          Rows of one register, newest first, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"},
-              or {"all":[...]}.
-search        Rows whose text matches, across every register you can see. Every word is a prefix.
-history       The writes that made one row, in order, each with who and when.
-activity      What has changed in the whole record lately, newest first: each write, the row it touched, and who made it. Read
-              it to pick up after another session.
-governance    What has been proposed and not yet answered, what was decided and why, and what was predicted. Ask by id for a
-              body.
-propose       Put a question to the person, with what you would do about it. It changes nothing by itself.
-create        Add a row to a register, which comes back with the number the record gave it.
-update        Change a row. Send the version you read.
-log           Append one note to a row, changing nothing about it.
-handoff       Keep your session's handoff true, so whoever picks this up next knows where it stands.
-meet          Someone you came across in the work. They are matched by email or handle, added if new, and linked to your
-              project with where you met them.
+record_index  Registers with entry counts, and figures; register: its fields.
+context       Start here: what you were told, where you are, who is here, your lane.
+instructions  {} reads what the person told you, {take:"IN4"} takes, {reply:"IN4",said,state} answers,
+              {answer:"SG9",option,said} decides on their word.
+get           One entry or figure. Two currencies are never added.
+list          Rows of one register, newest first. where filters: {"field":"state","is":"open"}.
+search        Rows matching your words, each a prefix, in every register.
+activity      What changed lately, newest first, by whom.
+governance    Open questions, decisions with reasons, and predictions.
+propose       Ask the person, with what you would do. Nothing changes until they decide.
+create        Add an entry; answers its number.
+update        Change an entry; on VERSION_STALE, re-apply to current.
+log           Note an entry; page: HTML drawn on it.
+handoff       Keep your run's step true: doing once you know it, next before you stop, dead ends in tried. task starts
+              one, done closes it. take or drop a run's step alone, drop with why.
+meet          A person or organisation; a bare name is only noted. Say where honestly: mail, commits and the web are
+              not believed alone; what you saw yourself is session in <repo>.
+triage        File an inbox arrival as an entry, or set it aside.
+undo          Put back your own write, by its receipt's batch.
 ```
 
-Several of them are shorter than an earlier revision of this section showed, because what they said twice went: the
-id grammar of `get` lives in its `spoken` argument, `handoff`'s rules sit beside the arguments they are about, and
-`context`, `propose` and `update` stopped repeating lines of the instructions a client shows in the same payload.
-`propose`'s `body` argument carries the rest of its description: the shape of each `body_kind`, that a change should
-send the `from_version` it read, and that `pack`, `settings` and `arrange` are read from `braindog:arrangement` and
-`braindog:grammar/proposals` first.
+The lines are wrapped here to fit the page; each is one string in `index.ts`. The folded `schema` ("One register's
+fields and types.") and `history` ("Every write to one entry, with who and when.") are not listed and still answer by
+their old names until `FOLDED_UNTIL`, 20 December 2026.
+
+They are shorter than an earlier revision of this section showed, because what they said twice went, and what the
+instructions used to carry moved to the one tool it is about. The money rule sits on `get` and on `create`'s `fields`
+("Money is minor units and a currency: GBP 2 decimals, JPY 0, KWD 3."), compare-and-set on `update`, the handoff's
+manners on `handoff`, and how to delete (`deleted_at` true in `update`'s `patch`) beside the argument it is about.
+Each argument's own rule sits beside the argument: `get`'s id grammar in `spoken` ("tasks#41, S42, a name, or a
+figure."), `list`'s page in `limit` ("1 to 100. Up to 60 whole, else 20."), `search`'s in its `limit` ("1 to 100.
+Default 20."), `activity` and `governance` paged as `list` is. `propose`'s `body` argument carries the shape of each
+`body_kind` and sends the rest to `braindog:grammar/proposals`.
 
 ### 4.6 · `INSTRUCTIONS`, the exact text
 
 ```
-BrainDog is one person's record of their work, projects, money and whatever else they keep in it, shared by every agent that works for them. Call context first: it names your session, your project, and what applies here. Read the Home page for what leads.
-Money is an integer in minor units with its currency. Shift it by the decimals of that currency before saying a number (GBP 2, JPY 0, KWD 3), and never add two currencies.
-Writes are compare-and-set. On VERSION_STALE, re-read the row and re-apply your change to the new copy. Never resend the copy you held.
-An agent never decides. Lay out options with propose; the person chooses in their app. To change something you may not change yourself, such as a skill's text or where a key applies, propose it.
-A credential never goes in a row, a note or a tool call. Deposit a key with the command braindog keys put <label>, which reads it from standard input.
-Call handoff with doing once you know the task, and before you stop with the one next step. Record each dead end in tried when you rule it out.
-Record a learning only when a future session would otherwise get something wrong, and say the failure in because. Most sessions record none.
-When you meet a person in the work, such as a commit author, a sender or a client, call meet.
-A refusal names the field and the fix. Correct the call; never retry it unchanged.
-Everything you write is read on a phone. Keep it short and plain.
+BrainDog is one person's record of their work, shared by their agents. Three rules hold on every call.
+1. Call context first: it names your run, project, next step and what waits.
+2. Suggest, and let the person decide in BrainDog: ask with propose; act when they tell you, passing their words as said.
+3. Write short and plain, for a phone: say names, never ids, and one line where one will do.
+Reads answer in short lines; format "full" gives JSON.
+Meet everyone you work with or hear of, with an email or handle.
+A credential never goes in a row, note or call. Deposit a key with braindog keys put <label>, which reads standard input.
+After a fix, a surprise or a dead end a later session would repeat, create a learning: topic is the skill it bears on, by name; because says how it went wrong.
+A refusal names the field and fix; its try is the corrected call. Never resend one unchanged.
 ```
 
-Ten lines, 264 words, 1,437 bytes, **400 tokens** by `tokenBudget`, which is the whole of their ceiling. No `o200k_base` count has been taken of this text,
-because the calibration of §9 is not built. It carries the rules every tool would otherwise repeat: call `context`
-first, and read the Home page for what leads; minor units, shifted by the currency's own decimals; re-read on `VERSION_STALE`; never decide, propose; never a
-credential, and how to deposit one; the handoff and `tried`; when a learning is worth recording; `meet`; the refusal
-teaches; read on a phone. It is returned in `initialize` and in `server/discover`, and not again with `tools/list`:
-a session that asked for both carried the whole text twice, and a client puts the instructions in every session's
-system prompt on its own.
+Nine lines, 166 words, 890 bytes, **248 tokens** by `tokenBudget`, inside their ceiling of 400. No `o200k_base`
+count has been taken of this text, because the calibration of §9 is not built.
+
+THE FIRST 512 CHARACTERS STAND ALONE. Codex and ChatGPT treat only the first 512 characters of a server's
+instructions as the part that is always read, so the opening says what BrainDog is and then the three rules every call
+needs: call `context` first; suggest, and let the person decide in BrainDog (acting only when they say so, with their
+words as `said`); write short and plain for a phone. The third rule ends inside the 512, and `budget.test.ts` holds it
+there. What follows holds across tools: how a read answers, whom to `meet`, the credential rule and the one command
+that deposits a key (held to the command line's own help by `apps/cli/test/stdio.test.ts`), when a learning is worth
+keeping, and what a refusal hands back. Money, compare-and-set and the handoff's manners are no longer here: they are
+in the descriptions of the tools they govern (§4.5).
+
+It is returned in `initialize` and in `server/discover`, and not again with `tools/list`: a session that asked for
+both carried the whole text twice, and a client puts the instructions in every session's system prompt on its own.
 
 ### 4.7 · Resources
 
@@ -679,7 +689,7 @@ nothing is streamed.
 
 1. Nothing is read from the record. The list is the same for every record and every caller, so it always arrives,
    and a caller who can read nothing still learns what it could call.
-2. `tools = TOOLS.map(listed)`: for each of the seventeen, in §4.4's order, `{ name, description, inputSchema }`, where
+2. `tools = TOOLS.map(listed)`: for each of the sixteen, in §4.4's order, `{ name, description, inputSchema }`, where
    `inputSchema` is the tool's `input`, plus `annotations`: `{ readOnlyHint: true, openWorldHint: false }` on the nine that never write, and `readOnlyHint: false` with `destructiveHint`, `idempotentHint` and `openWorldHint` on the eight that do. A tool that carries a card also has `_meta.ui.resourceUri` and `_meta['openai/outputTemplate']` (§4.7).
 3. Result `{ tools, instructions: INSTRUCTIONS, ttlMs: 3_600_000, cacheScope: 'private' }`.
 
@@ -690,10 +700,10 @@ what `budget.test.ts` counts (§5.9).
 
 ### 5.3 · `tools/call`
 
-1. A `params.name` that is not a string is `-32602`, with the seventeen in `data.allowed`. `params.arguments`, `{}` when
+1. A `params.name` that is not a string is `-32602`, with the sixteen in `data.allowed`. `params.arguments`, `{}` when
    absent, that is not an object is `-32602`. Neither reaches a tool.
 2. `tools(surface).call(name, args, ctx)` looks the name up with `Object.hasOwn`. A name that is not one of the
-   seventeen is an error result, `ROUTE_UNKNOWN` with the seventeen in `allowed`, and nothing runs. That covers every
+   sixteen, nor `schema` or `history` before `FOLDED_UNTIL` (§4.5), is an error result, `ROUTE_UNKNOWN` with the sixteen in `allowed`, and nothing runs. That covers every
    VAULT, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
 3. The tool addresses the call (§4.4). It parses `spoken` into `{ register, seq }`, or hands a prefixed id or a row id
    to the record, or hands a figure's id to `metric`, or refuses `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`;
@@ -764,7 +774,7 @@ drops its cursor.
 
 Neither notification is sent, and the capabilities declare `tools: {}` and `resources: {}` with no `listChanged`.
 The transport has no session and no server-initiated stream, and nothing is remembered between messages (§4.1), so
-there is nobody to tell. Nothing needs telling about the tools: the seventeen do not change on an install, and no
+there is nobody to tell. Nothing needs telling about the tools: the sixteen do not change on an install, and no
 description names a register (§4.5), so a client may hold `tools/list` for its hour without holding anything stale.
 
 What an install does change is read, never pushed:
@@ -878,13 +888,13 @@ code is relayed from the record unchanged.
 
 Plus the HTTP answers with an empty body: `405` (not `POST`), `403` (an `Origin`), `413` (over `maxBodyBytes`) and
 `415` (not JSON), and `202` for a notification. An unknown tool is not a protocol error. It is an error result
-carrying `ROUTE_UNKNOWN`, with the seventeen in `allowed` (§4.4), because a result is what the model reads to correct
+carrying `ROUTE_UNKNOWN`, with the sixteen in `allowed` (§4.4), because a result is what the model reads to correct
 the call.
 
 ### 6.2 · The corpus codes this package raises before any call
 
 **Not built.** There is no `REFUSED` table in `index.ts`. A VAULT, JOBS or ADMIN method name sent to `tools/call` is
-`ROUTE_UNKNOWN`, with the seventeen in `allowed` (§5.3), and the record refuses a token at those groups in any case
+`ROUTE_UNKNOWN`, with the sixteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
 (30 §10). The table below is an earlier revision's design, kept as that.
 
 > **The ADMIN row is about a direct write, not about metadata (September 22nd 2026).** An agent never calls `setDeclaration`, and it does not need to: it adds a
@@ -991,13 +1001,13 @@ level.
 | Arguments | the record's: it refuses a wrong field by name, with `allowed`. The tool layer checks addresses and nothing else (§4.4) |
 | Body size | 1 MB, on `Content-Length` and again on the bytes as they arrive (§5.1 step 5) |
 | Header agreement | a mirrored header must equal the body whenever it is sent, so a check an intermediary makes on the header is a check on the call (§5.1 step 7) |
-| Code generation | none. The seventeen input schemas are constants written by hand |
+| Code generation | none. The sixteen input schemas are constants written by hand |
 | A script trial | `propose` with `try` runs a draft in the host's sandbox, with the caller's reads and no key opened for a token (§4.4). It writes nothing and files nothing, and the record checks the draft as an install would before it runs |
 | Error text | a 401 is one word; a throw is `internal` and a UUID; a refusal carries the record's `code`, `fix`, `at` and `allowed`. No stack, no SQL and no path crosses the wire (12 §8) |
 | Logging | a throw writes one line to the host's log, or to standard error under stdio: the reference, the method and the error, and never an argument |
 | Credentials | no tool names a VAULT method, and the record refuses every token there. `context` names a key by its label and what it opens, and shows its secret field as `{ sealed, opened, last_opened, last_by }`: never the grant, the sealed bytes or a value (ADR-010). `braindog:actions` names a key by its Keychain label |
 | Deciding | there is no `decide` tool, and no token reaches `decide` (30 §10). The one way a question is answered through this door is the person's press on the decision card, carried by a one-time grant the model is never shown (§15.12, [12-SECURITY](12-SECURITY.md) §5.1) |
-| Completeness | the tool list is fixed at seventeen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
+| Completeness | the tool list is fixed at sixteen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
 
 **What never travels:** a plaintext credential, a stack trace, an exception message, a SQL string, a file path, a
 principal identifier the client did not already hold.
@@ -1141,7 +1151,7 @@ the documents that still cite the earlier decision.
 | D1 | **The input schemas are written by hand, and nothing generates them.** An earlier revision generated them from Valibot with `@valibot/to-json-schema`, `scripts/gen-schemas.ts` and a drift test. This package has no Valibot and no generator, because the record validates every argument and names the field (§4.4), and a second validator here would be a second set of checks to keep in step | `index.ts`, `obj()`. 16 (ADR-040) and 31 §9 still describe the generator and cite this row |
 | D2 | **The token estimator** is §5.8's six-class run heuristic, copied into `budget.test.ts`, and the ceilings of §7 are ceilings on its count. Its calibration against `o200k_base` is not built | `budget.test.ts` |
 | D3 | **No `list_changed`.** Nothing in `tools/list` changes on an install, and what does change is read when it is wanted (§5.6) | `rpc.ts`, `CAPABILITIES` |
-| D4 | **`INSTRUCTIONS`** is §4.6's text, sent with `initialize`, `server/discover` and every `tools/list` | `instructions.ts`, `rpc.ts` |
+| D4 | **`INSTRUCTIONS`** is §4.6's text, sent once a connection, with `initialize` or `server/discover`, and not with `tools/list` | `instructions.ts`, `rpc.ts` |
 | D5 | **The 2,760 includes the instructions**, and no tool description names a register, so the list is the same for every record. It was 2,600 until `triage`, and was raised once for it (§7) | `budget.test.ts`, §4.5 |
 | D6 | **`_meta.session` is the one `_meta` key that reaches the record.** `handle` reads no `_meta`. `serveMcp` hands `_meta.session` to the host's `session` option, which checks it with `hintsOf` (§4.2), and reads `io.modelcontextprotocol/protocolVersion` only to hold the version header to it | `http.ts`, `packages/host/src/session.ts` |
 | D7 | **Two error vocabularies.** A protocol failure is a JSON-RPC number (§6.1). Everything the record refuses, and every refusal this package makes on its behalf, is an error result inside HTTP 200 carrying the refusal whole; a conflict is `VERSION_STALE` with `current` and `actor`. An argument outside the published schema is not a protocol error here: the record refuses the field by name | `rpc.ts`, `render` |

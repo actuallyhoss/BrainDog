@@ -43,16 +43,22 @@ export function startServer(config: Config): Promise<{ port: number; close(): Pr
 export function openDirectory(path: string, driver: Config['sqlite']): Directory;
 export function openRecordFile(slugDir: string, deps: HostDeps): OpenRecord;    // throws BootRefused on !caps.fts5
 export const ROUTES: readonly Route[];                                          // §4.7 — the router-groups gate walks it
-export const METHOD_GROUPS: Readonly<Record<RoutableMethod, Group>>;            // 49 routes, as @braindog/host's ROUTES:
-                                                                                //   21 ADMIN, createToken listTokens revokeToken among them
+export const METHOD_GROUPS: Readonly<Record<RoutableMethod, Group>>;            // every method in @braindog/host's ROUTES (§4.7),
+                                                                                //   createToken listTokens revokeToken among the ADMIN ones
 
 type Config = {
   data: string;            // BRAINDOG_DATA        default '/data'
   kekFile: string;         // BRAINDOG_KEK_FILE    default `${data}/kek`
-  token?: string;          // BRAINDOG_TOKEN       owner bearer; single-user only (§5.7 enforces "single")
-  port: number;            // PORT                 default 8080
+  token?: string;          // BRAINDOG_SERVER_KEY  the server key; single-user only (§5.7 enforces "single").
+                           //                      BRAINDOG_TOKEN, its old name, is read when it is unset
+  listen?: string;         // BRAINDOG_LISTEN      the interface; default 127.0.0.1 with no server key, every
+                           //                      interface (`::`, else 0.0.0.0) with one. BRAINDOG_HOST, its old
+                           //                      name, is read when it is unset and holds no `://`
+  port: number;            // PORT                 default 8080; the image listens on 8080, and Compose publishes
+                           //                      it on BRAINDOG_PORT of the machine (default 8080)
   sqlite: 'node:sqlite' | 'better-sqlite3';       // BRAINDOG_SQLITE   default 'node:sqlite'
-  origin: string;          // BRAINDOG_ORIGIN      default `http://localhost:${port}` — magic-link URLs, rpId, CSRF
+  origin: string;          // BRAINDOG_ORIGIN      default `http://localhost:${port}`, or in the image
+                           //                      `http://localhost:${BRAINDOG_PORT}` when that differs — magic-link URLs, rpId, CSRF
   smtp?: { url: URL; from: string };              // BRAINDOG_SMTP_URL smtps://u:p@host:465 | smtp://u:p@host:587 ; BRAINDOG_MAIL_FROM (amended)
   outbound: 'off' | 'on';  // BRAINDOG_OUTBOUND    default 'off': add-ons' requests to other servers (§5.24)
   kennel: string | 'off';  // BRAINDOG_KENNEL      default the public registry: its own switch, not outbound's (§5.24)
@@ -75,10 +81,14 @@ type Directory = { sql: Sql; close(): void };                   // the typed que
 `startServer` resolves once `listen` has bound; `close()` stops the listener, clears every timer, drains the
 pollers' in-flight rows, checkpoints WAL and closes every database.
 
-The entry is `apps/selfhost/src/main.ts` — the file 48 §5.14 spawns — with three subcommands: `serve` (the
-default; `startServer(configFromEnv(process.env))`), `init <slug> [--owner <email>]` (§5.22) and `dev [--port <n>]`
-(§5.22). Exit codes: 0 clean stop · 1 `BootRefused`, `ConfigError` or an `init` refusal (one sentence on stderr,
-nothing else).
+The entry is `apps/selfhost/src/main.ts` — the file 48 §5.14 spawns — run as `node apps/selfhost/src/main.ts <command>`
+(in the image, `docker compose run --rm braindog node apps/selfhost/src/main.ts <command>`, or `docker compose exec`
+while it serves). Its commands: `serve` (the default; `startServer(configFromEnv(process.env))`), `init <slug>
+--owner <email>` and `init <slug> --from <file.brainl> [--key <public key>]` (§5.22), `backup <folder>`, `restore
+<backup folder>`, and `--help`, which says each as the person would type it there (`how.ts` `commandFor`). Every
+sentence that names a command names it that way, never as `braindog init`: the image has no `braindog`, and an
+installed command line has no self-host beside it. `dev` is not built (§5.22). Exit codes: 0 clean stop · 1
+`BootRefused`, `ConfigError` or an `init` refusal (one sentence on stderr, nothing else).
 
 ---
 
@@ -88,8 +98,8 @@ Nine source files, counted.
 
 | File | Responsibility | ~Lines |
 |---|---|---|
-| `src/main.ts` | argv → `serve` · `init <slug>` · `dev`; exit codes; `SIGTERM`/`SIGINT` → `close()` — the file 48 §5.14 spawns | 45 |
-| `src/server.ts` | `configFromEnv`, `startServer`, the boot sequence (§5.1), `openRecordFile`, `init`/`dev` (§5.22), record resolution (§5.3), the `node:http` request loop, `close()` | 200 |
+| `src/main.ts` | argv → `serve` · `init <slug>` · `backup` · `restore` · `--help`; exit codes; `SIGTERM`/`SIGINT` → `close()` — the file 48 §5.14 spawns | 45 |
+| `src/server.ts` | `configFromEnv`, `startServer`, the boot sequence (§5.1), `openRecordFile`, `init` (§5.22), record resolution (§5.3), the `node:http` request loop, `close()` | 200 |
 | `src/router.ts` | `ROUTES`, `METHOD_GROUPS`, path matching, body limits, `Result` → status (§6), GET aliases, the streamed export, `/a`, `/s`, `/<ID>`, `/in/*`, `/ws` 404, the shell fallback | 200 |
 | `src/auth.ts` | cookies and sessions, lockout, magic link, token exchange, invitations, the device grant and operation grants (48 §13 D1), `CallContext`, the per-token bucket | 270 |
 | `src/webauthn.ts` | CBOR subset, COSE → JWK, registration and assertion verification, DER → raw ECDSA — phase 3 | 170 |
@@ -238,8 +248,8 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 
 | Route | Method | Auth | Group | Phase |
 |---|---|---|---|---|
-| `/api/<method>` for the 12 DATA + 15 READ+ methods | POST | bearer-or-cookie | DATA · READ+ | 2 |
-| `/api/<method>` for VAULT (1), ADMIN (21, `createToken listTokens revokeToken` among them, 48 §5.12), `createJob cancelJob listJobs` | POST | cookie — ADMIN also an operation grant whose `reach` names the method (§5.2 step 7) | VAULT · ADMIN · JOBS | 2 (JOBS 7) |
+| `/api/<method>` for every DATA and READ+ method | POST | bearer-or-cookie | DATA · READ+ | 2 |
+| `/api/<method>` for every KEYCHAIN and ADMIN method (`createToken listTokens revokeToken` among the ADMIN ones, 48 §5.12), and the JOBS ones a browser starts | POST | cookie — ADMIN also an operation grant whose `reach` names the method (§5.2 step 7) | KEYCHAIN · ADMIN · JOBS | 2 (JOBS 7) |
 | `/api/claimJob[?wait=N]` · `/api/postJobEvent` · `/api/readCancel` | POST | runner | JOBS | 7 |
 | `/api/boot` · `/api/pages/:slug` · `/api/schema/:register` · `/api/version` | GET | bearer-or-cookie | READ+ | 2 |
 | `/api/snapshot` · `/api/snapshots` · `/api/snapshots/:id` | POST · GET · GET | cookie | ADMIN | 2 |
@@ -259,8 +269,10 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | `/<slug>/api/<method>` (September 23rd 2026 under `/app`, at the root since October 29th 2026, the old `/app/<slug>/api/<method>` still served): `/api/<method>` for the record the path names, moved to the root before anything reads it; a slug that is not this process's record is refused once the caller is known, so a request with no credential gets the root's own 401 | as `/api/<method>` | as `/api/<method>` | as `/api/<method>` | as `/api/<method>` |
 | Every other path, `GET /signin` included: the built app at the root, falling back to its `index.html`, contained by `realpath`, served with `frame-ancestors 'none'`; a missing file under `/_app/` is a 404. A path under `/app`, where the app was from September 23rd until October 29th 2026, is a `308` to the same path without it, so a mailed `/app/signin#magic=` link lands with its fragment (§5.19) | GET | none | SHELL | 3 |
 
-Forty-nine `/api/<method>` routes come from `ROUTES` in `@braindog/host`, 21 of them ADMIN; INTERNAL methods have none; `restore`
-answers 404 on this host (§13 #10). The `router-groups` gate (33 §8) asserts every entry has a `group`, that
+Every `/api/<method>` route comes from `ROUTES` in `packages/host/src/table.ts`, one per method, each with its group;
+INTERNAL methods have none. On October 30th 2026 that is 249 methods: 56 DATA, 90 READ+, 12 KEYCHAIN (the group this
+spec called VAULT), 84 ADMIN and 7 JOBS. Count them there rather than trusting the figure, which grows with the
+product. `restore` restores on this host (§5.13, *Amended September 28th 2026*), so §13 #10's 404 no longer holds. The `router-groups` gate (33 §8) asserts every entry has a `group`, that
 no VAULT route has `auth` other than `cookie` and no ADMIN route admits a `token` principal, and that the
 `METHOD_GROUPS` keys equal 30 §5's six groups less INTERNAL plus 48's three token methods.
 
@@ -302,7 +314,7 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
    4. `{ nextDueMs, outboxPending } = api.kernel.pendingWork()` (41 §2); `nextDueMs !== null && await scheduler.set(nextDueMs)`; `outboxPending && poller.kick()`.
    5. `poller.start()` (§5.12); `snapshots.armNightly()` (§5.13). `<slug>/inbound.token` is **not** read here (September 20th 2026): boot only builds the reader, which opens the file on the first forwarded message and at most once a second after that (§5.16, §5.22).
 6. A `record_dir` row with no directory, or a directory with no row, is logged as `slug` and skipped.
-7. `http.createServer(handle).listen(port, '0.0.0.0')`; resolve `{ port, close }`.
+7. `http.createServer(handle).listen(port, host)`, where `host` is `BRAINDOG_LISTEN` (or `BRAINDOG_HOST` holding an interface), else `127.0.0.1` with no server key and every interface with one: `::`, which takes both IP families where the machine has IPv6 and falls back to `0.0.0.0` (§2); resolve `{ port, close }`.
 8. `SIGTERM`/`SIGINT` → `close()`.
 
 ### 5.2 · A request
@@ -389,7 +401,7 @@ handful of typos from one address over a month added up to a lock.
 4. Session: a new id; a presented session is deleted first (fixation); the row records the person, the record
    they own (else the first they joined), `now + 30 d` and `authed_at = now`; `Set-Cookie` per §4.2; 200 with
    `{ person, email, record, provedAt }`. The app goes on to `next` when it is a path on this origin, else `/`.
-### 5.7 · Token exchange — `BRAINDOG_TOKEN` → a session
+### 5.7 · Token exchange — the server key → a session
 
 1. `POST /auth/token { serverKey }`: `config.token` unset → 404 `ROUTE_UNKNOWN`; reserve `ip:<ip>`.
 2. `SELECT COUNT(*) FROM person` > 1 → 403 `FORBIDDEN` — the token is single-user by design (12 §3), and the process enforces the word.
@@ -397,6 +409,20 @@ handful of typos from one address over a month added up to a lock.
 
 This is also the bootstrap when no SMTP is configured, and the authenticated session behind which the first
 passkey is registered (12 §8: registration needs a session in place of attestation).
+
+*Amended October 30th 2026.* The server key is `BRAINDOG_SERVER_KEY`. `BRAINDOG_TOKEN`, the name it had before, is
+still read when the new one is unset, so an older `.env` keeps working (`how.ts` `serverKeyOf`); a sentence about the
+key names whichever of the two set it. The rename is because `BRAINDOG_TOKEN` is also the `braindog` command line's
+own sign-in: one variable exported for both made the CLI call as the server key, an agent as the owner. Set but
+blank, either name refuses the start, since an empty key would open every interface to anyone presenting nothing.
+
+The way in on a first start is the claim link, not this exchange. While the Directory holds a person and no passkey,
+each start mints a `claim` link (§5.6 step 3, 24 hours) and writes it to `<data>/claim-link`, `/data/claim-link` in
+the image, removed and made again at 0600 so its mode is never an older file's (`first-run.ts` `setupLine`). It is
+never written to the log, which a container keeps and anyone with `docker logs` reads: the log says where the file
+is and the command that reads it (`docker compose exec braindog cat /data/claim-link`). Outside the image, at a
+terminal, the link is also printed to stdout. A restart makes a new one until a passkey exists; once one does, or
+when sign-in is off, the file is removed.
 
 ### 5.8 · Invitation
 
@@ -621,25 +647,36 @@ path is `index.html`. A path under `/app` is a `308` to the same path without it
 or a link mailed while the app was there still lands with its fragment; `/app/<slug>/api/<method>` and
 `/<slug>/api/<method>` are both `/api/<method>`.
 
-### 5.22 · `init <slug>` and `dev` — the two subcommands 48 §5.14 spawns
+### 5.22 · `init <slug>`, and `dev`, not built — the subcommands 48 §5.14 spawns
 
-`init <slug> [--owner <email>]` (`BRAINDOG_OWNER` when the flag is absent):
+`init <slug> --owner <email>` (`BRAINDOG_OWNER` when the flag is absent; with neither, refused):
 
-1. Config, KEK and Directory as §5.1 steps 1–4.
+1. A data folder that already holds another record → one sentence on stderr, exit 1, and nothing is made: `serve`
+   serves one record, so a second one made here left a container restarting for ever on "holds 2 records". The
+   sentence says to make it in an empty volume, or an empty `BRAINDOG_DATA`. (`--alongside` lifts this, for a developer
+   who serves one record by its file; it is not in `--help`.) Then config, KEK and Directory as §5.1 steps 1–4.
 2. `slug` must match `^[a-z][a-z0-9-]{1,31}$` (§13 #21); a `record_dir` row or a directory already there → one sentence on stderr, exit 1.
 3. `mkdir <slug>/blobs <slug>/snapshots`; `sql = openNodeSqlite(<slug>/record.brain)`; `api = createRecordApi(…)`; `await api.kernel.applyMigrations()` — migration 0001, the thirty-one tables.
 4. Keys: `dek_record`, `dek_connector` = `randomBytes(32)`; the signing pair = `subtle.generateKey('Ed25519', true, ['sign'])`, private half exported `pkcs8`; each wrapped AES-GCM under `KeyStore.current()` with a fresh 12-byte nonce → `{ wrapped, nonce, wrapped_by: 'kek', kek_id }` — the three `vault_key` rows of 30 §1 (12 §6, 03 §4: generated on first run).
 5. Owner: `email = trim(lower(owner))`; `person` row or `INSERT` one (`p_` + ULID).
 6. `api.createRecord({ id: 'rec_' + ULID, slug, name: slug, tz: 'UTC', locale: 'en', owner: { id, email, name: null }, keys }, systemCtx)` — 45's INTERNAL method writes `record`, the `person` mirror, `member('*', 'owner')` and the three `vault_key` rows (§12).
 7. Directory: `INSERT INTO record_dir (slug, rec_id, owner_person)`, `INSERT INTO person_record`; `writeFile(<slug>/inbound.token, base64url(randomBytes(32)), { mode: 0o600, flag: 'wx' })`.
-8. stderr: `record <slug> created · owner <email> · inbound email token at <slug>/inbound.token`; exit 0.
+8. stderr: `record <slug> created · owner <email> · inbound email token at <data>/<slug>/inbound.token`; exit 0.
 
-`dev [--port <n>]`:
+`init <slug> --from <file.brainl> [--key <public key>]` brings an export in as the record, into an empty data folder,
+under the same first refusal (`src/restore.ts`); `restore <backup folder>` puts a `backup <folder>` back, also only
+into an empty one. A backup holds the key file and each record's `inbound.token`, so it is kept outside the
+repository folder, which is the image's build context: `.dockerignore` keeps backups, key files and `.env` out, and
+`baked.ts` refuses to build or start an image that carries one anyway. The README restores from a read-only mount and
+never copies a backup into the build folder.
 
-1. `data = mkdtemp('braindog-dev-')`; `BRAINDOG_TOKEN` = `base64url(randomBytes(32))` unless set; `origin = http://localhost:<port>`.
-2. `init dev --owner dev@localhost`.
-3. `startServer` with a `Dispatch` whose `email` writes the message to stderr instead of SMTP — a scratch record on the developer's machine, never `serve`'s behaviour — and `Http`, `Blobs`, `KeyStore` unchanged.
-4. stderr: `dev record at http://localhost:<port> · BRAINDOG_TOKEN=<value>` — the throwaway token of a throwaway directory, printed so `braindog login` and `POST /auth/token` can be tried at once.
+A data folder with an owner named (`BRAINDOG_OWNER`) and no `directory.sqlite` is a first run: `serve` runs `init`
+itself, with `BRAINDOG_RECORD` or `home` as the name, so `docker compose up` is the whole of the setup.
+
+`dev [--port <n>]` IS NOT BUILT. It needs a `Dispatch` port `start` does not have (`main.ts`'s header), and neither
+`main.ts` nor the CLI has the command. The design was: a scratch data folder, `init dev --owner dev@localhost`, a
+`Dispatch` whose `email` writes to stderr, and one stderr line with the address and a throwaway server key. Until it
+is built, a developer runs `init` and `serve` against a scratch `BRAINDOG_DATA`.
 
 ### 5.20 · The SMTP client — `Dispatch.email`
 
@@ -848,7 +885,7 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 
 | Boundary | Rule |
 |---|---|
-| TLS | the reverse proxy's; the process speaks HTTP on `PORT`, binds `0.0.0.0` for Docker (`-p 127.0.0.1:8080:8080` is how a self-hoster keeps it local). The cookie is `__Host-bd_s` with `Secure` on https, and `bd_s` without it on http at a loopback name, which a browser treats as secure; any other http origin gets no cookie, so a self-host off localhost needs TLS and `BRAINDOG_ORIGIN` |
+| TLS | the reverse proxy's, or this process's own when `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY` are both set; the process speaks HTTP on `PORT`, binds every interface when it has a server key and loopback when it has none, `BRAINDOG_LISTEN` naming another (`BRAINDOG_PORT=127.0.0.1:8080` in `.env` is how a Compose self-hoster keeps it local). The cookie is `__Host-bd_s` with `Secure` on https, and `bd_s` without it on http at a loopback name, which a browser treats as secure; any other http origin gets no cookie, so a self-host off localhost needs TLS and `BRAINDOG_ORIGIN` |
 | The KEK | one file, 32 bytes, 0600, created `wx`; refused when group/other-readable; read once, derived twice, zero-filled; never logged, never in a snapshot, never in an export. It is what a self-hoster must back up **separately** — Settings → backups says so in one line |
 | Decryption | in the host, never the record (ADR-062): `openGrant` returns sealed material; the host unwraps the DEK, derives the grant key by HKDF, decrypts under `aad = record_id ‖ grant_id ‖ version` and returns plaintext once |
 | Cookie | `HttpOnly SameSite=Lax`, `Secure` wherever the origin allows it, 30 days, rotated after 24 h of use with a 60-second grace; `authed_at` gates the Keychain at 15 minutes |
@@ -864,9 +901,9 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 | Scheduled actions | The send loop is `@braindog/host/actions`, the one the Worker runs: https to an origin an active declaration names, a host written as a literal private or local address refused, same-origin redirects three at most, 10 s, 2 MB, the ledger asked first, and the key's value scrubbed from the answer and from every refusal sentence. `src/actions.ts` passes in what only this host has, September 15th 2026: its key opener, a `pin` step in which the host is resolved before connecting and refused when any address it gives is unspecified (`0/8`, `::`), loopback (`127/8`, `::1`), private (`10/8`, `172.16/12`, `192.168/16`), link-local (`169.254/16`, `fe80::/10`), unique-local (`fc00::/7`), carrier-grade NAT (`100.64/10`), multicast (`224/4`, `ff00::/8`), reserved (`240/4`), or an IPv6 form carrying one of those (mapped, compatible, NAT64); the socket connects through a `lookup` that answers only the checked address, so no second lookup happens; every same-origin redirect hop resolved and checked again, three at most; 10 s; 2 MB. A refused address is `PULL_ORIGIN_REFUSED` with one sentence, a failure on the run's event that pauses nothing and is not retried. Each run asks the Directory's `mayRun` first and each pass's usage goes to `meter`; the record is put on the `selfhost` plan at its first pass (and `init` provisions it there), so a self-host is never held |
 | Scripts | §5.23. A person's or an agent's code runs in QuickJS compiled to WebAssembly, a fresh instance and a fresh `WebAssembly.Memory` per run, never in this process's own JavaScript and never with `node:vm`. Ceilings, default and most a declaration may ask: `cpu_ms` 200 and 1,000, `fetches` 5 and 20, `wall_ms` 15,000 and 30,000, `writes` 200 and 1,000; 64 KB of source; 32 MB of memory; 8 KB of log. The memory ceiling is the WebAssembly `maximum`, because QuickJS's own limit is not a cap: measured on quickjs-ng 0.32.0, a hundred 1 MB strings pushed one at a time passed a 32 MB limit at 104,956,678 bytes. Time spent inside a host function counts against `cpu_ms` and `wall_ms`, running out of memory is `OUT_OF_BOUNDS`, and every refusal is sticky, so a script that catches one is still refused with no writes. The only way out is `ctx`; its `fetch` is the scheduled actions' send loop above over the script's own `egress:`, so the private-address rules, `pin` and the key discipline are the same code. A key is never in the sandbox: the script names a label, and the host opens the grant for one request after every check. Reads never carry a secret field and never filter on one. A key goes only to the host its Keychain entry opens, never the Keychain's `slash` key, and is scrubbed from the answer in every spelling `spellingsOf` names; a run's log is shown only to an owner who reads every list the script read and wrote, and a refused run's note carries none of the script's words. **Not built:** the install line does not say which host each key goes to, and a key whose `opens` is not among the script's origins is refused at each fetch, not at install. [12-SECURITY](12-SECURITY.md) §6.2 and §8 carry both |
 | SMTP | credentials from env, not the Keychain — the Keychain cannot hold what sends its own recovery mail (12 §6); TLS required |
-| Backups | a snapshot holds sealed `grant` rows and the KEK-wrapped `vault_key`; the six `local` tables are empty; it opens nothing without the KEK file. `braindog verify` proves it unchanged, and is **not built**: `verify` is specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (48 §2), so nothing checks a snapshot today |
-| Logs | `{ code, route, recId }` and shapes only; the `secret-grep` gate (33 §8) runs over this app's write paths and log lines |
-| Multi-user | `BRAINDOG_TOKEN` exchange refuses when the Directory holds more than one person |
+| Backups | a snapshot holds sealed `grant` rows and the KEK-wrapped `vault_key`; the six `local` tables are empty; it opens nothing without the KEK file. `braindog verify` proves it unchanged against its `.sig` (§5.13). A `backup <folder>` holds the key file and each record's `inbound.token`, so it goes outside the repository folder, never into the build context: `.dockerignore` keeps backups, key files and `.env` out, and `baked.ts` refuses to build or start an image that carries any (§5.22) |
+| Logs | `{ code, route, recId }` and shapes only; the `secret-grep` gate (33 §8) runs over this app's write paths and log lines. The owner's claim link is never logged: it goes to `<data>/claim-link` at 0600, and the log names the file (§5.7) |
+| Multi-user | the server key's exchange (`BRAINDOG_SERVER_KEY`, or `BRAINDOG_TOKEN`) refuses when the Directory holds more than one person |
 
 ---
 
@@ -889,19 +926,21 @@ and captures `DATA`).
 | ten fixture records | `listen` within 1,000 ms; RSS ≤ 80 MB + 4 MB × 10 |
 | `main.ts init demo --owner a@b.c` on an empty data dir | exit 0; `demo/record.brain` with 31 tables and three `vault_key` rows; `record_dir`, `person`, `person_record` rows; `demo/inbound.token` mode 0600; a second `init demo` → exit 1, one sentence |
 | `main.ts init Demo!` | exit 1 — the slug grammar |
-| `main.ts dev --port 0` | stderr carries `BRAINDOG_TOKEN=`; `POST /auth/token` with it → a session; a magic link mint appears on stderr, not on any socket |
+| `main.ts init other --owner a@b.c` on a data dir that holds `demo` | exit 1, one sentence naming `demo`; nothing written |
+| `serve` with `BRAINDOG_SERVER_KEY` set and an owner with no passkey | `<data>/claim-link` mode 0600 holds the claim link; stderr names the file and never carries the link; `POST /auth/token` with the key → a session |
+| `BRAINDOG_TOKEN` alone, or `BRAINDOG_HOST=127.0.0.1` alone | read as the server key and the interface; `BRAINDOG_HOST` holding `http://…` is left to the CLI |
 
 **Router**
 
 | Input | Expected |
 |---|---|
-| walk `ROUTES` | every entry has a `group`; VAULT entries have `auth: 'cookie'`; no ADMIN entry admits a `token` principal; `ROUTES` has 49 method routes, 21 of them ADMIN, and no INTERNAL method |
+| walk `ROUTES` | every entry has a `group`; KEYCHAIN entries have `auth: 'cookie'`; no ADMIN entry admits a `token` principal; `ROUTES` has no INTERNAL method (249 method routes, 84 of them ADMIN, on October 30th 2026) |
 | `POST /api/listGrants` with a `write` bearer | 403 `NEEDS_BROWSER_SESSION` |
-| `POST /api/installPack` with `BRAINDOG_TOKEN` | reaches the record (200 or 422 from it) |
+| `POST /api/installPack` with the server key | reaches the record (200 or 422 from it) |
 | `POST /api/list` with cookie, with bearer | 200 both; response has `Cache-Control: no-store` and no `Access-Control-*` header |
 | `POST /api/list` with cookie and `Origin: https://evil.example` | 403 `FORBIDDEN` |
 | `POST /api/nope` | 404 bare |
-| `POST /api/restore` | 404 bare |
+| `POST /api/restore` with a bearer | refused as every ADMIN route is; with an owner's fresh session it restores (§5.13) |
 | `GET /api/version` | `{ version }` equal to `MAX(event.rowid)` for an owner who reads every list; for a member, a number that does not move while only lines hidden from her are written |
 | `GET /ws` | 404 |
 | 1 MB + 1 byte body on `/api/log` | 413 |
@@ -1079,7 +1118,7 @@ so its row is what this spec needs from it:
 | 41 | `openRecord(sql, clock): Kernel`; `Kernel.applyMigrations() · refused() · pendingWork() · version() · declarations() · exportBrainl(cursor)`; the `CallContext` and `Result` types; `dog_manifest` excludes itself and `dog_sig` (K25) | 41 §2, §13 #1 |
 | 44 | `serveMcp(request, surface, ctx \| null, { maxBodyBytes? }): Promise<Response>`, with `gate(request)` and `unauthorized()` beside it, from `@braindog/mcp/http`; `surface` is the `RecordApi` | the agent path |
 | 47 | `runPull(job: OutboxRow<'pull.fetch'>, deps: { http, keys, clock, record, ctx }): Promise<PullResult>` — acks itself | 47 §2 |
-| 48 | `apps/selfhost/src/main.ts` with `init <slug>` and `dev`; `POST /auth/device { slug?, reach, label, subject? }` → `DeviceCode`; `POST /auth/device/token { device_code }` → `DevicePoll`; `Reach`; operation grants and `device_grant.reach`; `createToken listTokens revokeToken`; `POST /api/export` as streamed `text/plain`; `#dog` / `#table` block order with `dog_sig` last | 48 §4.2, §5.2–§5.3, §5.12, §5.14, §13 D1–D3 |
+| 48 | `apps/selfhost/src/main.ts` with `init <slug>` (`dev` not built); `POST /auth/device { slug?, reach, label, subject? }` → `DeviceCode`; `POST /auth/device/token { device_code }` → `DevicePoll`; `Reach`; operation grants and `device_grant.reach`; `createToken listTokens revokeToken`; `POST /api/export` as streamed `text/plain`; `#dog` / `#table` block order with `dog_sig` last | 48 §4.2, §5.2–§5.3, §5.12, §5.14, §13 D1–D3 |
 | 50 | `@braindog/web/node` → `handler(req, res, next)`; `/signin?next=`; `/decide/[id]`; `/settings/<area>` — `agents` for the code entry (`verification_uri`), `recovery` for the first passkey; `/r/<register>/<seq>` | 50 §2.2, §5.13, §13 #1–#2; 19 §2 |
 | 45 | `createRecordApi({ sql, scheduler, clock }): RecordApi & { kernel: Kernel }`; `drainSchedule`, `leaseOutbox({ kinds, n })`, `ackOutbox({ id, outcome, error })`, `applyPull`; `createRecord({ id, slug, name, tz, locale, owner, keys: { record, connector, signing } })` writing `record`, the `person` mirror, `member('*', 'owner')` and the three `vault_key` rows; `invite({ person, levels })` at acceptance; `arrive({ channel, headers, body, ingest_id?, verified })` — INTERNAL, the arrival write 33 §4 describes and 30 §5 does not list; the three token methods of 48 §5.12 | 30 §5, 33 §2, §9; this spec §5.8, §5.16, §5.22 |
 
@@ -1090,7 +1129,7 @@ so its row is what this spec needs from it:
 | # | Decision | Amend |
 |---|---|---|
 | 1 | **Passkeys are specified here (§5.10) and land in phase 3 with the web app; phase 2 closes with the magic link and the token exchange.** WebAuthn is a browser ceremony and phase 2 has no browser to drive it; ES256 and RS256, no attestation, registration behind a session | build phase 3: "+ `/auth/passkey/*`"; 12 §3 self-host row |
-| 2 | `POST /auth/token` exchanges `BRAINDOG_TOKEN` for an owner session — the browser bootstrap without SMTP, and the session a first passkey is registered behind; refused when the Directory holds more than one person | 33 §6 Auth row; 12 §3 |
+| 2 | `POST /auth/token` exchanges the server key (`BRAINDOG_SERVER_KEY`, formerly `BRAINDOG_TOKEN`) for an owner session — the browser bootstrap without SMTP, and the session a first passkey is registered behind; refused when the Directory holds more than one person | 33 §6 Auth row; 12 §3 |
 | 3 | **Inbound email on a self-host is a forwarding webhook**, `POST /in/email/<token>`, raw RFC 5322 in the body; the forwarding MTA's `Authentication-Results` pass is what makes a row eligible to match; no SMTP receive, no DKIM in-process | 33 §4 (a row); 07 §1 self-host column: "a forwarding webhook, or your own MX" |
 | 4 | **Phase 2 polls; `/ws` is 404.** The client's own 15 s fallback is the live channel; a WebSocket is §10's first line | 33 §4 `/ws` row: "Cloud; self-host phase 2: 404, the client polls" |
 | 5 | **`wake()` kicks the in-process poller** (`setImmediate`) instead of being a no-op; the poller's tick is **15 s** and is the belt for abandoned leases | 33 §1 `wake()` comment; 30 §8 doorbell row; 09 §1 self-hosted paragraph |
@@ -1109,7 +1148,7 @@ so its row is what this spec needs from it:
 | 18 | `CallContext.session` comes from `X-BrainDog-Session`, `-Client-Id`, `-Host`, `-Repo` on `/api/*`; `/mcp` reads `_meta` | 33 §2; 48 sends them |
 | 19 | The host signs: the final page of a streamed `POST /api/export` and every snapshot use one `sign()` over the record's `vault_key(purpose = 'signing')`, unwrapped with the KEK | 33 §9 Export rows: "the Worker or the self-host signs" |
 | 20 | One sick record does not stop the host: `SCHEMA_MISMATCH` / `SCHEMA_NEWER` is per record, 503 on its routes only | 33 §9 Migrations row (self-host clause) |
-| 21 | `main.ts` carries `init <slug> [--owner]` and `dev [--port]` (48 §5.14's contract); a slug is `^[a-z][a-z0-9-]{1,31}$`; `init` generates the record DEK, the connector DEK and the Ed25519 signing pair, wraps them under the KEK and hands them to `createRecord`; the inbound-email capability lives at `<slug>/inbound.token` (0600); `dev` prints mail and its throwaway `BRAINDOG_TOKEN` to stderr | 33 §5 `init` row (the owner flag, the token file); 34 §4 (a slug grammar row); 33 §6 |
+| 21 | `main.ts` carries `init <slug> --owner <email>` (48 §5.14's contract; `dev [--port]` was in it and is not built); a slug is `^[a-z][a-z0-9-]{1,31}$`; `init` refuses a data folder that already holds another record, generates the record DEK, the connector DEK and the Ed25519 signing pair, wraps them under the KEK and hands them to `createRecord`; the inbound-email capability lives at `<slug>/inbound.token` (0600) | 33 §5 `init` row (the owner flag, the token file); 34 §4 (a slug grammar row); 33 §6 |
 | 22 | `POST /api/export` answers streamed `text/plain` on this host too — 48 §13 D3's one exception to the `Result` envelope — and the host, not the record, emits the `dog_sig` line last (#19 names the key) | 33 §4 `/api/<method>` row (the export exception); 48 §13 D2 (who writes `dog_sig`) |
 | 23 | `createToken` · `listTokens` · `revokeToken` are routable ADMIN methods on this host, reached by a cookie or a `token` operation grant | 30 §5 ADMIN row (the three methods 48 §5.12 calls; 41 → 44 becomes 47 methods) |
 | 24 | **A script runs on this host in QuickJS compiled to WebAssembly**, one instance per run, leased with the scheduled actions and admitted on their count; its `ctx.fetch` is their send loop, and its reads are the record's own `list` and `get` as the script's actor. Not `node:vm`, which is not a boundary, and not `isolated-vm`, a native build on every self-hoster's machine | 31 §2 row 23 (done); 12 §8 (the ceilings) |
@@ -1122,8 +1161,8 @@ Twenty-four, counted.
 
 - [ ] `node apps/selfhost/src/main.ts init demo --owner a@b.c`, then `… serve`, on a clean `BRAINDOG_DATA`: creates `kek` (0600) and `vapid.json`, and answers `GET /api/version` with the record's version.
 - [ ] A build with `fts5: false` refuses with the exact block of §6 and exit code 1 (`boot-probe` green).
-- [ ] `main.ts init demo` creates the record, its three wrapped keys, the Directory rows and `inbound.token`; `main.ts dev` serves a scratch record and prints its token.
-- [ ] `ROUTES` passes `router-groups`: every route grouped, no bearer at VAULT, no `token` principal at ADMIN, 49 method routes, 21 of them ADMIN, none INTERNAL.
+- [ ] `main.ts init demo` creates the record, its three wrapped keys, the Directory rows and `inbound.token`, and refuses a data folder that already holds another record; `serve` writes the owner's claim link to `<data>/claim-link` (0600) and never to the log.
+- [ ] `ROUTES` passes `router-groups`: every route grouped, no bearer at VAULT, no `token` principal at ADMIN, every method in `ROUTES` routed (249, 84 of them ADMIN, on October 30th 2026), none INTERNAL.
 - [ ] Magic link round-trips through the mock SMTP; the token exchange works with no SMTP; the lockout refuses the eleventh attempt and fails closed on a missing reservation.
 - [ ] Device flow on 48's wire: `login` yields a `write` token once; `runner` a 90-day bearer; `export` a ten-minute operation grant that reaches `export` and nothing else; five wrong codes deny; expiry after ten minutes.
 - [ ] A write re-arms the timer; the timer drains within 250 ms of `due_at`; a 40-day row is clamped and chained.
