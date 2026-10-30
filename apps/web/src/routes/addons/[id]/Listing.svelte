@@ -27,7 +27,7 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { onMount, untrack } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import type { CatalogueIndex, CatalogueVersion, Reach, Trust } from '@braindog/declare/catalogue';
@@ -313,6 +313,16 @@
     if (again.first.ok) states = again.first.value;
   }
 
+  /**
+   * THE SHELL READ AGAIN ONCE SOMETHING WENT IN (first-hour audit E8): the rail is drawn from `boot`, kept for the tab, so
+   * Reading list, Debts and Pad went in and neither the rail nor the phone's bar moved until a reload. Forgotten and read
+   * again, the rail takes the new page, and the layout says where it came in ("Reading is in your sidebar now").
+   */
+  async function railAgain() {
+    (await import('$lib/record/boot-live.ts')).forget();
+    await invalidateAll();
+  }
+
   /* ── an update that is ready ────────────────────────────────────────────── */
 
   /* WHAT THE NEW VERSION CHANGES, for a record that holds an earlier one of an add-on from outside: read from the two
@@ -359,6 +369,7 @@
         if (out.ok) toasts.push(listing.kind === 'usecase' ? copy.switchedTo(listing.title) : words.turnedOn(listing.title), { intent: 'good' });
         else refused = out;
         await reread();
+        if (out.ok) await railAgain();
         return;
       }
       if (action.kind !== 'install' && action.kind !== 'update') return;
@@ -419,6 +430,9 @@
         /* A run that took other updates in first names them (`offer.ts` `installInTurn`), so nobody finds one moved unsaid. */
         toasts.push(out.first ? turnWords.installedAfter(listing.title, out.first) : copy.shareInstalled(listing.title), { intent: 'good' });
         planned = null;
+        await reread();
+        await railAgain();
+        return;
       } else if (entry && notOwner(out.code)) {
         wentIn(out);
         planned = null;
