@@ -7752,6 +7752,39 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
 
   /**
+   * A read's questions of the rows and the declarations asked once each (`blocksOf`): a list by the whole question asked
+   * of it (its `where`, order, limit and cursor), every page, every figure and one figure by its id. ONLY FOR DEPS THAT
+   * LAST ONE READ, as `pageDeps`' own figures and walks are: nothing is written under a synchronous read, so the rows
+   * cannot move under it. Each answer is handed out as a copy, so a block that shapes the rows it was handed shapes its
+   * own.
+   */
+  const onceForRead = (deps: PageDeps): Pick<PageDeps, 'list' | 'pages' | 'metric' | 'metrics'> => {
+    const lists = new Map<string, ReturnType<PageDeps['list']>>();
+    const figures = new Map<string, MetricDecl | null>();
+    let pages: PageDecl[] | undefined;
+    let every: readonly MetricDecl[] | undefined;
+    const { metrics } = deps;
+    return {
+      list: (q) => {
+        const key = JSON.stringify([q.register, q.where ?? null, q.limit ?? null, q.order ?? null, q.cursor ?? null]);
+        let got = lists.get(key);
+        if (got === undefined) {
+          got = deps.list(q);
+          lists.set(key, got);
+        }
+        return structuredClone(got);
+      },
+      pages: () => structuredClone((pages ??= deps.pages())),
+      metric: (id) => {
+        if (!figures.has(id)) figures.set(id, deps.metric(id));
+        const got = figures.get(id) ?? null;
+        return got === null ? null : structuredClone(got);
+      },
+      ...(metrics ? { metrics: () => structuredClone((every ??= metrics())) } : {}),
+    };
+  };
+
+  /**
    * `declaredOnce` KEPT ACROSS CALLS, for the one question that is only about declarations: which lists a block reads.
    * A `<module>.<figure>` path asks every figure and the add-on each came with, a query apiece, and the record asks it
    * of every block it holds from a reader, so the Money page read about 1,460 packs for one look. The figures, the packs
@@ -10836,9 +10869,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * `block` for every block of one read, over one set of deps, as a page's own read draws its blocks: a figure, a walk
      * and the vital signs are worked out once for the read and not once a block. Today's body is drawn block by block
      * (`previewPage`), and each block worked out its figures again, the signs among them.
+     *
+     * AND EACH LIST READ ONCE FOR THE READ, by the question asked of it, with the pages and the figures' declarations
+     * (`onceForRead`): Today's two blocks over what falls due read every list with a deadline twice, the same rows the
+     * same way, and its two key-number blocks and its cards read the projects three times.
      */
     blocksOf: (opts: { inbox?: boolean; viewer?: string | undefined; sees?: PageSees | undefined } = {}): ((decl: PageBlock) => BlockResult) => {
-      const deps: PageDeps = { ...pageDeps(opts.viewer, opts.sees), ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }) };
+      const own = pageDeps(opts.viewer, opts.sees);
+      const deps: PageDeps = { ...own, ...onceForRead(own), ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }) };
       return (decl) => readBlock({ ...deps }, decl);
     },
 

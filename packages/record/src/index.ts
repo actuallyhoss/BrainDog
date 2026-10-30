@@ -11070,6 +11070,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** The methods `today` asks for each tile's part (`today.ts`); set once `api` and its wrappers are. */
   let todayAsks: TodayAsks | null = null;
+  /**
+   * TODAY IS DRAWN IN ONE PASS: its body and the key numbers its cards lead with are two `previewPage`s, and each drew its
+   * blocks over reads of its own (`kernel.blocksOf`), so a figure both name was worked out twice and the projects and the
+   * key numbers' list were read again. A context `today` hands its parts is a copy of the caller's made for that one
+   * call, and every `previewPage` asked with it draws over the one set of reads the first made (`blocksOf` reads each
+   * list once by the question asked, and each figure once). Nobody else holds the copy, so nothing outside the one
+   * `today` shares its reads, and they go with it.
+   */
+  const todayDraws = new WeakMap<CallContext, ReturnType<Kernel['blocksOf']> | null>();
 
   /**
    * TODAY AS IT WAS LAST DRAWN, BY WHO ASKED AND WHAT BODY (`today`). On a lived-in record Today's body is the slowest
@@ -12559,8 +12568,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       };
 
       const decl = b as { page: string };
-      /* EVERY BLOCK OVER ONE READ (`blocksOf`), so a figure two blocks name and the signs are worked out once. */
-      const drawOne = kernel.blocksOf({ inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx), sees: seesFor(ctx) });
+      /* EVERY BLOCK OVER ONE READ (`blocksOf`), so a figure two blocks name and the signs are worked out once; and for a
+         part of `today`, over the one read its other parts draw over too (`todayDraws`). */
+      const drawOne = todayDraws.get(ctx) ?? kernel.blocksOf({ inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx), sees: seesFor(ctx) });
+      if (todayDraws.has(ctx)) todayDraws.set(ctx, drawOne);
       const drawnBlocks = written.map((block, i) => {
         const plan = plans[i]!;
         const cost = costs[i];
@@ -12675,7 +12686,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (said.fresh !== undefined && typeof said.fresh !== 'boolean') return no('VALUE_MALFORMED', 'fresh is true to have Today drawn now, never as it was last drawn.', { at: 'fresh' });
       if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'Today is not answered by this record yet.');
       const asks = todayAsks;
-      const drawOf = () => todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx, { offer });
+      /* IN ONE PASS (`todayDraws`): every part asked with a copy of the caller made for this drawing alone. */
+      const drawOf = () => {
+        const once: CallContext = { ...ctx };
+        todayDraws.set(once, null);
+        return todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), once, { offer });
+      };
       /* AND THE PAGE AS IT IS DECLARED (its title, `board`, the phone's arrangement), so the screen draws a kept Today from
          this one read and asks `page` for nothing. */
       /* ITS BLOCKS AS DECLARED TOO, for the board's Inspector, which changes a widget as it is kept and not as it is drawn. */

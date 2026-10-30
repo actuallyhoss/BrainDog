@@ -13,7 +13,7 @@
   import { addressCommand, mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { untrack } from 'svelte';
-  import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import { closed, closedAfter, opened } from '$lib/ui/screen.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
@@ -34,6 +34,22 @@
   const s = settingsState(() => shell);
   const anOwner = $derived(s.anOwner);
   const mintsHere = $derived(s.mintsHere);
+
+  /**
+   * NOT DRAWN OVER THE LAST COPY OF THE SHELL, which knows nobody as an owner (`drawnFrom` in `boot-copy.ts`): this area
+   * is an owner's, and its doors are read only once the live `boot` says who reads. Opened again from a kept shell, it said
+   * `ready` over the reader's half, took it back as the owner's reads went out, then said it again (finish W1, as F46
+   * was on the areas drawn from a chunk). So the copy is held as a call out until the live shell replaces it, closed a
+   * task later (`closedAfter`), by when the owner's reads are out. Offline the copy is all there is, and it is not held.
+   */
+  const fromCopy = $derived(shell.stale === true && shell.offline !== true);
+  $effect(() => {
+    if (!fromCopy) return;
+    return untrack(() => {
+      const at = opened();
+      return () => closedAfter(true, at);
+    });
+  });
 
   /**
    * THE MINT WAS BUILT AND NO OWNER COULD REACH IT.
@@ -178,14 +194,19 @@
    * channel line for them is not said twice.
    */
   let ways = $state.raw<WaySource[] | null>(null);
+  /* A CALL OUT FROM THE MOMENT IT IS ASKED, closed a task after it lands (`closedAfter`): the arrivals came after the doors,
+     and between the two the scheduled actions' "nothing set up" card was drawn over a record that has ways in, so the
+     screen said `empty` and then `ready`. */
   $effect(() => {
     untrack(() => {
+      const at = opened();
       void Promise.all([import('../../../inbox/series.ts'), import('../../../inbox/sources.ts')])
         .then(async ([series, sources]) => {
           const read = await series.readArrivals(apiBase(), Date.now(), sources.SOURCE_DAYS);
           ways = read === null ? null : sources.sourcesOf(read.lines, Date.now());
         })
-        .catch(() => (ways = null));
+        .catch(() => (ways = null))
+        .finally(() => closedAfter(true, at));
     });
   });
   const wayRows = $derived(

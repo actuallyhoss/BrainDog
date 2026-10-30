@@ -316,6 +316,15 @@ function earlyBoot(url: string): Promise<Response> | null {
   return held.at as Promise<Response>;
 }
 
+/** The record whose every list's declaration was asked beside `boot` and handed to the client (`firstOpen`). */
+let everyAt: string | null = null;
+
+/**
+ * Whether every list's declaration on `base` was asked beside `boot` and is the client's (`firstOpen`): a list learnt
+ * from here on is answered from that one read, never asked again, so a screen need not wait on anything else first.
+ */
+export const everyAsked = (base: string): boolean => everyAt === base;
+
 /**
  * THE TAB'S FIRST OPEN OF A RECORD, before any screen draws: the lists' declarations a screen asks in one turn go as one
  * read from now on (`batchSchemas`), and every list's declaration the page asked for beside `boot` (`app.html`,
@@ -333,6 +342,7 @@ export function firstOpen(base: string): void {
   if (!held || held.url !== url || !(held.at instanceof Promise)) return;
   (globalThis as { __bdSchemas?: unknown }).__bdSchemas = undefined;
   void createClient({ base }).schemas(held.at as Promise<Response>);
+  everyAt = base;
 }
 
 export function readBoot(base: string, io?: Fetch): Promise<Booted> {
