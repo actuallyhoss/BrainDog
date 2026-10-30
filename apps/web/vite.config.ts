@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -280,8 +280,63 @@ const routeMarksPlugin: Plugin = {
   },
 };
 
+/**
+ * A SCREEN'S CHUNK NAMES EVERY CHUNK IT WAITS FOR, SO THE BROWSER ASKS FOR THEM ALL AT ONCE (speed-c FL2).
+ *
+ * A module's imports are found only once it has arrived and been read, so a screen whose code is nine imports deep was
+ * nine round trips before it could run: Today's node imported 60 chunks and waited on 114, and on a slow phone network
+ * every level is half a second or more. Rollup's answer was `hoistTransitiveImports`, on by default, which names a
+ * chunk's whole graph in it as bare imports; Rolldown has not got it (it accepts only `false`). And the preload lists
+ * cannot carry it: Kit counts every route as an entry, so the rule above (`resolveDependencies`) names no shared chunk
+ * in any route's list, and the lists are in the app entry, whose budget has no room for them.
+ *
+ * SO IT IS DONE HERE, for every chunk a screen or an `import()` starts at: each names, after its own imports, every
+ * chunk under it that it does not import already. The browser then reads one level and asks for the rest together.
+ * NOTHING RUNS IN ANOTHER ORDER: a module's imports run in the order they are written and each module runs once, and
+ * the added ones come after the chunk's own, which have already run every one of them by then. Kit's own entry and
+ * what it imports are left alone: the shell asks for those before anything else. The cost is a few bytes for each name,
+ * in the chunks that carry them (Today's first load counts three of them), and nothing in the entry. Client build only.
+ *
+ * MEASURED, cold Today at 390 on a 4x slower CPU and Slow 4G over HTTP/2 with brotli: first paint 5.9 s to 4.9 s with
+ * this and FL1's cuts. Whole lists on every `import()` outside the entry were tried as well, which would make a tile
+ * one level and not two: the screen settled 0.6 s sooner but painted 0.5 s later, with 3.6 KB more on its first load,
+ * since everything the frame's loads ask for then races Today's own chunks. So not those.
+ */
+const hoistPlugin: Plugin = {
+  name: 'braindog:hoist-imports',
+  apply: 'build',
+  applyToEnvironment: (environment) => environment.name === 'client',
+  generateBundle: {
+    order: 'post',
+    handler(_, bundle) {
+      const walk = (into: Set<string>, file: string) => {
+        const chunk = bundle[file];
+        if (into.has(file) || chunk?.type !== 'chunk') return;
+        into.add(file);
+        for (const next of chunk.imports) walk(into, next);
+      };
+      const kit = new Set<string>();
+      for (const file of Object.keys(bundle)) if (/(?:^|\/)entry\/(?:start|app)\.[\w-]+\.js$/u.test(file)) walk(kit, file);
+      for (const [file, chunk] of Object.entries(bundle)) {
+        if (chunk.type !== 'chunk' || !(chunk.isEntry || chunk.isDynamicEntry) || kit.has(file)) continue;
+        const under = new Set<string>();
+        walk(under, file);
+        const own = new Set(chunk.imports);
+        const more = [...under].filter((dep) => dep !== file && !own.has(dep) && !kit.has(dep));
+        if (more.length === 0) continue;
+        const from = posix.dirname(file);
+        const named = more.map((dep) => {
+          const path = posix.relative(from, dep);
+          return `import"${path.startsWith('.') ? path : `./${path}`}";`;
+        });
+        chunk.code += `\n${named.join('')}\n`;
+      }
+    },
+  },
+};
+
 export default defineConfig({
-  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin, routeMarksPlugin],
+  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin, routeMarksPlugin, hoistPlugin],
   /* `__BRAINDOG_BUILD__` IS THE DEPLOY'S BUILD TUPLE, the one the Worker answers `/api/version` with as `app`, so a tab can
      tell it is running an older build than the one live (`newerBuild` in `lib/data/live.ts`). Empty in a build without one,
      which compares nothing. */
