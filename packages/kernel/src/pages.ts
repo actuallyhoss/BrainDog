@@ -25,7 +25,7 @@ import { evaluate, type Leaf, type Predicate, type Schema } from '@braindog/wher
 import type { ActionRow } from './actions.ts';
 import type { ScriptRow } from './script-rows.ts';
 import type { Exception } from './exceptions.ts';
-import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isReaderLeaf, keyedBlocks, kindsReading, kpisFault, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type KpisFor, type WhenReader } from './block-keys.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isPickedLeaf, isReaderLeaf, keyedBlocks, kindsReading, kpisFault, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type KpisFor, type WhenReader } from './block-keys.ts';
 import * as kpiRank from './kpi-rank.ts';
 import { kpiTrend, type KpiAnswer } from './sources/kpis.ts';
 import { cutActions, type OfferedAction } from './row-actions.ts';
@@ -75,7 +75,10 @@ export type WhenLeaf = { metric: string; empty?: boolean; beyond?: boolean; gt?:
  * A block's `when:`: one leaf, or `all:` (every one holds) or `any:` (one does) of two or more, each a leaf or one join of
  * leaves. Two levels deep at most (`block-keys.ts` `WHEN_DEPTH`).
  */
-export type WhenTree = WhenLeaf | WhenReaderLeaf | { all: WhenTree[] } | { any: WhenTree[] };
+export type WhenTree = WhenLeaf | WhenReaderLeaf | WhenPickedLeaf | { all: WhenTree[] } | { any: WhenTree[] };
+
+/** One test of what the reader picked on the page's own filter (`block-keys.ts` `isPickedLeaf`): `''` is none picked. */
+export type WhenPickedLeaf = { picked: string; is: string | readonly string[] };
 
 /** One test of who reads the page: the reader is one of these words (`block-keys.ts` `WHEN_READERS`). */
 export type WhenReaderLeaf = { reader: WhenReader | readonly WhenReader[] };
@@ -1129,6 +1132,8 @@ export type PageDeps = {
    * `when` asks who reads is sent, so a host that has not said who reads is never shown what was held for the owner.
    */
   readerIs?: WhenReader;
+  /** WHAT THE READER PICKED ON THE PAGE'S FILTERS, by field, for a `when: { picked }`. Absent, nothing was picked. */
+  picked?: ReadonlyMap<string, string>;
   /**
    * The verbs this host carries out (`RUNS` in `packages/record/src/verbs.ts`). A verb the table names and the host does
    * not run yet is cut, rather than sent to be refused on every press. Absent, the table is the whole answer.
@@ -1693,7 +1698,9 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
       return added === undefined ? folded : { ...folded, added };
     }
     /* THE PAGE'S ROW IS THE ENTRY ITS TEXT SITS ON, so `{{money:price}}` and `{{blockers.count}}` read the row. */
-    const on = found.row ? { ...deps, here: found.row } : deps;
+    const at = found.row ? { ...deps, here: found.row } : deps;
+    /* AND WHAT THE READER PICKED, so a line can say the months a strip narrows the blocks to (`when: { picked }`). */
+    const on = filters && filters.picked.size > 0 ? { ...at, picked: filters.picked } : at;
     const read = rowNamed(deps, found.row, readBlock(clauses.size > 0 || log ? narrowed(on, b, clauses, log) : on, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
     const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
@@ -2097,7 +2104,7 @@ function readerFilters(
   decl: PageDecl,
   blocks: readonly PageBlock[],
   filter: Readonly<Record<string, string>> | undefined,
-): { answer: PageFilter[]; clauses: Map<string, Predicate[]>; log: ((e: ActivityEvent) => boolean) | null } | null {
+): { answer: PageFilter[]; clauses: Map<string, Predicate[]>; log: ((e: ActivityEvent) => boolean) | null; picked: Map<string, string> } | null {
   const said = Array.isArray(decl.filters) ? (decl.filters as unknown[]) : [];
   const all = said.flatMap((f): { field: string; control: PageFilter['control']; options?: Choice[]; counts?: string }[] => {
     const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown; options?: unknown; counts?: unknown }) : {};
@@ -2273,7 +2280,8 @@ function readerFilters(
     const values = d.options.map((c, i) => ({ value: c.value, label: c.label, count: counts[i]! }));
     return { field: d.field, label: wordsOf(d.field), control: d.control, chosen: picks.get(d.field)?.value ?? null, values, reads };
   });
-  return { answer: answers, clauses, log: logged?.keep ?? null };
+  const picked = new Map<string, string>([...[...chosen].map(([field, c]) => [field, c.value] as const), ...[...picks].map(([field, c]) => [field, c.value] as const)]);
+  return { answer: answers, clauses, log: logged?.keep ?? null, picked };
 }
 
 /** A filter's own choice: the word an address keeps, the name a person reads, and the sentence of the rows it keeps. */
@@ -2486,7 +2494,7 @@ export function whenHolds(deps: PageDeps, when: unknown): boolean {
 /** Whether a `when:` of a shape already checked holds: a leaf of its figure, `all:` of every part, `any:` of one. */
 function treeHolds(deps: PageDeps, when: unknown): boolean {
   const join = whenJoin(when);
-  if (join === null) return isReaderLeaf(when) ? readerHolds(deps, when) : leafHolds(deps, when as WhenLeaf);
+  if (join === null) return isReaderLeaf(when) ? readerHolds(deps, when) : isPickedLeaf(when) ? pickedHolds(deps, when) : leafHolds(deps, when as WhenLeaf);
   const parts = (when as Record<string, unknown[]>)[join]!;
   return join === 'all' ? parts.every((part) => treeHolds(deps, part)) : parts.some((part) => treeHolds(deps, part));
 }
@@ -2508,6 +2516,13 @@ function readerHolds(deps: PageDeps, when: WhenReaderLeaf): boolean {
   if (deps.readerIs === undefined) return false;
   const words: readonly unknown[] = Array.isArray(when.reader) ? when.reader : [when.reader];
   return words.includes(deps.readerIs);
+}
+
+/** Whether a leaf about what was picked holds: the filter's choice is one it names, `''` for none picked. */
+function pickedHolds(deps: PageDeps, when: WhenPickedLeaf): boolean {
+  const now = deps.picked?.get(when.picked) ?? '';
+  const words: readonly string[] = Array.isArray(when.is) ? when.is : [when.is as string];
+  return words.includes(now);
 }
 
 /** Whether one leaf of a `when:` holds of the figure it names. */

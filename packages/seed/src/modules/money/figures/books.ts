@@ -9,9 +9,9 @@ import { MONEY, RUNS_OUT_NEVER } from './shared.ts';
  * by and every figure over the Ledger holds (`spending.ts`). Money moved between two accounts is in neither half, though
  * `book-cash` counts it: it is cash that moved and nothing earned or spent.
  */
-const BOOK_MONTH = 'state is cleared, transfer is false, stays is not true, on at least bom';
+const BOOK_MONTH = 'state is cleared, transfer is false, stays is not true, corrects is not true, on at least bom';
 /** The same entries over the thirteen months a book's chart reads, a month to a point. */
-const BOOK_MONTHS = 'state is cleared, transfer is false, stays is not true, on after -13m';
+const BOOK_MONTHS = 'state is cleared, transfer is false, stays is not true, corrects is not true, on after -13m';
 /**
  * ONE BOOK'S WALK AS A FIGURE READS IT: the legs a book's page walks (`BOOK_LEGS` in `pages/shared.ts`), each held to
  * the book the figure is asked about. A page fills `{{name}}` from the book it draws and a figure fills `{{it}}` from

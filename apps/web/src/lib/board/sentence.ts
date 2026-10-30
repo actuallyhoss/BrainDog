@@ -124,7 +124,7 @@ export type FieldSaid = { id: string; label?: string | undefined; type?: string 
 /** The direction words a money list's clause reads as ("money out"). */
 const DIRECTION: Readonly<Record<string, string>> = { out: 'money out', in: 'money in' };
 /** Clauses no person needs read to them: the ledger's own housekeeping. */
-const QUIET = /^(state is cleared|transfer is false|stays is not true|merged_into is empty|self is not true|state is not done or dropped|state is not done|live is true)$/u;
+const QUIET = /^(state is cleared|transfer is false|stays is not true|corrects is not true|merged_into is empty|self is not true|state is not done or dropped|state is not done|live is true)$/u;
 
 /**
  * THE SENTENCE: "Show [what] [in Food] [for this month] as [a list]." `list` is the list's name, `fields` its fields.

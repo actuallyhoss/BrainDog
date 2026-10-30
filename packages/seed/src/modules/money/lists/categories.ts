@@ -145,6 +145,13 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
      * (`./transactions.ts`). Nothing reads a category by its name, so this is how one is known for what it is.
      */
     { id: 'transfer', label: 'Money stays yours', type: 'bool', default: false },
+    /**
+     * A CORRECTION, NOT SPENDING (live check of 30 October, 20): a category of fixes to what an account holds, such as
+     * the Discrepancy a count of the cash files what it cannot explain under. Ticked, every figure of spending and income
+     * leaves out what is filed under it, through the Ledger's `corrects` (`./transactions.ts`), while what each account
+     * holds still counts it. Asked once of a category whose name says so (`scripts/category-correction.js`).
+     */
+    { id: 'correction', label: 'A correction, not spending', type: 'bool', default: false },
     { id: 'state', label: 'Status', type: 'enum', values: ['live', 'retired'], default: 'live', index: true, required: true },
     { id: 'note', type: 'text' },
   ],

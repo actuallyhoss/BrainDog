@@ -88,7 +88,7 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
     metric: 'uncategorised-share-30d',
     name: 'Out with no category, 30 days',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, stays is not true, direction is out, on after -30d',
+    where: 'state is cleared, transfer is false, stays is not true, corrects is not true, direction is out, on after -30d',
     value: { ratio: { of: { empty: 'category' }, per: { count: 'id' } } },
     format: 'pct',
     target: { lte: 0.2 },

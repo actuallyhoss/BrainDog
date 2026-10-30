@@ -94,7 +94,7 @@ test('THE CASH WALK HAS ONE EVERYDAY LEG over the moves, cleared and not a trans
   assert.equal(legs.length, 1);
   const leg = legs[0]!;
   assert.equal(leg.register, 'transactions');
-  assert.equal(leg.where, 'state is cleared, transfer is false, stays is not true');
+  assert.equal(leg.where, 'state is cleared, transfer is false, stays is not true, corrects is not true');
   assert.deepEqual(leg.incoming, { field: 'direction', is: 'in' });
   assert.equal(leg.everyday!.months, 3);
   /* UNSAID IS EVERY OTHER LEG OF THE WALK IT IS IN. A leg written out here rides onto a record that does not hold its

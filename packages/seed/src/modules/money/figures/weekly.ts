@@ -8,7 +8,7 @@
 import type { SeedMetric } from '../../base.ts';
 import { MONEY } from './shared.ts';
 
-const LEDGER_OUT = 'state is cleared, transfer is false, stays is not true, direction is out';
+const LEDGER_OUT = 'state is cleared, transfer is false, stays is not true, corrects is not true, direction is out';
 const WEEKS = 'on after -84d';
 
 export const WEEKLY_FIGURES: Record<string, SeedMetric> = {

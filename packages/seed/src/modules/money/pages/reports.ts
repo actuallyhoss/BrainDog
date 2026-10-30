@@ -4,7 +4,7 @@ import type { SeedPage } from '../../base.ts';
 import { WHERE_IT_WENT } from './parts/where-it-went.ts';
 
 /** What moved, as every figure of the Ledger counts it: cleared and not between a person's own accounts. */
-const MOVED = 'state is cleared, transfer is false, stays is not true';
+const MOVED = 'state is cleared, transfer is false, stays is not true, corrects is not true';
 
 /**
  * THE MONTHS A PERSON PICKS, as one strip over the page: this month, last month, three months or a year. Each is a
@@ -49,12 +49,20 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
   filters: [MONTH_PICKER],
   blocks: [
     {
-      /* THE MONTH SO FAR, EACH WAY, AND WHAT IS LEFT OF IT. */
+      /* THE MONTHS PICKED, EACH WAY, AND WHAT IS LEFT OF THEM (live check of 30 October, 20): the line said "This month"
+         over a year's donut with All picked, so it says the months the strip picked, All being the thirteen every block
+         reads with none picked (`BACK`). Each range's figures are `REPORT_RANGES`' (`figures/health.ts`). */
       kind: 'note',
       lead: true,
       span: 12,
       when: { metric: 'out-by-month', gt: 0 },
-      body: 'This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left.',
+      says: [
+        { when: { picked: 'months', is: 'this' }, body: 'This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left.' },
+        { when: { picked: 'months', is: 'last' }, body: 'Last month: {{received-last}} in, {{spent-last}} out, {{left-last}} left.' },
+        { when: { picked: 'months', is: 'three' }, body: 'The last 3 months: {{received-three}} in, {{spent-three}} out, {{left-three}} left.' },
+        { when: { picked: 'months', is: 'year' }, body: 'The last 12 months: {{received-year}} in, {{spent-year}} out, {{left-year}} left.' },
+        { body: 'The last 13 months: {{received-all}} in, {{spent-all}} out, {{left-all}} left.' },
+      ],
     },
     {
       /* NOTHING MOVED YET: what the page will hold, in place of noughts. */

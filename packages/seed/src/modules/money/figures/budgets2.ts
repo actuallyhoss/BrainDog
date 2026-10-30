@@ -8,7 +8,7 @@ import { MONEY } from './shared.ts';
  * counts (`figures/spending.ts` says why each clause is there). The page's bars read `spent-by-category-month` over the
  * same sentence, so a total here and a bar there are one sum.
  */
-const LEDGER_OUT = 'state is cleared, transfer is false, stays is not true, direction is out';
+const LEDGER_OUT = 'state is cleared, transfer is false, stays is not true, corrects is not true, direction is out';
 
 /** The categories that hold a budget, as `budgets-set` counts them (`figures/budgets.ts`). */
 const BUDGETED = 'state is live, direction is out, budget is set';
@@ -171,7 +171,7 @@ export const BUDGET_PAGE_FIGURES: Record<string, SeedMetric> = {
     metric: 'pending-out-month',
     name: 'Waiting to clear this month',
     source: 'register.transactions',
-    where: 'state is pending, transfer is false, stays is not true, direction is out, on at least bom',
+    where: 'state is pending, transfer is false, stays is not true, corrects is not true, direction is out, on at least bom',
     value: { sum: 'amount' },
     format: MONEY,
     target: { lte: 0 },
@@ -193,7 +193,7 @@ export const BUDGET_PAGE_FIGURES: Record<string, SeedMetric> = {
     metric: 'pending-out-month-count',
     name: 'Payments waiting to clear this month',
     source: 'register.transactions',
-    where: 'state is pending, transfer is false, stays is not true, direction is out, on at least bom',
+    where: 'state is pending, transfer is false, stays is not true, corrects is not true, direction is out, on at least bom',
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },

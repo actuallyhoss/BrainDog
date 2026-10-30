@@ -5,7 +5,7 @@ import { ROLLED } from '../legs.ts';
 import { MONEY } from './shared.ts';
 
 /** What moved, as every figure of the Ledger counts it: cleared and not between a person's own accounts. */
-const MOVED = 'state is cleared, transfer is false, stays is not true';
+const MOVED = 'state is cleared, transfer is false, stays is not true, corrects is not true';
 
 /**
  * HOW HEALTHY THE MONEY IS, SINCE money-core 3.29.0, and the month so far each way, which Reports opens on.
@@ -29,6 +29,41 @@ const MOVED = 'state is cleared, transfer is false, stays is not true';
  *
  * THE MONTH SO FAR, EACH WAY: money in since the first, and money out, which is `spent-by-category-month`'s whole.
  */
+/**
+ * THE MONTHS REPORTS' STRIP PICKS, EACH WITH ITS OWN IN, OUT AND LEFT (live check of 30 October, 20): the page's line said
+ * "This month: …" over a donut of twelve months with All picked. Each range is the strip's own sentence over `on`
+ * (`pages/reports.ts`), and the line says the one picked (`when: { picked: months }`). This month is `received-month`,
+ * `spent-by-category-month` and `left-month`, declared before these.
+ */
+export const REPORT_RANGES: Readonly<Record<string, { words: string; where: string }>> = {
+  last: { words: 'last month', where: 'on at least bom-1m, on before bom' },
+  three: { words: 'the last 3 months', where: 'on at least bom-2m' },
+  year: { words: 'the last 12 months', where: 'on at least bom-11m' },
+  all: { words: 'the last 13 months', where: 'on after -13m, on before +1d' },
+};
+
+const RANGE_FIGURES: Record<string, SeedMetric> = Object.fromEntries(
+  Object.entries(REPORT_RANGES).flatMap(([key, { words, where }]): [string, SeedMetric][] => [
+    [`received-${key}`, { metric: `received-${key}`, name: `Money in, ${words}`, source: 'register.transactions', where: `${MOVED}, direction is in, ${where}`, value: { sum: 'amount' }, format: MONEY, target: { gte: 0 }, window: '30d', compare: 'none' }],
+    [`spent-${key}`, { metric: `spent-${key}`, name: `Money out, ${words}`, source: 'register.transactions', where: `${MOVED}, direction is out, ${where}`, value: { sum: 'amount' }, format: MONEY, target: { gte: 0 }, window: '30d', compare: 'none' }],
+    [
+      `left-${key}`,
+      {
+        metric: `left-${key}`,
+        name: `Left over, ${words}`,
+        source: 'register.transactions',
+        where: `${MOVED}, ${where}`,
+        value: { sum: { product: ['amount', { lookup: 'sign', by: 'direction' }] } },
+        lookups: { sign: { in: 1, out: -1 } },
+        format: MONEY,
+        target: { gte: 0 },
+        window: '30d',
+        compare: 'none',
+      },
+    ],
+  ]),
+);
+
 export const HEALTH_FIGURES: Record<string, SeedMetric> = {
   'kept-share-90d': {
     metric: 'kept-share-90d',
@@ -174,4 +209,5 @@ export const HEALTH_FIGURES: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  ...RANGE_FIGURES,
 };
