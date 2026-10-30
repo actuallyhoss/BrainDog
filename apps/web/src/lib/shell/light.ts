@@ -1,5 +1,5 @@
 /**
- * THE SCREENS A STRANGER OPENS, DRAWN IN THE LIGHT FRAME: sign-in, every screen under it, and sign-up.
+ * THE SCREENS A STRANGER OPENS, DRAWN IN THE LIGHT FRAME: sign-in, the Mac app's sign-in under it, and sign-up.
  *
  * THEY NEVER LOAD THE APP'S FRAME (`AppFrame.svelte`). Until 30 Oct the frame was the root layout, so `/signin` and
  * `/signup` waited for about 54 files of shell (the rail, the palette's way in, the record's readers and what those
@@ -13,7 +13,13 @@
 import type { Shell } from '../record/boot-live.ts';
 
 /** Whether a path inside the record (`here()` of the address) is drawn in the light frame. */
-export const light = (inner: string): boolean => inner === '/signin' || inner.startsWith('/signin/') || inner === '/signup';
+export const light = (inner: string): boolean => LIGHT.has(inner);
+
+/**
+ * THE THREE BY NAME, NOT `/signin/*` (RE10): a typo under sign-in is a 404, and drawn in the light frame its page bar drew
+ * the Bell and the You menu over nothing read, so it is the app frame's 404, as it was before the split.
+ */
+const LIGHT: ReadonlySet<string> = new Set(['/signin', '/signin/desktop', '/signup']);
 
 /** What the app frame is handed: the shell the root load read, and whether a model is behind Slash. */
 export type FrameData = Shell & { slash: boolean };

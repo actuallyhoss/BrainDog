@@ -5,7 +5,7 @@
   WHAT IT KEEPS OF THE APP'S FRAME is what these screens used from it, and nothing they did not: the skip link, the one
   scrolling surface the app frame draws bare screens on (`.bare`), the screen's settled mark (`data-screen`) cleared on
   every move, the quiet mark on the document (`data-quiet`), the first-drawn mark later work waits for, focus on the new
-  screen's name after a move between them, and the Mac app's Go menu. No rail, no palette, no keys, no record reads:
+  screen's name after a move between them, the Mac app's Go menu, and a dock badge cleared. No rail, no palette, no keys, no record reads:
   neither screen is inside a record, and neither draws a toast or a sheet.
 -->
 <script lang="ts">
@@ -13,19 +13,25 @@
   import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { timingOpened } from '$lib/data/timing.ts';
-  import { appPath, onShell } from '$lib/shell.ts';
+  import { at } from '$lib/at.ts';
+  import { appPath, onShell, setBadge } from '$lib/shell.ts';
   import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
   import { leaving, quiet, settled } from '$lib/ui/screen.svelte.ts';
 
   let { children }: { children: Snippet } = $props();
 
-  /* The Mac app's Go menu and braindog://goto: only an address of the app moves the window (`appPath`). */
+  /* The Mac app's Go menu and braindog://goto: only an address of the app moves the window (`appPath`), inside the
+     BrainDog the address names, as the app frame moves it (RE9). */
   $effect(() =>
     onShell('goto', (to) => {
       const path = appPath(to);
-      if (path !== null) void goto(path);
+      if (path !== null) void goto(at(path));
     }),
   );
+
+  /* NOBODY IS SIGNED IN HERE, so the dock's Needs-you count goes (RE5): the app frame set it and is gone without a word,
+     and on a shared Mac the last person's number stayed. */
+  $effect(() => setBadge(0));
 
   /* CLEARED ON EVERY MOVE, or `data-screen` is the screen being left's answer until the next one arrives. */
   beforeNavigate(() => {

@@ -19,9 +19,9 @@ const read = (path: string): string => readFileSync(new URL(path, import.meta.ur
 const imports = (src: string): string[] =>
   [...src.matchAll(/^\s*import\s+(?!type\s)(?:[^'";]*?\sfrom\s+)?'([^']+)'/gmu)].map((m) => m[1] ?? '');
 
-test('the light screens are sign-in, every screen under it, and sign-up, and no other', () => {
+test('the light screens are sign-in, the Mac app\'s sign-in under it, and sign-up, and no other', () => {
   for (const inner of ['/signin', '/signin/desktop', '/signup']) assert.equal(light(inner), true, inner);
-  for (const inner of ['/', '/start', '/invite', '/connect', '/signupx', '/signins', '/s/abc']) assert.equal(light(inner), false, inner);
+  for (const inner of ['/', '/start', '/invite', '/connect', '/signupx', '/signins', '/s/abc', '/signin/typo', '/signin/desktop/x', '/signup/x']) assert.equal(light(inner), false, inner);
 });
 
 test('the root layout imports neither frame, so a screen fetches only the one it draws', () => {
