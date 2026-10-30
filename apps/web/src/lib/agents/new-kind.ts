@@ -263,7 +263,7 @@ export const words = {
   busy: 'Filing',
   cancel: 'Cancel',
   sent: 'Saved for your yes',
-  sentLine: 'Say yes to it once, and Run a job offers it.',
+  sentLine: 'Say yes to it once, and Start a job offers it.',
   notSent: 'BrainDog did not answer, so nothing was sent. Try again.',
   needTitle: 'Give it a title that starts with a letter.',
   thisKind: 'This kind',

@@ -31,7 +31,7 @@ export const panelWords = {
   which: 'Which job',
   start: 'Start',
   open: 'Open',
-  started: (title: string) => `${title} is waiting for a machine.`,
+  started: (title: string) => `${title} is waiting for your computer to pick it up.`,
   unreached: 'BrainDog could not be reached. Try again in a moment.',
   conflict: 'Something changed while this was asked. Try again.',
 } as const;

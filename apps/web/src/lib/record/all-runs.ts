@@ -36,7 +36,7 @@ export const runsWords = {
   /** The line over the list when a source could not be read. */
   short: 'Some runs could not be read, so this list may be short.',
   none: 'Nothing has run yet.',
-  runAJob: 'Run a job',
+  runAJob: 'Start a job',
   agentWorking: 'at work now',
   agentOpen: (when: string) => `open, last heard ${when}`,
   agentLeft: (when: string) => `left a step ${when}`,

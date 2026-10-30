@@ -37,7 +37,8 @@ export const runWords = {
   /** Something the record would not name to this reader. */
   aRow: 'one without a name',
   more: (n: number) => (n === 1 ? 'and 1 more change' : `and ${n.toLocaleString('en-GB')} more changes`),
-  nothing: 'This run has not changed anything that is still here to put back.',
+  /* SAID AS WHAT IT MEANS TO HIM (audit 6g, AG26). */
+  nothing: 'Changed nothing you can undo.',
   undo: 'Undo this run',
   /** The confirm, before anything goes back: how many, and how many are left alone and why. */
   sure: (n: number, skipped: number) =>

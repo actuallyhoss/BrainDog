@@ -416,7 +416,7 @@ export const words = {
   today: 'Today',
   yesterday: 'Yesterday',
   undated: 'No date',
-  noMachine: 'No machine yet',
+  noMachine: 'Not picked up yet',
   aMachine: 'Unnamed machine',
   /* The empty screen, and the machines. */
   whatTitle: 'What a job is',
@@ -438,15 +438,15 @@ export const words = {
   jobs: (n: number) => plural(n, 'job', 'jobs'),
   /* The sentence. */
   runningNow: (n: number) => `${n.toLocaleString('en-GB')} running now`,
-  andWaiting: (n: number) => `and ${n.toLocaleString('en-GB')} waiting for a machine`,
-  waiting: (n: number) => `${n.toLocaleString('en-GB')} waiting for a machine`,
+  andWaiting: (n: number) => `and ${n.toLocaleString('en-GB')} waiting to be picked up`,
+  waiting: (n: number) => `${n.toLocaleString('en-GB')} waiting to be picked up`,
   nothingRunning: 'Nothing is running now',
   failedToday: (n: number) => `${n.toLocaleString('en-GB')} failed today`,
   finishedToday: (n: number) => `${n.toLocaleString('en-GB')} finished today`,
   /* The lanes. */
   lanesTitle: 'Who ran what',
   lanesSubject: 'Runs by machine',
-  waitingLane: 'Waiting for a machine',
+  waitingLane: 'Waiting to be picked up',
   otherMachines: 'Other machines',
   lastDay: 'in the last 24 hours',
   lastWeek: 'in the last 7 days',
@@ -456,7 +456,7 @@ export const words = {
   noneTaken: (period: string) => `No machine took a run ${period}`,
   others: (n: number) => `the others ${n.toLocaleString('en-GB')}`,
   stillGoing: (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'is' : 'are'} still going`,
-  waitFor: (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'waits' : 'wait'} for a machine`,
+  waitFor: (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'waits' : 'wait'} to be picked up`,
   /* The split. */
   splitTitle: 'How they went',
   splitSubject: 'Runs by how they went',

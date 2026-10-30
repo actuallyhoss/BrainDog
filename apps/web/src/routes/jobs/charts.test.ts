@@ -114,7 +114,7 @@ test('the live runs lead, then each day newest first, named as a person names it
 test('the meta line names the machine, the start and the turns, and a waiting run says when it was asked for', () => {
   assert.deepEqual(detailOf(run({ at: at(29, 9, 12) })), ['claude-mac', '09:12', '6 turns']);
   const waiting = run({ status: 'queued', claimed_at: null, runner: null, turns: null, created_at: iso(at(29, 9, 50)) });
-  assert.deepEqual(detailOf(waiting), ['No machine yet', 'asked for at 09:50']);
+  assert.deepEqual(detailOf(waiting), ['Not picked up yet', 'asked for at 09:50']);
 });
 
 test('the sentence says what is running and what failed today, with the red on the failure only', () => {
@@ -134,7 +134,7 @@ test('the sentence says what is running and what failed today, with the red on t
   assert.equal(calm.some((p) => p.tone === 'needs'), false);
   const queued = sentenceOf([run({ status: 'claimed' }), run({ status: 'queued', claimed_at: null })], NOW);
   assert.ok(queued);
-  assert.equal(plain(queued), '1 running now and 1 waiting for a machine.');
+  assert.equal(plain(queued), '1 running now and 1 waiting to be picked up.');
   assert.equal(sentenceOf([], NOW), null);
 });
 
@@ -155,7 +155,7 @@ test('the lanes are the last day when anything ran in it, one lane a machine, wa
     [
       ['claude-mac', 2],
       ['build-box', 1],
-      ['Waiting for a machine', 1],
+      ['Waiting to be picked up', 1],
     ],
   );
   const live = v.lanes[0]?.spans.find((s) => s.live);
@@ -163,7 +163,7 @@ test('the lanes are the last day when anything ran in it, one lane a machine, wa
   assert.equal(live.to, NOW);
   const done = v.lanes[0]?.spans.find((s) => !s.live);
   assert.equal(done && done.to - done.from, 5 * 60_000);
-  assert.equal(lanesSaid(v), 'claude-mac ran 2 jobs and build-box 1 in the last 24 hours; 1 is still going, 1 waits for a machine and Weekly review failed at 09:12.');
+  assert.equal(lanesSaid(v), 'claude-mac ran 2 jobs and build-box 1 in the last 24 hours; 1 is still going, 1 waits to be picked up and Weekly review failed at 09:12.');
   assert.match(lanesSummary(v), /^Runs by machine in the last 24 hours\. claude-mac: 2 runs, 1 is still going\./u);
 });
 
