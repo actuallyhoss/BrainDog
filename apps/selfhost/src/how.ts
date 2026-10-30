@@ -49,3 +49,20 @@ export function listenOf(e: Record<string, string | undefined>): string | undefi
   const old = e.BRAINDOG_HOST?.trim();
   return old === undefined || old === '' || old.includes('://') ? undefined : old;
 }
+
+/**
+ * The origin to serve at: `BRAINDOG_ORIGIN`, or, in the image, `http://localhost:<BRAINDOG_PORT>` when Compose publishes
+ * the server on another port of the machine than the one it listens on inside. Undefined leaves `start` its own default,
+ * `http://localhost:<port>`, and a certificate its names.
+ *
+ * READ FROM THE CODE: `docker-compose.yml` maps `${BRAINDOG_PORT}:8080`, and the origin stayed `http://localhost:8080`,
+ * so the sign-in link and every passkey named a port nothing answered on, and a write from the page at the real port
+ * carried an `Origin` this host refused. The `.env` that sets the port is the one the container reads.
+ */
+export function originOf(e: Record<string, string | undefined>, port: number, tls: boolean): string | undefined {
+  if (e.BRAINDOG_ORIGIN !== undefined) return e.BRAINDOG_ORIGIN;
+  /* `9090`, or `127.0.0.1:9090`, which Compose also takes there to publish on one interface: the port is the last part. */
+  const published = /(?:^|:)(\d{1,5})$/u.exec(e.BRAINDOG_PORT?.trim() ?? '')?.[1];
+  if (tls || e.BRAINDOG_IMAGE !== '1' || published === undefined || Number(published) === port) return undefined;
+  return `http://localhost:${published}`;
+}

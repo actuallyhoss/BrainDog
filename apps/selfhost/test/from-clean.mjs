@@ -88,6 +88,9 @@ export function kindOf(line) {
   if (/^cp \S+\.env\.example \.env$/.test(line)) return 'env';
   if (/^docker compose up\b.*\s-d\b/.test(line)) return 'up';
   if (/^docker compose logs\b/.test(line)) return 'logs';
+  if (/^docker compose exec braindog cat \/data\/claim-link$/.test(line)) return 'claim';
+  /* THE DATA FOLDER THE README POINTS AT, which this check names itself (a scratch folder), so the line is not run. */
+  if (/^export BRAINDOG_DATA=\S+$/.test(line)) return 'data';
   if (/\bmain\.ts init\b/.test(line)) return 'init';
   if (/^node apps\/selfhost\/src\/main\.ts( serve)?$/.test(line)) return 'start';
   return 'other';
@@ -131,7 +134,7 @@ export function plan(blocks, { container = false, offline = false } = {}) {
     need(own, 'init', 'self-host');
     need(own, 'start', 'self-host');
     for (const { line, kind } of own) {
-      if (kind === 'clone' || kind === 'cd') continue;
+      if (kind === 'clone' || kind === 'cd' || kind === 'data') continue;
       if (kind === 'init') steps.push({ id: 'build the command' });
       steps.push({ id: kind === 'other' ? 'readme line' : kind === 'build' ? 'build the app' : kind, line });
       if (kind === 'install' && offline) steps.push({ id: 'offline' });
@@ -146,7 +149,7 @@ export function plan(blocks, { container = false, offline = false } = {}) {
   need(own, 'init', 'self-host');
   steps.push({ id: 'install', line: own.find((l) => l.kind === 'install').line }, { id: 'build the command' });
   for (const { line, kind } of box) {
-    if (kind === 'clone' || kind === 'cd') continue;
+    if (kind === 'clone' || kind === 'cd' || kind === 'data') continue;
     steps.push({ id: kind === 'other' ? 'readme line' : kind, line });
     /* `compose up --build` IS THE IMAGE AND THE START IN ONE LINE, so outbound is cut once it is in. */
     if (kind === 'up' && offline) steps.push({ id: 'offline' });
@@ -481,7 +484,7 @@ async function execute(steps, dir, { container, afterInstall, held }) {
     const child = track(
       spawn(local(words(s.startLine))[0], local(words(s.startLine)).slice(1), {
         cwd: repo,
-        env: { ...env, BRAINDOG_DATA: data, BRAINDOG_KEK_FILE: kekFile, PORT: String(port), BRAINDOG_TOKEN: serverKey },
+        env: { ...env, BRAINDOG_DATA: data, BRAINDOG_KEK_FILE: kekFile, PORT: String(port), BRAINDOG_SERVER_KEY: serverKey },
         stdio: ['ignore', 'pipe', 'pipe'],
       }),
     );
@@ -538,7 +541,7 @@ async function execute(steps, dir, { container, afterInstall, held }) {
         run(id, words(line), { cwd: repo, env });
         const envFile = join(repo, '.env');
         let text = readFileSync(envFile, 'utf8');
-        for (const [key, value] of [['BRAINDOG_OWNER', OWNER], ['BRAINDOG_TOKEN', serverKey]]) {
+        for (const [key, value] of [['BRAINDOG_OWNER', OWNER], ['BRAINDOG_SERVER_KEY', serverKey]]) {
           const at = new RegExp(`^${key}=.*$`, 'm');
           if (!at.test(text)) throw new Failed(id, `the .env the README line made has no ${key}= line to set`);
           text = text.replace(at, `${key}=${value}`);
@@ -560,10 +563,20 @@ async function execute(steps, dir, { container, afterInstall, held }) {
         break;
       }
       case 'logs': {
-        /* THE ONE-TIME LINK THE README PROMISES, looked for and never said: it signs in as the owner. */
+        /* THE LOG SAYS WHERE THE ONE-TIME LINK IS, AND NEVER HOLDS IT: the link signs in as the owner, and a log is read
+           by whoever ships it. */
         const said = run(id, words(line), { cwd: repo, env: s.compose, timeout: DEADLINE.docker });
-        if (!/first time: open \S+/.test(said)) throw new Failed(id, 'the log holds no "first time: open" link', said);
-        say(id, 'the one-time link is in the log');
+        if (!/first time: a one-time sign-in link for \S+ is in \/data\/claim-link/.test(said))
+          throw new Failed(id, 'the log does not say where the one-time link is', scrub(said));
+        if (/#claim=/.test(said)) throw new Failed(id, 'the log holds the one-time link itself');
+        say(id, 'the log names /data/claim-link and holds no link');
+        break;
+      }
+      case 'claim': {
+        /* AND THE FILE HOLDS IT, as the README's line reads it. Looked for and never said. */
+        const said = run(id, words(line), { cwd: repo, env: s.compose, timeout: DEADLINE.docker });
+        if (!/\/signin#claim=\S+/.test(said)) throw new Failed(id, '/data/claim-link holds no one-time link');
+        say(id, 'the one-time link is in /data/claim-link');
         break;
       }
       case 'init':

@@ -76,22 +76,24 @@ sealed, and a sealed copy is made every night. Sign-up is by invitation for now:
 ```sh
 git clone https://github.com/actuallyhoss/BrainDog braindog
 cd braindog
-cp selfhost.env.example .env      # set BRAINDOG_OWNER (your email) and BRAINDOG_TOKEN (the server key)
+cp selfhost.env.example .env      # set BRAINDOG_OWNER (your email) and BRAINDOG_SERVER_KEY (the server key)
 docker compose up -d --build
-docker compose logs braindog      # ends with a one-time link: open it and add a passkey
+docker compose logs braindog      # once started, it ends with the address
+docker compose exec braindog cat /data/claim-link      # a one-time link: open it and add a passkey
 ```
 
-Without Docker you need Node 24.13 or later and pnpm:
+Without Docker you need Node 24.13 or later and pnpm. This serves it to your own machine, where nobody signs in:
 
 ```sh
 pnpm install
 pnpm --filter @braindog/web build
+export BRAINDOG_DATA=$HOME/braindog-data
 node apps/selfhost/src/main.ts init <record name> --owner <your email>
 node apps/selfhost/src/main.ts
 ```
 
 Mail, a model for Slash and a public address are all optional and off until you set them.
-[apps/selfhost/README.md](apps/selfhost/README.md) covers backups, restores and upgrades, and
+[apps/selfhost/README.md](apps/selfhost/README.md) covers connecting agents, backups, restores and upgrades, and
 [docs/49-SPEC-SELFHOST.md](docs/49-SPEC-SELFHOST.md) every setting the server reads.
 
 ## Add-ons and starters
