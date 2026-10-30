@@ -994,8 +994,7 @@
                  left of the rows. The first few are named; the rest are a fold. -->
             {#each [usesOf(k, useFrom)] as uses}
               {#if uses.length > 0 && uses.length <= USES_SAID}
-                <p class="key-uses">{dated.usedBy}
-                  {#each uses as u, i (u.kind + u.name)}{i === 0 ? ' ' : i === uses.length - 1 ? ' and ' : ', '}{#if u.href}<a href={at(u.href)}>{u.name}</a>{:else}{u.name}{/if}{/each}</p>
+                <p class="key-uses">{dated.usedBy}{#each uses as u, i (u.kind + u.name)}{i === 0 ? ' ' : i === uses.length - 1 ? ' and ' : ', '}{#if u.href}<a href={at(u.href)}>{u.name}</a>{:else}{u.name}{/if}{/each}</p>
               {:else if uses.length > USES_SAID}
                 <details class="key-uses key-details">
                   <summary>{dated.usedByMany(uses.length)}</summary>

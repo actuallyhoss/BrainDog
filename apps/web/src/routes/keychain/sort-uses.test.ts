@@ -85,7 +85,7 @@ test('USED BY NAMES ONLY WHAT NAMES THE KEY, by its label or its handle', () => 
     ],
   });
   assert.deepEqual(uses, [
-    { kind: 'action', name: 'stripe-pull', href: null },
+    { kind: 'action', name: 'Stripe pull', href: null },
     { kind: 'tool', name: 'Billing server', href: '/r/tools/4' },
     { kind: 'script', name: 'Sweep', href: null },
   ]);

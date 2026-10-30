@@ -13,7 +13,7 @@
  * PURE, SO `node --test` CAN IMPORT IT, as `said.ts` is.
  */
 
-import { relativeWords, since, sinceWords } from 'braindog-render';
+import { handleName, relativeWords, since, sinceWords } from 'braindog-render';
 
 import { words as keychain, type KeyRow, type UsedByRun } from '../../lib/record/keychain.ts';
 import { OLD_NAME } from '../r/[register]/[seq]/timeline.ts';
@@ -369,6 +369,10 @@ export type Use = { kind: 'action' | 'tool' | 'script'; name: string; href: stri
  * WHO NAMES THIS KEY, from reads that already exist: an action's `key` and a script's `keys` are the key's label; a
  * tool's `needs` names `credentials#n` or the label. Nothing is guessed from a likeness, and no value is read.
  */
+/* A HANDLE IS SAID IN WORDS (AF14): "Used by fenwick, ledger-post" named a tool and an action by what they are filed as. */
+const HANDLE_NAME = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
+const wordsOf = (name: string): string => (HANDLE_NAME.test(name.trim()) ? handleName(name.trim()) : name);
+
 export function usesOf(k: KeyRow, from: UseSources): Use[] {
   const label = k.label.trim().toLowerCase();
   const names = (v: string): boolean => {
@@ -376,12 +380,12 @@ export function usesOf(k: KeyRow, from: UseSources): Use[] {
     return t !== '' && (t === label || (k.spoken !== null && t === k.spoken.toLowerCase()));
   };
   const out: Use[] = [];
-  for (const a of from.actions ?? []) if (a.key !== null && names(a.key)) out.push({ kind: 'action', name: a.ingest, href: null });
+  for (const a of from.actions ?? []) if (a.key !== null && names(a.key)) out.push({ kind: 'action', name: wordsOf(a.ingest), href: null });
   for (const t of from.tools ?? []) {
     const needs = Array.isArray(t.fields.needs) ? t.fields.needs.filter((n): n is string => typeof n === 'string') : [];
-    if (needs.some(names)) out.push({ kind: 'tool', name: String(t.fields.name ?? t.id), href: typeof t.seq === 'number' && t.register ? `/r/${t.register}/${t.seq}` : null });
+    if (needs.some(names)) out.push({ kind: 'tool', name: wordsOf(String(t.fields.name ?? t.id)), href: typeof t.seq === 'number' && t.register ? `/r/${t.register}/${t.seq}` : null });
   }
-  for (const u of from.keyUses ?? []) if (k.spoken !== null && u.credential.toLowerCase() === k.spoken.toLowerCase()) out.push({ kind: 'tool', name: u.title, href: null });
-  for (const s of from.scripts ?? []) if (s.keys.some(names)) out.push({ kind: 'script', name: s.title || s.script, href: null });
+  for (const u of from.keyUses ?? []) if (k.spoken !== null && u.credential.toLowerCase() === k.spoken.toLowerCase()) out.push({ kind: 'tool', name: wordsOf(u.title), href: null });
+  for (const s of from.scripts ?? []) if (s.keys.some(names)) out.push({ kind: 'script', name: s.title || wordsOf(s.script), href: null });
   return out;
 }
