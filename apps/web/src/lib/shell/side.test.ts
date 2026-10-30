@@ -295,3 +295,21 @@ test("MONEY'S OPEN PAGES ARE ITS FIRST SIX IN THEIR DECLARED ORDER, less its own
   assert.deepEqual(moneyLead(views, '/p/home'), ['/p/a', '/p/b', '/p/c', '/p/d', '/p/e', '/p/f']);
   assert.deepEqual(moneyLead(undefined, '/p/home'), []);
 });
+
+test('in play, earning and building are said in one place, by the lanes a list declares (live check of 30 October, 6)', async () => {
+  const { inPlayOf, earningOf, buildingOf, lanesOf } = await import('./side.ts');
+  for (const [lane, play, earn, build] of [
+    ['earning', true, true, false],
+    ['building', true, false, true],
+    ['parked', false, false, false],
+    ['retired', false, false, false],
+  ] as const) {
+    assert.equal(inPlayOf(lane), play, lane);
+    assert.equal(earningOf(lane), earn, lane);
+    assert.equal(buildingOf(lane), build, lane);
+  }
+  /* A LIST THAT CALLS ITS DONE LANE SOMETHING ELSE IS READ BY WHAT IT DECLARES. */
+  const lanes = lanesOf({ done: ['shipped'] }, ['building', 'parked', 'shipped']);
+  assert.equal(inPlayOf('shipped', lanes), false);
+  assert.equal(inPlayOf('retired', lanes), true);
+});
