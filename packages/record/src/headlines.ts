@@ -354,6 +354,9 @@ export function rulesLine(template: string, values: Readonly<Record<string, Json
   const kept = template.split(/,\s+/u).filter((clause) => (before = stands(clause) && (before || !/^with\b/iu.test(clause))));
   return kept
     .join(', ')
+    /* A LINK IS ITS WORDS: Money's figure late is the way to the bills (money-core, polish-i PI1), and the model is
+       handed the sentence a person reads, not its address. */
+    .replace(/\[([^\]]*)\]\([^)\s]*\)/gu, '$1')
     .replace(/\{\{\s*([^{}\s]+)\s*\}\}((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)/gu, (_, path: string, between: string, word: string) => {
       const figure = said(path) ?? '';
       return `${figure}${between} ${figure.trim() === '1' ? word : `${word}s`}`;

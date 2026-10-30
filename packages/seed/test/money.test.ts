@@ -956,7 +956,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   const said = lead.body?.split(/(?<=\.)\s+/u) ?? [];
   assert.equal(said.at(-1), '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.');
   assert.equal(reading(k, 'installments-late'), 0, 'the sample has no part late');
-  if (said.length > 1) assert.match(said[0]!, /^(?:Bills \{\{bad:late\}\}: \{\{overdue\}\} to pay\.|Cash falls to \{\{runway-days\.low\}\})/u);
+  if (said.length > 1) assert.match(said[0]!, /^(?:Bills \{\{bad:late\}\}: \[\{\{overdue\}\} to pay\]\(\/r\/obligations\?[^)]+\)\.|Cash falls to \{\{runway-days\.low\}\})/u);
 
   /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */
   for (const metric of ['cash-now', 'runway-days'])
