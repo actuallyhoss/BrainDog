@@ -53,7 +53,7 @@ import {
   type WalkStep,
 } from './api.ts';
 import { REGISTERS } from './held.ts';
-import { linkOf, REST_MARK, staleOf } from './blocks.ts';
+import { linkOf, REST_MARK, TALLY_LAST, TALLY_TIMES, staleOf } from './blocks.ts';
 import { thingName } from './project.ts';
 import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
@@ -536,7 +536,7 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
  * ONE LINE OF A WHOLE: a label as the list stores it, what every row under it adds to, the currency when that is
  * money, and for a heat set against another whole (`of:`) that day's whole.
  */
-type WholeLine = { label: string | number | boolean | null; value: number; currency?: string; of?: number; rest?: true };
+type WholeLine = { label: string | number | boolean | null; value: number; currency?: string; of?: number; rest?: true; times?: number; last?: string };
 
 /** A whole number that counts something, nought or more. */
 const counted = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
@@ -619,7 +619,9 @@ function wholeOf(v: unknown, kind: string, sums: boolean): WholeLine[] | null {
   const lines: WholeLine[] = [];
   for (const r of rows) {
     if (r === null || typeof r !== 'object') return null;
-    const { label = null, value, currency: named, unit, parts, of } = r as Record<string, unknown>;
+    const { label = null, value, currency: named, unit, parts, of, rows: times, last } = r as Record<string, unknown>;
+    /* A TALLY BAR'S COUNT AND NEWEST DAY (`tally:` in the kernel), carried as they were read, and nothing where they were not. */
+    const tally = { ...(counted(times) ? { times } : {}), ...(typeof last === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(last) ? { last } : {}) };
     if (label !== null && typeof label !== 'string' && typeof label !== 'number' && typeof label !== 'boolean') return null;
     if (of !== undefined && of !== null && !(typeof of === 'number' && Number.isFinite(of) && of >= 0)) return null;
     /* THE KERNEL NAMES THE CURRENCY `unit`, and a label in currencies it could not add answers `parts`, one amount a currency. */
@@ -630,16 +632,23 @@ function wholeOf(v: unknown, kind: string, sums: boolean): WholeLine[] | null {
       for (const p of parts) {
         const { amount, currency: c } = (p ?? {}) as Record<string, unknown>;
         if (typeof amount !== 'number' || !Number.isFinite(amount) || typeof c !== 'string') return null;
-        lines.push({ label, value: amount, currency: c, ...at });
+        lines.push({ label, value: amount, currency: c, ...at, ...tally });
       }
       continue;
     }
     if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-    lines.push({ label, value, ...(typeof currency === 'string' ? { currency } : {}), ...at });
+    lines.push({ label, value, ...(typeof currency === 'string' ? { currency } : {}), ...at, ...tally });
   }
   lines.push(...past);
   return addsUp(v, kind, sums, lines) ? lines : null;
 }
+
+/**
+ * A TALLY BAR'S LINE CARRIES ITS COUNT AND ITS NEWEST DAY in two columns no list has (`TALLY_TIMES`, `TALLY_LAST`), as the
+ * rest's line carries its mark, so the bar's drawer says them beside the bar (`barRows`). A line in two currencies is two
+ * lines that each carry the label's whole count, and the drawer takes the largest, never the sum.
+ */
+const tallyFields = (l: WholeLine): Record<string, unknown> => ({ ...(l.times === undefined ? {} : { [TALLY_TIMES]: l.times }), ...(l.last === undefined ? {} : { [TALLY_LAST]: l.last }) });
 
 /** The column a heat's share is written in when the block declares only its day: no list's field, so it is said as written. */
 const WHOLE_SHARE = 'share of whole';
@@ -687,7 +696,7 @@ function wholeRows(kind: string, columns: readonly { field?: unknown }[], lines:
     const row = (fields: Record<string, unknown>): Row => ({ id: '', seq: null, fields, version: 0, created_at: '' });
     if (!counts) {
       const sum = shares ? `${l.value} of ${l.of}` : l.currency ? { amount: l.value, currency: l.currency } : l.value;
-      rows.push(row({ [by]: l.label, [of || WHOLE_SHARE]: sum, ...(l.rest ? { [REST_MARK]: true } : {}) }));
+      rows.push(row({ [by]: l.label, [of || WHOLE_SHARE]: sum, ...(l.rest ? { [REST_MARK]: true } : {}), ...tallyFields(l) }));
       continue;
     }
     const one = row({ [by]: l.label, ...(l.rest ? { [REST_MARK]: true } : {}) });

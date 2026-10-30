@@ -39,7 +39,7 @@
 
 import { across, convertMinor, dayFieldOf, rateFor, rowsBySplit, type Part, type Rate } from '@braindog/kernel';
 import { daySaid } from '@braindog/where';
-import { day as longDay, money, parse, since, sinceWords, workingCell, WORKING_MARK, type Block } from 'braindog-render';
+import { day as longDay, money, parse, shortDay, since, sinceWords, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { bankCode, exponentOf, isPictureMime } from 'braindog-render';
@@ -117,6 +117,20 @@ const REST = 'Everything else';
  * by it. Its line holds this column, which holds a space and so is no list's field, and is said as `REST`, last.
  */
 export const REST_MARK = 'everything else';
+
+/**
+ * A TALLY BAR'S COUNT AND NEWEST DAY ON A LINE OF THE RECORD'S WHOLE (`tally:`), in columns that hold a space and so are
+ * no list's fields, as the rest's mark is (`page-live.ts` `tallyFields`).
+ */
+export const TALLY_TIMES = 'times paid';
+export const TALLY_LAST = 'last paid';
+
+/** What a tally bar says beside its amount: `once · 24 Aug`, or `4 times · last 24 Aug`. */
+export const tallySaid = (times: number, last: string | null, today?: string): string => {
+  const day = last === null ? '' : shortDay(last, today);
+  if (times === 1) return day ? `once · ${day}` : 'once';
+  return day ? `${times} times · last ${day}` : `${times} times`;
+};
 const isRest = (e: { fields: Record<string, unknown> }): boolean => e.fields[REST_MARK] === true;
 
 /** What a heat says under its cells when some of its list falls outside them, or nothing when none does. */
@@ -213,6 +227,28 @@ function barRows(block: BlockResult): string[] {
     if ((v === undefined || v === null || v === '') && or !== undefined && typeof e.fields[or] === 'string') return known.get(nameKey(e.fields[or] as string)) ?? v;
     return v;
   };
+  /* A TALLY (`tally:`): how many rows each bar adds up and the newest day among them. A line of the record's whole carries
+     both for its label (`TALLY_TIMES`, `TALLY_LAST`), the same count on each currency's line of one label, so a label's
+     count is its largest and a bar's is its labels' added up; a row of the list counts once and says its own day. */
+  const tally = block.kind === 'bar' && (block as { tally?: unknown }).tally === true;
+  const dayField = tally ? (REGISTERS[block.register ?? '']?.fields.find((f) => f.type === 'day' && f.id === 'on') ?? REGISTERS[block.register ?? '']?.fields.find((f) => f.type === 'day'))?.id : undefined;
+  const tallies = new Map<string, { labels: Map<string, number>; rows: number; last: string | null }>();
+  const tallyOf = (key: string, e: { fields: Record<string, unknown> }, label: unknown): void => {
+    if (!tally) return;
+    const at = tallies.get(key) ?? { labels: new Map<string, number>(), rows: 0, last: null };
+    const times = e.fields[TALLY_TIMES];
+    const own = typeof e.fields[TALLY_LAST] === 'string' ? (e.fields[TALLY_LAST] as string) : dayField && typeof e.fields[dayField] === 'string' ? (e.fields[dayField] as string).slice(0, 10) : null;
+    if (typeof times === 'number') at.labels.set(String(label), Math.max(at.labels.get(String(label)) ?? 0, times));
+    else at.rows += 1;
+    if (own !== null && (at.last === null || own > at.last)) at.last = own;
+    tallies.set(key, at);
+  };
+  const tallyNote = (key: string): string => {
+    const at = tallies.get(key);
+    if (!at) return '';
+    const times = at.rows + [...at.labels.values()].reduce((n, t) => n + t, 0);
+    return times > 0 ? tallySaid(times, at.last, recordToday(clockOf(block))) : '';
+  };
   for (const e of split && split.of === of ? rowsBySplit(block.matched, split.field) : block.matched) {
     if (isRest(e)) {
       past.push(...valuesOf(e.fields[of]));
@@ -243,6 +279,7 @@ function barRows(block: BlockResult): string[] {
     const list = grouped.get(key) ?? [];
     list.push(...valuesOf(e.fields[of]));
     grouped.set(key, list);
+    tallyOf(key, e, labelOfRow(e));
   }
 
   /* THE BAR IS PER GROUP, AND SO IS THE CURRENCY CHECK. One client billed in two currencies is one
@@ -271,7 +308,8 @@ function barRows(block: BlockResult): string[] {
       ? mixedFix(sum.mixed)
       : (written(sum, was.length > 0) ?? String(sum.amount));
     const colour = tints.get(key);
-    return `${escapeCell(key)} | ${escapeCell(shown)} | ${convertedNote(was)}${colour ? ` | ${colour}` : ''}`;
+    const note = [tallyNote(key), convertedNote(was)].filter(Boolean).join(' · ');
+    return `${escapeCell(key)} | ${escapeCell(shown)} | ${escapeCell(note)}${colour ? ` | ${colour}` : ''}`;
   });
   if (!block.unset || unset.length === 0 || !block.register) return drawn;
   const sum = total(unset);

@@ -153,6 +153,11 @@ export type PageBlock = {
   tiles?: boolean;
   /** A `split`'s: the parts drawn as a thin ring with their total in the middle. */
   donut?: boolean;
+  /**
+   * A `bar`'s over a list with a day: each bar says how many rows it adds up and the day of the newest, `4 times · last
+   * 24 Aug`, so a bar a payee is a line about that payee (`last` on each part of the whole read).
+   */
+  tally?: boolean;
   /** A `heat`'s: a line a person, a dot in each week they were in touch, columns `day | who`. `people:` until People 2.6.0. */
   who?: boolean;
   /** A `section`'s: the blocks after it, up to the next section, drawn on one surface. */
@@ -1321,6 +1326,8 @@ export type WholeRow = {
   parts?: Part[];
   /** The whole this part is a share of: a heat day's under `of:`, and all the rows of a `progress` group. */
   of?: number | null;
+  /** On a `tally:` bar, the day of the newest row with an amount in this part, as the list's day field holds it. */
+  last?: string;
 };
 
 /**
@@ -4241,8 +4248,10 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
      named him in the bank's words alone. A line whose words name nobody known stays with the rows that hold none. */
   const or = orOf(block, schema, shape.by);
   const by = or === null ? shape.by : [...shape.by, { field: or }];
+  /* A TALLY: GROUPED BY DAY AS WELL, as money converted a day at a time already is, so each part knows its newest day. */
+  const tally = block.kind === 'bar' && block.tally === true && money;
   const ask = (w: Predicate | undefined) =>
-    wholeParts(deps, { register, where: w, by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null }, splitOf(schema)?.of === shape.value ? splitOf(schema)!.field : null);
+    wholeParts(deps, { register, where: w, by, value: shape.value, dated: money && (home !== null || tally) ? datedBy(schema.fields) : null }, splitOf(schema)?.of === shape.value ? splitOf(schema)!.field : null);
   type Figure = Pick<WholeRow, 'value' | 'unit' | 'parts'> & { converted?: { asOf: string; stale: boolean } };
   const figure = (g: Gathered): Figure => {
     if (shape.value === null) return { value: shape.done ? g.done : g.rows };
@@ -4264,7 +4273,7 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   const from = heat ? heatFrom(today) : '';
   const drawn = (label: Json): label is string => typeof label === 'string' && label >= from && label <= today;
   const total = gathered();
-  const byLabel = new Map<string, { label: Json; who?: Json; sum: Gathered }>();
+  const byLabel = new Map<string, { label: Json; who?: Json; sum: Gathered; last?: string }>();
   let outside = 0;
   /* AND THE DAYS OUTSIDE THE WINDOW, EACH ONCE (`outsideDays`): a host says "N days fall outside the twelve weeks", and
      forty entries on one old day are one day. An entry holding no day is no day at all: it is in `outside`, which is
@@ -4285,6 +4294,7 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
     const key = JSON.stringify([label, 'who' in who ? who.who : 0]);
     const at = byLabel.get(key) ?? { label, ...who, sum: gathered() };
     gather(at.sum, part, done);
+    if (tally && part.day !== null && (at.last === undefined || part.day > at.last)) at.last = part.day;
     byLabel.set(key, at);
   }
 
@@ -4310,9 +4320,9 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   if (heat) parts.sort((a, b) => text(a.label).localeCompare(text(b.label)) || text(a.who ?? null).localeCompare(text(b.who ?? null)));
   else parts.sort((a, b) => (b.figure.value ?? -Infinity) - (a.figure.value ?? -Infinity) || b.sum.rows - a.sum.rows || text(a.label).localeCompare(text(b.label)));
   const kept = heat ? parts : parts.slice(0, WHOLE_PARTS);
-  const rows = kept.map(({ label, who, sum, figure: { converted: _at, ...f } }): WholeRow => {
+  const rows = kept.map(({ label, who, sum, last, figure: { converted: _at, ...f } }): WholeRow => {
     const share = heat && whole !== null ? { of: figure(wholes.get(label as string) ?? gathered()).value } : shape.done ? { of: sum.rows } : {};
-    return { label, ...(who === undefined ? {} : { who }), rows: sum.rows, ...f, ...share };
+    return { label, ...(who === undefined ? {} : { who }), rows: sum.rows, ...f, ...share, ...(last === undefined ? {} : { last }) };
   });
   const past = parts.slice(kept.length);
   const tail = gathered();

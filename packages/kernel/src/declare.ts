@@ -1870,7 +1870,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
 
     /* THE FLAGS THE NEW FORMS ARE TOLD BY, each a yes or a no, because a string here is a form drawn by accident:
        `lead: 'no'` is truthy wherever it is read. */
-    for (const flag of ['lead', 'range', 'tiles', 'who', 'box', 'donut'] as const) {
+    for (const flag of ['lead', 'range', 'tiles', 'who', 'box', 'donut', 'tally'] as const) {
       const value = (raw as Record<string, unknown>)[flag];
       if (value !== undefined && typeof value !== 'boolean')
         return bad('DECLARATION_INVALID', `${id}.${at}'s ${flag} is ${JSON.stringify(value)}; it is true or false.`, at);
