@@ -23,8 +23,11 @@ export const words = {
   lateOrToday: 'Late or due today',
   toCheck: 'Handed back to you',
   urgent: 'Urgent',
-  /** The late tile's name once urgent work or work handed back stands in it too. */
-  lateAndUrgent: 'Late and urgent',
+  /**
+   * THE LATE TILE'S NAME SAYS EACH KIND IT HOLDS (live check of 30 October, 5): "Late and urgent 6" stood over one late
+   * bill, a task due today and work handed back, beside Work's "None of your tasks is late". Its parts, first one first.
+   */
+  band: { late: 'Late', today: 'due today', urgent: 'urgent', back: 'handed back' },
   /** How a line that is not late came to stand in the late band, said where how late it is would be. */
   urgentWhy: 'urgent',
   backWhy: 'handed back to you',

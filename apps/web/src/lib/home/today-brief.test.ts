@@ -8,7 +8,7 @@ import { test } from 'node:test';
 
 import type { LiveBlock } from '../record/page-live.ts';
 import type { HomeLine } from './home-rows.ts';
-import { NAMED_MOST, briefOf, greetingOf, inBriefOrder, lateFigure, lateOf, onceEach, unasked } from './today-brief.ts';
+import { NAMED_MOST, bandHeading, briefOf, greetingOf, inBriefOrder, lateFigure, lateOf, onceEach, unasked } from './today-brief.ts';
 
 const money = (key: string, title: string, when: string, href = `/r/${key.replace('#', '/')}`): HomeLine => ({
   key,
@@ -133,4 +133,16 @@ test('ONE THING IN TWO LISTS IS ONE LINE, by the row a press can finish, and thi
   assert.equal(onceEach([paid, { key: 'tasks#3', title: 'Lanternfish salary', when: '13 days late', day: '2026-10-09', late: true }]).length, 2);
   /* AND THE BRIEF SAYS IT ONCE. */
   assert.equal(briefOf({ lines: onceEach([FEE, twin, paid, HARBOUR], finishes), needYou: 0, agents: [], calm: 'Calm.' }).parts[0]?.text, '3 payments are late');
+});
+
+test('the late tile is named for every kind it holds (live check of 30 October, 5)', () => {
+  const said = { late: 'Late', today: 'due today', urgent: 'urgent', back: 'handed back' };
+  const bill: HomeLine = { key: 'obligations#1', title: 'Northwind', when: '4 days late', late: true };
+  const today: HomeLine = { key: 'tasks#2', title: 'Send the checklist', when: 'Due today', late: false };
+  const back: HomeLine = { key: 'tasks#3', title: 'Research the market', when: 'handed back to you', late: false, mark: 'back' };
+  const urgent: HomeLine = { key: 'tasks#4', title: 'Fix the door', when: 'urgent', late: false, mark: 'urgent' };
+  assert.equal(bandHeading([bill, today, back], 0, said), 'Late, due today and handed back');
+  assert.equal(bandHeading([urgent, back], 0, said), 'Urgent and handed back');
+  assert.equal(bandHeading([back], 2, said), 'Late and handed back');
+  assert.equal(bandHeading([bill, urgent], 0, said), 'Late and urgent');
 });

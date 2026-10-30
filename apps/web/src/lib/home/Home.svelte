@@ -114,7 +114,7 @@
   import { afterNavigate } from '$app/navigation';
   import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
-  import { bandOf, greetingOf, inBriefOrder, lateOf, onceEach, unasked } from '$lib/home/today-brief.ts';
+  import { bandHeading, bandOf, greetingOf, inBriefOrder, lateOf, onceEach, unasked } from '$lib/home/today-brief.ts';
   import { verbOf } from '$lib/home/late-verb.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { toldNow } from '$lib/home/told-now.svelte.ts';
@@ -837,7 +837,7 @@
     const sized = (k: string): number => DESK_SHOWS[boardModel.sizeNow(k)];
     const desk = deskedOf(
       shaped.blocks.map((b, n): Desked<LiveBlock> => {
-        if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? words.lateAndUrgent : late?.heading || voice.overdue, more: late?.more ?? 0, most: board ? lateMost : phone.current ? 3 : 5 } };
+        if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? bandHeading(bandShown, late?.more ?? 0, words.band) : late?.heading || voice.overdue, more: late?.more ?? 0, most: board ? lateMost : phone.current ? 3 : 5 } };
         if (lateAt.includes(n) || bandAt.includes(n)) return { ...b, drawn: false };
         /* WHAT ARRIVED IS HOME'S OWN READING (`Landed.svelte`), drawn in the place of the feed it stands for. */
         if (board && b.key === 'arrivals') return { ...b, drawn: false };

@@ -735,6 +735,8 @@ function linesKept(b: LiveBlock): LiveBlock {
 const isDue = (b: LiveBlock): boolean => b.source === 'deadlines';
 const isQueue = (b: LiveBlock): boolean => b.kind === 'queue';
 const isTodo = (b: LiveBlock): boolean => b.kind === 'todo';
+/** The key of Today's own work this week, which says Work's This week and takes its rows before the late band. */
+const WORK_DUE: DeskKey = 'work-due';
 /** Whether the block's rows are its entries one for one, which every reshaping here needs to keep them aligned. */
 const aligned = (b: LiveBlock): boolean => b.entries.length === b.rows.length;
 
@@ -922,6 +924,16 @@ export function homeDrawn(
   /* WHAT IS DUE THIS WEEK IS TAKEN FIRST, wherever it stands: on the board Late is drawn above the week, and a row the
      week's tile holds is still the week's and not Late's, so it is drawn once and counted once. */
   if (week) for (const b of voiced) if (b.drawn && !says(b) && isWeekDue(b, week) && aligned(b)) for (const e of b.entries) drawn.add(`${week.due.register}#${e.seq}`);
+  /* YOUR WORK THIS WEEK IS TAKEN FIRST TOO (live check of 30 October, 5): it is Work's own This week, and the late band
+     took the task due today and the urgent one out of it first, so the tile said 3 where Work said 5. Its rows are its
+     own; the band keeps what is late and whatever this tile does not hold. */
+  const weekWork = new Set<LiveBlock>();
+  for (const b of voiced) {
+    const list = listOf(b);
+    if (!b.drawn || says(b) || b.key !== WORK_DUE || !isTodo(b) || !aligned(b) || list === null) continue;
+    weekWork.add(b);
+    for (const e of b.entries) drawn.add(`${list}#${e.seq}`);
+  }
   for (const b of voiced) {
     /* A BLOCK ITS `when:` LEFT OUT holds no row anybody saw, so it neither takes a row from the next nor counts. */
     if (says(b) || !b.drawn) {
@@ -950,7 +962,7 @@ export function homeDrawn(
     }
     /* A WIDGET HE ADDED (or a draft made for him) SHOWS WHAT IT READS, every row, even one another tile already shows:
        the house's own tiles share their rows, but a widget asked for by name is not emptied by them. */
-    if (isTodo(b) && aligned(b) && !addedWidget(b)) {
+    if (isTodo(b) && aligned(b) && !addedWidget(b) && !weekWork.has(b)) {
       const list = listOf(b);
       const at = where(b, (_, seq) => list === null || !drawn.has(`${list}#${seq}`));
       for (const n of at) if (list !== null) drawn.add(`${list}#${b.entries[n]!.seq}`);

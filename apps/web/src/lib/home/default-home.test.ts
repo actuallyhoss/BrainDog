@@ -237,6 +237,18 @@ test('A ROW IS DRAWN ONCE: a late urgent task is in the first block, and a deadl
   assert.deepEqual(out.sentence, { text: 'Nothing needs you. 2 things are late.', needs: '2 things are late' });
 });
 
+test('YOUR WORK THIS WEEK KEEPS ITS OWN ROWS, so it says what Work says, and the late band keeps the rest (live check of 30 October, 5)', () => {
+  const late = block({ kind: 'todo', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-09-30' }, { by: '2026-10-02' }], [4, 5]);
+  const urgent = block({ kind: 'todo', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-10-03' }, { by: '' }], [6, 9]);
+  const week = block({ kind: 'todo', key: 'work-due', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-10-02' }, { by: '2026-10-03' }, { by: '2026-10-06' }], [5, 6, 7]);
+  const out = homeDrawn([late, urgent, week], NOW);
+  assert.deepEqual(shown(out.blocks).map((b) => [b.key ?? '', b.entries.map((e) => e.seq), b.total]), [
+    ['', [4], 1],
+    ['', [9], 1],
+    ['work-due', [5, 6, 7], 3],
+  ]);
+});
+
 test('WHAT CHANGED IS ONLY WHAT IS NEW, and a block with nothing to show is not drawn', () => {
   const feed = block({
     kind: 'feed',

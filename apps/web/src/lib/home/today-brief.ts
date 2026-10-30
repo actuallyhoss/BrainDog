@@ -85,6 +85,23 @@ export function unasked(lines: readonly HomeLine[], questions: readonly { about?
 /** The fewest characters a title has before a question that holds it is read as asking about it. */
 const TITLE_NAMED = 12;
 
+/**
+ * THE LATE TILE'S NAME, SAID OF WHAT IT HOLDS (live check of 30 October, 5): "Late" where a line is past its day or more
+ * past the limit are, "due today" where one is due today, "urgent" and "handed back" where those stand in it, joined as a
+ * person lists them ("Late, due today and handed back"). Its count is every one of them, so the name says every kind.
+ */
+export function bandHeading(lines: readonly HomeLine[], moreLate: number, said: { late: string; today: string; urgent: string; back: string }): string {
+  const parts = [
+    lines.some((l) => !l.mark && l.late) || moreLate > 0 ? said.late : '',
+    lines.some((l) => !l.mark && !l.late) ? said.today : '',
+    lines.some((l) => l.mark === 'urgent') ? said.urgent : '',
+    lines.some((l) => l.mark === 'back') ? said.back : '',
+  ].filter((p) => p !== '');
+  if (parts.length === 0) return said.late;
+  const joined = parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+  return joined.charAt(0).toUpperCase() + joined.slice(1);
+}
+
 /** The headings Today's urgent work and the work handed back are declared under (`default-home.ts`), by their mark. */
 export type BandHeadings = { urgent: string; back: string };
 
