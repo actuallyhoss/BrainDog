@@ -5,8 +5,8 @@
   nothing of it. What it writes is `share-write.ts`'s.
 
   THE LINK IS SHOWN ONCE AND KEPT NOWHERE. The record never holds it (the host signs it after the record answers), so it
-  lives in this sheet's memory until the sheet closes, and closing forgets it. A person who lost it closes it in Settings
-  under Links and makes another; there is no way to see a link again, which is what makes one safe to hand out.
+  lives in this sheet's memory until the sheet closes, and closing forgets it. A person who lost it closes it in Settings,
+  under People & sharing, and makes another; there is no way to see a link again, which is what makes one safe to hand out.
 
   NO PRESS THAT FAILS. On opening, the sheet asks `shareable` (`readShareable`), and "Share a read-only link" is drawn
   only on yes. An owner on a host that makes no links reads the host's own sentence instead; anybody who is not an owner
@@ -27,7 +27,8 @@
   import { createClient } from '@braindog/client';
   import { apiBase, at } from '../at.ts';
   import { put } from '../clipboard.ts';
-  import { day } from 'braindog-render';
+  import { dateSaid } from 'braindog-render';
+  import { recordNow } from '../record/boot-live.ts';
   import { sourceOf } from '../dog/read.ts';
   import { saveDog } from '../dog/source.ts';
   import { kennelFetch, nextVersion, publishedHref, publishedLink, publishedSaid, publishWords, submitToKennel, type Submitted } from '../market/publish.ts';
@@ -151,7 +152,7 @@
     refused = null;
     try {
       const out = await openLink(apiBase(), slug, days);
-      if (out.ok) made = { link: linkOf(out.value.url, globalThis.location.origin), until: day(out.value.expires_at.slice(0, 10)) };
+      if (out.ok) made = { link: linkOf(out.value.url, globalThis.location.origin), until: dateSaid(out.value.expires_at.slice(0, 10), recordNow()) };
       else refused = out.fix;
     } finally {
       busy = false;
