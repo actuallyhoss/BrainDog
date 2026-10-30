@@ -72,7 +72,6 @@
     arrivalOf,
     billing,
     checkout,
-    checkName,
     chooseName,
     codeKept,
     HELD_KEY,
@@ -147,6 +146,7 @@
   import type { Accepting, NotMade } from '../start/accept.ts';
   import { accepting, nameSent, picked, replyOf, settle, titleSent } from './build.ts';
   import Apply from './Apply.svelte';
+  import { askFirst, takeEarly } from './early.ts';
   import NameField from './NameField.svelte';
   import { loadWidget, widgetWords, type WidgetState } from './turnstile.ts';
   import { words } from './words.ts';
@@ -755,12 +755,13 @@
     /* WHO MAY SIGN UP IS ASKED ONLY OF A HOST THAT SERVES SIGN-UP (`signup` on `/auth/methods`): a self-host has no such
        door, and asking it printed a 404 in the console. A host that says nothing of it has not opened sign-up, which is
        the closed page; one nobody reached is still asked, so it says "did not answer" as it did. */
-    const who = await methods();
-    if (who.ok && who.value.signup !== true) {
+    /* ASKED AS THE PAGE DREW, WHERE IT WAS (`early.ts`), so the field does not wait two more round trips after the page. */
+    const { who, named } = await (takeEarly() ?? askFirst());
+    if (named === null) {
       step = 'closed';
       return;
     }
-    const out = await checkName('');
+    const out = named;
     /* A HOST THAT REFUSES THE QUESTION ANSWERED IT: one with no sign-up door (a self-host has none) has not opened
        sign-up, which is the closed page and its way to sign in. Only a host nobody reached is "did not answer". */
     if (!out.ok) {

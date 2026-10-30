@@ -19,7 +19,7 @@
   import { apiBase } from '$lib/at.ts';
   import { run } from '$lib/data/optimistic.svelte.ts';
   import { reread } from '$lib/data/live.svelte.ts';
-  import { tellRead, type TellOptions, type TellRow } from '$lib/tell/read.ts';
+  import type { TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -58,7 +58,13 @@
   let typed = $state('');
   let sending = $state(false);
 
-  const told = $derived(typed.trim() === '' ? null : tellRead(typed, options));
+  /* THE READER COMES AFTER THE CARD: asked as the card is made, so the field draws with Today and a cold first load does
+     not wait for the sentence rules (speed-c FL1). It is in long before anybody finishes a word; a sentence typed
+     sooner is read the moment it lands. */
+  let reader = $state<typeof tellRead | null>(null);
+  void import('$lib/tell/read.ts').then((m) => (reader = m.tellRead));
+
+  const told = $derived(typed.trim() === '' || reader === null ? null : reader(typed, options));
   const rows = $derived(told?.rows ?? []);
   /* WHAT CAN BE ADDED NOW: an entry that still needs something stays in the preview, saying what, and the rest go. */
   const ready = $derived(readyRows(rows));
