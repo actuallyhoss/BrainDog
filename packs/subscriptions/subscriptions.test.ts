@@ -146,3 +146,17 @@ test('WITH NOTHING MARKED, THE PAGE LISTS THE REPEATING PAYMENTS TO TICK, and ne
   );
   close();
 });
+
+test('ONCE ONE IS MARKED, THE REST STAY UNDER OTHER REPEATING PAYMENTS, each still marked on its own (polish-i, PI4)', async () => {
+  const { api, close } = await fresh();
+  make(api, 'recurring', { what: 'Newsletter sending', direction: 'out', amount: gbp(3_900), every: 'monthly', next_due: '2026-11-10', subscription: true });
+  make(api, 'recurring', { what: 'Design suite', direction: 'out', amount: gbp(5_400), every: 'monthly', next_due: '2026-11-12' });
+  await settle(api);
+  const page = said<{ blocks: (Block & { row_actions?: unknown[] })[] }>(await api.page({ slug: 'subscriptions' }, owner));
+  const drawn = page.blocks.filter((b) => b.drawn !== false);
+  assert.ok(!drawn.some((b) => b.heading === 'Repeating payments'), 'the first-run list goes once one is marked');
+  const rest = drawn.find((b) => b.heading === 'Other repeating payments');
+  assert.deepEqual((rest?.rows ?? []).map((r) => r.fields.what), ['Design suite']);
+  assert.equal(rest?.row_actions?.length, 1);
+  close();
+});

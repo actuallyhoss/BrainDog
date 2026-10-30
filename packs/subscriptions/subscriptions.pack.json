@@ -4,7 +4,7 @@
   "icon": "refresh",
   "title": "Subscriptions",
   "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
-  "changes": "A month, by category says the ones with no category as No category, so its parts add up to the whole. With nothing marked yet, its page lists your repeating payments, each with Mark as a subscription, and no longer points to Money watch.",
+  "changes": "A month, by category says the ones with no category as No category, so its parts add up to the whole. With nothing marked yet, its page lists your repeating payments, each with Mark as a subscription, and the ones not marked stay under Other repeating payments once one is. It no longer points to Money watch.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -777,6 +777,52 @@
           "span": 12,
           "register": "recurring",
           "where": "subscription is true"
+        },
+        {
+          "kind": "table",
+          "heading": "Other repeating payments",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, direction is out, subscription is not true",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Payment",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "amount",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "row_actions": [
+            {
+              "verb": "row.update",
+              "label": "Mark as a subscription",
+              "args": {
+                "field": "subscription"
+              }
+            }
+          ],
+          "when": {
+            "metric": "subs-count",
+            "gt": 0
+          }
         },
         {
           "kind": "section",

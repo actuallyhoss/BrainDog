@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T22:42:38.124Z",
+  "made_at": "2026-10-30T22:48:40.107Z",
   "pages": [
     {
       "blocks": [
@@ -91,7 +91,7 @@
           "key": "k012r9p5",
           "rows": [
             {
-              "id": "01M67FNDXCD8BK87A99WFJDJ06",
+              "id": "01M67G0FDBBH2FH9MGGAX0QFJ3",
               "register": "recurring",
               "seq": 1,
               "fields": {
@@ -113,8 +113,8 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T22:42:38.124Z",
-              "updated_at": "2026-10-30T22:42:38.124Z",
+              "created_at": "2026-10-30T22:48:40.107Z",
+              "updated_at": "2026-10-30T22:48:40.107Z",
               "deleted_at": null
             }
           ],
@@ -447,6 +447,49 @@
           "fills": {}
         },
         {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Payment",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            }
+          ],
+          "heading": "Other repeating payments",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "amount"
+            }
+          ],
+          "source": "register.recurring",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "subs-count"
+          },
+          "where": "state is live, direction is out, subscription is not true",
+          "key": "k0pnzx47",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
           "fold": true,
           "heading": "Cancelled",
           "icon": "archive",
@@ -515,7 +558,7 @@
         "register.recurring"
       ],
       "title": "Subscriptions",
-      "read_at": "2026-10-30T22:42:38.124Z",
+      "read_at": "2026-10-30T22:48:40.107Z",
       "zone": "UTC",
       "look": {
         "look": "subscriptions",
