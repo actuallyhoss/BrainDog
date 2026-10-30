@@ -441,7 +441,7 @@ test('THE THIRTY-DAY FIGURES AND THE WALK OF THIRTY DAYS ADD UP THE SAME MOVEMEN
   const figure = (metric: string) => ({ value: reading(k, metric), label: String((METRICS[metric] as { name?: unknown }).name) });
   const arriving = figure('arriving-30d');
   const leaving = figure('leaving-30d');
-  assert.deepEqual([arriving.label, leaving.label], ['To come in, next 30 days', 'To go out, next 30 days']);
+  assert.deepEqual([arriving.label, leaving.label], ['To come in, next 30 days', 'Bills and usual spending, next 30 days']);
   /* AND NO TILE ON MONEY SAYS THE LINE'S FIGURES AGAIN, SINCE money-core 3.4.0: What you have went into the line. The one
      figure tile, Runs out since 3.11.0, says when the money runs out, which the line no longer says. */
   const line = (MONEY_PAGES.money!.blocks as { kind: string; lead?: boolean; body?: string }[]).filter((b) => b.kind === 'note' && b.lead).map((b) => String(b.body)).join(' ');
@@ -507,7 +507,7 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
      bridge has been off Money since. */
   assert.deepEqual(
     cells.filter((c) => c.where === 'money-core /money').map((c) => [c.metric, c.label]),
-    [['arriving-30d', 'To come in, next 30 days'], ['leaving-30d', 'To go out, next 30 days']],
+    [['arriving-30d', 'To come in, next 30 days'], ['leaving-30d', 'Bills and usual spending, next 30 days']],
     'the Money page says the thirty days twice again',
   );
   /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0, which drew the walk's two under the cash

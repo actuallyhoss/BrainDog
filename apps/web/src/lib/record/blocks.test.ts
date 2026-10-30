@@ -100,7 +100,7 @@ test('THE BRIDGE’S OUT ROW AND THE `Going out, 30 days` TILE ARE ONE MONEY IN 
      491e7e05 kept the two apart in words. `leaving-30d` walks `CASH_LEGS` over the same thirty days as the bridge
      (`packages/seed/src/modules/money.ts`), so it is the leg itself: the two must be the same money exactly. */
   const leaving = metric('leaving-30d');
-  assert.equal(leaving.label, 'To go out, next 30 days');
+  assert.equal(leaving.label, 'Bills and usual spending, next 30 days');
   const left = signedOf(leaving.value);
   assert.ok(left > 0, `a figure labelled ${JSON.stringify(leaving.label)} states an amount rather than a term in a sum, and it reads ${leaving.value}`);
   assert.equal(left, -out, `the figure says ${left} leaves where the bridge's own leg says ${-out}, over the one walk and the same thirty days`);

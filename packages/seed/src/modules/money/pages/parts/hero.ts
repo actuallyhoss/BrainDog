@@ -34,7 +34,9 @@ export const HERO: Record<string, unknown>[] = [
       { ...ON_WHAT_IS_DUE, label: 'Lasts', note: 'In {{runway-days}}' },
       { ...LASTS_SAID, label: 'If nothing comes in' },
       { metric: 'arriving-30d', label: 'To come in, next 30 days' },
-      { metric: 'leaving-30d', label: 'To go out, next 30 days' },
+      /* WHAT THE FIGURE HOLDS IS ITS NAME (live check of 30 October, 9): bills, plans and the usual everyday spending, so it
+         never reads as Coming up's repeating bills a month, a far smaller figure under a name alike. */
+      { metric: 'leaving-30d', label: 'Bills and usual spending, next 30 days' },
     ],
     when: { metric: 'cash-accounts', gt: 0 },
   },

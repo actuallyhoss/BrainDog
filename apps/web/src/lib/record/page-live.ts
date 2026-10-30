@@ -22,7 +22,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 import { KEEP_RATES_AT } from '@braindog/declare';
 import type { Bars, FxRead, MeasureSeries, Part, QueueQuestion, TargetIn } from '@braindog/kernel';
 import { COSTS, isBucket, isQuiet } from '@braindog/kernel/constants';
-import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, exponentOf, integer, slugWords, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
+import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, exponentOf, integer, slugWords, money, moneyWhole, quantity, shortDay, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { stopped } from '../shell/headline.ts';
@@ -69,7 +69,7 @@ import { liveOf } from '../ui/face.ts';
 import { sourceRows } from './source-rows.ts';
 import { scriptOf } from './scripts.ts';
 import { noteWithoutLeftovers } from './brief.ts';
-import { learnZone, recordToday, weekdayDaySaid } from './zone.ts';
+import { learnZone, recordToday } from './zone.ts';
 import { pathOf } from '../ui/icons.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
@@ -929,7 +929,9 @@ export function tileOf(
   const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
   /* A TREND AHEAD IS THE WALK FROM TODAY (`cells[].ahead`), and its note says the lowest it reaches and on which day. */
   const ahead = trend ? aheadOf((cell as { ahead?: unknown }).ahead) : null;
-  const lowest = ahead ? copy.cashLowest(aboutMoney(ahead.low.value, ahead.currency), weekdayDaySaid(ahead.low.day)) : '';
+  /* THE LOWEST SAID AS FORECAST SAYS IT (live check of 30 October, 18): whole money to the unit, and "today" or the day
+     as "29 Oct". Money and Today read "Lowest EGP 682,000 on Thu 29 Oct" where Forecast read "Lowest EGP 682,316 today". */
+  const lowest = ahead ? copy.cashLowest(wholeAmount(ahead.low.value, ahead.currency), lowDaySaid(ahead.low.day)) : '';
   return {
     id: cell.metric,
     label,
@@ -973,14 +975,18 @@ function aheadOf(v: unknown): NonNullable<Metric['ahead']> | null {
   return { from, currency, low: { day: low.day, value: low.value } };
 }
 
-/** An amount ahead, said roughly, as a sentence about the future says one: three figures of whole units. */
-function aboutMoney(minor: number, currency: string): string {
+/** An amount ahead in whole units, as Forecast says its lowest: never rounded to three figures beside it. */
+function wholeAmount(minor: number, currency: string): string {
   const exp = exponentOf(currency);
-  const whole = Math.round(minor / 10 ** exp);
-  const size = Math.abs(whole);
-  const step = size >= 1000 ? 10 ** (Math.floor(Math.log10(size)) - 2) : 1;
-  const rounded = (whole < 0 ? -1 : 1) * Math.round(size / step) * step * 10 ** exp;
-  return moneyWhole(rounded, currency, homeCurrency())?.text ?? money(rounded, currency);
+  const whole = Math.round(minor / 10 ** exp) * 10 ** exp;
+  return moneyWhole(whole, currency, homeCurrency())?.text ?? money(whole, currency);
+}
+
+/** The day of a lowest point as Forecast says it: "today", else "on 29 Oct", with its year only when it is not this one. */
+function lowDaySaid(day: string): string {
+  const today = recordToday();
+  if (day.slice(0, 10) === today) return 'today';
+  return `on ${shortDay(day.slice(0, 10), today)}`;
 }
 
 /** One row of an `actions` block, back in the shape the actions read gives "Runs on". */

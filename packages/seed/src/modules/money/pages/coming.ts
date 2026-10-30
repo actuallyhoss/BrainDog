@@ -55,7 +55,8 @@ export const MONEY_COMING_PAGE: SeedPage = {
       kind: 'note',
       lead: true,
       span: 12,
-      body: 'Next 30 days: {{arriving-30d}} in, {{leaving-30d}} out.',
+      /* AND WHAT THE OUT HOLDS (live check of 30 October, 9): bills and the usual spending, never the repeating bills below. */
+      body: 'Next 30 days: {{arriving-30d}} to come in, {{leaving-30d}} out in bills and usual spending.',
     },
     {
       /* WHAT REPEATS AT ITS MONTHLY SHARE, in, out and what is left, beside the line's next thirty days. */
@@ -64,8 +65,9 @@ export const MONEY_COMING_PAGE: SeedPage = {
       icon: 'calendar',
       span: 12,
       cells: [
-        { metric: 'every-month-in', label: 'In' },
-        { metric: 'every-month-out', label: 'Out' },
+        /* NAMED FOR WHAT EACH HOLDS (live check of 30 October, 9): "Out" read as the hero's thirty days out. */
+        { metric: 'every-month-in', label: 'Repeating in' },
+        { metric: 'every-month-out', label: 'Repeating bills' },
         { metric: 'every-month-net', label: 'Left over' },
       ],
       when: { metric: 'cash-accounts', gt: 0 },

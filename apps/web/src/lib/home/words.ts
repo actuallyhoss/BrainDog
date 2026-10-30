@@ -35,7 +35,8 @@ export const words = {
   comingIn: 'To come in, next 30 days',
   /** The weekday on today's date block in Coming up. */
   today: 'Today',
-  goingOut: 'To go out, next 30 days',
+  /** Bills, plans and the usual everyday spending, named for what it holds so it never reads as Coming up's repeating bills. */
+  goingOut: 'Bills and usual spending, next 30 days',
   /** The work that falls due this week, under Work's own heading (audit Q10). */
   workDue: 'Work this week',
   /** The tile of the few key numbers that lead Today (`numbersTile`). */

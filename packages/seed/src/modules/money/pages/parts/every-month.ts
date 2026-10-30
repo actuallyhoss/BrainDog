@@ -22,9 +22,9 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
     icon: 'refresh',
     span: 12,
     cells: [
-      { metric: 'every-month-in', label: 'In' },
-      { metric: 'every-month-out', label: 'Out' },
-      { metric: 'leaving-30d', label: 'To go out, next 30 days' },
+      { metric: 'every-month-in', label: 'Repeating in' },
+      { metric: 'every-month-out', label: 'Repeating bills' },
+      { metric: 'leaving-30d', label: 'Bills and usual spending, next 30 days' },
     ],
     when: { metric: 'every-month-out', gt: 0 },
   },
