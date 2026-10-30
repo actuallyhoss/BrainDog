@@ -105,7 +105,7 @@
     onselect?.(row, on);
   }
 
-  const plan = $derived(queuePlan(block.rows));
+  const plan = $derived(queuePlan(block.rows, opts));
   const tiles = $derived(block.form === 'tiles');
   const lead = $derived(block.form === 'lead');
   const nodes = (v: string | undefined) => inline(v ?? '', opts);

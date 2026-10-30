@@ -1451,7 +1451,7 @@ function feed(b: Block, o: RenderOptions): string {
  * rather than by a promise. The recommendation is a word beside its option and nothing is pre-chosen.
  */
 function queue(b: Block, o: RenderOptions): string {
-  const plan = queuePlan(b.rows);
+  const plan = queuePlan(b.rows, o);
   if (plan.items.length === 0) return `<p class="queue-empty">${escape(plan.empty)}</p>`;
   const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
   const tiles = b.form === 'tiles';

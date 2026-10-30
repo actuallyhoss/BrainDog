@@ -1,13 +1,17 @@
 /**
  * `InlineOptions.links`: where only links away are drawn (a shared page, review 30 Oct, R10), a path into the record is
- * drawn as its words, in prose, in a cell and in a `link` list, and a link that leaves the record stays one.
+ * drawn as its words, in prose, in a cell, in a `link` list and in a queue's "N more", and a link that leaves the record
+ * stays one.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { drawnLink, inline, text } from './inline.ts';
+import { toHTML } from './html.ts';
 import { linkPlan } from './links.ts';
+import { queuePlan } from './queue.ts';
+import type { Block } from './index.ts';
 
 test('a path into the record is its words where only links away are drawn, and a link away stays one', () => {
   const kept = inline('see [the **plan**](/r/things/1)', { links: 'away' });
@@ -32,4 +36,19 @@ test('a link list keeps its titles and drops only the addresses into the record'
     ],
   );
   assert.equal(linkPlan(rows)[0]?.href, '/r/projects/2');
+});
+
+/* Q2 (second review of 30 October): a `queue` fence's "N more" row still linked its path into the record on a shared page. */
+test('a queue\'s "N more" is said and not linked where only links away are drawn, in the plan and in the mirror', () => {
+  const rows = [{ cells: ['q', 's1', 'Claude', 'now', 'Which?', ''] }, { cells: ['opt', 's1', 'a', 'A', '', ''] }, { cells: ['more', '3', '/r/suggestion'] }];
+  const away = queuePlan(rows, { links: 'away' });
+  assert.equal(away.more, 3, 'the count is still said');
+  assert.equal(away.moreHref, null);
+  assert.equal(queuePlan(rows).moreHref, '/r/suggestion', 'without the option the path is drawn as before');
+
+  const block: Block = { type: 'block', kind: 'queue', raw: '', start: 0, end: 0, rows };
+  const html = toHTML([block], { links: 'away' });
+  assert.ok(!html.includes('href="/r/suggestion"'), html);
+  assert.match(html, /<p class="queue-more">/u);
+  assert.match(toHTML([block]), /<a class="queue-more" href="\/r\/suggestion">/u);
 });

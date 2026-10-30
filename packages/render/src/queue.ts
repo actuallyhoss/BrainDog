@@ -59,7 +59,7 @@
  * a price. It is read through `spoken`, and drawn only when `spoken` takes nothing out of it.
  */
 
-import { safeHref } from './inline.ts';
+import { drawnLink, safeHref, type InlineOptions } from './inline.ts';
 import { spoken } from './spoken.ts';
 
 /**
@@ -288,7 +288,7 @@ const cell = (cells: readonly string[], i: number): string => (cells[i] ?? '').t
  * evaluator's, which is the record's own, and this never reorders: what is costliest is the record's
  * judgement to make, not the drawer's.
  */
-export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly R[]): { items: QueueItem<R>[]; more: number; moreHref: string | null; empty: string } {
+export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly R[], opts: Pick<InlineOptions, 'links'> = {}): { items: QueueItem<R>[]; more: number; moreHref: string | null; empty: string } {
   const items: QueueItem<R>[] = [];
   let more = 0;
   let moreHref: string | null = null;
@@ -298,7 +298,8 @@ export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly
       const n = Number(cell(row.cells, 1));
       more = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
       const where = cell(row.cells, 2);
-      moreHref = ours(where) ? where : null;
+      /* WHERE ONLY LINKS AWAY ARE DRAWN (a shared page), "N more" is said and not linked (`InlineOptions.links`). */
+      moreHref = ours(where) ? drawnLink(where, opts) : null;
       continue;
     }
     if (word === 'q') {

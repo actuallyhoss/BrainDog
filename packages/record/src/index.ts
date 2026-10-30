@@ -5367,22 +5367,49 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * in memory and not as a pref: an object that restarts walks again from the first page, which costs reads and never an
    * ask (`HEADLINES_ASKED` counts an ask before it is made). `stamp` is the record as the walk began (`changeStamp`).
    */
-  let headlineWalk: { day: string; again: boolean; order: string[]; at: number; due: HeadlineDue[]; stamp: string } | null = null;
+  let headlineWalk: {
+    day: string;
+    again: boolean;
+    order: string[];
+    at: number;
+    due: HeadlineDue[];
+    stamp: string;
+    /** The pages a walk an object before this one had found owed, still to draw again. */
+    redo: string[];
+  } | null = null;
   /**
    * AND ITS PLACE AS ONE OF SLASH'S PREFS, written before each page is drawn (review of 30 October, R3): a page whose draw
    * runs past what the platform allows resets the object, and a walk kept in memory alone began again from Home, reached
    * the same page and was reset again, so the look stalled on the headlines step all day. A new object goes on from the
-   * page AFTER the one being drawn, and draws again only the pages already found owed (`owed`), since what was found is
-   * not kept: a page's blocks as read are too big for a pref.
+   * page AFTER the one being drawn, and draws again the pages already found owed (`owed`), since what was found is not
+   * kept: a page's blocks as read are too big for a pref.
+   *
+   * `drawing` IS THE PAGE UNDER WAY WHEN THE PREF WAS WRITTEN (second review of 30 October, Q1). A tick that ends on its
+   * budget writes the pref again without it, so a `drawing` a new object finds is a draw the object went in, whether it
+   * was a page on the rail or one found owed and drawn again. That page is left out of this walk, with a line in the
+   * look's log, and never drawn again by it: two alarms in a row cut in the look hold the whole look for six hours
+   * (`alarm-cuts.ts`), which costs far more than one page's headline, and the day's next walk reads it again. The pages
+   * drawn again are drawn under the tick's budget like the rest, the place kept before each, so every object gets
+   * further than the one before it.
    */
   const HEADLINE_WALK = 'headlines.walk';
-  type KeptWalk = { day: string; again: boolean; order: string[]; at: number; stamp: string; owed: string[] };
+  type KeptWalk = { day: string; again: boolean; order: string[]; at: number; stamp: string; owed: string[]; drawing?: string };
   const keptWalkOf = (): KeptWalk | null => {
     const raw = kernel.prefsOf(SLASH)[HEADLINE_WALK] as Partial<KeptWalk> | null | undefined;
     if (raw === null || typeof raw !== 'object' || typeof raw.day !== 'string' || typeof raw.again !== 'boolean' || !Number.isSafeInteger(raw.at)) return null;
     const words = (v: unknown): string[] => (Array.isArray(v) ? v.filter((w): w is string => typeof w === 'string') : []);
-    return { day: raw.day, again: raw.again, order: words(raw.order), at: raw.at!, stamp: typeof raw.stamp === 'string' ? raw.stamp : '', owed: words(raw.owed) };
+    return {
+      day: raw.day,
+      again: raw.again,
+      order: words(raw.order),
+      at: raw.at!,
+      stamp: typeof raw.stamp === 'string' ? raw.stamp : '',
+      owed: words(raw.owed),
+      ...(typeof raw.drawing === 'string' ? { drawing: raw.drawing } : {}),
+    };
   };
+  /** The look's log lines of the walk's pages left out for being cut (`drawing`), said by the next `slashHeadlines` to return. */
+  const headlineNotes: string[] = [];
   const forgetWalk = (): void => {
     headlineWalk = null;
     if (keptWalkOf() !== null) kernel.setPref(SLASH, HEADLINE_WALK, null);
@@ -5402,6 +5429,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   let headlinesSettled: { day: string; stamp: string; at: number } | null = null;
 
   const slashHeadlines = async (today: string, again = false, budget: TickBudget = UNBOUNDED): Promise<{ said: string[]; dropped: string[]; cut?: true }> => {
+    const out = await headlinesWalk(today, again, budget);
+    if (headlineNotes.length === 0) return out;
+    return { ...out, dropped: [...headlineNotes.splice(0), ...out.dropped] };
+  };
+  const headlinesWalk = async (today: string, again: boolean, budget: TickBudget): Promise<{ said: string[]; dropped: string[]; cut?: true }> => {
     const model = deps.slashModel;
     if (!model?.headline) return { said: [], dropped: [] };
     const headline = model.headline.bind(model);
@@ -5431,7 +5463,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const basis = homeBasis(home, today);
       return owed(HOME_PAGE, basis, undefined) ? [{ page: home, basis }] : [];
     };
-    if (walk === null && resumed !== null) walk = { day: today, again, order: resumed.order, at: Math.min(resumed.at, resumed.order.length), due: homeDue(), stamp: resumed.stamp };
+    if (walk === null && resumed !== null) {
+      /* WHAT IT HAD FOUND OWED IS DRAWN AGAIN, all but the page it was drawing when it went (`drawing`): that one is left
+         out of this walk, and the look's log says so. */
+      const went = resumed.drawing;
+      const redo = resumed.owed.filter((slug) => slug !== HOME_PAGE && slug !== went);
+      if (went !== undefined && went !== HOME_PAGE) {
+        const line = `${listed.find((p) => p.slug === went)?.title ?? went} was cut off while its headline was being worked out, so this look went on without it.`;
+        console.warn(line);
+        headlineNotes.push(line);
+      }
+      walk = { day: today, again, order: resumed.order, at: Math.min(resumed.at, resumed.order.length), due: homeDue(), stamp: resumed.stamp, redo };
+    }
     if (walk === null) {
       const first: HeadlineDue[] = homeDue();
       /* AND THE PAGES PER ROW, A PROJECT'S AMONG THEM (the thinking scope of 24 October): a project's hero said its
@@ -5439,7 +5482,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          `HEADLINE_PAGES_MOST`: a page left out is still owed, and a later ask of the day takes it. */
       const touched = (p: (typeof listed)[number]): string => String(p.about?.updated_at ?? '');
       const ordered = [...listed.filter((p) => p.about === null), ...listed.filter((p) => p.about !== null).sort((a, b) => touched(b).localeCompare(touched(a)))];
-      walk = { day: today, again, order: ordered.map((p) => p.slug), at: 0, due: first, stamp: changeStamp() };
+      walk = { day: today, again, order: ordered.map((p) => p.slug), at: 0, due: first, stamp: changeStamp(), redo: [] };
     }
     const bySlug = new Map(listed.map((p) => [p.slug, p] as const));
     /** What one page is owed, drawn now, or `null` for a page that does not draw, has no figures, or is owed nothing. */
@@ -5501,47 +5544,68 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(row ? { row: true as const } : {}),
       };
     };
-    /* A WALK AN OBJECT BEFORE THIS ONE KEPT: what it had found owed is drawn again, and the walk goes on past the page it
-       was drawing when it went. */
-    if (resumed !== null)
-      for (const slug of resumed.owed) {
-        if (walk.due.length >= HEADLINE_PAGES_MOST) break;
-        const p = bySlug.get(slug);
-        if (p === undefined || p.nav === null || p.slug === HOME_PAGE) continue;
-        budget.spend();
-        const d = dueOf(p);
-        if (d !== null) walk.due.push(d);
-      }
     headlineWalk = walk;
-    const due0 = walk.due;
+    const going = walk;
+    const due0 = going.due;
+    /**
+     * THE WALK'S PLACE, KEPT AS A PREF (`HEADLINE_WALK`): the pages found owed so far, then those still to draw again, and
+     * the page about to be drawn (`drawing`), if any. Kept before each page is drawn and when a tick's share is spent.
+     */
+    const keepPlace = (drawing?: string): void => {
+      kernel.setPref(SLASH, HEADLINE_WALK, {
+        day: going.day,
+        again: going.again,
+        order: going.order,
+        at: going.at,
+        stamp: going.stamp,
+        owed: [...due0.filter((d) => d.page.page !== HOME_PAGE).map((d) => d.page.page), ...going.redo],
+        ...(drawing === undefined ? {} : { drawing }),
+      } satisfies KeptWalk);
+    };
+    /** A tick's share of the walk spent: its place kept with no page under way, and the rest left to the next tick. */
+    const spent = (): { said: string[]; dropped: string[]; cut: true } => {
+      keepPlace();
+      return { said: [], dropped: [], cut: true };
+    };
     let drawn = 0;
-    while (walk.at < walk.order.length) {
+    /* A WALK AN OBJECT BEFORE THIS ONE KEPT: what it had found owed is drawn again, under the tick's budget as every page
+       is (second review of 30 October, Q1: it was drawn all at once, so the alarm that resumed a cut walk ran as long as
+       the one cut, and was cut in the same place). */
+    while (going.redo.length > 0) {
+      if (due0.length >= HEADLINE_PAGES_MOST) break;
+      if (drawn > 0 && budget.spent()) return spent();
+      const slug = going.redo.shift()!;
+      const p = bySlug.get(slug);
+      if (p === undefined || p.nav === null || p.slug === HOME_PAGE) continue;
+      drawn++;
+      budget.spend();
+      /* KEPT BEFORE THE PAGE IS DRAWN, NAMED AS UNDER WAY: an object reset in the draw goes on without it. */
+      keepPlace(slug);
+      const d = dueOf(p);
+      if (d !== null) due0.push(d);
+    }
+    while (going.at < going.order.length) {
       if (due0.length >= HEADLINE_PAGES_MOST) break;
       /* A TICK'S SHARE OF THE WALK IS SPENT: the rest waits for the next tick, and nothing is asked until it is read. */
-      if (drawn > 0 && budget.spent()) return { said: [], dropped: [], cut: true };
-      const p = bySlug.get(walk.order[walk.at]!);
-      walk.at++;
+      if (drawn > 0 && budget.spent()) return spent();
+      const p = bySlug.get(going.order[going.at]!);
+      going.at++;
       /* A PAGE GONE SINCE THE WALK BEGAN is passed over, as a page that does not draw is. */
       if (p === undefined) continue;
       /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
       if (p.nav === null || p.slug === HOME_PAGE) continue;
       drawn++;
       budget.spend();
-      /* KEPT BEFORE THE PAGE IS DRAWN, ITS PLACE ALREADY PAST IT: an object reset in the draw goes on from the next. */
-      kernel.setPref(SLASH, HEADLINE_WALK, {
-        day: walk.day,
-        again: walk.again,
-        order: walk.order,
-        at: walk.at,
-        stamp: walk.stamp,
-        owed: due0.filter((d) => d.page.page !== HOME_PAGE).map((d) => d.page.page),
-      } satisfies KeptWalk);
+      /* KEPT BEFORE THE PAGE IS DRAWN, ITS PLACE ALREADY PAST IT AND THE PAGE NAMED AS UNDER WAY: an object reset in the
+         draw goes on from the next, and says the page it left out. */
+      keepPlace(p.slug);
       const d = dueOf(p);
       if (d !== null) due0.push(d);
     }
-    /* THE WALK HAS READ WHAT IT WILL: a page it left unread is one `HEADLINE_PAGES_MOST` left out, still owed. */
-    const leftOut = walk.at < walk.order.length;
-    const walked = walk.stamp;
+    /* THE WALK HAS READ WHAT IT WILL: a page it left unread, or one it had to draw again and did not, is one
+       `HEADLINE_PAGES_MOST` left out, still owed. */
+    const leftOut = going.at < going.order.length || going.redo.length > 0;
+    const walked = going.stamp;
     forgetWalk();
     let due = due0;
     /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`): each page whose basis moved
