@@ -3080,6 +3080,52 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const sight = sightOver({ kernel, sql, listName, reads: (ctx, register) => readable(ctx, register) === null });
 
   /**
+   * The rows that name a file, and in which of their fields, for `fileHeld`: every file on every row, walked once and
+   * kept while the record stands (the newest line of the log and the newest row), so a gallery of dozens of pictures
+   * reads the record once and not once per picture (RD6). A write that leaves neither mark (a repair) can leave the
+   * map a step behind; a file it adds is then answered as a file no row names, which is how it was answered before.
+   */
+  let fileRefsKept: { at: string; by: Map<string, { id: string; register: string; fields: string[] }[]> } | null = null;
+  const fileRefs = (sha256: string): readonly { id: string; register: string; fields: string[] }[] => {
+    const mark = sql.one<{ e: number | null; r: number | null }>('SELECT (SELECT max(rowid) FROM event) AS e, (SELECT max(rowid) FROM entry) AS r');
+    const at = `${mark?.e ?? 0}:${mark?.r ?? 0}`;
+    if (fileRefsKept?.at !== at) {
+      const by = new Map<string, { id: string; register: string; fields: string[] }[]>();
+      const shas = (value: unknown, out: Set<string>): Set<string> => {
+        if (Array.isArray(value)) for (const v of value) shas(v, out);
+        else if (typeof value === 'object' && value !== null) {
+          const sha = (value as { sha256?: unknown }).sha256;
+          if (typeof sha === 'string') out.add(sha);
+        }
+        return out;
+      };
+      for (const row of sql.all<{ id: string; register: string; fields: string }>(`SELECT id, register, fields FROM entry WHERE fields LIKE '%"sha256"%'`)) {
+        let fields: Record<string, unknown>;
+        try {
+          fields = JSON.parse(row.fields) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+        const on = new Map<string, string[]>();
+        for (const [field, value] of Object.entries(fields))
+          for (const sha of shas(value, new Set())) {
+            const named = on.get(sha);
+            if (named === undefined) on.set(sha, [field]);
+            else named.push(field);
+          }
+        for (const [sha, named] of on) {
+          const refs = by.get(sha);
+          const ref = { id: row.id, register: row.register, fields: named };
+          if (refs === undefined) by.set(sha, [ref]);
+          else refs.push(ref);
+        }
+      }
+      fileRefsKept = { at, by };
+    }
+    return fileRefsKept.by.get(sha256) ?? [];
+  };
+
+  /**
    * The keychain gate: a person at `owner`, and never a bearer of any kind.
    *
    * NO TOKEN REACHES THE KEYCHAIN, AND IT IS NOT A SCOPE PROBLEM. An agent holding a write token can do
@@ -16043,30 +16089,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * held the same PDF) read it or confirmed it was there. Now a caller narrowed in any way (some lists, a rule on a
      * list, a list at adds only, a field hidden) is answered the bytes only when a row they can read names them in a
      * field they are shown. A file no row names (one just put, before its row is saved; a picture of a visual) is
-     * answered as before, and so is every caller who reads the whole record, who reads every row that could name it.
+     * answered as before.
+     *
+     * A PRIVATE ROW HOLDS ITS FILES FROM EVERYBODY ELSE TOO (RD6). A caller who reads the whole record was answered
+     * before any row was looked at, so a full member who held the same PDF read, or confirmed, a file on somebody else's
+     * private row. Now any caller is held to the rows they are shown when one of the rows naming the file is private.
+     *
+     * ONE WALK OF THE RECORD PER VERSION, NOT ONE PER FILE (`fileRefs`). Every picture a narrowed member opened ran a
+     * `LIKE` over the whole of `entry`, and a gallery is dozens of them.
      */
     fileHeld(sha256: string, ctx: CallContext): boolean {
       if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(sha256)) return true;
+      const naming = fileRefs(sha256);
+      if (naming.length === 0) return false;
       const narrowed =
         Array.isArray(ctx.registers) ||
         Object.values(ctx.levels ?? {}).some((level) => level === 'append') ||
         Object.keys(ctx.wheres ?? {}).length > 0 ||
         Object.values(ctx.hides ?? {}).some((fields) => fields.length > 0);
-      if (!narrowed) return false;
-      const naming = sql.all<{ id: string; register: string; fields: string }>('SELECT id, register, fields FROM entry WHERE fields LIKE ?', `%${sha256}%`);
-      if (naming.length === 0) return false;
-      const holds = (value: unknown): boolean =>
-        Array.isArray(value) ? value.some(holds) : typeof value === 'object' && value !== null && (value as { sha256?: unknown }).sha256 === sha256;
+      if (!narrowed && kernel.privateAmong(naming.map((row) => row.id)).size === 0) return false;
       for (const row of naming) {
         if (readable(ctx, row.register) !== null || !sight.admits(ctx, row)) continue;
         const hidden = sight.hidden(ctx, row.register);
-        let fields: Record<string, unknown>;
-        try {
-          fields = JSON.parse(row.fields) as Record<string, unknown>;
-        } catch {
-          continue;
-        }
-        for (const [field, value] of Object.entries(fields)) if (!hidden.has(field) && holds(value)) return false;
+        if (row.fields.some((field) => !hidden.has(field))) return false;
       }
       return true;
     },
