@@ -883,6 +883,10 @@ export const chipsOf = (params: URLSearchParams): Filter[] =>
     const at = raw.indexOf(':');
     if (at === -1) return { field: raw, op: 'is', values: [''] };
     const then = raw.indexOf(':', at + 1);
+    /* `payee:empty` AND `payee:set`, THE TWO-PIECE SPELLING A PAGE'S LINK WROTE (Payees' "Name them", Budgets' "File
+       them"), read as the `is empty` and `is set` the three-piece chip says, since the word is the value and never an
+       operator: it drew "payee is: is what?" where it meant the lines that name nobody (audit 31 Oct A36). */
+    if (then === -1 && /^(empty|set)$/u.test(raw.slice(at + 1))) return { field: raw.slice(0, at), op: 'is', values: [raw.slice(at + 1)] };
     return {
       field: raw.slice(0, at),
       op: then === -1 ? raw.slice(at + 1) : raw.slice(at + 1, then),

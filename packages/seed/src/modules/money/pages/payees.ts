@@ -53,7 +53,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       kind: 'note',
       span: 12,
       when: { metric: 'unnamed-paid-90d', gt: 0 },
-      body: 'Not named yet: {{unnamed-paid-90d}} payment(s) in 90 days. [Name them](/r/transactions?f=payee:empty&f=direction:is:out&f=transfer:is:false)',
+      body: 'Not named yet: {{unnamed-paid-90d}} payment(s) in 90 days. [Name them](/r/transactions?f=payee:is:empty&f=direction:is:out&f=transfer:is:false)',
     },
     {
       kind: 'note',

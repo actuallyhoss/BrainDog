@@ -94,6 +94,16 @@ test('the chip the URL carries is the chip the page reads, colons and all', () =
   assert.deepEqual(opened(url.toString()).seqs, holding('people', 'handles', 'git:jokonkwo'));
 });
 
+test('a two-piece `field:empty` or `field:set` chip reads as `is empty` and `is set`, never as an operator (audit 31 Oct A36)', () => {
+  const url = new URL('/r/transactions?f=payee:empty&f=category:set&f=direction:is:out', 'http://x');
+  assert.deepEqual(chipsOf(url.searchParams), [
+    { field: 'payee', op: 'is', values: ['empty'] },
+    { field: 'category', op: 'is', values: ['set'] },
+    { field: 'direction', op: 'is', values: ['out'] },
+  ]);
+  assert.equal(whereOf(chipsOf(url.searchParams)), 'payee is empty, category is set, direction is out');
+});
+
 test('EVERY ELEMENT OF EVERY LIST FIELD IN THE MIRROR SURVIVES THE ROUND TRIP', () => {
   /**
    * The sweep, because one field is an anecdote. Eleven list fields over five registers, nine

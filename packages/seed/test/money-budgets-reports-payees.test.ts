@@ -209,7 +209,7 @@ test('BUDGETS SETS EACH BUDGET AGAINST THIS MONTH, and names the money no catego
 
   const unfiled = m.page('money-budgets').find((b) => b.kind === 'note' && !b.lead && b.drawn !== false)!;
   assert.deepEqual([unfiled.values?.['unfiled-spent-month']], [egp(7_850)]);
-  assert.match(String(unfiled.body), /\[File them\]\(\/r\/transactions\?f=category:empty/u);
+  assert.match(String(unfiled.body), /\[File them\]\(\/r\/transactions\?f=category:is:empty/u);
 
   /* EVERY FIGURE THE THREE PAGES DECLARE READS, AND SAYS WHAT IT SHOULD. */
   const read = (id: string) => value<{ value: unknown }>(m.k.metric(MONEY_METRICS[id] as never)).value;
