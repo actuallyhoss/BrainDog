@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import type { Sql } from '@braindog/ports';
 
-import { tablesWritten, wroteNothing } from '../src/held-signs.ts';
+import { heldOn, noticeSign, signTraceOf, tablesWritten, wroteNothing } from '../src/held-signs.ts';
 import { openRecord, type VitalSign } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
@@ -30,6 +30,45 @@ test('A WRITE IS COUNTED BY THE TABLE IT WRITES, and one this cannot read moves 
   assert.deepEqual(tablesWritten('PRAGMA foreign_keys = ON'), []);
   assert.equal(tablesWritten('DROP TABLE entry'), null);
   assert.equal(tablesWritten('ALTER TABLE entry ADD COLUMN x'), null);
+});
+
+test('A SCHEMA BEFORE THE TABLE IS NOT THE TABLE: `"main"."entry"` writes entry, and another schema is not sure (review 3, P4)', () => {
+  assert.deepEqual(tablesWritten('UPDATE "main"."entry" SET fields = ? WHERE id = ?'), ['entry']);
+  assert.deepEqual(tablesWritten('INSERT INTO [main].[entry] (id) VALUES (?)'), ['entry']);
+  assert.deepEqual(tablesWritten('DELETE FROM `main` . `event` WHERE id = ?'), ['event']);
+  assert.deepEqual(tablesWritten("UPDATE main.entry SET note = 'main'"), ['entry']);
+  assert.deepEqual(tablesWritten('DELETE FROM"entry" WHERE id = ?'), ['entry']);
+  assert.equal(tablesWritten('UPDATE temp.scratch SET a = 1'), null);
+  assert.equal(tablesWritten('INSERT INTO "main". VALUES (1)'), null);
+});
+
+/** What a sign reading `text` with `params` is held on, on a record whose lists are `system`, `entry`, `active`, `tasks`, `projects` and the runs. */
+function heldBy(text: string, ...params: string[]) {
+  const lists = new Set(['system', 'entry', 'active', 'tasks', 'projects', 'session']);
+  const trace = signTraceOf();
+  noticeSign(trace, text, params, (w) => lists.has(w));
+  return heldOn(trace, (l) => l === 'session');
+}
+
+test('A VALUE THAT IS A LIST\'S ID NAMES NO LIST unless the list column is bound to it (review 3, P3)', () => {
+  /* EVERY LIST'S ROWS, read beside a word that is also a list's id: held on the rows' table, not on that one list. */
+  const any = heldBy("SELECT e.id FROM event e LEFT JOIN entry n ON e.target_kind = 'entry' AND n.id = substr(e.target, 7) WHERE e.ts >= ? AND e.actor = 'system'", '2026-10-30T00:00:00.000Z');
+  assert.deepEqual(any.lists, []);
+  assert.ok(any.tables.includes('entry'), JSON.stringify(any));
+  const bound = heldBy("SELECT id FROM entry WHERE state IN ('active', 'idle') AND kind = ?", 'system');
+  assert.deepEqual(bound.lists, []);
+  assert.ok(bound.tables.includes('entry'), JSON.stringify(bound));
+  /* ONE LIST, BOUND: held on that list alone, by a bound value or a quoted word, in any order of parameters. */
+  assert.deepEqual(heldBy('SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL', 'tasks'), { lists: ['tasks'], tables: [], head: false });
+  assert.deepEqual(heldBy("SELECT id FROM entry e WHERE e.register IN (?, 'projects') AND e.state = 'active'", 'tasks'), { lists: ['projects', 'tasks'], tables: [], head: false });
+  assert.deepEqual(heldBy('SELECT id FROM "main"."entry" WHERE x = ?1 AND register = ?2', 'system', 'tasks'), { lists: ['tasks'], tables: [], head: false });
+  /* A SECOND READ OF THE ROWS WITH NO LIST OF ITS OWN reads any list's rows. */
+  const joined = heldBy("SELECT p.title FROM entry e JOIN entry p ON p.id = json_extract(e.fields, '$.project') WHERE e.register = ?", 'tasks');
+  assert.ok(joined.tables.includes('entry'), JSON.stringify(joined));
+  /* A BINDING THAT NARROWS NOTHING (in what a select answers) names no list's rows alone. */
+  assert.ok(heldBy("SELECT count(CASE WHEN register = 'tasks' THEN 1 END) FROM entry").tables.includes('entry'));
+  /* A COMMA'S JOIN reads the rows too. */
+  assert.ok(heldBy('SELECT 1 FROM event, entry WHERE entry.id = ?', 'tasks').tables.includes('entry'));
 });
 
 test('A WRITE WHOSE RETURNING ANSWERED NOTHING CHANGED NOTHING: the belt claiming nothing due is not a write', () => {
