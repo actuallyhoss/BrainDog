@@ -881,6 +881,10 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   lines out; Reports' sentence follows the picked range (`metric.received-last` and eleven more by range); Paid most
  *   adds every line to a payee; the 30-day figure is "Bills and usual spending"; lines imported twice are offered to be
  *   archived (`script.ledger_twice`). Fields, rules, scripts and figures added, nothing taken away, so a minor step.
+ *   Before it shipped, Snapshots was also marked as written by automations alone (`register.snapshots` `kept_by`), so
+ *   BrainDog no longer offers it a page.
+ * - work 1.20.1 (finish loop, 30 Oct): Work's "No due day" lists the newest first (`page.work`), not by a due day none of
+ *   them has. An order, nothing added or taken away, so a patch step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.0',
@@ -888,7 +892,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   people: '4.2.1',
   'money-core': '3.33.0',
   estate: '2.6.0',
-  work: '1.20.0',
+  work: '1.20.1',
 };
 
 type Body = Record<string, unknown>;

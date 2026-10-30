@@ -2512,9 +2512,10 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'b6299d6dda85dfdc',
+    declares: '8aeb6babb5fcaf3a',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
+      'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
     ],
   },
   'work@1.17.0': {
@@ -3081,7 +3082,25 @@ const DECLARED: Record<string, Version> = {
     history: [
       "Work 1.20.0 (Q6 of 29 October): `page.work`'s project chips and Yours and Agents count what Open counts, and its line says none of your tasks is late; no id added or taken away -> 0aef6cf7e6d779f5",
     ],
+  },  'work@1.20.1': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open
+      metric.tasks-after-week-yours metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-in-play metric.tasks-late-yours metric.tasks-later metric.tasks-no-project
+      metric.tasks-not-this-week metric.tasks-overdue metric.tasks-this-week-yours metric.tasks-today-yours metric.tasks-undated-yours
+      metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.roadmap page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: '3a5fc3181fd352f1',
+    history: [
+      'Work 1.20.1 of 30 October: `page.work` lists No due day newest first; an order, no id added or taken away -> 3a5fc3181fd352f1',
+    ],
   },
+
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */
