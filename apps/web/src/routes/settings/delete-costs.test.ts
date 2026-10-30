@@ -7,7 +7,7 @@
  *
  *   - THE NAME IS BURNED, AND NEITHER SENTENCE SAID SO. `Directory.prepare` in
  *     `apps/worker/src/index.ts` refuses a slug whose claim reads `released` with *"was the name of
- *     another record and is never given out again"*, and `destroyRecord` releases every name the
+ *     another BrainDog and is never given out again"*, and `destroyRecord` releases every name the
  *     record had (`apps/worker/src/destroy.ts`). So changing your mind and making the record again
  *     at the same name, which is the one reversal the sentence invited, is the one the host has
  *     already decided it will refuse for ever.

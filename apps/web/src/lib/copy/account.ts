@@ -436,7 +436,7 @@ export const account = {
      final copy is kept for the rest of today, in case you change your mind within the hour. Within
      thirty days nothing of this record is left anywhere."* Changing your mind here means making the
      record again at the same name, and `Directory.prepare` (`apps/worker/src/index.ts`) answers a
-     slug whose claim reads `released` with *"was the name of another record and is never given out
+     slug whose claim reads `released` with *"was the name of another BrainDog and is never given out
      again"*. Deleting burns the name, permanently, and neither sentence on the screen said so.
 
      AND THE COPY IT PROMISED IS NOT TAKEN. `deleteRecord` (`packages/record/src/index.ts`) calls
