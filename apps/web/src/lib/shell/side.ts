@@ -201,6 +201,13 @@ export type SideList = {
  */
 export const shownCount = (l: Pick<SideList, 'open'>): { count?: number } => (typeof l.open === 'number' && l.open > 0 ? { count: l.open } : {});
 
+/**
+ * WHAT THE RECORD KEEPS FOR ITSELF IS NO ROW UNDER A PLACE (audit of 30 October, 40): Money's More read "Snapshots" and
+ * "Filing rules" among the pages a person opens Money for. The nights it keeps are drawn by Over time, and the filing
+ * rules open from the Ledger they file; both stay a search or an address away.
+ */
+const TUCKED: ReadonlySet<string> = new Set(['/r/snapshots', '/r/filing_rules', '/p/money-rules']);
+
 /** The home a list has when it is under no place: the projects' part, or More lists. */
 export const IN_PROJECTS = '#projects';
 export const IN_MORE = '#more';
@@ -343,7 +350,7 @@ export function sideModel(o: {
   };
   const places = o.places.map((p): SidePlace => {
     const l = folded.get(p.key);
-    const kids = once([...(o.views[p.key] ?? []), ...viewsOf(l), ...rows(p.key), ...own(p.key)]);
+    const kids = once([...(o.views[p.key] ?? []), ...viewsOf(l), ...rows(p.key), ...own(p.key)]).filter((k) => !TUCKED.has(k.href));
     const lead = o.leads?.[p.key];
     const split = lead ? leadFirst(kids, lead) : null;
     return {

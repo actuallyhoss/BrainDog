@@ -216,6 +216,10 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
      * and a ticked category takes every entry under it out at once. An entry with no category is counted.
      */
     { id: 'stays', label: 'Money stays yours', type: 'bool', derive: { via: { ref: 'category', field: 'transfer' } } },
+    /* FILED UNDER A CATEGORY OF CORRECTIONS (live check of 30 October, 20), read through the link as `stays` is: every
+       figure of spending and income says `corrects is not true` beside it, and Cash now, which rolls what moved, still
+       counts the line. */
+    { id: 'corrects', label: 'A correction, not spending', type: 'bool', derive: { via: { ref: 'category', field: 'correction' } } },
     /* THE PROMISE THIS PAYMENT DISCHARGED. Reconcile is this field and nothing else. */
     { id: 'settles', label: 'Settles', type: 'ref', to: 'obligations', index: true },
     /* THE REPEATING LINE THIS WAS POSTED FOR, SINCE money-core 3.31.0: written by `post_due` and by nothing else, so a real

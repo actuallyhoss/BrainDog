@@ -10,7 +10,10 @@
  * PURE, AND NODE LOADS IT, so `filters.test.ts` holds each rule.
  */
 
-import type { Filter } from 'braindog-render';
+import { bankCode, type Filter } from 'braindog-render';
+
+/** The fields that hold who was paid, whose bank codes are said as what they are (`bankCode`). */
+const PAID_TO: ReadonlySet<string> = new Set(['payee', 'counterparty_text']);
 
 /** What every filter key in the address starts with. */
 const PREFIX = 'f.';
@@ -36,7 +39,10 @@ export function filtersOf(page: unknown): Filter[] {
       if (!isObject(v)) return [];
       const value = spelt(v.value);
       if (value === null) return [];
-      const label = typeof v.label === 'string' && v.label.trim() !== '' ? v.label : value;
+      const named = typeof v.label === 'string' && v.label.trim() !== '' ? v.label : value;
+      /* A PAYEE THAT IS A BANK'S CODE IS SAID AS WHAT IT IS (live check of 30 October, 10): Payees' chips read "0140" and
+         "8307" where Money reads "Account ending 0140". The value stays the stored one, so the choice still narrows. */
+      const label = PAID_TO.has(f.field as string) ? (bankCode(named) ?? named) : named;
       if (label === '') return [];
       /* A PROJECT'S HUE, so its chip wears the project's dot. */
       const hue = typeof v.hue === 'number' && Number.isInteger(v.hue) && v.hue >= 0 && v.hue < 360 ? { hue: v.hue } : {};

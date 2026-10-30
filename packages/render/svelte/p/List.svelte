@@ -296,7 +296,9 @@
               >{:else}<Text nodes={inline(title.text ?? '', opts)} {opts} />{/if}</span
           >
         {/if}
-        <span class="item-detail"><Text nodes={inline(lines.detail, opts)} {opts} /></span>
+        <!-- MONEY IN IS MARKED AS THE LEDGER MARKS IT (recheck of 30 October, 18): a bill's "−£9,190" and an invoice's
+             "+£4,800" read alike in grey. -->
+        <span class="item-detail" data-sign={timelineIn(lines.detail) ? 'in' : undefined}><Text nodes={inline(lines.detail, opts)} {opts} /></span>
         <!-- THE THIRD AND FOURTH CELLS, when the row carries either, as one quiet line: when it falls due and who
              changed it last, on Work's Waiting on you. Outside the box's name on purpose, which stays the task. And
              before the unsaved mark, so a reader hears the row's facts before what this session did to it. -->

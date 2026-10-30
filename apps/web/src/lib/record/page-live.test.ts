@@ -646,7 +646,7 @@ test('a tile over a quantity is drawn as the quantity, and only a currency as mo
     new Map(),
     AT,
   );
-  assert.deepEqual(stat.metrics?.map((m) => m.value), ['150 kg', '12.5 h', 'GBP 1,299.00']);
+  assert.deepEqual(stat.metrics?.map((m) => m.value), ['150 kg', '12.5 h', 'GBP 1,299']);
 });
 
 test('A LEAD FIGURE AND ITS TREND COME THROUGH FROM THE RECORD, and reach the dialect as a form and a fourth cell', () => {
@@ -955,7 +955,7 @@ test('A SUM OVER A FIELD NOBODY HAS FILLED IN DRAWS NO VERDICT AND NO DOOR, and 
       AT,
     );
   const unsaid = earning({ rows: 0, held: 27 }).metrics?.[0];
-  assert.equal(unsaid?.value, 'GBP 0.00', 'a total of nothing is still zero');
+  assert.equal(unsaid?.value, 'GBP 0', 'a total of nothing is still zero');
   assert.equal(unsaid?.tone, undefined, 'a total of nothing is not good news');
   assert.equal((unsaid as { href?: string } | undefined)?.href, undefined, 'no door into a list of no rows');
   assert.equal(unsaid?.note, liveWords.unsaid);
@@ -1301,7 +1301,7 @@ test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules'
   const rules = 'Cash is {{cash-now}} across {{cash-accounts}} accounts.';
   assert.equal(blockOf(lead, new Map(), AT).body, rules);
   const said = blockOf({ ...lead, said: 'GBP 33,850.00 across HSBC and Monzo, steady on last month.' }, new Map(), AT);
-  assert.equal(said.body, 'GBP 33,850.00 across HSBC and Monzo, steady on last month.');
+  assert.equal(said.body, 'GBP 33,850 across HSBC and Monzo, steady on last month.');
   assert.equal(Object.hasOwn(said, 'said'), false, 'the line rode through onto the block as a key of its own');
   /* AND IT SAYS THE MODEL WROTE IT, so a project's hero that says it in place of the rules' line can say who wrote it. */
   assert.equal(said.modelLine, true);

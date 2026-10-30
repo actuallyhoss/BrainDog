@@ -161,7 +161,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       icon: 'chart-pie',
       span: 12,
       source: 'register.transactions',
-      where: 'state is cleared, transfer is false, stays is not true, direction is out, on at least bom, book is {{name}}',
+      where: 'state is cleared, transfer is false, stays is not true, corrects is not true, direction is out, on at least bom, book is {{name}}',
       columns: [{ field: 'category' }, { field: 'amount' }],
       limit: 6,
       unset: 'Uncategorised',

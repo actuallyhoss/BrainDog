@@ -4,6 +4,7 @@
  * `MONEY_AUTOMATIONS` spreads them where they stood, so the document is the same.
  */
 
+import { CATEGORY_CORRECTION_SCRIPT } from './scripts/category-correction.js';
 import { CATEGORY_STAYS_SCRIPT } from './scripts/category-stays.js';
 
 export const CATEGORY_STAYS_RULES: Record<string, unknown>[] = [
@@ -30,4 +31,27 @@ export const CATEGORY_STAYS_RULES: Record<string, unknown>[] = [
     steps: [{ script: { id: 'category_stays', as: 'ticking', input: { answer: '{{trigger.option}}' } } }],
   },
   CATEGORY_STAYS_SCRIPT,
+  /**
+   * A CATEGORY OF CORRECTIONS ASKS ONCE WHETHER TO LEAVE IT OUT OF SPENDING (live check of 30 October, 20,
+   * `scripts/category-correction.js`): a line filed under a category whose name says it holds corrections (a count's
+   * Discrepancy) starts the question, once a category, and the sweep reads the thirteen months Reports reads. Yes is
+   * `category-correction-yes`, which ticks the category's "A correction, not spending".
+   */
+  {
+    rule: 'category-correction-asks',
+    name: 'Ask whether a category of corrections is left out of spending',
+    pack: 'money-core',
+    on: { written: { register: 'transactions', op: ['create', 'update'], fields: ['category'] } },
+    when: 'category is set, state is cleared, on after -13m',
+    once_per: ['category'],
+    steps: [{ script: { id: 'category_correction', as: 'asking', input: {} } }],
+  },
+  {
+    rule: 'category-correction-yes',
+    name: 'Leave a category of corrections out of spending',
+    pack: 'money-core',
+    on: { decided: { about: 'script.category_correction', option: 'Yes' } },
+    steps: [{ script: { id: 'category_correction', as: 'ticking', input: { answer: '{{trigger.option}}' } } }],
+  },
+  CATEGORY_CORRECTION_SCRIPT,
 ];

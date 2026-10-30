@@ -387,10 +387,31 @@ export function readerLeafFault(leaf: { reader: unknown }, said: string): string
   return null;
 }
 
+/**
+ * WHAT THE READER PICKED ON THE PAGE'S OWN FILTER: a leaf `{ picked: months, is: this }` holds while that choice is the
+ * one picked, `is: ''` while none is, and `is: [last, three]` while one of them is. So a page's line can say the months a
+ * strip of choices narrows the blocks under it to, where it said "This month" over a year (live check of 30 October, 20).
+ */
+export const isPickedLeaf = (leaf: unknown): leaf is { picked: string; is: string | readonly string[] } =>
+  leaf !== null && typeof leaf === 'object' && !Array.isArray(leaf) && Object.hasOwn(leaf, 'picked');
+
+/** What is wrong with a leaf about what was picked, or `null`: the filter's field, and the choice or choices it holds for. */
+export function pickedLeafFault(leaf: { picked: unknown; is?: unknown }, said: string): string | null {
+  if (typeof leaf.picked !== 'string' || leaf.picked === '') return `${said} says picked: ${JSON.stringify(leaf.picked)}, and picked names a filter of the page: { picked: months, is: this }.`;
+  const is = Array.isArray(leaf.is) ? leaf.is : [leaf.is];
+  if (is.length === 0 || is.some((v) => typeof v !== 'string'))
+    return `${said} says what was picked with is: ${JSON.stringify(leaf.is ?? null)}, and is is a choice's value, '' for none picked, or a list of them.`;
+  const beside = Object.keys(leaf).filter((k) => k !== 'picked' && k !== 'is');
+  if (beside.length > 0) return `${said} says picked and ${beside.join(' and ')}. What was picked is the whole leaf: { picked: months, is: this }.`;
+  return null;
+}
+
 /** The leaf check when the caller has no fuller one: a leaf names its figure. The install hands `declare.ts`'s own. */
 const leafNamed: WhenLeafFault = (leaf, said) =>
   isReaderLeaf(leaf)
     ? readerLeafFault(leaf, said)
+    : isPickedLeaf(leaf)
+      ? pickedLeafFault(leaf, said)
     : leaf !== null && typeof leaf === 'object' && typeof (leaf as { metric?: unknown }).metric === 'string'
       ? null
       : `${said} is one leaf naming a metric, or one saying who reads: { reader: owner }.`;
@@ -414,7 +435,7 @@ export function whenJoin(when: unknown): 'all' | 'any' | 'both' | null {
  */
 export function whenTreeFault(when: unknown, said: string, leafFault: WhenLeafFault = leafNamed, depth = 1): string | null {
   const join = whenJoin(when);
-  if (join === null) return isReaderLeaf(when) ? readerLeafFault(when, said) : leafFault(when, said);
+  if (join === null) return isReaderLeaf(when) ? readerLeafFault(when, said) : isPickedLeaf(when) ? pickedLeafFault(when, said) : leafFault(when, said);
   if (join === 'both') return `${said} says all and any. A when is one of them, and the other goes inside it: { any: [{ all: [leaf, leaf] }, leaf] }.`;
   const list = (when as Record<string, unknown>)[join];
   const beside = Object.keys(when as object).filter((k) => k !== join);

@@ -25,7 +25,7 @@ import { evaluate, type Leaf, type Predicate, type Schema } from '@braindog/wher
 import type { ActionRow } from './actions.ts';
 import type { ScriptRow } from './script-rows.ts';
 import type { Exception } from './exceptions.ts';
-import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isReaderLeaf, keyedBlocks, kindsReading, kpisFault, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type KpisFor, type WhenReader } from './block-keys.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isPickedLeaf, isReaderLeaf, keyedBlocks, kindsReading, kpisFault, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type KpisFor, type WhenReader } from './block-keys.ts';
 import * as kpiRank from './kpi-rank.ts';
 import { kpiTrend, type KpiAnswer } from './sources/kpis.ts';
 import { cutActions, type OfferedAction } from './row-actions.ts';
@@ -75,7 +75,10 @@ export type WhenLeaf = { metric: string; empty?: boolean; beyond?: boolean; gt?:
  * A block's `when:`: one leaf, or `all:` (every one holds) or `any:` (one does) of two or more, each a leaf or one join of
  * leaves. Two levels deep at most (`block-keys.ts` `WHEN_DEPTH`).
  */
-export type WhenTree = WhenLeaf | WhenReaderLeaf | { all: WhenTree[] } | { any: WhenTree[] };
+export type WhenTree = WhenLeaf | WhenReaderLeaf | WhenPickedLeaf | { all: WhenTree[] } | { any: WhenTree[] };
+
+/** One test of what the reader picked on the page's own filter (`block-keys.ts` `isPickedLeaf`): `''` is none picked. */
+export type WhenPickedLeaf = { picked: string; is: string | readonly string[] };
 
 /** One test of who reads the page: the reader is one of these words (`block-keys.ts` `WHEN_READERS`). */
 export type WhenReaderLeaf = { reader: WhenReader | readonly WhenReader[] };
@@ -1129,6 +1132,8 @@ export type PageDeps = {
    * `when` asks who reads is sent, so a host that has not said who reads is never shown what was held for the owner.
    */
   readerIs?: WhenReader;
+  /** WHAT THE READER PICKED ON THE PAGE'S FILTERS, by field, for a `when: { picked }`. Absent, nothing was picked. */
+  picked?: ReadonlyMap<string, string>;
   /**
    * The verbs this host carries out (`RUNS` in `packages/record/src/verbs.ts`). A verb the table names and the host does
    * not run yet is cut, rather than sent to be refused on every press. Absent, the table is the whole answer.
@@ -1693,7 +1698,9 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
       return added === undefined ? folded : { ...folded, added };
     }
     /* THE PAGE'S ROW IS THE ENTRY ITS TEXT SITS ON, so `{{money:price}}` and `{{blockers.count}}` read the row. */
-    const on = found.row ? { ...deps, here: found.row } : deps;
+    const at = found.row ? { ...deps, here: found.row } : deps;
+    /* AND WHAT THE READER PICKED, so a line can say the months a strip narrows the blocks to (`when: { picked }`). */
+    const on = filters && filters.picked.size > 0 ? { ...at, picked: filters.picked } : at;
     const read = rowNamed(deps, found.row, readBlock(clauses.size > 0 || log ? narrowed(on, b, clauses, log) : on, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
     const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
@@ -2097,7 +2104,7 @@ function readerFilters(
   decl: PageDecl,
   blocks: readonly PageBlock[],
   filter: Readonly<Record<string, string>> | undefined,
-): { answer: PageFilter[]; clauses: Map<string, Predicate[]>; log: ((e: ActivityEvent) => boolean) | null } | null {
+): { answer: PageFilter[]; clauses: Map<string, Predicate[]>; log: ((e: ActivityEvent) => boolean) | null; picked: Map<string, string> } | null {
   const said = Array.isArray(decl.filters) ? (decl.filters as unknown[]) : [];
   const all = said.flatMap((f): { field: string; control: PageFilter['control']; options?: Choice[]; counts?: string }[] => {
     const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown; options?: unknown; counts?: unknown }) : {};
@@ -2273,7 +2280,8 @@ function readerFilters(
     const values = d.options.map((c, i) => ({ value: c.value, label: c.label, count: counts[i]! }));
     return { field: d.field, label: wordsOf(d.field), control: d.control, chosen: picks.get(d.field)?.value ?? null, values, reads };
   });
-  return { answer: answers, clauses, log: logged?.keep ?? null };
+  const picked = new Map<string, string>([...[...chosen].map(([field, c]) => [field, c.value] as const), ...[...picks].map(([field, c]) => [field, c.value] as const)]);
+  return { answer: answers, clauses, log: logged?.keep ?? null, picked };
 }
 
 /** A filter's own choice: the word an address keeps, the name a person reads, and the sentence of the rows it keeps. */
@@ -2486,7 +2494,7 @@ export function whenHolds(deps: PageDeps, when: unknown): boolean {
 /** Whether a `when:` of a shape already checked holds: a leaf of its figure, `all:` of every part, `any:` of one. */
 function treeHolds(deps: PageDeps, when: unknown): boolean {
   const join = whenJoin(when);
-  if (join === null) return isReaderLeaf(when) ? readerHolds(deps, when) : leafHolds(deps, when as WhenLeaf);
+  if (join === null) return isReaderLeaf(when) ? readerHolds(deps, when) : isPickedLeaf(when) ? pickedHolds(deps, when) : leafHolds(deps, when as WhenLeaf);
   const parts = (when as Record<string, unknown[]>)[join]!;
   return join === 'all' ? parts.every((part) => treeHolds(deps, part)) : parts.some((part) => treeHolds(deps, part));
 }
@@ -2508,6 +2516,13 @@ function readerHolds(deps: PageDeps, when: WhenReaderLeaf): boolean {
   if (deps.readerIs === undefined) return false;
   const words: readonly unknown[] = Array.isArray(when.reader) ? when.reader : [when.reader];
   return words.includes(deps.readerIs);
+}
+
+/** Whether a leaf about what was picked holds: the filter's choice is one it names, `''` for none picked. */
+function pickedHolds(deps: PageDeps, when: WhenPickedLeaf): boolean {
+  const now = deps.picked?.get(when.picked) ?? '';
+  const words: readonly string[] = Array.isArray(when.is) ? when.is : [when.is as string];
+  return words.includes(now);
 }
 
 /** Whether one leaf of a `when:` holds of the figure it names. */
@@ -4186,6 +4201,19 @@ function wholeShape(deps: PageDeps, block: PageBlock, register: string, schema: 
   return { by: label, value: summed ?? null, done: null };
 }
 
+/** A bar's or a split's second field for its label (`or:`), a text field of the list, or `null`. */
+function orOf(block: PageBlock, schema: Schema, by: WholeAsk['by']): string | null {
+  if ((block.kind !== 'bar' && block.kind !== 'split') || by.length !== 1) return null;
+  const or = block.columns?.[0]?.or;
+  return typeof or === 'string' && or !== by[0]!.field && schema.fields[or]?.type === 'text' ? or : null;
+}
+
+/** A BANK'S DAY AT THE HEAD OF ITS LINE ("19OCT26 "), which is no part of a name. */
+const BANK_STAMP = /^\d{1,2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}(?:\d{2})?\s+(?=\S)/iu;
+
+/** A name as two lines are matched on: no bank day before it, one space between words, any case. */
+const nameKey = (v: string): string => v.replace(BANK_STAMP, '').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
+
 /**
  * A kind that adds up, over every row its scope and `where` admit: the parts by label and the total, or
  * `null` when its columns name nothing to add up. `whole` is a heat's `of:` as a predicate, `null` when it has none.
@@ -4204,8 +4232,14 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   const held = money ? deps.ctx.fx?.() : undefined;
   const home = held?.home ?? null;
   const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
+  /* A BAR'S LABEL HAS A SECOND FIELD TO READ WHERE IT HOLDS NOTHING (`or:` on its first column), read only where its
+     words name a label the first field already holds (live check of 30 October, 10): Reports' "Paid most" counted only
+     the lines a payee was put on, so Ahmed Emad read 1,501.50 beside two lines of his own of 15,015 and 23,020 that
+     named him in the bank's words alone. A line whose words name nobody known stays with the rows that hold none. */
+  const or = orOf(block, schema, shape.by);
+  const by = or === null ? shape.by : [...shape.by, { field: or }];
   const ask = (w: Predicate | undefined) =>
-    wholeParts(deps, { register, where: w, by: shape.by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null }, splitOf(schema)?.of === shape.value ? splitOf(schema)!.field : null);
+    wholeParts(deps, { register, where: w, by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null }, splitOf(schema)?.of === shape.value ? splitOf(schema)!.field : null);
   type Figure = Pick<WholeRow, 'value' | 'unit' | 'parts'> & { converted?: { asOf: string; stale: boolean } };
   const figure = (g: Gathered): Figure => {
     if (shape.value === null) return { value: shape.done ? g.done : g.rows };
@@ -4221,6 +4255,8 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
 
   const read = ask(where);
   if (!read.ok) return read;
+  const known = new Map<string, Json>();
+  if (or !== null) for (const part of read.value) if (typeof part.by[0] === 'string' && part.by[0].trim() !== '' && !known.has(nameKey(part.by[0]))) known.set(nameKey(part.by[0]), part.by[0]);
   const heat = block.kind === 'heat';
   const from = heat ? heatFrom(today) : '';
   const drawn = (label: Json): label is string => typeof label === 'string' && label >= from && label <= today;
@@ -4235,7 +4271,8 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
     const done = shape.done ? shape.done(part.by[1] ?? null) : false;
     gather(total, part, done);
     if (shape.by.length === 0) continue;
-    const label = part.by[0] ?? null;
+    const own = part.by[0] ?? null;
+    const label = (own === null || own === '') && or !== null && typeof part.by[1] === 'string' ? (known.get(nameKey(part.by[1])) ?? null) : own;
     if (heat && !drawn(label)) {
       outside += part.rows;
       if (typeof label === 'string') outsideDays.add(label);

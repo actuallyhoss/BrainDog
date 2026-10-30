@@ -154,7 +154,8 @@ test('A PAGE A PLACE DECLARES AND THE LIST OF THE SAME NAME ARE ONE ROW: the pag
     counted: {},
   });
   const kids = m.places.find((p) => p.label === 'Money')?.kids ?? [];
-  assert.deepEqual(kids.map((k) => `${k.label} ${k.href}`), ['Accounts /p/money-accounts', 'Ledger /p/money-ledger', 'Filing rules /p/money-rules', 'Categories /r/categories']);
+  /* AND THE FILING RULES ARE NO ROW AT ALL (audit of 30 October, 40): they open from the Ledger they file. */
+  assert.deepEqual(kids.map((k) => `${k.label} ${k.href}`), ['Accounts /p/money-accounts', 'Ledger /p/money-ledger', 'Categories /r/categories']);
 });
 
 test('EXACTLY ONE ROW IS LIT: the row the page is on most closely, a list over its place and a project over Projects', () => {

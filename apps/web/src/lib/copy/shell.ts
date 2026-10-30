@@ -243,7 +243,8 @@ export const shell = {
   pastDay: (day: string) => `Past ${day}`,
   figureConverted: (day: string) => `Converted at rates as of ${day}.`,
   /** Under a cash figure whose line is the walk ahead: where it is lowest, said roughly, and on which day. */
-  cashLowest: (amount: string, day: string) => `Lowest ${amount} on ${day}`,
+  /** `day` is "today" or "on 29 Oct", as Forecast says the lowest point. */
+  cashLowest: (amount: string, day: string) => `Lowest ${amount} ${day}`,
   /* A BAR'S OWN NOTE, beside the bar and not under the chart: what its money was kept in before it was said in home. */
   convertedFrom: (codes: string) => `converted from ${codes}`,
   /**

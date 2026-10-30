@@ -7,7 +7,7 @@ import { LEDGER_COLUMNS } from './parts/ledger.ts';
  * THE LAST NINETY DAYS OF WHAT MOVED, as the payee figures read them (`figures/payees.ts`): cleared, not between a
  * person's own accounts, and nothing dated ahead.
  */
-const LEDGER_90D = 'state is cleared, transfer is false, stays is not true, on after -90d, on before +1d';
+const LEDGER_90D = 'state is cleared, transfer is false, stays is not true, corrects is not true, on after -90d, on before +1d';
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: one bar a payee, the most paid first, how often each was paid and the
@@ -72,7 +72,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       span: 12,
       source: 'register.transactions',
       where: `${LEDGER_90D}, direction is out`,
-      columns: [{ field: 'payee' }, { field: 'amount' }],
+      columns: [{ field: 'payee', or: 'what' }, { field: 'amount' }],
       unset: 'Not named yet',
       limit: 15,
       empty: 'Nobody paid in 90 days.',
@@ -111,7 +111,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       span: 12,
       source: 'register.transactions',
       /* PAID, SO MONEY OUT: a payout coming in is under Money in, never under Last paid. */
-      where: 'state is not void, transfer is false, stays is not true, direction is out',
+      where: 'state is not void, transfer is false, stays is not true, corrects is not true, direction is out',
       columns: LEDGER_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: 10,
@@ -150,7 +150,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       span: 12,
       source: 'register.transactions',
       where: `${LEDGER_90D}, direction is in`,
-      columns: [{ field: 'payee' }, { field: 'amount' }],
+      columns: [{ field: 'payee', or: 'what' }, { field: 'amount' }],
       unset: 'Not named yet',
       limit: 10,
       empty: 'Nothing in for 90 days.',

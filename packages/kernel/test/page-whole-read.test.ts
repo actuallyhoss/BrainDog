@@ -345,3 +345,18 @@ test('A READER HELD TO SOME OF A LIST IS HANDED HER ROWS ADDED UP, and nothing o
   for (const label of ['Food', 'Travel']) assert.ok(!said.includes(label), `${label} is on her page`);
   assert.ok(!said.includes(`"total":${ROWS}`) && !said.includes(`"matched":${ROWS}`), 'the count of the whole list is on her page');
 });
+
+/* LAST, SINCE IT ADDS ROWS: the tests above count the 301. */
+test('A LINE WITH NO LABEL COUNTS UNDER THE ONE ITS SECOND FIELD NAMES (`or:`), only where that is a label a line holds', () => {
+  const plain = both(k, { kind: 'bar', columns: BY_CATEGORY });
+  const food = plain.rows.find((r) => r.label === 'Food')!.rows;
+  const none = plain.rows.find((r) => r.label === null)!.rows;
+  for (const what of ['19OCT26 FOOD', 'Somebody nobody files']) {
+    const made = k.create('ledger', { what, on: day(1), amount: { amount: 500, currency: 'EGP' } }, { actor: 'p_1' });
+    assert.ok(made.ok, JSON.stringify(made));
+  }
+  const w = both(k, { kind: 'bar', columns: [{ field: 'category', or: 'what' }, { field: 'amount' }] });
+  assert.equal(w.rows.find((r) => r.label === 'Food')?.rows, food + 1, 'the line whose words name Food is not under Food');
+  assert.equal(w.rows.find((r) => r.label === null)?.rows, none + 1, 'a line naming nobody known left the rows that hold none');
+  assert.equal(w.rows.filter((r) => typeof r.label === 'string' && !CATEGORIES.includes(r.label)).length, 0, 'a line made a label of its own words');
+});

@@ -22,7 +22,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 import { KEEP_RATES_AT } from '@braindog/declare';
 import type { Bars, FxRead, MeasureSeries, Part, QueueQuestion, TargetIn } from '@braindog/kernel';
 import { COSTS, isBucket, isQuiet } from '@braindog/kernel/constants';
-import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, exponentOf, integer, slugWords, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
+import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, exponentOf, integer, slugWords, money, moneyWhole, quantity, shortDay, since, barFigures, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { stopped } from '../shell/headline.ts';
@@ -69,7 +69,7 @@ import { liveOf } from '../ui/face.ts';
 import { sourceRows } from './source-rows.ts';
 import { scriptOf } from './scripts.ts';
 import { noteWithoutLeftovers } from './brief.ts';
-import { learnZone, recordToday, weekdayDaySaid } from './zone.ts';
+import { learnZone, recordToday } from './zone.ts';
 import { pathOf } from '../ui/icons.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
@@ -929,7 +929,9 @@ export function tileOf(
   const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
   /* A TREND AHEAD IS THE WALK FROM TODAY (`cells[].ahead`), and its note says the lowest it reaches and on which day. */
   const ahead = trend ? aheadOf((cell as { ahead?: unknown }).ahead) : null;
-  const lowest = ahead ? copy.cashLowest(aboutMoney(ahead.low.value, ahead.currency), weekdayDaySaid(ahead.low.day)) : '';
+  /* THE LOWEST SAID AS FORECAST SAYS IT (live check of 30 October, 18): whole money to the unit, and "today" or the day
+     as "29 Oct". Money and Today read "Lowest EGP 682,000 on Thu 29 Oct" where Forecast read "Lowest EGP 682,316 today". */
+  const lowest = ahead ? copy.cashLowest(wholeAmount(ahead.low.value, ahead.currency), lowDaySaid(ahead.low.day)) : '';
   return {
     id: cell.metric,
     label,
@@ -940,7 +942,9 @@ export function tileOf(
     value: !r.unit
       ? format(decl?.format ?? declared, r.value)
       : /^[A-Z]{3}$/u.test(r.unit)
-        ? money(Math.round(r.value), r.unit)
+        ? /* A TILE'S MONEY IN WHOLE UNITS (recheck of 30 October, 34): "Left over −£9,762.16" stood beside "£930" and
+             "£10,692". The Ledger and the tables keep their pennies. */
+          wholeMoneyIn(money(Math.round(r.value), r.unit))
         : quantity(r.value, r.unit),
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
@@ -973,14 +977,33 @@ function aheadOf(v: unknown): NonNullable<Metric['ahead']> | null {
   return { from, currency, low: { day: low.day, value: low.value } };
 }
 
-/** An amount ahead, said roughly, as a sentence about the future says one: three figures of whole units. */
-function aboutMoney(minor: number, currency: string): string {
+/** Each money column of a table's rows said as one set (`barFigures`), in place. */
+function moneySets(register: string, columns: readonly { field?: unknown }[], rows: { cells: (string | null)[] }[]): void {
+  const fields = REGISTERS[register]?.fields ?? [];
+  columns.forEach((c, i) => {
+    if (typeof c.field !== 'string') return;
+    const type = fields.find((f) => f.id === c.field)?.type;
+    const at = rows.flatMap((r, n) => (typeof r.cells[i] === 'string' && r.cells[i] !== '' ? [n] : []));
+    /* A LIST'S MONEY FIELD, OR A COLUMN NO LIST DECLARES (what falls due, across lists) whose every cell is money. */
+    const money = type === 'money' || (type === undefined && at.length > 0 && at.every((n) => /\p{Sc}|\b[A-Z]{3}\b/u.test(rows[n]!.cells[i] as string) && /\d/u.test(rows[n]!.cells[i] as string)));
+    if (!money) return;
+    const said = barFigures(at.map((n) => rows[n]!.cells[i] as string));
+    at.forEach((n, k) => (rows[n]!.cells[i] = said[k]!));
+  });
+}
+
+/** An amount ahead in whole units, as Forecast says its lowest: never rounded to three figures beside it. */
+function wholeAmount(minor: number, currency: string): string {
   const exp = exponentOf(currency);
-  const whole = Math.round(minor / 10 ** exp);
-  const size = Math.abs(whole);
-  const step = size >= 1000 ? 10 ** (Math.floor(Math.log10(size)) - 2) : 1;
-  const rounded = (whole < 0 ? -1 : 1) * Math.round(size / step) * step * 10 ** exp;
-  return moneyWhole(rounded, currency, homeCurrency())?.text ?? money(rounded, currency);
+  const whole = Math.round(minor / 10 ** exp) * 10 ** exp;
+  return moneyWhole(whole, currency, homeCurrency())?.text ?? money(whole, currency);
+}
+
+/** The day of a lowest point as Forecast says it: "today", else "on 29 Oct", with its year only when it is not this one. */
+function lowDaySaid(day: string): string {
+  const today = recordToday();
+  if (day.slice(0, 10) === today) return 'today';
+  return `on ${shortDay(day.slice(0, 10), today)}`;
 }
 
 /** One row of an `actions` block, back in the shape the actions read gives "Runs on". */
@@ -1884,6 +1907,8 @@ export function blockOf(
         ...(at ? { href: `/r/${at[1]}/${at[2]}` } : {}),
       };
     });
+    /* AND ITS AMOUNTS AS ONE SET, as every table's money column is (`moneySets`): no ".00" down whole amounts. */
+    if (kind === 'table') moneySets('deadlines', b.columns ?? [], rows as { cells: (string | null)[] }[]);
     return { ...shell, register: 'deadlines', entries, matched: entries, rows, shown: entries.length, total: matched };
   }
   /* KEY NUMBERS ARE NOT ROWS OF A LIST: the record answers them as the block's `kpis`, which ride on it whole and are
@@ -2066,6 +2091,10 @@ export function blockOf(
   const rows = toRows(register, drawnEntries, columns, now, namesOf(refs));
   /* WHO CHANGED EACH ROW LAST, named by the kernel on `changes`, and each money column's sign. */
   markColumns(register, b.columns, entries, rows, (_e, n) => changeOf(changed, n));
+  /* A TABLE'S MONEY COLUMN AS ONE SET (recheck of 30 October, 34): no ".00" down a column of whole amounts, and every
+     amount to the penny where one has pence, as a bar's figures are (`barFigures`). The Ledger's lines are a timeline,
+     said to the penny by its own rule. */
+  if (kind === 'table') moneySets(register, columns, rows);
   /* WHETHER AN AGENT IS ON EACH ROW, which the record works out from the row's history and its live
      runs. Narrowed here like everything else the record sends: a `working_now` that is not an array
      of booleans is left off, and the block draws no dots rather than drawing one for `"yes"`. */
@@ -2224,7 +2253,9 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
       if (dayFigure) return format('day', v);
       /* A MONEY FIGURE THE RECORD ANSWERED WITH NO CURRENCY (a sum of nothing) is said in the home one, never a bare "0". */
       const shape = Object.hasOwn(METRICS, figure) ? METRICS[figure]?.format : undefined;
-      if (shape === 'money' || shape?.startsWith('money.')) return format(shape, v);
+      /* AND IN WHOLE UNITS, AS EVERY SENTENCE SAYS MONEY (recheck of 30 October, 34): "£11,317" stood beside
+         "£3,655.20" in one line. The tiles and the Ledger keep their pennies; a sentence does not. */
+      if (shape === 'money' || shape?.startsWith('money.')) return wholeMoneyIn(format(shape, v));
       return Number.isInteger(v) ? integer(v) : String(v);
     }
     if (typeof v === 'boolean') return v ? 'yes' : 'no';
@@ -2233,14 +2264,14 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
     if (Array.isArray(v)) {
       const parts = v.filter((p): p is { amount: number; currency: string } => isObject(p) && typeof p.amount === 'number' && typeof p.currency === 'string');
       if (!parts.length || parts.length !== v.length) return null;
-      if (!path.endsWith('.apart')) return partsText(parts);
-      const said = parts.map((p) => money(Math.round(p.amount), p.currency));
+      if (!path.endsWith('.apart')) return wholeMoneyIn(partsText(parts));
+      const said = parts.map((p) => wholeMoneyIn(money(Math.round(p.amount), p.currency)));
       return said.length === 1 ? said[0]! : `${said.slice(0, -1).join(', ')} and ${said.at(-1)}`;
     }
     if (v !== null && typeof v === 'object') {
       const { amount, currency } = v as { amount?: unknown; currency?: unknown };
       /* `<figure>.converted` IS ABOUT THAT MUCH, in whole units (`convertedValue`), so it is said with no pennies. */
-      if (typeof amount === 'number' && typeof currency === 'string') return path.endsWith('.converted') ? money(amount, currency).replace(/\.0+$/u, '') : money(amount, currency);
+      if (typeof amount === 'number' && typeof currency === 'string') return wholeMoneyIn(money(amount, currency));
     }
     return null;
   };
