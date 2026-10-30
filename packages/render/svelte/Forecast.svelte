@@ -402,6 +402,7 @@
         class="forecast-low-label num"
         data-side={p.lowLabel.side}
         data-drop={p.lowLabel.drop ? '' : undefined}
+        data-foot={p.lowLabel.foot ? '' : undefined}
         style="--at:{p.lowLabel.at};--y:{p.lowLabel.y}"
         aria-hidden="true"><span class="forecast-low-word">{FORECAST_LOWEST}</span><span class="forecast-low-figure">{p.lowLabel.figure}</span></span
       >{/if}
