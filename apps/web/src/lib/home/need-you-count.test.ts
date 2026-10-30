@@ -89,7 +89,7 @@ test('the money leads Today’s Needs you, oldest first in each group (today F3)
 
 test('the rail, the tab and Today all read the one count', () => {
   /* The rail and the phone tab both take `open` from the shell. */
-  assert.match(read('../../routes/+layout.svelte'), /const open = \$derived\(needYouCount\(/u);
+  assert.match(read('../shell/AppFrame.svelte'), /const open = \$derived\(needYouCount\(/u);
   /* Today hands `boot`'s waits, less what was pressed, to the page it draws. */
   assert.match(read('./Home.svelte'), /const w = waitsNow\(\);/u);
   assert.match(read('./Home.svelte'), /homeDrawn\(live\.page\.blocks, live\.now, voice, one, waits/u);

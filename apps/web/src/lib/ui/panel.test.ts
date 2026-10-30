@@ -17,7 +17,7 @@ test('the panel docks from one width, and a phone starts at another below it, bo
   assert.equal(PHONE_WIDTH, `(width < ${PHONE}px)`);
   assert.ok(PHONE < DOCKS);
   /* THE SHELL'S DOCK COLUMN OPENS WHERE THE PANEL DOCKS, so a docked panel always has its column and a sheet never does. */
-  const shell = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  const shell = readFileSync(new URL('../shell/AppFrame.svelte', import.meta.url), 'utf8');
   assert.match(shell, new RegExp(`@media \\(width >= ${DOCKS}px\\) \\{\\s*\\.shell \\{\\s*grid-template-columns: [^;]*var\\(--dock-col`));
 });
 
@@ -283,7 +283,7 @@ test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
  * is the opaque tile with a 1px edge. `lib/no-glass.test.ts` holds the whole app to it; this names the overlays.
  */
 test('no overlay or chrome blurs what is behind it', () => {
-  const files = ['Panel.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', '../shell/SideBar.svelte', '../../routes/+layout.svelte'];
+  const files = ['Panel.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', '../shell/SideBar.svelte', '../shell/AppFrame.svelte'];
   for (const file of files) {
     const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
     assert.doesNotMatch(code, /backdrop-filter|--glass/u, `${file} still blurs or names the glass`);

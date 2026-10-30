@@ -35,7 +35,7 @@ import { forget, readBoot, refusedShell, type Fetch } from './boot-live.ts';
 const ROUTES = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes');
 const SIGNIN = readFileSync(join(ROUTES, 'signin', '+page.svelte'), 'utf8');
 const INVITE = readFileSync(join(ROUTES, 'invite', '+page.svelte'), 'utf8');
-const LAYOUT = readFileSync(join(ROUTES, '+layout.svelte'), 'utf8');
+const LAYOUT = readFileSync(join(ROUTES, '..', 'lib', 'shell', 'AppFrame.svelte'), 'utf8');
 
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -124,7 +124,26 @@ for (const [where, src, key] of [
 test('SIGNING IN FORGETS THE KEPT BOOT, so a move that is not a full load still asks the record', () => {
   const enter = /const enter = [\s\S]*?\n {2}\};/u.exec(SIGNIN)?.[0] ?? '';
   assert.ok(enter, 'no `enter` on the sign-in screen');
-  assert.match(enter, /\bforget\(\)/u, `enter() does not call forget():\n${enter}`);
+  /* THROUGH `forget-read.ts`, which calls `forget` once the readers have loaded and drops the device's copy before. */
+  assert.match(enter, /\bforgetRead\(\)/u, `enter() does not call forgetRead():\n${enter}`);
+  assert.doesNotMatch(SIGNIN, /from '\$lib\/record\/boot-live\.ts'/u, 'sign-in imports the record readers again (E14)');
+});
+
+test('FORGETTING WITHOUT THE READERS DROPS THE COPY, and with them calls their own forget', async () => {
+  const { forgetRead } = await import('./forget-read.ts');
+  const { COPY_KEY } = await import('./boot-copy.ts');
+  /* `boot-live.ts` is imported at the top of this file, so its `forget` is the one called here. */
+  const kept = new Map<string, string>([[COPY_KEY, '{}']]);
+  const store = { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => void kept.set(k, v), removeItem: (k: string) => void kept.delete(k) };
+  const was = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { value: store, configurable: true });
+  try {
+    forgetRead();
+    assert.equal(kept.has(COPY_KEY), false, 'the shell copy outlived a sign-in');
+  } finally {
+    if (was) Object.defineProperty(globalThis, 'localStorage', was);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
 });
 
 test('ACCEPTING AN INVITATION FORGETS THE KEPT BOOT, and only once the host has said yes', () => {

@@ -1,7 +1,7 @@
 /**
  * The first screens of one walk, drawn and read into the snapshots `first-screen.mjs` judges.
  * `first-run.mjs` hands its `shot` the record at two moments, just kept and just told; this draws each as the app's
- * shell would at 1440: the sidebar (`shell/SideBar.svelte`, fed as `routes/+layout.svelte` feeds it, the full column
+ * shell would at 1440: the sidebar (`shell/SideBar.svelte`, fed as `lib/shell/AppFrame.svelte` feeds it, the full column
  * a desk that wide draws) and Today inside `main` (the head and the body, `PageHead.svelte` and `PageView.svelte`, fed
  * as `Home.svelte` feeds them), and as a phone would at 390: the same Today over the tab bar (`shell/TabBar.svelte`).
  *
@@ -32,7 +32,7 @@ export const WIDTH = 1440;
 export const PHONE = 390;
 
 /**
- * The sidebar's props at one address, read off the shell as `routes/+layout.svelte` reads them for a reader who has
+ * The sidebar's props at one address, read off the shell as `lib/shell/AppFrame.svelte` reads them for a reader who has
  * arranged nothing, with nothing kept on this device (no list's facts, no pins) and nothing heard since `boot`: the
  * model (`sideModel`), the row lit there (`litOf`), and the rail's places, which the phone's tab bar holds.
  */

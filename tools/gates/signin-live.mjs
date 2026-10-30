@@ -52,7 +52,7 @@ export const needs = ['web-build'];
 /** How long any one step may take before it is a finding, in milliseconds. */
 const STEP_MS = 30_000;
 
-/** The marker Today carries once its first read has completed (`apps/web/src/routes/+layout.svelte`). */
+/** The marker Today carries once its first read has completed (`apps/web/src/lib/shell/AppFrame.svelte`). */
 const SCREEN = 'main#main[data-screen]';
 
 /** The fields `WebAuthn.addCredential` needs, every one a string but the two flags and the count. */

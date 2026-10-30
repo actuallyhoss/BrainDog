@@ -34,6 +34,7 @@ import { forgetKept } from '../data/kept.ts';
 import { forgetRows } from '../data/ref-rows.ts';
 import { forgetToday } from '../home/today-kept.ts';
 import { dropCopy } from './boot-copy.ts';
+import { forgetWith } from './forget-read.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
 import { listName, titleOf } from './names.ts';
@@ -595,6 +596,8 @@ export function forget(): void {
   forgetKept();
   forgetToday();
 }
+/* SIGN-IN FORGETS THROUGH `forget-read.ts`, which never loads this file: from the moment it has loaded, this is it. */
+forgetWith(forget);
 
 /** Drop only the kept answer to `boot` and the last shell copy, so the next screen asks `boot` again. */
 export function forgetShell(): void {

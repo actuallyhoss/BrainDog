@@ -13,7 +13,7 @@
  * site's pricing buttons, and those go to Stripe's page as before.
  *
  * PLAIN TYPESCRIPT, like `auth.ts` beside it, so a test can load it in Node with a fake `fetch` and no browser. The page
- * (`routes/signup/+page.svelte`) and the no-record state on `/start` (`routes/start/NoRecord.svelte`) hold the runes.
+ * (`routes/signup/Signup.svelte`) and the no-record state on `/start` (`routes/start/NoRecord.svelte`) hold the runes.
  *
  * EVERY CALL IS AT THE ROOT, under no slug, as `/auth/switch` and `/account/records` are: sign-up and billing are the
  * person's, not a record's, and there is no record yet to name.
@@ -33,28 +33,12 @@ import { playedBy } from './start/parts.ts';
 import type { Reply } from './first-run.ts';
 import type { Asked as Answered, FirstAsked, SetupAsked, SetupReply } from './start/ask.ts';
 import type { HeardLine, Place, Proposal } from './start/propose.ts';
+import { call, checkName, isObj, live, str, type Asked, type Io, type NameSeen, type SignupMode } from './signup-door.ts';
 
-/** The world the calls reach, so a test needs no socket. */
-export type Io = { fetch: (url: string, init: RequestInit) => Promise<Response> };
+/* THE DOOR AND ITS ENVELOPE LIVE IN `signup-door.ts`, where sign-in reads them without the rest of this file. */
+export { checkName, signupMode } from './signup-door.ts';
+export type { Asked, Io, NameSeen, SignupMode } from './signup-door.ts';
 
-/**
- * An answer, or the one thing the screen needs to say instead. `fix` is the host's sentence when it sent one, and `at`
- * the field it was about, so a free record refused for its plan is not offered the name to try again.
- */
-export type Asked<T> =
-  | { ok: true; value: T }
-  | { ok: false; kind: 'refused'; fix: string | null; at?: string; code?: string }
-  | { ok: false; kind: 'locked'; retryAfter: number }
-  | { ok: false; kind: 'unreachable' };
-
-/** Who may sign up on this host: anybody, a new address with a code, or nobody yet. */
-export type SignupMode = 'open' | 'invite' | 'closed';
-
-/**
- * What the name check answers, who may sign up (`mode`, and `open` when it is not `closed`), and the Turnstile site key
- * when the host asks for one.
- */
-export type NameSeen = { slug: string; free: boolean; why: string | null; mode: SignupMode; open: boolean; turnstile: string | null };
 
 /** What spending the mailed proof answers: who was made, and what was typed at the start. */
 export type Verified = { person: string; email: string; slug: string; name: string | null; tz: string | null };
@@ -152,45 +136,6 @@ export function keepPlan(storage: Pick<Storage, 'setItem' | 'removeItem'> | null
   }
 }
 
-/** Fifteen minutes, the lockout's own length, for a 429 that does not say how long. */
-const LOCK_SECONDS = 900;
-
-const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
-
-function live(): Io {
-  return { fetch: (url, init) => globalThis.fetch(url, init) };
-}
-
-/** One call in the `/auth` envelope. A body makes it a POST, sent as JSON because the host refuses anything else. */
-async function call(io: Io, path: string, body?: Record<string, unknown>): Promise<Asked<unknown>> {
-  let res: Response;
-  try {
-    res = await io.fetch(path, {
-      method: body ? 'POST' : 'GET',
-      headers: body ? { 'content-type': 'application/json', accept: 'application/json' } : { accept: 'application/json' },
-      credentials: 'same-origin',
-      cache: 'no-store',
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-  } catch {
-    return { ok: false, kind: 'unreachable' };
-  }
-  const said: unknown = await res.json().catch(() => undefined);
-  const env = isObj(said) ? said : null;
-  if (res.status === 429) {
-    const n = typeof env?.retryAfter === 'number' ? env.retryAfter : Number(res.headers.get('retry-after') ?? Number.NaN);
-    return { ok: false, kind: 'locked', retryAfter: Number.isFinite(n) && n > 0 ? Math.ceil(n) : LOCK_SECONDS };
-  }
-  if (res.ok && env?.ok === true) return { ok: true, value: env.value };
-  if (env?.ok === false || (res.status >= 400 && res.status < 500)) {
-    const refusal = isObj(env?.refusal) ? env.refusal : null;
-    const at = str(refusal?.at);
-    const code = str(refusal?.code);
-    return { ok: false, kind: 'refused', fix: str(refusal?.fix), ...(at !== null ? { at } : {}), ...(code !== null ? { code } : {}) };
-  }
-  return { ok: false, kind: 'unreachable' };
-}
 
 /**
  * A record name as it would be typed into the address: lower-case, spaces and anything else as one hyphen, no hyphen
@@ -781,34 +726,6 @@ export function zone(): string | null {
   }
 }
 
-/** Whether a name is free, and whether sign-up is open here at all. An empty name asks only the second. */
-export async function checkName(slug: string, io: Io = live()): Promise<Asked<NameSeen>> {
-  const out = await call(io, `/auth/signup/name?slug=${encodeURIComponent(slug)}`);
-  if (!out.ok) return out;
-  const v = isObj(out.value) ? out.value : {};
-  /* `mode` FIRST; A HOST A RELEASE OLDER SAYS ONLY `open`, which was open to anybody or to nobody. */
-  const mode: SignupMode = v.mode === 'open' || v.mode === 'invite' || v.mode === 'closed' ? v.mode : v.open === true ? 'open' : 'closed';
-  return {
-    ok: true,
-    value: {
-      slug: typeof v.slug === 'string' ? v.slug : slug,
-      free: v.free === true,
-      why: str(v.why),
-      mode,
-      open: mode !== 'closed',
-      turnstile: str(v.turnstile),
-    },
-  };
-}
-
-/**
- * WHO MAY SIGN UP HERE, for a screen that needs only that (sign in's foot line, first S8): the same one door sign-up
- * asks, with no name. `null` when the host did not answer, and the screen then offers no way to a BrainDog of one's own.
- */
-export async function signupMode(io: Io = live()): Promise<SignupMode | null> {
-  const out = await checkName('', io);
-  return out.ok ? out.value.mode : null;
-}
 
 /**
  * Ask for a record: the host always answers the same for an address, and the mail says the rest. By invitation, the

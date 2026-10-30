@@ -42,7 +42,7 @@
   import { desktopStart, keepVerifier, pkce } from '$lib/desktop-signin.ts';
   import { isApp, openOutside } from '$lib/shell.ts';
   import { copy } from '$lib/copy.ts';
-  import { forget } from '$lib/record/boot-live.ts';
+  import { forgetRead } from '$lib/record/forget-read.ts';
   import { words } from './words.ts';
   import { googleStart, googleWhy, onwardOf, stateOf, type GoogleWhy, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
   import { actable, mailHeld, noDoorYet } from './first-door.ts';
@@ -54,7 +54,7 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
   import Human from './Human.svelte';
-  import { signupMode, type SignupMode } from '$lib/signup.ts';
+  import { signupMode, type SignupMode } from '$lib/signup-door.ts';
 
   const here = support();
 
@@ -294,7 +294,7 @@
    * a record it had read, so a move out that is not a full load asks the record again rather than drawing the old one.
    */
   const enter = (via: 'passkey' | 'key' | 'link') => (who: Who) => {
-    forget();
+    forgetRead();
     entered = { who, via };
     link = null;
     step = { at: 'idle' };

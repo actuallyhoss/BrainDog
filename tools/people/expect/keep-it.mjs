@@ -179,7 +179,7 @@ async function lettersFor(sent, to, at) {
  *
  * `title` is the record's name she was shown at step 2 (`Mariam's Candles` for Mariam), the name the record must open
  * under. `name` is what the page sends as `name` at the start, by default as the page sends it
- * (`routes/signup/+page.svelte` `send`: `read.name`, the name heard in her sentence), so a page that names the record
+ * (`routes/signup/Signup.svelte` `send`: `read.name`, the name heard in her sentence), so a page that names the record
  * after her and not after what she was shown is red here.
  * `wrap(fetch, harness)` answers the fetch the tab uses: the test's way to break one door and see the line go red.
  * Every line the Worker writes while the walk runs is held back and read for her sentence, then let go.

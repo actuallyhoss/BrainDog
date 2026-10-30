@@ -190,7 +190,7 @@ test('a stored colour that still clears the floors is put back, and kept', () =>
  * first so that a paragraph ABOUT the old shape cannot pass for the old shape.
  */
 test('and the shell catches it, in the toast dialect the rest of the shell already speaks', () => {
-  const shell = readFileSync(fileURLToPath(new URL('../routes/+layout.svelte', import.meta.url)), 'utf8');
+  const shell = readFileSync(fileURLToPath(new URL('./shell/AppFrame.svelte', import.meta.url)), 'utf8');
   const code = shell.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, '');
 
   /* THE CALL AND THE LINE UNDER IT, EXTRACTED, AND THE EXTRACTION IS NOT TIDINESS. A `doesNotMatch`

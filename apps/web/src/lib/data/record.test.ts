@@ -598,7 +598,7 @@ test('NO SCREEN READS THE SAMPLE OR HOLDS A ROW THE RECORD WAS NOT GIVEN', () =>
   const screens: [string, string][] = [
     ['the register list', '../../routes/r/[register]/+page.svelte'],
     ['the row page', '../../routes/r/[register]/[seq]/+page.svelte'],
-    ['the shell', '../../routes/+layout.svelte'],
+    ['the shell', '../shell/AppFrame.svelte'],
     ['the first run', '../../routes/start/+page.svelte'],
   ];
   for (const [what, at] of screens)

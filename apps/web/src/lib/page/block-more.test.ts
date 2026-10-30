@@ -120,6 +120,6 @@ test('a refused page can be asked again from the same cursor', async () => {
 });
 
 test('nothing every screen loads imports this file: it is reached by import() only', () => {
-  const entry = ['../../routes/+layout.svelte', '../../routes/+layout.ts'].map((p) => new URL(p, import.meta.url));
+  const entry = ['../../routes/+layout.svelte', '../../routes/+layout.ts', '../shell/AppFrame.svelte'].map((p) => new URL(p, import.meta.url));
   for (const url of entry) if (existsSync(url)) assert.doesNotMatch(readFileSync(url, 'utf8'), /block-more/u);
 });

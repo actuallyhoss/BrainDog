@@ -22,7 +22,7 @@ type Item = { key: string; href: string; label: string; near: readonly string[] 
 type Drawn = { keys: ReadonlySet<string>; hidden: readonly string[] };
 type ArrivedIn = (was: Drawn | null, now: readonly Item[]) => string[];
 
-const shell = readFileSync(fileURLToPath(new URL('./+layout.svelte', import.meta.url)), 'utf8');
+const shell = readFileSync(fileURLToPath(new URL('../lib/shell/AppFrame.svelte', import.meta.url)), 'utf8');
 /* Comments off first, so a paragraph about the rule cannot pass for the rule. */
 const code = shell.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, '');
 

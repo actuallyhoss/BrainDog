@@ -48,7 +48,8 @@ const RENDERED_IN = new Map([
   ['lib/page/Arrange.svelte withoutEntry(route.url', 'the page the person is on, with the entry line taken off its query: `route.url` already holds the app base'],
   ['lib/board/WidgetSheet.svelte url', 'the page the person is on with `?widgets` taken off its query, a replace: `page.url` already holds the record'],
   ['lib/shell.ts url', 'an outside link opened in this tab (a payment page), which is not an address in the app'],
-  ['routes/+layout.svelte path', '`appPath` answers only an address of the app, from the Mac app\'s Go menu'],
+  ['lib/shell/AppFrame.svelte path', '`appPath` answers only an address of the app, from the Mac app\'s Go menu'],
+  ['lib/shell/LightFrame.svelte path', '`appPath` answers only an address of the app, from the Mac app\'s Go menu, as on the app frame'],
   ['service-worker.ts `${to.href}${url.search}`', 'the start address sent on to the record the copy\'s mark names, an absolute address `keep` wrote from `apiBase`'],
 ]);
 
