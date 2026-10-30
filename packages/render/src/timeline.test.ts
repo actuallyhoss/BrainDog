@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dayThisYear, rowsCell, timelineCell, timelineDays, timelineTitle } from './timeline.ts';
+import { dayThisYear, rowsCell, timelineCell, timelineDays, timelineTitle, timelineWordy } from './timeline.ts';
 
 const rows = (...days: string[]) => days.map((d) => ({ cells: [d, 'something'] }));
 
@@ -62,4 +62,17 @@ test('A BANK LINE READS AS A NAME: its own date stamp and a till number run onto
   assert.equal(timelineTitle('Rent2'), 'Rent2');
   assert.equal(timelineTitle('HMRC VAT Q3'), 'HMRC VAT Q3');
   assert.equal(timelineTitle('22OCT26'), '22OCT26');
+});
+
+/* A project's note drew its log on a phone as "Raise…" beside "first increase since launch": a sentence of detail took
+   the line from the title. Such a detail is marked to go under its title there; a figure keeps its place. */
+test('A DETAIL OF WORDS IS TOLD FROM A FIGURE, so a phone can put it under its title', () => {
+  assert.equal(timelineWordy('first increase since launch'), true);
+  assert.equal(timelineWordy('Hobnail cancelled'), true);
+  assert.equal(timelineWordy('{{bad:not paid}} yet'), true);
+  assert.equal(timelineWordy('+£2,400'), false);
+  assert.equal(timelineWordy('EGP 467,915'), false);
+  assert.equal(timelineWordy('£1,200 a month'), false);
+  assert.equal(timelineWordy('Done'), false);
+  assert.equal(timelineWordy(''), false);
 });
