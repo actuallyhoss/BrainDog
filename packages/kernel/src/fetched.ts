@@ -124,16 +124,19 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
 
     /* ── the bytes, first and always ── */
     const raw = deps.mint();
+    /* A U+0000 IN A PROVIDER'S EXPORT IS KEPT AS U+FFFD, as `runArrival` keeps one in a text (review of 30 October, R5): the
+       port refuses U+0000 in any text, so the insert threw, the page was never kept, its cursor never moved, and every run
+       fetched and failed the same page. The hash stays the one taken over the bytes as they came. */
     deps.sql.exec(
       `INSERT INTO inbox_raw (id, ts, channel, headers, body, sha256, state, reason)
        VALUES (?, ?, 'pull', ?, ?, ?, ?, ?) ON CONFLICT (channel, sha256) DO NOTHING`,
       raw,
       at,
       JSON.stringify(page.raw.headers),
-      page.raw.body,
+      typeof page.raw.body === 'string' ? page.raw.body.replaceAll('\u0000', '\uFFFD') : page.raw.body,
       page.raw.sha256,
       page.raw.state,
-      page.raw.reason ?? null,
+      typeof page.raw.reason === 'string' ? page.raw.reason.replaceAll('\u0000', '\uFFFD') : null,
     );
     const held = deps.sql.one<{ id: string }>("SELECT id FROM inbox_raw WHERE channel = 'pull' AND sha256 = ?", page.raw.sha256);
     /* THESE BYTES ARRIVED BEFORE, so whatever was done with them the first time stands. */
