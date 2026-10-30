@@ -301,7 +301,7 @@ export const words = {
   /** The button that closes a page opened from its card. */
   closePage: 'Close this page',
   /** Under a page's title on its card, where it has no section of its own. */
-  home: 'Home',
+  home: 'Today',
   /** Under a page none of the person's entries reaches: what it will hold, in its list's own words. */
   holds: (what: string) => `It will hold ${what}.`,
   /** The same, for a page that reads no list. */

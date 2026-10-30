@@ -66,7 +66,7 @@ export const shell = {
   product: 'BrainDog',
 
   /* the spine */
-  home: 'Home',
+  home: 'Today',
   decide: 'Needs you',
   inbox: 'Inbox',
   /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. `Your things` AND IT WAS
@@ -422,7 +422,7 @@ export const shell = {
   writeMarkAdded: 'Added',
   writeMarkSaving: 'Saving',
   /* Settings, keychain and packs writes (lane C) */
-  writeRaced: 'The record changed while this was sent, so it has been read again.',
+  writeRaced: 'Something changed while this was sent, so it has been read again.',
   exported: (file: string) => `${file} is in your downloads.`,
   /* Lane E: archive and restore, installing an add-on, and saved views */
   writeArchived: (what: string) => `Archived ${what}.`,
@@ -453,7 +453,7 @@ export const shell = {
   /* ── WORDS THE FRAME DRAWS FROM OTHER AREAS, kept here so the frame's copy (`frame.ts`) is this file and not theirs ── */
 
   /* The account's: the rail, the sidebar and the record switcher say them on every screen. */
-  recordOpenSignIn: 'Sign in again to open another record.',
+  recordOpenSignIn: 'Sign in again to open another BrainDog.',
   signOut: 'Sign out',
   signingOut: 'Signing out',
   signOutFailed: 'You are still signed in. Try again.',
