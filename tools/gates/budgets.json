@@ -144,6 +144,8 @@
     "widths": [390, 1512],
     "//todaySettleMs": "The scope's line: `--check` exits 1 when Today, opened warm, settles over 2 s.",
     "todaySettleMs": 2000,
+    "//todayColdPhoneMs": "F14 (30 Oct): `--check` also exits 1 when Today, opened cold on the phone (a new browser, nothing kept), settles over 2 s. It went from 1.7 s to 3.2 s between 28 and 30 October, and the warm line said nothing.",
+    "todayColdPhoneMs": 2000,
     "//quietCapMs": "How long a screen is watched for no call out. A screen still busy then is measured on what it asked by then.",
     "quietCapMs": 8000,
     "//restMs": "Kept after the quiet mark, so a tile's late wave still counts against the screen that asked it.",

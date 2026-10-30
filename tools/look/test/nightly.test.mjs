@@ -31,6 +31,27 @@ test('A NIGHT IS SLOW WHEN TODAY, OPENED WARM, SETTLES OVER ITS BUDGET, and only
   assert.deepEqual(judge([row({ kind: 'cold', settleMs: 2400 }), row({ screen: 'money', settleMs: 9000 })], S), []);
 });
 
+test('AND WHEN TODAY, OPENED COLD ON THE PHONE, SETTLES OVER ITS OWN LINE; a cold laptop is not judged', () => {
+  const S = { todaySettleMs: 2000, todayColdPhoneMs: 2000 };
+  const row = (over) => ({ screen: 'today', kind: 'cold', width: 390, settleMs: 1700, ...over });
+  assert.deepEqual(judge([row({})], S), []);
+  assert.deepEqual(judge([row({ settleMs: 3169 })], S), ['Today on the phone @390 opened cold in 3169 ms, over 2000 ms']);
+  assert.deepEqual(judge([row({ settleMs: null })], S), ['Today on the phone @390 never settled cold']);
+  assert.deepEqual(judge([row({ width: 1512, settleMs: 3169 }), row({ screen: 'money', settleMs: 9000 })], S), []);
+});
+
+test('BY HAND IT WALKS THE SCREENS NAMED, WITH A SLOWER PHONE AND A TRIP TO THE RECORD, and refuses nonsense', () => {
+  const asked = parse(['--source', 'seed', '--screens', 'today, money', '--throttle', '4', '--latency=150']);
+  assert.deepEqual(asked.screens, ['today', 'money']);
+  assert.equal(asked.throttle, 4);
+  assert.equal(asked.latency, 150);
+  assert.equal(parse(['--source', 'seed']).throttle, 1);
+  assert.equal(parse(['--source', 'seed']).latency, 0);
+  assert.throws(() => parse(['--source', 'seed', '--throttle', '0.5']), /--throttle/u);
+  assert.throws(() => parse(['--source', 'seed', '--latency', '-1']), /--latency/u);
+  assert.throws(() => parse(['--source', 'seed', '--screens', ',']), /--screens/u);
+});
+
 test('IT READS THE RECORD IT IS TOLD, needs one, and refuses a flag it does not take', () => {
   assert.deepEqual(parse(['--source', 'live:the-studio']).source, { name: 'live', arg: 'the-studio' });
   assert.deepEqual(parse(['--source', 'seed', '--check']).source, { name: 'seed', arg: undefined });
