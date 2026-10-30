@@ -19,7 +19,7 @@ import { parseArgs } from 'node:util';
 
 import type { Refusal, Result } from '@braindog/ports';
 
-import { inTheClear, isLoopback } from './http.ts';
+import { inTheClear, isLoopback, withFixOf } from './http.ts';
 import { refuse } from './json.ts';
 import { approveOperation, heldLogin } from './login.ts';
 import type { BrainfileIo } from './brainfile.ts';
@@ -67,7 +67,9 @@ async function post(url: URL, key: string, args: object, bearer: string | undefi
   }
   const envelope = body as { ok?: unknown; refusal?: unknown };
   if (typeof body !== 'object' || body === null || typeof envelope.ok !== 'boolean' || (envelope.ok === false && typeof envelope.refusal !== 'object')) return gone;
-  return { status: res.status, result: body as Result<unknown> };
+  /* A 401 TO BRAINDOG_TOKEN SAYS TO CHANGE IT (`refusedFix`), since the host says only `unauthorized`. */
+  const result = body as Result<unknown>;
+  return { status: res.status, result: res.status === 401 && bearer !== undefined && bearer === io.env.BRAINDOG_TOKEN ? withFixOf(result, { key, from: 'env' }) : result };
 }
 
 /** `braindog token create`, and the exit code: 0 minted and printed, 1 refused or not what was asked, 3 no answer. */

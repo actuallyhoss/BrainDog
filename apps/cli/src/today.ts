@@ -144,10 +144,13 @@ export async function widgetCommand(args: string[], io: AgentIo): Promise<number
   if (at === null) return 1;
   /* THE WIDGET AS TODAY KEEPS IT, not as it was drawn: what it reads and how it draws, never his rows. */
   const arranged: Result<unknown> = await at.client.call('arrangement', { page: 'home' });
+  /* A TODAY WITH NO BOARD OF ITS OWN HAS NO DECLARATION, and the record's sentence for that named one and listed every
+     page's slug; the person is told what it means here. */
+  if (refused(arranged) && arranged.refusal.code === 'PAGE_UNKNOWN') return refuse(io, arranged, NOT_KEPT);
   if (!arranged.ok) return refuse(io, arranged, line(arranged, at.to));
   const stored = storedOf(arranged.value, 'home');
   if ('fix' in stored) {
-    io.say('Today is not kept as a board yet. Add a widget to it in the app first.');
+    io.say(NOT_KEPT);
     return 1;
   }
   const kept = (Array.isArray((stored.body as { blocks?: unknown }).blocks) ? ((stored.body as { blocks: unknown[] }).blocks.filter(isObject) as Block[]) : []).filter((b) => typeof b.key === 'string');

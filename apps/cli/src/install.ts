@@ -81,6 +81,9 @@ type Entry = { hooks: Hook[] };
  */
 export const HOOK_STATUS = 'Connecting to BrainDog...';
 
+/** And while a session closes, the end hook's own words: "Connecting" there read as a session starting (D22). */
+export const HOOK_END_STATUS = 'Saving this session to BrainDog...';
+
 /**
  * TEN SECONDS EACH, two more than the hook's own eight (`HOOK_MS`), so the hook ends itself before Claude Code has to.
  * They were twenty and fifteen, and a start with the network cut held the session for all twenty.
@@ -103,14 +106,14 @@ export const HOOK_STATUS = 'Connecting to BrainDog...';
  * yet tried on a signed-in session, which is why nothing turns it on but `braindog install --rewake`.
  */
 const EVENTS = [
-  { event: 'SessionStart', which: 'start', timeout: 10, status: true },
-  { event: 'SessionEnd', which: 'end', timeout: 10, status: true },
-  { event: 'PostToolUse', which: 'beat', timeout: 10, status: false },
-  { event: 'UserPromptSubmit', which: 'prompt', timeout: 5, status: false },
-  { event: 'PreToolUse', which: 'tool', timeout: 5, status: false },
-  { event: 'Stop', which: 'stop', timeout: 5, status: false },
+  { event: 'SessionStart', which: 'start', timeout: 10, status: HOOK_STATUS },
+  { event: 'SessionEnd', which: 'end', timeout: 10, status: HOOK_END_STATUS },
+  { event: 'PostToolUse', which: 'beat', timeout: 10, status: null },
+  { event: 'UserPromptSubmit', which: 'prompt', timeout: 5, status: null },
+  { event: 'PreToolUse', which: 'tool', timeout: 5, status: null },
+  { event: 'Stop', which: 'stop', timeout: 5, status: null },
 ] as const;
-const WATCH = { event: 'Stop', which: 'watch', timeout: 610, status: false } as const;
+const WATCH = { event: 'Stop', which: 'watch', timeout: 610, status: null } as const;
 type Which = (typeof EVENTS)[number]['which'] | typeof WATCH.which;
 
 /** The hook entries a run writes: the six, and the watcher when `rewake` asks for it. */
@@ -701,7 +704,7 @@ function planSettings(named: string, options: Options): Plan {
       type: 'command',
       command: hookCommand(which, options.scripts, options.platform),
       timeout,
-      ...(status ? { statusMessage: HOOK_STATUS } : {}),
+      ...(status !== null ? { statusMessage: status } : {}),
       ...(which === 'watch' ? { asyncRewake: true } : {}),
     };
     const same = (h: unknown) =>

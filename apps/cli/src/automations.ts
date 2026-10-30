@@ -62,8 +62,21 @@ function everyOf(every: string): string {
   return m[1] === '1' ? `Every ${one}` : `Every ${m[1]!} ${many}`;
 }
 
-/** `2026-09-21 14:02 UTC` from the record's ISO instant, which a person reads faster than the milliseconds and the `Z`. */
-const when = (iso: string): string => (/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC` : iso);
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `21 Sep 14:02 UTC` from the record's ISO instant, the day as every date here reads, with no milliseconds and no `Z`. */
+const when = (iso: string): string => {
+  const m = /^\d{4}-(\d\d)-(\d\d)T(\d\d:\d\d)/u.exec(iso);
+  const month = m === null ? undefined : MONTHS[Number(m[1]) - 1];
+  return m === null || month === undefined ? iso : `${String(Number(m[2]))} ${month} ${m[3]!} UTC`;
+};
+
+/** An automation's name as a person reads it: its own when it has one, else its id in words ("budget-near" is "Budget near"). */
+const titleOf = (a: Pick<AutomationRow, 'name' | 'rule'>): string => {
+  if (a.name !== a.rule && a.name.trim() !== '') return a.name.trim().replace(/[.!?]$/u, '');
+  const words = a.rule.replace(/^rule\./u, '').replace(/[-_]+/gu, ' ').trim();
+  return words === '' ? a.rule : words.charAt(0).toUpperCase() + words.slice(1);
+};
 
 /** A sentence the record wrote, closed with a full stop only when it has none of its own. */
 const closed = (text: string): string => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
@@ -126,8 +139,9 @@ function month(m: AutomationRow['month']): string | null {
 
 function listLine(a: AutomationRow, named: Named = asIs): string {
   const said = [
-    /* The name only when somebody gave one: the record falls back to the bare id, which is already the line's first word. */
-    a.name === a.rule ? null : closed(a.name),
+    /* THE NAME FIRST, AND THE ID AFTER IT AS THE WORD `show` AND `run` TAKE: the line opened on the id, whose `-` and `_`
+       are each pack's own, and an automation with no name of its own had nothing else (D21). */
+    `${titleOf(a)} (${a.rule}).`,
     starts(a, named),
     a.enabled ? null : 'Turned off.',
     origin(a),
@@ -136,7 +150,7 @@ function listLine(a: AutomationRow, named: Named = asIs): string {
     a.open > 0 ? `${plural(a.open, 'run', 'runs')} open.` : null,
     month(a.month),
   ].filter((s): s is string => s !== null);
-  return `  ${a.rule}  ${said.join(' ')}`;
+  return `  ${said.join(' ')}`;
 }
 
 /** How a run began, as the record keeps its trigger's kind. */
@@ -210,7 +224,7 @@ async function list(args: string[], io: AgentIo): Promise<number> {
      told it sees none, not that the record has none. */
   if (answer.value.length === 0) io.out('No automation you can read is set up on this BrainDog.');
   else {
-    io.out('Automations on this BrainDog:');
+    io.out('Automations on this BrainDog, each with the name braindog automations show takes:');
     const named = await namesOf(at.client);
     for (const a of printable(answer.value)) io.out(listLine(a, named));
   }
@@ -281,7 +295,8 @@ function scriptStarts(r: ScriptRow['runs']): string {
 
 function scriptLine(s: ScriptRow, named: Named = asIs): string {
   const said = [
-    s.title === s.script ? null : closed(s.title),
+    /* THE NAME FIRST AND THE ID AFTER IT, as an automation's line has them (`listLine`). */
+    `${titleOf({ name: s.title, rule: s.script })} (${s.script}).`,
     scriptStarts(s.runs),
     /* PAUSED SAYS WHERE THE BUTTON IS: `resume` from this command is ADMIN and a token is refused at that door. */
     s.status === 'paused' ? `Paused: its last ${String(s.refused.pauses_at)} runs were refused, and it runs again only when somebody resumes it in the app.` : null,
@@ -294,7 +309,7 @@ function scriptLine(s: ScriptRow, named: Named = asIs): string {
     s.writes.length === 0 ? null : `Writes ${s.writes.map(named).join(', ')}.`,
     s.egress.length === 0 ? null : `Fetches from ${s.egress.join(', ')}.`,
   ].filter((x): x is string => x !== null);
-  return `  ${s.script}  ${said.join(' ')}`;
+  return `  ${said.join(' ')}`;
 }
 
 /** `braindog scripts list|resume`, and the exit code the command decides. */

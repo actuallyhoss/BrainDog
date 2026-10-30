@@ -149,7 +149,7 @@ test('ONE LINE A KEY: its name, what it opens, where it applies, sealed or where
   assert.deepEqual(one.lines, [
     'Apple developer · opens The Lanternfish app in the store · Lanternfish · kept at the password manager, under Apple · expired 1 October 2026',
     'Cloudflare deploy · opens Deploys of every site · Everywhere · sealed · no expiry day',
-    'Old mail relay · opens Mail sent by an old site · Everywhere · kept nowhere named · no expiry day',
+    'Old mail relay · opens Mail sent by an old site · Everywhere · kept elsewhere · no expiry day',
     'Stripe live · opens Payments for Oxbow.gg · Oxbow.gg · sealed · expires 2 November 2026',
   ]);
   assert.deepEqual(one.said, ['4 keys: 2 sealed, 2 kept elsewhere.']);

@@ -129,13 +129,13 @@ test('BRAINDOG UNDERSTAND --DRY-RUN reads the record\'s plan, prints what it rea
   assert.deepEqual(h.seen, [{ method: 'understandPlan', verb: 'GET', body: {} }]);
   assert.deepEqual(one.lines, ['A dry run over 40 runs: nothing was changed and nothing was asked.', '', 'It would link', '  2 runs placed in their projects', '', 'The changes', '  Place Fix the retry in Glaze.', '  Place Fire the kiln in Kiln.']);
 
-  /* Without --dry-run nothing is sent, and it says where the walk is done. */
+  /* Without --dry-run it reads the same plan, since it only ever reads; it never runs the walk. */
   const two = io(h.base);
-  assert.equal(await understandCommand([], two), 1);
-  assert.equal(h.seen.length, 1);
-  assert.match(two.said[0]!, /only reads, with --dry-run/);
+  assert.equal(await understandCommand([], two), 0, two.said.join('\n'));
+  assert.deepEqual(h.seen, [{ method: 'understandPlan', verb: 'GET', body: {} }, { method: 'understandPlan', verb: 'GET', body: {} }]);
+  assert.deepEqual(two.lines, one.lines);
   assert.equal(await understandCommand(['--apply'], two), 1);
-  assert.match(two.said.at(-1)!, /^braindog understand takes --dry-run/);
+  assert.match(two.said.at(-1)!, /^braindog understand takes \[--dry-run\]/);
 });
 
 test('BRAINDOG UNDERSTAND --DRY-RUN SAYS PLAINLY why the record would not read it: a token it does not let in, a record older than the plan, or a caller who does not read the whole record', async (t) => {

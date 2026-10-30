@@ -142,6 +142,33 @@ test('PUT WITH NOTHING PIPED IN, OR AN EMPTY PIPE, SENDS NOTHING', async (t) => 
   assert.deepEqual(host.seen, []);
 });
 
+test('PUT AT A TERMINAL ASKS FOR THE VALUE WITH ECHO OFF, sends what was typed once, and says nothing of it; stopped, it sends nothing', async (t) => {
+  const value = fakeValue();
+  const grant = fakeGrant();
+  const host = await stub(t, value);
+  const { file } = config(t, host.base, grant);
+  const asked: string[] = [];
+  const run = io(file, { stdin: null });
+  const typed: KeysIo = { ...run.io, secret: async (question) => (asked.push(question), value) };
+  assert.equal(await keys(['put', 'Kiln deploy'], typed), 0, run.said.join('\n'));
+  assert.equal(asked.length, 1);
+  assert.ok(!asked[0]!.includes('Kiln deploy'), 'the question named the label');
+  assert.deepEqual(host.seen[0]?.body, { label: 'Kiln deploy', value });
+  nowhere([...asked, ...run.said], [value, grant]);
+
+  /* CTRL+C AT THE QUESTION, OR ENTER ON NOTHING, SENDS NOTHING. */
+  for (const answer of [null, '']) {
+    const stopped = io(file, { stdin: null });
+    assert.equal(await keys(['put', 'Kiln deploy'], { ...stopped.io, secret: async () => answer }), 1);
+    assert.equal(stopped.said.length, 1);
+  }
+  assert.equal(host.seen.length, 1);
+
+  /* A PIPE IS READ AS IT ALWAYS WAS, AND NOTHING IS ASKED. */
+  const piped = io(file, { stdin: `${value}\n` });
+  assert.equal(await keys(['put', 'Kiln deploy'], { ...piped.io, secret: async () => assert.fail('asked with a pipe') }), 0, piped.said.join('\n'));
+});
+
 test('EXEC HANDS THE VALUE TO THE COMMAND UNDER ONE VARIABLE, exits with its code, and says nothing of it', async (t) => {
   const value = fakeValue();
   const grant = fakeGrant();

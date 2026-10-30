@@ -730,7 +730,11 @@ export function methods(deps: RecordDeps) {
       const stop = guard(ctx, 'propose', OWN_RUN);
       if (stop) return { ok: false, refusal: stop };
       if (ctx.principal.kind !== 'token')
-        return no('FORBIDDEN', 'instructions reads what an agent was told, and you are signed in as a person, not as an agent. Connect this agent with its own token: braindog token create --scope write.', { at: 'principal' });
+        return no(
+          'FORBIDDEN',
+          'Only an agent with a token of its own reads what it was told, and this one is signed in as the person. Connect this agent with a token: braindog token create --scope write, or braindog setup again.',
+          { at: 'principal' },
+        );
       const a = (args ?? {}) as Record<string, unknown>;
       const stray = strayOf('instructions', a, MINE_TAKES);
       if (stray) return stray;

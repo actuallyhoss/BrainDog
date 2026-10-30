@@ -39,10 +39,21 @@ import { parseArgs } from 'node:util';
 
 import { dogName, dogText, parseDog, storedOf, type DogParsed } from '@braindog/dog';
 import { validateDeclaration } from '@braindog/kernel';
-import { refused, type Result } from '@braindog/ports';
+import { fixOf, refused, type Result } from '@braindog/ports';
 
 import { refuse } from './json.ts';
 import { connect, type AgentIo, type Connected } from './skills.ts';
+
+/**
+ * A page this caller cannot read, said for a person: the slugs `pull` takes, which the record's sentence lists after
+ * its own words for an agent ("There is no page declaration page.<slug> ... The pages are: a, b"). When that list is not
+ * there, the sentence without it.
+ */
+export function noPage(slug: string, fix: string): string {
+  const pages = /The pages are: (.+?)\.?$/u.exec(fix)?.[1];
+  const there = `There is no page ${slug} here that you can read.`;
+  return pages === undefined || pages === 'none' ? there : `${there} braindog page pull takes one of: ${pages}.`;
+}
 
 /** A file the parser refused, said with its name and the line, so the person can go straight to it. */
 const unread = (file: string, no: Extract<DogParsed, { ok: false }>): string => `${file}, line ${String(no.line)}: ${no.fix}`;
@@ -86,7 +97,7 @@ async function pull(args: string[], io: AgentIo): Promise<number> {
   if (typeof at === 'number') return at;
 
   const answer = await at.client.call('arrangement', { page: slug });
-  if (!answer.ok) return refuse(io, answer);
+  if (!answer.ok) return refuse(io, answer, refused(answer) && answer.refusal.code === 'PAGE_UNKNOWN' ? noPage(slug, answer.refusal.fix) : fixOf(answer));
   const stored = storedOf(answer.value, slug);
   if ('fix' in stored) {
     io.say(stored.fix);

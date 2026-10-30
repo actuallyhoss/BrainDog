@@ -365,3 +365,12 @@ test('THE INSTALLED COMMAND IS THE FILE A SERVER RUNS, and a checkout is as new 
   assert.deepEqual(installedOf(bundle), { file: bundle, changed: Date.parse('2026-10-07T00:00:00Z') });
   assert.equal(installedOf(join(top, 'gone.mjs')), null);
 });
+
+test('A MACHINE WITH NO PROFILE AND NO APP IS NOT SET UP, which is said with the way to set it up, and exits 1', () => {
+  const home = newHome();
+  const out = doctor([], { home, env: {}, crontab: () => null, clients: [], ps: () => [], installed: () => null });
+  assert.deepEqual(out.report.places, []);
+  assert.equal(out.code, 1);
+  assert.ok(!out.lines.some((l) => l.startsWith('Nothing to fix')), out.lines.join('\n'));
+  assert.match(out.lines.at(-1)!, /^BrainDog is not set up on this machine: .+ Run braindog setup /u);
+});

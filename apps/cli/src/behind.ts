@@ -185,7 +185,7 @@ export function doctorLine(home: string, now = Date.now(), run: () => { report: 
     writeFileSync(tmp, `${JSON.stringify({ at: new Date(now).toISOString() })}\n`, { mode: 0o600 });
     renameSync(tmp, file);
     const out = run();
-    return out.code === 1 ? `braindog doctor lists ${String(out.report.places.length)} places to fix. Run braindog doctor to see them.` : null;
+    return out.code === 1 && out.report.places.length > 0 ? `braindog doctor lists ${String(out.report.places.length)} places to fix. Run braindog doctor to see them.` : null;
   } catch {
     return null;
   }

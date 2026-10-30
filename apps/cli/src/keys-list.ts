@@ -149,7 +149,7 @@ function dayOf(day: string): string {
 /** One key's line. A key past its day says "expired", a word and never a colour. */
 export function keyLine(k: KeyRead): string {
   const day = k.expires === null ? 'no expiry day' : `${k.expired ? 'expired' : 'expires'} ${dayOf(k.expires)}`;
-  const kept = k.sealed ? 'sealed' : k.kept === null ? 'kept nowhere named' : `kept at ${k.kept}`;
+  const kept = k.sealed ? 'sealed' : k.kept === null ? 'kept elsewhere' : `kept at ${k.kept}`;
   return [k.name, k.opens === '' ? 'opens nothing named' : `opens ${k.opens}`, k.applies, kept, day].join(' · ');
 }
 

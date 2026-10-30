@@ -1040,7 +1040,7 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
   assert.equal(dry.code, 0, dry.stderr);
   assert.ok(dry.stdout.startsWith(`braindog install would change ${file}:\n`), dry.stdout);
   assert.ok(dry.stdout.includes(`  + hooks.SessionStart: ${JSON.stringify({ hooks: [{ type: 'command', command: start, timeout: 10, statusMessage: status }] })}`), dry.stdout);
-  assert.ok(dry.stdout.includes(`  + hooks.SessionEnd: ${JSON.stringify({ hooks: [{ type: 'command', command: end, timeout: 10, statusMessage: status }] })}`), dry.stdout);
+  assert.ok(dry.stdout.includes(`  + hooks.SessionEnd: ${JSON.stringify({ hooks: [{ type: 'command', command: end, timeout: 10, statusMessage: 'Saving this session to BrainDog...' }] })}`), dry.stdout);
   /* THE BEAT CARRIES NO STATUS LINE: it runs after every tool call, and a line flashing under the agent's work each time
      is a busier screen (hooks-48's checker). */
   assert.ok(dry.stdout.includes(`  + hooks.PostToolUse: ${JSON.stringify({ hooks: [{ type: 'command', command: beat, timeout: 10 }] })}`), dry.stdout);
