@@ -279,6 +279,9 @@ export const words = {
   reset: 'Reset',
   /* A BLANK SUM SAYS IT IS BLANK: its currency in front of an empty box read as a value. */
   notSet: 'Not set',
+  /* AN EMPTY LIMIT IS NO LIMIT, said in its box (audit 31 Oct g, AG29). */
+  noLimit: 'No limit',
+  moreLimits: (n: number) => `Show ${n} more ${n === 1 ? 'limit' : 'limits'}`,
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
   speaksAlone: 'It is the only starter on, so BrainDog speaks in its words. This becomes a choice when a second one is on.',
   unit: 'Unit',

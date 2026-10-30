@@ -25,6 +25,31 @@ export function answersIn(declarations: readonly unknown[], keys: readonly strin
   return Object.fromEntries(keys.map((key) => [key, filled.has(key) ? 'next-update' : 'now'] as const));
 }
 
+/**
+ * THE FIGURE EACH LIMIT IS A LINE FOR, by the setting's key: a figure declares `target: { setting }` and its name, so a
+ * limit's box says what it does ("Lapsing is marked as over once it goes past this") rather than nothing (audit 31 Oct g,
+ * AG29). A setting no figure names is left out.
+ */
+export function targetsIn(declarations: readonly unknown[], keys: readonly string[]): Record<string, string> {
+  const want = new Set(keys);
+  const out: Record<string, string> = {};
+  for (const d of declarations) {
+    const body = isMap(d) && isMap(d.body) ? d.body : d;
+    if (!isMap(body) || typeof body.metric !== 'string' || typeof body.name !== 'string' || !isMap(body.target)) continue;
+    const key = body.target.setting;
+    if (typeof key === 'string' && want.has(key) && out[key] === undefined) out[key] = body.name;
+  }
+  return out;
+}
+
+const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** What a limit's box says under it: the figure it holds, and that empty is no limit. */
+export const targetSaid = (figure: string): string => `${figure} is marked as over once it goes past this. Leave it empty for no limit.`;
+
+/** A note that only says when a setting takes hold, which the foot already says once for every setting. */
+export const savingNote = (note: string): boolean => /\bas soon as it is saved\b/iu.test(note);
+
 /** The line under one setting, naming the add-on by its title. */
 export const takesHoldSaid = (answer: TakesHold, title: string): string =>
   answer === 'now' ? 'Takes effect now.' : `Takes effect when ${title} next updates.`;

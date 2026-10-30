@@ -273,13 +273,16 @@
   /**
    * Uninstall one. The record takes it out, and the list is read again, so what is drawn is what the record now holds.
    * NOT ASKED FIRST: the record keeps its settings and schedules for thirty days, so Undo installs it again.
+   *
+   * AN ADD-ON FROM THE STORE HAS NO UNDO IN THE TOAST: it comes back from its own page, where its file is checked and its
+   * plan shown, and Removed below links there with Put back (`wayBack`). Its rows stay all the same.
    */
   async function uninstall(id: string, name: string) {
     if (!source || busy !== null) return;
     busy = id;
     try {
       const out = await source.uninstall(id);
-      if (out.ok) toasts.push(copy.uninstalled(name), { intent: 'good', undo: () => void reinstall(id, name) });
+      if (out.ok) toasts.push(copy.uninstalled(name), byId.has(id) ? { intent: 'good', undo: () => void reinstall(id, name) } : { intent: 'good' });
       else toasts.push(out.refusal.code === 'VERSION_STALE' ? copy.writeRaced : out.refusal.fix, { intent: 'warn' });
       if (out.ok || out.refusal.code === 'VERSION_STALE') await reread();
     } finally {
@@ -705,7 +708,6 @@
       {#snippet actions()}<Button size="sm" href={STORE_AT}>{words.findAddons}</Button>{/snippet}
       <ul class="ledger addons">
         {#each addons as state (state.id)}
-          {@const pack = byId.get(state.id)}
           {@const off = state.disabled_at !== null}
           {@const block = blocks[state.id]}
           {@const name = nameOf(state.id)}
@@ -726,9 +728,8 @@
                   <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}><Icon name="eye" size="s" />{copy.installDiff}</button>
                   <!-- ON AND OFF IN THE "⋯", never a bare switch on the row: what stops it is said under the row. -->
                   <button type="button" class="mi" role="menuitem" aria-label={copy.packSwitch(name)} disabled={busy !== null} onclick={() => turn(state.id, off)}><Icon name={off ? 'check' : 'close'} size="s" />{off ? words.turnOn : words.turnOff}</button>
-                  {#if pack}
-                    <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, pack.name)}><Icon name="trash" size="s" />{copy.uninstall}</button>
-                  {/if}
+                  <!-- EVERY ADD-ON UNINSTALLS, one from the store as a built-in does (AG2): the record keeps its rows either way. -->
+                  <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, name)}><Icon name="trash" size="s" />{copy.uninstall}</button>
                 </Menu>
               </span>
 {#if off}<span class="addon-off">{words.off}</span>{/if}
