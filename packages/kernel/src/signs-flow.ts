@@ -24,7 +24,7 @@ import type { Sql } from '@braindog/ports';
 
 import { ASK_PERSON_WAIT, runKey } from './flow.ts';
 import { intervalMs } from './pull.ts';
-import type { SignReader, SignReading, SignState } from './signs.ts';
+import type { SignLasts, SignReader, SignReading, SignState } from './signs.ts';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -132,6 +132,18 @@ function readPaused(sql: Sql): SignReading {
  */
 const monthFrom = (nowMs: number): string => `${new Date(nowMs).toISOString().slice(0, 7)}-01T00:00:00.000Z`;
 
+/** The first instant of the next calendar month, UTC: where `monthFrom` moves by the clock alone (`SignLasts`). */
+const monthAfter = (nowMs: number): number => {
+  const d = new Date(nowMs);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+};
+
+/** The instant an ISO time crosses a line `ms` after it, or `Infinity` for none: a time that cannot be read never crosses. */
+const crossesAt = (at: string | null | undefined, ms: number): number => {
+  const t = typeof at === 'string' ? Date.parse(at) : Number.NaN;
+  return Number.isNaN(t) ? Infinity : t + ms;
+};
+
 /**
  * THE MONTH'S FAILURES SAID AFTER A GREEN SENTENCE: " 2 runs were refused earlier this month: Gold price." A sign
  * judges the last run or the last week, and it said "every script finished" under a month Automations counted four
@@ -143,7 +155,9 @@ function earlier(who: readonly string[], verb: 'refused' | 'failed'): string {
   return ` ${runs} ${verb} earlier this month: ${names(tally(who).map(([n]) => n))}.`;
 }
 
-function readRefused(sql: Sql, nowMs: number, tz: string): SignReading {
+function readRefused(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
+  /* THE MONTH'S REFUSALS ARE COUNTED FROM ITS FIRST DAY; nothing else here reads the clock. */
+  lasts(monthAfter(nowMs));
   const scripts = installedScripts(sql);
   if (scripts.length === 0) return reading('none', null, 'No script is installed yet.');
   /* THE LAST RUN THAT RAN THE SOURCE NOW INSTALLED, as the pause reads it: `ok` or `refused`, signed by this version.
@@ -271,12 +285,15 @@ function tally(all: readonly string[]): [string, number][] {
   return [...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-function readFailed(sql: Sql, nowMs: number): SignReading {
+function readFailed(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): SignReading {
   const since = new Date(nowMs - FLOW_WINDOW_DAYS * DAY).toISOString();
-  const runs = sql.all<{ rule: string; state: string; say: string | null }>(
-    'SELECT rule, state, say FROM automation_run WHERE coalesce(finished_at, started_at) >= ? ORDER BY coalesce(finished_at, started_at) DESC, rowid DESC',
+  const runs = sql.all<{ rule: string; state: string; say: string | null; at: string | null }>(
+    'SELECT rule, state, say, coalesce(finished_at, started_at) AS at FROM automation_run WHERE coalesce(finished_at, started_at) >= ? ORDER BY coalesce(finished_at, started_at) DESC, rowid DESC',
     since,
   );
+  /* BY THE CLOCK ALONE (`SignLasts`): a run leaves the window, or a new month begins. */
+  lasts(monthAfter(nowMs));
+  for (const r of runs) lasts(crossesAt(r.at, FLOW_WINDOW_DAYS * DAY));
   if (runs.length === 0) return reading('none', null, `No automation has run in ${FLOW_WINDOW_DAYS} days.`);
   const failed = runs.filter((r) => r.state === 'failed');
   const facts = [`${count(runs.length, 'run')} in ${FLOW_WINDOW_DAYS} days, ${failed.length} failed.`];
@@ -292,7 +309,8 @@ function readFailed(sql: Sql, nowMs: number): SignReading {
   return reading('red', failed.length, `${count(failed.length, 'automation run')} failed in ${FLOW_WINDOW_DAYS} days: ${names(who.map(([name]) => name))}.`, facts);
 }
 
-function readParked(sql: Sql, nowMs: number, tz: string): SignReading {
+function readParked(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
+  lasts(Infinity);
   /* THE STEP THE RUN WAITS AT is its `step`, and the row `record` wrote for it says what it asked and since when. */
   const waiting = sql.all<{ id: string; rule: string; at: string }>(
     `SELECT r.id, r.rule, s.at FROM automation_run r JOIN automation_step s ON s.run = r.id AND s.n = r.step
@@ -305,7 +323,10 @@ function readParked(sql: Sql, nowMs: number, tz: string): SignReading {
   const parked = waiting.filter((w) => {
     const due = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'rule' AND key = ?", runKey(w.id))?.due_at;
     const wakeMs = due !== undefined ? Date.parse(due) : Date.parse(w.at) + fallback;
-    return wakeMs + PARKED_GRACE_MS < nowMs;
+    const past = wakeMs + PARKED_GRACE_MS < nowMs;
+    /* ONE INSIDE ITS WAIT IS PAST IT by the clock alone (`SignLasts`); a wake that cannot be read never is. */
+    if (!past && !Number.isNaN(wakeMs)) lasts(wakeMs + PARKED_GRACE_MS + 1);
+    return past;
   });
   const facts = [`${count(waiting.length, 'run waits', 'runs wait')} on a person, ${parked.length} past ${waiting.length === 1 ? 'its' : 'their'} wait.`];
   if (parked.length <= AUTOMATIONS_PARKED_MOST)
@@ -315,10 +336,13 @@ function readParked(sql: Sql, nowMs: number, tz: string): SignReading {
   return reading('red', parked.length, `${count(parked.length, 'run is', 'runs are')} still waiting on a person after ${parked.length === 1 ? 'its' : 'their'} wait ended: ${names(tally(parked.map((p) => nameOf(p.rule))).map(([n]) => n))}.`, facts);
 }
 
-function readIdle(sql: Sql, nowMs: number): SignReading {
+function readIdle(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): SignReading {
+  lasts(Infinity);
   const on = switchedOn(sql);
   if (on.length === 0) return reading('none', null, 'No automation is switched on yet.');
   const old = new Date(nowMs - IDLE_AFTER_DAYS * DAY).toISOString();
+  /* ONE SWITCHED ON TOO LATELY TO JUDGE is judged once it is old enough (`SignLasts`). */
+  for (const r of on) if (!(r.since <= old)) lasts(crossesAt(r.since, IDLE_AFTER_DAYS * DAY));
   /* NEVER RUN: no run of the runner, and for a rule that finishes inside a write, no line of the log signed by it. */
   const idle = on.filter(
     (r) =>
@@ -336,7 +360,8 @@ function readIdle(sql: Sql, nowMs: number): SignReading {
   return reading('green', idle.length, said, facts);
 }
 
-function readStopped(sql: Sql, nowMs: number, tz: string): SignReading {
+function readStopped(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
+  lasts(Infinity);
   const since = new Date(nowMs - FLOW_WINDOW_DAYS * DAY).toISOString();
   const runs = sql.all<{ target: string; ts: string; stopped: number }>(
     `SELECT target, ts,
@@ -347,6 +372,8 @@ function readStopped(sql: Sql, nowMs: number, tz: string): SignReading {
     CHAIN_STOPPED_SAID,
     since,
   );
+  /* A RUN LEAVES THE WINDOW by the clock alone (`SignLasts`). */
+  for (const r of runs) lasts(crossesAt(r.ts, FLOW_WINDOW_DAYS * DAY));
   if (runs.length === 0) return reading('none', null, `No script has run in ${FLOW_WINDOW_DAYS} days.`);
   const stopped = runs.filter((r) => Number(r.stopped) === 1);
   const facts = [`${count(runs.length, 'script run')} in ${FLOW_WINDOW_DAYS} days, ${stopped.length} stopped a chain.`];
@@ -366,11 +393,12 @@ const kernel = (sign: string, name: string, thresholds: Record<string, number>, 
  * as PRF-A01's are; a person reads the names.
  */
 export const SIGNS_FLOW: readonly SignReader[] = [
-  kernel('scripts-paused', 'No script is paused', { SCRIPTS_PAUSED_MOST }, (sql) => readPaused(sql)),
+  /* READ WITHOUT THE CLOCK: stands until something it read is written (`SignLasts`). */
+  kernel('scripts-paused', 'No script is paused', { SCRIPTS_PAUSED_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readPaused(sql))),
   kernel('scripts-refused', 'Scripts finish their runs', { SCRIPTS_REFUSED_MOST }, readRefused),
-  kernel('scripts-sourceless', 'Every script holds its source', { SCRIPTS_SOURCELESS_MOST }, (sql) => readSourceless(sql)),
-  kernel('automations-failed', 'Automations do not fail', { FLOW_WINDOW_DAYS, AUTOMATIONS_FAILED_MOST }, (sql, nowMs) => readFailed(sql, nowMs)),
+  kernel('scripts-sourceless', 'Every script holds its source', { SCRIPTS_SOURCELESS_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readSourceless(sql))),
+  kernel('automations-failed', 'Automations do not fail', { FLOW_WINDOW_DAYS, AUTOMATIONS_FAILED_MOST }, (sql, nowMs, _tz, lasts) => readFailed(sql, nowMs, lasts)),
   kernel('automations-parked', 'No run is stuck waiting on a person', { PARKED_GRACE_MS, AUTOMATIONS_PARKED_MOST }, readParked),
-  kernel('automations-idle', 'Automations that have never run', { IDLE_AFTER_DAYS }, (sql, nowMs) => readIdle(sql, nowMs)),
+  kernel('automations-idle', 'Automations that have never run', { IDLE_AFTER_DAYS }, (sql, nowMs, _tz, lasts) => readIdle(sql, nowMs, lasts)),
   kernel('automations-stopped-chains', 'Chains run to their end', { FLOW_WINDOW_DAYS, CHAINS_STOPPED_MOST }, readStopped),
 ];

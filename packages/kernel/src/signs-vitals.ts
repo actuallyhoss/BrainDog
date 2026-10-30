@@ -37,7 +37,7 @@ import { dayIn } from './finished.ts';
 import { FORMAT_VERSION, KERNEL_MIGRATION } from './migrate.ts';
 import { newestRate, PAIR_RATE_DAYS } from './pairs.ts';
 import { ratesFeed, ratesFeedSaid } from './rates-feed.ts';
-import type { SignReader, SignReading, SignState } from './signs.ts';
+import type { SignLasts, SignReader, SignReading, SignState } from './signs.ts';
 
 const HOUR = 3_600_000;
 
@@ -128,9 +128,13 @@ const BACKED = `SELECT 1 AS x FROM event WHERE (id = ? OR batch = ?) AND (
     OR (kind = 'create' AND json_valid(to_v) AND json_extract(to_v, '$.taken') = ?)
   ) LIMIT 1`;
 
-function readAuthored(sql: Sql, nowMs: number): SignReading {
+function readAuthored(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): SignReading {
   const since = new Date(nowMs - AUTHORED_WINDOW_HOURS * HOUR).toISOString();
-  const writes = Number(sql.one<{ n: number }>('SELECT count(DISTINCT coalesce(batch, id)) AS n FROM event WHERE ts >= ?', since)?.n ?? 0);
+  const window = sql.one<{ n: number; first: string | null }>('SELECT count(DISTINCT coalesce(batch, id)) AS n, min(ts) AS first FROM event WHERE ts >= ?', since);
+  /* THE OLDEST LINE OF THE WINDOW LEAVES IT by the clock alone (`SignLasts`); a time that cannot be read never does. */
+  const first = typeof window?.first === 'string' ? Date.parse(window.first) : Number.NaN;
+  lasts(Number.isNaN(first) ? Infinity : first + AUTHORED_WINDOW_HOURS * HOUR);
+  const writes = Number(window?.n ?? 0);
   if (writes === 0) return reading('none', null, `Nothing was written in the last ${AUTHORED_WINDOW_HOURS} hours.`);
   const lines = sql.all<{ id: string; batch: string | null; actor: string; register: string | null }>(
     `SELECT e.id, e.batch, e.actor, n.register FROM event e
@@ -297,8 +301,10 @@ const kernel = (sign: string, name: string, thresholds: Record<string, number>, 
  * ids are kebab case, as PRF-A01's are; a person reads the names.
  */
 export const SIGNS_VITALS: readonly SignReader[] = [
-  kernel('writes-authored', 'Every write has an author', { AUTHORED_WINDOW_HOURS, UNAUTHORED_MOST }, (sql, nowMs) => readAuthored(sql, nowMs)),
-  kernel('format-current', 'The record is in the current format', { FORMAT_BEHIND_MOST }, (sql) => readFormat(sql)),
-  kernel('amounts-whole', 'Every amount is whole', { AMOUNTS_BROKEN_MOST }, (sql) => readAmounts(sql)),
-  kernel('rate-age', 'How old is the newest rate', { RATE_DAYS_MOST }, readRateAge),
+  kernel('writes-authored', 'Every write has an author', { AUTHORED_WINDOW_HOURS, UNAUTHORED_MOST }, (sql, nowMs, _tz, lasts) => readAuthored(sql, nowMs, lasts)),
+  /* READ WITHOUT THE CLOCK, or by the record's day alone (a rate's age): each stands until something it read is written
+     (`SignLasts`), and the kernel reads them again on a new day. */
+  kernel('format-current', 'The record is in the current format', { FORMAT_BEHIND_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readFormat(sql))),
+  kernel('amounts-whole', 'Every amount is whole', { AMOUNTS_BROKEN_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readAmounts(sql))),
+  kernel('rate-age', 'How old is the newest rate', { RATE_DAYS_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readRateAge(sql, nowMs, tz))),
 ];

@@ -17,7 +17,7 @@
  */
 
 import { scriptRows } from './script-rows.ts';
-import type { Clock, Param, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
+import type { Clock, Param, Refusal, Result, Row, Scheduler, Sql } from '@braindog/ports';
 import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { nameSpokenIn } from './spoken-names.ts';
@@ -183,6 +183,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { HELD_SHORT_MS, HeldReadings, notice, traceOf, within, type ReadTrace } from './held-readings.ts';
+import { HeldSigns, heldOn, noticeSign, signTraceOf, tablesWritten, wroteNothing, type SignHeldOn, type SignTrace } from './held-signs.ts';
 import { localDays, readableZone } from './measures.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, claimRank, fill, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
@@ -1782,27 +1783,51 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /* AND EVERY READ IS NOTED BY THE READINGS BEING READ NOW (`holdAcross`), which hold by the lists they read; a write
      made while one is read holds none of them. `muted` while their versions are themselves asked. */
   const traces: ReadTrace[] = [];
+  /* AND BY THE SIGNS BEING READ NOW (`signsHeldNow`), which hold by every table they read (`held-signs.ts`). */
+  const signTraces: SignTrace[] = [];
   let muted = 0;
   let knownList = (_word: string): boolean => false;
   const noted = (text: string, params: readonly Param[]): void => {
-    if (muted === 0) for (const t of traces) notice(t, text, params, knownList);
+    if (muted > 0) return;
+    for (const t of traces) notice(t, text, params, knownList);
+    for (const t of signTraces) noticeSign(t, text, params, knownList);
+  };
+  /* EVERY WRITE IS COUNTED BY THE TABLE IT WRITES (`tablesWritten`), and one this cannot read moves every table: a sign
+     held over a table is read again once the table has been written (`signsHeldNow`). Counted as it is sent, so a write
+     taken back still counts, which only reads a sign again. One whose `RETURNING` answered no row changed none and is not
+     counted (`wroteNothing`): the belt's claim of what is due runs every tick and mostly claims nothing. */
+  const writes = new Map<string, number>();
+  let writesAny = 0;
+  const wrote = (text: string, returned?: number): void => {
+    if (returned !== undefined && wroteNothing(text, returned)) return;
+    const tables = tablesWritten(text);
+    if (tables === null) writesAny++;
+    else for (const t of tables) writes.set(t, (writes.get(t) ?? 0) + 1);
+    if (tables === null || tables.length > 0) for (const t of signTraces) t.wrote = true;
   };
   const sql: Sql = {
     exec: (text, ...params) => {
       moment?.drop();
       if (/^\s*ROLLBACK\b/iu.test(text)) dropHeld();
       for (const t of traces) t.whole = true;
+      wrote(text);
       raw.exec(text, ...params);
     },
-    all: (text, ...params) => {
-      if (!reads(text)) moment?.drop();
-      if (traces.length > 0) noted(text, params);
-      return raw.all(text, ...params);
+    all: <T = Row>(text: string, ...params: Param[]): T[] => {
+      if (traces.length > 0 || signTraces.length > 0) noted(text, params);
+      if (reads(text)) return raw.all<T>(text, ...params);
+      moment?.drop();
+      const out = raw.all<T>(text, ...params);
+      wrote(text, out.length);
+      return out;
     },
-    one: (text, ...params) => {
-      if (!reads(text)) moment?.drop();
-      if (traces.length > 0) noted(text, params);
-      return raw.one(text, ...params);
+    one: <T = Row>(text: string, ...params: Param[]): T | undefined => {
+      if (traces.length > 0 || signTraces.length > 0) noted(text, params);
+      if (reads(text)) return raw.one<T>(text, ...params);
+      moment?.drop();
+      const out = raw.one<T>(text, ...params);
+      wrote(text, out === undefined ? 0 : 1);
+      return out;
     },
     transactionSync: (fn) => {
       try {
@@ -7200,7 +7225,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   const readingsHeld = new HeldReadings<Result<Reading>>();
   const walksHeld = new HeldReadings<Runway | null>();
-  const signsHeld = new HeldReadings<SignReading>();
+  const signsHeld = new HeldSigns<SignReading>();
   dropHeld = () => {
     readingsHeld.clear();
     walksHeld.clear();
@@ -7259,16 +7284,52 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * as they come. `how` keeps a read in its home currency apart from one in each currency (`readApart`).
    */
   /**
-   * THE VITAL SIGNS AS A FIGURE READS THEM (`signs-red`, `unread-now`), each sign held over the lists it read for at most
-   * `HELD_SHORT_MS`, since a sign may say how long ago something was. One that read the log, the questions or its own
-   * kept readings is read each time.
+   * THE VITAL SIGNS AS A FIGURE AND HEALTH READ THEM (`signs-red`, `unread-now`, `signs`), each held until something it
+   * read is written or its answer moves by the clock alone (`held-signs.ts`). Each was held over the lists it read for
+   * at most `HELD_SHORT_MS`, and one that read the log, the questions or what arrived was read each time: Today read
+   * every sign again on every open, about half of its time on his record (finish S1).
+   *
+   * THE STAMP: every write of the kernel's own counted by table (`writes`, and `writesAny` for one it could not read),
+   * the lists named by their versions (`listsStamp`), and the newest line of the log for a sign that read a table the
+   * record writes past the kernel, as the alarm's change marker reads it (`changeStamp`). A sign read inside a write is
+   * read now and never held, as every held reading is; an outer reading that asked one reads past the lists.
    */
   const signsHeldNow = (): VitalSign[] => {
     const now = clock.now();
     const tz = recordTz();
     const zone = readableZone(tz);
+    const day = dayAt(zone, now);
     const once: Stamps = { rows: new Map() };
-    return readSigns(sql, now, tz, (sign, read) => holdAcross(signsHeld, JSON.stringify([sign, zone]), zone, now, once, read, HELD_SHORT_MS));
+    let head: string | undefined;
+    const stampOf = (on: SignHeldOn): string => {
+      muted++;
+      try {
+        head ??= on.head ? JSON.stringify(sql.one<{ r: number; id: string }>('SELECT rowid AS r, id FROM event ORDER BY rowid DESC LIMIT 1') ?? null) : undefined;
+        return JSON.stringify([writesAny, on.lists.length > 0 ? listsStamp(on.lists, once) : null, on.tables.map((t) => writes.get(t) ?? 0), on.head ? (head ?? null) : null]);
+      } finally {
+        muted--;
+      }
+    };
+    return readSigns(sql, now, tz, (sign, read) => {
+      for (const t of traces) t.whole = true;
+      if (depth > 0) return read(() => undefined);
+      const key = JSON.stringify([sign, zone]);
+      const held = signsHeld.get(key, day, now, stampOf);
+      if (held !== undefined) return structuredClone(held.value);
+      const trace = signTraceOf();
+      signTraces.push(trace);
+      let until: number | undefined;
+      let value: SignReading;
+      try {
+        value = read((at) => (until = Math.min(until ?? Infinity, at)));
+      } finally {
+        signTraces.pop();
+      }
+      /* A READER THAT TOLD NOTHING is held for as long as every sign was (`SignLasts`). */
+      const on = heldOn(trace, (list) => list === SESSION);
+      signsHeld.set(key, { ...on, day, at: now, until: until ?? now + HELD_SHORT_MS, stamp: stampOf(on), value: structuredClone(value) }, trace);
+      return value;
+    });
   };
   const readingHeld = (decl: MetricDecl, ctx: EvalContext, how: string, read: (sql: Sql, ctx: EvalContext) => Result<Reading>, once: Stamps = { rows: new Map() }): Result<Reading> => {
     if (ctx.asOfMs !== undefined || ctx.point === true || ctx.reads !== undefined) return read(sql, ctx);
@@ -7374,7 +7435,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * read through `evalContext`, and that would read itself.
    */
   /* `built` IS THE BUILT-IN SIGNS ALREADY READ, by a walk that read them for a figure (`pageWalk`), so they are not read twice. */
-  const everySign = (built: VitalSign[] = readSigns(sql, clock.now(), recordTz())): VitalSign[] => {
+  /* HELD AS A FIGURE'S ARE (`signsHeldNow`), so Health, the briefing and the alarm's kept reading read a sign once
+     between the writes it reads, and the alarm's reading is the one Today's open finds. */
+  const everySign = (built: VitalSign[] = signsHeldNow()): VitalSign[] => {
     const ctx = evalContext();
     const decls = sql
       .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")

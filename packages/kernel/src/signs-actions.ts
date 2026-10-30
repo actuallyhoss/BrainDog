@@ -23,7 +23,7 @@ import type { Sql } from '@braindog/ports';
 import { ACTION_KINDS, listActions, type ActionRow } from './actions.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { intervalMs } from './pull.ts';
-import type { SignReader, SignReading, SignState } from './signs.ts';
+import type { SignLasts, SignReader, SignReading, SignState } from './signs.ts';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -208,19 +208,27 @@ function readScheduleFailed(sql: Sql, _nowMs: number, tz: string): SignReading {
 /* A DOOR IS A LIVE PATTERN THAT FILES WHAT ARRIVES, counted by its receipts. ONE RETIRED IS NOT JUDGED: a door he turned
    off is quiet for a good reason, the risk the brief names ("Risk"), and so is one switched off at its door
    (`ingest_off.<id>`, the record's `door-switch.ts`). */
-function readDoorsSilent(sql: Sql, nowMs: number, tz: string): SignReading {
+function readDoorsSilent(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
   const quietFrom = new Date(nowMs - DOOR_QUIET_DAYS * DAY).toISOString();
   const busyFrom = new Date(nowMs - (DOOR_QUIET_DAYS + DOOR_BUSY_DAYS) * DAY).toISOString();
-  const doors = sql.all<{ ingest_id: string; before: number; since: number; last: string }>(
-    `SELECT r.ingest_id, count(DISTINCT CASE WHEN r.ts < ? THEN r.raw_id END) AS before, count(DISTINCT CASE WHEN r.ts >= ? THEN r.raw_id END) AS since, max(r.ts) AS last
+  const doors = sql.all<{ ingest_id: string; before: number; since: number; last: string; first: string | null; quiet: string | null }>(
+    `SELECT r.ingest_id, count(DISTINCT CASE WHEN r.ts < ? THEN r.raw_id END) AS before, count(DISTINCT CASE WHEN r.ts >= ? THEN r.raw_id END) AS since, max(r.ts) AS last,
+            min(r.ts) AS first, min(CASE WHEN r.ts >= ? THEN r.ts END) AS quiet
        FROM ingest_receipt r
       WHERE r.ts >= ? AND EXISTS (SELECT 1 FROM declaration d WHERE d.id = 'ingest.' || r.ingest_id AND d.superseded_at IS NULL AND d.retired = 0)
         AND NOT EXISTS (SELECT 1 FROM dog_meta m WHERE m.key = 'ingest_off.' || r.ingest_id)
       GROUP BY r.ingest_id ORDER BY r.ingest_id`,
     quietFrom,
     quietFrom,
+    quietFrom,
     busyFrom,
   );
+  /* BY THE CLOCK ALONE (`SignLasts`): an arrival leaves the last few days for the two weeks before, or leaves both. */
+  lasts(Infinity);
+  for (const d of doors) {
+    lasts(crossesAt(d.first, (DOOR_QUIET_DAYS + DOOR_BUSY_DAYS) * DAY));
+    lasts(crossesAt(d.quiet, DOOR_QUIET_DAYS * DAY));
+  }
   const busy = doors.filter((d) => Number(d.before) >= DOOR_BUSY_LEAST);
   if (busy.length === 0) return reading('none', null, `No door has filed ${DOOR_BUSY_LEAST} arrivals in two weeks, so a quiet one says nothing yet.`);
   const silent = busy.filter((d) => Number(d.since) === 0).map((d) => ({ ...d, name: ingestName(sql, d.ingest_id) }));
@@ -246,9 +254,12 @@ const CAME: Readonly<Record<string, string>> = { email: 'by email', webhook: 'th
 /* AN ARRIVAL NOTHING VERIFIED (`ingest.ts`'s `UNVERIFIED`, the exact string written on the row) was offered to no
    pattern. A forgery is the sender's fault, but a door whose signing broke makes every real message one of these, and
    nothing else on the record says so: `arrivals-filed` counts them out on purpose. */
-function readUnverified(sql: Sql, nowMs: number, tz: string): SignReading {
+function readUnverified(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
   const since = new Date(nowMs - UNVERIFIED_WINDOW_DAYS * DAY).toISOString();
-  const all = Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM inbox_raw WHERE state <> 'erased' AND ts >= ?", since)?.n ?? 0);
+  const window = sql.one<{ n: number; first: string | null }>("SELECT count(*) AS n, min(ts) AS first FROM inbox_raw WHERE state <> 'erased' AND ts >= ?", since);
+  /* THE OLDEST MESSAGE IN THE WINDOW LEAVES IT by the clock alone (`SignLasts`). */
+  lasts(crossesAt(window?.first, UNVERIFIED_WINDOW_DAYS * DAY));
+  const all = Number(window?.n ?? 0);
   if (all === 0) return reading('none', null, `Nothing has come in for ${UNVERIFIED_WINDOW_DAYS} days, so there is nothing to judge by.`);
   const by = sql.all<{ channel: string; n: number; last: string }>(
     "SELECT channel, count(*) AS n, max(ts) AS last FROM inbox_raw WHERE state <> 'erased' AND ts >= ? AND reason = ? GROUP BY channel ORDER BY n DESC, channel",
@@ -320,14 +331,28 @@ export function actionsBlocking(sql: Sql, nowMs: number, project: string, tz = '
 
 const kernel = (sign: string, name: string, thresholds: Record<string, number>, read: NonNullable<SignReader['read']>): SignReader => ({ sign, name, hand: 'kernel', version: 1, thresholds, read });
 
+/** The instant an ISO time crosses a line `ms` after it, or `Infinity` for none: a time that cannot be read never crosses. */
+const crossesAt = (at: string | null | undefined, ms: number): number => {
+  const t = typeof at === 'string' ? Date.parse(at) : Number.NaN;
+  return Number.isNaN(t) ? Infinity : t + ms;
+};
+
+/** The first instant of the next calendar month, UTC, where an action's month (`listActions`) begins again. */
+const monthAfter = (nowMs: number): number => {
+  const d = new Date(nowMs);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+};
+
 /**
  * THE FIVE, in SHL-C01's order less `actions.late`. `signs.ts` joins them to `VITAL_SIGNS` with `...SIGNS_ACTIONS`. The
  * ids are kebab case, as PRF-A01's are; a person reads the names.
  */
 export const SIGNS_ACTIONS: readonly SignReader[] = [
-  kernel('actions-paused', 'No scheduled action is paused', { ACTIONS_PAUSED_MOST }, readActionsPaused),
-  kernel('actions-held', "No run waits on the plan's limit", { ACTIONS_HELD_MOST }, (sql, nowMs) => readActionsHeld(sql, nowMs)),
-  kernel('schedule-failed', 'Nothing that runs by itself has died', { SCHEDULE_FAILED_MOST }, readScheduleFailed),
+  /* HOW LONG EACH STANDS BY THE CLOCK ALONE (`SignLasts`): what is paused or has died moves only with a write; what the
+     plan held is counted by the month. */
+  kernel('actions-paused', 'No scheduled action is paused', { ACTIONS_PAUSED_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readActionsPaused(sql, nowMs, tz))),
+  kernel('actions-held', "No run waits on the plan's limit", { ACTIONS_HELD_MOST }, (sql, nowMs, _tz, lasts) => (lasts?.(monthAfter(nowMs)), readActionsHeld(sql, nowMs))),
+  kernel('schedule-failed', 'Nothing that runs by itself has died', { SCHEDULE_FAILED_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readScheduleFailed(sql, nowMs, tz))),
   kernel('doors-silent', 'Busy doors do not go quiet', { DOOR_BUSY_LEAST, DOOR_BUSY_DAYS, DOOR_QUIET_DAYS }, readDoorsSilent),
   kernel('arrivals-unverified', 'Every arrival is verified', { UNVERIFIED_WINDOW_DAYS, UNVERIFIED_MOST }, readUnverified),
 ];
