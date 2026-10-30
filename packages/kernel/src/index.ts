@@ -21,7 +21,7 @@ import type { Clock, Param, Refusal, Result, Scheduler, Sql } from '@braindog/po
 import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { nameSpokenIn } from './spoken-names.ts';
-import { coerce, currencyFixed, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
+import { coerce, currencyFixed, isAbsent, instant, measure, parseSpoken, range, rowOverCap, type FieldDecl, type Json } from './coerce.ts';
 import { overSplit, splitFault, splitOf, splitOfFields } from './row-parts.ts';
 import { attempt } from './tx.ts';
 import { misread, sentencesOver, widens } from './widen.ts';
@@ -5171,6 +5171,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (placed) merged.project = placed.spoken;
       }
 
+      /* THE ROW AS ONE VALUE, held to what the Cloud takes before a sequence number is spent on it (`rowOverCap`). */
+      const stored = JSON.stringify(merged);
+      const overCap = rowOverCap(merged, stored, current ? () => JSON.stringify(current.fields) : null);
+      if (overCap) return { ok: false, refusal: overCap };
+
       if (!current) {
         const id = mint();
         const seq = decl.series ? null : allocate(`seq:${register}`);
@@ -5179,7 +5184,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           id,
           register,
           seq,
-          JSON.stringify(merged),
+          stored,
           nextState,
           now,
           now,
@@ -5213,7 +5218,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
       sql.exec(
         'UPDATE entry SET fields = ?, state = ?, version = version + 1, updated_at = ?, deleted_at = ? WHERE id = ?',
-        JSON.stringify(merged),
+        stored,
         nextState,
         now,
         deletedAt,

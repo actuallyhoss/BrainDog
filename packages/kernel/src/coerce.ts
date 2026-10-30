@@ -17,7 +17,7 @@
  * invisible at the moment it happens.
  */
 
-import type { Refusal } from '@braindog/ports';
+import { DO_LIMITS, type Refusal } from '@braindog/ports';
 import type { Json } from '@braindog/where';
 
 /** Canonical JSON: what a field holds once it is in the record. */
@@ -98,8 +98,8 @@ const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 /**
  * THE DEFAULT CAPS, in UTF-8 bytes (`02 §5`, `41 §5.4`): what a field of each type holds when its declaration says no
  * `max`, and what a `max` may lower and never raise. Without them any writer could put a field of any length in a
- * row, and a write token could fill a record a row at a time. `json`, a `list`'s length and a row's whole `fields`
- * are not capped here yet.
+ * row, and a write token could fill a record a row at a time. `json` and a `list`'s length are not capped field by
+ * field; they are held by the row's whole `fields` (`ROW_CAP`).
  */
 export const TEXT_CAPS: Readonly<Record<'text' | 'document' | 'url' | 'email', number>> = { text: 16_384, document: 524_288, url: 2_048, email: 2_048 };
 
@@ -123,6 +123,39 @@ function overCap(type: keyof typeof TEXT_CAPS, value: string, at: string): Coerc
 function nulRefused(value: string, at: string): Coerced | null {
   if (!value.includes('\u0000')) return null;
   return bad('VALUE_MALFORMED', `${at} has a hidden character in it (U+0000, the null character), which a record cannot keep in text. Send it again without that character.`, at);
+}
+
+/**
+ * A row's whole `fields` as stored, in UTF-8 bytes: the Durable Object's documented ceiling on one value
+ * (`DO_LIMITS.length`, 2 MB). The row is bound as one text, and past what the Cloud takes (4 MB, `DO_MEASURED.length`)
+ * the write was a driver's throw on the Cloud and a row the self-host kept and the Cloud could never take in.
+ */
+export const ROW_CAP = DO_LIMITS.length;
+
+/**
+ * `OUT_OF_BOUNDS` at the row's largest field when a write makes its `fields` larger than `ROW_CAP`, or `null`.
+ *
+ * ONLY A WRITE THAT GROWS THE ROW IS REFUSED. A row already past the cap was written when nothing held it, and an edit
+ * that leaves it no larger (a state moved, a field cleared) goes through, so no row a record holds becomes one it cannot
+ * write. `before` is read only when the row is over, which a row almost never is.
+ */
+export function rowOverCap(fields: Readonly<Record<string, Json>>, stored: string, before: (() => string) | null): Refusal | null {
+  if (stored.length * 3 <= ROW_CAP) return null;
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(stored).length;
+  if (bytes <= ROW_CAP) return null;
+  if (before !== null && bytes <= encoder.encode(before()).length) return null;
+  let at = '';
+  let largest = -1;
+  for (const [key, value] of Object.entries(fields)) {
+    const n = JSON.stringify(value)?.length ?? 0;
+    if (n > largest) [at, largest] = [key, n];
+  }
+  return {
+    code: 'OUT_OF_BOUNDS',
+    fix: `${at} makes this row ${bytes} bytes, and a row holds at most ${ROW_CAP} bytes. Keep the large part in a file and store a link to it, or split it across rows.`,
+    at,
+  };
 }
 
 const INT_STRING = /^-?\d+$/;
