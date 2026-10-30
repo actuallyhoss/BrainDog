@@ -2560,6 +2560,30 @@ export function forgetWalks(but: string | null = null): void {
   for (const slug of [...WALKS.keys()]) if (slug !== but) WALKS.delete(slug);
 }
 
+/**
+ * THE PAGE THE PAGE ASKED FOR BEFORE THE APP ARRIVED (`app.html`, an address `/p/<slug>` with nothing after it), as a
+ * fetch that answers that one ask with it and sends every other, taken once and only for the address the reader would
+ * ask at, or `null`. A page's first read waited for its whole code before it went out, two seconds and more on a cold
+ * phone (speed-d SD2); a guess that turns out wrong is left unread, and the reader asks as it always did.
+ */
+function earlyPage(base: string, slug: string): Fetch | null {
+  const url = new URL(`${base}/api/page`);
+  url.searchParams.set('slug', slug);
+  url.searchParams.set('shape', '1');
+  const held = (globalThis as { __bdPage?: { url?: unknown; at?: unknown } }).__bdPage;
+  if (!held || held.url !== url.toString() || !(held.at instanceof Promise)) return null;
+  (globalThis as { __bdPage?: unknown }).__bdPage = undefined;
+  let early: Promise<Response> | null = held.at as Promise<Response>;
+  return ((input: string | URL | Request, init?: RequestInit) => {
+    const at = early;
+    if (at !== null && String(input) === url.toString() && (init?.method ?? 'GET') === 'GET') {
+      early = null;
+      return at;
+    }
+    return globalThis.fetch(input, init);
+  }) as Fetch;
+}
+
 /** A page reader for one tab. `base` is the page's own origin; the app never holds a token. */
 export function pageReader(base: string, io?: Fetch, clock: () => number = () => Date.now()): PageReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
@@ -2613,9 +2637,11 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
          its parts, the record answers what they draw beside the blocks, and nothing is read for them after. Any other page
          is answered as it was. */
       const walk = opts.walk ?? WALKS.get(slug);
+      /* THE FIRST READ OF A PAGE OPENED BY ITS ADDRESS MAY HAVE GONE OUT WITH THE PAGE ITSELF (`earlyPage`). */
+      const early = walk === undefined && io === undefined && !(filter && Object.keys(filter).length) ? earlyPage(base, slug) : null;
       const out =
         walk === undefined
-          ? await client.page(slug, filter, { shape: true })
+          ? await (early ? createClient({ base, fetch: early }) : client).page(slug, filter, { shape: true })
           : await client.call<unknown>('page', { slug, ...(filter && Object.keys(filter).length ? { filter } : {}), walk, shape: '1' });
       if (!out.ok) {
         if (!('refusal' in out)) return { from: 'refused', fix: liveWords.changed };

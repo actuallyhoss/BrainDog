@@ -258,10 +258,13 @@
   const tell = $derived(first && !told && showTell(kept, prefs));
 
   /* THE NEXT STEPS' OWN CODE, LOADED ON A FIRST TODAY ONLY (`want-more.ts`): it reads every use case this build ships, and
-     a Today kept for months never draws a step. Asked once a first Today is known, so it lands a moment after the page. */
+     a Today kept for months never draws a step. Asked once a first Today is known, so it lands a moment after the page.
+     NOT WHERE NO STEP CAN DRAW (hidden, or more added than a first Today holds, as `steps` reads it): `first` holds on
+     any record its keeper may add to, and the use cases were about 50 KB of a cold phone's Today for nothing. */
   let nextSteps = $state.raw<typeof import('$lib/home/want-more.ts') | null>(null);
   $effect(() => {
-    if (first && nextSteps === null) void import('$lib/home/want-more.ts').then((m) => (nextSteps = m), () => undefined);
+    if (first && nextSteps === null && prefs.nextStepsHidden !== true && added <= FIRST_TODAY_MOST)
+      void import('$lib/home/want-more.ts').then((m) => (nextSteps = m), () => undefined);
   });
 
   /* THE NEXT STEPS, under Today's blocks, on a first Today only: a record kept for months is not offered them, and its
@@ -488,6 +491,8 @@
          on a cold phone it was about 100 ms between the lists landing and Today being asked (finish W3). */
       void import('$lib/record/page-drawn.ts').catch(() => null);
       void import('./today-read.ts').catch(() => null);
+      /* AND THE CODE OF THE TILES TODAY'S EARLY ANSWER SHOWS (`tile-code.ts`), which is in the tab long before that read. */
+      if (declares === null) void import('./tile-code.ts').then((m) => m.askEarlyTiles(`${apiBase()}/api/today`), () => null);
       const slug = declares;
       const before = new Set(Object.keys(REGISTERS));
       /* EVERY LIST LEARNT ALREADY (Today drawn before in this tab): nothing waits for the copy. */
@@ -565,13 +570,14 @@
 
   /** A kept board drawn from the record's one `today` read, or `null` to read it as a page. */
   async function keptToday(slug: string, fresh: boolean): Promise<Opened | null> {
-    const [m, t] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts')]);
+    const [m, t, tiles] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts')]);
     const base = apiBase();
     let declared: Record<string, unknown> | null = null;
     let version: number | undefined;
     const drawn = await m.drawnOf({ page: slug, blocks: [] }, base, undefined, async (client) => {
       const out = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide');
       if (out.ok) {
+        tiles.askTiles((out.value as { blocks?: unknown }).blocks);
         const said = out.value as { declared?: unknown; declared_version?: unknown };
         if (said.declared !== null && typeof said.declared === 'object' && !Array.isArray(said.declared)) declared = said.declared as Record<string, unknown>;
         if (typeof said.declared_version === 'number') version = said.declared_version;
@@ -621,11 +627,18 @@
        same read: loaded after the page, the cards and their lines landed after the screen said it was ready. FETCHED
        BESIDE THE READ AND NEVER WAITED ON: their code is slower than the read, and waiting held the whole body back until
        it came, so the body landed as the reader moved on and a list's revisit after Today went from 30 ms to 100. */
-    void import('./ProjectCards.svelte').catch(() => null);
+    /* ONLY WHERE THE PROJECTS ARE ASKED: a phone leaves them out (`phoneAsk`), and their cards' code was about 40 KB of
+       a cold phone's Today for a widget it does not draw. */
+    if (asked.blocks.some((b) => (b as { key?: unknown }).key === 'projects')) void import('./ProjectCards.svelte').catch(() => null);
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
-    const [m, t] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts')]);
+    const [m, t, tiles] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts')]);
     const base = apiBase();
-    let drawn = await m.drawnOf(asked, base, undefined, (client) => t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut, shape));
+    /* AND THE SHOWN TILES' OWN CODE THE MOMENT THE ANSWER SAYS WHICH THEY ARE (`tile-code.ts`), beside the page reader's. */
+    let drawn = await m.drawnOf(asked, base, undefined, async (client) => {
+      const out = await t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut, shape);
+      if (out.ok) tiles.askTiles((out.value as { blocks?: unknown }).blocks);
+      return out;
+    });
     /* A RECORD BUILT BEFORE BOARDS refuses a board's keys (`board: is not a key a page has`): Today is asked without them
        and laid out from its own body's sizes, so an app ahead of its record still opens Today (audit 30 Oct, item 2). */
     if (drawn.from === 'refused' && /\b(board|phone|size|draft|until)\b/u.test(drawn.fix)) {

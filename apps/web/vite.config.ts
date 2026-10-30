@@ -317,8 +317,14 @@ const hoistPlugin: Plugin = {
       };
       const kit = new Set<string>();
       for (const file of Object.keys(bundle)) if (/(?:^|\/)entry\/(?:start|app)\.[\w-]+\.js$/u.test(file)) walk(kit, file);
+      /* EVERY CHUNK AN `import()` LANDS ON, not only those Rolldown calls a dynamic entry (speed-d SD1). A module asked by
+         `import()` that a screen also imports statically shares a chunk with others and gets no facade, and that chunk is
+         not flagged: Today's page reader (`PageView`) and its read (`page-drawn`) were such chunks, and each went down its
+         graph one level at a time, 4 s from asking `page-drawn` to having it on a cold phone. */
+      const asked = new Set<string>();
+      for (const chunk of Object.values(bundle)) if (chunk.type === 'chunk') for (const next of chunk.dynamicImports) asked.add(next);
       for (const [file, chunk] of Object.entries(bundle)) {
-        if (chunk.type !== 'chunk' || !(chunk.isEntry || chunk.isDynamicEntry) || kit.has(file)) continue;
+        if (chunk.type !== 'chunk' || !(chunk.isEntry || chunk.isDynamicEntry || asked.has(file)) || kit.has(file)) continue;
         const under = new Set<string>();
         walk(under, file);
         const own = new Set(chunk.imports);

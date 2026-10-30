@@ -127,3 +127,16 @@ test('firstOpen hands the early declarations to the client once, and only at the
     forgetSchemas();
   }
 });
+
+test('A PAGE OPENED BY ITS ADDRESS IS ASKED BESIDE BOOT, as its reader asks it first, and nothing else is (speed-d SD2)', () => {
+  const left = (pathname: string, search = ''): unknown => {
+    const window: Record<string, unknown> = {};
+    const fetch = () => Promise.resolve(new Response('{}'));
+    new Function('location', 'window', 'fetch', SCRIPT)({ pathname, origin: 'https://brain.dog', search }, window, fetch);
+    return (window.__bdPage as { url?: unknown } | undefined)?.url;
+  };
+  assert.equal(left('/acme/p/money'), 'https://brain.dog/acme/api/page?slug=money&shape=1');
+  assert.equal(left('/p/work'), 'https://brain.dog/api/page?slug=work&shape=1');
+  for (const [path, search] of [['/acme/p/money', '?src=1'], ['/acme/p/money/x', ''], ['/acme/p', ''], ['/acme', ''], ['/signin', '']] as const)
+    assert.equal(left(path, search), undefined, `${path}${search}`);
+});

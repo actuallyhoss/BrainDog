@@ -34,7 +34,7 @@
 
   import * as pref from '$lib/pref.ts';
   import { copy } from '$lib/copy/frame.ts';
-  import { callsOut, leaving, quiet, settled } from '$lib/ui/screen.svelte.ts';
+  import { callsOut, leaving, quiet, rested, settled } from '$lib/ui/screen.svelte.ts';
   import { onCallsOut } from '@braindog/client';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { inField, notTheShells } from '$lib/a11y/typed.ts';
@@ -119,10 +119,38 @@
   let Keymap = $state<typeof KeymapView | null>(null);
   /* AND THE COPY'S HAIRLINE: invisible until a screen drawn from the local copy holds it, so it can land after the shell. */
   let CopyMark = $state<typeof CopyMarkView | null>(null);
+  /* THE FRAME'S OWN CODE THAT NO SCREEN DRAWS FROM WAITS FOR THE FIRST SCREEN TO BE DRAWN AND AT REST (`rested`, 5 s at
+     most), or for the moment it is asked for. Asked as the shell mounted, the palette (and the decision card and Slash
+     it carries), the key sheet, the copy's mark, the freeze watchdog and the link reads were about 150 KB racing
+     Today's own code and reads on a cold phone, and Today settled that much later (speed-d SD1, 30 Oct). */
+  const atRest = rested();
+  const later = (load: () => void): void => void atRest.then(load);
+  let paletteAsked = false;
+  const loadPalette = (): void => {
+    if (paletteAsked) return;
+    paletteAsked = true;
+    void import('$lib/palette/Palette.svelte').then(
+      (m) => (Palette = m.default),
+      () => (paletteAsked = false),
+    );
+  };
+  let keymapAsked = false;
+  const loadKeymap = (): void => {
+    if (keymapAsked) return;
+    keymapAsked = true;
+    void import('$lib/ui/Keymap.svelte').then(
+      (m) => (Keymap = m.default),
+      () => (keymapAsked = false),
+    );
+  };
   $effect(() => {
-    void import('$lib/palette/Palette.svelte').then((m) => (Palette = m.default));
-    void import('$lib/ui/Keymap.svelte').then((m) => (Keymap = m.default));
-    void import('$lib/ui/CopyMark.svelte').then((m) => (CopyMark = m.default));
+    later(loadPalette);
+    later(loadKeymap);
+    later(() => void import('$lib/ui/CopyMark.svelte').then((m) => (CopyMark = m.default)));
+  });
+  /* OPENED BEFORE IT LANDED: asked now, and drawn open the moment it arrives. */
+  $effect(() => {
+    if (palette.open) loadPalette();
   });
 
   /* FRAME B'S SIDEBAR (23 October): under the top bar, the record's projects. Shown or hidden and its width are this
@@ -161,6 +189,9 @@
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
      `/[id]`'s `Search` button navigated Home instead of searching. */
   let keymapOpen = $state(false);
+  $effect(() => {
+    if (keymapOpen) loadKeymap();
+  });
   /* THE FACE'S "KEYBOARD KEYS" ASKS FOR THE SHEET (`shell/frame.svelte.ts`): opened here, with this rail's `g` letters. */
   $effect(() => {
     if (!frame.keys) return;
@@ -290,27 +321,30 @@
       return {};
     }
   });
-  /* WHAT EACH LIST DECLARES, READ ONCE THE SHELL HAS DRAWN, on the desk and the phone alike, and kept on this device so
-     the next draw places each list at once. Its reader is the sidebar's own chunk, asked for here, never in the entry. */
+  /* WHAT EACH LIST DECLARES, READ ONCE THE FIRST SCREEN HAS RESTED (`later`), on the desk and the phone alike, and kept on
+     this device so the next draw places each list at once. Its reader is the sidebar's own chunk, asked for here, never
+     in the entry, and never in the first screen's way: it carries the projects' cards' readers, about 20 KB. */
   $effect(() => {
     if (bare || data.live !== true || data.refused) return;
     const base = apiBase(page.url);
     const lists = data.lists;
     let gone = false;
-    void import('$lib/shell/side-read.ts')
-      .then((m) => m.readFacts(base, lists))
-      .then((facts) => {
-        if (gone || Object.keys(facts).length === 0) return;
-        frame.facts = facts;
-        try {
-          const all = JSON.parse(localStorage.getItem(FACTS_KEY) ?? '{}') as Record<string, unknown>;
-          all[base] = facts;
-          localStorage.setItem(FACTS_KEY, JSON.stringify(all));
-        } catch {
-          /* Kept for this tab only. */
-        }
-      })
-      .catch(() => undefined);
+    later(() =>
+      void import('$lib/shell/side-read.ts')
+        .then((m) => m.readFacts(base, lists))
+        .then((facts) => {
+          if (gone || Object.keys(facts).length === 0) return;
+          frame.facts = facts;
+          try {
+            const all = JSON.parse(localStorage.getItem(FACTS_KEY) ?? '{}') as Record<string, unknown>;
+            all[base] = facts;
+            localStorage.setItem(FACTS_KEY, JSON.stringify(all));
+          } catch {
+            /* Kept for this tab only. */
+          }
+        })
+        .catch(() => undefined),
+    );
     return () => {
       gone = true;
     };
@@ -611,17 +645,17 @@
    * inside the record and what the screen held, so the next freeze names itself where the last one could not be made
    * to happen again.
    *
-   * ASKED FOR AS THE SHELL MOUNTS, as the palette is, so it is never in the first screen's way; it reads the browser's
+   * ASKED ONCE THE FIRST SCREEN HAS RESTED, as the palette is, so it is never in that screen's way; it reads the browser's
    * record from the start of the load, so a block before it arrived is still seen. The words are asked when the freeze
    * is said, because the screen it is about is the one on show when the page came back.
    */
   $effect(() => {
     let stop: (() => void) | null = null;
     let gone = false;
-    void import('$lib/watchdog.ts').then((dog) => {
+    later(() => void import('$lib/watchdog.ts').then((dog) => {
       if (gone) return;
       stop = dog.watchFreezes(window, () => ({ route: here(page.url.pathname), rendering: dog.drawingOf(document) }));
-    });
+    }));
     return () => {
       gone = true;
       stop?.();
@@ -945,15 +979,15 @@
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
   /* A SCREEN'S FIRST READ IS ASKED WHILE ITS LINK IS HOVERED, FOCUSED OR TOUCHED (`preload.ts`), on a live record
-     whose access has not ended, and loaded after the first paint, so the entry carries none of it. */
+     whose access has not ended, and loaded once the first screen has rested, so the entry carries none of it. */
   const readsAhead = $derived(data.live === true && !data.refused && live.ended === null);
   $effect(() => {
     if (!readsAhead) return;
     let stop: (() => void) | null = null;
     let gone = false;
-    void import('$lib/data/preload.ts').then((m) => {
+    later(() => void import('$lib/data/preload.ts').then((m) => {
       if (!gone) stop = m.watch(document);
-    });
+    }));
     return () => {
       gone = true;
       stop?.();
