@@ -29,6 +29,7 @@ import {
   endedSplit,
   heatReading,
   hubSentence,
+  hubWords,
   intervalOf,
   lastLine,
   monthBars,
@@ -253,6 +254,7 @@ test('HOW RUNS ENDED NEVER READS AS THE WHOLE WHILE ANYTHING FAILED', () => {
   assert.deepEqual(endedSplit(rows), { runs: 300, failed: 1, ok: 299 });
   assert.equal(endedReading(rows), '99% finished; the failures are on B.');
   assert.equal(endedReading([auto('A', { month: { runs: 8, failures: 0 } })]), 'Every one of the 8 runs this month finished.');
+  assert.equal(endedReading([auto('A', { month: { runs: 1, failures: 0 } })]), 'The one run this month finished.');
   assert.equal(endedSplit([auto('A')]), null, 'no month, no chart');
 });
 
@@ -451,4 +453,14 @@ test('A RULE THE RECORD COUNTS AND KEEPS NO RUN OF STILL HAS ITS LAST FIRING ON 
   assert.equal(lines.length, 1);
   assert.equal(lines[0]?.name, 'Categorise what cleared');
   assert.match(lines[0]?.said ?? '', /^Ran 17 times/u);
+});
+
+test('THE MONTH OF RUNS SAYS A RULE THAT ACTED ON CHANGES IS COUNTED ON ITS ROW (finish F53)', () => {
+  const now = Date.parse('2026-09-03T15:00:00Z');
+  const weekly = auto('Weekly review', { month: { runs: 1, failures: 0 } });
+  const ledger = auto('Categorise what cleared', { path: 'inline', fired: 17, last_at: '2026-09-03T06:35:00.000Z' });
+  assert.equal(monthReading([weekly], now), 'Weekly review ran once, the most this month, and nothing failed.');
+  assert.equal(monthReading([weekly, ledger], now), `Weekly review ran once, the most this month, and nothing failed. ${hubWords.rulesApart}`);
+  /* A RULE THAT LAST ACTED IN AN EARLIER MONTH SAYS NOTHING OF THIS ONE. */
+  assert.equal(monthReading([weekly, { ...ledger, last_at: '2026-08-30T06:35:00.000Z' }], now), 'Weekly review ran once, the most this month, and nothing failed.');
 });

@@ -218,7 +218,7 @@
       <Tile icon="refresh" title={w.runsMonth} meta={w.runsMonthMeta(split.runs)}>
         <Bars items={bars} subject={w.runsMonthSubject} />
         {#if bars.some((b) => (b.part ?? 0) > 0)}<p class="key">The red part of a bar is its failed runs.</p>{/if}
-        <p class="reading">{monthReading(rows)}</p>
+        <p class="reading">{monthReading(rows, now)}</p>
         {#if why.length > 0}
           <ul class="why" aria-label={w.whyFailed}>
             {#each why as f, i (i)}<li><span class="why-name">{f.name}</span> {f.say}</li>{/each}
