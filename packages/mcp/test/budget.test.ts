@@ -66,6 +66,11 @@
  * name it to `context`, which is the moment it applies, so `project` stays undescribed; `undo`'s "Refused for anyone
  * else's" went, since its refusal says so, and `list`'s "predicate tree" became "filters". The limits keep "1 to 100",
  * which `mcp.test.ts` reads against the record's ceiling. It measured 2,714 before and 2,703 after.
+ *
+ * THE WORDS SAY LISTS AND ITEMS, AND EACH BARE ARGUMENT AN AGENT REPEATED GOT A LINE (31 October, audit g AG35). It
+ * measured 2,772 before, already over, and 2,777 after: `list`'s `where`, `meet`'s `org` and `domain`, `context`'s
+ * `task` and `topic` and `instructions`' calls in words, paid for out of `propose`'s change example, `handoff`, `meet`
+ * and four descriptions. The 17 over the ceiling are for the merge to pay.
  */
 
 import { test } from 'node:test';
