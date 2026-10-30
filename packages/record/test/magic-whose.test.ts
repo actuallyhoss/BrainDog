@@ -54,3 +54,16 @@ test('A TOKEN NOBODY MINTED, OR ONE OF THE WRONG KIND, IS THE ONE FAILURE BODY',
     assert.deepEqual('refusal' in out ? out.refusal : null, NOT_YOU);
   }
 });
+
+/* RD5: EVERY ANSWER STRUCK THE ASKING ADDRESS, on the count every sign-in shares, and only a sign-in clears it. */
+test('RD5: ASKING ABOUT A REAL LINK OFTEN DOES NOT LOCK THE ADDRESS OUT; MISSES STILL DO', async () => {
+  const d = setup();
+  const sent = await d.auth({ flow: 'magic.start', email: 'ada@example.com', ip: '203.0.113.1' });
+  const linkToken = sent.status === 200 && sent.mail && 'linkToken' in sent.mail ? sent.mail.linkToken : assert.fail('no link');
+  for (let i = 0; i < 25; i++) assert.equal((await d.auth({ flow: 'magic.whose', linkToken, ip: '198.51.100.7' })).status, 200, `load ${i + 1}`);
+  assert.equal((await d.auth({ flow: 'magic.redeem', linkToken, ip: '198.51.100.7' })).status, 200, 'the link page locked its own address out');
+
+  let locked = false;
+  for (let i = 0; i < 25 && !locked; i++) locked = (await d.auth({ flow: 'magic.whose', linkToken: `${'z'.repeat(42)}${i % 10}`, ip: '198.51.100.8' })).status === 429;
+  assert.ok(locked, 'guessing tokens through the question never locked');
+});
