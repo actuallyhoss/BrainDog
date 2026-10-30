@@ -24,7 +24,7 @@ import { GLYPH_NAMES } from 'braindog-render/glyphs/names';
 import { censusOf, pathsOf, viewerOfRead, whollyWithheld, type BlockResult, type Census, type PageBlock, type PageResult } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 
-import { lintAnswer, roundOver } from '../page-lint.ts';
+import { lintAnswer, ROUND_MS, ROUND_PAGES } from '../page-lint.ts';
 import { hostSourcesOf } from '../sources/index.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -69,8 +69,9 @@ const HELD: Refusal = { code: 'FORBIDDEN', fix: 'This reads a list you may not o
 /** The sources that read across the whole record, which only a caller who reads it whole is shown (`ACROSS` in `index.ts`). */
 const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs', 'exceptions', 'usage.days', 'usage.actions', 'usage.projects', 'pages']);
 
-export function methods(deps: RecordDeps) {
-  const { kernel, scoped, readable, no, clock } = deps;
+/** What the census and its slices share: who may open a page, and each block as the caller is shown it. */
+function shared(deps: RecordDeps) {
+  const { kernel, readable } = deps;
 
   /** Whether the caller may open a page `kernel.pages()` lists: the rule of `seesPage` in `index.ts`, asked of `readable`. */
   const opens = (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }): boolean =>
@@ -108,6 +109,94 @@ export function methods(deps: RecordDeps) {
     return held ? ({ kind: b.kind, refusals: [HELD] } as unknown as BlockResult) : b;
   };
 
+  /** A census about to begin: the pages the caller may open, somebody's own first, then the ones each template made. */
+  const begun = (ctx: CallContext): CensusPart => {
+    const listed = kernel.pages().filter((p) => opens(ctx, p));
+    /* THE PAGES SOMEBODY WROTE FIRST, then the pages each template made, so a round cut short has counted his own. */
+    const order = [...listed.filter((p) => p.template === null), ...listed.filter((p) => p.template !== null)];
+    return { order: order.map((p) => ({ slug: p.slug, title: p.title, stored: p.template === null })), next: 0, read: 0, pages: [], undrawn: [] };
+  };
+
+  /** Whether a census has drawn every page it will: its last page, or `ROUND_PAGES`. */
+  const ended = (part: CensusPart): boolean => part.next >= part.order.length || part.read >= ROUND_PAGES;
+
+  /**
+   * The next pages of a census, until it ends or `stop` says so. `stop` is asked before each page after the first this
+   * call draws, with how many it drew, so every call draws at least one page while any is left.
+   */
+  const step = (ctx: CallContext, part: CensusPart, stop: (drawn: number) => boolean): CensusPart => {
+    const out: CensusPart = { ...part, pages: [...part.pages], undrawn: [...part.undrawn] };
+    /* THE RECORD'S OWN SOURCES (`lists`, `pages`) ARE HANDED IN, so a page over one is counted as drawn, not refused. */
+    const hostSources = hostSourcesOf({ kernel, ctx, readable });
+    let drawn = 0;
+    while (!ended(out)) {
+      if (drawn > 0 && stop(drawn)) break;
+      const p = out.order[out.next]!;
+      out.next += 1;
+      out.read += 1;
+      drawn += 1;
+      let answer: PageResult;
+      try {
+        const got = kernel.page(p.slug, undefined, { hostSources, viewer: viewerOfRead(ctx) });
+        if (!got.ok) {
+          out.undrawn.push(p.title);
+          continue;
+        }
+        answer = got.value;
+      } catch {
+        out.undrawn.push(p.title);
+        continue;
+      }
+      const held: PageResult = { ...answer, blocks: answer.blocks.map((b) => shown(ctx, b)) };
+      /* OVER EVERY BLOCK, as `drawnWithheld` in `index.ts` asks it, so a census counts exactly the pages `pages` lists. */
+      if (whollyWithheld(held.blocks)) continue;
+      const dashes = lintAnswer(held, null).filter((f) => DASH_RULES.has(f.rule)).length;
+      const counted = censusOf(held, dashes, { held: p.stored ? 'stored' : 'generated', glyphs: GLYPH_NAMES });
+      out.pages.push({ ...counted, title: answer.title });
+    }
+    return out;
+  };
+
+  /** What a census came to, as `pagesCensus` answers it. */
+  const answer = (part: CensusPart): PagesCensus => {
+    const { pages } = part;
+    const counted = (has: (c: PageCensus) => boolean) => pages.filter(has).length;
+    return {
+      pages,
+      totals: {
+        pages: pages.length,
+        refused: counted((c) => c.refused.length > 0),
+        unresolved: counted((c) => c.unresolved.length > 0),
+        dashed: counted((c) => c.dashes > 0),
+        dashes: pages.reduce((n, c) => n + c.dashes, 0),
+        glyphs_unknown: counted((c) => c.glyphs_unknown.length > 0),
+        undrawn: part.undrawn,
+        unread: part.order.length - part.read,
+      },
+    };
+  };
+
+  return { opens, whole, everyList, shown, census: { begun, ended, step, answer } };
+}
+
+/**
+ * A census under way, kept between ticks as plain data: the pages in the order they are counted, the next one, how many
+ * were drawn, and what was counted so far. The record's lint counts its census a few pages a tick (`lintTick`).
+ */
+export type CensusPart = { order: { slug: string; title: string; stored: boolean }[]; next: number; read: number; pages: PageCensus[]; undrawn: string[] };
+
+/**
+ * THE CENSUS A FEW PAGES AT A TIME, for a host's tick: `begun`, `step` until `ended`, then `answer`, which is what
+ * `pagesCensus` answers for the same pages. One census in one call is `pagesCensus` itself, built from these.
+ */
+export function censusSlices(deps: RecordDeps) {
+  return shared(deps).census;
+}
+
+export function methods(deps: RecordDeps) {
+  const { kernel, scoped, readable, no, clock } = deps;
+  const { census } = shared(deps);
+
   return {
     /**
      * Every page the caller may open, counted: its blocks, how many draw, each refusal, each path that named nothing, each
@@ -117,56 +206,10 @@ export function methods(deps: RecordDeps) {
     async pagesCensus(_args: unknown, ctx: CallContext): Promise<Result<PagesCensus>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const listed = kernel.pages().filter((p) => opens(ctx, p));
-      /* THE RECORD'S OWN SOURCES (`lists`, `pages`) ARE HANDED IN, so a page over one is counted as drawn, not refused. */
-      const hostSources = hostSourcesOf({ kernel, ctx, readable });
-      /* THE PAGES SOMEBODY WROTE FIRST, then the pages each template made, so a round cut short has counted his own. */
-      const order = [...listed.filter((p) => p.template === null), ...listed.filter((p) => p.template !== null)];
-      const pages: PageCensus[] = [];
-      const undrawn: string[] = [];
       /* A ROUND IS BOUNDED AS THE PAGE LINT'S IS: drawing is synchronous, so a record with a page per run stops counting
          at `ROUND_PAGES` or `ROUND_MS` and says how many it left, rather than holding the host. */
       const start = clock.now();
-      let read = 0;
-      for (const p of order) {
-        if (roundOver(read, start, clock.now())) break;
-        read += 1;
-        let answer: PageResult;
-        try {
-          const out = kernel.page(p.slug, undefined, { hostSources, viewer: viewerOfRead(ctx) });
-          if (!out.ok) {
-            undrawn.push(p.title);
-            continue;
-          }
-          answer = out.value;
-        } catch {
-          undrawn.push(p.title);
-          continue;
-        }
-        const held: PageResult = { ...answer, blocks: answer.blocks.map((b) => shown(ctx, b)) };
-        /* OVER EVERY BLOCK, as `drawnWithheld` in `index.ts` asks it, so a census counts exactly the pages `pages` lists. */
-        if (whollyWithheld(held.blocks)) continue;
-        const dashes = lintAnswer(held, null).filter((f) => DASH_RULES.has(f.rule)).length;
-        const census = censusOf(held, dashes, { held: p.template === null ? 'stored' : 'generated', glyphs: GLYPH_NAMES });
-        pages.push({ ...census, title: answer.title });
-      }
-      const counted = (has: (c: PageCensus) => boolean) => pages.filter(has).length;
-      return {
-        ok: true,
-        value: {
-          pages,
-          totals: {
-            pages: pages.length,
-            refused: counted((c) => c.refused.length > 0),
-            unresolved: counted((c) => c.unresolved.length > 0),
-            dashed: counted((c) => c.dashes > 0),
-            dashes: pages.reduce((n, c) => n + c.dashes, 0),
-            glyphs_unknown: counted((c) => c.glyphs_unknown.length > 0),
-            undrawn,
-            unread: order.length - read,
-          },
-        },
-      };
+      return { ok: true, value: census.answer(census.step(ctx, census.begun(ctx), () => clock.now() - start > ROUND_MS)) };
     },
 
     /**

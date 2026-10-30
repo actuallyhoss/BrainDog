@@ -342,40 +342,90 @@ const NO_DRAW = 'Does not open: the record could not draw this page.';
  * One round over the record's pages, as many as `ROUND_MS` allows, in `pagesToLint`'s order. A PAGE THAT WILL NOT DRAW
  * IS A FINDING, whether the draw refused or threw: a person opening it sees nothing, and one bad page never ends the
  * round for the rest. The draw is a read and only a read (`kernel.page`, no reader, nothing observed).
+ *
+ * ONE TICK, AS IT ALWAYS WAS: `roundBegun`, then `roundStep` until `ROUND_MS` or `ROUND_PAGES`, then `roundOf`. A host
+ * whose tick may not hold that long draws the same round a few pages a tick (`roundStep` with its own stop), and
+ * `roundOf` reads the same round from what the ticks kept.
  */
 export function lintRound(deps: PageLintDeps): PageLintRound {
   const start = deps.now();
-  const order = pagesToLint(deps.pages());
+  const part = roundStep(deps, roundBegun(deps), () => deps.now() - start > ROUND_MS);
+  return roundOf(part);
+}
+
+/**
+ * A round under way, kept between ticks: the pages in the order they are read, the next one, the questions waiting when
+ * it began, and what was found so far. Plain data, so a host may keep it as a pref and carry it to the next tick.
+ */
+export type RoundPart = {
+  order: { slug: string; title: string }[];
+  next: number;
+  waiting: number | null;
+  findings: PageFinding[];
+  withFindings: string[];
+  read: number;
+  cells: number;
+  cut: PageLintRound['cut'];
+};
+
+/** A round about to begin: its pages in `pagesToLint`'s order, read now, and the questions waiting now. */
+export function roundBegun(deps: PageLintDeps): RoundPart {
+  const order = pagesToLint(deps.pages()).map((p) => ({ slug: p.slug, title: p.title }));
   let waiting: number | null = null;
   try {
     waiting = deps.questionsOpen();
   } catch {
     /* A count that cannot be read only turns the hidden-questions check off. */
   }
-  const findings: PageFinding[] = [];
-  const withFindings: string[] = [];
-  let read = 0;
-  let cells = 0;
-  const cut: PageLintRound['cut'] = [];
-  for (const p of order) {
-    if (roundOver(read, start, deps.now())) break;
-    read++;
+  return { order, next: 0, waiting, findings: [], withFindings: [], read: 0, cells: 0, cut: [] };
+}
+
+/** Whether a round has read every page it will: its last page, or `ROUND_PAGES`. */
+export const roundEnded = (part: RoundPart): boolean => part.next >= part.order.length || part.read >= ROUND_PAGES;
+
+/**
+ * The next pages of a round, until it ends or `stop` says so. `stop` is asked before each page after the first this call
+ * draws, with how many it drew, so every call draws at least one page while any is left. Answers the round as it now is.
+ */
+export function roundStep(deps: PageLintDeps, part: RoundPart, stop: (drawn: number) => boolean): RoundPart {
+  const out: RoundPart = { ...part, findings: [...part.findings], withFindings: [...part.withFindings], cut: [...part.cut] };
+  let drawn = 0;
+  while (!roundEnded(out)) {
+    if (drawn > 0 && stop(drawn)) break;
+    const p = out.order[out.next]!;
+    out.next++;
+    out.read++;
+    drawn++;
     let found: PageFinding[];
     let title = p.title;
     try {
       const answer = deps.page(p.slug);
       if (answer.ok) title = answer.value.title;
       const pageRead: PageRead = { cells: 0, cut: [] };
-      found = answer.ok ? lintAnswer(answer.value, waiting, deps.typesOf, pageRead, deps.keysOf) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
-      cells += pageRead.cells;
-      cut.push(...pageRead.cut.map((c) => ({ page: title, ...c })));
+      found = answer.ok ? lintAnswer(answer.value, out.waiting, deps.typesOf, pageRead, deps.keysOf) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
+      out.cells += pageRead.cells;
+      out.cut.push(...pageRead.cut.map((c) => ({ page: title, ...c })));
     } catch {
       found = [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
     }
-    if (found.length > 0) withFindings.push(title);
-    findings.push(...found);
+    if (found.length > 0) out.withFindings.push(title);
+    out.findings.push(...found);
   }
-  return { findings, pages: read, unread: order.length - read, withFindings, cells, cut };
+  return out;
+}
+
+/** The round a part came to: what it found, how many pages it read and how many it left. */
+export function roundOf(part: RoundPart): PageLintRound {
+  return { findings: part.findings, pages: part.read, unread: part.order.length - part.read, withFindings: part.withFindings, cells: part.cells, cut: part.cut };
+}
+
+/** A kept part read back, or `null` for anything of another shape (a pref written by an older build). */
+export function roundPartOf(raw: unknown): RoundPart | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const n = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  if (!Array.isArray(r.order) || !n(r.next) || !(r.waiting === null || n(r.waiting)) || !Array.isArray(r.findings) || !Array.isArray(r.withFindings) || !n(r.read) || !n(r.cells) || !Array.isArray(r.cut)) return null;
+  return raw as RoundPart;
 }
 
 /* ── the sign ───────────────────────────────────────────────────────────── */
