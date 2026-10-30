@@ -26,6 +26,6 @@ test('A RECORD WHOSE APPLIED MIGRATION IS NOT THE TEXT THE LOCK HOLDS STOPS THE 
   db.close();
   const r = spawnSync(process.execPath, [MAIN, 'serve'], { env, encoding: 'utf8', timeout: 20_000 });
   assert.equal(r.status, 1, r.stderr);
-  assert.match(r.stderr, /This record ran migration 1 \(kernel\) as text this build does not hold/);
+  assert.match(r.stderr, /This BrainDog ran migration 1 \(kernel\) as text this build does not hold/);
   assert.match(r.stderr, /restore the copy taken before the upgrade/);
 });

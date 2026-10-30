@@ -21,7 +21,7 @@ const plain = (what: string) => assert.doesNotMatch(what, /—|\bids?\b|\brows?\
 test('IMPORTS IS ONE READ+ READ, taking nothing, said for the owner', () => {
   const r = row('imports');
   assert.deepEqual([r.group, r.writes, r.takes], ['READ+', false, {}]);
-  assert.equal(r.what, 'Every import made into this record, what each brought in, and whether you said it is your own. Only the owner reads it.');
+  assert.equal(r.what, 'Every import made into this BrainDog, what each brought in, and whether you said it is your own. Only the owner reads it.');
   plain(r.what);
 });
 

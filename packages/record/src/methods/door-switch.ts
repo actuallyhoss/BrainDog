@@ -154,7 +154,7 @@ export function methods(deps: RecordDeps) {
         return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to switch this door back on. It is still off.', at: 'principal' } };
 
       const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${ingest}`);
-      if (!row) return no('DECLARATION_UNKNOWN', `This record declares no door called ${ingest}.`, { at: 'ingest' });
+      if (!row) return no('DECLARATION_UNKNOWN', `There is no door called ${ingest} here.`, { at: 'ingest' });
       const decl = JSON.parse(row.body) as { channel?: unknown };
       if (decl.channel !== 'webhook')
         return no('VALUE_MALFORMED', `${ingest} arrives by ${String(decl.channel)}, and only a web address is switched off here.`, { at: 'ingest' });

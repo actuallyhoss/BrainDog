@@ -54,7 +54,7 @@ export function methods(deps: RecordDeps) {
       if (!whole(ctx)) {
         return part(ctx)
           ? no('FORBIDDEN', 'Where agents stand is about the whole record, and this caller is held to part of it.', { at: 'principal' })
-          : no('FORBIDDEN', 'Where agents stand is for the owner of this record to read, so nothing was read.', { at: 'principal' });
+          : no('FORBIDDEN', 'Where agents stand is for the owner of this BrainDog to read, so nothing was read.', { at: 'principal' });
       }
       return { ok: true, value: read.standing(deps.validFrom?.()) };
     },
@@ -78,7 +78,7 @@ export function methods(deps: RecordDeps) {
       const out = read.takeBack(said.agent, kind, deps.validFrom?.());
       if ('unknown' in out) {
         return out.unknown === 'agent'
-          ? no('VALUE_MALFORMED', `No agent connected to this record is called ${said.agent.trim()}. Nothing was changed.`, { at: 'agent' })
+          ? no('VALUE_MALFORMED', `No agent connected here is called ${said.agent.trim()}. Nothing was changed.`, { at: 'agent' })
           : no('VALUE_MALFORMED', `${said.agent.trim()} has no kind of change called ${kind?.trim()}. Nothing was changed.`, { at: 'kind' });
       }
       return { ok: true, value: { agents: [out.agent] } };

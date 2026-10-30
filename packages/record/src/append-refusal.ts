@@ -18,7 +18,7 @@ import type { Refusal } from '@braindog/ports';
 
 /** The sentence. Plain, and it names the screen where the key is made. */
 export const APPEND_READ_FIX =
-  'You can add to this record and you cannot read it here. You add through an agent of your own. Make its key in Settings, under Agents.';
+  'You can add to this BrainDog and you cannot read it here. You add through an agent of your own. Make its key in Settings, under Agents.';
 
 /** Where the refusal is about: the caller's level, which is `append`. A screen reads this, never the sentence. */
 export const APPEND_READ_AT = 'level.append';

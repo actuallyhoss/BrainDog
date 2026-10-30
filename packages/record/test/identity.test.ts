@@ -837,7 +837,7 @@ test('A SESSION ASKED WITH A SLUG ANSWERS THAT RECORD FOR A MEMBER, the same 403
 
   /* SOMEBODY ELSE'S RECORD, A CLOSED ONE, A NAME NOBODY HOLDS, A SPOKEN ID AND GARBAGE: ONE ANSWER, WORD FOR WORD. A
      different sentence for "no such name" would be an oracle for which names exist, readable by anybody signed in. */
-  const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+  const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' };
   for (const slug of ['bobs-books', 'the-old-shop', 'nobody-here', 'd41', '', 'the-ſhop', 'x'.repeat(40)]) {
     const refused = await d.auth({ flow: 'session', sid, slug });
     assert.equal(refused.status, 403, JSON.stringify(slug));

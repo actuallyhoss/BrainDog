@@ -20,7 +20,7 @@ test('the twentieth spent refuses the next with OUT_OF_BOUNDS and the sentence',
   assert.equal(out.ok, false);
   if (out.ok || !('refusal' in out)) return assert.fail('refused with a refusal');
   assert.equal(out.refusal.code, 'OUT_OF_BOUNDS');
-  assert.equal(out.refusal.fix, 'Agents have tried 20 scripts on this record today, the most they may. Propose it untried, or try again tomorrow.');
+  assert.equal(out.refusal.fix, 'Agents have tried 20 scripts here today, the most they may. Propose it untried, or try again tomorrow.');
   assert.equal(out.refusal.fix, TRIALS_SPENT);
   assert.equal(trialsLeft(57).ok, false);
 });

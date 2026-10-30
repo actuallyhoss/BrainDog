@@ -142,7 +142,7 @@ function lockRefusal(file: string): string | null {
     const held = locked.get(Number(row.version));
     if (held === undefined || held.checksum === row.checksum) continue;
     return (
-      `This record ran migration ${row.version} (${held.slug}) as text this build does not hold, so this build would refuse every request to it and has not started. ` +
+      `This BrainDog ran migration ${row.version} (${held.slug}) as text this build does not hold, so this build would refuse every request to it and has not started. ` +
       'Start the build that last served the record, or restore the copy taken before the upgrade with braindog init <slug> --from <copy>. ' +
       'A migration a record has run is never edited, so the build is at fault: report it with the migration number.'
     );

@@ -200,7 +200,7 @@ function recordNamed(chosen: string, here: OAuthHereOptions): string | null {
 }
 
 /** What a person is told when minting answered and no bearer came back, which the record never does on purpose. */
-const NOT_MINTED = 'BrainDog could not connect this app to this record.';
+const NOT_MINTED = 'BrainDog could not connect this app.';
 
 /** What the door mints with: the reach, the app's name, the days, and the app the door proved, forwarded as is. */
 type MintArgs = Parameters<Extract<Approver, { ok: true }>['mint']>[0];

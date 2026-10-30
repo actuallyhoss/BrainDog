@@ -113,12 +113,12 @@ export function fadeOf(register: object): { field: string; after: string } | nul
 
 /** The one sentence a read answers when the record keeps no list that plays a part: whole sentences, never an id. */
 const NO_LIST: Readonly<Record<AgentRole, string>> = {
-  skills: 'This record keeps no skills.',
-  tools: 'This record keeps no tools.',
-  learnings: 'This record keeps no learnings.',
-  'keys-index': 'This record keeps no keys by name.',
-  profiles: 'This record keeps no profiles.',
-  carry: 'This record keeps nothing to carry between machines.',
+  skills: 'This BrainDog keeps no skills.',
+  tools: 'This BrainDog keeps no tools.',
+  learnings: 'This BrainDog keeps no learnings.',
+  'keys-index': 'This BrainDog keeps no keys by name.',
+  profiles: 'This BrainDog keeps no profiles.',
+  carry: 'This BrainDog keeps nothing to carry between machines.',
 };
 
 /** The one sentence a read answers when the record keeps no list that plays `role`. */

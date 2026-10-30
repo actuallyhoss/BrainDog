@@ -27,7 +27,7 @@ test('A PATH THAT NAMES NOTHING is found with the nearest name that exists, and 
   assert.equal(rest.length, 0);
   assert.equal(f!.kind, 'names-nothing');
   assert.deepEqual(f!.where, { page: 'Home', name: 'Notes' });
-  assert.equal(f!.said, '"{{revenue.monthy}}" names nothing in this record.');
+  assert.equal(f!.said, '"{{revenue.monthy}}" names nothing in your BrainDog.');
   assert.match(f!.fix, /Write \{\{revenue\.monthly\}\}, the nearest name the record has/);
   /* THE KERNEL'S ANSWER WINS where it was given: a path it says names nothing is one, whatever the names hold. */
   assert.deepEqual(kinds(of({ text: '{{projects.count}}', unnamed: ['projects.count'] })), ['names-nothing']);
@@ -164,7 +164,7 @@ test('THE READ FINDS THE PLANTED PLACEHOLDER IN A NOTE AND THE BROKEN FENCE ON A
   assert.ok(note, JSON.stringify(got.faults));
   assert.equal(note.where.list, 'Projects');
   assert.equal(note.where.field, 'Note');
-  assert.equal(note.said, '"{{revenue.monthly}}" names nothing in this record.');
+  assert.equal(note.said, '"{{revenue.monthly}}" names nothing in your BrainDog.');
   const fence = got.faults.find((f) => f.kind === 'degraded');
   assert.ok(fence, JSON.stringify(got.faults));
   assert.deepEqual(fence.where, { page: 'Overview', name: 'Lead' });

@@ -338,7 +338,7 @@ test('A HELD RUN SENDS NOTHING: no name resolved, no key opened, no request, and
   let opened = 0;
   const inner = actionExecutor(api, { openKey: async () => (opened++, 'sk-example-123'), send: net.send, resolve: dns.resolve });
   const asked: string[] = [];
-  const say = 'balance is waiting until 1 October. This record has used 15,000 runs for September.';
+  const say = 'balance is waiting until 1 October. This BrainDog has used 15,000 runs for September.';
   const run = await api.kernel.runActions(holding(inner, REC, (record, action) => (asked.push(`${record} ${action}`), { until: Date.UTC(2026, 9, 1), say })));
 
   assert.equal(run.held, 1);

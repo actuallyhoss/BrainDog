@@ -790,13 +790,13 @@ const planOf = (value: string | undefined): Plan => ((PLANS as readonly string[]
 const PLUS = PLAN_TABLE.plus.name;
 /* TEAMS ARE A PLUS FEATURE: the plain line an owner reads when an invitation is refused, and the one the
    person holding the link reads. Each says why and offers the way on. The gate is off while the host sells no plan. */
-export const FREE_ONE_PERSON = `Teams are part of ${PLUS}, so nobody else can join this record yet. Move it to ${PLUS} in Settings to invite colleagues.`;
+export const FREE_ONE_PERSON = `Teams are part of ${PLUS}, so nobody else can join this BrainDog yet. Move it to ${PLUS} in Settings to invite colleagues.`;
 /* TEAMS HELD (the Worker var `TEAMS_HELD`): sharing is not open yet, on any plan, so the sentence names no plan. */
-export const TEAMS_HELD_SAID = 'Inviting colleagues opens soon. Nobody else can join this record yet.';
-export const FREE_JOIN_REFUSED = `This record is not on ${PLUS}, so nobody else can join it yet. Ask its owner to move it to ${PLUS}, then open this link again.`;
+export const TEAMS_HELD_SAID = 'Inviting colleagues opens soon. Nobody else can join this BrainDog yet.';
+export const FREE_JOIN_REFUSED = `This BrainDog is not on ${PLUS}, so nobody else can join it yet. Ask its owner to move it to ${PLUS}, then open this link again.`;
 /* THE SAME TWO ON A HOST THAT SELLS NO PLAN, where naming a plan to move to names a door that is not there. */
-export const FREE_ONE_PERSON_SHORT = `Teams are part of ${PLUS}, so nobody else can join this record.`;
-export const FREE_JOIN_REFUSED_SHORT = `This record is not on ${PLUS}, so nobody else can join it.`;
+export const FREE_ONE_PERSON_SHORT = `Teams are part of ${PLUS}, so nobody else can join this BrainDog.`;
+export const FREE_JOIN_REFUSED_SHORT = `This BrainDog is not on ${PLUS}, so nobody else can join it.`;
 
 /**
  * The Directory's own schema revision. `49 §5.1` step 4.
@@ -1585,7 +1585,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       if (row.state === 'comp' && before !== undefined && before.state !== 'comp' && (before.subscription !== null || before.state === 'lapsed'))
         return no<BillingRow>(
           'ALREADY_KNOWN',
-          before.state === 'lapsed' ? 'This record lapsed on a paid plan, and a gift does not end a lapse.' : 'This record pays through a subscription. End it before giving the plan.',
+          before.state === 'lapsed' ? 'This BrainDog lapsed on a paid plan, and a gift does not end a lapse.' : 'This BrainDog pays through a subscription. End it before giving the plan.',
           { at: 'state' },
         );
       for (const key of ['subscription', 'price'] as const)
@@ -1696,7 +1696,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       if (held) return ok({ added: false, left: Number(held.left) });
       const record = sql.one<{ closed_at: string | null }>('SELECT closed_at FROM dir_record WHERE id = ?', call.record);
       if (!record || record.closed_at !== null)
-        return no<R>('OUT_OF_BOUNDS', record ? 'This record is closed, and credits end with it.' : `There is no record ${call.record}.`, { at: 'record' });
+        return no<R>('OUT_OF_BOUNDS', record ? 'This BrainDog is closed, and credits end with it.' : `There is no record ${call.record}.`, { at: 'record' });
       if (!sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', call.person)) return no<R>('OUT_OF_BOUNDS', `There is no person ${call.person}.`, { at: 'person' });
       sql.exec(
         'INSERT INTO dir_credit (event, record, person, pack, credits, left, bought_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1813,7 +1813,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         return no<ExtraUsage>('VALUE_MALFORMED', `cap_cents is whole cents from 0, which turns extra usage off, to ${EXTRA_CAP_MOST}.`, { at: 'cap_cents' });
       const row = sql.one<{ plan: string; closed_at: string | null }>('SELECT plan, closed_at FROM dir_record WHERE id = ?', call.record);
       if (!row || row.closed_at !== null)
-        return no<ExtraUsage>('OUT_OF_BOUNDS', row ? 'This record is closed, so it runs nothing.' : `There is no record ${call.record}.`, { at: 'record' });
+        return no<ExtraUsage>('OUT_OF_BOUNDS', row ? 'This BrainDog is closed, so it runs nothing.' : `There is no record ${call.record}.`, { at: 'record' });
       const plan = planOf(row.plan);
       if (PLAN_TABLE[plan].extra === null)
         return no<ExtraUsage>('VALUE_MALFORMED', `${PLAN_TABLE[plan].name} has no extra usage. It is part of ${PLAN_TABLE.hosted.name} and ${PLAN_TABLE.plus.name}.`, { at: 'record' });
@@ -2955,12 +2955,12 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         if (extra.cents < extra.cap_cents) return null;
         return {
           until,
-          say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This record has reached the ${centsSaid(extra.cap_cents)} cap set on its extra usage for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
+          say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This BrainDog has reached the ${centsSaid(extra.cap_cents)} cap set on its extra usage for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
         };
       }
       return {
         until,
-        say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This record has used ${SPENT[over](allowance[over])} for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
+        say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This BrainDog has used ${SPENT[over](allowance[over])} for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
       };
     },
 
@@ -3030,13 +3030,13 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           email: person?.email ?? null,
           say: past
             ? kind === 'held'
-              ? `This record has reached the ${cap} cap set on its extra usage for ${month}, so its scheduled actions and automations wait until ${again}.`
-              : `This record's extra usage for ${month} has come to ${centsSaid(extra.cents)} of its ${cap} cap. At the cap its scheduled actions and automations wait until ${again}.`
+              ? `This BrainDog has reached the ${cap} cap set on its extra usage for ${month}, so its scheduled actions and automations wait until ${again}.`
+              : `This BrainDog's extra usage for ${month} has come to ${centsSaid(extra.cents)} of its ${cap} cap. At the cap its scheduled actions and automations wait until ${again}.`
             : kind === 'held'
-              ? `This record has used ${SPENT[binding](allowance[binding])} for ${month}, so its scheduled actions and automations wait until ${again}.`
+              ? `This BrainDog has used ${SPENT[binding](allowance[binding])} for ${month}, so its scheduled actions and automations wait until ${again}.`
               : extraOn
-                ? `This record has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. Past it, extra usage carries on up to the ${cap} cap set for the month.`
-                : `This record has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. At the limit its scheduled actions and automations wait until ${again}.`,
+                ? `This BrainDog has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. Past it, extra usage carries on up to the ${cap} cap set for the month.`
+                : `This BrainDog has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. At the limit its scheduled actions and automations wait until ${again}.`,
         };
       }),
 

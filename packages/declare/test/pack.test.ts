@@ -694,12 +694,12 @@ test('and a dependency it does not have is a refusal with the version in it', as
   const pack = await packOf({ requires: { format: 9, primitives: 1, packs: {} } });
   const format = await plan(pack, EMPTY);
   assert.equal(format.requires.format.ok, false);
-  assert.match(refusal(await install(pack, format, fakeHost(), format.planHash)).fix, /needs format 9 and this record is at 1/);
+  assert.match(refusal(await install(pack, format, fakeHost(), format.planHash)).fix, /needs format 9 and this BrainDog is at 1/);
 
   const needs = await packOf({ requires: { format: 1, primitives: 1, packs: { 'studio-core': '>=2.0.0' } } });
   const diff = await plan(needs, { ...EMPTY, packs: [{ id: 'studio-core', version: '1.0.0' }] });
   assert.equal(diff.requires.packs[0]?.ok, false);
-  assert.match(refusal(await install(needs, diff, fakeHost(), diff.planHash)).fix, /needs studio-core >=2.0.0, and this record has 1.0.0/);
+  assert.match(refusal(await install(needs, diff, fakeHost(), diff.planHash)).fix, /needs studio-core >=2.0.0, and this BrainDog has 1.0.0/);
 });
 
 test('and a seed the register refuses stops the install rather than becoming a row nothing could make', async () => {

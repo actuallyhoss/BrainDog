@@ -48,7 +48,7 @@ Reading list 1.0.0 reads as an add-on: 1 lists, 1 pages and 2 example rows. Noth
 When something is wrong, the last line says what, with its code in brackets. Here the page was pointed at a list called `books` that nothing declares:
 
 ```code | What it prints when the file is wrong
-  Refused in a scratch record: reading-list points at the books list (page.reading-list.requires), which this record does not hold and reading-list does not declare. Install the pack that declares books first, or declare it in reading-list. (REGISTER_UNRESOLVED)
+  Refused in a scratch record: reading-list points at the books list (page.reading-list.requires), which is not here and reading-list does not declare. Install the pack that declares books first, or declare it in reading-list. (REGISTER_UNRESOLVED)
 Reading list 1.0.0 would be refused by a record, as said above.
 ```
 

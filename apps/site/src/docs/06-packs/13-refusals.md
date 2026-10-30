@@ -27,8 +27,8 @@ This add-on declares a list called tasks, which belongs to BrainDog's Work modul
 ```
 
 ```code | A dialect newer than the record (FORMAT_OUT_OF_RANGE, PRIMITIVES_OUT_OF_RANGE)
-reading-list needs format 2 and this record is at 1. Update BrainDog.
-reading-list needs primitives 9 and this record renders 1. Update BrainDog, or ask the author for a build against the primitives this record renders.
+reading-list needs format 2 and this BrainDog is at 1. Update BrainDog.
+reading-list needs primitives 9 and this BrainDog renders 1. Update BrainDog, or ask the author for a build against the primitives it renders.
 ```
 
 - **`PACK_OVER_CAP`**, a file past the size an add-on may be: "This file is <n> KB, and an add-on is at most <n> KB. Ship fewer example rows, or split it."
@@ -37,7 +37,7 @@ reading-list needs primitives 9 and this record renders 1. Update BrainDog, or a
 ## What it needs installed first
 
 ```code | A pack it needs, at a version the record does not have (OUT_OF_BOUNDS)
-reading-list needs people >=1.0.0 <2.0.0, and this record has 2.2.0.
+reading-list needs people >=1.0.0 <2.0.0, and this BrainDog has 2.2.0.
 ```
 
 - **`DEPENDENCY_UNRESOLVED`**, a pack it needs is not installed: "<pack> requires <pack>: not installed. Install the pack that declares it first, or use --with-deps."
@@ -67,7 +67,7 @@ register.items: seq_prefix 'D' is taken by decisions. D, SG and S are the kernel
 ## Pages and blocks
 
 ```code | A list nothing declares (REGISTER_UNRESOLVED)
-reading-list points at the books list (page.reading-list.requires), which this record does not hold and reading-list does not declare. Install the pack that declares books first, or declare it in reading-list.
+reading-list points at the books list (page.reading-list.requires), which is not here and reading-list does not declare. Install the pack that declares books first, or declare it in reading-list.
 ```
 
 ```code | A kind of block nobody declares (KIND_UNKNOWN)
@@ -168,7 +168,7 @@ job.reading-notes's argument title says how long it may be, a whole number from 
 
 A new version is planned against what the record holds, so some refusals arrive only then.
 
-- **`PLAN_STALE`**, the record changed after the plan was made: "This record has moved, or the pack has, since the plan you approved. Read the plan again."
+- **`PLAN_STALE`**, the record changed after the plan was made: "This BrainDog has moved, or the pack has, since the plan you approved. Read the plan again."
 - **`FIELD_TYPE_CHANGED`**, a field's type changed under rows: "<list>.<field>: <old type> → <new type> changes a type, and <n> rows were written under the old one. Retire the field and add a new one."
 - **`ID_RENAMED`**, an id changed: "<old id> → <new id> renames a spoken id, so <list>#<n> in a note would stop resolving."
 - **`REQUIRED_ON_POPULATED`**, a field made required on a list with rows: "<list>.<field> is required and <n> rows have none. Give it a default, or fill those rows first."

@@ -378,7 +378,7 @@ export function methods(deps: RecordDeps) {
      * principal, and nobody else is answered. It takes nothing and changes nothing.
      */
     async firsts(_args: unknown, ctx: CallContext): Promise<Result<Firsts>> {
-      if (ctx.principal.kind !== 'system') return no('FORBIDDEN', 'Only the host reads when this record first met an agent and a briefing, for its funnel.', { at: 'principal' }) as Result<Firsts>;
+      if (ctx.principal.kind !== 'system') return no('FORBIDDEN', 'Only the host reads when this BrainDog first met an agent and a briefing, for its funnel.', { at: 'principal' }) as Result<Firsts>;
       return { ok: true, value: firsts(kernel) };
     },
   };

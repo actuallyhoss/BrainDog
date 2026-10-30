@@ -310,7 +310,7 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
   const line = (text: string): void => {
     out.push(`${pad}${text}`);
   };
-  if (!isObject(step)) return line(`A step this record cannot read: ${words(step)}.`);
+  if (!isObject(step)) return line(`A step BrainDog cannot read: ${words(step)}.`);
   const s = step;
   if ('if' in s) {
     line(`If ${words(s.if)}:`);
@@ -400,7 +400,7 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
   if ('suggest' in s) return line(`Ask on Decide ${JSON.stringify(words(spec('suggest').question))}, ${listed(spec('suggest').options)}.`);
   if ('run' in s) return line(`Send the declared call ${words(s.run)}.`);
   if ('stop' in s) return line('Stop, and take no further step.');
-  return line(`A step this record does not know: ${words(step)}.`);
+  return line(`A step BrainDog does not know: ${words(step)}.`);
 }
 
 /**

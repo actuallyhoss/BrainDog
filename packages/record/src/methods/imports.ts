@@ -46,7 +46,7 @@ export function methods(deps: RecordDeps) {
       if (!whole(ctx)) {
         return part(ctx)
           ? no('FORBIDDEN', 'What was imported is about the whole record, and this caller is held to part of it.', { at: 'principal' })
-          : no('FORBIDDEN', 'What was imported is for the owner of this record to read, so nothing was read.', { at: 'principal' });
+          : no('FORBIDDEN', 'What was imported is for the owner of this BrainDog to read, so nothing was read.', { at: 'principal' });
       }
       return { ok: true, value: { imports: read.importsFound() } };
     },
@@ -65,7 +65,7 @@ export function methods(deps: RecordDeps) {
       if (typeof said.run !== 'string' || said.run.trim() === '') return no('REQUIRED_MISSING', 'Say which import, by the run Settings shows for it, such as S12.', { at: 'run' });
       if (typeof said.yes !== 'boolean') return no('REQUIRED_MISSING', 'yes is true when the import is your own, and false to treat it as outside text.', { at: 'yes' });
       const run = said.run.trim().toUpperCase();
-      if (!read.importsFound().some((i) => i.run === run) && !read.importActors().includes(run)) return no('VALUE_MALFORMED', `No import on this record is ${said.run.trim()}. Nothing was changed.`, { at: 'run' });
+      if (!read.importsFound().some((i) => i.run === run) && !read.importActors().includes(run)) return no('VALUE_MALFORMED', `No import here is ${said.run.trim()}. Nothing was changed.`, { at: 'run' });
       read.adopt(run, said.yes, ctx.principal.id);
       const after = read.importsFound().find((i) => i.run === run) ?? { run, at: '', lists: [], rows: 0, adopted: said.yes };
       return { ok: true, value: after };

@@ -15,14 +15,14 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'sharing', group: 'ADMIN', writes: false, what: 'Every share on this record, live and ended in the last 30 days, each said as one sentence.' },
+  { name: 'sharing', group: 'ADMIN', writes: false, what: 'Every share here, live and ended in the last 30 days, each said as one sentence.' },
   { name: 'share', group: 'ADMIN', writes: true, what: 'Share part of the record with somebody, or change a share. Never with an owner, and never by an agent.' },
   { name: 'unshare', group: 'ADMIN', writes: true, what: 'Stop one share at once, and every share made onward from it.' },
   { name: 'sharePreview', group: 'ADMIN', writes: true, postRead: true, what: 'A share said as one sentence, with how many rows of each list it reaches now. It keeps nothing.' },
   { name: 'groupPut', group: 'ADMIN', writes: true, what: 'Make a group of people to share with, rename one, or retire one, which ends every share it holds.' },
   { name: 'shareActivity', group: 'ADMIN', writes: false, what: 'What people who are not owners saw and changed lately, and through which share, in plain words.' },
   { name: 'sharedOut', group: 'ADMIN', writes: false, what: "What is shared out, for Today's one line: how many shares, with how many people, and those made today." },
-  { name: 'groups', group: 'ADMIN', writes: false, what: 'Every live group on this record: its name, its people, and how many shares it holds.' },
+  { name: 'groups', group: 'ADMIN', writes: false, what: 'Every live group here: its name, its people, and how many shares it holds.' },
   { name: 'groupMember', group: 'ADMIN', writes: true, what: "Put somebody on the record in a group, or take them out, which ends the group's shares for them." },
   { name: 'myShares', group: 'DATA', writes: false, what: 'What has been shared with you here, each as one sentence. A person only.' },
   { name: 'shareOnward', group: 'DATA', writes: true, what: 'Share on what you manage, with somebody on the record, at most Edit and never past your own share.' },

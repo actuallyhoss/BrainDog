@@ -22,7 +22,7 @@
  * the two labels one importer writes and required that importer's use case. Three probes were run against the file
  * as it stood, and all three failed: its text held the import's label for the base case; on a record holding Portfolio and a
  * `datapoints` list from a pack of somebody else's, it was refused `OUT_OF_BOUNDS`, "portfolio-bands needs
- * usecase-founder ^1.0.0, and this record has none"; and there was no way to give it other names. The tests under
+ * usecase-founder ^1.0.0, and this BrainDog has none"; and there was no way to give it other names. The tests under
  * "The settings" and "What it leans on" are those probes, grown.
  *
  * 2.0.0 TAKES THE NAMES AS SETTINGS. 1.0.0 shipped a `fill` and a `fill.ts` that

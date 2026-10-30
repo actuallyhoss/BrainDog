@@ -15,6 +15,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'exceptions', group: 'READ+', writes: false, what: 'What stopped on this record: a list that took something most days and then nothing, a way in that went quiet, a feed that missed its time, and anything older than its page allows. Each by its name, in one sentence, with the day it stopped. It changes nothing.',
+  { name: 'exceptions', group: 'READ+', writes: false, what: 'What stopped here: a list that took something most days and then nothing, a way in that went quiet, a feed that missed its time, and anything older than its page allows. Each by its name, in one sentence, with the day it stopped. It changes nothing.',
     takes: {} },
 ];

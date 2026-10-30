@@ -439,7 +439,7 @@ export function methods(deps: RecordDeps) {
       if (row === null || sightOf(ctx, `suggestion:${id}`) === null) return no('OUT_OF_BOUNDS', `There is no question called ${said}.`, { at });
       if (row.status !== 'open') return no('TRANSITION_ILLEGAL', `${said} is already answered.`, { at });
       if (!PRESSABLE.has(String(row.body_kind ?? '')))
-        return no('FORBIDDEN', `${said} changes what this record is, so it is answered in BrainDog, where that is shown whole.`, { at });
+        return no('FORBIDDEN', `${said} changes what this BrainDog is, so it is answered in BrainDog, where that is shown whole.`, { at });
       const takes = answersTaken(row);
       /* HIS WORD AS HE SAYS IT: "approve" or "yes" is the yes this question takes, "decline" or "no" its no. */
       const same = SAME_ANSWER.find((g) => g.includes(word.toLowerCase()));
@@ -468,7 +468,7 @@ export function methods(deps: RecordDeps) {
     const by = i.by;
     if (by === null || !by.startsWith('p_') || ctx.principal.kind !== 'token' || ctx.principal.person !== by)
       return no('FORBIDDEN', `${i.id} is not an order to this key, so it answers nothing.`, { at: 'answer' });
-    if (kernel.access(by)?.level !== 'owner') return no('FORBIDDEN', `${i.id} was sent by somebody who no longer owns this record.`, { at: 'answer' });
+    if (kernel.access(by)?.level !== 'owner') return no('FORBIDDEN', `${i.id} was sent by somebody who no longer owns this BrainDog.`, { at: 'answer' });
     const row = kernel.governanceRow('suggestion', id);
     if (row === null || row.status !== 'open') return no('TRANSITION_ILLEGAL', `${given} is already answered.`, { at: 'answer' });
     if ((await questionVersion(row)) !== named.version)

@@ -64,7 +64,7 @@ const STEP_WORDS: Record<Verb, string> = {
 };
 
 const isObject = (x: unknown): x is Body => x !== null && typeof x === 'object' && !Array.isArray(x);
-const stepWords = (verb: Verb | null): string => (verb === null ? 'a step this record cannot read' : STEP_WORDS[verb]);
+const stepWords = (verb: Verb | null): string => (verb === null ? 'a step BrainDog cannot read' : STEP_WORDS[verb]);
 
 /** Where a step sits, for a person: "step 2", or "step 1 under step 2", or "step 1 under step 2's otherwise". */
 function placeOf(at: At): string {

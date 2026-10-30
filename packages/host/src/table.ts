@@ -95,7 +95,7 @@ export type Route = {
  * changed group and nothing would be gained by it.
  */
 const CORE_ROUTES: readonly Route[] = [
-  { name: 'boot', group: 'READ+', writes: false, what: 'What this record holds, and how many rows are in each register.' },
+  { name: 'boot', group: 'READ+', writes: false, what: 'What this BrainDog holds, and how many rows are in each register.' },
   { name: 'schema', group: 'READ+', writes: false, what: 'What one register holds: its fields, their types, and what each may take.',
     takes: { register: 'text' } },
   { name: 'get', group: 'DATA', writes: false, what: 'One row, by the number a person says out loud: tasks#3, or S1.',
@@ -125,7 +125,7 @@ const CORE_ROUTES: readonly Route[] = [
      in a POST body, which is a number there. The record checks both spellings and says what it wanted. */
   { name: 'whatsNew', group: 'READ+', writes: false, what: 'What changed since you last read, newest first, held to what you may see.',
     takes: {} },
-  { name: 'recentHistory', group: 'READ+', writes: false, what: 'Every change to this record, newest first, a page at a time, held to what you may see.',
+  { name: 'recentHistory', group: 'READ+', writes: false, what: 'Every change here, newest first, a page at a time, held to what you may see.',
     takes: { limit: 'integer' } },
   /* `state` IS DECLARED BECAUSE THE RECORD TAKES IT. It was missing, so the table told a reader the inbox answered only
      what waits on a person, when `?state=skipped` and `?state=all` already reached the record as undeclared text.
@@ -137,12 +137,12 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { q: 'text', limit: 'integer' } },
   { name: 'version', group: 'READ+', writes: false, what: "The record's version, to tell whether anything you may see has changed. An owner who reads every list gets the newest event's rowid and may ask what changed since; anybody else gets a number that is only equal or not, never larger or smaller. Given since, the lists that moved since then.",
     takes: { since: 'integer' } },
-  { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
+  { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are here, and which verbs you reach.' },
   { name: 'sessionsLive', group: 'READ+', writes: false, what: 'The runs that are live now, with how long since each was heard from.' },
   { name: 'context', group: 'READ+', writes: false, what: 'Where an agent stands: its run, its project, the last handoff, who is live, what waits, and what applies here.' },
   { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.',
     takes: { digest: 'text' } },
-  { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
+  { name: 'pages', group: 'READ+', writes: false, what: 'Every page this BrainDog can draw, templates expanded.' },
   /* THE PAGES CENSUS AND THE PATHS CHECK: two reads beside `pages`, writing nothing. `checkPaths` takes a
      whole document, so a caller sends it as a POST body; a read may arrive either way. `register` is the list the document
      is written into, whose fields a page made for its rows fills. */
@@ -185,7 +185,7 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { register: 'text', id: 'text', status: 'text', limit: 'integer', cursor: 'text' } },
   { name: 'propose', group: 'DATA', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
   { name: 'decide', group: 'DATA', writes: true, what: 'Answer one, with the reason. No token reaches this.' },
-  { name: 'packs', group: 'READ+', writes: false, what: 'Which packs this record has, and at what version.' },
+  { name: 'packs', group: 'READ+', writes: false, what: 'Which packs this BrainDog has, and at what version.' },
   { name: 'packConfig', group: 'READ+', writes: false, what: "One pack's settings, and the value each holds now.",
     takes: { id: 'text' } },
   { name: 'arrangement', group: 'READ+', writes: false, what: 'How this BrainDog is arranged and what may be proposed about it: packs, the catalogue, voice and pages; one page declaration; or a grammar.',
@@ -203,7 +203,7 @@ const CORE_ROUTES: readonly Route[] = [
   /* THE SCRIPTS, WHICH NOTHING LISTED. `resumeScript` was routed and no read named what it could resume: `actions` stops at
      `pull`, `call` and `poll`. Held by the record to the lists each script reads and writes. */
   { name: 'scripts', group: 'READ+', writes: false, what: 'Every installed script: what it may read, write and fetch, whether it is paused, its last run and its refused runs in a row.' },
-  { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
+  { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this BrainDog. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
   { name: 'slash', group: 'ADMIN', writes: false, what: 'What Slash noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
   { name: 'slashPropose', group: 'ADMIN', writes: true, what: "Put Slash's proposals on Decide, through propose's checks. Given asked, a description of what to build, and page, the page it is about, it files what slashDraft would answer for it instead. It changes nothing until the owner accepts one.",
@@ -219,7 +219,7 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { url: 'text' } },
   /* THE WHOLE FIRST RUN AS ONE CALL. The browser ran it as a script of a dozen calls, so a closed tab left a
      record part made. ADMIN as `installPack` is: it installs add-ons, and only the owner in a browser may. */
-  { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this record from what its owner accepted, in one call: the add-ons in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
+  { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this BrainDog from what its owner accepted, in one call: the add-ons in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. A browser session only.' },
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
@@ -248,7 +248,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the entries already there, as one batch one Undo takes back. `dry` first, to see what it would change.' },
   { name: 'examples', group: 'ADMIN', writes: false, what: 'The example rows setting up planted that nobody has touched, counted by list. It writes nothing.' },
   { name: 'clearExamples', group: 'ADMIN', writes: true, what: 'Delete every example row nobody has touched. A row somebody edited, or one a row of theirs points at, stays.' },
-  { name: 'members', group: 'ADMIN', writes: false, what: 'Who is on this record, at what level, and where.' },
+  { name: 'members', group: 'ADMIN', writes: false, what: 'Who is here, at what level, and where.' },
   { name: 'invite', group: 'ADMIN', writes: true, what: 'Put somebody on, or move them. A level per register. An address alone mints a single-use link, sent by nobody.' },
   { name: 'invitations', group: 'ADMIN', writes: false, what: 'Every invitation nobody has used or withdrawn, the ones that ran out marked expired. Never a link.' },
   { name: 'revokeInvite', group: 'ADMIN', writes: true, what: 'Withdraw an invitation. Its link stops working at once.' },
@@ -267,7 +267,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'ingestMint', group: 'ADMIN', writes: true, what: "Make the token a webhook ingest's address carries, and answer that address. It is shown once, only its digest is kept, and minting again replaces it." },
   /* THE DOORS THIS RECORD DECLARES, so the screen that mints their tokens learns them from the record and names none of
      its own. An owner's, for the mint's reason; the digest is never in it. */
-  { name: 'doors', group: 'ADMIN', writes: false, what: 'Every webhook door this record declares: what it is, how it is verified, whether a token is held for it and the list it writes. Never the token.' },
+  { name: 'doors', group: 'ADMIN', writes: false, what: 'Every webhook door this BrainDog declares: what it is, how it is verified, whether a token is held for it and the list it writes. Never the token.' },
   /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event (12 §6's rule that a
      keychain whose reads are not audited cannot say whether anything got out) and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
@@ -279,7 +279,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'snapshots', group: 'ADMIN', writes: false, what: 'The copies this host keeps, newest first, each with when it was taken and its size.' },
   { name: 'restore', group: 'ADMIN', writes: true, what: 'Put the record back to one kept copy. What it was is kept as a copy first.' },
   { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person: every value naming them, in one transaction, and one event that names them only as a hash.' },
-  { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this record, with its name typed to confirm. There is no undo.' },
+  { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this BrainDog, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
   { name: 'setPref', group: 'DATA', writes: true, what: 'One of your own settings: the rail order, the pages hidden from it, the navigation shape, whether new pages are suggested, or what you dismissed. A person only, and not an event.' },
   /* A PHONE ASKING TO BE TOLD, AND TELLING IT TO STOP. READ+ because they are verbs over no row, as `boot`

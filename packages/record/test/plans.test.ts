@@ -114,10 +114,10 @@ test("the Directory's plans and allowance are the table's", () => {
 test("Free's sentences read the table's count of people and the plans' names", () => {
   assert.equal(
     directory.FREE_ONE_PERSON,
-    'Teams are part of Cloud Plus, so nobody else can join this record yet. Move it to Cloud Plus in Settings to invite colleagues.',
+    'Teams are part of Cloud Plus, so nobody else can join this BrainDog yet. Move it to Cloud Plus in Settings to invite colleagues.',
   );
   assert.equal(
     directory.FREE_JOIN_REFUSED,
-    'This record is not on Cloud Plus, so nobody else can join it yet. Ask its owner to move it to Cloud Plus, then open this link again.',
+    'This BrainDog is not on Cloud Plus, so nobody else can join it yet. Ask its owner to move it to Cloud Plus, then open this link again.',
   );
 });

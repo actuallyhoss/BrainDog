@@ -104,9 +104,9 @@ const UNKNOWN: Result<KeychainGrantSeen> = {
 const VALUE_LIMIT = 65_536;
 
 const NO_STORE = 'This host holds no key store yet, so it keeps no keys for agents.';
-export const OLD_RECORD = 'Keys need a record created after this host key store was bound, and this record is older than that.';
-const WRONG_KEY = 'This host key store does not open this record, so no key was sealed or opened.';
-const CONNECTOR_SEAL = 'This record cannot seal a key for a scheduled connector yet, so nothing was added. Add it for you to use, or try again after the next update.';
+export const OLD_RECORD = 'Keys need a BrainDog made after this host key store was bound, and this one is older than that.';
+const WRONG_KEY = 'This host key store does not open this BrainDog, so no key was sealed or opened.';
+const CONNECTOR_SEAL = 'This BrainDog cannot seal a key for a scheduled connector yet, so nothing was added. Add it for you to use, or try again after the next update.';
 
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 const text = (x: unknown): string => (typeof x === 'string' ? x : '');

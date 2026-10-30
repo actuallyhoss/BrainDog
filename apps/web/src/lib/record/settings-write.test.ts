@@ -243,8 +243,8 @@ test('a kept copy downloads as the file the host named, and a refusal is read th
   }
   assert.deepEqual(file.sent.map((s) => [s.path, s.method]), [['/api/snapshots/x', 'GET']]);
 
-  const refused = await downloadSnapshot(BASE, 'x', host(() => json(422, { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies this record keeps.' } })).io);
-  assert.deepEqual(refused, { ok: false, from: 'refused', code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies this record keeps.', raced: false });
+  const refused = await downloadSnapshot(BASE, 'x', host(() => json(422, { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies kept here.' } })).io);
+  assert.deepEqual(refused, { ok: false, from: 'refused', code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies kept here.', raced: false });
   const off = await downloadSnapshot(BASE, 'x', host(null).io);
   assert.equal(!off.ok && off.from, 'refused');
   /* AND IT SAYS SO. This arm handed the screen an empty sentence, which only the sample's toast ever covered. */

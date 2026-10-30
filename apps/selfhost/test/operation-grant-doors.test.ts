@@ -4,7 +4,7 @@
  * MEASURED BEFORE THIS FILE: `contextFor` was handed the path's method name as the
  * door for any HTTP method and under any slug, and `bearerFor` spent the grant as soon as that name was one of the four.
  * `GET /api/export` spent it and then `serveApi` answered 405 "export changes the record, so it is a POST.", and
- * `POST /not-this-one/api/export` spent it and then the slug was refused 403 "You are not on this record.". In both
+ * `POST /not-this-one/api/export` spent it and then the slug was refused 403 "You are not on this BrainDog.". In both
  * cases the right request that followed was 401, and the person had to approve on their phone again for nothing.
  *
  * THE STACK IS `operation-bearer.test.ts`'s, the device flow as the CLI drives it, so the bearer is the one a real

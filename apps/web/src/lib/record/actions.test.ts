@@ -136,7 +136,7 @@ test('A PAUSED ACTION SAYS WHY in one calm sentence, in warn and never in red, a
 });
 
 test('A HELD ACTION SAYS THE DIRECTORY\'S OWN SENTENCE and points at usage; a failing one says there is nothing to do', () => {
-  const note = 'stripe-balance is waiting until 1 October. This record has used its 15,000 runs for September.';
+  const note = 'stripe-balance is waiting until 1 October. This BrainDog has used its 15,000 runs for September.';
   const held = stateOf(row({ last: { at: '2026-09-15T11:00:00.000Z', outcome: 'held', status: null, note } }), NOW_MS);
   assert.equal(held.line, note);
   assert.equal(held.usage, true);

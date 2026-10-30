@@ -81,7 +81,7 @@ test('A MEMBER, A MEMBER\'S TOKEN AND A CALLER HELD TO PART OF THE RECORD ARE RE
   for (const who of [member, memberToken]) {
     const r = refusal(await api.imports({}, who));
     assert.equal(r.code, 'FORBIDDEN');
-    assert.equal(r.fix, 'What was imported is for the owner of this record to read, so nothing was read.');
+    assert.equal(r.fix, 'What was imported is for the owner of this BrainDog to read, so nothing was read.');
   }
   const r = refusal(await api.imports({}, narrow));
   assert.equal(r.fix, 'What was imported is about the whole record, and this caller is held to part of it.');
@@ -114,7 +114,7 @@ test('AN UNKNOWN RUN IS REFUSED WITH ITS FIX, and so is a call that does not say
   const { api } = await door();
   const r = refusal(await api.importAdopt({ run: 'S99', yes: true }, owner));
   assert.equal(r.code, 'VALUE_MALFORMED');
-  assert.equal(r.fix, 'No import on this record is S99. Nothing was changed.');
+  assert.equal(r.fix, 'No import here is S99. Nothing was changed.');
   assert.equal(r.at, 'run');
   assert.equal(refusal(await api.importAdopt({ run: 'S1' }, owner)).at, 'yes');
   assert.equal(refusal(await api.importAdopt({ yes: true }, owner)).at, 'run');

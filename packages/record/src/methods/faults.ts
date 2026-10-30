@@ -66,7 +66,7 @@ export function methods(deps: RecordDeps) {
     async faults(_args: unknown, ctx: CallContext): Promise<Result<{ faults: FaultSeen[] }>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      if (!owns(ctx)) return no('FORBIDDEN', 'Only the owner of this record reads what is not working in BrainDog. Ask them to look in Settings.', { at: 'principal' });
+      if (!owns(ctx)) return no('FORBIDDEN', 'Only the owner of this BrainDog reads what is not working in it. Ask them to look in Settings.', { at: 'principal' });
       if (verbs.faults === undefined) return notYet();
       const out = verbs.faults();
       if (!out.ok) return out as Result<never>;

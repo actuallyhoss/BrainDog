@@ -220,7 +220,7 @@ export function passphraseOf(said: unknown, setting: boolean): Result<string | n
 
 /** The sentence a host with no key store gives, which is also the sentence for a record its root key does not open. */
 const NO_STORE = 'This host holds no key store, so a keychain password cannot be set or taken off here.';
-const NOT_OPENED = 'This host key store does not open this record, so nothing was changed.';
+const NOT_OPENED = 'This host key store does not open this BrainDog, so nothing was changed.';
 
 /** The step for one change, holding the passphrase the request carried and asking the root key only when it runs. */
 function rewrapFor(to: 'passphrase' | 'kek', said: unknown, root: () => Promise<RootKeys | null>): PassphraseRewrap {

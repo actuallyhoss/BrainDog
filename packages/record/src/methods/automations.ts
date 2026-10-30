@@ -116,7 +116,7 @@ export function methods(deps: RecordDeps) {
         if (name === READS_ACROSS ? wholeRecord(ctx) : readsEveryList(ctx)) continue;
         return {
           code: 'LEVEL_REQUIRED',
-          fix: `${id} may reach any list in this record, since nothing ties it to one row, so it is shown to somebody who reads every list.`,
+          fix: `${id} may reach any of your lists, since nothing ties it to one row, so it is shown to somebody who reads every list.`,
           at,
         };
       }

@@ -106,7 +106,7 @@ async function stack(o: { shell?: boolean } = {}) {
   };
 }
 
-const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' };
 
 test('UNDER ITS OWN SLUG, A SESSION AND A BEARER ARE ANSWERED AS AT /api, reads and writes, the query kept', async () => {
   /* WITH A SHELL, because that is what answered the path before: `index.html` and a 200, which the app read as a record. */

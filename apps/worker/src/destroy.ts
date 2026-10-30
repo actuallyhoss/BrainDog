@@ -60,7 +60,7 @@ export type Wipe = { deleteAlarm(): Promise<void>; deleteAll(): Promise<void> };
 export type Close = (record: string) => Promise<{ code: string; fix: string } | null>;
 
 /** What a deleted record answers from then on, on every door it has. */
-export const DELETED = { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted.', at: 'record' } as const;
+export const DELETED = { code: 'RECORD_UNAVAILABLE', fix: 'This BrainDog was deleted.', at: 'record' } as const;
 
 /**
  * The bucket's half of a deletion: the copy to keep, and the prefix to empty around it.

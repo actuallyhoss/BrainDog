@@ -15,6 +15,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'briefing', group: 'READ+', writes: false, what: 'What matters on this record now: a few cards, each one line and the thing it opens, the most pressing first. What is late, what is asked, a step an agent left and what falls due this week. No card when nothing is pressing. It changes nothing.',
+  { name: 'briefing', group: 'READ+', writes: false, what: 'What matters here now: a few cards, each one line and the thing it opens, the most pressing first. What is late, what is asked, a step an agent left and what falls due this week. No card when nothing is pressing. It changes nothing.',
     takes: {} },
 ];

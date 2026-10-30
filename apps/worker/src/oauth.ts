@@ -124,7 +124,7 @@ const REFUSED: Record<401 | 403 | 429 | 503, string> = {
   401: 'Sign in to BrainDog in this browser, then allow this again.',
   403: 'You cannot connect an app to that record.',
   429: 'Too many requests from this browser. Try again in a minute.',
-  503: 'BrainDog could not reach this record. Try again in a minute.',
+  503: 'BrainDog could not be reached. Try again in a minute.',
 };
 
 /** What the door mints with: the reach, the app's name, the days, and the app the door proved, forwarded as is. */

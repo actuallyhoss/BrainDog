@@ -169,7 +169,7 @@ export async function copyRefusal(id: string, list: () => Promise<Result<Snapsho
         at: 'id',
       },
     };
-  return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies this record keeps.`, at: 'id' } };
+  return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies kept here.`, at: 'id' } };
 }
 
 /** Whether a request is the version poll: `GET /api/version`, the one call a tab makes on a clock. */

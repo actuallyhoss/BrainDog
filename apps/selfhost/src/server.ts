@@ -245,12 +245,12 @@ const said401 = (why: string): { refused: Refusal } => {
   return { refused: UNAUTHORIZED_ONLY };
 };
 /** A credential this record does not know. */
-const UNKNOWN = (): { refused: Refusal } => said401('This record does not know that credential.');
+const UNKNOWN = (): { refused: Refusal } => said401('This BrainDog does not know that credential.');
 /** None at all, where one is needed. */
-const NONE = (): { refused: Refusal } => said401('This record takes a bearer token. Send it as Authorization: Bearer <token>.');
+const NONE = (): { refused: Refusal } => said401('This BrainDog takes a bearer token. Send it as Authorization: Bearer <token>.');
 
 /** A credential it knows, belonging to somebody it does not. 403, and the Worker says the same. */
-const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach this record.', at: 'principal' };
+const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach this BrainDog.', at: 'principal' };
 
 /** What a person an owner has stopped reads at the session door, the Worker's words exactly (`MEMBER_STOPPED`). */
 const STOPPED: Refusal = { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' };
@@ -282,7 +282,7 @@ const endedOf = (ended: { owner: string | null } | null): Refusal | null => (end
  */
 const NOBODY: Refusal = {
   code: 'RECORD_UNAVAILABLE',
-  fix: 'Every owner of this record is suspended, so nobody may act on it. Un-suspend one.',
+  fix: 'Every owner of this BrainDog is suspended, so nobody may act on it. Un-suspend one.',
   at: 'record',
 };
 
@@ -296,7 +296,7 @@ const CROSS: Refusal = { code: 'FORBIDDEN', fix: 'A change here is accepted only
  * A slug in the path that is not this host's record. Word for word the Directory's sentence for a name that is not the
  * caller's (`packages/record/src/identity.ts`), which the Worker answers too, so one record says one thing on both hosts.
  */
-const NOT_ON: Refusal = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+const NOT_ON: Refusal = { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' };
 
 /**
  * `/<slug>/api/<method>`, or the old `/app/<slug>/api/<method>`: the slug a path names and the `/api/…` path the record
@@ -561,7 +561,7 @@ const keychainSpent = new WeakMap<Request, Response>();
 async function keychainToken(request: Request, site: Site | null): Promise<Result<CallContext>> {
   const refused: Result<CallContext> = {
     ok: false,
-    refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a keychain grant nor a login this record knows.', at: 'authorization' },
+    refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a keychain grant nor a login this BrainDog knows.', at: 'authorization' },
   };
   const sent = presented(request);
   if (site === null || sent === undefined) return refused;
@@ -755,7 +755,7 @@ function postKeys(api: { kernel: Pick<Api['kernel'], 'sealedGrant' | 'identity'>
     async open(grant) {
       if (!store) return { ok: false, why: 'This host has no key store, so no signing key can be opened.' };
       const record = api.kernel.identity()?.id;
-      if (!record) return { ok: false, why: 'This record has not been created, so it holds no key.' };
+      if (!record) return { ok: false, why: 'This BrainDog has not been made, so it holds no key.' };
       const out = api.kernel.sealedGrant({ outbox: job.id, leasedUntil: job.leasedUntil, grant }, 'system');
       if (!out.ok) return { ok: false, why: fixOf(out) };
       const sealed = out.value;
@@ -1955,7 +1955,7 @@ export async function start(options: {
     /* A DELETED RECORD ANSWERS NOTHING BUT THAT, and never reads a file that is no longer there. */
     if (gone) {
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted. Create another with braindog init.' } }));
+      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This BrainDog was deleted. Make another with braindog init.' } }));
       return;
     }
     /* `/.well-known/braindog-key` (`03 §4`): the key this record's exports are signed with, `{ key_id, public_key }`, to
@@ -2622,7 +2622,7 @@ async function copyOf(id: string, ctx: CallContext, site: Site): Promise<Respons
   if (!listed.ok) return json(httpStatus(listed), listed);
   const file = listed.value.some((s) => s.id === id) ? (site.snapshots?.path(id) ?? null) : null;
   if (!file) {
-    const out = { ok: false as const, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies this record keeps.`, at: 'id' } };
+    const out = { ok: false as const, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies kept here.`, at: 'id' } };
     return json(httpStatus(out), out);
   }
   const slug = site.api.kernel.identity()?.slug ?? 'record';

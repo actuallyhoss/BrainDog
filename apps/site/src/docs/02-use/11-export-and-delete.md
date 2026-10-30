@@ -49,7 +49,7 @@ To remove everything one person wrote, the owner uses **Erase a person** in Sett
 
 ## Delete the record
 
-**Delete this record**, the last area in Settings, is the one act with no way back.
+**Delete my BrainDog**, the last area in Settings, is the one act with no way back.
 
 ```note | Before you delete | bad
 Deleting a record removes every list, page and row in it, and it cannot be undone. The record's name is given up for good, and no record can use it again. A final copy is kept for 30 days, for recovery only, and then deleted; you cannot open it yourself, so export a copy first if you want the rows.

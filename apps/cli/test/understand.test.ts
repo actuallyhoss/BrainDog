@@ -139,7 +139,7 @@ test('BRAINDOG UNDERSTAND --DRY-RUN reads the record\'s plan, prints what it rea
 });
 
 test('BRAINDOG UNDERSTAND --DRY-RUN SAYS PLAINLY why the record would not read it: a token it does not let in, a record older than the plan, or a caller who does not read the whole record', async (t) => {
-  const browser = await host(t, { refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.' } });
+  const browser = await host(t, { refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this BrainDog is.' } });
   const one = io(browser.base);
   assert.equal(await understandCommand(['--dry-run'], one), 1);
   assert.deepEqual(one.said, ["Only you, signed in to the app, can read this. A key on this machine cannot."]);

@@ -298,7 +298,7 @@ export function previewer(deps: PreviewDeps) {
       if (!isMap(d) || typeof d.id !== 'string' || typeof d.kind !== 'string' || !isMap(d.body))
         return no('VALUE_MALFORMED', 'Each declaration is { id, kind, body }, as a change carries it.', { at });
       if (!(KINDS as readonly string[]).includes(d.kind))
-        return no('ENUM_VALUE_UNKNOWN', `${d.kind} is not a kind of declaration this record keeps.`, { at: `${at}.kind`, allowed: [...KINDS] });
+        return no('ENUM_VALUE_UNKNOWN', `${d.kind} is not a kind of declaration BrainDog keeps.`, { at: `${at}.kind`, allowed: [...KINDS] });
       if (!d.id.startsWith(`${d.kind}.`) || d.id.length === d.kind.length + 1)
         return no('VALUE_MALFORMED', `${d.id} is not a ${d.kind}'s id: it is the kind, a dot and a name, such as ${d.kind}.name.`, { at: `${at}.id` });
       if (batch.some((b) => b.id === d.id)) return no('VALUE_MALFORMED', `${d.id} is in this change twice. Say each declaration once.`, { at: `${at}.id` });

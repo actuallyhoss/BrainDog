@@ -93,14 +93,14 @@ const refuse = (status: number, refusal: Refusal, extra: Record<string, string> 
 
 /* THE WORKER'S SENTENCES, but for the store that is missing: here it is a record held in memory. */
 const NO_STORE: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'A record held in memory keeps no files. Serve it from a file to keep them.' };
-const NO_FILE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'This record holds no file by that name.' };
+const NO_FILE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'There is no file by that name here.' };
 const NOT_HERE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'A file is put with PUT /api/files/<sha256> and read with GET /api/files/<sha256>.' };
 const TOO_BIG: Refusal = { code: 'OUT_OF_BOUNDS', fix: 'A file here is at most 2 MB. Send a smaller one.' };
 const NOT_TAKEN: Refusal = { code: 'BODY_MALFORMED', fix: 'A file here is a PNG, JPEG, GIF, WebP or AVIF picture, or a PDF.' };
 const MISLABELLED = (said: string, found: string): Refusal => ({ code: 'BODY_MALFORMED', fix: `This file was sent as ${said} and is ${found}. Send it with its own type.` });
 const MISMATCH: Refusal = { code: 'CHECKSUM_MISMATCH', fix: 'These bytes do not hash to the address they were put at, so nothing was kept; put them at their own hash.' };
 const EMPTY: Refusal = { code: 'BODY_MALFORMED', fix: 'The file arrived empty. Send its bytes as the body.' };
-const CANNOT_READ: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Reading a file here takes somebody who can read this record, or a token.' };
+const CANNOT_READ: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Reading a file here takes somebody who can read this BrainDog, or a token.' };
 const CANNOT_WRITE: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Adding a file takes somebody who can write here, or a token with write scope.' };
 
 /**

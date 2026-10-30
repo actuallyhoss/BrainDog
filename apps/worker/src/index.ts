@@ -879,7 +879,7 @@ export class Record$ extends DurableObject<Env> {
     this.#copies = blobs
       ? lazily(() => {
           const record = api.kernel.identity()?.id;
-          if (!record) throw new Error('This record has not been created yet, so it keeps no copies.');
+          if (!record) throw new Error('This BrainDog has not been made yet, so it keeps no copies.');
           return cloudSnapshots(blobs, this.#arming(), (at, bookmark) => streamDumpOf(api, at, bookmark), {
             record,
             now: () => Date.now(),
@@ -1010,7 +1010,7 @@ export class Record$ extends DurableObject<Env> {
                 blobs,
                 () => {
                   const record = api.kernel.identity()?.id;
-                  if (!record) throw new Error('This record has not been created yet, so it keeps no sealed files.');
+                  if (!record) throw new Error('This BrainDog has not been made yet, so it keeps no sealed files.');
                   return record;
                 },
                 (bytes) => abuseWait(this.env, 'uploadDay', api.kernel.identity()?.id ?? '', bytes),
@@ -1018,7 +1018,7 @@ export class Record$ extends DurableObject<Env> {
               /* VISUALS' PAGES BESIDE THE RECORD'S FILES, and its pictures looked up where the file door put them (`visuals.ts`). */
               visuals: cloudVisuals(blobs, () => {
                 const record = api.kernel.identity()?.id;
-                if (!record) throw new Error('This record has not been created yet, so it keeps no visuals.');
+                if (!record) throw new Error('This BrainDog has not been made yet, so it keeps no visuals.');
                 return record;
               }),
             }),
@@ -1852,7 +1852,7 @@ export class Record$ extends DurableObject<Env> {
    */
   async reopen(): Promise<boolean> {
     if (!this.#armed) return false;
-    this.ctx.abort('This record was put back to a copy, and starts again from it.');
+    this.ctx.abort('This BrainDog was put back to a copy, and starts again from it.');
     return true;
   }
 
@@ -2011,7 +2011,7 @@ export class Record$ extends DurableObject<Env> {
    * the Worker the record method has no Directory to ask for the other records itself (`deps.directory` is `null`).
    */
   async mirrorPerson(person: string, change: { name?: string | undefined; email?: string | undefined }): Promise<Result<unknown>> {
-    if (this.#gone) return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record is closed.' } };
+    if (this.#gone) return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This BrainDog is closed.' } };
     const api = await this.#record();
     return api.kernel.mirrorPerson(person, change);
   }
@@ -2205,7 +2205,7 @@ export class Record$ extends DurableObject<Env> {
     const broken = api.kernel.refused();
     if (broken) return { ok: false, refusal: broken };
     const record = api.kernel.identity()?.id;
-    if (!record) return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record has not been created, so it holds no key.' } };
+    if (!record) return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This BrainDog has not been made, so it holds no key.' } };
     const out = api.kernel.sealedGrant(args, 'system');
     return out.ok ? ok({ record, seal: out.value }) : out;
   }
@@ -2300,7 +2300,7 @@ export class Record$ extends DurableObject<Env> {
       return json(out, httpStatus(out));
     }
     const ctx = JSON.parse(request.headers.get(CTX_HEADER) ?? 'null') as CallContext | null;
-    if (!ctx) return saidUnauthorized('record', 'This record needs a caller.');
+    if (!ctx) return saidUnauthorized('record', 'This BrainDog needs a caller.');
 
     /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
        sent is parsed, and the tools reach this record through the same methods `/api` calls. */
@@ -2959,7 +2959,7 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
       : {
           erase: async (sha256: string, page?: boolean) => {
             const recId = await record.recId();
-            if (recId === null) throw new Error('This record could not say its own id, so nothing was deleted.');
+            if (recId === null) throw new Error('This BrainDog could not say its own id, so nothing was deleted.');
             await env.BLOBS!.delete(page === true ? `${pagesPrefix(recId)}${sha256}` : fileKey(recId, sha256));
           },
         }),
@@ -4227,7 +4227,7 @@ async function keyDoor(request: Request, env: Env): Promise<Response> {
       if ('status' in found)
         return found.status === 403
           ? { ok: false, refusal: found.refusal }
-          : { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a keychain grant nor a login this record knows.', at: 'authorization' } };
+          : { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a keychain grant nor a login this BrainDog knows.', at: 'authorization' } };
       spent.over = await overLimit(env, { door: 'bearer', ctx: found.ctx }, asked, 'write');
       if (spent.over !== null) return { ok: false, refusal: { code: 'RATE_LIMITED', fix: 'This login has used its writes for this minute.', at: 'authorization' } };
       return ok({ record: found.record, ctx: found.ctx });
@@ -4266,7 +4266,7 @@ const noSession = (): Response =>
   json({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot reach the keychain.', at: 'principal' } }, 403);
 
 /** What a token gets at `/api/slash/read`, from the router and from the object. The sentence is `serveSlash`'s own. */
-const NO_SLASH_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Slash about this record.', at: 'principal' };
+const NO_SLASH_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Slash about this BrainDog.', at: 'principal' };
 /** What any context that is not a signed-in session gets at `/api/slash/*` from the object. */
 const NO_SLASH_UNSIGNED: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in to ask Slash about a record.', at: 'principal' };
 

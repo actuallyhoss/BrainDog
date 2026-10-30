@@ -41,7 +41,7 @@ export async function rewrapAtStart(
   const record = api.kernel.identity()?.id;
   const stuck = (): RewrapOutcome => {
     say(
-      "  some of this record's keys could not be moved under the current key file, because neither key file holds the key they name or they do not open under it. What is stored with them answers WRONG_KEY until the key they were wrapped under is back beside the key file as its .prev.",
+      "  some of this BrainDog's keys could not be moved under the current key file, because neither key file holds the key they name or they do not open under it. What is stored with them answers WRONG_KEY until the key they were wrapped under is back beside the key file as its .prev.",
     );
     return 'straggler';
   };
@@ -88,6 +88,6 @@ export async function rewrapAtStart(
     if (!done.ok) left = true;
   }
   if (left) return stuck();
-  say("  this record's keys were under the previous key file and are under the current one now.");
+  say("  this BrainDog's keys were under the previous key file and are under the current one now.");
   return 'rewrapped';
 }

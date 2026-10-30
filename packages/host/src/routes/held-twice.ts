@@ -21,7 +21,7 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'heldTwice', group: 'READ+', writes: false, what: 'Which people, or which things in a list that says what makes two of them the same, may be on this record twice, each by their number in the list, lowest first. Nothing for any other list. It changes nothing.',
+  { name: 'heldTwice', group: 'READ+', writes: false, what: 'Which people, or which things in a list that says what makes two of them the same, may be here twice, each by their number in the list, lowest first. Nothing for any other list. It changes nothing.',
     takes: { register: 'text' } },
   { name: 'askFoldTwice', group: 'DATA', writes: true, what: 'Put one question on Decide that folds everything a list holds twice into one of each, or only the things picked and what they are here twice with, with one Undo, asked by a person and never by an agent.',
     takes: { register: 'text', rows: 'json' } },

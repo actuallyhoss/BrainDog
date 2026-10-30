@@ -59,7 +59,7 @@ export const scrubWords = {
   secret: "A secret field's value never leaves the record.",
   key: 'This looks like a key, and a key never leaves the record.',
   token: 'A token or a password never leaves the record. Whoever installs it adds their own.',
-  door: "A door's address belongs to this record, so whoever installs it gets their own.",
+  door: "A door's address belongs to the BrainDog it is in, so whoever installs it gets their own.",
   skill: "A skill's text is the author's own, so it stays in the record.",
   address: 'This text holds an email address, and an address names a person, so it stays in the record.',
   link: "This text holds a link, and the author's links stay in the record.",

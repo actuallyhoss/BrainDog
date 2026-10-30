@@ -104,7 +104,7 @@ function door(lines: string[], opts: { report?: { tables: number; rows: number }
       return handle(method, body);
     }
     if (auth === null) return answer(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in first.', at: 'principal' } });
-    return answer(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot export this record.', at: 'principal' } });
+    return answer(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot export this BrainDog.', at: 'principal' } });
   }) as typeof globalThis.fetch;
   return { seen, fetch, api: () => seen.filter((s) => s.path.startsWith('/api/')) };
 }

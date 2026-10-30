@@ -1134,7 +1134,7 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, budget
     return Promise.resolve(
       no(
         'SLASH_BUDGET_SPENT',
-        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this record has used every ask this host's model allows one record in a month, so the run stopped there. Asks start again on ${next.getUTCDate()} ${MONTHS[next.getUTCMonth()]}.`,
+        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this BrainDog has used every ask this host's model allows one BrainDog in a month, so the run stopped there. Asks start again on ${next.getUTCDate()} ${MONTHS[next.getUTCMonth()]}.`,
       ),
     );
   };

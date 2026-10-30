@@ -652,7 +652,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (record === undefined || record.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to buy credits for by that id.', { at: 'record' });
     const rows = await deps.billing({ op: 'for', person: who.person });
     const row = rows.find((r) => r.record === record.record);
-    if (row?.state === 'lapsed') return no('FORBIDDEN', 'Billing for this record has lapsed. Pay for its plan again, and credits can be bought for it then.', { at: 'record' });
+    if (row?.state === 'lapsed') return no('FORBIDDEN', 'Billing for this BrainDog has lapsed. Pay for its plan again, and credits can be bought for it then.', { at: 'record' });
 
     const stripe = deps.stripe(key.value);
     /* A GIFT'S ROW HAS NO CUSTOMER, so the record's own is taken only when it has one. */
@@ -789,8 +789,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         back = `${origin.value}/${free.slug}/settings/billing`;
       } else {
         if (row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for by that id.', { at: 'record' });
-        if (isGift(row)) return no('ALREADY_KNOWN', 'This record is a gift from BrainDog, so there is nothing to pay for.', { at: 'record' });
-        if (row.state !== 'lapsed') return no('ALREADY_KNOWN', 'This record is paid for. Manage payment changes the card or the plan.', { at: 'record' });
+        if (isGift(row)) return no('ALREADY_KNOWN', 'This BrainDog is a gift from us, so there is nothing to pay for.', { at: 'record' });
+        if (row.state !== 'lapsed') return no('ALREADY_KNOWN', 'This BrainDog is paid for. Manage payment changes the card or the plan.', { at: 'record' });
         customer = row.customer;
         metadata = { person: who.person, record: row.record, plan: plan.value };
         back = `${origin.value}/${row.slug}/settings/billing`;
@@ -847,7 +847,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (!origin.ok) return origin;
     const row = await ownedRow(who.person, body['record']);
     if (row === null || row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours with a payment to manage by that id.', { at: 'record' });
-    if (isGift(row)) return no('FORBIDDEN', 'This record is a gift from BrainDog, so there is no payment to manage.', { at: 'record' });
+    if (isGift(row)) return no('FORBIDDEN', 'This BrainDog is a gift from us, so there is no payment to manage.', { at: 'record' });
     const stripe = deps.stripe(key.value);
     const back = `${origin.value}/${row.slug}/settings/billing`;
 
@@ -858,9 +858,9 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       const price = priceOf(env, plan.value);
       if (price === null)
         return no('NOT_IN_THIS_BUILD', `${HOSTED_PLANS[plan.value].setting} is not set, so ${planName(plan.value)} is not sold on this host.`, { at: 'plan' });
-      if (row.state === 'lapsed') return no('FORBIDDEN', 'Billing for this record has lapsed. Pay again, on the plan you choose, and it is switched as it is paid for.', { at: 'record' });
-      if (backOnFree(row)) return no('FORBIDDEN', 'This record is on Free. Pay for it on the plan you choose, and it moves as it is paid for.', { at: 'record' });
-      if (row.price === price) return no('ALREADY_KNOWN', `This record is on ${planName(plan.value)} already.`, { at: 'plan' });
+      if (row.state === 'lapsed') return no('FORBIDDEN', 'Billing for this BrainDog has lapsed. Pay again, on the plan you choose, and it is switched as it is paid for.', { at: 'record' });
+      if (backOnFree(row)) return no('FORBIDDEN', 'This BrainDog is on Free. Pay for it on the plan you choose, and it moves as it is paid for.', { at: 'record' });
+      if (row.price === price) return no('ALREADY_KNOWN', `This BrainDog is on ${planName(plan.value)} already.`, { at: 'plan' });
       const sub = row.subscription === null ? null : await subscriptionOf(stripe, row.subscription, planPrices(env));
       if (sub === null || sub.item === null) {
         op({ op: 'billing', door: 'portal', ok: false, why: 'subscription', rec: row.record }, 'error');
@@ -1273,7 +1273,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (row === null) return no('OUT_OF_BOUNDS', 'There is no paid record of yours by that id.', { at: 'record' });
     if (isGift(row)) return no('VALUE_MALFORMED', 'This plan is a gift and is never charged, so it has no extra usage.', { at: 'record' });
     if (row.subscription === null || row.state === 'lapsed')
-      return no('VALUE_MALFORMED', `Extra usage is part of ${planName('cloud')} and ${planName('plus')}, and this record is not paid for on either just now.`, { at: 'record' });
+      return no('VALUE_MALFORMED', `Extra usage is part of ${planName('cloud')} and ${planName('plus')}, and this BrainDog is not paid for on either just now.`, { at: 'record' });
     if (cap > 0) {
       const stripe = deps.stripe(key.value);
       const differs = await extraPriceRefused(stripe, price);

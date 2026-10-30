@@ -82,7 +82,7 @@ export function methods(deps: RecordDeps) {
       if (!Array.isArray(picked) || picked.some((r) => typeof r !== 'string' || r === '' || r.length > REF_MOST || /\s/u.test(r)))
         return no('VALUE_MALFORMED', 'Say who may be the same person: rows is a list of two or more people.', { at: 'rows' });
       if (kernel.meetsList()?.register !== register)
-        return no('VALUE_MALFORMED', `Only people are asked about as one, and ${listName(register)} is not where this record keeps them.`, { at: 'register' });
+        return no('VALUE_MALFORMED', `Only people are asked about as one, and ${listName(register)} is not where they are kept.`, { at: 'register' });
 
       const ids: string[] = [];
       for (const ref of picked as string[]) {

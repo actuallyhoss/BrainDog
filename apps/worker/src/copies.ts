@@ -217,7 +217,7 @@ export function cloudSnapshots(
      */
     async restore(id: string): Promise<void> {
       const copy = (await held()).find((c) => c.id === id);
-      if (!copy) throw new Error(`${id} is not one of the copies this record keeps.`);
+      if (!copy) throw new Error(`${id} is not one of the copies kept here.`);
       if (copy.bookmark === undefined)
         throw new Error(
           `${id} was taken with no point-in-time bookmark, so the record cannot be put back to it in place. Nothing was changed. The copy is still a file that opens with the backup identity and imports.`,

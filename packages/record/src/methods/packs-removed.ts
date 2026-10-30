@@ -102,7 +102,7 @@ export function methods(deps: RemovedDeps) {
      * reinstall puts its settings and schedules back. Takes nothing. It changes nothing.
      */
     async packsRemoved(args: unknown, ctx: CallContext) {
-      const stop = admin(ctx, 'read what was taken out of this record');
+      const stop = admin(ctx, 'read what was taken out of this BrainDog');
       if (stop) return { ok: false as const, refusal: stop };
       if (args !== undefined && args !== null && (typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length > 0))
         return no('FIELD_UNKNOWN', `This takes nothing: it reads every add-on taken out in the last ${REMOVED_WINDOW_DAYS} days.`, { at: Object.keys(args as object)[0] ?? 'args' });

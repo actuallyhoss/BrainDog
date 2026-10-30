@@ -16,7 +16,7 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'namedTwice', group: 'READ+', writes: false, what: 'Which organisations and projects may be on this record twice, each with one sentence saying why. It changes nothing.',
+  { name: 'namedTwice', group: 'READ+', writes: false, what: 'Which organisations and projects may be here twice, each with one sentence saying why. It changes nothing.',
     takes: { limit: 'integer' } },
   { name: 'askNamedSame', group: 'DATA', writes: true, what: 'Put one question on Decide that folds two organisations or projects into one, with one Undo, asked by a person and never by an agent.',
     takes: { pair: 'text' } },

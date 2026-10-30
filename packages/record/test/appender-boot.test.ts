@@ -19,7 +19,7 @@ test('THE SENTENCE SAYS WHAT SHE CAN DO AND WHERE, and the refusal carries `leve
   assert.equal(r.code, 'LEVEL_REQUIRED');
   assert.equal(
     r.fix,
-    'You can add to this record and you cannot read it here. You add through an agent of your own. Make its key in Settings, under Agents.',
+    'You can add to this BrainDog and you cannot read it here. You add through an agent of your own. Make its key in Settings, under Agents.',
   );
   assert.equal(r.fix, APPEND_READ_FIX);
   assert.equal(r.at, 'level.append');

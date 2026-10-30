@@ -20,7 +20,7 @@ An agent that wants an automation run asks with `propose`, and you press Run now
 ```comparison | Files
 Command | What it does
 braindog export | Take the record as a .brainl file and check it here. --redact-grants makes a copy to share that cannot put keys back, and -o names the file
-braindog import <file.brainl> | Check the file here, then put the record back from it, in place of everything it holds now. It takes only this record's own copy
+braindog import <file.brainl> | Check the file here, then put the record back from it, in place of everything it holds now. It takes only this BrainDog's own copy
 braindog verify <file> | Check a .brainl file on this machine: its format, every table against its manifest, and its signature. --key names the key to check it against
 ```
 

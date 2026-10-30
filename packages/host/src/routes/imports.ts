@@ -16,7 +16,7 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'imports', group: 'READ+', writes: false, what: 'Every import made into this record, what each brought in, and whether you said it is your own. Only the owner reads it.',
+  { name: 'imports', group: 'READ+', writes: false, what: 'Every import made into this BrainDog, what each brought in, and whether you said it is your own. Only the owner reads it.',
     takes: {} },
   { name: 'importAdopt', group: 'ADMIN', writes: true, what: 'Say an import is your own, or treat it as outside text, so an agent that reads it asks first.',
     takes: { run: 'text', yes: 'json' } },

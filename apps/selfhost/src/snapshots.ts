@@ -219,7 +219,7 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
 
     async restore(id: string): Promise<void> {
       const from = path(id);
-      if (!from) throw new Error(`${id} is not one of the copies this record keeps.`);
+      if (!from) throw new Error(`${id} is not one of the copies kept here.`);
       sql.exec('ATTACH DATABASE ? AS snap', from);
       try {
         const versions = (schema: string): string => {
@@ -231,7 +231,7 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
         };
         const mine = versions('main');
         if (!mine || versions('snap') !== mine)
-          throw new Error(`${id} was written by a different version of this record, so it cannot be put back in place. Restore it into a fresh directory with braindog import.`);
+          throw new Error(`${id} was written by a different version of this BrainDog, so it cannot be put back in place. Restore it into a fresh directory with braindog import.`);
 
         const tables = sql
           .all<{ name: string }>(

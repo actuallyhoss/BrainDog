@@ -329,7 +329,7 @@ export function slashDayStop(sql: Sql, now: number): Refusal | null {
 /** The one sentence every bearer gets here. `46 §5.2`: every bearer at a cookie route is 403 `NEEDS_BROWSER_SESSION`. */
 const NO_BEARER: Refusal = {
   code: 'NEEDS_BROWSER_SESSION',
-  fix: 'Open this in the app; a token cannot ask Slash about this record.',
+  fix: 'Open this in the app; a token cannot ask Slash about this BrainDog.',
   at: 'principal',
 };
 

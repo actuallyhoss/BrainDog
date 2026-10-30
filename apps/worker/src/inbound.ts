@@ -97,7 +97,7 @@ const refusal = (status: number, refused: Refusal, extra: readonly Header[] = []
  */
 export const NO_MINT_SESSION: Refusal = {
   code: 'NEEDS_BROWSER_SESSION',
-  fix: 'Open the app and sign in as an owner of this record to change where its mail arrives.',
+  fix: 'Open the app and sign in as an owner of this BrainDog to change where its mail arrives.',
   at: 'principal',
 };
 
@@ -191,7 +191,7 @@ export async function serveInbound(request: Request, door: InboundDoor, ctx: Cal
     return refusal(403, { code: 'FORBIDDEN', fix: 'A forwarding address is minted from this app, in a browser, on this address.', at: 'origin' });
 
   if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
-    return refusal(403, { code: 'LEVEL_REQUIRED', fix: 'Only an owner of this record can change where its mail arrives.', at: 'principal' });
+    return refusal(403, { code: 'LEVEL_REQUIRED', fix: 'Only an owner of this BrainDog can change where its mail arrives.', at: 'principal' });
   if (ctx.credentialed === false) return refusal(403, NO_MINT_SESSION);
 
   /* AND A PROOF IN THE LAST FIFTEEN MINUTES, WHICH IS THE RUNG THIS DOOR WAS MISSING. Every other
@@ -208,7 +208,7 @@ export async function serveInbound(request: Request, door: InboundDoor, ctx: Cal
      AND ABSENT IS NOT STALE. `provedAt` reaches a context only from a session row, so undefined is a
      caller with no session at all, which `credentialed` a line above has already had its say about. */
   if (ctx.provedAt !== undefined && Date.now() - ctx.provedAt > FRESH)
-    return refusal(403, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change where this record takes its mail.', at: 'principal' });
+    return refusal(403, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change where this BrainDog takes its mail.', at: 'principal' });
 
   /* REVOCATION IS THE SAME WRITE WITH NOTHING IN IT, and it answers no value: there is nothing to
      show, and the record now takes no forwarded mail at all until somebody mints again. */

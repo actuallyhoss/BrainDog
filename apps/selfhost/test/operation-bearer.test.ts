@@ -5,7 +5,7 @@
  * MEASURED AT 1586f2a2, BEFORE THIS FILE: the record had `operationGrant` and an `admin` that admits a context
  * carrying `operation`, and no host built one. The self-host's `bearerFor` asked `verifyToken`, which reads the `token`
  * table, and an operation bearer lives in `device_grant`, so `POST /api/export` with the bearer the device had just been
- * handed answered 401 "This record does not know that credential." `braindog export` against a self-host had a bearer
+ * handed answered 401 "This BrainDog does not know that credential." `braindog export` against a self-host had a bearer
  * and no door.
  *
  * THE ORDER OF THE CHECKS IS WHAT IS PROVED. The grant is spent only at one of the four doors an operation can open, so a

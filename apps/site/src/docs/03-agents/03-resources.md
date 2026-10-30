@@ -12,7 +12,7 @@ Each resource says how long a client may keep it before reading it again. Who is
 
 ```comparison | Resources with no argument
 Address | What it holds | Keep it for
-braindog:whoami | Who the agent is to this record, and which verbs it reaches | Read fresh
+braindog:whoami | Who the agent is here, and which verbs it reaches | Read fresh
 braindog:boot | What the record holds, and how many rows each list has | A minute
 braindog:context | The briefing for where the agent is: its session, its project, and what applies there | Read fresh
 braindog:sessions/live | Who else is working now, on what, and in which repository | Read fresh
@@ -61,7 +61,7 @@ braindog:inbox/{state} | The newest hundred in one state, or one arrival whole b
 
 The inbox states are `untriaged`, `review`, `skipped`, `matched`, `proposed`, `ignored` and `all`. `skipped` is where a skip rule that is too wide shows itself.
 
-`braindog:page/home` is the place to start when an agent needs to know what leads in this record: it answers the Home page with every block worked out.
+`braindog:page/home` is the place to start when an agent needs to know what leads in this BrainDog: it answers the Home page with every block worked out.
 
 ## Set up a machine
 

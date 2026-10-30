@@ -98,7 +98,7 @@ test('TWO OF ANOTHER LIST ARE REFUSED IN THE RECORD\'S OWN SENTENCE, whichever w
   const { sql, client, fanline, copperleaf } = await wired();
   const asList = refused(await client.sameOne({ register: 'things', rows: [fanline, copperleaf] }));
   assert.deepEqual([asList.code, asList.at], ['VALUE_MALFORMED', 'register']);
-  assert.equal(asList.fix, 'Only people are asked about as one, and Projects is not where this record keeps them.');
+  assert.equal(asList.fix, 'Only people are asked about as one, and Projects is not where they are kept.');
 
   const asPeople = refused(await client.sameOne({ register: 'people', rows: [fanline, copperleaf] }));
   assert.deepEqual([asPeople.code, asPeople.at], ['REF_REGISTER_MISMATCH', 'rows']);

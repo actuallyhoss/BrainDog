@@ -351,7 +351,7 @@ test('A HELD RECORD FETCHES NOTHING, and the row goes back rather than staying l
       return Promise.resolve(new Response('{"data":[]}', { status: 200, headers: { 'content-type': 'application/json' } }));
     },
   };
-  const say = 'acme-charges is waiting until 1 October. This record has used its runs for September.';
+  const say = 'acme-charges is waiting until 1 October. This BrainDog has used its runs for September.';
   const asked: string[] = [];
   const page = holdingPaged(
     pagedRunner({ kernel: k } as never, { http, clock: { now: () => NOW } }),

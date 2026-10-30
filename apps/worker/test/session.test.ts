@@ -142,7 +142,7 @@ test('A COOKIE UNDER A SLUG IS THAT RECORD FOR A MEMBER, whichever record the se
 
 test('A SLUG THAT IS NOT THEIRS AND ONE NOBODY HOLDS ARE THE SAME 403, AND THE RECORD IS NEVER ADDRESSED', async () => {
   const { deps, accessed, sid } = await named();
-  const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+  const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' };
   const bodies: unknown[] = [];
   for (const slug of ['bobs-books', 'nobody-has-this', 'd41']) {
     const door = await doorOf(at('/api/boot', { headers: { cookie: `__Host-bd_s=${sid}` } }), deps, slug);
@@ -210,7 +210,7 @@ test('A BEARER ASKS ITS RECORD ONCE, AND THE DIRECTORY’S READS OVERLAP THAT ON
   assert.deepEqual(trips, ['knows', 'named', 'lapsed', 'admit'], 'the record was asked more than once, or a Directory read waited for it');
   /* A PERSON THE RECORD HOLDS NOTHING FOR IS STILL 403, from the same trip. */
   const off = await bearerOf(request, 'api', { ...bearer, admit: async () => ({ verified: { id: 'tok_1', person_id: 'p_1', scope: 'read' }, held: null }) });
-  assert.deepEqual(off, { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } });
+  assert.deepEqual(off, { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' } });
   /* AND A BEARER NOBODY ISSUED IS THE 401 IT WAS, the slug and the lapse unread, even when the Directory failed. */
   const failing = async (): Promise<never> => {
     throw new Error('directory down');

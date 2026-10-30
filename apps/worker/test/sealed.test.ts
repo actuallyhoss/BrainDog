@@ -57,7 +57,7 @@ test('A NAME THE RECORD DID NOT MAKE IS NEVER A KEY: a path, a prefix of its own
 
 test('A RECORD NOT CREATED YET KEEPS NOTHING, and the day is asked before a part is kept', async () => {
   const store = cloudSealed(bucket(), () => {
-    throw new Error('This record has not been created yet, so it keeps no sealed files.');
+    throw new Error('This BrainDog has not been made yet, so it keeps no sealed files.');
   });
   await assert.rejects(store.put(await sealedName('sync/key', SHA, 0), Uint8Array.of(1)), /not been created/);
 

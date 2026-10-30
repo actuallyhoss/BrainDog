@@ -313,7 +313,7 @@ test('EVERY RUN IS METERED from the first: runs, requests, bytes, run time and f
 test('AT THE PLAN’S LIMIT A RUN WAITS FOR THE NEXT MONTH: nothing is sent, nothing is paused, and an event says so', async () => {
   const { k, sql, clock } = await record(CALL());
   const OCTOBER = Date.UTC(2026, 9, 1);
-  const say = 'ping is waiting until 1 October. This record has used its 15,000 runs for September.';
+  const say = 'ping is waiting until 1 October. This BrainDog has used its 15,000 runs for September.';
 
   /* The host asks the Directory before it sends, and answers `held` when the record is at its limit. */
   const asked: ActionRequest[] = [];
@@ -429,7 +429,7 @@ test('TURNING THE PACK OFF STOPS RE-ARMING, turning it on arms again, and uninst
 test('THE LIST SAYS WHY AN ACTION IS PAUSED, counts a held run in the month, and carries no key', async () => {
   const { k, keys } = await record(POLL(), CALL());
   const OCTOBER = Date.UTC(2026, 9, 1);
-  const say = 'ping is waiting until 1 October. This record has used its 15,000 runs for September.';
+  const say = 'ping is waiting until 1 October. This BrainDog has used its 15,000 runs for September.';
   await k.runActions(async (request) =>
     request.channel === 'poll' ? said(401, 'no') : { status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: { until: OCTOBER, say } },
   );

@@ -74,12 +74,12 @@ test('THE FADE: a declared rule, else the old day field for ninety days, else no
 
 test('A SENTENCE FOR EACH PART A RECORD KEEPS NONE OF: plain, named, no id and no em dash', () => {
   assert.deepEqual(AGENT_ROLES.map(noListSaid), [
-    'This record keeps no skills.',
-    'This record keeps no tools.',
-    'This record keeps no learnings.',
-    'This record keeps no keys by name.',
-    'This record keeps no profiles.',
-    'This record keeps nothing to carry between machines.',
+    'This BrainDog keeps no skills.',
+    'This BrainDog keeps no tools.',
+    'This BrainDog keeps no learnings.',
+    'This BrainDog keeps no keys by name.',
+    'This BrainDog keeps no profiles.',
+    'This BrainDog keeps nothing to carry between machines.',
   ]);
   for (const role of AGENT_ROLES) assert.ok(!noListSaid(role).includes('—') && !noListSaid(role).includes(AGENT_LIST_FALLBACK['keys-index']!));
 });
@@ -265,7 +265,7 @@ test('A RECORD THAT KEEPS NO AGENTS LISTS answers its empty answers, the tools i
   const got = await answers(none.api);
   assert.deepEqual(got.behind, { skills: [], total: 0 });
   assert.deepEqual(got.skills, []);
-  assert.deepEqual(got.tools, { tools: [{ name: 'linter', did: 'skipped', why: 'This record keeps no tools.' }] });
+  assert.deepEqual(got.tools, { tools: [{ name: 'linter', did: 'skipped', why: 'This BrainDog keeps no tools.' }] });
   /* AND A CARD DRAWN FROM THIS RECORD'S OWN CONTEXT says nothing of skills, lessons or keys, and the session goes on. */
   const drawn = card(value<Context>(await (none.api as unknown as { context: (a: unknown, c: CallContext) => Promise<unknown> }).context({}, run)), {}, NOW).card;
   assert.ok(!/learning|keys by name|skill/u.test(drawn), drawn);

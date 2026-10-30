@@ -51,7 +51,7 @@ const admin = (ctx: CallContext, reads?: string): Refusal | null => {
   if (ctx.principal.kind === 'token')
     return {
       code: 'NEEDS_BROWSER_SESSION',
-      fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`,
+      fix: reads === undefined ? 'Open this from the app; a token cannot change what this BrainDog is.' : `Open this from the app; a token cannot ${reads}.`,
       at: 'principal',
     };
   return allows(ctx, 'owner');
@@ -123,7 +123,7 @@ test('A TOKEN AND A COLLEAGUE ARE REFUSED in one sentence, and nothing is said a
   const byToken = await r.read(token);
   assert.equal(byToken.ok, false);
   assert.equal(byToken.refusal?.code, 'NEEDS_BROWSER_SESSION');
-  assert.equal(byToken.refusal?.fix, 'Open this from the app; a token cannot read what was taken out of this record.');
+  assert.equal(byToken.refusal?.fix, 'Open this from the app; a token cannot read what was taken out of this BrainDog.');
   assert.equal(byToken.value, undefined);
   const byColleague = await r.read(colleague);
   assert.equal(byColleague.ok, false);

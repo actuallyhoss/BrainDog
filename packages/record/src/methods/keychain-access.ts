@@ -93,7 +93,7 @@ export function methods(deps: RecordDeps) {
       if (args?.credential !== undefined) {
         const named = typeof args.credential === 'string' ? args.credential.trim() : '';
         const row = named ? kernel.get(named) : null;
-        if (!row || row.register !== KEYS || row.deleted_at) return no('REF_UNKNOWN', 'This record holds no key by that name.', { at: 'credential' });
+        if (!row || row.register !== KEYS || row.deleted_at) return no('REF_UNKNOWN', 'There is no key by that name here.', { at: 'credential' });
         id = row.id;
       }
       const names = await machineNames();
@@ -142,7 +142,7 @@ export function methods(deps: RecordDeps) {
       const named = typeof args?.credential === 'string' ? args.credential.trim() : '';
       if (!named) return no('REQUIRED_MISSING', 'Name the key by its spoken id, such as credentials#3.', { at: 'credential' });
       const row = kernel.get(named);
-      if (!row || row.register !== KEYS || row.deleted_at) return no('REF_UNKNOWN', 'This record holds no key by that name.', { at: 'credential' });
+      if (!row || row.register !== KEYS || row.deleted_at) return no('REF_UNKNOWN', 'There is no key by that name here.', { at: 'credential' });
       const machine = typeof args?.machine === 'string' ? args.machine.trim() : '';
       if (!machine) return no('REQUIRED_MISSING', 'Name the machine by its handle from Settings, or * for every machine.', { at: 'machine' });
       const rule = args?.rule ?? null;

@@ -197,7 +197,7 @@ function partFaults(part: TextPart, names: TextNames, where: TextWhere): TextFau
     if (!named) {
       const near = nearest(p, [...(part.own ?? []), ...names.all]);
       const keep = 'or put the words in backticks to keep them as text';
-      add('names-nothing', p, `"{{${p}}}" names nothing in this record.`,
+      add('names-nothing', p, `"{{${p}}}" names nothing in your BrainDog.`,
         near ? `Write {{${near}}}, the nearest name the record has, ${keep}.` : `Name a figure, a list or a field the record has, ${keep}.`);
       return;
     }

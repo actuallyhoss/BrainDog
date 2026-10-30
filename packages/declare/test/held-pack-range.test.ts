@@ -89,7 +89,7 @@ test('money-core 2.0.0 UNDER bank-hsbc-eg 1.0.0 IS REFUSED, naming the held pack
   assert.equal(out.refusal?.code, 'PACK_REQUIRED');
   assert.equal(
     out.refusal?.fix,
-    'bank-hsbc-eg 1.0.0 needs money-core ^1.8.0, which money-core 2.0.0 is not, and the money-core 1.8.0 this record holds is. Update bank-hsbc-eg to a version that takes money-core 2.0.0 first, then install money-core 2.0.0.',
+    'bank-hsbc-eg 1.0.0 needs money-core ^1.8.0, which money-core 2.0.0 is not, and the money-core 1.8.0 here is. Update bank-hsbc-eg to a version that takes money-core 2.0.0 first, then install money-core 2.0.0.',
   );
   assert.equal(out.refusal?.at, 'dependents.bank-hsbc-eg');
   assert.equal(version(k, 'money-core'), '1.8.0', 'the refused update still moved money-core');

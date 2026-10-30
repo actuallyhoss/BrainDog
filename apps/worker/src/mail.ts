@@ -150,7 +150,7 @@ const WHY: Record<MailKind, string> = {
   'lapse.90': 'about billing for a record this address pays for or owns',
   'lapse.back': 'about billing for a record this address pays for or owns',
   welcome: 'because a BrainDog record was made for this address',
-  'usage.notice': "about this record's usage this month",
+  'usage.notice': "about your BrainDog's usage this month",
 };
 
 /**
@@ -298,7 +298,7 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
     case 'usage.notice':
       return {
         subject: v.record ? `${v.record}: usage this month` : 'Your BrainDog usage this month',
-        parts: [{ say: v.say || "There is news about this record's usage this month." }],
+        parts: [{ say: v.say || "There is news about your BrainDog's usage this month." }],
       };
   }
 }

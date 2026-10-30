@@ -122,7 +122,7 @@ test('TWO PEOPLE ON IT: taking the gift back is refused in one sentence, and the
   await opsPlan(ask({ record: 'tidepool', plan: 'plus' }), ENV, w.deps);
   const out = await read(await opsPlan(ask({ record: 'tidepool', plan: null }), ENV, w.deps));
   assert.equal(out.ok, false);
-  assert.equal(out.refusal?.fix, 'Free is for one person and this record has 2, so it keeps its gift until it has one.');
+  assert.equal(out.refusal?.fix, 'Free is for one person and this BrainDog has 2, so it keeps its gift until it has one.');
   assert.equal(w.billed.get('rec_tidepool')?.state, 'comp');
   assert.equal(w.byId.get('rec_tidepool')?.plan, 'plus');
 });
@@ -150,7 +150,7 @@ test('A RECORD THAT PAYS THROUGH STRIPE IS REFUSED, and its row and plan are lef
 test('A RECORD WITH NO GIFT HAS NOTHING TO TAKE BACK', async () => {
   const w = world([{ ...LONE }]);
   const out = await read(await opsPlan(ask({ record: 'tidepool', plan: null }), ENV, w.deps));
-  assert.equal(out.refusal?.fix, 'This record has no gift to take back.');
+  assert.equal(out.refusal?.fix, 'This BrainDog has no gift to take back.');
   assert.equal(w.byId.get('rec_tidepool')?.plan, 'free');
 });
 

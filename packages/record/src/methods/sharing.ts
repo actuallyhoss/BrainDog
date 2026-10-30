@@ -668,7 +668,7 @@ export function methods(deps: RecordDeps) {
 
     /** Every share on the record, live and ended in the last 30 days, each said as one sentence (§3.2). */
     async sharing(_args: unknown, ctx: CallContext): Promise<Result<SharingRow[]>> {
-      const stop = team(ctx, 'see what this record shares');
+      const stop = team(ctx, 'see what this BrainDog shares');
       if (stop) return { ok: false, refusal: stop };
       const catalog = kernel.catalog();
       const since = instant(clock.now() - SHARES_ENDED_DAYS * DAY_MS);
@@ -678,7 +678,7 @@ export function methods(deps: RecordDeps) {
 
     /** Every live group, by name: its people by name and how many live shares it holds (§3.2, Groups). */
     async groups(_args: unknown, ctx: CallContext): Promise<Result<GroupRow[]>> {
-      const stop = team(ctx, 'see the groups this record shares with');
+      const stop = team(ctx, 'see the groups this BrainDog shares with');
       if (stop) return { ok: false, refusal: stop };
       const ids = sql.all<{ id: string }>('SELECT id FROM share_group WHERE retired_at IS NULL ORDER BY name COLLATE NOCASE, id');
       const out: GroupRow[] = [];
@@ -885,7 +885,7 @@ export function methods(deps: RecordDeps) {
       const who = typeof args?.who === 'string' ? args.who : '';
       if (who === '' || who === me) return refuse('REQUIRED_MISSING', 'Share it on with somebody else on the record, by id.', 'who');
       if (sql.one('SELECT 1 AS y FROM person WHERE id = ?', who) === undefined || !onRecord(who))
-        return refuse('REF_UNKNOWN', 'You can share on only with somebody already on this record.', 'who');
+        return refuse('REF_UNKNOWN', 'You can share on only with somebody already here.', 'who');
       const can = args?.can;
       if (can !== 'view' && can !== 'comment' && can !== 'edit') return refuse('OUT_OF_BOUNDS', 'You can share it on at view, comment or edit, never manage.', 'can');
 

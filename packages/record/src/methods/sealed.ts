@@ -280,7 +280,7 @@ export function methods(deps: RecordDeps) {
       if (store.spend !== undefined && !kept0.has(n)) {
         const wait = await store.spend(body.byteLength);
         if (wait !== null)
-          return no('RATE_LIMITED', `This record has kept as many new bytes today as it may. Put the rest ${later(wait)}.`, { at: 'bytes', retry_after: wait });
+          return no('RATE_LIMITED', `This BrainDog has kept as many new bytes today as it may. Put the rest ${later(wait)}.`, { at: 'bytes', retry_after: wait });
       }
 
       const now = new Date(clock.now()).toISOString();

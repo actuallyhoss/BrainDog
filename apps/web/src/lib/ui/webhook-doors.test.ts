@@ -159,7 +159,7 @@ test('A STALE OR MISSING SIGN-IN IS signin, with the record\'s sentence verbatim
 });
 
 test('A DOOR THE RECORD NO LONGER DECLARES IS THE RECORD\'S OWN SENTENCE, which says what is missing', () => {
-  const fix = 'This record declares no ingest called stripe-events.';
+  const fix = 'There is no way in called stripe-events.';
   assert.deepEqual(saidOf({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix } }, BASE), { kind: 'refused', fix });
 });
 

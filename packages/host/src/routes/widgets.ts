@@ -8,7 +8,7 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'widgetGallery', group: 'READ+', writes: false, what: 'Every widget this record can show on Today, each drawn small on its own data or saying what would fill it, and the few suggested from use. It changes nothing.',
+  { name: 'widgetGallery', group: 'READ+', writes: false, what: 'Every widget this BrainDog can show on Today, each drawn small on its own data or saying what would fill it, and the few suggested from use. It changes nothing.',
     takes: { group: 'text', q: 'text', board: 'json', addon: 'text' } },
   { name: 'widgetSuggest', group: 'READ+', writes: false, what: 'The widgets Slash would add to Today from how the record is used, each with its reason in one line, three at most. It changes nothing.',
     takes: { board: 'json', cell: 'json' } },

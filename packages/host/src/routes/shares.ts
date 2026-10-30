@@ -18,7 +18,7 @@ import type { Route } from '../index.ts';
 export const ROUTES: readonly Route[] = [
   { name: 'openShare', group: 'ADMIN', writes: true, what: 'Open a read-only link to one page for 1 to 90 days, 30 unless said. The link is shown once and never again.' },
   { name: 'closeShare', group: 'ADMIN', writes: true, what: 'Close one shared link for good. Sharing the page again makes a new link.' },
-  { name: 'shares', group: 'ADMIN', writes: false, what: 'The links this record opened to its pages, newest first, open and closed, and never a link itself.' },
+  { name: 'shares', group: 'ADMIN', writes: false, what: 'The links opened here to your pages, newest first, open and closed, and never a link itself.' },
   { name: 'sharedPage', group: 'READ+', writes: false, what: 'The one page a shared link opens, read-only and one level deep. Only a shared link asks it.' },
   { name: 'shareable', group: 'ADMIN', writes: false, what: 'Whether this BrainDog can make a read-only link to a page, and why not.' },
 ];

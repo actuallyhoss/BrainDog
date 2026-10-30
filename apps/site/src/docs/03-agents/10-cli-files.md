@@ -17,8 +17,8 @@ A starter is a whole arrangement (modules, lists, pages, voice and labels) in on
 
 ```comparison | Starters
 Command | What it does
-braindog starter list | Say the starters on this record, the one speaking, and the ones on offer
-braindog starter export | Save this record's arrangement as a starter file, with only the example rows you name. --out, --title and --version shape the file
+braindog starter list | Say the starters in your BrainDog, the one speaking, and the ones on offer
+braindog starter export | Save your BrainDog's arrangement as a starter file, with only the example rows you name. --out, --title and --version shape the file
 braindog starter check <file> | Read a starter file the way a record will, on this machine: its size, any key in it, its shape and its blocks
 braindog starter new <id> | Write a starting starter file, one list and a page over it, that already reads the way a record will
 braindog starter diff <earlier> <later> | Say what moved between two versions, and the least version bump that needs

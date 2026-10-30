@@ -40,7 +40,7 @@ export const GIFT_PLANS = ['hosted', 'plus'] as const;
 export type GiftPlan = (typeof GIFT_PLANS)[number];
 
 /** The sentence a record that pays through Stripe is refused with. */
-export const PAYS_FIX = 'This record pays for Cloud. End that plan first.';
+export const PAYS_FIX = 'This BrainDog pays for Cloud. End that plan first.';
 
 /** A billing row as this door reads it: the Directory's `BillingRow`, of which it needs these. */
 export type GiftRow = { record: string; person: string; customer: string; subscription: string | null; state: string };
@@ -136,7 +136,7 @@ const failed = (r: Result<unknown>): Refusal =>
  */
 async function give(deps: OpsPlanDeps, found: { record: string; owner: string }, row: GiftRow | null, plan: GiftPlan): Promise<Done> {
   if (row?.state === 'lapsed')
-    return { ok: false, refusal: { code: 'ALREADY_KNOWN', fix: 'This record lapsed on a paid plan, and a gift does not end a lapse. Paying again does.', at: 'record' } };
+    return { ok: false, refusal: { code: 'ALREADY_KNOWN', fix: 'This BrainDog lapsed on a paid plan, and a gift does not end a lapse. Paying again does.', at: 'record' } };
   if (row !== null && row.subscription !== null) return { ok: false, refusal: { code: 'ALREADY_KNOWN', fix: PAYS_FIX, at: 'record' } };
   const person = row?.person ?? found.owner;
   const written = await deps.billing({
@@ -157,15 +157,15 @@ async function give(deps: OpsPlanDeps, found: { record: string; owner: string },
 async function takeBack(deps: OpsPlanDeps, record: string, row: GiftRow | null): Promise<Done> {
   if (row === null || row.state !== 'comp') {
     if (row !== null && row.subscription !== null) return { ok: false, refusal: { code: 'ALREADY_KNOWN', fix: PAYS_FIX, at: 'record' } };
-    return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'This record has no gift to take back.', at: 'record' } };
+    return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'This BrainDog has no gift to take back.', at: 'record' } };
   }
   const people = await deps.people(record);
   if (people === null)
-    return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'Nobody could count the people on this record just now, so it keeps its gift. Try again in a minute.' } };
+    return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'Nobody could count the people on this BrainDog just now, so it keeps its gift. Try again in a minute.' } };
   if (people !== 1)
     return {
       ok: false,
-      refusal: { code: 'OUT_OF_BOUNDS', fix: `Free is for one person and this record has ${String(people)}, so it keeps its gift until it has one.`, at: 'record' },
+      refusal: { code: 'OUT_OF_BOUNDS', fix: `Free is for one person and this BrainDog has ${String(people)}, so it keeps its gift until it has one.`, at: 'record' },
     };
   const owned = await deps.owned(row.person);
   if (!owned.ok) return { ok: false, refusal: failed(owned) };

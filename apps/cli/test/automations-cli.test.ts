@@ -134,7 +134,7 @@ type Seen = { method: string; args: Record<string, unknown> };
 /** The record's own sentence for a token at an ADMIN door, with the words each method passes to `admin()`. */
 const browserOnly = (reads?: string) => ({
   ok: false,
-  refusal: { code: 'NEEDS_BROWSER_SESSION', fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`, at: 'principal' },
+  refusal: { code: 'NEEDS_BROWSER_SESSION', fix: reads === undefined ? 'Open this from the app; a token cannot change what this BrainDog is.' : `Open this from the app; a token cannot ${reads}.`, at: 'principal' },
 });
 
 /* A REAL ATTACK, BYTE FOR BYTE: what a member at `append` wrote into a row, and what a `set_var` step
@@ -272,7 +272,7 @@ test('automations run and cancel: where the record lets them, each says the run 
 test('scripts resume: sends the id to resumeScript, and a token gets the ADMIN sentence', async (t) => {
   const h = await setup(t, { admin: false });
   assert.equal(await scripts(['resume', 'fx-rates'], h.io), 1);
-  assert.deepEqual(h.said, ['Open this from the app; a token cannot change what this record is.']);
+  assert.deepEqual(h.said, ['Open this from the app; a token cannot change what this BrainDog is.']);
   assert.deepEqual(called(h.seen, 'resumeScript')[0]?.args, { script: 'fx-rates' });
 
   const ok = await setup(t, { admin: true });

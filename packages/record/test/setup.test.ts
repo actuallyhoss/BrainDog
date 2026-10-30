@@ -226,7 +226,7 @@ test('ONLY THE OWNER, IN A BROWSER SESSION: a token of any scope and a member wh
   const { api, sql, on } = await record();
   const token = refusal(await api.setup({ usecase: 'study' }, agent));
   assert.equal(token.code, 'NEEDS_BROWSER_SESSION');
-  assert.match(token.fix, /a token cannot set this record up/);
+  assert.match(token.fix, /a token cannot set this BrainDog up/);
   assert.equal(refusal(await api.setup({ usecase: 'study' }, decider)).code, 'LEVEL_REQUIRED');
   assert.equal(refusal(await api.setup(undefined, owner)).at, 'body');
   assert.deepEqual(on(), []);

@@ -59,7 +59,7 @@ const SOURCE_SAYS: Readonly<Record<string, string | null>> = {
   signs: "the record's vital signs as rows: sign, name, state, value, said; in the list's order, no order:",
   'handoffs.open': 'the next steps runs left and nobody has taken, newest first, as rows: run, agent, next, left_at, mark; about: one project; no order:',
   'actions.blocking': "one project's scheduled actions that are paused, failing or late, as rows: name, why, since, status, said; about: the project, required; no order:",
-  exceptions: 'what went quiet on this record, the longest quiet first, as rows: subject, since, was, and kind, which is list, door, schedule or stale; no order:',
+  exceptions: 'what went quiet here, the longest quiet first, as rows: subject, since, was, and kind, which is list, door, schedule or stale; no order:',
 };
 
 /** Each name with what it reads: the module's own `says` first, then this file's line, then nothing. */

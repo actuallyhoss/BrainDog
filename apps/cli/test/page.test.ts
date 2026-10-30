@@ -104,7 +104,7 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
       if (method === 'setDeclaration')
         return answer(
           opts.admin === false
-            ? { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.', at: 'principal' } }
+            ? { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this BrainDog is.', at: 'principal' } }
             : { ok: true, value: { id: 'page.invoicing', kind: 'page' } },
         );
       /* ONE QUESTION BY ID, as `push --wait` reads it: the next of `polls` each time, the last one held. */

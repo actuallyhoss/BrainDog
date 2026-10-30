@@ -709,7 +709,7 @@ function rankedOf(tail: readonly string[]): Ranked | null {
 }
 
 /** A bound as the column holds it, or the refusal for the words that could not be one. */
-type Bound = { value: string | number | { amount: number; currency: string } | { value: number; unit: string } } | { code: string; fix: string };
+type Bound = { value: string | number | { amount: number; currency?: string } | { value: number; unit: string } } | { code: string; fix: string };
 
 /**
  * One bound of an ordered clause, read in the type of the field it is compared with.

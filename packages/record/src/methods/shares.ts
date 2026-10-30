@@ -694,7 +694,7 @@ export function methods(deps: RecordDeps) {
       const id = isRecord(args) ? args.id : undefined;
       if (typeof id !== 'string' || id === '') return no('REQUIRED_MISSING', 'A link is closed by its id, as shares lists it.', { at: 'id' });
       const link = id.length > SHARE_ID_MOST ? undefined : openedOf(id);
-      if (link === undefined) return no('REF_UNKNOWN', 'This record opened no link with that id. shares lists every one.', { at: 'id' });
+      if (link === undefined) return no('REF_UNKNOWN', 'No link with that id was opened here. shares lists every one.', { at: 'id' });
       const was = closedAt(id);
       if (was !== null) return ok({ id, closed_at: was });
       const closed_at = instant(clock.now());

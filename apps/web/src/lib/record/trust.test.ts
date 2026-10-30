@@ -73,7 +73,7 @@ test('every line has a key of its own, so a list can be drawn from them', () => 
 });
 
 test('a refused call (a member) draws nothing', async () => {
-  const refused = { trust: async () => ({ ok: false as const, refusal: { code: 'FORBIDDEN', fix: 'Where agents stand is for the owner of this record to read, so nothing was read.' } }) };
+  const refused = { trust: async () => ({ ok: false as const, refusal: { code: 'FORBIDDEN', fix: 'Where agents stand is for the owner of this BrainDog to read, so nothing was read.' } }) };
   assert.equal(await readTrust(refused), null);
 });
 

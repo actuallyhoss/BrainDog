@@ -87,7 +87,7 @@ test('revoking is the same door with nothing to show', async () => {
 test('A SIGN-IN OLDER THAN FIFTEEN MINUTES IS A STATE AND NOT AN ERROR', async () => {
   /* The door's own sentence, verbatim, for the proof it wants; `13 §6` says the `fix` is what the person reads.
      This is the one refusal on this screen with a way forward that is not a correction, so it is its own kind. */
-  const fix = 'Sign in again to change where this record takes its mail.';
+  const fix = 'Sign in again to change where this BrainDog takes its mail.';
   const stale = host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix, at: 'principal' } }));
   assert.deepEqual(await mintInbound(BASE, stale.io), { kind: 'signin', fix });
   /* AND REVOKING ASKS FOR THE SAME PROOF, because it is the worse of the two losses: a bank's mail silently not
@@ -96,14 +96,14 @@ test('A SIGN-IN OLDER THAN FIFTEEN MINUTES IS A STATE AND NOT AN ERROR', async (
   assert.deepEqual(await revokeInbound(BASE, stale.io), { kind: 'signin', fix });
   /* No session at all answers the same code with the other sentence, and it is the same state: signing in is the fix. */
   const none = host(() =>
-    json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open the app and sign in as an owner of this record to change where its mail arrives.', at: 'principal' } }),
+    json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open the app and sign in as an owner of this BrainDog to change where its mail arrives.', at: 'principal' } }),
   );
   assert.equal((await mintInbound(BASE, none.io)).kind, 'signin');
 });
 
 test('a colleague, and a page somewhere else, read the record’s own sentence', async () => {
-  const notOwner = host(() => json(403, { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'Only an owner of this record can change where its mail arrives.', at: 'principal' } }));
-  assert.deepEqual(await mintInbound(BASE, notOwner.io), { kind: 'refused', fix: 'Only an owner of this record can change where its mail arrives.' });
+  const notOwner = host(() => json(403, { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'Only an owner of this BrainDog can change where its mail arrives.', at: 'principal' } }));
+  assert.deepEqual(await mintInbound(BASE, notOwner.io), { kind: 'refused', fix: 'Only an owner of this BrainDog can change where its mail arrives.' });
   const elsewhere = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'A forwarding address is minted from this app, in a browser, on this address.', at: 'origin' } }));
   assert.equal((await mintInbound(BASE, elsewhere.io)).kind, 'refused');
 });

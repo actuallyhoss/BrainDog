@@ -116,7 +116,7 @@ test('A DRAFT RUNS AND WRITES NOTHING: the writes it would make come back, and t
 });
 
 test('A TRIAL THE PLAN HOLDS STARTS NOTHING, and is counted as held', async () => {
-  const hold = { until: NOW + 86_400_000, say: "This record has used this month's runs." };
+  const hold = { until: NOW + 86_400_000, say: "This BrainDog has used this month's runs." };
   const { answer, sent, counted } = await tryIt({ body: body() }, { hold });
   assert.deepEqual(answer, { held: hold });
   assert.deepEqual(sent, [], 'a held trial sent a request');

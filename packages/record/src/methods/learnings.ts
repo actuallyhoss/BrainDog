@@ -389,7 +389,7 @@ export function methods(deps: RecordDeps) {
         const move = state?.transitions?.[from];
         const to = decl.done?.find((d) => move?.to.includes(d));
         const reason = move?.requires?.[0];
-        if (to === undefined || decl.state === undefined) return no('NOT_IN_THIS_BUILD', 'This record cannot mark a learning replaced, so a lesson learned twice is not asked about.');
+        if (to === undefined || decl.state === undefined) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot mark a learning replaced, so a lesson learned twice is not asked about.');
         const filed = kernel.propose(
           {
             question: said.question,

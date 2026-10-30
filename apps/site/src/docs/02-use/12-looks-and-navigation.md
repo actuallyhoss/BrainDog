@@ -56,7 +56,7 @@ On a phone, BrainDog uses a tab bar whatever the shape: Today and three more pla
 
 ## A shape recommended for you
 
-BrainDog's design agent reads what your record holds and how you use it, and may recommend a shape that suits it better, with one sentence saying why. It appears in Settings under Navigation as **A shape that might suit this record better**, with **Switch to** that shape. It never switches for you, and once you dismiss a recommendation it does not come back.
+BrainDog's design agent reads what your BrainDog holds and how you use it, and may recommend a shape that suits it better, with one sentence saying why. It appears in Settings under Navigation as **A shape that might suit this record better**, with **Switch to** that shape. It never switches for you, and once you dismiss a recommendation it does not come back.
 
 The same rule holds for pages: the record may offer a page for a list that keeps growing, but it never places one in your navigation for you. See [Home and pages](/docs/use/home-and-pages).
 

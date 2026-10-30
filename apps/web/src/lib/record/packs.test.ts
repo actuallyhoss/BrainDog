@@ -292,7 +292,7 @@ test('A REFUSAL NAMES ITS SETTING, AND THE SESSION RULES ARE ANSWERED BY SIGNING
 
 test('A SAVE SENDS setPackConfig WITH ONLY THE VALUES, and says whether this use case is the only one on', async () => {
   const sent: { name: string; args: unknown }[] = [];
-  const session = { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.' } };
+  const session = { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this BrainDog is.' } };
   const caller = (config: Awaited<ReturnType<Caller['packConfig']>>): Caller => ({
     packs: async () => ({ ok: true, value: [] }),
     disablePack: async () => ({ ok: false, conflict: {} }),

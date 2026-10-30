@@ -48,7 +48,7 @@ A token reaches the record's reads and its everyday writes, each held to the tok
 ```comparison | Reads
 Method | What it answers
 boot | What the record holds, how many rows each list has, and who is asking
-whoami | Who you are to this record, and which verbs you reach
+whoami | Who you are here, and which verbs you reach
 schema, get, list, search, history | Lists and rows, as the MCP tools of the same names give them
 backlinks | What points at one row, from the other lists
 whatsNew, recentHistory | What changed, newest first, held to what you may see

@@ -816,7 +816,7 @@ export async function seeAs<L extends string>(
   if (held.level !== 'owner' && held.level !== 'decide')
     return { refusal: { code: 'FORBIDDEN', fix: 'Only an owner or an Admin can see the record as somebody else.', at: 'as' } };
   const theirs = as.length > SEE_AS_MOST ? null : await accessOf(as);
-  if (theirs === null) return { refusal: { code: 'FORBIDDEN', fix: 'That person is not on this record, so there is nothing to see as them.', at: 'as' } };
+  if (theirs === null) return { refusal: { code: 'FORBIDDEN', fix: 'That person is not on this BrainDog, so there is nothing to see as them.', at: 'as' } };
   if (theirs.level === 'owner') return { refusal: { code: 'FORBIDDEN', fix: 'An owner sees everything. See as somebody else.', at: 'as' } };
   return { ctx: { ...sessionContext({ ...who, person: as }, theirs), confirmable: false, preview: as, previewBy: who.person } };
 }

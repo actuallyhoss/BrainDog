@@ -69,7 +69,7 @@ test('--force LIFTS WOULD_ORPHAN and says so in one line', async () => {
 test('ANOTHER REFUSAL STANDS UNDER --force, printed as it always is', async () => {
   for (const other of [
     { code: 'ID_RENAMED', fix: 'register.services → register.jobs renames a spoken id. Ids are stable for ever: keep register.services and change its name instead.', at: 'register.jobs' },
-    { code: 'PLAN_STALE', fix: 'This record has moved, or the pack has, since the plan you approved. Read the plan again.', at: 'planHash' },
+    { code: 'PLAN_STALE', fix: 'This BrainDog has moved, or the pack has, since the plan you approved. Read the plan again.', at: 'planHash' },
     { code: 'REQUIRED_MISSING', fix: 'kiln-books calls other services. Approve the line its plan calls out, then install.', at: 'approve' },
   ]) {
     const t = io();

@@ -229,7 +229,7 @@ test('A FIELD POINTING AT A LIST NOTHING HOLDS IS REGISTER_UNRESOLVED, naming th
   assert.equal(fault.code, 'REGISTER_UNRESOLVED');
   assert.equal(
     fault.fix,
-    'sample-ledger points at the people list (register.samples.fields.contact.to), which this record does not hold and sample-ledger does not declare. Install people first: it declares people.',
+    'sample-ledger points at the people list (register.samples.fields.contact.to), which is not here and sample-ledger does not declare. Install people first: it declares people.',
   );
   const r = refusal(await install(pack, diff, hostFor(k), diff.planHash));
   assert.deepEqual([r.code, r.at], ['REGISTER_UNRESOLVED', 'register.samples.fields.contact.to']);
@@ -242,7 +242,7 @@ test('A LIST NO FIRST-PARTY PACK DECLARES IS NAMED WITH THE GENERAL REPAIR, and 
   const widgets = await plan(value<Pack>(await normalise(LEANING('widgets'))), empty);
   assert.equal(
     unresolvedFault(widgets)?.fix,
-    'sample-ledger points at the widgets list (register.samples.fields.contact.to), which this record does not hold and sample-ledger does not declare. Install the pack that declares widgets first, or declare it in sample-ledger.',
+    'sample-ledger points at the widgets list (register.samples.fields.contact.to), which is not here and sample-ledger does not declare. Install the pack that declares widgets first, or declare it in sample-ledger.',
   );
 
   const page = DOC({

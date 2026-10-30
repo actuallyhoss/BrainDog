@@ -527,7 +527,7 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
       notes.push('The catalogue could not be read tonight, so whether an add-on is behind is not known.');
     }
     if (offers !== null && (kernel.prefsOf === undefined || kernel.setPref === undefined))
-      notes.push('This record keeps no prefs here, so how long an add-on has been behind is not known.');
+      notes.push('This BrainDog keeps no prefs, so how long an add-on has been behind is not known.');
     else if (offers !== null) {
       const was = kernel.prefsOf!(ARRIVED_HOLDER)[ARRIVED_BEHIND];
       const kept = was !== null && typeof was === 'object' && !Array.isArray(was) ? (was as Record<string, { since?: unknown }>) : {};

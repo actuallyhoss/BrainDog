@@ -55,7 +55,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'setAgentProfile', group: 'ADMIN', writes: true, what: 'Make, change or retire one agent’s settings: how far it may go, where, which tools, its brief. The owner, signed in.' },
   { name: 'createJob', group: 'JOBS', writes: true, what: 'Start one job of a kind the owner approved. It waits in the queue until a runner claims it.' },
   { name: 'cancelJob', group: 'JOBS', writes: true, what: 'Stop one job. A runner working on it reads the stop and ends it.' },
-  { name: 'listJobs', group: 'JOBS', writes: false, what: 'The jobs on this record, newest first, in one state or all of them, a page at a time.',
+  { name: 'listJobs', group: 'JOBS', writes: false, what: 'The jobs here, newest first, in one state or all of them, a page at a time.',
     takes: { status: 'text', limit: 'integer', cursor: 'text' } },
   { name: 'jobEvents', group: 'JOBS', writes: false, what: 'What one job has done since a step you name, and whether it is still running.',
     takes: { id: 'text', after: 'integer' } },

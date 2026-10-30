@@ -55,7 +55,7 @@ Past the allowance, an action waits for the first of next month, and failures ar
 
 ## Seeing where you stand
 
-- `whoami` says who you are to the record and which verbs you reach.
+- `whoami` says who you are here and which verbs you reach.
 - The app's list of tokens shows when each was last used.
 - `usedBy` says which sessions used a key or a tool, the most recent first.
 - `actions` and `scripts` say this month's runs for each scheduled action and script.

@@ -119,7 +119,7 @@ export function methods(deps: RecordDeps) {
       const row = (args ?? {}) as ProfileRow;
       const token = row.match !== null && typeof row.match === 'object' ? (row.match as { token?: unknown }).token : undefined;
       if (typeof token === 'string' && token.trim() !== '' && sql.one<{ id: string }>('SELECT id FROM token WHERE id = ?', token.trim()) === undefined)
-        return no('ROW_UNKNOWN', 'There is no key with that id on this record. Pick one from Connections.', { at: 'match.token' });
+        return no('ROW_UNKNOWN', 'There is no key with that id here. Pick one from Connections.', { at: 'match.token' });
       const set = kernel.setProfile(row, ctx.principal.id);
       return tail(set.ok ? ok(viewOf(sql, kernel, set.value)) : set);
     },

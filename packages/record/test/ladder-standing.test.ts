@@ -302,7 +302,7 @@ test('ASK AGAIN NAMES WHAT IT DID NOT FIND, and takes only an agent and a kind',
   lift(sql, 'tasks:edit');
   const was = sql.all('SELECT * FROM ladder');
   const none = refusalOf(await api.trustTakeBack({ agent: 'Windsurf' }, inBrowser));
-  assert.deepEqual([none.code, none.fix], ['VALUE_MALFORMED', 'No agent connected to this record is called Windsurf. Nothing was changed.']);
+  assert.deepEqual([none.code, none.fix], ['VALUE_MALFORMED', 'No agent connected here is called Windsurf. Nothing was changed.']);
   assert.equal(refusalOf(await api.trustTakeBack({ agent: 'Claude Code', kind: 'add projects' }, inBrowser)).code, 'VALUE_MALFORMED');
   assert.equal(refusalOf(await api.trustTakeBack({ agent: 'An old script' }, inBrowser)).code, 'VALUE_MALFORMED', 'a revoked grant stands nowhere');
   assert.equal(refusalOf(await api.trustTakeBack({}, inBrowser)).code, 'REQUIRED_MISSING');

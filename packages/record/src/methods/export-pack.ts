@@ -247,7 +247,7 @@ export function methods(deps: RecordDeps) {
         return no('VALUE_MALFORMED', `declarations is a list of one to ${TICKS_MOST} of the ids this answers as offered.`, { at: 'declarations' });
       const unknown = (ticks as string[]).find((t) => !own.has(t));
       if (unknown !== undefined)
-        return no('DECLARATION_UNKNOWN', `${unknown} is not one of this record's own to share. Ask with nothing ticked to see what is.`, { at: 'declarations' });
+        return no('DECLARATION_UNKNOWN', `${unknown} is not one of your own to share. Ask with nothing ticked to see what is.`, { at: 'declarations' });
       for (const key of ['title', 'id', 'version'] as const)
         if (said[key] !== undefined && (typeof said[key] !== 'string' || (said[key] as string).trim() === ''))
           return no('VALUE_MALFORMED', `${key} is a line of text.`, { at: key });

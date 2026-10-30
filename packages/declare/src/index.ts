@@ -992,7 +992,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     const { register: _named, ...rest } = body as Record<string, Json>;
     const stored = kind === 'register' ? ({ id: name, ...rest } as Record<string, Json>) : body;
     const canonical = canonicalise(stored);
-    if (canonical === null) return malformed(`${declId} holds something this record cannot write down.`, declId);
+    if (canonical === null) return malformed(`${declId} holds something BrainDog cannot write down.`, declId);
     declarations.push({ kind, id: declId, body: stored, canonical });
   }
 
@@ -1461,7 +1461,7 @@ function addedTo(pack: string, add: PageAddition, host: { kind: DeclKind; body: 
       unresolved: true,
       refusal: {
         code: 'PAGE_UNKNOWN',
-        fix: `${pack} adds a column to the ${name} page, which this record does not hold. Install the pack that declares ${add.page} first.`,
+        fix: `${pack} adds a column to the ${name} page, which is not here. Install the pack that declares ${add.page} first.`,
         at: `adds.${add.page}`,
       },
     };
@@ -1478,7 +1478,7 @@ function addedTo(pack: string, add: PageAddition, host: { kind: DeclKind; body: 
       unresolved: true,
       refusal: {
         code: 'PAGE_UNKNOWN',
-        fix: `${pack} adds a block to the ${name} page, which this record does not hold. Install the pack that declares ${add.page} first.`,
+        fix: `${pack} adds a block to the ${name} page, which is not here. Install the pack that declares ${add.page} first.`,
         at: `adds.${add.page}`,
       },
     };
@@ -2661,7 +2661,7 @@ export function unresolvedFault(diff: Pick<Diff, 'pack' | 'unresolved'>): Refusa
       : `Install the pack that declares ${joined(lists)} first, or declare ${lists.length === 1 ? 'it' : 'them'} in ${id}.`;
   return {
     code: 'REGISTER_UNRESOLVED',
-    fix: `${id} points at the ${first.register} list (${first.at}), which this record does not hold and ${id} does not declare.${
+    fix: `${id} points at the ${first.register} list (${first.at}), which is not here and ${id} does not declare.${
       others.length > 0 ? ` It also points at ${joined(others)}.` : ''
     } ${repair}`,
     at: first.at,
@@ -3517,14 +3517,14 @@ function faultOf(pack: Pack, diff: Diff, options: InstallOptions = {}): Result<n
   if (!diff.requires.format.ok)
     return no<never>(
       'FORMAT_OUT_OF_RANGE',
-      `${diff.pack.id} needs format ${diff.requires.format.wanted} and this record is at ${diff.requires.format.has}. Update BrainDog.`,
+      `${diff.pack.id} needs format ${diff.requires.format.wanted} and this BrainDog is at ${diff.requires.format.has}. Update BrainDog.`,
       { at: 'requires.format' },
     );
 
   if (!diff.requires.primitives.ok)
     return no<never>(
       'PRIMITIVES_OUT_OF_RANGE',
-      `${diff.pack.id} needs primitives ${diff.requires.primitives.wanted} and this record renders ${diff.requires.primitives.has}. Update BrainDog, or ask the author for a build against the primitives this record renders.`,
+      `${diff.pack.id} needs primitives ${diff.requires.primitives.wanted} and this BrainDog renders ${diff.requires.primitives.has}. Update BrainDog, or ask the author for a build against the primitives it renders.`,
       { at: 'requires.primitives' },
     );
 
@@ -3532,7 +3532,7 @@ function faultOf(pack: Pack, diff: Diff, options: InstallOptions = {}): Result<n
   if (missing)
     return no<never>(
       'OUT_OF_BOUNDS',
-      `${diff.pack.id} needs ${missing.id} ${missing.range}, and this record has ${missing.installed ?? 'none'}.`,
+      `${diff.pack.id} needs ${missing.id} ${missing.range}, and this BrainDog has ${missing.installed ?? 'none'}.`,
       { at: `requires.packs.${missing.id}` },
     );
 
@@ -3546,7 +3546,7 @@ function faultOf(pack: Pack, diff: Diff, options: InstallOptions = {}): Result<n
   if (leaning)
     return no<never>(
       'PACK_REQUIRED',
-      `${leaning.id} ${leaning.version} needs ${diff.pack.id} ${leaning.range}, which ${diff.pack.id} ${diff.pack.version} is not, and the ${diff.pack.id} ${diff.installed_version} this record holds is. Update ${leaning.id} to a version that takes ${diff.pack.id} ${diff.pack.version} first, then install ${diff.pack.id} ${diff.pack.version}.`,
+      `${leaning.id} ${leaning.version} needs ${diff.pack.id} ${leaning.range}, which ${diff.pack.id} ${diff.pack.version} is not, and the ${diff.pack.id} ${diff.installed_version} here is. Update ${leaning.id} to a version that takes ${diff.pack.id} ${diff.pack.version} first, then install ${diff.pack.id} ${diff.pack.version}.`,
       { at: `dependents.${leaning.id}` },
     );
 
@@ -3890,7 +3890,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   if (planHash !== diff.planHash)
     return no<Applied>(
       'PLAN_STALE',
-      'This record has moved, or the pack has, since the plan you approved. Read the plan again.',
+      'This BrainDog has moved, or the pack has, since the plan you approved. Read the plan again.',
       { at: 'planHash' },
     );
 
@@ -3924,7 +3924,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
     return no<Applied>(
       'PROVIDES_CONFLICT',
       first.pack === OWN
-        ? `${first.id} was written in this record, and installing ${diff.pack.id} would take it over. Retire it first if you want the pack to own it.`
+        ? `${first.id} was made here, and installing ${diff.pack.id} would take it over. Retire it first if you want the pack to own it.`
         : step !== undefined
           ? `${first.id} belongs to ${first.pack}${step.installed === null ? '' : ` ${step.installed}`}, and ${diff.pack.id} needs ${first.pack} ${step.range}. Update ${first.pack} first, then install ${diff.pack.id}.`
           : `${first.id} belongs to ${first.pack}, and two packs cannot own one declaration.${

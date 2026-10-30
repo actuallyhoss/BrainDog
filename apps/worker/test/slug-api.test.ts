@@ -105,7 +105,7 @@ test('A SLUG SHE IS NOT ON AND ONE NOBODY HOLDS ARE THE SAME 403, AND NO RECORD 
     assert.equal(out.status, 403, slug);
     bodies.push(await out.json());
   }
-  const NOT_ON = { ok: false, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
+  const NOT_ON = { ok: false, refusal: { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' } };
   assert.deepEqual(bodies, [NOT_ON, NOT_ON], 'a name that exists answered differently from one that does not');
   /* `idFromName` ON A NAME NOBODY HAS CREATES THE OBJECT, so a refused slug must not reach the records at all. */
   assert.deepEqual(addressed, []);

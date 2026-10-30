@@ -17,7 +17,7 @@ import type { Refusal, Result } from '@braindog/ports';
 export const TRIALS_A_DAY = 20;
 
 /** What the trial past the cap is told. */
-export const TRIALS_SPENT = `Agents have tried ${TRIALS_A_DAY} scripts on this record today, the most they may. Propose it untried, or try again tomorrow.`;
+export const TRIALS_SPENT = `Agents have tried ${TRIALS_A_DAY} scripts here today, the most they may. Propose it untried, or try again tomorrow.`;
 
 /** The UTC day a trial at `at` is counted in, as `YYYY-MM-DD`. */
 export const trialDay = (at: number): string => new Date(at).toISOString().slice(0, 10);

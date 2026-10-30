@@ -117,7 +117,7 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
         ? { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' }
         : ended !== null
           ? { code: 'FORBIDDEN', fix: accessEndedSaid(ended.owner), at: ACCESS_ENDED_AT }
-          : { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+          : { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' };
       return { door: 'refused', status: 403, refusal, ...carried };
     }
     /* `12 §8` CSRF: a cookie write comes from a page on this origin or not at all. */
@@ -397,7 +397,7 @@ async function heldBy(
     return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'This token is for a different record than the one this address names.', at: 'slug' } };
   /* `known` IS WHAT `admit` ALREADY ANSWERED IN THE SAME TRIP AS THE SECRET, so the record is not asked twice. */
   const held = known !== undefined ? known : token === undefined ? await deps.access(record, person) : await deps.access(record, person, token);
-  if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
+  if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' } };
   return { held };
 }
 

@@ -779,7 +779,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!on) {
           /* A NAME THEY WERE TAKEN OFF SAYS THEIR ACCESS ENDED, which tells them nothing they did not know: they held it. */
           const left = slug === null ? undefined : sql.one<{ name: string | null; email: string | null }>(LEFT_RECORD, found.row.person, slug);
-          const refusal = left ? { code: 'FORBIDDEN', fix: accessEndedSaid(left.name ?? left.email), at: ACCESS_ENDED_AT } : { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+          const refusal = left ? { code: 'FORBIDDEN', fix: accessEndedSaid(left.name ?? left.email), at: ACCESS_ENDED_AT } : { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' };
           return { status: 403, refusal, ...carry(found) };
         }
         return { status: 200, body: { ...whoOf(found.row), record: on.record, passkey }, ...carry(found) };

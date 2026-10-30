@@ -201,7 +201,7 @@ const deleting = (value) => ({
   [`PUT /${SLUG}/api/files`]: { body: { sha256: 'a'.repeat(64) } },
   'POST /account/close': ALONE,
   [`POST /${SLUG}/api/deleteRecord`]: { body: { ok: true, value } },
-  [`POST /${SLUG}/api/boot`]: { status: 404, body: { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted.' } } },
+  [`POST /${SLUG}/api/boot`]: { status: 404, body: { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This BrainDog was deleted.' } } },
   'GET /account/records': { body: { ok: true, value: [] } },
 });
 

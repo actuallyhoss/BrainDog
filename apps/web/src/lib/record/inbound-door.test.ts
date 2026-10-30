@@ -76,7 +76,7 @@ test('and the Worker, which has the door, says so without being signed in to', a
      cannot forward mail. */
   const signedOut = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }));
   assert.equal(await mintsMail(BASE, signedOut.io), true);
-  const stale = host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open the app and sign in as an owner of this record to change where its mail arrives.' } }));
+  const stale = host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open the app and sign in as an owner of this BrainDog to change where its mail arrives.' } }));
   assert.equal(await mintsMail(BASE, stale.io), true);
 });
 

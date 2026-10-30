@@ -83,7 +83,7 @@ function doorOf(kernel: Kernel, o: { refuseListAfter?: number; refuseDecide?: bo
     list: async ({ register, limit, cursor }) => {
       lists++;
       if (o.refuseListAfter !== undefined && lists > o.refuseListAfter)
-        return { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' } };
+        return { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This BrainDog does not know that credential.', at: 'authorization' } };
       return kernel.list({ register, ...(limit === undefined ? {} : { limit }), ...(cursor === undefined || cursor === null ? {} : { cursor }) });
     },
     create: async ({ register, fields, note }) => kernel.create(register, fields, { actor: ACTOR, ...(note === undefined ? {} : { note }) }),
@@ -95,7 +95,7 @@ function doorOf(kernel: Kernel, o: { refuseListAfter?: number; refuseDecide?: bo
       }),
     governance: async ({ register, status, limit, cursor }) =>
       o.refuseDecide === true
-        ? { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' } }
+        ? { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This BrainDog does not know that credential.', at: 'authorization' } }
         : kernel.governance((register ?? 'suggestion') as never, {
             ...(status === undefined ? {} : { status }),
             ...(limit === undefined ? {} : { limit }),

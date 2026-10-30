@@ -661,7 +661,7 @@ export function methods(deps: RecordDeps) {
         ? `Make one widget for Today that shows what this one shows, a different way. It was made because: ${said}. The one turned down: ${JSON.stringify(stripDraft(tried))}`
         : from
         ? `Change this one widget on Today, keeping it one block, so that: ${said}. The widget now: ${JSON.stringify(from)}`
-        : `Make one widget for Today, a single block in the page grammar over the lists this record keeps, that shows: ${said}`;
+        : `Make one widget for Today, a single block in the page grammar over the lists this BrainDog keeps, that shows: ${said}`;
       const not: SlashDeclined[] = [...turned].slice(0, 3).map((b) => ({ change: { to: { id: 'page.widget-draft', kind: 'page', body: { page: 'widget-draft', title: 'Widget', blocks: [JSON.parse(b)] } } } }) as unknown as SlashDeclined);
       const got = await described(
         { asked, page: 'widget-draft', body: { page: 'widget-draft', title: 'Widget', blocks: from ? [from] : [] }, ...(not.length > 0 ? { not } : {}) },

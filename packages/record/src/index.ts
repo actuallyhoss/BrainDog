@@ -3102,7 +3102,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
-        fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`,
+        fix: reads === undefined ? 'Open this from the app; a token cannot change what this BrainDog is.' : `Open this from the app; a token cannot ${reads}.`,
         at: 'principal',
       };
     return allows(ctx, 'owner', listName);
@@ -3257,7 +3257,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const unreached = <T>(grant: Pick<KeychainGrant, 'scope'> | null): Result<T> =>
     grant === null
-      ? no<T>('REF_UNKNOWN', 'This record holds no key by that name.', { at: 'credential' })
+      ? no<T>('REF_UNKNOWN', 'There is no key by that name here.', { at: 'credential' })
       : no<T>(
           'FORBIDDEN',
           grant.scope === '*'
@@ -11597,7 +11597,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           },
         };
       const decl = kernel.register(binding.register);
-      if (!decl) return no('REGISTER_UNKNOWN', `This key sends rows to ${binding.register}, and this record has no such list now.`, { at: 'register' });
+      if (!decl) return no('REGISTER_UNKNOWN', `This key sends rows to ${binding.register}, and there is no such list here now.`, { at: 'register' });
       const stampType = binding.stamp === undefined ? undefined : decl.fields.find((f) => f.id === binding.stamp)?.type;
       const now = new Date(clock.now()).toISOString();
       const batched = Array.isArray((args as { rows?: unknown }).rows);
@@ -12739,7 +12739,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (body === null || typeof body !== 'object' || Array.isArray(body))
         return no('REQUIRED_MISSING', "body is Today's body, a page declaration's body as braindog:grammar/page says.", { at: 'body' });
       if (said.fresh !== undefined && typeof said.fresh !== 'boolean') return no('VALUE_MALFORMED', 'fresh is true to have Today drawn now, never as it was last drawn.', { at: 'fresh' });
-      if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'Today is not answered by this record yet.');
+      if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'This BrainDog does not answer Today yet.');
       const asks = todayAsks;
       /* IN ONE PASS (`todayDraws`): every part asked with a copy of the caller made for this drawing alone. */
       const drawOf = () => {
@@ -14048,7 +14048,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const held = rowsetHeld(ctx, asked as Record<string, unknown> | null);
         if (held) return { ok: false as const, refusal: held };
         if ((kind === 'pack' || kind === 'settings' || kind === 'arrange') && ctx.onWord === undefined) {
-          const owner = admin(ctx, 'accept a change to what this record is');
+          const owner = admin(ctx, 'accept a change to what this BrainDog is');
           if (owner) return { ok: false as const, refusal: owner };
         }
         /* AND A CHANGE OR A PATTERN THAT INSTALLS WHAT RUNS UNATTENDED, ALONE OR IN A BUNDLE, IS HELD TO THE DOOR
@@ -14289,7 +14289,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * ON A RECORD ALREADY SET UP IT IS REFUSED UNLESS `again` IS TRUE, which writes only what is missing.
      */
     async setup(args: Record<string, unknown> | undefined, ctx: CallContext): Promise<Result<SetupAnswer>> {
-      const stop = admin(ctx, 'set this record up');
+      const stop = admin(ctx, 'set this BrainDog up');
       if (stop) return { ok: false, refusal: stop };
       if (args === null || typeof args !== 'object' || Array.isArray(args))
         return no('VALUE_MALFORMED', 'Send what to set up, such as {"usecase":"<id from offer>","me":{"name":"<what to call you>"}}.', { at: 'body' });
@@ -14863,7 +14863,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * `guards` gate does now, which is the repair that survives the next method somebody adds.
      */
     async members(ctx: CallContext) {
-      const stop = team(ctx, 'see who is on this record');
+      const stop = team(ctx, 'see who is here');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.members());
     },
@@ -15114,7 +15114,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** The report keys this record has issued, each with what it is bound to. Never a hash, never a bearer. */
     async reportKeys(ctx: CallContext) {
-      const stop = admin(ctx, 'list the report keys this record has issued');
+      const stop = admin(ctx, 'list the report keys made here');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(
         kernel.listTokens().flatMap((t) => {
@@ -15131,7 +15131,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * ended carries `ended_by: 'operator'` (`RecordDeps.validFrom`), so the owner sees why it stopped.
      */
     async listTokens(ctx: CallContext) {
-      const stop = admin(ctx, 'list the tokens this record has issued');
+      const stop = admin(ctx, 'list the tokens made here');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.listTokens(deps.validFrom?.()));
     },
@@ -15181,7 +15181,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * ended carries `ended_by: 'operator'`, as `listTokens` marks a token.
      */
     async listDevices(ctx: CallContext): Promise<Result<DeviceRow[]>> {
-      const stop = admin(ctx, 'list the devices signed in to this record');
+      const stop = admin(ctx, 'list the devices signed in here');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(await kernel.deviceList(deps.validFrom?.()));
     },
@@ -15208,7 +15208,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * credentials to a machine they did not authorise.
      */
     async export(args: { sections?: readonly string[]; redactGrants?: boolean; kek_id?: string }, ctx: CallContext) {
-      const stop = admin(ctx, 'export this record', 'export');
+      const stop = admin(ctx, 'export this BrainDog', 'export');
       if (stop) return { ok: false as const, refusal: stop };
 
       /* A SECTION NOBODY HAS IS NOT AN EMPTY EXPORT. `sections: "data"` — the easy JSON mistake —
@@ -15254,7 +15254,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const keys = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n ?? 0);
         const sealed = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM grant WHERE ciphertext IS NOT NULL')?.n ?? 0);
         if (held === null && (keys > 0 || sealed > 0))
-          return no('WRONG_KEY', 'This record holds sealed bytes and names no wrapping key for them, so no export can carry them.', { at: 'vault_key' });
+          return no('WRONG_KEY', 'This BrainDog holds sealed bytes and names no wrapping key for them, so no export can carry them.', { at: 'vault_key' });
         if (held !== null && args.kek_id !== held)
           return no('WRONG_KEY', `The sealed bytes are wrapped by ${held}. An export carrying them names that key.`, { at: 'kek_id' });
       }
@@ -15320,7 +15320,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** The copies this host keeps, newest first, each with when it was taken and how large it is. */
     async snapshots(ctx: CallContext): Promise<Result<Snapshot[]>> {
-      const stop = admin(ctx, 'list the copies this record keeps');
+      const stop = admin(ctx, 'list the copies kept here');
       if (stop) return { ok: false as const, refusal: stop };
       if (!snapshots) return { ok: false as const, refusal: NO_SNAPSHOTS };
       return ok(await snapshots.list());
@@ -15343,7 +15343,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
         return {
           ok: false as const,
-          refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to restore this record. Going back replaces everything written since.', at: 'principal' },
+          refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to restore this BrainDog. Going back replaces everything written since.', at: 'principal' },
         };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['bookmark', 'at']);
       if (extra) return { ok: false as const, refusal: extra };
@@ -15355,7 +15355,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const kept = await snapshots.list();
       const chosen = kept.find((s) => s.id === args.bookmark);
       if (!chosen)
-        return no('OUT_OF_BOUNDS', `${args.bookmark} is not one of the copies this record keeps.`, { at: 'bookmark', allowed: kept.map((s) => s.id) });
+        return no('OUT_OF_BOUNDS', `${args.bookmark} is not one of the copies kept here.`, { at: 'bookmark', allowed: kept.map((s) => s.id) });
 
       const before = await snapshots.take('before-restore');
       /* READ BEFORE THE PORT ARMS, for a port that reopens: nothing on this object is written after the arm. */
@@ -15427,14 +15427,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
       if (!destroy) return { ok: false as const, refusal: NO_DELETE };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to delete this record. Nothing was deleted.', at: 'principal' } };
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to delete this BrainDog. Nothing was deleted.', at: 'principal' } };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['slug']);
       if (extra) return { ok: false as const, refusal: extra };
       if (typeof args?.slug !== 'string' || !args.slug.trim())
-        return no('REQUIRED_MISSING', 'Type the name of this record to delete it.', { at: 'slug' });
+        return no('REQUIRED_MISSING', 'Type the name of this BrainDog to delete it.', { at: 'slug' });
       const slug = kernel.identity()?.slug ?? '';
       if (!slug || args.slug.trim() !== slug)
-        return no('VALUE_MALFORMED', `Type ${slug || 'the name of this record'} exactly to delete it. Nothing was deleted.`, { at: 'slug' });
+        return no('VALUE_MALFORMED', `Type ${slug || 'the name of this BrainDog'} exactly to delete it. Nothing was deleted.`, { at: 'slug' });
       const answer = await destroy();
       return ok({ slug, deleted: true as const, ...(answer ?? {}) });
     },
@@ -15603,7 +15603,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const ingest = args?.ingest;
       if (typeof ingest !== 'string' || ingest === '') return no('REQUIRED_MISSING', 'Which ingest is the token for? Name it by its id.', { at: 'ingest' });
       const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${ingest}`);
-      if (!row) return no('DECLARATION_UNKNOWN', `This record declares no ingest called ${ingest}.`, { at: 'ingest' });
+      if (!row) return no('DECLARATION_UNKNOWN', `There is no way in called ${ingest} here.`, { at: 'ingest' });
       const decl = JSON.parse(row.body) as { channel?: unknown; verify?: { kind?: unknown } };
       if (decl.channel !== 'webhook')
         return no('VALUE_MALFORMED', `${ingest} arrives by ${String(decl.channel)}, and only a webhook is verified by a token in its URL.`, { at: 'ingest' });
@@ -15616,7 +15616,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         'SELECT version FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
         row.id,
       )?.version;
-      if (since === undefined) return no('DECLARATION_UNKNOWN', `This record declares no ingest called ${ingest}.`, { at: 'ingest' });
+      if (since === undefined) return no('DECLARATION_UNKNOWN', `There is no way in called ${ingest} here.`, { at: 'ingest' });
       const token = webhookSecret();
       const digest = await sha256Hex(token);
       const key = ingestTokenKey(ingest);
@@ -15874,7 +15874,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         'SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = ?',
         under,
       );
-      if (!key) return no('NOT_IN_THIS_BUILD', 'This record has no wrapped key, so it cannot hold a sealed value.', { at: 'credential' });
+      if (!key) return no('NOT_IN_THIS_BUILD', 'This BrainDog has no wrapped key, so it cannot hold a sealed value.', { at: 'credential' });
 
       /* The same additional data `openGrant` hands back, so what is sealed here is what opens there. */
       const sealed = await seal({ grant: id, version, aad: `${kernel.identity()?.id ?? 'self'}\u001f${id}\u001f${version}`, key, purpose: under });

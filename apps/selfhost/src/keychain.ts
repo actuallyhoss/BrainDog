@@ -90,9 +90,9 @@ async function grantKey(
   }
 }
 
-const WRONG_KEY = 'This host key store does not open this record, so no key was sealed or opened.';
-const CONNECTOR_SEAL = 'This record cannot seal a key for a scheduled connector yet, so nothing was added. Add it for you to use, or try again after the next update.';
-const NO_IDENTITY = 'This record has no identity yet, so it keeps no keys.';
+const WRONG_KEY = 'This host key store does not open this BrainDog, so no key was sealed or opened.';
+const CONNECTOR_SEAL = 'This BrainDog cannot seal a key for a scheduled connector yet, so nothing was added. Add it for you to use, or try again after the next update.';
+const NO_IDENTITY = 'This BrainDog has no identity yet, so it keeps no keys.';
 
 /** The one answer a value leaves in. */
 function answerOpen(credential: string, label: string, plain: Plaintext): Response {

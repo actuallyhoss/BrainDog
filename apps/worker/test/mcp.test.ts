@@ -63,7 +63,7 @@ test('THE RECORD CHECKS THE SECRET AND SAYS WHAT THE PERSON MAY DO, and /mcp is 
   const gone = deps({ held: null });
   assert.deepEqual(await bearerOf(at({ authorization: `Bearer ${BEARER}` }), 'mcp', gone.d), {
     status: 403,
-    refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' },
+    refusal: { code: 'FORBIDDEN', fix: 'You are not on this BrainDog.' },
   });
 
   const held: Held = { level: 'read', registers: ['obligations'], levels: { obligations: 'write' } };

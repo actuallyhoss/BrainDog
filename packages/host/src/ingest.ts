@@ -285,7 +285,7 @@ function refusal(status: number, refused: Refusal, extra: readonly Header[] = []
  */
 const UNAVAILABLE: Refusal = {
   code: 'RECORD_UNAVAILABLE',
-  fix: 'This record cannot take arrivals right now. Send it again in a few minutes.',
+  fix: 'This BrainDog cannot take arrivals right now. Send it again in a few minutes.',
 };
 
 /**
