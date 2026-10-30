@@ -36,6 +36,16 @@ const SECRETS = new Set([
 ]);
 const secretName = (key: string): boolean => SECRETS.has(key.toLowerCase().replace(/[-_]/gu, ''));
 
+/**
+ * A label that reads as words for a kind of thing (`API token`, `Recovery codes`, `Clé d’API`): short, letters and
+ * spaces with light punctuation, no digit and no credential's shape, so `hunter2` under a secret's name is refused.
+ */
+const WORDS = /^[\p{L}\p{M}]+(?:[ '’.&/-]+[\p{L}\p{M}]+)*\.?$/u;
+const readsAsWords = (label: string): boolean => {
+  const said = label.trim();
+  return said.length <= 40 && WORDS.test(said) && !looksLikeCredential(said);
+};
+
 /** How deep any declaration or use-case file goes, with room to spare: a page's block's column's filter is about eight. */
 export const NESTED_MOST = 64;
 
@@ -73,11 +83,14 @@ export function credentialKey(body: Json, seen: WeakSet<object> = new WeakSet())
     if (!Array.isArray(body) && secretName(key) && typeof value === 'string' && value.trim()) return key;
     /* AN ENUM'S WORDS FOR ITS VALUES ARE NAMED BY THE VALUES (`labels: { api_token: 'API token' }`): a key there that is
        one of the field's own `values` is a kind of thing, not a credential, and only what it says is walked. The Agents
-       pack's Keys list said its kinds that way in 1.28.0, and the seed was refused. */
-    if (!Array.isArray(body) && key === 'labels' && Array.isArray((body as Record<string, Json>).values) && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      const values = new Set(((body as Record<string, Json>).values as Json[]).filter((v): v is string => typeof v === 'string'));
+       pack's Keys list said its kinds that way in 1.28.0, and the seed was refused. ONLY ON AN ENUM FIELD, AND ONLY FOR
+       WORDS: any object could name its own key in `values`, so `{ values: ['password'], labels: { password: 'hunter2' } }`
+       passed (review 3, P2). */
+    if (!Array.isArray(body) && key === 'labels' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const own = body as Record<string, Json>;
+      const values = own.type === 'enum' && Array.isArray(own.values) ? new Set((own.values as Json[]).filter((v): v is string => typeof v === 'string')) : new Set<string>();
       for (const [k, v] of Object.entries(value)) {
-        if (!values.has(k) && secretName(k) && typeof v === 'string' && v.trim()) return k;
+        if (secretName(k) && typeof v === 'string' && v.trim() && !(values.has(k) && readsAsWords(v))) return k;
         const found = credentialKey(v, seen);
         if (found) return found;
       }

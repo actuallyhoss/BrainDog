@@ -15,7 +15,7 @@ import { learn } from '../record/remote.ts';
 import { rowHref } from '../record/row-href.ts';
 import { MONEY_IN, monthsOf, type MoneyIn } from '../../routes/r/[register]/[seq]/figures.ts';
 import { lanesOf, type Lanes, type ListFacts, type SideProject } from './side.ts';
-import { keepSide, keptSide, type SideCopy } from './side-copy.ts';
+import { keepSide, keptPerson, keptSide, type SideCopy } from './side-copy.ts';
 
 /** The most projects read: more than any record holds, and the limit the desk and the pages ask, so all share one read. */
 const READ = 500;
@@ -182,45 +182,72 @@ export async function readWeek(base: string, list: string, play: readonly SideRo
   );
 }
 
-/** Where this device keeps each record's last week, by the record's base. */
+/** Where this device keeps the last week it drew, for one record and one person. */
 export const WEEK_KEPT_KEY = 'bd_side_week';
+/** Bump when the kept shape changes. Before 2 it was every record's week by base alone, for whoever was signed in. */
+export const WEEK_KEPT_VERSION = 2;
+
+type WeekStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+type WeekKept = { v: number; base: string; person: string; week: Record<string, { late?: unknown; moved?: unknown }> };
+
+const weekStore = (): WeekStore | null => {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * THE WEEK THIS DEVICE LAST DREW FOR THE RECORD AT `base`, drawn at once on every screen while it is read again (audit 2,
  * B18): Kiln's "late" was on Today, which reads it in its own first read, and missing on Needs you, Settings and Keys,
  * where the week waits for the screen's reads to rest and was not in yet. Empty where nothing is kept.
+ *
+ * ONE ENTRY, FOR ONE RECORD AND ONE PERSON, drawn only beside the shell this browser keeps for them (`keptPerson`), as
+ * the list beside it is (`side-copy.ts`). Kept by record alone, a member who signed in after the owner on a shared
+ * device was drawn the owner's late counts, which took in rows kept private from them, and a failed read kept them
+ * (review 3, P1). An entry of the old shape, another person's, or one with no shell beside it is dropped.
  */
-export function keptWeek(base: string, raw: string | null = readKept()): Week {
+export function keptWeek(base: string, now: number = Date.now(), store: WeekStore | null = weekStore()): Week {
+  if (!store) return new Map();
   try {
-    const all = JSON.parse(raw ?? '{}') as Record<string, Record<string, { late?: unknown; moved?: unknown }>>;
-    const mine = all[base];
-    if (mine === null || typeof mine !== 'object') return new Map();
+    const raw = store.getItem(WEEK_KEPT_KEY);
+    if (raw === null) return new Map();
+    const e = JSON.parse(raw) as Partial<WeekKept> | null;
+    if (!e || e.v !== WEEK_KEPT_VERSION || typeof e.base !== 'string' || typeof e.person !== 'string' || e.week === null || typeof e.week !== 'object') {
+      store.removeItem(WEEK_KEPT_KEY);
+      return new Map();
+    }
+    if (e.base !== base) return new Map();
+    if (keptPerson(base, now, store) !== e.person) {
+      store.removeItem(WEEK_KEPT_KEY);
+      return new Map();
+    }
     return new Map(
-      Object.entries(mine).flatMap(([key, w]) =>
+      Object.entries(e.week).flatMap(([key, w]) =>
         w !== null && typeof w === 'object' && typeof w.late === 'number' && Number.isInteger(w.late) && w.late >= 0 ? [[key, { late: w.late, moved: w.moved === true }] as const] : [],
       ),
     );
   } catch {
+    try {
+      store.removeItem(WEEK_KEPT_KEY);
+    } catch {
+      /* nothing to drop */
+    }
     return new Map();
   }
 }
 
-/** Keeps the week just read for the record at `base`, beside any other record's. */
-export function keepWeek(base: string, week: Week): void {
+/** Keeps the week just read for the record at `base`, for the person the shell beside it was read for; else nothing. */
+export function keepWeek(base: string, week: Week, now: number = Date.now(), store: WeekStore | null = weekStore()): void {
+  if (!store) return;
   try {
-    const all = JSON.parse(readKept() ?? '{}') as Record<string, unknown>;
-    all[base] = Object.fromEntries(week);
-    globalThis.localStorage?.setItem(WEEK_KEPT_KEY, JSON.stringify(all));
+    const person = keptPerson(base, now, store);
+    if (person === null) return;
+    const entry: WeekKept = { v: WEEK_KEPT_VERSION, base, person, week: Object.fromEntries(week) };
+    store.setItem(WEEK_KEPT_KEY, JSON.stringify(entry));
   } catch {
     /* A browser that keeps nothing draws the week once it is read. */
-  }
-}
-
-function readKept(): string | null {
-  try {
-    return globalThis.localStorage?.getItem(WEEK_KEPT_KEY) ?? null;
-  } catch {
-    return null;
   }
 }
 

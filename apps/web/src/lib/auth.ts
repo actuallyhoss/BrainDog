@@ -13,6 +13,8 @@
  * and `graph` counts a type import as an edge). Only the fields this file reads are here.
  */
 
+import { forgetSignedOut } from './record/signed-out.ts';
+
 /** Who a live session belongs to. */
 export type Who = { person: string; email: string; record: string | null; provedAt: number };
 
@@ -430,8 +432,14 @@ export async function redeemLink(link: Link, io: Io = live()): Promise<Said<Who>
   return signedIn(call(io, '/auth/magic/redeem', link.kind === 'magic' ? { linkToken: link.token } : { claimToken: link.token }));
 }
 
+/**
+ * End this session. WHAT THIS BROWSER KEPT OF WHAT THEY READ GOES WITH IT (`signed-out.ts`), from the frame's menu and from
+ * Settings alike, so the next person to sign in here is never drawn the last one's week, threads or places.
+ */
 export async function signOut(io: Io = live()): Promise<Said<null>> {
-  return done(call(io, '/auth/logout', {}));
+  const out = await done(call(io, '/auth/logout', {}));
+  if (out.ok) forgetSignedOut();
+  return out;
 }
 
 export async function passkeys(io: Io = live()): Promise<Said<PasskeyInfo[]>> {
@@ -510,6 +518,7 @@ export async function signOutEverywhere(keep: 'this' | 'none' = 'this', io: Io =
   const out = await call(io, '/auth/logout/all', { keep });
   if (!out.ok) return out;
   const ended = isObj(out.value) && typeof out.value.ended === 'number' ? out.value.ended : null;
+  if (ended !== null && keep === 'none') forgetSignedOut();
   return ended === null ? { ok: false, kind: 'refused', fix: null } : { ok: true, value: ended };
 }
 

@@ -25,6 +25,7 @@ const localTab = () => import('./local-tab.ts');
 /** The local copy wiped, through the reader that arrives after the shell. */
 const wipeLocal = (): Promise<void> => localTab().then((m) => m.wipeLocal());
 import { dropShell, forget, hear, hearShell, keep } from './offline.ts';
+import { forgetSignedOut } from '../record/signed-out.ts';
 
 /**
  * `state` is what the hairline draws.
@@ -79,6 +80,7 @@ async function reboot(): Promise<void> {
 function end(said: string): void {
   void forget().catch(() => undefined);
   void wipeLocal();
+  forgetSignedOut();
   void import('$lib/record/boot-live.ts').then((m) => m.forget(), () => undefined);
   /* AND NOTHING KEPT BY THE VERSION IS HANDED TO THEM AGAIN: the reads kept for the tab go, and none is kept from now. */
   void import('@braindog/client').then((c) => c.keepReads(false), () => undefined);
@@ -180,6 +182,7 @@ function asker(base: string): () => Promise<number> {
       if ('refusal' in out && out.refusal.code === 'UNAUTHORIZED') {
         void forget().catch(() => undefined);
         void wipeLocal();
+        forgetSignedOut();
       }
       /* A PERSON WHOSE ACCESS ENDED IS TOLD SO, within one poll of the share stopping: 1.5 s on a focused tab. */
       if ('refusal' in out && endedBy(out.refusal)) end(out.refusal.fix);

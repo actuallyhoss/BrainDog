@@ -39,7 +39,8 @@
     SIDE_MAX,
     SIDE_MIN,
     byWeek,
-    countKept,
+    countsEntry,
+    countsKept,
     factOf,
     holdsProjects,
     phoneLine,
@@ -53,6 +54,7 @@
     type SideProject,
   } from './side.ts';
   import { keepWeek, keptRead, keptWeek, readFolk, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
+  import { keptPerson } from './side-copy.ts';
 
   let {
     base,
@@ -138,24 +140,29 @@
      row says the number this device last drew, never nothing. */
   const counting = $derived(model.places.filter((p) => p.list !== undefined));
   let counts = $state<Record<string, number>>({});
+  /* KEPT FOR ONE RECORD AND ONE PERSON, beside the shell this browser keeps for them (`countsKept`, review 3 P1): the
+     next person to sign in on a shared device is never drawn the last one's counts, and an entry of the old shape, or
+     another person's, is dropped at the first read. */
   const keptCounts = (b: string): Record<string, number> => {
-    let raw: string | null = null;
     try {
-      raw = localStorage.getItem(COUNTS_KEY);
+      const kept = countsKept(localStorage.getItem(COUNTS_KEY), b, keptPerson(b));
+      if (kept === null) {
+        localStorage.removeItem(COUNTS_KEY);
+        return {};
+      }
+      const places = new Set(untrack(() => counting).map((p) => p.key));
+      return Object.fromEntries(Object.entries(kept).filter(([key]) => places.has(key)));
     } catch {
       /* Nothing kept. */
+      return {};
     }
-    return Object.fromEntries(untrack(() => counting).flatMap((p) => {
-      const n = countKept(raw, b, p.key);
-      return n === null ? [] : [[p.key, n] as const];
-    }));
   };
   counts = untrack(() => keptCounts(base));
   function keepCounts(b: string, now: Record<string, number>): void {
     try {
-      const all = JSON.parse(localStorage.getItem(COUNTS_KEY) ?? '{}') as Record<string, Record<string, number>>;
-      all[b] = { ...(all[b] ?? {}), ...now };
-      localStorage.setItem(COUNTS_KEY, JSON.stringify(all));
+      const person = keptPerson(b);
+      if (person === null) return;
+      localStorage.setItem(COUNTS_KEY, countsEntry(localStorage.getItem(COUNTS_KEY), b, person, now));
     } catch {
       /* A browser that keeps nothing draws the shell's count until the read lands. */
     }

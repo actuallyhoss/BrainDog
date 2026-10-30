@@ -8,7 +8,8 @@ import {
   SIDE_MIN,
   SIDE_START,
   byWeek,
-  countKept,
+  countsEntry,
+  countsKept,
   crumbOf,
   factOf,
   factsKept,
@@ -216,12 +217,19 @@ test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT: "Projects 0 in play" h
   assert.equal(holdsProjects({ rows: [{ key: 'things#1' }] }), true);
 });
 
-test('what the device keeps of counts and facts is read safely, by record', () => {
-  const raw = JSON.stringify({ '/a': { work: 39, folk: -1, bad: 'x' } });
-  assert.equal(countKept(raw, '/a', 'work'), 39);
-  assert.equal(countKept(raw, '/a', 'folk'), null);
-  assert.equal(countKept(raw, '/b', 'work'), null);
-  assert.equal(countKept('{', '/a', 'work'), null);
+test('what the device keeps of counts and facts is read safely, by record and person', () => {
+  const raw = JSON.stringify({ v: 2, base: '/a', person: 'p_1', counts: { work: 39, folk: -1, bad: 'x' } });
+  assert.deepEqual(countsKept(raw, '/a', 'p_1'), { work: 39 });
+  assert.deepEqual(countsKept(raw, '/b', 'p_1'), {}, "another record's is not drawn");
+  assert.deepEqual(countsKept(null, '/a', 'p_1'), {});
+  assert.equal(countsKept('{', '/a', 'p_1'), null);
+  /* A SHARED DEVICE (review 3, P1): the owner's counts are never drawn for the member who signs in next, nor with no
+     shell kept beside them, and the old shape, every record's by base for whoever was signed in, is dropped. */
+  assert.equal(countsKept(raw, '/a', 'p_2'), null);
+  assert.equal(countsKept(raw, '/a', null), null);
+  assert.equal(countsKept(JSON.stringify({ '/a': { work: 39 } }), '/a', 'p_1'), null);
+  assert.deepEqual(JSON.parse(countsEntry(raw, '/a', 'p_1', { folk: 4 })), { v: 2, base: '/a', person: 'p_1', counts: { work: 39, folk: 4 } });
+  assert.deepEqual(JSON.parse(countsEntry(raw, '/a', 'p_2', { folk: 4 })).counts, { folk: 4 }, "another person's counts are not carried over");
   assert.deepEqual(factsKept(JSON.stringify({ '/a': { ledger: { money: true, pack: 'books' }, bad: 3 } }), '/a'), { ledger: { pack: 'books', money: true, folk: false, projects: false, ofProjects: false } });
   assert.deepEqual(factsKept('nope', '/a'), {});
 });

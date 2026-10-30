@@ -28,7 +28,7 @@ import { HELD_LONG_MS } from './held-readings.ts';
 export type SignTrace = {
   /** Every table its statements read from, lower case. */
   tables: Set<string>;
-  /** The lists its statements named, by a bound value or a quoted word. */
+  /** The lists its statements bound the rows' list to (`register = ?`, `register IN ('a', ?)`). */
   lists: Set<string>;
   /** It read the rows with no list named, so any row written may move it. */
   rows: boolean;
@@ -39,28 +39,151 @@ export type SignTrace = {
 /** A fresh trace. */
 export const signTraceOf = (): SignTrace => ({ tables: new Set(), lists: new Set(), rows: false, wrote: false });
 
-/** Each table a statement reads from, as `FROM t` or `JOIN t`, a schema's name and quotes taken off. */
-const TABLES = /\b(?:FROM|JOIN)\s+(?:main\.)?["`[]?([A-Za-z_][A-Za-z0-9_]*)/giu;
-/** The rows' table, as a word: `entry`, never `entry_private` or `entry_fts`. */
-const ROWS = /\bentry\b/u;
-/** A quoted word that may be a list's id. */
-const QUOTED = /'([a-z][a-z0-9_]{0,31})'/gu;
+/** A table's name as SQL may write it: bare, or in double quotes, backticks or brackets. */
+const NAME = /^\s*(?:"((?:[^"]|"")+)"|`((?:[^`]|``)+)`|\[([^\]]+)\]|([A-Za-z_][A-Za-z0-9_$]*))/u;
 
-/** Note in `trace` what one read names: its tables, and the lists it names, or the rows of none. */
+/** The name at the head of `text`, its quotes taken off, and what follows it. */
+function nameAt(text: string): { name: string; rest: string } | null {
+  const m = NAME.exec(text);
+  if (m === null) return null;
+  const name = m[1]?.replace(/""/gu, '"') ?? m[2]?.replace(/``/gu, '`') ?? m[3] ?? m[4]!;
+  return { name, rest: text.slice(m[0].length) };
+}
+
+/**
+ * The table named at the head of `text`, and the schema before it if there is one: `entry`, `main.entry`,
+ * `"main"."entry"`, `[main].[entry]`. `null` where no name can be read, or a dot is followed by none.
+ */
+export function tableAt(text: string): { schema: string | null; name: string } | null {
+  const first = nameAt(text);
+  if (first === null) return null;
+  const dot = /^\s*\.(?!\.)/u.exec(first.rest);
+  if (dot === null) return { schema: null, name: first.name };
+  const second = nameAt(first.rest.slice(dot[0].length));
+  return second === null ? null : { schema: first.name, name: second.name };
+}
+
+/** Where a statement reads a table: the name after each `FROM` and `JOIN`. */
+const READS_AT = /\b(?:FROM|JOIN)\b/giu;
+/**
+ * The rows' table where a statement reads it, as a word not followed by a dot (`entry.register` is a column):
+ * `entry`, never `entry_private` or `entry_fts`. Read in the text with its strings blanked, so `target_kind = 'entry'`
+ * is no read of the rows; a comma's join (`FROM event, entry`) is.
+ */
+const ROWS_READ = /\bentry\b(?!\s*["`\]]?\s*\.)/giu;
+/** The list column held to one list: `register = ?`, `e.register = 'tasks'`. */
+const BOUND_ONE = /\bregister["`\]]?\s*==?\s*(\?\d+|'\d+')/giu;
+/** The list column held to a few: `register IN (?, 'tasks')`, never a select inside. */
+const BOUND_SOME = /\bregister["`\]]?\s+IN\s*\(([^()]*)\)/giu;
+/**
+ * What comes before a binding that narrows the rows read: `WHERE`, `AND` or `ON`, past any brackets and a table's
+ * name. One after `OR`, `WHEN` or in what a select answers narrows nothing.
+ */
+const NARROWS = /\b(?:WHERE|AND|ON)\s*(?:\(\s*)*(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)?["`[]?$/iu;
+
+/**
+ * `text` with its comments blanked, each string as `'n'` (its place in `strings`) and each parameter as `?n` (its number
+ * as SQLite counts them, from 1), so a word is read only where it stands in the SQL and a bound value is found by its
+ * place. A quoted name is kept as it is.
+ */
+export function marked(text: string): { text: string; strings: string[] } {
+  const strings: string[] = [];
+  const named = new Map<string, number>();
+  let most = 0;
+  let out = '';
+  for (let i = 0; i < text.length; ) {
+    const c = text[i]!;
+    if (c === "'") {
+      let j = i + 1;
+      let value = '';
+      for (; j < text.length; j++) {
+        if (text[j] !== "'") value += text[j];
+        else if (text[j + 1] === "'") (value += "'"), j++;
+        else break;
+      }
+      out += `'${strings.length}'`;
+      strings.push(value);
+      i = j + 1;
+    } else if (c === '-' && text[i + 1] === '-') {
+      const end = text.indexOf('\n', i);
+      out += ' ';
+      i = end < 0 ? text.length : end;
+    } else if (c === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2);
+      out += ' ';
+      i = end < 0 ? text.length : end + 2;
+    } else if (c === '"' || c === '`' || c === '[') {
+      const close = c === '[' ? ']' : c;
+      let j = i + 1;
+      for (; j < text.length; j++) {
+        if (text[j] !== close) continue;
+        /* A QUOTE DOUBLED inside a quoted name is the quote itself. */
+        if (close !== ']' && text[j + 1] === close) {
+          j++;
+          continue;
+        }
+        break;
+      }
+      out += text.slice(i, j + 1);
+      i = j + 1;
+    } else if (c === '?') {
+      const digits = /^\d*/u.exec(text.slice(i + 1))![0];
+      const n = digits === '' ? most + 1 : Number(digits);
+      most = Math.max(most, n);
+      out += `?${n}`;
+      i += 1 + digits.length;
+    } else if ((c === ':' || c === '@' || c === '$') && /[A-Za-z_]/u.test(text[i + 1] ?? '') && !/[A-Za-z0-9_]/u.test(text[i - 1] ?? ' ')) {
+      const word = /^[A-Za-z0-9_]+/u.exec(text.slice(i + 1))![0];
+      let n = named.get(word);
+      if (n === undefined) named.set(word, (n = ++most));
+      out += `?${n}`;
+      i += 1 + word.length;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return { text: out, strings };
+}
+
+/**
+ * Note in `trace` what one read names: its tables, and the lists it holds the rows to, or the rows of none.
+ *
+ * A LIST IS NAMED ONLY WHERE THE LIST COLUMN IS BOUND TO IT (`register = ?`, `register IN (...)`), never by a value
+ * elsewhere in the statement that happens to be a list's id: `actor = 'system'` on a record with a list called
+ * `system` read every list's rows and was held on that one list alone (review 3, P3). And the rows are held to their
+ * lists only where each read of them is narrowed so: a second read of the rows with no list of its own (a join to the
+ * project a row belongs to) reads the rows of any list.
+ */
 export function noticeSign(trace: SignTrace, text: string, params: readonly Param[], known: (word: string) => boolean): void {
-  for (const m of text.matchAll(TABLES)) trace.tables.add(m[1]!.toLowerCase());
-  let named = false;
-  for (const p of params)
-    if (typeof p === 'string' && known(p)) {
-      trace.lists.add(p);
-      named = true;
+  for (const m of text.matchAll(READS_AT)) {
+    const t = tableAt(text.slice(m.index + m[0].length));
+    if (t !== null) trace.tables.add(t.name.toLowerCase());
+  }
+  const sql = marked(text);
+  const valueOf = (token: string): string | undefined => {
+    const t = token.trim();
+    const p = /^\?(\d+)$/u.exec(t);
+    if (p !== null) {
+      const v = params[Number(p[1]) - 1];
+      return typeof v === 'string' ? v : undefined;
     }
-  for (const m of text.matchAll(QUOTED))
-    if (known(m[1]!)) {
-      trace.lists.add(m[1]!);
-      named = true;
-    }
-  if (!named && ROWS.test(text)) trace.rows = true;
+    const q = /^'(\d+)'$/u.exec(t);
+    return q === null ? undefined : sql.strings[Number(q[1])];
+  };
+  let narrowed = 0;
+  const bind = (at: number, values: (string | undefined)[]): void => {
+    if (values.length === 0 || !values.every((v) => v !== undefined && known(v))) return;
+    for (const v of values) trace.lists.add(v!);
+    if (NARROWS.test(sql.text.slice(Math.max(0, at - 80), at))) narrowed++;
+  };
+  for (const m of sql.text.matchAll(BOUND_ONE)) bind(m.index, [valueOf(m[1]!)]);
+  for (const m of sql.text.matchAll(BOUND_SOME)) bind(m.index, m[1]!.split(',').map(valueOf));
+  const reads = [...sql.text.matchAll(ROWS_READ)].length;
+  if (reads > narrowed) {
+    trace.rows = true;
+    trace.tables.add('entry');
+  }
 }
 
 /**
@@ -68,8 +191,8 @@ export function noticeSign(trace: SignTrace, text: string, params: readonly Para
  * index made or dropped (a list's unique field, as an add-on installs one), a table made where none was.
  */
 const NO_ROW = /^(?:BEGIN|COMMIT|END|SAVEPOINT|RELEASE|ROLLBACK|SELECT|VALUES|PRAGMA|EXPLAIN|ANALYZE|VACUUM|REINDEX|CREATE\s+(?:UNIQUE\s+)?INDEX|DROP\s+INDEX|CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS)\b/iu;
-/** A write and the table it writes. */
-const WRITES = /^(?:INSERT(?:\s+OR\s+[A-Z]+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+[A-Z]+)?|DELETE\s+FROM)\s+(?:main\s*\.\s*)?["`[]?([A-Za-z_][A-Za-z0-9_]*)/iu;
+/** A write, up to the table it writes (`tableAt`), which is read only there and never from the values it writes. */
+const WRITES = /^(?:INSERT(?:\s+OR\s+[A-Z]+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+[A-Z]+)?|DELETE\s+FROM)\b/iu;
 /** The statement a `WITH` leads to, past its tables, at the top level. */
 const AFTER_WITH = /^(?:SELECT|VALUES|INSERT|REPLACE|UPDATE|DELETE)\b/iu;
 
@@ -111,7 +234,11 @@ export function tablesWritten(text: string): string[] | null {
     }
     const m = WRITES.exec(statement);
     if (m === null) return null;
-    out.add(m[1]!.toLowerCase());
+    /* THE TABLE AFTER ITS SCHEMA, quoted or not: `UPDATE "main"."entry"` writes `entry`, never `main` (review 3, P4).
+       Another schema's table (`temp.x`, an attached file) is one this cannot be sure of. */
+    const t = tableAt(statement.slice(m[0].length));
+    if (t === null || (t.schema !== null && t.schema.toLowerCase() !== 'main')) return null;
+    out.add(t.name.toLowerCase());
   }
   return [...out];
 }
