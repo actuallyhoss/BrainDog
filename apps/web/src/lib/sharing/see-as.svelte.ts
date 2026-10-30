@@ -113,9 +113,10 @@ export function install(): void {
   installed = true;
   globalThis.fetch = seeing(globalThis.fetch.bind(globalThis), seeingAs, () => globalThis.location?.origin);
   if (current !== null) {
-    const early = globalThis as { __bdBoot?: unknown; __bdToday?: unknown };
+    const early = globalThis as { __bdBoot?: unknown; __bdToday?: unknown; __bdPage?: unknown };
     early.__bdBoot = undefined;
     early.__bdToday = undefined;
+    early.__bdPage = undefined;
   }
   globalThis.addEventListener?.(SEE_AS_EVENT, (e) => {
     const who = askedOf((e as CustomEvent<unknown>).detail);
