@@ -61,7 +61,7 @@ test('THE PACK CARRIES weather.js, CALLS ONLY OPEN-METEO, AND OFFERS TWO WIDGETS
   ]);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(PACK.version, '1.2.0');
+  assert.equal(PACK.version, '1.2.1');
 });
 
 test('A PLACE IS LOOKED UP, AND EACH DAY IS ONE ROW, its sky in words', async () => {

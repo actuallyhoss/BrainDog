@@ -1,10 +1,10 @@
 {
   "pack": "weather",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "sun",
   "title": "Weather",
   "summary": "The weather where you are, today and the next six days, from Open-Meteo: free, with no key and no account. Set your town on this page and it is kept in step every three hours.",
-  "changes": "Temperatures read 21° and the chance of rain 70%, and the page says where to set your town.",
+  "changes": "The week's weather in Add a widget reads like today's, in whole degrees, where it showed dates and bare numbers. Nothing it does has changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -150,29 +150,22 @@
       "needs": [
         "register.weather"
       ],
-      "example": [
-        {
-          "what": "Partly cloudy",
-          "day": "2026-10-29",
-          "high": 27.9,
-          "low": 17.7,
-          "rain": 0
-        },
-        {
-          "what": "Mostly clear",
-          "day": "2026-10-30",
-          "high": 26.0,
-          "low": 15.3,
-          "rain": 0
-        },
-        {
-          "what": "Cloudy",
-          "day": "2026-10-31",
-          "high": 27.1,
-          "low": 15.7,
-          "rain": 10
-        }
-      ],
+      "example": {
+        "rows": [
+          {
+            "title": "Partly cloudy",
+            "meta": "Today · 22°, low 14°"
+          },
+          {
+            "title": "Mostly clear",
+            "meta": "Tomorrow · 23°, low 15°"
+          },
+          {
+            "title": "Light rain",
+            "meta": "The day after · 19°, low 13°, rain 60%"
+          }
+        ]
+      },
       "icon": "cloud"
     }
   ],

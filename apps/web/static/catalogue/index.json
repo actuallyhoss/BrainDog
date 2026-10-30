@@ -7325,8 +7325,40 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "c8437aec06a1bbb8438f03b348d50668f140b7037afff51c4f8880c212c29181",
+          "bytes": 14446,
+          "published_at": "2026-10-30T19:04:33.352Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Weather"
+            ],
+            "pages": [
+              "Weather"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "geocoding-api.open-meteo.com",
+                "line": "CALLS OUT geocoding-api.open-meteo.com and api.open-meteo.com · every 3h · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Weather",
+              "The week's weather"
+            ]
+          },
+          "notes": "The week's weather in Add a widget reads like today's, in whole degrees, where it showed dates and bare numbers. Nothing it does has changed.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "e45221442595804e496917e8bc536e85db7ba67f0416508610cd237581fbb365",
