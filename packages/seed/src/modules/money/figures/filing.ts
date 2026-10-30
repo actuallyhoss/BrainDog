@@ -122,6 +122,37 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /**
+   * HOW MANY LINES ONE RULE FILED, ALL TIME, for the rule's own card on Filing rules (audit of 31 October, 11): the page
+   * listed no rule and said what each filed only as bars, from two rules up. Read once a card, the rule filled in by its
+   * spoken id (`filing-rule-filed:{{spoken}}`), so two rules with the same text are two counts.
+   */
+  'filing-rule-filed': {
+    metric: 'filing-rule-filed',
+    pack: 'money-core',
+    name: 'Filed by this rule',
+    source: 'register.transactions',
+    where: 'filed_by is {{it}}',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /** HOW MANY FILING RULES THERE ARE, ON OR OFF, so Filing rules says "none yet" with a way to add one, and not a count of nought. */
+  'filing-rules': {
+    metric: 'filing-rules',
+    pack: 'money-core',
+    name: 'Filing rules',
+    source: 'register.filing_rules',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /** HOW MANY RULES HAVE EVER FILED ANYTHING, so the parts of `rule-filed` are drawn as bars only from two of them. */
   'rules-filing': {
     metric: 'rules-filing',

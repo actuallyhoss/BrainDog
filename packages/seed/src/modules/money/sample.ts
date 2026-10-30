@@ -142,6 +142,22 @@ export const CATEGORIES: Fields[] = [
   { name: 'Travel', icon: 'train-front', colour: 'teal', direction: 'out', budget: gbp(25_000), match: 'NORTHERN RAIL', state: 'live', note: '' },
 ];
 
+/**
+ * THE STUDIO'S FILING RULES (audit of 31 October, 11): the five shops a category names, each as the rule a person would
+ * have written for it, so Filing rules lists rules and what each filed, and the lines they file say which rule did
+ * (`filed_by`). Written after the categories they point at (`category`, by its place in `CATEGORIES`) and before the
+ * Ledger, so `txn-categorise` finds them when the seed's rules are read over its lines. They file what the categories'
+ * own "Matches" already file, so no line moves to another category; Ledger Post, Paperhaus and the coffee shop stay for a
+ * person, as before.
+ */
+export const FILING_RULES: Fields[] = [
+  { match: 'KILN STOREFRONT PAYOUT', match_by: 'starts', reads: 'payee', direction: 'in', category: 2, rank: 1, state: 'on', note: '' },
+  { match: 'FENWICK CLOUD', match_by: 'starts', reads: 'payee', direction: 'out', category: 4, rank: 2, state: 'on', note: '' },
+  { match: 'LOWRY STREET STUDIOS', match_by: 'starts', reads: 'payee', direction: 'out', category: 5, rank: 3, state: 'on', note: '' },
+  { match: 'TALLYARD', match_by: 'starts', reads: 'payee', direction: 'out', category: 7, rank: 4, state: 'on', note: '' },
+  { match: 'NORTHERN RAIL', match_by: 'starts', reads: 'payee', direction: 'out', category: 9, rank: 5, state: 'on', note: '' },
+];
+
 /* ── the ledger ──────────────────────────────────────────────────────────── */
 
 /**
@@ -196,15 +212,18 @@ function generatedTransactions(count: number): Fields[] {
   const r = rng(20260904);
   /* `party` IS THE ORGANISATION THE RECORD KNOWS IT AS, where it knows one (`ORGANISATIONS` in `people.ts`), and the rest
      are a payee as the bank wrote it and nothing more, which is what a bank door leaves for the record to resolve. */
-  const merchants: { what: string; direction: string; account: number; low: number; high: number; party?: number }[] = [
-    { what: 'FENWICK CLOUD', direction: 'out', account: 3, low: 3_800, high: 5_200, party: 5 },
-    { what: 'BRIDGE STREET COFFEE', direction: 'out', account: 3, low: 320, high: 1_140, party: 6 },
+  /* AND THE PAYEE A BANK'S FEED NAMED, in a person's words (audit of 31 October, 10): Payees listed nobody, because no
+     line of the sample said who it paid, while the Ledger drew each by its bank line. The feed names the shops it knows;
+     Paperhaus is one it does not, so the sample keeps lines for a person to name. The hand-typed lines above name none. */
+  const merchants: { what: string; direction: string; account: number; low: number; high: number; party?: number; payee?: string }[] = [
+    { what: 'FENWICK CLOUD', direction: 'out', account: 3, low: 3_800, high: 5_200, party: 5, payee: 'Fenwick Cloud' },
+    { what: 'BRIDGE STREET COFFEE', direction: 'out', account: 3, low: 320, high: 1_140, party: 6, payee: 'Bridge Street Coffee' },
     { what: 'PAPERHAUS SUPPLIES', direction: 'out', account: 3, low: 2_400, high: 18_600 },
-    { what: 'NORTHERN RAIL', direction: 'out', account: 3, low: 1_900, high: 12_400 },
-    { what: 'LEDGER POST', direction: 'out', account: 3, low: 3_900, high: 3_900 },
-    { what: 'LOWRY STREET STUDIOS', direction: 'out', account: 1, low: 165_000, high: 165_000 },
-    { what: 'TALLYARD', direction: 'out', account: 1, low: 4_800, high: 4_800 },
-    { what: 'KILN STOREFRONT PAYOUT', direction: 'in', account: 1, low: 74_000, high: 121_000 },
+    { what: 'NORTHERN RAIL', direction: 'out', account: 3, low: 1_900, high: 12_400, payee: 'Northern Rail' },
+    { what: 'LEDGER POST', direction: 'out', account: 3, low: 3_900, high: 3_900, payee: 'Ledger Post' },
+    { what: 'LOWRY STREET STUDIOS', direction: 'out', account: 1, low: 165_000, high: 165_000, payee: 'Lowry Street Studios' },
+    { what: 'TALLYARD', direction: 'out', account: 1, low: 4_800, high: 4_800, payee: 'Tallyard' },
+    { what: 'KILN STOREFRONT PAYOUT', direction: 'in', account: 1, low: 74_000, high: 121_000, payee: 'Kiln storefront' },
   ];
   const out: Fields[] = [];
   for (let i = 0; i < count; i++) {
@@ -217,6 +236,7 @@ function generatedTransactions(count: number): Fields[] {
       account: m.account,
       ...(m.party === undefined ? {} : { party: m.party }),
       counterparty_text: m.what,
+      ...(m.payee === undefined ? {} : { payee: m.payee }),
       state: 'cleared',
       note: '',
     });

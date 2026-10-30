@@ -1,9 +1,16 @@
 /** Filing rules' page: each rule, what it files under, how many entries it filed, and what it filed last. */
 
 import type { SeedPage } from '../../base.ts';
+import { LEDGER_LINE_COLUMNS } from './ledger.ts';
 
 /** Drawn only once a rule has filed something, ever. */
 const HAS_FILED = { metric: 'rule-filed', gte: 1 };
+
+/** Drawn only once there is a rule, on or off. */
+const HAS_RULES = { metric: 'filing-rules', gte: 1 };
+
+/** The box that writes a new rule: the list's own form, opened by the address (`?new=1`). */
+const ADD_RULE = '/r/filing_rules?new=1';
 
 /**
  * ONE PAGE, UNDER MONEY, SINCE money-core 3.17.0: what the record has learnt to file by itself, rule by
@@ -14,12 +21,16 @@ const HAS_FILED = { metric: 'rule-filed', gte: 1 };
  * both and adds neither. The counts are read off the Ledger's `filed_by`, which the step that files the category writes,
  * so the page cannot disagree with the Ledger.
  *
- * THREE LEAD SENTENCES AND ONE DRAWN: nothing filed yet, which says how a rule comes to be; something filed in the last
- * thirty days, which says how much; and rules that filed before and not lately, which says so and the count in all.
+ * FOUR LEAD SENTENCES AND ONE DRAWN: no rule yet, which says what one does and how to add one; rules that have filed
+ * nothing; something filed in the last thirty days, which says how much; and rules that filed before and not lately,
+ * which says so and the count in all.
  *
- * THE BARS WAIT FOR TWO RULES, as Money's bars by book wait for two books: one rule's count is the lead's own number,
- * and a bar of one part says nothing a sentence does not. THE DAY OF THE LAST is said by the entries rules filed lately,
- * each beside the rule that filed it, the newest first: a part of a figure carries one number, its count, and no day.
+ * EVERY RULE IS A CARD WITH WHAT IT FILED, SINCE THE AUDIT OF 31 OCTOBER (11): the page said "No rule has filed anything
+ * yet." over a record with no rules, listed none, and had no way to add one, while the Ledger said "Filed for you 2" (lines
+ * a bank's statement brought in, which the Ledger now says as added). Now a record with no rule is told so with the way to
+ * add one, and each rule that is on is a card: its text, the category it files under, how it matches and how many lines it
+ * filed (`filing-rule-filed`, read once a card). One switched off is listed apart. THE DAY OF THE LAST is said by the
+ * lines rules filed lately, each beside the rule that filed it, the newest first.
  */
 export const MONEY_RULES_PAGE: SeedPage = {
   page: 'money-rules',
@@ -31,12 +42,20 @@ export const MONEY_RULES_PAGE: SeedPage = {
   pack: 'money-core',
   blocks: [
     {
-      /* NOTHING FILED YET: what a rule is for, and where one comes from, in place of a count of nought. */
+      /* NO RULE YET: what one does, and the way to add one, in place of a count of nought. */
       kind: 'note',
       lead: true,
       span: 12,
-      when: { metric: 'rule-filed', lt: 1 },
-      body: 'No rule has filed anything yet.',
+      when: { metric: 'filing-rules', lt: 1 },
+      body: `No filing rules yet. A rule puts a line under a category as it comes in. [Add a rule](${ADD_RULE})`,
+    },
+    {
+      /* RULES, AND NONE HAS FILED A LINE: said, never "0 rules filed 0". */
+      kind: 'note',
+      lead: true,
+      span: 12,
+      when: { all: [HAS_RULES, { metric: 'rule-filed', lt: 1 }] },
+      body: 'No rule has filed a line yet.',
     },
     {
       /* WHAT THE RULES DID THIS MONTH, as one line: how many rules, and how many entries between them. */
@@ -61,54 +80,63 @@ export const MONEY_RULES_PAGE: SeedPage = {
       kind: 'note',
       span: 12,
       when: { metric: 'txn-uncategorised', gt: 0 },
-      body: '{{txn-uncategorised}} entries with no category. [File them](/automations/txn-categorise?again=1)',
+      body: '{{txn-uncategorised}} line(s) with no category. [File them](/automations/txn-categorise?again=1)',
     },
     {
-      /* EVERY RULE, ON OR OFF, in the person's own order and then by its text. A rule opens from its line, where it
-         is switched off; one that is off keeps its count below. */
-      kind: 'table',
+      /* EVERY RULE THAT IS ON, A CARD EACH, in the person's own order and then by its text: what it matches, the
+         category it files under, how it matches, and how many lines it filed. A rule opens from its card, where it is
+         changed or switched off. */
+      kind: 'cards',
       heading: 'Rules',
       icon: 'tag',
       span: 12,
       source: 'register.filing_rules',
+      where: 'state is on',
       columns: [
-        { field: 'match', label: 'Matches', width: 'minmax(14ch,1fr)' },
-        { field: 'match_by', label: 'How it matches', width: '16ch' },
-        { field: 'category', label: 'Category', width: 'minmax(10ch,18ch)' },
-        { field: 'state', label: 'Status', width: '8ch' },
+        { field: 'match', as: 'title' },
+        { field: 'category', label: 'Files under', as: 'fact' },
+        { field: 'match_by', label: 'Matches', as: 'fact' },
+        { metric: 'filing-rule-filed:{{spoken}}', label: 'Lines filed', as: 'fact' },
       ],
       order: [
         { field: 'rank', dir: 'asc' },
         { field: 'match', dir: 'asc' },
       ],
       limit: 120,
-      empty: 'No filing rules yet.',
     },
     {
-      /* HOW MANY ENTRIES EACH RULE FILED, ALL TIME, the most first, each by the rule's own text. */
-      kind: 'bar',
-      heading: 'Entries each rule filed',
-      icon: 'chart-bar',
+      /* AND THE WAY TO ADD ONE, under the rules, once there is one: with none, the lead says it. */
+      kind: 'note',
       span: 12,
-      source: 'metric.rule-filed',
-      when: { metric: 'rules-filing', gte: 2 },
-      empty: 'No rule has filed anything yet.',
+      when: HAS_RULES,
+      body: `[Add a rule](${ADD_RULE})`,
     },
     {
-      /* WHAT THE RULES FILED LAST, the newest first, so the day each rule last filed is on the line beside it. */
+      /* RULES SWITCHED OFF, APART: kept with what they filed, and filing nothing new. */
       kind: 'table',
+      heading: 'Switched off',
+      icon: 'tag',
+      span: 12,
+      source: 'register.filing_rules',
+      where: 'state is off',
+      columns: [
+        { field: 'match', label: 'Matches', width: 'minmax(14ch,1fr)' },
+        { field: 'category', label: 'Files under', width: 'minmax(10ch,18ch)' },
+      ],
+      order: [{ field: 'match', dir: 'asc' }],
+      limit: 120,
+    },
+    {
+      /* WHAT THE RULES FILED LAST, as the Ledger draws its lines, the newest first, so the day a rule last filed is the
+         day over its line. As a table it said each rule's text twice, as the rule and as the line's description. */
+      kind: 'timeline',
       heading: 'Filed lately',
       icon: 'history',
       span: 12,
       source: 'register.transactions',
-      where: 'filed_by is set',
-      columns: [
-        { field: 'filed_by', label: 'Rule', width: 'minmax(12ch,18ch)' },
-        { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-        { field: 'category', label: 'Category', width: 'minmax(10ch,18ch)' },
-        { field: 'on', label: 'Date', width: '13ch', align: 'end' },
-      ],
-      order: [{ field: 'created_at', dir: 'desc' }],
+      where: 'filed_by is set, state is not void',
+      columns: LEDGER_LINE_COLUMNS,
+      order: [{ field: 'on', dir: 'desc' }],
       limit: 6,
       when: HAS_FILED,
     },
