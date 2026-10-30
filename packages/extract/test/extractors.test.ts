@@ -105,6 +105,24 @@ test('A ZERO-WIDTH CHARACTER CANNOT HIDE A WORD FROM AN ANCHOR', () => {
   assert.deepEqual(one({ enum: { map: { debited: 'debit' } } }, sneaky), { outcome: 'exact', value: 'debit' });
 });
 
+test('A DIRECTION MARK GOES WHERE IT TOUCHES AN AMOUNT AND STAYS INSIDE A WORD', () => {
+  const RLM = '‏';
+  const LRM = '‎';
+  const ALM = '؜';
+  /* Between a number and its code (he-IL), between a minus and its digits (ar-EG), between a sign and a code (fa-IR):
+     all three go, so the anchor and the money reader see what a person saw. */
+  assert.equal(normalise(`Paid 12.50 ${RLM}EGP`), 'Paid 12.50 EGP');
+  assert.equal(normalise(`${ALM}-${RLM}١٢ EGP`), '-١٢ EGP');
+  assert.equal(normalise(`${LRM}−${LRM}EGP 5`), '−EGP 5');
+  assert.equal(normalise(`total ${RLM}€5`), 'total €5');
+  /* Inside a word they set the order a right-to-left name is shown in, and a text field is shown to a person. */
+  assert.equal(normalise(`תל${RLM}-אביב`), `תל${RLM}-אביב`);
+  assert.equal(normalise(`at שלום${RLM} cafe`), `at שלום${RLM} cafe`);
+  /* And the anchor after a code finds its number. */
+  assert.deepEqual(one({ decimal: { after: 'EGP ' } }, normalise(`EGP ${RLM}3,020.15`)), { outcome: 'exact', value: 3020.15 });
+  assert.deepEqual(one({ money: {} }, normalise(`-1,234.50 ${RLM}EGP`)), { outcome: 'exact', value: { amount: -123450, currency: 'EGP' } });
+});
+
 test('matching folds case and slicing does not', () => {
   /* The anchor is found whatever case the provider used, and the value comes back as it was written,
      because a merchant name is a merchant name and not a lowercase one. */

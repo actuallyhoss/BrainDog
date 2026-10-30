@@ -23,7 +23,62 @@ export type CurrencyTable = Record<string, { exponent: number; symbol?: string }
 
 const MAX = Number.MAX_SAFE_INTEGER; // 2^53 − 1, the ceiling on minor units
 
-const isDigit = (ch: string | undefined): boolean => ch !== undefined && ch >= '0' && ch <= '9';
+/**
+ * WHICH OF THE THREE DIGIT SYSTEMS A CHARACTER IS FROM: 0 Latin, 1 Arabic-Indic (`٠`–`٩`, U+0660), 2 the extended
+ * Arabic-Indic of Persian and Urdu (`۰`–`۹`, U+06F0), or -1 for none.
+ *
+ * AN EGYPTIAN BANK WRITING IN ARABIC WRITES `١٬٢٥٠٫٠٠`, and with `0`–`9` as the only digits that SMS held no number
+ * at all: no amount, every time, on the record of a man who banks in Cairo. `43 §10` still rules out Unicode
+ * normalisation, and this is not that: each of these digits is one UTF-16 unit, as its Latin twin is, so reading
+ * one as the other moves no index. The digits are mapped where a token is READ (`split`), and the text is never
+ * rewritten.
+ *
+ * A NUMBER WRITTEN IN TWO SYSTEMS IS REFUSED WHOLE (`split`'s `mixed`). `١2٣` is a typo, a forgery or two numbers
+ * run together, and no reading of it is one anybody sent.
+ */
+function systemOf(ch: string | undefined): number {
+  if (ch === undefined) return -1;
+  if (ch >= '0' && ch <= '9') return 0;
+  const c = ch.charCodeAt(0);
+  if (c >= 0x0660 && c <= 0x0669) return 1;
+  if (c >= 0x06f0 && c <= 0x06f9) return 2;
+  return -1;
+}
+const isDigit = (ch: string | undefined): boolean => systemOf(ch) !== -1;
+/** A digit of any of the three systems as its Latin twin. */
+const latin = (ch: string): string => {
+  const system = systemOf(ch);
+  return system === 0 ? ch : String.fromCharCode(0x30 + ch.charCodeAt(0) - (system === 1 ? 0x0660 : 0x06f0));
+};
+/** Is `ch` a digit, in any of the three systems? The bidi-mark rule in `extractors.ts` asks it. */
+export const isAnyDigit = isDigit;
+
+/**
+ * THE ARABIC DECIMAL SEPARATOR (`٫`, U+066B) AND THOUSANDS SEPARATOR (`٬`, U+066C), which say which they are.
+ *
+ * `1.250` is two amounts; `١٫٢٥٠` is one, because U+066B is never grouping and U+066C is never a point. So a token
+ * carrying either is read by what the marks say (`readArabic`) and not by the thousands rule, and a token that
+ * carries one of them beside a `.` or `,` is refused: `١٫٢٣٤,٥٠` has two decimal points by two conventions, and
+ * the only way to read it is to pick one.
+ */
+const ARABIC_POINT = '٫';
+const ARABIC_GROUP = '٬';
+const isArabicSep = (ch: string): boolean => ch === ARABIC_POINT || ch === ARABIC_GROUP;
+
+/**
+ * THE APOSTROPHE AS SWITZERLAND PRINTS IT: `'` on a keyboard, `’` (U+2019) out of `Intl` and every Swiss bank's
+ * PDF, and `‘` (U+2018) from a word processor that curled it the wrong way.
+ *
+ * `isSep` held the keyboard one alone, so `CHF 1’234.50` tokenised as `1` and `234.50` and the first token took the
+ * code: CHF 1.00, in the ledger, a thousand times too small. A WRONG NUMBER, which is the class this file exists
+ * to refuse.
+ *
+ * AND AN APOSTROPHE ONLY EVER GROUPS. No locale writes it as a decimal point, so `KWD 1’250` is one thousand two
+ * hundred and fifty dinars and not the one and a quarter the thousands rule gives a lone `,` at exponent 3, and
+ * `5’50` is refused rather than read as five and a half.
+ */
+const isApostrophe = (ch: string | undefined): boolean => ch === "'" || ch === '’' || ch === '‘';
+
 const isLetter = (ch: string | undefined): boolean =>
   ch !== undefined && ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'));
 const isUpper = (ch: string | undefined): boolean => ch !== undefined && ch >= 'A' && ch <= 'Z';
@@ -61,7 +116,27 @@ export const SPACE_LIKE: ReadonlySet<string> = new Set([
 const isSpace = (ch: string | undefined): boolean => ch === ' ' || (ch !== undefined && SPACE_LIKE.has(ch));
 
 const isSep = (ch: string | undefined): boolean =>
-  ch === ',' || ch === '.' || ch === "'" || isSpace(ch);
+  ch === ',' || ch === '.' || isApostrophe(ch) || ch === ARABIC_POINT || ch === ARABIC_GROUP || isSpace(ch);
+
+/**
+ * THE THREE DIRECTION MARKS, U+200E, U+200F AND U+061C, which right-to-left text puts around a number.
+ *
+ * `Intl.NumberFormat('ar-EG')` writes a negative as `U+061C - U+200F ١٬٢٣٤٫٥٠ EGP` and `he-IL` writes
+ * `-1,234.50 U+00A0 U+200F EGP`: a mark between the sign and the digits, and between the space and the code. The
+ * walk below stopped at the mark, so the first lost its minus (a debit read as a credit) and the second its code.
+ *
+ * DROPPED FROM `scanMoney`'S OWN COPY ONLY. They are invisible, so the copy is the text a person saw; nothing is
+ * sliced out of it, so no index into the caller's text moves; and `normalise` keeps them inside words, where they
+ * set the order the words are shown in (`extractors.ts`).
+ */
+export const BIDI_MARKS: ReadonlySet<string> = new Set(['‎', '‏', '؜']);
+
+const withoutMarks = (text: string): string => {
+  if (!text.includes('‎') && !text.includes('‏') && !text.includes('؜')) return text;
+  let out = '';
+  for (const ch of text) if (!BIDI_MARKS.has(ch)) out += ch;
+  return out;
+};
 
 /* ── the tokenizer, shared by money, int and decimal ─────────────────────── */
 
@@ -189,21 +264,50 @@ export function numberTokens(text: string, glued?: (at: number) => boolean): Num
   return out;
 }
 
-/** A token split into its digit runs and the separators between them. */
-function split(token: string): { groups: string[]; seps: string[] } {
+/**
+ * A token split into its digit runs, in Latin digits, and the separators between them.
+ *
+ * `mixed` WHEN THE DIGITS COME FROM MORE THAN ONE SYSTEM, which every reader refuses (see `systemOf`).
+ */
+function split(token: string): { groups: string[]; seps: string[]; mixed: boolean } {
   const groups: string[] = [];
   const seps: string[] = [];
   let run = '';
+  let system = -1;
+  let mixed = false;
   for (const ch of token) {
-    if (isDigit(ch)) run += ch;
-    else {
+    const s = systemOf(ch);
+    if (s !== -1) {
+      if (system === -1) system = s;
+      else if (s !== system) mixed = true;
+      run += latin(ch);
+    } else {
       groups.push(run);
       seps.push(ch);
       run = '';
     }
   }
   groups.push(run);
-  return { groups, seps };
+  return { groups, seps, mixed };
+}
+
+/**
+ * LAKH GROUPING, which every Indian bank prints and Urdu prints with `٬`: `12,34,567` is twelve lakh thirty-four
+ * thousand five hundred and sixty-seven. The last group is three digits, every group before it two, and the first
+ * one or two.
+ *
+ * ONLY WHEN THE WHOLE NUMBER IS GROUPED THAT WAY, and at least three groups long. Below a lakh the Indian and the
+ * Western forms are the same string (`12,345`), so nothing changes there; above it, a figure is read as lakhs only
+ * when every group fits, so `1,23,456,789` (two conventions in one figure) is still no candidate, and so is
+ * `1,234,56`. ONLY WITH `,` OR `٬`, the two marks India and Pakistan group with: a lakh-shaped figure grouped by `.`
+ * is printed by nobody, and reading one would be a guess.
+ */
+function lakh(groups: readonly string[], sep: string): boolean {
+  if (sep !== ',' && sep !== ARABIC_GROUP) return false;
+  if (groups.length < 3) return false;
+  if (groups[0]!.length < 1 || groups[0]!.length > 2) return false;
+  for (let i = 1; i < groups.length - 1; i++) if (groups[i]!.length !== 2) return false;
+  return groups[groups.length - 1]!.length === 3;
 }
 
 /** Are the groups after the first exactly three digits long, and the first one to three? */
@@ -212,6 +316,10 @@ function grouped(groups: readonly string[], upto: number): boolean {
   for (let i = 1; i <= upto; i++) if (groups[i]!.length !== 3) return false;
   return true;
 }
+
+/** Is a whole part, split at `sep`, grouped by thousands or, with `,` or `٬`, by lakhs? */
+const wholeGrouped = (whole: readonly string[], sep: string): boolean =>
+  grouped(whole, whole.length - 1) || lakh(whole, sep);
 
 const safe = (digits: string): number | null => {
   const n = Number(digits);
@@ -228,8 +336,9 @@ const safe = (digits: string): number | null => {
  * provider that writes dinars with grouping and no decimals is a provider that needs `map:` rather than text.
  */
 export function readAmount(token: string, e: number): number | null {
-  const { groups, seps } = split(token);
-  if (groups.some((g) => g.length === 0)) return null;
+  const { groups, seps, mixed } = split(token);
+  if (mixed || groups.some((g) => g.length === 0)) return null;
+  if (seps.some(isArabicSep)) return readArabic(groups, seps, e);
 
   let whole: string;
   let fraction: string;
@@ -239,35 +348,52 @@ export function readAmount(token: string, e: number): number | null {
     fraction = '';
   } else if (seps.length === 1) {
     const last = groups[1]!;
-    if (last.length === 3 && e !== 3) {
+    /* AN APOSTROPHE GROUPS AT EVERY EXPONENT, three, too: it is never a point (`isApostrophe`). */
+    if (last.length === 3 && (e !== 3 || isApostrophe(seps[0]))) {
       if (!grouped(groups, 1)) return null;
       whole = groups[0]! + last;
       fraction = '';
     } else {
-      if (last.length > e) return null;
+      if (last.length > e || isApostrophe(seps[0])) return null;
       whole = groups[0]!;
       fraction = last;
     }
   } else {
-    /* Two or more: everything but the last separator is ONE grouping character over groups of exactly three.
-       A last separator that differs is the decimal point; one that is the same has to leave three digits
-       behind it, or the grouping is not grouping. */
+    /* Two or more: everything but the last separator is ONE grouping character, over groups of three or, with
+       `,`, over lakhs. A last separator that differs is the decimal point; one that is the same has to leave
+       the whole number grouped, or the grouping is not grouping. */
     const groupChar = seps[0]!;
     for (let i = 0; i < seps.length - 1; i++) if (seps[i] !== groupChar) return null;
-    if (!grouped(groups, seps.length - 1)) return null;
-    const last = groups[groups.length - 1]!;
-    if (seps[seps.length - 1] === groupChar) {
-      if (last.length !== 3) return null;
-      whole = groups.join('');
-      fraction = '';
-    } else {
-      if (last.length > e) return null;
-      whole = groups.slice(0, -1).join('');
-      fraction = last;
-    }
+    const lastSep = seps[seps.length - 1]!;
+    const pointed = lastSep !== groupChar;
+    if (pointed && isApostrophe(lastSep)) return null;
+    const wholeGroups = pointed ? groups.slice(0, -1) : groups;
+    if (!wholeGrouped(wholeGroups, groupChar)) return null;
+    whole = wholeGroups.join('');
+    fraction = pointed ? groups[groups.length - 1]! : '';
+    if (fraction.length > e) return null;
   }
 
   return safe(whole + fraction.padEnd(e, '0'));
+}
+
+/**
+ * A token whose separators are the Arabic ones, read by what they say rather than by the thousands rule.
+ *
+ * `٬` GROUPS AND `٫` IS THE POINT, always, so `١٫٢٥٠` at exponent 2 is refused (three decimals) where `1.250` would
+ * be one thousand two hundred and fifty, and `١٬٢٥٠` in dinars is 1,250 where `1,250` would be one and a quarter.
+ * The point is the last separator and comes once; every other is `٬`; anything else among them is refused.
+ */
+function readArabic(groups: readonly string[], seps: readonly string[], e: number): number | null {
+  const point = seps.indexOf(ARABIC_POINT);
+  if (point !== -1 && point !== seps.length - 1) return null;
+  const groupSeps = point === -1 ? seps : seps.slice(0, -1);
+  if (groupSeps.some((s) => s !== ARABIC_GROUP)) return null;
+  const whole = point === -1 ? groups : groups.slice(0, -1);
+  if (whole.length > 1 && !wholeGrouped(whole, ARABIC_GROUP)) return null;
+  const fraction = point === -1 ? '' : groups[groups.length - 1]!;
+  if (fraction.length > e) return null;
+  return safe(whole.join('') + fraction.padEnd(e, '0'));
 }
 
 /* ── currency ────────────────────────────────────────────────────────────── */
@@ -399,7 +525,9 @@ function dollarAfter(text: string, pos: number): { at: number } | null {
  * either side of one number and disagree, there is no candidate at all, because nothing in the string decides
  * and a coin flip here is a wrong balance.
  */
-export function scanMoney(text: string, table: CurrencyTable, declared?: string): Money[] {
+export function scanMoney(given: string, table: CurrencyTable, declared?: string): Money[] {
+  /* The direction marks out, so a sign and a code are found past them (`BIDI_MARKS`). Only amounts leave here. */
+  const text = withoutMarks(given);
   const symbols = unambiguousSymbols(table);
   const out: Money[] = [];
   /* Where the previous amount found its trailing currency, so this one cannot claim the same three
@@ -578,12 +706,16 @@ export function scanInts(text: string): number[] {
 export function scanDecimals(text: string, sep: '.' | ',' = '.'): number[] {
   const out: number[] = [];
   for (const token of numberTokens(text)) {
-    const { groups, seps } = split(token.text);
-    if (groups.some((g) => g.length === 0)) continue;
-    const points = seps.filter((s) => s === sep).length;
+    const { groups, seps, mixed } = split(token.text);
+    if (mixed || groups.some((g) => g.length === 0)) continue;
+    /* THE ARABIC MARKS SAY WHICH IS THE POINT, whatever `sep` says, and never beside a `.` or a `,`. */
+    const arabic = seps.some(isArabicSep);
+    if (arabic && !seps.every(isArabicSep)) continue;
+    const point = arabic ? ARABIC_POINT : sep;
+    const points = seps.filter((s) => s === point).length;
     if (points > 1) continue;
 
-    const at = seps.indexOf(sep);
+    const at = seps.indexOf(point);
     const whole = at === -1 ? groups : groups.slice(0, at + 1);
     const fraction = at === -1 ? '' : groups.slice(at + 1).join('');
     if (at !== -1 && seps.length - 1 > at) continue; // a separator after the point is not grouping
@@ -591,7 +723,7 @@ export function scanDecimals(text: string, sep: '.' | ',' = '.'): number[] {
     if (groupSeps.some((s) => s !== groupSeps[0])) continue;
     /* ONLY WHEN THERE IS GROUPING. `3020.15` has a four-digit whole part and is a perfectly ordinary
        decimal; the one-to-three rule is about what a grouping separator implies, not about size. */
-    if (groupSeps.length > 0 && !grouped(whole, whole.length - 1)) continue;
+    if (groupSeps.length > 0 && !wholeGrouped(whole, groupSeps[0]!)) continue;
 
     const digits = whole.join('');
     let lead = 0;

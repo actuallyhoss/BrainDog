@@ -38,7 +38,8 @@ const rows: Row[] = [
   ['JPY 12.5', undefined],
   ['EGP 12.345', money(1234500, 'EGP')],
   ['EGP 1,250.000', undefined],
-  ['EGP 1,25,000', undefined],
+  ['EGP 1,25,000', money(12500000, 'EGP')],
+  ['EGP 1,23,456,789', undefined],
   ['EGP 1250,000', undefined],
   ['EGP 1,250,000', money(125000000, 'EGP')],
   ['EGP 1.250.000', money(125000000, 'EGP')],
@@ -59,6 +60,13 @@ const rows: Row[] = [
   ['on 29/08/26 EGP 5.00', money(500, 'EGP')],
   ['EGP 90,071,992,547,409.91', money(9007199254740991, 'EGP')],
   ['EGP 90,071,992,547,409.92', undefined],
+  ['EGP 1’250.00', money(125000, 'EGP')],
+  ['KWD 1’250', money(1250000, 'KWD')],
+  ['EGP 5’50', undefined],
+  ['EGP ١٬٢٥٠٫٠٠', money(125000, 'EGP')],
+  ['EGP ١٫٢٥٠', undefined],
+  ['EGP ١2٣', undefined],
+  ['12.50 \u200fEGP', money(1250, 'EGP')],
 ];
 
 for (const [input, want, declared] of rows)
