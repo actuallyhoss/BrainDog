@@ -16,7 +16,7 @@
  * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
  */
 
-import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
+import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, handleName, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 /* THE LISTS A MODULE BRINGS, BY NAME AND WITHOUT ITS DOCUMENT (`@braindog/seed/packs/lists`): this file is on the first open. */
@@ -390,6 +390,8 @@ export function display(
     const named = rowNameSaid(register, value);
     if (named !== value) return named;
   }
+  /* AND THE SKILL A LEARNING BEARS ON IS SAID BY ITS NAME: How the brain changed read "Bears on: axis-qa". */
+  if (register === 'learnings' && field === 'topic' && typeof value === 'string' && value.trim() !== '') return handleName(value);
   const f = decl(register, field);
   if (!f) return typed === undefined ? undeclared(value) : answered(typed, value, now, names);
   switch (f.type) {

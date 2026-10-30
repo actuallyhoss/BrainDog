@@ -15,6 +15,8 @@
  * event, and only pairs inside the window are drawn.
  */
 
+import { handleName } from 'braindog-render';
+
 export const FADE_DAYS = 90;
 export const SOON_DAYS = 14;
 /** How far back the timeline reads. */
@@ -148,7 +150,8 @@ function learned(row: LearningRow, now: number, since: number): EvolutionEvent[]
       seq: row.seq,
       lesson,
       because: text(row.fields.because),
-      topic: text(row.fields.topic),
+      /* THE SKILL IT BEARS ON BY ITS NAME, never the handle it is filed under ("axis-qa"). */
+      topic: text(row.fields.topic) === null ? null : handleName(text(row.fields.topic)!),
       replaces: text(row.fields.supersedes) !== null,
       mark,
       faded,
@@ -169,7 +172,7 @@ function changed(skill: SkillRow, versions: readonly Version[], since: number): 
   for (let i = 1; i < versions.length; i++) {
     const after = versions[i]!;
     if (Date.parse(after.at) < since) continue;
-    out.push({ kind: 'changed', at: after.at, key: `s${skill.seq ?? name}-${i}`, seq: skill.seq, skill: name, from: i + offset, to: i + 1 + offset, before: versions[i - 1]!.text, after: after.text });
+    out.push({ kind: 'changed', at: after.at, key: `s${skill.seq ?? name}-${i}`, seq: skill.seq, skill: handleName(name), from: i + offset, to: i + 1 + offset, before: versions[i - 1]!.text, after: after.text });
   }
   return out;
 }
