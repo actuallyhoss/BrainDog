@@ -1757,14 +1757,16 @@
 
   /* UNDER THE DOT WHEN THE FLAG IS NEAR (`data-near-flag`, on the label or on the plot round it, from
      `src/forecast.ts`). The crossing's flag sits over the chart's top edge, and with the day it names a few days off
-     today the two labels landed on one another at 390, "30 Oct" over "£33,850". Below, the figure starts at the dot's
-     own edge rather than after it, so it hangs from the dot and not over the line falling away to its end side. */
+     today the two labels landed on one another at 390, "30 Oct" over "£33,850". Below, the words start a step past
+     today's hairline, as they do over it: started at the dot's own edge, "Today £33,850" sat across the hairline in the
+     six-month and one-year views, where the flag is near (polish-g W2). A line that falls through that corner moves
+     them to the start side (`nowPlace`). */
   :is(.forecast-now-label[data-near-flag], [data-near-flag] .forecast-now-label) {
-    translate: calc(-1 * var(--sp-1)) var(--sp-2);
+    translate: var(--sp-2) var(--sp-2);
   }
 
   :is(.forecast-now-label[data-near-flag], [data-near-flag] .forecast-now-label):dir(rtl) {
-    translate: var(--sp-1) var(--sp-2);
+    translate: calc(-1 * var(--sp-2)) var(--sp-2);
   }
 
   /* THE CORNER THE LINE DOES NOT RUN THROUGH (`data-place`, from `src/forecast.ts` `nowPlace`): at 390 a walk that
