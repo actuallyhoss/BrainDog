@@ -695,7 +695,8 @@ export const account = {
      BILLING SAYS ONE SENTENCE A RECORD, and the sentence says what happens next: nothing for a paid one, Stripe's retry
      and a new card for a failed payment, and for a lapsed one the date it went read-only, the date it is deleted and
      that export never stops. The plan's price is the Worker's own string (`GET /account/billing`), never written here. */
-  billingYours: 'Records you own',
+  /* "YOUR BRAINDOG", NEVER "RECORDS" (first hour audit, E9): a new person owns one, and reads the app's word for it. */
+  billingYours: (n: number) => (n > 1 ? 'Your BrainDogs' : 'Your BrainDog'),
   billingPlan: (plan: string, price: string) => (price ? `${plan}, ${price}` : plan),
   billingPlanHosted: 'Cloud',
   billingPlanPlus: 'Cloud Plus',
@@ -714,7 +715,8 @@ export const account = {
   billingManage: 'Manage payment',
   billingPayAgain: 'Pay again',
   billingOpening: 'Opening the payment page',
-  billingNotOpen: 'This BrainDog is not taking payments at the moment, so nothing here can be paid or changed.',
+  /* ABOUT BRAINDOG'S OWN PLANS: "not taking payments" read as if her bakery had stopped taking them (E9). */
+  billingNotOpen: 'Paid plans are not open yet, so there is nothing to pay or change here.',
   billingNoneOwned: 'Billing belongs to the owner, and you own no BrainDog here.',
   billingUnread: 'What your BrainDog costs could not be read just now. Try again in a minute.',
   /* The Worker's `LAPSED_FIX` (`apps/worker/src/lapse.ts`), word for word, because the banner and a refused write must

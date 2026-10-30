@@ -250,6 +250,8 @@ export const words = {
   meterFull: (resets: string) => `Used up. Actions wait until ${resets}.`,
   meterPast: (share: string) => `${share} of the month's allowance.`,
   binding: (noun: string) => `The limit you are nearest is your ${noun}.`,
+  /* A MONTH FAR FROM EVERY LIMIT IS SAID SO, never "the limit you are nearest is your runs" at 1 of 1,000 (E9). */
+  withinAll: 'Well within every limit this month.',
   /* UNDER AN HOUR IN MINUTES: "0 hours of 50 hours" stood beside "<1%" on a month that ran. */
   hours: (n: number) =>
     n > 0 && n * 60 < 1
