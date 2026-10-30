@@ -1,6 +1,6 @@
 # Learnings and skills
 
-A learning is something one session found out that would otherwise trip up the next. A skill is a written method an agent reaches for when a task calls for it. Both live in your record, so what one agent learns on Monday is there for every agent after it.
+A learning is something one session found out that would otherwise trip up the next. A skill is a written method an agent reaches for when a task calls for it. Both live in your BrainDog, so what one agent learns on Monday is there for every agent after it.
 
 ## Recording a learning
 
@@ -35,7 +35,7 @@ An agent reads one at `braindog:skill/{name}`, and the briefing lists the ones t
 braindog skills sync
 ```
 
-`skills sync` writes the record's skills into the folders Claude Code reads them from, and `braindog setup` runs it for you. It never overwrites a change made on the machine: a file edited since the last sync is kept, and its new text is proposed to you as the skill's next version. A skill file you wrote by hand, found in those folders, is added to the record. A file written into a repository is reported, never committed. `--dry-run` says what it would do and writes nothing.
+`skills sync` writes your BrainDog's skills into the folders Claude Code reads them from, and `braindog setup` runs it for you. It never overwrites a change made on the machine: a file edited since the last sync is kept, and its new text is proposed to you as the skill's next version. A skill file you wrote by hand, found in those folders, is added to your BrainDog. A file written into a repository is reported, never committed. `--dry-run` says what it would do and writes nothing.
 
 What a sync wrote is kept in `skills-lock.json` in the `.braindog` folder in your home folder, which is how it tells your edits from its own.
 
