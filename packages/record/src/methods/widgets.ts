@@ -34,6 +34,7 @@ import {
   WIDGET_GROUPS,
   distill,
   widgetBlock,
+  fittedSize,
   widgetById,
   widgetMatches,
   type GalleryAnswer,
@@ -484,6 +485,7 @@ export function methods(deps: RecordDeps) {
       return t ? filledOf(t, choices) : {};
     })());
     const ranked = widgetOffers(signals, heldOf(prefs), today, onBoardOf(board, values, cat.byId), cell).slice(0, cell ? CELL_TRIES : undefined);
+    const filledFor = new Map<string, Record<string, string>>();
     const offers = ranked.flatMap((r): WidgetOffer[] => {
       if (r.remove !== undefined)
         return [{ key: r.key, widget: r.widget, title: 'Take it off Today', why: r.why, size: 'small', block: {}, signal: r.signal, score: r.score, remove: r.remove }];
@@ -491,6 +493,7 @@ export function methods(deps: RecordDeps) {
       if (t === undefined) return [];
       const filled = values(r);
       const block = widgetBlock(t, t.size, filled);
+      filledFor.set(r.key, filled);
       return [
         {
           key: r.key,
@@ -513,6 +516,12 @@ export function methods(deps: RecordDeps) {
       adding.forEach((o, i) => {
         const t = cat.byId(o.widget);
         if (t !== undefined && drawn[i] !== null && drawn[i] !== undefined) o.reading = distill(t, drawn[i], { now: clock.now() });
+        /* OFFERED AT THE SIZE ITS ROWS FILL (`fittedSize`): one person to get back to is a Wide row, not a Tall box. */
+        const fit = t === undefined ? o.size : fittedSize(t.sizes, o.size, o.reading);
+        if (t !== undefined && fit !== o.size) {
+          o.size = fit;
+          o.block = widgetBlock(t, fit, filledFor.get(o.key) ?? {});
+        }
       });
     }
     /* TODAY'S ONE CELL SHOWS THE FIRST THAT DRAWS SOMETHING (recheck of 30 October): the cell hides a widget whose reading
@@ -556,8 +565,10 @@ export function methods(deps: RecordDeps) {
       const onBoard = boardOf(said.board);
       const widgets: GalleryWidget[] = shown.map((t) => {
         const isReady = readings.has(t.id);
-        const block = widgetBlock(t, t.size, filled.get(t.id)!);
         const reading = readings.get(t.id) ?? null;
+        /* AND IN THE GALLERY, A LIST STARTS AT THE SIZE ITS ROWS FILL, as the suggestion does (`fittedSize`). */
+        const size = fittedSize(t.sizes, t.size, reading);
+        const block = widgetBlock(t, size, filled.get(t.id)!);
         /* A WIDGET THAT FILLS IN BY BEING USED IS NOBODY'S TO ADD (`fills`): no add-on is named for it. */
         const addon = t.needs.addon !== undefined && t.fills === undefined ? { id: t.needs.addon, name: cat.addonName(t.needs.addon) } : null;
         return {
@@ -568,7 +579,7 @@ export function methods(deps: RecordDeps) {
           for: t.for,
           icon: t.icon,
           sizes: [...t.sizes],
-          size: t.size,
+          size,
           block,
           filled: filled.get(t.id)!,
           ...((): Partial<GalleryWidget> => {
