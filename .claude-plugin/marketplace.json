@@ -6,7 +6,7 @@
     {
       "name": "braindog",
       "source": "./plugins/claude-code",
-      "description": "Connects Claude Code to your BrainDog record: the MCP server with sign-in, the session start and end hooks, and the BrainDog skill.",
+      "description": "Connects Claude Code to your BrainDog record: the MCP server with sign-in, the session hooks, and the BrainDog skill.",
       "homepage": "https://brain.dog/docs/agents/connect",
       "license": "Apache-2.0"
     }

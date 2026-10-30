@@ -67,9 +67,9 @@ test('ANOTHER RUN CANNOT UNDO IT: FORBIDDEN, and the row stays', async () => {
   assert.equal(refused.value.code, 'FORBIDDEN');
 });
 
-test('A BATCH THAT WAS NEVER WRITTEN IS ROW_UNKNOWN, and undo is no destructive tool', async () => {
+test('A BATCH THAT WAS NEVER WRITTEN IS ROW_UNKNOWN, and undo says it takes things away', async () => {
   const { call } = await open();
   const r = await call('undo', { batch: 'nothing-wrote-this' }, as('t_one'));
   assert.equal(r.value.code, 'ROW_UNKNOWN');
-  assert.equal(TOOLS.find((t) => t.name === 'undo')?.destructive, undefined);
+  assert.equal(TOOLS.find((t) => t.name === 'undo')?.destructive, true);
 });

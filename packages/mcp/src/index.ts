@@ -416,7 +416,8 @@ export type Tool = {
   /** `read` tools never change anything, and a client may say so to its user. */
   writes: boolean;
   /**
-   * A write that overwrites what was there, which a host asks a person about before it runs: `update` alone.
+   * A write that overwrites or takes away what was there, which a host asks a person about before it runs: `update` and
+   * `undo`, whose undoing of a create deletes the row.
    *
    * THE SPEC'S DEFAULT FOR A WRITE IS DESTRUCTIVE, and every write here inherited it, so a new task prompted in Claude
    * as a delete would. The additive writes (`create`, `propose`, `log`, `meet`, `triage`, `handoff`) add a row, a
@@ -721,14 +722,14 @@ export const TOOLS: readonly Tool[] = [
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
        below says how. */
+    /* `page` IS LISTED (door audit D33): the description names it, and a client that holds to the schema dropped it, so
+       the page never arrived. `draft: true` stays taken and not listed, a page handed in to be kept or thrown away, which
+       Try again's instruction names to the run; an agent's page is a draft whether it says so or not (`attachVisual`). */
     input: obj(
-      { spoken: str('As get takes it. Omit for your run.'), note: { type: 'string' } },
+      { spoken: str('As get takes it. Omit for your run.'), note: { type: 'string' }, page: { type: 'string' } },
       ['note'],
     ),
-    /* `page` IS TAKEN AND NOT LISTED, said once in the description above: the list sits at its ceiling to the token. So
-       is `draft: true`, a page handed in to be kept or thrown away, which Try again's instruction names to the run; an
-       agent's page is a draft whether it says so or not (`attachVisual`). */
-    quiet: ['page', 'draft'],
+    quiet: ['draft'],
     writes: true,
   },
   {
@@ -777,7 +778,7 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation; a bare name is only noted. Mail, commits and the web are not believed alone: say where honestly. Your run is session in <repo>.',
+      'A person or organisation; a bare name is only noted. Say where honestly: mail, commits and the web are not believed alone; what you saw yourself is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
@@ -825,11 +826,13 @@ export const TOOLS: readonly Tool[] = [
     name: 'undo',
     title: 'Undo a change',
     /* THE LAST ONE, FOR THE RECEIPTS: every write answers a batch and this takes it back. Only the caller's own run's
-       writes go back; the owner's Undo in the app stays the owner's. It deletes nothing it did not make, so it is not
-       destructive in the spec's sense. */
+       writes go back; the owner's Undo in the app stays the owner's. DESTRUCTIVE IN THE SPEC'S SENSE (door audit D35):
+       undoing a create deletes the row, and a client that runs non-destructive tools without asking would have run it
+       unasked. */
     description: 'Put back your own write, by its receipt\'s batch.',
     input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
     writes: true,
+    destructive: true,
     idempotent: true,
   },
 ];
@@ -3562,8 +3565,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       );
       return said({ ok: false, refusal }, refusalBrief(refusal as Record<string, unknown>));
     }
-    /* `format` IS THIS LAYER'S, and never reaches the record, which would refuse a key its method does not take. */
-    const full = args.format === 'full';
+    /* `format` IS THIS LAYER'S, and never reaches the record, which would refuse a key its method does not take. "json"
+       is the same ask in other words, and any other value is refused rather than quietly read as brief (door audit D33). */
+    if (args.format !== undefined && args.format !== null && args.format !== 'full' && args.format !== 'json' && args.format !== 'brief') {
+      const refusal = taught(
+        { code: 'ENUM_VALUE_UNKNOWN', fix: 'format is "full", which answers JSON, or left out for short lines.', at: 'format', allowed: ['full'] },
+        callOf(name, { ...args, format: 'full' }),
+      );
+      return said({ ok: false, refusal }, refusalBrief(refusal as Record<string, unknown>));
+    }
+    const full = args.format === 'full' || args.format === 'json';
     const sent: Args = Object.fromEntries(Object.entries(args).filter(([k]) => k !== 'format'));
     /* NOT SAID IN WORDS WHEN THE CALL ASKS full, whose text is the JSON: the reads only a line needs are not made. */
     const turn: Turn = { text: text && !full, titles: new Map() };

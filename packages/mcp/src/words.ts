@@ -226,9 +226,17 @@ export function humanize(id: string): string {
   return words.slice(0, 1).toUpperCase() + words.slice(1);
 }
 
+/**
+ * THE RULES BRAINDOG ANSWERS FOR ITSELF WITH, which the app says as BrainDog (`OWN_RULES` in the record's
+ * `update-pass.ts`): "The handled automation" was the record settling its own arranging.
+ */
+const OWN_RULES: ReadonlySet<string> = new Set(['rule:handled', 'rule:additive', 'rule:update']);
+
 /** What signs a line when it is a mechanism rather than somebody, by the word before its colon: named, and not. */
 const MECHANISMS: Readonly<Record<string, readonly [named: (name: string) => string, unnamed: string]>> = {
-  rule: [(name) => `The ${name} automation`, 'An automation'],
+  /* A RULE BY ITS NAME IN QUOTATION MARKS, as the app's Activity says it (`apps/web/src/routes/audit/who.ts`): "The rule
+     “Invoice late”". It was "The invoice late automation", which an agent repeated to the person word for word. */
+  rule: [(name) => `The rule “${name.slice(0, 1).toUpperCase()}${name.slice(1)}”`, 'An automation'],
   ingest: [(name) => `The ${name} door`, 'A door'],
   script: [(name) => `The ${name} script`, 'A script'],
   report: [() => 'A report key', 'A report key'],
@@ -252,7 +260,8 @@ export function actorWords(by: string, names: ReadonlyMap<string, string>, runs:
   if (named !== undefined && named.trim() !== '') return named.trim();
   if (/^S[1-9][0-9]*$/u.test(who)) return `${runs.get(who) ?? 'An agent'} (${who})`;
   if (who === 'slash') return 'Slash';
-  if (who === 'system' || who === 'kernel' || who === 'p_seed' || who === '') return 'BrainDog';
+  if (who === 'system' || who === 'kernel' || who === 'p_seed' || who === '' || OWN_RULES.has(who)) return 'BrainDog';
+  if (who === 'rule:ladder') return 'The trust rule';
   const agent = /^agent:(.+)$/u.exec(who)?.[1];
   if (agent !== undefined) return ULID.test(agent) ? 'An agent' : agentOf(agent, true);
   /* `person:<id>` IS HOW THE FOUNDING OWNER'S OWN GRANT SIGNS ITS LINE (`packages/kernel/src/provision.ts`). */

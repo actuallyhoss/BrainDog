@@ -199,7 +199,7 @@ const rowsOf = (c: Context, role: AgentRole): Brief[] => {
 export function plainly(said: string, c: Context, all: boolean, at?: CardAt): string {
   const out = said.replace(NETWORK, (network) => machineOf(network));
   if (!all) return out;
-  return out
+  return moneyPlain(out)
     .replace(ROW_ID, (id) => at?.named?.(id) ?? 'an entry you cannot see')
     .replace(PATH, (path) => path.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1) || 'a folder')
     .replace(HANDLE, (handle, list: string) => {
@@ -207,6 +207,28 @@ export function plainly(said: string, c: Context, all: boolean, at?: CardAt): st
       const said = row ? words(wordsOf(row), 40) : '';
       return said || at?.named?.(handle) || `one of ${c.registers.find((r) => r.id === list)?.name ?? list.replace(/_/gu, ' ')}`;
     });
+}
+
+/**
+ * The currencies a person writes by a sign, as the kernel's messages do (`SIGN` in `packages/kernel/src/rules.ts`). Any
+ * other is left by its code.
+ */
+const MONEY_SIGN: Readonly<Record<string, string>> = {
+  GBP: '£', EUR: '€', USD: '$', JPY: '¥', CNY: 'CN¥', INR: '₹', KRW: '₩', ILS: '₪',
+  CAD: 'CA$', AUD: 'A$', NZD: 'NZ$', HKD: 'HK$', SGD: 'S$', MXN: 'MX$', BRL: 'R$',
+};
+
+/**
+ * An amount a question was written with, as a person says it (door audit D32): "GBP 39.00" is "£39", and "GBP 39.50"
+ * "£39.50". A code with no sign is left as written, so three capitals that are no currency are never touched.
+ */
+export function moneyPlain(text: string): string {
+  return text.replace(/\b([A-Z]{3}) ([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,3}))?(?![\d.,]*\d)/gu, (whole, code: string, minus: string, units: string, minor: string | undefined) => {
+    const sign = MONEY_SIGN[code];
+    const cents = minor !== undefined && /[1-9]/u.test(minor) ? `.${minor}` : '';
+    if (sign === undefined) return whole;
+    return `${minus === '' ? '' : '−'}${sign}${units}${cents}`;
+  });
 }
 
 /** A row's id as the kernel mints it, a ULID: 26 characters of Crockford's base 32. */

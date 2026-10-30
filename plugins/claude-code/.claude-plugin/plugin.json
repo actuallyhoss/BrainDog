@@ -1,7 +1,7 @@
 {
   "name": "braindog",
-  "version": "1.0.0",
-  "description": "Connects Claude Code to your BrainDog record: the MCP server with sign-in, the session start and end hooks, and the BrainDog skill.",
+  "version": "1.1.0",
+  "description": "Connects Claude Code to your BrainDog record: the MCP server with sign-in, the session hooks, and the BrainDog skill.",
   "author": { "name": "BrainDog", "url": "https://brain.dog" },
   "homepage": "https://brain.dog/docs/agents/connect",
   "privacyPolicyUrl": "https://brain.dog/legal/privacy",

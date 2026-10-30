@@ -51,7 +51,7 @@ import {
 
 import type { CallContext } from '../index.ts';
 import { readSight } from '../sight.ts';
-import { PRESSABLE, answersTaken, questionVersion } from './chat-answer.ts';
+import { PRESSABLE, answersSaid, answersTaken, questionVersion } from './chat-answer.ts';
 import { tellFinished } from '../push.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -444,7 +444,7 @@ export function methods(deps: RecordDeps) {
       /* HIS WORD AS HE SAYS IT: "approve" or "yes" is the yes this question takes, "decline" or "no" its no. */
       const same = SAME_ANSWER.find((g) => g.includes(word.toLowerCase()));
       const option = takes.includes(word) ? word : (same?.find((w) => takes.includes(w)) ?? word);
-      if (!takes.includes(option)) return no('ENUM_VALUE_UNKNOWN', `${said} is answered with one of ${takes.join(', ')}.`, { at, allowed: takes });
+      if (!takes.includes(option)) return no('ENUM_VALUE_UNKNOWN', `${said} is answered with one of ${answersSaid(row, takes)}.`, { at, allowed: takes });
       if (out.some((y) => y.question === id)) return no('VALUE_MALFORMED', `${said} is named twice. Give it one answer.`, { at });
       out.push({ question: id, option, version: await questionVersion(row) });
     }
@@ -512,11 +512,11 @@ export function methods(deps: RecordDeps) {
     const kind = String(row.body_kind ?? '');
     const takes = PRESSABLE.has(kind) ? answersTaken(row) : ['accept', 'reject'];
     const asked = typeof option === 'string' ? option.trim() : '';
-    if (asked === '') return no('REQUIRED_MISSING', `Which answer did they give? Send option, one of ${takes.join(', ')}.`, { at: 'option', allowed: takes });
+    if (asked === '') return no('REQUIRED_MISSING', `Which answer did they give? Send option, one of ${answersSaid(row, takes)}.`, { at: 'option', allowed: takes });
     /* HIS WORD AS HE SAYS IT, as an order's: "approve" or "yes" is the yes this question takes, "decline" or "no" its no. */
     const same = SAME_ANSWER.find((g) => g.includes(asked.toLowerCase()));
     const chosen = takes.includes(asked) ? asked : (same?.find((w) => takes.includes(w)) ?? asked);
-    if (!takes.includes(chosen)) return no('ENUM_VALUE_UNKNOWN', `${given} is answered with one of ${takes.join(', ')}.`, { at: 'option', allowed: takes });
+    if (!takes.includes(chosen)) return no('ENUM_VALUE_UNKNOWN', `${given} is answered with one of ${answersSaid(row, takes)}.`, { at: 'option', allowed: takes });
     /* WHAT THE ANSWER WOULD DO, AND NOTHING ELSE: a no to a set of rows or an install changes nothing, and of a choice only
        the option picked is read, so a key named by another option never holds this one back. */
     const body = typeof row.body === 'object' && row.body !== null ? (row.body as Record<string, unknown>) : {};

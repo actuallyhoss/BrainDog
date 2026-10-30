@@ -280,7 +280,8 @@ export function methods(deps: RecordDeps) {
       const title = clip(titled, VISUAL_TITLE_MOST);
 
       const store = deps.visuals;
-      if (store === undefined) return no('NOT_IN_THIS_BUILD', 'This BrainDog keeps no visuals: it has no file store.', { at: 'host' });
+      if (store === undefined)
+        return no('NOT_IN_THIS_BUILD', 'This BrainDog keeps no pages drawn on a row: it has no file store. Say what the page shows in a note instead, with log and no page.', { at: 'page' });
 
       /* EVERY PICTURE IS ONE THE FILE STORE HOLDS, a picture and no larger than the store takes, asked of the store and
          never taken from the call: what the page names is what was kept. */

@@ -141,7 +141,7 @@ test('WHAT END REFUSES, BEFORE ANYTHING IS FOUND OR OPENED: a person, a read tok
   assert.match(person.fix, /a person is never a run/u);
   const reader = refusal(await api.end({}, agent({ client_id: 'c-1' }, 'read')));
   assert.equal(reader.code, 'FORBIDDEN');
-  assert.match(reader.fix, /needs propose/u);
+  assert.match(reader.fix, /asks the person, and this token only reads/u);
 
   const stated = refusal(await api.end({ state: 'done' } as never, agent({ client_id: 'c-1' })));
   assert.deepEqual([stated.code, stated.at], ['FIELD_UNKNOWN', 'state']);

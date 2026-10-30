@@ -1039,6 +1039,23 @@ const TOKEN_REACH: Record<Scope, Need[]> = {
   write: ['read', 'propose', 'append', 'write'],
 };
 
+/** What a call that needs each rung does, as a token is told it: "This adds to the record". */
+const NEED_WORDS: Readonly<Record<string, string>> = {
+  read: 'reads the record',
+  propose: 'asks the person',
+  append: 'adds to the record',
+  write: 'changes the record',
+  decide: 'decides',
+  owner: 'is the owner’s to do',
+};
+
+/** What a token of each scope may do, after "only": "this token only reads". */
+const TOKEN_WORDS: Readonly<Record<string, string>> = {
+  read: 'reads',
+  propose: 'reads and asks the person',
+  write: 'reads, asks and changes',
+};
+
 const LEVEL_REACH: Record<HeldLevel, Need[]> = {
   read: ['read'],
   /* READ AND PROPOSE, the comment rung of a share: comments and suggestions on what they can see. */
@@ -1178,6 +1195,15 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
   /* TWO RETURNS AND NOT ONE, so each code sits as a literal where `refusals.mjs` reads it. This was
      `code: short ? 'SCOPE_INSUFFICIENT' : 'LEVEL_REQUIRED'`, and the first arm was a code in no
      registry, counted by that gate as one of the five outside it. */
+  /* A TOKEN IS TOLD IN WORDS, NOT RUNGS (door audit D32): "This needs append, and you have a read token on owner access"
+     was repeated to people word for word. What the call does and what the token may do; a person keeps the rungs, which
+     the app reads (`answering.ts`). */
+  if (p.kind === 'token') {
+    const does = NEED_WORDS[need] ?? `needs ${need}`;
+    const may = TOKEN_WORDS[p.scope] ?? `is a ${p.scope} token`;
+    const said = short ? `This ${does}, and this token only ${may}.${next}` : `This ${does}, and the access this token was made with does not reach that.${next}`;
+    return short ? { code: 'FORBIDDEN', fix: said, allowed: reach } : { code: 'LEVEL_REQUIRED', fix: said, allowed: reach };
+  }
   if (short) return { code: 'FORBIDDEN', fix: `This needs ${need}, and you have ${has}.${next}`, allowed: reach };
   if (p.kind === 'person' && level === 'append' && need === 'read') return { ...appendReadRefusal(), allowed: reach };
   return { code: 'LEVEL_REQUIRED', fix: `This needs ${need}, and you have ${has}.${next}`, allowed: reach };
