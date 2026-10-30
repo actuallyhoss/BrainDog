@@ -1,12 +1,16 @@
 /*
- * An `embed` block (`kinds/embed.ts`, drawn by `braindog-render`'s `Embed.svelte` and its `toHTML` twin): a video, a
- * design or a map, first as a facade (its title, whose it is, a Load button) and, once pressed, as the provider's frame.
+ * An `embed` block (the app's `kinds/embed.ts`, drawn by `braindog-render`'s `Embed.svelte` and its `toHTML` twin): a
+ * video, a design or a map, first as a facade (its title, whose it is, a Load button) and, once pressed, as the
+ * provider's frame.
  *
  * THE FACADE AND THE FRAME ARE ONE SIZE, the aspect the author named (`data-aspect`), so pressing Load swaps what is in
  * the box and moves nothing under it. The box is the block's full width at every width; a tall `9:16`
  * alone is held to a phone's width, since at 1440 a full-width portrait frame would be taller than the screen.
  *
  * Nothing here loads anything: the renderer puts the frame on the page only on the press.
+ *
+ * IN THE SKIN AND NOT THE APP, so every place that draws blocks has it (`blocks-kinds.css`), like the calendar's:
+ * kept in the app's own kinds, the site's docs drew it unstyled (K1 of 30 Oct).
  */
 
 @layer components {

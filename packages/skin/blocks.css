@@ -23,8 +23,8 @@
  * THIS IS THE SHEET EVERY SCREEN WAITS ON, so it holds only what screens other than a declared page draw with too: the
  * intent map, the block frame, rows, chips, lists, tables and inline values. A kind that only a declared page draws
  * brings its own sheet, loaded with the screens that draw declared pages: `kinds/<kind>.css` beside this file, gathered
- * by `blocks-kinds.css`, and, for a kind registered in the app, `apps/web/src/lib/page/kinds/<kind>.css`
- * (`kinds/styles.ts`). A screen that draws one of those kinds outside a declared page imports that kind's sheet itself.
+ * by `blocks-kinds.css`, a kind registered in the app as much as any other, so the site draws it too. A screen that
+ * draws one of those kinds outside a declared page imports that kind's sheet itself.
  */
 
 @layer components {

@@ -1,5 +1,5 @@
 /*
- * A `link` block (`kinds/link.ts`, drawn by `braindog-render`'s `Links.svelte` and its `toHTML` twin): a list of
+ * A `link` block (the app's `kinds/link.ts`, drawn by `braindog-render`'s `Links.svelte` and its `toHTML` twin): a list of
  * addresses, each its title, the host it goes to under the title, and a note.
  *
  * IT IS A LIST AND KEEPS THE LIST'S RULES (`.list > .item` in `blocks.css`): the title on the first line, the host in
@@ -10,6 +10,9 @@
  * 2005: the row says it goes somewhere with a chevron at its end (`.link-chevron`, drawn by the renderer), the wash
  * under the pointer, and the title in ink with no underline. A row that carries a glyph (`link.ts`: the fourth cell,
  * drawn by the renderer as `.link-well`) draws it in a well at the row's start, as every other row with a glyph does.
+ *
+ * IN THE SKIN AND NOT THE APP, so every place that draws blocks has it (`blocks-kinds.css`), like the calendar's:
+ * kept in the app's own kinds, the site's docs drew it unstyled (K1 of 30 Oct).
  */
 
 @layer components {

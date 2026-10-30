@@ -16,7 +16,6 @@
      product's own blocks and charts, and without these a chart showed as its data table. */
   import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
-  import '$lib/page/kinds/styles.ts';
   import { titleOf } from '$lib/title.ts';
   import SheetCharts from '$lib/design/SheetCharts.svelte';
   import DesignBook from '$lib/design/DesignBook.svelte';

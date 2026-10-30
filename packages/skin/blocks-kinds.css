@@ -37,3 +37,7 @@
 @import './kinds/instruct.css';
 @import './kinds/presence.css';
 @import './kinds/calendar.css';
+@import './kinds/embed.css';
+@import './kinds/gallery.css';
+@import './kinds/link.css';
+@import './kinds/table.css';

@@ -21,7 +21,6 @@
   /* WHAT ONLY A DECLARED PAGE DRAWS, with the screen that draws it, in the order `PageView` loads them. */
   import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
-  import '$lib/page/kinds/styles.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { iconFor } from '$lib/record/api.ts';
