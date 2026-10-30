@@ -68,11 +68,16 @@
   const shown = $derived(open ? kept : kept.slice(0, most));
   const hidden = $derived(kept.length - shown.length);
 
-  /** An amount to the cent, in its own currency, as a person says it: "$287.15", "EGP 467,915". */
+  /**
+   * An amount to the cent, in its own currency, as a person says it, WITH ITS WAY (audit 31 Oct f, AF5): "−£9,190" for a
+   * bill to pay and "+£2,400" for money to come, as Coming up says them, and unsigned only where the way is not known.
+   */
   function amountSaid(line: HomeLine): string | null {
-    if (!line.money) return line.amount ? line.amount.text.replace(/^[+−-]/u, '') : null;
+    const sign = /^[−-]/u.test(line.amount?.text ?? '') ? '−' : line.amount?.text.startsWith('+') ? '+' : '';
+    if (!line.money) return line.amount ? line.amount.text : null;
     const { minor, currency } = line.money;
-    return writeAmount({ minor: Math.abs(minor), currency }, homeCurrency(), 'read')?.text ?? null;
+    const said = writeAmount({ minor: Math.abs(minor), currency }, homeCurrency(), 'read')?.text ?? null;
+    return said === null ? null : `${sign}${said}`;
   }
 
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;

@@ -109,9 +109,11 @@ type ShellBase = {
   };
   /**
    * The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs, and `cut` on a
-   * tabbed section's page the rail's budget left out: the strip of tabs draws it and the rail does not.
+   * tabbed section's page the rail's budget left out: the strip of tabs draws it and the rail does not. `waits` (with
+   * `cut`) on a page held off the rail while every list it reads is empty: the sidebar still draws it under its place's
+   * More, or under More lists, so an add-on just installed has somewhere to be opened from (audit 31 Oct f, AF7).
    */
-  nav: (NavEntry & { tabs?: true; cut?: true })[];
+  nav: (NavEntry & { tabs?: true; cut?: true; waits?: true })[];
   /**
    * The holding pen: what the record would add if somebody asked, each offer with the whole declaration keeping it
    * writes. A holding pen, not a decision (19 §3). Empty for a caller who is offered nothing.
@@ -1116,8 +1118,13 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
   /* AND WHETHER ITS SECTION IS DRAWN AS TABS (`$lib/page/tabs.ts`). This entry named its five keys and so dropped every
      other one `boot` sent: with `tabs: true` on the page, `tabsOf` over this list answered no strip on every page of the
      section (`tabs.test.ts`, five of its cases). Only `true` is carried, and a page that did not say it carries no key. */
+  /* A PAGE THAT WAITS IS STILL CARRIED, CUT AND MARKED (audit 31 Oct f, AF7): Splits and Weather, installed from the
+     store over lists of their own with nothing in them yet, had no row anywhere and no crumb, and the store's Open was
+     the only way back. The rail still leaves it out (`cut`); the sidebar draws it under its place's More, or under More
+     lists where its section is no place (`waits` on the entry), and the palette finds it. A page about one row still waits unseen. */
+  const heldBack = (p: NonNullable<Boot['pages']>[number]): boolean => !!p.nav && p.nav.section !== copy.viewsSection && !p.about && waiting(p);
   const nav: ShellBase['nav'] = (b.pages ?? []).flatMap((p) =>
-    p.nav && !waiting(p) && (kept.has(p) || tabbed.has(p.nav.section))
+    p.nav && ((!waiting(p) && (kept.has(p) || tabbed.has(p.nav.section))) || heldBack(p))
       ? [
           {
             id: p.slug,
@@ -1128,6 +1135,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
             icon: iconFor(p.icon ?? undefined, 'doc'),
             ...((p.nav as { tabs?: unknown }).tabs === true ? { tabs: true as const } : {}),
             ...(kept.has(p) ? {} : { cut: true as const }),
+            ...(heldBack(p) ? { waits: true as const } : {}),
             /* A PAGE ONE ROW MADE, which the flat nav leaves to its list's own page (`flatNav`). */
             ...(p.about ? { row: true as const, register: p.about.register } : {}),
             /* AND IT DRAWS AS THAT THING'S OWN COLOURED DOT in the rail, so each project is told from its neighbours:

@@ -4,7 +4,7 @@
   "icon": "calendar",
   "title": "Calendar",
   "summary": "Your calendar's next events, read every hour from its secret ICS link in Google Calendar or Outlook, into a list you, your widgets and your agents can read. The link stays in your keys. Nothing is written back to the calendar.",
-  "changes": "Says to put the link in your keys from a terminal, with braindog keys put \"Calendar link\", which reads it from standard input.",
+  "changes": "Says to put the link in your keys where Install asks for it, or from a terminal with braindog keys put \"Calendar link\", which reads it from standard input.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -17,7 +17,7 @@
       "type": "secret",
       "default": "Calendar link",
       "label": "Key holding the calendar link",
-      "note": "Copy your calendar's secret ICS link (Google Calendar: Settings, your calendar, Secret address in iCal format; Outlook: Settings, Shared calendars, Publish a calendar, ICS), then pipe it into braindog keys put \"Calendar link\" in a terminal. Google or Outlook only."
+      "note": "Copy your calendar's secret ICS link (Google Calendar: Settings, your calendar, Secret address in iCal format; Outlook: Settings, Shared calendars, Publish a calendar, ICS), then add it as the key Calendar link when Install asks for it. Google or Outlook only."
     }
   },
   "widgets": [

@@ -26,7 +26,7 @@ const said = <T>(r: unknown): T => {
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 type Body = Record<string, unknown>;
 type Reading = { value: number | null; unit?: string | null; refusals: unknown[] };
-type Block = { kind: string; heading?: string; refusals: unknown[]; rows?: { fields: Body }[] };
+type Block = { kind: string; heading?: string; drawn?: boolean; refusals: unknown[]; rows?: { fields: Body }[] };
 
 const FILE = new URL('./tax-set-aside.pack.json', import.meta.url);
 const shipped = (): Body & { declarations: Body[]; extends: Body } => JSON.parse(readFileSync(FILE, 'utf8')) as never;
@@ -122,5 +122,18 @@ test('THE PAGE draws with nothing refused, before a rate and after', async () =>
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
   const heads = page.blocks.map((b) => b.heading);
   for (const h of ['This year', 'Set aside each month', 'Payments this year']) assert.ok(heads.includes(h), `${h} is on the page: ${heads.join(', ')}`);
+  close();
+});
+
+test('AN ACCOUNT NAMED FOR TAX IS SAID AGAINST THE TAX BILLS before one is marked (audit 31 Oct f, AF25)', async () => {
+  const { api, close } = await fresh();
+  make(api, 'accounts', { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: '2026-10-25', liquid: false });
+  make(api, 'accounts', { name: 'Current account', kind: 'bank', balance: gbp(500_000), as_of: '2026-10-25', liquid: true });
+  await settle(api);
+  assert.equal((await metric(api, 'tax-reserves')).value, 1, 'only the account named for tax');
+  assert.equal((await metric(api, 'tax-reserve')).value, 2_400_000);
+  const page = said<{ blocks: Block[] }>(await api.page({ slug: 'tax-set-aside' }, owner));
+  const note = page.blocks.find((b) => b.heading === 'Tax account' && b.drawn !== false);
+  assert.ok(note, 'the reserve is said before any rate or mark');
   close();
 });

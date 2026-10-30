@@ -68,6 +68,20 @@ test('AN AMOUNT WHOSE WAY IS NOT KNOWN IS NOT MONEY COMING IN: said unsigned, in
   );
 });
 
+test('A BILL OWED BY ME IS MONEY OUT AND AN INVOICE OWED TO ME MONEY IN, each signed (audit 31 Oct f, AF5)', () => {
+  const due = block('spec', ['title', 'amount'], [
+    { cells: ['Legal review, June', 'GBP 9,190.00'], fields: { day: '2026-07-01', amount: gbp(919000), direction: 'owed_by_me' } },
+    { cells: ['Invoice 2026-041', 'GBP 4,800.00'], fields: { day: '2026-08-28', amount: gbp(480000), direction: 'owed_to_me' } },
+  ]);
+  assert.deepEqual(
+    lateLines([due], TODAY).map((l) => l.amount),
+    [
+      { text: '−GBP 9,190.00', dir: 'out' },
+      { text: '+GBP 4,800.00', dir: 'in' },
+    ],
+  );
+});
+
 test('A BLOCK WHOSE ROWS AND ENTRIES ARE NOT ONE FOR ONE says nothing it could put on the wrong line', () => {
   const torn = { ...block('todo', ['what'], [{ cells: ['A'], fields: {} }]), entries: [] } as unknown as LiveBlock;
   assert.deepEqual(lateLines([torn], TODAY), []);

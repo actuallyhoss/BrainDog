@@ -4,7 +4,7 @@
   "icon": "refresh",
   "title": "Subscriptions",
   "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
-  "changes": "A month, by category says the ones with no category as No category, so its parts add up to the whole.",
+  "changes": "A month, by category says the ones with no category as No category, so its parts add up to the whole. With nothing marked yet, its page lists your repeating payments to tick, and no longer points to Money watch.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -464,11 +464,49 @@
           "heading": "Nothing marked yet",
           "icon": "refresh",
           "span": 12,
-          "body": "Add one below, or mark a line in Repeating as a subscription. Money watch finds payments that repeat.",
+          "body": "Tick A subscription on a repeating payment below, or add one.",
           "when": {
             "metric": "subs-count",
             "lt": 1
           }
+        },
+        {
+          "kind": "table",
+          "heading": "Repeating payments",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, direction is out, subscription is not true",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Payment",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "amount",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "subs-count",
+            "lt": 1
+          },
+          "empty": "No repeating payments yet."
         },
         {
           "kind": "stat",

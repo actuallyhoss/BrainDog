@@ -4,7 +4,7 @@
   "icon": "sun",
   "title": "Weather",
   "summary": "The weather where you are, today and the next six days, from Open-Meteo: free, with no key and no account. Set your town on this page and it is kept in step every three hours.",
-  "changes": "The week's weather in Add a widget reads like today's, in whole degrees, where it showed dates and bare numbers. Nothing it does has changed.",
+  "changes": "The week's weather in Add a widget reads like today's, in whole degrees, where it showed dates and bare numbers. Before a forecast, its page says No forecast yet and links to where you set your town.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -321,13 +321,14 @@
       "blocks": [
         {
           "kind": "note",
-          "lead": true,
+          "heading": "No forecast yet",
+          "icon": "sun",
           "span": 12,
           "when": {
             "metric": "weather-days",
             "lt": 1
           },
-          "body": "No weather yet. Set your town under Place in this add-on's settings (Add-ons, Weather), and the forecast arrives within three hours."
+          "body": "Set your town, and the forecast arrives within three hours. [Set your town](/addons/weather?set=place)"
         },
         {
           "kind": "cards",

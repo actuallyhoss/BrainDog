@@ -25,7 +25,7 @@ const said = <T>(r: unknown): T => {
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 type Body = Record<string, unknown>;
 type Reading = { value: number | null; unit?: string | null; refusals: unknown[] };
-type Block = { kind: string; heading?: string; refusals: unknown[]; rows?: { fields: Body }[] };
+type Block = { kind: string; heading?: string; drawn?: boolean; refusals: unknown[]; rows?: { fields: Body }[] };
 
 const FILE = new URL('./subscriptions.pack.json', import.meta.url);
 const shipped = (): Body & { declarations: Body[]; extends: Body } => JSON.parse(readFileSync(FILE, 'utf8')) as never;
@@ -125,5 +125,18 @@ test('THE PAGE draws with nothing refused, empty and full', async () => {
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
   const heads = page.blocks.map((b) => b.heading);
   for (const h of ['What they cost', 'Free trials ending', 'Hardly used', 'Every subscription']) assert.ok(heads.includes(h), `${h} is on the page: ${heads.join(', ')}`);
+  close();
+});
+
+test('WITH NOTHING MARKED, THE PAGE LISTS THE REPEATING PAYMENTS TO TICK, and never points to Money watch (audit 31 Oct f, AF6)', async () => {
+  const { api, close } = await fresh();
+  make(api, 'recurring', { what: 'Newsletter sending', direction: 'out', amount: gbp(3_900), every: 'monthly', next_due: '2026-11-10' });
+  make(api, 'recurring', { what: 'Retainer', direction: 'in', amount: gbp(300_000), every: 'monthly', next_due: '2026-11-01' });
+  await settle(api);
+  const page = said<{ blocks: (Block & { body?: string })[] }>(await api.page({ slug: 'subscriptions' }, owner));
+  const drawn = page.blocks.filter((b) => b.drawn !== false);
+  const offered = drawn.find((b) => b.heading === 'Repeating payments');
+  assert.deepEqual((offered?.rows ?? []).map((r) => r.fields.what), ['Newsletter sending'], 'money going out, not yet marked');
+  assert.ok(!JSON.stringify(page.blocks).includes('Money watch'));
   close();
 });

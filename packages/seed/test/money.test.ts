@@ -939,7 +939,10 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the redesign (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
   /* EACH CURRENCY APART, AND THE ACCOUNTS THE ACCOUNTS TILE LISTS, SINCE money-core 3.27.0: the sample keeps one
      currency, so nothing is said converted, and every account it counts as cash holds money. */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on']);
+  /* AND SINCE money-core 3.33.0 (AF4) THE BILLS THAT ARE LATE, OR THE LOW POINT WITH NOTHING LATE, BEFORE THE CARD. */
+  const LINE_SAYS = ['card-to-pay', 'card-to-pay-on', 'overdue', 'runway-days.low', 'runway-days.low_on'];
+  for (const k of Object.keys(lead.values ?? {})) assert.ok(LINE_SAYS.includes(k), `the line says ${k}`);
+  assert.ok(Object.hasOwn(lead.values ?? {}, 'card-to-pay'));
   /* HOW MUCH, AND HOW FAR IT MOVED, ARE THE HERO'S SINCE money-core 3.29.0, drawn under the line in the figure's own size. */
   const hero = blocks.find((b) => b.kind === 'stat' && b.lead === true)!;
   assert.deepEqual(Object.keys(hero.values ?? {}).filter((v) => v.startsWith('cash-now.')).sort(), ['cash-now.moved']);
@@ -949,12 +952,11 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* IN WORDS: "6% down on a month ago", where it said "−6%". */
   assert.equal(hero.values?.['cash-now.moved'], `${-moved}% down`);
   /* THE LINE IS ONLY WHAT NEEDS DOING SINCE money-core 3.29.1: the part that is late, then the card to pay. */
-  const [late, card] = lead.body?.split(/(?<=\.)\s+/u) ?? [];
-  assert.equal(card, '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.');
-  /* AND THE PART THAT IS LATE, A SENTENCE OF ITS OWN SINCE money-core 3.18.0, which the sample has none of: its figures
-     hold no value here, so the app leaves the sentence out whole (`leadOf`). */
-  assert.match(late ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u);
-  assert.equal(reading(k, 'installments-late'), 0, 'the sample has a part late');
+  /* WHAT HURTS MOST FIRST SINCE money-core 3.33.0 (AF4): the bills that are late, or the low point, then the card. */
+  const said = lead.body?.split(/(?<=\.)\s+/u) ?? [];
+  assert.equal(said.at(-1), '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.');
+  assert.equal(reading(k, 'installments-late'), 0, 'the sample has no part late');
+  if (said.length > 1) assert.match(said[0]!, /^(?:Bills \{\{bad:late\}\}: \{\{overdue\}\} to pay\.|Cash falls to \{\{runway-days\.low\}\})/u);
 
   /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */
   for (const metric of ['cash-now', 'runway-days'])

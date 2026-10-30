@@ -95,14 +95,17 @@ const bill = (k: Kernel, amount: number, due: number): void =>
 /* AND EACH ENDS ON THE PART THAT IS LATE, since money-core 3.18.0: a sentence of its own,
    which the app leaves out whole while no part is late (`leadOf`). With two books the line says the money there is. */
 /* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0, left out whole with no card that says it. */
-const LATE = '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
+/* AND SINCE money-core 3.33.0 (AF4) THE LINE LEADS WITH WHAT HURTS MOST: what is late, or, with nothing late, the low
+   point while the walk goes under inside twelve weeks; the card second. */
+const CARD = '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
+const LOW = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.';
 /* NO WORD OF WHERE THE MONEY IS KEPT SINCE money-core 3.29.1: the Accounts tile draws a row for each, so the line is only
    what needs doing, and on one book with nothing late and no card it says nothing. */
 const ACCOUNTS = '{{cash-by-account.groups}} account(s)';
-const WHAT_THERE_IS = LATE;
-const LASTS = `Lasts the year on what is due. ${LATE}`;
+const WHAT_THERE_IS = `${LOW} ${CARD}`;
+const LASTS = `Lasts the year on what is due. ${CARD}`;
 /* SPREAD OVER HOW MANY ACCOUNTS SINCE money-core 3.30.0, and no longer how many books. */
-const BOOKS = `Spread over ${ACCOUNTS}. ${LATE}`;
+const BOOKS = `Spread over ${ACCOUNTS}. ${CARD}`;
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
@@ -159,7 +162,7 @@ test('TWO CURRENCIES WITH NO RATE STILL READ WHAT THERE IS, and the line does no
   account(k, 'Dollar account', { amount: 500_000, currency: 'USD' });
   bill(k, 900_000, 12);
   assert.equal(figure(k, 'runway-days'), null, 'a day count across two currencies with no rate');
-  assert.deepEqual(bodies(k), [WHAT_THERE_IS], 'nobody knows whether GBP 5,000 and USD 5,000 pay GBP 9,000');
+  assert.deepEqual(bodies(k), [CARD], 'nobody knows whether GBP 5,000 and USD 5,000 pay GBP 9,000');
 });
 
 test('A RECORD WITH NO ACCOUNT IS NOT TOLD ITS MONEY LASTS', async () => {
@@ -175,7 +178,7 @@ test('WITH TWO BOOKS, the line says how many accounts the money is spread over, 
   account(k, 'Own account', gbp(200_000), { book: book('Personal') });
   assert.deepEqual(bodies(k), [BOOKS], 'a walk over two books is a walk over the sum');
   bill(k, 900_000, 12);
-  assert.deepEqual(bodies(k), [BOOKS]);
+  assert.deepEqual(bodies(k), [`${LOW} ${BOOKS}`]);
 });
 
 test('A PART OF A PLAN PAST ITS DAY IS NAMED IN THE LINE, the one late longest, and Heads up says it first', async () => {
@@ -193,6 +196,6 @@ test('A PART OF A PLAN PAST ITS DAY IS NAMED IN THE LINE, the one late longest, 
   assert.deepEqual(lead?.values?.['installments-late.first_amount'], gbp(48_000));
   assert.equal(lead?.values?.['installments-late.first_due'], day(-10));
   type Said = Drawn & { says_at?: number };
-  const heads = value<{ blocks: Said[] }>(k.page('money')).blocks.find((b) => typeof b.says_at === 'number');
+  const heads = value<{ blocks: Said[] }>(k.page('money')).blocks.find((b) => typeof b.says_at === 'number' && b.lead !== true);
   assert.match(heads?.body ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u, 'Heads up says the late part first');
 });

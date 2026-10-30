@@ -442,6 +442,15 @@
     return { at, places: sideOrder(places, at), others };
   });
   const sideHomes = $derived(homesOf(sideLists, placed.places, placed.at));
+  /* A PAGE HELD OFF THE RAIL WHILE ITS LISTS ARE EMPTY (`waits`, audit 31 Oct f, AF7) goes under its section's place, at
+     the end of that place's rows (under Money's More), or under More lists where its section is no place: Splits and
+     Weather, just installed, had no row and no crumb. Hidden pages stay hidden. */
+  const waiting = $derived.by(() => {
+    const byName = new Map(placed.places.map((p) => [p.label.trim().toLowerCase(), p.key] as const));
+    return navPrefs
+      .relabel(data.nav.filter((n) => n.waits === true && !navPrefs.hidden.includes(n.href)))
+      .map((n) => ({ href: n.href, label: n.title, icon: n.icon, home: byName.get(n.section.trim().toLowerCase()) ?? IN_MORE }));
+  });
   const model = $derived(
     sideModel({
       places: placed.places,
@@ -466,6 +475,7 @@
       /* MONEY KEEPS ITS PAGES OPEN AND ITS LISTS FOLDED (Q35 of the 29 Oct audit): the places he goes stand under it,
          and Snapshots, Books, Exchange rates, Categories and the rest wait under its More. */
       leads: placed.at.money ? { [placed.at.money]: moneyLead(rail.views[placed.at.money], [...rail.places, ...rail.rest].find((i) => i.key === placed.at.money)?.href) } : {},
+      waiting,
     }),
   );
   /* A TAB IS LIT ON ITS PLACE'S OWN LISTS TOO, as the sidebar's place unfolds there: Money's tab on its ledger. */

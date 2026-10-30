@@ -346,3 +346,25 @@ test('in play, earning and building are said in one place, by the lanes a list d
   assert.equal(inPlayOf('shipped', lanes), false);
   assert.equal(inPlayOf('retired', lanes), true);
 });
+
+test('A PAGE HELD OFF THE RAIL GOES UNDER ITS PLACE, OR UNDER MORE LISTS WHERE ITS SECTION IS NO PLACE (audit 31 Oct f, AF7)', () => {
+  const places = [TODAY, DECIDE, MONEY];
+  const m = sideModel({
+    places,
+    others: [],
+    projects: null,
+    lists: [],
+    homes: homesOf([], places, AT),
+    views: { [MONEY.key]: [{ href: '/p/money-ledger', label: 'Ledger', icon: 'doc' }] },
+    tools: [],
+    foot: [],
+    counted: {},
+    waiting: [
+      { href: '/p/splits', label: 'Splits', icon: 'split', home: MONEY.key },
+      { href: '/p/weather', label: 'Weather', icon: 'sun', home: IN_MORE },
+    ],
+  });
+  assert.deepEqual(m.places.find((p) => p.label === 'Money')?.kids.map((k) => k.href), ['/p/money-ledger', '/p/splits']);
+  assert.ok(m.more.some((k) => k.href === '/p/weather'));
+  assert.equal(litOf('/p/splits', m), '/p/splits');
+});
