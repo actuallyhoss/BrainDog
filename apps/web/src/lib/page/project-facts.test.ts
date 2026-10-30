@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runsOnOf, sessionsOf, sideOf, stripName, type FactTask, type FactsIn } from './project-facts.ts';
+import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runSaid, runsOnOf, sessionsOf, sideOf, stripName, type FactTask, type FactsIn } from './project-facts.ts';
 
 const NOW = Date.UTC(2026, 9, 27, 10);
 const TODAY = '2026-10-27';
@@ -228,4 +228,29 @@ test('sessions say how each ended, and what happened folds the record edits into
     happenedOf(base({ tasks }), numbersOf(base())).map((l) => l.text),
     ['4 tasks were added: Wave one, Wave two and 2 more.'],
   );
+});
+
+test('a run is said from when it was last heard: working, gone quiet, or how it ended (AG14)', () => {
+  const run = (at: number, state: string) => ({ agent: 'claude', at: new Date(at).toISOString(), state, closedAs: '', next: '', notes: [] });
+  assert.equal(runSaid(run(NOW - 5 * 60_000, 'active'), NOW), 'Claude is working on it now');
+  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'active'), NOW), 'Claude went quiet 2 h ago');
+  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'idle'), NOW), 'Claude went quiet 2 h ago');
+  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'done'), NOW), 'Claude worked on it 2 h ago, and the session stopped without a note');
+});
+
+test('an aim whose month has gone by says so and where it stands (AG24)', () => {
+  const aimed = (targetBy: string) => [
+    { name: 'Subscribers', measure: 'Subscribers', unit: '', every: '1w', headline: true, points: [{ at: '2026-10-20', value: 318 }], latest: { at: '2026-10-20', value: 318 }, change: null, target: 500, targetBy },
+  ];
+  const ahead = sideOf(base({ kpis: aimed('2026-12-01') }), numbersOf(base()));
+  assert.equal(ahead.kind === 'path' && ahead.aim, 'Aim: 500 by Dec 2026');
+  const gone = sideOf(base({ kpis: aimed('2026-08-01') }), numbersOf(base()));
+  assert.equal(gone.kind === 'path' && gone.aim, 'Aimed for 500 by Aug; 318 now.');
+});
+
+test('a renewal day gone by reads lapsed, in the late tone (AG17)', () => {
+  const services = [{ seq: 1, name: 'kilnfonts.example', provider: 'Nordhaven', kind: 'domain', renews: '2026-10-20', cost: null, cycle: 'yearly', state: 'live', note: '', href: '/r/services/1' }];
+  const [line] = runsOnOf({ today: TODAY, format: fmt, services }, numbersOf(base()));
+  assert.equal(line?.right, 'lapsed 20 Oct');
+  assert.equal(line?.tone, 'bad');
 });

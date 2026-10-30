@@ -41,7 +41,7 @@
   import { copy } from '$lib/copy.ts';
   import { said as voiceSaid } from '$lib/voice.svelte.ts';
   import { decl as fieldDecl, homeCurrency, labelOf } from '$lib/record/api.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
+  import { REGISTERS, TITLES } from '$lib/record/held.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';
@@ -325,6 +325,14 @@
     /* `{{ref:tasks#241}}` IS A LINK TO THAT ROW: its own page where its list made one, else its screen (`row-href.ts`).
        Record-relative, and `href` above puts it under the app. */
     link: rowHref,
+    /* AND IT IS SAID BY ITS ROW'S NAME (31 October, AG21), where the record named it or this tab has read its list:
+       "Tracked as #3" stood in Kiln's note where the task's name belonged. */
+    refName: (spoken: string) => {
+      const m = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u.exec(spoken);
+      if (!m) return null;
+      const known = (block as { names?: ReadonlyMap<string, string> }).names?.get(spoken);
+      return known ?? TITLES.get(m[1]!)?.get(Number(m[2])) ?? null;
+    },
     /* `{{date:2026-11-03}}` IS A LINK TO THAT DAY ON THE CALENDAR, on a record whose pages hold one (`day-href.ts`);
        on any other the renderer is answered `null` and draws the date plain. */
     dayHref: (iso: string) => dayHref((route.data as unknown as Partial<Shell>).pages, iso),

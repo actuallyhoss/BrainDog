@@ -41,7 +41,7 @@ import { money as moneyOf, monthShort } from 'braindog-render';
 import { moneyShown, partsLaid, type PartsHave } from './project-parts.ts';
 import { rowHref } from '$lib/record/row-href.ts';
 import { updateRow } from '../record/page-write.ts';
-import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runsOnOf, sessionsOf, sideOf, type FactKpi, type FactTask, type FactsIn, type KpiAt } from './project-facts.ts';
+import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runSaid, runsOnOf, sessionsOf, sideOf, type FactKpi, type FactTask, type FactsIn, type KpiAt } from './project-facts.ts';
 
 /**
  * A FLOW'S FIGURE AND ITS PERIOD AS TODAY SAYS THEM (`kpiView`, on the record's clock): its last whole period, and when
@@ -265,7 +265,18 @@ export class ShapeHold {
     const agentRow = (x: WorkRow) => {
       const a = agentOf(x);
       const on = working.has(a) || [...working].some((w) => actor(w).name === actor(a).name);
-      return { seq: x.seq, title: titleOf(x.fields), agent: a, live: (on ? 'working' : 'stopped') as 'working' | 'stopped', sub: `${actor(a).name}, ${on ? 'working now' : 'queued'}`, red: false };
+      /* ONE WORD FOR THE RUN, FROM WHEN IT WAS LAST HEARD (31 October, AG14), and what waits on you said as that: the
+         lead said its run "went quiet 2 h ago", the Path "waits on you", and this "Claude, queued", for one task. */
+      const st = String(x.fields[via.state.id] ?? '');
+      const theirs = read.runs.find((r) => actor(r.agent).name === actor(a).name);
+      const sub = on
+        ? `${actor(a).name}, working now`
+        : WAITS.includes(st)
+          ? `Waits on you${theirs ? ` · ${runSaid(theirs, read.now)}` : ''}`
+          : theirs
+            ? runSaid(theirs, read.now)
+            : `${actor(a).name} has it`;
+      return { seq: x.seq, title: titleOf(x.fields), agent: a, live: (on ? 'working' : 'stopped') as 'working' | 'stopped', sub, red: false };
     };
     const yourRow = (x: WorkRow) => {
       const st = String(x.fields[via.state.id] ?? '');

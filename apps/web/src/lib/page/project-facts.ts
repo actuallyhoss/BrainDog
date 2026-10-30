@@ -327,7 +327,7 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
   if (f.lane === 'parked' && f.since) facts.push(`${f.name} has been parked since ${f.since}.`);
   if (due.length > 0) facts.push(due.length === 1 ? `${quoted(due[0]!.title)} is due ${dayChip(due[0]!.by!)}.` : `${due.length} tasks fall due this week, the first ${dayChip(due[0]!.by!)}.`);
   const run = f.runs[0];
-  if (run) facts.push(`${agentName(run.agent)} worked on it ${ago(run.at, f.now)}, and the session ${endedAs({ state: run.state, closedAs: run.closedAs, handed: run.next !== '' || run.notes.length > 0 }).said.replace(/^still open$/u, 'is still open')}.`);
+  if (run) facts.push(`${runSaid(run, f.now)}.`);
   if (f.about !== '' && fold(f.about) !== fold(f.next)) facts.push(/[.!?]$/u.test(f.about) ? f.about : `${f.about}.`);
   const kept = facts.filter((s) => fold(s) !== fold(f.next));
   const headline = kept[0] ?? (open.length > 0 ? `${plural(open.length, 'task is', 'tasks are')} open on ${f.name}.` : `Nothing on ${f.name} has a date yet.`);
@@ -352,6 +352,25 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
   return { headline, lede, red, soft };
 }
 
+/** A run open and heard from inside this long is working: the kernel's `WORKING_MS` (`presenceOf`). */
+const WORKING_MS = 15 * 60_000;
+
+/**
+ * A RUN IN ONE SENTENCE, FROM WHEN IT WAS LAST HEARD (31 October, AG14): "Claude is working on it now", "Claude went
+ * quiet 2 h ago", or how it ended. The lead said "Claude worked on it 2 h ago, and the session is still open" of the
+ * run its own page called "Gone quiet", and the Tasks tile "Claude, queued"; each part says this now.
+ */
+export function runSaid(run: Pick<FactRun, 'agent' | 'at' | 'state' | 'closedAs' | 'next' | 'notes'>, now: number): string {
+  const who = agentName(run.agent);
+  const ended = endedAs({ state: run.state, closedAs: run.closedAs, handed: run.next !== '' || run.notes.length > 0 });
+  if (ended.open) {
+    const heard = Date.parse(run.at);
+    if (run.state === 'active' && Number.isFinite(heard) && now - heard <= WORKING_MS) return `${who} is working on it now`;
+    return `${who} went quiet ${ago(run.at, now)}`;
+  }
+  return `${who} worked on it ${ago(run.at, now)}, and the session ${ended.said}`;
+}
+
 const agentName = (agent: string): string => {
   const a = agent.trim().toLowerCase();
   const known: Record<string, string> = { claude: 'Claude', codex: 'Codex', cursor: 'Cursor', gemini: 'Gemini', other: 'An agent' };
@@ -370,6 +389,13 @@ export type SideTile =
 const PER_YEAR: Readonly<Record<string, number>> = { monthly: 12, month: 12, yearly: 1, year: 1, annual: 1, annually: 1, weekly: 52, quarterly: 4, fortnightly: 26 };
 const PER_MONTH: Readonly<Record<string, number>> = { weekly: 52 / 12, fortnightly: 26 / 12, twice_monthly: 2, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 };
 const live = (s: FactService): boolean => !/cancel|ended|gone/u.test(s.state);
+
+/**
+ * WHEN A SERVICE RENEWS, OR THAT IT LAPSED (31 October, AG17): a renewal day gone by is no renewal. Kiln read
+ * "kilnfonts.example renews 30 Aug" in the orange of the ones to come, on 3 Sep, beside the task four days late on it.
+ */
+const renewal = (renews: string | null, today: string): { said: string; gone: boolean } | null =>
+  renews === null ? null : renews < today ? { said: `lapsed ${daySaid(renews, today)}`, gone: true } : { said: `renews ${daySaid(renews, today)}`, gone: false };
 
 export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
   if (f.lane === 'earning') {
@@ -427,7 +453,7 @@ export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
     return {
       kind: 'keep',
       about: f.about,
-      lines: kept.slice(0, 4).map((s) => ({ k: `${s.name}${s.provider ? ` · ${s.provider}` : ''}`, v: s.renews ? `renews ${daySaid(s.renews, f.today)}` : s.cost ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}` : '', href: s.href })),
+      lines: kept.slice(0, 4).map((s) => ({ k: `${s.name}${s.provider ? ` · ${s.provider}` : ''}`, v: s.renews ? renewal(s.renews, f.today)!.said : s.cost ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}` : '', href: s.href })),
       year: year && year.minor > 0 ? `${f.format(year.minor, year.currency)} a year to keep` : kept.length === 0 ? 'Nothing it runs on is still paid for.' : null,
       domain,
     };
@@ -451,11 +477,25 @@ export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
   ];
   const aimK = f.kpis.find((k) => k.target !== null);
   const aimMoney = aimK && typeof aimK.target === 'string' ? amountOf(aimK.target) : null;
-  const aim = aimK
-    ? `${aimMoney ? f.format(aimMoney.minor, aimMoney.currency) : String(aimK.target)}${aimK.every === '1m' ? ' a month' : ''}${aimK.targetBy ? `, the aim by ${SHORT[Number(aimK.targetBy.slice(5, 7)) - 1]} ${aimK.targetBy.slice(0, 4)}` : ''}`
-    : null;
+  /* AN AIM WHOSE MONTH HAS GONE BY SAYS SO, AND WHERE IT STANDS (31 October, AG24): "Aim: 500, the aim by Aug 2026"
+     stood on 3 Sep at 318, as if August were still to come. */
+  const aim = aimK ? aimSaid(aimK, f) : null;
   if (stops.length === 0 && aim === null) return { kind: 'path', end: null, stops: [], aim: null, empty: `No task on ${f.name} has a day yet. Give one a day and its path is drawn here.` };
   return { kind: 'path', end: openDated.at(-1) ? daySaid(openDated.at(-1)!.by!, f.today) : null, stops, aim, empty: null };
+}
+
+/** A key number's aim in one line: "Aim: 500 by Aug 2026", or once that month has gone, "Aimed for 500 by Aug; 318 now." */
+function aimSaid(k: FactKpi, f: Pick<FactsIn, 'format' | 'today'>): string {
+  const money = typeof k.target === 'string' ? amountOf(k.target) : null;
+  const target = `${money ? f.format(money.minor, money.currency) : String(k.target)}${k.every === '1m' ? ' a month' : ''}`;
+  if (!k.targetBy) return `Aim: ${target}`;
+  const month = SHORT[Number(k.targetBy.slice(5, 7)) - 1];
+  if (k.targetBy.slice(0, 7) >= f.today.slice(0, 7)) return `Aim: ${target} by ${month} ${k.targetBy.slice(0, 4)}`;
+  const last = k.latest;
+  const lastMoney = last && typeof last.amount === 'string' ? amountOf(last.amount) : null;
+  const now = lastMoney ? f.format(lastMoney.minor, lastMoney.currency) : typeof last?.value === 'number' && Number.isFinite(last.value) ? last.value.toLocaleString('en-GB') : null;
+  const by = k.targetBy.slice(0, 4) === f.today.slice(0, 4) ? month : `${month} ${k.targetBy.slice(0, 4)}`;
+  return now === null ? `Aimed for ${target} by ${by}.` : `Aimed for ${target} by ${by}; ${now} now.`;
 }
 
 /* ── its dates ─────────────────────────────────────────────────────────── */
@@ -476,7 +516,7 @@ export function datesOf(f: FactsIn, most = 6): DateLine[] {
 
 /* ── what it runs on, and when each renews ────────────────────────────── */
 
-export type RunsOnLine = { name: string; sub: string; right: string; tone: 'warn' | 'good' | 'plain'; href: string | null };
+export type RunsOnLine = { name: string; sub: string; right: string; tone: 'bad' | 'warn' | 'good' | 'plain'; href: string | null };
 
 export function runsOnOf(f: Pick<FactsIn, 'today' | 'format'> & { services: readonly FactService[] }, numbers: Numbers): RunsOnLine[] {
   const lines: RunsOnLine[] = f.services
@@ -484,11 +524,12 @@ export function runsOnOf(f: Pick<FactsIn, 'today' | 'format'> & { services: read
     .sort((a, b) => (a.renews ?? '9999').localeCompare(b.renews ?? '9999'))
     .map((s) => {
       const soon = s.renews !== null && daysBetween(f.today, s.renews) <= 30;
+      const when = renewal(s.renews, f.today);
       return {
         name: s.name,
         sub: [s.provider || s.kind, s.cost && s.cost.minor > 0 ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}`.trim() : ''].filter(Boolean).join(' · '),
-        right: s.renews ? `renews ${daySaid(s.renews, f.today)}` : '',
-        tone: soon ? 'warn' : 'plain',
+        right: when?.said ?? '',
+        tone: when?.gone ? 'bad' : soon ? 'warn' : 'plain',
         href: s.href,
       };
     });

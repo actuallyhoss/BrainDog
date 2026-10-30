@@ -114,7 +114,7 @@ export const kpis = {
   kpiAddNumber: 'Add a number',
   kpiNoneYet: 'No key numbers yet.',
   kpiNotRead: 'The key numbers could not be read just now.',
-  kpiLeads: 'Leads the card',
+  kpiLeads: 'Shown first',
   /* UNDER TODAY'S NUMBERS, the door to every number kept. */
   kpiAllNumbers: 'All numbers',
 

@@ -60,8 +60,8 @@ Per product | One number per shipped thing | needs a definition of "shipped"
 Flat studio | One price, no counting | hardest to raise later
 \`\`\`
 
-Open as SG31 and it blocks two quotes. The September issue announces whichever wins, so it is not
-deferrable past {{date:2026-09-20}}.
+It waits on you in [Needs you](/decide) and blocks two quotes. The September issue announces whichever wins, so
+it is not deferrable past {{date:2026-09-20}}.
 
 ## 3 · What is on the roadmap
 
@@ -81,8 +81,8 @@ Object storage | {{money:4100 GBP}} a month | the binaries
 
 \`\`\`note | Watch this | warn
 \`kilnfonts.example\` is the redirect every old licence PDF points at. Letting it lapse breaks
-links in files that have already been delivered, which is not a thing an apology fixes. Tracked
-as {{ref:tasks#3}}.
+links in files that have already been delivered, which is not a thing an apology fixes. The task
+to turn auto-renew back on is {{ref:tasks#3}}.
 \`\`\`
 
 ## What is not verified
@@ -98,7 +98,7 @@ as {{ref:tasks#3}}.
 {{ago:2026-05-19}} | Moved off the old CI | Hobnail cancelled
 \`\`\`
 
-Settled by research. Do not run it again: the domain host comparison is D41.
+Settled by research. Do not run it again: the domain host comparison was decided for Nordhaven Registry.
 
 \`\`\`stat | This block is wrong on purpose
 Too | many | cells | for | a | stat | row
@@ -490,7 +490,7 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
         default: KPI_LIST.defaults.today,
         index: true,
       },
-      { id: 'headline', label: 'Leads the card', type: 'bool', default: KPI_LIST.defaults.headline },
+      { id: 'headline', label: 'Shown first', type: 'bool', default: KPI_LIST.defaults.headline },
       { id: 'order', label: 'Order', type: 'int' },
       /* SUGGESTED AND NOT KEPT YET, as a draft project is (portfolio 1.18.0): nothing is tracked until its owner keeps it. */
       { id: 'draft', label: 'Not kept yet', type: 'bool', default: KPI_LIST.defaults.draft },

@@ -101,7 +101,7 @@
   const agentLines = $derived(hold.here > 0 ? hold.sessionLines.filter((s) => !s.open) : hold.sessionLines);
   /* WHAT IT RUNS ON, ONE LIST: its services with when each renews, the numbers feed (its setup behind it), then the keys,
      tools and skills its agents used, one line a name and kind. */
-  type RunsLine = { name: string; sub: string; right: string; tone: 'warn' | 'good' | 'plain'; href: string | null; icon: LineIcon };
+  type RunsLine = { name: string; sub: string; right: string; tone: 'bad' | 'warn' | 'good' | 'plain'; href: string | null; icon: LineIcon };
   const runsLines = $derived<RunsLine[]>([
     ...hold.runsOnLines.map((l): RunsLine => {
       const feed = l.name === 'Numbers feed';
@@ -216,7 +216,7 @@
             {/each}
           </ol>
         {/if}
-        {#if side.aim}<p class="s-aim">Aim: {side.aim}</p>{/if}
+        {#if side.aim}<p class="s-aim">{side.aim}</p>{/if}
         {#if side.empty}<p class="s-empty">{side.empty}</p>{/if}
       </Tile>
     {:else if side.kind === 'keep'}
@@ -1059,12 +1059,13 @@
       flex-grow: 1;
     }
 
-    /* DATES IS AS TALL AS ITS DATES (Q32 of 29 October): two lines stood in a tile stretched to Runs on's height. */
-    .shape-part[data-shape='dates'] {
+    /* DATES IS AS TALL AS ITS DATES (Q32 of 29 October): two lines stood in a tile stretched to Runs on's height. AND
+       NUMBERS AS TALL AS ITS FIGURES (31 October, AG22): three figures stood over a tall empty band, stretched to Tasks. */
+    .shape-part:is([data-shape='dates'], [data-shape='numbers']) {
       align-self: start;
     }
 
-    .shape-part[data-shape='dates'] > :global(:last-child) {
+    .shape-part:is([data-shape='dates'], [data-shape='numbers']) > :global(:last-child) {
       flex-grow: 0;
     }
 
@@ -1290,6 +1291,12 @@
 
   .r-row[data-tone='warn'] .r-right {
     color: var(--warn);
+    font-weight: 600;
+  }
+
+  /* A RENEWAL GONE BY, "lapsed 30 Aug", in the red that late is drawn in everywhere else (AG17). */
+  .r-row[data-tone='bad'] .r-right {
+    color: var(--red);
     font-weight: 600;
   }
 

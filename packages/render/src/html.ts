@@ -129,6 +129,11 @@ export type RenderOptions = InlineOptions & {
   /** Turn a spoken id into an address. A link the host cannot resolve renders as plain text. */
   link?: (spoken: string) => string | null;
   /**
+   * THE NAME A SPOKEN ID GOES BY, `tasks#3` as "Turn auto-renew back on" (31 October, AG21): a note drew "Tracked as #3"
+   * where the task's name belonged. A host that knows no name answers `null` and the row's number stands.
+   */
+  refName?: (spoken: string) => string | null;
+  /**
    * Where a figure's rows are, by its position in the block. `null` is "nowhere to go".
    *
    * A FIGURE THAT IS NOT A DOOR IS A DEAD END. "Overdue · GBP 2,340.00" is a number somebody
@@ -1178,8 +1183,11 @@ export function written(value: string, o: Pick<RenderOptions, 'home'>, setting: 
  * (`GBP 18,400.00`), and drawn as it was one page spelled the pound two ways. Where the host does not say, and for every
  * other form, it is the text as written. The node keeps the stored form, which `text` hands the drawers that parse it.
  */
-export const typedText = (n: Extract<Inline, { type: 'typed' }>, o: Pick<RenderOptions, 'home'>): string =>
-  n.form === 'money' ? (written(n.text, o, 'read')?.text ?? n.text) : n.text;
+export const typedText = (n: Extract<Inline, { type: 'typed' }>, o: Pick<RenderOptions, 'home' | 'refName'>): string =>
+  n.form === 'money' ? (written(n.text, o, 'read')?.text ?? n.text) : n.form === 'ref' ? (named(o.refName?.(n.arg)) ?? n.text) : n.text;
+
+/** A row's name a host answered, trimmed, or `null` for none: an empty name is no name. */
+const named = (v: string | null | undefined): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
 /** A gauge's value or target: a stored amount as the writer says it short, and anything else as its cell wrote it. */
 export const gaugeFigure = (cell: string | undefined, o: Pick<RenderOptions, 'home'>): string | undefined =>
