@@ -29,8 +29,24 @@ checking it against the SHA-256 published beside it, and a `braindog` command be
 folder goes on your PATH if it is not there already: on Windows in your user PATH, elsewhere through one line in your
 shell's startup file, so a new terminal finds it. Nothing needs an administrator. Run the same line again to update.
 
-To sign this machine in to your record, run `braindog login` with the record's address, as in
-`braindog login https://app.brain.dog/<your record>`, and approve the six digits it prints in the app.
+## Set up a machine
+
+One line sets a machine up from your record:
+
+```sh
+braindog setup https://app.brain.dog/<your record>
+```
+
+It signs the machine in (approve the six digits it prints in the app), adds BrainDog's hooks to Claude Code's settings
+after showing you what it will add, registers the `braindog` MCP server in Claude Code and the other agent apps it
+finds, writes the tools and skills your record holds, and makes each agent a token of its own. Each step prints one
+line. `braindog setup <address> --dry-run` shows the steps and changes nothing, and running it again changes only
+what is missing.
+
+On a self-host, put its address in place of `https://app.brain.dog/<your record>`. With the server key in
+`BRAINDOG_TOKEN`, no sign-in is asked for, and each agent's token is made from the key.
+
+To sign the machine in and nothing else, run `braindog login https://app.brain.dog/<your record>`.
 
 To remove it, delete the `.braindog` folder in your home folder and the PATH line the install added.
 
