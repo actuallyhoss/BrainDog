@@ -367,7 +367,9 @@ test('an app not on this machine is one line and is left alone; --only names the
   mkdirSync(join(m.home, '.braindog'), { recursive: true });
   writeFileSync(profilesFile(m.home), `${JSON.stringify({ profiles: [m.work, join(m.home, '.claude-gone')] })}\n`);
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
-  assert.ok(saidStep(m.out, '3. MCP server, Fake App: not on this machine, so setup leaves it.'), m.out.join('\n'));
+  /* EVERY APP NOT HERE IN ONE LINE, after the ones that are. */
+  assert.equal(m.out.filter((l) => / not on this machine, so setup leaves (?:it|them)\.$/u.test(l)).length, 1, m.out.join('\n'));
+  assert.ok(m.out.some((l) => /^(?:3\.| {2}) MCP server, (?:.+, |.+ and )?Fake App(?: and .+)?: not on this machine, so setup leaves (?:it|them)\.$/u.test(l)), m.out.join('\n'));
   assert.ok(m.out.includes('   The profile ~/.claude-gone was set up before and is no longer on this machine, so it is left out.'), m.out.join('\n'));
   assert.ok(saidStep(m.out, '3. MCP server, Claude Code in ~/.claude-work: braindog is registered, running this command.'), m.out.join('\n'));
   assert.ok(!existsSync(join(m.home, '.fakeapp')) && !existsSync(join(m.home, '.claude-gone')));

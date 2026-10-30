@@ -591,7 +591,6 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
   if (stoppedBefore(3)) return 1;
   const entry = JSON.stringify(BRAINDOG_SERVER);
   const run = io.claude ?? runIn;
-  for (const c of apps.filter((app) => !here.includes(app))) io.out(`3. MCP server, ${c.title}: not on this machine, so setup leaves it.`);
   for (const dir of profiles) {
     const where = `Claude Code in ${nameOf(dir, io.home)}`;
     const done = await registerServer(dir, { home: io.home, env: io.env, cwd: io.cwd, dryRun, copied, run });
@@ -658,6 +657,10 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
     io.out(`3. MCP server, ${c.title}: braindog ${held !== undefined ? 'replaced the entry there and is' : 'is'} registered, running this command.`);
     detail(applied.lines);
   }
+
+  /* THE APPS NOT HERE, IN ONE LINE AFTER THE ONES THAT ARE, so the step opens on what it did. */
+  const absent = apps.filter((app) => !here.includes(app));
+  if (absent.length > 0) io.out(`3. MCP server, ${listOf(absent.map((c) => c.title))}: not on this machine, so setup leaves ${absent.length === 1 ? 'it' : 'them'}.`);
 
   /* ── 4 and 5. what the record holds for every machine ────────────────── */
   if (!held && dryRun) {
