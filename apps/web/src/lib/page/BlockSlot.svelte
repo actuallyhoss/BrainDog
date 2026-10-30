@@ -27,6 +27,7 @@
   import { held as heldRates } from '$lib/money/rates.svelte.ts';
   import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
   import LedgerCards, { cardsOf as linesOf } from '$lib/money/LedgerCards.svelte';
+  import { linesSaid } from '$lib/money/ledger-lines.ts';
   import { recordToday } from '$lib/record/zone.ts';
   import { kpiHref, kpisIn } from './kpis-in.ts';
   import QueueAnswer from './QueueAnswer.svelte';
@@ -907,7 +908,9 @@
   {#if linesPlan && moneyLooks.view === 'cards'}
     <LedgerCards columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} plan={linesPlan} home={homeCurrency()} {now} />
   {:else}
-  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} />
+  <!-- AND THE LEDGER VIEW SAYS WHO WAS PAID AS THE CARDS DO (`ledger-lines.ts`): words, not the bank's capitals. -->
+  {@const shown = folded ? all.slice(0, folded.shown) : all}
+  <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} />
   {/if}
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}

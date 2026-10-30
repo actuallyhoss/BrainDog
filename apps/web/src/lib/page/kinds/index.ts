@@ -10,8 +10,8 @@
  *
  * ADDING A KIND is three files and three lines, one in each registry: this table and `kinds/<kind>.ts` beside it;
  * the kernel's `packages/kernel/src/kinds/index.ts` and its `<kind>.ts`; and the renderer's row in
- * `packages/render/src/kinds.ts` `TABLE`. A kind's stylesheet is `kinds/<kind>.css`, and `styles.ts` beside this file
- * gathers every one, so no new kind edits `blocks.css`.
+ * `packages/render/src/kinds.ts` `TABLE`. A kind's stylesheet is `packages/skin/kinds/<kind>.css` with a line in
+ * `blocks-kinds.css`, so no new kind edits `blocks.css` and the site draws the kind as the app does.
  *
  * IT LOADS IN PLAIN NODE, and so does every module it names: `blocks.ts` imports it, and the app's tests import
  * `blocks.ts`. So a kind module imports no stylesheet, no `.svelte` file and no `$lib` path, and names its imports with

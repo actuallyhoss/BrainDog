@@ -27,8 +27,6 @@
      on (`blocks-kinds.css`). Before the charts, in the order the rules had when they were one sheet. */
   import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
-  /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
-  import './kinds/styles.ts';
   /* MONEY'S OWN LOOK, over the same kinds, on the pages its add-on brings (`$lib/money/look.css`). */
   import '$lib/money/look.css';
   import { setContext, untrack } from 'svelte';

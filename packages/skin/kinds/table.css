@@ -2,9 +2,12 @@
  * A `table` whose rows carry their group (group-table-draw-89): `Table.svelte`, in its grid and its phone card list,
  * draws a heading row per group, one cell across the columns holding the group's name and its count as a pill.
  *
- * HERE AND NOT IN `blocks.css`, so the rules arrive with the screens that draw a block (`styles.ts`) and the entry
- * stylesheet does not carry them: they put it over its 12 KB line. Only a page's block is drawn grouped (a list's own
- * table and a view hand `Table` no group), and every screen that draws one imports `styles.ts`.
+ * HERE AND NOT IN `blocks.css`, so the rules arrive with the screens that draw a block (`blocks-kinds.css`) and the
+ * entry stylesheet does not carry them: they put it over its 12 KB line. Only a page's block is drawn grouped (a list's
+ * own table and a view hand `Table` no group), and every screen that draws one imports `blocks-kinds.css`.
+ *
+ * IN THE SKIN AND NOT THE APP, as the calendar's sheet is, so the site's docs draw a grouped table and an empty cell as
+ * the app does (K1 of 30 Oct).
  *
  * The group's name at the table's own size, weight 600, its count as a pill. No rule, no wash, no colour of its own.
  */

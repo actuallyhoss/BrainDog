@@ -1,6 +1,6 @@
 /*
- * A `gallery` block (`kinds/gallery.ts`, drawn by `braindog-render`'s `Gallery.svelte` and its `toHTML` twin): a tile a
- * row, the picture where the record serves the file, the file's name where it is not a picture, and the caption under
+ * A `gallery` block (the app's `kinds/gallery.ts`, drawn by `braindog-render`'s `Gallery.svelte` and its `toHTML`
+ * twin): a tile a row, the picture where the record serves the file, the file's name where it is not a picture, and the caption under
  * either.
  *
  * THE HOST LAYS THE TILES OUT, and the renderer counts no columns: as many 10rem tracks as the block holds, and two
@@ -10,6 +10,9 @@
  * EVERY TILE KEEPS ONE SHAPE, 4:3, whatever it holds: a picture is cut to it, a file that is no picture is its name on
  * a well of the same size, and a tile whose file the record could not find is the same empty well over its caption. So
  * a missing file never collapses its tile and pulls the row out of line, and the caption still says what was there.
+ *
+ * IN THE SKIN AND NOT THE APP, so every place that draws blocks has it (`blocks-kinds.css`), like the calendar's:
+ * kept in the app's own kinds, the site's docs drew it unstyled (K1 of 30 Oct).
  */
 
 @layer components {
