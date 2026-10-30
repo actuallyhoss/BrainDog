@@ -77,7 +77,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
+  import { answeredLine, answerRowOf, askedDay, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, leave, pointerOff, settle } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
@@ -309,9 +309,8 @@
   /** "Asked by your rule Chase late payments, 16 Jul": who asked, at the row's foot and never leading it. */
   const askedLine = $derived.by(() => {
     if (!row) return '';
-    const at = new Date(question.at);
     /* THREE LETTERS FOR THE MONTH, as every other date reads ("3 Sep"); `en-GB`'s own short month says "Sept". */
-    const day = Number.isFinite(at.getTime()) ? `${at.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getMonth()]}` : '';
+    const day = askedDay(question.at);
     const rule = card.by.kind === 'rule' ? card.by.name.replace(/^A rule: /u, '') : null;
     const who = rule !== null ? cardWords.byRule(rule.charAt(0).toUpperCase() + rule.slice(1)) : card.by.kind === 'you' ? cardWords.byYou : cardWords.by(card.by.name);
     return day ? `${who}, ${day}` : who;

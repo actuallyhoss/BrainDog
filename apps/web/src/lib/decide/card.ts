@@ -723,12 +723,25 @@ export const ANSWERS_MOST = 2;
 const LATER_SAID = /^(?:later|not now|ask me later|ask later|remind me later|maybe later)\.?$/iu;
 
 /**
+ * WHETHER AN ANSWER OF THE ASKER'S OWN ONLY PUTS THE QUESTION OFF, so it is the one Later and no second is drawn beside
+ * it. One rule for the card and the question's own page: the page also counted "Not yet", which on a chase is an answer
+ * (do not chase it yet), so the opened question dropped the Later its card has (audit of 31 October, A24).
+ */
+export const putsOff = (label: string): boolean => LATER_SAID.test(label.trim());
+
+/** THE DAY A QUESTION WAS ASKED, as a card's foot says it: "3 Sep", three letters for the month as every date reads. */
+export function askedDay(iso: string): string {
+  const at = new Date(iso);
+  return Number.isFinite(at.getTime()) ? `${at.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getMonth()]}` : '';
+}
+
+/**
  * THE ROW OF ANSWERS A CARD DRAWS: at most two answers, the one the row fills first, and one quiet Later. An answer of
  * the asker's own that only puts the question off is that Later, so a card never shows "Later" and "Ask me later"
  * together. `more` is how many answers are left to the question's own page.
  */
 export function answerRowOf<W extends { key: string; label: string }>(ways: readonly W[], primary: string | null): { shown: W[]; later: W | null; more: number } {
-  const later = ways.length > 2 ? (ways.find((w) => LATER_SAID.test(w.label.trim()) && w.key !== primary) ?? null) : null;
+  const later = ways.length > 2 ? (ways.find((w) => putsOff(w.label) && w.key !== primary) ?? null) : null;
   const rest = ways.filter((w) => w !== later);
   const first = rest.find((w) => w.key === primary);
   const ordered = first ? [first, ...rest.filter((w) => w !== first)] : rest;

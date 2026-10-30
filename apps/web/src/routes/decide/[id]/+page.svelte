@@ -70,7 +70,7 @@
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { proposer, queueMergeOf, queueWords, type FileAt } from '$lib/page/queue-answer.ts';
   import '$lib/decide/form.css';
-  import { cardWords, queueOf, spoken } from '$lib/decide/card.ts';
+  import { askedDay, cardWords, putsOff, queueOf, spoken } from '$lib/decide/card.ts';
   import OptionVisual from '$lib/decide/OptionVisual.svelte';
   import { visualOf as drawingOf } from '$lib/decide/option-visual.ts';
   import { homeCurrency } from '$lib/record/api.ts';
@@ -1011,7 +1011,7 @@
      It opens the step that asks why not yet and until when. -->
 {#snippet later()}
   <!-- NEVER BESIDE AN ANSWER OF THE ASKER'S OWN THAT ONLY PUTS IT OFF: one Later, not "Later" and "Later". -->
-  {#if !deferring && !(question?.options ?? []).some((o) => /^(?:later|not now|ask me later|not yet)\.?$/iu.test(o.title.trim()))}
+  {#if !deferring && !(question?.options ?? []).some((o) => putsOff(o.title))}
     <!-- A CLOCK AND ITS WORDS, as on every card (VERIFY H8): "Ask me later", 44 under a thumb. The clock alone floated
          under the answers and said nothing to anybody who had not pressed it. -->
     <button type="button" class="dc-btn dc-later" data-weight="bare" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} aria-label={queueWords.notNow} title={queueWords.notNow} onclick={defer}
@@ -1138,7 +1138,8 @@
         <p class="gate-by">
           <span class="dc-sr">{cardWords.askedBy}</span>
           {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{askerSaid}</span>{/if}
-          <span class="gate-when">{since(question.opened, now)}</span>
+          <!-- WHEN, AS ITS CARD SAYS IT: a money row's card says the day ("3 Sep"), every other card how long ago. -->
+          <span class="gate-when">{moneyRow ? askedDay(question.opened) || since(question.opened, now) : since(question.opened, now)}</span>
         </p>
         <!-- WHAT IT IS ASKED WITH TO LOOK AT, above the answers: a still or a quiet card, opened full width on a press. -->
         <VisualStrip on={question.id} />
