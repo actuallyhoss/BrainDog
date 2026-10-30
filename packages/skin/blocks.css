@@ -779,6 +779,19 @@
       white-space: nowrap;
     }
 
+    /* SAID ON SCREEN TOO WHERE THE VALUE ALONE DOES NOT SAY WHAT IT IS (`cardCells`): "People 10", "Was £34". Quiet,
+       in the second line's size, before its value. */
+    [data-named] > .table-card-name {
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      overflow: visible;
+      clip-path: none;
+      color: var(--ink-3);
+      font-size: var(--fs-meta);
+      font-weight: 400;
+    }
+
     .table-card-rest {
       display: flex;
       flex-wrap: wrap;
