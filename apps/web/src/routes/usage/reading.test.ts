@@ -8,8 +8,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { daysOf, usageFromActions, usageFromLedger, words, type AccountUsage, type Allowed, type Group, type UsageView } from '../../lib/record/actions.ts';
-import { asksOf, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+import { daysOf, namesOf, usageFromActions, usageFromLedger, words, type AccountUsage, type Allowed, type Group, type UsageView } from '../../lib/record/actions.ts';
+import { asksOf, byProject, daysSaid, earlierOf, groupName, placeOf, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
 const t = (runs: number, held = 0) => ({ runs, requests: runs * 2, bytes: runs * 1_000, ms: runs * 10, failures: 0, held });
 
@@ -181,4 +181,19 @@ test('A MONTH OF RUNS SAYS THAT RULES ACTING ON CHANGES ARE NOT AMONG THEM, wher
   const view = usageFromActions([], '2026-09', 'events', '2026-09-03', true, [{ name: 'Weekly review', month: { runs: 1, failed: 0 } }]);
   assert.equal(sentenceOf(view)?.text, '1 run this month.');
   assert.equal(sentenceOf({ ...view, acted: true })?.text, `1 run this month. ${said.rulesApart}`);
+});
+
+test('a month whose runs were in no project is not split by project, and its actions name no project after them', () => {
+  const none = { key: '', name: 'Everywhere', totals: { runs: 158 } } as unknown as Group;
+  const kiln = { key: 'p_kiln', name: 'Kiln', totals: { runs: 3 } } as unknown as Group;
+  assert.equal(byProject([none]), false);
+  assert.equal(byProject([none, kiln]), true);
+  assert.equal(placeOf(none), '');
+  assert.equal(placeOf(kiln), 'Kiln');
+});
+
+test('a rule read back by its id is said in words, and a name of its own is kept', () => {
+  const names = namesOf({ automations: [{ id: 'weekly-review', name: 'weekly-review' }, { id: 'rent', name: 'Remind me of the rent' }] });
+  assert.equal(names.get('rule:weekly-review'), 'Weekly review');
+  assert.equal(names.get('rule:rent'), 'Remind me of the rent');
 });

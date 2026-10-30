@@ -52,7 +52,7 @@
   import Stacked from '$lib/viz/Stacked.svelte';
   import { homeCurrency } from '$lib/record/api.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
-  import { asksOf, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+  import { asksOf, byProject, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, placeOf, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
   import { extraOffered, hostedHere, readBilling, type BillingAnswer } from '../settings/billing.ts';
   import ExtraCap from './ExtraCap.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -129,9 +129,11 @@
   /* A ROW AN ACTION, BUSIEST FIRST, each with the project it runs in, so the month's heaviest work reads from the top. */
   const actionRows = $derived(
     groups
-      .flatMap((g) => g.actions.map((a) => ({ ...a, project: groupName(g) })))
+      .flatMap((g) => g.actions.map((a) => ({ ...a, project: placeOf(g) })))
       .sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name)),
   );
+  /* WHETHER A ROW A PROJECT SAYS ANYTHING: not when every run was in none. */
+  const split = $derived(byProject(groups));
   /* A ROW A PROJECT, BUSIEST FIRST, linking to its slice. Everywhere has no slice and no link. */
   const projectRows = $derived([...groups].sort((a, b) => b.totals.runs - a.totals.runs || groupName(a).localeCompare(groupName(b))));
   const parts = $derived(view ? projectParts(view.groups) : null);
@@ -362,7 +364,7 @@
         </Empty>
       {:else if sliced.length === 0}
         <!-- A ROW A PROJECT, then A ROW AN ACTION, each with its counts beside it; a project's row opens its slice. -->
-        <Tile class="section" data-surface="tile" title={words.byProject} count={projectRows.length || undefined}>
+        {#if split}<Tile class="section" data-surface="tile" title={words.byProject} count={projectRows.length || undefined}>
           <div class="section-body">
             <ul class="ledger use-list">
               {#each projectRows as g (g.key)}
@@ -379,14 +381,14 @@
               {/each}
             </ul>
           </div>
-        </Tile>
+        </Tile>{/if}
         <Tile class="section" data-surface="tile" title={words.byAction} count={actionRows.length || undefined}>
           <div class="section-body">
             <ul class="ledger use-list">
               {#each actionRows as a, i (`${a.project} ${a.name} ${i}`)}
                 <li>
                   <div class="line use-row" data-faint={a.faint ? '' : undefined}>
-                    <span class="line-title">{a.name}<span class="use-in">{` · ${a.project}`}</span></span>
+                    <span class="line-title">{a.name}{#if a.project}<span class="use-in">{` · ${a.project}`}</span>{/if}</span>
                     <span class="line-when use-counts">{countsOf(a)}</span>
                   </div>
                 </li>

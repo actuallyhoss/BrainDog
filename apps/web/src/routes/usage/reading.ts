@@ -103,6 +103,15 @@ export function offCloud(view: UsageView): UsageView {
 export const groupName = (g: Pick<Group, 'key' | 'name'>): string => (g.key === '' ? said.noProject : g.name);
 
 /**
+ * WHETHER THE MONTH'S RUNS ARE SPLIT BY PROJECT AT ALL: only when some ran in a project. A month where every run was in
+ * none said "By project: Not in a project" over fourteen actions each ending "· Not in a project" (audit 2, B16).
+ */
+export const byProject = (groups: readonly Pick<Group, 'key' | 'totals'>[]): boolean => groups.some((g) => g.key !== '' && g.totals.runs > 0);
+
+/** The project an action's line names after it: its project's name, and nothing for the actions in no project. */
+export const placeOf = (g: Pick<Group, 'key' | 'name'>): string => (g.key === '' ? '' : g.name);
+
+/**
  * The month before, where the record was alive in it: `null` for a month before the earliest record was made, and the
  * month as it was where the host does not say when that was.
  */

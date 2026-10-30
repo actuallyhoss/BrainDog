@@ -670,14 +670,31 @@ export function namesOf(o: {
   const out = new Map<string, string>(o.actions ? projectNames(o.actions) : []);
   for (const a of o.automations ?? []) {
     /* THE LEDGER NAMES A RULE'S RUN `rule:<id>` (`@braindog/host` `meteredOf`); both ids are kept, as either can be it. */
-    out.set(`rule:${a.id}`, a.name);
-    if (a.rule) out.set(`rule:${a.rule}`, a.name);
+    const name = spokenName(a.name, [a.id, a.rule]);
+    out.set(`rule:${a.id}`, name);
+    if (a.rule) out.set(`rule:${a.rule}`, name);
   }
   for (const s of o.scripts ?? []) {
-    out.set(s.id, s.title);
-    if (s.script) out.set(s.script, s.title);
+    const title = spokenName(s.title, [s.id, s.script]);
+    out.set(s.id, title);
+    if (s.script) out.set(s.script, title);
   }
   return out;
+}
+
+/** A name written as an id: lower case words joined by hyphens, underscores or dots, as `weekly-review`. */
+const SLUG = /^[a-z0-9]+(?:[-_.][a-z0-9]+)+$/u;
+
+/**
+ * A NAME AS A PERSON READS IT, where the record answered the id in its place: a rule declared with no name of its own
+ * is read back by its id, and Usage said "weekly-review" (audit 2, B16). Said in words, as `nameOf` says a name the
+ * ledger holds none for.
+ */
+function spokenName(name: string, ids: readonly (string | undefined)[]): string {
+  const bare = name.trim();
+  if (bare === '') return humanize(ids.find((id) => id !== undefined && id !== '') ?? '');
+  const isId = ids.some((id) => id !== undefined && (id === bare || id.replace(/^rule\./u, '') === bare));
+  return isId || SLUG.test(bare) ? humanize(bare) : bare;
 }
 
 /** An amount of one meter, as a person reads it. */
