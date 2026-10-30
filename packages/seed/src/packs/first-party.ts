@@ -896,6 +896,8 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - estate 2.6.1 (finish loop, 30 Oct, audit 2 B14): `rule.renew-soon` asks only about a service that costs more than
  *   nothing, and the two rules that act on its answer are named for what they do, since a question's answers read
  *   them as their reasons. Words and a condition, nothing added or taken away, so a patch step.
+ * - money-core 3.33.0, before it shipped (audit 31 Oct f, AF4): Money's first line leads with late bills, or the low
+ *   point when cash goes under within 12 weeks, the card second (`page.money`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.1',
