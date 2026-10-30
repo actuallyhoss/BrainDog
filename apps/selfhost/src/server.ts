@@ -167,15 +167,27 @@ function openDriver(path: string): Sql & { close(): void } {
     all: <T = Row>(text: string, ...params: Param[]) => db.prepare(text).all(...(params as never[])) as T[],
     one: <T = Row>(text: string, ...params: Param[]) => db.prepare(text).get(...(params as never[])) as T | undefined,
     transactionSync<T>(fn: () => T): T {
-      if (depth > 0) return fn();
-      db.exec('BEGIN');
+      /* A NESTED CALL IS A SAVEPOINT, as on the Durable Object, where a nested `storage.transactionSync` is one
+         (measured on workerd 1.20260903.1): an inner throw undoes the inner writes and nothing else, and the outer
+         transaction carries on. This answered a nested call with `fn()`, so an inner throw that its caller caught kept
+         its writes here and lost them on the Cloud (the conformance suite's `transaction-nested`). Named by depth, so
+         the stack of savepoints unwinds in order; `attempt()`'s own are `dog_attempt_N` and never collide. */
+      const savepoint = depth > 0 ? `dog_tx_${depth}` : null;
+      db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
       depth++;
       try {
         const value = fn();
-        db.exec('COMMIT');
+        db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT');
         return value;
       } catch (e) {
-        db.exec('ROLLBACK');
+        /* ONLY WHILE THERE IS ONE TO ROLL BACK: an error SQLite answers by ending the transaction itself (a full disk,
+           an ON CONFLICT ROLLBACK) has already undone it, and a second rollback would throw over the first error. */
+        if (db.isTransaction) {
+          if (savepoint) {
+            db.exec(`ROLLBACK TO ${savepoint}`);
+            db.exec(`RELEASE ${savepoint}`);
+          } else db.exec('ROLLBACK');
+        }
         throw e;
       } finally {
         depth--;

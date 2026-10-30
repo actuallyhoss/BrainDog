@@ -57,9 +57,11 @@ export function projectedText(fields: readonly Searchable[], values: Record<stri
        jamo and kana voicing are letters, not marks — so a name stored decomposed became a different
        token from the same name typed composed, and was findable by nothing. One end normalised is
        worse than neither. */
+    /* A U+0000 IS A GAP, as white space is: the port refuses a text holding one (`guard`), and a row written before it
+       was must still be indexed when it is next written. */
     const text = (Array.isArray(raw) ? raw.map((v) => String(v)).join(' ') : String(raw))
       .normalize('NFC')
-      .replace(/\s+/g, ' ')
+      .replace(/[\s\u0000]+/g, ' ')
       .trim();
     if (text) lines.push(text);
   }

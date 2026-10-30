@@ -2,14 +2,14 @@
  * The driver half of the suite: what the `Sql` port answers on each host, below the kernel.
  *
  * Values in and out, the guard's ceilings, transactions, FTS5, JSON, the SQL the kernel reaches for, and the
- * Durable Object's limits the guard does not count. Every case starts on an empty database of its own.
+ * Durable Object's limits on a statement's shape. Every case starts on an empty database of its own.
  *
  * WHERE A CASE PINS A VALUE IT WAS MEASURED ON `node:sqlite` (Node 24.13.0, SQLite 3.50.4) or is the Durable Object's
  * documented ceiling (`DO_LIMITS`, `packages/ports/src/sql.ts`). Where the Durable Object's answer is not known, the case
  * asserts only what the contract promises and puts what it saw in its trace, so `compare.run.ts` finds the difference.
  */
 
-import { DO_LIMITS, bootProbe, measureCaps, type Param, type Sql } from '@braindog/ports';
+import { DO_LIMITS, DO_MEASURED, bootProbe, measureCaps, type Param, type Sql } from '@braindog/ports';
 
 import { codeOf, thrownCode, type Case } from './suite.ts';
 
@@ -37,7 +37,9 @@ export const SQL_CASES: Case[] = [
         ['smallest-safe', -Number.MAX_SAFE_INTEGER, 'number'],
         ['fraction', 0.1, 'real'],
         ['negative-fraction', -2.5, 'real'],
-        ['huge', 1e308, 'real'],
+        /* NOT 1e308: every double past 2^53 is a whole number to JavaScript, and the guard refuses those as
+           INT_OUT_OF_RANGE (`guard-int-range`). This is the largest with a fraction a double can hold. */
+        ['large-fraction', 4503599627370495.5, 'real'],
         ['subnormal', 5e-324, 'real'],
         ['empty-text', '', 'text'],
         ['ascii', 'hello', 'text'],
@@ -54,29 +56,32 @@ export const SQL_CASES: Case[] = [
         const row = rows[i]!;
         t.equal(row.k, k, 'the rows came back out of order');
         t.deepEqual(row.x, x, `${k} came back as something else`);
-        /* A WHOLE NUMBER'S STORAGE CLASS IS LEFT TO THE TRACE: `node:sqlite` binds every JavaScript number as a REAL
-           (measured: 1 is typeof 'real' and CAST text '1.0'), and `number-storage-class` is the case about it. */
-        if (kind !== 'number') t.equal(row.t, kind, `${k} was stored as ${row.t}`);
+        /* A WHOLE NUMBER IS A REAL ON BOTH HOSTS: each binds every JavaScript number as one (measured on Node 24.13.0
+           and on workerd 1.20260903.1: 1 is typeof 'real'), and `number-storage-class` is the case about it. */
+        t.equal(row.t, kind === 'number' ? 'real' : kind, `${k} was stored as ${row.t}`);
       }
-      /* AND LEFT OUT OF THIS TRACE TOO, so one difference is reported once, by the case that is about it. */
-      return { rows: rows.map((r, i) => (sent[i]![2] === 'number' ? { k: r.k, x: r.x } : r)) };
+      return { rows };
     },
   },
   {
     id: 'number-storage-class',
     area: 'values',
-    says: 'a whole JavaScript number is bound the same way on both hosts, so SQL that turns it into text writes the same text',
-    /* NO `drift`, BECAUSE THE DURABLE OBJECT'S ANSWER IS NOT MEASURED. `node:sqlite` binds every number as a REAL, so
-       `CAST(? AS TEXT)` of 1 is '1.0' and a number bound into a TEXT column or `json_set` is written with a `.0`. If the
-       Durable Object binds a whole number as an INTEGER, the traces differ here and `compare.run.ts` says so. */
+    says: 'a whole JavaScript number is bound as a REAL on both hosts, so SQL that turns it into text writes the same text',
+    /* MEASURED ON BOTH, 30 Oct 2026: node:sqlite (Node 24.13.0) and the Durable Object (workerd 1.20260903.1) each bind
+       every JavaScript number as a REAL, so `CAST(? AS TEXT)` of 1 is '1.0', `json_object('n', ?)` is {"n":1.0} and 1
+       bound into a TEXT column is stored as '1.0'. Finish-queue Y3 had read the self-host as the odd one out and asked it
+       to bind whole numbers as INTEGERs; that would have made it the only host writing '1' and {"n":1}, and turned
+       `json_type(...) = 'integer'` true on one host and false on the other. So neither changes, and this holds them
+       alike. A bigint is the way to bind an INTEGER on both (`bigint-param`). */
     run(h, t) {
-      const sent: [string, number][] = [
-        ['one', 1],
-        ['largest-safe', Number.MAX_SAFE_INTEGER],
-        ['half', 0.5],
-        ['minus-zero', -0],
+      const sent: [string, number, string, string][] = [
+        ['one', 1, '1.0', '{"n":1.0}'],
+        ['minus-one', -1, '-1.0', '{"n":-1.0}'],
+        ['a-day-in-ms', 1_761_830_400_000, '1761830400000.0', '{"n":1761830400000.0}'],
+        ['half', 0.5, '0.5', '{"n":0.5}'],
+        ['minus-zero', -0, '0.0', '{"n":0.0}'],
       ];
-      const seen = sent.map(([k, n]) => {
+      const seen = sent.map(([k, n, s, j]) => {
         const row = h.sql.one<{ v: Param; t: string; s: string; j: string }>(
           "SELECT ? AS v, typeof(?) AS t, CAST(? AS TEXT) AS s, json_object('n', ?) AS j",
           n,
@@ -85,13 +90,37 @@ export const SQL_CASES: Case[] = [
           n,
         )!;
         t.ok(row.v === n || (Object.is(n, -0) && row.v === 0), `${k} came back as ${String(row.v)}`);
+        t.deepEqual({ t: row.t, s: row.s, j: row.j }, { t: 'real', s, j }, `${k} was bound as something other than a REAL`);
         return { k, t: row.t, s: row.s, j: row.j };
       });
       /* AND INTO A TEXT COLUMN, which is where the class shows in a stored value. */
       h.sql.exec('CREATE TABLE words (w TEXT)');
       h.sql.exec('INSERT INTO words (w) VALUES (?)', 1);
       const word = h.sql.one<{ w: string }>('SELECT w FROM words')!.w;
+      t.equal(word, '1.0', 'a whole number bound into a TEXT column was stored as other text');
       return { seen, intoText: word };
+    },
+  },
+  {
+    id: 'real-as-text-past-fifteen-digits',
+    area: 'values',
+    says: 'a REAL of more than fifteen significant digits turned into text in SQL reads back as the same number',
+    drift: {
+      host: 'node:sqlite',
+      why: "the SQLite node:sqlite bundles (3.50.4) writes a REAL as text to fifteen significant digits, so 2^53 - 1 becomes '9.00719925474099e+15' and 0.1 + 0.2 becomes '0.3'; the Durable Object's SQLite writes the shortest text that reads back exactly (measured on workerd 1.20260903.1: '9007199254740991.0'). Not the binding, which is a REAL on both, and not fixable by binding: an INTEGER would write '9007199254740991', which is still not the Cloud's text. Nothing the record writes through SQL is a number this long: a decimal field is held to fifteen digits (kernel/src/coerce.ts) and a row's JSON is written by JSON.stringify",
+    },
+    run(h, t) {
+      const sent: [string, number][] = [
+        ['largest-safe', Number.MAX_SAFE_INTEGER],
+        ['seventeen-digits', 0.1 + 0.2],
+      ];
+      const seen = sent.map(([k, n]) => {
+        const row = h.sql.one<{ s: string; j: string }>("SELECT CAST(? AS TEXT) AS s, json_object('n', ?) AS j", n, n)!;
+        t.equal(Number(row.s), n, `${k} as text read back as ${row.s}`);
+        t.equal((JSON.parse(row.j) as { n: number }).n, n, `${k} in JSON read back as ${row.j}`);
+        return { k, s: row.s, j: row.j };
+      });
+      return { seen };
     },
   },
   {
@@ -117,20 +146,21 @@ export const SQL_CASES: Case[] = [
   {
     id: 'text-with-nul',
     area: 'values',
-    says: 'a string holding U+0000 is stored whole or refused, never cut short',
-    drift: {
-      host: 'node:sqlite',
-      why: "node:sqlite binds a string up to its first U+0000 (measured on Node 24.13.0: 'a\\u0000b' is stored as 'a', length 1), so a text field holding one loses its tail without a word",
-    },
+    says: 'a string holding U+0000 is refused as SYNTAX on both hosts, never cut short or kept half-readable',
+    /* REFUSED BY THE GUARD ON BOTH (packages/ports/src/sql.ts, step 4). Measured before it: node:sqlite stored
+       'a\u0000b' as 'a', and the Durable Object kept all three characters, which its own length() read as one. The
+       kernel refuses such a text at its field first, in words (`coerce`, VALUE_MALFORMED). */
     run(h, t) {
       table(h.sql);
       const sent = 'before\u0000after';
       const code = codeOf(() => h.sql.exec('INSERT INTO v (k, x) VALUES (?, ?)', 'nul', sent));
-      if (code !== 'ok') return { refused: code };
-      const row = h.sql.one<{ x: string; n: number }>('SELECT x, length(CAST(x AS BLOB)) AS n FROM v')!;
-      t.equal(row.x, sent, 'the text was cut at the NUL');
-      t.equal(row.n, 12, 'the stored bytes are not the twelve that were sent');
-      return { stored: row.x, bytes: row.n };
+      t.equal(code, 'SYNTAX', 'a text holding U+0000 was not refused');
+      t.equal(h.sql.all('SELECT 1 FROM v').length, 0, 'a refused text left a row');
+      /* THE SAME BYTES AS BYTES ARE A BLOB, kept whole on both. */
+      h.sql.exec('INSERT INTO v (k, x) VALUES (?, ?)', 'bytes', Uint8Array.of(97, 0, 98));
+      const n = h.sql.one<{ n: number }>('SELECT length(x) AS n FROM v')!.n;
+      t.equal(n, 3, 'the bytes were cut at the zero');
+      return { refused: code, bytes: n };
     },
   },
   {
@@ -378,10 +408,9 @@ export const SQL_CASES: Case[] = [
     id: 'transaction-nested',
     area: 'transactions',
     says: 'a nested transactionSync whose throw is caught undoes only its own writes, and the outer one commits',
-    drift: {
-      host: 'node:sqlite',
-      why: "the self-host's port answers a nested call with fn() (apps/selfhost/src/server.ts, transactionSync: `if (depth > 0) return fn()`), so the inner writes stay; the Durable Object's is a savepoint (apps/worker/src/index.ts storageSql, measured on workerd 1.20260903.1)",
-    },
+    /* BOTH HOSTS MAKE A SAVEPOINT: the Durable Object's nested `storage.transactionSync` is one (apps/worker/src/index.ts
+       storageSql, measured on workerd 1.20260903.1), and the self-host's port opens `SAVEPOINT dog_tx_N` (apps/selfhost
+       openSqlite), where it once answered a nested call with fn() and kept the inner writes. */
     run(h, t) {
       table(h.sql);
       h.sql.transactionSync(() => {
@@ -394,10 +423,26 @@ export const SQL_CASES: Case[] = [
         } catch {
           /* caught by its caller, which carries on */
         }
+        /* AND ONE THAT KEEPS ITS WRITES: a nested call that returns commits with the outer one, two deep. */
+        const kept = h.sql.transactionSync(() => {
+          h.sql.exec("INSERT INTO v (k, x) VALUES ('nested', 4)");
+          return h.sql.transactionSync(() => (h.sql.exec("INSERT INTO v (k, x) VALUES ('deeper', 5)"), 'kept'));
+        });
+        t.equal(kept, 'kept', 'a nested transaction did not hand back its value');
         h.sql.exec("INSERT INTO v (k, x) VALUES ('after', 3)");
       });
       const rows = h.sql.all<{ k: string }>('SELECT k FROM v ORDER BY rowid').map((r) => r.k);
-      t.deepEqual(rows, ['outer', 'after'], 'the inner transaction kept its writes after it threw');
+      t.deepEqual(rows, ['outer', 'nested', 'deeper', 'after'], 'the inner transaction kept its writes after it threw');
+      /* AND THE OUTER ONE STILL ROLLS BACK WHOLE, the savepoints released inside it included. */
+      try {
+        h.sql.transactionSync(() => {
+          h.sql.transactionSync(() => h.sql.exec("INSERT INTO v (k, x) VALUES ('gone', 6)"));
+          throw new Error('the outer one says no');
+        });
+      } catch {
+        /* expected */
+      }
+      t.equal(h.sql.all("SELECT 1 FROM v WHERE k = 'gone'").length, 0, 'a released savepoint outlived its outer rollback');
       return { rows };
     },
   },
@@ -594,75 +639,80 @@ export const SQL_CASES: Case[] = [
     },
   },
 
-  /* ── the Durable Object's ceilings the guard does not count ─────────────────────────────────────────────────────── */
+  /* ── the Durable Object's ceilings on a statement's shape, which the guard counts from below ─────────────────────── */
+  /* EACH WAS A DRIFT: node:sqlite allows a depth of 1,000, 2,000 columns, 1,000 arguments and a billion bytes, so a
+     statement the self-host ran failed on the Cloud. `guardShape` and step 4 of `guard` (packages/ports/src/sql.ts) now
+     refuse them on both hosts, at the numbers the Durable Object was measured at on workerd 1.20260903.1. */
   {
     id: 'limit-expression-depth',
     area: 'limits',
-    says: 'an expression deeper than the Durable Object\'s 100 is refused as EXPR_TOO_DEEP, and a shallow one runs',
-    drift: {
-      host: 'node:sqlite',
-      why: 'the guard does not count expression depth (packages/ports/src/sql.ts, guard: "Expression depth is not here"); node:sqlite allows 1,000, so a statement the self-host runs fails on the Cloud',
-    },
+    says: "an expression deeper than the Durable Object's 100 is refused as EXPR_TOO_DEEP, and a shallow one runs",
     run(h, t) {
       const chain = (n: number) => `SELECT ${Array.from({ length: n }, () => '1').join(' + ')} AS v`;
       const shallow = h.sql.one<{ v: number }>(chain(50))!.v;
       t.equal(shallow, 50, 'a shallow expression did not run');
+      const edge = h.sql.one<{ v: number }>(chain(DO_LIMITS.exprDepth))!.v;
+      t.equal(edge, DO_LIMITS.exprDepth, 'an expression exactly as deep as the Durable Object allows did not run');
       const deep = codeOf(() => h.sql.all(chain(150)));
       t.equal(deep, 'EXPR_TOO_DEEP', 'an expression deeper than the Durable Object allows ran');
-      return { shallow, deep };
+      return { shallow, edge, deep };
     },
   },
   {
     id: 'limit-columns',
     area: 'limits',
-    says: "a table of more than the Durable Object's 100 columns is refused as TOO_MANY_COLUMNS",
-    drift: {
-      host: 'node:sqlite',
-      why: 'DO_LIMITS.column (100) is declared and not counted by guard; node:sqlite allows 2,000',
-    },
+    says: "a table, an index or a SELECT of more than the Durable Object's 100 columns is refused as TOO_MANY_COLUMNS",
     run(h, t) {
       const create = (name: string, n: number) =>
         `CREATE TABLE ${name} (${Array.from({ length: n }, (_, i) => `c${i} TEXT`).join(', ')})`;
       const fifty = codeOf(() => h.sql.exec(create('fifty', 50)));
+      const hundred = codeOf(() => h.sql.exec(create('hundred', DO_LIMITS.column)));
       const over = codeOf(() => h.sql.exec(create('over', DO_LIMITS.column + 1)));
-      t.deepEqual({ fifty, over }, { fifty: 'ok', over: 'TOO_MANY_COLUMNS' }, 'the column ceiling moved');
-      return { fifty, over };
+      const results = codeOf(() => h.sql.all(`SELECT ${Array.from({ length: DO_LIMITS.column + 1 }, (_, i) => `${i} AS c${i}`).join(', ')}`));
+      t.deepEqual(
+        { fifty, hundred, over, results },
+        { fifty: 'ok', hundred: 'ok', over: 'TOO_MANY_COLUMNS', results: 'TOO_MANY_COLUMNS' },
+        'the column ceiling moved',
+      );
+      return { fifty, hundred, over, results };
     },
   },
   {
     id: 'limit-function-args',
     area: 'limits',
-    says: "a call with more than the Durable Object's 32 arguments is refused, and one with 20 runs",
-    drift: {
-      host: 'node:sqlite',
-      why: 'DO_LIMITS.functionArg (32) is declared and not counted by guard; node:sqlite on SQLite 3.50.4 allows 1,000 (measured: json_array of 40 runs)',
-    },
+    says: "a call with more than the Durable Object's 127 arguments is refused as SYNTAX, and one with 127 runs",
+    /* 127, NOT `DO_LIMITS.functionArg`'s documented 32: measured on workerd 1.20260903.1, json_array of 40 and of 127
+       ran and of 128 was `too many arguments on function`. The guard counts at what the Cloud refuses
+       (`DO_MEASURED.functionArg`), so it never refuses what the Cloud runs. */
     run(h, t) {
       const call = (n: number) => `SELECT json_array(${Array.from({ length: n }, (_, i) => String(i)).join(', ')}) AS v`;
       const twenty = h.sql.one<{ v: string }>(call(20))!.v;
       t.equal(JSON.parse(twenty).length, 20, 'twenty arguments did not run');
-      const forty = codeOf(() => h.sql.all(call(40)));
-      t.ok(forty !== 'ok', 'forty arguments ran where the Durable Object refuses more than 32');
-      return { twenty: JSON.parse(twenty).length, fortyRefused: forty !== 'ok' };
+      const most = h.sql.one<{ v: string }>(call(DO_MEASURED.functionArg))!.v;
+      t.equal(JSON.parse(most).length, DO_MEASURED.functionArg, 'as many arguments as the Durable Object takes did not run');
+      const over = codeOf(() => h.sql.all(call(DO_MEASURED.functionArg + 1)));
+      t.equal(over, 'SYNTAX', 'more arguments than the Durable Object takes ran');
+      return { twenty: JSON.parse(twenty).length, most: JSON.parse(most).length, over };
     },
   },
   {
     id: 'limit-value-length',
     area: 'limits',
-    says: 'a bound string past the Durable Object\'s length ceiling is refused, and one of a megabyte is stored whole',
-    drift: {
-      host: 'node:sqlite',
-      why: 'DO_LIMITS.length (2 MB; workerd sets 4 MB) is declared and not counted by guard, and node:sqlite takes a billion bytes; coerce caps text but not a json field or a row\'s whole fields (kernel/src/coerce.ts TEXT_CAPS)',
-    },
+    says: "a bound value past the Durable Object's 4 MB is refused as STATEMENT_TOO_LONG, and one of a megabyte is stored whole",
+    /* 4 MB, NOT `DO_LIMITS.length`'s documented 2 MB: measured on workerd 1.20260903.1, a bound string of 4,194,304
+       bytes ran and of 4,194,305 was `string or blob too big` (`DO_MEASURED.length`). The kernel holds a row's fields to
+       the documented 2 MB with a sentence first (`ROW_CAP`, kernel/src/coerce.ts). */
     run(h, t) {
       table(h.sql);
       const megabyte = 'm'.repeat(1024 * 1024);
       h.sql.exec('INSERT INTO v (k, x) VALUES (?, ?)', 'megabyte', megabyte);
       const n = h.sql.one<{ n: number }>("SELECT length(x) AS n FROM v WHERE k = 'megabyte'")!.n;
       t.equal(n, megabyte.length, 'a megabyte was not stored whole');
-      const over = codeOf(() => h.sql.exec('INSERT INTO v (k, x) VALUES (?, ?)', 'over', 'o'.repeat(4 * 1024 * 1024 + 1)));
-      t.ok(over !== 'ok', 'a value past the Durable Object\'s length ceiling was stored');
-      return { megabyte: n, overRefused: over !== 'ok' };
+      const over = codeOf(() => h.sql.exec('INSERT INTO v (k, x) VALUES (?, ?)', 'over', 'o'.repeat(DO_MEASURED.length + 1)));
+      t.equal(over, 'STATEMENT_TOO_LONG', "a value past the Durable Object's length ceiling was stored");
+      const bytes = codeOf(() => h.sql.exec('INSERT INTO v (k, x) VALUES (?, ?)', 'bytes', new Uint8Array(DO_MEASURED.length + 1)));
+      t.equal(bytes, 'STATEMENT_TOO_LONG', "bytes past the Durable Object's length ceiling were stored");
+      return { megabyte: n, over, bytes };
     },
   },
 ];

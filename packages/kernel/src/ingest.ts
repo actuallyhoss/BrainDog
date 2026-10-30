@@ -840,7 +840,10 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
   {
     const at = instant(deps.nowMs);
     const headers = lower(arrival.headers ?? {});
-    const body = arrival.body ?? '';
+    /* A U+0000 IN WHAT A SENDER'S MACHINE SENT IS READ AS U+FFFD, as a decoder reads a bad byte, because the port refuses
+       a text holding one (`guard`) and a bank's alert is not to be lost over a character nobody reads. Its hash is of
+       the bytes as they came (`arrival.sha256`), so a redelivery is still the same arrival. */
+    const body = (arrival.body ?? '').replaceAll('\u0000', '\uFFFD');
 
     /* IDEMPOTENT ON THE HASH. A redelivery is the ordinary case — every webhook sender retries, and
        most mail servers will too — and writing the row twice is the failure people notice as a

@@ -69,10 +69,13 @@ export function openSqlite(path = ':memory:', options?: OpenOptions): NodeSql {
   if (options?.raw === true && !options.why?.trim()) throw new Error('openSqlite: { raw: true } needs a why that says what the test measures');
   /* DEFENSIVE OFF, as `apps/selfhost` opens: Node 26 turns it on by default and 24.13 does not, and under it the
      kernel cannot rebuild a damaged search index (`migrate.ts`, `rebuildIndex`). */
-  const db = new DatabaseSync(path, { defensive: false } as never);
+  /* FOREIGN KEYS OFF, as both hosts run (`apps/selfhost` `openDriver`; a Durable Object keeps SQLite's default, off).
+     `node:sqlite` turns them ON unless told, and the schema does declare one, `decision.supersedes REFERENCES
+     decision(id)`, which is documentary and enforced nowhere in production; this comment said the opposite on both counts
+     and the tests enforced it. The record's integrity is the write path's, in one transaction, where a refusal can
+     carry a sentence. */
+  const db = new DatabaseSync(path, { enableForeignKeyConstraints: false, defensive: false } as never);
   const check = options?.raw === true ? () => {} : sqlGuard;
-  /* Foreign keys OFF is SQLite's default and the schema does not declare any: the record's integrity
-     is the write path's, in one transaction, where a refusal can carry a sentence. */
   db.exec('PRAGMA journal_mode = WAL');
 
   let depth = 0;
@@ -101,19 +104,32 @@ export function openSqlite(path = ':memory:', options?: OpenOptions): NodeSql {
 
     /**
      * `33-CONTRACTS` §1 says the driver never nests, so the depth counter is here rather than in the
-     * kernel's callers: a re-entrant write shares its trigger's transaction, and a second BEGIN
-     * against SQLite is an error rather than a savepoint.
+     * kernel's callers. A nested call is a savepoint, as both hosts answer it (`apps/selfhost` `openSqlite`, the
+     * Durable Object's own `transactionSync`): it answered with `fn()`, so a test here kept an inner throw's writes that
+     * production undoes.
      */
     transactionSync<T>(fn: () => T): T {
-      if (depth > 0) return fn();
-      db.exec('BEGIN');
+      /* A NESTED CALL IS A SAVEPOINT, as on the Durable Object, where a nested `storage.transactionSync` is one
+         (measured on workerd 1.20260903.1): an inner throw undoes the inner writes and nothing else, and the outer
+         transaction carries on. This answered a nested call with `fn()`, so an inner throw that its caller caught kept
+         its writes here and lost them on the Cloud (the conformance suite's `transaction-nested`). Named by depth, so
+         the stack of savepoints unwinds in order; `attempt()`'s own are `dog_attempt_N` and never collide. */
+      const savepoint = depth > 0 ? `dog_tx_${depth}` : null;
+      db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
       depth++;
       try {
         const value = fn();
-        db.exec('COMMIT');
+        db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT');
         return value;
       } catch (e) {
-        db.exec('ROLLBACK');
+        /* ONLY WHILE THERE IS ONE TO ROLL BACK: an error SQLite answers by ending the transaction itself (a full disk,
+           an ON CONFLICT ROLLBACK) has already undone it, and a second rollback would throw over the first error. */
+        if (db.isTransaction) {
+          if (savepoint) {
+            db.exec(`ROLLBACK TO ${savepoint}`);
+            db.exec(`RELEASE ${savepoint}`);
+          } else db.exec('ROLLBACK');
+        }
         throw e;
       } finally {
         depth--;

@@ -16,7 +16,7 @@
  */
 
 import type { Conflict, Refusal, Result } from '@braindog/ports';
-import { conflicted, refused } from '@braindog/ports';
+import { conflicted, nulAt, nulSaid, refused } from '@braindog/ports';
 
 import { FIREWALL_FAULT, firewall } from '@braindog/record/sight';
 
@@ -635,6 +635,11 @@ export async function serveApi(
         refusal: { code: 'BODY_MALFORMED', fix: `${name} takes a JSON object as its body.` },
       });
     }
+    /* A U+0000 ANYWHERE IN IT IS REFUSED HERE, AT ITS PLACE: the port refuses one at the bind (`guard`), which would
+       have been a crash, and the self-host's SQLite cut a text at it before that. Only a body whose text spells one is
+       walked. */
+    const nul = text.includes('\\u0000') ? nulAt(args) : null;
+    if (nul !== null) return json(400, { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: nulSaid(nul), at: nul } });
     /* A READ MAY ALSO ARRIVE AS A POST, and a JSON body carries its own types rather than earning
        them. So there is nothing to decode and the type is simply the one the table declares: a
        `POST /api/get` with `{"seq":{"a":1}}` was the same 500 as the GET, on the same line of the
@@ -656,6 +661,8 @@ export async function serveApi(
        stopped being a slug. The table says which arguments are structured, so only those are
        decoded and the rest are the text they were sent as. */
     for (const [key, raw] of url.searchParams) {
+      /* A `%00` IN THE QUERY IS THE SAME CHARACTER, and is refused the same way. */
+      if (raw.includes('\u0000') || key.includes('\u0000')) return json(400, { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: nulSaid(key), at: key } });
       /* `Object.hasOwn`, BECAUSE THE KEY IS A WORD THE CALLER CHOSE. It is the same lesson
          `httpStatus` learned above and `packages/record/src/index.ts:358` learned before either:
          `?constructor=x` would otherwise read a kind of `Object` off the prototype and coerce

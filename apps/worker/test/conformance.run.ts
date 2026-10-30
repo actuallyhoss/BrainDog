@@ -62,7 +62,14 @@ import { alarmScheduler } from '../src/alarm.ts';
 export class Conformance extends DurableObject {
   async fetch(request) {
     const id = decodeURIComponent(new URL(request.url).pathname.slice(1));
-    if (id === '__sqlite') return Response.json({ sqlite: this.ctx.storage.sql.exec('SELECT sqlite_version() AS v').toArray()[0].v });
+    /* THE OBJECT REFUSES sqlite_version() (measured: "not authorized to use function"), so its build is said so. */
+    if (id === '__sqlite') {
+      try {
+        return Response.json({ sqlite: this.ctx.storage.sql.exec('SELECT sqlite_version() AS v').toArray()[0].v });
+      } catch {
+        return Response.json({ sqlite: 'not said (sqlite_version is not authorized)' });
+      }
+    }
     const c = CASES.find((x) => x.id === id);
     if (!c) return new Response('no such case: ' + id, { status: 404 });
     let wakes = 0;

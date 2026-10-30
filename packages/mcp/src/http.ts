@@ -24,6 +24,7 @@
  * caller's answer to another.
  */
 
+import { nulAt, nulSaid } from '@braindog/ports';
 import { firewall } from '@braindog/record/sight';
 
 import type { McpSurface } from './index.ts';
@@ -264,11 +265,17 @@ async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | nu
   if (bytes === null) return bare(413);
 
   let message: unknown;
+  let text: string;
   try {
-    message = JSON.parse(new TextDecoder('utf-8', UTF8).decode(bytes));
+    text = new TextDecoder('utf-8', UTF8).decode(bytes);
+    message = JSON.parse(text);
   } catch {
     return json(400, failure(null, RPC.parse, 'The body is not JSON.'));
   }
+  /* A U+0000 ANYWHERE IN IT IS REFUSED HERE, AT ITS PLACE, as the API's router refuses it: the port would have thrown
+     at the bind. Only a body whose text spells one is walked. */
+  const nul = text.includes('\\u0000') ? nulAt(message) : null;
+  if (nul !== null) return json(400, failure(isObject(message) && (typeof message.id === 'string' || typeof message.id === 'number') ? message.id : null, RPC.invalid, nulSaid(nul)));
 
   if (isObject(message) && typeof message.method === 'string') {
     const wrong = disagrees(message, request.headers);
