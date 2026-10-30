@@ -43,6 +43,7 @@
   import { isApp, openOutside } from '$lib/shell.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
+  import { words } from './words.ts';
   import { googleStart, googleWhy, onwardOf, stateOf, type GoogleWhy, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
   import { actable, mailHeld, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
@@ -301,6 +302,22 @@
 
   const withPasskey = () => void run('passkey', () => passkeySignIn(), enter('passkey'));
 
+  /**
+   * STRAIGHT IN WHEN NOTHING IS LEFT TO ASK (first hour audit, E21). Signing in by email stopped twice: "Sign in with
+   * this link", which stays (a scanner must not spend it), and then "You're signed in / Open BrainDog" with one BrainDog
+   * to open. A sign-in made on this screen, with no passkey to offer first (`lead` is `open`: the person has one), no
+   * link waiting and a BrainDog behind the session, goes on to it. Somebody who came here already in still sees the
+   * screen, with Sign out on it.
+   */
+  let going = $state(false);
+  $effect(() => {
+    if (going || entered === null || view.name !== 'signed-in' || view.lead !== 'open' || view.link !== null) return;
+    if (view.who.record === null && goTo === `${BASE}/`) return;
+    if (view.add === 'asking' || step.at !== 'idle') return;
+    going = true;
+    location.assign(goTo);
+  });
+
   /** Offer this site's passkeys in the email field's autofill, once, until it signs somebody in or is withdrawn. */
   function offerPasskey() {
     if (offer) return;
@@ -526,6 +543,8 @@
             {view.asking ? copy.signingIn : view.link.kind === 'claim' ? copy.claimRecord : copy.useLink}
           </Button>
         </div>
+      {:else if view.name === 'signed-in' && going}
+        <p class="status" role="status">{words.goingIn}</p>
       {:else if view.name === 'signed-in'}
         <div class="calm">
           <IconWell name="check" size="card" tone="earn" />
