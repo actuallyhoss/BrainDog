@@ -189,9 +189,11 @@ test('A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 li
 
 test("UNDER THE CEILING THE DAILY LOOK ASKS THE BINDING ONCE, and its row spends the background's month and none of his", async (t) => {
   const { ai, c, post } = await recordOver(t, '900000', 1);
-  /* ANY REQUEST PAST THE FORTNIGHT WAKES THE LOOK (`slashLook` beside every request), and this one is no press. */
+  /* ANY REQUEST PAST THE FORTNIGHT WAKES THE LOOK, and this one is no press: it asks whether the look is due
+     (`slashDue`) and sets the alarm for now, and the alarm does the look (`wake`). */
   const made = await post('create', { register: 'list_0', fields: { what: 'a second one' } });
   assert.ok(made.ok, JSON.stringify(made));
+  assert.ok((await c.wake(REC)) >= 1, 'the request did not wake the alarm for the look');
 
   const rows = await ledger(c, (now) => now.some((r) => r.question === "Slash's daily look"));
   const looks = rows.filter((r) => r.question === "Slash's daily look");

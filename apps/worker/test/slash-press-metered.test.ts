@@ -94,8 +94,11 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
     presses.push(out.value as Filed);
   }
 
-  /* SIX ASKS AND NOT FIVE: the first request past the fortnight also wakes Slash's daily look (`slashLook` beside every
-     answer), which drafts through the same `slashFile` and so is the same unmetered call. RED BEFORE THE METER WAS
+  /* THE LOOK THE PRESSES WOKE IS THE ALARM'S: a request asks whether it is due (`slashDue`) and sets the alarm for now. */
+  await c.wake(REC);
+
+  /* SIX ASKS AND NOT FIVE: the first request past the fortnight also wakes Slash's daily look (its alarm, set by the
+     request), which drafts through the same `slashFile` and so is the same unmetered call. RED BEFORE THE METER WAS
      PASSED, measured: 6 binding calls under a ceiling of 3, one per press and one for the look, and the
      `call` table not even created, because nothing had built the engine that owns it. */
   assert.equal(ai.runs(), 4, `5 presses and the daily look under a ceiling of three asks made ${ai.runs()} included calls`);

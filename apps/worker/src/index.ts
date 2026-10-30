@@ -35,7 +35,7 @@ import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@brai
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
 import { INVITE_GONE, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
-import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
+import { createRecordApi, tickBudget, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
@@ -63,7 +63,7 @@ import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/h
 
 import { alarmScheduler } from './alarm.ts';
 import { fileModelSign } from '@braindog/host/sign-model';
-import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
+import { slashDue, slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { PLAN_AGENTS, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { fallbackWire, includedCandidates, includedInference } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
@@ -462,6 +462,14 @@ const ALARM_STEP = 'braindog.alarm-step';
 
 /** Where an object keeps how many alarms in a row were cut in one step (`alarm-cuts.ts`). */
 const ALARM_CUTS = 'braindog.alarm-cuts';
+
+/**
+ * EACH OF THE ALARM'S PAGE-DRAWING STEPS (the look, the lint) GETS ABOUT THIS MUCH OF ONE ALARM, and stops after the page
+ * that spends it (`TickBudget`). The pages are the bound that holds here: the object's clock stands still while a page
+ * draws, so the milliseconds cut only where a step waited on the network.
+ */
+const ALARM_STEP_MS = 5_000;
+const ALARM_STEP_PAGES = 10;
 
 /** A step slower than this writes an `alarm-step` line with its time. */
 const SLOW_STEP_MS = 5_000;
@@ -1138,9 +1146,25 @@ export class Record$ extends DurableObject<Env> {
     const more = await this.#step(api, 'act', () => this.#act(api), false);
     const asked = await this.#step(api, 'ask', () => this.#ask(api), false);
     const modelled = await this.#step(api, 'model', () => this.#model(api), false);
-    await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore }), undefined);
+    /* THE LOOK AND THE LINT, EACH A SHARE OF THIS ALARM (`ALARM_STEP_MS`, `ALARM_STEP_PAGES`). Each drew every page it
+       read in one go, the look up to 49 s and the lint up to 27 s, and the platform reset the object. Now each stops
+       when its share is spent, keeps where it stopped, and answers `more`, and the alarm is set for now below, so the
+       rest is the next alarm's and requests are answered in between. */
+    const looked = await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore, budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) }), false);
     /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
-    await this.#step(api, 'lint', () => api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e))), undefined);
+    const linted = await this.#step(
+      api,
+      'lint',
+      () =>
+        api
+          .lintTick({ budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) })
+          .then((out) => out.ran === false && out.more === true)
+          .catch((e: unknown) => {
+            console.error('lint:', e instanceof Error ? e.message : String(e));
+            return false;
+          }),
+      false,
+    );
     /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
        replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
     await this.#step(api, 'signs', (): void => {
@@ -1156,7 +1180,21 @@ export class Record$ extends DurableObject<Env> {
        before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
        question. Neither jobs `#act` released nor questions left in the outbox are schedule rows, so nothing else here
        would set it back. */
-    if (more || asked || modelled) await this.#alarm.set(Date.now());
+    if (more || asked || modelled || looked || linted) await this.#alarm.set(Date.now());
+  }
+
+  /**
+   * The look due after a request, handed to the alarm: set for now when anything is due (`slashDue`), and never run here.
+   * An alarm already set for sooner is left as it is.
+   */
+  async #lookSoon(api: RecordApi): Promise<void> {
+    if (!(await slashDue(api))) return;
+    try {
+      const at = await this.#alarm.get();
+      if (at === null || at > Date.now()) await this.#alarm.set(Date.now());
+    } catch (e) {
+      console.error('slash: the alarm could not be set for the look:', e instanceof Error ? e.message : String(e));
+    }
   }
 
   /**
@@ -2302,7 +2340,8 @@ export class Record$ extends DurableObject<Env> {
        and every other read still start it. NOR FOR `boot`, the first call of every open: the look's first run of the day
        landed on it, and every call after waited. */
     const path = new URL(request.url).pathname;
-    if (!pollAsked(request.method, path) && !/^\/+api\/+boot\/*$/u.test(path) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api, { sql: this.#jobsStore }));
+    /* AND THE LOOK IS ONLY ASKED HERE, NEVER RUN (`slashDue`): work due wakes the alarm now, which does it in slices. */
+    if (!pollAsked(request.method, path) && !/^\/+api\/+boot\/*$/u.test(path) && !(await this.lapsed())) this.ctx.waitUntil(this.#lookSoon(api));
     /* THE METHOD ROUTER'S HANDLERS, WITH THE KEYCHAIN PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
        (`withKeychainPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
        below serve the same table. */

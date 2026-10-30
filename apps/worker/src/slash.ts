@@ -68,7 +68,7 @@ import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, type Understan
 import { slashAskDoor, slashDayStop, type SlashAskDoor } from '@braindog/host';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
 import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
-import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
+import type { CallContext, RecordApi, SlashModel, TickBudget } from '@braindog/record';
 import { PLANS, PLAN_TABLE, type Plan } from '@braindog/record/plans';
 import type { Slash, SlashOptions } from '@braindog/slash';
 
@@ -1431,8 +1431,11 @@ const LOOK_PURPOSES = "purpose IN ('look', 'headline', 'skill')";
 /** `LEDGER_FAILED` of `packages/slash/src/health.ts`, restated: this file never imports the package before a model is asked. */
 const FAILED = "status = 'error' AND code IN ('UNREACHABLE', 'PULL_REQUEST_REFUSED', 'ANSWER_UNREADABLE')";
 
-/** Where the look writes what failed: Slash's own store, and the time its rows are written at. Both default to what the model noted. */
-export type LookLedger = { sql?: Sql | undefined; clock?: Clock | undefined };
+/**
+ * Where the look writes what failed: Slash's own store, and the time its rows are written at. Both default to what the
+ * model noted. `budget` is the alarm's share for the look (`TickBudget`): the look stops when it is spent and says so.
+ */
+export type LookLedger = { sql?: Sql | undefined; clock?: Clock | undefined; budget?: TickBudget | undefined };
 
 /**
  * A look that failed, written into Slash's ledger where the engine's readings and Health count a failed background ask.
@@ -1505,7 +1508,7 @@ const ledgerMark = (sql: Sql): number =>
  * failed: ..." and never a key or an address. `ledger` names Slash's store; absent, the store the record's model noted
  * on its last ask is used, and with neither the failure is the log line alone, as it was.
  */
-export async function slashLook(api: Pick<RecordApi, 'slashTick'>, ledger: LookLedger = {}): Promise<void> {
+export async function slashLook(api: Pick<RecordApi, 'slashTick'>, ledger: LookLedger = {}): Promise<boolean> {
   const ear = earOf(api);
   const store = (): Sql | undefined => ledger.sql ?? ear?.store?.();
   const clock = ledger.clock ?? { now: () => Date.now() };
@@ -1519,20 +1522,42 @@ export async function slashLook(api: Pick<RecordApi, 'slashTick'>, ledger: LookL
     since = null;
   }
   let threw: string | null = null;
+  let more = false;
   try {
-    await api.slashTick();
+    const out: unknown = await api.slashTick(ledger.budget === undefined ? undefined : { budget: ledger.budget });
+    more = typeof out === 'object' && out !== null && (out as { more?: unknown }).more === true;
   } catch (e) {
     const said = e instanceof Error ? e.message : String(e);
     console.error('slash:', said);
     threw = lookWords(said);
   }
   const heard = ear !== null && ear.words !== null && ear.at >= began ? ear.words : null;
-  if (threw === null && heard === null) return;
+  if (threw === null && heard === null) return more;
   try {
     const sql = store();
     if (sql !== undefined) lookCounted(sql, since, from, heard ?? threw, clock.now(), threw !== null);
   } catch (e) {
     console.error('slash: the failed look could not be counted:', e instanceof Error ? e.message : String(e));
+  }
+  return more;
+}
+
+/**
+ * Whether the look has work due now, asked after a request and doing none of it (`slashTick`'s `defer`). It never throws.
+ *
+ * A REQUEST NO LONGER CARRIES THE LOOK. `slashLook` ran in every request's `waitUntil` but the version poll's and
+ * `boot`'s, and the update pass and the page walks it starts drew every page there: from 00:00 UTC on 30 October each
+ * `/api/pulse` on his record (one every 25 s while a session was open) spent 14 to 17 s of CPU, about 2,100 s an hour,
+ * and the alarm and the bank's texts queued behind it. A request now only asks whether anything is due, in a few
+ * indexed reads, and the host wakes its alarm for it, which does the work a slice at a time.
+ */
+export async function slashDue(api: Pick<RecordApi, 'slashTick'>): Promise<boolean> {
+  try {
+    const out: unknown = await api.slashTick({ defer: true });
+    return typeof out === 'object' && out !== null && (out as { why?: unknown }).why === 'later';
+  } catch (e) {
+    console.error('slash:', e instanceof Error ? e.message : String(e));
+    return false;
   }
 }
 
