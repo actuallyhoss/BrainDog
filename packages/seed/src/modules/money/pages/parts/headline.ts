@@ -35,7 +35,7 @@ const CARD_OWES = ' {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}
  * below nought). The card comes after, as the second thing. The first sentence whose `when:` holds is said (`says:`).
  */
 /**
- * THE LATE PART IS THE WAY IN, SINCE money-core 3.34.0 (polish-i, PI1): Heads up said "Bills late: £10,540 to pay. See
+ * THE LATE PART IS THE WAY IN, SINCE money-core 3.33.0 (polish-i, PI1): Heads up said "Bills late: £10,540 to pay. See
  * them" under a first line that already said it. The figure late is the link now, to the bills or the plan's part that
  * are late, and Heads up says it no more.
  */

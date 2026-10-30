@@ -54,7 +54,7 @@ export const HEADS_UP: Record<string, unknown>[] = [
     body: 'Invoices {{bad:late}}: {{late-in}} to come in. [See them](/r/obligations?f=direction:is:owed_to_me&f=state:in:open,part&f=due:before:today)',
     when: { metric: 'late-in', gt: 0 },
   },
-  /* NO "BILLS LATE" LINE SINCE money-core 3.34.0 (polish-i, PI1): the page's first line says what is late, a part of a
+  /* NO "BILLS LATE" LINE SINCE money-core 3.33.0 (polish-i, PI1): the page's first line says what is late, a part of a
      plan first, and its figure is the link to them (`headline.ts`). Said here too it was the same fact twice. */
   {
     /* A CATEGORY MARKED ONE WAY THAT HOLDS MONEY GOING THE OTHER, SINCE money-core 3.16.0: an import
