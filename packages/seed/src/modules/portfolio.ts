@@ -1795,7 +1795,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         where: 'kind is not action, scope is global',
         columns: [
           { field: 'name', as: 'title' },
-          { field: 'kind', label: 'What it is', as: 'fact' },
+          { field: 'kind', label: 'Kind', as: 'fact' },
           { field: 'used_agents', label: 'Used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],
