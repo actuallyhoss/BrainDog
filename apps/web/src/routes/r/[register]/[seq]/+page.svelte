@@ -1156,7 +1156,7 @@
   {#snippet sentenceLine()}{#each sentence as piece, i (i)}{#if piece.kind === 'state'}<span class="lead-word">{stateSaid(decl, stateValue)}</span>{:else if piece.kind === 'late'}<span class="said-late" data-tone={piece.tone} data-needs={piece.tone === 'bad' ? '' : undefined}>{piece.text}</span>{:else}{piece.text}{/if}{/each}{/snippet}
 
   <!-- WHO A PERSON IS, OR WHAT AN ORGANISATION IS, in place of the sentence a row of any other list leads with. -->
-  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{/snippet}
+  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link tap" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{/snippet}
 
   <!-- A VALUE AS THE PAGE SAYS IT, in its line of the fields tile. -->
   {#snippet shown(f: FieldDecl, value: unknown)}
@@ -1747,7 +1747,8 @@
   /* ── the sentence's pieces ─────────────────────────────────────────── */
 
   /* A NAME IN A PERSON'S SENTENCE OPENS ITS PAGE: the sentence's own ink at 500, underlined only under a pointer, so the
-     line reads as a sentence and not as a row of links. */
+     line reads as a sentence and not as a row of links. `.tap` makes it a 44px target under a thumb, as its words are a
+     22px line (measured at 390, 30 Oct). */
   .who-link {
     color: inherit;
     font-weight: 500;
