@@ -3,7 +3,7 @@
  * BrainDog was a large frame, about 380px, holding only "Nothing needs you" with its heading in the middle, beside Orders
  * due this week as large again with one order in it. The phone's rows already close up under what is drawn
  * (`Board.svelte`, A16); the laptop's grid keeps fixed cells, so a frame two rows tall is laid one row tall while what it
- * holds fits one row: a large as a wide, a tall as a small.
+ * holds fits one row: a large as a wide, a tall as a small (or a wide, for a kind with no small).
  *
  * ONLY WHERE THE COUNT IS KNOWN: a list's rows, a queue's questions, the late lines, the runs at work. A figure, a chart
  * or anything else keeps the size it was given. Editing, every widget is laid at its own size, so a resize is seen as it
@@ -21,8 +21,10 @@ export const ONE_ROW_HOLDS: Readonly<Partial<Record<WidgetSize, number>>> = { wi
 export function restSize(kind: string, size: WidgetSize, rows: number | null): WidgetSize {
   if (rows === null) return size;
   const can = sizesOf(kind);
-  const to: WidgetSize | null = size === 'large' ? 'wide' : size === 'tall' ? 'small' : null;
-  if (to === null || !can.includes(to)) return size;
+  /* A TALL GOES SMALL, or wide where its kind has no small (People's faces are cards): the same room, one row tall. */
+  const tries: WidgetSize[] = size === 'large' ? ['wide'] : size === 'tall' ? ['small', 'wide'] : [];
+  const to = tries.find((s) => can.includes(s));
+  if (to === undefined) return size;
   return rows <= (ONE_ROW_HOLDS[to] ?? 0) ? to : size;
 }
 

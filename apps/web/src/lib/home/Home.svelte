@@ -997,7 +997,8 @@
        question is a tall line with its answers, so with any asked it keeps its frame. */
     const asked = counted.get('needs-you');
     if (kinds.has('needs-you')) counted.set('needs-you', asked === 0 || asked === null || asked === undefined ? (signsSaid ? 1 : 0) : null);
-    if (kinds.has('arrivals')) counted.set('arrivals', landed.length);
+    /* WHAT LANDED BY THE LINES IT IS DRAWN AS: two writes an hour are one line each (`arrivalsOf`). */
+    if (kinds.has('arrivals')) counted.set('arrivals', landedKit ? landedKit.arrivalsOf(landed).length : landed.length);
     for (const [k, rows] of counted) {
       const size = boardModel.sizeNow(k);
       const at = restSize(kinds.get(k)!, size, rows);
@@ -1174,10 +1175,10 @@
   const LANDED_READ = 40;
   /* ITS CODE LOADS ONCE A LINE IS NEW, as it did inside the desk before the desk's tiles were blocks: a first open with
      nothing new waits for none of it, and Arrivals draws nothing for nothing anyway. */
-  let landedKit = $state.raw<{ Part: typeof import('./Landed.svelte').default; landedOf: typeof import('./landed.ts').landedOf } | null>(null);
+  let landedKit = $state.raw<{ Part: typeof import('./Landed.svelte').default; landedOf: typeof import('./landed.ts').landedOf; arrivalsOf: typeof import('./landed.ts').arrivalsOf } | null>(null);
   $effect(() => {
     if (newLines.length > 0 && landedKit === null)
-      void Promise.all([import('./Landed.svelte'), import('./landed.ts')]).then(([c, m]) => (landedKit = { Part: c.default, landedOf: m.landedOf }), () => undefined);
+      void Promise.all([import('./Landed.svelte'), import('./landed.ts')]).then(([c, m]) => (landedKit = { Part: c.default, landedOf: m.landedOf, arrivalsOf: m.arrivalsOf }), () => undefined);
   });
   const landed = $derived.by(() => {
     if (landedKit === null) return [];

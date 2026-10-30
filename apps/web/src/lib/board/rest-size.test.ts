@@ -9,7 +9,7 @@ import { restSize, rowsOf } from './rest-size.ts';
 
 test('a large list with one row is laid one row tall, and a full one keeps its frame', () => {
   assert.equal(restSize('table', 'large', 1), 'wide');
-  assert.equal(restSize('feed', 'tall', 1), 'tall', 'a kind with no small keeps its frame');
+  assert.equal(restSize('feed', 'tall', 1), 'wide', 'a kind with no small goes wide');
   assert.equal(restSize('table', 'large', 2), 'wide');
   assert.equal(restSize('table', 'large', 5), 'large');
   assert.equal(restSize('queue', 'large', 0), 'wide', 'Needs you with nothing asked');
