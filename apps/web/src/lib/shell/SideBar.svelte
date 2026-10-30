@@ -52,7 +52,7 @@
     type SidePlace,
     type SideProject,
   } from './side.ts';
-  import { keptRead, readFolk, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
+  import { keepWeek, keptRead, keptWeek, readFolk, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
 
   let {
     base,
@@ -131,7 +131,8 @@
   });
   /** The outline's rows, by how far each bar reaches. */
   const OUTLINE = ['62%', '48%', '56%'] as const;
-  let week = $state.raw<Week>(new Map());
+  /* THE WEEK THIS DEVICE LAST DREW, at once, as the list is (`keptWeek`), so a project's "late" is on every screen. */
+  let week = $state.raw<Week>(untrack(() => keptWeek(base)));
 
   /* THE COUNTS THE SIDEBAR READS ITSELF (Work's open tasks, the people a list keeps), BY PLACE. While a read is out the
      row says the number this device last drew, never nothing. */
@@ -193,6 +194,7 @@
       read = keptRead(b);
       answered = false;
       counts = keptCounts(b);
+      week = keptWeek(b);
     }
     const go = (): void => {
       void readSide(b, l)
@@ -208,9 +210,10 @@
              of them up behind it in the record's one thread. */
           await rested();
           if (n !== asked) return;
-          const w = await readWeek(b, got.list, play);
+          const w = await readWeek(b, got.list, play, Date.now(), untrack(() => week));
           if (n !== asked) return;
           week = w;
+          keepWeek(b, w);
         })
         /* NOT ANSWERED AFTER ITS TRIES (`readSide`): what is drawn stays, and the next move of the record asks again. */
         .catch(() => {
