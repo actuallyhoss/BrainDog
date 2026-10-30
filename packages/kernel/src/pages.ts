@@ -1712,7 +1712,10 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
     const at = found.row ? { ...deps, here: found.row } : deps;
     /* AND WHAT THE READER PICKED, so a line can say the months a strip narrows the blocks to (`when: { picked }`). */
     const on = filters && filters.picked.size > 0 ? { ...at, picked: filters.picked } : at;
-    const read = rowNamed(deps, found.row, readBlock(clauses.size > 0 || log ? narrowed(on, b, clauses, log) : on, b));
+    /* A PAGE'S LINE OVER A LIST THE READER NARROWED IS SAID OF WHAT IS SHOWN (31 October, AG15): Work narrowed to Kiln
+       said "1 late, 3 waiting on you." over a Waiting on you of one. */
+    const lined = b !== null && typeof b === 'object' && b.kind === 'note' && b.lead === true ? figuresNarrowed(on, clauses) : on;
+    const read = rowNamed(deps, found.row, readBlock(clauses.size > 0 || log ? narrowed(lined, b, clauses, log) : lined, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
     const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
     const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
@@ -1723,7 +1726,8 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
   /* A BOARD IS LAID OUT BY ITS OWN ORDER AND SIZES (`board.ts`), never reordered by a look: what he arranged on Today is
      where it stays, and nothing moves under him (Call 19). */
   const looked = (found.decl as { board?: unknown }).board === true ? null : lookedAt(deps, found.decl.page, shown?.blocks ?? blocks, shown, found.decl.layout !== undefined);
-  const head = pageHead(deps, found.decl, every, read_at, zone);
+  /* AND THE COUNT BESIDE THE NAME: "Work 15" stood over the seven tasks of the one project picked. */
+  const head = pageHead(figuresNarrowed(deps, clauses), found.decl, every, read_at, zone);
   /* AND THE HEAD SAYS HOW MANY THE WORD FOUND, across the page's lists, as this reader is shown them: "3 found". */
   const kept = head && word !== null ? { word, found: foundAcross(shown?.blocks ?? blocks, searched) } : null;
   return ok({
@@ -2438,6 +2442,34 @@ function logFilters(
     answers.set(field, { field, label, control: 'chips', chosen: pick, values: shown, reads: [WHOLE_RECORD] });
   }
   return { answers, keep: chosen.size > 0 ? (e) => holds(e) : null };
+}
+
+/**
+ * The figures a page's line and its head's count read, with the reader's choices ANDed onto every figure over a list
+ * they narrow (`register.<list>`). Every other figure, and a figure whose own sentence cannot be read here, is read as
+ * declared. A narrowed figure is another figure to the read's cache, which keys a figure by its declaration whole.
+ */
+function figuresNarrowed(deps: PageDeps, clauses: ReadonlyMap<string, readonly Predicate[]>): PageDeps {
+  if (clauses.size === 0) return deps;
+  const read = deps.read;
+  return {
+    ...deps,
+    read: (decl) => {
+      const list = /^register\.([a-z][a-z0-9_]*)$/u.exec(typeof decl.source === 'string' ? decl.source : '')?.[1];
+      const extra = list === undefined ? undefined : clauses.get(list);
+      if (list === undefined || extra === undefined || extra.length === 0) return read(decl);
+      let own: Predicate | undefined;
+      if (typeof decl.where === 'string') {
+        const schema = deps.schemaOf(list);
+        if (!schema) return read(decl);
+        const got = predicateOf(decl.where, schema, deps.ctx);
+        if (got.bad.length > 0) return read(decl);
+        own = got.predicate;
+      } else own = decl.where;
+      const and: Predicate = own === undefined ? (extra.length === 1 ? extra[0]! : { all: [...extra] }) : { all: [own, ...extra] };
+      return read({ ...decl, where: and });
+    },
+  };
 }
 
 /**

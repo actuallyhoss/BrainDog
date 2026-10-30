@@ -35,14 +35,14 @@ export function todoTitle(title: string): { head: string; rest: string } {
 export const todoMeta = (cells: readonly string[]): string[] => cells.slice(2, 4).filter((c) => c.trim() !== '');
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /** A day as `format.ts`'s `day` says it, `1 Jul 2026`, standing alone in a cell; `1 Jul` is one in the reader's year. */
 const SAID_DAY = new RegExp(`^(\\d{1,2}) (${MONTHS.join('|')})(?: (\\d{4}))?$`, 'u');
 const DAY_MS = 86_400_000;
 
 /**
  * WHEN A TASK FALLS DUE, AS A PERSON SAYS IT (the verifier's H10): "4 days late" in the red phrase, "Today", "Tomorrow",
- * the weekday within six days, and past that the day, without its year in the reader's own year. Work read "30 Aug 2026"
+ * the weekday and its day within six days ("Sat 5 Sep"), and past that the day, without its year in the reader's own year. Work read "30 Aug 2026"
  * in grey for a task Kiln called four days late. A task that is done is never late, so its day is only said. Anything
  * that is not a day standing alone in the cell is left as written. UTC, as `day` writes it.
  */
@@ -59,7 +59,9 @@ export function todoDay(text: string, now: number = Date.now(), done = false): s
   if (ahead < 0) return `{{bad:${-ahead} ${ahead === -1 ? 'day' : 'days'} late}}`;
   if (ahead === 0) return 'Today';
   if (ahead === 1) return 'Tomorrow';
-  if (ahead <= 6) return WEEKDAYS[new Date(at).getUTCDay()]!;
+  /* THE WEEK'S DAYS WITH THEIR DATE, "Sat 5 Sep" (31 October, AG31): "Saturday", "Monday" stood on Work while Projects
+     said "Sat 5" and the task's page "Due 13 Sep", so no two screens named the same day alike. */
+  if (ahead <= 6) return `${WEEKDAYS[new Date(at).getUTCDay()]!} ${year}`;
   return year;
 }
 
