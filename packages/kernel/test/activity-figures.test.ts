@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { openRecord } from '../src/index.ts';
 import { EVENT_KINDS } from '../src/events.ts';
-import { BUILT_IN_FIGURES, RECORD_ACTIVITY, builtInFigure, readActivity } from '../src/built-in-figures.ts';
+import { BUILT_IN_FIGURES, RECORD_ACTIVITY, builtInFigure, ownWork, readActivity } from '../src/built-in-figures.ts';
 import { evaluateMetric, type Group, type Reading } from '../src/metrics.ts';
 import { figureLists } from '../src/money-figures.ts';
 import { byOf } from '../src/pages.ts';
@@ -106,21 +106,21 @@ test('the three figures are declared over the log, with names a person reads', (
   }
 });
 
-test('activity-by-who: the count for each of agent, rule and you, in the shape a figure in parts answers', async () => {
+test('activity-by-who: the count for each of agent, rule, you and BrainDog, in the shape a figure in parts answers', async () => {
   const { sql } = await record();
   const r = read(sql, 'activity-by-who');
-  assert.deepEqual(parts(r), { agent: 30, rule: 12, you: 18 });
+  assert.deepEqual(parts(r), { agent: 30, rule: 12, you: 18, braindog: 0 });
   assert.deepEqual([r.value, r.rows, r.held, r.unit, r.met], [60, 60, 60, null, null]);
   assert.deepEqual(r.refusals, []);
   /* The shape is `Group`, the one `events.<list>` and every grouped figure answers: nothing new for a reader to learn. */
   const agent: Group = r.groups![0]!;
   assert.deepEqual(agent, { key: 'agent', label: 'Agents', value: 30, rows: 30, state: 'full' });
-  assert.deepEqual(r.groups!.map((g) => g.label), ['Agents', 'Rules', 'You']);
+  assert.deepEqual(r.groups!.map((g) => g.label), ['Agents', 'Rules', 'You', 'BrainDog']);
   assert.doesNotMatch(JSON.stringify(r), /S1|S2|p_owner|rule:renewal|—/u, 'a handle or an id reached what a person reads');
   sql.close();
 });
 
-test('who is who by the feed\'s own rule, so the figure and a feed never split a line two ways', async () => {
+test('who is who by the feed\'s own rule, with BrainDog\'s own work apart, so the figure and a feed never split a line two ways', async () => {
   const { sql } = await record();
   line(sql, NOW - HOUR, 'slash', 'edit');
   line(sql, NOW - HOUR, 'agent:claude', 'edit');
@@ -128,10 +128,10 @@ test('who is who by the feed\'s own rule, so the figure and a feed never split a
   line(sql, NOW - HOUR, 'script:tidy@v2', 'create');
   line(sql, NOW - HOUR, 'p_seed', 'create');
   const all = sql.all<{ actor: string }>('SELECT actor FROM event');
-  const want = { agent: 0, rule: 0, you: 0 };
-  for (const e of all) want[byOf(e.actor)] += 1;
+  const want = { agent: 0, rule: 0, you: 0, braindog: 0 };
+  for (const e of all) want[ownWork(e.actor) ? 'braindog' : byOf(e.actor)] += 1;
   assert.deepEqual(parts(read(sql, 'activity-by-who')), want);
-  assert.deepEqual(want, { agent: 32, rule: 15, you: 18 });
+  assert.deepEqual(want, { agent: 32, rule: 13, you: 18, braindog: 2 });
   sql.close();
 });
 
@@ -231,7 +231,7 @@ test('the record keeping its own books is left out, as a feed leaves it out, and
   line(sql, at, 'p_owner', 'access.grant', { target: 'p_01M1KJ7RG0TYYA0AX15QPGJJ4', target_kind: 'member' });
   line(sql, at, 'p_owner', 'share.open', { target: 'SH1', target_kind: 'share' });
   line(sql, at, 'p_owner', 'edit', { target: 'VK1', target_kind: 'vault_key' });
-  assert.deepEqual(parts(read(sql, 'activity-by-who')), { agent: 30, rule: 12, you: 18 }, 'a line of the record\'s books was counted as work');
+  assert.deepEqual(parts(read(sql, 'activity-by-who')), { agent: 30, rule: 12, you: 18, braindog: 0 }, 'a line of the record\'s books was counted as work');
   assert.equal(read(sql, 'activity-by-kind').value, 60);
   assert.equal(read(sql, 'activity-by-hour').value, 60);
 
@@ -242,7 +242,7 @@ test('the record keeping its own books is left out, as a feed leaves it out, and
   line(sql, at, 'system', 'pull', { target: 'declaration:script.night', target_kind: 'declaration', to: { wrote: 3 } });
   line(sql, at, 'p_owner', 'state', { target: 'entry:RUN2', field: 'state', from: 'active', to: 'done' });
   line(sql, at, 'S2', 'edit', { target: 'entry:RUN2', field: 'doing', from: 'One thing', to: 'Another' });
-  assert.deepEqual(parts(read(sql, 'activity-by-who')), { agent: 32, rule: 13, you: 20 });
+  assert.deepEqual(parts(read(sql, 'activity-by-who')), { agent: 32, rule: 12, you: 20, braindog: 1 });
 
   /* ONE RULE, HELD TO THE KERNEL'S OWN: every line of the log is asked of the feed's two tests, and the figure counts
      what they keep. */
@@ -285,7 +285,7 @@ test('a quiet record holds nothing to draw, and a read writes nothing', async ()
   sql.exec('DELETE FROM event');
   const quiet = read(sql, 'activity-by-who');
   assert.deepEqual([quiet.value, quiet.held, quiet.rows], [0, 0, 0], 'held is whether there was anything to read');
-  assert.deepEqual(parts(quiet), { agent: 0, rule: 0, you: 0 });
+  assert.deepEqual(parts(quiet), { agent: 0, rule: 0, you: 0, braindog: 0 });
   assert.deepEqual(read(sql, 'activity-by-kind').groups, []);
   assert.equal(read(sql, 'activity-by-hour').groups!.length, 24);
   assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event')?.n, 0);
@@ -343,8 +343,8 @@ test('through the record itself, over writes the record made: the figure counts 
 
   const who = k.metric(builtInFigure('activity-by-who')!);
   assert.ok(who.ok);
-  const want = { agent: 0, rule: 0, you: 0 };
-  for (const e of kept) want[byOf(e.actor)] += 1;
+  const want = { agent: 0, rule: 0, you: 0, braindog: 0 };
+  for (const e of kept) want[ownWork(e.actor) ? 'braindog' : byOf(e.actor)] += 1;
   assert.deepEqual(parts(who.value), want);
   assert.equal(who.value.value, kept.length);
   assert.ok(want.you >= 5 && want.rule >= 2);

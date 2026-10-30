@@ -482,8 +482,20 @@ const activity = (id: string, name: string, by: ActivityBy): ActivityDecl => ({
   activity: by,
 });
 
-/** Who a line is by, as a feed groups it (`FEED_BY` in `sources/activity.ts`), and what a feed calls each group. */
-const WHO_SAID = { agent: 'Agents', rule: 'Rules', you: 'You' } as const;
+/**
+ * Who a line is by, as a feed groups it (`FEED_BY` in `sources/activity.ts`), and what a feed calls each group, with
+ * BrainDog's own work as a fourth part after You, as Today's "What changed" draws it (`FEED_OWN` in the renderer).
+ */
+const WHO_SAID = { agent: 'Agents', rule: 'Rules', you: 'You', braindog: 'BrainDog' } as const;
+
+/**
+ * BRAINDOG'S OWN WORK: what the record wrote of itself (`system`), the sample's own hand (`p_seed`), and the rules it
+ * answers for itself with (`rule:handled`, `rule:additive`, `rule:update`). A feed signs them as rules and says each
+ * one's who as BrainDog (`actor` in the app's `names.ts`, `OWN_RULE`), so "Who worked" counted them under Rules beside a
+ * feed that groups them as BrainDog (polish-g W1). The trust ladder keeps its own name there, and so it is a rule here.
+ */
+export const ownWork = (actor: string): boolean =>
+  actor === 'system' || actor === 'p_seed' || actor === 'rule:handled' || actor === 'rule:additive' || actor === 'rule:update';
 
 /**
  * What each kind of write a feed holds is called, the words Activity says them in. A kind with no word here is said by
@@ -556,8 +568,12 @@ const logged = (v: string | null): unknown => {
   }
 };
 
-/** Who a line is by, as a feed groups it: `byOf` in `pages.ts`, which is not imported here (that file imports `metrics.ts`). */
+/**
+ * Who a line is by, as a feed groups it: `byOf` in `pages.ts`, which is not imported here (that file imports `metrics.ts`),
+ * with BrainDog's own work (`ownWork`) apart from the rules.
+ */
 const activityBy = (actor: string): keyof typeof WHO_SAID => {
+  if (ownWork(actor)) return 'braindog';
   if (/^S\d+$/u.test(actor) || actor.startsWith('agent:') || actor === 'slash') return 'agent';
   if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor.startsWith('script:') || actor === 'system' || actor === 'p_seed') return 'rule';
   return 'you';
@@ -568,8 +584,9 @@ const activityBy = (actor: string): keyof typeof WHO_SAID => {
  * kind of write it was (`activity-by-kind`), and the hour of the day it was written in (`activity-by-hour`).
  *
  * THE ANSWER IS A FIGURE IN PARTS, the shape `events.<list>` and every grouped figure answer: `value` is every line
- * counted and `groups` the cut. Who is always three parts, in a feed's own order, and the hours always twenty-four, in
- * the order of the day, so a chart of either keeps its places on a quiet month; a nought there is a count, not a gap.
+ * counted and `groups` the cut. Who is always four parts (Agents, Rules, You and BrainDog), in a feed's own order, and
+ * the hours always twenty-four, in the order of the day, so a chart of either keeps its places on a quiet month; a
+ * nought there is a count, not a gap.
  * The kinds are the ones that happened, the largest first, the eight largest by name and the rest as one part.
  *
  * WHAT A FEED LEAVES OUT IS LEFT OUT (`ACTIVITY_SHOWN`, and a run's stamp below), so "Who worked" and the feed beside
@@ -609,7 +626,7 @@ export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'
     return got;
   };
 
-  const who = { agent: 0, rule: 0, you: 0 };
+  const who = { agent: 0, rule: 0, you: 0, braindog: 0 };
   const kinds = new Map<string, number>();
   const hours = Array.from({ length: 24 }, () => 0);
   let total = 0;

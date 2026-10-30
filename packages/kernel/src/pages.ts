@@ -33,7 +33,7 @@ import { GROUPED_BY_FIELD, applyLook, composeLook, figureSaid, lookOf, mergeLook
 /* A PAGE'S HEAD OVER ITS TITLE, read and resolved by the file that checks it at install. */
 import { headerBody, resolveHead, type HeadFigure, type ResolvedHead } from './page-head.ts';
 import { listRead, searchClauses, searchWord, type SearchShape } from './page-search.ts';
-import { HANDOFFS_OPEN, KIND_SAID, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
+import { HANDOFFS_OPEN, KIND_SAID, RECORD_ACTIVITY, builtInFigure, ownWork, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { splitOf, rowsBySplit } from './row-parts.ts';
@@ -2363,11 +2363,13 @@ const addressWord = (name: string): string =>
 
 /**
  * Who wrote a line, as a reader chooses it: an agent by the name of its kind ("Claude"), however many runs it was; Slash
- * by name; the rules and the record's own work together; a person by the name the record holds for them, else every
- * person together as People. NEVER AN ID: a run's handle and a person's id are only ever what is looked up.
+ * by name; the rules together, and BrainDog's own work as BrainDog, as "Who worked" beside it counts them (`ownWork`);
+ * a person by the name the record holds for them, else every person together as People. NEVER AN ID: a run's handle and
+ * a person's id are only ever what is looked up.
  */
 function whoOf(deps: PageDeps, actor: string): { value: string; label: string } {
   if (actor === 'slash') return { value: 'slash', label: 'Slash' };
+  if (ownWork(actor)) return { value: 'braindog', label: 'BrainDog' };
   const by = byOf(actor);
   if (by === 'rule') return { value: 'rules', label: 'Rules' };
   if (by === 'agent') {
