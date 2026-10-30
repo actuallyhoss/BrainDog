@@ -30,8 +30,11 @@ function build() {
   return { dir, root, app, clean: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-const get = async (serve: (r: Request) => Response, path: string, method = 'GET') => {
-  const res = serve(new Request(`http://localhost:8080${path}`, { method }));
+/* THE ORIGIN THIS HOST IS CONFIGURED AT, which is not the one the request arrived on: a redirect is built from this alone. */
+const ORIGIN = 'https://studio.example';
+
+const get = async (serve: (r: Request, origin: string) => Response, path: string, method = 'GET') => {
+  const res = serve(new Request(`http://localhost:8080${path}`, { method }), ORIGIN);
   return { status: res.status, headers: res.headers, text: await res.text() };
 };
 
@@ -80,9 +83,18 @@ test('EVERY PATH UNDER /app IS A 308 TO THE SAME PATH AT THE ROOT, WITH THE QUER
     ] as const) {
       const out = await get(serve, path);
       assert.equal(out.status, 308, path);
-      assert.equal(out.headers.get('location'), to, path);
+      assert.equal(out.headers.get('location'), `${ORIGIN}${to}`, path);
       assert.equal(out.headers.get('cache-control'), 'no-store', path);
       assert.equal(out.text, '', path);
+    }
+    /* A DOUBLED SLASH OR A BACKSLASH AFTER /app NEVER NAMES ANOTHER HOST. Less `/app`, `/app//evil.example/x` was the
+       bare `//evil.example/x`, which a browser follows to evil.example; under this host's origin it is a path here. */
+    for (const path of ['/app//evil.example/x', '/app/\\evil.example/x', '/app/%5Cevil.example/x', '/app///evil.example']) {
+      const out = await get(serve, path);
+      assert.equal(out.status, 308, path);
+      const to = out.headers.get('location') ?? '';
+      assert.ok(to.startsWith(`${ORIGIN}/`), `${path} -> ${to}`);
+      assert.equal(new URL(to, 'https://elsewhere.example').origin, ORIGIN, `${path} -> ${to}`);
     }
     /* A redirect is for a navigation. Anything else is refused as it was. */
     assert.equal((await get(serve, '/app/', 'POST')).status, 405);
@@ -102,7 +114,7 @@ test('/fonts/* IS SERVED FROM THE BUILD, because the shared tokens.css asks for 
     assert.equal(font.status, 200);
     assert.equal(font.text, FONT);
     assert.equal(font.headers.get('content-type'), 'font/woff2');
-    assert.equal((await get(serve, '/app/fonts/inter.woff2')).headers.get('location'), '/fonts/inter.woff2');
+    assert.equal((await get(serve, '/app/fonts/inter.woff2')).headers.get('location'), `${ORIGIN}/fonts/inter.woff2`);
     /* A missing font is a 404, never the page. */
     const missing = await get(serve, '/fonts/missing.woff2');
     assert.equal(missing.status, 404);

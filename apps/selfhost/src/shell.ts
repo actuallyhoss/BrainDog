@@ -127,13 +127,13 @@ function appFolder(dir: string): string {
  * address it reads as nobody's. The fragment of a `#magic=` link survives, because a `Location` with no fragment keeps
  * the one the browser had. A path whose first word is one of the host's doors is a 404, under `/app` or not.
  */
-export function shellOf(dir: string): (request: Request) => Response {
+export function shellOf(dir: string): (request: Request, origin: string) => Response {
   const root = appFolder(dir);
   const fallback = join(root, 'index.html');
   if (!existsSync(fallback))
     throw new Error(`${dir} has no index.html, so it is not a built app. Build apps/web, or point BRAINDOG_SHELL at its build directory.`);
 
-  return (request) => {
+  return (request, origin) => {
     /* THE FRAME A DRAWN BLOCK IS DRAWN IN is answered from code under its own policy, as the Worker answers it, and is
        never a file of the build (`@braindog/host/drawn-frame`). */
     if (isDrawnFrame(new URL(request.url).pathname)) return drawnFrame(request.method);
@@ -162,8 +162,11 @@ export function shellOf(dir: string): (request: Request) => Response {
       return new Response(null, { status: 404, headers });
     }
     if (legacy) {
-      /* The raw path and not the decoded one, so what was sent is what the browser is sent back to. */
-      headers.set('location', `${url.pathname.slice(LEGACY.length) || '/'}${url.search}`);
+      /* The raw path and not the decoded one, so what was sent is what the browser is sent back to. AND UNDER THIS HOST'S
+         OWN ORIGIN, never as a bare path: `/app//evil.example/x` less `/app` is `//evil.example/x`, which a browser reads
+         as another host, so a link to this host could send its reader anywhere. Behind the configured origin the same
+         characters are only a path on this host. */
+      headers.set('location', `${origin}${url.pathname.slice(LEGACY.length) || '/'}${url.search}`);
       headers.set('cache-control', 'no-store');
       return new Response(null, { status: 308, headers });
     }

@@ -2475,7 +2475,7 @@ async function answer(
   res: ServerResponse,
   handlers: Record<string, Handler>,
   site: Site | null,
-  shell: ((request: Request) => Response) | null,
+  shell: ((request: Request, origin: string) => Response) | null,
   trustProxy: boolean,
 ): Promise<void> {
   const asked = new URL(`http://localhost${req.url ?? '/'}`);
@@ -2553,7 +2553,7 @@ async function answer(
     return write(
       res,
       shell
-        ? shell(request)
+        ? shell(request, site.origin)
         : wantsPage(method, path, request.headers)
           ? unbuilt(method)
           : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }),

@@ -90,6 +90,7 @@ async function stack(o: { shell?: boolean } = {}) {
 
   return {
     call,
+    origin,
     serverKey,
     running,
     /** A session from the server key, which proves a sign-in now. */
@@ -141,7 +142,7 @@ test('UNDER ITS OWN SLUG, A SESSION AND A BEARER ARE ANSWERED AS AT /api, reads 
     assert.deepEqual(old.body, (await s.call('/api/boot', { sid })).body);
     const page = await s.call('/app/the-studio/r/tasks', { sid });
     assert.equal(page.status, 308);
-    assert.equal(page.headers.get('location'), '/the-studio/r/tasks');
+    assert.equal(page.headers.get('location'), `${s.origin}/the-studio/r/tasks`);
   } finally {
     await s.close();
   }
