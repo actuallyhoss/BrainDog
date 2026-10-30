@@ -37,7 +37,7 @@
   import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
   import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
-  import { ROW_ACTIONS_HEAD, type OnAct } from '../../src/actions.ts';
+  import { ROW_ACTIONS_HEAD, rowActionsTrack, type OnAct } from '../../src/actions.ts';
   import Actions from '../Actions.svelte';
   import { pointed, type Point } from '../menu-at.ts';
   import { windowed } from '../../src/rows-window.ts';
@@ -174,7 +174,7 @@
      where the column sits. */
   const scoped = $derived(new Set((scope?.columns ?? []).map((i) => columns[i]?.field).filter((f): f is string => f !== undefined)));
 
-  const tracks = $derived(columns.map((c) => c.width).join(' ') + (acts ? ' auto' : ''));
+  const tracks = $derived(columns.map((c) => c.width).join(' ') + (acts ? ` ${rowActionsTrack(rowActions)}` : ''));
   /* One function for the groups AND the step they are counted in, because `aria-rowindex` is
      `group * step + i` and the two disagreeing is a table that announces a different row than the
      one on screen. It is also where `chunk={0}` stops being an endless loop during render. */

@@ -129,6 +129,18 @@ export function rowActionsPlan(list: readonly unknown[] | null | undefined, { na
 }
 
 /**
+ * THE WIDTH OF A TABLE'S ACTIONS COLUMN, DECLARED AND NOT `auto` (polish-i, PI4): a table is one `--cols` track list on
+ * its grid root whose rows are each a grid of their own, so an `auto` track was sized row by row, and the head row,
+ * whose cell holds only a hidden "Actions", drew Amount and How often a button's width right of their figures. Wide
+ * enough for the first label shown, and the menu's button beside it when more fold.
+ */
+export function rowActionsTrack(list: readonly unknown[] | null | undefined): string {
+  const plan = rowActionsPlan(list, { narrow: false });
+  const first = plan.shown[0]?.label.length ?? 0;
+  return `${Math.max(6, first + 3 + (plan.menu.length > 0 ? 4 : 0))}ch`;
+}
+
+/**
  * THE BLOCK'S ROW A TABLE'S PRESS WAS ON. A table block draws its rows through `comparisonPlan`, whose `TableRow` key is
  * its place under the head row, so the host is handed back the row the page declared and not the drawer's copy of it.
  * A row this cannot place is handed on as it came.

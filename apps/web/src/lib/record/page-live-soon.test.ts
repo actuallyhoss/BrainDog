@@ -30,8 +30,13 @@ test('A ROW DUE SOON SAYS WHEN IN ITS DUE CELL AND LOSES ITS AMBER; a late row a
   assert.equal(rows[4]!.cells[1], '5 Nov');
 });
 
-test('A TABLE THAT DOES NOT DRAW THE DEADLINE KEEPS ITS DOT, the one thing there that says it', () => {
-  const rows = [{ cells: ['Tax', '£19,100'] as (string | null)[], tone: 'warn' as const }];
-  soonSaid('obligations', [{ field: 'what' }, { field: 'amount' }], [entry('2026-09-07')], rows, NOW);
-  assert.equal(rows[0]!.tone, 'warn');
+test('A TABLE THAT DOES NOT DRAW THE DEADLINE IS CALM, as a list is: no dot with no word; a late row keeps its red', () => {
+  const rows: { cells: (string | null)[]; tone?: string }[] = [
+    { cells: ['Tax', '£19,100'], tone: 'warn' },
+    { cells: ['VAT', '£7,420'], tone: 'bad' },
+  ];
+  soonSaid('obligations', [{ field: 'what' }, { field: 'amount' }], [entry('2026-09-07'), entry('2026-09-01')], rows, NOW);
+  assert.equal('tone' in rows[0]!, false);
+  assert.deepEqual(rows[0]!.cells, ['Tax', '£19,100']);
+  assert.equal(rows[1]!.tone, 'bad');
 });

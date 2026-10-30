@@ -1027,20 +1027,20 @@ export function pendingSaid(register: string, columns: readonly { field?: unknow
  * A ROW DUE SOON SAYS WHEN IN ITS DUE CELL, AND WEARS NO AMBER DOT (polish-i, PI3): a page's table drew "Corporation tax,
  * payment on account · 7 Sep" with an orange dot and no word, where a list's card says "Due in 4 days" and its table
  * dropped the amber (P24). The cell of the list's deadline says "Due today", "Due tomorrow" or "Due in N days", the
- * card's words, and the row's `warn` goes, since the words say it. A late row keeps its red, and a table that does not
- * draw the deadline keeps its dot, the one thing there that says it.
+ * card's words, and the row's `warn` goes, since the words say it. A table that does not draw the deadline is calm as a
+ * list is: a dot with no word beside it said nothing a reader could read. A late row keeps its red.
  */
 export function soonSaid(register: string, columns: readonly { field?: unknown }[], entries: readonly Entry[], rows: { cells: (string | null)[]; tone?: string | undefined }[], now: number): void {
   const dated = REGISTERS[register]?.fields.find((f) => f.type === 'day' && f.deadline)?.id;
   const at = dated === undefined ? -1 : columns.findIndex((c) => c.field === dated);
-  if (dated === undefined || at < 0) return;
   entries.forEach((e, n) => {
     const row = rows[n];
-    const due = e.fields[dated];
-    if (!row || row.tone !== 'warn' || typeof due !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(due)) return;
+    if (!row || row.tone !== 'warn') return;
+    delete row.tone;
+    const due = dated === undefined ? undefined : e.fields[dated];
+    if (at < 0 || typeof due !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(due)) return;
     const days = Math.floor(Date.parse(`${due}T00:00:00Z`) / 86_400_000) - Math.floor(now / 86_400_000);
     row.cells[at] = days <= 0 ? DUE_WORDS.today : days === 1 ? DUE_WORDS.tomorrow : DUE_WORDS.inDays(days);
-    delete row.tone;
   });
 }
 
