@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type KeychainGrantSeen } from '@braindog/host';
+import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type KeychainGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { accessHeaders, clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -81,6 +81,7 @@ import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { cloudSealed } from './sealed.ts';
 import { cloudVisuals, pagesPrefix } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
+import { isHeld, redeliver, serveHeld, sweepHeld, type HeldDeps, type HeldMessage } from './held.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
@@ -213,8 +214,11 @@ type EmailBinding = { send(message: Mail): Promise<void> };
 type Env = {
   RECORD: DurableObjectNamespace<Record$>;
   DIRECTORY: DurableObjectNamespace<Directory$>;
-  /** The doorbell. Its message is `{ record }` and never a payload — 51 §13 D16. */
-  INGRESS: Queue<{ record: string }>;
+  /**
+   * The doorbell. Its message is `{ record }` and never a payload — 51 §13 D16. AND A KEPT ARRIVAL'S RING, `{ held, tries }`,
+   * which names a sealed object in `BLOBS` and not a payload either (`held.ts`).
+   */
+  INGRESS: Queue<{ record: string } | HeldMessage>;
   EMAIL?: EmailBinding;
   /**
    * `<date>+<sha>`, overwritten at deploy time by `--var`, declared empty in `wrangler.jsonc`.
@@ -3233,8 +3237,24 @@ export default {
    * finds nothing — which is why the queue can be at-least-once and the notification is still
    * sent once.
    */
-  async queue(batch: MessageBatch<{ record: string }>, env: Env): Promise<void> {
-    await consume(batch.messages, (id) => drainOutbox(env, id));
+  async queue(batch: MessageBatch<{ record: string } | HeldMessage>, env: Env): Promise<void> {
+    /* A KEPT ARRIVAL'S RING IS TRIED HERE, one at a time; every other message is a doorbell, as before. A try that could
+       not queue its next one is retried by the queue, and past its retries the nightly sweep finds the object. */
+    const rings: Message<{ record: string }>[] = [];
+    for (const m of batch.messages) {
+      if (!isHeld(m.body)) {
+        rings.push(m as Message<{ record: string }>);
+        continue;
+      }
+      try {
+        await redeliver(m.body, heldDeps(env));
+        m.ack();
+      } catch (e) {
+        op({ op: 'door', redelivered: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+        m.retry({ delaySeconds: 300 });
+      }
+    }
+    await consume(rings, (id) => drainOutbox(env, id));
   },
 
   /**
@@ -3250,6 +3270,12 @@ export default {
    * the operator's record when `OPS_RECORD` is set.
    */
   async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    /* FIRST, AND NEVER IN THE WAY OF THE WALK: arrivals kept at the door and not yet landed are rung again (`held.ts`). */
+    try {
+      await sweepHeld(heldDeps(env));
+    } catch (e) {
+      op({ op: 'door', swept: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
     await nightly(env);
   },
 
@@ -3273,6 +3299,20 @@ export default {
     await takeMail(message, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) });
   },
 };
+
+/**
+ * The `/in/*` door with its hold (`held.ts`): this deployment's bucket, secret and queue, and the door `serveIngest` was
+ * handed before the hold, built fresh for each ask.
+ */
+function heldDeps(env: Env): HeldDeps {
+  return {
+    bucket: env.BLOBS,
+    secret: env.SESSION_SECRET,
+    queue: env.INGRESS,
+    door: () => ({ ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) }),
+    tell: (fields) => opsAlert(env, { op: 'door', ...fields }, alertClaim(env)),
+  };
+}
 
 /** The walk, wired to the Directory, the objects and the bucket. Exported from nowhere: the cron is its one caller. */
 async function nightly(env: Env): Promise<void> {
@@ -3473,7 +3513,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        returns for everything it does not recognise, and before the app shell, which would answer a bank's
        webhook with `index.html` and a 200 that its retry logic reads as delivered. `serveIngest` holds the
        whole order from here, including the 404 for the shape this host does not serve. */
-    if (servesIn(url.pathname)) return serveIngest(request, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) });
+    if (servesIn(url.pathname)) return serveHeld(request, heldDeps(env));
     /* THE KEY DOORS, before any door is asked: their bearer is a keychain grant, no cookie may reach them, and a login
        token reaches only the deposit door, to add a new key (`keyDoor`). */
     if (servesKeychain(url.pathname)) return keyDoor(request, env);
