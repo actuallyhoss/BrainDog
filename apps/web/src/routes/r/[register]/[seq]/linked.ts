@@ -7,8 +7,9 @@
  * So the amount says its way, "+£3,030" in, "−£3,030" out, as the Money page and a list's cards do, and the dot has a
  * word beside it: "Paid", "38 days late", "Due in 5 days", "Part paid".
  *
- * THE TONE IS NOT DECIDED HERE. It is `toneOf`'s, read by the list with the record's clock, so a bill drawn late in its
- * list is drawn late here; this file only says it in words. Out of the component so a test can load it in Node.
+ * THE TONE IS THE LIST'S (`toneOf`, read with the record's clock), so a bill drawn late in its list is drawn late here,
+ * with one exception: `toneOf` measures from noon, so a bill due today turns red at midday while its word still says
+ * "Due today". Here the dot follows the word, amber all of its day. Out of the component so a test can load it in Node.
  */
 
 import type { Fields, RegisterDecl } from '../../../../lib/record/schema.ts';
@@ -29,37 +30,45 @@ function labelled(decl: RegisterDecl, field: string, value: string): string {
   return said.charAt(0).toUpperCase() + said.slice(1);
 }
 
+/** What a pointing row says beside its dot, and the dot's tone. */
+export type Stands = { text: string | null; tone: 'good' | 'warn' | 'bad' | 'info' | undefined };
+
 /**
- * Where one pointing row stands, in words, or `null` where there is nothing to say beyond its day.
+ * Where one pointing row stands, in words (`null` where there is nothing to say beyond its day), and the list's `tone`
+ * for it, amber on the day it is due.
  *
  * - A finished row says its state: "Paid", "Written off". A list whose rows are born done (a ledger's "cleared") says
  *   nothing, as `toneOf` draws no dot for it.
  * - An open row past its deadline says how late, and one inside a fortnight how close, the window `toneOf` colours.
  * - Any other state that is not the list's first says itself ("Part paid"), and ahead of the lateness when both hold.
  */
-export function linkedState(decl: RegisterDecl | undefined, fields: Readonly<Record<string, unknown>>, now: number): string | null {
-  if (!decl) return null;
+export function linkedState(decl: RegisterDecl | undefined, fields: Readonly<Record<string, unknown>>, now: number, tone?: Stands['tone']): Stands {
+  if (!decl) return { text: null, tone };
   const stateId = decl.state;
   const state = stateId ? fields[stateId] : undefined;
   const stateField = stateId ? decl.fields.find((f) => f.id === stateId) : undefined;
   if (typeof state === 'string' && decl.done?.includes(state)) {
     const born = stateField?.default;
-    return typeof born === 'string' && decl.done.includes(born) ? null : labelled(decl, stateId!, state);
+    return { text: typeof born === 'string' && decl.done.includes(born) ? null : labelled(decl, stateId!, state), tone };
   }
   const first = stateField?.values?.[0];
   const own = stateId && typeof state === 'string' && state !== '' && state !== first ? labelled(decl, stateId, state) : null;
   const deadline = decl.fields.find((f) => f.type === 'day' && f.deadline);
   const due = deadline ? fields[deadline.id] : undefined;
   let when: string | null = null;
+  let toned = tone;
   if (typeof due === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(due)) {
     const n = daysUntil(due.slice(0, 10), now);
     if (n < 0) when = rowWords.overdue(-n);
-    else if (n === 0) when = rowWords.dueToday;
+    else if (n === 0) {
+      when = rowWords.dueToday;
+      toned = 'warn';
+    }
     else if (n === 1) when = rowWords.dueTomorrow;
     else if (n < 14) when = rowWords.dueIn(n);
   }
-  if (own && when) return `${own}, ${when.charAt(0).toLowerCase()}${when.slice(1)}`;
-  return own ?? when;
+  if (own && when) return { text: `${own}, ${when.charAt(0).toLowerCase()}${when.slice(1)}`, tone: toned };
+  return { text: own ?? when, tone: toned };
 }
 
 /**

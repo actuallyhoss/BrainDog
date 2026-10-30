@@ -32,17 +32,23 @@ const BILLS = {
 const bill = (more: Record<string, unknown>) => ({ what: 'Website build, October', direction: 'owed_to_me', amount: { amount: 336_000, currency: 'GBP' }, due: '2026-11-08', state: 'open', ...more });
 
 test('A FINISHED BILL SAYS ITS STATE, a late one how late, a near one how close, a far one nothing', () => {
-  assert.equal(linkedState(BILLS, bill({ state: 'paid', due: '2026-06-01' }), NOW), 'Paid');
-  assert.equal(linkedState(BILLS, bill({ due: '2026-07-27' }), NOW), '38 days late');
-  assert.equal(linkedState(BILLS, bill({ due: '2026-09-03' }), NOW), 'Due today');
-  assert.equal(linkedState(BILLS, bill({ due: '2026-09-04' }), NOW), 'Due tomorrow');
-  assert.equal(linkedState(BILLS, bill({ due: '2026-09-08' }), NOW), 'Due in 5 days');
-  assert.equal(linkedState(BILLS, bill({}), NOW), null);
+  assert.equal(linkedState(BILLS, bill({ state: 'paid', due: '2026-06-01' }), NOW).text, 'Paid');
+  assert.equal(linkedState(BILLS, bill({ due: '2026-07-27' }), NOW).text, '38 days late');
+  assert.equal(linkedState(BILLS, bill({ due: '2026-09-03' }), NOW).text, 'Due today');
+  assert.equal(linkedState(BILLS, bill({ due: '2026-09-04' }), NOW).text, 'Due tomorrow');
+  assert.equal(linkedState(BILLS, bill({ due: '2026-09-08' }), NOW).text, 'Due in 5 days');
+  assert.equal(linkedState(BILLS, bill({}), NOW).text, null);
+});
+
+test('A BILL DUE TODAY IS AMBER ALL DAY, whatever the list said after noon; any other keeps the list\'s tone', () => {
+  assert.equal(linkedState(BILLS, bill({ due: '2026-09-03' }), NOW + 3 * 3_600_000, 'bad').tone, 'warn');
+  assert.equal(linkedState(BILLS, bill({ due: '2026-07-27' }), NOW, 'bad').tone, 'bad');
+  assert.equal(linkedState(BILLS, bill({ state: 'paid' }), NOW, 'good').tone, 'good');
 });
 
 test('A PART-PAID BILL SAYS SO, and ahead of how late it is', () => {
-  assert.equal(linkedState(BILLS, bill({ state: 'part' }), NOW), 'Part paid');
-  assert.equal(linkedState(BILLS, bill({ state: 'part', due: '2026-07-01' }), NOW), 'Part paid, 64 days late');
+  assert.equal(linkedState(BILLS, bill({ state: 'part' }), NOW).text, 'Part paid');
+  assert.equal(linkedState(BILLS, bill({ state: 'part', due: '2026-07-01' }), NOW).text, 'Part paid, 64 days late');
 });
 
 test('THE AMOUNT IS SIGNED BY ITS WAY and drawn as the sentence draws money', () => {

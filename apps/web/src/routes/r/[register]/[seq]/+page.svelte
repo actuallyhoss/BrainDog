@@ -1653,16 +1653,18 @@
               {#each rel.rows as r, i (r.key)}
                 {@const fields = rel.raw?.[i]}
                 {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency()))}
-                {@const stands = fields ? linkedState(relDecl, fields, clock) : null}
+                {@const stood = fields ? linkedState(relDecl, fields, clock, r.tone) : { text: null, tone: r.tone }}
+                {@const stands = stood.text}
+                {@const tone = stood.tone}
                 <li>
                   <a class="item item-link" href={at(r.href ?? '')}>
                     <span class="item-main">
                       <span class="item-title" dir="auto">{moneyInText(r.cells[0] || r.key, homeCurrency())}</span>
                       {#if rest.length > 0}<span class="item-detail">{rest.join(' · ')}</span>{/if}
                     </span>
-                    {#if r.tone || stands}
-                      <span class="item-when item-stands" data-intent={r.tone}
-                        >{#if r.tone}<span class="glyph" role={stands ? undefined : 'img'} aria-hidden={stands ? 'true' : undefined} aria-label={stands ? undefined : TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}{#if stands}<span
+                    {#if tone || stands}
+                      <span class="item-when item-stands" data-intent={tone}
+                        >{#if tone}<span class="glyph" role={stands ? undefined : 'img'} aria-hidden={stands ? 'true' : undefined} aria-label={stands ? undefined : TONES[tone].label}>{TONES[tone].glyph}</span>{/if}{#if stands}<span
                             class="stands-word">{stands}</span
                           >{/if}</span
                       >
