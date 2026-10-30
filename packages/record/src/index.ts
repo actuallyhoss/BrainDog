@@ -12239,13 +12239,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * (`today.ts`): what BrainDog did itself, what is shared out, and the project cards' late work, runs and key numbers.
      * READ+, and it changes nothing. Each part is its own method's answer to this caller; one refused is `null`.
      * To the owner, a read may be answered Today as it was last drawn, marked `behind` (`todayKept`); `fresh` is never.
+     * `offer: false` leaves out the widget the board's last cell offers, which the app then asks `widgetSuggest` for.
      */
-    async today(args: { body?: unknown; fresh?: boolean; page?: string } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
+    async today(args: { body?: unknown; fresh?: boolean; page?: string; offer?: boolean } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
-      const extra = stray(said, ['body', 'fresh', 'page']);
+      const extra = stray(said, ['body', 'fresh', 'page', 'offer']);
       if (extra) return { ok: false as const, refusal: extra };
+      if (said.offer !== undefined && typeof said.offer !== 'boolean') return no('VALUE_MALFORMED', 'offer is false to leave the widget offer out, which widgetSuggest answers.', { at: 'offer' });
+      const offer = said.offer !== false;
       /* `{ page: 'home' }`: TODAY AS IT IS KEPT, once somebody has added to it or arranged it (a board, the widgets plan
          §4.3), drawn in the same one read as the body Today is built from, with the version it was read at so the board's
          editor writes against it (`boardSteps`). A page this reader may not open is no page. */
@@ -12276,7 +12279,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (said.fresh !== undefined && typeof said.fresh !== 'boolean') return no('VALUE_MALFORMED', 'fresh is true to have Today drawn now, never as it was last drawn.', { at: 'fresh' });
       if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'Today is not answered by this record yet.');
       const asks = todayAsks;
-      const drawOf = () => todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx);
+      const drawOf = () => todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx, { offer });
       /* AND THE PAGE AS IT IS DECLARED (its title, `board`, the phone's arrangement), so the screen draws a kept Today from
          this one read and asks `page` for nothing. */
       /* ITS BLOCKS AS DECLARED TOO, for the board's Inspector, which changes a widget as it is kept and not as it is drawn. */
@@ -12285,7 +12288,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* HELD ONLY FOR THE OWNER, who opens Today the most and whose answer nobody else is handed; anybody else is drawn now. */
       if (allows(ctx, 'owner') !== null) return draw();
       const { batch: _batch, provedAt: _proved, ...caller } = ctx;
-      const key = JSON.stringify([caller, body]);
+      /* AN ANSWER WITHOUT THE OFFER IS ANOTHER ANSWER, kept apart from one with it. */
+      const key = JSON.stringify(offer ? [caller, body] : [caller, body, 'no offer']);
       /* WHAT THIS OBJECT DID NOT HOLD IN MEMORY, AS AFTER A RESTART, IS READ FROM BESIDE THE RECORD first (`keptToday`). */
       if (!todayKept.has(key) && said.fresh !== true) {
         const stored = await keptToday(key);

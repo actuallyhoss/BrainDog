@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import { heardLocal } from '../data/local-tab.ts';
 import { forgetToday } from './today-kept.ts';
-import { askToday, cardsHeld, todayHeld, type TodayAnswer } from './today-read.ts';
+import { askOffer, askToday, boardReadOf, cardsHeld, todayHeld, type TodayAnswer } from './today-read.ts';
+import { onOfferHeard } from '../board/offer-heard.ts';
 
 const BASE = 'https://x.test/api';
 const BODY = { page: 'today', title: 'Today', blocks: [] };
@@ -60,4 +61,58 @@ test('A RECORD SWITCH OR A SIGN-OUT DROPS WHAT IS HELD', async () => {
   assert.ok(todayHeld('https://y.test/api'));
   forgetToday();
   assert.equal(todayHeld('https://y.test/api'), null);
+});
+
+test("THE BOARD'S OFFER IS LEFT OUT OF TODAY'S READ AND ASKED APART, over the board as drawn; an older record carries it", async () => {
+  forgetToday();
+  heardLocal(5);
+  const heard: unknown[] = [];
+  onOfferHeard((v) => heard.push(v));
+  heard.length = 0;
+  const sent: { name: string; args: Record<string, unknown> }[] = [];
+  const offer = { key: 'w', widget: 'w', title: 'W', why: 'Used.', size: 'small', block: {} };
+  const newer = {
+    call: async (name: string, args: Record<string, unknown> = {}): Promise<never> => {
+      sent.push({ name, args });
+      if (name === 'today') return { ok: true, value: ANSWER } as never;
+      return { ok: true, value: { offers: [offer] } } as never;
+    },
+  };
+  const body = { ...BODY, blocks: [{ kind: 'todo', key: 'late', source: 'register.tasks' }] };
+  await askToday(newer as never, BASE, body, false, null, [{ kind: 'kpis', key: 'numbers', source: 'kpis' }]);
+  assert.equal(sent[0]!.args.offer, false);
+  assert.deepEqual(heard, [], "Today's read says nothing of the offer");
+  await askOffer(newer as never, BASE);
+  assert.equal(sent[1]!.name, 'widgetSuggest');
+  assert.deepEqual(sent[1]!.args.board, [
+    { key: 'late', source: 'register.tasks', empty: false },
+    { key: 'numbers', source: 'kpis', empty: false },
+  ]);
+  assert.deepEqual(heard, [offer]);
+
+  /* A RECORD BUILT BEFORE `offer` REFUSES IT: asked again without it, its offer heard in the read, none asked apart. */
+  forgetToday();
+  heard.length = 0;
+  const older: string[] = [];
+  const old = {
+    call: async (name: string, args: Record<string, unknown> = {}): Promise<never> => {
+      older.push(name);
+      if (name === 'today' && args.offer !== undefined) return { ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: 'No.', at: 'offer' } } as never;
+      return { ok: true, value: { ...ANSWER, widget: offer } } as never;
+    },
+  };
+  await askToday(old as never, 'https://old.test/api', BODY);
+  assert.deepEqual(older, ['today', 'today']);
+  assert.deepEqual(heard, [offer]);
+  await askOffer(old as never, 'https://old.test/api');
+  assert.deepEqual(older, ['today', 'today']);
+});
+
+test('A WIDGET THAT DREW NOTHING IS EMPTY TO THE OFFER, as the record reads it', () => {
+  const body = { blocks: [{ kind: 'note', lead: true }, { kind: 'todo', key: 'late' }, { kind: 'stat', key: 'cash', cells: [{ metric: 'cash' }] }] };
+  const page = { blocks: [{}, { rows: [] }, { readings: [{ reading: { value: 12 } }] }] };
+  assert.deepEqual(boardReadOf(body, page), [
+    { key: 'late', empty: true },
+    { key: 'cash', metric: 'cash', empty: false },
+  ]);
 });

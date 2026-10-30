@@ -22,6 +22,7 @@
   import { page } from '$app/state';
   import { boardWords, type BoardModel } from './board.svelte.ts';
   import { WIDGETS_PARAM } from './sheet-address.ts';
+  import { todayOffer } from './offer.svelte.ts';
   import { fitBoard } from './fit.ts';
 
   /* THE SHEET AND THE SUGGESTION ARE FETCHED WHEN ASKED FOR, not with Today: the catalogue, its previews and the
@@ -264,8 +265,9 @@
         {#each model.holes as h (h)}<div class="hole" style="grid-area:{h}" aria-hidden="true"></div>{/each}
       {/if}
     </div>
-    {#if mayEdit && !model.editing}
-      <!-- ONE QUIET SUGGESTION AT THE BOARD'S END (§6.3), its widget drawn at the board's own cell. -->
+    {#if mayEdit && !model.editing && todayOffer.offer !== null}
+      <!-- ONE QUIET SUGGESTION AT THE BOARD'S END (§6.3), its widget drawn at the board's own cell. ITS CODE ONLY ONCE
+           THERE IS ONE: it is asked after Today has drawn, and loading the cell before then put it on a cold open's path. -->
       <div class="suggest">{#await suggestPart() then { default: SuggestCell }}<SuggestCell onadd={added} {onremove} />{/await}</div>
     {/if}
   </div>

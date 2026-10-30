@@ -73,6 +73,41 @@ export function wasBehind(base: string): boolean {
   return was;
 }
 
+/** The records built before `today` took `offer`, which still answer the offer in Today's read. */
+const offerIn = new Set<string>();
+
+/** One widget of the board as `widgetSuggest` reads it (`boardRead` in the record's `today.ts`). */
+export type BoardRead = { key: string; heading?: string; source?: string; where?: string; metric?: string; empty: boolean };
+/** The board Today was last drawn with, for the offer asked apart (`askOffer`), by the record it was read from. */
+let boardAt: { base: string; board: BoardRead[] } | null = null;
+
+/**
+ * THE BOARD AS THE WIDGET SIGNALS READ IT, the record's own `boardRead` (`packages/record/src/today.ts`) over the body
+ * asked and the page drawn of it, block for block: each keyed block, what it reads, and whether it drew nothing. A widget
+ * the phone left out of its ask (`left`, `phone-ask.ts`) is on the board and is not called empty: nothing was drawn of
+ * it because nothing was asked.
+ */
+export function boardReadOf(body: Record<string, unknown>, page: unknown, left: readonly Record<string, unknown>[] = []): BoardRead[] {
+  const one = (b: Record<string, unknown>, d: Record<string, unknown> | null): BoardRead => {
+    const cells = Array.isArray(b.cells) ? (b.cells as { metric?: unknown }[]) : [];
+    const readings = d && Array.isArray(d.readings) ? (d.readings as { reading?: { value?: unknown } | null }[]) : [];
+    const listed = d !== null && ['rows', 'queue', 'feed', 'kpis'].some((k) => Array.isArray(d[k]) && (d[k] as unknown[]).length > 0);
+    const figured = readings.some((r) => typeof r.reading?.value === 'number' && r.reading.value !== 0);
+    return {
+      key: b.key as string,
+      ...(typeof b.heading === 'string' ? { heading: b.heading } : {}),
+      ...(typeof b.source === 'string' ? { source: b.source } : {}),
+      ...(typeof b.where === 'string' ? { where: b.where } : {}),
+      ...(typeof cells[0]?.metric === 'string' ? { metric: cells[0].metric } : {}),
+      empty: d !== null && !listed && !figured,
+    };
+  };
+  const declared = Array.isArray(body.blocks) ? (body.blocks as Record<string, unknown>[]) : [];
+  const drawn = Array.isArray((page as { blocks?: unknown } | null)?.blocks) ? (page as { blocks: Record<string, unknown>[] }).blocks : [];
+  const keyed = (b: unknown): b is Record<string, unknown> => b !== null && typeof b === 'object' && typeof (b as { key?: unknown }).key === 'string';
+  return [...declared.flatMap((b, i) => (keyed(b) ? [one(b, drawn[i] ?? {})] : [])), ...left.filter(keyed).map((b) => one(b, null))];
+}
+
 /**
  * Today's body drawn by the record, as `previewPage` answers it, with each tile's part held here for the tiles. On a
  * host without `today`, `previewPage` itself.
@@ -80,29 +115,54 @@ export function wasBehind(base: string): boolean {
  * A FIRST READ MAY BE ANSWERED TODAY AS THE RECORD LAST DREW IT (`behind`), at once, where drawing it took the record
  * over a second on a lived-in record; `fresh` asks for it drawn now, which every read after the screen's first does.
  * The tiles take their parts from it as from any answer, so they say what the body says, and the fresh one replaces it.
+ *
+ * WITHOUT THE WIDGET OFFER (`offer: false`): the board's last cell is no part of the screen, and the record took about
+ * 0.2 s a read to draw it, and 2 s on the first read after it woke (F13, 30 Oct). The screen asks it once Today has
+ * drawn (`askOffer`). A record built before `offer` refuses it, and is asked as before, with the offer in the read.
+ * `left` is what a phone left out of `body` (`phone-ask.ts`), which the offer still reads as on the board.
  */
-export async function askToday(client: Pick<Client, 'call'>, base: string, body: Record<string, unknown>, fresh = false, kept: string | null = null): Promise<PageSaid> {
+export async function askToday(client: Pick<Client, 'call'>, base: string, body: Record<string, unknown>, fresh = false, kept: string | null = null, left: readonly Record<string, unknown>[] = []): Promise<PageSaid> {
   /* A KEPT TODAY (`kept`, its slug) IS ASKED BY ITS SLUG, and a host without `today` has no such read: the caller reads the
      page itself. */
   if (without.has(base)) return kept === null ? client.call<PageAnswer>('previewPage', { body }) : (UNKEPT as PageSaid);
-  const asked = kept === null ? { body } : { page: kept };
-  const out = client.call<TodayAnswer>('today', fresh ? { ...asked, fresh: true } : asked);
+  const apart = !offerIn.has(base);
+  const asked = { ...(kept === null ? { body } : { page: kept }), ...(fresh ? { fresh: true } : {}), ...(apart ? { offer: false } : {}) };
+  const out = client.call<TodayAnswer>('today', asked);
   const entry: Held = { base, token: tokenNow(), at: Date.now(), answer: out.then((o) => (o.ok ? o.value : null), () => null) };
   held = entry;
   const got = await out;
   if (got.ok) {
-    /* THE WIDGET SLASH WOULD ADD, which Today's read carries, held for the board's last cell and the palette. */
-    hearOffer((got.value as { widget?: unknown }).widget);
+    /* THE WIDGET SLASH WOULD ADD, held for the board's last cell and the palette: carried by a record built before
+       `offer`, and otherwise asked apart once Today has drawn, from the board it was drawn with. */
+    if (apart) {
+      const declared = kept === null ? body : (got.value.page as { declared?: unknown }).declared;
+      boardAt = { base, board: boardReadOf(declared !== null && typeof declared === 'object' ? (declared as Record<string, unknown>) : {}, got.value.page, left) };
+    } else hearOffer((got.value as { widget?: unknown }).widget);
     if (got.value.behind === true) behindAt = base;
     else if (behindAt === base) behindAt = null;
     return { ...got, value: got.value.page };
   }
   if (held === entry) held = null;
+  if ('refusal' in got && apart && got.refusal.at === 'offer') {
+    offerIn.add(base);
+    return askToday(client, base, body, fresh, kept, left);
+  }
   if ('refusal' in got && UNSERVED.has(got.refusal.code)) {
     without.add(base);
     return kept === null ? client.call<PageAnswer>('previewPage', { body }) : (UNKEPT as PageSaid);
   }
   return got as PageSaid;
+}
+
+/**
+ * THE BOARD'S LAST CELL, asked apart once Today has drawn: what Slash would add from use, for the board Today was last
+ * drawn with from `base`. Nothing where the record carried it in Today's read, or Today has not been read from it.
+ */
+export async function askOffer(client: Pick<Client, 'call'>, base: string): Promise<void> {
+  const at = boardAt;
+  if (at === null || at.base !== base || offerIn.has(base)) return;
+  const out = await client.call<{ offers?: unknown[] }>('widgetSuggest', { board: at.board, cell: true });
+  if (out.ok) hearOffer(Array.isArray(out.value.offers) ? out.value.offers[0] : undefined);
 }
 
 /**
@@ -126,4 +186,5 @@ export async function cardsHeld(base: string, register: string): Promise<TodayCa
 /* DROPPED WITH THE REST OF TODAY (`forgetToday`), where the app's `forget` runs: a record switch, a sign-out. */
 onForgetToday(() => {
   held = null;
+  boardAt = null;
 });

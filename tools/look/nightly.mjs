@@ -2,6 +2,7 @@
  * The night's speed measure: how fast the live six open on a real record, and how many reads each one asks, read-only.
  *
  *   node tools/look/nightly.mjs [--source live:<record>|seed] [--out <file>] [--check] [--runs <n>]
+ *                               [--screens today,money] [--throttle <cpu>] [--latency <ms>]
  *
  * WHY: the perf gate times the app over the gates' own seed on this machine, with no network in between, so it cannot
  * say what his record costs from Cairo. This walks the same six screens a look draws (`screens.mjs` `six`), at the
@@ -17,8 +18,16 @@
  * - `bytes`: the decoded size of every answer it read;
  * - `rec`: the record's own time for each call, from its `Server-Timing` (`rec;dur=`), when the host says it.
  *
- * `--check` judges the warm Today against `speed.todaySettleMs` and exits 1 when it is over, so a launchd job can say a
- * slow night without anyone reading the file. The file is  unless `--out` names another.
+ * `--check` judges Today and exits 1 when it is over, so a launchd job can say a slow night without anyone reading the
+ * file: opened warm at either width against `speed.todaySettleMs`, and opened cold on the phone against
+ * `speed.todayColdPhoneMs`, the first open of a day on a phone, which the warm line never saw (F14: the cold phone open
+ * went from 1.7 s to 3.2 s between 28 and 30 October and the night said nothing). The file is
+ * `loop/proof/speed/<day>.json` (`<day>-<source>.json` for any source but a live record) unless `--out` names another.
+ *
+ * MEASURED BY HAND THE SAME WAY, on the seed and on this machine: `--screens` walks only the screens named, `--throttle`
+ * slows the phone's CPU that many times (Chrome's own throttling, as a mid-range phone is about 4), and `--latency` holds
+ * every call to the record back that many milliseconds, the trip to a record the seed does not make. Neither is used by
+ * the launchd job, so the nights stay comparable with each other.
  *
  * THE LAUNCHD JOB, at 04:30 on the Mac's own clock (Cairo), as the hourly watch is kept (`tools/watch/mac.mjs`):
  *
@@ -55,8 +64,8 @@ export function parse(args) {
       out[args[i].slice(2)] = true;
       continue;
     }
-    const m = /^--(source|out|runs|root)(?:=(.*))?$/u.exec(args[i]);
-    if (m === null) throw new Error(`The night's measure takes --source, --out, --runs, --check, --plist, --install, --uninstall and --root, and not ${args[i]}.`);
+    const m = /^--(source|out|runs|root|screens|throttle|latency)(?:=(.*))?$/u.exec(args[i]);
+    if (m === null) throw new Error(`The night's measure takes --source, --out, --runs, --check, --plist, --install, --uninstall, --root, --screens, --throttle and --latency, and not ${args[i]}.`);
     out[m[1]] = m[2] ?? args[(i += 1)];
   }
   if (out.uninstall) return { uninstall: true };
@@ -65,7 +74,13 @@ export function parse(args) {
   const raw = out.source;
   if (raw === undefined) throw new Error("The night's measure needs --source live:<record> or --source seed.");
   const colon = raw.indexOf(':');
-  return { raw, source: { name: colon === -1 ? raw : raw.slice(0, colon), arg: colon === -1 ? undefined : raw.slice(colon + 1) }, out: out.out, check: out.check, plist: out.plist, install: out.install, root: out.root === undefined ? ROOT : resolve(out.root), runs: Number(out.runs ?? 1) };
+  const screens = out.screens === undefined ? undefined : out.screens.split(',').map((n) => n.trim()).filter(Boolean);
+  if (screens?.length === 0) throw new Error('--screens needs names, as in --screens today,money.');
+  const throttle = Number(out.throttle ?? 1);
+  if (!Number.isFinite(throttle) || throttle < 1) throw new Error('--throttle is how many times slower the phone is, 1 or more, as in --throttle 4.');
+  const latency = Number(out.latency ?? 0);
+  if (!Number.isFinite(latency) || latency < 0) throw new Error('--latency is the milliseconds each call to the record is held back, as in --latency 150.');
+  return { raw, source: { name: colon === -1 ? raw : raw.slice(0, colon), arg: colon === -1 ? undefined : raw.slice(colon + 1) }, out: out.out, check: out.check, plist: out.plist, install: out.install, root: out.root === undefined ? ROOT : resolve(out.root), runs: Number(out.runs ?? 1), screens, throttle, latency };
 }
 
 export const LABEL = 'dog.brain.speed';
@@ -210,7 +225,7 @@ async function open(page, url, quietCapMs, timeoutMs) {
 }
 
 /** The night's rows: each of the six at each width, cold then warm, `runs` times over, the middle of each kept. */
-export async function walk({ app, screens, widths, runs }) {
+export async function walk({ app, screens, widths, runs, throttle = 1 }) {
   const S = budget('speed');
   const timeoutMs = budget('ready').settleTimeoutMs;
   const height = budget('layout').viewportHeightPx;
@@ -221,10 +236,12 @@ export async function walk({ app, screens, widths, runs }) {
       for (const screen of screens) {
         const tries = { cold: [], warm: [] };
         for (let i = 0; i < runs; i += 1) {
-          const phone = width < 600;
+          const phone = width < PHONE_UNDER;
           const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: phone ? 2 : 1, isMobile: phone, hasTouch: phone });
           await context.addInitScript(stamp);
           const page = await context.newPage();
+          /* A PHONE'S CPU, where it is asked for (`--throttle`): the page's own work slowed as a phone's is. */
+          if (phone && throttle > 1) await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
           try {
             tries.cold.push(await open(page, `${app}${screen.path}`, S.quietCapMs, timeoutMs));
             tries.warm.push(await open(page, `${app}${screen.path}`, S.quietCapMs, timeoutMs));
@@ -246,15 +263,33 @@ export async function walk({ app, screens, widths, runs }) {
   return rows;
 }
 
-/** What a night's rows say against the budgets: one sentence a finding, none for a good night. */
+/** The widths a night opens as a phone (`walk`), which the cold open is judged at. */
+export const PHONE_UNDER = 600;
+
+/**
+ * What a night's rows say against the budgets: one sentence a finding, none for a good night. Today opened warm at any
+ * width, and Today opened cold on the phone, each against its own line.
+ */
 export function judge(rows, S = budget('speed')) {
   const out = [];
   for (const r of rows) {
-    if (r.screen !== 'today' || r.kind !== 'warm') continue;
-    if (r.settleMs === null) out.push(`Today @${r.width} never settled warm`);
-    else if (r.settleMs > S.todaySettleMs) out.push(`Today @${r.width} settled warm in ${r.settleMs} ms, over ${S.todaySettleMs} ms`);
+    if (r.screen !== 'today') continue;
+    if (r.kind === 'warm') {
+      if (r.settleMs === null) out.push(`Today @${r.width} never settled warm`);
+      else if (r.settleMs > S.todaySettleMs) out.push(`Today @${r.width} settled warm in ${r.settleMs} ms, over ${S.todaySettleMs} ms`);
+    } else if (r.kind === 'cold' && r.width < PHONE_UNDER && S.todayColdPhoneMs !== undefined) {
+      if (r.settleMs === null) out.push(`Today on the phone @${r.width} never settled cold`);
+      else if (r.settleMs > S.todayColdPhoneMs) out.push(`Today on the phone @${r.width} opened cold in ${r.settleMs} ms, over ${S.todayColdPhoneMs} ms`);
+    }
   }
   return out;
+}
+
+/** The source with every call to the record held back `ms` (`--latency`), the trip a local record does not make. */
+export function delayed(source, ms) {
+  if (!(ms > 0)) return source;
+  const handle = source.handle.bind(source);
+  return { ...source, counts: () => source.counts(), close: () => source.close(), handle: (req, res, at) => new Promise((done) => setTimeout(done, ms)).then(() => handle(req, res, at)) };
 }
 
 /** Build the app when the build is older than the tree, as a look refuses a stale one. */
@@ -281,19 +316,24 @@ async function main() {
   try {
     const build = await built();
     if (!existsSync(appShell(build))) throw new Error('There is no built app to open.');
-    served = await serve(source, { build });
+    served = await serve(delayed(source, asked.latency), { build });
     await answers(served.origin);
     const picked = await pick(asker(served.origin));
-    const { screens } = await screensOf('six', picked);
+    const { screens: six } = await screensOf('six', picked);
+    const screens = asked.screens === undefined ? six : six.filter((s) => asked.screens.includes(s.key));
+    if (screens.length === 0) throw new Error(`--screens names none of the six: ${six.map((s) => s.key).join(', ')}.`);
     const started = new Date();
-    const rows = await walk({ app: served.app, screens, widths: budget('speed').widths, runs: asked.runs });
+    const rows = await walk({ app: served.app, screens, widths: budget('speed').widths, runs: asked.runs, throttle: asked.throttle });
     const findings = judge(rows);
     const day = started.toISOString().slice(0, 10);
-    const file = asked.out === undefined ? join(ROOT, 'loop', 'proof', 'speed', `${day}.json`) : resolve(asked.out);
+    /* A NIGHT ON ANOTHER SOURCE (the seed, by hand) IS KEPT BESIDE THE NIGHT'S FILE, never over it. */
+    const named = source.name === 'live' ? day : `${day}-${source.name}`;
+    const file = asked.out === undefined ? join(ROOT, 'loop', 'proof', 'speed', `${named}.json`) : resolve(asked.out);
     mkdirSync(dirname(file), { recursive: true });
     const counts = source.counts();
-    writeFileSync(file, `${JSON.stringify({ record: source.record, source: source.name, started: started.toISOString(), closed: new Date().toISOString(), budgets: budget('speed'), writesBlocked: counts.writes ?? 0, findings, rows }, null, 2)}\n`);
-    console.log(`  speed: ${rows.length} rows in ${file}; ${findings.length === 0 ? 'Today is inside its budget' : findings.join('; ')}`);
+    const by = { ...(asked.throttle > 1 ? { throttle: asked.throttle } : {}), ...(asked.latency > 0 ? { latencyMs: asked.latency } : {}) };
+    writeFileSync(file, `${JSON.stringify({ record: source.record, source: source.name, started: started.toISOString(), closed: new Date().toISOString(), budgets: budget('speed'), ...by, writesBlocked: counts.writes ?? 0, findings, rows }, null, 2)}\n`);
+    console.log(`  speed: ${rows.length} rows in ${file}; ${findings.length === 0 ? 'Today is inside its budgets' : findings.join('; ')}`);
     if (asked.check && findings.length > 0) process.exitCode = 1;
   } finally {
     await served?.close();
