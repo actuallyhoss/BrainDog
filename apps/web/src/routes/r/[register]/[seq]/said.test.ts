@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { since, sinceWords } from 'braindog-render';
 
-import { addedSaid, agoSaid, daySaid, daysOf, daysTo, dueSaid, importKeysOnly, sentenceOf } from './said.ts';
+import { addedSaid, agoSaid, daySaid, daysOf, daysTo, dueSaid, importKeysOnly, keyHeld, keySentence, sentenceOf } from './said.ts';
 
 /* Tags "kilnnotes:servicereading:oracle-a1:cpu:2026-09-28" listed as
    a fact. An import's keys are not a person's tags; a tag a person wrote is. */
@@ -109,4 +109,14 @@ test('THE HISTORY IS GROUPED BY DAY, newest first as it came, as Today, Yesterda
     ],
   );
   assert.deepEqual(daysOf([], MORNING), []);
+});
+
+test('A KEY LEADS WITH WHEN IT EXPIRES AND WHETHER ITS VALUE IS HELD (AG16), never "Stale, due in 12 days, added 12 hours ago"', () => {
+  const now = Date.parse('2026-09-03T12:00:00Z');
+  assert.deepEqual(keySentence({ expires: '2026-09-15', value: 'g_1' }, now), [{ kind: 'late', text: 'Expires 15 Sep, in 12 days', tone: 'warn' }, { kind: 'words', text: '. Value held.' }]);
+  assert.deepEqual(keySentence({ expires: '2026-11-15' }, now), [{ kind: 'words', text: 'Expires 15 Nov, in 73 days. No value yet.' }]);
+  assert.deepEqual(keySentence({ expires: '2026-08-30', value: { sealed: true, opened: 0 } }, now), [{ kind: 'late', text: 'Expired 30 Aug', tone: 'bad' }, { kind: 'words', text: '. Value held.' }]);
+  assert.deepEqual(keySentence({ where: '1Password' }, now), [{ kind: 'words', text: 'Kept in 1Password.' }]);
+  assert.equal(keyHeld({ value: '' }), false);
+  assert.equal(keyHeld({ value: 'g_2' }), true);
 });

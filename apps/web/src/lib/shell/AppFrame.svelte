@@ -502,7 +502,8 @@
       /* THE AGENTS' TOOLS ARE THE AGENTS': what runs by itself, and the keys they use. */
       tools: [
         { href: '/automations', label: copy.automations, icon: 'refresh', home: placed.at.agents ?? IN_MORE },
-        { href: '/keychain', label: copy.keysPlace, icon: 'vault', home: placed.at.agents ?? IN_MORE },
+        /* THE KEYS LIST IS THE KEYCHAIN'S TABLE VIEW (AG16), so the Keychain is lit there and on a key's own page too. */
+        { href: '/keychain', label: copy.keysPlace, icon: 'vault', home: placed.at.agents ?? IN_MORE, near: ['/r/credentials'] },
       ],
       foot,
       counted: holdsTasks ? { work: TASKS } : {},

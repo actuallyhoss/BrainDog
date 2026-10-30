@@ -44,6 +44,8 @@
   import { REGISTERS } from '$lib/record/held.ts';
   import { handFor, readHolders } from '$lib/record/hand.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import KeyViews from '../../keychain/KeyViews.svelte';
+  import { KEYS_REGISTER } from '$lib/record/keychain.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -3067,13 +3069,15 @@
        panel takes from the window's end edge, and nothing otherwise; the head's and the list's own gutter already
        stand inside it, so what is added is the rest. -->
   <div class="list-screen">
-  <PageHead icon={iconFor(decl.icon, 'rows')}
-    title={decl.name}
+  <!-- THE KEYS LIST IS THE KEYCHAIN'S TABLE VIEW (AG16): titled as the one place, with the switch back to its keys. -->
+  <PageHead icon={id === KEYS_REGISTER ? 'vault' : iconFor(decl.icon, 'rows')}
+    title={id === KEYS_REGISTER ? copy.keychain : decl.name}
     count={head}
     total={denominator}
     sentence={reading ? readingSaid : undefined}
   >
     {#snippet actions()}
+      {#if id === KEYS_REGISTER}<KeyViews on="table" />{/if}
       <!-- THE HEAD HOLDS ONE PRIMARY AND AN OVERFLOW. How the list is drawn, its search and its filters
            are about the rows, so they moved down into the list's own tile, where the rows are. -->
       <!-- ONE WAY TO ADD, AND IT IS THE LIST'S FIRST LINE. The head said "New item" over a line saying "Add an item",
