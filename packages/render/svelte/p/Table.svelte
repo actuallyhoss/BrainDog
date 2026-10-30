@@ -710,4 +710,27 @@
   :global(.table-cards > li > .table-card-acts) {
     flex: none;
   }
+
+  /* A ROW'S ONE ACTION, SHOWN ON A PHONE (`rowActionsPlan`), goes under the card's words rather than beside them, so a
+     label such as "Mark as a subscription" never squeezes the title into a column. */
+  :global(.table-cards > li:has(> .table-card-acts > .actions:not([data-fold]))) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  :global(.table-cards > li > .table-card-acts:has(> .actions:not([data-fold]))) {
+    padding: 0 var(--sp-1) var(--sp-2);
+  }
+
+  /* AT THE START OF THE LINE, UNDER THE TITLE, AND TOLD AS A PRESS BY ITS FILL: quiet grey words at the far edge of a
+     line of their own read as a note, not a button. */
+  :global(.table-cards > li > .table-card-acts > .actions:not([data-fold])) {
+    justify-content: flex-start;
+  }
+
+  :global(.table-cards > li > .table-card-acts > .actions:not([data-fold]) .actions-btn) {
+    background: var(--tile-2);
+    color: var(--ink);
+  }
 </style>

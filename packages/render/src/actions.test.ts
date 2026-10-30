@@ -151,8 +151,8 @@ test('a row shows its first action and folds the rest into one menu', () => {
   assert.ok(rowActionsPlan(make(4)).shown.every((p) => !p.primary), 'a row takes no accent fill');
 });
 
-test('on a phone a row shows none and every action is in its menu', () => {
-  assert.deepEqual(rowCounts(make(1), true), [[], ['Brew'], 'sheet']);
+test('on a phone a row shows none and every action is in its menu, save a row with only one, which shows it', () => {
+  assert.deepEqual(rowCounts(make(1), true), [['Brew'], [], null]);
   assert.deepEqual(rowCounts(make(4), true), [[], ['Brew', 'Steep', 'Pour', 'Stir'], 'sheet']);
   assert.deepEqual(rowCounts([], true), [[], [], null]);
 });
