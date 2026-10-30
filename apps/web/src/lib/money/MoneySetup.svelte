@@ -131,7 +131,6 @@
     <div class="ms-actions"><Button weight="primary" onclick={onclose}>{words.toMoney}</Button></div>
   {:else}
     <header class="ms-head">
-      <span class="ms-step">{words.step(place + 1, steps.length)}</span>
       <h2 class="ms-title" id="ms-title">{words.title}</h2>
       {#if place === 0}<p class="ms-line">{words.lead}</p>{/if}
     </header>
@@ -222,11 +221,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-  }
-
-  .ms-step {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
   }
 
   .ms-title,
