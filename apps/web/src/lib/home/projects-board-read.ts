@@ -29,7 +29,9 @@ import { localDay } from '../../routes/r/[register]/[seq]/said.ts';
 import { cardKpiOf, isForecast, type KpiAnswered } from './card-kpi.ts';
 import { readLeads } from './card-kpis.ts';
 import { runsListFor } from './card-life.ts';
-import { boardOf, type Board, type BoardInput, type BoardKpi, type BoardProject } from './projects-board.ts';
+import { boardOf, type Board, type BoardInput, type BoardKpi, type BoardProject, type BoardReading } from './projects-board.ts';
+import { cadenceOf } from '../page/feed-age.ts';
+import { lanesOf, inPlayOf } from '../shell/side.ts';
 
 /** What this tab has asked, so a list's declaration is asked for once. */
 const asked = new Map<string, Promise<void>>();
@@ -68,6 +70,10 @@ const fieldMoney = (v: unknown): { minor: number; currency: string } | null => {
   return m && typeof m.amount === 'number' && typeof m.currency === 'string' && m.currency !== '' ? { minor: m.amount, currency: m.currency } : null;
 };
 
+const EVERY_DAYS: Readonly<Record<string, number>> = { '1h': 1, '1d': 1, '1w': 7, '1m': 31 };
+/** The most of a project's newest readings read for how old its numbers are: enough for each measure's cadence. */
+const READINGS_READ = 300;
+
 const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A key number as the board draws it. */
@@ -98,6 +104,8 @@ function kpiOf(a: KpiAnswered, format: (minor: number, currency: string) => stri
     stale: card?.stale ?? null,
     aim,
     readings: a.points.length,
+    /* AS ITS PAGE READS IT (`project-facts.ts`): its declared cadence, else the usual gap between its points. */
+    cadence: (a.every ? EVERY_DAYS[a.every] : undefined) ?? cadenceOf(a.points.flatMap((p) => (typeof p.at === 'string' ? [p.at] : []))),
   };
 }
 
@@ -168,8 +176,25 @@ export async function readBoard(base: string, list: string, entries: readonly Ro
   const runs = runsListFor(list);
   const services = listWith(list, ['renews', 'provider']);
   const recurring = listWith(list, ['every', 'next_due', 'direction']);
+  /* ITS NUMBERS FEED, THE LIST ITS OWN PAGE READS (`project-shape.ts` `SHAPE_LINKED.readings`), by what it declares and
+     never one that hands work out: each project in play's newest readings, so the board says how old its numbers are
+     as its page does. A read a project, each small, since one read of every project's newest would leave out the quiet
+     ones, whose readings are the oldest. */
+  const feedList = listWith(list, ['at', 'value', 'name'], Object.keys(REGISTERS).filter((id) => handFor(REGISTERS[id]) !== null));
+  const lanes = lanesOf(REGISTERS[list], (REGISTERS[list]?.fields.find((f) => f.id === (REGISTERS[list]?.state ?? 'lane')) as { values?: string[] } | undefined)?.values ?? ['parked', 'retired']);
+  const feedOf = async (p: BoardProject): Promise<BoardReading[]> => {
+    if (!feedList) return [];
+    const got = await client
+      .list({ register: feedList.list, where: where(`${feedList.field} is ${p.spoken}`) as never, limit: READINGS_READ, order: [{ field: 'at', dir: 'desc' }], fields: ['name', 'at'] })
+      .catch(() => null);
+    if (!got?.ok) return [];
+    return (got.value.rows as Row[]).flatMap((r) => {
+      const at = text(r.fields?.at);
+      return at === '' ? [] : [{ project: p.spoken, name: text(r.fields?.name), at }];
+    });
+  };
 
-  const [openRows, movedRows, runRows, leads, asksRaw, renewRows, recRows] = await Promise.all([
+  const [openRows, movedRows, runRows, leads, asksRaw, renewRows, recRows, feeds] = await Promise.all([
     work && via ? rows(work, openWhere) : Promise.resolve([]),
     work && via ? rows(work, `${via.field} is set, updated_at after -31d`) : Promise.resolve([]),
     runs ? rows(runs.list, 'last_seen after -31d', { order: [{ field: 'last_seen', dir: 'desc' }] }) : Promise.resolve([]),
@@ -180,6 +205,7 @@ export async function readBoard(base: string, list: string, entries: readonly Ro
       .catch(() => []),
     services ? rows(services.list, 'renews after yesterday, renews before +61d') : Promise.resolve([]),
     recurring ? rows(recurring.list, `${recurring.field} is set`) : Promise.resolve([]),
+    Promise.all(projects.filter((p) => inPlayOf(p.lane, lanes)).map(feedOf)),
   ]);
 
   const input: BoardInput = {
@@ -237,6 +263,8 @@ export async function readBoard(base: string, list: string, entries: readonly Ro
           return [{ project: text(f[recurring.field]), minor: m.minor, currency: m.currency, every: text(f.every), state: text(f.state) || 'live', nextDue: text(f.next_due) || null }];
         })
       : [],
+    readings: feeds.flat(),
+    lanes,
     now,
     today,
     format,

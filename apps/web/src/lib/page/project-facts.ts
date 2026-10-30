@@ -11,6 +11,7 @@
 
 import { article } from '../copy/english.ts';
 import { nextSplit } from './next-split.ts';
+import { cadenceOf, feedAgeOf } from './feed-age.ts';
 import { isForecast } from '../home/card-kpi.ts';
 import { ago, dayChip, daysBetween, endedAs, trailOf } from '../home/projects-board.ts';
 
@@ -162,14 +163,6 @@ const EVERY_WORD: Readonly<Record<number, string>> = { 1: 'Daily', 7: 'Weekly', 
 
 type Measure = { label: string; points: { at: string; v: number; money: Money | null }[]; every: number; kpi: FactKpi | null; unit: string };
 
-/** The usual days between readings: the middle of the gaps between days that have one. */
-function cadenceOf(ats: readonly string[]): number {
-  const days = [...new Set(ats.map((a) => a.slice(0, 10)))].sort();
-  if (days.length < 2) return 31;
-  const gaps = days.slice(1).map((d, i) => Math.max(1, daysBetween(days[i]!, d))).sort((a, b) => a - b);
-  return gaps[Math.floor(gaps.length / 2)]!;
-}
-
 const figureOf = (v: number, money: Money | null, unit: string, format: FactsIn['format']): string =>
   money ? format(money.minor, money.currency) : `${Number.isInteger(v) ? v.toLocaleString('en-GB') : v.toLocaleString('en-GB', { maximumFractionDigits: 1 })}${unit === '%' ? '%' : ''}`;
 
@@ -240,13 +233,16 @@ export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'form
     const pts = m.points.slice(-45).map((p) => p.v);
     return { label: m.label, figure: figureOf(last.v, last.money, m.unit, f.format), sub: movedOf(m, f.format, f.today), points: pts, age, stale, trail: trailOf(pts, 120, 32) };
   });
-  const newest = all
-    .map((m) => m.points.at(-1)!.at.slice(0, 10))
-    .sort()
-    .at(-1) ?? null;
-  const age = newest ? Math.max(0, daysBetween(newest, f.today)) : 0;
+  /* THE FEED'S AGE AND WHETHER IT STOPPED ARE THE ONE RULE THE PROJECTS BOARD READS TOO (`feed-age.ts`), over every
+     measure and not only the cells drawn. */
+  const feed = feedAgeOf(
+    all.map((m) => ({ newest: m.points.at(-1)!.at, every: m.every })),
+    f.today,
+  );
+  const newest = feed.newest;
+  const age = feed.age;
   const every = all.length > 0 ? Math.min(...all.map((m) => m.every)) : 31;
-  const allStale = cells.length > 0 && cells.every((c) => c.stale) && age >= 7;
+  const allStale = feed.quiet;
   const fromImport = f.readings.length > 0 && f.readings.every((r) => /import/iu.test(r.source));
   return {
     cells,

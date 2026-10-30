@@ -74,6 +74,19 @@ export function lanesOf(decl: { done?: readonly string[] | undefined } | undefin
   return { parked: new Set(values.filter((v) => v === 'parked' && !done.has(v))), finished: done };
 }
 
+/** The lanes of a projects list that declares none of its own: `parked`, and `retired` as its done. */
+export const LANES_DEFAULT: Lanes = lanesOf(undefined, ['parked', 'retired']);
+
+/**
+ * THE THREE WORDS EVERY SCREEN COUNTS PROJECTS BY, SAID IN ONE PLACE (live check of 30 October, 6): IN PLAY is neither
+ * parked nor finished, EARNING is in play in the `earning` lane, and BUILDING is in play in any other. The sidebar, Today's
+ * projects tile and the Projects board all read these.
+ */
+export const inPlayOf = (lane: string, lanes: Lanes = LANES_DEFAULT): boolean => !lanes.parked.has(lane) && !lanes.finished.has(lane);
+export const EARNING_LANE = 'earning';
+export const earningOf = (lane: string, lanes: Lanes = LANES_DEFAULT): boolean => lane === EARNING_LANE && inPlayOf(lane, lanes);
+export const buildingOf = (lane: string, lanes: Lanes = LANES_DEFAULT): boolean => lane !== EARNING_LANE && inPlayOf(lane, lanes);
+
 /** The projects split into in play, parked and finished, each keeping the order it came in. */
 export function splitOf<P extends Pick<SideProject, 'lane'>>(list: readonly P[], lanes: Lanes): { play: P[]; parked: P[]; finished: P[] } {
   const out = { play: [] as P[], parked: [] as P[], finished: [] as P[] };

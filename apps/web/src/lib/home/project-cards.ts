@@ -12,6 +12,7 @@ import { briefFromNote } from '../record/brief.ts';
 import { actor } from '../record/names.ts';
 import { rowHref, rowScreen } from '../record/row-href.ts';
 import { keptOrder } from '../shell/project-order.ts';
+import { LANES_DEFAULT } from '../shell/side.ts';
 import { hueFor, slotOf } from '../ui/face.ts';
 
 import type { CardKpi } from './card-kpi.ts';
@@ -81,8 +82,8 @@ export const takenBackFree = (card: Pick<ProjectCard, 'draft' | 'made'>, nowMs: 
   return card.draft && Number.isFinite(at) && nowMs - at >= 0 && nowMs - at <= FRESH_DRAFT_MS;
 };
 
-/** The lanes that are not on the desk. */
-export const OFF_DESK: ReadonlySet<string> = new Set(['retired', 'parked']);
+/** The lanes that are not on the desk: the ones not in play, as the sidebar and Projects count them (`side.ts`). */
+export const OFF_DESK: ReadonlySet<string> = new Set([...LANES_DEFAULT.finished, ...LANES_DEFAULT.parked]);
 
 /**
  * How many cards the desk draws; the rest are one link away. EVERY PROJECT IN PLAY:

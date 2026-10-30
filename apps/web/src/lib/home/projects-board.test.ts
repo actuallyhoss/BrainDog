@@ -6,7 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { boardOf, endedAs, names, quietOf, runProject, trailOf, type BoardInput, type BoardProject } from './projects-board.ts';
+import { boardOf, endedAs, names, runProject, trailOf, type BoardInput, type BoardProject } from './projects-board.ts';
+import { feedAgeOf } from '../page/feed-age.ts';
 
 test('a line is drawn from three readings, inside its box', () => {
   assert.equal(trailOf([1, 2], 80, 24), null);
@@ -155,6 +156,8 @@ test('earning a month adds linked repeating money, else a monthly key number, in
     ],
   );
   assert.equal(b.earning.also, '1 project with no money linked');
+  /* THE TILE COUNTS EVERY EARNING PROJECT, as the list's Earning group does, the one with no money linked among them. */
+  assert.equal(b.earning.count, 3);
   assert.equal(b.groups[0]!.said, '3');
 });
 
@@ -172,14 +175,25 @@ test('the parked ask nothing unless something of theirs is due, and the finished
   assert.equal(b.headline.includes('moss.example renews in 24 days'), true);
 });
 
-test('a number with a cadence is quiet past twice it, and one without past two weeks', () => {
-  assert.deepEqual(quietOf({ every: '1d', latestAt: '2026-10-24' }, TODAY), { quiet: true, days: 3 });
-  assert.deepEqual(quietOf({ every: '1m', latestAt: '2026-09-30' }, TODAY), { quiet: false, days: 27 });
-  assert.deepEqual(quietOf({ every: null, latestAt: '2026-10-20' }, TODAY), { quiet: false, days: 7 });
+test('a feed is quiet once every measure is past twice its cadence and the newest is a week old', () => {
+  assert.deepEqual(feedAgeOf([{ newest: '2026-10-24', every: 1 }], TODAY), { newest: '2026-10-24', age: 3, quiet: false });
+  assert.deepEqual(feedAgeOf([{ newest: '2026-10-19', every: 1 }], TODAY), { newest: '2026-10-19', age: 8, quiet: true });
+  assert.deepEqual(feedAgeOf([{ newest: '2026-09-30', every: 31 }], TODAY), { newest: '2026-09-30', age: 27, quiet: false });
+  /* ONE MEASURE STILL ARRIVING KEEPS THE FEED ALIVE. */
+  assert.equal(feedAgeOf([{ newest: '2026-08-01', every: 31 }, { newest: '2026-10-26', every: 1 }], TODAY).quiet, false);
+  assert.deepEqual(feedAgeOf([], TODAY), { newest: null, age: 0, quiet: false });
 });
 
-test('names join as a sentence', () => {
-  assert.equal(names(['A']), 'A');
-  assert.equal(names(['A', 'B']), 'A and B');
-  assert.equal(names(['A', 'B', 'C', 'D']), 'A, B and 2 more');
+test('how old the numbers are is the feed\'s newest reading, not the key number it leads with (live check of 30 October, 2)', () => {
+  const kpi = { project: 'things#1', name: 'Revenue by month', figure: '$3,926', money: { minor: 392_565, currency: 'USD' }, every: '1m', latestAt: '2026-08-01', points: [], move: null, stale: null, aim: null, readings: 11 };
+  const days = Array.from({ length: 30 }, (_, i) => new Date(Date.UTC(2026, 7, 30 + i)).toISOString().slice(0, 10));
+  const b = boardOf(base({ kpis: [kpi], readings: days.map((at) => ({ project: 'things#1', name: 'Players a day', at })) }));
+  assert.match(b.lede ?? '', /Kiln has sent no numbers for 29 days\./u);
+  assert.equal(b.week.quiet.said, 'since 28 Sep');
+  assert.deepEqual(b.week.quiet.lines[0], { day: null, project: 'Kiln', text: 'quiet since 28 Sep', href: '/p/kiln' });
+  /* AND THE FIGURE ITSELF SAYS ITS OWN AGE: August's revenue is 87 days old, and not added into the month. */
+  const row = b.groups[0]!.rows[0]!;
+  assert.equal(row.number.kind === 'kpi' && row.number.sub, '87 days old');
+  assert.equal(b.earning.count, 1);
+  assert.equal(b.earning.lines[0]!.left, true);
 });

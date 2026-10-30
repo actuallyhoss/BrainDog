@@ -18,7 +18,9 @@
  */
 
 import { nextSplit } from '../page/next-split.ts';
-import { shownName } from '../shell/side.ts';
+import { cadenceOf, feedAgeOf, measureStale, type FeedMeasure } from '../page/feed-age.ts';
+import { EARNING_LANE, LANES_DEFAULT, inPlayOf, shownName, type Lanes } from '../shell/side.ts';
+import { isForecast } from './card-kpi.ts';
 import { counted, names } from './phrase.ts';
 
 const DAY = 86_400_000;
@@ -26,8 +28,6 @@ const DAY = 86_400_000;
 export const WEEK_DAYS = 7;
 /** How far ahead a renewal is said. */
 export const RENEW_DAYS = 30;
-/** A number with no cadence is quiet past this many days. */
-export const QUIET_DAYS = 14;
 
 /** One project as the board reads it. */
 export type BoardProject = {
@@ -82,7 +82,11 @@ export type BoardKpi = {
   aim: { said: string; by: string | null } | null;
   /** How many readings it was drawn from. */
   readings: number;
+  /** The usual days between its readings: its cadence where it declares one, else read off its points. */
+  cadence?: number;
 };
+/** One reading of a project's numbers feed, as the readings list keeps it: what it measured and when. */
+export type BoardReading = { project: string; name: string; at: string };
 /** A question waiting on a person, about a project. */
 export type BoardAsk = { project: string; question: string; href: string };
 /** A service that renews soon, and the project it is on, where it is on one. */
@@ -99,6 +103,10 @@ export type BoardInput = {
   asks: readonly BoardAsk[];
   renewals: readonly BoardRenewal[];
   recurring: readonly BoardRecurring[];
+  /** The newest readings of each project's numbers feed, which say how old its numbers are as its own page says it. */
+  readings?: readonly BoardReading[];
+  /** Which lanes are parked and which finished, as the projects list declares them (`side.ts` `lanesOf`). */
+  lanes?: Lanes;
   /** The record's clock, and its day as YYYY-MM-DD. */
   now: number;
   today: string;
@@ -132,8 +140,10 @@ export type BoardRow = {
 export type BoardGroup = { id: 'earning' | 'moving' | 'quiet'; name: string; said: string; rows: BoardRow[] };
 export type WeekLine = { day: string | null; project: string; text: string; href: string };
 export type WeekTile = { count: number; said: string; lines: WeekLine[]; more: number };
-export type EarnLine = { name: string; hue: number | null; minor: number; said: string; status: string; warn: boolean; href: string };
-export type Earning = { total: string | null; year: string | null; currency: string | null; lines: EarnLine[]; empty: string | null; also: string | null };
+/** One earning project's month. `left` is a month too old to be added, said and not in the total or the bar. */
+export type EarnLine = { name: string; hue: number | null; minor: number; said: string; status: string; warn: boolean; left: boolean; href: string };
+/** What the earning projects bring in a month. `count` is every project earning, money linked or not, as the list counts them. */
+export type Earning = { total: string | null; year: string | null; currency: string | null; count: number; lines: EarnLine[]; empty: string | null; also: string | null };
 export type Parked = { name: string; mark: string; hue: number | null; href: string; due: string | null };
 export type Board = {
   date: string;
@@ -187,6 +197,8 @@ export function ago(at: string, now: number): string {
   const d = Math.round(h / 24);
   return d === 1 ? 'yesterday' : `${d} days ago`;
 }
+/** "28 Sep". */
+const dayMonth = (day: string): string => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]!.slice(0, 3)}`;
 const lateWords = (days: number): string => (days === 1 ? 'a day late' : `${counted(days)} days late`);
 
 /* ── who points at which project ──────────────────────────────────────── */
@@ -246,8 +258,13 @@ type Facts = {
   open: number;
   due: { day: string; text: string; href: string }[];
   kpi: BoardKpi | null;
+  /** Its numbers feed stopped, how many days since its newest reading, and that day (`feed-age.ts`). */
   quiet: boolean;
   quietDays: number;
+  feedSince: string | null;
+  /** How old the key number it leads with is, and whether that one is past twice its cadence. */
+  kpiAge: number;
+  kpiStale: boolean;
   asks: BoardAsk[];
   renews: BoardRenewal[];
   runs: BoardRun[];
@@ -257,13 +274,22 @@ type Facts = {
 };
 
 const EVERY_DAYS: Readonly<Record<string, number>> = { '1h': 1, '1d': 1, '1w': 7, '1m': 31 };
-/** Whether a key number's newest reading is past twice its cadence (or past `QUIET_DAYS` with none), and how old it is. */
-export function quietOf(k: Pick<BoardKpi, 'every' | 'latestAt'>, today: string): { quiet: boolean; days: number } {
-  if (!k.latestAt) return { quiet: false, days: 0 };
-  const days = daysBetween(k.latestAt.slice(0, 10), today);
-  const every = k.every ? (EVERY_DAYS[k.every] ?? null) : null;
-  const limit = every === null ? QUIET_DAYS : Math.max(2 * every, every === 31 ? 45 : 2);
-  return { quiet: days > limit, days };
+/** The usual days between a key number's readings. */
+const kpiEvery = (k: Pick<BoardKpi, 'every' | 'cadence'>): number => k.cadence ?? (k.every ? (EVERY_DAYS[k.every] ?? 31) : 31);
+
+/**
+ * THE MEASURES A PROJECT'S FEED KEEPS, as its own page reads them (`project-facts.ts` `numbersOf`): its key numbers, and
+ * each measure its readings hold, a forecast left out. Its feed is as old as the newest of them (`feed-age.ts`).
+ */
+export function measuresOf(kpis: readonly BoardKpi[], readings: readonly BoardReading[]): FeedMeasure[] {
+  const out: FeedMeasure[] = kpis.filter((k) => !!k.latestAt && !isForecast(k.name)).map((k) => ({ newest: k.latestAt!, every: kpiEvery(k) }));
+  const byName = new Map<string, string[]>();
+  for (const r of readings) {
+    if (r.at === '' || isForecast(r.name)) continue;
+    byName.set(r.name, [...(byName.get(r.name) ?? []), r.at]);
+  }
+  for (const ats of byName.values()) out.push({ newest: ats.slice().sort().at(-1)!, every: cadenceOf(ats) });
+  return out;
 }
 
 /** A monthly amount from money that comes every `every`. */
@@ -294,6 +320,7 @@ function factsOf(input: BoardInput): Facts[] {
   const asks = by(input.asks, (a) => a.project);
   const renewals = by(input.renewals, (r) => r.project ?? '');
   const kpis = by(input.kpis, (k) => k.project);
+  const readings = by(input.readings ?? [], (r) => r.project);
   const runs = new Map<number, BoardRun[]>();
   for (const r of input.runs) {
     const p = runProject(r, projects);
@@ -311,10 +338,12 @@ function factsOf(input: BoardInput): Facts[] {
     const due = [...dueTasks, ...dueSaid].sort((a, b) => a.day.localeCompare(b.day));
     const ks = kpis.get(p.seq) ?? [];
     const kpi = ks[0] ?? null;
-    /* HOW LONG SINCE NUMBERS CAME IS READ FROM THE NEWEST READING OF ANY OF ITS NUMBERS (Q7 of 29 October): read off its
-       first number alone, Crumb.gg "sent no numbers for 89 days" on Projects while its own page said 31. */
-    const newest = ks.filter((k) => !!k.latestAt).sort((a, b) => b.latestAt!.localeCompare(a.latestAt!))[0] ?? kpi;
-    const q = newest ? quietOf(newest, today) : { quiet: false, days: 0 };
+    /* HOW LONG SINCE NUMBERS CAME IS ITS FEED'S AGE, BY THE RULE ITS OWN PAGE SAYS IT (live check of 30 October, 2): the
+       newest reading of anything its feed sends, its key numbers among them. Read off its key numbers alone, Crumb.gg
+       "sent no numbers for 89 days" on Projects, the age of its August revenue, while its own page said 31. */
+    const feed = feedAgeOf(measuresOf(ks, readings.get(p.seq) ?? []), today);
+    const kpiAge = kpi?.latestAt ? Math.max(0, daysBetween(kpi.latestAt.slice(0, 10), today)) : 0;
+    const kpiStale = !!kpi?.latestAt && measureStale({ newest: kpi.latestAt, every: kpiEvery(kpi) }, today);
     const rs = (runs.get(p.seq) ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
     const ms = (moves.get(p.seq) ?? []).map((m) => m.at).sort();
     /* THE NAME DRAWN IS THE ONE THE SIDEBAR SAYS (Q31 of 29 October): "mara-site" stood as a slug on Projects while the
@@ -326,8 +355,11 @@ function factsOf(input: BoardInput): Facts[] {
       open: mine.length,
       due,
       kpi,
-      quiet: q.quiet,
-      quietDays: q.days,
+      quiet: feed.quiet,
+      quietDays: feed.age,
+      feedSince: feed.newest,
+      kpiAge,
+      kpiStale,
       asks: asks.get(p.seq) ?? [],
       renews: (renewals.get(p.seq) ?? []).filter((r) => daysBetween(today, r.day) <= RENEW_DAYS),
       runs: rs,
@@ -338,9 +370,6 @@ function factsOf(input: BoardInput): Facts[] {
   });
 }
 
-const PARKED = 'parked';
-const FINISHED = 'retired';
-const inPlay = (lane: string): boolean => lane !== PARKED && lane !== FINISHED;
 
 /** The one chip a row wears: what is late, else a day due, else numbers gone quiet, else a renewal, else a question. */
 function chipOf(f: Facts, today: string): Chip {
@@ -355,9 +384,9 @@ function chipOf(f: Facts, today: string): Chip {
 function numberOf(f: Facts): NumberCell {
   const k = f.kpi;
   if (k && k.readings > 0) {
-    /* ONE SHORT LINE: how old it is when it went quiet, else how it moved, else what it counts. */
-    const sub = f.quiet ? `${f.quietDays} days old` : (k.move ?? (monthOrAge(k) !== '' ? `${k.name}, ${monthOrAge(k)}` : k.name));
-    return { kind: 'kpi', figure: k.figure, sub, stale: f.quiet, points: k.points };
+    /* ONE SHORT LINE: how old the figure itself is once it is past its cadence, else how it moved, else what it counts. */
+    const sub = f.kpiStale ? `${f.kpiAge} days old` : (k.move ?? (monthOrAge(k) !== '' ? `${k.name}, ${monthOrAge(k)}` : k.name));
+    return { kind: 'kpi', figure: k.figure, sub, stale: f.kpiStale, points: k.points };
   }
   if (k?.aim) return { kind: 'aim', said: 'Not measured yet', sub: `aim ${k.aim.said}${k.aim.by ? ` by ${k.aim.by}` : ''}` };
   return { kind: 'none', said: 'No key number' };
@@ -399,8 +428,9 @@ function ordered(fs: Facts[]): Facts[] {
 /* ── what they earn a month ───────────────────────────────────────────── */
 
 function earningOf(input: BoardInput, fs: Facts[]): Earning {
-  const earning = fs.filter((f) => f.p.lane === 'earning');
-  const lines: (EarnLine & { currency: string; left?: true })[] = [];
+  const lanes = input.lanes ?? LANES_DEFAULT;
+  const earning = fs.filter((f) => f.p.lane === EARNING_LANE && inPlayOf(f.p.lane, lanes));
+  const lines: (EarnLine & { currency: string })[] = [];
   for (const f of earning) {
     /*
      * ONE FIGURE A PROJECT, THE SAME ONE ITS ROW AND TODAY'S TILE SAY (audit of 30 October, 5): what it actually brought
@@ -418,8 +448,8 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
       const when = k!.latestAt ? MONTH_SHORT[Number(k!.latestAt.slice(5, 7)) - 1]! : '';
       /* A MONTH'S MONEY OLDER THAN 45 DAYS IS SAID AND NOT ADDED (Q7 of 29 October): August's revenue read as this month's
          and made "about $152,000 a year". The line stays, saying how old it is and that the total leaves it out. */
-      const status = old ? `${when}, ${age} days old, not in the total` : f.quiet ? `made in ${when}, ${f.quietDays} days old` : `made in ${when}`;
-      lines.push({ name: f.p.name, hue: f.p.hue, minor: k!.money!.minor, said: input.format(k!.money!.minor, k!.money!.currency), status, warn: f.quiet || old, href: f.p.href, currency: k!.money!.currency, ...(old ? { left: true } : {}) });
+      const status = old ? `${when}, ${age} days old, not in the total` : f.kpiStale ? `made in ${when}, ${f.kpiAge} days old` : `made in ${when}`;
+      lines.push({ name: f.p.name, hue: f.p.hue, minor: k!.money!.minor, said: input.format(k!.money!.minor, k!.money!.currency), status, warn: f.kpiStale || old, left: old, href: f.p.href, currency: k!.money!.currency });
       continue;
     }
     if (live.length > 0) {
@@ -428,12 +458,12 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
       const paused = live.find((r) => r.state === 'paused');
       const next = live.map((r) => r.nextDue).filter((d): d is string => !!d).sort()[0];
       const status = paused ? `repeats, paused${paused.nextDue ? `, was due ${dayChip(paused.nextDue).slice(4)}` : ''}` : next ? `repeats, next pay ${dayChip(next)}` : 'repeats';
-      lines.push({ name: f.p.name, hue: f.p.hue, minor, said: input.format(minor, currency), status, warn: !!paused, href: f.p.href, currency });
+      lines.push({ name: f.p.name, hue: f.p.hue, minor, said: input.format(minor, currency), status, warn: !!paused, left: false, href: f.p.href, currency });
       continue;
     }
     if (f.p.year) {
       const minor = Math.round(f.p.year.minor / 12);
-      lines.push({ name: f.p.name, hue: f.p.hue, minor, said: input.format(minor, f.p.year.currency), status: 'a twelfth of its year', warn: false, href: f.p.href, currency: f.p.year.currency });
+      lines.push({ name: f.p.name, hue: f.p.hue, minor, said: input.format(minor, f.p.year.currency), status: 'a twelfth of its year', warn: false, left: false, href: f.p.href, currency: f.p.year.currency });
     }
   }
   if (lines.length === 0)
@@ -441,6 +471,7 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
       total: null,
       year: null,
       currency: null,
+      count: earning.length,
       lines: [],
       empty: earning.length === 0 ? 'No project is earning yet.' : 'No money linked yet.',
       also: null,
@@ -455,7 +486,8 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
     total: summed.some((l) => !l.left) ? input.format(total, currency) : null,
     year: summed.some((l) => !l.left) ? `about ${input.format(Math.round((total * 12) / 100_000) * 100_000, currency)} a year` : null,
     currency,
-    lines: [...summed, ...other].map(({ currency: _c, left: _l, ...l }) => l),
+    count: earning.length,
+    lines: [...summed, ...other].map(({ currency: _c, ...l }) => l),
     empty: null,
     also: [other.length > 0 ? `${names(other.map((l) => l.name))} in another currency, not added` : '', unlinked > 0 ? `${plural(unlinked, 'project', 'projects')} with no money linked` : '']
       .filter(Boolean)
@@ -466,7 +498,7 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
 /* ── the headline ──────────────────────────────────────────────────────── */
 
 function headlineOf(fs: Facts[], renewals: readonly BoardRenewal[], input: BoardInput): { headline: string; lede: string | null } {
-  const live = fs.filter((f) => inPlay(f.p.lane));
+  const live = fs.filter((f) => inPlayOf(f.p.lane, input.lanes));
   const late = ordered(live.filter((f) => f.late.length > 0));
   const quiet = live.filter((f) => f.quiet);
   const due = live.filter((f) => f.late.length === 0 && f.due.length > 0).sort((a, b) => a.due[0]!.day.localeCompare(b.due[0]!.day));
@@ -515,9 +547,11 @@ function headlineOf(fs: Facts[], renewals: readonly BoardRenewal[], input: Board
 /** The board, from what was read. */
 export function boardOf(input: BoardInput): Board {
   const fs = factsOf(input);
-  const live = fs.filter((f) => inPlay(f.p.lane));
-  const parked = fs.filter((f) => f.p.lane === PARKED);
-  const finished = fs.filter((f) => f.p.lane === FINISHED);
+  const lanes = input.lanes ?? LANES_DEFAULT;
+  /* IN PLAY, EARNING AND BUILDING ARE THE SIDEBAR'S WORDS (`side.ts`), so this page and the sidebar count one 18. */
+  const live = fs.filter((f) => inPlayOf(f.p.lane, lanes));
+  const parked = fs.filter((f) => lanes.parked.has(f.p.lane));
+  const finished = fs.filter((f) => lanes.finished.has(f.p.lane));
   const { headline, lede } = headlineOf(fs, input.renewals, input);
 
   const rowOf = (f: Facts): BoardRow => ({
@@ -532,8 +566,8 @@ export function boardOf(input: BoardInput): Board {
     number: numberOf(f),
     work: workOf(f, input.now),
   });
-  const earningFs = ordered(live.filter((f) => f.p.lane === 'earning'));
-  const building = live.filter((f) => f.p.lane !== 'earning');
+  const earningFs = ordered(live.filter((f) => f.p.lane === EARNING_LANE));
+  const building = live.filter((f) => f.p.lane !== EARNING_LANE);
   const movingFs = ordered(building.filter((f) => moving(f, input.now)));
   const quietFs = building
     .filter((f) => !moving(f, input.now))
@@ -554,13 +588,13 @@ export function boardOf(input: BoardInput): Board {
     .map(({ at: _a, ...l }) => l);
   const dueProjects = new Set(dueLines.map((l) => l.project)).size;
   const quietFsAll = live.filter((f) => f.quiet);
-  const quietSince = quietFsAll.map((f) => f.kpi?.latestAt?.slice(0, 10) ?? '').filter(Boolean).sort().at(-1);
+  const quietSince = quietFsAll.map((f) => f.feedSince ?? '').filter(Boolean).sort().at(-1);
   const renewLines = input.renewals
     .filter((r) => daysBetween(input.today, r.day) <= 60)
     .sort((a, b) => a.day.localeCompare(b.day))
     .map((r) => {
       const p = r.project ? projectOf(r.project, input.projects) : null;
-      return { day: `${Number(r.day.slice(8, 10))} ${MONTH_SHORT[Number(r.day.slice(5, 7)) - 1]}`, project: r.name, text: p ? `${p.lane === PARKED ? 'parked ' : ''}${shownName(p.name)}, in ${plural(daysBetween(input.today, r.day), 'day', 'days')}` : `in ${plural(daysBetween(input.today, r.day), 'day', 'days')}`, href: r.href };
+      return { day: `${Number(r.day.slice(8, 10))} ${MONTH_SHORT[Number(r.day.slice(5, 7)) - 1]}`, project: r.name, text: p ? `${lanes.parked.has(p.lane) ? 'parked ' : ''}${shownName(p.name)}, in ${plural(daysBetween(input.today, r.day), 'day', 'days')}` : `in ${plural(daysBetween(input.today, r.day), 'day', 'days')}`, href: r.href };
     });
 
   const lateCount = lateLines.length;
@@ -587,8 +621,9 @@ export function boardOf(input: BoardInput): Board {
       due: { count: dueLines.length, said: dueLines.length === 0 ? 'nothing due' : `across ${plural(dueProjects, 'project', 'projects')}`, lines: dueLines.slice(0, 4), more: Math.max(0, dueLines.length - 4) },
       quiet: {
         count: quietFsAll.length,
-        said: quietFsAll.length === 0 ? 'all reporting' : quietSince ? `since ${Number(quietSince.slice(8, 10))} ${MONTH_SHORT[Number(quietSince.slice(5, 7)) - 1]}` : '',
-        lines: quietFsAll.slice(0, 4).map((f) => ({ day: null, project: f.p.name, text: `${f.kpi!.readings > 1 ? `${f.kpi!.readings.toLocaleString('en-GB')} readings, then none` : `${f.kpi!.name.toLowerCase()}, typed once`}`, href: f.p.href })),
+        said: quietFsAll.length === 0 ? 'all reporting' : quietSince ? `since ${dayMonth(quietSince)}` : '',
+        /* SAID AS ITS OWN PAGE SAYS ITS FEED: quiet since the day its newest reading came, of any measure. */
+        lines: quietFsAll.slice(0, 4).map((f) => ({ day: null, project: f.p.name, text: f.feedSince ? `quiet since ${dayMonth(f.feedSince)}` : 'quiet', href: f.p.href })),
         more: Math.max(0, quietFsAll.length - 4),
       },
       renewals: { count: renewLines.length, said: renewLines.length === 0 ? 'none in 60 days' : 'in 60 days', lines: renewLines.slice(0, 4), more: Math.max(0, renewLines.length - 4) },

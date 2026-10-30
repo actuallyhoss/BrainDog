@@ -60,7 +60,8 @@
 
 {#if board}
   {@const b = board}
-  {@const earnTotal = b.earning.lines.reduce((s, l) => s + l.minor, 0)}
+  <!-- THE BAR IS THE TOTAL'S: a month too old to be added (`left`) is said in the list and has no part of the bar. -->
+  {@const earnTotal = b.earning.lines.filter((l) => !l.left).reduce((s, l) => s + l.minor, 0)}
   <div class="projects-board">
     <div class="b-top">
       <section class="b-lead" aria-label="Where the projects are">
@@ -76,12 +77,12 @@
         {/if}
       </section>
       <section class="b-earn" aria-label="Earning, a month">
-        <header class="t-head"><IconWell name="coins" size="m" /><h2 class="t-title">Earning, a month</h2>{#if b.earning.lines.length > 0}<span class="t-meta">{b.earning.lines.length} {b.earning.lines.length === 1 ? 'project' : 'projects'}</span>{/if}</header>
+        <header class="t-head"><IconWell name="coins" size="m" /><h2 class="t-title">Earning, a month</h2>{#if b.earning.count > 0}<span class="t-meta">{b.earning.count} {b.earning.count === 1 ? 'project' : 'projects'}</span>{/if}</header>
         {#if b.earning.total}
           <p class="e-total num">{b.earning.total}</p>
           {#if b.earning.year}<p class="small">{b.earning.year}</p>{/if}
           <div class="e-stack" aria-hidden="true">
-            {#each b.earning.lines as l (l.name)}<i style={slotStyle(l.hue)} style:inline-size={share(l.minor, earnTotal)}></i>{/each}
+            {#each b.earning.lines.filter((l) => !l.left) as l (l.name)}<i style={slotStyle(l.hue)} style:inline-size={share(l.minor, earnTotal)}></i>{/each}
           </div>
           <ul class="kv">
             {#each b.earning.lines as l (l.name)}
