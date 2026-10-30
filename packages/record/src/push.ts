@@ -184,7 +184,7 @@ export function tellFinished(deps: FinishDeps, i: Pick<Instr, 'row' | 'state' | 
   const told = deps.sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'notify.push' AND json_extract(payload, '$.cause') = ?", cause)?.n ?? 0;
   if (Number(told) > 0) return 'told';
   /* AND WHERE IT OPENS: Needs you is answered in Decide, and Done is read on Agents. A path, never a word. */
-  const open = i.state === 'needs_you' ? '/decide' : '/agents';
+  const open = i.state === 'needs_you' ? '/decide' : '/p/agents';
   for (const id of subs) deps.outbox('notify.push', { sub: { id }, cause, open });
   return 'sent';
 }

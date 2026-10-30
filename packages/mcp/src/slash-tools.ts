@@ -128,7 +128,7 @@ const PLACES: Readonly<Record<string, { href: string; label: string }>> = {
   inbox: { href: '/inbox', label: 'Inbox' },
   automations: { href: '/automations', label: 'Automations' },
   settings: { href: '/settings', label: 'Settings' },
-  agents: { href: '/agents', label: 'Agents' },
+  agents: { href: '/p/agents', label: 'Agents' },
   keys: { href: '/keychain', label: 'Keys' },
   keychain: { href: '/keychain', label: 'Keys' },
   usage: { href: '/usage', label: 'Usage' },

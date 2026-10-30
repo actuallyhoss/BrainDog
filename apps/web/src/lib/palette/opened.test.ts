@@ -8,7 +8,7 @@ test('THE EMPTY PALETTE OFFERS THREE QUESTIONS: asked with a model, else the she
   assert.equal(asked.length, 3);
   assert.deepEqual(asked.map((a) => a.ask), TODAY_QUESTIONS.map((q) => q.title));
   const opened = questionsOf(false);
-  assert.deepEqual(opened.map((a) => a.href), ['/decide', '/agents', '/audit']);
+  assert.deepEqual(opened.map((a) => a.href), ['/decide', '/p/agents', '/audit']);
   assert.ok(opened.every((a) => a.ask === null));
 });
 

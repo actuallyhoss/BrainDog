@@ -357,7 +357,7 @@
         >
           {#snippet actions()}
             {#if (view.fired ?? 0) > 0}<Button weight="quiet" href="/automations">{usageWords.seeAutomations}</Button>
-            {:else}<Button weight="quiet" href="/agents">{usageWords.seeAgents}</Button>{/if}
+            {:else}<Button weight="quiet" href="/p/agents">{usageWords.seeAgents}</Button>{/if}
           {/snippet}
         </Empty>
       {:else if sliced.length === 0}
