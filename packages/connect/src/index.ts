@@ -99,7 +99,7 @@ export type PageDecl =
   | { kind: 'cursor_param'; param: string; from: string; more?: Expect }
   | { kind: 'offset'; param: string; size: number; more?: Expect }
   | { kind: 'page_number'; param: string; start?: number; more?: Expect }
-  | { kind: 'keyset'; param: string; from: string }
+  | { kind: 'keyset'; param: string; from: string; more?: Expect }
   | { kind: 'link_header'; stop_when: { param: string; is: string } };
 
 /**

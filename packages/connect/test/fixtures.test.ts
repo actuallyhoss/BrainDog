@@ -1128,7 +1128,9 @@ const VERCEL: Fixture = {
     auth: { kind: 'bearer', grant: 'vercel-read' },
     query: { projectId: '{grant.project_id}', target: 'production', limit: 2 },
     schedule: { every: '1h' },
-    page: { kind: 'keyset', param: 'until', from: 'createdAt' },
+    /* `pagination.next` IS NULL ON THE LAST PAGE, and `more:` reads it, so the run stops there rather than asking for
+       one more page to find it empty. */
+    page: { kind: 'keyset', param: 'until', from: 'createdAt', more: { path: 'pagination.next', is_not: null } },
     read: { format: 'json', rows: 'deployments' },
   },
   map: {
@@ -1159,11 +1161,11 @@ const deployment = (uid: string, createdAt: number, readyState = 'READY'): Recor
   meta: { githubCommitRef: 'master' },
 });
 
-const vercelPage = (deployments: Record<string, unknown>[]): unknown => ({
+const vercelPage = (deployments: Record<string, unknown>[], last = deployments.length === 0): unknown => ({
   deployments,
   pagination: {
     count: deployments.length,
-    next: deployments.length === 0 ? null : (deployments.at(-1)?.createdAt as number),
+    next: last ? null : (deployments.at(-1)?.createdAt as number),
     prev: deployments.length === 0 ? null : (deployments[0]?.createdAt as number),
   },
 });
@@ -1197,6 +1199,23 @@ test('Vercel: the next page is asked for by the last row it was given, and an em
     state: 'ERROR',
     url: 'braindog-web-7rjp1kv.vercel.app',
   });
+  assert.equal(wrote.ack?.state, 'done');
+});
+
+test('Vercel: a last page that says next is null ends the run there, with no empty page asked for', async () => {
+  const { out, wrote, seen } = await run(
+    VERCEL,
+    [
+      { body: vercelPage([deployment('dpl_8sKq2Lw', 1_768_898_000_000), deployment('dpl_7rJp1Kv', 1_768_890_000_000)]) },
+      { body: vercelPage([deployment('dpl_6qHn0Ju', 1_768_880_000_000)], true) },
+    ],
+    VERCEL_GRANT,
+  );
+
+  assert.equal(out.outcome, 'ok', out.error?.fix);
+  /* TWO REQUESTS AND NOT THREE. The third would have been asked for by `1768880000000` and answered with nothing. */
+  assert.equal(seen.length, 2);
+  assert.deepEqual(wrote.pages.flatMap((p) => p.rows).map((r) => r.fields.id), ['dpl_8sKq2Lw', 'dpl_7rJp1Kv', 'dpl_6qHn0Ju']);
   assert.equal(wrote.ack?.state, 'done');
 });
 

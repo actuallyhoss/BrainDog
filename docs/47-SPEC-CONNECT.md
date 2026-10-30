@@ -183,7 +183,7 @@ type PageDecl =
   | { kind: 'cursor_param'; param: string; from: string; more?: Expect }               // Stripe: starting_after ← data[-1].id
   | { kind: 'offset';       param: string; size: number; more?: Expect }               // next = offset + size
   | { kind: 'page_number';  param: string; start?: number; more?: Expect }             // default start 1
-  | { kind: 'keyset';       param: string; from: string }                              // next = last row's key
+  | { kind: 'keyset';       param: string; from: string; more?: Expect }               // next = last row's key
   | { kind: 'link_header';  stop_when: { param: string; is: string } };                // Sentry: results="false"
 
 type Expect = { path: string; on_fail?: 'warn' | 'review' | 'fail' } & (                // default on_fail: review
@@ -467,7 +467,7 @@ the leased rows concurrently, one `runPull` each. Then, per row:
 | `cursor_param` | `readPath(json, from)` (Stripe `data[-1].id`) | `more` fails, `from` is missing, or rows are empty |
 | `offset` | `value + size` | rows `< size`, or `more` fails |
 | `page_number` | `value + 1` | rows are empty, or `more` fails |
-| `keyset` | `readPath(rows[-1], from)` | rows are empty or the key is missing |
+| `keyset` | `readPath(rows[-1], from)` | rows are empty, `more` fails (Vercel's `pagination.next` is null on the last page), or the key is missing |
 | `link_header` | the `rel="next"` URL of the `Link` header, RFC 8288 | no `next` link, **or** the link carries `stop_when.param` equal to `stop_when.is` — Sentry's `results="false"` (25 §4); presence alone never decides |
 
 Every kind also stops at `max_pages` and `rows_per_run` (step 8). A next value equal to the current one is a loop
@@ -573,7 +573,7 @@ records every request; a stub `RecordApi` that records every `applyPull` and `ac
 | `posthog-endpoints` | `header` auth with `name: X-Api-Key`, `offset` paging with `size`; a sibling case with `name: Authorization` | header exact; stops when a page returns fewer than `size` rows; the sibling is `PULL_REQUEST_REFUSED` |
 | `ga4` | `jwt_rs256` mode `exchange`: RS256 signature verified with the fixture's public key, one POST to `token_url`, then `Bearer <access_token>`; `expect: metadata.subjectToThresholding is_not true` | exact claim set `{ iss, scope, aud, iat, exp }`; a thresholded page → `review` |
 | `sentry` | `link_header` with `stop_when: { param: results, is: "false" }` | stops on `results="false"` although a `next` link is present — never loops |
-| `vercel` | `bearer`, `keyset` paging, `cumulative` kind | next = last row's key; empty rows end the loop |
+| `vercel` | `bearer`, `keyset` paging with `more: { path: pagination.next, is_not: null }`, a register (a list of deployments has no cumulative figure) | next = last row's key; a page whose `pagination.next` is null ends the loop with no empty page asked for; empty rows end it too |
 | `enable-banking` (tenth, for the second `jwt_rs256` customer) | mode `present`, `kid` from the grant | `Authorization: Bearer <jwt>` with `kid` in the header, no token step |
 | `aws-cost` (eleventh, the eighth kind) | `aws_sigv4` against the reference vector | the exact `Authorization` string and `x-amz-date` of the published example |
 
