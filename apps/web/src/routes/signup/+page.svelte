@@ -79,6 +79,7 @@
     keepLeft,
     keepPlan,
     keepSaid,
+    keepSpent,
     madeFor,
     namesHeard,
     openOwned,
@@ -89,6 +90,7 @@
     saidForLink,
     saidFromLink,
     saidKept,
+    spentFor,
     startSignup,
     verifySignup,
     zone,
@@ -157,6 +159,7 @@
     | 'verifying'
     | 'lock'
     | 'link-failed'
+    | 'link-used'
     | 'making'
     | 'made-partly'
     | 'make-failed'
@@ -866,6 +869,8 @@
     step = 'verifying';
     const out = await verifySignup(token);
     if (!out.ok) {
+      /* A LINK THIS DEVICE SPENT ALREADY IS SAID AS USED, with the way on that fits (`usedLink`). */
+      if (out.kind === 'refused' && (await usedLink(token))) return;
       /* THE HOST'S OWN SENTENCE when it refused with one, the wait when it locked, and never "expired" for a lost line. */
       linkWhy = out.kind === 'refused' ? out.fix : out.kind === 'locked' ? copy.signupLocked(Math.ceil(out.retryAfter / 60)) : words.linkUnreached;
       step = 'link-failed';
@@ -876,6 +881,7 @@
     const shown = read ?? (sentence.trim() === '' ? null : settle(await readingKept(saidKept(localStore()), reading)(sentence), amends, null, sentence));
     held = { slug: out.value.slug, name: titleSent(shown, out.value.name), tz: out.value.tz, plan };
     hold(globalThis.sessionStorage, held);
+    await keepSpent(localStore(), token, { email: out.value.email, slug: out.value.slug });
     if (plan !== 'free') {
       step = 'pay';
       return;
@@ -889,6 +895,37 @@
       return;
     }
     void makeFree(held);
+  }
+
+  /** A link this device spent: for whom, and whether this browser is signed in and owns a BrainDog to open. */
+  let used = $state<{ email: string; signedIn: boolean; owns: string | null } | null>(null);
+
+  /**
+   * WHETHER THE LINK WAS SPENT ON THIS DEVICE (`spentFor`), and if so the screen that says it was used (first hour
+   * audit, E15): the BrainDog to open where this browser is signed in and owns one, the make where it owns none, and
+   * Sign in with that address where it is signed out. A link this device never spent is the plain refusal, as before.
+   */
+  async function usedLink(token: string): Promise<boolean> {
+    const was = await spentFor(localStore(), token);
+    if (was === null) return false;
+    const who = await methods();
+    const me = who.ok ? who.value.me : null;
+    let owns: string | null = null;
+    if (me !== null) {
+      const account = await billing();
+      const records = account.ok ? account.value.records : [];
+      owns = (records.find((r) => r.slug === was.slug) ?? records[0])?.slug ?? null;
+    }
+    used = { email: me?.email ?? was.email, signedIn: me !== null, owns };
+    step = 'link-used';
+    return true;
+  }
+
+  /** Open the BrainDog a used link made, in this browser. */
+  async function openUsed(slug: string): Promise<void> {
+    busy = true;
+    await openOwned(slug);
+    location.assign(at('/', `${BASE}/${slug}/`));
   }
 
   /**
@@ -1412,6 +1449,20 @@
     <h1 class="entry-title">{copy.signupLinkFailed}</h1>
     <p class="entry-lede" role="alert">{linkWhy ?? copy.signupLinkFailedWhy}</p>
     <div class="go"><Button weight="primary" onclick={() => void ask()}>{copy.signupStartAgain}</Button></div>
+    <p class="aside"><a class="link" href={at('/signin')}>{words.usedElsewhere}</a></p>
+  {:else if step === 'link-used' && used}
+    <h1 class="entry-title">{words.linkUsedTitle}</h1>
+    {#if used.signedIn && used.owns}
+      {@const mine = used.owns}
+      <p class="entry-lede" role="status">{words.linkUsedOpen}</p>
+      <div class="go"><Button weight="primary" onclick={() => void openUsed(mine)} disabled={busy}>{words.openMine}</Button></div>
+    {:else if used.signedIn}
+      <p class="entry-lede" role="status">{words.linkUsedMake}</p>
+      <div class="go"><Button weight="primary" onclick={() => void ask()}>{words.makeRecord}</Button></div>
+    {:else}
+      <p class="entry-lede" role="status">{words.linkUsedSignIn(used.email)}</p>
+      <div class="go"><Button weight="primary" href={`${at('/signin')}#email=${encodeURIComponent(used.email)}`}>{words.signIn}</Button></div>
+    {/if}
   {:else if step === 'making'}
     <h1 class="entry-title">{words.making}</h1>
     <p class="entry-lede" role="status">{stage}</p>

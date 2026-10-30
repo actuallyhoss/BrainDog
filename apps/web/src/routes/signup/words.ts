@@ -101,6 +101,18 @@ export const words = {
   sendFailed: 'That did not go through. Check the address, then send it again.',
   /** The mailed link opened while the host could not be reached: the link is not spent, so it is not called expired. */
   linkUnreached: 'We could not reach BrainDog. Open the link again in a minute.',
+  /**
+   * A SIGN-UP LINK OPENED A SECOND TIME ON THE DEVICE THAT SPENT IT (first hour audit, E15): said as used, never as
+   * broken, with the one way on that fits. It sent her to make a second BrainDog.
+   */
+  linkUsedTitle: 'This link was already used',
+  linkUsedOpen: 'A link works once, and this one was opened here before. Your BrainDog is made, and you are signed in.',
+  linkUsedMake: 'A link works once, and this one was opened here before. You are signed in, so you can make your BrainDog now.',
+  linkUsedSignIn: (email: string) => `A link works once, and this one was opened here before. Sign in with ${email} to open your BrainDog.`,
+  openMine: 'Open your BrainDog',
+  signIn: 'Sign in',
+  /** Under a link that did not work on a device that never spent it: it may have been used somewhere else. */
+  usedElsewhere: 'Already opened it? Sign in instead',
   haveOne: 'Already have a BrainDog? Sign in',
   /** The header's half of it from 640px: the question in the second ink, then only "Sign in" as the link. */
   haveAsk: 'Already have a BrainDog?',

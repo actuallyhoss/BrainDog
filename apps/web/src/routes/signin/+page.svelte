@@ -215,6 +215,17 @@
       kept.delete('google');
       history.replaceState(history.state, '', `${location.pathname}${kept.size > 0 ? `?${kept}` : ''}${location.hash}`);
     }
+    /* AN ADDRESS HANDED ON BY A SPENT SIGN-UP LINK (`/signin#email=`), filled in so the link's way in is one press. In
+       the fragment, so it never reaches a server's log; and it leaves the address at once. */
+    const handed = /^#email=(.+)$/su.exec(location.hash);
+    if (handed) {
+      clearHash();
+      const to = decodeURIComponent(handed[1] ?? '').trim();
+      if (/^[^\s@]+@[^\s@]+$/u.test(to)) {
+        email = to;
+        mailing = true;
+      }
+    }
     link = takeLink(location.hash, clearHash);
     void load();
     if (here.secure && here.webauthn) void canAutofill().then((yes) => (autofill = yes));

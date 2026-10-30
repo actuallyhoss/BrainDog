@@ -43,7 +43,7 @@ export type Io = { fetch: (url: string, init: RequestInit) => Promise<Response> 
  */
 export type Asked<T> =
   | { ok: true; value: T }
-  | { ok: false; kind: 'refused'; fix: string | null; at?: string }
+  | { ok: false; kind: 'refused'; fix: string | null; at?: string; code?: string }
   | { ok: false; kind: 'locked'; retryAfter: number }
   | { ok: false; kind: 'unreachable' };
 
@@ -186,7 +186,8 @@ async function call(io: Io, path: string, body?: Record<string, unknown>): Promi
   if (env?.ok === false || (res.status >= 400 && res.status < 500)) {
     const refusal = isObj(env?.refusal) ? env.refusal : null;
     const at = str(refusal?.at);
-    return { ok: false, kind: 'refused', fix: str(refusal?.fix), ...(at !== null ? { at } : {}) };
+    const code = str(refusal?.code);
+    return { ok: false, kind: 'refused', fix: str(refusal?.fix), ...(at !== null ? { at } : {}), ...(code !== null ? { code } : {}) };
   }
   return { ok: false, kind: 'unreachable' };
 }
@@ -835,7 +836,9 @@ export async function startSignup(
 /** Spend the mailed proof, once: the person is made and this browser is signed in as them. */
 export async function verifySignup(token: string, io: Io = live()): Promise<Asked<Verified>> {
   const out = await call(io, '/auth/signup/verify', { token });
-  if (!out.ok) return out;
+  /* A LINK THE HOST WILL NOT TAKE IS ITS ONE 401, "That did not sign you in.", which under "That link did not work" said
+     the same thing twice and nothing of why: it leaves the fix to the page, "A link works once, within a day". */
+  if (!out.ok) return out.kind === 'refused' && out.code === 'UNAUTHORIZED' ? { ok: false, kind: 'refused', fix: null } : out;
   const v = isObj(out.value) ? out.value : null;
   if (!v || typeof v.person !== 'string' || typeof v.email !== 'string' || typeof v.slug !== 'string') return { ok: false, kind: 'refused', fix: null };
   return { ok: true, value: { person: v.person, email: v.email, slug: v.slug, name: str(v.name), tz: str(v.tz) } };
@@ -945,6 +948,55 @@ export function heldOf(storage: Pick<Storage, 'getItem'> | null | undefined): He
     if (!isObj(v) || typeof v.slug !== 'string' || v.slug === '') return null;
     const plan = planIn(v.plan);
     return { slug: v.slug, name: str(v.name), tz: str(v.tz), ...(plan ? { plan } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+/** The key a spent sign-up link is remembered under on this device, in `localStorage` (`keepSpent`). */
+export const SPENT_KEY = 'braindog.signup.spent';
+
+/** How long a spent link is remembered: a week, longer than any link lives. */
+const SPENT_MS = 7 * 24 * 3600 * 1000;
+
+/** A sign-up link spent on this device: who it was for and the name it made, never the link itself. */
+export type Spent = { email: string; slug: string };
+
+/** The link as it is remembered: the first half of its SHA-256, so the link itself is never kept. */
+async function linkMark(token: string): Promise<string | null> {
+  try {
+    const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
+    return [...bytes.slice(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remember that this link was spent here, and for whom (first hour audit, E15).
+ *
+ * A LINK WORKS ONCE, AND A SECOND OPEN SENT HER TO MAKE A SECOND BRAINDOG. Somebody who closed the tab at "Your email
+ * is confirmed" and opened the mail again read "That link did not work … Start again". The host says the same 401 for
+ * every link it will not take, rightly, so the device that spent it is the one that can say it was used.
+ */
+export async function keepSpent(storage: Pick<Storage, 'setItem'> | null | undefined, token: string, spent: Spent, now: number = Date.now()): Promise<void> {
+  const mark = await linkMark(token);
+  if (mark === null) return;
+  try {
+    storage?.setItem(SPENT_KEY, JSON.stringify({ mark, email: spent.email, slug: spent.slug, until: now + SPENT_MS }));
+  } catch {
+    /* Storage off: a second open says only that the link did not work, as before. */
+  }
+}
+
+/** Whether this very link was spent on this device, and for whom; `null` for any other link, or once a week has gone. */
+export async function spentFor(storage: Pick<Storage, 'getItem'> | null | undefined, token: string, now: number = Date.now()): Promise<Spent | null> {
+  try {
+    const raw = storage?.getItem(SPENT_KEY);
+    const v: unknown = raw ? JSON.parse(raw) : null;
+    if (!isObj(v) || typeof v.mark !== 'string' || typeof v.email !== 'string' || typeof v.slug !== 'string') return null;
+    if (typeof v.until !== 'number' || v.until < now) return null;
+    return v.mark === (await linkMark(token)) ? { email: v.email, slug: v.slug } : null;
   } catch {
     return null;
   }
