@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { archiveOf, compareVersions, developerId, distMissing, entitlementsFor, envFile, feedOf, liveRefusal, teamOf, uploadsOf, withVersion } from '../../../tools/desktop/release.mjs';
+import { archiveOf, compareVersions, developerId, distMissing, entitlementsFor, envFile, feedOf, feedSignatures, liveRefusal, teamOf, uploadsOf, withVersion } from '../../../tools/desktop/release.mjs';
 import { CONF, configPubkey, withPubkey } from '../../../tools/desktop/updater-key.mjs';
 
 test('ONLY A DEVELOPER ID SIGNS FOR OTHER MACS: an Apple Development identity is not one', () => {
@@ -84,7 +84,7 @@ test('RD9: A BUILD MUST BE NEWER THAN WHAT IS LIVE; AN UPLOAD OF FILES ALREADY B
   assert.equal(liveRefusal('0.2.1', '0.2.0', false), null);
   assert.match(liveRefusal('0.2.0', '0.2.0', false) ?? '', /--upload-only/u);
   assert.match(liveRefusal('0.1.9', '0.2.0', false) ?? '', /not newer/u);
-  assert.equal(liveRefusal('0.2.0', '0.2.0', true), null);
+  assert.equal(liveRefusal('0.2.0', '0.2.0', true, true), null);
   assert.equal(liveRefusal('0.2.1', '0.2.0', true), null);
   assert.match(liveRefusal('0.1.9', '0.2.0', true) ?? '', /older/u);
 });
@@ -95,4 +95,16 @@ test('RD9: --upload-only NAMES WHAT dist DOES NOT HOLD FOR THE VERSION, the feed
   assert.deepEqual(distMissing(['BrainDog.dmg', 'latest.json'], '0.2.0', '0.2.0'), [archiveOf('0.2.0')]);
   assert.deepEqual(distMissing(all, '0.1.9', '0.2.0').length, 2);
   assert.deepEqual(distMissing([], null, '0.2.0').sort(), [archiveOf('0.2.0'), 'BrainDog.dmg', 'latest.json'].sort());
+});
+
+/* RE13: 0.2.0 LIVE, A PLAIN BUILD OF 0.2.0 REWROTE dist, and --upload-only put its other bytes under the live number. */
+test('RE13: --upload-only SENDS THE LIVE VERSION AGAIN ONLY AS THE LIVE BUILD ITSELF', () => {
+  assert.match(liveRefusal('0.2.0', '0.2.0', true, false) ?? '', /another build/u);
+  assert.match(liveRefusal('0.2.0', '0.2.0', true) ?? '', /another build/u);
+  const live = feedOf({ version: '0.2.0', notes: '', at: '', signature: 'sig-a', archive: archiveOf('0.2.0'), universal: true, arch: 'arm64' });
+  const rebuilt = feedOf({ version: '0.2.0', notes: '', at: '', signature: 'sig-b', archive: archiveOf('0.2.0'), universal: true, arch: 'arm64' });
+  assert.equal(feedSignatures(live), feedSignatures({ ...live, pub_date: 'later' }));
+  assert.notEqual(feedSignatures(live), feedSignatures(rebuilt));
+  assert.equal(feedSignatures(null), null);
+  assert.equal(feedSignatures({ version: '0.2.0' }), null);
 });

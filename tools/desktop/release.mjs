@@ -156,12 +156,19 @@ export function uploadsOf(version) {
 
 /**
  * What a live version says about this run, or `null` to go on. A build must be newer than what is live; files already
- * built (`--upload-only`) may be the same version, since that is a publish that stopped part way being finished.
+ * built (`--upload-only`) may be the same version, since that is a publish that stopped part way being finished, but
+ * only when they are the live build's own bytes (`sameAsLive`: the feed in `dist` signs the same update as the live
+ * one). A plain build of the live version since rewrote `dist`, and sending that replaced the live dmg, archive and
+ * feed with other bytes under the same number, which installed copies never update to.
  */
-export function liveRefusal(version, live, uploadOnly) {
+export function liveRefusal(version, live, uploadOnly, sameAsLive = false) {
   if (live === null) return null;
   const order = compareVersions(version, live);
-  if (order > 0 || (uploadOnly && order === 0)) return null;
+  if (order > 0) return null;
+  if (uploadOnly && order === 0)
+    return sameAsLive
+      ? null
+      : `${version} is live, and apps/desktop/dist holds another build of it: sending it would put other bytes under the live number. For a new release, run --publish with --version and a higher number.`;
   if (uploadOnly) return `${version} is older than ${live}, which is live: there is nothing of it to finish.`;
   return order === 0
     ? `${version} is already live. To finish a publish of it that stopped part way, run with --upload-only, which builds nothing. For a new release, run again with --version and a higher number.`
@@ -180,15 +187,48 @@ export function distMissing(names, feedVersion, version) {
 const found = (dir, end) => (existsSync(dir) ? (readdirSync(dir).find((f) => f.endsWith(end)) ?? null) : null);
 
 /** The version the live feed offers, `null` when there is none yet (or it cannot be read, which is said). */
-async function liveVersion() {
+async function liveFeed() {
   try {
     const res = await fetch(`${BUCKET_PUBLIC}/latest.json`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`answered ${res.status}`);
-    return String((await res.json()).version ?? '') || null;
+    const feed = await res.json();
+    return String(feed?.version ?? '') ? feed : null;
   } catch (e) {
     say(`the live feed could not be read (${e instanceof Error ? e.message : e}); going on as if none is live.`);
     return null;
+  }
+}
+
+async function liveVersion() {
+  const feed = await liveFeed();
+  return feed === null ? null : String(feed.version);
+}
+
+/** The update signatures a feed names, one a chip, sorted and joined: two feeds sign the same update when these match. */
+export function feedSignatures(feed) {
+  const platforms = feed && typeof feed === 'object' && feed.platforms && typeof feed.platforms === 'object' ? Object.values(feed.platforms) : [];
+  const signs = platforms.map((p) => (p && typeof p.signature === 'string' ? p.signature.trim() : '')).filter((x) => x !== '');
+  return signs.length === 0 ? null : [...new Set(signs)].sort().join('\n');
+}
+
+/** Whether Gatekeeper's verdict accepts a notarised Developer ID. */
+const notarised = (checked) => checked.status === 0 && /accepted/u.test(`${checked.stdout ?? ''}${checked.stderr ?? ''}`) && /Notarized Developer ID/u.test(`${checked.stdout ?? ''}${checked.stderr ?? ''}`);
+
+/**
+ * Whether the dmg in `dist` ships a notarised app: the dmg itself accepted, or, as `--publish` judges it, the app inside
+ * it. `--publish` checks the app and goes on when the dmg cannot be stapled, so a dmg that does not read as notarised on
+ * its own is the very case `--upload-only` finishes, and it refused every one.
+ */
+function dmgShipsNotarised(dmg) {
+  if (notarised(spawnSync('spctl', ['-a', '-t', 'open', '--context', 'context:primary-signature', '-vv', dmg], { encoding: 'utf8' }))) return true;
+  const mount = mkdtempSync(join(tmpdir(), 'braindog-dmg-'));
+  if (spawnSync('hdiutil', ['attach', '-nobrowse', '-readonly', '-noautoopen', '-mountpoint', mount, dmg], { stdio: 'ignore' }).status !== 0) return false;
+  try {
+    const app = found(mount, '.app');
+    return app !== null && notarised(spawnSync('spctl', ['-a', '-vv', join(mount, app)], { encoding: 'utf8' }));
+  } finally {
+    spawnSync('hdiutil', ['detach', mount, '-quiet'], { stdio: 'ignore' });
   }
 }
 
@@ -304,24 +344,26 @@ const settings = () => ({ ...(existsSync(SIGNING_ENV) ? envFile(readFileSync(SIG
 
 /**
  * `--upload-only`: the files `dist` holds for this version go up as `--publish` sends them, and nothing is built. The
- * dmg there must be one Gatekeeper accepts as notarised, since `dist` is written before that check is made.
+ * app in the dmg there must be one Gatekeeper accepts as notarised, since `dist` is written before that check is made,
+ * and a version already live goes up again only as its own bytes (`liveRefusal`).
  */
 async function uploadOnly(version) {
   if (asked !== null) stop('--upload-only sends files already built, so it takes no --version.');
-  const refused = liveRefusal(version, await liveVersion(), true);
-  if (refused !== null) stop(refused);
-  let feedVersion = null;
+  let distFeed = null;
   try {
-    feedVersion = String(JSON.parse(readFileSync(join(DIST, 'latest.json'), 'utf8')).version ?? '') || null;
+    distFeed = JSON.parse(readFileSync(join(DIST, 'latest.json'), 'utf8'));
   } catch {
-    feedVersion = null;
+    distFeed = null;
   }
+  const feedVersion = String(distFeed?.version ?? '') || null;
+  const live = await liveFeed();
+  const ours = feedSignatures(distFeed);
+  const refused = liveRefusal(version, live === null ? null : String(live.version), true, ours !== null && ours === feedSignatures(live));
+  if (refused !== null) stop(refused);
   const missing = distMissing(existsSync(DIST) ? readdirSync(DIST) : [], feedVersion, version);
   if (missing.length > 0) stop(`apps/desktop/dist does not hold ${version}'s files (${missing.join(', ')}): run --publish to build them.`);
-  const checked = spawnSync('spctl', ['-a', '-t', 'open', '--context', 'context:primary-signature', '-vv', join(DIST, 'BrainDog.dmg')], { encoding: 'utf8' });
-  const verdict = `${checked.stdout ?? ''}${checked.stderr ?? ''}`;
-  if (!(checked.status === 0 && /accepted/u.test(verdict) && /Notarized Developer ID/u.test(verdict)))
-    stop('the dmg in apps/desktop/dist is not one Gatekeeper accepts as notarised: run --publish to build and notarise it. /download stays held.');
+  if (!dmgShipsNotarised(join(DIST, 'BrainDog.dmg')))
+    stop('the dmg in apps/desktop/dist, and the app inside it, are not ones Gatekeeper accepts as notarised: run --publish to build and notarise it. /download stays held.');
   say(`BrainDog ${version}: sending the files apps/desktop/dist holds, building nothing`);
   if (DRY) {
     say(`would upload ${uploadsOf(version).map((u) => u.key).join(', ')} to the bucket ${BUCKET}, then open /download`);
