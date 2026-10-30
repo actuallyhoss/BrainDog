@@ -851,13 +851,16 @@
 <svelte:window {onkeydown} ontouchstart={pullStart} ontouchmove={pullMove} ontouchend={pullEnd} ontouchcancel={pullEnd} />
 
 <!-- THE QUICK ADD (`lib/money`): the `+` key and the palette's money rows on every page drawn here, and the floating +
-     on a page that draws the ledger or its accounts. Not on a preview, which writes nothing. -->
+     on a page of Money's that draws the ledger or its accounts. NOT ON A PAGE THAT ONLY HOLDS A MONEY TILE (audit 31 Oct,
+     B9): on Kiln at 390 the + sat on its Money tile's "£4,050" and "Tue 15 Sep" from the first screen, with no Money
+     padding under the last card to keep it clear at the foot; there the `+` key and the palette are the way in. Not on a
+     preview, which writes nothing. -->
 {#if pulled > 0 || pullBusy}
   <div class="pull" role="status" style:transform={`translateY(${pullBusy ? 16 : pulled - 24}px)`}>{pullBusy ? 'Refreshing' : pulled >= PULL_AT / 2 ? 'Let go to refresh' : 'Pull to refresh'}</div>
 {/if}
 
 {#if mode !== 'preview' && live}
-  <QuickHost fab={mode === 'page' && pageOfLedger(live.page.page.requires, quick.ledger)} />
+  <QuickHost fab={mode === 'page' && moneyPage && pageOfLedger(live.page.page.requires, quick.ledger)} />
 {/if}
 
 {#if got === null}
