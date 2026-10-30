@@ -28,7 +28,8 @@ import assert from 'node:assert/strict';
 import { KINDS, type Tone } from './kinds.ts';
 import { parse, type Block, type Degraded } from './parse.ts';
 import { toHTML } from './html.ts';
-import { inline } from './inline.ts';
+import { inline, safeHref } from './inline.ts';
+import { linkHref, linkFault } from './links.ts';
 import { valueWord } from './format.ts';
 import { queuePlan, queueCost, QUEUE_COSTS } from './queue.ts';
 import { agentDoing, AGENT_VERBS } from './agents.ts';
@@ -403,4 +404,21 @@ test('AN UNTERMINATED CONSTRUCT IS THE AUTHOR TEXT, and never an exception', () 
 test('A DOCUMENT OF NOTHING BUT FENCES TERMINATES', () => {
   const took = ms(() => void toHTML(parse('```'.repeat(1) + '\n' + '```stat | A\n'.repeat(2_000))));
   assert.ok(took < 2_000, `the fences took ${took.toFixed(0)}ms`);
+});
+
+/**
+ * A TAB OR A LINE BREAK IS DROPPED BY THE URL PARSER BEFORE IT READS AN ADDRESS, so `/\t/evil.example` passed the
+ * slash test as a path of this record and reached the browser as `//evil.example`. Any write key could plant it in a
+ * link list's cell.
+ */
+test('A CONTROL CHARACTER IN AN ADDRESS MAKES IT NO LINK, ON A LIST OR IN A SENTENCE', () => {
+  for (const where of ['/\t/evil.example', '/\n/evil.example/x', '/\r\n/evil.example', '/\t\\evil.example', 'https://ok.example/\u0000x', '/\u007f/x']) {
+    assert.equal(safeHref(where), null, JSON.stringify(where));
+    assert.equal(linkHref(where), null, JSON.stringify(where));
+    assert.notEqual(linkFault([['Somewhere', where]]), null, JSON.stringify(where));
+    assert.equal(queuePlan([{ cells: ['more', '5', where] }]).moreHref, null, JSON.stringify(where));
+  }
+  assert.equal(safeHref('/p/handbook'), '/p/handbook');
+  assert.equal(safeHref('https://example.com/a b'), 'https://example.com/a b');
+  assert.equal(linkHref('/r/tasks?sort=due'), '/r/tasks?sort=due');
 });
