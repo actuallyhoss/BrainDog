@@ -2,7 +2,7 @@
   The desk's Today, as the app's Today draws it since 30 October: the greeting alone (DIRECTION §51), then a board of
   widgets, each at its own size on one twelve-column grid as the app packs them: Needs you wide beside Cash ahead,
   then Working now, Coming up and a widget Claude made that is still a draft (dashed, with Keep and Throw away), then
-  the projects across the row. "Edit Today" and "Add a widget" sit at the board's foot, as in the app.
+  the projects across the row. "Edit Today" and "Add widget" sit at the board's foot, as in the app.
 
   Answering on the Needs you tile moves the ask out with an Undo, and the count in the sidebar follows, because both
   read one store.
@@ -304,7 +304,7 @@
     margin: 0;
   }
 
-  /* THE BOARD'S FOOT: "Add a widget" and "Edit Today", quiet buttons at its end. */
+  /* THE BOARD'S FOOT: "Add widget" and "Edit Today", quiet buttons at its end. */
   .bfoot {
     display: flex;
     justify-content: flex-end;

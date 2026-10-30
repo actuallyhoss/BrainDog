@@ -396,7 +396,8 @@ export function distill(t: Pick<WidgetTemplate, 'rows' | 'block'>, drawn: unknow
     if (title === undefined) return [];
     const day = read.day ? textOf(f[read.day]) : undefined;
     const amount = read.amount ? amountOf(f[read.amount]) : undefined;
-    const meta = read.meta ? (textOf(f[read.meta]) ?? (typeof scopes[i] === 'string' ? (scopes[i] as string) : undefined)) : undefined;
+    const said = read.meta ? (textOf(f[read.meta]) ?? (typeof scopes[i] === 'string' ? (scopes[i] as string) : undefined)) : undefined;
+    const meta = read.meta === 'agent' ? agentNamed(said) : said;
     const p = progressOf(r, title);
     return [{ title, ...(day ? { day: day.slice(0, 10) } : {}), ...(amount ? { amount } : {}), ...(meta ? { meta } : {}), ...(p ? p : {}) }];
   });
@@ -552,6 +553,27 @@ export function exampleMoney(text: string, home: string | null): string {
 
 /** A name typed as a slug: small letters and digits joined by hyphens or underscores ("sam-site"). */
 const SLUG = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+$/u;
+
+/**
+ * AN AGENT BY ITS OWN SPELLING: a run signs with the bare word ("claude"), and Agents at work listed "claude" and "codex"
+ * where every other page says "Claude" and "Codex" (recheck of 30 October, 33). A name not known here is raised at its
+ * first letter, which is still a name.
+ */
+const AGENT_NAMES: Readonly<Record<string, string>> = {
+  claude: 'Claude',
+  'claude-code': 'Claude Code',
+  codex: 'Codex',
+  cursor: 'Cursor',
+  gemini: 'Gemini',
+  copilot: 'Copilot',
+  windsurf: 'Windsurf',
+};
+export function agentNamed(text: string | undefined): string | undefined {
+  if (text === undefined || text === '') return text;
+  const known = AGENT_NAMES[text.toLowerCase()];
+  if (known !== undefined) return known;
+  return /[A-Z]/u.test(text) ? text : text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 /**
  * A line a bank shouted, said as a name: "FENWICK CLOUD" as "Fenwick Cloud". Anything already in mixed case is left.

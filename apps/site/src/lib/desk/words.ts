@@ -10,7 +10,8 @@ export const DESK = {
   tabs: { today: 'Today', needs: 'Needs you', projects: 'Projects', money: 'Money', agents: 'Agents' },
   /* The app's glyph for each place: Needs you is the tray (`inbox`, SPEC 2.A.25). */
   icons: { today: 'today', needs: 'inbox', projects: 'projects', money: 'money', agents: 'agent' } as Record<string, IconName>,
-  ask: { bar: 'Ask or change anything', key: '/', open: 'Ask BrainDog', close: 'Close' },
+  /* THE APP'S KEY FOR ASK, ⌘J (Ctrl J off a Mac), as its bar shows it. */
+  ask: { bar: 'Ask or change anything', key: '⌘J', open: 'Ask BrainDog', close: 'Close' },
   /** Today's head, as the app's `greetingOf` says it by the reader's hour. */
   greet: (hour: number, name: string): string =>
     `${hour >= 5 && hour < 12 ? 'Good morning' : hour >= 12 && hour < 18 ? 'Good afternoon' : 'Good evening'}, ${name}`,
@@ -32,7 +33,7 @@ export const DESK = {
   board: {
     coming: 'Coming up',
     edit: 'Edit Today',
-    add: 'Add a widget',
+    add: 'Add widget',
     draftBy: (who: string) => `${who} added this`,
     keep: 'Keep',
     toss: 'Throw away',

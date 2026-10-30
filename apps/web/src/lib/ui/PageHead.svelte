@@ -222,6 +222,15 @@
       if (frame.figure === fig) frame.figure = '';
     };
   });
+  /* A NAMED PAGE'S WAY BACK IS THE CRUMB'S TRAIL where no sidebar row is lit (`crumbOf`'s `up`). */
+  $effect(() => {
+    if (!named || !kicker || !back) return;
+    const up = { label: kicker, href: back };
+    frame.up = up;
+    return () => {
+      if (frame.up === up) frame.up = null;
+    };
+  });
 
   /* WHETHER THE BAR SAYS THIS PAGE'S NAME, so the name row here is the sentence and the actions, and the `h1` unseen. */
   const titled = $derived(!named && !headless && !tiled && barTitled());

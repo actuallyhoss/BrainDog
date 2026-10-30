@@ -80,7 +80,9 @@
 </script>
 
 {#snippet name(line: HomeLine)}
-  {#if line.href}<a class="hl-title tap" href={at(line.href)} data-own>{line.title}</a>{:else}<span class="hl-title" data-own>{line.title}</span>{/if}
+  <!-- THE WORDS IN THEIR OWN SPAN, which a day's line clamps to two lines: a clamp is `overflow: hidden`, and on the link
+       itself it cut `.tap`'s 44px box down to the 22px line (measured at 390, 30 Oct). -->
+  {#if line.href}<a class="hl-title tap" href={at(line.href)} data-own><span class="hl-words">{line.title}</span></a>{:else}<span class="hl-title" data-own><span class="hl-words">{line.title}</span></span>{/if}
 {/snippet}
 
 {#snippet amount(line: HomeLine)}
@@ -391,8 +393,11 @@
   }
 
   .hd-line .hl-title {
-    display: -webkit-box;
     flex: 1;
+  }
+
+  .hd-line .hl-words {
+    display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;

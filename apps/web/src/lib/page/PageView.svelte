@@ -90,7 +90,8 @@
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '../at.ts';
-  import { barTitled } from '../shell/frame.svelte.ts';
+  import { barTitled, frame } from '../shell/frame.svelte.ts';
+  import { listName } from '../record/names.ts';
   import QuickHost from '$lib/money/QuickHost.svelte';
   import { pageOfLedger } from '$lib/money/ledger.ts';
   import { quick } from '$lib/money/quick.svelte.ts';
@@ -217,6 +218,16 @@
      row, never for the same page read again after a write. */
   const about = $derived(mode === 'page' ? (live?.page.page.param ?? null) : null);
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
+  /* A PAGE ABOUT A ROW SITS WHERE ITS LIST SITS, in the bar's crumb (`crumbOf`'s `up`): an account's or a bill's own page
+     said its name alone there (Q38 of the 29 Oct audit). */
+  $effect(() => {
+    if (!about) return;
+    const up = { label: listName(about.register), href: `/r/${about.register}` };
+    frame.up = up;
+    return () => {
+      if (frame.up === up) frame.up = null;
+    };
+  });
   /* ── the project's shape ───────────────────────────────────────────────────
      A PAGE ABOUT A ROW READS THE ROW'S PROJECT ONCE (`shape-hold.svelte.ts`), and every part of the shape the page
      declares (`{ kind: project, part }`) is drawn from that one read in its own slot (`BlockSlot.svelte`,

@@ -238,3 +238,11 @@ test('A RUN THAT ASKED IS NAMED BY THE APP IT RAN IN, never "An agent", once its
   assert.equal(proposer('S42').name, 'An agent', 'before the run is read');
   assert.deepEqual(proposer('S42', null, new Map(), { run: 'S42', agent: 'claude', client: 'claude-code 2.1.4', parent: null }), { name: 'Claude Code', kind: 'agent' });
 });
+
+test('A RULE THAT ASKED IS SAID BY ITS TITLE, with no "A rule:" before it, and the trust ladder as Trust rule', () => {
+  assert.equal(queueWords.rule('Chase late payments'), 'Chase late payments');
+  assert.equal(queueWords.rule('ladder'), 'Trust rule');
+  assert.equal(proposer('rule:ladder').name, 'Trust rule');
+  assert.equal(proposer('rule:ladder').kind, 'rule');
+  assert.doesNotMatch(proposer('rule:invoice-late').name, /^A rule/u);
+});

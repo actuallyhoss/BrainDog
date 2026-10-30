@@ -48,7 +48,7 @@ on unmodified `master` before reporting.
    [Report a vulnerability](https://github.com/actuallyhoss/BrainDog/security/advisories/new)
    (Repository → **Security** → **Report a vulnerability**). It gives us a private fork to fix in and an advisory to publish from, and it
    keeps the report attached to the code.
-2. **Fallback: email `security@brain.dog`.** Use this if private reporting is unavailable to
+2. **Fallback: email `support@brain.dog`.** Use this if private reporting is unavailable to
    you, or if the defect is in the hosted service rather than in the source. Encrypt if you want to;
    ask for a key in a first message that contains no detail.
 

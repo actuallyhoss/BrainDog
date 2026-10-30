@@ -56,6 +56,32 @@ function signEntry(s: VitalSign, at: string): Entry {
 }
 
 /**
+ * What a filed sign says before anything has ever been filed for it (`signs.ts` `readNow`). Kept here, since a source
+ * module imports nothing of the kernel at run time, and the kernel reads it from here.
+ */
+export const NEVER_FILED = 'Nothing has been filed for this sign yet.';
+
+/** Names said as a person lists them: "A", "A and B", "A, B and C". */
+const listed = (names: readonly string[]): string => (names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`);
+
+/**
+ * THE SIGNS NOTHING HAS BEEN FILED FOR YET, AS ONE ROW where there are two or more: Health said "Nothing has been filed
+ * for this sign yet." six times, once under each (recheck of 30 October, Low list). The row stands where the first of
+ * them stood, its title their names and its sentence said once. One alone keeps its own row.
+ */
+export function foldUnfiled(rows: readonly Entry[]): Entry[] {
+  const unfiled = rows.filter((r) => r.fields.state === 'none' && r.fields.said === NEVER_FILED);
+  if (unfiled.length < 2) return [...rows];
+  const first = unfiled[0]!;
+  const folded: Entry = {
+    ...first,
+    id: 'sign:never-filed',
+    fields: { ...first.fields, sign: 'never-filed', name: listed(unfiled.map((r) => String(r.fields.name))), said: 'Nothing has been filed for these yet.' },
+  };
+  return rows.flatMap((r) => (r === first ? [folded] : unfiled.includes(r) ? [] : [r]));
+}
+
+/**
  * The record's vital signs, one row each, in the order of the closed list (`signs.ts` `VITAL_SIGNS`).
  *
  * THE SAME READ AS `braindog signs` AND THE RECORD'S `signs`, so Health, the command line and an agent cannot disagree
@@ -75,10 +101,12 @@ function signsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: A
   const at = new Date(deps.ctx.nowMs).toISOString();
   /* QUIETED BEFORE IT IS A ROW, so neither a column nor a `where:` reads the inbox's words for a reader held from it. */
   const quiet = deps.reader?.inbox === false;
-  const kept = deps
-    .signs()
-    .map((s) => signEntry(quiet ? quietSign(s) : s, at))
-    .filter((r) => evaluate(said.predicate, r.fields, SIGNS));
+  const kept = foldUnfiled(
+    deps
+      .signs()
+      .map((s) => signEntry(quiet ? quietSign(s) : s, at))
+      .filter((r) => evaluate(said.predicate, r.fields, SIGNS)),
+  );
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   return { ...base, rows: kept.slice(0, limit), matched: kept.length };
 }

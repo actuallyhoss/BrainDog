@@ -38,6 +38,8 @@ export const frame = $state({
   title: '',
   /** What the bar says in place of the page's name where the page greets rather than names: Today's "Good afternoon, Mara". */
   heading: '',
+  /** Where a page that names itself sits, as its head's way back says it: the crumb's trail when no sidebar row is lit. */
+  up: null as { label: string; href: string } | null,
   /** The page's count, said quietly after its name in the bar ("Needs you 4"). */
   figure: '',
   /** The bar carries the crumb, so a page's head on a desk draws no way back of its own. */

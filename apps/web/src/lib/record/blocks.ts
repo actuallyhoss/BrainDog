@@ -1039,7 +1039,7 @@ function queueRows(block: BlockResult): string[] {
          (`@braindog/kernel`'s `weigh.ts`). Passed through as the record's own word rather than as a
          sentence: the words a reader sees are `render/src/queue.ts`'s, the way tone's are. */
       /* WHO ASKED IS SAID AS THE CARD THAT ANSWERS IT SAYS IT (`QueueAnswer.svelte`, through `proposer`): "Claude",
-         "A rule: chase late payments", "Slash", never `rule:cash-stale`. This fence is handed no reader, so a person
+         "Chase late payments" (a rule), "Slash", never `rule:cash-stale`. This fence is handed no reader, so a person
          who asked is Someone on this record here; the card names them from the shell's people. */
       ['q', q.id, proposer(q.who).name, since(q.at, at), q.question, q.why, q.cost ?? ''].map(escapeCell).join(' | '),
       /* WHAT ACCEPTING IT CHANGES, a line a row, which the record writes on a lead queue's first question and on

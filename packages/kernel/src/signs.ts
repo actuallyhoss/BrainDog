@@ -40,6 +40,7 @@ import { ratesRole, type RoleList } from './roles.ts';
 import { SIGNS_ACTIONS } from './signs-actions.ts';
 import { SIGNS_FLOW } from './signs-flow.ts';
 import { SIGNS_VITALS } from './signs-vitals.ts';
+import { NEVER_FILED } from './sources/signs.ts';
 
 export type SignState = 'green' | 'red' | 'none';
 
@@ -705,6 +706,9 @@ export const VITAL_SIGNS: readonly SignReader[] = [
 /** The sign called `id` on the closed list, or `null`. */
 export const signOf = (id: string): SignReader | null => VITAL_SIGNS.find((s) => s.sign === id) ?? null;
 
+/* What a sign says before anything was ever filed for it is `NEVER_FILED` (`sources/signs.ts`), which a page folds into
+   one line where two or more say it: Health said it six times over (recheck of 30 October, Low list). */
+
 /** What the night writes for a filed sign on a day nothing was filed: a placeholder, never a filing. */
 const NOT_FILED = 'Nothing was filed for this sign that day.';
 
@@ -724,7 +728,7 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
     s.sign,
     NOT_FILED,
   );
-  if (row === undefined) return reading('none', null, 'Nothing has been filed for this sign yet.');
+  if (row === undefined) return reading('none', null, NEVER_FILED);
   /* NOT `> FILED_STANDS_MS`: a `read_at` that does not parse is NaN, and NaN is never more than a day, so the filing
      would stand forever. Written so a time that cannot be read reads as old. */
   const t = Date.parse(row.read_at);
