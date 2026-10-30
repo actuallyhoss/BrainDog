@@ -1069,9 +1069,17 @@ const NAMES = new Set(ROUTES.map((r) => r.name));
  */
 const unreachable = (why: string): Refusal => ({
   code: 'UNREACHABLE',
-  fix: 'BrainDog could not be reached.',
+  fix: answeredBadly(why) ? "BrainDog's answer could not be read." : 'BrainDog could not be reached.',
   detail: why,
 });
+
+/**
+ * WHETHER THE HOST WAS REACHED AND ITS ANSWER WAS THE TROUBLE. Every such reason starts with the status that came back
+ * (`500 with a body that is not JSON`); a socket's own message never does. A 500 said "BrainDog could not be reached"
+ * about a host that had answered (audit f, AF19). A gateway's 502, 503 and 504 are the hop in front saying the host
+ * behind it did not answer, so they keep the old sentence.
+ */
+const answeredBadly = (why: string): boolean => /^\d{3}\b/u.test(why) && !/^50[234]\b/u.test(why);
 
 /**
  * A RECORD TOO BUSY TO TAKE A REQUEST (503, its object's queue full) IS ASKED AGAIN, a read only, twice at most, after a

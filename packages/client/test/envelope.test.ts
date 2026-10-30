@@ -70,6 +70,18 @@ test('and the answers that were already refused are refused in the same words', 
   assert.match(refusalOf(notAnObject)?.detail ?? '', /an answer this client does not recognise/);
 });
 
+test('A HOST THAT ANSWERED WITH AN ERROR WAS REACHED, and is never said to be out of reach (audit f, AF19)', async () => {
+  const broke = await answering(500, '<html>Internal Server Error</html>', 'text/html').boot();
+  assert.equal(refusalOf(broke)?.code, 'UNREACHABLE');
+  assert.equal(refusalOf(broke)?.fix, "BrainDog's answer could not be read.");
+  assert.equal(refusalOf(broke)?.detail, '500 with a body that is not JSON');
+  /* A gateway's 502 to 504 is the hop in front saying the host did not answer. */
+  for (const status of [502, 503, 504]) {
+    const gate = await answering(status, '<html>gateway</html>', 'text/html').boot();
+    assert.equal(refusalOf(gate)?.fix, 'BrainDog could not be reached.', String(status));
+  }
+});
+
 test('AND EVERY REAL ANSWER STILL PASSES THROUGH UNCHANGED, value, refusal and conflict alike', async () => {
   const value = await answering(200, '{"ok":true,"value":{"registers":[],"now":"2026-09-20T00:00:00Z"}}').boot();
   assert.ok(value.ok);

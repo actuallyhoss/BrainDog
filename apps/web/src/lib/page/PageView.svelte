@@ -517,6 +517,17 @@
      its blocks read the head is drawn from that entry and bars stand only where the blocks go. A page the rail does not
      hold (one past its budget, or opened by its address alone) waits with the head's bar as before. */
   const railed = $derived(mode === 'page' && got === null ? ((shell?.nav ?? []).find((n) => n.id === slug) ?? null) : null);
+  /* THE TAB SAYS WHAT THE SCREEN SAYS (audit f, AF19): a page the record does not have is "No page called nope", as a
+     mistyped address is, and one that did not load keeps its rail name, or says it did not load. Both said "BrainDog". */
+  const tabTitle = $derived(
+    live
+      ? live.page.page.title
+      : got === null
+        ? railed?.title
+        : got.from === 'refused'
+          ? ((shell?.nav ?? []).find((n) => n.id === slug)?.title ?? copy.errorPage.broken.title)
+          : copy.noPageCalled(slug),
+  );
 
   /* ── the reader's mark ─────────────────────────────────────────────────────
      A PAGE THAT DRAWS WHAT IS NEW SINCE THE MARK STAMPS THE MARK WHEN THE READER LEAVES IT, through the one
@@ -843,7 +854,7 @@
 </script>
 
 <svelte:head>
-  {#if mode === 'page'}<title>{titleOf(live?.page.page.title ?? railed?.title)}</title>{/if}
+  {#if mode === 'page'}<title>{titleOf(tabTitle)}</title>{/if}
 </svelte:head>
 
 <svelte:window {onkeydown} ontouchstart={pullStart} ontouchmove={pullMove} ontouchend={pullEnd} ontouchcancel={pullEnd} />
@@ -1541,6 +1552,8 @@
   .said {
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: calc(var(--measure) + 2 * var(--gutter));
+    /* CENTRED, as a mistyped address's card is (`routes/[id]`): the two whole-screen states stood in two places (AF19). */
+    margin-inline: auto;
   }
 
   .preview {
