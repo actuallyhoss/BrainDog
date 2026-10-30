@@ -13,7 +13,7 @@
  * a listing, an event and a revoke name a row by a handle derived from the id and not by the id.
  */
 
-import type { Result } from '@braindog/ports';
+import type { Refusal, Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
@@ -214,7 +214,17 @@ export async function deviceStart(
  * under the count, and the fifth denies them all. A malformed entry costs nothing, because a typo
  * should not spend somebody else's enrolment.
  */
-export async function deviceApprove(deps: TokenDeps, person: string, args: { user_code: string }): Promise<Result<Approved>> {
+export async function deviceApprove(
+  deps: TokenDeps,
+  person: string,
+  args: { user_code: string },
+  /**
+   * What the approver's own sign-in still lacks for the grant this code names, asked once the code has matched and before
+   * anything is approved: the record's keychain asks a proof inside its own lock window for `vault`, which is shorter than
+   * the fifteen minutes every other approval takes. A refusal here spends no try, because the code was right.
+   */
+  held?: (reach: Reach) => Refusal | null,
+): Promise<Result<Approved>> {
   const code = typeof args?.user_code === 'string' ? args.user_code : '';
   if (!/^\d{6}$/.test(code)) return no('VALUE_MALFORMED', 'A device code is six digits.', { at: 'user_code' });
 
@@ -234,6 +244,8 @@ export async function deviceApprove(deps: TokenDeps, person: string, args: { use
   if (hits > 1) hit = undefined;
 
   if (hit) {
+    const stop = held?.(hit.reach) ?? null;
+    if (stop) return { ok: false, refusal: stop };
     const at = instant(deps.nowMs);
     deps.sql.exec(
       "UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'pending'",

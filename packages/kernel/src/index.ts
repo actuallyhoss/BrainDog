@@ -390,6 +390,7 @@ import {
   type DeviceRow,
   type Exchanged,
   type OperationGrant,
+  type Reach as DeviceReach,
   type ShapeGrant,
   type KeychainGrant,
   type Waiting,
@@ -11677,7 +11678,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       deviceStart(tokenDeps(), args),
 
     /** The owner types the six digits. A wrong code costs every pending request a try. */
-    deviceApprove: (person: string, args: { user_code: string }): Promise<Result<Approved>> => deviceApprove(tokenDeps(), person, args),
+    deviceApprove: (person: string, args: { user_code: string }, held?: (reach: DeviceReach) => Refusal | null): Promise<Result<Approved>> =>
+      deviceApprove(tokenDeps(), person, args, held),
 
     /** The device asks again, and after approval gets its bearer once. INTERNAL. */
     devicePoll: (args: { device_code: string }, validFrom?: string): Promise<Result<Waiting | Exchanged>> => devicePoll({ ...tokenDeps(), validFrom }, args),

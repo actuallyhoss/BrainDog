@@ -15453,7 +15453,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
         return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'principal' } };
-      return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never)));
+      /* AND A DEVICE LET INTO THE KEYCHAIN IS HELD TO THE KEYCHAIN'S OWN LOCK WINDOW (`keychain` above), which the owner
+         may have set to five minutes: approving a `vault` grant hands a machine what opening the keychain here would, so
+         a proof the keychain itself would refuse does not approve one either. */
+      const proved = ctx.provedAt;
+      const locked = (reach: string): Refusal | null =>
+        reach === 'vault' && proved !== undefined && clock.now() - proved > kernel.lockAfter() * 60_000
+          ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to let a device into the keychain.', at: 'principal' }
+          : null;
+      return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never), locked));
     },
 
     /**

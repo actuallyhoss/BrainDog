@@ -136,3 +136,26 @@ test('THE THREE INTERNAL METHODS EXIST AND NO ROUTE REACHES THEM; THE THREE ADMI
   }
   for (const name of ['deviceApprove', 'listDevices', 'revokeDevice']) assert.equal(routed.get(name), 'ADMIN', `${name} is not routed ADMIN`);
 });
+
+/* A DEVICE LET INTO THE KEYCHAIN IS HELD TO THE KEYCHAIN'S OWN LOCK WINDOW. It asked only the fifteen minutes every
+   approval asks, so with the window at five, a sign-in ten minutes old could not open the keychain here and could still
+   hand a machine a keychain grant. The code was right, so the refusal spends no try, and a fresh sign-in approves it. */
+test('A KEYCHAIN GRANT ASKS A SIGN-IN INSIDE THE KEYCHAIN’S LOCK WINDOW; A LOGIN ASKS ONLY THE FIFTEEN MINUTES', async () => {
+  const r = await record();
+  r.api.kernel.setLockAfter(5);
+  const vault = await r.api.deviceStart({ reach: 'vault', scope: '*', label: 'test-laptop · braindog-cli' }, ADDRESS);
+  if (!vault.ok) return assert.fail(JSON.stringify(vault));
+  const login = await r.start();
+
+  const stale = await r.api.deviceApprove({ user_code: vault.value.user_code }, r.owner(r.now() - 10 * MINUTE));
+  assert.equal(r.refusalOf(stale)?.code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(r.refusalOf(stale)?.at, 'principal');
+  const still = await r.api.devicePoll({ device_code: vault.value.device_code });
+  assert.deepEqual(still.ok && still.value, { pending: true, interval: 5 }, 'a sign-in the keychain refuses let a machine into it');
+
+  const loginApproved = await r.api.deviceApprove({ user_code: login.user_code }, r.owner(r.now() - 10 * MINUTE));
+  assert.ok(loginApproved.ok, JSON.stringify(loginApproved));
+
+  const fresh = await r.api.deviceApprove({ user_code: vault.value.user_code }, r.owner(r.now() - 4 * MINUTE));
+  assert.ok(fresh.ok, JSON.stringify(fresh));
+});
