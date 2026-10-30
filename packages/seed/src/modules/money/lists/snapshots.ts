@@ -33,6 +33,9 @@ export const SNAPSHOTS_REGISTER: MoneyRegister = {
   title: 'what',
   mobile: ['what', 'cash', 'net'],
   pack: 'money-core',
+  /* KEPT BY THE NIGHT'S AUTOMATION, SINCE THE MERGE AFTER money-core 3.33.0: one row a night, written by the walk and read
+     by Net worth and the charts, so it is never offered "a page for Snapshots this week" (recheck of 30 October). */
+  kept_by: 'automations',
   fields: [
     /* THE NIGHT, SPELLED THE WAY A DAY IS SPELLED ON SCREEN. It repeats `on`, and the repetition is the
        point: `on` is the day the arithmetic sorts and filters by, and this is the one a person types. */

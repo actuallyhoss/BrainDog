@@ -308,3 +308,15 @@ test("A RECORD IS AS OLD AS ITS PEOPLE'S OWN USE: an import, an agent and the sy
   assert.equal(youngOf(usedOf(sql), start + PEN_YOUNG_DAYS * DAY), null);
   sql.close();
 });
+
+test('A LIST ONLY THE AUTOMATIONS KEEP IS OFFERED NO PAGE, as the nightly Snapshots are (kept_by: automations)', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const NIGHTS = { ...BINS, id: 'register.nights', body: { id: 'nights', name: 'Nights', title: 'name', kept_by: 'automations', fields: [{ id: 'name', type: 'text', required: true }] } } as never;
+  value(await api.kernel.install([BINS, NIGHTS]));
+  value(api.kernel.create('bins', { name: 'Top shelf' }, { actor: 'p_1' }));
+  value(api.kernel.create('nights', { name: '29 Oct' }, { actor: 'p_1' }));
+  const { pen } = await bootOf(api, owner);
+  assert.deepEqual(pen.map((i) => i.id), ['page:bins']);
+  assert.equal(code(await api.kernel.install([{ ...BINS, body: { ...BINS.body as object, kept_by: 'people' } } as never])), 'DECLARATION_INVALID');
+});

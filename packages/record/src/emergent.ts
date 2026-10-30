@@ -212,13 +212,19 @@ function figuresByList(declared: readonly { kind: string; body: string }[], want
  * every list), then one read of the declarations for the figures and the slugs, taken only when a list qualified, and
  * one lint of the whole answer. Only when that lint refuses is each item linted alone.
  */
+/**
+ * A LIST ONLY THE RECORD'S AUTOMATIONS WRITE (`kept_by: automations`, `42 §4.4`) IS OFFERED NO PAGE AND NO WEEK: a page
+ * of the nightly Snapshots was offered as "Snapshots this week", a list nobody types into and nobody reads by the week.
+ */
+const keptByAutomations = (decl: RegisterDecl): boolean => decl.kept_by === 'automations';
+
 function pagesOffered(deps: PenDeps): Made[] {
   const { kernel, reads, pages, dismissed } = deps;
   const readByAPage = new Set(pages.flatMap((p) => p.registers));
 
   const waiting: { id: string; name: string; rows: number; decl: RegisterDecl }[] = [];
   for (const [id, decl] of kernel.registers()) {
-    if (readByAPage.has(id) || dismissed.has(signatureOf('page', id)) || !reads(id)) continue;
+    if (readByAPage.has(id) || keptByAutomations(decl) || dismissed.has(signatureOf('page', id)) || !reads(id)) continue;
     const rows = kernel.count(id);
     if (rows > 0) waiting.push({ id, name: decl.name, rows, decl });
   }
@@ -1105,7 +1111,7 @@ function weeksOffered(deps: PenDeps): Made[] {
 
   const offers: Offer[] = [];
   for (const [id, decl] of kernel.registers()) {
-    if (dismissed.has(signatureOf('week', id)) || !reads(id) || kernel.count(id) < PEN_WEEK_FEWEST) continue;
+    if (keptByAutomations(decl) || dismissed.has(signatureOf('week', id)) || !reads(id) || kernel.count(id) < PEN_WEEK_FEWEST) continue;
     const live = decl.fields.filter((f) => f.retired !== true);
     const days = live.filter((f) => f.type === 'day');
     const day =

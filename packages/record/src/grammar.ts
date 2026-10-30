@@ -249,6 +249,7 @@ const REGISTER = {
     same: "{fields: [<text field>], within?: <scope or ref field>, fold: text|exact, keep?: oldest|latest|sealed}: what makes two rows one thing, such as two skills of one name in one project. text reads 'Ponytail (copy)' and 'ponytail.md' as 'ponytail'; exact reads them as written",
     role: "one of skills, tools, learnings, keys-index, profiles, carry: the part the list plays for the record's agents, so a list under any id is read as that part. A list playing profiles or carry is personal",
     fade: '{field: <day field>, after: <days, such as 90d>}: the day a row fades by and how long after it, as learnings fade unconfirmed',
+    kept_by: "automations: the record's own automations write its rows, as the nightly money snapshots, so it is offered no page of its own",
   },
   field: {
     id: 'lower-case letters, digits and single underscores; never id, seq, register, created_at, updated_at, deleted_at, version, spoken or title, and never starting with _ (required)',

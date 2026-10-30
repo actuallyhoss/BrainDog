@@ -4517,6 +4517,8 @@ function createFault(
  *             The app's "Hand to" reads it, and nothing in the kernel names the list that declares it.
  *   `once`    the fields an add-on plants and never patches: its own later write (`WriteContext.pack`) leaves them as
  *             a row holds them, and a person's edit is not narrowed (the write path in `index.ts`).
+ *   `kept_by` `automations`, the one value: its rows are written by the record's own automations, never typed one by one,
+ *             so the record offers it no page of its own (`emergent.ts` in `packages/record`). It refuses no write.
  *   `same`    `{ fields, within?, fold, keep? }`: what makes two of its rows the same thing, its text `fields` folded by
  *             `fold` (`text` or `exact`) within one value of `within`, its scope or a link; `keep` is which of two is
  *             kept, `oldest` unless it says `latest` or `sealed` (`sameFault` below, `entities.ts`'s `rowKeys`).
@@ -4543,6 +4545,7 @@ const REGISTER_KEYS = [
   'role',
   'fade',
   'restates',
+  'kept_by',
 ] as const;
 
 /**
@@ -6093,6 +6096,12 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     if (typeof f.after !== 'string' || !/^[1-9][0-9]{0,4}d$/u.test(f.after))
       return bad('DECLARATION_INVALID', `${id}'s fade after is a number of days, such as 90d. ${JSON.stringify(f.after)} is not.`, 'fade.after');
   }
+
+  /* `kept_by:` IS `automations` OR LEFT OUT, as `delete:` is its one word: a list the record's automations keep, such as
+     the nightly snapshots, is offered no page of its own. Checked here, so a misspelt one is never inert. */
+  const keptBy = decl.body.kept_by;
+  if (keptBy !== undefined && keptBy !== 'automations')
+    return bad('DECLARATION_INVALID', `${id}'s kept_by is automations, or left out. ${JSON.stringify(keptBy)} is not.`, 'kept_by', ['automations']);
 
   /* `restates:` NAMES A MONEY FIELD AND A DAY FIELD OF THIS LIST, and what the night's net worth is restated in by them
      (`restatesOf` in `restates.ts`). The night's field it fills is the night list's to declare, so it is not checked

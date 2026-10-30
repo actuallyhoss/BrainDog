@@ -41,6 +41,8 @@ export type SeedRegister = {
    * as Money's accounts declare it (`modules/money/lists/accounts.ts`), and held to that list at install (`declare.ts`).
    */
   delete?: 'refuse_while_referenced';
+  /** `automations`: the record's own automations write its rows, never a person one by one, so no page is offered for it. */
+  kept_by?: 'automations';
   /** The order a read that names none comes back in: one field that sorts, `desc` highest first (`declare.ts`). */
   order?: { field: string; dir: 'asc' | 'desc' };
   /** A list whose rows are steps of another's: the link naming that row, the done flag, and the order they go in. */

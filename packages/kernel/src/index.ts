@@ -1082,6 +1082,8 @@ export type RegisterDecl = {
   owner_only?: true;
   /** A list only the owner reads and writes: no grant, share, link, child key or "See as" reaches it (`42 §4.4`). */
   personal?: true;
+  /** A list the record's own automations write, never typed one by one: offered no page of its own (`42 §4.4`). */
+  kept_by?: 'automations';
   /** Who holds a row: a link to the person it is handed to, a text field naming the agent, and a state it moves
    * to when an agent takes it (checked at install by `declare.ts`'s `handFault`). */
   hand?: { person?: string; agent?: string; taken?: string };
