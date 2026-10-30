@@ -44,6 +44,15 @@ export const words = {
      terminal that reads the key from standard input, and never a field on this sheet. */
   keyMissing: (label: string) => `The key "${label}" is not in your keys yet. Pipe it into this in a terminal:`,
   keyLooking: 'Looking again every few seconds. You can go on once the key is in.',
+  /* AND THE BROWSER MAY TAKE IT (audit 31 Oct f, AF3, his call taken 31 Oct): where the sheet can put a key in, the key
+     is added here, as the Keychain takes one, and the terminal is the second way. */
+  keyHere: (label: string) => `The key "${label}" is not in your keys yet. Add it here, and it is kept in your Keychain.`,
+  keyField: (label: string) => label,
+  keyAdd: 'Add it here',
+  keyAdding: 'Adding…',
+  keyPass: 'Keychain password',
+  keyTerminal: 'Or from a terminal:',
+  keyAdded: (label: string) => `"${label}" is in your keys.`,
   keyAgain: 'Then open this again.',
   adds: 'Adds',
   /* THE NUMBERS A PLAN ADDS, AS ONE ROW: seventeen of them named one under another buried its lists. */
@@ -231,6 +240,22 @@ function addsSection(named: Row[], figures: number): Section[] {
 }
 const row = (t: string, detail: string | null = null): Row => ({ text: t, detail });
 
+/**
+ * WHAT A PLAN ADDS, EACH THING ONCE (audit 31 Oct f, AF23): Subscriptions' sheet listed "Keep a subscription's old price
+ * when its amount changes" and "Keep a subscription's old price", the rule and the script it runs, and counted 13 where
+ * its page counts 12; Calendar's listed "Events" twice, the list and its page. A script a rule of the same name runs is
+ * the rule's, and a page named as a list it comes with is that list's: the first stands for both, as the page counts.
+ */
+function onceEach(adds: readonly Body[], name: (id: string) => string): Body[] {
+  const ids = new Set(adds.map((a) => text(a.id)));
+  const lists = new Set(adds.map((a) => text(a.id)).filter((id) => id.startsWith('register.')).map((id) => name(id).trim().toLowerCase()));
+  return adds.filter((a) => {
+    const id = text(a.id);
+    if (id.startsWith('script.') && ids.has(`rule.${id.slice('script.'.length)}`)) return false;
+    return !(id.startsWith('page.') && lists.has(name(id).trim().toLowerCase()));
+  });
+}
+
 /* THE PREDICATE NAMES ITS OWN SHAPE, AND NOT PLAIN `Body`: two guards that both narrow to the same wide type leave the
    `if (isDiff(plan)) {} else {}` below with nothing to exclude in its `else`, which TypeScript then reads as `never`
    rather than "the other shape". */
@@ -302,7 +327,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     move: installed && installed !== version ? words.updateAvailable : '',
     sections: [
       ...addsSection(
-        list(d.adds).filter((a) => !text(a.id).startsWith('metric.')).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : addDetail(text(a.id), text(a.summary)))),
+        onceEach(list(d.adds).filter((a) => !text(a.id).startsWith('metric.')), name).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : addDetail(text(a.id), text(a.summary)))),
         list(d.adds).filter((a) => text(a.id).startsWith('metric.')).length,
       ),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),

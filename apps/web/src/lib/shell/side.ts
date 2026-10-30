@@ -329,6 +329,11 @@ export function sideModel(o: {
    * carries no count, since a list's size is not something that needs you (Money's Snapshots 31, Categories 15).
    */
   leads?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * PAGES HELD OFF THE RAIL WHILE THEIR LISTS ARE EMPTY (`waits` in `boot-live.ts`), by the place they go under, or
+   * `IN_MORE` where their section is no place: an add-on just installed is drawn somewhere (audit 31 Oct f, AF7).
+   */
+  waiting?: readonly (SideLink & { home: string })[];
 }): SideModel {
   const named = new Map([...o.places, ...o.others].map((p) => [word(p.label), p.key] as const));
   const folded = new Map<string, SideList>();
@@ -342,7 +347,7 @@ export function sideModel(o: {
     o.lists
       .filter((l) => !taken.has(l.id) && !l.facts?.projects && o.homes.get(l.id) === home)
       .flatMap((l) => [{ href: `/r/${l.id}`, label: l.name, icon: l.icon, ...shownCount(l) }, ...l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' }))]);
-  const own = (key: string): SideLink[] => o.tools.filter((t) => t.home === key).map(({ home: _, ...t }) => t);
+  const own = (key: string): SideLink[] => [...o.tools, ...(o.waiting ?? [])].filter((t) => t.home === key).map(({ home: _, ...t }) => t);
   const viewsOf = (l: SideList | undefined): SideLink[] => (l ? l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })) : []);
   /* ONE ROW FOR ONE WORD UNDER A PLACE: a page the place declares (Money's Accounts, Ledger, Filing rules) and the list
      of the same name were two rows. The page is the row, and its list is a tap away on it. */
@@ -384,7 +389,7 @@ export function sideModel(o: {
   return {
     places,
     projects: o.projects ? { ...o.projects, kids: rows(IN_PROJECTS) } : null,
-    more: [...others, ...o.others.flatMap((p) => viewsOf(folded.get(p.key))), ...rows(IN_MORE)],
+    more: [...others, ...o.others.flatMap((p) => viewsOf(folded.get(p.key))), ...rows(IN_MORE), ...(o.waiting ?? []).filter((w) => w.home === IN_MORE).map(({ home: _, ...w }) => w)],
     foot: [...o.foot],
   };
 }

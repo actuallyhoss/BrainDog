@@ -36,6 +36,7 @@
     extra,
     fieldOf,
     onrecheck,
+    onkey,
   }: {
     /** The record's `Diff`, a use case's `SharedPlan`, or an array of either for "Update all". */
     diff: unknown;
@@ -54,7 +55,42 @@
      * a key put in from a terminal lifts the stop with no press here. Left out, the sheet says to open it again.
      */
     onrecheck?: (() => Promise<void>) | undefined;
+    /**
+     * PUTS A KEY IN FROM THIS SHEET (audit 31 Oct f, AF3): its label, the value typed, and the Keychain password where it
+     * has one. Answers the record's sentence on a refusal, and `pass` when the Keychain wants its password. Left out, the
+     * sheet offers only the terminal command.
+     */
+    onkey?: ((label: string, value: string, passphrase: string) => Promise<{ ok: true } | { ok: false; fix: string; pass?: boolean }>) | undefined;
   } = $props();
+
+  /* WHAT IS TYPED FOR EACH MISSING KEY, never kept past the sheet: emptied as it is sent, whatever comes back. */
+  let keyValues = $state<Record<string, string>>({});
+  let keySaid = $state<Record<string, string>>({});
+  let keyPass = $state('');
+  let askPass = $state(false);
+  let putting = $state('');
+  async function putKey(e: SubmitEvent, label: string): Promise<void> {
+    e.preventDefault();
+    const value = keyValues[label] ?? '';
+    if (!onkey || putting !== '' || value.trim() === '') return;
+    putting = label;
+    keySaid = { ...keySaid, [label]: '' };
+    const pass = keyPass;
+    keyPass = '';
+    try {
+      const out = await onkey(label, value, pass);
+      if (out.ok) {
+        keyValues = { ...keyValues, [label]: '' };
+        askPass = false;
+        await onrecheck?.();
+      } else {
+        if (out.pass) askPass = true;
+        keySaid = { ...keySaid, [label]: out.fix };
+      }
+    } finally {
+      putting = '';
+    }
+  }
 
   /* A FIELD BY THE LABEL THE RECORD SHOWS, where the browser holds its list; `sheetOf` reads the id as words otherwise. */
   const sheet = $derived(sheetOf(diff, nameOf, (list, field) => fieldOf?.(list, field) ?? REGISTERS[list]?.fields.find((f) => f.id === field)?.label ?? null));
@@ -116,11 +152,31 @@
           <ul class="plan-rows">
             {#each sheet.stops as stop, i (i)}<li class="plan-row"><span class="plan-text">{stop}</span></li>{/each}
             <!-- A KEY NOT IN THE KEYS YET: the sentence, the one command that puts it in, and that the sheet looks again. -->
-            {#each sheet.keys as k (k.label)}
+            {#each sheet.keys as k, i (k.label)}
               <li class="plan-row plan-key">
-                <span class="plan-text">{k.line}</span>
-                {#if k.command}<CodeLine text={k.command} label={k.label} words />{/if}
-                <span class="plan-detail">{onrecheck ? words.keyLooking : words.keyAgain}</span>
+                {#if onkey && k.command}
+                  <!-- THE KEY PUT IN HERE, as the Keychain takes one (AF3): a password field, so it is not drawn while it is
+                       typed, and the terminal as the second way under it. -->
+                  <span class="plan-text">{words.keyHere(k.label)}</span>
+                  <form class="plan-key-form" onsubmit={(e) => void putKey(e, k.label)} novalidate>
+                    <label class="field-label" for="plan-key-{i}">{words.keyField(k.label)}</label>
+                    <div class="plan-key-put">
+                      <div class="field"><input class="field-input" id="plan-key-{i}" type="password" autocomplete="off" spellcheck="false" bind:value={keyValues[k.label]} /></div>
+                      <Button weight="primary" type="submit" disabled={putting !== '' || (keyValues[k.label] ?? '').trim() === ''}>{putting === k.label ? words.keyAdding : words.keyAdd}</Button>
+                    </div>
+                    {#if askPass}
+                      <label class="field-label" for="plan-key-pass-{i}">{words.keyPass}</label>
+                      <div class="field"><input class="field-input" id="plan-key-pass-{i}" type="password" autocomplete="current-password" bind:value={keyPass} /></div>
+                    {/if}
+                    {#if keySaid[k.label]}<p class="plan-key-said" role="status">{keySaid[k.label]}</p>{/if}
+                  </form>
+                  <span class="plan-detail">{words.keyTerminal}</span>
+                  <CodeLine text={k.command} label={k.label} words />
+                {:else}
+                  <span class="plan-text">{k.line}</span>
+                  {#if k.command}<CodeLine text={k.command} label={k.label} words />{/if}
+                  <span class="plan-detail">{onrecheck ? words.keyLooking : words.keyAgain}</span>
+                {/if}
               </li>
             {/each}
           </ul>
@@ -285,6 +341,32 @@
 
   .plan-key {
     gap: var(--sp-2);
+  }
+
+  .plan-key-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  /* THE VALUE AND ITS BUTTON ON ONE LINE, the field taking what the button leaves; on a phone the button goes under. */
+  .plan-key-put {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    align-items: center;
+  }
+
+  .plan-key-put .field {
+    flex: 1 1 14rem;
+    min-inline-size: 0;
+  }
+
+  .plan-key-said {
+    margin: 0;
+    color: var(--red);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .plan-text {

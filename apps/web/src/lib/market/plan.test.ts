@@ -160,3 +160,25 @@ test('a ready-made setup’s plan folds its numbers too, and keeps its rules by 
   assert.deepEqual(adds?.rows.map((r) => r.text), ['Firings', 'Kiln', 'Mark a firing done', 'and 3 numbers']);
   assert.equal(adds?.n, 6);
 });
+
+test('WHAT A PLAN ADDS IS SAID ONCE EACH: the script its rule runs, and the page named as its list (AF23)', () => {
+  const names: Record<string, string> = {
+    'rule.price': "Keep a subscription's old price when its amount changes",
+    'script.price': "Keep a subscription's old price",
+    'register.events': 'Events',
+    'page.events': 'Events',
+    'page.subscriptions': 'Subscriptions',
+  };
+  const sheet = sheetOf(
+    {
+      pack: { id: 'subs', version: '1.0.0', summary: '' },
+      planHash: 'h',
+      direction: 'install',
+      adds: [{ id: 'page.events' }, { id: 'register.events' }, { id: 'rule.price' }, { id: 'script.price' }, { id: 'page.subscriptions' }, { id: 'metric.a' }],
+    },
+    (id) => names[id] ?? id,
+  );
+  const adds = sheet?.parts[0]?.sections.find((s) => s.key === 'adds');
+  assert.deepEqual(adds?.rows.map((r) => r.text), ['Events', "Keep a subscription's old price when its amount changes", 'Subscriptions', 'and 1 number']);
+  assert.equal(adds?.n, 4);
+});
