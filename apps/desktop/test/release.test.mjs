@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { developerId, envFile, feedOf } from '../../../tools/desktop/release.mjs';
+import { archiveOf, compareVersions, developerId, entitlementsFor, envFile, feedOf, teamOf, uploadsOf, withVersion } from '../../../tools/desktop/release.mjs';
 import { CONF, configPubkey, withPubkey } from '../../../tools/desktop/updater-key.mjs';
 
 test('ONLY A DEVELOPER ID SIGNS FOR OTHER MACS: an Apple Development identity is not one', () => {
@@ -39,4 +39,40 @@ test('THE CONFIG HOLDS A REAL PUBLIC KEY, and writing one changes that line alon
   assert.equal(withPubkey(placeholder, 'QUJD'), '{ "plugins": { "updater": { "pubkey": "QUJD" } } }');
   assert.throws(() => withPubkey(placeholder, 'not base64!'));
   assert.equal(JSON.parse(readFileSync(CONF, 'utf8')).bundle.macOS.signingIdentity, null, 'no identity is written into the config; the release reads it from the keychain');
+});
+
+test('A VERSION IS NEWER ONLY BY ITS NUMBERS, so a release under the live number is refused', () => {
+  assert.equal(compareVersions('0.1.0', '0.1.0'), 0);
+  assert.equal(compareVersions('0.1.1', '0.1.0'), 1);
+  assert.equal(compareVersions('0.2.0', '0.10.0'), -1);
+  assert.equal(compareVersions('1.0.0', '0.99.99'), 1);
+});
+
+test('--version WRITES THE NUMBER IN BOTH FILES and nothing else', () => {
+  const conf = '{\n  "productName": "BrainDog",\n  "version": "0.1.0",\n  "identifier": "dog.brain.desktop"\n}';
+  const cargo = '[package]\nname = "braindog-desktop"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\nserde_json = "1"\n';
+  const out = withVersion(conf, cargo, '0.2.0');
+  assert.equal(out.conf, conf.replace('0.1.0', '0.2.0'));
+  assert.equal(out.cargo, cargo.replace('version = "0.1.0"', 'version = "0.2.0"'));
+  assert.throws(() => withVersion(conf, cargo, 'two'));
+});
+
+test('THE ARCHIVE IS NAMED BY VERSION, and latest.json goes up last', () => {
+  assert.equal(archiveOf('0.2.0'), 'BrainDog-0.2.0.app.tar.gz');
+  const keys = uploadsOf('0.2.0').map((u) => u.key);
+  assert.equal(keys.at(-1), 'latest.json');
+  assert.ok(keys.includes('BrainDog.dmg') && keys.includes('BrainDog-0.2.0.app.tar.gz'));
+});
+
+test('A PROVISIONED BUILD SIGNS WITH THE ASSOCIATED DOMAINS AND THE TEAM\'S APPLICATION IDENTIFIER', () => {
+  const base = readFileSync(new URL('../src-tauri/Entitlements.plist', import.meta.url), 'utf8');
+  assert.match(base, /webcredentials:brain\.dog/);
+  assert.match(base, /webcredentials:app\.brain\.dog/);
+  const out = entitlementsFor(base, 'ABCDE12345');
+  assert.match(out, /<string>ABCDE12345\.dog\.brain\.desktop<\/string>/);
+  assert.match(out, /<\/dict>\n<\/plist>\n$/);
+  assert.equal(teamOf('Developer ID Application: Quartz Apps LLC (ABCDE12345)'), 'ABCDE12345');
+  assert.equal(teamOf(null), null);
+  const conf = JSON.parse(readFileSync(CONF, 'utf8'));
+  assert.equal(conf.bundle.macOS.entitlements, undefined, 'Associated Domains in the config would get an unprovisioned build killed at launch');
 });

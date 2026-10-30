@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Mac app's entitlements beyond the hardened runtime Tauri signs with. Passkeys in the app's window need the
+  window's names associated with the app: `brain.dog` is the passkeys' relying party and `app.brain.dog` is where the
+  window is, and each answers /.well-known/apple-app-site-association naming the app (apps/worker/src/apple.ts).
+
+  NOT IN tauri.conf.json, ON PURPOSE. Associated Domains is a restricted entitlement: a build that carries it without a
+  provisioning profile that grants it is killed by macOS at launch. `tools/desktop/release.mjs` adds this file, with the
+  team's application identifier, only when the Developer ID provisioning profile is on this Mac.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:brain.dog</string>
+		<string>webcredentials:app.brain.dog</string>
+	</array>
+</dict>
+</plist>

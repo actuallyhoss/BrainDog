@@ -22,7 +22,7 @@
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here } from '$lib/at.ts';
-  import { appPath, applyInset, macNotifications, notify, onShell, setBadge, windowFocused } from '$lib/shell.ts';
+  import { appPath, applyInset, isApp, macNotifications, notify, onShell, setBadge, windowFocused } from '$lib/shell.ts';
   import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* Title-bar room for the Mac app: sets --shell-inset once, 0 in a browser. */
   applyInset();
@@ -99,11 +99,25 @@
   import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
   import { PRODUCT } from '$lib/title.ts';
   import { navigating, page } from '$app/state';
-  /* The Mac app's Go menu and braindog://goto: only an address of the app moves the window (`appPath`). */
+  /* The Mac app's Go menu, a notification's click and braindog://goto: only an address of the app moves the window
+     (`appPath`), and it stays in the BrainDog on screen (`at`), as the `g` chords do. */
   $effect(() => onShell('goto', (to) => {
     const path = appPath(to);
-    if (path !== null) void goto(path);
+    if (path !== null) void goto(at(path));
   }));
+  /* ⌥SPACE AND THE MENU'S "ASK SLASH" (⌘J) OPEN ASK, and its "Search" (⌘K) opens the search: the same surfaces the keys
+     open in the page. Only the Mac app sends these; a browser never does. */
+  $effect(() => {
+    if (!isApp) return;
+    const stops = [
+      onShell('slash', () => openAsk()),
+      onShell('search', () => openPalette()),
+      /* A download has no browser bar to show it in the app: say where the file went. */
+      onShell('saved', (name) => toasts.push(copy.savedToDownloads(name ?? ''))),
+      onShell('unsaved', (name) => toasts.push(copy.notSaved(name ?? ''), { intent: 'warn' })),
+    ];
+    return () => stops.forEach((stop) => stop());
+  });
 
   let { data, children } = $props();
 

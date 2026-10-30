@@ -108,6 +108,9 @@ export const shell = {
   redo: 'Redo',
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
+  /* THE MAC APP'S DOWNLOADS (an export, a backup): where the file went, since there is no browser bar to show it. */
+  savedToDownloads: (name: string) => `Saved ${name} to Downloads.`,
+  notSaved: (name: string) => `${name} was not saved. Try again.`,
   copied: (what: string) => `Copied ${what}.`,
   copyRefused: 'The browser would not give this page the clipboard.',
 

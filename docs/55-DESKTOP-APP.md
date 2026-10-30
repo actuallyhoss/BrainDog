@@ -29,23 +29,41 @@ engine, which the checks below make sure of. Because the shell is thin, moving t
 the shell only, never the app.
 
 It lives in `apps/desktop` (`src-tauri/` with `tauri.conf.json`, its permissions and a little Rust). The window loads
-the live site, and only `https://brain.dog` may talk to the shell, through the few commands listed here.
+the live site, and only `https://app.brain.dog` may talk to the shell, through the five commands in
+`src-tauri/capabilities/remote.json` (open a link outside, notify, set the badge, drag the window, and the title bar's
+double click).
 
 ## What the Mac app adds
 
 1. **Its own window**, with the Mac's traffic lights sitting in the app's top bar, the bar draggable, and the size and
    place remembered.
-2. **⌥Space from anywhere opens Slash.** The window comes forward with the bar already open (the bar that opens in
-   place, §47). Later, a small floating Slash bar that answers without opening the whole window.
+2. **⌥Space from anywhere opens Ask.** The window comes forward with Ask open, as ⌘J opens it in the page. The app
+   menu's "Open Ask with ⌥Space" turns the key off (it is the non-breaking space on some keyboards), and it is left
+   unticked when another app already owns the key. Later, a small floating Slash bar that answers without opening the
+   whole window.
 3. **The Dock badge is the Needs you count**, and Mac notifications for what needs you, with the answer buttons in
    the notification where the Mac allows it.
-4. **Real menus:** Edit (copy, paste, undo), View (zoom), Go (⌘1 Today, ⌘2 Projects, ⌘3 Needs you, ⌘4 Agents),
-   ⌘, for Settings, ⌘K and / for Slash, Window and Help.
+4. **Real menus:** Edit (copy, paste, undo), View (Reload ⌘R, Actual Size ⌘0, Zoom In ⌘=, Zoom Out ⌘-, full screen),
+   Go (⌘1 Today, ⌘2 Needs you, Settings, Search ⌘K, Ask Slash ⌘J; the rest of the nav is the page's `g` then 1 to 9,
+   since add-on pages differ from one BrainDog to the next), ⌘, for Settings, Window and Help. The page hears ⌘K and
+   ⌘J first and opens the same things; the menu names them. Offline at launch, the window shows a "could not be
+   reached" page with Try again instead of a blank window. Exports and backups save to Downloads, and the page says
+   so.
 5. **Links:** `braindog://` links and BrainDog links open in the app; every other link opens in the default browser.
-6. **Sign in once.** Email codes and passkeys work in the window. Google refuses sign-in inside an app window, so
-   Google sign-in opens the browser and comes back to the app by a `braindog://` link carrying a one-time code, which
-   the worker swaps for the usual session.
-7. **Updates:** the app updates itself when the shell changes (signed updates). The product updates with every deploy.
+6. **Sign in once.** Google refuses sign-in inside an app window, and an emailed link opens in the default browser,
+   so both finish in the browser and come back to the app by a `braindog://auth` link carrying a one-time code, which
+   the app's window swaps for the usual session (`POST /auth/desktop`, with the PKCE verifier only the window holds).
+   For the email, the app sends its challenge with the link request, the link carries it as `?app=`, and the page it
+   opens offers "Open BrainDog for Mac", which seals the unspent link to that challenge (`/auth/desktop/handoff`), or
+   signing in in that browser instead. Either way the app lands where it was headed. Passkeys in the window need the
+   app's Associated Domains (`webcredentials:brain.dog` and `app.brain.dog`) and `/.well-known/apple-app-site-association`
+   on both names, which the worker serves once `APPLE_TEAM_ID` is set; the release embeds the entitlement only with
+   the Developer ID provisioning profile.
+7. **Updates:** the app updates itself when the shell changes (signed updates), checking at launch and every six
+   hours, since closing the window only hides it. The product updates with every deploy. The release
+   (`tools/desktop/release.mjs --publish`) uploads the dmg, the versioned update archive and `latest.json` to the R2
+   bucket `braindog-desktop` (at `download.brain.dog`); `brain.dog/desktop/*` redirects there, and a version already
+   live is refused.
 
 ## What the web app does now, so the Mac app is easy (small, during launch)
 

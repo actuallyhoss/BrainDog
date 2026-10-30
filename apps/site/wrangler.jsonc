@@ -83,7 +83,7 @@
   "assets": {
     "directory": "build",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/oauth/*", "/.well-known/braindog-build", "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/*", "/.well-known/oauth-authorization-server", "/healthz"]
+    "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/oauth/*", "/.well-known/braindog-build", "/.well-known/apple-app-site-association", "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/*", "/.well-known/oauth-authorization-server", "/healthz"]
   },
 
   /* Two environments for symmetry with `apps/worker/wrangler.jsonc`. Only production is deployed
@@ -152,7 +152,7 @@
       "assets": {
         "directory": "build-alpha",
         "not_found_handling": "404-page",
-        "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/oauth/*", "/.well-known/braindog-build", "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/*", "/.well-known/oauth-authorization-server", "/healthz"]
+        "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/oauth/*", "/.well-known/braindog-build", "/.well-known/apple-app-site-association", "/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/*", "/.well-known/oauth-authorization-server", "/healthz"]
       },
       "services": [{ "binding": "APP", "service": "braindog-alpha" }]
     }

@@ -1,7 +1,8 @@
 <!--
-  `/signin/desktop?code=`: where the Mac app lands after Google, in the app's own window. It swaps the one-time code
-  and the verifier this window kept for the session cookie (`lib/desktop-signin.ts`), then opens the app. The code is
-  taken out of the address on arrival so it is never in history.
+  `/signin/desktop?code=`: where the Mac app lands after a sign-in finished in the browser (Google, or an emailed link
+  handed back), in the app's own window. It swaps the one-time code and the verifier this window kept for the session
+  cookie (`lib/desktop-signin.ts`), then opens the app where the window was headed when it began. The code is taken out
+  of the address on arrival so it is never in history.
 
   ON THE ENTRY FRAME, AS SIGN IN IS (`../Entry.svelte`, first F12): the layout draws this bare, so the brand stands where
   it stood on sign in a moment ago. While it works, one status line; when it fails, the error and the way back.
@@ -13,7 +14,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { BASE } from '$lib/at.ts';
-  import { swapCode, takeVerifier } from '$lib/desktop-signin.ts';
+  import { swapCode, takeKept } from '$lib/desktop-signin.ts';
+  import { appPath } from '$lib/shell.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
@@ -30,13 +32,13 @@
   onMount(async () => {
     const code = new URLSearchParams(location.search).get('code') ?? '';
     history.replaceState(null, '', location.pathname);
-    const verifier = takeVerifier();
+    const { verifier, next } = takeKept();
     if (code === '' || verifier === null || !(await swapCode(code, verifier, location.origin))) {
       failed = true;
       return;
     }
-    // A full load so the whole app boots with the new cookie.
-    location.replace(`${BASE}/`);
+    // A full load so the whole app boots with the new cookie, on the page it was headed to (only a page of the app).
+    location.replace(appPath(next ?? undefined) ?? `${BASE}/`);
   });
 </script>
 

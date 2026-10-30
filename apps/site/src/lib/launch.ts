@@ -50,7 +50,7 @@ export const HELD: readonly string[] = [
   '/changelog',
   '/changelog.xml',
   '/packs',
-  /* THE MAC DOWNLOAD UNTIL A NOTARISED DMG IS STAGED (`desktop.ts`, set by `tools/desktop/release.mjs --stage`). */
+  /* THE MAC DOWNLOAD UNTIL A NOTARISED DMG IS PUBLISHED (`desktop.ts`, set by `tools/desktop/release.mjs --publish`). */
   ...(DESKTOP_NOTARIZED ? [] : ['/download']),
   ...Object.values(cases.drawn.moreFor)
     .map((more) => more.href)

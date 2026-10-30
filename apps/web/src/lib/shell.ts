@@ -5,7 +5,11 @@
 
 import { fromLegacy, split } from './at.ts';
 
-export type ShellEvent = 'slash' | 'goto';
+/**
+ * What the Mac app says: `slash` opens Ask (⌥Space, ⌘J), `search` opens the search (⌘K), `goto` moves the window, and
+ * `saved` / `unsaved` name a download that did or did not land in Downloads.
+ */
+export type ShellEvent = 'slash' | 'search' | 'goto' | 'saved' | 'unsaved';
 
 /** What the Mac app puts on `window`; every part is optional so a partial shell still works. */
 interface Shell {
@@ -33,7 +37,7 @@ export function openOutside(url: string, opts: { here?: boolean } = {}): void {
 }
 
 /** Hear things locally where there is no shell (a browser notification's click), so `goto` works in both. */
-const local: Record<ShellEvent, Set<(arg?: string) => void>> = { slash: new Set(), goto: new Set() };
+const local: Record<ShellEvent, Set<(arg?: string) => void>> = { slash: new Set(), search: new Set(), goto: new Set(), saved: new Set(), unsaved: new Set() };
 
 /**
  * A notification: the shell's, else a web one only if already granted (never asks here). `goto` is the app's address a
@@ -88,7 +92,7 @@ export function setBadge(n: number): void {
   void nav?.setAppBadge?.(n)?.catch(() => {});
 }
 
-/** Hear the shell ("slash", "goto"); a browser never sends either, so this is a no-op there. Returns the stopper. */
+/** Hear the shell ("slash", "search", "goto"); a browser never sends them, so this is a no-op there. Returns the stopper. */
 export function onShell(event: ShellEvent, fn: (arg?: string) => void): () => void {
   const s = shell();
   if (s?.on) return s.on(event, fn);

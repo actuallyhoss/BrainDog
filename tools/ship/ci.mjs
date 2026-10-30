@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CI on this machine: what `ci.yml` (test, gates, build), `gates.yml` and `selfhost.yml` run on a runner, run here.
+ * CI on this machine: what `ci.yml` (test, gates, build), `gates.yml`, `selfhost.yml` and `desktop.yml` run on a runner, run here.
  *
  *   node tools/ship/ci.mjs                       everything, then a pass marker for HEAD when all of it is green
  *   node tools/ship/ci.mjs --quick               typechecks, the touched workspaces' tests, the gates that need no build
@@ -92,6 +92,7 @@ const isGateRun = (run) => /tools\/gates\/run\.mjs|^pnpm gates\b/m.test(run ?? '
 const ci = readWorkflow('.github/workflows/ci.yml');
 const gatesWf = readWorkflow('.github/workflows/gates.yml');
 const selfhost = readWorkflow('.github/workflows/selfhost.yml');
+const desktop = readWorkflow('.github/workflows/desktop.yml');
 
 /* The setup action's install, once, as every job starts with it. Not in `--quick`, which runs on the tree as it is. */
 if (!QUICK) for (const run of setupRuns()) add({ title: `setup: ${run}`, script: run, timeoutMin: 15 });
@@ -210,6 +211,15 @@ for (const gate of listed.stdout.split('\n').map((s) => s.trim()).filter(Boolean
     continue;
   }
   add({ title: `gate ${gate}`, gate, script: `node tools/gates/run.mjs --only ${gate}${skip}`, timeoutMin: gatesWf.jobs.get('gates-shard').timeout });
+}
+
+/* desktop.yml: the Mac app compiled (`cargo check`), on this Mac as on the runner; in --quick only when it was touched. */
+if (!QUICK || touches('apps/desktop') || touches('tools/desktop')) {
+  const job = desktop.jobs.get('check');
+  for (const step of job.steps) {
+    if (step.uses || !step.run) continue;
+    add({ title: `desktop: ${step.name ?? short(step.run)}`, script: step.run, env: literalEnv(step, 'desktop.yml check'), timeoutMin: job.timeout });
+  }
 }
 
 /* selfhost.yml: both jobs, with the outbound block left out, since it is iptables and `sg`, which macOS does not have. */
