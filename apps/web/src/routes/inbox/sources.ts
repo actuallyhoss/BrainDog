@@ -59,7 +59,7 @@ const saidOf = (channel: string): { name: string; icon: IconName } =>
  * Every way in, from the arrivals read, newest first by its last arrival and then the everyday ways nothing came by.
  * An arrival whose time will not read is left out of the days and the last arrival, and still counted as having come.
  */
-export function sourcesOf(lines: readonly { channel: string; ts: string; reason?: string | null; from?: string }[], now: number): Source[] {
+export function sourcesOf(lines: readonly { channel: string; ts: string; reason?: string | null; from?: string }[], now: number, where: Where = 'inbox'): Source[] {
   const today = dayOf(now);
   const by = new Map<string, Source>();
   let newestMail: { reason?: string | null } | null = null;
@@ -90,7 +90,7 @@ export function sourcesOf(lines: readonly { channel: string; ts: string; reason?
   const signed = mailSignedOf(newestMail);
   const mail = by.get('email');
   if (mail && signed !== null) mail.signed = signed;
-  const unsigned = unsignedOf([...senders.values()].filter((w) => w.unsigned).sort((a, b) => b.at - a.at).map((w) => w.name));
+  const unsigned = unsignedOf([...senders.values()].filter((w) => w.unsigned).sort((a, b) => b.at - a.at).map((w) => w.name), where);
   /* SAID ONCE: the sentence that names the senders takes the place of the one about the last mail. */
   if (mail && unsigned !== null) mail.signed = mail.unsigned = unsigned;
   const came = [...by.values()].sort((a, b) => (Date.parse(b.last ?? '') || 0) - (Date.parse(a.last ?? '') || 0));
@@ -104,15 +104,18 @@ export const signedWords = {
   unsigned: 'The last mail was not signed, so it cannot be matched. Check the forwarding.',
 } as const;
 
+/** Where the unsigned sentence is drawn: on the Inbox, where the mail waits, or anywhere else, which names the Inbox. */
+export type Where = 'inbox' | 'elsewhere';
+
 /**
  * The one sentence for the senders whose newest mail arrived unsigned, newest first, or `null` when there are none. Two
- * are named; past that the rest are counted.
+ * are named; past that the rest are counted. "HERE" ONLY ON THE INBOX (AF13): Settings said the mail "waits here".
  */
-export function unsignedOf(names: readonly string[]): string | null {
+export function unsignedOf(names: readonly string[], where: Where = 'inbox'): string | null {
   if (names.length === 0) return null;
   const who =
     names.length === 1 ? names[0]! : names.length === 2 ? `${names[0]} and ${names[1]}` : `${names[0]}, ${names[1]} and ${names.length - 2} more`;
-  return `Mail from ${who} isn't signed as it arrives, so it waits here to be filed by hand.`;
+  return `Mail from ${who} isn't signed as it arrives, so it waits ${where === 'inbox' ? 'here' : 'in the Inbox'} to be filed by hand.`;
 }
 
 /**
@@ -130,7 +133,8 @@ export const drawsLine = (s: Source): boolean => s.days.filter((n) => n > 0).len
 
 /** The words under a way in's name. */
 export function lastSaid(s: Source, since: (iso: string) => string): string {
-  return s.last === null ? 'Nothing has come in this way yet' : `Last in ${since(s.last)}`;
+  /* "LAST ONE 10H AGO" (AF26): "Last in 10h ago" read as two prepositions. */
+  return s.last === null ? 'Nothing has come in this way yet' : `Last one ${since(s.last)}`;
 }
 
 /** The count at the right of a way in, for the fortnight. */

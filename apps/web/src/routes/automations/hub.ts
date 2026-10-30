@@ -20,6 +20,7 @@ import { since } from 'braindog-render';
 import { VERB_LABELS, words as flowWords } from '../../lib/flow/flow.ts';
 import { lastSaid, lasted } from '../../lib/flow/source.ts';
 import { REGISTERS } from '../../lib/record/held.ts';
+import { ruleMonthOf } from '../../lib/record/actions.ts';
 import { humanize, ruleNameSaid } from '../../lib/record/names.ts';
 
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
@@ -132,8 +133,10 @@ export const hubWords = {
   switchOf: (name: string) => `Run ${name}`,
   /* THE RIGHT-HAND COLUMN OF AN AUTOMATION'S ROW, when it has a next turn. */
   nextAt: (when: string) => `Next ${when}`,
-  /* WHAT A RULE HAS DONE, from the record's whole count: how often and the day it last did, or never. */
-  ranCount: (n: number, when: string) => `Ran ${times(n)}${when ? `${n === 1 ? ', ' : ', last '}${when}` : ''}.`,
+  /* WHAT A RULE HAS DONE, from the record's whole count: how often and the day it last did, or never. EVERY COUNT SAYS
+     ITS PERIOD (audit 6f AF9): "in all", and this month's beside it where the record keeps the month (`month_fired`), so
+     "Ran 129 times" is never read against the tiles' "Runs this month". */
+  ranCount: (n: number, when: string, month?: number) => `Ran ${ranPeriod(n, month)}${when ? `${n === 1 ? ', ' : ', last '}${when}` : ''}.`,
   neverRan: 'Never ran.',
   neverRanShort: 'Never ran',
   offShort: 'Off',
@@ -141,8 +144,6 @@ export const hubWords = {
   turnedOff: (n: number) => `${n.toLocaleString('en')} off`,
   turnedOn: (n: number) => `${n.toLocaleString('en')} on`,
   thisWeek: (n: number) => (n === 0 ? 'None this week.' : `${n.toLocaleString('en')} this week.`),
-  /* AND THE MONTH, where the record keeps it (`month_fired`, DR2): the tiles above and Usage both say "this month". */
-  thisMonth: (n: number) => (n === 0 ? 'None this month.' : `${n.toLocaleString('en')} this month.`),
 
   /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
   runsMonth: 'Runs this month',
@@ -151,9 +152,9 @@ export const hubWords = {
      "Ran 17 times", which the month's runs never held. The count is the runs; the line under the bars says where the
      rules' own counts are (`rulesApart`). */
   runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
-  rulesApart: 'Rules that act as things change are not counted here; their rows below say how often they ran.',
-  /* AND WHERE THE RECORD KEEPS THEIR MONTH (`month_fired`, sec-follow M5), how often they ran in it, for real. */
-  rulesMonth: (n: number) => `Rules that act as things change ran ${times(n)} this month, and are not counted here.`,
+  /* ONLY FROM A HOST TOO OLD TO SEND EACH RULE'S MONTH (AF9), named by what a person sees: the rules in the bars act as
+     things change too, and run on their own. */
+  rulesApart: 'Rules that do their work inside another change leave no run and are not counted here; their rows below say how often they ran.',
   endedTitle: 'How runs ended',
   endedSubject: 'Runs this month that finished',
   endedOf: (n: number) => `of ${n.toLocaleString('en')}`,
@@ -218,6 +219,17 @@ export function spell(n: number, start = false): string {
 
 /** "once", "2 times", "14 times": a figure, never the word for it. */
 export const times = (n: number): string => (n === 1 ? 'once' : `${n.toLocaleString('en')} times`);
+
+/**
+ * A rule's whole count with its period, and this month's beside it where the record keeps the month (AF9): "129 times in
+ * all, 40 this month", "129 times, all this month", "12 times in all, none this month", and "12 times in all" from a
+ * host that keeps no month.
+ */
+export function ranPeriod(all: number, month?: number): string {
+  if (typeof month !== 'number') return `${times(all)} in all`;
+  if (month >= all) return all === 1 ? 'once, this month' : `${times(all)}, all this month`;
+  return `${times(all)} in all, ${month === 0 ? 'none' : month.toLocaleString('en')} this month`;
+}
 
 /** "A", "A and B", "A, B and C". */
 function andList(names: readonly string[]): string {
@@ -335,10 +347,9 @@ export function countSaid(row: Counted, now: number): string {
   if (typeof row.fired !== 'number') return '';
   if (row.fired <= 0) return [hubWords.neverRan, row.why_idle?.trim() ?? ''].filter(Boolean).join(' ');
   const when = row.last_at ? onDay(row.last_at, now) : '';
-  /* THE MONTH FOLLOWS THE WHOLE COUNT, so a busy rule and a quiet one read differently at a glance, in the month the
-     tiles above and Usage count in (DR2): the row said "3 this week" under "Runs this month". The week only from a host
-     older than the month's count. */
-  if (typeof row.month_fired === 'number') return `${hubWords.ranCount(row.fired, when)} ${hubWords.thisMonth(row.month_fired)}`;
+  /* THE MONTH IS SAID WITH THE WHOLE COUNT, so a busy rule and a quiet one read differently at a glance, in the month the
+     tiles above and Usage count in (DR2, AF9). The week only from a host older than the month's count. */
+  if (typeof row.month_fired === 'number') return hubWords.ranCount(row.fired, when, row.month_fired);
   return typeof row.week === 'number' ? `${hubWords.ranCount(row.fired, when)} ${hubWords.thisWeek(row.week)}` : hubWords.ranCount(row.fired, when);
 }
 
@@ -375,7 +386,7 @@ export function rowSaid(row: Counted, now: number): string {
   if (typeof row.fired !== 'number') return lastLine(row, now).replace(/\.$/u, '');
   if (row.fired <= 0) return hubWords.neverRanShort;
   const when = row.last_at ? onDay(row.last_at, now).replace(/^on /u, '') : '';
-  const ran = `Ran ${times(row.fired)}${when === '' ? '' : row.fired === 1 ? `, ${/^\d/u.test(when) ? `on ${when}` : when}` : `, last ${when}`}`;
+  const ran = `Ran ${ranPeriod(row.fired, row.month_fired)}${when === '' ? '' : row.fired === 1 ? `, ${/^\d/u.test(when) ? `on ${when}` : when}` : `, last ${when}`}`;
   /* A FAILED LAST RUN FOLLOWS, the part that needs him. */
   const tail = row.last && row.last.state === 'failed' ? lastSaid(row, now).replace(/\.$/u, '') : '';
   return [ran, tail].filter(Boolean).join('. ');
@@ -388,11 +399,12 @@ export function rowSaid(row: Counted, now: number): string {
  * THE KEY IS A HANDLE AND NEVER WORDS. It is the record's (`familyOf`), and the family's name is made from the list's
  * name and the fields its actions set, read off the body the row already has, so nothing a person reads spells the key.
  */
-export function ruleSaid(row: Counted, listSaid: (id: string) => string): Pick<HubRow, 'family' | 'fired' | 'lastAt'> {
+export function ruleSaid(row: Counted, listSaid: (id: string) => string): Pick<HubRow, 'family' | 'fired' | 'lastAt' | 'month'> {
   const fired = typeof row.fired === 'number' ? row.fired : undefined;
   const lastAt = fired === undefined ? undefined : (row.last_at ?? null);
-  if (!row.family || row.register === null) return { fired, lastAt };
-  return { family: { key: row.family, list: listSaid(row.register), did: didOf(row.body) }, fired, lastAt };
+  const month = fired !== undefined && typeof row.month_fired === 'number' ? row.month_fired : undefined;
+  if (!row.family || row.register === null) return { fired, lastAt, month };
+  return { family: { key: row.family, list: listSaid(row.register), did: didOf(row.body) }, fired, lastAt, month };
 }
 
 /* WHAT AN ACTION WITH NO FIELD ACTS ON, as a family names it. */
@@ -422,12 +434,20 @@ export const nextOf = (row: AutomationRow, now: number): string | undefined =>
 
 export type Bar = { label: string; value: number; tone?: string | undefined; note?: string | undefined; part?: number | undefined };
 
-/** The automations that ran this month, most runs first: the ones in the month's record, and only with a run. */
-function ranThisMonth(rows: readonly AutomationRow[]): (AutomationRow & { month: { runs: number; failures: number } })[] {
+/**
+ * The automations that ran this month, most first, each with its month: the record's dated count (`month_fired`), which
+ * holds an inline rule's work as well as a rule's runs, so the tile, the rows below and Usage say one figure (AF9). A
+ * host too old to send it is counted by its runs. Failures are always the runs'.
+ */
+function ranThisMonth(rows: readonly AutomationRow[]): (AutomationRow & { ran: number; failures: number })[] {
   return rows
-    .filter((r): r is AutomationRow & { month: { runs: number; failures: number } } => r.month !== null && r.month.runs > 0)
-    .sort((a, b) => b.month.runs - a.month.runs || a.name.localeCompare(b.name));
+    .map((r) => ({ ...r, ran: r.month === null && typeof r.month_fired !== 'number' ? 0 : ruleMonthOf(r), failures: r.month?.failures ?? 0 }))
+    .filter((r) => r.ran > 0)
+    .sort((a, b) => b.ran - a.ran || a.name.localeCompare(b.name));
 }
+
+/** Whether every row came with its month's count, so nothing the tile says is left apart. */
+const monthKept = (rows: readonly AutomationRow[]): boolean => rows.every((r) => typeof r.month_fired === 'number');
 
 /**
  * "Runs this month": a bar per automation, the busiest six. Every bar is the one grey, so the key has nothing to explain, the
@@ -438,41 +458,33 @@ export function monthBars(rows: readonly AutomationRow[], top = 6): Bar[] {
     .slice(0, top)
     .map((r) => ({
       label: ruleNameSaid(r.name),
-      value: r.month.runs,
+      value: r.ran,
       /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR, red from its start, and the rest of
          the bar is the runs that finished: "3 failed" of 20 drew the whole bar red. */
-      part: r.month.failures > 0 ? Math.min(r.month.failures, r.month.runs) : undefined,
+      part: r.failures > 0 ? Math.min(r.failures, r.ran) : undefined,
       /* THE FAILED RUNS ARE SAID IN THE NUMBER COLUMN, "34 · 3 failed", never written on the bar's track. */
-      said: r.month.failures > 0 ? `${r.month.runs.toLocaleString('en')} · ${hubWords.failedNote(r.month.failures)}` : undefined,
+      said: r.failures > 0 ? `${r.ran.toLocaleString('en')} · ${hubWords.failedNote(r.failures)}` : undefined,
     }));
 }
 
 /** The month's runs across every automation, and how many of them failed; `null` when none ran. */
 export function endedSplit(rows: readonly AutomationRow[]): { runs: number; failed: number; ok: number } | null {
   const ran = ranThisMonth(rows);
-  const runs = ran.reduce((n, r) => n + r.month.runs, 0);
+  const runs = ran.reduce((n, r) => n + r.ran, 0);
   if (runs === 0) return null;
-  const failed = Math.min(runs, ran.reduce((n, r) => n + r.month.failures, 0));
+  const failed = Math.min(runs, ran.reduce((n, r) => n + r.failures, 0));
   return { runs, failed, ok: runs - failed };
 }
 
 /**
- * Whether a rule that acts as things change, which leaves no run, did so this month (`fired` and `last_at`, the record's
- * whole count): its work is on its row and not in the month's runs, so the tile says the two apart.
+ * Whether a rule that works inside another change, which leaves no run, did so this month on a host too old to send its
+ * month (`fired` and `last_at`, the record's whole count): its work is on its row and not in the month's runs, so the
+ * tile says the two apart. Where every row came with its month, every rule is in the tile and nothing is apart.
  */
 function actedThisMonth(rows: readonly AutomationRow[], now: number): boolean {
+  if (monthKept(rows)) return false;
   const month = new Date(now).toISOString().slice(0, 7);
   return rows.some((r) => r.path === 'inline' && (r.fired ?? 0) > 0 && typeof r.last_at === 'string' && r.last_at.slice(0, 7) === month);
-}
-
-/**
- * How many times the rules that act as things change ran this month, from the record's dated count (`month_fired`,
- * sec-follow M5), or `null` where any of them came without one (an older host), and only `actedThisMonth` can be said.
- */
-export function inlineMonth(rows: readonly AutomationRow[]): number | null {
-  const inline = rows.filter((r) => r.path === 'inline');
-  if (inline.length === 0 || !inline.every((r) => typeof r.month_fired === 'number')) return null;
-  return inline.reduce((n, r) => n + (r.month_fired ?? 0), 0);
 }
 
 /**
@@ -484,15 +496,13 @@ export function monthReading(rows: readonly AutomationRow[], now = Date.now()): 
   const ran = ranThisMonth(rows);
   const top = ran[0];
   if (!top) return '';
-  const worst = [...ran].filter((r) => r.month.failures > 0).sort((a, b) => b.month.failures - a.month.failures || b.month.runs - a.month.runs)[0];
-  const lead = `${top.name} ran ${times(top.month.runs)}, the most this month`;
+  const worst = [...ran].filter((r) => r.failures > 0).sort((a, b) => b.failures - a.failures || b.ran - a.ran)[0];
+  const lead = `${ruleNameSaid(top.name)} ran ${times(top.ran)}, the most this month`;
   const said = !worst
     ? `${lead}, and nothing failed.`
     : worst === top
-      ? `${lead}, and ${spell(worst.month.failures)} of those failed.`
-      : `${lead}; ${worst.name} failed ${spell(worst.month.failures)} of ${worst.month.runs.toLocaleString('en')}.`;
-  const counted = inlineMonth(rows);
-  if (counted !== null) return counted > 0 ? `${said} ${hubWords.rulesMonth(counted)}` : said;
+      ? `${lead}, and ${spell(worst.failures)} of those failed.`
+      : `${lead}; ${ruleNameSaid(worst.name)} failed ${spell(worst.failures)} of ${worst.ran.toLocaleString('en')}.`;
   return actedThisMonth(rows, now) ? `${said} ${hubWords.rulesApart}` : said;
 }
 
@@ -505,9 +515,9 @@ export function endedReading(rows: readonly AutomationRow[]): string {
      as 99% and not as the whole. */
   const share = Math.floor((split.ok / split.runs) * 100);
   const where = ranThisMonth(rows)
-    .filter((r) => r.month.failures > 0)
-    .sort((a, b) => b.month.failures - a.month.failures)
-    .map((r) => r.name);
+    .filter((r) => r.failures > 0)
+    .sort((a, b) => b.failures - a.failures)
+    .map((r) => ruleNameSaid(r.name));
   const on = where.length <= 2 ? andList(where) : `${spell(where.length)} automations`;
   return `${share}% finished; the failures are on ${on}.`;
 }
@@ -709,6 +719,8 @@ export type HubRow = {
   fired?: number | undefined;
   /** When it last did, beside `fired`. */
   lastAt?: string | null | undefined;
+  /** How many times this month, from the record's dated count, when the host sent one (`month_fired`). */
+  month?: number | undefined;
 };
 
 export type RunKind = 'automation' | 'scheduled' | 'script' | 'agent' | 'job';
@@ -784,7 +796,7 @@ export function runLines(
          beside "Nothing has run yet" here was two answers to one question. Its last firing is its line, with the count. */
       const c = a as Counted;
       if (typeof c.fired === 'number' && c.fired > 0 && typeof c.last_at === 'string' && Number.isFinite(Date.parse(c.last_at)))
-        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: ruleNameSaid(a.name, true), at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path, counted: true, outcome: outcomeOf('done'), times: c.fired });
+        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: ruleNameSaid(a.name, true), at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now), c.month_fired), bad: false, path, counted: true, outcome: outcomeOf('done'), times: c.fired });
     }
   }
   for (const s of actions) {

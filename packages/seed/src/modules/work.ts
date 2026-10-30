@@ -1049,6 +1049,10 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         icon: 'archive',
         span: 12,
         fold: true,
+        /* A FOLD SAYS HOW MANY IT HOLDS (audit 6f AF20): over its figure's own clauses, so its heading counts what is under
+           it, and a closed card with Show and no number never hides whether there is anything there. */
+        source: 'register.tasks',
+        where: WORK_METRICS['tasks-not-this-week']!.where,
         when: { metric: 'tasks-not-this-week', gt: 0 },
       },
       {
@@ -1104,6 +1108,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         icon: 'inbox',
         span: 12,
         fold: true,
+        source: 'register.tasks',
+        where: WITH_NO_PROJECT.where,
         when: { metric: 'tasks-no-project', gt: 0 },
       },
       { ...WITH_NO_PROJECT },
@@ -1116,6 +1122,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         icon: 'hourglass',
         span: 12,
         fold: true,
+        source: 'register.tasks',
+        where: STALE,
       },
       {
         /* A TABLE AND NOT A LIST THAT TICKS, as With no project is: a task here is in its band above too, and a list a
@@ -1140,6 +1148,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         icon: 'check',
         span: 12,
         fold: true,
+        source: 'register.tasks',
+        where: 'state is done, done_on after -8d',
         when: { metric: 'tasks-done-7d', gt: 0 },
       },
       /* NO HOW FAST IT MOVES SINCE work 1.15.0: Done this week, with its last seven nights, is the strip's third figure. */

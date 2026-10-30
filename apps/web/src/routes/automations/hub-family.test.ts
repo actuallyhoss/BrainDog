@@ -53,7 +53,7 @@ test('A FAMILY SUMS ITS COUNT, TAKES THE NEWEST FIRING, AND COUNTS THE ONES THAT
   assert.equal(f.family.fired, 12);
   assert.equal(f.family.never, 1);
   assert.equal(f.family.lastAt, new Date(2026, 9, 10, 9).toISOString());
-  assert.equal(familySaid(f.family, NOW), 'Ran 12 times, last on 10 Oct · 1 never ran');
+  assert.equal(familySaid(f.family, NOW), 'Ran 12 times in all, last on 10 Oct · 1 never ran');
 });
 
 test('A FAMILY WITH A MEMBER THAT CAME WITH NO COUNT SAYS NO SUM, and one where none ran says so', () => {

@@ -25,7 +25,7 @@
 import { bytes as fmtBytes, since, writeAmount } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { humanize } from './names.ts';
+import { humanize, titleOf } from './names.ts';
 import { keptRead, wroteOutside } from '@braindog/client';
 import type { RECONNECT_STATE, ReconnectState } from './keychain.ts';
 
@@ -496,15 +496,11 @@ export type UsageView = {
    */
   fired?: number;
   /**
-   * Whether a rule that acts as a change lands, and leaves no run, acted in the month on screen (finish F53): its work is
-   * none of the runs counted here, so the sentence says where its count is.
+   * Whether a rule that acts as a change lands, and leaves no run, acted in the month on screen (finish F53), on a host
+   * too old to send each rule's month (`month_fired`): its work is none of the runs counted here, so the sentence says
+   * where its count is. A host that sends the month has every rule's work in `totals`, and this is never set.
    */
   acted?: boolean;
-  /**
-   * How many times those rules ran in the month on screen, from the record's dated count (`month_fired`, sec-follow M5),
-   * where every one of them came with it; absent from an older host, and `acted` alone is said.
-   */
-  rulesRan?: number;
   /**
    * The month the earliest record in the view was made, `YYYY-MM`, so the switcher offers no month from before it
    * ("August" on a record made in September). `null` where the host does not say.
@@ -591,6 +587,9 @@ function groupsOf(rows: readonly Scoped[]): Group[] {
  * what it ran this month (`month.runs`, of which `month.failed` failed).
  */
 export type AutomationRuns = {
+  /** The rule's ids, so a rule the record names by its id is said in words (`spokenName`). */
+  id?: string;
+  rule?: string;
   name: string;
   project?: string | null;
   month?: { runs?: number; failed?: number } | null;
@@ -602,6 +601,14 @@ export type AutomationRuns = {
   /** Times it ran or landed its work this calendar month, UTC (`rule_month`). Absent from an older host. */
   month_fired?: number;
 };
+
+/**
+ * HOW MANY TIMES A RULE RAN THIS MONTH, the one count every screen says (sec-follow M5, audit 6f AF9): the record's
+ * dated count (`month_fired`, the kernel's `rule_month`), which holds a rule's runs and the work an inline rule did as a
+ * change landed alike. Only a host too old to send it is read from its runs (`month.runs`), which leave the inline out.
+ */
+export const ruleMonthOf = (a: { month_fired?: number | undefined; month?: { runs?: number } | null | undefined }): number =>
+  typeof a.month_fired === 'number' ? a.month_fired : (a.month?.runs ?? 0);
 
 /**
  * The record's own events, summed: what `/usage` draws when there is no ledger. Nothing about limits.
@@ -631,13 +638,15 @@ export function usageFromActions(rows: readonly ActionRow[], month: string, from
   }
   const titles = projectNames(rows);
   for (const a of automations) {
-    const runs = a.month?.runs ?? 0;
+    /* EVERY RULE BY ITS MONTH'S COUNT, the inline ones too (AF9): Automations says the same figure. */
+    const runs = ruleMonthOf(a);
     if (!(runs > 0)) continue;
     /* UNDER ITS PROJECT WHERE AN ACTION HERE NAMED IT, else under Everywhere: a project is never said by its id. */
     const title = a.project ? titles.get(a.project) : undefined;
     const key = title === undefined ? '' : a.project!;
     const name = title ?? words.everywhereUsage;
-    const named: Named = { name: a.name, faint: key === '', runs, requests: 0, bytes: 0, failures: a.month?.failed ?? 0 };
+    /* IN WORDS, NEVER AN ID (AF10): a rule declared with no name of its own is read back as "weekly-review". */
+    const named: Named = { name: ruleSpoken(a.name, [a.id, a.rule]), faint: key === '', runs, requests: 0, bytes: 0, failures: a.month?.failed ?? 0 };
     add(totals, named);
     const p = projects.get(key) ?? { name, faint: key === '', ...zero() };
     add(p, named);
@@ -679,7 +688,7 @@ export function namesOf(o: {
   const out = new Map<string, string>(o.actions ? projectNames(o.actions) : []);
   for (const a of o.automations ?? []) {
     /* THE LEDGER NAMES A RULE'S RUN `rule:<id>` (`@braindog/host` `meteredOf`); both ids are kept, as either can be it. */
-    const name = spokenName(a.name, [a.id, a.rule]);
+    const name = ruleSpoken(a.name, [a.id, a.rule]);
     out.set(`rule:${a.id}`, name);
     if (a.rule) out.set(`rule:${a.rule}`, name);
   }
@@ -704,6 +713,19 @@ function spokenName(name: string, ids: readonly (string | undefined)[]): string 
   if (bare === '') return humanize(ids.find((id) => id !== undefined && id !== '') ?? '');
   const isId = ids.some((id) => id !== undefined && (id === bare || id.replace(/^rule\./u, '') === bare));
   return isId || SLUG.test(bare) ? humanize(bare) : bare;
+}
+
+/**
+ * A RULE'S NAME AS AUTOMATIONS AND ACTIVITY SAY IT (AF9, AF10): where the record answered its id for a name, the
+ * product's own name for a rule it ships (`titleOf`, "Categorise what cleared"), else the id in words, so Usage never
+ * says "Txn categorise" for the rule the next screen calls something else.
+ */
+function ruleSpoken(name: string, ids: readonly (string | undefined)[]): string {
+  const bare = name.trim();
+  const id = ids.find((x) => x !== undefined && x !== '')?.replace(/^rule\./u, '');
+  const isId = bare === '' || ids.some((x) => x !== undefined && (x === bare || x.replace(/^rule\./u, '') === bare));
+  if (isId) return titleOf({ id: id ?? bare, kind: 'rule' });
+  return SLUG.test(bare) ? titleOf({ id: bare, kind: 'rule' }) : bare;
 }
 
 /** An amount of one meter, as a person reads it. */
@@ -970,15 +992,14 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
     const autos = automations?.ok && Array.isArray(automations.value) ? automations.value : [];
     return drawn(() => {
       const fired = autos.reduce((n, a) => n + (typeof a.week === 'number' && a.week > 0 ? a.week : 0), 0);
-      const acted = autos.some((a) => a.path === 'inline' && (a.fired ?? 0) > 0 && typeof a.last_at === 'string' && a.last_at.slice(0, 7) === range.month);
-      /* THE MONTH'S OWN COUNT OF THEM, where the record keeps one for every such rule (`month_fired`, sec-follow M5). */
-      const inline = autos.filter((a) => a.path === 'inline');
-      const rulesRan = inline.length > 0 && inline.every((a) => typeof a.month_fired === 'number') ? inline.reduce((n, a) => n + (a.month_fired ?? 0), 0) : null;
+      /* WHERE THE RECORD KEEPS EVERY RULE'S MONTH (`month_fired`, sec-follow M5), the inline rules are in the runs counted
+         and nothing is left apart (AF9); only an older host's inline rules are, and the sentence says so. */
+      const counted = autos.every((a) => typeof a.month_fired === 'number');
+      const acted = !counted && autos.some((a) => a.path === 'inline' && (a.fired ?? 0) > 0 && typeof a.last_at === 'string' && a.last_at.slice(0, 7) === range.month);
       const view = {
         ...usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current, autos),
         ...(fired > 0 ? { fired } : {}),
         ...(acted ? { acted } : {}),
-        ...(rulesRan !== null ? { rulesRan } : {}),
       };
       return member ? { ...view, owner: false } : view;
     });

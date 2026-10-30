@@ -60,6 +60,8 @@ test('A GRANT DATES A KEY, AND THE REGISTER SAYS WHEN IT EXPIRES', () => {
   assert.equal(changedSaid(stripe!, NOW), 'Changed 2 weeks ago');
   assert.equal(expiresSaid(stripe!, NOW), 'Expires in 2 weeks');
   assert.equal(expiresSaid({ ...stripe!, expires: '2026-10-20' }, NOW), 'Expired 6 days ago');
+  /* A KEY WITH NO VALUE HAS NOTHING TO EXPIRE (audit 6f AF14). */
+  assert.equal(expiresSaid({ ...stripe!, expires: '2026-10-20', sealed: false }, NOW), null);
   assert.equal(changedSaid(plain!, NOW), null);
   assert.equal(expiresSaid(plain!, NOW), null);
 });
@@ -83,7 +85,7 @@ test('USED BY NAMES ONLY WHAT NAMES THE KEY, by its label or its handle', () => 
     ],
   });
   assert.deepEqual(uses, [
-    { kind: 'action', name: 'stripe-pull', href: null },
+    { kind: 'action', name: 'Stripe pull', href: null },
     { kind: 'tool', name: 'Billing server', href: '/r/tools/4' },
     { kind: 'script', name: 'Sweep', href: null },
   ]);

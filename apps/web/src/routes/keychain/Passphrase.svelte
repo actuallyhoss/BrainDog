@@ -54,7 +54,9 @@
   let asking = $state(false);
   const unasked = $derived(lock.state === 'reading' && !asking && onask !== undefined);
   const local = {
-    unasked: 'Lock your keys so only you can open them.',
+    /* NOT "LOCK" (AF14): the screen's own Lock now and Lock after stood above a line saying the keys had no lock. The
+       password is asked before a key opens; the lock is the screen putting every value away. */
+    unasked: 'Ask for a password before any key is opened.',
     set: 'Set a keychain password',
   } as const;
 

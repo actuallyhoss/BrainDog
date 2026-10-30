@@ -106,3 +106,8 @@ test('THE READER FILED UNDER HER OWN NAME IS NO ARRIVAL: a new Today said Arriva
   /* With nothing else new nothing is drawn, so the tile is not there at all. */
   assert.deepEqual(landedOf([own], folk, me, NOW, names), []);
 });
+
+test('rows a script made are its setup and not an arrival (audit 6f AF11)', () => {
+  const rows = landedOf([line('s', { actor: 'script:plans_from_names@v1', title: 'Halden licence' }), line('a')], lists, null, NOW);
+  assert.deepEqual(rows.map((r) => r.name), ['Talabat']);
+});

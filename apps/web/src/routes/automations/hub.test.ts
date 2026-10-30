@@ -37,6 +37,7 @@ import {
   nextOf,
   nextReading,
   nextWeek,
+  ranPeriod,
   runDays,
   runHeat,
   ruleSaid,
@@ -169,24 +170,24 @@ test('ONE THE RECORD KEEPS NO RUNS OF SAYS WHEN THE LOG LAST HAS IT, never "Not 
 test('A RULE THE RECORD COUNTED SAYS HOW OFTEN IT RAN AND THE DAY IT LAST DID, never "nothing lately"', () => {
   const inline = auto('File parcels by courier', { trigger: 'written', path: 'inline', register: 'parcels' });
   const counted = { ...inline, acted: null, fired: 12, last_at: new Date(2026, 9, 3, 9).toISOString() };
-  assert.equal(lastLine(counted, NOW), 'Ran 12 times, last on 3 Oct.');
-  assert.equal(lastLine({ ...counted, fired: 1 }, NOW), 'Ran once, on 3 Oct.');
-  assert.equal(lastLine({ ...counted, last_at: iso(NOW - 3_600_000) }, NOW), 'Ran 12 times, last today.');
-  assert.equal(lastLine({ ...counted, last_at: new Date(2025, 11, 30, 9).toISOString() }, NOW), 'Ran 12 times, last on 30 Dec 2025.');
+  assert.equal(lastLine(counted, NOW), 'Ran 12 times in all, last on 3 Oct.');
+  assert.equal(lastLine({ ...counted, fired: 1 }, NOW), 'Ran once in all, on 3 Oct.');
+  assert.equal(lastLine({ ...counted, last_at: iso(NOW - 3_600_000) }, NOW), 'Ran 12 times in all, last today.');
+  assert.equal(lastLine({ ...counted, last_at: new Date(2025, 11, 30, 9).toISOString() }, NOW), 'Ran 12 times in all, last on 30 Dec 2025.');
   assert.doesNotMatch(lastLine(counted, NOW), /lately/u, 'the count is the whole of it, not a page of the log');
-  assert.deepEqual(pageSentence(counted, NOW), { text: 'Ran 12 times, last on 3 Oct.', needs: '' });
+  assert.deepEqual(pageSentence(counted, NOW), { text: 'Ran 12 times in all, last on 3 Oct.', needs: '' });
   assert.equal(countSaid(inline, NOW), '', 'a host that sends no count says nothing from one');
 });
 
 test('THE WEEK FOLLOWS THE WHOLE COUNT WHEN THE RECORD SENT IT, and a quiet week is said as none', () => {
   const inline = auto('Remind me of bills', { trigger: 'written', path: 'inline', register: 'parcels' });
   const counted = { ...inline, acted: null, fired: 12, last_at: iso(NOW - 3_600_000) };
-  assert.equal(lastLine({ ...counted, week: 3 }, NOW), 'Ran 12 times, last today. 3 this week.');
-  assert.equal(lastLine({ ...counted, week: 0 }, NOW), 'Ran 12 times, last today. None this week.');
-  assert.equal(lastLine(counted, NOW), 'Ran 12 times, last today.', 'a host that sends no week says none');
+  assert.equal(lastLine({ ...counted, week: 3 }, NOW), 'Ran 12 times in all, last today. 3 this week.');
+  assert.equal(lastLine({ ...counted, week: 0 }, NOW), 'Ran 12 times in all, last today. None this week.');
+  assert.equal(lastLine(counted, NOW), 'Ran 12 times in all, last today.', 'a host that sends no week says none');
   /* AND THE MONTH IN ITS PLACE WHERE THE RECORD KEEPS IT (DR2), as the tiles above and Usage say. */
-  assert.equal(lastLine({ ...counted, week: 3, month_fired: 5 }, NOW), 'Ran 12 times, last today. 5 this month.');
-  assert.equal(lastLine({ ...counted, week: 3, month_fired: 0 }, NOW), 'Ran 12 times, last today. None this month.');
+  assert.equal(lastLine({ ...counted, week: 3, month_fired: 5 }, NOW), 'Ran 12 times in all, 5 this month, last today.');
+  assert.equal(lastLine({ ...counted, week: 3, month_fired: 0 }, NOW), 'Ran 12 times in all, none this month, last today.');
 });
 
 test('A RULE THAT NEVER RAN SAYS "NEVER" AND THE RECORD\'S ONE SENTENCE ON WHY', () => {
@@ -200,8 +201,8 @@ test('A RULE THAT NEVER RAN SAYS "NEVER" AND THE RECORD\'S ONE SENTENCE ON WHY',
 
 test('A COUNTED RULE WHOSE LAST RUN FAILED SAYS THE COUNT, THEN THE FAILURE', () => {
   const row = { ...auto('Weekly digest', { last: { at: iso(NOW - 3_600_000), state: 'failed' as const, say: 'The key is missing.' } }), fired: 8, last_at: iso(NOW - 3_600_000) };
-  assert.match(lastLine(row, NOW), /^Ran 8 times, last today\. Last run .*failed\. The key is missing\.$/u);
-  assert.equal(lastLine({ ...row, last: { ...row.last!, state: 'done' } }, NOW), 'Ran 8 times, last today.');
+  assert.match(lastLine(row, NOW), /^Ran 8 times in all, last today\. Last run .*failed\. The key is missing\.$/u);
+  assert.equal(lastLine({ ...row, last: { ...row.last!, state: 'done' } }, NOW), 'Ran 8 times in all, last today.');
 });
 
 test('A RULE IN A FAMILY CARRIES THE LIST AND WHAT IT SETS, IN WORDS, beside the key', () => {
@@ -445,8 +446,8 @@ test('an automation row is short: what starts it in a few words, then what it di
   assert.equal(rowWhat('When anything arrives'), 'When anything arrives');
   const counted = (fired: number, last_at: string | null, over: Partial<AutomationRow> = {}) => ({ ...auto('Chase', over), fired, last_at, why_idle: 'No entry has been added since it was turned on.' });
   assert.equal(rowSaid(counted(0, null), NOW), 'Never ran', 'why it never ran is the automation page\'s to say');
-  assert.equal(rowSaid(counted(17, iso(at(2026, 9, 3, 14))), NOW), 'Ran 17 times, last 3 Sep');
-  assert.equal(rowSaid(counted(1, iso(at(2026, 9, 3, 14))), NOW), 'Ran once, on 3 Sep');
+  assert.equal(rowSaid(counted(17, iso(at(2026, 9, 3, 14))), NOW), 'Ran 17 times in all, last 3 Sep');
+  assert.equal(rowSaid(counted(1, iso(at(2026, 9, 3, 14))), NOW), 'Ran once in all, on 3 Sep');
   assert.equal(rowSaid(counted(4, iso(at(2026, 9, 3, 14)), { enabled: false }), NOW), 'Off');
 });
 
@@ -468,13 +469,17 @@ test('THE MONTH OF RUNS SAYS A RULE THAT ACTED ON CHANGES IS COUNTED ON ITS ROW 
   assert.equal(monthReading([weekly, { ...ledger, last_at: '2026-08-30T06:35:00.000Z' }], now), 'Weekly review ran once, the most this month, and nothing failed.');
 });
 
-test('WHERE THE RECORD KEEPS THE MONTH, THE LINE SAYS HOW OFTEN THE RULES RAN IN IT (sec-follow M5)', () => {
+test('WHERE THE RECORD KEEPS EVERY RULE\'S MONTH, EVERY RULE IS IN THE TILE AND NONE IS SAID APART (audit 6f AF9)', () => {
   const now = Date.parse('2026-09-03T15:00:00Z');
-  const weekly = auto('Weekly review', { month: { runs: 1, failures: 0 } });
+  const weekly = auto('Weekly review', { month: { runs: 1, failures: 0 }, fired: 1, month_fired: 1 });
   const ledger = auto('Categorise what cleared', { path: 'inline', fired: 17, last_at: '2026-09-03T06:35:00.000Z', month_fired: 4 });
   const quiet = auto('Tag the rent', { path: 'inline', fired: 2, last_at: '2026-08-01T06:35:00.000Z', month_fired: 0 });
-  assert.equal(monthReading([weekly, ledger, quiet], now), `Weekly review ran once, the most this month, and nothing failed. ${hubWords.rulesMonth(4)}`);
-  assert.equal(hubWords.rulesMonth(4), 'Rules that act as things change ran 4 times this month, and are not counted here.');
-  /* NONE THIS MONTH SAYS NOTHING OF THEM, whatever the whole count. */
-  assert.equal(monthReading([weekly, quiet], now), 'Weekly review ran once, the most this month, and nothing failed.');
+  assert.equal(monthReading([weekly, ledger, quiet], now), 'Categorise what cleared ran 4 times, the most this month, and nothing failed.');
+  assert.deepEqual(endedSplit([weekly, ledger, quiet]), { runs: 5, failed: 0, ok: 5 });
+  assert.deepEqual(monthBars([weekly, ledger, quiet]).map((b) => [b.label, b.value]), [['Categorise what cleared', 4], ['Weekly review', 1]]);
+  /* EACH COUNT SAYS ITS PERIOD. */
+  assert.equal(ranPeriod(17, 4), '17 times in all, 4 this month');
+  assert.equal(ranPeriod(17, 17), '17 times, all this month');
+  assert.equal(ranPeriod(2, 0), '2 times in all, none this month');
+  assert.equal(ranPeriod(12), '12 times in all');
 });

@@ -19,6 +19,7 @@
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import { callerAt, feedsOf, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
   import { sinceWords } from 'braindog-render';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import type { Source as WaySource } from '../../../inbox/sources.ts';
   /* A CONSTANT, NOT THE MODULE: `sources.ts` is read lazily below, and this one string is all the markup needs of it. */
   const UNSIGNED_HELP = 'https://brain.dog/docs/use/inbox-and-doors#when-mail-arrives-unsigned';
@@ -187,7 +188,9 @@
   const doors = read(() => (anOwner ? `doors ${apiBase()}` : null), doorsNow);
   const doorList = $derived(doors.value ?? []);
   /* WHAT HAS FED THE RECORD THROUGH THOSE DOORS, newest first, on the reader's clock. */
-  const feeds = $derived(feedsOf(doorList, Date.now()));
+  /* ON THE RECORD'S ONE CLOCK (`recordNow`), as the Inbox says the same arrivals (AF13): this said "8 weeks ago" of the
+     mail the Inbox called "10h ago". */
+  const feeds = $derived(feedsOf(doorList, recordNow()));
 
   /**
    * AND EVERY WAY IN, read from the Inbox's own arrivals of the fortnight (`readArrivals`, `sourcesOf`): mail, texts and
@@ -208,8 +211,8 @@
       const at = opened();
       void Promise.all([import('../../../inbox/series.ts'), import('../../../inbox/sources.ts')])
         .then(async ([series, sources]) => {
-          const read = await series.readArrivals(apiBase(), Date.now(), sources.SOURCE_DAYS);
-          ways = read === null ? null : sources.sourcesOf(read.lines, Date.now());
+          const read = await series.readArrivals(apiBase(), recordNow(), sources.SOURCE_DAYS);
+          ways = read === null ? null : sources.sourcesOf(read.lines, recordNow(), 'elsewhere');
         })
         .catch(() => (ways = null))
         .finally(() => {
@@ -223,7 +226,7 @@
   const wayRows = $derived(
     (ways ?? [])
       .filter((w) => !(w.channel === 'webhook' && feeds.length > 0))
-      .map((w) => ({ id: w.channel, name: w.name, said: w.last === null ? 'Nothing has come in this way yet' : `Last arrival ${sinceWords(w.last, Date.now())}` })),
+      .map((w) => ({ id: w.channel, name: w.name, said: w.last === null ? 'Nothing has come in this way yet' : `Last arrival ${sinceWords(w.last, recordNow())}` })),
   );
 
   /**

@@ -78,6 +78,9 @@ export const historyWords = {
   byRules: (n: number) => `${count(n)} by rules`,
   byBrainDog: (n: number) => `${count(n)} by BrainDog`,
   lanesSubject: 'Agent stretches of work in the last 24 hours',
+  /* WHO WORKED OVER THE MONTH, the record's own figure (`activity-by-who`), with BrainDog's own work as a part (AF12). */
+  lastMonth: 'Last 30 days',
+  whoSubject: 'Changes in the last 30 days, by who made them',
   groupsSubject: 'Changes by who made them',
   kindsSubject: 'Changes by kind, the five biggest',
   heatSubject: 'Changes by hour over the last 7 days',
@@ -641,30 +644,64 @@ export function ranSaid(note: string, title: string, id: string): string {
   return rest.charAt(0).toUpperCase() + rest.slice(1);
 }
 
+/** The script a line was written by, by its id without the version, or `null` for any other doer. */
+const scriptOf = (by: string): string | null => /^script:([^@]+)@v\d+$/u.exec(by)?.[1] ?? null;
+
 /**
- * ONE LINE A RULE A DAY. A filing rule runs on every payment that arrives and writes a
- * "ran" line each time, so a day of Activity was forty "Fetched · A rule: Meet payees · Meet payees ran." The runs of
- * one rule on one day that went through are its newest line, saying how many times; a run that failed stays a line of
- * its own, since that one needs him.
+ * ONE LINE A RULE A DAY, AND ONE A SCRIPT A DAY WITH WHAT IT WROTE. A filing rule runs on every payment that arrives and
+ * writes a "ran" line each time, so a day of Activity was forty "Fetched · A rule: Meet payees · Meet payees ran." The
+ * runs of one rule on one day that went through are its newest line, saying how many times; a run that failed stays a
+ * line of its own, since that one needs him.
+ *
+ * A SCRIPT THE SAME, AND WHAT IT WROTE FOLDED IN (audit 6f AF11): a script that set up two plans opened the day with
+ * eight lines, four "Ran …" and the entries it made and changed between them. Its runs that day are one line, and the
+ * writes it signed that day are said on it ("4 times · made 2 entries, changed 12") rather than drawn under it.
  */
 export function rolledRuns(told: readonly Told[]): Told[] {
+  /* THE SCRIPTS THAT RAN WELL, BY DAY, read first: a script's writes are logged before the run that made them. */
+  const ranWell = new Set<string>();
+  for (const t of told) {
+    const ran = ranOf(t.e);
+    if (ran?.kind === 'script' && !ranBadly(t.e)) ranWell.add(`${ran.id}\u0001${dayOf(t.e.at)}`);
+  }
+  const wrote = new Map<string, { made: number; changed: number }>();
+  for (const t of told) {
+    const script = t.e.kind === 'pull' ? null : scriptOf(t.e.by);
+    const k = script === null ? '' : `${script}\u0001${dayOf(t.e.at)}`;
+    if (!ranWell.has(k)) continue;
+    const w = wrote.get(k) ?? { made: 0, changed: 0 };
+    if (t.e.kind === 'create') w.made += t.count;
+    else w.changed += t.count;
+    wrote.set(k, w);
+  }
   const out: Told[] = [];
   const held = new Map<string, Told>();
+  const say = (k: string, n: number): string => {
+    const w = wrote.get(k);
+    const did = w === undefined ? [] : [w.made > 0 ? `made ${historyWords.rows(w.made)}` : '', w.changed > 0 ? `changed ${w.made > 0 ? count(w.changed) : historyWords.rows(w.changed)}` : ''].filter(Boolean);
+    return [n > 1 ? historyWords.times(n) : '', did.join(', ')].filter(Boolean).join(' · ');
+  };
   for (const t of told) {
-    if (ranOf(t.e)?.kind !== 'rule' || ranBadly(t.e)) {
+    const ran = ranOf(t.e);
+    const script = t.e.kind === 'pull' ? null : scriptOf(t.e.by);
+    /* A WRITE OF A SCRIPT THAT RAN WELL THAT DAY IS SAID ON ITS RUN'S LINE. */
+    if (script !== null && ranWell.has(`${script}\u0001${dayOf(t.e.at)}`)) continue;
+    if (ran === null || ranBadly(t.e)) {
       out.push(t);
       continue;
     }
-    const k = `${t.e.by}\u0001${dayOf(t.e.at)}`;
-    const had = held.get(k);
+    const k = ran.kind === 'rule' ? `${t.e.by}\u0001${dayOf(t.e.at)}` : `${ran.id}\u0001${dayOf(t.e.at)}`;
+    const keyed = `${ran.kind}\u0001${k}`;
+    const had = held.get(keyed);
     if (had) {
       had.count += t.count;
       had.from = t.from;
-      had.note = historyWords.times(had.count);
+      had.note = ran.kind === 'script' ? say(k, had.count) : historyWords.times(had.count);
       continue;
     }
-    const line: Told = { ...t, note: t.count > 1 ? historyWords.times(t.count) : '' };
-    held.set(k, line);
+    const note = ran.kind === 'script' ? (wrote.has(k) || t.count > 1 ? say(k, t.count) : t.note) : t.count > 1 ? historyWords.times(t.count) : '';
+    const line: Told = { ...t, note };
+    held.set(keyed, line);
     out.push(line);
   }
   return out;
@@ -889,6 +926,35 @@ export function lanesOf(events: readonly AuditEvent[], clock: number, me: string
     return { label, spans, newest: last };
   });
   return lanes.sort((a, b) => b.newest - a.newest).map(({ label, spans }) => ({ label, spans }));
+}
+
+/** One part of who worked, as the record's figure answers it: what it is called and how many changes. */
+export type WhoPart = { label: string; value: number };
+
+/**
+ * WHO WORKED OVER THE MONTH, from the record's figure `activity-by-who` (Agents, Rules, You and BrainDog over the last
+ * 30 days): its parts that did something, the largest first, or `null` for a refusal, an answer of another shape, or a
+ * month with nothing in it (audit 6f AF12: the figure counted BrainDog's own work and no screen drew it).
+ */
+export function whoPartsOf(answer: unknown): WhoPart[] | null {
+  const out = answer as { ok?: unknown; value?: { groups?: unknown } | null } | null | undefined;
+  if (out?.ok !== true || !Array.isArray(out.value?.groups)) return null;
+  const parts: WhoPart[] = [];
+  for (const g of out.value.groups as unknown[]) {
+    const p = g as { label?: unknown; value?: unknown } | null;
+    if (p === null || typeof p.label !== 'string' || typeof p.value !== 'number' || !Number.isFinite(p.value) || p.value <= 0) continue;
+    parts.push({ label: p.label, value: p.value });
+  }
+  return parts.length === 0 ? null : parts.sort((a, b) => b.value - a.value);
+}
+
+/** "Over the last 30 days BrainDog made 333 changes, rules 221 and agents 5." */
+export function whoSaid(parts: readonly WhoPart[]): string {
+  const said = parts.map((p, i) => {
+    const who = p.label === 'BrainDog' ? p.label : p.label.toLowerCase();
+    return i === 0 ? `${p.label} made ${count(p.value)} ${p.value === 1 ? 'change' : 'changes'}` : `${who} ${count(p.value)}`;
+  });
+  return `Over the last 30 days ${said[0]}${said.length > 1 ? `, ${listed(said.slice(1))}` : ''}.`;
 }
 
 /** "Claude ran 4 stretches, Codex 2 and Cursor 2. Codex is working now." */

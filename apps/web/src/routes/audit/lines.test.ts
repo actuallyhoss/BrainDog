@@ -41,6 +41,8 @@ import {
   partOf,
   ranSaid,
   rolledRuns,
+  whoPartsOf,
+  whoSaid,
   settledOf,
   settledWords,
   tallyOf,
@@ -373,6 +375,26 @@ test('a rule’s quiet runs on one day are one line saying how many times, and a
   assert.equal(lines[0]!.from, iso(29, 6), 'the line spans from its first run');
 });
 
+test('a script’s runs on one day are one line, and what it wrote that day is said on it (audit 6f AF11)', () => {
+  const by = 'script:plans_from_names@v1';
+  const run = (h: number) => one({ ...ev(iso(29, h), by, 'pull', 'declaration:script.plans_from_names'), note: '“Give each plan a page” ran and wrote 4 lines.' });
+  const lines = rolledRuns([
+    run(9),
+    { ...one(ev(iso(29, 9), by, 'edit', 'tasks#1')), count: 4 },
+    run(8),
+    one(ev(iso(29, 8), by, 'create', 'tasks#2')),
+    one(ev(iso(29, 8), by, 'create', 'tasks#3')),
+    one(ev(iso(29, 7), 'you', 'edit', 'tasks#4')),
+  ]);
+  assert.deepEqual(
+    lines.map((t) => [t.e.by, t.count, t.note]),
+    [
+      [by, 2, '2 times · made 2 entries, changed 4'],
+      ['you', 1, ''],
+    ],
+  );
+});
+
 test('a run’s note says no id and not its title again', () => {
   assert.equal(ranSaid('settle_matched_line did not finish, so it wrote nothing; its log says why.', 'Settle a matched line', 'settle_matched_line'), 'Did not finish, so it wrote nothing; its log says why.');
   assert.equal(ranSaid('“File what an account holds in the account’s book” ran and wrote one line.', 'File what an account holds in the account’s book', 'book_from_account'), 'Wrote one line.');
@@ -499,4 +521,18 @@ test('THE LOG IS NEWEST FIRST BY WHEN, then by version, whatever order the recor
     { seq: 5, at: 'not a time' },
   ];
   assert.deepEqual(newestFirst(log).map((e) => e.seq), [8, 7, 9, 6, 5]);
+});
+
+test('who worked over the month is the record’s figure, BrainDog’s own work a part of it (audit 6f AF12)', () => {
+  const groups = [
+    { key: 'agent', label: 'Agents', value: 5 },
+    { key: 'rule', label: 'Rules', value: 221 },
+    { key: 'you', label: 'You', value: 0 },
+    { key: 'braindog', label: 'BrainDog', value: 333 },
+  ];
+  const parts = whoPartsOf({ ok: true, value: { value: 559, groups } });
+  assert.deepEqual(parts, [{ label: 'BrainDog', value: 333 }, { label: 'Rules', value: 221 }, { label: 'Agents', value: 5 }]);
+  assert.equal(whoSaid(parts!), 'Over the last 30 days BrainDog made 333 changes, rules 221 and agents 5.');
+  assert.equal(whoPartsOf({ ok: false }), null);
+  assert.equal(whoPartsOf({ ok: true, value: { groups: groups.map((g) => ({ ...g, value: 0 })) } }), null);
 });

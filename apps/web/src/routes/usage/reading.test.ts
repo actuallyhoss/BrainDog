@@ -183,10 +183,15 @@ test('A MONTH OF RUNS SAYS THAT RULES ACTING ON CHANGES ARE NOT AMONG THEM, wher
   assert.equal(sentenceOf({ ...view, acted: true })?.text, `1 run this month. ${said.rulesApart}`);
 });
 
-test('WHERE THE RECORD KEEPS THE MONTH, THE RULES ARE SAID BY HOW OFTEN THEY RAN IN IT (sec-follow M5)', () => {
-  const view = usageFromActions([], '2026-09', 'events', '2026-09-03', true, [{ name: 'Weekly review', month: { runs: 1, failed: 0 } }]);
-  assert.equal(sentenceOf({ ...view, acted: true, rulesRan: 17 })?.text, '1 run this month. Rules that act as things change ran 17 times this month, and are not counted here.');
-  assert.equal(sentenceOf({ ...view, acted: true, rulesRan: 0 })?.text, '1 run this month.');
+test('WHERE THE RECORD KEEPS EVERY RULE\'S MONTH, EVERY RULE IS IN THE RUNS AND NONE IS SAID APART (audit 6f AF9)', () => {
+  const view = usageFromActions([], '2026-09', 'events', '2026-09-03', true, [
+    { id: 'rule.weekly-review', rule: 'weekly-review', name: 'weekly-review', path: 'run', month: { runs: 1, failed: 0 }, month_fired: 1 },
+    { name: 'File a Ledger entry', path: 'inline', month: { runs: 0, failed: 0 }, month_fired: 17 },
+  ]);
+  assert.equal(view.totals.runs, 18);
+  assert.equal(sentenceOf(view)?.text, '18 runs this month.');
+  /* AND A RULE NAMED BY ITS ID IS SAID IN WORDS (AF10). */
+  assert.deepEqual(view.actions.map((a) => a.name).sort(), ['File a Ledger entry', 'Weekly review']);
 });
 
 test('a month whose runs were in no project is not split by project, and its actions name no project after them', () => {

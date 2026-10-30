@@ -92,6 +92,8 @@
   const finding = $derived(findText.trim() || asked || '');
   /* HOW THE KEYS ARE ORDERED: this screen's own choice, kept out of the address. */
   let sortBy = $state<SortBy>('name');
+  /** How many things a key's line names before they are a fold of their own. */
+  const USES_SAID = 3;
   const shownKeys = $derived(sortKeys(keysFor(keys, finding), sortBy));
   /* WHAT NAMES A KEY (actions, tools, scripts), read once after the keys drew, for each key's details. */
   let useFrom = $state.raw<UseSources>({});
@@ -987,20 +989,22 @@
                 </div>
               </div>
             {/if}
-            <!-- WHAT NAMES THIS KEY, from the actions, tools and scripts already read; no value is read for it. -->
+            <!-- WHAT NAMES THIS KEY, from the actions, tools and scripts already read; no value is read for it. A LINE UNDER
+                 THE NAME, OR NOTHING (AF14): a fold said "Used by (1)", and over a key nothing named a bare "Used by" set out
+                 left of the rows. The first few are named; the rest are a fold. -->
             {#each [usesOf(k, useFrom)] as uses}
-            <details class="key-details">
-              <summary>{dated.usedBy}{uses.length > 0 ? ` (${uses.length})` : ''}</summary>
-              {#if uses.length === 0}
-                <p>{dated.usedByNone}</p>
-              {:else}
-                <ul>
-                  {#each uses as u (u.kind + u.name)}
-                    <li>{#if u.href}<a href={at(u.href)}>{u.name}</a>{:else}{u.name}{/if} <span class="group-count">{u.kind}</span></li>
-                  {/each}
-                </ul>
+              {#if uses.length > 0 && uses.length <= USES_SAID}
+                <p class="key-uses">{dated.usedBy}{#each uses as u, i (u.kind + u.name)}{i === 0 ? ' ' : i === uses.length - 1 ? ' and ' : ', '}{#if u.href}<a href={at(u.href)}>{u.name}</a>{:else}{u.name}{/if}{/each}</p>
+              {:else if uses.length > USES_SAID}
+                <details class="key-uses key-details">
+                  <summary>{dated.usedByMany(uses.length)}</summary>
+                  <ul>
+                    {#each uses as u (u.kind + u.name)}
+                      <li>{#if u.href}<a href={at(u.href)}>{u.name}</a>{:else}{u.name}{/if} <span class="group-count">{u.kind}</span></li>
+                    {/each}
+                  </ul>
+                </details>
               {/if}
-            </details>
             {/each}
           </li>
         {/each}
@@ -1275,6 +1279,18 @@
 
   .key-details {
     padding-block: var(--sp-1);
+  }
+
+  /* UNDER THE KEY'S NAME, lined up with it as the revealed value is, never out at the row's edge. */
+  .key-uses {
+    margin: 0 var(--sp-3) var(--sp-2) calc(var(--well-l) + var(--sp-3) * 2);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .key-uses a {
+    color: var(--ink-2);
   }
 
   .key-details summary {
