@@ -151,7 +151,8 @@ test('A FRESH SHOP RECORD OPENS ON THE CARD under its line, with no next step ye
   assert.match(src, /const tell = \$derived\([^;]*showTell\(/u);
   assert.match(src, /\{#if tell\}<TellOne options=\{tellOptions\} onadded=\{toldOne\} \/>\{\/if\}/u);
   assert.match(src, /sentence=\{tell \? TELL_LINE :/u);
-  assert.equal(TELL_LINE, 'Tell it one real thing, and watch where it goes.');
+  assert.equal(TELL_LINE, 'Your BrainDog is ready. Start with something from today, and watch where it goes.');
+  assert.ok(!TELL_LINE.startsWith('Tell it one real thing'), 'the line does not say the card\'s title again');
   assert.ok(src.indexOf('<ClearExamples />') < src.indexOf('<TellOne'), 'the examples offer stays first');
   assert.ok(src.indexOf('<PageView') < src.indexOf('<WantMore'), 'the next steps sit under Today’s blocks');
   /* A RECORD WITH NO ENTRY YET IS NOT "EMPTY": it holds lists, and the card is drawn rather than Start here. */

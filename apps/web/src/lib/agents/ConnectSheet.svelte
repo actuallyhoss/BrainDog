@@ -34,6 +34,7 @@
     listen,
     code,
     onchanged,
+    start,
   }: {
     open?: boolean;
     /** The record's lines (`connectLines`). */
@@ -44,6 +45,8 @@
     code?: Snippet | undefined;
     /** Something changed the connected list: a key was made. */
     onchanged?: (() => void) | undefined;
+    /** The way in open when the sheet opens, where the caller offered one by name (Today's "Connect Claude"). */
+    start?: TileId | undefined;
   } = $props();
 
   /* EACH WAY IN WEARS ITS APP'S MARK, as Connect your agent's segments do; the two with no maker wear a glyph. */
@@ -61,6 +64,13 @@
   /* ONE TILE OPEN AT A TIME, and when it opened, which is the moment its live row waits for a call after. */
   let openId = $state<TileId | null>(null);
   let openedAt = $state(0);
+  /* THE WAY IN THE CALLER NAMED, open each time the sheet opens. */
+  $effect(() => {
+    if (open && start !== undefined) untrack(() => {
+      openId = start;
+      openedAt = Date.now();
+    });
+  });
   let heard = $state<Heard[]>([]);
   let now = $state(Date.now());
   let os = $state<Os>(osOf(globalThis.navigator));

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { NEAREST_MOST, nearest, type Place } from './nearest.ts';
+import { NEAREST_MOST, nearest, shellPlaces, type Place } from './nearest.ts';
 
 const PAGES: Place[] = [
   { title: 'Money', href: '/p/money', address: 'money' },
@@ -40,4 +40,11 @@ test('never more than five, each once, and nothing nameless', () => {
   assert.equal(new Set(near.map((p) => p.href)).size, near.length);
   assert.ok(near.every((p) => p.title.trim() !== ''));
   assert.deepEqual(nearest('x', []), []);
+});
+
+test('a page and the list it shows are offered once, by the page (E20)', () => {
+  const places = shellPlaces([{ title: 'Orders', href: '/p/orders' }, { title: 'People', href: '/p/people' }], [{ id: 'people', name: 'People' }, { id: 'orders', name: 'Orders' }]);
+  const titles = nearest('orders', places).map((p) => p.title);
+  assert.deepEqual(titles, ['Orders', 'People']);
+  assert.equal(nearest('people', places)[0]!.href, '/p/people');
 });

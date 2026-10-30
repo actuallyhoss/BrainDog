@@ -2,7 +2,8 @@
  * What the end of the first run offers, once the BrainDog is made (`/start#made`): one agent and one source, each saying
  * what it would find here, then Home (research-firstrun-17's recommended flow).
  *
- * ONE OF EACH, CHOSEN FROM WHAT THIS BRAINDOG KEEPS, never a gallery. The agent is Claude Code, the one most people
+ * ONE OF EACH, CHOSEN FROM WHAT THIS BRAINDOG KEEPS, never a gallery. The agent is Claude, the app (it was Claude Code,
+ * a terminal tool, until the first-hour audit's E22); the paragraph below is the older reasoning. Claude Code was the one most people
  * connecting from a first run have, by the one command that connects it over sign-in (`device.ts` `connectLines`); the
  * rest are a press away in Settings. The source is the one whose finds land in a list this BrainDog has: a bank's mail
  * where money is kept, any mail where people are, a file from another app otherwise.
@@ -31,7 +32,7 @@ export type SourceOffer = { kind: 'bank' | 'mail' | 'file'; name: string; finds:
  * A list as the next steps read it: its id, or its id and the name this record gives it ("Clients" where the people are
  * called so). A name is what a person reads; an id is only ever looked up, never said.
  */
-export type KeptList = string | { id: string; name?: string | undefined };
+export type KeptList = string | { id: string; name?: string | undefined; count?: number | undefined };
 
 const idOf = (l: KeptList): string => (typeof l === 'string' ? l : l.id);
 
@@ -69,7 +70,10 @@ const lower = (name: string): string => (/^\p{Lu}\p{Ll}/u.test(name) ? name[0]!.
  * orders), then the people, then the work handed out. So a shop reads "your orders and clients", never projects it does
  * not keep. A list the caller names by id alone is said by the use case's name for it, else the house word.
  */
-function agentThings(lists: readonly KeptList[]): string[] {
+function agentThings(all: readonly KeptList[]): string[] {
+  /* ONLY WHAT SHE HAS (first-hour audit E22): a list the record says is empty is not named, so a bakery whose Projects
+     came with the house is not told about its projects. A list given without its count is named as before. */
+  const lists = all.filter((l) => typeof l === 'string' || l.count === undefined || l.count > 0);
   const ids = lists.map(idOf);
   const given = new Map(lists.flatMap((l) => (typeof l !== 'string' && l.name?.trim() ? [[l.id, l.name.trim()] as const] : [])));
   const own = ownLists();

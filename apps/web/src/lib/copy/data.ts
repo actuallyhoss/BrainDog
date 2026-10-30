@@ -22,6 +22,8 @@ export const data = {
   setUpRows: (rows: number) => `Added ${rows} example ${rows === 1 ? 'item' : 'items'}`,
   setUpLinked: 'Linked the examples to each other',
   /** Who did it and what to, in a `feed` block on a live record: "You", "Someone", "installed the Team board use case". */
+  /** The making of a BrainDog, its owner, add-ons and the person it is for, as one line of the feed. */
+  feedMade: 'Your BrainDog was made',
   /** A decision in the feed, with the reason it was given when there is one. */
   feedDecided: (title: string, reason: string | null) => (reason ? `Decided: ${title}${/[.?!]$/u.test(title) ? '' : '.'} ${reason}` : `Decided: ${title}`),
   /** Many writes by one writer in a few seconds, such as an import, as one line of the feed: "Added 52 items and asked 8 questions". */

@@ -114,8 +114,8 @@ export function balanceOf(typed: string, currency: string): number | null {
 /** Kept here, so the setup owns its words. Plain, sentence case. */
 export const words = {
   title: 'Set up Money',
-  lead: 'Three short steps. You can change any of it later.',
-  step: (n: number, of: number) => `Step ${n} of ${of}`,
+  /* NO COUNT OF STEPS (first-hour audit E10): "Step 1 of 2" stood over "Three short steps", and the first run counts none. */
+  lead: 'A few short questions. You can change any of it later.',
   currency: 'Home currency',
   currencyLine: 'Totals in other currencies are added up in this one.',
   account: 'First account',

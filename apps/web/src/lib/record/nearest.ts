@@ -59,14 +59,21 @@ export function shellPlaces(nav: readonly { title: string; href: string }[], lis
   ];
 }
 
-/** The `most` places nearest to what was typed, each once by where it opens, the nearest first. */
+/**
+ * The `most` places nearest to what was typed, each once by where it opens and once by its name, the nearest first. A
+ * page and the list it shows share a name (People's page and its list), and the screen said "People, People" (first-hour
+ * audit E20): the first of them, the rail's page, stands for both.
+ */
 export function nearest(asked: string, places: readonly Place[], most: number = NEAREST_MOST): Place[] {
   const said = fold(asked);
   const seen = new Set<string>();
+  const named = new Set<string>();
   const scored: { place: Place; d: number; n: number }[] = [];
   places.forEach((place, n) => {
-    if (place.title.trim() === '' || seen.has(place.href)) return;
+    const name = fold(place.title);
+    if (name === '' || seen.has(place.href) || named.has(name)) return;
     seen.add(place.href);
+    named.add(name);
     const d = Math.min(distance(said, fold(place.title)), place.address === undefined ? 1 : distance(said, fold(place.address)));
     scored.push({ place, d, n });
   });

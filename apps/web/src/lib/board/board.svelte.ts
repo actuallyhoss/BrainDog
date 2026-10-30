@@ -102,7 +102,17 @@ export class BoardModel {
   /* AND `quiet`: the widgets on the board with nothing to show now (Arrivals once seen). At rest they take no cell; while
      the board is edited each takes its own, drawn as a named quiet tile, so it is seen, moved, sized or hidden there and
      not left as an empty box nobody can name (audit 31 Oct, A17). */
-  src: { widgets: () => Widget[]; phone: () => Phone | null; shown: () => ReadonlySet<string>; names: () => ReadonlyMap<string, string>; drafts?: () => ReadonlySet<string>; quiet?: () => ReadonlySet<string> } = {
+  /* AND `rest`: the size each widget is laid at on a laptop at rest where what it holds fits a smaller frame (`rest-size.ts`,
+     first-hour audit E6). Never while editing, and never what is kept. */
+  src: {
+    widgets: () => Widget[];
+    phone: () => Phone | null;
+    shown: () => ReadonlySet<string>;
+    names: () => ReadonlyMap<string, string>;
+    drafts?: () => ReadonlySet<string>;
+    quiet?: () => ReadonlySet<string>;
+    rest?: () => ReadonlyMap<string, WidgetSize>;
+  } = {
     widgets: () => [],
     phone: () => null,
     shown: () => new Set(),
@@ -233,7 +243,10 @@ export class BoardModel {
     const cols = this.onPhone ? 2 : 4;
     const fresh = new Set(this.added.map((b) => String(b.key)));
     const placing = this.placing;
-    const items = this.laidWidgets.filter((w) => placing.has(w.key) || fresh.has(w.key) || this.held === w.key);
+    const rest = cols > 2 && !this.editing ? (this.src.rest?.() ?? null) : null;
+    const items = this.laidWidgets
+      .filter((w) => placing.has(w.key) || fresh.has(w.key) || this.held === w.key)
+      .map((w) => (rest?.has(w.key) ? { ...w, size: rest.get(w.key)! } : w));
     /* A DRAFT ON THE PHONE TAKES A ROW MORE AT REST, so its Keep / Try again / Throw away bar sits in that row and the widget
        it asks about is seen whole above it (a chart under the bar was hidden). Editing, it is laid at its size. */
     const drafts = cols <= 2 && !this.editing ? (this.src.drafts?.() ?? new Set<string>()) : new Set<string>();

@@ -188,7 +188,7 @@
 {/snippet}
 
 {#if connect}
-  <connect.Sheet bind:open={sheetOpen} lines={connect.lines} listen={connect.listen} code={mayConnect ? codeField : undefined} />
+  <connect.Sheet bind:open={sheetOpen} lines={connect.lines} listen={connect.listen} code={mayConnect ? codeField : undefined} start="claude-web" />
 {/if}
 
 <style>

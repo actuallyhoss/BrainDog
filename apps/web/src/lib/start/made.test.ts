@@ -16,7 +16,7 @@ test('ONE AGENT AND ONE SOURCE, the agent first, each saying what it would find'
   const offers = madeOffers(of('portfolio', 'people', 'money-core'));
   assert.deepEqual(Object.keys(offers), ['agent', 'source'], 'the agent comes before the source');
   assert.equal(offers.agent.name, firstRun.agentName);
-  assert.match(offers.agent.finds, /^It sees your /u, 'the agent says what it sees here');
+  assert.match(offers.agent.finds, /^Ask it about your /u, 'the agent says what it can be asked about here');
   assert.match(offers.source.finds, /^Forward them here, and Money fills itself/u, 'the bank says what forwarding does');
   for (const o of [offers.agent, offers.source]) assert.doesNotMatch(`${o.name} ${o.finds}`, /—|\brow\b/u, 'no em dash or "row" in copy a person reads');
 });
@@ -32,9 +32,9 @@ test('A SHOP\'S AGENT SEES ITS ORDERS AND CLIENTS by the names the record gives 
   const shop = ['people', 'orders', 'products', ...of('money-core')];
   /* NAMED BY THE RECORD, as Home has them: the people are her clients (use case 6, step 2). */
   const named = shop.map((id) => ({ id, name: id === 'people' ? 'Clients' : id === 'orders' ? 'Orders' : id === 'products' ? 'Products' : 'Money' }));
-  assert.equal(madeOffers(named).agent.finds, 'It sees your orders and clients before it starts, and leaves what it did when it stops.');
+  assert.equal(madeOffers(named).agent.finds, 'Ask it about your orders and clients, from the Claude app.');
   /* BY ID ALONE, as a caller with no names hands them: the shop's own list by the use case's name, the people by the house word. */
-  assert.equal(madeOffers(shop).agent.finds, 'It sees your orders and the people you work with before it starts, and leaves what it did when it stops.');
+  assert.equal(madeOffers(shop).agent.finds, 'Ask it about your orders and the people you work with, from the Claude app.');
   /* A PRODUCT IS NOBODY'S, so the agent's line does not list it; and no id is ever said. */
   assert.doesNotMatch(madeOffers(named).agent.finds, /products|projects|tasks/u);
   assert.equal(madeOffers([{ id: 'zz_01HX', name: '' }]).agent.finds, firstRun.agentFinds([]), 'a list with no name is never said by its id');
@@ -88,10 +88,16 @@ test('THE NEXT STEPS KEEP THE FIRST RUN\'S ORDER, and work that arrives by messa
   assert.deepEqual(kinds(madeSteps(of('portfolio'))), ['agent', 'file'], 'without the answer a file is still a file');
 });
 
-test("HER FIRST TODAY'S NEXT STEPS, AS THE VISION ORDERS THEM: her orders come by messages, so the bank's texts lead, then Claude Code", () => {
+test("HER FIRST TODAY'S NEXT STEPS, AS THE VISION ORDERS THEM: her orders come by messages, so the bank's texts lead, then Claude", () => {
   const steps = madeSteps([{ id: 'people', name: 'Clients' }, { id: 'orders', name: 'Orders' }, ...of('money-core')], 'messages');
   assert.deepEqual(steps.map((s) => (s.kind === 'agent' ? 'agent' : s.source.kind)), ['bank', 'agent']);
   const [bank, agent] = steps;
   assert.equal(bank?.kind === 'source' && bank.source.name, "Your bank's texts");
-  assert.equal(agent?.kind === 'agent' && agent.agent.finds, 'It sees your orders and clients before it starts, and leaves what it did when it stops.');
+  assert.equal(agent?.kind === 'agent' && agent.agent.finds, 'Ask it about your orders and clients, from the Claude app.');
+});
+
+test('THE AGENT NAMES ONLY WHAT SHE HAS: a list the record says is empty is left out (E22)', () => {
+  const lists = [{ id: 'things', name: 'Projects', count: 0 }, { id: 'orders', name: 'Orders', count: 1 }, { id: 'people', name: 'People', count: 2 }];
+  assert.equal(madeOffers(lists).agent.finds, 'Ask it about your orders and people, from the Claude app.');
+  assert.equal(madeOffers(lists).agent.name, 'Claude');
 });
