@@ -1,13 +1,18 @@
 <!--
-  The end of the first run, and the first of the five minutes: the BrainDog is made, and the person connects their agent.
+  The end of the first run, and the first of the five minutes: the BrainDog is made, and the person is shown what to do
+  first, in the app, and then, for whoever uses one, how to connect an AI app.
 
-  ONE APP AT A TIME (first F1). A segmented control of the five apps, Claude Code first and
-  chosen, each with its maker's mark; under it that app's steps only, numbered where there are two, each step's command
-  or address in its own block with its own Copy (`CodeLine`). All of it in one tile at most 720 wide, on the frame's
-  start edge. Under the tile the live sign: "Waiting for your agent…" beside a grey dot until the record hears its
-  first session, then "Connected: Claude Code on MacBook" beside a green one. It asks the way the connect sheet does
-  (`listenFor`, `poll`, every two seconds while the tab is shown), and stops asking once it has heard. "Skip for now"
-  and "Go to Today" both go to Today, so nobody is held here.
+  TODAY LEADS, THE AGENT IS SECOND (first hour audit, E3). The screen opened on "Connect your agent" with Claude Code's
+  `curl` install chosen and a small "Skip for now" at its foot, for a bakery, while the site says connecting an AI tool
+  is optional and nobody needs to be technical. Now the first tile says what was made and the one thing to do on Today,
+  with "Go to Today" as the press; the second tile, under it, is the connect step for people who want it.
+
+  ONE APP AT A TIME (first F1), in the second tile. A segmented control of the five apps, Claude Code first and chosen,
+  each with its maker's mark; under it that app's steps only, numbered where there are two, each step's command or
+  address in its own block with its own Copy (`CodeLine`). Under them the live sign: "Waiting for your agent…" beside a
+  grey dot until the record hears its first session, then "Connected: Claude Code on MacBook" beside a green one. It asks
+  the way the connect sheet does (`listenFor`, `poll`, every two seconds while the tab is shown), and stops asking once
+  it has heard. Both tiles at most 720 wide, on the frame's start edge.
 
   `.cmd`, NEVER `.line`: the ledger's global `.line` (`rows.css`) is a four-column grid, and it broke every command
   into a 120px column with its Copy a whole window away.
@@ -15,7 +20,7 @@
   NO KEY IS SHOWN: an MCP app signs in by OAuth and `braindog setup` signs in itself.
 
   `modules` (`made.modules`) is what was just made; nothing here reads it, and the prop stays so `/start`'s call is unchanged.
-  `places` are the names of the places made, said in one line over the apps, so the screen first says what
+  `places` are the names of the places made, said in one line over the first step, so the screen first says what
   was built. On a phone (under 640) Claude comes first and chosen, since nobody runs a terminal command there, and a
   command breaks only at its spaces (`CodeLine` `words`).
 -->
@@ -38,9 +43,8 @@
   let made: { modules?: readonly string[] | null | undefined; places?: readonly string[] | null | undefined } = $props();
   const madeLine = $derived(firstWords.made(made.places ?? []));
 
-  /* This screen's own words. The sub-line says what connecting does, and no longer asks anybody to paste "its line". */
+  /* This screen's own words for the connect steps; the titles are `firstWords`. */
   const words = {
-    sub: 'Pick the app you use. Your agent can then read and update this BrainDog.',
     apps: 'Your app',
     install: 'Install BrainDog',
     connect: 'Connect this BrainDog',
@@ -114,7 +118,17 @@
     <header class="head">
       <p class="made-line">{madeLine}</p>
       <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
-      <p class="entry-lede">{words.sub}</p>
+      <p class="entry-lede">{firstWords.sub}</p>
+    </header>
+    <div class="go">
+      <Button weight="primary" href="/">{firstWords.go}</Button>
+    </div>
+  </div>
+
+  <section class="made-tile agent" aria-labelledby="agent-h">
+    <header class="head">
+      <h2 class="agent-h" id="agent-h">{firstWords.agentTitle}</h2>
+      <p class="agent-sub">{firstWords.agentSub}</p>
     </header>
 
     <Segmented full role="group" aria-label={words.apps}>
@@ -145,17 +159,9 @@
         {/each}
       </ol>
     {/if}
-  </div>
 
-  <p class="sign" role="status" data-on={sign.connected ? '' : undefined}><span class="dot" aria-hidden="true"></span>{sign.said}</p>
-
-  <div class="go">
-    {#if sign.connected}
-      <Button weight="primary" href="/">{firstWords.go}</Button>
-    {:else}
-      <Button weight="bare" href="/">{firstWords.skip}</Button>
-    {/if}
-  </div>
+    <p class="sign" role="status" data-on={sign.connected ? '' : undefined}><span class="dot" aria-hidden="true"></span>{sign.said}</p>
+  </section>
 </section>
 
 <style>
@@ -187,6 +193,24 @@
   .head {
     display: grid;
     gap: var(--sp-2);
+  }
+
+  /* THE SECOND STEP READS AS ONE: a heading in the head size, under the page's title, never a second page title. */
+  .agent-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: 600;
+    line-height: 24px;
+    text-wrap: balance;
+  }
+
+  .agent-sub {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    text-wrap: pretty;
   }
 
   /* WHAT WAS MADE, over the title in the body size and ink, so the first thing read is the record, not a command. */
@@ -301,10 +325,6 @@
 
   .go :global(.btn) {
     min-block-size: max(40px, var(--ctl-h));
-  }
-
-  .go :global(.btn[data-weight='bare']) {
-    margin-inline-start: calc(-1 * var(--sp-3));
   }
 
   @media (forced-colors: active) {

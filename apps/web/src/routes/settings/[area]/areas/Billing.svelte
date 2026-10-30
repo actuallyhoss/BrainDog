@@ -71,7 +71,17 @@
   );
   const needs = $derived(nearest && nearest.share >= 0.8 ? nearest.said : null);
   const reading = $derived(
-    [allowed?.binding ? actionWords.binding(allowed.binding) : `${actionWords.noUsage}.`, allowed?.slash ?? null, allowed?.extra ?? null]
+    [
+      /* THE NEAREST LIMIT IS NAMED ONLY ONCE IT IS HALF USED: under that, every limit is far, and naming one worried a
+         person at 1 run of 1,000 (first hour audit, E9). */
+      allowed?.binding && nearest && nearest.share >= 0.5
+        ? actionWords.binding(allowed.binding)
+        : allowed?.binding
+          ? actionWords.withinAll
+          : `${actionWords.noUsage}.`,
+      allowed?.slash ?? null,
+      allowed?.extra ?? null,
+    ]
       .filter((x): x is string => x !== null)
       .join(' '),
   );
@@ -184,7 +194,7 @@
   on both hosts: "At no point is export withheld." A lapsed record says so in its own sentence.
 -->
 {#if hosted}
-  <Tile icon="money" class="section" data-surface="tile" title={copy.billingYours}>
+  <Tile icon="money" class="section" data-surface="tile" title={copy.billingYours(bill.value?.records.length ?? 1)}>
     <div class="section-body">
       {#if bill.state === 'ready' && bill.value}
         <!-- A HOST THAT SELLS PACKS AND NO PLAN is taking payments, for credits, so it is never told it is not. -->

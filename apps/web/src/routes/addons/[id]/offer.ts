@@ -83,7 +83,7 @@ export const turnWords = {
 } as const;
 
 /** The words over what waits on the sheet, kept with the market's other words. */
-export const sheetWords = { waits: words.waits, waitsNote: words.waitsNote } as const;
+export const sheetWords = { waits: words.waits, waitsNote: words.waitsNote, planMoved: words.planMoved } as const;
 
 /** What a part waits for, said: a role any list may play in the market's own words (`words.waitsOn`), else the list by its name. */
 const waitedFor = (h: string, nameOf: (id: string) => string): string => (Object.hasOwn(words.waitsOn, h) ? words.waitsOn[h]! : nameOf(h));

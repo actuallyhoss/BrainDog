@@ -41,3 +41,14 @@ test('the reason is said aloud, and the way on is still drawn', () => {
   assert.match(DRAWN, /role="alert"/);
   assert.match(DRAWN, /copy\.signupStartAgain/);
 });
+
+test('A LINK THIS DEVICE SPENT IS SAID AS USED, with a way on, never as "Start again" (first hour audit, E15)', () => {
+  assert.match(VERIFY, /out\.kind === 'refused' && \(await usedLink\(token\)\)/);
+  assert.match(PAGE, /await keepSpent\(localStore\(\), token,/);
+  const USED = PAGE.slice(PAGE.indexOf("{:else if step === 'link-used' && used}"), PAGE.indexOf("{:else if step === 'making'}"));
+  assert.match(USED, /words\.linkUsedTitle/);
+  assert.match(USED, /words\.openMine/);
+  assert.match(USED, /signin'\)\}#email=/);
+  assert.doesNotMatch(USED, /signupStartAgain/);
+  assert.match(words.linkUsedSignIn('nadia@example.com'), /Sign in with nadia@example\.com/);
+});

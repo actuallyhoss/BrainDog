@@ -39,10 +39,14 @@ function asked(pathname: string): string {
 }
 
 test('it asks at the address the app asks at, for a record, a bare address and the app’s own screens', () => {
-  for (const path of ['/acme', '/acme/', '/acme/decide', '/', '/', '/signin', '/decide', '/d41', '/start', '/elsewhere']) {
+  for (const path of ['/acme', '/acme/', '/acme/decide', '/', '/', '/decide', '/d41', '/start', '/elsewhere']) {
     const url = new URL(`https://brain.dog${path}`);
     assert.equal(asked(path), `${apiBase(url)}/api/boot`, path);
   }
+});
+
+test('NOTHING IS ASKED ON SIGN-IN OR SIGN-UP, where a stranger has no record to read (first hour audit, E14)', () => {
+  for (const path of ['/signin', '/signup', '/acme/signin', '/signin/desktop']) assert.equal(asked(path), '', path);
 });
 
 test('readBoot takes the early answer once, and only at the address it was asked at', async () => {

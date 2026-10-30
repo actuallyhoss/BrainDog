@@ -16,4 +16,6 @@ export const words = {
   desktopFailed: 'That sign-in did not finish',
   desktopFailedWhy: 'It may have timed out. Start again from the app.',
   desktopBack: 'Back to sign in',
+  /** Signed in with nothing left to ask here, on the way straight in (first hour audit, E21). */
+  goingIn: 'Signed in. Opening BrainDog',
 } as const;
