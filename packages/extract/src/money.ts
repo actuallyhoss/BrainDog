@@ -292,20 +292,29 @@ function split(token: string): { groups: string[]; seps: string[]; mixed: boolea
 }
 
 /**
+ * The currencies whose banks print lakhs with `,`: India, Pakistan, Nepal, Sri Lanka and Bangladesh.
+ *
+ * A LIST, BECAUSE A COMMA LIST IS NOT A RUPEE. Read for every currency, `EGP 10,20,300` was EGP 1,020,300.00 and
+ * "scores 1,10,100" was an amount (review of 30 October, R13), where before both were no amount at all. Nobody prints
+ * pounds or dollars in lakhs with a comma, and a figure that only reads by guessing the convention is not read.
+ */
+export const LAKH_CURRENCIES: ReadonlySet<string> = new Set(['INR', 'PKR', 'NPR', 'LKR', 'BDT']);
+
+/**
  * LAKH GROUPING, which every Indian bank prints and Urdu prints with `٬`: `12,34,567` is twelve lakh thirty-four
  * thousand five hundred and sixty-seven. The last group is three digits, every group before it two, and the first
- * one or two.
+ * one or two, never starting with a nought (`00,12,345` is nobody's figure).
  *
  * ONLY WHEN THE WHOLE NUMBER IS GROUPED THAT WAY, and at least three groups long. Below a lakh the Indian and the
  * Western forms are the same string (`12,345`), so nothing changes there; above it, a figure is read as lakhs only
  * when every group fits, so `1,23,456,789` (two conventions in one figure) is still no candidate, and so is
- * `1,234,56`. ONLY WITH `,` OR `٬`, the two marks India and Pakistan group with: a lakh-shaped figure grouped by `.`
- * is printed by nobody, and reading one would be a guess.
+ * `1,234,56`. ONLY WITH `٬`, WHICH NO WESTERN FIGURE CARRIES, OR WITH `,` IN A LAKH CURRENCY (`LAKH_CURRENCIES`): a
+ * lakh-shaped figure grouped by `.` is printed by nobody, and one grouped by `,` in pounds is a list, not an amount.
  */
-function lakh(groups: readonly string[], sep: string): boolean {
-  if (sep !== ',' && sep !== ARABIC_GROUP) return false;
+function lakh(groups: readonly string[], sep: string, currency: string | undefined): boolean {
+  if (sep !== ARABIC_GROUP && !(sep === ',' && currency !== undefined && LAKH_CURRENCIES.has(currency))) return false;
   if (groups.length < 3) return false;
-  if (groups[0]!.length < 1 || groups[0]!.length > 2) return false;
+  if (groups[0]!.length < 1 || groups[0]!.length > 2 || groups[0]![0] === '0') return false;
   for (let i = 1; i < groups.length - 1; i++) if (groups[i]!.length !== 2) return false;
   return groups[groups.length - 1]!.length === 3;
 }
@@ -317,9 +326,9 @@ function grouped(groups: readonly string[], upto: number): boolean {
   return true;
 }
 
-/** Is a whole part, split at `sep`, grouped by thousands or, with `,` or `٬`, by lakhs? */
-const wholeGrouped = (whole: readonly string[], sep: string): boolean =>
-  grouped(whole, whole.length - 1) || lakh(whole, sep);
+/** Is a whole part, split at `sep`, grouped by thousands or, with `٬` or a lakh currency's `,`, by lakhs? */
+const wholeGrouped = (whole: readonly string[], sep: string, currency?: string): boolean =>
+  grouped(whole, whole.length - 1) || lakh(whole, sep, currency);
 
 const safe = (digits: string): number | null => {
   const n = Number(digits);
@@ -334,8 +343,10 @@ const safe = (digits: string): number | null => {
  * exponent 3 it is the decimal point, because three decimals is what that currency writes. The ceiling is
  * named in `43 §10`: `KWD 1,250` meaning one thousand two hundred and fifty dinars reads as 1.250, and a
  * provider that writes dinars with grouping and no decimals is a provider that needs `map:` rather than text.
+ *
+ * `currency` IS THE CODE THE AMOUNT IS IN, when there is one: it decides whether `,` may group by lakhs (`lakh`).
  */
-export function readAmount(token: string, e: number): number | null {
+export function readAmount(token: string, e: number, currency?: string): number | null {
   const { groups, seps, mixed } = split(token);
   if (mixed || groups.some((g) => g.length === 0)) return null;
   if (seps.some(isArabicSep)) return readArabic(groups, seps, e);
@@ -368,7 +379,7 @@ export function readAmount(token: string, e: number): number | null {
     const pointed = lastSep !== groupChar;
     if (pointed && isApostrophe(lastSep)) return null;
     const wholeGroups = pointed ? groups.slice(0, -1) : groups;
-    if (!wholeGrouped(wholeGroups, groupChar)) return null;
+    if (!wholeGrouped(wholeGroups, groupChar, currency)) return null;
     whole = wholeGroups.join('');
     fraction = pointed ? groups[groups.length - 1]! : '';
     if (fraction.length > e) return null;
@@ -667,7 +678,7 @@ export function scanMoney(given: string, table: CurrencyTable, declared?: string
     const currency = before ?? after ?? declared ?? null;
     if (currency === null || !Object.hasOwn(table, currency)) continue;
 
-    const amount = readAmount(token.text, table[currency]!.exponent);
+    const amount = readAmount(token.text, table[currency]!.exponent, currency);
     if (amount === null) continue;
 
     /* NOT WHEN IT IS ZERO. `-0` is not an amount: it survives `JSON.stringify` as `0` and comes back from

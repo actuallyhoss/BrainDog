@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseMoney, type CurrencyTable } from '../src/money.ts';
+import { parseMoney, scanDecimals, scanInts, type CurrencyTable } from '../src/money.ts';
 
 /* Exponents 0, 2 and 3, because the minor-unit arithmetic is where this can go wrong and a table
    of nothing but 2 would never exercise it. */
@@ -372,21 +372,30 @@ test('2,000 AMOUNTS AS INTL PRINTS THEM IN 24 LOCALES READ BACK TO THE AMOUNT AN
 /**
  * LAKH GROUPING, which every Indian bank prints: `12,34,567.50`.
  *
- * READ EXACTLY ON BOTH SIDES OF A LAKH. Below one the Indian and the Western forms are the same string; from one
- * up, `readAmount` takes a figure as lakhs when every group fits (the first one or two digits, then twos, then the
- * last three), so the record of somebody paid in rupees reads what their bank printed instead of nothing.
+ * READ EXACTLY ON BOTH SIDES OF A LAKH, IN RUPEES. Below one the Indian and the Western forms are the same string; from
+ * one up, `readAmount` takes a figure as lakhs when every group fits (the first one or two digits, then twos, then the
+ * last three) and the currency is one whose banks print lakhs (`LAKH_CURRENCIES`), so the record of somebody paid in
+ * rupees reads what their bank printed instead of nothing. In any other currency a comma figure shaped as lakhs is no
+ * amount, as it was before lakhs were read (review of 30 October, R13): `en-IN` printing dollars above a lakh is refused,
+ * and the same dollars below one still read.
  */
-test('INDIAN GROUPING IS READ EXACTLY, BELOW A LAKH AND ABOVE ONE', () => {
+test('INDIAN GROUPING IS READ EXACTLY IN RUPEES, BELOW A LAKH AND ABOVE ONE, AND IN NO OTHER CURRENCY ABOVE ONE', () => {
   const next = rng(0x43_09_06);
   let below = 0;
+  let refused = 0;
   for (let i = 0; i < 600; i++) {
     const currency = (['INR', 'USD', 'JPY', 'KWD'] as const)[Math.floor(next() * 4)]!;
     const amount = amountFrom(next);
     const text = intl('en-IN', currency, 'code', amount);
-    assert.deepEqual(parseMoney(text, INTL), { amount, currency }, shown(text));
-    if (Math.floor(Math.abs(amount) / 10 ** INTL[currency]!.exponent) < 100_000) below += 1;
+    const lakhs = Math.floor(Math.abs(amount) / 10 ** INTL[currency]!.exponent) >= 100_000;
+    if (!lakhs) below += 1;
+    if (lakhs && currency !== 'INR') {
+      assert.equal(parseMoney(text, INTL), undefined, shown(text));
+      refused += 1;
+    } else assert.deepEqual(parseMoney(text, INTL), { amount, currency }, shown(text));
   }
   assert.ok(below > 100 && below < 500, `${below} of 600 below a lakh; the draw stopped covering one side`);
+  assert.ok(refused > 50, `${refused} lakh figures in other currencies; the draw stopped covering them`);
 });
 
 /**
@@ -399,7 +408,12 @@ test('A FIGURE GROUPED PARTLY BY LAKHS AND PARTLY BY THOUSANDS IS NO AMOUNT', ()
   /* The same shapes that do fit. */
   assert.deepEqual(parseMoney('INR 1,00,000', INTL), { amount: 10_000_000, currency: 'INR' });
   assert.deepEqual(parseMoney('INR 10,00,00,000.50', INTL), { amount: 10_000_000_050, currency: 'INR' });
-  assert.deepEqual(parseMoney('KWD 1,00,000', INTL), { amount: 100_000_000, currency: 'KWD' });
+  /* NOT IN A CURRENCY NOBODY PRINTS IN LAKHS, AND NEVER FROM A NOUGHT (review of 30 October, R13). */
+  for (const text of ['KWD 1,00,000', 'EGP 10,20,300', 'EGP 1,25,000', 'USD 12,34,567.50', 'INR 00,12,345', 'INR 0,12,345'])
+    assert.equal(parseMoney(text, INTL), undefined, text);
+  assert.deepEqual(parseMoney('EGP ١٬٢٥٬٠٠٠', INTL), { amount: 12_500_000, currency: 'EGP' }, 'the Arabic mark groups lakhs in any currency');
+  assert.deepEqual(scanInts('scores 1,10,100'), [], 'a comma list is not a number');
+  assert.deepEqual(scanDecimals('scores 1,10,100'), []);
 });
 
 /**
