@@ -53,6 +53,7 @@ import {
   type WalkStep,
 } from './api.ts';
 import { REGISTERS } from './held.ts';
+import { rowHref, spokenOf } from './row-href.ts';
 import { linkOf, REST_MARK, staleOf } from './blocks.ts';
 import { thingName } from './project.ts';
 import { bylineOf } from './byline.ts';
@@ -1318,6 +1319,23 @@ function latestOf(v: unknown): MeasureLatest[] {
   );
 }
 
+/** What a project runs on is, in the words its blocks are headed by. */
+const RUNS_ON_KINDS: Readonly<Record<string, string>> = { key: 'Key', tool: 'Tool or server', skill: 'Skill', action: 'Scheduled action' };
+
+/** Where a scheduled action is read: the schedule, since an action has no screen of its own (`routes/automations/hub.ts`). */
+const SCHEDULED_HREF = '/automations?tab=scheduled';
+
+/**
+ * Where one thing a project runs on opens: its own row by the spoken id the kernel answers (`spoken`, `credentials#3`),
+ * or the schedule for a scheduled action. `null` for anything else, which draws no link rather than one to no page.
+ */
+export function runsOnHref(fields: Readonly<Record<string, unknown>>): string | null {
+  if (fields.kind === 'action') return SCHEDULED_HREF;
+  const spoken = typeof fields.spoken === 'string' ? fields.spoken : '';
+  const at = spokenOf(spoken);
+  return at ? (rowHref(spoken) ?? `/r/${at.register}/${at.seq}`) : null;
+}
+
 /** One answered block as the page draws it. */
 /**
  * What a project runs on types its columns as (the kernel's `RUNS_ON`), for a record on a build that answered no `types`
@@ -1789,7 +1807,14 @@ export function blockOf(
     const types = answeredTypes(b) ?? {};
     /* A RUN THIS READER COULD NOT OPEN is said by the agent the record named beside it (`used_agent`), before An agent. */
     const said = runNames(refs, runs, entries, 'used_by', 'used_agent');
-    const rows = toRows(register, entries, shell.columns, now, said, types);
+    /* EACH CARD OPENS THE ROW IT STANDS FOR, never `/r/runs_on/<n>`, which is no list (audit 31 Oct A37): a key, a tool
+       or a skill by the spoken id the kernel answered beside it (`credentials#3`), on its own page where its list made
+       one, and a scheduled action on the schedule, since an action has no screen of its own. */
+    const rows = toRows(register, entries, shell.columns, now, said, types).map((row, n) => {
+      const { href: _href, ...rest } = row;
+      const to = runsOnHref(entries[n]!.fields);
+      return { ...rest, ...(to ? { href: to } : {}) };
+    });
     /* THE RUN'S FACE ON THE CARD, from the run the page read, as a block of runs hands its own. */
     const runFaces = runFacesOf(b, types, entries, runs, now);
     /* EACH ROW'S PROJECT IS A CHIP, as any block with a `scope` column draws one: the kernel's own
@@ -1809,6 +1834,8 @@ export function blockOf(
         const cell = row.cells[i];
         if (c.as === 'title' && c.field === 'name' && typeof cell === 'string') row.cells[i] = thingName(cell);
         else if (c.field === 'detail' && entries[n]?.fields.kind === 'tool') row.cells[i] = '';
+        /* WHAT IT IS IN A WORD, as the blocks beside it are headed: "Key", never the kernel's `key`. */
+        else if (c.field === 'kind' && typeof entries[n]?.fields.kind === 'string') row.cells[i] = RUNS_ON_KINDS[entries[n]!.fields.kind as string] ?? cell;
       });
     });
     const scopeCells = scopeCellsOf(b.columns ?? [], rows, scopeMarked);
