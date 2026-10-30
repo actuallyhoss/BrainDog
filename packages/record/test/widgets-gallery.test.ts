@@ -131,3 +131,17 @@ test('a question is matched to the widget whose declaration answers it, narrow w
   assert.equal(askedWidget('what are the agents working on', all), 'agents-working');
   assert.equal(askedWidget('the moon', all), null);
 });
+
+test("Today's one cell is never a widget that would draw nothing: a blank reading passes to the next", async () => {
+  const { blankReading } = await import('../src/methods/widgets.ts');
+  assert.equal(blankReading({ count: 0, empty: 'Nothing yet.' }), true);
+  assert.equal(blankReading({ figures: [], rows: [], count: 0, empty: null }), true);
+  assert.equal(blankReading(undefined), false);
+  assert.equal(blankReading({ rows: [{ title: 'Rent' } as never], count: 1, empty: null }), false);
+  const api = await seeded();
+  const cell = await api.widgetSuggest!({ cell: true }, owner);
+  assert.ok(cell.ok);
+  const offers = (cell.value as { offers: { remove?: unknown; reading?: never }[] }).offers;
+  assert.ok(offers.length <= 1);
+  for (const o of offers) assert.ok(o.remove !== undefined || !blankReading(o.reading));
+});

@@ -68,6 +68,14 @@ export const GALLERY_BATCH = 12;
 export const GALLERY_Q_MOST = 100;
 /** The most of the board `widgetSuggest` is handed. */
 export const BOARD_MOST = 24;
+/** How many suggestions Today's one cell reads, strongest first, for one that draws something: all in one draw. */
+export const CELL_TRIES = 3;
+
+/**
+ * A reading with no figure and no line, which Today's cell does not show (`SuggestCell.svelte` in `apps/web`). A widget
+ * the record could not draw has no reading, and is not blank: its cell says it is waiting, as before.
+ */
+export const blankReading = (r: WidgetReading | undefined): boolean => r !== undefined && (r.figures?.length ?? 0) === 0 && (r.rows?.length ?? 0) === 0;
 /** The most projects or currencies offered for a blank, and the most rows read to find them. */
 const CHOICES_MOST = 8;
 const CHOICES_READ = 200;
@@ -475,7 +483,7 @@ export function methods(deps: RecordDeps) {
       const t = cat.byId(s.widget);
       return t ? filledOf(t, choices) : {};
     })());
-    const ranked = widgetOffers(signals, heldOf(prefs), today, onBoardOf(board, values, cat.byId), cell).slice(0, cell ? 1 : undefined);
+    const ranked = widgetOffers(signals, heldOf(prefs), today, onBoardOf(board, values, cat.byId), cell).slice(0, cell ? CELL_TRIES : undefined);
     const offers = ranked.flatMap((r): WidgetOffer[] => {
       if (r.remove !== undefined)
         return [{ key: r.key, widget: r.widget, title: 'Take it off Today', why: r.why, size: 'small', block: {}, signal: r.signal, score: r.score, remove: r.remove }];
@@ -506,6 +514,13 @@ export function methods(deps: RecordDeps) {
         const t = cat.byId(o.widget);
         if (t !== undefined && drawn[i] !== null && drawn[i] !== undefined) o.reading = distill(t, drawn[i], { now: clock.now() });
       });
+    }
+    /* TODAY'S ONE CELL SHOWS THE FIRST THAT DRAWS SOMETHING (recheck of 30 October): the cell hides a widget whose reading
+       holds no figure and no line, so the day's one suggestion drawing nothing left the cell empty all day. The next is
+       read in the same draw, never more than `CELL_TRIES`. */
+    if (cell) {
+      const shown = offers.find((o) => o.remove !== undefined || !blankReading(o.reading));
+      return shown === undefined ? [] : [shown];
     }
     return offers;
   };
