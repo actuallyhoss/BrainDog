@@ -1835,7 +1835,7 @@ export function blockOf(
         if (c.as === 'title' && c.field === 'name' && typeof cell === 'string') row.cells[i] = thingName(cell);
         else if (c.field === 'detail' && entries[n]?.fields.kind === 'tool') row.cells[i] = '';
         /* WHAT IT IS IN A WORD, as the blocks beside it are headed: "Key", never the kernel's `key`. */
-        else if (c.field === 'kind' && typeof entries[n]?.fields.kind === 'string') row.cells[i] = RUNS_ON_KINDS[entries[n]!.fields.kind as string] ?? cell;
+        else if (c.field === 'kind' && typeof entries[n]?.fields.kind === 'string') row.cells[i] = RUNS_ON_KINDS[entries[n]!.fields.kind as string] ?? cell ?? null;
       });
     });
     const scopeCells = scopeCellsOf(b.columns ?? [], rows, scopeMarked);
