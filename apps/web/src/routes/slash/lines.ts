@@ -42,8 +42,8 @@ export const words = {
   byRules: 'From how you use BrainDog',
   byModel: (name: string) => `Drafted by ${name}`,
   /* HOW LONG ONE ON DECIDE WAITS, beside who drafted it, and why one he did not answer was taken back. */
-  waits: (day: string) => `Waits until ${day}`,
-  waitsToday: 'Waits until today',
+  waits: (day: string) => `Offered until ${day}`,
+  waitsToday: 'Offered until tonight',
   takenStronger: 'Taken back: a stronger suggestion took its place.',
   takenLapsed: (day: string) => `Taken back on ${day}: nobody answered it.`,
   takenLapsedDay: 'Taken back: nobody answered it.',

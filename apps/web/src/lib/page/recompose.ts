@@ -292,6 +292,9 @@ export function recomposer(): {
     /* A CHANGE STILL PLAYING ENDS HERE, so the next one starts from the page and not from its middle. */
     halt();
     if (now() - opened < SETTLE) return null;
+    /* NOR ON A BOARD STILL SETTLING (`Board.svelte`'s `data-still`): Today's tiles land where they are, never slid there
+       from where the copy drew them (live check of 30 October, item 8). */
+    if (typeof page.closest === 'function' && page.closest('[data-still]')) return null;
     if (typeof document !== 'undefined' && document.hidden) return null;
     if (typeof Element === 'undefined' || typeof Element.prototype.animate !== 'function') return null;
     const was = measure(page);

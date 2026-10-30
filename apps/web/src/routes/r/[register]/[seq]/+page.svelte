@@ -1557,11 +1557,16 @@
             {/if}
             {#if openWork}
               <Tile icon="task" title={rowWords.openWork} href={workAll ?? undefined} hrefLabel={workAll ? rowWords.all : undefined}>
-                <p class="tile-figure num">{openWork.total.toLocaleString('en')}{#if openWork.atLeast}<span class="more-sign">+</span>{/if}</p>
-                <Stacked parts={openWork.parts.map((p) => ({ label: p.label, value: p.count }))} subject={rowWords.openWork} />
-                <p class="reading">
-                  {openWorkSaid(openWork)}{#if openWork.late > 0}{' '}<span class="said-late" data-tone="bad">{figureWords.late(openWork.late)}</span>{/if}
-                </p>
+                <!-- ONE KIND OF WORK IS SAID ONCE (recheck, low notes): its number and its word, with no bar of one colour
+                     across the tile and no sentence saying the number a third time. -->
+                {@const single = openWork.parts.length === 1 ? openWork.parts[0]! : null}
+                <p class="tile-figure num">{openWork.total.toLocaleString('en')}{#if openWork.atLeast}<span class="more-sign">+</span>{/if}{#if single}<span class="tile-figure-note">{single.label.toLowerCase()}</span>{/if}</p>
+                {#if !single}<Stacked parts={openWork.parts.map((p) => ({ label: p.label, value: p.count }))} subject={rowWords.openWork} />{/if}
+                {#if !single || openWork.late > 0}
+                  <p class="reading">
+                    {#if !single}{openWorkSaid(openWork)}{/if}{#if openWork.late > 0}{single ? '' : ' '}<span class="said-late" data-tone="bad">{figureWords.late(openWork.late)}</span>{/if}
+                  </p>
+                {/if}
               </Tile>
             {/if}
           </div>

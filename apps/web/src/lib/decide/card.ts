@@ -83,9 +83,9 @@ export const cardWords = {
    * HOW LONG AN OFFER WAITS ("every proposal states a deadline"): the last day it waits, as the Slash page says
    * it. It promises no taking back, because nothing takes an offer back by itself yet. `day` is already a day in words.
    */
-  lapses: (day: string) => `Waits until ${day}`,
+  lapses: (day: string) => `Offered until ${day}`,
   /** The same once that day has come. */
-  lapsesToday: 'Waits until today',
+  lapsesToday: 'Offered until tonight',
   /** Past the two answers a row shows: the rest, on the question's own page. */
   otherAnswers: (n: number) => (n === 1 ? '1 more answer' : `${n.toLocaleString('en-GB')} more answers`),
   /** The info mark that opens the ladder's rule, and its name for a screen reader. */
@@ -455,7 +455,7 @@ export function todayOf(now: number): string {
 
 /**
  * HOW LONG AN ARRANGEMENT WAITS, from the `lapses` its body holds: the last day it waits, in words, the same
- * line the Slash page draws ("Waits until 27 Oct"). A day already come is said as today, never as a day past. It names
+ * line the Slash page draws ("Offered until 27 Oct"). A day already come is said as today, never as a day past. It names
  * nobody and promises no taking back: nothing takes an offer back by itself yet. `null` for anything that is not an
  * arrangement or whose body holds no real day.
  */

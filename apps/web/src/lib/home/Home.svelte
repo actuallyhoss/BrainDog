@@ -680,6 +680,7 @@
         got = out;
         fromCopy = false;
         ok = out?.from === 'live';
+        if (ok) boardLoading = false;
         readFailed = !ok;
         if (ok && out) keepPart('body', key, { got: out, news: null } satisfies KeptBody);
         if (ok) keepNews(before, mine, key);
@@ -696,6 +697,8 @@
       })
       .finally(() => {
         reading = false;
+        /* A READ THAT FAILED STILL ENDS THE BOARD'S WAIT: what is drawn is all there is to settle on. */
+        boardLoading = false;
         settled = true;
         fromMemory = false;
         drewFirst();
@@ -813,8 +816,11 @@
     if (nav.type === 'enter' && !enteredOnce && !still()) entering = true;
     enteredOnce = true;
   });
+  /* HELD FROM THE FIRST PICTURE, not from the record's answer: a copy drawn first and the answer landing seconds later
+     kept the arrival on, and a tile drawn again in that answer rose in a second time (live check of 30 October, 8). */
+  const pictured = $derived(got !== null || settled);
   $effect(() => {
-    if (!entering || !settled) return;
+    if (!entering || !pictured) return;
     const off = setTimeout(() => (entering = false), ENTER_HELD_MS);
     return () => clearTimeout(off);
   });
@@ -823,6 +829,8 @@
      nothing beside it, or nothing in it, is one column. */
   /** The board and its editor, which the screen hands what it reads (`src`), so it follows without a step between. */
   const boardModel = new BoardModel();
+  /** Whether Today still waits for the record's own answer, so the board holds its cells (`Board.svelte` `loading`). */
+  let boardLoading = $state(true);
   const deskedRaw = $derived.by(() => {
     if (!got || got.from !== 'live' || !shaped) return null;
     /* THE LATE LIST IS THE LATE TILE'S on the board: the first late block of the page is drawn as the late tile, a line a
@@ -1468,7 +1476,7 @@
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
       {#if board}
         <!-- TODAY IS A BOARD OF WIDGETS (the widgets plan of 29 October): each in its cell, and the editor over them. -->
-        <Board model={boardModel} mayEdit={mayArrange} ondone={() => void boardDone()} onadd={boardAdd} onremove={(key) => boardStep([{ remove: key }], null)} onmake={boardMake} widgets={sheetBoard}>{@render readerPart()}</Board>
+        <Board model={boardModel} loading={boardLoading} mayEdit={mayArrange} ondone={() => void boardDone()} onadd={boardAdd} onremove={(key) => boardStep([{ remove: key }], null)} onmake={boardMake} widgets={sheetBoard}>{@render readerPart()}</Board>
         {#if inspectedWidget}
           <!-- THE INSPECTOR (W4): what a tapped widget shows, in one sentence; its changes are kept with the edit's Done. -->
           {#await import('$lib/board/Inspector.svelte') then { default: Inspector }}<Inspector
@@ -1903,6 +1911,13 @@
     align-items: baseline;
     justify-content: space-between;
     column-gap: var(--sp-2);
+  }
+
+  /* NO NOTE BESIDE A SIDE FIGURE: "Converted at rates as of …" squeezed between the figure and the frame's edge and was
+     cut to "Converted at rates as", with the label crushed to "To go out, next" (his record, 30 Oct). The rate's day is
+     Money's to say, where the figure has room. */
+  .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2) .cell-note) {
+    display: none;
   }
 
   /* ITS LABEL WRAPS BESIDE ITS FIGURE rather than being cut ("To come in, next 30 d…", audit 30 Oct, item 32). */

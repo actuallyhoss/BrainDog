@@ -417,7 +417,7 @@ export const account = {
      are all there is and the app cannot even list them. See `restoreCloud`. */
   /* navigation — `29 §4`'s one global switch, which `19 §2` says is why this area exists */
   suggestPages: 'Suggest new pages',
-  suggestPagesHint: 'When something you keep grows, or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you. An offer waits below until you promote it.',
+  suggestPagesHint: 'When something you keep grows, or you keep asking the same question, BrainDog suggests a page for it. Nothing is placed for you: a suggestion waits below until you keep it.',
   suggestOff: 'Not offering anything',
   suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
   perDevice: 'This setting is remembered on this device.',
