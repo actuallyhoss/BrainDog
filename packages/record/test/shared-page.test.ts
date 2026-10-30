@@ -191,8 +191,10 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
   const { id } = value<{ id: string }>(await direct.openShare({ slug: 'notes', money: true }, owner));
   const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'notes')));
   const note = (shown.blocks.find((b) => b.kind === 'note') as { body: string }).body;
-  assert.match(note, /^Earning\. £18,400(?:\.00)?(?: GBP)? in the last twelve months\.$/mu);
-  assert.match(note, /^It is not deferrable past 20 Nov 2026/mu);
+  /* A CODE AFTER A FIGURE STANDS ACROSS A NO-BREAK SPACE (`AMOUNT_SPACE`), so the line never ends on £18,400. */
+  assert.match(note, /^Earning\. £18,400(?:\.00)?(?:\u00a0GBP)? in the last twelve months\.$/mu);
+  /* A DAY READS AS THE APP SAYS IT: the day, and how far off it is from when the page was read. */
+  assert.match(note, /^It is not deferrable past 20 Nov, in 5 weeks\.$/mu);
   assert.match(note, /^\d{1,2} Aug \| Raised the studio tier/mu);
   assert.match(note, /Letting it lapse breaks links\.\n```/u);
   assert.match(note, /^Settled by research\.$/mu);
