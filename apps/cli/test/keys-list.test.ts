@@ -147,10 +147,10 @@ test('ONE LINE A KEY: its name, what it opens, where it applies, sealed or where
   assert.equal(await keys(['list'], one), 0, one.said.join('\n'));
   /* By name, as the Vault orders them, and the retired key is not among them. */
   assert.deepEqual(one.lines, [
-    'Apple developer · opens The Lanternfish app in the store · Lanternfish · kept at the password manager, under Apple · expired 1 October 2026',
+    'Apple developer · opens The Lanternfish app in the store · Lanternfish · kept at the password manager, under Apple · expired 1 Oct',
     'Cloudflare deploy · opens Deploys of every site · Everywhere · sealed · no expiry day',
     'Old mail relay · opens Mail sent by an old site · Everywhere · kept elsewhere · no expiry day',
-    'Stripe live · opens Payments for Oxbow.gg · Oxbow.gg · sealed · expires 2 November 2026',
+    'Stripe live · opens Payments for Oxbow.gg · Oxbow.gg · sealed · expires 2 Nov',
   ]);
   assert.deepEqual(one.said, ['4 keys: 2 sealed, 2 kept elsewhere.']);
   for (const line of [...one.lines, ...one.said]) assert.doesNotMatch(line, /—/u, 'no em dash in what a person reads');
@@ -298,7 +298,7 @@ test('A KEY IS PAST ITS DAY BY THE RECORD’S OWN CLOCK, in its zone, in the lin
   const cairo = await host(t, rows, null, { today: '2026-10-14' });
   const one = { ...io(cairo.base), now: () => late };
   assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
-  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 October 2026', 'expires 14 October 2026']);
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 Oct', 'expires 14 Oct']);
   assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [true, false]);
   assert.deepEqual(one.said, ['2 keys: 2 kept elsewhere.'], 'nothing is said of the clock when the record answered');
   /* The record is asked in its own words, by the field its declaration marks as the deadline, and no run is named. */
@@ -310,7 +310,7 @@ test('A KEY IS PAST ITS DAY BY THE RECORD’S OWN CLOCK, in its zone, in the lin
   const west = await host(t, rows, null, { today: '2026-10-13' });
   const two = { ...io(west.base), now: () => Date.parse('2026-10-14T01:30:00Z') };
   assert.equal(await keys(['list'], two), 0, two.said.join('\n'));
-  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026', 'expires 14 October 2026']);
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 Oct', 'expires 14 Oct']);
 });
 
 test('A RECORD THAT CANNOT SAY WHICH KEYS ARE PAST is said so once, and each key is judged by this machine’s own day', async (t) => {
@@ -330,7 +330,7 @@ test('A RECORD THAT CANNOT SAY WHICH KEYS ARE PAST is said so once, and each key
     const h = await host(t, rows, null, clock);
     const one = { ...io(h.base), now: () => late };
     assert.equal(await keys(['list'], one), 0, one.said.join('\n'));
-    assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2027', 'expired 13 October 2026']);
+    assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 Oct 2027', 'expired 13 Oct']);
     assert.deepEqual(one.said, ['Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.', '2 keys: 2 kept elsewhere.']);
     for (const line of one.said) assert.doesNotMatch(line, /—/u);
   }
@@ -349,14 +349,14 @@ test('AN ANSWER THAT HOLDS EVERY KEY IS NOT BELIEVED when a day in it is too nea
   const all = await host(t, dated, null, { today: '2026-10-14', deaf: true });
   const one = io(all.base);
   assert.equal(await keys(['list'], one), 0, one.said.join('\n'));
-  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 1 October 2026', 'expires 13 October 2026']);
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 1 Oct', 'expires 13 Oct']);
   assert.deepEqual(one.said, [unsaid, '2 keys: 2 kept elsewhere.']);
 
   /* A key with no day is past no day, so an answer that holds one was not picked by the filter. */
   const blind = await host(t, [...dated, row(3, { label: 'No day', opens: 'A service' })], null, { today: '2026-10-14', deaf: true });
   const two = io(blind.base);
   assert.equal(await keys(['list'], two), 0, two.said.join('\n'));
-  assert.ok(two.lines.some((l) => l.endsWith('expires 13 October 2026')), two.lines.join('\n'));
+  assert.ok(two.lines.some((l) => l.endsWith('expires 13 Oct')), two.lines.join('\n'));
   assert.equal(two.said[0], unsaid);
 
   /* A record that does read the filter is still believed: every key long past, and the whole list is the true answer. */
@@ -379,7 +379,7 @@ test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLE
   const deaf = await host(t, today, null, { today: '2026-10-14', deaf: true });
   const one = io(deaf.base);
   assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
-  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026']);
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 Oct']);
   assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [false]);
   assert.deepEqual(one.said, [unsaid, '1 key: 1 kept elsewhere.']);
 
@@ -390,7 +390,7 @@ test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLE
   const read = await host(t, today, null, { today: '2026-10-14' });
   const two = { ...io(read.base), now: () => Date.parse('2026-10-13T22:30:00Z') };
   assert.equal(await keys(['list', '--json'], two), 0, two.said.join('\n'));
-  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 October 2026']);
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 Oct']);
   assert.deepEqual((two.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [true]);
   assert.deepEqual(two.said, ['1 key: 1 kept elsewhere.'], 'nothing is said of the clock when the record answered');
 });
@@ -408,7 +408,7 @@ test('A RECORD WHOSE ONLY DATED KEY ENDED YESTERDAY IS BELIEVED, and the sentenc
   const honest = await host(t, rows);
   const one = io(honest.base);
   assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
-  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 12 October 2026', 'no expiry day']);
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 12 Oct', 'no expiry day']);
   assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [true, false]);
   assert.deepEqual(one.said, ['2 keys: 2 kept elsewhere.'], 'nothing is said of the clock when the record answered');
   assert.deepEqual(honest.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today', 'expires after today', 'expires after -3d', 'expires before +3d']);
@@ -451,7 +451,7 @@ test('AN EMPTY ANSWER TO THE OPPOSITE QUESTION IS NOT BELIEVED BY ITSELF: the re
     const h = await host(t, rows, null, clock);
     const one = { ...io(h.base), now: () => late };
     assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
-    assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026', 'no expiry day'], JSON.stringify(clock));
+    assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 Oct', 'no expiry day'], JSON.stringify(clock));
     assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [false, false]);
     assert.deepEqual(one.said, [unsaid, '2 keys: 2 kept elsewhere.'], JSON.stringify(clock));
     assert.deepEqual(h.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today', 'expires after today', 'expires after -3d']);
@@ -465,7 +465,7 @@ test('AN EMPTY ANSWER TO THE OPPOSITE QUESTION IS NOT BELIEVED BY ITSELF: the re
   const lettered = await host(t, rows, null, { today: '2026-10-14', text: true });
   const four = { ...io(lettered.base), now: () => late };
   assert.equal(await keys(['list', '--json'], four), 0, four.said.join('\n'));
-  assert.deepEqual(four.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026', 'no expiry day']);
+  assert.deepEqual(four.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 Oct', 'no expiry day']);
   assert.deepEqual((four.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [false, false]);
   assert.deepEqual(four.said, [unsaid, '2 keys: 2 kept elsewhere.']);
   const fourAsked = ['expires before today', 'expires after today', 'expires after -3d', 'expires before +3d'];
@@ -475,7 +475,7 @@ test('AN EMPTY ANSWER TO THE OPPOSITE QUESTION IS NOT BELIEVED BY ITSELF: the re
   const honest = await host(t, rows, null, { today: '2026-10-14' });
   const two = { ...io(honest.base), now: () => late };
   assert.equal(await keys(['list'], two), 0, two.said.join('\n'));
-  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 October 2026', 'no expiry day']);
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 Oct', 'no expiry day']);
   assert.deepEqual(two.said, ['2 keys: 2 kept elsewhere.']);
   assert.deepEqual(honest.seen.filter((s) => s.where !== null).map((s) => s.where), fourAsked);
   for (const s of honest.seen) assert.equal(s.headers['x-braindog-session'], undefined);
@@ -503,7 +503,7 @@ test('A KEY WHOSE DAY IS TODAY ON THIS MACHINE IS NOT CALLED EXPIRED BY A HOST T
   const deaf = await host(t, rows, null, { today: '2026-10-14', deaf: true });
   const one = { ...io(deaf.base), now: () => evening };
   assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
-  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 12 October 2026', 'expires 13 October 2026']);
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 12 Oct', 'expires 13 Oct']);
   assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [true, false]);
   assert.deepEqual(one.said, [unsaid, '2 keys: 2 kept elsewhere.']);
 });
@@ -519,7 +519,7 @@ test('A HOST THAT IGNORES THE FILTER IS NOT BELIEVED FOR ONE PROJECT’S KEYS EI
   const rows = [row(1, { label: 'Ends today', opens: 'A service', project: OXBOW, expires: '2026-10-13' }), row(2, { label: 'Ended on the 1st', opens: 'A service', project: LANTERN, expires: '2026-10-01' })];
 
   const deaf = await host(t, rows, null, { today: '2026-10-14', deaf: true });
-  for (const [project, last] of [['oxbow.gg', 'expires 13 October 2026'], ['lanternfish', 'expired 1 October 2026']] as const) {
+  for (const [project, last] of [['oxbow.gg', 'expires 13 Oct'], ['lanternfish', 'expired 1 Oct']] as const) {
     const one = io(deaf.base);
     assert.equal(await keys(['list', '--project', project], one), 0, one.said.join('\n'));
     assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), [last]);
@@ -531,7 +531,7 @@ test('A HOST THAT IGNORES THE FILTER IS NOT BELIEVED FOR ONE PROJECT’S KEYS EI
   const honest = await host(t, rows, null, { today: '2026-10-13' });
   const two = io(honest.base);
   assert.equal(await keys(['list', '--project', 'oxbow.gg'], two), 0, two.said.join('\n'));
-  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026']);
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 Oct']);
   assert.equal(two.said.length, 1, 'nothing is said of the clock when the record answered');
 });
 

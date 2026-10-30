@@ -90,7 +90,8 @@
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
   import { choicesOf, finishOf, stateSaid } from './lead.ts';
-  import { addedSaid, daySaid, dueSaid, importKeysOnly, localDay, rowWords, sentenceOf } from './said.ts';
+  import { addedSaid, daySaid, dueSaid, importKeysOnly, keyHeld, keySentence, localDay, rowWords, sentenceOf } from './said.ts';
+  import { KEYS_REGISTER } from '$lib/record/keychain.ts';
   import { linkedCells, linkedState } from './linked.ts';
   import {
     aboutOf,
@@ -1017,7 +1018,9 @@
    * `stateSaid`, in the `lead-word` span the label tests read.
    */
   const sentence = $derived(
-    row
+    row && id === KEYS_REGISTER && !archived
+      ? keySentence(row.fields, clock)
+      : row
       ? sentenceOf({
           archived,
           state: stateValue !== '',
@@ -1327,7 +1330,7 @@
        primary and its "…", and what is true of the row is said under its name. -->
   {#snippet headLine()}<span class="head-scope"
       ><ScopeMove register={id} {row} {names} live={changes} size="s" title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} /></span
-    >{#if !archived && (lead?.parts || lead?.last)}{@render whoLine()}{:else}{@render sentenceLine()}{/if}{#if live && !archived}{' '}<HandSheet
+    >{#if !archived && (lead?.parts || lead?.last)}{@render whoLine()}{:else}{@render sentenceLine()}{/if}{#if id === KEYS_REGISTER && !archived && !keyHeld(row.fields) && !(typeof row.fields.where === 'string' && row.fields.where.trim() !== '')}{' '}<a class="who-link tap" href={at(`/keychain?reconnect=${encodeURIComponent(String(row.fields.label ?? ''))}`)}>Add it</a>{/if}{#if live && !archived}{' '}<HandSheet
         register={id}
         {row}
         {decl}

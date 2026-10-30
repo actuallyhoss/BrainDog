@@ -18,7 +18,8 @@ import { dirname, join } from 'node:path';
 
 import { hookStart, type WorkJob } from '../src/hooks.ts';
 import { startWork } from '../src/session-start.ts';
-import { connect, describedIn, render, skillPath, skills, syncSkills, thisMachine, type AgentIo } from '../src/skills.ts';
+import { connect, describedIn, render, skillPath, skills, syncSkills, thisMachine, type SkillsIo } from '../src/skills.ts';
+import { allowSkills, consentPath, skillsAllowed, tellOnce } from '../src/skills-consent.ts';
 
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-5e2a'].join('.');
@@ -48,7 +49,7 @@ const PROJECT_ID = 'e_things_1';
 const SHOWN = 20;
 
 /** A record with a skills register: `context` lists the active rows, and `get`, `create`, `update` and `propose` answer. */
-async function stubRecord(t: After, o: { project?: boolean; register?: boolean; page?: number }) {
+async function stubRecord(t: After, o: { project?: boolean; register?: boolean; page?: number; level?: string }) {
   const rows: Row[] = [];
   const seen: Seen[] = [];
   let proposals = 0;
@@ -125,6 +126,7 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean; 
         return answer({ ok: true, value: entry(r) });
       }
       if (method === 'propose') return answer({ ok: true, value: { id: `SG${String(++proposals)}` } });
+      if (method === 'whoami') return answer({ ok: true, value: { kind: 'token', id: 't_1', person: 'p_1', level: o.level ?? 'owner', scope: 'write' } });
       return answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } });
     });
   });
@@ -151,7 +153,7 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean; 
   return { base: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, rows, seen, add, bump, proposals: () => seen.filter((s) => s.method === 'propose') };
 }
 
-async function setup(t: After, o: { project?: boolean; register?: boolean; page?: number } = {}) {
+async function setup(t: After, o: { project?: boolean; register?: boolean; page?: number; level?: string } = {}) {
   const host = await stubRecord(t, o);
   const dir = mkdtempSync(join(tmpdir(), 'braindog-skills-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -163,7 +165,21 @@ async function setup(t: After, o: { project?: boolean; register?: boolean; page?
   const env = { XDG_CONFIG_HOME: join(dir, 'config'), BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: configDir };
   const out: string[] = [];
   const said: string[] = [];
-  const io: AgentIo = { env, cwd, home, out: (l) => void out.push(l), say: (l) => void said.push(l), headers: async () => ({}) };
+  /* THE TERMINAL'S ANSWER TO THE FIRST SYNC'S QUESTION: what `answers` holds next, and no terminal once it is empty. */
+  const answers: (boolean | null)[] = [];
+  const asked: string[] = [];
+  const io: SkillsIo = {
+    env,
+    cwd,
+    home,
+    out: (l) => void out.push(l),
+    say: (l) => void said.push(l),
+    headers: async () => ({}),
+    ask: async (q) => {
+      asked.push(q);
+      return answers.length > 0 ? (answers.shift() ?? null) : null;
+    },
+  };
   const sync = async (s: { dryRun?: boolean; until?: number; clock?: () => number } = {}) => {
     const at = await connect(undefined, io);
     if (typeof at === 'number') throw new Error(`connect ended with ${String(at)}`);
@@ -174,7 +190,7 @@ async function setup(t: After, o: { project?: boolean; register?: boolean; page?
   const lockFile = join(home, '.braindog', 'skills-lock.json');
   const lock = () => JSON.parse(readFileSync(lockFile, 'utf8')) as Record<string, Record<string, unknown>>;
   const global = (name: string) => join(configDir, 'skills', name, 'SKILL.md');
-  return { ...host, dir, home, configDir, cwd, top, env, io, out, said, sync, lock, lockFile, global };
+  return { ...host, dir, home, configDir, cwd, top, env, io, out, said, sync, lock, lockFile, global, answers, asked };
 }
 
 const RELEASE = { name: 'kiln-release', trigger: 'When a kiln build ships', body: '# Release\n\nTag it, then push.\n' };
@@ -643,7 +659,8 @@ test('braindog skills: a wrong verb or flag is exit 1, a record without skills i
   const h = await setup(t, { register: false });
   assert.equal(await skills(['pull'], h.io), 1);
   assert.equal(await skills(['sync', '--force'], h.io), 1);
-  assert.deepEqual(h.said, ['braindog skills takes sync, --host and --dry-run, and nothing else.', 'braindog skills takes sync, --host and --dry-run, and nothing else.']);
+  const usage = 'braindog skills takes sync (with --host, --dry-run or --yes) or off (with --host), and nothing else.';
+  assert.deepEqual(h.said, [usage, usage]);
 
   assert.equal(await skills(['sync'], h.io), 0);
   assert.deepEqual(h.out, ['This BrainDog has no Skills list, so there is nothing to sync.']);
@@ -663,6 +680,7 @@ test('braindog skills sync --dry-run prints what it would do and says it was a d
   h.add(RELEASE);
   assert.equal(await skills(['sync', '--dry-run'], h.io), 0);
   assert.deepEqual(h.out, [`Skill kiln-release would be written to ${h.global('kiln-release')}.`, 'That was a dry run, so nothing was written, sent or proposed.']);
+  allowSkills(h.home, h.base);
   assert.equal(await skills(['sync'], h.io), 0);
   assert.equal(h.out.at(-1), `Skill kiln-release written to ${h.global('kiln-release')}.`);
   assert.equal(await skills(['sync'], h.io), 0);
@@ -675,6 +693,7 @@ test('braindog skills sync --dry-run prints what it would do and says it was a d
 test('THE START HOOK SYNCS SKILLS on startup, after its card, and not on a compaction', async (t) => {
   const h = await setup(t);
   h.add(RELEASE);
+  allowSkills(h.home, h.base);
   const written: string[] = [];
   /* THE WORK THE HOOK LEAVES FOR AFTER ITS CARD, done here and waited for, where a session's is a detached process. */
   const pending: Promise<unknown>[] = [];
@@ -735,6 +754,81 @@ test("THE LOCK IS EACH HOST'S: another host's row is never read here, another sy
   assert.deepEqual(await run(true), [], 'a dry run after a sync had something to say');
   assert.deepEqual(await run(true), [], 'a second dry run had something to say');
   assert.equal(h.rows.length, 1, 'a skill was registered twice');
+});
+
+/* ── the yes (audit 31 Oct g, AG4) ─────────────────────────────────────── */
+
+test('THE FIRST SYNC SAYS WHAT IT WOULD COPY EACH WAY AND ASKS: nothing moves before the yes, and the yes is kept', async (t) => {
+  const h = await setup(t);
+  h.add(RELEASE);
+  const mine = join(h.configDir, 'skills', 'my-notes', 'SKILL.md');
+  mkdirSync(dirname(mine), { recursive: true });
+  writeFileSync(mine, '---\nname: my-notes\ndescription: My own notes\n---\n\nPrivate.\n');
+
+  /* NO TERMINAL: said, nothing copied, exit 1. */
+  assert.equal(await skills(['sync'], h.io), 1);
+  assert.equal(h.asked.length, 1);
+  assert.ok(h.out.includes(`- It copies one skill from ${thisMachine()} into your BrainDog, each with its whole text: my-notes.`), h.out.join('\n'));
+  assert.ok(h.out.includes(`- It writes one skill from your BrainDog into ${h.configDir}: kiln-release.`), h.out.join('\n'));
+  assert.match(h.said.at(-1) ?? '', /^Nothing was copied, because there is no terminal to ask in\./);
+  assert.equal(h.rows.length, 1, 'a skill was registered before the yes');
+  assert.equal(existsSync(h.global('kiln-release')), false, 'a skill was written before the yes');
+  assert.equal(skillsAllowed(h.home, h.base), false);
+
+  /* A NO: nothing either way, kept, and a start says nothing more about it. */
+  h.answers.push(false);
+  assert.equal(await skills(['sync'], h.io), 0);
+  assert.match(h.out.at(-1) ?? '', /^Nothing was copied either way/);
+  assert.equal(h.rows.length, 1);
+  assert.equal(tellOnce(h.home, h.base), null, 'a start nagged after a no');
+
+  /* A YES: the sync runs, and the next one does not ask. */
+  h.answers.push(true);
+  assert.equal(await skills(['sync'], h.io), 0);
+  assert.equal(h.rows.length, 2, 'the skill kept by hand was not registered after the yes');
+  assert.ok(existsSync(h.global('kiln-release')));
+  assert.equal(skillsAllowed(h.home, h.base), true);
+  const askedBefore = h.asked.length;
+  assert.equal(await skills(['sync'], h.io), 0);
+  assert.equal(h.asked.length, askedBefore, 'a sync after the yes asked again');
+  const kept = readFileSync(consentPath(h.home), 'utf8');
+  assert.ok(!kept.includes(TOKEN) && !kept.includes('my-notes'), 'the consent file holds more than hosts and times');
+
+  /* OFF takes it back. */
+  assert.equal(await skills(['off'], h.io), 0);
+  assert.equal(skillsAllowed(h.home, h.base), false);
+  printed.push(...h.out, ...h.said);
+});
+
+test('ONLY INTO A BRAINDOG YOU OWN: a member is never asked, and nothing is copied either way', async (t) => {
+  const h = await setup(t, { level: 'write' });
+  h.add(RELEASE);
+  const mine = join(h.configDir, 'skills', 'my-notes', 'SKILL.md');
+  mkdirSync(dirname(mine), { recursive: true });
+  writeFileSync(mine, 'Private.\n');
+  h.answers.push(true);
+  assert.equal(await skills(['sync', '--yes'], h.io), 1);
+  assert.equal(h.asked.length, 0);
+  assert.match(h.said.at(-1) ?? '', /is not a BrainDog you own, so nothing was copied either way\./);
+  assert.equal(h.rows.length, 1);
+  assert.equal(existsSync(h.global('kiln-release')), false);
+  assert.equal(skillsAllowed(h.home, h.base), false);
+});
+
+test('WITHOUT THE YES, A SYNC FROM SETUP WRITES DOWN AND SENDS NOTHING UP, and says how many it held back', async (t) => {
+  const h = await setup(t);
+  h.add(RELEASE);
+  const mine = join(h.configDir, 'skills', 'my-notes', 'SKILL.md');
+  mkdirSync(dirname(mine), { recursive: true });
+  writeFileSync(mine, 'Private.\n');
+  const at = await connect(undefined, h.io);
+  if (typeof at === 'number') throw new Error(`connect ended with ${String(at)}`);
+  const lines = await syncSkills({ client: at.client, context: at.context, home: h.home, configDir: h.configDir, top: null, dryRun: false, machine: 'test-machine', upload: false });
+  assert.ok(existsSync(h.global('kiln-release')));
+  assert.equal(h.rows.length, 1, 'a skill kept by hand went up without the yes');
+  assert.equal(h.seen.filter((s) => s.method === 'create' || s.method === 'propose' || s.method === 'update').length, 0);
+  assert.equal(lines.at(-1), `One skill on ${thisMachine()} was not copied into your BrainDog, because it copies them only after you say yes. Run braindog skills sync to choose.`);
+  printed.push(...lines);
 });
 
 test('THE TOKEN WAS NEVER PRINTED by any sync, command or hook above', () => {

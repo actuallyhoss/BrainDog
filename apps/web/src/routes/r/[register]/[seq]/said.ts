@@ -111,6 +111,44 @@ export function sentenceOf(p: {
   }, []);
 }
 
+/**
+ * A KEY'S SENTENCE, IN PLACE OF A ROW'S (audit 31 Oct g, AG16): when it expires and whether its value is held, the two
+ * things a person opens a key to learn. "Stale, due in 12 days, added 12 hours ago." said neither. So it reads
+ * "Expires 15 Sep, in 12 days. Value held." or "No value yet.", the day red once it has passed and amber inside two
+ * weeks, and a key that holds no value is offered Add it beside the sentence (`keyHeld` says which).
+ *
+ * HELD IS WHAT THE KEYCHAIN READS (`keysOf`): the value field names a sealed grant, or says it is sealed. A key whose
+ * value is kept elsewhere (`where`) says where it is kept rather than that nothing is held.
+ */
+export function keySentence(fields: Readonly<Record<string, unknown>>, now: number): Piece[] {
+  const out: Piece[] = [];
+  const expires = typeof fields.expires === 'string' ? fields.expires.slice(0, 10) : '';
+  const days = daysTo(expires, now);
+  if (days !== null) {
+    const on = daySaid(expires, now);
+    const text =
+      days < 0 ? `Expired ${on}` : days === 0 ? `Expires today, ${on}` : days === 1 ? `Expires tomorrow, ${on}` : `Expires ${on}, in ${String(days)} days`;
+    out.push(days < 0 ? { kind: 'late', text, tone: 'bad' } : days <= 14 ? { kind: 'late', text, tone: 'warn' } : { kind: 'words', text });
+    out.push({ kind: 'words', text: '. ' });
+  }
+  /* "Kept in the studio password manager", the article lowered mid-sentence; a name keeps its capital. */
+  const where = typeof fields.where === 'string' ? fields.where.trim().replace(/^The /u, 'the ') : '';
+  out.push({ kind: 'words', text: keyHeld(fields) ? 'Value held.' : where !== '' ? `Kept in ${where}.` : 'No value yet.' });
+  return out.reduce<Piece[]>((all, piece) => {
+    const last = all.at(-1);
+    if (last?.kind === 'words' && piece.kind === 'words') all[all.length - 1] = { kind: 'words', text: last.text + piece.text };
+    else all.push(piece);
+    return all;
+  }, []);
+}
+
+/** Whether a key's row holds its value here: a sealed grant's id, or a known state that says it is sealed. */
+export function keyHeld(fields: Readonly<Record<string, unknown>>): boolean {
+  const v = fields.value;
+  if (typeof v === 'string') return v.trim() !== '';
+  return typeof v === 'object' && v !== null && (v as { sealed?: unknown }).sealed === true;
+}
+
 /** One day of a row's history: its heading ("Today", "Yesterday", "2 Sep") and its lines, newest first as they came. */
 export type Day<T> = { key: string; said: string; lines: T[] };
 

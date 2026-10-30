@@ -504,7 +504,8 @@
         /* A SCRIPT'S PAGE IS AUTOMATIONS' TOO (its Scripts tab), so it lights this row and its crumb reads "Agents ›
            Automations › <script>" where it was the title alone (audit 6g, AG30). */
         { href: '/automations', label: copy.automations, icon: 'refresh', home: placed.at.agents ?? IN_MORE, near: ['/scripts'] },
-        { href: '/keychain', label: copy.keysPlace, icon: 'vault', home: placed.at.agents ?? IN_MORE },
+        /* THE KEYS LIST IS THE KEYCHAIN'S TABLE VIEW (AG16), so the Keychain is lit there and on a key's own page too. */
+        { href: '/keychain', label: copy.keysPlace, icon: 'vault', home: placed.at.agents ?? IN_MORE, near: ['/r/credentials'] },
       ],
       foot,
       counted: holdsTasks ? { work: TASKS } : {},

@@ -10,6 +10,7 @@ test('THE EMPTY PALETTE OFFERS THREE QUESTIONS: asked with a model, else the she
   const opened = questionsOf(false);
   assert.deepEqual(opened.map((a) => a.href), ['/decide', '/p/agents', '/audit']);
   assert.ok(opened.every((a) => a.ask === null));
+  assert.deepEqual(opened.map((a) => a.title), ['Needs you', 'What your agents did', 'What changed'], 'with no model they still read as questions');
 });
 
 test('RECENT IS WHERE HE WENT, newest first, once each, and never the way in or Today', () => {

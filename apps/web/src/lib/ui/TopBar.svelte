@@ -60,7 +60,8 @@
        and ⌘J (Ctrl J off a Mac) opens straight into Ask, which is the key the hint names. -->
   {#if !searching}
     <button type="button" class="bar-ask tap" data-palette-from="bar" aria-keyshortcuts="/ Control+K Meta+K Control+J Meta+J" title={copy.searchKeys} onclick={() => onfind?.()}>
-      <Icon name="search" size="m" /><span class="bar-ask-words">{copy.palettePlaceholder}</span><span class="bar-ask-key" aria-hidden="true"><Kbd keys="⌘J" /></span>
+      <!-- WITH NO MODEL, "Search or go to…" and the search's own key (AG5): ⌘J opens Find there, so naming it promised an Ask. -->
+      <Icon name="search" size="m" /><span class="bar-ask-words">{page.data.slash === true ? copy.palettePlaceholder : copy.paletteFind}</span><span class="bar-ask-key" aria-hidden="true"><Kbd keys={page.data.slash === true ? '⌘J' : '⌘K'} /></span>
     </button>
   {/if}
 

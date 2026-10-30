@@ -99,10 +99,11 @@ export type Asked = { title: string; href: string | null; ask: string | null };
  * every record has whatever it installed: Needs you, Agents and the log. None names an add-on's place.
  */
 export const TODAY_QUESTIONS = [
-  { title: 'What needs me today?', href: '/decide' },
-  { title: 'What did my agents do today?', href: '/p/agents' },
-  { title: 'What changed today?', href: '/audit' },
+  { title: 'What needs me today?', href: '/decide', place: 'Needs you' },
+  { title: 'What did my agents do today?', href: '/p/agents', place: 'What your agents did' },
+  { title: 'What changed today?', href: '/audit', place: 'What changed' },
 ] as const;
 
+/* WITHOUT A MODEL EACH IS NAMED AS THE PLACE IT OPENS, never as a question nobody will answer (audit 31 Oct g, AG5). */
 export const questionsOf = (slash: boolean): Asked[] =>
-  TODAY_QUESTIONS.map((q) => (slash ? { title: q.title, href: null, ask: q.title } : { title: q.title, href: q.href, ask: null }));
+  TODAY_QUESTIONS.map((q) => (slash ? { title: q.title, href: null, ask: q.title } : { title: q.place, href: q.href, ask: null }));

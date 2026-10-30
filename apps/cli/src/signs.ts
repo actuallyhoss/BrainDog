@@ -126,7 +126,7 @@ function headline(signs: readonly SignRead[]): string {
 
 /**
  * What the signs say, a person's way: one line for the whole, then each sign with its word, its sentence, a few of its
- * facts, and how many of its last days it read red.
+ * facts, and how many of its last days it read red, when any did.
  */
 export function signLines(signs: readonly SignRead[]): string[] {
   if (signs.length === 0) return ['Your BrainDog has no signs to read yet.'];
@@ -136,7 +136,8 @@ export function signLines(signs: readonly SignRead[]): string[] {
     if (s.said !== '') out.push(`  ${closed(moneySaid(s.said))}`);
     for (const fact of s.facts.slice(0, FACTS_SHOWN)) out.push(`  ${closed(moneySaid(fact))}`);
     const reds = s.days.filter((d) => d === 'red').length;
-    if (s.days.length > 0) out.push(`  Red on ${String(reds)} of the last ${String(s.days.length)} ${s.days.length === 1 ? 'day' : 'days'}.`);
+    /* ONLY WHEN IT WAS RED AT ALL (AG34): "Red on 0 of the last 14 days." under every fine sign said nothing. */
+    if (reds > 0) out.push(`  Red on ${String(reds)} of the last ${String(s.days.length)} ${s.days.length === 1 ? 'day' : 'days'}.`);
   }
   return out;
 }

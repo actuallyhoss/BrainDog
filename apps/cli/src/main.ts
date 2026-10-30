@@ -315,8 +315,10 @@ const fullUsage = () =>
     "  Print the key as one header, {\"<Header>\":\"<value>\"}, for a program that reads it, such as Claude Code's headersHelper. It refuses to print to a terminal.",
     'braindog keys helper <credentials#n | label> [--keychain <project>] [--host <host>]',
     "  Print the key alone, for Claude Code's apiKeyHelper in a profile that runs on an API key. It refuses to print to a terminal, as keys headers does.",
-    'braindog skills sync [--host <host>] [--dry-run]',
-    "  Write your BrainDog's skills where Claude Code reads them, keep a local edit and propose it, and register a skill kept by hand.",
+    'braindog skills sync [--host <host>] [--dry-run] [--yes]',
+    "  Keep this machine's skills in step with a BrainDog you own: write its skills where Claude Code reads them, keep a local edit and propose it, and register a skill kept by hand. The first time, it says what it would copy each way and asks; the yes is kept, and from then on each session's start does the same. Nothing is copied before that yes.",
+    'braindog skills off [--host <host>]',
+    "  Take the yes back: no session copies this machine's skills or records its MCP servers for that BrainDog.",
     'braindog tools scan [--host <host>] [--dry-run]',
     '  Record the MCP servers in .mcp.json and ~/.claude.json. A key found there is deposited, and only its name is recorded.',
     'braindog tools write [--scope user|project] [--dry-run]',
@@ -521,7 +523,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['statusline', "Draw Claude Code's status line"],
     ['session <verb>', 'Read or change the run this folder is in'],
     ['context', 'Print the card: this run, the next step, what waits'],
-    ['skills sync', "Write your BrainDog's skills where Claude Code reads them"],
+    ['skills sync|off', "Keep this machine's skills in step with your BrainDog, after one yes"],
     ['tools scan|write', 'Record MCP servers, or show the entries to write'],
     ['token create', 'Mint a token for an agent'],
     ['runner <verb>', 'Run approved jobs on this machine'],
@@ -655,12 +657,23 @@ async function mcp(args: string[]): Promise<void> {
     };
     /* THE START WORK, ONCE THE FIRST `initialize` IS ANSWERED (`session-start.ts`): for an app with no start hook, once a
        day for this machine, folder and app, in the background and inside the hook's budget, its lines on stderr. */
-    const output = afterHello(process.stdout, () => void startFromServer({ io: { env: process.env }, to, where, agent, headers: () => hints(said), ms: hookBudget(process.env), say }));
+    /* A LINE THE START WORK HAS FOR THE AGENT (no yes to copy skills yet: `skills-consent.ts`) goes in the next tool
+       answer once, ahead of the line about a newer build, which then waits for the answer after. */
+    let told: string | null = null;
+    const output = afterHello(process.stdout, () =>
+      void startFromServer({ io: { env: process.env }, to, where, agent, headers: () => hints(said), ms: hookBudget(process.env), say, tell: (l) => void (told = l) }),
+    );
     /* CODEX SAYS NO SESSION ID, so its session's inbox file goes by the Codex process that started this server, which
        also starts its turn-end program (`codexSession`, `notifyHook`). */
     const session = agent === 'codex' && hostSessionOf(process.env) === null ? codexSession(process.ppid) : undefined;
     /* AN UPDATE UNDER THIS SESSION IS SAID ONCE in its next tool answer (`installed-build.ts`); a checkout says nothing. */
-    const installed = installedBuild() ? watchInstalled({ file: fileURLToPath(import.meta.url), mine: cliBuild() }) : undefined;
+    const newer = installedBuild() ? watchInstalled({ file: fileURLToPath(import.meta.url), mine: cliBuild() }) : undefined;
+    const installed = () => {
+      if (told === null) return newer?.() ?? null;
+      const line = told;
+      told = null;
+      return line;
+    };
     /* A STOP SIGNAL IS THE APP CLOSING THIS SERVER, AND THE RUN STILL ENDS. An app gives a server two seconds between
        closing its input and SIGTERM, and a closed window sends SIGHUP; the end waits up to `END_GRACE_MS` for the end
        hook and then asks the host, which did not fit, so a run that closed normally was killed before its end was sent

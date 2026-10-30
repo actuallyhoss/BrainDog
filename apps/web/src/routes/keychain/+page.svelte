@@ -48,6 +48,7 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import KeyViews from './KeyViews.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -730,6 +731,8 @@
 
 <PageHead icon="vault" title={copy.keychain} count={index.kind === 'held' ? keys.length : undefined} sentence={sentence?.text} needs={sentence?.needs}>
   {#snippet actions()}
+    <!-- ONE KEYS PLACE (AG16): the list of the same rows is this place's Table view. -->
+    <KeyViews on="keys" />
     <!-- ON A PHONE "Add a key" IS THE TOOLBAR'S CIRCLE: ink while it is the one thing to press, glass
          while a request waiting for its digits holds the screen's one primary. At a desk it is the list's own pill. -->
     {#if acts && index.kind === 'held'}

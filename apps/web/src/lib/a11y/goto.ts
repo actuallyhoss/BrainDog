@@ -77,5 +77,13 @@ export function hrefOf(rows: readonly GotoRow[], letter: string): string | undef
  */
 export function sayGoto(rows: readonly GotoRow[]): void {
   const row = BINDINGS.find((b) => b.id === 'goto');
-  if (row) Object.assign(row, chordOf(gotoOf(rows)));
+  if (row) Object.assign(row, chordOf(sheetOf(rows)));
+}
+
+/**
+ * WHAT THE SHEET NAMES: every letter, but Inbox only while the rail draws it (audit 31 Oct g, AG33). "g then i: Go to
+ * Inbox" led to a place the rail did not show, which reads as a mistake; `g i` still goes there for whoever learnt it.
+ */
+export function sheetOf(rows: readonly GotoRow[]): Goto[] {
+  return gotoOf(rows).filter((l) => l.href !== '/inbox' || rows.some((r) => r.href === '/inbox'));
 }

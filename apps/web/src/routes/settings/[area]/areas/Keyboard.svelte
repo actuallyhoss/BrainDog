@@ -30,6 +30,8 @@
   const MOST = [
     'palette',
     'palette-slash-key',
+    /* ⌘J, AS THE `?` SHEET LISTS IT (AG33): the most-used keys left out the one that asks. */
+    'palette-ask',
     'goto',
     'sidebar',
     'undo',

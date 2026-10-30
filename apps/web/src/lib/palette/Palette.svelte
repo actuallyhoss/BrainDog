@@ -157,6 +157,8 @@
     plain?: true | undefined;
     /** How many rows of one title this line stands for, past the first. */
     folded?: number | undefined;
+    /** The group a row was found in before it was drawn as the best match, so its count still says what it counts. */
+    from?: string | undefined;
     /** The group a "Show all" row opens. */
     more?: string | undefined;
     /** Set on a "what it is" row wearing its project's own mark, which a page's glyph never covers. */
@@ -732,6 +734,7 @@
 
   /** A space after a tag takes it out of the field as a chip; the words left are the field. */
   function oninput() {
+    moved = false;
     const read = plainRead;
     if (!read || !/\s$/u.test(q)) return;
     const out = read.chips.filter((c) => c.kind !== 'day');
@@ -739,6 +742,16 @@
     held = [...held, ...out];
     q = `${lineTokens(parsed.text, { decl: REGISTERS[plainLine!.register]!, now: Date.now() }, [...given, ...read.chips.filter((c) => c.kind === 'day').map((c) => c.words)]).text} `;
   }
+
+  /**
+   * A SENTENCE TYPED WITH NO MODEL BEHIND THE ASK (audit 31 Oct g, AG5): three words or a question mark, no prefix. It is
+   * told that asking needs a model, with the way to connect one, and Enter does not take the first loose hit for it.
+   */
+  const askless = $derived(!slashHere && parsed.prefix === null && asksFirst(parsed.text));
+  /** Whether the arrows or the pointer picked a row since the last keystroke, so Enter runs what was chosen. */
+  let moved = $state(false);
+  /** A row Enter does not run for a sentence with no model until it is picked: any but a command or the add line. */
+  const looseFor = (r: Row): boolean => askless && !moved && r.plain !== true && r.group !== copy.commands;
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
   const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
@@ -882,7 +895,9 @@
     const opening = convo.turns.find((t) => t.role === 'you')?.text;
     if (blank && opening !== undefined)
       out.push({ id: 'resume', title: threadWords.resume(opening), href: null, group: ASK_TODAY, icon: 'ask', resume: true });
-    if (blank)
+    /* ONLY WITH A MODEL BEHIND THE ASK (audit 31 Oct g, AG5): without one the three were questions nobody answers, and as
+       places they were Go to's own rows a second time ("Needs you" twice). */
+    if (blank && slashHere)
       for (const [i, asked] of questionsOf(slashHere).entries())
         out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: ASK_TODAY, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
     /* OPENED ON THIS DEVICE, SO TOLD BY THIS DEVICE'S CLOCK: the record's could be behind it, and said "in 8w". */
@@ -1206,6 +1221,22 @@
     opened = new Set();
   });
 
+  /** A row that is a person or an organisation, by the list its address opens. */
+  const isWho = (r: Row): boolean => r.href !== null && /^\/r\/(?:people|organisations)\/\d+(?:$|[?#])/u.test(r.href);
+
+  /**
+   * WHAT A FOLDED COUNT COUNTS, by the list the rows came from: "2 tools", never "2 times" (AG32). A heading that is no
+   * list's says the rows share a name.
+   */
+  const foldedSaid = (r: Row): string | undefined => {
+    if (!r.folded || r.folded < 2) return undefined;
+    const g = r.from ?? r.group;
+    const n = r.folded.toLocaleString('en-GB');
+    /* A LIST CALLED BY ITS PLURAL COUNTS IN IT ("2 tools"); one called otherwise is where they are ("3 in Ledger"). */
+    if (!REGISTER_NAMES.has(g)) return `${n} with this name`;
+    return /s$/u.test(g) ? `${n} ${g.toLowerCase()}` : `${n} in ${g}`;
+  };
+
   /** Rows that are a thing a person would name (a page, a list, a row, a person), never a command or a reading. */
   const named = (r: Row): boolean =>
     r.href !== null && r.group !== GO_TO && r.group !== RECENT && r.group !== FIGURES && r.group !== copy.commands && r.group !== copy.destinations && r.group !== '';
@@ -1215,12 +1246,19 @@
     /* THE THING MEANT FIRST (motion F13): a page, a list, a project or a person whose name is exactly what was typed
        comes before every row that only mentions it. "kiln" drew three ledger lines before the project. */
     const needle = parsed.text.trim().toLowerCase();
-    const best = needle === '' ? new Set<string>() : new Set(rows.filter((r) => named(r) && r.title.trim().toLowerCase() === needle).slice(0, 3).map((r) => r.id));
-    for (const r of rows) {
+    /* AND A PERSON OR AN ORGANISATION WHOSE NAME STARTS WITH THE WORDS LEADS IT (audit 31 Oct g, AG32): "fenwick" put a
+       tool called Fenwick over the organisation Fenwick Cloud. Who leads, then what is named exactly, three at most. */
+    const titled = (r: Row): string => r.title.trim().toLowerCase();
+    const leads = (r: Row): boolean => isWho(r) && (titled(r) === needle || titled(r).startsWith(`${needle} `));
+    const best =
+      needle === ''
+        ? new Set<string>()
+        : new Set([...rows.filter((r) => named(r) && leads(r)), ...rows.filter((r) => named(r) && !leads(r) && titled(r) === needle)].slice(0, 3).map((r) => r.id));
+    for (const r of [...rows].sort((a, b) => Number(best.has(b.id) && leads(b)) - Number(best.has(a.id) && leads(a)))) {
       if (r.id === 'all' || r.id === 'slash') continue;
       const group = best.has(r.id) ? BEST : r.group;
       if (!out.has(group)) out.set(group, []);
-      out.get(group)!.push(group === r.group ? r : { ...r, group });
+      out.get(group)!.push(group === r.group ? r : { ...r, group, from: r.group });
     }
     /* IDENTICAL TITLES IN ONE GROUP ARE ONE LINE WITH A COUNT, which opens the search for that title: three
        "KILN STOREFRONT PAYOUT" lines said nothing the one does not. Then each group shows six, and a row to show all. */
@@ -1552,9 +1590,11 @@
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      moved = true;
       cursor = Math.min(cursor + 1, flat.length - 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      moved = true;
       cursor = Math.max(cursor - 1, 0);
     } else if (e.key === 'Backspace' && held.length > 0 && input?.selectionStart === 0 && input.selectionEnd === 0) {
       /* BACKSPACE AT THE START OF THE FIELD GIVES THE LAST CHIP BACK AS WORDS, which then stay words. */
@@ -1565,7 +1605,11 @@
       q = untoken(q, last);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      run(flat[cursor]);
+      /* A SENTENCE WITH NO MODEL BEHIND IT NEVER JUMPS TO A LOOSE HIT (AG5): "add a task to call Ada on Friday" opened Ada
+         Vine's page and added nothing. A row picked with the arrows, a command, or the line that adds what was typed still runs. */
+      const top = flat[cursor];
+      if (top !== undefined && looseFor(top)) return;
+      run(top);
     } else if (e.key === 'Tab' && !e.shiftKey) {
       /**
        * `⇥` COMPLETES THE QUERY, AND IT USED TO SWALLOW `⇧⇥` AS WELL.
@@ -1659,7 +1703,7 @@
         aria-controls="palette-list"
         aria-activedescendant={activeId}
         aria-label={copy.paletteLabel}
-        placeholder={copy.palettePlaceholder}
+        placeholder={slashHere ? copy.palettePlaceholder : copy.paletteFind}
         spellcheck="false"
         autocomplete="off"
       />
@@ -1718,6 +1762,7 @@
   <div class="p-body">
     <!-- LOOKING, AT ONCE: the same frame as the keystroke, where the first answer will land, and gone when it does. -->
     {#if pending}<p class="p-looking" role="status">{copy.looking}</p>{/if}
+    {#if askless && flat.length > 0}<p class="p-needs">{copy.askNeedsModel} <a class="tap" href={at('/settings/agents')} onclick={() => (open = false)}>{copy.askConnect}</a>.</p>{/if}
     <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending}>
       {#if askRow && askLeads}{@render result(askRow)}{/if}
       {#each groups as [group, items]}
@@ -1737,7 +1782,11 @@
            not disabled (23 §8). This record has no model, so this is what you get.
 
            OUTSIDE THE LISTBOX, because it is a sentence about the list rather than a row in it. -->
-      <p class="p-none">{hits?.fix ?? `${copy.noMatches} “${q}”`}</p>
+      {#if askless && !hits?.fix}
+        <p class="p-none">{copy.askNeedsModel} <a class="tap" href={at('/settings/agents')} onclick={() => (open = false)}>{copy.askConnect}</a>.</p>
+      {:else}
+        <p class="p-none">{hits?.fix ?? `${copy.noMatches} “${q}”`}</p>
+      {/if}
     {/if}
   </div>
   {/if}
@@ -1786,13 +1835,13 @@
     class="p-row"
     role="option"
     id={optionId(row.id)}
-    aria-selected={index === cursor}
+    aria-selected={index === cursor && !looseFor(row)}
     tabindex={-1}
-    data-cursor={index === cursor ? '' : undefined}
-    onmouseenter={() => (cursor = index)}
+    data-cursor={index === cursor && !looseFor(row) ? '' : undefined}
+    onmouseenter={() => ((cursor = index), (moved = true))}
     onclick={() => run(row)}
   >
-    <Result icon={row.more !== undefined ? undefined : row.icon} title={row.more !== undefined ? row.title : readable(row.title)} line={lineOf(row)} value={figureOf(row.value)} tone={row.tone} status={row.tone === 'bad' || row.tone === 'warn' ? row.detail : undefined} folded={row.folded} more={row.more !== undefined} />
+    <Result icon={row.more !== undefined ? undefined : row.icon} title={row.more !== undefined ? row.title : readable(row.title)} line={lineOf(row)} value={figureOf(row.value)} tone={row.tone} status={row.tone === 'bad' || row.tone === 'warn' ? row.detail : undefined} folded={row.folded} foldedSaid={foldedSaid(row)} more={row.more !== undefined} />
     <!-- THE KEY CAP HINT, ON THE CURSOR ROW ONLY (the design system: "the cursor row is wash plus a key cap hint"): the row's own
          binding when it has one, so the slow path teaches the fast one, and `↵`, which is what runs it now. Drawn only at
          desktop width with a fine pointer (the style block says when), and `aria-hidden` so no key is read out as part of
@@ -2149,6 +2198,13 @@
   .p-none {
     margin: 0;
     padding: var(--sp-5) var(--sp-3);
+    color: var(--ink-3);
+  }
+
+  /* ASKING NEEDS A MODEL, over the hits a sentence also matched: one quiet line, its link the way on. */
+  .p-needs {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-3) 0;
     color: var(--ink-3);
   }
 

@@ -63,7 +63,7 @@ test('THE THREE TOOLS LIST WHAT AN ANSWER ON HIS WORD SENDS', async () => {
   for (const k of ['answer', 'option', 'said']) assert.ok(props('instructions').includes(k), `instructions lists no ${k}`);
   assert.ok(props('create').includes('said'));
   assert.ok(props('update').includes('said'));
-  assert.match(tools.find((t) => t.name === 'instructions')!.description, /\{answer:"SG9",option,said\} decides on their word/u);
+  assert.match(tools.find((t) => t.name === 'instructions')!.description, /answer SG9 with option and said decides on their word/u);
   sql.close();
 });
 

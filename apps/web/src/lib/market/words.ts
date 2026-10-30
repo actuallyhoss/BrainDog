@@ -51,6 +51,7 @@ export const words = {
     on: (version: string): string => `On · ${version}`,
     off: (version: string): string => `Off · ${version}`,
     updateTo: (version: string): string => `Update to ${version}`,
+    open: (name: string): string => `Open ${name}`,
   },
   all: 'All',
   categoriesLabel: 'Kinds of add-on',

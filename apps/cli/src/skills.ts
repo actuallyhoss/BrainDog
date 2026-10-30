@@ -38,6 +38,7 @@ import { refused, type Result } from '@braindog/ports';
 import { unbom } from './unbom.ts';
 import { clip } from './clip.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
+import { allowSkills, askAtTerminal, refuseSkills, skillsAllowed } from './skills-consent.ts';
 import { refuse, type Answering } from './json.ts';
 import { decideLink } from './links.ts';
 import { git } from './position.ts';
@@ -415,7 +416,18 @@ export type SkillSync = {
    * record's, so a file of its name here is never registered as a new one; it is only not written or updated.
    */
   leave?: ReadonlySet<string> | undefined;
+  /**
+   * Whether anything of this machine's may go up: a skill kept by hand registered, a local edit proposed, a description
+   * read back from a file. `false` writes the record's skills down and sends nothing, and says once how many were held
+   * back. True when absent, for `braindog skills sync` after its yes (`skills-consent.ts`).
+   */
+  upload?: boolean | undefined;
+  /** Filled with the names of what was (or, in a dry run, would be) copied each way, for the question before a yes. */
+  tally?: Tally | undefined;
 };
+
+/** What a sync copied, or would copy, by skill name: up into the record, edits proposed, down into a folder, deleted. */
+export type Tally = { up: string[]; edits: string[]; down: string[]; gone: string[] };
 
 type Got = { kind: Kind; text: string; managed: boolean; state: string | null; name: unknown };
 
@@ -445,6 +457,8 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
   }
 
   const lines: string[] = [];
+  /* What this machine holds that a sync with no yes kept back: skills kept by hand, and edits made here. */
+  let keptBack = 0;
   const machine = s.machine ?? hostname();
   const projectBase = s.top !== null && s.context.project !== null ? join(s.top, '.claude') : null;
   const bases = [s.configDir, ...(projectBase === null ? [] : [projectBase])];
@@ -513,6 +527,8 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     if (path === undefined) return null;
     const described = describedAs(readFileSync(path, 'utf8'));
     if (described === undefined) return null;
+    /* A FILE'S WORDS GO UP ONLY AFTER THE YES, as a skill kept by hand does. */
+    if (s.upload === false) return null;
     if (s.dryRun) {
       lines.push(`Skill ${name} would take its description from ${where(path)} again.`);
       return { trigger: described, version: row.version };
@@ -673,6 +689,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           const got = await fetchRow(row.spoken, name, trigger);
           if (got === null || !got.managed) continue;
           if (!write(path, got.text, row.spoken, rev)) continue;
+          s.tally?.down.push(name);
           tell(`Skill ${name} updated to version ${String(rev)} in ${where(path)}.`, `Skill ${name} would be updated to version ${String(rev)} in ${where(path)}.`);
           continue;
         }
@@ -685,6 +702,11 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           continue;
         }
         const both = rev > entry.version;
+        if (s.upload === false) {
+          keptBack++;
+          continue;
+        }
+        s.tally?.edits.push(name);
         if (s.dryRun) {
           lines.push(`Skill ${name} was edited in ${where(path)}; it would be kept and proposed as version ${String(rev + 1)}.`);
           continue;
@@ -722,6 +744,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           continue;
         }
         if (!write(path, got.text, row.spoken, rev)) continue;
+        s.tally?.down.push(name);
         tell(`Skill ${name} written to ${where(path)}.`, `Skill ${name} would be written to ${where(path)}.`);
         continue;
       }
@@ -732,6 +755,11 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         continue;
       }
       if (lock[path]?.proposed_sha === now) continue;
+      if (s.upload === false) {
+        keptBack++;
+        continue;
+      }
+      s.tally?.edits.push(name);
       if (s.dryRun) {
         lines.push(`Skill ${name} in ${where(path)} differs from your BrainDog; it would be kept and proposed as version ${String(rev + 1)}.`);
         continue;
@@ -767,6 +795,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
             }
           delete lock[path];
         }
+        s.tally?.gone.push(name);
         tell(`Skill ${name} was retired, so ${where(path)} was deleted.`, `Skill ${name} was retired, so ${where(path)} would be deleted.`);
       } else if (entry.proposed_sha !== now) {
         if (!s.dryRun) lock[path] = { ...entry, proposed_sha: now };
@@ -794,6 +823,11 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           lines.push(`Skill ${file.name} in ${where(file.path)} was not registered, because not every skill in your BrainDog could be read.`);
           continue;
         }
+        if (s.upload === false) {
+          keptBack++;
+          continue;
+        }
+        s.tally?.up.push(file.name);
         if (s.dryRun) {
           lines.push(`Skill ${file.name} in ${where(file.path)} would be registered as index only.`);
           continue;
@@ -812,6 +846,10 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         lines.push(`Skill ${file.name} in ${where(file.path)} was registered as ${spoken}, index only.`);
       }
     }
+    if (keptBack > 0)
+      lines.push(
+        `${keptBack === 1 ? 'One skill' : `${String(keptBack)} skills`} on ${thisMachine()} ${keptBack === 1 ? 'was' : 'were'} not copied into your BrainDog, because it copies them only after you say yes. Run braindog skills sync to choose.`,
+      );
   } catch (e) {
     if (!(e instanceof Stopped)) throw e;
     lines.push('BrainDog stopped answering part way, so the rest of the skills wait for the next sync.');
@@ -833,17 +871,71 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
   return lines;
 }
 
-const USAGE = 'braindog skills takes sync, --host and --dry-run, and nothing else.';
+const USAGE = 'braindog skills takes sync (with --host, --dry-run or --yes) or off (with --host), and nothing else.';
 
-/** `braindog skills sync [--host <host>] [--dry-run]`, and the exit code. */
-export async function skills(args: string[], io: AgentIo): Promise<number> {
+/** `a, b and c`, the first `most` by name and how many more. */
+const named = (names: readonly string[], most = 5): string => {
+  const shown = names.slice(0, most);
+  const more = names.length - shown.length;
+  const parts = more > 0 ? [...shown, `${String(more)} more`] : shown;
+  return parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
+};
+
+const skillsWord = (n: number): string => (n === 1 ? 'one skill' : `${String(n)} skills`);
+
+/**
+ * What a first sync would copy each way, as the lines said before the question: by count, and the first few by name.
+ * The tools line only where the record keeps tools, since the yes also lets each session's start record them.
+ */
+export function copyLines(t: Tally, where: { record: string; folder: string; tools: boolean }): string[] {
+  const out: string[] = [];
+  if (t.up.length > 0) out.push(`- It copies ${skillsWord(t.up.length)} from ${thisMachine()} into ${where.record}, each with its whole text: ${named(t.up)}.`);
+  if (t.edits.length > 0) out.push(`- It suggests ${t.edits.length === 1 ? 'one edit' : `${String(t.edits.length)} edits`} made here as new versions, for you to accept on Needs you: ${named(t.edits)}.`);
+  if (t.down.length > 0) out.push(`- It writes ${skillsWord(t.down.length)} from ${where.record} into ${where.folder}: ${named(t.down)}.`);
+  if (t.gone.length > 0) out.push(`- It deletes ${skillsWord(t.gone.length)} retired in ${where.record} from ${where.folder}: ${named(t.gone)}.`);
+  if (out.length === 0) out.push('- Right now there is nothing to copy either way.');
+  out.push(
+    `- After a yes, each session's start keeps them in step${where.tools ? `, and records the MCP servers ${thisMachine()} runs (a key found in one goes to your Keychain)` : ''}.`,
+  );
+  return out;
+}
+
+/** What `skills` needs past `AgentIo`: how it asks, which a test holds and a terminal answers (`askAtTerminal`). */
+export type SkillsIo = AgentIo & { ask?: ((question: string) => Promise<boolean | null>) | undefined };
+
+/**
+ * `braindog skills sync [--host <host>] [--dry-run] [--yes]` and `braindog skills off [--host <host>]`, and the exit code.
+ *
+ * THE FIRST SYNC ASKS (`skills-consent.ts`). Only the owner of a BrainDog may keep this machine's skills in it, so the
+ * command reads `whoami` first; then it says what it would copy each way, from a dry run, and asks once at the
+ * terminal. The yes is kept for that host, and from then on this command and each session's start sync without
+ * asking. `--yes` is the yes typed ahead, for a script; off a terminal without it nothing is copied. `off` takes the
+ * yes back.
+ */
+export async function skills(args: string[], io: SkillsIo): Promise<number> {
   const [verb, ...rest] = args;
-  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined };
+  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; yes?: boolean | undefined };
   try {
-    ({ values } = parseArgs({ args: rest, strict: true, options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' } } }));
+    ({ values } = parseArgs({ args: rest, strict: true, options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' }, yes: { type: 'boolean' } } }));
   } catch {
     io.say(USAGE);
     return 1;
+  }
+  if (verb === 'off') {
+    if (values['dry-run'] === true || values.yes === true) {
+      io.say(USAGE);
+      return 1;
+    }
+    let to: Target;
+    try {
+      to = target(values.host, io.env, hostsPath(io.env));
+    } catch (e) {
+      io.say(e instanceof Error ? e.message : 'No BrainDog host could be read.');
+      return 1;
+    }
+    refuseSkills(io.home, to.key);
+    io.out(`BrainDog will leave ${thisMachine()}'s skills alone for ${to.key}: no session copies them either way. Run braindog skills sync to turn it back on.`);
+    return 0;
   }
   if (verb !== 'sync') {
     io.say(USAGE);
@@ -856,7 +948,38 @@ export async function skills(args: string[], io: AgentIo): Promise<number> {
     return 0;
   }
   const dryRun = values['dry-run'] === true;
-  const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: io.env.CLAUDE_CONFIG_DIR || join(io.home, '.claude'), top: at.top, dryRun, until: Infinity, to: at.to });
+  const configDir = io.env.CLAUDE_CONFIG_DIR || join(io.home, '.claude');
+  const base = { client: at.client, context: at.context, home: io.home, configDir, top: at.top, until: Infinity, to: at.to };
+  if (!dryRun && !skillsAllowed(io.home, at.to.key)) {
+    /* ONLY INTO A BRAINDOG OF YOUR OWN: a member's copy of somebody else's, or a token held to less, is never handed this
+       machine's skills, and its skills are not written here either. */
+    const me = await at.client.whoami();
+    const level = me.ok && isObject(me.value) ? me.value.level : null;
+    if (level !== 'owner') {
+      io.say(
+        me.ok
+          ? `${at.to.key} is not a BrainDog you own, so nothing was copied either way. Skills are kept in step only with your own.`
+          : `${at.to.key} did not say whose BrainDog it is, so nothing was copied either way.`,
+      );
+      return 1;
+    }
+    const tally: Tally = { up: [], edits: [], down: [], gone: [] };
+    await syncSkills({ ...base, dryRun: true, tally });
+    io.out(`Before BrainDog keeps ${thisMachine()}'s skills in step with ${at.to.key}, this is what it would do now:`);
+    for (const line of copyLines(tally, { record: 'your BrainDog', folder: configDir, tools: at.context.registers.some((r) => r.id === 'tools') })) io.out(line);
+    const yes = values.yes === true ? true : await (io.ask ?? askAtTerminal)('Keep your skills in step with your BrainDog? [y/N] ');
+    if (yes === null) {
+      io.say('Nothing was copied, because there is no terminal to ask in. Run braindog skills sync in a terminal, or add --yes to say yes.');
+      return 1;
+    }
+    if (!yes) {
+      refuseSkills(io.home, at.to.key);
+      io.out('Nothing was copied either way, and sessions will leave your skills alone. Run braindog skills sync again to change that.');
+      return 0;
+    }
+    allowSkills(io.home, at.to.key);
+  }
+  const lines = await syncSkills({ ...base, dryRun });
   for (const line of lines) io.out(line);
   if (lines.length === 0) io.out('Skills are in sync.');
   if (dryRun) io.out('That was a dry run, so nothing was written, sent or proposed.');

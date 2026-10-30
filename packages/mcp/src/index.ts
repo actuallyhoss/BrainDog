@@ -473,7 +473,7 @@ export const TOOLS: readonly Tool[] = [
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
     /* AND ONE LIST'S FIELDS, WHICH WAS `schema` (agents and MCP plan §6.1, 12a): a tool of its own for one argument, folded
        here and still callable by its old name until `FOLDED_UNTIL`. */
-    description: 'Registers with entry counts, and figures; register: its fields.',
+    description: 'Lists with item counts, and figures; register: its fields.',
     input: obj({ register: { type: 'string' } }),
     writes: false,
   },
@@ -491,7 +491,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND `topic`, WHAT THE PERSON IS WORKING ON, which an agent with no folder says on its first call (Claude.ai,
        ChatGPT, any remote client): with no repository, remote or folder it is the one thing that places its run, in the
        project of that name or the first one formed from it. An agent that sends none is asked for it in the answer. */
-    input: obj({ task: str('Whole, with its version.'), project: { type: 'string' }, topic: str('No folder: what they work on') }),
+    input: obj({ task: str('Read whole, like tasks#41.'), project: { type: 'string' }, topic: str('With no folder, what they work on.') }),
     quiet: ['depth', 'since'],
     writes: false,
   },
@@ -502,7 +502,7 @@ export const TOOLS: readonly Tool[] = [
        The three calls are the examples, because an agent copies an example before it reads a sentence. */
     /* AND AN SG HE TOLD YOU TO ANSWER, with `option` and his words in `said` (`wordAnswer`, the owner's decision of 27
        October): the one example that says it, paid for out of the budget's last tokens. */
-    description: '{} reads what the person told you, {take:"IN4"} takes, {reply:"IN4",said,state} answers, {answer:"SG9",option,said} decides on their word.',
+    description: 'What the person told you. Empty reads it; take IN4 starts it; reply IN4 with said and state answers it; answer SG9 with option and said decides on their word.',
     /* AND `answer` ALONE, A QUESTION HIS ORDER NAMED, given as he said: the line he sent says the call. */
     input: obj({
       take: { type: 'string' },
@@ -530,7 +530,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND BY ITS NAME, AND WITH ITS HISTORY (§6.1): "Kiln" answers the one thing called that, and several are
        refused `NAME_AMBIGUOUS` with their handles; `history: true` folds in what was `history`, still callable by its old
        name until `FOLDED_UNTIL`. */
-    description: 'One entry or figure. Two currencies are never added.',
+    description: 'One item or figure. Two currencies are never added.',
     input: obj(
       /* SHORTER BY TEN TOKENS FOR `handoff`'s take and drop: "from record_index" is what that tool's own
          description says of its figures, and a ref field's value is a row id by what it is. */
@@ -544,14 +544,13 @@ export const TOOLS: readonly Tool[] = [
     title: 'Browse entries',
     /* "NARROWED BY A PREDICATE. THE PREDICATE IS A TREE" SAID "PREDICATE" TWICE; saying it once paid for most of
        `fields` below. The list measured 2,720 before `fields` and 2,751 after, of the 2,760 `budget.test.ts` holds. */
-    description:
-      'Rows of one register, newest first. where filters: {"field":"state","is":"open"}.',
+    description: 'Items of one list, like tasks, newest first.',
     input: obj(
       {
         register: { type: 'string' },
         /* "A PREDICATE TREE" WAS SAID HERE AND IN THE DESCRIPTION ABOVE, which a client shows in the same breath. The
            five tokens it cost went to `propose`'s `from_version`. */
-        where: { type: 'object' },
+        where: { type: 'object', description: 'Filters, like {"field":"state","is":"open"}.' },
         /* THE RECORD'S OWN TWO NUMBERS WERE "1 to 200. Default 25.", which was neither: `kernel.list` answers 50 when
            asked for none and up to 500 (`packages/kernel/src/index.ts`), and this tool forwarded `limit` untouched.
            The default became 20 and true, because the `list` below sends 20 when the call names no limit.
@@ -576,7 +575,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'search',
     title: 'Search everything',
-    description: 'Rows matching your words, each a prefix, in every register.',
+    description: 'Items matching your words, each a prefix, in every list.',
     /* AND 100, NOT THE 50 THIS SAID, for `list`'s reason one tool up. `ftsSearch` is
        `Math.min(Math.max(1, opts.limit ?? 20), 100)` (`packages/kernel/src/fts.ts:116`). Measured over
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
@@ -649,7 +648,7 @@ export const TOOLS: readonly Tool[] = [
         body: {
           type: 'object',
           description:
-            'options: {"options":[{id,label,because,patches}]}, two or more; patches like rowset. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"x","type":"url"}]}}}, or a whole declaration with from_version. Others, automations too: braindog:grammar/proposals.',
+            'options: {"options":[{id,label,because,patches}]}, two or more; patches like rowset. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[...]}}}, or a whole declaration with from_version. Others, automations too: braindog:grammar/proposals.',
         },
         cause: str('A short key, so it is asked once.'),
         again: str('What changed since they answered.'),
@@ -663,7 +662,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'create',
     title: 'Add something',
-    description: 'Add an entry; answers its number.',
+    description: 'Add an item; answers its number.',
     /* MONEY IS SAID WHERE IT IS WRITTEN. The instructions carried it as their second rule, read on every call; it
        matters on the two calls that write a value, and a brief answer now says every amount as a person reads it. */
     input: obj(
@@ -695,7 +694,7 @@ export const TOOLS: readonly Tool[] = [
        AND DELETING IS SAID, because nothing told an agent how. Other records hand their agents a
        delete tool; here it is `deleted_at` through the same verb and the same permission, and an
        agent had no way to find that out. */
-    description: 'Change an entry; on VERSION_STALE, re-apply to current.',
+    description: 'Change an item; on VERSION_STALE, re-apply to current.',
     input: obj(
       {
         spoken: str('As get takes it.'),
@@ -717,7 +716,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND A PAGE DRAWN ON IT: a visual changes no value, as a note changes none, so it rides on `log`
        rather than an eighteenth tool the list has no tokens for. `note` is then its title, and a page sent again under
        the same title is its next version. */
-    description: 'Note an entry; page: HTML drawn on it.',
+    description: 'Note an item; page: HTML drawn on it.',
     /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL. It needed a row, so an agent first
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
@@ -739,7 +738,7 @@ export const TOOLS: readonly Tool[] = [
        read on every call of every tool. Each field's own rule stays beside the field. */
     /* TAKE AND DROP ARE A CALL OF THEIR OWN, on a step another run left: `take` picks it up, and the second of
        two sessions racing for it is told in the record's words who has it; `drop` closes one that is no longer true. */
-    description: "Keep your run's step true: doing once you know it, next before you stop, dead ends in tried. task starts one, done closes it. take or drop a run's step alone, drop with why.",
+    description: "Keep your step true: doing once you know it, next before you stop, dead ends in tried. task starts one, done closes it. take or drop another run's step, drop with why.",
     input: obj({
       next: str('One step.'),
       tried: { type: 'string' },
@@ -778,7 +777,7 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation; a bare name is only noted. Say where honestly: mail, commits and the web are not believed alone; what you saw yourself is session in <repo>.',
+      'A person or organisation; a name alone is only noted. Say where honestly: mail, commits and the web are not believed alone; your own run is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
@@ -786,8 +785,8 @@ export const TOOLS: readonly Tool[] = [
         email: str('Only as seen.'),
         handle: { type: 'string' },
         keys: { type: 'array', items: { type: 'string' } },
-        org: { type: 'string' },
-        domain: { type: 'string' },
+        org: str('Who they work for.'),
+        domain: str('Like kiln.example.'),
         role: { type: 'string' },
         where: { type: 'string' },
       },
@@ -805,7 +804,7 @@ export const TOOLS: readonly Tool[] = [
        `ignore` says nothing beside its name, because "or set it aside" in the description already has.
        AND ITS ARGUMENTS SAY LESS. The seven are the record's, and the two that only go with `back` and the note that only
        goes with `register` are named and left to the record's sentence, which says when each is taken. */
-    description: 'File an inbox arrival as an entry, or set it aside.',
+    description: 'File an inbox arrival as an item, or set it aside.',
     input: obj(
       {
         arrival: str('Its id in braindog:inbox.'),
@@ -932,7 +931,7 @@ const parse = (spoken: unknown): { register: string; seq: number } | null => {
   return m ? { register: m[1]!, seq: Number(m[2]) } : null;
 };
 
-const ROW_OR_ID = 'A row is addressed as register#number, like tasks#41, or by its prefixed id, like S42.';
+const ROW_OR_ID = 'Name an item by its list and number, like tasks#41, or by its own id, like S42.';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 

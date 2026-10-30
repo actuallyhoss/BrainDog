@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { answersIn, declarationsOf, savedSaid, takesHoldSaid } from './takes-hold.ts';
+import { answersIn, declarationsOf, savedSaid, savingNote, takesHoldSaid, targetSaid, targetsIn } from './takes-hold.ts';
 
 /** A made-up kiln add-on as its file writes it: a figure reads `most_open` when drawn, a page fills `heading`. */
 const KILN = [
@@ -67,4 +67,16 @@ test("BrainDog's own use case is read from this build: a setting its pages fill 
 
 test('an add-on from the catalogue with no version held has no file to read', async () => {
   assert.equal(await declarationsOf('sample-kiln', null, false), null);
+});
+
+test('A LIMIT SAYS WHAT IT HOLDS: the figure that names it, by its name, and empty is no limit (AG29)', () => {
+  const decls = [
+    { metric: 'lapsing', name: 'Lapsing', source: 'register.services', target: { setting: 'most_lapsing' } },
+    { body: { metric: 'renews-30d', name: 'Renews in 30 days', target: { setting: 'most_renewing_30d' } } },
+    { metric: 'held', name: 'Services', target: { gte: 0 } },
+  ];
+  assert.deepEqual(targetsIn(decls, ['most_lapsing', 'most_renewing_30d', 'most_a_year']), { most_lapsing: 'Lapsing', most_renewing_30d: 'Renews in 30 days' });
+  assert.equal(targetSaid('Lapsing'), 'Lapsing is marked as over once it goes past this. Leave it empty for no limit.');
+  assert.equal(savingNote('Held to this as soon as it is saved.'), true);
+  assert.equal(savingNote('Paid on the first of the month.'), false);
 });

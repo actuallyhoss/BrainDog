@@ -82,6 +82,9 @@ test('THE SIGNS ARE SAID BY NAME, each state with a word and never a colour alon
   }
   assert.deepEqual(signLines(readSigns([SIGNS[3]])), ['The one sign is fine.', '', 'Oldest question: Fine', '  The oldest open question is 6 days old.']);
   assert.deepEqual(signLines([]), ['Your BrainDog has no signs to read yet.']);
+  /* A SIGN THAT WAS NEVER RED SAYS NOTHING OF ITS DAYS (AG34), where every fine sign said "Red on 0 of the last 14 days." */
+  const calm = signLines(readSigns([{ ...SIGNS[3], days: Array.from({ length: 14 }, () => 'green') }]));
+  assert.ok(!calm.some((l) => /Red on/u.test(l)), calm.join('\n'));
 });
 
 test('A SIGN NOT READ YET IS NEVER COUNTED AS FINE: none read says so, and some unread are counted apart from the fine', () => {

@@ -41,10 +41,11 @@
   import Tile from '$lib/ui/Tile.svelte';
   import ShipsWidgets from '$lib/board/ShipsWidgets.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
+  import { homeCurrency } from '$lib/record/api.ts';
   import { currencyOptions } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
   import { heldNames, holdName, waitingIn, waitingLine } from './waiting.ts';
-  import { answersIn, declarationsOf, holdsFoot, savedSaid, type TakesHold } from './takes-hold.ts';
+  import { answersIn, declarationsOf, holdsFoot, savedSaid, savingNote, targetSaid, targetsIn, type TakesHold } from './takes-hold.ts';
   import { foldOf, sharedNotes } from './fold.ts';
   import { KEEP_RATES_ASK, ratesFeedOf, ratesKept } from './rates-switch.ts';
   import { goto } from '$app/navigation';
@@ -103,8 +104,14 @@
   import { recordToday } from '$lib/record/zone.ts';
 
   const pack = $derived(firstPartyModules().find((p) => p.id === id));
+  /* AN ADD-ON FROM THE STORE IS NO MODULE OF THIS BUILD (audit 31 Oct g, AG2): its name, what it is for and what it
+     brings are its listing's, the one the store drew it from, so its page was "What it is for" over nothing. */
+  const listing = $derived(pack || !found || found.listing.installedId !== id ? null : found.listing);
   /* A use case's pack by its use case, never `usecase-founder`. */
-  const name = $derived(pack?.name ?? moduleName(id));
+  const name = $derived(pack?.name ?? listing?.title ?? moduleName(id));
+  const blurb = $derived(pack?.blurb ?? listing?.summary ?? '');
+  /* THE CURRENCY THE RECORD'S MONEY IS IN, read as Settings > Words and money reads it, for a home currency not saved. */
+  const moneyIn = $derived(((page.data.index as { currency?: string | null } | undefined)?.currency || homeCurrency() || '').toUpperCase());
 
   let from = $state<'reading' | 'ready' | 'refused'>('reading');
   let refusal = $state('');
@@ -219,11 +226,14 @@
    * and the form says the general rule once instead of guessing per setting.
    */
   let holds = $state<Record<string, TakesHold> | null | undefined>(undefined);
+  /* THE FIGURE EACH LIMIT HOLDS, from the same file (`targetsIn`), so its box says what it does. */
+  let targets = $state<Record<string, string>>({});
   async function readHolds(s: PackConfig, want: string) {
     const firstParty = firstPartyModules().some((m) => m.id === want);
     const declarations = await declarationsOf(want, s.version, firstParty).catch(() => null);
     if (id !== want) return;
     holds = declarations === null ? null : answersIn(declarations, Object.keys(s.config));
+    targets = declarations === null ? {} : targetsIn(declarations, Object.keys(s.config));
   }
 
   /* ── on or off ─────────────────────────────────────────────────────────── */
@@ -241,6 +251,30 @@
   );  let turning = $state(false);
   /** The record's sentence when it refused the switch; the cascade that answers a dependent is offered on /packs. */
   let turnSaid = $state('');
+
+  /**
+   * UNINSTALL, ON THE ADD-ON'S OWN PAGE TOO, for every add-on that is not part of BrainDog. The record keeps every row
+   * and, for thirty days, its settings and schedules (`uninstallPack`), exactly as for a built-in one, and the list of
+   * add-ons it goes back to offers Put back under Removed.
+   */
+  let removing = $state(false);
+  async function uninstall() {
+    const s = source;
+    if (!s || removing || core) return;
+    removing = true;
+    turnSaid = '';
+    try {
+      const out = await s.uninstall(id);
+      if (!out.ok) {
+        turnSaid = out.refusal.fix;
+        return;
+      }
+      toasts.push(copy.uninstalled(name), { intent: 'good' });
+      void goto(at('/settings/addons'));
+    } finally {
+      removing = false;
+    }
+  }
 
   /** The rates add-on this record holds, for the "Keep rates current" switch; `null` until one is set up. */
   let feed = $state<PackState | null>(null);
@@ -370,7 +404,17 @@
      empty boxes, each with the same two lines under it. */
   const fold = $derived(foldOf(entries, settings?.values ?? {}));
   let unfoldedMore = $state(false);
-  const shared = $derived(sharedNotes(entries));
+  /* SAVING IS SAID ONCE, AT THE FOOT: a note that only says a setting holds once saved is not said again over it. */
+  const shared = $derived(sharedNotes(entries).filter((n) => !(foot && savingNote(n))));
+  /** The line under one setting: what the limit does when a figure names it, else its own note unless the foot says it. */
+  const noteOf = (key: string, decl: ConfigDecl): string | null => {
+    if (targets[key]) return targetSaid(targets[key]);
+    if (!decl.note || sharedNotes(entries).includes(decl.note)) return null;
+    return foot && savingNote(decl.note) ? null : decl.note;
+  };
+  /** What an empty limit's box shows: its default when it has one, else that it holds none. */
+  const emptySaid = (key: string, decl: ConfigDecl): string | undefined =>
+    decl.default !== undefined && decl.default !== null && typeof decl.default !== 'object' ? String(decl.default) : targets[key] ? words.noLimit : undefined;
   const foot = $derived(holdsFoot(holds ?? null, Object.fromEntries(entries.map(([k, d]) => [k, labelOf(k, d)])), name));
   /** Drawn: not folded, or the fold is open, or it holds a change or a refusal somebody must see. */
   const drawnHere = (key: string): boolean => unfoldedMore || !fold.folded.includes(key) || key in pending.values || key in pending.wrong || fixAt === key || asked === key;
@@ -477,6 +521,36 @@
   /* THE PAGES LISTED UNDER WHAT THE ADD-ON ADDED leave out the one that is the add-on itself: "Agents" inside Agents. */
   const ledgerPages = $derived(shownPages.filter((p) => pageName(p).trim().toLowerCase() !== name.trim().toLowerCase()));
 
+  /* ── what a store add-on brought ─────────────────────────────────────── */
+
+  const same = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
+  /* ITS LISTS ARE THE ONES THE RECORD SAYS IT HOLDS, and its pages the ones its listing names at the version held, found
+     in this record's menu by title, so a page it did not bring (or one taken out since) is never linked. */
+  const heldReach = $derived.by(() => {
+    if (!listing) return null;
+    const held = installed?.version ?? settings?.version ?? null;
+    return (listing.versions.find((v) => v.version === held) ?? listing.versions[0])?.reach ?? null;
+  });
+  const storePages = $derived(
+    (heldReach?.pages ?? []).flatMap((title) => {
+      const e = ((page.data.nav ?? []) as { id: string; title: string; row?: true }[]).find((n) => n.row !== true && same(n.title, title));
+      return e ? [e.id] : [];
+    }),
+  );
+  /* WHAT IT ADDED, A BUILT-IN'S FROM ITS MODULE AND A STORE ADD-ON'S FROM THE RECORD AND ITS LISTING. */
+  const addedLists = $derived(pack ? pack.registers : listing ? (installed?.registers ?? []) : []);
+  const addedPages = $derived(pack ? ledgerPages : storePages.filter((p) => !same(pageName(p), name)));
+  const addsSaid = $derived(pack ? describe(moduleHolds(pack)) : describe({ lists: addedLists.length, pages: storePages.length }));
+  /* "OPEN DEBTS": the page that is the add-on itself, else its first page, else its first list. */
+  const openAt = $derived.by(() => {
+    if (installed?.disabled_at || core) return null;
+    const pages = pack ? shownPages : storePages;
+    const own = pages.find((p) => same(pageName(p), name)) ?? pages[0];
+    if (own !== undefined) return `/p/${own}`;
+    const list = addedLists[0];
+    return list === undefined ? null : `/r/${list}`;
+  });
+
   /* EACH LIST'S OWN ICON AND COUNT, as the rail draws it, and when it last changed, from the newest page of the log: a
      list the log's newest page never touched says no age rather than a guess. */
   const railOf = (r: string) => ((page.data.index?.registers ?? []) as { id: string; count: number; icon: IconName; guessed?: true }[]).find((x) => x.id === r);
@@ -561,7 +635,7 @@
          switch says the state to a screen reader, and this line says it in words, so off is never colour alone. -->
     <div class="lead-cell">
      <Tile lead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} title={copy.useCaseFor} aria-label={copy.useCaseFor}>
-      {#if pack?.blurb}<p class="summary">{pack.blurb}</p>{/if}
+      {#if blurb}<p class="summary">{blurb}</p>{/if}
       <p class="about">
         {#if installed?.version ?? settings.version}{@const v = (installed?.version ?? settings.version)!}<span class="num">{installed?.disabled_at ? market.about.off(v) : market.about.on(v)}</span>{/if}
         {#if core}<span>{market.about.partOf}</span>{/if}
@@ -569,7 +643,7 @@
       </p>
       {#if asking}
         <div class="turn-ask" role="group" aria-label={copy.packSwitch(name)}>
-          <p class="turn-ask-said">{turnWords.ask(name, (pack?.registers.length ?? 0) + shownPages.length)}</p>
+          <p class="turn-ask-said">{turnWords.ask(name, addedLists.length + (pack ? shownPages.length : storePages.length))}</p>
           <div class="turn-ask-do">
             <Button size="sm" disabled={turning} onclick={() => void turn()}>{turnWords.yes}</Button>
             <Button size="sm" weight="bare" onclick={() => (asking = false)}>{turnWords.no}</Button>
@@ -578,6 +652,12 @@
       {/if}
       <p class="turn-said" role="status">{turnSaid}</p>
       {#if waits}<p class="waits">{waits}</p>{/if}
+      {#if installed && (openAt || !core)}
+        <div class="lead-do">
+          {#if openAt}<Button size="sm" href={at(openAt)}>{market.about.open(name)}</Button>{/if}
+          {#if !core}<Button size="sm" weight="bare" disabled={removing} onclick={() => void uninstall()}>{copy.uninstall}</Button>{/if}
+        </div>
+      {/if}
       <ShipsWidgets pack={id} {name} on={!installed?.disabled_at} />
      </Tile>
     </div>
@@ -671,10 +751,14 @@
                            with the down arrow, measured through `currencyChoices`, went AED, AUD, AED, AUD and never
                            reached a third code. A saved code the picker does not offer still draws, because the draft
                            starts as the saved value and every pick is an offered one. -->
-                      {@const saved = settings?.values[key]}
-                      {@const choices = currencyOptions(typeof saved === 'string' ? saved : '')}
-                      <select class="setting-select" id="set-{key}" value={d.text.trim().toUpperCase()} onchange={(e) => (d.text = typed(e))}>
-                        <option value="">{copy.currencyNone}</option>
+                      <!-- AND WHERE NO CODE IS SAVED, THE ONE THE RECORD'S MONEY IS IN, as Settings > Words and money shows it
+                           (audit 31 Oct g, AG28): Money's page said "None chosen" over a record in pounds. None is offered
+                           only where it means something: a code is saved and could be cleared, or the record reads none. -->
+                      {@const saved = typeof settings?.values[key] === 'string' ? String(settings?.values[key]).trim().toUpperCase() : ''}
+                      {@const heldIn = saved || moneyIn}
+                      {@const choices = currencyOptions(heldIn)}
+                      <select class="setting-select" id="set-{key}" value={d.text.trim().toUpperCase() || heldIn} onchange={(e) => (d.text = typed(e))}>
+                        {#if saved !== '' || heldIn === ''}<option value="">{copy.currencyNone}</option>{/if}
                         <optgroup label={copy.currencyCommon}>{#each choices.common as c (c.code)}<option value={c.code}>{c.label}</option>{/each}</optgroup>
                         <optgroup label={copy.currencyAll}>{#each choices.other as c (c.code)}<option value={c.code}>{c.label}</option>{/each}</optgroup>
                       </select>
@@ -697,7 +781,7 @@
                           id="set-{key}"
                           type="text"
                           inputmode="decimal"
-                          placeholder={heldElsewhere(settings, key) ?? words.notSet}
+                          placeholder={heldElsewhere(settings, key) ?? emptySaid(key, decl) ?? words.notSet}
                           value={d.text}
                           oninput={(e) => (d.text = typed(e))}
                           aria-invalid={why ? 'true' : undefined}
@@ -711,6 +795,7 @@
                           id="set-{key}"
                           type="text"
                           inputmode="decimal"
+                          placeholder={emptySaid(key, decl)}
                           value={d.text}
                           oninput={(e) => (d.text = typed(e))}
                           aria-invalid={why ? 'true' : undefined}
@@ -753,7 +838,7 @@
                   </div>
 
                   {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
-                  {#if decl.note && !shared.includes(decl.note)}<p class="setting-note">{decl.note}</p>{/if}
+                  {#if noteOf(key, decl)}<p class="setting-note">{noteOf(key, decl)}</p>{/if}
                   {#if decl.type === 'secret'}<p class="setting-note">{copy.settingSecretSaid(d.text || String(decl.default ?? ''))} <a href={at('/keychain')}>{copy.settingSecretOpen}</a></p>{/if}
                   {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{why}</p>{/if}
                 </div>
@@ -762,7 +847,7 @@
 
             {#if fold.folded.length > 0 && !unfoldedMore}
               <div class="more-limits">
-                <Button weight="bare" onclick={() => (unfoldedMore = true)}>{fold.label}<span class="num quiet-part">{fold.folded.length}</span></Button>
+                <Button weight="bare" onclick={() => (unfoldedMore = true)}>{words.moreLimits(fold.folded.length)}</Button>
               </div>
             {/if}
             {#each shared as note (note)}<p class="setting-note">{note}</p>{/each}
@@ -811,7 +896,7 @@
           </label>
         </Tile>
       {/if}
-    {:else if !(pack && (pack.registers.length || shownPages.length))}
+    {:else if !(addedLists.length || addedPages.length)}
       <!-- ONLY WHEN IT ADDS NOTHING ELSE (P45): beside the lists and pages it added, a tile saying
            there is nothing to set was a tile of nothing. -->
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
@@ -823,20 +908,20 @@
             kind="no-data-yet"
             compact
             title={copy.packNothingToSet}
-            body={pack && (pack.registers.length || shownPages.length) ? copy.packNothingToSetWhy : undefined}
+            body={addedLists.length || addedPages.length ? copy.packNothingToSetWhy : undefined}
           />
         </div>
       </Tile>
     {/if}
     </div>
-    {#if pack && (pack.registers.length || shownPages.length)}
+    {#if addedLists.length || addedPages.length}
      <div class="adds-cell">
       <!-- WHAT IT HOLDS AS INSTALLED AND THE STORE SAY IT, "3 lists and 2 pages", never the two summed into one. -->
-      <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} meta={describe(moduleHolds(pack)) || undefined}>
+      <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} meta={addsSaid || undefined}>
         <div class="section-body">
           <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
           <ul class="ledger">
-            {#each pack.registers as r (r)}
+            {#each addedLists as r (r)}
               <li>
                 <a class="line added" href={at(`/r/${r}`)}>
                   <span class="line-mark"><IconWell name={railOf(r)?.icon ?? 'rows'} size="l" /></span>
@@ -846,7 +931,7 @@
                 </a>
               </li>
             {/each}
-            {#each ledgerPages as p (p)}
+            {#each addedPages as p (p)}
               <li>
                 <a class="line added" href={at(`/p/${p}`)}>
                   <span class="line-mark"><IconWell name="doc" size="l" /></span>
@@ -893,6 +978,14 @@
 
   .stack {
     gap: var(--tile-gap);
+  }
+
+  /* OPEN AND UNINSTALL, under what it is for: the way into it, and the way out. */
+  .lead-do {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
   }
 
   .summary {
@@ -1181,12 +1274,6 @@
 
   .setting-said:empty {
     display: none;
-  }
-
-  /* THE FOLD'S COUNT BESIDE ITS WORDS, quiet. */
-  .more-limits .quiet-part {
-    margin-inline-start: var(--sp-2);
-    color: var(--ink-3);
   }
 
   .settings-actions {
