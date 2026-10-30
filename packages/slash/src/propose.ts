@@ -1356,7 +1356,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
     return { code: 'SLASH_BUDGET_SPENT', fix: `Slash is out of asks until ${core.resets().slice(0, 10)}. Add your own key, or wait.` };
   };
   const owner = (ctx: CallContext): Refusal | null =>
-    ctx.principal.kind === 'person' && ctx.principal.level === 'owner' ? null : { code: 'FORBIDDEN', fix: 'Only the record owner sets up what it keeps.' };
+    ctx.principal.kind === 'person' && ctx.principal.level === 'owner' ? null : { code: 'FORBIDDEN', fix: 'Only the owner of this BrainDog sets up what Slash keeps.' };
 
   /** Hold, ask, settle: the one path both asks take, answering the checked object or the refusal the ledger kept. */
   const asked = async (

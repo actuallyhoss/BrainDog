@@ -194,7 +194,7 @@ test("A READ COLLEAGUE'S SETTINGS POST IS 403 IN THE PACKAGE'S OWN SENTENCE, and
     assert.equal(refused.status, 403, `a read colleague configured Slash: ${refused.raw}`);
     assert.deepEqual(refused.body?.refusal && { code: refused.body.refusal.code, fix: refused.body.refusal.fix }, {
       code: 'FORBIDDEN',
-      fix: 'Only the record owner changes how Slash is set up.',
+      fix: 'Only the owner of this BrainDog changes how Slash is set up.',
     });
 
     const ada = s.plant(owner);

@@ -18,7 +18,7 @@ missing piece is built as a primitive, for everyone, and the feature stays a pac
 packs/<id>/
   <id>.pack.json   the add-on: its manifest, its lists, what it lays on other add-ons' lists (`extends`),
                    and its pages, figures, rules, digests and scripts
-  <id>.test.json   rows to write into a scratch record, and what the record should then hold
+  <id>.test.json   rows to write into a scratch BrainDog, and what the record should then hold
   <id>.test.ts     a fresh record, the add-on installed exactly as it ships, and what a person or an agent then sees
   *.js             a script the add-on runs, when it has one
   README.md        what it adds, in a few lines, when it has one
@@ -63,7 +63,7 @@ A pack can carry a test of each kind, and they do different jobs. Every pack her
 `braindog pack new` starts every new one.
 
 **`<id>.test.json` is the author's test**, the one `braindog pack test <folder>` runs. It installs the add-on in a
-scratch record on your machine, after the modules it needs and its example rows, then writes each of `rows` as a
+scratch BrainDog on your machine, after the modules it needs and its example rows, then writes each of `rows` as a
 person would, with the record's rules running, and says each of `expect` as passed or failed:
 
 ```json
@@ -100,7 +100,7 @@ file was refused. Each one is held to these habits:
 
 ```
 braindog pack check <folder>     read it, warn on any manifest key the Kennel does not take, install it in a
-                                 scratch record and draw each page it adds, saying every refusal with its code
+                                 scratch BrainDog and draw each page it adds, saying every refusal with its code
 braindog pack test <folder>      run its <id>.test.json, as above
 braindog pack preview <folder>   start a scratch BrainDog on this machine with the add-on in its catalogue
 braindog pack publish <id>.pack.json --kennel [--sign <key file>]

@@ -39,7 +39,7 @@ The operator reviews from the command line, with the Kennel's operator key in th
 
 ```spec | braindog kennel review
 (on its own) | what waits | each submission, its publisher, when it came and what it reaches
-show <kind> <id> <version> | look at one | installs it in a scratch record and prints everything it reaches and every host it calls out to
+show <kind> <id> <version> | look at one | installs it in a scratch BrainDog and prints everything it reaches and every host it calls out to
 list <kind> <id> <version> | list it | makes its preview from the record's own drawing of its pages, and lists it with that
 refuse <kind> <id> <version> --reason <why> | refuse it | the reason is kept with the refusal
 trust <publisher> | trust a publisher | their later versions are listed at once
@@ -48,7 +48,7 @@ trust <publisher> | trust a publisher | their later versions are listed at once
 ~~~code | As written
 ```spec | braindog kennel review
 (on its own) | what waits | each submission, its publisher, when it came and what it reaches
-show <kind> <id> <version> | look at one | installs it in a scratch record and prints everything it reaches and every host it calls out to
+show <kind> <id> <version> | look at one | installs it in a scratch BrainDog and prints everything it reaches and every host it calls out to
 list <kind> <id> <version> | list it | makes its preview from the record's own drawing of its pages, and lists it with that
 refuse <kind> <id> <version> --reason <why> | refuse it | the reason is kept with the refusal
 trust <publisher> | trust a publisher | their later versions are listed at once

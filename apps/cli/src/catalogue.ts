@@ -211,7 +211,7 @@ const packReadme = (id: string, title: string, file: string): string =>
     `# ${title}`,
     `What ${title} adds to a BrainDog, in one sentence.`,
     `Edit ${file}, then run braindog addon check ${id} to see what BrainDog would say about it.`,
-    `Run braindog addon test ${id} to write the rows in ${testFileName(id)} into a scratch record and check what it expects.`,
+    `Run braindog addon test ${id} to write the rows in ${testFileName(id)} into a scratch BrainDog and check what it expects.`,
     `Publish it with braindog addon publish ${file} --kennel, signed with --sign <key file> or as the person signed in.`,
     '',
   ].join('\n');
@@ -474,13 +474,13 @@ async function testPack(args: string[], io: AgentIo): Promise<number> {
   if (!checked.ok || checked.held === null) {
     checked.held?.scratch.close();
     for (const line of checked.lines) io.out(line);
-    io.say(`${oneLine(read.file.file.title)} does not install in a scratch record, so its test did not run.`);
+    io.say(`${oneLine(read.file.file.title)} does not install in a scratch BrainDog, so its test did not run.`);
     return 1;
   }
   const { scratch } = checked.held;
   try {
     const run = runPackTest(scratch, test.value);
-    io.out(`${oneLine(read.file.file.title)} ${oneLine(read.file.file.pack.manifest.version)}, tested in a scratch record after installing it:`);
+    io.out(`${oneLine(read.file.file.title)} ${oneLine(read.file.file.pack.manifest.version)}, tested in a scratch BrainDog after installing it:`);
     for (const line of run.lines) io.out(line);
     if (!run.passed) io.say('Some of what the test expects did not hold, as said above.');
     return run.passed ? 0 : 1;
@@ -1308,11 +1308,11 @@ async function preview(args: string[], io: AgentIo, kind: EntryKind = 'usecase')
   const made = await run(['init', 'preview', '--owner', 'preview@example.invalid'], false);
   if (made !== 0) {
     rmSync(scratch, { recursive: true, force: true });
-    io.say('The scratch record for the preview could not be created.');
+    io.say('The scratch BrainDog for the preview could not be created.');
     return 1;
   }
   /* THE FILE'S TITLE IS ITS AUTHOR'S, and `preview` reads a file from an address as readily as `check` does. */
-  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/addons/${read.id}?kind=${kind} and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
+  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/addons/${read.id}?kind=${kind} and press Review the plan. Stop with Ctrl+C; the scratch BrainDog is removed.`);
   const code = await run(['serve'], true);
   rmSync(scratch, { recursive: true, force: true });
   return code;

@@ -54,7 +54,7 @@ It writes a starting folder: `<id>.pack.json`, or `<id>.pack.yaml` with `--yaml`
 braindog addon check reading-list
 ```
 
-It reads the pack, JSON or YAML, warns on any manifest key a record does not take, and installs it in a scratch record in memory, beside the first-party modules it requires. Every refusal the record would give, a list it does not bring, a figure with no window, a colour outside a theme, is said here with its code, before anybody else sees the file.
+It reads the pack, JSON or YAML, warns on any manifest key a record does not take, and installs it in a scratch BrainDog in memory, beside the first-party modules it requires. Every refusal the record would give, a list it does not bring, a figure with no window, a colour outside a theme, is said here with its code, before anybody else sees the file.
 
 ## `pack test`
 
@@ -69,7 +69,7 @@ It reads the pack, JSON or YAML, warns on any manifest key a record does not tak
 }
 ```
 
-`braindog addon test <folder>` installs the pack in a scratch record after the modules it needs and its example rows, writes each of `rows` as a person would, with the record's rules running, and says each of `expect` as passed or failed. A count counts the example rows too, `row` counts from one, and a figure is read the way a page reads it.
+`braindog addon test <folder>` installs the pack in a scratch BrainDog after the modules it needs and its example rows, writes each of `rows` as a person would, with the record's rules running, and says each of `expect` as passed or failed. A count counts the example rows too, `row` counts from one, and a figure is read the way a page reads it.
 
 ## `pack preview`
 

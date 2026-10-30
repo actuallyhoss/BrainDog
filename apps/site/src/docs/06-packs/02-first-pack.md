@@ -40,7 +40,7 @@ Reading list 1.0.0 reads as an add-on: 1 lists, 1 pages and 2 example rows. Noth
   Adds lists: Items; pages: Reading list; rules: none
   Example rows: 2; suggests skills: none
   Calls out to: nothing. It reads and writes only your BrainDog.
-  Installs in a scratch record:2 declarations and 2 example rows, and one page.
+  Installs in a scratch BrainDog: 2 declarations and 2 example rows, and one page.
 ```
 
 `check` reads the file the way BrainDog will, then installs it in a scratch BrainDog in memory. The lines in the middle are the plan an owner sees before installing: what the add-on adds, what it needs installed first, and every host it would call out to. The last line says the install went through.
@@ -48,7 +48,7 @@ Reading list 1.0.0 reads as an add-on: 1 lists, 1 pages and 2 example rows. Noth
 When something is wrong, the last line says what, with its code in brackets. Here the page was pointed at a list called `books` that nothing declares:
 
 ```code | What it prints when the file is wrong
-  Refused in a scratch record: reading-list points at the books list (page.reading-list.requires), which is not here and reading-list does not declare. Install the pack that declares books first, or declare it in reading-list. (REGISTER_UNRESOLVED)
+  Refused in a scratch BrainDog: reading-list points at the books list (page.reading-list.requires), which is not here and reading-list does not declare. Install the pack that declares books first, or declare it in reading-list. (REGISTER_UNRESOLVED)
 Reading list 1.0.0 would be refused by BrainDog, as said above.
 ```
 
@@ -61,7 +61,7 @@ braindog addon test reading-list
 ```
 
 ```code | What it prints
-Reading list 1.0.0, tested in a scratch record after installing it:
+Reading list 1.0.0, tested in a scratch BrainDog after installing it:
   passed  items holds 3 rows.
   passed  row 1's state is "open".
 ```
@@ -69,7 +69,7 @@ Reading list 1.0.0, tested in a scratch record after installing it:
 The test installs the add-on with its example rows, writes each row in `rows` as a person would, and then holds the record to each line of `expect`. The starting test writes one row, so the list holds three. When an expectation does not hold, it says so, and the command ends with a failure a script or a CI job can see:
 
 ```code | What it prints when a test fails
-Reading list 1.0.0, tested in a scratch record after installing it:
+Reading list 1.0.0, tested in a scratch BrainDog after installing it:
   FAILED  items holds 4 rows; it holds 3.
   passed  row 1's state is "open".
 Some of what the test expects did not hold, as said above.
@@ -82,10 +82,10 @@ braindog addon preview reading-list
 ```
 
 ```code | What it prints
-Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/addons/reading-list?kind=pack and press Review the plan. Stop with Ctrl+C; the scratch record is removed.
+Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/addons/reading-list?kind=pack and press Review the plan. Stop with Ctrl+C; the scratch BrainDog is removed.
 ```
 
-`preview` starts a whole BrainDog on your machine with nothing in it but your add-on in its catalogue. Open the address, review the plan, install it, and use its page the way somebody who installs it will. `--port <n>` chooses another port. Starting the scratch record takes a little while the first time.
+`preview` starts a whole BrainDog on your machine with nothing in it but your add-on in its catalogue. Open the address, review the plan, install it, and use its page the way somebody who installs it will. `--port <n>` chooses another port. Starting the scratch BrainDog takes a little while the first time.
 
 ## Publish it
 

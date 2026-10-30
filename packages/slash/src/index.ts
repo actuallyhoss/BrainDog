@@ -311,7 +311,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     /* THE OWNER AND NOBODY ELSE (`46 §5.2`). Switching tiers spends somebody's money and names a
        keychain grant; a member with `write` on one register is not the person who decides either. */
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
-      return no('FORBIDDEN', 'Only the record owner changes how Slash is set up.');
+      return no('FORBIDDEN', 'Only the owner of this BrainDog changes how Slash is set up.');
 
     const before = core.settings();
     const stored = own();
@@ -431,7 +431,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
      `purpose` the store has written since version 3, so the page that lists them can count his own apart from the record's. */
   const history = (limit: number, ctx: CallContext): Result<{ asks: Asked[] }> => {
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
-      return no('FORBIDDEN', 'Only the record owner reads what Slash was asked.');
+      return no('FORBIDDEN', 'Only the owner of this BrainDog reads what Slash was asked.');
     const most = Number.isInteger(limit) && limit > 0 ? Math.min(limit, ASKS_MOST) : ASKS_LISTED;
     const asks = deps.sql
       .all<Asked>(

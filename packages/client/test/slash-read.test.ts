@@ -60,7 +60,7 @@ test("A READING COMES BACK AS THE DOOR SENT IT, from the door's own path and wit
 });
 
 test('A HOST WITH NO MODEL SAYS SO, and the client passes its sentence on rather than one of its own', async () => {
-  const refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'No model is configured behind Slash on this host, so it cannot read the record for you.' };
+  const refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'No model is configured behind Slash on this host, so it cannot read your BrainDog for you.' };
   const out = await answering(501, { ok: false, refusal }).client.slashRead('Which tasks are open?');
   assert.deepEqual(out, { ok: false, refusal });
 });

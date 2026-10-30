@@ -260,7 +260,7 @@ export const CALENDAR_SOURCE = 'deadlines';
  *
  * THE SIDE COLUMN IS THE LOG AS THREE FIGURES (`activity-by-who`, `activity-by-kind`, `activity-by-hour`, the kernel's
  * own over the last thirty days), each tile headed by its figure's name, so a tile and the figure an agent reads are
- * never called two things. Who worked is a `split`, three parts of one whole; the other two are bars. Under them, what
+ * never called two things. Who worked is a `split`, four parts of one whole; the other two are bars. Under them, what
  * an agent asked: the fifth part the hand-built screen lacked.
  *
  * IT OPENS ON ITS LINE, AS EVERY PAGE DOES (held by `calm-pages.test.ts`), in plain words and with no
