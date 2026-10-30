@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { copy } from '../../lib/copy.ts';
 import { actorOf } from '../../lib/record/api.ts';
 import type { AuditEvent } from '../../lib/record/schema.ts';
-import { actorSaid, offeredActors, personIn, runsIn, targetSaid } from './who.ts';
+import { actorSaid, byMatches, didSaid, offeredActors, personIn, runsIn, targetSaid } from './who.ts';
 
 /** The decider on the driven record, the id the screen printed raw. */
 const DECIDER = 'p_01M1KJ7RG0TYYA0AX15QPGJJ4';
@@ -151,4 +151,21 @@ test('THE FILTER OFFERS A RUN IT CAN NAME, and says it as the line does', () => 
   assert.deepEqual(offeredActors(['S42', 'S43', 'system'], null, NO_NAMES, runs), ['S42', 'S43', 'system']);
   assert.deepEqual(offeredActors(['S42', 'S43', 'system'], null, NO_NAMES), ['system'], 'with no run_by both are An agent');
   assert.equal(actorSaid('S42', null, NO_NAMES, runs.get('S42') ?? null).name, 'Claude Code');
+});
+
+test('A LINE WHOSE TITLE SAYS WHAT WAS DONE SAYS WHO DID IT AS A SENTENCE, and BrainDog\'s own rule is BrainDog', () => {
+  /* The recheck of 30 October read "A rule: Handled · closed" under "Filed 2 Ledger Post payments under Software". */
+  assert.equal(actorSaid('rule:handled', null, NO_NAMES).name, 'BrainDog');
+  assert.equal(didSaid('rule:handled', null, NO_NAMES, null, 'closed'), 'BrainDog closed it');
+  assert.equal(didSaid('you', null, NO_NAMES, null, 'decided'), 'You decided it');
+  assert.equal(didSaid('rule:invoice-late', null, NO_NAMES, null, 'closed'), 'The rule “Chase late payments” closed it');
+  assert.equal(didSaid('rule:ladder', null, NO_NAMES, null, 'closed'), 'The trust rule closed it');
+  assert.equal(didSaid('system', null, NO_NAMES, null, 'gave access'), 'BrainDog gave access');
+});
+
+test('BRAINDOG UNDER ANY OF ITS NAMES IS ONE CHIP, and that chip keeps all of its lines', () => {
+  assert.deepEqual(offeredActors(['rule:handled', 'system', 'p_seed', 'slash'], null, NO_NAMES), ['system', 'slash']);
+  assert.deepEqual(offeredActors(['rule:handled', 'rule:additive', 'slash'], null, NO_NAMES), ['rule:handled', 'slash']);
+  assert.equal(byMatches('rule:handled', 'system'), true);
+  assert.equal(byMatches('slash', 'system'), false);
 });

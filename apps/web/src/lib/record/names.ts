@@ -62,6 +62,9 @@ export const AGENT_NAMES: Readonly<Record<string, string>> = {
 /** The person the seed signs its own rows with (`packages/seed/src/index.ts`, `installSeed`): the sample, not somebody. */
 const SEED = 'p_seed';
 
+/** The rules BrainDog answers for itself with, which a person reads as BrainDog (kernel `OWN_RULES`, less the ladder). */
+const OWN_RULE = /^rule[.:](?:handled|additive|update)$/u;
+
 /** A ULID anywhere in a string: never part of a name, always a row, a person or a declaration somebody forgot to word. */
 const ULID = /[0-9A-HJKMNP-TV-Z]{26}/u;
 
@@ -277,6 +280,10 @@ export function actor(by: string, me: string | null = null, names: ReadonlyMap<s
   if (who === 'slash') return said(nameWords.slash, 'slash');
   if (who === 'system') return said(nameWords.brainDog, 'system');
   if (who === SEED) return said(nameWords.brainDog, 'sample');
+  /* BRAINDOG'S OWN ANSWERS ARE SIGNED AS RULES (`rule:handled` when it settles his own arranging, `rule:additive` and
+     `rule:update` for its own updates), and the kernel says them as BrainDog (`whoOf` in undo.ts): Activity read
+     "A rule: Handled · closed" (recheck of 30 October). The trust ladder keeps its own name. */
+  if (OWN_RULE.test(who)) return said(nameWords.brainDog, 'system');
   const rule = /^rule[.:](.+)$/u.exec(who)?.[1];
   if (rule !== undefined) return said(shipped(rule) ?? ownRule(rule), 'rule');
   const agent = /^agent:(.+)$/u.exec(who)?.[1] ?? (Object.hasOwn(AGENT_NAMES, who) ? who : undefined);
