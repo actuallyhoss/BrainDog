@@ -57,7 +57,7 @@
   /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
      the target of an access row) all printed raw `p_` ids on a record with more than one person on
      it. `who.ts` holds the reason and the measurement. */
-  import { actorSaid, offeredActors, runsIn, targetSaid } from './who.ts';
+  import { actorSaid, byMatches, didSaid, offeredActors, runsIn, targetSaid } from './who.ts';
   /* WHAT THE LOG SAYS, IN WORDS AND IN FIGURES: the sentence, the bands, a row by its title and list, a burst as one
      line, and the three tiles' counts and readings. `lines.ts` holds each rule and why. */
   import {
@@ -479,7 +479,7 @@
   const matched = $derived(
     kept.filter(
       (e) =>
-        (!who || e.by === who) &&
+        (!who || byMatches(e.by, who)) &&
         (!what || e.kind === what) &&
         (!when || dayOf(e.at) === when) &&
         (!list || listOf(e.target) === list),
@@ -728,7 +728,7 @@
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.you && myName ? myName : by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : by.name)}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}<!--
+            >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : said.done ? didSaid(e.by, me, names, e.run_by ?? null, said.done) : by.name)}{#if said.done && (settled !== null || ran !== null)}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}<!--
               WHERE IT HAPPENED, in the same run of quiet words, so it wraps with them on a phone: the list a row is in.
             -->{#if thing?.list}<span class="where-chip">{' · '}{thing.list}</span>{/if}</span
           >

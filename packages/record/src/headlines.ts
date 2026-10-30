@@ -276,19 +276,36 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
  * A DAY AS THE APP SAYS ONE (Q34 of 29 October): "13 Jan 2027", and "29 Oct" in the year it is. A line said "the last
  * due on 2036-04-13" and "cash lasts to 2027-01-13" where every other place reads "13 Jan 2027".
  */
-export function dayWords(iso: string, now = Date.now()): string {
+export function dayWords(iso: string, now: Today = Date.now()): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(iso);
   if (!m) return iso;
   const said = `${Number(m[3])} ${MONTHS_SHORT[Number(m[2]) - 1] ?? m[2]}`;
-  return Number(m[1]) === new Date(now).getUTCFullYear() ? said : `${said} ${m[1]}`;
+  return Number(m[1]) === yearOf(now) ? said : `${said} ${m[1]}`;
 }
+
+/**
+ * WHEN "THE YEAR IT IS" IS READ FROM (F36): the record's own day ("2026-12-31", what a tick is handed as `today`), or an
+ * instant. The day is the record's, so a record in Cairo says "1 Jan" on its own New Year's morning while the machine's
+ * clock is still in the old year in UTC, and a test with a fixed clock says what that clock says.
+ */
+export type Today = number | string;
+
+const yearOf = (now: Today): number => {
+  if (typeof now === 'string') {
+    const y = /^(\d{4})-\d{2}-\d{2}/u.exec(now)?.[1];
+    if (y !== undefined) return Number(y);
+    const t = Date.parse(now);
+    return Number.isFinite(t) ? new Date(t).getUTCFullYear() : new Date().getUTCFullYear();
+  }
+  return new Date(now).getUTCFullYear();
+};
 
 /**
  * A LINE AS A PERSON WOULD WRITE IT, whatever the model wrote (Q34 of 29 October): every ISO day as the app says it, no
  * sign after a word that already says which way ("down −11%" is "down 11%"), and no "The" before the name of one of the
  * person's own things ("Northwind Premiums is late", never "The Northwind Premiums is late").
  */
-export function plainLine(line: string, names: readonly string[] = [], now = Date.now()): string {
+export function plainLine(line: string, names: readonly string[] = [], now: Today = Date.now()): string {
   let out = line.replace(/(?<![\d-])(\d{4}-\d{2}-\d{2})(?![\d-])/gu, (d) => dayWords(d, now));
   out = out.replace(/\b(down|up|fell|rose|dropped|climbed|fallen|risen|lower|higher)( by)?\s+[−+-]\s?(?=\d)/giu, (_, w: string, by: string | undefined) => `${w}${by ?? ''} `);
   for (const name of names) {
@@ -301,8 +318,8 @@ export function plainLine(line: string, names: readonly string[] = [], now = Dat
   return out;
 }
 
-export function figureText(v: Json | undefined): string | null {
-  if (typeof v === 'string') return v.trim() === '' ? null : dayWords(v);
+export function figureText(v: Json | undefined, now: Today = Date.now()): string | null {
+  if (typeof v === 'string') return v.trim() === '' ? null : dayWords(v, now);
   if (typeof v === 'number') return Number.isFinite(v) ? v.toLocaleString('en-u-nu-latn', { maximumFractionDigits: 2 }) : null;
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   const isMoney = (p: unknown): p is { amount: number; currency: string } =>
@@ -319,8 +336,8 @@ export const nought = (text: string): boolean => text.split(' · ').every((part)
  * nought left out, and `account(s)` one or several. The app's `leadOf` is the one the page draws; this is the same
  * sentence for the model to improve on, so it is handed what the person would otherwise read.
  */
-export function rulesLine(template: string, values: Readonly<Record<string, Json>>): string {
-  const said = (path: string): string | null => (Object.hasOwn(values, path) ? figureText(values[path]) : null);
+export function rulesLine(template: string, values: Readonly<Record<string, Json>>, now: Today = Date.now()): string {
+  const said = (path: string): string | null => (Object.hasOwn(values, path) ? figureText(values[path], now) : null);
   const stands = (clause: string): boolean => {
     const figures = holesOf(clause).map(said);
     return figures.length === 0 || (figures.every((f) => f !== null) && figures.some((f) => !nought(f!)));
@@ -386,7 +403,7 @@ export function handedHoles(page: HeadlinePage): Map<string, string> {
  * A line with each of its holes filled from the figures its page was handed, as a person reads it, or `null` when a
  * hole names a figure the page was not handed. A line with no hole is itself.
  */
-export function filledHeadline(line: string, page: HeadlinePage): string | null {
+export function filledHeadline(line: string, page: HeadlinePage, now: Today = Date.now()): string | null {
   const handed = handedHoles(page);
   let missing = false;
   const filled = line.replace(HOLE, (_, id: string) => {
@@ -394,7 +411,7 @@ export function filledHeadline(line: string, page: HeadlinePage): string | null 
     if (value === undefined) missing = true;
     return value ?? '';
   });
-  return missing ? null : plainLine(filled.trim(), namesOf(page));
+  return missing ? null : plainLine(filled.trim(), namesOf(page), now);
 }
 
 /**
@@ -451,14 +468,14 @@ const typedIn = (text: string): string | undefined => {
  * right number sit in a wrong sentence ("3 of 2 steps" beside figures of 3 and 2). Now the record writes every number
  * itself, from the figure the hole names.
  */
-export function headlineFault(text: unknown, page: HeadlinePage): string | null {
+export function headlineFault(text: unknown, page: HeadlinePage, now: Today = Date.now()): string | null {
   if (typeof text !== 'string' || text.trim() === '') return `The model wrote no line for ${page.title}.`;
   const line = text.trim();
   const handed = handedHoles(page);
   const stray = [...line.matchAll(HOLE)].map((m) => m[1]!).find((id) => !handed.has(id));
   if (stray !== undefined) return `The line for ${page.title} left a hole for ${stray}, which is not one of its figures.`;
   if (JOINED.test(line)) return `The line for ${page.title} joined a figure to what is beside it, where each stands as a word of its own.`;
-  const filled = filledHeadline(line, page) ?? line;
+  const filled = filledHeadline(line, page, now) ?? line;
   if (filled.length > HEADLINE_MOST || line.length > HEADLINE_RAW_MOST) return `The line for ${page.title} was longer than ${HEADLINE_MOST} characters.`;
   /* WHAT THE MODEL TYPED ITSELF: the line with its holes taken out. */
   const typed = line.replace(HOLE, ' ');

@@ -467,6 +467,9 @@
   const spot = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
   const lit = $derived(litOf(spot, model));
   const crumb = $derived(crumbOf(spot, model, lit, frame.title || null, frame.heading || null, frame.up));
+  /* A PAGE ABOUT A ROW LIGHTS THE ROW ITS LIST SITS UNDER (F33): an account's page opened Money with Accounts lit, as its
+     crumb says, where it lit nothing and Money stayed shut. */
+  const sideLit = $derived(lit ?? (frame.up?.href ? litOf(frame.up.href, model) : null));
   $effect.pre(() => {
     frame.here = crumb.at(-1)?.label ?? '';
   });
@@ -1258,7 +1261,7 @@
               base={apiBase(page.url)}
               lists={data.lists}
               {model}
-              {lit}
+              lit={sideLit}
               working={workingOn}
               version={live.version}
               mode={sideOn ? 'full' : 'rail'}
@@ -1298,7 +1301,7 @@
               base={apiBase(page.url)}
               lists={data.lists}
               {model}
-              {lit}
+              lit={sideLit}
               working={workingOn}
               version={live.version}
               shown={true}
@@ -1349,7 +1352,7 @@
       {/if}
       {#if phoneMenu}
         <!-- ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE: every place, the projects, every list and Settings. -->
-        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} {lit} working={workingOn} version={live.version} pen={sidePen} />{/if}
+        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} />{/if}
       {:else}
         {@render children()}
       {/if}

@@ -143,7 +143,14 @@ export function pinsKept(raw: string | null): string[] {
 }
 
 /** A row of the sidebar: where it goes, its words and glyph, and the count it carries, if any. */
-export type SideLink = { href: string; label: string; icon: string; count?: number | undefined };
+export type SideLink = {
+  href: string;
+  label: string;
+  icon: string;
+  count?: number | undefined;
+  /** Other addresses the row answers for, where it stands for a row of the same name (Money's Accounts page for its list). */
+  near?: string[] | undefined;
+};
 
 /**
  * WHETHER THE SIDEBAR OPENS ON ITS PROJECTS: only once the record holds one. "Projects 0 in
@@ -339,14 +346,22 @@ export function sideModel(o: {
   const viewsOf = (l: SideList | undefined): SideLink[] => (l ? l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })) : []);
   /* ONE ROW FOR ONE WORD UNDER A PLACE: a page the place declares (Money's Accounts, Ledger, Filing rules) and the list
      of the same name were two rows. The page is the row, and its list is a tap away on it. */
+  /* AND THE ROW KEPT ANSWERS FOR THE ONE LEFT OUT (F33): Money's Accounts page stood for the Accounts list, so an
+     account's own page, whose crumb is placed by its list (`upTrail`), found no row and read "Accounts › HSBC" with no
+     Money before it. */
   const once = (rows: readonly SideLink[]): SideLink[] => {
-    const seen = new Set<string>();
-    return rows.filter((r) => {
+    const seen = new Map<string, SideLink>();
+    const out: SideLink[] = [];
+    for (const r of rows) {
       const at = word(r.label);
-      if (seen.has(at)) return false;
-      seen.add(at);
-      return true;
-    });
+      const kept = seen.get(at);
+      if (kept === undefined) {
+        const row = { ...r };
+        seen.set(at, row);
+        out.push(row);
+      } else if (r.href !== kept.href) kept.near = [...(kept.near ?? []), r.href];
+    }
+    return out;
   };
   const places = o.places.map((p): SidePlace => {
     const l = folded.get(p.key);

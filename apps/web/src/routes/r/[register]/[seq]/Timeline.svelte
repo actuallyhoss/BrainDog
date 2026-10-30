@@ -193,7 +193,7 @@
           {@const whole = m.event.settled ? null : lineWhole(m.event.by, m.event.note)}
           <li class="event">
             <Face name={w.name} kind={w.kind} run={runOf(m.event.by)} size="s" />
-            <p class="event-line">{#if whole}{whole}{:else}<span class="by">{m.event.settled ?? w.name}</span> {noteSaid(m.event.note)}{/if}</p>
+            <p class="event-line">{#if whole}{whole}{:else}<span class="by">{m.event.settled ?? w.name}</span> {noteSaid(m.event.note, m.event)}{/if}</p>
             <time class="when" datetime={m.event.at}>{whenSaid(m.event.at, now)}</time>
           </li>
         {:else if m.thread.comment.resolved}

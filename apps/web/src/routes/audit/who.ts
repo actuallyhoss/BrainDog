@@ -33,12 +33,23 @@
  * further change here.
  */
 
-import { actor, type ActorKind, type RunBy } from '../../lib/record/names.ts';
+import { actor, nameWords, type ActorKind, type RunBy } from '../../lib/record/names.ts';
 import type { AuditEvent } from '../../lib/record/schema.ts';
 
 /** The words this file says of its own: a rule is named as one, beside the rule glyph its face wears. */
 export const whoWords = {
   rule: (name: string): string => (name.trim().toLowerCase() === 'ladder' ? 'Trust rule' : `A rule: ${name}`),
+  /* A RULE INSIDE A SENTENCE, by its title in quotation marks, since a rule's title is a sentence of its own: "The rule
+     “Chase late payments” closed it". */
+  ruleIn: (name: string): string => (name.trim().toLowerCase() === 'ladder' ? 'The trust rule' : `The rule “${name.trim()}”`),
+  /* WHO DID IT AND WHAT, where the line's title already said what was done (`lineSaid`'s `done`): "BrainDog closed it",
+     and not "A rule: Handled · closed". A verb with its own object ("gave access") takes no "it". */
+  did: (who: string, done: string): string => {
+    const verb = done.trim();
+    if (/\s/u.test(verb)) return `${who} ${verb}`;
+    /* A QUESTION IS ASKED ABOUT WHAT IT NAMES: "The rule … asked about it", never "asked it". */
+    return verb === 'asked' ? `${who} asked about it` : `${who} ${verb} it`;
+  },
 } as const;
 
 /**
@@ -104,6 +115,29 @@ export function actorSaid(by: string, me: string | null, names: ReadonlyMap<stri
 }
 
 /**
+ * WHO DID IT, AS A SENTENCE, for a line whose title already says what was done ("Filed 2 payments under Software"): the
+ * verb goes after who did it, "You closed it", "BrainDog closed it", "The rule “Chase late payments” closed it". It was
+ * the actor's label, a dot and the verb: "A rule: Handled · closed" (recheck of 30 October).
+ */
+export function didSaid(by: string, me: string | null, names: ReadonlyMap<string, string>, run_by: RunBy | null, done: string): string {
+  const said = saidOf(by, me, names, run_by);
+  const who = said.kind === 'rule' && said.name !== nameWords.importedRule ? whoWords.ruleIn(lead(said.name)) : said.person ? said.name : lead(said.name);
+  return whoWords.did(who, done);
+}
+
+/**
+ * BRAINDOG IS ONE ACTOR TO A READER however the record signed it: `system`, the seed, and the rules it answers for itself
+ * with (`rule:handled`), which `actor` all says "BrainDog".
+ */
+const isBrainDog = (by: string): boolean => {
+  const kind = actor(by).kind;
+  return kind === 'system' || kind === 'sample';
+};
+
+/** Whether a line signed `by` is one the `by` filter set to `who` keeps: the same actor, or BrainDog under either name. */
+export const byMatches = (by: string, who: string): boolean => by === who || (isBrainDog(by) && isBrainDog(who));
+
+/**
  * Who the line is ABOUT, when that is a person rather than a row.
  *
  * `null` for every other target, and the caller then words it as it always did: a row keeps its
@@ -143,10 +177,12 @@ export function offeredActors(
   names: ReadonlyMap<string, string>,
   runs: ReadonlyMap<string, RunBy> = new Map(),
 ): string[] {
-  /* THE SEED AND THE RECORD ITSELF ARE BOTH SAID "BrainDog" (`actor`), so a live record whose log holds both offered
-     neither. They are one actor to a reader, so the record's own chip (`system`) stands for both and the seed's is not
-     counted beside it. */
-  const offered = all.includes('system') ? all.filter((by) => by !== 'p_seed') : all;
+  /* THE SEED, THE RECORD ITSELF AND BRAINDOG'S OWN RULES ARE ALL SAID "BrainDog" (`actor`), so a live record whose log
+     holds two of them offered neither. They are one actor to a reader, so one chip stands for them all (the record's
+     own, `system`, where the log holds it) and `byMatches` keeps every one of their lines under it. */
+  const own = all.filter(isBrainDog);
+  const one = own.includes('system') ? 'system' : own[0];
+  const offered = all.filter((by) => !isBrainDog(by) || by === one);
   const seen = new Map<string, number>();
   for (const by of offered) {
     const said = actorSaid(by, me, names, runs.get(by) ?? null).name;
