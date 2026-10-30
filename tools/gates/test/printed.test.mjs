@@ -13,7 +13,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { checkScreen, LINT_HELD, OWN } from '../printed.mjs';
+import { checkScreen, LINT_HELD, OWN, WORKER_LOST } from '../printed.mjs';
 
 const GATES = join(import.meta.dirname, '..');
 const WHERE = '/today @390';
@@ -100,6 +100,18 @@ test("the self-host's own no is not a finding: its status and its path, and only
   assert.deepEqual(checkScreen(missing, { missing: true }), []);
   /* AND A SERVER'S FAULT IS NEVER THE HOST'S WORD, missing or not. */
   assert.equal(checkScreen({ where: WHERE, text: CLEAN, errors: [line(500, 'Internal Server Error')], failed: [{ status: 500, path: '/api/jobEvents' }] }, { missing: true }).length, 1);
+});
+
+test("WebKit's lost request for the worker's script is not the screen's error; any other word about the worker still is", () => {
+  const lost = { kind: 'uncaught', text: 'http://localhost:60021/service-worker.js due to access control checks.' };
+  assert.ok(WORKER_LOST.test(lost.text));
+  assert.deepEqual(said(CLEAN, [lost]), []);
+  assert.deepEqual(said(CLEAN, [{ ...lost, kind: 'console' }]), []);
+  /* THE SAME WORDS FOR ANY OTHER ADDRESS ARE STILL RED: a read the page asked for and lost is the page's to say. */
+  assert.equal(said(CLEAN, [{ kind: 'uncaught', text: 'http://localhost:60021/api/stale due to access control checks.' }]).length, 1);
+  /* AND A WORKER THAT LOADED AND WAS WRONG IS RED. */
+  assert.equal(said(CLEAN, [{ kind: 'uncaught', text: 'A bad HTTP response code (404) was received when fetching the script.' }]).length, 1);
+  assert.equal(said(CLEAN, [{ kind: 'uncaught', text: 'SyntaxError: Unexpected token in service-worker.js' }]).length, 1);
 });
 
 /* ── the planted trees, as the self-test runs them ── */
