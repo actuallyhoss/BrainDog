@@ -139,7 +139,8 @@ test('a block with nothing in it is no tile, the opening line is under the title
     where,
   );
   assert.equal(page.lead, 'Settle how Kiln is licensed');
-  assert.deepEqual(page.blocks.map((s) => s.block.heading), ['Runs on', 'Tools', 'The road']);
+  /* AND AN EMPTY BLOCK'S OWN SENTENCE IS THE OWNER'S, so "The road: Kiln has no stages yet." is no tile either (AF18). */
+  assert.deepEqual(page.blocks.map((s) => s.block.heading), ['Runs on', 'Tools']);
   const tools = page.blocks[1]!;
   assert.deepEqual(tools.columns.map((c) => c.label), ['Name']);
   assert.equal(tools.rows.length, 1);

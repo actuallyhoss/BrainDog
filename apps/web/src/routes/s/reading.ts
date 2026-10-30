@@ -235,8 +235,9 @@ function columnsOf(b: SharedBlock): (SharedColumn & { label: string })[] {
  *
  * A BLOCK WITH NOTHING TO SAY IS NOT A TILE. A project's own parts, a list of keys whose names a link keeps back and a
  * row of figures the record sent none of each drew a card with a heading over nothing ("Overview", "Numbers and work",
- * "Key numbers"), so a stranger read the owner's tab names as empty boxes. Only a block's own `empty:` sentence keeps an
- * empty block, since that is something its owner wrote to be read.
+ * "Key numbers"), so a stranger read the owner's tab names as empty boxes. NOR DOES A BLOCK'S OWN `empty:` SENTENCE KEEP
+ * ONE: it is written for the owner, who can fill it, and a stranger read "The road: Kiln has no stages yet." about a part
+ * of the work nobody had started (audit f, AF18).
  *
  * AND IN A TILE, NO EMPTY COLUMN AND NO NAMELESS ROW: a column no row fills is not drawn ("Doing said", "Note"), and a row
  * whose first column is blank, a key whose name is kept back, is left out rather than drawn as a blank line.
@@ -261,7 +262,7 @@ export function shownBlocks(blocks: readonly SharedBlock[], where: Where): { lea
     const title = columns[0];
     const rows = title === undefined ? [] : b.rows.filter((r) => !blank(cellSaid(r, title, where)));
     const matched = Math.max(rows.length, b.matched - (b.rows.length - rows.length));
-    const says = rows.length > 0 || b.readings.length > 0 || b.authored.some((cells) => cells.some((c) => plainSaid(c, where) !== '')) || Boolean(b.body) || Boolean(b.refused) || Boolean(b.empty && b.rows.length === 0);
+    const says = rows.length > 0 || b.readings.length > 0 || b.authored.some((cells) => cells.some((c) => plainSaid(c, where) !== '')) || Boolean(b.body) || Boolean(b.refused);
     if (says) out.push({ block: b, columns, rows, matched });
   }
   /* A SECTION WITH NOTHING UNDER IT before the next section, or the end, goes. */

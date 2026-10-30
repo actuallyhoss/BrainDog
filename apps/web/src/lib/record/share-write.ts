@@ -32,6 +32,9 @@ export const words = {
   shareLead: 'Anybody with the link can read this page as it is now. They cannot change anything or open any other page.',
   shareDays: 'Works for',
   shareMake: 'Make the link',
+  /* THE ONE TICK ON A LINK: amounts are left off it unless it is ticked. */
+  shareMoney: 'Include money',
+  shareMoneyWhy: 'Amounts, bills and money figures. Left off, they are not on the link at all.',
   shareMaking: 'Making the link',
   shareOnce: 'This is the only time the link is shown. Copy it now.',
   shareLinkLabel: 'Read-only link',
@@ -61,7 +64,8 @@ export const words = {
   sharedRetry: 'Try again',
   sharedDetails: 'Details',
   sharedMade: 'Made with BrainDog',
-  sharedShowing: (shown: number, of: number) => `Showing ${shown} of ${of}`,
+  /* UNDER A LIST THE LINK SHOWS PART OF: how many more there are, since a stranger has no way to the rest (AF18). */
+  sharedMore: (more: number) => `and ${more} more`,
   sharedNoRows: 'Nothing here yet',
   sharedNoFigure: 'No figure',
   sharedNothing: 'This page has nothing a link can show.',
@@ -78,9 +82,12 @@ export const daysSaid = (n: number): string => (n === 1 ? '1 day' : `${n} days`)
 
 const clientOf = (base: string, io?: Fetch) => createClient({ base, ...(io ? { fetch: io } : {}) });
 
-/** Open a link to one page. The link is in the answer once, and nowhere after it. */
-export async function openLink(base: string, slug: string, days: number, io?: Fetch): Promise<Wrote<ShareLink>> {
-  return wrote(await clientOf(base, io).openShare({ slug, days }));
+/**
+ * Open a link to one page. The link is in the answer once, and nowhere after it. `money` says whether its amounts, money
+ * figures and money lists go on it, which the sharer ticks as "Include money" (AF18); the record leaves them off unsaid.
+ */
+export async function openLink(base: string, slug: string, days: number, money: boolean, io?: Fetch): Promise<Wrote<ShareLink>> {
+  return wrote(await clientOf(base, io).openShare({ slug, days, money }));
 }
 
 /** Close one link for good. Sharing the page again makes a new link. */

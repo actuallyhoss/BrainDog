@@ -959,7 +959,7 @@
         <!-- ONE SHARE ON AN ACCOUNT (audit of 30 October, 19): its first choice is sharing the account, the sheet
              `AccountShare.svelte` draws, where Share and "Share this account" stood side by side. -->
         {@const account = accountPage && sharable ? about : null}
-        <ShareMenu {slug} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />
+        <ShareMenu {slug} project={projectPage} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />
         {#if sharing && sharable && !account}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
         {#if account}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="sheet" ask={accountAsk} seq={account.seq} name={account.title} />{/await}{/if}
         <ChangePage

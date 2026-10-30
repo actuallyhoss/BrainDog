@@ -42,10 +42,20 @@
   import Sheet from './Sheet.svelte';
   import { toasts } from './toast.svelte.ts';
 
-  let { slug, people, peopleLabel }: { slug: string; people?: (() => void) | undefined; peopleLabel?: string | undefined } = $props();
+  let {
+    slug,
+    people,
+    peopleLabel,
+    project = false,
+  }: { slug: string; people?: (() => void) | undefined; peopleLabel?: string | undefined; project?: boolean } = $props();
 
   let open = $state(false);
   let days = $state<number>(SHARE_DAYS_DEFAULT);
+  /**
+   * WHETHER THE LINK CARRIES MONEY (AF18): off on a project's page until the sharer ticks it, since a project's bills
+   * went to whoever held its link without anybody choosing that; on elsewhere, where a page of money is its money.
+   */
+  let money = $state(false);
   let busy = $state(false);
   let made = $state<{ link: string; until: string } | null>(null);
   let refused = $state<string | null>(null);
@@ -67,6 +77,7 @@
     made = null;
     refused = null;
     days = SHARE_DAYS_DEFAULT;
+    money = !project;
     mode = 'link';
     open = true;
     void ask();
@@ -151,7 +162,7 @@
     busy = true;
     refused = null;
     try {
-      const out = await openLink(apiBase(), slug, days);
+      const out = await openLink(apiBase(), slug, days, money);
       if (out.ok) made = { link: linkOf(out.value.url, globalThis.location.origin), until: dateSaid(out.value.expires_at.slice(0, 10), recordNow()) };
       else refused = out.fix;
     } finally {
@@ -252,6 +263,13 @@
           >
         {/each}
       </Segmented>
+      <label class="share-money">
+        <input type="checkbox" bind:checked={money} aria-describedby="{ids}money-why" />
+        <span class="share-money-words">
+          <span>{words.shareMoney}</span>
+          <span class="share-hint" id="{ids}money-why">{words.shareMoneyWhy}</span>
+        </span>
+      </label>
       {#if refused}<p class="refused" role="alert">{refused}</p>{/if}
       <div class="share-actions">
         <Button weight="primary" disabled={busy} aria-busy={busy ? 'true' : undefined} onclick={() => void make()}>
@@ -389,6 +407,28 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+  }
+
+  /* THE ONE TICK: its box beside its words, the reason under them in the hint's ink, a whole row to press. */
+  .share-money {
+    display: flex;
+    align-items: start;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    cursor: pointer;
+  }
+
+  .share-money input {
+    flex: none;
+    margin-block-start: 3px;
+  }
+
+  .share-money-words {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
   .refused {

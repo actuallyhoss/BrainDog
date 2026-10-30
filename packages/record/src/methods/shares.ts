@@ -27,6 +27,10 @@
  * in the record's language, and one with nothing to fill prints nothing; and the answer says the record's language and
  * zone, so a stranger's device does not decide how a number or a day reads.
  *
+ * MONEY ONLY WHEN THE SHARER SAID SO (audit f, AF18). A link opened from now on carries `money` on its `share.open`, and
+ * it is false unless `openShare` was told `money: true`: every amount, every money figure and every list that is money
+ * is then kept off the link (`moneyFree`). A link opened before carries nothing about money and shows what it showed.
+ *
  * ONLY WHERE THE HOST SAYS IT CAN. `shareable` asks the host (`shares` in the record's dependencies), and a host that
  * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
@@ -484,6 +488,45 @@ type Showing = {
   cell: (form: TypedForm, arg: string) => string | undefined;
   /** The lists a block reads, as the kernel names them (`blockRegisters`), `*` for the whole record. */
   reads: (b: BlockResult) => readonly string[];
+  /** Whether the link shows money: false keeps every amount, money figure and money list off it (`moneyFree`). */
+  money: boolean;
+};
+
+/**
+ * A LIST THAT IS MONEY: one whose rows each must hold an amount (a required money field), which is what the list is for
+ * (the ledger, bills, accounts, what recurs). A list that merely may hold one (a person's rate, a project's revenue) is
+ * not, and keeps its rows with the amount taken off.
+ */
+const moneyList = (decl: RegisterDecl | undefined): boolean => decl !== undefined && decl.fields.some((f) => f.type === 'money' && f.required === true && f.retired !== true);
+
+/** Whether anything in a value is an amount: money as minor units and a currency, at any depth. */
+const holdsMoney = (x: unknown, depth = 0): boolean => {
+  if (depth > 6 || x === null || typeof x !== 'object') return false;
+  if (moneyShown(x) !== undefined) return true;
+  return (Array.isArray(x) ? x : Object.values(x)).some((v) => holdsMoney(v, depth + 1));
+};
+
+/** A figure read in a currency, or one whose parts are amounts. */
+const moneyReading = (reading: unknown): boolean =>
+  isRecord(reading) && ((typeof reading.unit === 'string' && /^[A-Z]{3}$/u.test(reading.unit)) || holdsMoney(reading.parts) || holdsMoney(reading.groups) || holdsMoney(reading.noRate));
+
+/**
+ * A block with money kept off it, or `null` for a block that is money through and through: a cash walk, a block over a
+ * list that is money (`moneyList`), or the runway. Otherwise a column of an amount goes (and its cells with it, since a
+ * row keeps only what its columns draw), a figure read in a currency goes, and a computed key that holds an amount goes.
+ */
+const moneyFree = (b: BlockResult, showing: Showing): BlockResult | null => {
+  if (b.walk !== undefined || b.walks !== undefined || b.source === 'forecast.runway') return null;
+  const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
+  const lists = [...showing.reads(b), ...(list === undefined ? [] : [list]), ...b.rows.map((r) => r.register)];
+  if (lists.some((l) => moneyList(showing.lists.get(l)))) return null;
+  const typeOf = (field: string): FieldType | undefined => (list === undefined ? undefined : showing.lists.get(list)?.fields.find((f) => f.id === field)?.type);
+  const block = b as unknown as Record<string, unknown>;
+  const kept: Record<string, unknown> = { ...block };
+  if (b.columns !== undefined) kept.columns = b.columns.filter((c) => c.sign === undefined && typeOf(c.field) !== 'money');
+  if (b.readings !== undefined) kept.readings = b.readings.filter((r) => !moneyReading(r.reading));
+  for (const key of FIGURES) if (holdsMoney(block[key])) delete kept[key];
+  return kept as unknown as BlockResult;
 };
 
 /** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
@@ -518,11 +561,13 @@ const WORDS = ['heading', 'lead', 'empty', 'body'] as const;
  * columns, which is what a card or a list without columns draws. A `sign` names a second field a money column reads.
  * Every column says the label the owner reads over it: hers, else the field's, else the field's id as words.
  */
-const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> | null => {
+const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknown> | null => {
   const { lists, figure, said, typed, cell } = showing;
-  if (typeof b.kind !== 'string' || !shareKind(b.kind) || !shareDraws(b.source)) return null;
-  if (showing.reads(b).some((list) => NEVER_READ.has(list))) return null;
-  if (b.refusals.length > 0) return null;
+  if (typeof whole.kind !== 'string' || !shareKind(whole.kind) || !shareDraws(whole.source)) return null;
+  if (showing.reads(whole).some((list) => NEVER_READ.has(list))) return null;
+  if (whole.refusals.length > 0) return null;
+  const b = showing.money ? whole : moneyFree(whole, showing);
+  if (b === null) return null;
   const block = b as unknown as Record<string, unknown>;
   const kept: Record<string, unknown> = {};
   for (const key of LOOKS) if (block[key] !== undefined) kept[key] = block[key];
@@ -589,8 +634,16 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
   return kept;
 };
 
+/**
+ * HOW A VALUE IS SAID ON A LINK THAT KEEPS MONEY OFF: an amount is said as nothing at all, which a note reads as a hole
+ * (`GONE`), so the sentence that held "£18,400" is left out whole and a heading loses the word alone.
+ */
+const moneyKept = (money: boolean, said: Showing['said']): Showing['said'] =>
+  money ? said : (v) => (moneyShown(v) !== undefined || (Array.isArray(v) && v.length > 0 && v.every((m) => moneyShown(m) !== undefined)) ? undefined : said(v));
+const typedKept = (money: boolean, typed: Showing['typed']): Showing['typed'] => (money ? typed : (form, arg) => (form === 'money' ? undefined : typed(form, arg)));
+
 /** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
-type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure']; reads: Showing['reads'] };
+type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure']; reads: Showing['reads']; money: boolean };
 
 /**
  * The page as a link shows it: its title, when it was read, its layout, when the link closes, the language and zone it
@@ -600,7 +653,15 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
   const layout = isRecord(page.layout) ? page.layout : null;
   const language = languageOf(where.language);
   const zone = typeof where.zone === 'string' && where.zone !== '' ? where.zone : typeof page.zone === 'string' && page.zone !== '' ? page.zone : 'UTC';
-  const showing: Showing = { lists, figure: where.figure, reads: where.reads, said: saidIn(language, where.home), typed: typedIn(where.now, zone, where.home), cell: typedIn(where.now, zone, where.home, true) };
+  const showing: Showing = {
+    lists,
+    figure: where.figure,
+    reads: where.reads,
+    money: where.money,
+    said: moneyKept(where.money, saidIn(language, where.home)),
+    typed: typedKept(where.money, typedIn(where.now, zone, where.home)),
+    cell: typedKept(where.money, typedIn(where.now, zone, where.home, true)),
+  };
   const blocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
   return {
     title: page.title,
@@ -688,6 +749,20 @@ export function methods(deps: RecordDeps) {
   };
 
   /**
+   * WHETHER A LINK SHOWS MONEY: only one opened since links said so carries `money`, and only `false` keeps it off. A link
+   * opened before (no `money`, or nothing bound at all) shows what it always showed, so nobody's sent link changes.
+   */
+  const moneyOf = (said: string | null): boolean => {
+    if (said === null) return true;
+    try {
+      const b = JSON.parse(said) as { money?: unknown };
+      return b.money !== false;
+    } catch {
+      return true;
+    }
+  };
+
+  /**
    * The slug a link's page has now, or `null` when what it was made for is gone or has become something else.
    *
    * A PAGE OF A ROW IS FOUND BY ITS ROW, so a renamed row's link follows the row to its new address and never stays on
@@ -763,7 +838,7 @@ export function methods(deps: RecordDeps) {
      * THE HOST SIGNS THE LINK after this answers (`withShareLinks`, and `linkOpened` at the Worker's door), and a host
      * with no key refuses before this is asked, so no `share.open` is written for a link nobody could be handed.
      */
-    async openShare(args: { slug?: unknown; days?: unknown } | undefined, ctx: CallContext): Promise<Result<ShareOpened>> {
+    async openShare(args: { slug?: unknown; days?: unknown; money?: unknown } | undefined, ctx: CallContext): Promise<Result<ShareOpened>> {
       const stop = admin(ctx);
       if (stop) return { ok: false, refusal: stop };
       if (ctx.principal.kind !== 'person' || ctx.credentialed === false)
@@ -780,6 +855,9 @@ export function methods(deps: RecordDeps) {
       const days = said.days === undefined ? SHARE_DAYS : said.days;
       if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > SHARE_DAYS_MOST)
         return no('OUT_OF_BOUNDS', `A link opens for a whole number of days from 1 to ${SHARE_DAYS_MOST}, and ${SHARE_DAYS} unless you say.`, { at: 'days' });
+      /* MONEY IS OFF UNLESS SAID (AF18): the sharer ticks "Include money", and an agent says `money: true`. */
+      const money = said.money === undefined ? false : said.money;
+      if (typeof money !== 'boolean') return no('VALUE_MALFORMED', 'Say money as true to show amounts on the link, or false to keep them off.', { at: 'money' });
       if (!kernel.pages().some((p) => p.slug === slug)) return no('PAGE_UNKNOWN', 'There is no such page to share.', { at: 'slug' });
       if (personalPage(slug)) return no('FORBIDDEN', 'This page shows a personal list, which only the owner reads, so no link can open it.', { at: 'slug' });
       const bound = boundFor(slug);
@@ -795,7 +873,8 @@ export function methods(deps: RecordDeps) {
         `share:${id}`,
         slug,
         expires_at,
-        JSON.stringify(bound),
+        /* WHAT IT WAS MADE FOR, AND WHETHER IT SHOWS MONEY, in one: `boundOf` reads the first and leaves `money` alone. */
+        JSON.stringify({ ...bound, money }),
       );
       return tail(ok({ id, slug, expires_at }));
     },
@@ -901,7 +980,7 @@ export function methods(deps: RecordDeps) {
       const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
       const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
       const reads = (b: BlockResult): readonly string[] => kernel.blockRegisters(b as unknown as Parameters<typeof kernel.blockRegisters>[0]);
-      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads }));
+      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money: moneyOf(opened.bound) }));
     },
   };
 }

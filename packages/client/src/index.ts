@@ -3190,8 +3190,8 @@ export function createClient(options: ClientOptions) {
 
     /* SHARED LINKS TO ONE PAGE. The first three are ADMIN, so a browser session at owner; their answers are
        `@braindog/host`'s, because the host signs the link into `openShare`'s and the record never holds the key. */
-    /** Open a read-only link to one page, for `days` from 1 to 90 (30 unless said). The link is in the answer once. */
-    openShare: (args: { slug: string; days?: number }) => call<ShareLink>('openShare', args as Record<string, unknown>),
+    /** Open a read-only link to one page, for `days` from 1 to 90 (30 unless said), with amounts only when `money` is true. The link is in the answer once. */
+    openShare: (args: { slug: string; days?: number; money?: boolean }) => call<ShareLink>('openShare', args as Record<string, unknown>),
     /** Whether this host can open a link at all, and the sentence why not when it cannot. */
     shareable: () => call<{ can: boolean; why?: string }>('shareable'),
     /** Close one link for good. Sharing the page again makes a new link. */

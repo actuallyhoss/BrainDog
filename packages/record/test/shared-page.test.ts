@@ -77,11 +77,12 @@ async function harness() {
     api.kernel.create('invoices', { client: COMPANIES[1], amount_due: { amount: 30_050, currency: 'EUR' }, stage: 'paid', parent: first.id }, { actor: 'p_owner' }),
   );
   const direct = shareMethods({ kernel: api.kernel, sql, clock, no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
-  const read = async (slug: string): Promise<SharedPage> => {
-    const { id } = value<{ id: string }>(await direct.openShare({ slug }, owner));
+  /* THESE LINKS SAY "Include money", since what they test is how money reads on one; a link that does not is below. */
+  const read = async (slug: string, money: boolean | 'unsaid' = true): Promise<SharedPage> => {
+    const { id } = value<{ id: string }>(await direct.openShare(money === 'unsaid' ? { slug } : { slug, money }, owner));
     return value<SharedPage>(await api.sharedPage(undefined, link(id, slug)));
   };
-  return { sql, read, rows: [first.id, second.id] };
+  return { sql, read, direct, api, rows: [first.id, second.id] };
 }
 
 /** Every string anywhere in an answer: what a reader could print. */
@@ -187,7 +188,7 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
   sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
   const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
-  const { id } = value<{ id: string }>(await direct.openShare({ slug: 'notes' }, owner));
+  const { id } = value<{ id: string }>(await direct.openShare({ slug: 'notes', money: true }, owner));
   const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'notes')));
   const note = (shown.blocks.find((b) => b.kind === 'note') as { body: string }).body;
   assert.match(note, /^Earning\. £18,400(?:\.00)?(?: GBP)? in the last twelve months\.$/mu);
@@ -196,5 +197,64 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
   assert.match(note, /Letting it lapse breaks links\.\n```/u);
   assert.match(note, /^Settled by research\.$/mu);
   assert.doesNotMatch(note, /SG31|D41|Tracked|invoices|\{\{|\}\}|\u0000/u);
+  sql.close();
+});
+
+test('AF18: A NEW LINK KEEPS MONEY OFF UNLESS IT WAS ASKED FOR, and a link made before shows what it showed', async () => {
+  const { sql, read, direct, api } = await harness();
+  for (const money of ['unsaid', false] as const) {
+    const shown = await read('money', money);
+    const said = JSON.stringify(shown);
+    assert.doesNotMatch(said, /"currency"|EUR|GBP|€|£/u, `money reached a link made with money ${String(money)}`);
+    /* THE ROWS STAY, THEIR AMOUNT GOES: invoices may hold an amount, and are not money through and through. */
+    const table = tableOf(shown);
+    assert.deepEqual(table.columns.map((c) => c.label), ['Client', 'Stage', 'Where']);
+    for (const r of table.rows) assert.equal(r.cells.amount_due, undefined);
+    /* A FIGURE IN A CURRENCY GOES, and the sentence that said it goes whole. */
+    const stat = shown.blocks.find((b) => b.kind === 'stat') as { readings?: unknown[] } | undefined;
+    assert.equal(stat?.readings?.length ?? 0, 0);
+    const note = shown.blocks.find((b) => b.kind === 'note') as { body?: string } | undefined;
+    assert.doesNotMatch(note?.body ?? '', /Owed/u);
+  }
+  /* SAID AS ANYTHING BUT TRUE OR FALSE, IT IS REFUSED, rather than read as either. */
+  const bad = (await direct.openShare({ slug: 'money', money: 'yes' }, owner)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  assert.equal(bad.ok, false);
+  assert.deepEqual([bad.refusal?.code, bad.refusal?.at], ['VALUE_MALFORMED', 'money']);
+  /* A LINK OPENED BEFORE LINKS SAID SO carries no word about money, and shows it as it did. */
+  const { id } = value<{ id: string }>(await direct.openShare({ slug: 'money', money: false }, owner));
+  const held = sql.one<{ bound: string }>("SELECT from_v AS bound FROM event WHERE target = ? AND kind = 'share.open'", `share:${id}`)!;
+  const { money: _gone, ...before } = JSON.parse(held.bound) as Record<string, unknown>;
+  assert.equal(_gone, false);
+  sql.exec("UPDATE event SET from_v = ? WHERE target = ? AND kind = 'share.open'", JSON.stringify(before), `share:${id}`);
+  const old = value<SharedPage>(await api.sharedPage(undefined, link(id, 'money')));
+  assert.match(JSON.stringify(old), /"currency":"GBP"/u);
+  sql.close();
+});
+
+test('AF18: WITH MONEY OFF, A LIST THAT IS MONEY IS NOT SENT AT ALL', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  sql.exec(
+    "INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, 'rec_1', 'studio', 'Studio', 'en-GB', 'Europe/London', 1, '2026-10-01T00:00:00.000Z')",
+  );
+  const LEDGER = {
+    id: 'register.ledger',
+    kind: 'register',
+    body: { id: 'ledger', name: 'Bills and invoices', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money', required: true }] },
+  } as never;
+  const PLAN = page('plan', [
+    { kind: 'table', source: 'register.ledger', heading: 'Bills', columns: [{ field: 'what' }, { field: 'amount' }] },
+    { kind: 'note', heading: 'Notes', body: 'Earning. {{money:1840000 GBP}} in the last twelve months.\n\nThe licensing tier ships in September.' },
+  ]);
+  value(await api.kernel.install([LEDGER, PLAN]));
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  value(api.kernel.create('ledger', { what: 'Hosting, quarterly, July', amount: { amount: -853_000, currency: 'GBP' } }, { actor: 'p_owner' }));
+  const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
+  const { id } = value<{ id: string }>(await direct.openShare({ slug: 'plan' }, owner));
+  const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'plan')));
+  const said = JSON.stringify(shown);
+  assert.doesNotMatch(said, /Hosting|Bills|18,400|GBP|£/u);
+  assert.match(said, /The licensing tier ships in September\./u);
   sql.close();
 });

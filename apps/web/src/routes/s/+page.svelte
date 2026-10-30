@@ -159,9 +159,7 @@
         {/each}
       </tbody>
     </table>
-    {#if s.matched > s.rows.length}<p class="part-note">{words.sharedShowing(s.rows.length, s.matched)}</p>{/if}
-  {:else if s.rows.length === 0 && b.readings.length === 0 && b.authored.length === 0 && !b.body && b.empty}
-    <p class="part-note">{b.empty}</p>
+    {#if s.matched > s.rows.length}<p class="part-note">{words.sharedMore(s.matched - s.rows.length)}</p>{/if}
   {/if}
 {/snippet}
 
