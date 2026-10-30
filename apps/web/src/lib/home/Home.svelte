@@ -57,7 +57,7 @@
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase, at as inApp } from '$lib/at.ts';
-  import { stillShown } from 'braindog-render';
+  import { stillShown, type WidgetSize } from 'braindog-render';
   import { recordToday } from '$lib/record/zone.ts';
   import { partsOf } from '$lib/shell/headline.ts';
   import { barTitled, frame } from '$lib/shell/frame.svelte.ts';
@@ -125,6 +125,7 @@
   import EditCover from '$lib/board/EditCover.svelte';
   import DraftMark from '$lib/board/DraftMark.svelte';
   import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
+  import { restSize, rowsOf } from '$lib/board/rest-size.ts';
   import { leftBlock, phoneAsk, withLeft } from '$lib/home/phone-ask.ts';
   import { fitted, widgetsOf, type Phone } from '$lib/board/board-widgets.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -977,7 +978,34 @@
       }),
     );
   });
-  boardModel.src = { widgets: () => boardWidgets, phone: () => boardPhone, shown: () => boardShown, names: () => boardNames, drafts: () => boardDrafts, quiet: () => boardQuiet };
+  /**
+   * EACH TILE AS TALL AS WHAT IT HOLDS, on a laptop at rest (`rest-size.ts`, first-hour audit E6): a large Needs you with
+   * nothing asked, or a large list with one order in it, is laid one row tall. Read off the blocks as drawn, by the size
+   * each was given, so it never feeds the size the rows are cut to.
+   */
+  const boardRest = $derived.by((): ReadonlyMap<string, WidgetSize> => {
+    const out = new Map<string, WidgetSize>();
+    if (!board || !deskedRaw || boardModel.onPhone) return out;
+    const kinds = new Map(boardWidgets.map((w) => [w.key, w.kind] as const));
+    const counted = new Map<string, number | null>();
+    for (const b of deskedRaw) {
+      const k = boardKeyOf(b);
+      if (!k || !kinds.has(k) || counted.has(k)) continue;
+      counted.set(k, b.drawn || k === 'needs-you' ? rowsOf(b as unknown as Parameters<typeof rowsOf>[0]) : null);
+    }
+    /* NEEDS YOU WITH NOTHING ASKED IS ITS FOOT ALONE, the calm line, and a red sign's line under it when there is one. A
+       question is a tall line with its answers, so with any asked it keeps its frame. */
+    const asked = counted.get('needs-you');
+    if (kinds.has('needs-you')) counted.set('needs-you', asked === 0 || asked === null || asked === undefined ? (signsSaid ? 1 : 0) : null);
+    if (kinds.has('arrivals')) counted.set('arrivals', landed.length);
+    for (const [k, rows] of counted) {
+      const size = boardModel.sizeNow(k);
+      const at = restSize(kinds.get(k)!, size, rows);
+      if (at !== size) out.set(k, at);
+    }
+    return out;
+  });
+  boardModel.src = { widgets: () => boardWidgets, phone: () => boardPhone, shown: () => boardShown, names: () => boardNames, drafts: () => boardDrafts, quiet: () => boardQuiet, rest: () => boardRest };
   /* THE DRAFT IS KEPT ON THIS DEVICE UNDER THE RECORD IT IS FOR. */
   boardModel.draftKey = `bd_board_draft:${apiBase()}`;
 
