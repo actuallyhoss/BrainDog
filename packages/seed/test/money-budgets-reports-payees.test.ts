@@ -257,8 +257,13 @@ test('REPORTS AND PAYEES NARROW BY WHAT IS PICKED: the months on Reports, one pa
   const last = m.block('money-reports', 'Spending by category', { months: 'last' });
   assert.ok(last.rows!.length > 0 && last.rows!.every((r) => String(r.fields.on) < '2026-10-01' && String(r.fields.on) >= '2026-09-01'));
 
-  const one = m.block('money-payees', 'Last paid', { payee: 'Lantern Grill' });
-  assert.deepEqual(one.rows!.map((r) => r.fields.on), ['2026-10-09', '2026-09-20', '2026-09-12']);
+  /* ONE PAYEE PICKED IS ONE BAR: what was paid, how many times and the day of the last (`tally:`, audit of 31 October). */
+  const one = m.block('money-payees', 'Who you paid, 90 days', { payee: 'Lantern Grill' });
+  const whole = (one as { wholeRead?: { rows: { label: unknown; rows: number; last?: string }[] } }).wholeRead!;
+  assert.deepEqual(
+    whole.rows.map((r) => [r.label, r.rows, r.last]),
+    [['Lantern Grill', 3, '2026-10-09']],
+  );
   const lead = m.page('money-payees').find((b) => b.lead && b.drawn !== false)!;
   assert.equal(lead.values?.['payees-paid-90d'], 3);
 });
