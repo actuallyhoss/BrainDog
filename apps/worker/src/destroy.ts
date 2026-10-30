@@ -25,6 +25,7 @@
  */
 
 import { filesPrefix } from './files.ts';
+import { heldPrefixes } from './held.ts';
 import { sealedPrefix } from './sealed.ts';
 import { prefixOf, type Blobs } from './snapshots.ts';
 
@@ -130,7 +131,10 @@ export async function expireFinal(blobs: Pick<Blobs, 'list' | 'delete'>, record:
   /* AND ITS FILES, for the same measured reason: a record deleted before the file store's prefix was swept at delete
      left its files at `<record>/a/`, and a closed record's prefix is the one place anybody will find them. Its sealed
      files' parts likewise, at `<record>/sealed/`. */
-  return (await sweep(blobs, prefixOf(record), null)) + (await sweep(blobs, filesPrefix(record), null)) + (await sweep(blobs, sealedPrefix(record), null));
+  let removed = (await sweep(blobs, prefixOf(record), null)) + (await sweep(blobs, filesPrefix(record), null)) + (await sweep(blobs, sealedPrefix(record), null));
+  /* AND ITS KEPT ARRIVALS, waiting or given up (`held.ts`), which a deletion before they were swept left behind. */
+  for (const prefix of heldPrefixes(record)) removed += await sweep(blobs, prefix, null);
+  return removed;
 }
 
 /**
@@ -166,6 +170,9 @@ export async function destroyRecord(storage: Wipe, close: Close, record: string 
     /* AND ITS SEALED FILES, which nothing but the record names and the final copy names without their bytes. A record put
        back from that copy lists them as not whole, and the owner's machines put them again. */
     removed += await sweep(copies.blobs, sealedPrefix(record), null);
+    /* AND THE ARRIVALS KEPT AT THE DOOR FOR IT, waiting or given up (`held.ts`): sealed webhook bodies, bank texts among
+       them, that outlived the record they were for. */
+    for (const prefix of heldPrefixes(record)) removed += await sweep(copies.blobs, prefix, null);
     answer = { kept, removed };
   }
   await storage.deleteAlarm();

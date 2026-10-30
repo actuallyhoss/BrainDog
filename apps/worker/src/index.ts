@@ -83,7 +83,7 @@ import { cloudVisuals, pagesPrefix } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, resetSaid, type Cuts } from './alarm-cuts.ts';
 import { isHeld, redeliver, serveHeld, sweepHeld, type HeldDeps, type HeldMessage } from './held.ts';
-import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
+import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
@@ -2916,8 +2916,8 @@ const NIGHT_WAIT_MS = 1500;
 /** The Directory's window over every isolate's ops mail, for `opsAlert`. */
 const alertClaim =
   (env: Env) =>
-  (kind: OpsKind, quietMs: number): Promise<boolean> =>
-    env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).alertDue(kind, quietMs);
+  (slot: string, quietMs: number): Promise<boolean> =>
+    env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).alertDue(slot, quietMs);
 
 /**
  * One pass over one record’s outbox, with this deployment’s bindings behind it.

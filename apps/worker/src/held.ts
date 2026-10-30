@@ -56,6 +56,15 @@ export const HELD_TELL_AFTER = 6;
 /** A kept arrival still waiting this long after it was kept is given up on, with a mail: a week. */
 export const HELD_OLDEST_MS = 7 * 86_400_000;
 
+/**
+ * How long a given-up arrival is kept for the operator to read, after which the nightly sweep deletes it: thirty days, the
+ * same as a deleted record's final copy. It was kept for ever, so a sealed bank text outlived any reason to look at it.
+ */
+export const HELD_GAVE_UP_MS = 30 * 86_400_000;
+
+/** Every prefix a record's kept arrivals sit under, waiting or given up, so a deletion empties both (`destroy.ts`). */
+export const heldPrefixes = (record: string): string[] => [`${HELD_WAIT}${record}/`, `${HELD_GAVE_UP}${record}/`];
+
 /** How long the door waits before its second ask. */
 const SECOND_ASK_MS = 500;
 
@@ -307,7 +316,31 @@ export async function sweepHeld(deps: HeldDeps): Promise<number> {
     rung += 1;
   }
   if (page.objects.length > 0) op({ op: 'door', swept: rung, waiting: page.objects.length }, rung > 0 ? 'error' : 'info');
+  /* AND A GIVEN-UP ARRIVAL PAST ITS THIRTY DAYS GOES, apart from the ringing, so a bucket that will not list does not stop
+     the rings above. */
+  try {
+    const gone = await pruneGaveUp(bucket, now);
+    if (gone > 0) op({ op: 'door', pruned: gone });
+  } catch (e) {
+    op({ op: 'door', pruned: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+  }
   return rung;
+}
+
+/**
+ * Deletes every given-up arrival older than `HELD_GAVE_UP_MS`, across every page of the listing, and answers how many.
+ * Their keys carry no metadata, so the age is when the object was written, which is when it was given up on.
+ */
+export async function pruneGaveUp(bucket: HeldBucket, now: number): Promise<number> {
+  const old: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({ prefix: HELD_GAVE_UP, ...(cursor === undefined ? {} : { cursor }) });
+    for (const o of page.objects) if (now - o.uploaded.getTime() > HELD_GAVE_UP_MS) old.push(o.key);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor !== undefined);
+  for (const key of old) await bucket.delete(key);
+  return old.length;
 }
 
 /* ── the pieces ───────────────────────────────────────────────────────────── */
