@@ -409,14 +409,14 @@
       "name": "Keep a service live, and leave its next renewal day to you",
       "pack": "estate",
       "on": { "decided": { "about": "rule.renew-soon", "option": "Keep it" } },
-      "steps": [ { "move": "live" }, { "note": "You chose to keep this in Decide. Set the day it renews next once it has." } ]
+      "steps": [ { "move": "live" }, { "note": "You chose to keep this in Needs you. Set the day it renews next once it has." } ]
     },
     {
       "rule": "renewal-cancelled",
       "name": "Mark a service cancelled, and leave telling the provider to you",
       "pack": "estate",
       "on": { "decided": { "about": "rule.renew-soon", "option": "Cancel it" } },
-      "steps": [ { "move": "cancelled" }, { "note": "You chose to cancel this in Decide. Cancel it with the provider too." } ]
+      "steps": [ { "move": "cancelled" }, { "note": "You chose to cancel this in Needs you. Cancel it with the provider too." } ]
     }
   ],
   "seeds": [

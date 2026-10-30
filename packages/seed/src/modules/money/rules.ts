@@ -291,7 +291,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
        chased, and a note on the row says why the day is there. */
     steps: [
       { set: { field: 'chased', to: '{{trigger.day}}' } },
-      { note: 'You chose to chase this in Decide.' },
+      { note: 'You chose to chase this in Needs you.' },
       /* AND A MESSAGE READY TO SEND, in "Draft to send": the invoice's own amount and due day in one
          plain sentence, in the two forms a template writes a message in (`{{short:amount}}`, `{{on:due}}`). It names
          nobody, so it reads whole on an invoice with no person on it. WRITTEN ONLY WHERE THERE IS NONE: an invoice
