@@ -10,9 +10,9 @@
  * nav, its notifications, a list's default (kept by person already), and each person's publisher key, which is kept
  * under their own id (`author-key.ts`) and is reached only by them.
  *
- * AND THE PICTURES DRAWN WIDGETS LEFT (`drawn-pictures.ts`): each is what a component drew from the record as the person
- * who last saw it, keyed by its code and size alone, so the next person's board drew it at once, before their own
- * component ran.
+ * NOT THE PICTURES DRAWN WIDGETS LEFT (`drawn-pictures.ts`), which went here once (SEC23) and are now kept under the
+ * person and the BrainDog they were drawn for, so the next person is never drawn one and the same person's sign-in does
+ * not redraw every widget from nothing (sec-follow M3).
  *
  * THE KEYS ARE WRITTEN OUT HERE, not imported, so sign-out loads none of the screens that keep them;
  * `signed-out.test.ts` holds each to the constant its own module keeps it under.
@@ -41,8 +41,6 @@ export const SIGNED_OUT_KEYS = [
   'today-late-aside',
   'braindog:slot:aside',
   'braindog.inbox.into',
-  /* the list of drawn widgets' pictures kept (`drawn-pictures.ts`) */
-  'bd.drawn.pics',
 ] as const;
 
 /** Keys kept in `localStorage` one a page, a record or a board, by what they start with. */
@@ -53,8 +51,8 @@ export const SIGNED_OUT_PREFIXES = [
   'braindog.welcomed:',
   /* a board's unsaved arrangement (`Home.svelte`) */
   'bd_board_draft:',
-  /* each drawn widget's picture, as it last drew the record (`drawn-pictures.ts`) */
-  'bd.drawn.pic.',
+  /* Slash's threads, one list a person a BrainDog (`slash-chat.ts` `threadsKey`) */
+  'bd_slash_threads:',
 ] as const;
 
 /** Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), never carried to the next session. */

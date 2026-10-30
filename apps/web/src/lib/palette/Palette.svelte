@@ -98,7 +98,8 @@
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
   import { asksFirst, capLine, inOrder, offersSlash, slashWords } from './slash.ts';
   import SlashThread from './SlashThread.svelte';
-  import { ask as askThread, clear as clearThread, convo, open as threadOn, rethink, rethinkable } from './thread.svelte.ts';
+  import { ask as askThread, askingAs, clear as clearThread, convo, open as threadOn, rethink, rethinkable } from './thread.svelte.ts';
+  import { threadsKey } from './slash-chat.ts';
   import AttachPicker from '../send/AttachPicker.svelte';
   import { sendWords, targets as readTargets, type Attached, type Target } from '../send/send.ts';
   import Menu from '../ui/Menu.svelte';
@@ -193,7 +194,7 @@
       open?: number;
       /* EVERY LIST, THE EMPTY ONES TOO, and who is asking: what the add row is offered on, and to whom (`create.ts`). */
       lists?: { id: string; name: string }[];
-      me?: { level: string; lists: string[] | null; owner?: boolean };
+      me?: { level: string; lists: string[] | null; owner?: boolean; person?: string | null };
       /* THE SLUG OF EVERY PAGE `boot` LISTS, so a second page of one name lands beside the first (`new-page.ts`). */
       pages?: string[];
       questions?: { id: string; title: string }[];
@@ -269,6 +270,11 @@
     if (!inAsk || targetsAsked) return;
     targetsAsked = true;
     void readTargets(apiBase()).then((got) => (sendTargets = got));
+  });
+
+  /* WHOSE SLASH THREADS THESE ARE: the person the shell names on this BrainDog, kept and listed under them alone. */
+  $effect(() => {
+    askingAs(threadsKey(apiBase(), shell.me?.person));
   });
 
   function asked(question: string) {

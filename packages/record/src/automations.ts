@@ -479,6 +479,11 @@ export type AutomationRow = {
   /** How many times it ran or landed its work in the last seven days, counted as `fired` is. */
   week: number;
   /**
+   * How many times it ran or landed its work in this calendar month so far, UTC, counted as `fired` is: the kernel's
+   * `rule_month` (migration 48), a dated count, so "this month" over a rule is the month's and never the whole count.
+   */
+  month_fired: number;
+  /**
    * The same key for every rule that does the same thing to the same list: the list, the path, and each action with
    * the field it acts on (`familyOf`). The page draws "Category by payee, 57 rules" as one line by it. A handle, never
    * words, and `null` for a body with no list or nothing to do.
@@ -685,6 +690,19 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
     month.runs += r.n;
     if (r.state === 'done' || r.state === 'failed' || r.state === 'cancelled') month[r.state] += r.n;
   }
+  /* THIS MONTH, from the dated count kept beside the whole one (`rule_month`, migration 48). A record whose whole count
+     came from the log above (restored or imported, no `rule_stat`) has none kept either, so its month is read from the
+     log the same way: its writes, or its runs, since the first of the month. */
+  const monthKey = new Date(nowMs).toISOString().slice(0, 7);
+  const monthFrom = `${monthKey}-01T00:00:00.000Z`;
+  const month_fired =
+    stat !== undefined && stat !== null
+      ? (sql.one<{ fired: number }>('SELECT fired FROM rule_month WHERE rule = ? AND month = ?', typeof body.rule === 'string' && body.rule !== '' ? body.rule : bare, monthKey)?.fired ?? 0)
+      : fired === 0
+        ? 0
+        : last
+          ? (sql.one<{ n: number }>('SELECT count(*) AS n FROM automation_run WHERE rule = ? AND started_at >= ?', bare, monthFrom)?.n ?? 0)
+          : writesOf(sql, bare, monthFrom);
   /* THE LAST SEVEN DAYS, counted the way the whole count is: an inline rule by its writes, any other by its runs. */
   const weekFrom = new Date(nowMs - 7 * 86_400_000).toISOString();
   const week =
@@ -714,6 +732,7 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
       last_at,
       why_idle: fired > 0 ? null : idleSaid(sql, d.id, body),
       week,
+      month_fired,
       family: familyOf(body),
     },
   };

@@ -11,7 +11,7 @@
   import { page } from '$app/state';
   import { since } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
-  import { keptThreads, threads as recordThreads, type KeptThread } from '$lib/palette/slash-chat.ts';
+  import { keptThreads, threadsKey, threads as recordThreads, type KeptThread } from '$lib/palette/slash-chat.ts';
   import { openAsk, openThread, palette } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -31,9 +31,11 @@
   let threads = $state<KeptThread[]>([]);
   let now = $state(Date.now());
   /* READ AGAIN EACH TIME THE PALETTE CLOSES, so a conversation just had over this page is listed. */
+  /* THIS PERSON'S THREADS ON THIS BRAINDOG, never the device's whole list (sec-follow M4). */
+  const keptAt = $derived(threadsKey(apiBase(), (page.data as { me?: { person?: string | null } }).me?.person));
   $effect(() => {
     if (palette.open) return;
-    threads = keptThreads();
+    threads = keptThreads(keptAt);
     now = Date.now();
     drew('ready');
     /* ONLY A HOST WITH A MODEL BEHIND SLASH KEEPS CONVERSATIONS (`slash` in the shell): one with none answers the door
@@ -41,7 +43,7 @@
     if (page.data.slash !== true) return;
     void recordThreads(apiBase()).then((kept) => {
       if (!kept) return;
-      const mine = keptThreads();
+      const mine = keptThreads(keptAt);
       const byId = new Map(mine.map((t) => [t.id, t]));
       for (const t of kept) byId.set(t.id, { ...t, title: t.title || byId.get(t.id)?.title || '' });
       threads = [...byId.values()].sort((a, b) => b.at - a.at);

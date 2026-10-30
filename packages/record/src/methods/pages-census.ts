@@ -21,7 +21,7 @@
  */
 
 import { GLYPH_NAMES } from 'braindog-render/glyphs/names';
-import { censusOf, pathsOf, viewerOfRead, whollyWithheld, type BlockResult, type Census, type PageBlock, type PageResult } from '@braindog/kernel';
+import { censusOf, pathsOf, sourceReadsWhole, viewerOfRead, whollyWithheld, type BlockResult, type Census, type PageBlock, type PageResult } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 
 import { lintAnswer, ROUND_MS, ROUND_PAGES } from '../page-lint.ts';
@@ -66,9 +66,6 @@ const DASH_RULES: ReadonlySet<string> = new Set(['no-reading', 'only-a-dash']);
 /** What a block held from its reader carries in the census, as `page` holds it: a refusal and nothing it would print. */
 const HELD: Refusal = { code: 'FORBIDDEN', fix: 'This reads a list you may not open.', at: 'source' };
 
-/** The sources that read across the whole record, which only a caller who reads it whole is shown (`ACROSS` in `index.ts`). */
-const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs', 'exceptions', 'usage.days', 'usage.actions', 'usage.projects', 'pages']);
-
 /** What the census and its slices share: who may open a page, and each block as the caller is shown it. */
 function shared(deps: RecordDeps) {
   const { kernel, readable } = deps;
@@ -101,7 +98,7 @@ function shared(deps: RecordDeps) {
     const lists = kernel.blockRegisters(b as unknown as PageBlock);
     const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
     const held =
-      (typeof b.source === 'string' && ACROSS.has(b.source) && !(b.source.startsWith('governance.') ? everyList(ctx) : whole(ctx))) ||
+      (sourceReadsWhole(b.source, hostSourcesOf({ kernel, ctx, readable })) && !(String(b.source).startsWith('governance.') ? everyList(ctx) : whole(ctx))) ||
       lists.some((id) => readable(ctx, id) !== null) ||
       lists.some((id) => id !== source && Object.hasOwn(ctx.wheres ?? {}, id));
     /* A HELD BLOCK IS DRAWN AS ITS REFUSAL, whatever its own `when:` said for the owner, as `shellOf` drops `drawn`: an

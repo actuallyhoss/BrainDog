@@ -31,7 +31,7 @@
  * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
 
-import { NOBODY, instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
+import { NOBODY, instant, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { TYPED, dateSaid, formatTyped, writeAmount, type TypedForm } from 'braindog-render';
 import { ok } from '@braindog/ports';
@@ -146,12 +146,16 @@ export const shareKind = (kind: string): boolean => SHARE_KINDS.has(kind) || /^b
  */
 export const SHARE_SOURCES: ReadonlySet<string> = new Set(['forecast.runway', 'figures.home']);
 
-/** Whether a link may draw a block with this `source`: none, a list's rows, a figure, or one of `SHARE_SOURCES`. */
+/**
+ * Whether a link may draw a block with this `source`: none, a list's rows, a figure, or one of `SHARE_SOURCES`, AND NEVER
+ * ONE THAT READS ACROSS THE WHOLE RECORD, by the kernel's one list of them (`sourceReadsWhole`), the list the record holds back
+ * from a member by. So a source marked `whole` is off every link even if somebody puts its name on `SHARE_SOURCES`.
+ */
 export const shareDraws = (source: unknown): boolean =>
   source === undefined ||
   source === null ||
   source === '' ||
-  (typeof source === 'string' && (/^(?:register|metric)\.[a-z]/u.test(source) || SHARE_SOURCES.has(source)));
+  (typeof source === 'string' && !sourceReadsWhole(source) && (/^(?:register|metric)\.[a-z]/u.test(source) || SHARE_SOURCES.has(source)));
 
 /**
  * The lists that, named among what a block reads, keep it off a link: the whole record (`*`, as the kernel names a block

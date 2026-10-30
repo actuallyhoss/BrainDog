@@ -501,6 +501,11 @@ export type UsageView = {
    */
   acted?: boolean;
   /**
+   * How many times those rules ran in the month on screen, from the record's dated count (`month_fired`, sec-follow M5),
+   * where every one of them came with it; absent from an older host, and `acted` alone is said.
+   */
+  rulesRan?: number;
+  /**
    * The month the earliest record in the view was made, `YYYY-MM`, so the switcher offers no month from before it
    * ("August" on a record made in September). `null` where the host does not say.
    */
@@ -594,6 +599,8 @@ export type AutomationRuns = {
   path?: 'inline' | 'run';
   fired?: number;
   last_at?: string | null;
+  /** Times it ran or landed its work this calendar month, UTC (`rule_month`). Absent from an older host. */
+  month_fired?: number;
 };
 
 /**
@@ -964,7 +971,15 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
     return drawn(() => {
       const fired = autos.reduce((n, a) => n + (typeof a.week === 'number' && a.week > 0 ? a.week : 0), 0);
       const acted = autos.some((a) => a.path === 'inline' && (a.fired ?? 0) > 0 && typeof a.last_at === 'string' && a.last_at.slice(0, 7) === range.month);
-      const view = { ...usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current, autos), ...(fired > 0 ? { fired } : {}), ...(acted ? { acted } : {}) };
+      /* THE MONTH'S OWN COUNT OF THEM, where the record keeps one for every such rule (`month_fired`, sec-follow M5). */
+      const inline = autos.filter((a) => a.path === 'inline');
+      const rulesRan = inline.length > 0 && inline.every((a) => typeof a.month_fired === 'number') ? inline.reduce((n, a) => n + (a.month_fired ?? 0), 0) : null;
+      const view = {
+        ...usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current, autos),
+        ...(fired > 0 ? { fired } : {}),
+        ...(acted ? { acted } : {}),
+        ...(rulesRan !== null ? { rulesRan } : {}),
+      };
       return member ? { ...view, owner: false } : view;
     });
   }

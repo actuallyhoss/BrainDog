@@ -27,7 +27,7 @@
  * THE READ WRITES NOTHING. It files no question; the question and the three times it runs are job b's (`index.ts`).
  */
 
-import { viewerOfRead, type BlockResult, type Entry, type PageBlock, type PageResult } from '@braindog/kernel';
+import { sourceReadsWhole, viewerOfRead, type BlockResult, type Entry, type PageBlock, type PageResult } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
@@ -79,9 +79,6 @@ const NOT_YET: TextFaultsRead = { count: 0, pages: 0, line: '', faults: [], trun
 /** The words before a colon that are forms and never a figure's name. */
 const NOT_FIGURES: ReadonlySet<string> = new Set([...TYPED, 'bad', 'icon']);
 
-/** The sources that read across the whole record (`ACROSS` in `index.ts`), shown only to a caller who reads it whole. */
-const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs']);
-
 /** A field as a person says it when it carries no label: `effort_days` as "Effort days". */
 const words = (id: string): string => {
   const w = id.replace(/[-_.]+/g, ' ').trim();
@@ -125,7 +122,7 @@ function walker(deps: RecordDeps) {
     const lists = listsOf(b as unknown as PageBlock);
     const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
     return (
-      (typeof b.source === 'string' && ACROSS.has(b.source) && !(b.source.startsWith('governance.') ? everyList(ctx) : whole(ctx))) ||
+      (sourceReadsWhole(b.source, hostSourcesOf({ kernel, ctx, readable })) && !(String(b.source).startsWith('governance.') ? everyList(ctx) : whole(ctx))) ||
       lists.some((id) => readable(ctx, id) !== null) ||
       lists.some((id) => id !== source && Object.hasOwn(ctx.wheres ?? {}, id))
     );

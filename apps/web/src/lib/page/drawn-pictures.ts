@@ -3,6 +3,12 @@
  * at a size and in light or dark, so a board draws it at once, inert, and the component comes alive after. Kept in this
  * browser only and never sent anywhere; a component whose code changed has a new key, so an old picture is never shown
  * for new code. Every read and write is guarded, so a browser that keeps nothing draws the component without a picture.
+ *
+ * KEPT PER PERSON AND PER BRAINDOG (`whoseOf`, sec-follow M3). A picture is what a component drew from the BrainDog as
+ * the person who saw it, so one person's never shows to another: keyed by code and size alone, the next person on a
+ * shared device was drawn the last one's figures before their own component ran (SEC23), and wiping every picture on
+ * sign-out to stop that made a sign-in redraw every widget from nothing. Now each is kept under who saw it and where,
+ * survives sign-out, and is drawn only to that person on that BrainDog. A frame that cannot say who reads keeps none.
  */
 
 /** How many pictures are kept, and the most one may weigh, in characters. */
@@ -22,8 +28,15 @@ function hash(text: string): string {
   return (h >>> 0).toString(36);
 }
 
-/** The key a picture is kept under: the code, the frame's size (or the page), and light or dark. */
-export const pictureKey = (code: string, size: string | null, mode: 'light' | 'dark'): string => `${hash(code)}.${size ?? 'page'}.${mode}`;
+/**
+ * Who a picture is kept for: the person reading and the BrainDog they read (its API base), hashed into one short word,
+ * or `null` where either is unknown, and then no picture is kept or drawn.
+ */
+export const whoseOf = (base: string, person: string | null | undefined): string | null =>
+  typeof person === 'string' && person !== '' && base !== '' ? hash(`${base}\n${person}`) : null;
+
+/** The key a picture is kept under: who it was drawn for (`whoseOf`), the code, the frame's size (or the page), and light or dark. */
+export const pictureKey = (whose: string, code: string, size: string | null, mode: 'light' | 'dark'): string => `${whose}.${hash(code)}.${size ?? 'page'}.${mode}`;
 
 const store = (): Storage | null => {
   try {

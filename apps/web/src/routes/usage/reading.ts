@@ -29,6 +29,8 @@ export const said = {
   firedWeek: (n: number) => `Automations fired ${n === 1 ? 'once' : `${n.toLocaleString('en-GB')} times`} in the last 7 days.`,
   noActionRun: 'No scheduled runs this month',
   rulesApart: 'Rules that act as things change are not counted here; Automations says how often each ran.',
+  /* HOW OFTEN THEY RAN THIS MONTH, where the record keeps the month's count (sec-follow M5). */
+  rulesMonth: (n: number) => `Rules that act as things change ran ${n === 1 ? 'once' : `${n.toLocaleString('en-GB')} times`} this month, and are not counted here.`,
 } as const;
 
 /** Where a meter reads as near its limit: the Directory's `NOTICE_AT`, as `actions.ts` holds it. */
@@ -83,7 +85,15 @@ export function sentenceOf(view: UsageView): Sentence | null {
   const limit = r ? ', with no monthly limit' : '';
   /* AND WHERE RULES ACTED AS THINGS CHANGED, THAT THEY ARE NOT THESE RUNS (finish F53): "1 run this month" stood beside
      Automations' Ledger rules that "Ran 17 times", which no run here holds. */
-  const apart = view.current && view.acted === true ? ` ${said.rulesApart}` : '';
+  const apart = !view.current
+    ? ''
+    : typeof view.rulesRan === 'number'
+      ? view.rulesRan > 0
+        ? ` ${said.rulesMonth(view.rulesRan)}`
+        : ''
+      : view.acted === true
+        ? ` ${said.rulesApart}`
+        : '';
   return { text: view.current ? `${runs} this month${limit}.${apart}` : `${runs} in ${month}${limit}.` };
 }
 

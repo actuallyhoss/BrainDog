@@ -95,6 +95,8 @@ export type AutomationRow = {
   last_at?: string | null | undefined;
   why_idle?: string | null | undefined;
   family?: string | null | undefined;
+  /** Times it ran or landed its work this calendar month, UTC, from the record's dated count (`rule_month`). */
+  month_fired?: number | undefined;
 };
 
 /** `propose`'s answer: the suggestion's id, or `null` when the record filed it without saying which. */
@@ -286,7 +288,7 @@ export function rowOf(r: unknown): AutomationRow | null {
     /* WHEN IT LAST FIRED, FROM THE RECORD, which answers it for every rule: an inline rule leaves no run, and one page
        of the log said "nothing lately" of a rule whose last firing sat below that page. */
     ...('lastFired' in r ? { acted: text(r.lastFired) } : {}),
-    ...(typeof r.fired === 'number' ? { fired: r.fired, last_at: text(r.last_at), why_idle: text(r.why_idle), family: text(r.family), ...(typeof r.week === 'number' ? { week: r.week } : {}) } : {}),
+    ...(typeof r.fired === 'number' ? { fired: r.fired, last_at: text(r.last_at), why_idle: text(r.why_idle), family: text(r.family), ...(typeof r.week === 'number' ? { week: r.week } : {}), ...(typeof r.month_fired === 'number' ? { month_fired: r.month_fired } : {}) } : {}),
   };
 }
 

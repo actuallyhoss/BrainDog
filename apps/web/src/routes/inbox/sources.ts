@@ -15,11 +15,15 @@
  * AND WHETHER THE NEWEST MAIL WAS SIGNED. Mail the host could not check the sender's signature on is stored
  * with the kernel's `UNVERIFIED` reason and is never matched, so Mail's well says which of the two the last one was,
  * from the reason the arrival already carries. A read that did not carry the reason says nothing rather than "signed".
+ * AND WHOSE MAIL IS NOT (sec-follow M2): a forwarder that rewrites a message on its way breaks the sender's signature,
+ * and that sender's mail then waits in the Inbox every time with nothing saying why. So each sender whose newest mail
+ * arrived unsigned is named once, in one sentence (`unsigned`), on the Inbox's Mail well and in Settings beside the mail
+ * door, with the fix in the docs (`UNSIGNED_HELP`).
  *
  * PURE, so `node --test` holds it.
  */
 
-import { UNVERIFIED } from '@braindog/kernel';
+import { UNVERIFIED, senderOf } from '@braindog/kernel';
 import { dayOf, daysBetween } from '../../lib/work/board.ts';
 import type { IconName } from '../../lib/ui/icons.ts';
 
@@ -30,7 +34,10 @@ export const SOURCE_DAYS = 14;
  * One way in, as the tile draws it. `days` is oldest first and ends today. `signed` is Mail's alone: whether the newest
  * mail was signed, in words, and absent when nothing says (no mail yet, or a read that did not carry the reason).
  */
-export type Source = { channel: string; name: string; icon: IconName; last: string | null; days: number[]; total: number; signed?: string };
+export type Source = { channel: string; name: string; icon: IconName; last: string | null; days: number[]; total: number; signed?: string; unsigned?: string };
+
+/** Where the docs say how to keep a forwarded mail's signature whole, which the unsigned sentence links to. */
+export const UNSIGNED_HELP = 'https://brain.dog/docs/use/inbox-and-doors#when-mail-arrives-unsigned';
 
 /** What each channel is called and the glyph its well wears. */
 const SAID: Readonly<Record<string, { name: string; icon: IconName }>> = {
@@ -52,16 +59,23 @@ const saidOf = (channel: string): { name: string; icon: IconName } =>
  * Every way in, from the arrivals read, newest first by its last arrival and then the everyday ways nothing came by.
  * An arrival whose time will not read is left out of the days and the last arrival, and still counted as having come.
  */
-export function sourcesOf(lines: readonly { channel: string; ts: string; reason?: string | null }[], now: number): Source[] {
+export function sourcesOf(lines: readonly { channel: string; ts: string; reason?: string | null; from?: string }[], now: number): Source[] {
   const today = dayOf(now);
   const by = new Map<string, Source>();
   let newestMail: { reason?: string | null } | null = null;
+  /* EACH SENDER'S NEWEST MAIL, by address, so a sender whose last mail came unsigned is named however it went before. */
+  const senders = new Map<string, { at: number; name: string; unsigned: boolean }>();
   const make = (channel: string): Source => ({ channel, ...saidOf(channel), last: null, days: Array<number>(SOURCE_DAYS).fill(0), total: 0 });
   for (const line of lines) {
     const s = by.get(line.channel) ?? make(line.channel);
     by.set(line.channel, s);
     const at = Date.parse(line.ts);
     if (!Number.isFinite(at)) continue;
+    if (line.channel === 'email' && typeof line.from === 'string' && line.reason !== undefined) {
+      const who = senderOf(line.from);
+      const was = who.address === '' ? undefined : senders.get(who.address);
+      if (who.address !== '' && (was === undefined || at > was.at)) senders.set(who.address, { at, name: who.name || who.address, unsigned: line.reason === UNVERIFIED });
+    }
     if (s.last === null || at > Date.parse(s.last)) {
       s.last = line.ts;
       if (line.channel === 'email') newestMail = line;
@@ -76,6 +90,9 @@ export function sourcesOf(lines: readonly { channel: string; ts: string; reason?
   const signed = mailSignedOf(newestMail);
   const mail = by.get('email');
   if (mail && signed !== null) mail.signed = signed;
+  const unsigned = unsignedOf([...senders.values()].filter((w) => w.unsigned).sort((a, b) => b.at - a.at).map((w) => w.name));
+  /* SAID ONCE: the sentence that names the senders takes the place of the one about the last mail. */
+  if (mail && unsigned !== null) mail.signed = mail.unsigned = unsigned;
   const came = [...by.values()].sort((a, b) => (Date.parse(b.last ?? '') || 0) - (Date.parse(a.last ?? '') || 0));
   const quiet = EVERYDAY.filter((c) => !by.has(c)).map(make);
   return [...came, ...quiet];
@@ -86,6 +103,17 @@ export const signedWords = {
   signed: 'The sender signed the last mail',
   unsigned: 'The last mail was not signed, so it cannot be matched. Check the forwarding.',
 } as const;
+
+/**
+ * The one sentence for the senders whose newest mail arrived unsigned, newest first, or `null` when there are none. Two
+ * are named; past that the rest are counted.
+ */
+export function unsignedOf(names: readonly string[]): string | null {
+  if (names.length === 0) return null;
+  const who =
+    names.length === 1 ? names[0]! : names.length === 2 ? `${names[0]} and ${names[1]}` : `${names[0]}, ${names[1]} and ${names.length - 2} more`;
+  return `Mail from ${who} isn't signed as it arrives, so it waits here to be filed by hand.`;
+}
 
 /**
  * Whether the newest mail was signed, in words: `null` with no mail, or when the arrival read did not carry its reason

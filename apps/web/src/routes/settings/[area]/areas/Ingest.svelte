@@ -20,6 +20,8 @@
   import { callerAt, feedsOf, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
   import { sinceWords } from 'braindog-render';
   import type { Source as WaySource } from '../../../inbox/sources.ts';
+  /* A CONSTANT, NOT THE MODULE: `sources.ts` is read lazily below, and this one string is all the markup needs of it. */
+  const UNSIGNED_HELP = 'https://brain.dog/docs/use/inbox-and-doors#when-mail-arrives-unsigned';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -216,6 +218,8 @@
         });
     });
   });
+  /** The sentence naming the senders whose newest mail arrived unsigned, or `null` (`sourcesOf`). */
+  const unsignedMail = $derived(ways?.find((w) => w.channel === 'email')?.unsigned ?? null);
   const wayRows = $derived(
     (ways ?? [])
       .filter((w) => !(w.channel === 'webhook' && feeds.length > 0))
@@ -238,6 +242,7 @@
        writing and deleting it do, and never the address. */
     unrouted: 'Show the command that prints it',
     unroutedHosted: 'Not offered here yet.',
+    unsignedFix: 'How to keep forwarded mail signed',
   };
 </script>
 
@@ -336,6 +341,11 @@
 <Tile icon="mail" class="section" data-surface="tile" title={mailWords.title}>
   <div class="section-body">
     <p class="hint">{mailWords.how}</p>
+    <!-- WHOSE MAIL ARRIVES UNSIGNED, said once where the person running the mail door looks (sec-follow M2): a forwarder
+         that rewrites a message breaks its signature, and it waits in the Inbox with nothing else saying why. -->
+    {#if unsignedMail}
+      <p class="hint">{unsignedMail} <a class="tap" href={UNSIGNED_HELP} target="_blank" rel="noopener noreferrer">{words.unsignedFix}</a></p>
+    {/if}
     {#if mintsHere === false}
       <!-- THE HOST'S ANSWER, AS THE SECTION'S OWN SENTENCE. It says where a self-host keeps the
            address and what writing and deleting that file do, so the person leaves with the thing

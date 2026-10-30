@@ -464,3 +464,14 @@ test('THE MONTH OF RUNS SAYS A RULE THAT ACTED ON CHANGES IS COUNTED ON ITS ROW 
   /* A RULE THAT LAST ACTED IN AN EARLIER MONTH SAYS NOTHING OF THIS ONE. */
   assert.equal(monthReading([weekly, { ...ledger, last_at: '2026-08-30T06:35:00.000Z' }], now), 'Weekly review ran once, the most this month, and nothing failed.');
 });
+
+test('WHERE THE RECORD KEEPS THE MONTH, THE LINE SAYS HOW OFTEN THE RULES RAN IN IT (sec-follow M5)', () => {
+  const now = Date.parse('2026-09-03T15:00:00Z');
+  const weekly = auto('Weekly review', { month: { runs: 1, failures: 0 } });
+  const ledger = auto('Categorise what cleared', { path: 'inline', fired: 17, last_at: '2026-09-03T06:35:00.000Z', month_fired: 4 });
+  const quiet = auto('Tag the rent', { path: 'inline', fired: 2, last_at: '2026-08-01T06:35:00.000Z', month_fired: 0 });
+  assert.equal(monthReading([weekly, ledger, quiet], now), `Weekly review ran once, the most this month, and nothing failed. ${hubWords.rulesMonth(4)}`);
+  assert.equal(hubWords.rulesMonth(4), 'Rules that act as things change ran 4 times this month, and are not counted here.');
+  /* NONE THIS MONTH SAYS NOTHING OF THEM, whatever the whole count. */
+  assert.equal(monthReading([weekly, quiet], now), 'Weekly review ran once, the most this month, and nothing failed.');
+});

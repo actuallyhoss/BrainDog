@@ -11,13 +11,21 @@ import assert from 'node:assert/strict';
 import type { IngestDoor, IngestArrival } from '@braindog/host';
 import type { Result } from '@braindog/ports';
 
-import { HELD_GAVE_UP, HELD_OLDEST_MS, HELD_PER_PLACE, HELD_PER_RECORD, HELD_STEPS_S, HELD_WAIT, open, redeliver, serveHeld, sweepHeld, timeSigned, type HeldBucket, type HeldDeps, type HeldMessage } from '../src/held.ts';
+import { createHash } from 'node:crypto';
+
+import { HELD_GAVE_UP, HELD_OLDEST_MS, HELD_PER_DOOR, HELD_PER_PLACE, HELD_PER_RECORD, HELD_STEPS_S, HELD_WAIT, SIGNED_DOOR, open, redeliver, serveHeld, sweepHeld, timeSigned, type HeldBucket, type HeldDeps, type HeldMessage } from '../src/held.ts';
 
 const REC = 'rec_01J8ZC0000000000000000000A';
 const TOKEN = 'tok-123';
 const URL_ = `https://brain.dog/in/webhook/${REC}/bank-from-out-sms/${TOKEN}`;
 const TEXT = 'Your card ending 1234 was used for EGP 201.36 at Talabat';
 const SECRET = 'a-session-secret-of-thirty-two-bytes-or-more';
+const NOW_M6 = Date.UTC(2026, 9, 30, 12);
+/** The door's token as the Directory keeps it (`dir_door`, RD1): its SHA-256 in hex. */
+const SIGN = createHash('sha256').update(TOKEN).digest('hex');
+/** The Directory as the hold asks it: his bank door by its token, and a `bank` door signed in a header. */
+const directory: HeldDeps['holds'] = async (rec, ingest, sign) =>
+  rec === REC && ((ingest === 'bank-from-out-sms' && sign === SIGN) || (ingest === 'bank' && sign === SIGNED_DOOR));
 
 type Kept = { bytes: Uint8Array; uploaded: Date; meta?: Record<string, string> };
 
@@ -77,10 +85,10 @@ function door(answers: ('ok' | 'throw' | 'gone')[], seen: IngestArrival[]): () =
   });
 }
 
-function deps(answers: ('ok' | 'throw' | 'gone')[], seen: IngestArrival[], b = bucket(), sent: { body: HeldMessage; delay: number | undefined }[] = [], knows: HeldDeps['knows'] = async (rec) => rec === REC) {
+function deps(answers: ('ok' | 'throw' | 'gone')[], seen: IngestArrival[], b = bucket(), sent: { body: HeldMessage; delay: number | undefined }[] = [], holds: HeldDeps['holds'] = directory) {
   const told: string[] = [];
   const d: HeldDeps = {
-    knows,
+    holds,
     bucket: b,
     secret: SECRET,
     queue: { send: async (body, options) => void sent.push({ body, delay: options?.delaySeconds }) },
@@ -305,13 +313,36 @@ test('SEC7: A RECORD THE DIRECTORY DOES NOT HOLD, OR CANNOT SAY IT HOLDS, IS NEV
   assert.equal(b.objects.size, 0, 'a made-up record, or one nobody could vouch for, was kept');
 });
 
-test('SEC7: ONE PLACE KEEPS AT MOST HELD_PER_PLACE, and his own text from his phone still finds room', async () => {
+test('RD1: A JUNK TOKEN, OR A DOOR THE DIRECTORY WAS NEVER TOLD OF, IS NOT KEPT, and his own text is', async () => {
   const b = bucket();
-  for (let i = 0; i < HELD_PER_PLACE + 5; i++) await serveHeld(junk(REC, i, '2001:db8:aa:bb::' + (i + 1).toString(16)), deps(['throw'], [], b).d);
-  assert.equal(b.objects.size, HELD_PER_PLACE, 'one /64 filled more than its share');
-  assert.ok(HELD_PER_PLACE < HELD_PER_RECORD);
+  for (let i = 0; i < 20; i++) {
+    assert.equal((await serveHeld(junk(REC, i, '2001:db8:aa:' + (i + 1).toString(16) + '::1'), deps(['throw'], [], b).d)).status, 503);
+    const wrong = `https://brain.dog/in/webhook/${REC}/bank-from-out-sms/not-the-token-${i}`;
+    assert.equal((await serveHeld(junk(REC, i, '198.51.100.' + (i + 1), wrong), deps(['throw'], [], b).d)).status, 503);
+  }
+  assert.equal(b.objects.size, 0, 'a token that is not the door\'s was kept');
   const mine = await serveHeld(new Request(URL_, { method: 'POST', headers: { 'cf-connecting-ip': '203.0.113.50' }, body: TEXT }), deps(['throw'], [], b).d);
-  assert.equal(mine.status, 202, "his own text was turned away by a stranger's junk");
+  assert.equal(mine.status, 202);
+});
+
+test('RD14: ONE PLACE KEEPS AT MOST HELD_PER_PLACE FOR ONE RECORD, and the same place still has room for another', async () => {
+  const b = bucket();
+  const both: HeldDeps['holds'] = async (rec, ingest, sign) => (rec === REC || rec === OTHER) && ingest === 'bank-from-out-sms' && sign === SIGN;
+  const at = (rec: string, n: number): Request =>
+    new Request(`https://brain.dog/in/webhook/${rec}/bank-from-out-sms/${TOKEN}`, { method: 'POST', headers: { 'cf-connecting-ip': '2001:db8:aa:bb::1' }, body: `text ${n}` });
+  for (let i = 0; i < HELD_PER_PLACE + 5; i++) await serveHeld(at(REC, i), deps(['throw'], [], b, [], both).d);
+  assert.equal(b.objects.size, HELD_PER_PLACE, 'one place filled more than its share of one record');
+  assert.ok(HELD_PER_PLACE < HELD_PER_RECORD);
+  /* A GATEWAY POSTING FOR SOMEBODY ELSE FROM THE SAME PLACE IS NOT REFUSED FOR IT. */
+  assert.equal((await serveHeld(at(OTHER, 1), deps(['throw'], [], b, [], both).d)).status, 202);
+});
+
+test('RD1: THE DIRECTORY LEARNS EACH DOOR FROM ITS OWN TRAFFIC, by the token\'s digest and never the token', async () => {
+  const learned: [string, string, string | null][] = [];
+  const { d } = deps(['ok'], []);
+  const res = await serveHeld(post(), { ...d, learn: async (rec, ingest, sign) => void learned.push([rec, ingest, sign]) });
+  assert.equal(res.status, 202);
+  assert.deepEqual(learned, [[REC, 'bank-from-out-sms', SIGN]]);
 });
 
 test('SEC7: A FOUR-SEGMENT POST WITH NO SIGNATURE IS JUNK AND IS NOT KEPT; ONE SIGNED IN A HEADER IS', async () => {
@@ -341,4 +372,32 @@ test('SEC7: A BODY WITH NO LENGTH IS READ ONLY UP TO THE CEILING, and past it is
   assert.equal(res.status, 413);
   assert.equal(asked, 0, 'the record was asked about a body that was never going to fit');
   assert.ok(sent < 4 * 1024 * 1024, `read ${sent} bytes of a body past the ceiling`);
+});
+
+/* ── sec-follow M6: one door's share, and room made only for a signed arrival ─────────────────────────────── */
+
+test('M6: ONE DOOR KEEPS AT MOST HELD_PER_DOOR, so another door of the record still has room', async () => {
+  const b = bucket();
+  const doors: HeldDeps['holds'] = async (rec, ingest, sign) => rec === REC && ((ingest === 'leaked' && sign === SIGN) || (ingest === 'bank-from-out-sms' && sign === SIGN));
+  const leaked = (n: number): Request =>
+    new Request(`https://brain.dog/in/webhook/${REC}/leaked/${TOKEN}`, { method: 'POST', headers: { 'cf-connecting-ip': `198.51.${Math.floor(n / 200)}.${(n % 200) + 1}` }, body: `flood ${n}` });
+  for (let i = 0; i < HELD_PER_DOOR + 5; i++) await serveHeld(leaked(i), deps(['throw'], [], b, [], doors).d);
+  assert.equal(b.objects.size, HELD_PER_DOOR, 'one door took more than its share of the record');
+  const mine = await serveHeld(new Request(URL_, { method: 'POST', headers: { 'cf-connecting-ip': '203.0.113.50' }, body: TEXT }), deps(['throw'], [], b, [], doors).d);
+  assert.equal(mine.status, 202);
+});
+
+test('M6: A FULL DOOR MOVES ITS OLDEST UNSIGNED ARRIVAL TO GAVE-UP FOR A SIGNED ONE, AND NEVER FOR AN UNSIGNED ONE', async () => {
+  const b = bucket();
+  const either: HeldDeps['holds'] = async (rec, ingest, sign) => rec === REC && ingest === 'bank-from-out-sms' && (sign === SIGN || sign === SIGNED_DOOR);
+  const text = (n: number): Request => new Request(URL_, { method: 'POST', headers: { 'cf-connecting-ip': `198.51.100.${n + 1}` }, body: `text ${n}` });
+  let now = NOW_M6;
+  const at = (): HeldDeps => ({ ...deps(['throw'], [], b, [], either).d, now: () => (now += 1000) });
+  for (let i = 0; i < HELD_PER_DOOR; i++) assert.equal((await serveHeld(text(i), at())).status, 202);
+  assert.equal((await serveHeld(text(150), at())).status, 503, 'an unsigned arrival pushed a waiting one out');
+  const signed = new Request(`https://brain.dog/in/webhook/${REC}/bank-from-out-sms`, { method: 'POST', headers: { 'x-hub-signature-256': 'sha256=abc' }, body: 'signed' });
+  assert.equal((await serveHeld(signed, at())).status, 202);
+  const gave = [...b.objects.keys()].filter((k) => k.startsWith(HELD_GAVE_UP));
+  assert.equal(gave.length, 1);
+  assert.equal([...b.objects.keys()].filter((k) => k.startsWith(HELD_WAIT)).length, HELD_PER_DOOR);
 });

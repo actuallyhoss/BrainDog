@@ -343,9 +343,18 @@ export type KeptThread = { id: string; title: string; at: number };
 export const THREADS_KEY = 'bd_slash_threads';
 export const THREADS_CAP = 30;
 
-export function keptThreads(): KeptThread[] {
+/**
+ * WHERE ONE PERSON'S THREADS ARE KEPT ON ONE BRAINDOG (sec-follow M4), or `null` where the person is not known, and then
+ * none is kept or listed. One list for the device listed one person's questions to the next who signed in on another
+ * BrainDog, or to a colleague after a switch, whenever no sign-out came between to wipe it (`signed-out.ts`).
+ */
+export const threadsKey = (base: string, person: string | null | undefined): string | null =>
+  typeof person === 'string' && person !== '' && base !== '' ? `${THREADS_KEY}:${base}:${person}` : null;
+
+export function keptThreads(key: string | null): KeptThread[] {
+  if (key === null) return [];
   try {
-    const list: unknown = JSON.parse(localStorage.getItem(THREADS_KEY) ?? '[]');
+    const list: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
     if (!Array.isArray(list)) return [];
     return list.filter((t): t is KeptThread => isObj(t) && typeof t.id === 'string' && typeof t.title === 'string' && typeof t.at === 'number');
   } catch {
@@ -353,13 +362,14 @@ export function keptThreads(): KeptThread[] {
   }
 }
 
-/** Keep `id` first in the list, with the question that opened it. Storage that throws keeps nothing, and nothing breaks. */
-export function keepThread(id: string, title: string, at = Date.now()): void {
+/** Keep `id` first in the person's list (`threadsKey`), with the question that opened it. Storage that throws keeps nothing, and nothing breaks. */
+export function keepThread(key: string | null, id: string, title: string, at = Date.now()): void {
+  if (key === null) return;
   try {
-    const had = keptThreads();
+    const had = keptThreads(key);
     const was = had.find((t) => t.id === id);
     const next = [{ id, title: was?.title ?? title, at }, ...had.filter((t) => t.id !== id)].slice(0, THREADS_CAP);
-    localStorage.setItem(THREADS_KEY, JSON.stringify(next));
+    localStorage.setItem(key, JSON.stringify(next));
   } catch {
     /* A full or blocked store: the thread still goes on, it is only not listed on the Slash page. */
   }

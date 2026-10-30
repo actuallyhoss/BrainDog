@@ -150,6 +150,8 @@ export const hubWords = {
      rules' own counts are (`rulesApart`). */
   runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
   rulesApart: 'Rules that act as things change are not counted here; their rows below say how often they ran.',
+  /* AND WHERE THE RECORD KEEPS THEIR MONTH (`month_fired`, sec-follow M5), how often they ran in it, for real. */
+  rulesMonth: (n: number) => `Rules that act as things change ran ${times(n)} this month, and are not counted here.`,
   endedTitle: 'How runs ended',
   endedSubject: 'Runs this month that finished',
   endedOf: (n: number) => `of ${n.toLocaleString('en')}`,
@@ -457,6 +459,16 @@ function actedThisMonth(rows: readonly AutomationRow[], now: number): boolean {
 }
 
 /**
+ * How many times the rules that act as things change ran this month, from the record's dated count (`month_fired`,
+ * sec-follow M5), or `null` where any of them came without one (an older host), and only `actedThisMonth` can be said.
+ */
+export function inlineMonth(rows: readonly AutomationRow[]): number | null {
+  const inline = rows.filter((r) => r.path === 'inline');
+  if (inline.length === 0 || !inline.every((r) => typeof r.month_fired === 'number')) return null;
+  return inline.reduce((n, r) => n + (r.month_fired ?? 0), 0);
+}
+
+/**
  * The line under "Runs this month": the busiest, and the one that failed most. AND, WHERE A RULE ACTED ON A CHANGE THIS
  * MONTH, that its count is on its row (finish F53): a rule that files as entries land leaves no run, so "Ran 17 times"
  * on the Ledger's row was never in this tile's one run.
@@ -472,6 +484,8 @@ export function monthReading(rows: readonly AutomationRow[], now = Date.now()): 
     : worst === top
       ? `${lead}, and ${spell(worst.month.failures)} of those failed.`
       : `${lead}; ${worst.name} failed ${spell(worst.month.failures)} of ${worst.month.runs.toLocaleString('en')}.`;
+  const counted = inlineMonth(rows);
+  if (counted !== null) return counted > 0 ? `${said} ${hubWords.rulesMonth(counted)}` : said;
   return actedThisMonth(rows, now) ? `${said} ${hubWords.rulesApart}` : said;
 }
 

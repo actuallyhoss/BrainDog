@@ -80,6 +80,22 @@ const live = (): SlashTurn | undefined => {
   return t?.role === 'slash' ? t : undefined;
 };
 
+/** Where this tab's reader keeps their threads (`threadsKey`): the person and the BrainDog, set by the palette. */
+let keptAs: string | null = null;
+/** The last reader named, kept through a moment the shell names nobody (a page with no shell), so that is no switch. */
+let lastAs: string | null = null;
+
+/**
+ * WHO ASKS HERE NOW, as the shell names them (sec-follow M4): their threads are kept under them, and a thread open for
+ * somebody else, or on another BrainDog, is let go of, so a switch never carries one person's conversation to the next.
+ */
+export function askingAs(key: string | null): void {
+  keptAs = key;
+  if (key === null || key === lastAs) return;
+  if (lastAs !== null) clear();
+  lastAs = key;
+}
+
 /** Start again: the thread is let go of, and an answer still streaming is stopped. */
 export function clear(): void {
   stream?.abort();
@@ -149,7 +165,7 @@ async function stream_(body: ChatBody, said: string, base: string): Promise<void
       switch (e.type) {
         case 'thread':
           convo.id = e.id;
-          keepThread(e.id, firstQuestion() ?? said);
+          keepThread(keptAs, e.id, firstQuestion() ?? said);
           break;
         case 'step':
           turn.steps.push(e.text);
@@ -199,7 +215,7 @@ async function stream_(body: ChatBody, said: string, base: string): Promise<void
     }
   }
   convo.busy = false;
-  if (convo.id) keepThread(convo.id, firstQuestion() ?? said);
+  if (convo.id) keepThread(keptAs, convo.id, firstQuestion() ?? said);
 }
 
 const firstQuestion = (): string | undefined => convo.turns.find((t) => t.role === 'you')?.text;
