@@ -7,11 +7,15 @@
  * ONLY SERVER LOADS AND ENDPOINTS IMPORT THIS, so the text of every page rides in the prerendered files
  * and never in a script the browser loads for a page that shows one of them.
  *
+ * A PART HELD UNTIL LAUNCH (`<!-- launch: repo -->` … `<!-- /launch -->`, `launched` in `pages.ts`) is read with the
+ * site's own `LAUNCH`, so it is in the page, its text and the search on the day its flag is, and not before.
+ *
  * EMPTY UNDER PLAIN NODE, where Vite has not replaced `import.meta.env` and `import.meta.glob` does not
  * exist, for the reason `lib/nav.ts` gives: a test can import this file without a build.
  */
 import { SECTIONS, byOrder, docOf, plainOf, type Doc, type Entry, type Section } from './pages.ts';
 import { docsWords } from './words.ts';
+import { LAUNCH } from '../launch.ts';
 
 const files: Record<string, string> = import.meta.env
   ? import.meta.glob<string>('/src/docs/**/*.md', { query: '?raw', import: 'default', eager: true })
@@ -19,7 +23,7 @@ const files: Record<string, string> = import.meta.env
 
 /** Every page, in the order the docs are read. */
 export const DOCS: readonly Doc[] = Object.entries(files)
-  .map(([key, src]) => docOf(key, src))
+  .map(([key, src]) => docOf(key, src, LAUNCH))
   .sort(byOrder);
 
 /** The page at `/docs/<section>/<slug>`, or `null`. */
