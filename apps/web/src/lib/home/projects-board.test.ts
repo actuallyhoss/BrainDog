@@ -197,3 +197,18 @@ test('how old the numbers are is the feed\'s newest reading, not the key number 
   assert.equal(b.earning.count, 1);
   assert.equal(b.earning.lines[0]!.left, true);
 });
+
+test('the headline counts every project with work due this week, a late one too, as the This week tile does', () => {
+  const b = boardOf(
+    base({
+      tasks: [
+        { seq: 10, project: 'things#1', title: 'Check the door on two phones', by: '2026-10-26', href: '/r/tasks/10' },
+        { seq: 11, project: 'things#1', title: 'Send the draft', by: '2026-10-29', href: '/r/tasks/11' },
+        { seq: 12, project: 'things#3', title: 'Deploy the first wave', by: '2026-10-28', href: '/r/tasks/12' },
+      ],
+    }),
+  );
+  /* Kiln is late and has work due; Lantern and Portage have work due. */
+  assert.equal(b.week.due.said, 'across 3 projects');
+  assert.match(b.headline, /three projects have work due this week/u);
+});

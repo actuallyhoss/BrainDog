@@ -152,6 +152,14 @@
     align-self: center;
   }
 
+  /* WITH NO AMOUNT RESTATED UNDER THE AMOUNT, THE QUIET LINE TAKES THE ROW'S WIDTH, so "2 Sep · Production · Waiting to
+     clear" is read whole on a phone and not cut where the amount above it ends. */
+  .list[data-kind='timeline'] > .item[data-rich]:has(> .item-under:not(:empty)):not(:has(> .item-approx)) {
+    grid-template-areas:
+      'chip title detail'
+      'chip under under';
+  }
+
   .item-under {
     grid-area: under;
     align-self: start;

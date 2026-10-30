@@ -931,7 +931,7 @@ export function tileOf(
   const ahead = trend ? aheadOf((cell as { ahead?: unknown }).ahead) : null;
   /* THE LOWEST SAID AS FORECAST SAYS IT (live check of 30 October, 18): whole money to the unit, and "today" or the day
      as "29 Oct". Money and Today read "Lowest EGP 682,000 on Thu 29 Oct" where Forecast read "Lowest EGP 682,316 today". */
-  const lowest = ahead ? copy.cashLowest(wholeAmount(ahead.low.value, ahead.currency), lowDaySaid(ahead.low.day)) : '';
+  const lowest = ahead && trend ? copy.cashLowest(wholeAmount(ahead.low.value, ahead.currency), lowDaySaid(ahead.low.day), aheadWindowSaid(trend.length - 1)) : '';
   return {
     id: cell.metric,
     label,
@@ -992,11 +992,41 @@ function moneySets(register: string, columns: readonly { field?: unknown }[], ro
   });
 }
 
+/** The words a ledger line waiting to clear wears under its name. */
+export const WAITING_TO_CLEAR = 'Waiting to clear';
+
+/**
+ * Each ledger line of a timeline still waiting to clear, marked in the line under its name: its account cell (the
+ * second of the two the line under reads, `TIMELINE_UNDER` in braindog-render) says the words in place of the account,
+ * so they fit a phone's line ("2 Sep · Production · Waiting to clear"); the first is the category, which picks the
+ * line's chip, so it stays. Only a list of money moved (one with an account and an amount) whose state field holds
+ * `pending`.
+ */
+export function pendingSaid(register: string, columns: readonly { field?: unknown }[], entries: readonly Entry[], rows: { cells: (string | null)[] }[]): void {
+  const state = REGISTERS[register]?.state;
+  const at = columns.findIndex((c) => c.field === 'account');
+  if (!state || (at !== 3 && at !== 4) || !columns.some((c) => c.field === 'amount')) return;
+  entries.forEach((e, n) => {
+    const row = rows[n];
+    if (!row || e.fields[state] !== 'pending') return;
+    row.cells[at] = WAITING_TO_CLEAR;
+  });
+}
+
 /** An amount ahead in whole units, as Forecast says its lowest: never rounded to three figures beside it. */
 function wholeAmount(minor: number, currency: string): string {
   const exp = exponentOf(currency);
   const whole = Math.round(minor / 10 ** exp) * 10 ** exp;
   return moneyWhole(whole, currency, homeCurrency())?.text ?? money(whole, currency);
+}
+
+/**
+ * How far a walk ahead looks, from its days (the trend is today and then the end of each day): "12 weeks" when it is
+ * whole weeks, as Today says its window, else "30 days".
+ */
+export function aheadWindowSaid(days: number): string {
+  if (days >= 14 && days % 7 === 0) return `${days / 7} weeks`;
+  return days === 1 ? '1 day' : `${days} days`;
 }
 
 /** The day of a lowest point as Forecast says it: "today", else "on 29 Oct", with its year only when it is not this one. */
@@ -2095,6 +2125,9 @@ export function blockOf(
      amount to the penny where one has pence, as a bar's figures are (`barFigures`). The Ledger's lines are a timeline,
      said to the penny by its own rule. */
   if (kind === 'table') moneySets(register, columns, rows);
+  /* A LEDGER LINE STILL WAITING TO CLEAR SAYS SO IN THE TILE (finish F3), as the Ledger lists it apart and Budgets counts
+     it: Money home's Ledger drew the pending £2,500 like any cleared line. Said at the end of the line under the name. */
+  if (kind === 'timeline') pendingSaid(register, columns, entries, rows);
   /* WHETHER AN AGENT IS ON EACH ROW, which the record works out from the row's history and its live
      runs. Narrowed here like everything else the record sends: a `working_now` that is not an array
      of booleans is left off, and the block draws no dots rather than drawing one for `"yes"`. */

@@ -1059,7 +1059,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'tasks-after-week-yours', gt: 0 },
       },
       {
-        /* The project is its detail, because there is no day to show. */
+        /* The project is its detail, because there is no day to show. NEWEST FIRST (finish F8): it was ordered by the day
+           its tasks do not have, so the order was whatever the list kept, and what was just written down with no day is
+           what a person looks for here. */
         kind: 'todo',
         heading: 'No due day',
         icon: 'circle-dashed',
@@ -1067,7 +1069,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         source: 'register.tasks',
         where: `${YOURS}, by is empty`,
         columns: [{ field: 'what' }, { field: 'thing' }],
-        order: [{ field: 'by', dir: 'asc' }],
+        order: [{ field: 'created_at', dir: 'desc' }],
         limit: 8,
         when: { metric: 'tasks-undated-yours', gt: 0 },
       },

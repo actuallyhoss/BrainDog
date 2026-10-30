@@ -1253,12 +1253,15 @@
   }
 
   /* THE PAGE'S END SPACE MOVES UNDER THE OFFER, so the line sits one tile gap below the last block and not after a
-     100px empty band; the space is kept under the offer. */
-  .body-wrap:has(+ .page-offer:not(:has(> [data-lessons]))) :global(.page) {
+     100px empty band; the space is kept under the last offer. NO `:has` INSIDE A `:has` (finish F5): written as
+     `:has(+ .page-offer:not(:has(> [data-lessons])))` the selector was no selector, the browser dropped both rules, and
+     Budgets stood 120px apart from its Set a budget. What every agent is told (`[data-lessons]`) takes the same space
+     (`routes/p/[slug]`), so every offer moves it. */
+  .body-wrap:has(+ .page-offer) :global(.page) {
     padding-block-end: 0;
   }
 
-  .body-wrap + .page-offer:not(:has(> [data-lessons])) {
+  .body-wrap ~ .page-offer:not(:has(~ .page-offer)) {
     padding-block-end: var(--sp-9);
   }
 
