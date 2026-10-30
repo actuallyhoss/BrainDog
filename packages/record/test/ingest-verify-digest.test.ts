@@ -196,7 +196,7 @@ test('THE REFUSAL FOR A CALLER WHO PRESENTED NOTHING SAYS WHAT WORKS, and not a 
   const fix = !out.ok && 'refusal' in out ? out.refusal.fix : '';
   assert.doesNotMatch(fix, /or send BRAINDOG_TOKEN/u);
   assert.match(fix, /start/iu);
-  assert.match(fix, /BRAINDOG_TOKEN/u);
+  assert.match(fix, /BRAINDOG_SERVER_KEY/u);
   assert.match(fix, /agent/iu);
   sql.close();
 });

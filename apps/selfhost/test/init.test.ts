@@ -277,7 +277,7 @@ test('MINTING A BEARER NEEDS A CREDENTIAL, and the one it mints then works', asy
 
     assert.equal(bare.status, 403, 'a request carrying nothing minted a bearer that works from anywhere');
     assert.equal(said.refusal?.code, 'NEEDS_BROWSER_SESSION');
-    assert.match(said.refusal!.fix, /BRAINDOG_TOKEN/);
+    assert.match(said.refusal!.fix, /BRAINDOG_SERVER_KEY/);
 
     /* AND THEN WITH ONE. Reading and writing without a credential stays what it was; minting is the
        one call that needed the operator to have said something. */

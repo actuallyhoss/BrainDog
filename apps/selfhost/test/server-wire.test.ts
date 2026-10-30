@@ -190,7 +190,7 @@ test('WITH THE SWITCH OFF AN ADD-ON ACTION IS HELD WITH THE SENTENCE SCHEDULED S
  */
 function bareEnv(extra: Record<string, string>): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env, ...extra };
-  for (const name of ['BRAINDOG_OUTBOUND', 'SLASH_KEY', 'SLASH_MODEL', 'SLASH_ENDPOINT', 'BRAINDOG_TOKEN', 'BRAINDOG_ORIGIN', 'BRAINDOG_BUILD']) delete env[name];
+  for (const name of ['BRAINDOG_OUTBOUND', 'SLASH_KEY', 'SLASH_MODEL', 'SLASH_ENDPOINT', 'BRAINDOG_TOKEN', 'BRAINDOG_SERVER_KEY', 'BRAINDOG_LISTEN', 'BRAINDOG_ORIGIN', 'BRAINDOG_BUILD']) delete env[name];
   return env;
 }
 

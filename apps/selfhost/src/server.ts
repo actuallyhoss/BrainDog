@@ -315,7 +315,7 @@ function slugApi(pathname: string): { slug: string; rest: string } | null {
 }
 
 /** Why an owner cannot invite anybody here: nobody but the owner can sign in, so the link would lead nowhere. */
-const INVITES_OFF = 'Nobody else can sign in to this BrainDog yet, so an invitation link would lead nowhere. Start it with BRAINDOG_TOKEN, a session key and a directory first.';
+const INVITES_OFF = 'Nobody else can sign in to this BrainDog yet, so an invitation link would lead nowhere. Start it with BRAINDOG_SERVER_KEY, a session key and a directory first.';
 
 /**
  * AN ADDRESS THAT CAN ALREADY SIGN IN: a person with a passkey, or with a record. Somebody made here and never
@@ -1884,12 +1884,12 @@ export async function start(options: {
 
   /* LOOPBACK UNLESS THERE IS A TOKEN. `listen(port)` with no host binds every interface, and the
      no-token case above hands `p_self` at `owner` to whoever asks, so a self-host started with no
-     `BRAINDOG_TOKEN`, which is the documented way to start one, served the credential index and the
+     `BRAINDOG_SERVER_KEY`, which is the documented way to start one, served the credential index and the
      whole export to anything that could reach the machine. The two decisions are only safe
      together: no token means one person on one machine, and one machine is `127.0.0.1`.
 
      A deployment that wants a wider bind says so by setting a token, which is the same sentence
-     read from the other end. `BRAINDOG_HOST` is the explicit override for the case in between: a
+     read from the other end. `BRAINDOG_LISTEN` is the explicit override for the case in between: a
      container that has a token and needs `0.0.0.0` to be reachable at all. */
   const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '0.0.0.0');
   const trustProxy = options.trustProxy === true;

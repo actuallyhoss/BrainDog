@@ -45,8 +45,10 @@ import { ulids } from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 
 import { NIGHTLY_AT, nightlyBackups } from './backup.ts';
+import { APP_ROOT, bakedSaid, bakedSecrets } from './baked.ts';
 import { backupData, restoreData } from './cold.ts';
 import { degradeLines, setupLine } from './first-run.ts';
+import { commandFor, inImage, listenOf, serverKeyOf } from './how.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
 import { initFrom } from './restore.ts';
@@ -156,22 +158,22 @@ type SignIn = { origin: string; ways: string[]; off: 'open' | 'directory' | 'ins
 function bootLine(s: SignIn): string {
   switch (s.off) {
     case 'open':
-      return '  loopback only, and nobody signs in: a request carrying nothing is the owner. Set BRAINDOG_TOKEN to require sign-in and to mint bearers.';
+      return '  loopback only, and nobody signs in: a request carrying nothing is the owner. Set BRAINDOG_SERVER_KEY to require sign-in and to mint bearers.';
     case 'directory':
-      return '  behind BRAINDOG_TOKEN; there is no directory here, so the app cannot sign anybody in, and the token works as a bearer';
+      return '  behind BRAINDOG_SERVER_KEY; there is no directory here, so the app cannot sign anybody in, and the key works as a bearer';
     case 'insecure':
       /* THE FIX IS NO LONGER IN THIS SENTENCE. It used to end "Serve it over https, or at localhost",
          which restates the refusal to somebody who has just deliberately typed something that is
          neither, and names none of the three shapes that work. `reachLine` says what to set, and it is
          printed under this line by `serve` for every origin that has something wrong with it, not only
          for this one case. */
-      return `  behind BRAINDOG_TOKEN; ${s.origin} cannot hold a session cookie, so the app cannot sign anybody in.`;
+      return `  behind BRAINDOG_SERVER_KEY; ${s.origin} cannot hold a session cookie, so the app cannot sign anybody in.`;
     case 'key':
-      return '  behind BRAINDOG_TOKEN; there is no session key, so the app cannot sign anybody in';
+      return '  behind BRAINDOG_SERVER_KEY; there is no session key, so the app cannot sign anybody in';
     default:
       return s.ways.length === 0
-        ? `  behind BRAINDOG_TOKEN; ${s.origin}/signin has no way in to offer yet`
-        : `  behind BRAINDOG_TOKEN; sign in at ${s.origin}/signin with ${s.ways.join(' or ')}`;
+        ? `  behind BRAINDOG_SERVER_KEY; ${s.origin}/signin has no way in to offer yet`
+        : `  behind BRAINDOG_SERVER_KEY; sign in at ${s.origin}/signin with ${s.ways.join(' or ')}`;
   }
 }
 
@@ -637,8 +639,11 @@ async function serve(): Promise<void> {
      names one, for a deployment that wants sessions to outlive a new key file, or to die without one.
      Either way it is 32 bytes by HKDF, and it is zero-filled once the Directory holds its own copy. */
   /* AN EMPTY SERVER KEY IS NO KEY: set but blank, it would open every interface to anyone presenting nothing. */
-  if (env.BRAINDOG_TOKEN !== undefined && env.BRAINDOG_TOKEN.trim() === '')
-    return refuse('BRAINDOG_TOKEN is set but empty. Put a long random value in it (openssl rand -base64 32), or remove the line to run on loopback only with nobody signing in.');
+  const serverKey = serverKeyOf(env);
+  if (serverKey.value !== undefined && serverKey.value.trim() === '')
+    return refuse(
+      `${serverKey.name} is set but empty. Put a long random value in it (openssl rand -base64 32 | tr '+/' '-_' | tr -d '='), or remove the line to run on loopback only with nobody signing in.`,
+    );
   const secret = env.BRAINDOG_SESSION_SECRET;
   if (secret !== undefined && secret.length < 32)
     return refuse('BRAINDOG_SESSION_SECRET is shorter than 32 characters. Make it 32 random bytes in base64url, or unset it to derive one from the key file.');
@@ -668,9 +673,9 @@ async function serve(): Promise<void> {
     port,
     /* A HOST STARTED TO TAKE A SHAPE COPY BACK, for a developer reading a customer's structure; never the default. */
     ...(allowShape ? { allowShape: true } : {}),
-    token: env.BRAINDOG_TOKEN,
+    token: serverKey.value,
     keys: store,
-    ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),
+    ...(listenOf(env) === undefined ? {} : { host: listenOf(env) }),
     ...(existsSync(dirFile) ? { directory: dirFile } : {}),
     ...(env.BRAINDOG_ORIGIN === undefined ? {} : { origin: env.BRAINDOG_ORIGIN }),
     ...(tls === undefined ? {} : { tls }),
@@ -723,10 +728,20 @@ async function serve(): Promise<void> {
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
-  /* AND THE ONE-TIME LINK THAT MAKES THE OWNER'S SIGN-IN, until they have a passkey. It is a terminal line, so it is
-     a day's single use and printed only while nobody has one. */
+  /* AND WHERE THE ONE-TIME LINK THAT MAKES THE OWNER'S SIGN-IN IS, until they have a passkey: in a 0600 file in the data
+     folder, and never in this output, which a container keeps as its log (`first-run.ts`). A person at a terminal of
+     their own, outside the image, also sees it there; stdout is safe then, since a terminal is no `--json` reader. */
   if (existsSync(dirFile)) {
-    const first = await setupLine({ dir: running.directorySql, auth: running.directory.auth as never, origin: running.signIn.origin, signInOff: running.signIn.off });
+    const claimFile = join(data, 'claim-link');
+    const first = await setupLine({
+      dir: running.directorySql,
+      auth: running.directory.auth as never,
+      origin: running.signIn.origin,
+      signInOff: running.signIn.off,
+      file: claimFile,
+      read: inImage() ? `docker compose exec braindog cat ${claimFile}` : `cat ${claimFile}`,
+      tty: !inImage() && process.stdout.isTTY ? (line) => void process.stdout.write(`${line}\n`) : undefined,
+    });
     if (first) say(first);
   }
   /* AND WHERE MAIL GOES, by host and port and never with what password. */
@@ -798,6 +813,12 @@ async function serve(): Promise<void> {
  */
 const [, , command = 'serve', ...rest] = argv;
 try {
+  /* AN IMAGE THAT CARRIES A SECRET DOES NOT START (`baked.ts`): a backup, a key file or a token in a layer is in every
+     copy of the image, and serving from it would make it look fine. Its own data folder is never counted. */
+  if (inImage()) {
+    const found = bakedSecrets(APP_ROOT, [dataDir(), env.BRAINDOG_KEK_FILE ?? join(dataDir(), 'kek')]);
+    if (found.length > 0) refuse(bakedSaid(found));
+  }
   if (command === 'init') await init(rest);
   else if (command === 'serve') await serve();
   else if (command === 'backup') {

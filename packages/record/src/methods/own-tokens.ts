@@ -92,7 +92,7 @@ export function methods(deps: RecordDeps) {
     if (ctx.credentialed === false)
       return {
         code: 'NEEDS_BROWSER_SESSION',
-        fix: 'A key works from anywhere, so making one needs a credential. Set BRAINDOG_TOKEN and send it, or open this from the app.',
+        fix: 'A key works from anywhere, so making one needs a credential. Start this BrainDog with BRAINDOG_SERVER_KEY and send that key, or open this from the app.',
         at: 'principal',
       };
     return { id: p.id };
