@@ -1,62 +1,59 @@
 # Making your BrainDog
 
-A record is your own BrainDog: its lists, its pages and the history of every change. Making one takes an email address, a name for it, and one sentence about who you are.
+Your BrainDog holds your lists, your pages and the history of every change. Making one takes a sentence about who you are, an email address, and a minute.
 
-## Sign up
+## Early access
 
-Open the sign-up page and give two things: your email, and a name for your record. The name is part of the record's address, so it is lower-case letters, digits and hyphens, and the page tells you as you type whether it is free.
+BrainDog is in early access, so sign-up is by invitation. Without one, the sign-up page asks your name, your email and what you would use it for, and your invitation comes to that address when there is room. Open the link in it to start.
+
+## Say who you are
+
+The first screen asks one thing: **Who are you?** Answer in a sentence, in your own words: your name, and what you want to keep track of. "I'm Mariam. I run a candle shop and want to keep track of orders, stock and what I owe suppliers."
+
+As you type, the words it understood light up, and your BrainDog is drawn beside them: its pages, with examples so you can see their shape. None of it is saved, and nothing you type leaves your device until you press **That's me**. When you press it, BrainDog's model may read the sentence once, to understand it better.
+
+Under **What I heard**, each phrase says what it became. Tap one to change it or take it out.
+
+## One question
+
+If there is something your sentence could not settle, such as which currency you use, BrainDog asks it, once. Pick an answer, or skip it. There is never a second question.
+
+## Keep it
 
 ```steps
-Give your email and a name | The name becomes part of your record's address | On the sign-up page
-Open the link | It is mailed to you, works once, and lasts a day. Open it on the same device | In your mail
-Add a passkey | So you can sign in again without waiting for an email | On this device
+Check the name | It is chosen from what you said. Change it if you like | On the Keep it step
+Give your email | Press Email me a link | On the same step
+Open the link | It works once, and lasts a day | In your mail, on this device
 ```
 
-Free needs no card. If you chose Cloud or Cloud Plus, you pay on Stripe's page after opening the link, then come straight back. While the payment lands, BrainDog says it is making your record, which takes a few seconds. If you close the payment page without paying, nothing is charged and you can start again.
+Open the link on the device you started on, so everything you said and changed goes with it. On another device, the link carries your sentence, or the start of it if it was long, and you can add the rest once your BrainDog is made.
+
+If your invitation was mailed to the address you give, that address is already proved, so no second email comes and it goes straight on.
+
+<!-- launch: billing -->
+If you chose Cloud or Cloud Plus, you pay on Stripe's page after opening the link, then come straight back. While the payment lands, BrainDog says it is making your BrainDog, which takes a few seconds. If you close the payment page without paying, nothing is charged and you can start again.
+<!-- /launch -->
 
 ## Keep a way back in
 
-The first thing a new record asks is to add a passkey on the device you are using. A passkey is how you get back in, so keep more than one, on more than one device. You can say Not now and add one later in Settings, under Recovery.
+Once your email is confirmed, BrainDog offers a passkey on the device you are using, such as **Use this Mac**. A passkey is how you get back in with one touch, so keep more than one, on more than one device. You can say **Not now** and add one later in Settings, under Recovery.
 
-If you lose every passkey, a sign-in link can be mailed to the address on your account. It lasts fifteen minutes and works once. There are no recovery codes. Ten failed attempts lock sign-in for fifteen minutes, and waiting is the only way through.
+Without a passkey, a sign-in link can be mailed to your address. It lasts fifteen minutes and works once. There are no recovery codes. Ten failed attempts lock sign-in for fifteen minutes, and waiting is the only way through.
 
-## Who are you?
+## It is made
 
-A new record opens on one question: **Who are you?** Answer it in a sentence, in your own words. Say your name and what you want to keep here: the companies you run, the course you are on, the bills you pay, the team you are part of. Four chips under the field add a starting phrase if you want one:
+BrainDog makes everything you kept in one go and says what it is adding as it goes. A list with nothing in it yet says so and shows you how to add the first entry.
 
-- I'm a student
-- I run a few companies
-- I'm part of a team
-- I'm starting something new
+If part of it could not be added, it says so. Press **Try again** and only the missing parts are added, or open it as it is and add the rest from inside.
 
-Press **Show my BrainDog**. Nothing is written yet.
+Then it opens. You can connect an agent straight away, or skip that and start on Today.
 
-## The preview
+## Invited to someone else's
 
-BrainDog shows what it heard and what it will make from it:
-
-- **What I heard**: your name, and what each phrase of your sentence became. Your words are kept as the note on your entry in People.
-- **Your BrainDog**: its pages and its Home, drawn with examples so you can see their shape. None of the examples is saved.
-- **What it keeps**: a switch for each list it would make, such as Money or People. Turn off what you do not want. A switch that another part needs says so.
-- **Which currency do you use?**: asked only when you keep Money and your sentence named none. Money is made in the currency you choose.
-- **Remind me on this phone**: offered when something you keep has due dates, so what falls due can ring on this device once you say yes.
-
-Where a model is set up for Slash and your sentence describes something none of the ready-made shapes fits, Slash drafts lists, figures and pages for it. They are drawn over sample rows, which are never written.
-
-## Make it mine
-
-**Make it mine** writes it all in one press and opens your Home. There is no second form to fill in. A list with nothing in it says so and shows you how to add the first row.
-
-If part of it could not be made, BrainDog says which part and why, under Details. Press Make it mine again and only the missing parts are written.
-
-You can answer the question again later. Answering again adds to your record and takes nothing away.
-
-## Invited rather than signing up
-
-If somebody invited you to their record, you do not make one. Open the link in the invitation, press Accept, and prove the address is yours from the mail it sends. You land on their record at the level they gave you, and you are asked for a passkey, because that is how you come back. See [Sharing and access](/docs/use/sharing).
+If somebody invited you to their BrainDog, you do not make one. Open the link in the invitation, press Accept, and prove the address is yours from the mail it sends. You land in their BrainDog at the level they gave you, and you are asked for a passkey, because that is how you come back. See [Sharing and access](/docs/use/sharing).
 
 ## What next
 
 - [Home and pages](/docs/use/home-and-pages): what your Home shows, and how to arrange a page.
 - [Lists and rows](/docs/use/lists-and-rows): adding and finding what you keep.
-- [Slash](/docs/use/slash): asking your record a question.
+- [Slash](/docs/use/slash): asking your BrainDog a question.
