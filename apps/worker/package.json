@@ -26,6 +26,7 @@
     "deploy:production": "wrangler deploy --env production",
     "tail": "wrangler tail",
     "test": "node --test test/*.test.ts && node --test scripts/*.test.mjs",
+    "conformance": "node --test test/conformance.run.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
   }
 }

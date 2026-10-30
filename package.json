@@ -9,6 +9,7 @@
   "scripts": {
     "test": "pnpm -r --workspace-concurrency=1 run test && node --test docs/test/*.test.mjs && node --test tools/people/test/*.test.mjs && node --test tools/people/expect/*.test.mjs && node --test tools/agent-bench/test/*.test.mjs",
     "typecheck": "pnpm -r run typecheck",
+    "conformance": "pnpm --filter @braindog/selfhost run conformance; pnpm --filter @braindog/worker run conformance; pnpm --filter @braindog/host run conformance:compare",
     "gates": "node tools/gates/run.mjs",
     "release": "node tools/release.mjs",
     "dev": "pnpm --filter @braindog/web dev",

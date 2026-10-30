@@ -1013,7 +1013,7 @@ export type Started = Awaited<ReturnType<typeof start>>;
  * not being woken, and a job that waits fifteen seconds for the next tick when the record already
  * knows it is there is fifteen seconds of latency nobody chose.
  */
-function nodeScheduler(run: () => Promise<void>, poll: () => Promise<void>): Scheduler & { stop(): void } {
+export function nodeScheduler(run: () => Promise<void>, poll: () => Promise<void>): Scheduler & { stop(): void } {
   /* Node's timer overflows past 2^31 ms and fires IMMEDIATELY, which for a yearly renewal reminder
      would be a notification a year early rather than a year late. Clamped, and re-armed on arrival. */
   const CEILING_MS = 2 ** 31 - 1;
