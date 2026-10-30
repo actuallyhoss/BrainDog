@@ -235,6 +235,29 @@ export const since = (before, after) => {
 };
 
 /** One picture of one screen at one width and theme, and its line of `said.json`. */
+/**
+ * Scroll the page's own scroller (the shell scrolls `.body`, not the document) from top to bottom in steps of most of a
+ * window, pausing on each so what draws on coming into view has drawn, then put it back at the top. Nothing when the page
+ * fits its window.
+ */
+async function scrollThrough(page) {
+  await page
+    .evaluate(async () => {
+      const scroller = [...document.querySelectorAll('.body, main')].find((el) => el.scrollHeight > el.clientHeight + 1);
+      if (!scroller) return;
+      const step = Math.max(200, Math.floor(scroller.clientHeight * 0.8));
+      for (let y = step; y < scroller.scrollHeight; y += step) {
+        scroller.scrollTop = y;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      scroller.scrollTop = scroller.scrollHeight;
+      await new Promise((r) => setTimeout(r, 150));
+      scroller.scrollTop = 0;
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    })
+    .catch(() => {});
+}
+
 async function shoot(page, ready, heard, { app, screen, width, theme, out, source, timeoutMs, settleMs, known, now }) {
   heard.errors.length = 0;
   heard.failed.length = 0;
@@ -294,6 +317,14 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
      screen with only the board's change. The context bypasses the app's policy for it, and only when there is one. */
   if (typeof source.css === 'string' && source.css.trim() !== '') await page.addStyleTag({ content: source.css }).catch((e) => heard.errors.push(`the board's skin was not put on: ${e.message.split('\n')[0]}`));
   await page.waitForTimeout(settleMs);
+  /* THE PAGE IS SCROLLED THROUGH ONCE BEFORE ANYTHING IS READ OR PICTURED, and back to its top: a widget draws as it
+     comes into view (Today's Numbers at 1512, Coming up and the rest at 390), so a full picture of a page nobody had
+     scrolled showed empty bands where they would be (audit 31 Oct A32), and the words check never read them. What a
+     widget starts as it draws is waited for as the screen's own was, with the same cap. */
+  await scrollThrough(page);
+  await page
+    .waitForFunction(() => document.querySelector('main [aria-busy="true"], main [data-shape-waiting], main .waiting') === null, null, { timeout: Math.min(timeoutMs, 5_000) })
+    .catch(() => {});
   const facts = await page
     .evaluate(() => ({
       overflow: document.documentElement.scrollWidth - window.innerWidth,
