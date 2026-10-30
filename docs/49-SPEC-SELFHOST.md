@@ -354,7 +354,10 @@ Keys: `ip:<addr>` on `/auth/token`, `/auth/passkey/assert` and `/auth/magic/rede
 `/auth/device/approve`, the last three in the **record's** `auth_fail` (33 §10) and the rest in the Directory's
 `dir_fail`. `<addr>` is `socket.remoteAddress`. Behind a proxy the operator names with `BRAINDOG_TRUST_PROXY=1`, it
 is the last `X-Forwarded-For` entry, the one that proxy wrote; otherwise the header is ignored, because an address
-anybody can write is an address anybody can lock out.
+anybody can write is an address anybody can lock out. Without it, behind a proxy every request is the proxy's address,
+so ten wrong keys from anywhere lock everybody out: the host says so at start when its origin is https and it serves
+plain http with a server key, and once on stderr at the first request that carries a forwarding header from a loopback
+or private peer (`ONE_PLACE` in `apps/selfhost/src/key-lockout.ts`).
 
 ```sql
 -- one statement, BEFORE any comparison: ?1 the key, ?2 now, ?3 now minus 15 min, ?4 now plus 15 min

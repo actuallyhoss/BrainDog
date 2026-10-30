@@ -63,3 +63,24 @@ export function keyLockout(now: () => number, rule: { most: number; window: numb
     },
   };
 }
+
+/**
+ * WHAT THE OPERATOR IS TOLD WHEN THE LOCKOUT SEES ONE ADDRESS FOR EVERYBODY (RD7). Behind Caddy, nginx or cloudflared
+ * without `BRAINDOG_TRUST_PROXY=1`, every request comes from the proxy, so ten wrong keys from anywhere on the internet
+ * locked the server key for everyone, again every fifteen minutes, and nothing said why.
+ */
+export const ONE_PLACE =
+  'Requests reach this BrainDog through a proxy, and BRAINDOG_TRUST_PROXY is not set, so the sign-in lockout counts every visitor as the proxy: ten wrong keys from anywhere lock the server key for everyone for fifteen minutes. Set BRAINDOG_TRUST_PROXY=1 if a proxy you run is the only way in.';
+
+/** An address on this machine or a private network: where a proxy in front of this process stands. */
+export function nearPeer(address: string): boolean {
+  const a = address.toLowerCase().replace(/^::ffff:/u, '');
+  if (a === '::1' || a === 'localhost' || /^127\./u.test(a) || /^10\./u.test(a) || /^192\.168\./u.test(a)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./u.test(a)) return true;
+  return /^f[cd][0-9a-f]{0,2}:/u.test(a);
+}
+
+/** Whether one request reads as a proxy's: a forwarding header, from a peer on this machine or its network. */
+export function proxied(peer: string, headers: Readonly<Record<string, string | string[] | undefined>>): boolean {
+  return nearPeer(peer) && ['x-forwarded-for', 'forwarded', 'x-real-ip', 'cf-connecting-ip'].some((h) => headers[h] !== undefined);
+}
