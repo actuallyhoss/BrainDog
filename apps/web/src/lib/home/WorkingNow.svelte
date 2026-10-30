@@ -28,6 +28,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import { WORKING_MOST, type WorkingRow } from './desk.ts';
   import { afterFirst } from '$lib/data/first-drawn.ts';
+  import { THREADS_READ, earlyRuns, takeWorking, workingHeld } from './working-early.ts';
 
   let { rows }: { rows: readonly WorkingRow[] } = $props();
 
@@ -51,15 +52,36 @@
 
   async function read(): Promise<void> {
     try {
-      const [m, d] = await Promise.all([import('$lib/record/instruct.ts'), import('./desk-live.ts')]);
-      const io = m.control(apiBase());
-      const [p, t] = await Promise.all([io.presence(), owner ? io.threads(20) : Promise.resolve(null)]);
-      if (!p.ok) return;
-      const threads: Thread[] = t?.ok ? t.value : [];
+      /* THE FIRST READ MAY HAVE BEEN ASKED AHEAD, once Today was read (`working-early.ts`): taken once, while fresh, and
+         read with no code of the control room's, which it would otherwise wait a round trip for. */
+      const early = takeWorking(apiBase());
+      const got = early ? await early : null;
+      const desk = import('./desk-live.ts');
+      desk.catch(() => null);
+      let room: typeof import('$lib/record/instruct.ts') | null = null;
+      let runs: LiveRun[];
+      let threads: Thread[];
+      if (got && got.owner === owner) {
+        const said = earlyRuns(got);
+        if (said.runs === null) return;
+        runs = said.runs as LiveRun[];
+        threads = said.threads as Thread[];
+      } else {
+        room = await import('$lib/record/instruct.ts');
+        const io = room.control(apiBase());
+        const [p, t] = await Promise.all([io.presence(), owner ? io.threads(THREADS_READ) : Promise.resolve(null)]);
+        if (!p.ok) return;
+        runs = p.value;
+        threads = t?.ok ? t.value : [];
+      }
       const known = new Set(rows.map((r) => r.run));
-      if (p.value.some((r: LiveRun) => r.project !== null && !known.has(r.run) && !projects.has(r.project))) projects = await io.projects(p.value);
+      if (runs.some((r: LiveRun) => r.project !== null && !known.has(r.run) && !projects.has(r.project))) {
+        room ??= await import('$lib/record/instruct.ts');
+        projects = await room.control(apiBase()).projects(runs);
+      }
+      const d = await desk;
       const named = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
-      live = { rows: d.liveRows(rows, p.value, threads, named), folds: d.liveFolds(p.value, named) };
+      live = { rows: d.liveRows(rows, runs, threads, named), folds: d.liveFolds(runs, named) };
     } catch {
       /* What is drawn stands. */
     }
@@ -67,8 +89,9 @@
 
   onMount(() => {
     /* ASKED AGAIN ONCE THE FIRST SCREEN HAS DRAWN (`first-drawn.ts`): the rows are `boot`'s until then, and the page is
-       asked first. */
-    void afterFirst().then(read);
+       asked first. UNLESS TODAY'S ANSWER ASKED IT ALREADY (`working-early.ts`), when the answer is taken at once. */
+    if (workingHeld(apiBase())) void read();
+    else void afterFirst().then(read);
     let off = (): void => {};
     void import('$lib/record/instruct.ts').then((m) => (off = m.told.on(() => void read())));
     const clock = setInterval(() => void (document.hidden || read()), 15_000);

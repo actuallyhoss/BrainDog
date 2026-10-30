@@ -23,6 +23,8 @@
 
 import { createClient } from '@braindog/client';
 
+import { askEarly, takeEarly } from '../data/early-asks.ts';
+
 type Fetch = typeof fetch;
 
 /** A question as the slot reads it: the few parts of a `governance.open` queue's question it draws and answers. */
@@ -189,6 +191,24 @@ export async function readSlot(base: string, io?: Fetch): Promise<SlotQuestion[]
     return [];
   }
 }
+
+/* ── asked with the page's first read ───────────────────────────────────── */
+
+const slotKey = (base: string): string => `${base} slot`;
+
+/**
+ * The page's suggestion, asked as soon as the page's own first answer is in hand (`page-live.ts`, the page opened by its
+ * address), and taken by the slot when it draws (`SuggestionSlot.svelte`), which asked only after the page had drawn
+ * and the browser was next idle (speed-e SE3). Not for a page that is no place to decide (`slotPlace`), nor one that
+ * draws its own queue of questions, where the slot reads from that queue and asks nothing.
+ */
+export function askSlot(base: string, page: SlotPage, blocks: readonly { kind?: unknown; source?: unknown; drawn?: unknown }[]): void {
+  if (slotPlace(page) === null || blocks.some((b) => b.kind === 'queue' && b.source === 'governance.open' && b.drawn !== false)) return;
+  askEarly(slotKey(base), () => readSlot(base));
+}
+
+/** The suggestion asked ahead for the page at `base`, handed once while fresh: `null` when the slot reads for itself. */
+export const takeSlot = (base: string): Promise<SlotQuestion[] | null> | null => takeEarly<SlotQuestion[]>(slotKey(base));
 
 /** Where this device keeps what it set aside, and the most it keeps. */
 const KEPT = 'braindog:slot:aside';

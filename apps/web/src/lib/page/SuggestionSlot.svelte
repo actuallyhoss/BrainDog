@@ -8,7 +8,8 @@
   stands on (it took 40% of Today's at 390).
 
   ON A PAGE THAT DRAWS A QUEUE, its questions are read from that queue and none of the ones it shows is drawn again here;
-  on any other page they are read once, after the page has drawn, so the slot never holds the page up.
+  on any other page they are read once, after the page has drawn, so the slot never holds the page up; or, on a page
+  opened by its address, beside the page's own first reads (`slot.ts` `askSlot`), and taken as the slot is made.
 
   THE ANSWER IS THE ONE EVERY QUESTION TAKES (`decide-write.ts`), and a question that turns out to owe a reason opens in
   Needs you, where its whole card asks for one. Not now changes nothing in the record: the question leaves the slot on
@@ -19,7 +20,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { drawnIn, isDrawing, putAside, readSlot, setAside, slotPick, slotQuestion, slotWords as words, type SlotQuestion, type SlotRow } from './slot.ts';
+  import { drawnIn, isDrawing, putAside, readSlot, setAside, slotPick, slotQuestion, slotWords as words, takeSlot, type SlotQuestion, type SlotRow } from './slot.ts';
 
   let {
     blocks,
@@ -45,10 +46,28 @@
   let aside = $state<Set<string>>(setAside());
   let busy = $state(false);
 
-  /* A PAGE WITH NO QUEUE OF ITS OWN READS THE QUESTIONS ONCE, when the browser is next idle. */
+  /* WHAT THE PAGE'S FIRST READ ASKED FOR THIS SLOT (`askSlot`), taken as the slot is made. */
+  let ahead = takeSlot(apiBase());
+
+  /* A PAGE WITH NO QUEUE OF ITS OWN READS THE QUESTIONS ONCE, when the browser is next idle; at once where the page's
+     first read asked them already. */
   $effect(() => {
     if (own !== null || read !== null) return;
     let live = true;
+    if (ahead !== null) {
+      const asked = ahead;
+      void asked.then((got) => {
+        if (!live) return;
+        if (got !== null) read = got;
+        else {
+          ahead = null;
+          void readSlot(apiBase()).then((again) => live && (read = again));
+        }
+      });
+      return () => {
+        live = false;
+      };
+    }
     const go = () => void readSlot(apiBase()).then((got) => live && (read = got));
     const idle = typeof requestIdleCallback === 'function' ? requestIdleCallback(go, { timeout: 2000 }) : setTimeout(go, 300);
     return () => {

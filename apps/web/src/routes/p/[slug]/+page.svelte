@@ -45,6 +45,9 @@
   import { plainOf, revivedOf } from '$lib/data/plain.ts';
   import { keepLocal, localTicket, nearLocal, settledLocal } from '$lib/data/local-tab.ts';
   import { painted } from '$lib/data/timing.ts';
+  import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
+  import { quick } from '$lib/money/quick.svelte.ts';
+  import { askBooks } from '$lib/money/books.ts';
   import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { holdPresses } from '$lib/data/held.svelte.ts';
@@ -245,6 +248,13 @@
     holdTimer = setTimeout(() => (waited = HOLD_MS), HOLD_MS);
     reading = true;
     const mine = ++started;
+    /* MONEY'S CHIPS AND ITS ROW OF BOOKS ARE ASKED WITH ITS OWN READ (speed-e SE3): each was asked once its part had
+       drawn, a round trip after the page. The chips are once a record (`looks.svelte.ts`); the books only where the
+       ledger is known by now (`books.ts`), and the row takes them when it draws. */
+    if (/^money(-|$)/u.test(asked)) {
+      moneyLooks.ask();
+      if (asked === 'money' && quick.base === apiBase() && quick.ledger?.book) askBooks(apiBase(), quick.ledger.book);
+    }
     /* A PAGE ABOUT A PROJECT'S ROW CARRIES ITS SHAPE IN ITS OWN ANSWER (`page-live.ts`, `shape-answer.ts`), so nothing is
        asked for it beside the page. */
     const out = await reader.read(asked, filtered).finally(() => {

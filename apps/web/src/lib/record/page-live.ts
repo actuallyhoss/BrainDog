@@ -59,6 +59,7 @@ import { thingName } from './project.ts';
 import { bylineOf } from './byline.ts';
 import { FIGURES_KNOWN as METRICS } from './figures-known.ts';
 import { figuresFor, learnFigures } from './figures-said.ts';
+import { askSlot } from '../page/slot.ts';
 import { readBoot } from './boot-live.ts';
 import { kept as keptAnswers, pageKey } from './kept-pages.ts';
 import { beyondOf, format, fxNote, hrefFor, leadOf, markOf, pluralsIn, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
@@ -2786,6 +2787,10 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const got = await actionsOf(io ?? ((url, init) => fetch(url, init)), base).actions();
         held = got.ok && Array.isArray(got.value) ? got.value : null;
       }
+      /* THE PAGE OPENED BY ITS ADDRESS ASKS ITS SUGGESTION NOW (`slot.ts` `askSlot`), its own reads done and before it
+         draws, and the slot takes it when it draws, where it asked only once the page had drawn and the browser was
+         idle. NOT BESIDE THE PAGE'S READS: batched with them, the page waited for the suggestion too. */
+      if (early !== null) askSlot(base, page, blocks);
       /* A PAGE ABOUT A ROW NAMED AS A SLUG IS TITLED IN WORDS (`slugWords`): a skill's page read "review-pr". */
       const titled = param && typeof page.title === 'string' ? { ...page, title: slugWords(page.title) } : page;
       return {
