@@ -254,8 +254,9 @@ export const TEAM = {
 
      2.29.0: Team task list is part of Team board now. A cycle carries a retro, a document for how it went. One field
      added and nothing taken away, so a minor step.
-     2.29.1: the card's summary is one short line. Words only, so a patch step. */
-  version: '2.29.1',
+     2.29.1: the card's summary is one short line. Words only, so a patch step.
+     2.29.2: the project page's And from everywhere cards say "What it is", not "Kind". Words only, so a patch step. */
+  version: '2.29.2',
   title: 'Team board',
   summary: 'Tickets, cycles and the agents on them.',
   author: 'BrainDog',

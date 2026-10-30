@@ -113,7 +113,7 @@ test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and found
      beside Portfolio 1.27.0's Add a project box, and 3.7.0 since its project page draws the page of 27 October, and
      3.7.1 since its card's summary is one short line, and 3.8.0 since its page is Founder overview and the Dashboard
      says what went quiet with the way to fix the feed. */
-  assert.equal(doc.version, '3.8.0');
+  assert.equal(doc.version, '3.8.1');
   assert.equal(doc.hands['register.datapoints'], 'portfolio');
   assert.ok(!doc.declarations.some((d) => d.register === 'datapoints'), 'founder declares Numbers no more');
   assert.ok(!(doc.seeds ?? []).some((s) => s.register === 'datapoints'), 'and seeds no list it does not own');

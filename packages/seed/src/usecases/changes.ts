@@ -36,6 +36,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.8.1', notes: 'A project\'s And from everywhere cards say what each thing is, not its kind.' },
     { version: '3.8.0', notes: 'The founder page is called Founder overview, not Today. While no numbers came in thirty days, the Dashboard says so in one line, shows what went quiet and links to fixing the feed.' },
     { version: '3.7.1', notes: SUMMARY },
     { version: '3.7.0', notes: "A project page leads with what is true of the project, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane: what it brings in, its dated path, or what it costs to keep. Its numbers have lines and say their age, and its dates, what it runs on and renews, its agents and what happened sit under them. Projects opens on what needs you and one sorted list." },
@@ -81,6 +82,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.29.2', notes: 'A project\'s And from everywhere cards say what each thing is, not its kind.' },
     { version: '2.29.1', notes: SUMMARY },
     { version: '2.29.0', notes: 'Team task list is part of Team board now: a cycle can carry a write-up of how it went.' },
     { version: '2.28.0', notes: "A product's page leads with what is true of it, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane, and its numbers, dates, what it runs on, its agents and what happened sit under it. Projects opens on what needs you and one sorted list." },

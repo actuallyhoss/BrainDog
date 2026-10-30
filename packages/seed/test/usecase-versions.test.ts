@@ -1690,6 +1690,28 @@ const DECLARED: Record<string, Version> = {
     declares: '49b914b6f4ae95e6',
     history: ["`page.home-founder` is called Founder overview, not Today, beside the real Today; the Dashboard says in one line when no numbers came in thirty days, shows what went quiet and links to fixing the feed. No id added or taken away -> 49b914b6f4ae95e6"],
   },
+  'founder@3.8.1': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
+      extends.register.datapoints.organisation extends.register.datapoints.about_service
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
+      metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
+      metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'ca8024f0e5283005',
+    history: ["`page.project` labels the cards of And from everywhere \"What it is\", not \"Kind\". Words only, no id added or taken away -> ca8024f0e5283005"],
+  },
   'founder@3.7.1': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
@@ -2295,6 +2317,13 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '8d09acce2d6bc162',
     history: ["The card's summary is one short line, a word outside the pack; `page.home-team` and every other declaration are 2.29.0's word for word -> 8d09acce2d6bc162"],
+  },
+  'team@2.29.2': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project register.cycle_days register.cycle_plan register.cycles rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day script.plan_follows_ticket setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'cf97a60188fc2399',
+    history: ["`page.project` labels the cards of And from everywhere \"What it is\", not \"Kind\". Words only, no id added or taken away -> cf97a60188fc2399"],
   },
 };
 
