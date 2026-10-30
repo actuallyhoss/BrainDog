@@ -855,6 +855,10 @@ const TODAY_BEHIND_MS = 21_600_000;
 const TODAY_KEPT_MOST = 8;
 /** The key Today's drawings are kept under in the host's store beside the record (`RecordDeps.kept`). */
 const TODAY_KEPT_KEY = 'today.kept';
+/** The key the last body each caller asked Today with is kept under, by shape of screen (`todayLast`). */
+const TODAY_LAST_KEY = 'today.last';
+/** The shapes of screen Today's last body is remembered for: a phone, which asks without the widgets it hides, or wider. */
+const TODAY_SHAPES = ['phone', 'wide'] as const;
 /** Today as it was drawn: the record's version then, when, the day where the record is, and the answer. */
 type TodayDrawn = { version: string; at: number; day: string; value: TodayAnswer };
 /** A key's SHA-256 in hex, so a key of any length names one entry in a store whose keys are short. */
@@ -11232,6 +11236,135 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
   /** A drawing of Today out now, by the same key, so an ask that must be fresh waits for it rather than drawing twice. */
   const todayOut = new Map<string, Promise<Result<TodayAnswer>>>();
+  /**
+   * THE LAST BODY TODAY WAS ASKED WITH, BY WHO ASKED IT AND ON WHAT SHAPE OF SCREEN (`shape`, a phone or wider), so the
+   * next open asks Today beside `boot` (`last`, `app.html`), before the app has built its body from `boot` and the lists:
+   * on a cold phone that body was ready only after the shell's code, `boot` and the lists' declarations had all landed,
+   * one whole round trip before Today could be asked (finish S2). The answer carries the digest of what it drew
+   * (`asked`), and the app draws it only when the body it builds is that one. In memory, and beside the record as Today's
+   * drawings are (`deps.kept`), so the first open after a restart finds it too.
+   */
+  type TodayShape = (typeof TODAY_SHAPES)[number];
+  type TodayLast = { what: { body: unknown } | { page: string }; offer: boolean; asked: string };
+  const todayLast = new Map<string, TodayLast>();
+  const lastKeyOf = (ctx: CallContext, shape: TodayShape): string => {
+    const { batch: _batch, provedAt: _proved, ...caller } = ctx;
+    return JSON.stringify([caller, shape]);
+  };
+  const rememberToday = async (ctx: CallContext, shape: TodayShape, said: Record<string, unknown>): Promise<void> => {
+    const what = typeof said.page === 'string' ? { page: said.page } : { body: said.body };
+    const offer = said.offer !== false;
+    const asked = await digestOf(JSON.stringify([what, offer]));
+    const key = lastKeyOf(ctx, shape);
+    if (todayLast.get(key)?.asked === asked) return;
+    todayLast.delete(key);
+    todayLast.set(key, { what, offer, asked });
+    if (todayLast.size > TODAY_KEPT_MOST) todayLast.delete(todayLast.keys().next().value as string);
+    await deps.kept?.put(`${TODAY_LAST_KEY}.${await digestOf(key)}`, { what, offer, asked });
+  };
+  const lastToday = async (ctx: CallContext, shape: TodayShape): Promise<TodayLast | undefined> => {
+    const key = lastKeyOf(ctx, shape);
+    const held = todayLast.get(key);
+    if (held !== undefined) return held;
+    if (deps.kept === undefined) return undefined;
+    const got = (await deps.kept.get(`${TODAY_LAST_KEY}.${await digestOf(key)}`).catch(() => undefined)) as Partial<TodayLast> | undefined;
+    if (got === undefined || got === null || typeof got !== 'object' || typeof got.asked !== 'string' || typeof got.offer !== 'boolean') return undefined;
+    const what = got.what as Record<string, unknown> | undefined;
+    if (what === undefined || what === null || typeof what !== 'object' || (typeof what.page !== 'string' && (what.body === null || typeof what.body !== 'object'))) return undefined;
+    const kept = { what: typeof what.page === 'string' ? { page: what.page } : { body: what.body }, offer: got.offer, asked: got.asked };
+    if (!todayLast.has(key)) todayLast.set(key, kept);
+    return kept;
+  };
+  /**
+   * TODAY AS `today` ANSWERS ONE BODY (or a kept page by its slug): held for the owner, drawn now for anybody else. The
+   * method itself reads `last` and `shape` around it (`todayLast`).
+   */
+  const todayFor = async (args: Record<string, unknown> | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> => {
+    const stop = scoped(ctx, 'read');
+    if (stop) return { ok: false as const, refusal: stop };
+    const said = (args ?? {}) as Record<string, unknown>;
+    const extra = stray(said, ['body', 'fresh', 'page', 'offer']);
+    if (extra) return { ok: false as const, refusal: extra };
+    if (said.offer !== undefined && typeof said.offer !== 'boolean') return no('VALUE_MALFORMED', 'offer is false to leave the widget offer out, which widgetSuggest answers.', { at: 'offer' });
+    const offer = said.offer !== false;
+    /* `{ page: 'home' }`: TODAY AS IT IS KEPT, once somebody has added to it or arranged it (a board, the widgets plan
+       §4.3), drawn in the same one read as the body Today is built from, with the version it was read at so the board's
+       editor writes against it (`boardSteps`). A page this reader may not open is no page. */
+    let keptVersion: number | null = null;
+    let body = said.body;
+    if (said.page !== undefined) {
+      if (typeof said.page !== 'string' || said.page === '' || body !== undefined) return no('VALUE_MALFORMED', "page is the slug of the kept Today, such as home, given instead of body.", { at: 'page' });
+      const slug = said.page;
+      /* A MEMBER'S OWN TODAY, where they keep one (W8), drawn in place of the record's. */
+      const member = slug === 'home' ? ownTodayFor(ctx) : null;
+      const mine = member === null ? null : ownTodayOf(member);
+      if (mine !== null) {
+        body = mine.body;
+        keptVersion = mine.version;
+      } else {
+        const listed = kernel.pages().find((p) => p.slug === slug);
+        const at = listed && seesPage(ctx, listed) ? pageDeclaredAt(slug) : null;
+        const row = at ? sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', at.id) : undefined;
+        if (!at || !row) return no('PAGE_UNKNOWN', `There is no page at ${slug} to draw Today from.`, { at: 'page' });
+        const { pack: _pack, origin: _origin, derived_from: _from, placed: _placed, ...drawn } = JSON.parse(row.body) as Record<string, unknown>;
+        /* A DRAFTED WIDGET IS DRAWN FOR THE OWNER ALONE. */
+        body = allows(ctx, 'owner') === null || !Array.isArray(drawn.blocks) ? drawn : { ...drawn, blocks: (drawn.blocks as Record<string, unknown>[]).filter((b) => b?.draft === undefined) };
+        keptVersion = at.version;
+      }
+    }
+    if (body === null || typeof body !== 'object' || Array.isArray(body))
+      return no('REQUIRED_MISSING', "body is Today's body, a page declaration's body as braindog:grammar/page says.", { at: 'body' });
+    if (said.fresh !== undefined && typeof said.fresh !== 'boolean') return no('VALUE_MALFORMED', 'fresh is true to have Today drawn now, never as it was last drawn.', { at: 'fresh' });
+    if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'This BrainDog does not answer Today yet.');
+    const asks = todayAsks;
+    /* IN ONE PASS (`todayDraws`): every part asked with a copy of the caller made for this drawing alone. */
+    const drawOf = () => {
+      const once: CallContext = { ...ctx };
+      todayDraws.set(once, null);
+      return todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), once, { offer });
+    };
+    /* AND THE PAGE AS IT IS DECLARED (its title, `board`, the phone's arrangement), so the screen draws a kept Today from
+       this one read and asks `page` for nothing. */
+    /* ITS BLOCKS AS DECLARED TOO, for the board's Inspector, which changes a widget as it is kept and not as it is drawn. */
+    const declared = keptVersion === null ? null : (body as Record<string, unknown>);
+    const draw = keptVersion === null ? drawOf : () => drawOf().then((r) => (r.ok ? ok({ ...r.value, page: { ...(r.value.page as object), declared_version: keptVersion, declared } }) : r));
+    /* HELD ONLY FOR THE OWNER, who opens Today the most and whose answer nobody else is handed; anybody else is drawn now. */
+    if (allows(ctx, 'owner') !== null) return draw();
+    const { batch: _batch, provedAt: _proved, ...caller } = ctx;
+    /* AN ANSWER WITHOUT THE OFFER IS ANOTHER ANSWER, kept apart from one with it. */
+    const key = JSON.stringify(offer ? [caller, body] : [caller, body, 'no offer']);
+    /* WHAT THIS OBJECT DID NOT HOLD IN MEMORY, AS AFTER A RESTART, IS READ FROM BESIDE THE RECORD first (`keptToday`). */
+    if (!todayKept.has(key) && said.fresh !== true) {
+      const stored = await keptToday(key);
+      if (stored !== undefined && !todayKept.has(key)) todayKept.set(key, stored);
+    }
+    const now = clock.now();
+    const day = localDays(readableZone(kernel.identity()?.tz))(now);
+    const version = stamp();
+    const kept = todayKept.get(key);
+    const usable = kept !== undefined && kept.day === day && kept.at <= now && now - kept.at < TODAY_BEHIND_MS;
+    if (usable && kept.version === version && now - kept.at < HELD_MS) return ok(structuredClone(kept.value));
+    if (usable && said.fresh !== true) return ok({ ...structuredClone(kept.value), behind: true });
+    const out = todayOut.get(key);
+    if (out !== undefined) return out.then((r) => (r.ok ? ok(structuredClone(r.value)) : r));
+    const drawing = draw().then((r) => {
+      if (r.ok) {
+        const drawn: TodayDrawn = { version, at: now, day, value: structuredClone(r.value) };
+        todayKept.delete(key);
+        todayKept.set(key, drawn);
+        if (todayKept.size > TODAY_KEPT_MOST) todayKept.delete(todayKept.keys().next().value as string);
+        void keepToday(key, drawn).catch(() => undefined);
+      }
+      return r;
+    });
+    todayOut.set(key, drawing);
+    try {
+      return await drawing;
+    } finally {
+      if (todayOut.get(key) === drawing) todayOut.delete(key);
+    }
+  };
+
   /** The methods a project's page asks for its shape (`project-shape.ts`); set once `api` and its wrappers are. */
   let shapeAsks: ShapeAsks | null = null;
   /** `page` as it reads one address, for its read by a row's spoken id to ask again (`page` below); set once `api` is. */
@@ -12767,90 +12900,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * To the owner, a read may be answered Today as it was last drawn, marked `behind` (`todayKept`); `fresh` is never.
      * `offer: false` leaves out the widget the board's last cell offers, which the app then asks `widgetSuggest` for.
      */
-    async today(args: { body?: unknown; fresh?: boolean; page?: string; offer?: boolean } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
+    async today(args: { body?: unknown; fresh?: boolean; page?: string; offer?: boolean; last?: string; shape?: string } | undefined, ctx: CallContext): Promise<Result<TodayAnswer | null>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
-      const extra = stray(said, ['body', 'fresh', 'page', 'offer']);
+      const extra = stray(said, ['body', 'fresh', 'page', 'offer', 'last', 'shape']);
       if (extra) return { ok: false as const, refusal: extra };
-      if (said.offer !== undefined && typeof said.offer !== 'boolean') return no('VALUE_MALFORMED', 'offer is false to leave the widget offer out, which widgetSuggest answers.', { at: 'offer' });
-      const offer = said.offer !== false;
-      /* `{ page: 'home' }`: TODAY AS IT IS KEPT, once somebody has added to it or arranged it (a board, the widgets plan
-         §4.3), drawn in the same one read as the body Today is built from, with the version it was read at so the board's
-         editor writes against it (`boardSteps`). A page this reader may not open is no page. */
-      let keptVersion: number | null = null;
-      let body = said.body;
-      if (said.page !== undefined) {
-        if (typeof said.page !== 'string' || said.page === '' || body !== undefined) return no('VALUE_MALFORMED', "page is the slug of the kept Today, such as home, given instead of body.", { at: 'page' });
-        const slug = said.page;
-        /* A MEMBER'S OWN TODAY, where they keep one (W8), drawn in place of the record's. */
-        const member = slug === 'home' ? ownTodayFor(ctx) : null;
-        const mine = member === null ? null : ownTodayOf(member);
-        if (mine !== null) {
-          body = mine.body;
-          keptVersion = mine.version;
-        } else {
-          const listed = kernel.pages().find((p) => p.slug === slug);
-          const at = listed && seesPage(ctx, listed) ? pageDeclaredAt(slug) : null;
-          const row = at ? sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', at.id) : undefined;
-          if (!at || !row) return no('PAGE_UNKNOWN', `There is no page at ${slug} to draw Today from.`, { at: 'page' });
-          const { pack: _pack, origin: _origin, derived_from: _from, placed: _placed, ...drawn } = JSON.parse(row.body) as Record<string, unknown>;
-          /* A DRAFTED WIDGET IS DRAWN FOR THE OWNER ALONE. */
-          body = allows(ctx, 'owner') === null || !Array.isArray(drawn.blocks) ? drawn : { ...drawn, blocks: (drawn.blocks as Record<string, unknown>[]).filter((b) => b?.draft === undefined) };
-          keptVersion = at.version;
-        }
+      /* `last`: TODAY ASKED BESIDE `boot`, with the body this caller asked last time on a screen of this shape. */
+      if (said.last !== undefined) {
+        if (!TODAY_SHAPES.includes(said.last as never)) return no('VALUE_MALFORMED', 'last is phone or wide, the screen Today was last asked on.', { at: 'last', allowed: [...TODAY_SHAPES] });
+        if (Object.keys(said).length > 1) return no('VALUE_MALFORMED', 'last is asked by itself: the body is the one this screen asked last time.', { at: 'last' });
+        const was = await lastToday(ctx, said.last as TodayShape);
+        /* NOTHING ASKED ON A SCREEN LIKE THIS YET: answered as nothing, never refused, since the page asks it unseen. */
+        if (was === undefined) return ok(null);
+        /* AND THE VERSION IT WAS ASKED AT, taken before it is drawn: a tab that has heard a newer one by the time it takes
+           this answer draws it as behind and asks again (`earlyToday`). */
+        const at = versionFor(ctx);
+        const got = await todayFor({ ...was.what, ...(was.offer ? {} : { offer: false }) }, ctx);
+        return got.ok ? ok({ ...got.value, asked: was.asked, version: at }) : got;
       }
-      if (body === null || typeof body !== 'object' || Array.isArray(body))
-        return no('REQUIRED_MISSING', "body is Today's body, a page declaration's body as braindog:grammar/page says.", { at: 'body' });
-      if (said.fresh !== undefined && typeof said.fresh !== 'boolean') return no('VALUE_MALFORMED', 'fresh is true to have Today drawn now, never as it was last drawn.', { at: 'fresh' });
-      if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'This BrainDog does not answer Today yet.');
-      const asks = todayAsks;
-      /* IN ONE PASS (`todayDraws`): every part asked with a copy of the caller made for this drawing alone. */
-      const drawOf = () => {
-        const once: CallContext = { ...ctx };
-        todayDraws.set(once, null);
-        return todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), once, { offer });
-      };
-      /* AND THE PAGE AS IT IS DECLARED (its title, `board`, the phone's arrangement), so the screen draws a kept Today from
-         this one read and asks `page` for nothing. */
-      /* ITS BLOCKS AS DECLARED TOO, for the board's Inspector, which changes a widget as it is kept and not as it is drawn. */
-      const declared = keptVersion === null ? null : (body as Record<string, unknown>);
-      const draw = keptVersion === null ? drawOf : () => drawOf().then((r) => (r.ok ? ok({ ...r.value, page: { ...(r.value.page as object), declared_version: keptVersion, declared } }) : r));
-      /* HELD ONLY FOR THE OWNER, who opens Today the most and whose answer nobody else is handed; anybody else is drawn now. */
-      if (allows(ctx, 'owner') !== null) return draw();
-      const { batch: _batch, provedAt: _proved, ...caller } = ctx;
-      /* AN ANSWER WITHOUT THE OFFER IS ANOTHER ANSWER, kept apart from one with it. */
-      const key = JSON.stringify(offer ? [caller, body] : [caller, body, 'no offer']);
-      /* WHAT THIS OBJECT DID NOT HOLD IN MEMORY, AS AFTER A RESTART, IS READ FROM BESIDE THE RECORD first (`keptToday`). */
-      if (!todayKept.has(key) && said.fresh !== true) {
-        const stored = await keptToday(key);
-        if (stored !== undefined && !todayKept.has(key)) todayKept.set(key, stored);
-      }
-      const now = clock.now();
-      const day = localDays(readableZone(kernel.identity()?.tz))(now);
-      const version = stamp();
-      const kept = todayKept.get(key);
-      const usable = kept !== undefined && kept.day === day && kept.at <= now && now - kept.at < TODAY_BEHIND_MS;
-      if (usable && kept.version === version && now - kept.at < HELD_MS) return ok(structuredClone(kept.value));
-      if (usable && said.fresh !== true) return ok({ ...structuredClone(kept.value), behind: true });
-      const out = todayOut.get(key);
-      if (out !== undefined) return out.then((r) => (r.ok ? ok(structuredClone(r.value)) : r));
-      const drawing = draw().then((r) => {
-        if (r.ok) {
-          const drawn: TodayDrawn = { version, at: now, day, value: structuredClone(r.value) };
-          todayKept.delete(key);
-          todayKept.set(key, drawn);
-          if (todayKept.size > TODAY_KEPT_MOST) todayKept.delete(todayKept.keys().next().value as string);
-          void keepToday(key, drawn).catch(() => undefined);
-        }
-        return r;
-      });
-      todayOut.set(key, drawing);
-      try {
-        return await drawing;
-      } finally {
-        if (todayOut.get(key) === drawing) todayOut.delete(key);
-      }
+      if (said.shape !== undefined && !TODAY_SHAPES.includes(said.shape as never)) return no('VALUE_MALFORMED', 'shape is phone or wide, the screen Today is asked on.', { at: 'shape', allowed: [...TODAY_SHAPES] });
+      const { shape, ...asked } = said;
+      const got = await todayFor(asked, ctx);
+      /* THE FIRST READ OF AN OPEN IS REMEMBERED FOR THAT SHAPE OF SCREEN, so the next open can ask it beside `boot`; a read
+         drawn now (`fresh`) is a screen already open, asked again. */
+      if (got.ok && shape !== undefined && asked.fresh !== true) void rememberToday(ctx, shape as TodayShape, asked).catch(() => undefined);
+      return got;
     },
 
     /** One figure, by the id a `stat` cell names. */

@@ -569,7 +569,7 @@
     let declared: Record<string, unknown> | null = null;
     let version: number | undefined;
     const drawn = await m.drawnOf({ page: slug, blocks: [] }, base, undefined, async (client) => {
-      const out = await t.askToday(client, base, {}, fresh, slug);
+      const out = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide');
       if (out.ok) {
         const said = out.value as { declared?: unknown; declared_version?: unknown };
         if (said.declared !== null && typeof said.declared === 'object' && !Array.isArray(said.declared)) declared = said.declared as Record<string, unknown>;
@@ -612,6 +612,9 @@
        on a wider screen or in the editor reads Today again whole (`phoneOnly`). */
     const trim = untrack(() => narrow.current && !boardModel.editing && !boardModel.phoneView);
     const { asked, left } = trim ? phoneAsk(body) : { asked: body, left: [] };
+    /* THE SHAPE OF SCREEN IT IS ASKED ON, so the record remembers this body for the next open to ask beside `boot`
+       (`app.html`): a phone's trimmed body, or a wider screen's whole one. A phone asking whole (the editor) says none. */
+    const shape = trim ? 'phone' : untrack(() => narrow.current) ? undefined : 'wide';
     const leftOut = left as unknown as Record<string, unknown>[];
     /* AND THE DESK'S CARDS' OWN CODE WHILE THE RECORD DRAWS, so they are drawn with the page and take their parts from the
        same read: loaded after the page, the cards and their lines landed after the screen said it was ready. FETCHED
@@ -621,7 +624,7 @@
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
     const [m, t] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts')]);
     const base = apiBase();
-    let drawn = await m.drawnOf(asked, base, undefined, (client) => t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut));
+    let drawn = await m.drawnOf(asked, base, undefined, (client) => t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut, shape));
     /* A RECORD BUILT BEFORE BOARDS refuses a board's keys (`board: is not a key a page has`): Today is asked without them
        and laid out from its own body's sizes, so an app ahead of its record still opens Today (audit 30 Oct, item 2). */
     if (drawn.from === 'refused' && /\b(board|phone|size|draft|until)\b/u.test(drawn.fix)) {

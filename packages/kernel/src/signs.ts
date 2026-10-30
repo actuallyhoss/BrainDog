@@ -92,6 +92,18 @@ export const SIGNS_KEY = 'signs';
 /** Who reads a sign: the kernel itself, or the layer that files it. */
 export type SignHand = 'kernel' | 'record' | 'host';
 
+/**
+ * HOW LONG A READING STANDS BY THE CLOCK ALONE, told by its reader: the first instant at which the same rows could read
+ * otherwise because time moved (a message turning a day old, a feed a period late, a window letting a run go), or
+ * `Infinity` when only a write or the day where the record is can move it. Told more than once, the earliest stands.
+ *
+ * WHY. Today's "signs need a look" read every sign again on every open, because each was held 30 s at most: a sign may
+ * say how long ago something was. A reader that knows when its answer moves says so here, and the kernel holds its
+ * reading until then or until something it read is written (`held-signs.ts`). A reader that tells nothing is read again
+ * after 30 s, as before, so a sign nobody taught this is never held past what it was.
+ */
+export type SignLasts = (until: number) => void;
+
 /** A sign on the closed list: its id, its name, who reads it, and for the kernel's own the reader and its thresholds. */
 export type SignReader = {
   sign: string;
@@ -99,11 +111,17 @@ export type SignReader = {
   hand: SignHand;
   version: number;
   thresholds: Readonly<Record<string, number>>;
-  read: ((sql: Sql, nowMs: number, tz: string) => SignReading) | null;
+  read: ((sql: Sql, nowMs: number, tz: string, lasts?: SignLasts) => SignReading) | null;
 };
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+
+/** The instant an ISO time crosses a line `ms` after it, or `Infinity` for none: a time that cannot be read never crosses. */
+const crossesAt = (at: string | null | undefined, ms: number): number => {
+  const t = typeof at === 'string' ? Date.parse(at) : Number.NaN;
+  return Number.isNaN(t) ? Infinity : t + ms;
+};
 
 /* ── the thresholds, one line each, as 2.2 of  sets them ───────────────── */
 
@@ -236,7 +254,8 @@ const plain = (id: string): string => id.replace(/[-_.:]+/g, ' ').trim();
 /* An arrival nothing verified (`ingest.ts`'s `UNVERIFIED`) is the sender's fault and waits on nobody. */
 const VOUCHED = "(state <> 'untriaged' OR reason IS NULL OR reason <> ?)";
 
-function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
+function readArrivals(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
+  lasts(Infinity);
   /* THE DOORS AND THE LISTS EACH FEEDS: an installed pattern that takes messages in, and where it files. */
   const fed = new Map<string, Set<string>>();
   /* AND THE PATTERNS THAT FILE INTO EACH LIST: a message another list's pattern filed says nothing of this one. */
@@ -260,10 +279,24 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
     new Date(nowMs - ARRIVAL_WAIT_MS).toISOString(),
     UNVERIFIED,
   );
+  /* THE NEXT MESSAGE TO TURN A DAY OLD UNFILED moves this reading by the clock alone (`SignLasts`). */
+  lasts(
+    crossesAt(
+      sql.one<{ ts: string | null }>(
+        `SELECT min(ts) AS ts FROM inbox_raw WHERE state IN ('untriaged', 'review', 'proposed') AND ts > ? AND ${VOUCHED}`,
+        new Date(nowMs - ARRIVAL_WAIT_MS).toISOString(),
+        UNVERIFIED,
+      )?.ts,
+      ARRIVAL_WAIT_MS,
+    ),
+  );
   /* NO PATTERN IS NOT NOTHING TO JUDGE BY WHILE MESSAGES WAIT: a pattern retired or lost leaves them waiting all the same. */
   if (fed.size === 0 && waiting.length === 0) return reading('none', null, 'Nothing takes messages in yet.');
   const since = new Date(nowMs - ARRIVALS_WINDOW_DAYS * DAY).toISOString();
-  const recent = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM inbox_raw WHERE state <> 'erased' AND ts >= ? AND ${VOUCHED}`, since, UNVERIFIED)?.n ?? 0);
+  const window = sql.one<{ n: number; first: string | null }>(`SELECT count(*) AS n, min(ts) AS first FROM inbox_raw WHERE state <> 'erased' AND ts >= ? AND ${VOUCHED}`, since, UNVERIFIED);
+  const recent = Number(window?.n ?? 0);
+  /* AND THE OLDEST MESSAGE IN THE WINDOW LEAVING IT. */
+  lasts(crossesAt(window?.first, ARRIVALS_WINDOW_DAYS * DAY));
   if (waiting.length === 0 && recent === 0) return reading('none', null, `Nothing has come in for ${ARRIVALS_WINDOW_DAYS} days, so there is nothing to judge by.`);
 
   /* EACH FED LIST AGAINST THE NEWEST MESSAGE AT ITS DOORS THAT WAS NOT SET ASIDE: one filed is in the list, one waiting is not. */
@@ -390,9 +423,12 @@ const ARRIVED = '(mp.series, mp.source) IN (SELECT series, source FROM arrived)'
  */
 const NO_NUMBER_FEED = 'No number arrives on a schedule yet, so there is nothing to judge by.';
 
-function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
+function readNumbers(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
+  lasts(Infinity);
   const feeds = feedsOn(sql);
   const late = feeds.filter((f) => nowMs - f.lastGoodMs > FEED_LATE_PERIODS * f.everyMs);
+  /* A FEED ON TIME IS LATE BY THE CLOCK ALONE once two of its periods pass with no good run (`SignLasts`). */
+  for (const f of feeds) if (!late.includes(f)) lasts(f.lastGoodMs + FEED_LATE_PERIODS * f.everyMs + 1);
 
   /* EVERY SERIES THAT EVER HELD ENOUGH NUMBERS TO HAVE A USUAL GAP, the median of its last thirty. */
   const series = sql.all<{ series: string; newest: string }>(
@@ -433,6 +469,7 @@ function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
     const newestMs = Date.parse(s.newest);
     const age = nowMs - newestMs;
     if (age > SERIES_GAP_TIMES * gap && age > SERIES_STALE_DAYS * DAY) stale.push({ name: seriesName(sql, s.series), newestMs });
+    /* AND A SERIES ON TIME IS BEHIND once its newest number is older than both lines. */ else if (!Number.isNaN(newestMs)) lasts(newestMs + Math.max(SERIES_GAP_TIMES * gap, SERIES_STALE_DAYS * DAY) + 1);
   }
   const newestAll = judged.reduce((m, s) => Math.max(m, Date.parse(s.newest)), -Infinity);
   const facts = [
@@ -484,8 +521,16 @@ const sentence = (said: string): string => {
 /** Whether this record has ever been asked anything: with nothing ever asked, the two question signs have nothing to judge by. */
 const everAsked = (sql: Sql): boolean => sql.one('SELECT 1 AS x FROM suggestion LIMIT 1') !== undefined;
 
-function readCauses(sql: Sql, nowMs: number): SignReading {
-  if (!everAsked(sql)) return reading('none', null, 'Nothing has been asked yet.');
+/** The next question put off to a later time that comes back open by the clock alone (`SignLasts`). */
+const nextOpen = (sql: Sql, nowMs: number): number =>
+  crossesAt(sql.one<{ at: string | null }>("SELECT min(defer_until) AS at FROM suggestion WHERE status = 'open' AND defer_until > ?", new Date(nowMs).toISOString())?.at, 0);
+
+function readCauses(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): SignReading {
+  if (!everAsked(sql)) {
+    lasts(Infinity);
+    return reading('none', null, 'Nothing has been asked yet.');
+  }
+  lasts(nextOpen(sql, nowMs));
   /* THE CAUSE IS THE QUESTION'S OWN, the column `propose` keeps every cause it filed or derived in (migration 31), else
      the body's (a tail question from before the column writes it, and Slash's reading keeps its key, `understand_key`),
      ELSE THE KIND OF CHANGE STAMPED ON IT WITH WHAT IT IS ABOUT, ELSE NONE. Read off the body alone, every question an
@@ -544,11 +589,17 @@ function readCauses(sql: Sql, nowMs: number): SignReading {
   return !biggest && faults.length > 0 ? { ...out, named: faults.length === 1 ? 'Something did not work' : `${faults.length} things did not work` } : out;
 }
 
-function readOldest(sql: Sql, nowMs: number, tz: string): SignReading {
-  if (!everAsked(sql)) return reading('none', null, 'Nothing has been asked yet.');
+function readOldest(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
+  if (!everAsked(sql)) {
+    lasts(Infinity);
+    return reading('none', null, 'Nothing has been asked yet.');
+  }
+  lasts(nextOpen(sql, nowMs));
   const oldest = sql.one<{ id: string; at: string }>(`SELECT id, opened_at AS at FROM suggestion WHERE ${OPEN} ORDER BY opened_at LIMIT 1`, new Date(nowMs).toISOString());
   if (oldest === undefined) return reading('green', 0, 'No question is waiting.');
   const days = Math.max(0, Math.floor((nowMs - Date.parse(oldest.at)) / DAY));
+  /* A DAY OLDER at the same hour it was asked. */
+  lasts(Date.parse(oldest.at) + (days + 1) * DAY);
   const facts = [`Asked on ${dateSaid(oldest.at, tz, nowMs)}: ${askedIn(sql, oldest.id)}`];
   /* NOUGHT DAYS IS TODAY: "is 0 days old" was how Health said a question asked this morning. */
   const said = days === 0 ? 'The oldest open question was asked today.' : `The oldest open question is ${count(days, 'day')} old.`;
@@ -558,7 +609,8 @@ function readOldest(sql: Sql, nowMs: number, tz: string): SignReading {
 /* ── runs-true ─────────────────────────────────────────────────────────── */
 
 /* RUNS ARE THE RECORD'S OWN BOOKKEEPING (agents' sessions, counted for health): owner-level by design, no private-row clause. */
-function readRuns(sql: Sql, nowMs: number): SignReading {
+function readRuns(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): SignReading {
+  lasts(Infinity);
   const since = new Date(nowMs - RUNS_WINDOW_DAYS * DAY).toISOString();
   /* HEARD OR PULSED, as the sweep reads it (`quietRuns` in `presence.ts`): a window open on a question is not silent. */
   const HEARD = "max(coalesce(json_extract(fields, '$.last_seen'), updated_at), coalesce(json_extract(fields, '$.pulse_at'), ''))";
@@ -571,11 +623,23 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
   /* A HANDOFF THE SWEEP WROTE IS A RUN THAT WENT SILENT, not one that ended: `sweepSessions` hands off a run that crashed
      after leaving a step, and its `state` line is by `system`. A run that handed off itself signs its own line. Read in
      the same query, the newest `state` line of each handoff, so a week of runs is one read and not one a run. */
-  const runs = sql.all<{ state: string | null; swept: number }>(
+  const runs = sql.all<{ state: string | null; swept: number; seen: string | null }>(
     `SELECT state, (state = 'handoff' AND coalesce((SELECT e.actor FROM event e WHERE e.target = 'entry:' || entry.id AND e.kind = 'state'
-       ORDER BY e.ts DESC, e.rowid DESC LIMIT 1), '') = 'system') AS swept
+       ORDER BY e.ts DESC, e.rowid DESC LIMIT 1), '') = 'system') AS swept, ${HEARD_HERE} AS seen
      FROM entry WHERE register = 'session' AND deleted_at IS NULL AND ${HEARD_HERE} >= ?`,
     since,
+  );
+  /* BY THE CLOCK ALONE (`SignLasts`): a run of the week leaves it, and an open run goes silent twelve hours after it was
+     last heard from. */
+  for (const r of runs) lasts(crossesAt(r.seen, RUNS_WINDOW_DAYS * DAY));
+  lasts(
+    crossesAt(
+      sql.one<{ heard: string | null }>(
+        `SELECT min(${HEARD}) AS heard FROM entry WHERE register = 'session' AND deleted_at IS NULL AND state IN ('active', 'idle') AND ${HEARD} >= ?`,
+        new Date(nowMs - RUN_SILENT_MS).toISOString(),
+      )?.heard,
+      RUN_SILENT_MS,
+    ),
   );
   /* STILL OPEN LONG AFTER IT WAS LAST HEARD FROM: the sweep that writes such a run off did not. AT ANY AGE, not only this
      week's: a run the sweep never wrote off falls out of the window and would read as no run at all. */
@@ -593,6 +657,9 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
   if (swept > 0) facts.push(`${count(swept, 'run')} went silent and ${swept === 1 ? 'was' : 'were'} left waiting with ${swept === 1 ? 'its' : 'their'} next step, not ended.`);
   if (silent.length > 0) {
     const ago = nowMs - Date.parse(silent[0]!.heard);
+    /* ITS AGE IS SAID IN HOURS, then in days: the next hour or day it reaches. */
+    const step = ago < 2 * DAY ? HOUR : DAY;
+    lasts(Date.parse(silent[0]!.heard) + (Math.floor(ago / step) + 1) * step);
     facts.push(`${silent[0]!.agent ?? 'A run'} was last heard from ${ago < 2 * DAY ? count(Math.floor(ago / HOUR), 'hour') : count(Math.floor(ago / DAY), 'day')} ago and is still open.`);
   }
   if (!lost && silent.length === 0)
@@ -668,7 +735,9 @@ function currencyWords(code: string): string {
  * NOTHING TO JUDGE BY ON A RECORD WITH ONE CURRENCY, however old its rates: nothing there is converted. And none with no
  * rate at all, as the figure says nothing then: nought would say the rates are fresh on a record that has none.
  */
-function readRatesCurrent(sql: Sql, nowMs: number, tz: string): SignReading {
+function readRatesCurrent(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
+  /* BY THE DAY ALONE: the rate's age is counted in the record's days, and nothing else here reads the clock. */
+  lasts(Infinity);
   const held = currenciesHeld(sql);
   if (held.length < 2)
     return reading('none', null, held.length === 0 ? 'No money is written down yet, so no exchange rate is needed.' : `Every amount is in ${currencyWords(held[0]!)}, so no exchange rate is needed.`);
@@ -702,9 +771,9 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   filed('model-answers', 'The model answers', 'host'),
   filed('tools-listed', 'Agents get the tool list', 'host'),
   filed('briefing-true', 'What agents are told is true', 'record'),
-  kernel('questions-by-cause', 'Each problem is asked once', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs) => readCauses(sql, nowMs)),
+  kernel('questions-by-cause', 'Each problem is asked once', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs, _tz, lasts) => readCauses(sql, nowMs, lasts)),
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
-  kernel('runs-true', 'Agent runs end cleanly', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs), 2),
+  kernel('runs-true', 'Agent runs end cleanly', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs, _tz, lasts) => readRuns(sql, nowMs, lasts), 2),
   /* Version 2: a refused block or a path that named nothing, counted by the pages census, is red too. */
   filed('pages-clean', 'Pages draw without errors', 'host', 2),
   filed('arrived', 'What shipped has arrived', 'record'),
@@ -724,11 +793,21 @@ export const signOf = (id: string): SignReader | null => VITAL_SIGNS.find((s) =>
 /** What the night writes for a filed sign on a day nothing was filed: a placeholder, never a filing. */
 const NOT_FILED = 'Nothing was filed for this sign that day.';
 
-/** One sign read now. A reader that throws reads `none` with its own words, never green and never a throw out of here. */
-function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReading {
+/**
+ * One sign read now. A reader that throws reads `none` with its own words, never green and never a throw out of here.
+ * `lasts` is told how long the reading stands by the clock alone (`SignLasts`): the earliest its reader told, nothing
+ * when it told nothing or threw, and for a filed sign, until its filing stops standing.
+ */
+function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string, lasts?: SignLasts): SignReading {
   if (s.read !== null) {
+    let until: number | undefined;
     try {
-      return s.read(sql, nowMs, tz);
+      const got = s.read(sql, nowMs, tz, (at) => {
+        /* A TIME THAT IS NOT A NUMBER stands for no time at all. */
+        until = Math.min(until ?? Infinity, Number.isNaN(at) ? -Infinity : at);
+      });
+      if (until !== undefined) lasts?.(until);
+      return got;
     } catch (e) {
       return reading('none', null, 'This sign could not be read.', [e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200)]);
     }
@@ -740,10 +819,16 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
     s.sign,
     NOT_FILED,
   );
-  if (row === undefined) return reading('none', null, NEVER_FILED);
+  /* UNTIL SOMETHING IS FILED, which is a write to the readings. */
+  if (row === undefined) {
+    lasts?.(Infinity);
+    return reading('none', null, NEVER_FILED);
+  }
   /* NOT `> FILED_STANDS_MS`: a `read_at` that does not parse is NaN, and NaN is never more than a day, so the filing
      would stand forever. Written so a time that cannot be read reads as old. */
   const t = Date.parse(row.read_at);
+  /* A FILING THAT STANDS STANDS UNTIL A DAY AFTER IT WAS FILED; one that no longer does reads the same until another is filed. */
+  lasts?.(nowMs - t <= FILED_STANDS_MS ? t + FILED_STANDS_MS + 1 : Infinity);
   if (!(nowMs - t <= FILED_STANDS_MS))
     return reading('none', null, Number.isNaN(t) ? 'No day it was read is known.' : `Not read since ${dateSaid(t, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
   const kept = factsOf(row.facts);
@@ -752,16 +837,17 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
 
 /**
  * Every sign now, with its last fourteen days, oldest first; a day with no reading is `none`. `each` reads one sign as
- * the caller holds it (the kernel's figures hold a sign over the lists it read, `holdAcross`); absent, each is read now.
+ * the caller holds it (the kernel holds a sign until something it read is written or the clock moves it, `held-signs.ts`),
+ * its `read` telling `lasts` how long the reading stands by the clock alone (`SignLasts`); absent, each is read now.
  */
-export function readSigns(sql: Sql, nowMs: number, tz: string, each?: (sign: string, read: () => SignReading) => SignReading): VitalSign[] {
+export function readSigns(sql: Sql, nowMs: number, tz: string, each?: (sign: string, read: (lasts: SignLasts) => SignReading) => SignReading): VitalSign[] {
   const today = dayIn(nowMs, safeZone(tz));
   const first = dayBefore(today, 14);
   const kept = new Map<string, SignState>();
   for (const r of sql.all<{ sign: string; day: string; state: SignState }>('SELECT sign, day, state FROM sign_reading WHERE day >= ? AND day < ?', first, today))
     kept.set(`${r.sign} ${r.day}`, r.state);
   return VITAL_SIGNS.map((s) => {
-    const now = each === undefined ? readNow(sql, s, nowMs, safeZone(tz)) : each(s.sign, () => readNow(sql, s, nowMs, safeZone(tz)));
+    const now = each === undefined ? readNow(sql, s, nowMs, safeZone(tz)) : each(s.sign, (lasts) => readNow(sql, s, nowMs, safeZone(tz), lasts));
     const days = Array.from({ length: 14 }, (_, i) => dayBefore(today, 14 - i)).map((day) => ({ day, state: kept.get(`${s.sign} ${day}`) ?? ('none' as const) }));
     const sign: VitalSign = { sign: s.sign, name: now.named ?? s.name, state: now.state, value: now.value, said: now.said, facts: now.facts ?? [], days };
     if (now.counts !== undefined) sign.counts = { ...now.counts };
