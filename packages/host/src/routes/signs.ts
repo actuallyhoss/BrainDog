@@ -13,6 +13,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'signs', group: 'READ+', writes: false, what: 'Your record’s vital signs now, each with whether it needs a look, its number, one sentence and its last 14 days. It changes nothing.',
+  { name: 'signs', group: 'READ+', writes: false, what: 'Your BrainDog’s vital signs now, each with whether it needs a look, its number, one sentence and its last 14 days. It changes nothing.',
     takes: {} },
 ];

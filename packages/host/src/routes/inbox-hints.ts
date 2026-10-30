@@ -15,6 +15,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'inboxHints', group: 'READ+', writes: false, what: 'For each arrival named in the Inbox, what it is (a payment, or someone writing), who it is from by the name the record knows them by, and the amount it says, worked out by rules from what arrived. Fifty at most. It changes nothing.',
+  { name: 'inboxHints', group: 'READ+', writes: false, what: 'For each arrival named in the Inbox, what it is (a payment, or someone writing), who it is from by the name this BrainDog knows them by, and the amount it says, worked out by rules from what arrived. Fifty at most. It changes nothing.',
     takes: { ids: 'json' } },
 ];

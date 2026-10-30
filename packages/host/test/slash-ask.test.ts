@@ -258,7 +258,7 @@ test('NO MODEL CONFIGURED SAYS SO IN WORDS, and every other route on the same ho
   const out = await ask(host.origin, { question: 'Which tasks are open?' });
   assert.equal(out.status, 501, JSON.stringify(out.body));
   assert.equal(out.body.refusal?.code, 'NOT_IN_THIS_BUILD');
-  assert.equal(out.body.refusal?.fix, 'No model is configured behind Slash on this host, so it cannot read the record for you.');
+  assert.equal(out.body.refusal?.fix, 'No model is configured behind Slash on this host, so it cannot read your BrainDog for you.');
   assert.equal(asked, 1);
 
   /* THE KEYLESS PATH DOES NOT REGRESS: the record's own surface is untouched by the door in front of it, and

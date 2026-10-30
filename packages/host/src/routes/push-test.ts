@@ -13,5 +13,5 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'pushTest', group: 'DATA', writes: true, what: 'Send one test notification to each device you turned notifications on for, to see that it arrives. A person only, once a minute; it says nothing about the record.' },
+  { name: 'pushTest', group: 'DATA', writes: true, what: 'Send one test notification to each device you turned notifications on for, to see that it arrives. A person only, once a minute; it says nothing about what this BrainDog holds.' },
 ];

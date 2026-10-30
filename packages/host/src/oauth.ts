@@ -494,10 +494,10 @@ const ladder = (scope: string): string => {
  */
 export const scopeSentence = (scope: OAuthScope): string =>
   scope === 'read'
-    ? 'Read your record.'
+    ? 'Read your BrainDog.'
     : scope === 'propose'
-      ? 'Read your record and propose changes, which wait for you to decide.'
-      : 'Read your record, propose changes, and change rows directly.';
+      ? 'Read your BrainDog and propose changes, which wait for you to decide.'
+      : 'Read your BrainDog, propose changes, and change rows directly.';
 
 /**
  * Whether a `resource` names the one resource this server protects (RFC 8707), by any address it has (`resources`),

@@ -74,14 +74,14 @@ export type AccountRoute = { path: string; method: 'GET' | 'POST'; on: 'both' | 
  * row answers 404 `ROUTE_UNKNOWN`, which is what a path nobody serves already answered.
  */
 export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
-  { path: '/account/usage', method: 'GET', on: 'both', needs: 'session', what: 'What the records you own used between two days, and each month so far against its allowance.' },
+  { path: '/account/usage', method: 'GET', on: 'both', needs: 'session', what: 'What the BrainDogs you own used between two days, and each month so far against its allowance.' },
   /* THE SWITCHER'S INDEX, and not an authorisation: every open record this person can REACH, by
      the level they actually hold there. `usage` above answers for records this person OWNS; this
      answers for every one they can open at all, which is the wider question the sidebar asks. */
   { path: '/account/records', method: 'GET', on: 'both', needs: 'session', what: 'Which records you can reach, each with its name and the level you hold there.' },
   { path: '/account/billing', method: 'GET', on: 'worker', needs: 'session', what: 'Each record you own, whether it is paid for, and whether this host takes payment at all.' },
   { path: '/account/billing/checkout', method: 'POST', on: 'worker', needs: 'session', what: 'A payment page for a new record, `{ slug, name?, tz?, plan? }`, for paying again, `{ record, plan? }`, or for Slash credits, `{ record, pack }`.' },
-  { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a record you own, `{ record }`, or `{ record, plan }` to switch its plan.' },
+  { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a BrainDog you own, `{ record }`, or `{ record, plan }` to switch its plan.' },
   { path: '/account/billing/extra', method: 'POST', on: 'worker', needs: 'session', what: 'Extra usage past the allowance for a paid record you own, under a monthly cap: `{ record, cap_cents }`, 0 turning it off.' },
   { path: '/account/billing/webhook', method: 'POST', on: 'worker', needs: 'stripe', what: 'The payment provider saying a payment happened, signed over the body as it was sent.' },
   { path: '/account/close', method: 'POST', on: 'worker', needs: 'session', what: 'Close your account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes.' },
@@ -340,10 +340,10 @@ function askedOf(path: string, door: AccountDoor): Asked | null {
 /** The one sentence a signed-out request is told, by what it was trying to see or do. */
 function signInFor(path: string): string {
   if (path === '/account/records') return 'Sign in to see which records you can reach.';
-  if (path === '/account/usage') return 'Sign in to see what your records used.';
+  if (path === '/account/usage') return 'Sign in to see what your BrainDogs used.';
   if (path === '/account/close') return 'Sign in to close your account.';
   if (path.startsWith('/account/email')) return 'Sign in to change the address you sign in with, then open the link again.';
-  return 'Sign in to see billing for the records you own.';
+  return 'Sign in to see billing for the BrainDogs you own.';
 }
 
 /**
@@ -479,8 +479,8 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   /* LOCK NOW, for the keychain (`12 §6.3`): the session's proof is put behind the keychain's longest window, so the next
      keychain act asks for a sign-in again and nothing else changes. A POST, as everything that changes a session is. */
   { path: '/auth/keychain/lock', method: 'POST', flow: 'keychain.lock', on: 'both', needs: 'session', what: 'Lock the keychain in this browser: its next use asks you to sign in again, and nothing else changes.' },
-  { path: '/auth/switch', method: 'POST', flow: 'switch', on: 'both', needs: 'session', what: 'Open another record you are on, in this browser. `{ slug }`.' },
-  { path: '/auth/signup/start', method: 'POST', flow: 'signup.start', on: 'worker', needs: 'nothing', what: 'Ask for a record of your own: a link is mailed to prove the address. `{ email, slug, name?, tz? }`.' },
+  { path: '/auth/switch', method: 'POST', flow: 'switch', on: 'both', needs: 'session', what: 'Open another BrainDog you are on, in this browser. `{ slug }`.' },
+  { path: '/auth/signup/start', method: 'POST', flow: 'signup.start', on: 'worker', needs: 'nothing', what: 'Ask for a BrainDog of your own: a link is mailed to prove the address. `{ email, slug, name?, tz? }`.' },
   { path: '/auth/signup/verify', method: 'POST', flow: 'signup.verify', on: 'worker', needs: 'nothing', what: 'Spend the mailed link, once: the person is made and signed in. `{ token }`.' },
   { path: '/auth/signup/name', method: 'GET', flow: 'signup.name', on: 'worker', needs: 'nothing', what: 'Whether a name for a new record is free, `?slug=`, and why not when it is not.' },
   { path: '/auth/google/start', method: 'GET', flow: 'google.start', on: 'worker', needs: 'nothing', what: 'Send the browser to Google to say which address it is signed in as. `?next=` is where to land afterwards.' },
@@ -489,7 +489,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/desktop', method: 'POST', flow: 'desktop', on: 'worker', needs: 'nothing', what: 'The Mac app swaps a one-time code from `braindog://auth` and its PKCE verifier for the session cookie.' },
   { path: '/auth/desktop/handoff', method: 'POST', flow: 'desktop.handoff', on: 'worker', needs: 'nothing', what: 'A sign-in link the Mac app asked for, opened in a browser: sealed to the app\'s challenge as a one-time code, and not spent. `{ linkToken, challenge }`.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
-  { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
+  { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A BrainDog, its Directory rows and a 24-hour claim link, handed to the operator.' },
   { path: '/auth/suspend', method: 'POST', flow: 'suspend', on: 'worker', needs: 'operator', what: 'Stop somebody signing in, `{ email }`, ending every session they hold, or let them in again, `{ email, suspended: false }`.' },
   ...DEVICE_ROUTES,
   ...INVITE_ROUTES,
@@ -833,7 +833,7 @@ export async function seeAs<L extends string>(
   const as = asked?.trim() ?? '';
   if (as === '') return null;
   if (held.level !== 'owner' && held.level !== 'decide')
-    return { refusal: { code: 'FORBIDDEN', fix: 'Only an owner or an Admin can see the record as somebody else.', at: 'as' } };
+    return { refusal: { code: 'FORBIDDEN', fix: 'Only an owner or an Admin can see this BrainDog as somebody else.', at: 'as' } };
   const theirs = as.length > SEE_AS_MOST ? null : await accessOf(as);
   if (theirs === null) return { refusal: { code: 'FORBIDDEN', fix: 'That person is not on this BrainDog, so there is nothing to see as them.', at: 'as' } };
   if (theirs.level === 'owner') return { refusal: { code: 'FORBIDDEN', fix: 'An owner sees everything. See as somebody else.', at: 'as' } };

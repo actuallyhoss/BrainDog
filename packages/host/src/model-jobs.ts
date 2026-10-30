@@ -508,7 +508,7 @@ async function samplesOfShape(api: ModelJobsApi, shape: string): Promise<Result<
  * there; what Slash offers is a real change or nothing.
  */
 function findingReading(p: Record<string, unknown>): string {
-  return typeof p.why === 'string' && p.why.trim() !== '' ? p.why : `The record noticed ${String(p.signal)} on ${String(p.subject ?? 'something')}.`;
+  return typeof p.why === 'string' && p.why.trim() !== '' ? p.why : `BrainDog noticed ${String(p.signal)} on ${String(p.subject ?? 'something')}.`;
 }
 
 /**

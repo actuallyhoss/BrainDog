@@ -131,11 +131,11 @@ const CORE_ROUTES: readonly Route[] = [
      what waits on a person, when `?state=skipped` and `?state=all` already reached the record as undeclared text.
      `repeats` IS JSON, as `includeDeleted` on list is: undeclared, `?repeats=true` reached the record as the text "true",
      which it refuses, so the Inbox's "Held as repeats" read always came back empty. */
-  { name: 'inbox', group: 'READ+', writes: false, what: 'What arrived and no rule filed, newest first, a page at a time, in one state or all of them, with a count for each. An owner reads it, and so does a token for the whole record that its owner gave the inbox reach. No other token does. With digest it answers every state at once, the newest 100 of each with the body cut to 180 characters, and with id one arrival whole.',
+  { name: 'inbox', group: 'READ+', writes: false, what: 'What arrived and no rule filed, newest first, a page at a time, in one state or all of them, with a count for each. An owner reads it, and so does a token for all of this BrainDog that its owner gave the inbox reach. No other token does. With digest it answers every state at once, the newest 100 of each with the body cut to 180 characters, and with id one arrival whole.',
     takes: { state: 'text', cursor: 'integer', limit: 'integer', repeats: 'json', digest: 'json', id: 'text' } },
   { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.',
     takes: { q: 'text', limit: 'integer' } },
-  { name: 'version', group: 'READ+', writes: false, what: "The record's version, to tell whether anything you may see has changed. An owner who reads every list gets the newest event's rowid and may ask what changed since; anybody else gets a number that is only equal or not, never larger or smaller. Given since, the lists that moved since then.",
+  { name: 'version', group: 'READ+', writes: false, what: "This BrainDog's version, to tell whether anything you may see has changed. An owner who reads every list gets the newest event's rowid and may ask what changed since; anybody else gets a number that is only equal or not, never larger or smaller. Given since, the lists that moved since then.",
     takes: { since: 'integer' } },
   { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are here, and which verbs you reach.' },
   { name: 'sessionsLive', group: 'READ+', writes: false, what: 'The runs that are live now, with how long since each was heard from.' },
@@ -148,7 +148,7 @@ const CORE_ROUTES: readonly Route[] = [
      is written into, whose fields a page made for its rows fills. */
   { name: 'pagesCensus', group: 'READ+', writes: false, what: 'Each page you can open, counted: what it holds, what it could not show you, each placeholder that names nothing and each dash where a value goes. It changes nothing.',
     takes: {} },
-  { name: 'checkPaths', group: 'READ+', writes: false, what: 'Each placeholder a document holds, and whether your record has anything by that name. It changes nothing.',
+  { name: 'checkPaths', group: 'READ+', writes: false, what: 'Each placeholder a document holds, and whether your BrainDog has anything by that name. It changes nothing.',
     takes: { document: 'text', register: 'text' } },
   /* `filter` IS THE READER'S OWN CHOICE over the page's declared filters, a field to the value chosen, so it is JSON: on a
      GET it is `?filter={"project":"oxbow"}`. What it may name is the record's question (`kernel.page`), not this table's.
@@ -271,13 +271,13 @@ const CORE_ROUTES: readonly Route[] = [
   /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event (12 §6's rule that a
      keychain whose reads are not audited cannot say whether anything got out) and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
-  { name: 'export', group: 'ADMIN', writes: true, what: 'The record as a file: line per row, and it imports back.' },
+  { name: 'export', group: 'ADMIN', writes: true, what: 'This BrainDog as a file: a line per row, and it imports back.' },
   /* `replace` IS A RESTORE AND NOT A MERGE: the file must be this record's own copy, and it replaces every row that travels.
      Anything else into a record that holds rows is still refused `IMPORT_NOT_EMPTY` (`packages/kernel/src/index.ts`, `import`). */
-  { name: 'import', group: 'ADMIN', writes: true, what: 'A file into an EMPTY record, or with replace, the record put back from its own copy, what it was kept first where this host keeps copies. Anything else is a merge nobody asked for.' },
-  { name: 'snapshot', group: 'ADMIN', writes: true, what: 'A copy of the whole record, now, kept by this host. A host that keeps none says so.' },
+  { name: 'import', group: 'ADMIN', writes: true, what: 'A file into an EMPTY BrainDog, or with replace, this BrainDog put back from its own copy, what it was kept first where this host keeps copies. Anything else is a merge nobody asked for.' },
+  { name: 'snapshot', group: 'ADMIN', writes: true, what: 'A copy of all of this BrainDog, now, kept by this host. A host that keeps none says so.' },
   { name: 'snapshots', group: 'ADMIN', writes: false, what: 'The copies this host keeps, newest first, each with when it was taken and its size.' },
-  { name: 'restore', group: 'ADMIN', writes: true, what: 'Put the record back to one kept copy. What it was is kept as a copy first.' },
+  { name: 'restore', group: 'ADMIN', writes: true, what: 'Put this BrainDog back to one kept copy. What it was is kept as a copy first.' },
   { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person: every value naming them, in one transaction, and one event that names them only as a hash.' },
   { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this BrainDog, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
@@ -287,10 +287,10 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'subscribePush', group: 'READ+', writes: true, what: 'This browser asks to be told when something needs you. A person only, their own, and not an event.' },
   { name: 'unsubscribePush', group: 'READ+', writes: true, what: 'This browser stops being told. Only your own subscription is taken away.' },
   { name: 'log', group: 'DATA', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
-  { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
+  { name: 'create', group: 'DATA', writes: true, what: 'Add a row. BrainDog gives it its number.' },
   { name: 'report', group: 'DATA', writes: true, what: 'Rows a project sends with its report key, one or up to a hundred, into the list the key is bound to. A report key reaches this and nothing else.' },
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
-  { name: 'makePrivate', group: 'DATA', writes: true, what: 'Keep a row you made to yourself, or share it with the record again. Only its maker can.' },
+  { name: 'makePrivate', group: 'DATA', writes: true, what: 'Keep a row you made to yourself, or share it with everyone on this BrainDog again. Only its maker can.' },
   { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
   { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
   { name: 'undoOwn', group: 'DATA', writes: true, what: "Take back one of your own writes by the batch its receipt gave. Only your own run's writes; anything else is refused." },

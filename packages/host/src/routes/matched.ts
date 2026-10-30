@@ -16,6 +16,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'matched', group: 'READ+', writes: false, what: 'Who the record matched on its own and still holds as one: who was folded into whom by name, one sentence of evidence, when, and the batch an Undo takes. Newest first, 50 at most. Nothing on a record that keeps no people. It changes nothing.',
+  { name: 'matched', group: 'READ+', writes: false, what: 'Who BrainDog matched on its own and still holds as one: who was folded into whom by name, one sentence of evidence, when, and the batch an Undo takes. Newest first, 50 at most. Nothing on a BrainDog that keeps no people. It changes nothing.',
     takes: { limit: 'integer' } },
 ];

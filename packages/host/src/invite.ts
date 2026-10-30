@@ -36,7 +36,7 @@ export type InviteFlow = 'invite';
 
 /** The route, as data, appended to `AUTH_ROUTES`. */
 export const INVITE_ROUTES: readonly AuthRoute[] = [
-  { path: '/auth/invite', method: 'POST', flow: 'invite', on: 'both', needs: 'nothing', what: 'An invitation link, looked at or accepted: the person signed in, then put on the record it names.' },
+  { path: '/auth/invite', method: 'POST', flow: 'invite', on: 'both', needs: 'nothing', what: 'An invitation link, looked at or accepted: the person signed in, then put on the BrainDog it names.' },
 ];
 
 /** The host's half: the record the token names, and the Directory. In process on the self-host. */

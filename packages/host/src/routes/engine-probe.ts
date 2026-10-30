@@ -12,5 +12,5 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'engineProbe', group: 'ADMIN', writes: true, what: 'Ask each model Slash would use whether it answers now, with a fixed question that holds nothing of the record, and say which answered and how fast, or why not. One every ten minutes.' },
+  { name: 'engineProbe', group: 'ADMIN', writes: true, what: 'Ask each model Slash would use whether it answers now, with a fixed question that holds nothing of your BrainDog, and say which answered and how fast, or why not. One every ten minutes.' },
 ];
