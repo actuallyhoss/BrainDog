@@ -131,7 +131,8 @@ export function keySentence(fields: Readonly<Record<string, unknown>>, now: numb
     out.push(days < 0 ? { kind: 'late', text, tone: 'bad' } : days <= 14 ? { kind: 'late', text, tone: 'warn' } : { kind: 'words', text });
     out.push({ kind: 'words', text: '. ' });
   }
-  const where = typeof fields.where === 'string' ? fields.where.trim() : '';
+  /* "Kept in the studio password manager", the article lowered mid-sentence; a name keeps its capital. */
+  const where = typeof fields.where === 'string' ? fields.where.trim().replace(/^The /u, 'the ') : '';
   out.push({ kind: 'words', text: keyHeld(fields) ? 'Value held.' : where !== '' ? `Kept in ${where}.` : 'No value yet.' });
   return out.reduce<Piece[]>((all, piece) => {
     const last = all.at(-1);

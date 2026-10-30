@@ -592,8 +592,6 @@
   const RECENT = 'Recent';
   /* THE EMPTY PALETTE'S THREE ASKS, over everything else. */
   const ASK_TODAY = 'Ask';
-  /* AND WITH NO MODEL, THE SAME THREE AS PLACES, under a heading that promises no asking (AG5). */
-  const FOR_TODAY = 'For today';
   /* THE PLACES WITH NOTHING TYPED, under the destinations' own heading, so one heading never means two groups. */
   const GO_TO = copy.destinations;
   const BEST = 'Best match';
@@ -750,8 +748,10 @@
    * told that asking needs a model, with the way to connect one, and Enter does not take the first loose hit for it.
    */
   const askless = $derived(!slashHere && parsed.prefix === null && asksFirst(parsed.text));
-  /** Whether the arrows picked a row since the last keystroke, so Enter runs what was chosen rather than what came first. */
+  /** Whether the arrows or the pointer picked a row since the last keystroke, so Enter runs what was chosen. */
   let moved = $state(false);
+  /** A row Enter does not run for a sentence with no model until it is picked: any but a command or the add line. */
+  const looseFor = (r: Row): boolean => askless && !moved && r.plain !== true && r.group !== copy.commands;
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
   const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
@@ -895,9 +895,11 @@
     const opening = convo.turns.find((t) => t.role === 'you')?.text;
     if (blank && opening !== undefined)
       out.push({ id: 'resume', title: threadWords.resume(opening), href: null, group: ASK_TODAY, icon: 'ask', resume: true });
-    if (blank)
+    /* ONLY WITH A MODEL BEHIND THE ASK (audit 31 Oct g, AG5): without one the three were questions nobody answers, and as
+       places they were Go to's own rows a second time ("Needs you" twice). */
+    if (blank && slashHere)
       for (const [i, asked] of questionsOf(slashHere).entries())
-        out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: slashHere ? ASK_TODAY : FOR_TODAY, icon: slashHere ? 'search' : 'arrow', ...(asked.ask === null ? {} : { ask: asked.ask }) });
+        out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: ASK_TODAY, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
     /* OPENED ON THIS DEVICE, SO TOLD BY THIS DEVICE'S CLOCK: the record's could be behind it, and said "in 8w". */
     if (blank)
       for (const place of openedList)
@@ -1229,7 +1231,10 @@
   const foldedSaid = (r: Row): string | undefined => {
     if (!r.folded || r.folded < 2) return undefined;
     const g = r.from ?? r.group;
-    return REGISTER_NAMES.has(g) ? `${r.folded.toLocaleString('en-GB')} ${g.toLowerCase()}` : `${r.folded.toLocaleString('en-GB')} with this name`;
+    const n = r.folded.toLocaleString('en-GB');
+    /* A LIST CALLED BY ITS PLURAL COUNTS IN IT ("2 tools"); one called otherwise is where they are ("3 in Ledger"). */
+    if (!REGISTER_NAMES.has(g)) return `${n} with this name`;
+    return /s$/u.test(g) ? `${n} ${g.toLowerCase()}` : `${n} in ${g}`;
   };
 
   /** Rows that are a thing a person would name (a page, a list, a row, a person), never a command or a reading. */
@@ -1603,7 +1608,7 @@
       /* A SENTENCE WITH NO MODEL BEHIND IT NEVER JUMPS TO A LOOSE HIT (AG5): "add a task to call Ada on Friday" opened Ada
          Vine's page and added nothing. A row picked with the arrows, a command, or the line that adds what was typed still runs. */
       const top = flat[cursor];
-      if (askless && !moved && top !== undefined && top.plain !== true && top.group !== copy.commands) return;
+      if (top !== undefined && looseFor(top)) return;
       run(top);
     } else if (e.key === 'Tab' && !e.shiftKey) {
       /**
@@ -1830,10 +1835,10 @@
     class="p-row"
     role="option"
     id={optionId(row.id)}
-    aria-selected={index === cursor}
+    aria-selected={index === cursor && !looseFor(row)}
     tabindex={-1}
-    data-cursor={index === cursor ? '' : undefined}
-    onmouseenter={() => (cursor = index)}
+    data-cursor={index === cursor && !looseFor(row) ? '' : undefined}
+    onmouseenter={() => ((cursor = index), (moved = true))}
     onclick={() => run(row)}
   >
     <Result icon={row.more !== undefined ? undefined : row.icon} title={row.more !== undefined ? row.title : readable(row.title)} line={lineOf(row)} value={figureOf(row.value)} tone={row.tone} status={row.tone === 'bad' || row.tone === 'warn' ? row.detail : undefined} folded={row.folded} foldedSaid={foldedSaid(row)} more={row.more !== undefined} />

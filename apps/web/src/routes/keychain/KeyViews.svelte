@@ -1,10 +1,10 @@
 <!--
-  The Keychain's two views, Keys and Table: one place for keys (audit 31 Oct g, AG16, his call taken 31 Oct).
+  The Keychain's two views, Keys and List: one place for keys (audit 31 Oct g, AG16, his call taken 31 Oct).
 
   THERE WERE TWO KEYS PAGES. The rail's Keys opened the Keychain ("6 keys. 3 have no value yet."), and the Agents page's
   Keys opened the list of the same rows ("6 open, none late", with Stale, Invalid and Live). The Keychain is the place
-  now, and the list is its Table view: both carry this switch, both are titled Keychain, and the rail lights the
-  Keychain on either.
+  now, and the list is its table view, called List here because the list draws its own Table, Board and Cards under
+  it: both carry this switch, both are titled Keychain, and the rail lights the Keychain on either.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
@@ -14,7 +14,7 @@
   let { on }: { on: 'keys' | 'table' } = $props();
   const views = [
     { key: 'keys', label: 'Keys', href: '/keychain' },
-    { key: 'table', label: 'Table', href: `/r/${KEYS_REGISTER}` },
+    { key: 'table', label: 'List', href: `/r/${KEYS_REGISTER}` },
   ] as const;
 </script>
 
