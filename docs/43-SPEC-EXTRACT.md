@@ -249,10 +249,20 @@ digits.
 money   = [ "(" ] [ sign ] [ cur ws? ] number [ ws? cur ] [ ")" ]      ; parentheses = negative
 sign    = "-" | "−" | "+"
 cur     = code | symbol                                                 ; code: 3 upper-case letters in the table, whole token
-number  = digits { grp digits3 } [ dec digits ] | digits [ dec digits ]
-grp     = "," | "." | " " | "'"                                         ; a run of groups uses ONE character
-dec     = "." | ","
+number  = digits { grp digits3 } [ dec digits ] | lakh [ dec digits ] | digits [ dec digits ]
+lakh    = digits1-2 { ( "," | "٬" ) digits2 } ( "," | "٬" ) digits3        ; Indian grouping, at least three groups
+grp     = "," | "." | " " | "'" | "’" | "‘" | "٬"                        ; a run of groups uses ONE character
+dec     = "." | "," | "٫"
+digit   = "0"–"9" | "٠"–"٩" (U+0660) | "۰"–"۹" (U+06F0)                ; one system per number
 ```
+
+**Digits and marks beyond ASCII.** Arabic-Indic and extended Arabic-Indic digits read as their Latin twins; each is
+one UTF-16 unit, so no index moves (this is not the normalisation §10 rules out). A number whose digits come from
+two systems is no candidate. `٬` (U+066C) only groups and `٫` (U+066B) is only the point, so a token carrying
+either is read by what the marks say and not by the thousands rule (`KWD ١٬٢٥٠` → 1250000 · `EGP ١٫٢٥٠` → nothing),
+and one carrying either beside `.` or `,` is no candidate. An apostrophe, in any of its three spellings, only
+groups: `KWD 1’250` → 1250000 · `5’50` → nothing. The direction marks U+200E, U+200F and U+061C are skipped
+wherever they stand (`ar-EG` prints `؜-‏١٢`, `he-IL` prints `12.50 ‏EGP`).
 
 | Shape | Reading | Example (e = 2) |
 |---|---|---|
@@ -261,6 +271,7 @@ dec     = "." | ","
 | **one separator, last group exactly 3 digits** | **thousands, unless e = 3, then decimal** | `1.250` → 125000 · `KWD 1.250` → 1250 |
 | two or more separators | all but the last are one grouping character over groups of exactly 3; a last separator that differs is the decimal point; one that is the same needs a 3-digit last group | `1,250.00` → 125000 · `1.250,00` → 125000 · `1 250,00` → 125000 · `1,250,000` → 125000000 |
 | first group | 1–3 digits when grouping | `1250,000` → nothing |
+| lakh grouping | with `,` or `٬` only, and only when every group fits: first 1–2 digits, then 2s, then the last 3 | `1,25,000` → 12500000 · `12,34,567.50` → 123456750 · `1,23,456,789` → nothing |
 | a currency adjacent before and after that differ | no candidate | |
 | a symbol two table rows share | not a currency; `declared` or nothing | `$` with USD and CAD in the table |
 | \|amount\| > 2^53 − 1 | no candidate | |
@@ -361,7 +372,9 @@ and never `map:` beside `extract:`. A `pull`'s `map:` keeps the path check it ha
    `UNPARSEABLE` → needs-review, reason `body unparseable as <format>`; more than `maxRows` → needs-review, reason
    `rows over cap (<n>; the cap is <maxRows>)` — kept raw, never truncated (07 §2: nothing dropped). Stop on either.
 4. **Normalise** (text rows only): CR and CRLF → LF; tab, NBSP and the Unicode space separators U+2000–U+200A,
-   U+202F, U+205F, U+3000 → space; zero-width U+200B–U+200D and U+FEFF removed; runs of spaces collapsed; each
+   U+202F, U+205F, U+3000 → space; zero-width U+200B–U+200D and U+FEFF removed; the direction marks U+200E,
+   U+200F and U+061C removed where they touch a digit, a currency sign, a three-capital code, or a sign or bracket
+   beside one, and kept inside words, where they order a right-to-left name; runs of spaces collapsed; each
    line trimmed. No Unicode normalisation (§10). Case is folded on a parallel copy for matching, never in a value.
 5. **Fields**, in declared order. A text row: each `extract:` form through §5.3. A structured row: each `map:` entry
    through §4.5. Every declared field is required; `default` is how a field is optional (§13 D7). Each field gets
@@ -426,7 +439,8 @@ Complexity: one left-to-right pass per slice; `first` with *k* forms is *k* pass
 
 1. Find the next digit whose predecessor is not a digit, a letter, `/`, `:` or `-` joined to a digit (so `29/08/26`
    and `2026-08-29` yield no amounts, and `Ref 88213.` does).
-2. Take the longest number token from it: digits, and `,` `.` `'` or a single space only when followed by a digit.
+2. Take the longest number token from it: digits, and `,` `.` `'` `’` `‘` `٬` `٫` or a single space only when
+   followed by a digit.
    The token ends before any other character.
 3. Look back over optional spaces for a currency token, then a sign, then `(`; look forward over at most one
    space for a currency token, then `)`. A code is 3 upper-case letters bounded by non-letters and present in
@@ -631,7 +645,11 @@ every test is `{ EGP: {2}, USD: {2, '$'}, CAD: {2, '$'}, EUR: {2, '€'}, JPY: {
 | `JPY 12.5` | | undefined — more precision than the currency |
 | `EGP 12.345` | | 1234500 EGP — the only valid reading at exponent 2 |
 | `EGP 1,250.000` | | undefined — three decimals at exponent 2 |
-| `EGP 1,25,000` · `EGP 1250,000` | | undefined — groups not of three / first group too long |
+| `EGP 1,25,000` | | 12500000 EGP — lakh grouping |
+| `EGP 1,23,456,789` · `EGP 1250,000` | | undefined — lakhs and thousands in one figure / first group too long |
+| `EGP 1’250.00` · `KWD 1’250` · `EGP 5’50` | | 125000 EGP · 1250000 KWD · undefined — an apostrophe only groups |
+| `EGP ١٬٢٥٠٫٠٠` · `EGP ١٫٢٥٠` · `EGP ١2٣` | | 125000 EGP · undefined (three decimals) · undefined (two digit systems) |
+| `12.50 ‏EGP` (U+200F before the code) | | 1250 EGP — the direction mark is skipped |
 | `EGP 1,250,000` · `EGP 1.250.000` | | 125000000 EGP |
 | `EGP 1,250,000.50` | | 125000050 EGP |
 | `-EGP 1,250.00` · `EGP -1,250.00` · `(EGP 1,250.00)` · `EGP −1,250.00` | | −125000 EGP |

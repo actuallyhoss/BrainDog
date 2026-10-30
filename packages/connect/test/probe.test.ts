@@ -135,8 +135,10 @@ test('an honoured Retry-After on a declared error status is carried too', () => 
 /* CLOUDFLARE'S GRAPHQL ANSWERS 200 WITH AN `errors` ARRAY. A run that read the status alone would
    write an empty page and move its cursor past a window it never fetched. */
 test('a 200 with an errors array is the provider being unavailable', () => {
-  const on = decl({ on_error: { error_when: [{ path: 'errors', present: true }] } });
+  /* BY LENGTH AND NOT BY PRESENCE: a success answers `"errors": null`, and `present: true` would fire on it. */
+  const on = decl({ on_error: { error_when: [{ path: 'errors', len_gte: 1 }] } });
   classifyBody(on, { data: { x: 1 } }, 200, WINDOW, TZ, 'fetch.on_error');
+  classifyBody(on, { data: { x: 1 }, errors: null }, 200, WINDOW, TZ, 'fetch.on_error');
   assert.throws(
     () => classifyBody(on, { errors: [{ message: 'nope' }] }, 200, WINDOW, TZ, 'fetch.on_error'),
     (e: unknown) => e instanceof PullError && e.code === 'PULL_PROVIDER_UNAVAILABLE',

@@ -3109,6 +3109,7 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
         page?: Record<string, unknown>;
         probe?: { read?: unknown };
         on_error?: Record<string, unknown>;
+        window?: { end?: unknown } | null;
       }
     | undefined;
   if (fetch !== undefined && fetch !== null && typeof fetch === 'object') {
@@ -3125,6 +3126,11 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
       );
     const wrongRead = readFault(fetch, id);
     if (wrongRead) return wrongRead;
+    /* `window.end` SAYS WHETHER THE PROVIDER'S RANGE INCLUDES ITS LAST DAY, which decides what `{until}` is written
+       as (`47 §4.1`). A misspelling read as `exclusive` would ask an inclusive API for today on every run. */
+    const end = fetch.window?.end;
+    if (end !== undefined && end !== 'exclusive' && end !== 'inclusive')
+      return bad('DECLARATION_INVALID', `${id}'s window.end is ${JSON.stringify(end)}: write inclusive when the provider's range includes its last day, or leave it out.`, `${id}.fetch.window.end`, ['exclusive', 'inclusive']);
     if (fetch.page?.from !== undefined) {
       const wrong = pathFault(fetch.page.from, `${id}.fetch.page.from`);
       if (wrong) return wrong;

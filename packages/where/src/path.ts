@@ -15,9 +15,16 @@
  * THE GRAMMAR, `47 §4.3` verbatim:
  *
  *   path  = seg { "." seg }
- *   seg   = key { index }
- *   key   = [A-Za-z_] { [A-Za-z0-9_-] }
+ *   seg   = key { index } | index { index }
+ *   key   = any characters but "." "[" "]" and white space
  *   index = "[" integer "]" | "[-1]" | "[]"          ([] = every element; legal at most once)
+ *
+ * AS WIDE AS WHAT INSTALL ACCEPTS, AND NO NARROWER. `declare` checks a connector's paths with `43 §4.4`'s
+ * segment (`packages/kernel/src/declare.ts`, `PATH_SEGMENT`): a key of anything but a dot, a bracket or a space,
+ * or a bare index. This read a narrower key (`[A-Za-z_][A-Za-z0-9_-]*`) and no bare index, so `page.from: '[0]'`
+ * over rows that are arrays, `read.rows: '[]'` over a body that is a list, or a key like `@id` installed clean and
+ * then read nothing on every page: a cursor never found is the end of the run, so it looked like a provider with
+ * one page. A path install refuses can still be read here; a path install accepts always can.
  *
  * There is no wildcard key, no filter and no function, and that is a ceiling rather than an
  * omission: it covered every response shape of `25 §4`, and the first path that needs a function is
@@ -45,9 +52,9 @@ export type Json = string | number | boolean | null | Json[] | { [k: string]: Js
  */
 export type Read = Json | undefined | (Json | undefined)[];
 
-const KEY = String.raw`[A-Za-z_][A-Za-z0-9_-]*`;
+const KEY = String.raw`[^.[\]\s]+`;
 const INDEX = String.raw`\[(?:-?\d+)?\]`;
-const SEG = `${KEY}(?:${INDEX})*`;
+const SEG = `(?:${KEY}(?:${INDEX})*|(?:${INDEX})+)`;
 const PATH = new RegExp(String.raw`^${SEG}(?:\.${SEG})*$`, 'u');
 const STEPS = new RegExp(`(${KEY})|${INDEX}`, 'gu');
 
@@ -122,12 +129,10 @@ export function readPath(json: Json | undefined, path: string): Read {
  *
  * WHERE THEY DIVERGE, AND WHY EACH DIVERGENCE IS LOAD-BEARING:
  *
- *   key charset · `47` keys are `[A-Za-z_][A-Za-z0-9_-]*`; `43` keys are anything but `.`, `[` and `]`.
- *     A connector's path names a field in a JSON body somebody designed. An extractor's path names a CSV
- *     header (`Amount (EGP)`) or an XML element carrying a namespace prefix (`atom:entry`, which `43 §5.5`
- *     requires be literal). Narrowing `43` to `47`'s charset would make the Atom case unreadable; widening
- *     `47` to `43`'s would stop `declare` catching a typo at install, which is `47`'s whole reason for
- *     having `pathFault`.
+ *   key charset · `47` keys are anything but `.`, `[`, `]` and white space; `43` keys may hold a space.
+ *     An extractor's path names a CSV header (`Amount (EGP)`) or an XML element carrying a namespace prefix
+ *     (`atom:entry`, which `43 §5.5` requires be literal). `47`'s keys were narrower still until 30 Oct 2026,
+ *     narrower than the install check, so a connector path install accepted could read nothing at run.
  *
  *   a missing element in a fan · `47` keeps it as `undefined`; `43` drops it.
  *     `readPath`'s comment says why: a check over every element must not quietly become a check over the

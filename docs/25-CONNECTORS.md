@@ -192,7 +192,11 @@ a sixth placeholder, `{each}`, that nothing can yet name ([47-SPEC-CONNECT](47-S
 
 The window is arithmetic, not a string the author formats: `since = max(start, watermark − lookback)`,
 `until = min(since + max_span, end of the current grain)`, half-open; after a complete run
-`watermark = min(until, start of the current grain)`, so today is re-asked until it ends
+`watermark = min(until, start of the current grain)`, so today is re-asked until it ends. `{until}` is that
+exclusive end, which is right for `created[lt]` and wrong for an API whose range includes its last day: npm's
+`range/a:b`, Plausible's `date_range` and GA4's `endDate` would each be asked for today, unfinished, on every
+run. Such a connector declares `window.end: inclusive`, and `{until}` becomes the window's last instant (the day
+before, as a `:date`); absent, it is `exclusive`, which is what every connector meant before the key existed
 ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D11). Connect calls `extract(decl, raw, ctx)` **once per page**,
 and `ctx` carries no currency table of its own: the exponent comes from the kernel's `exponentOf`
 ([02-DATA-MODEL](02-DATA-MODEL.md) §3 rule 1), and `extract` owns only a
@@ -373,8 +377,9 @@ expect:
 
 Operators: `eq`/`ne` · `is`/`is_not` · `present`/`absent` · `contains`/`starts`/`ends` (capped at 40
 bytes, the same cap as the `where:` grammar) · `len_lte`/`len_gte`. `is`/`is_not` compare a bare literal
-with no substitution — `is: list` is the string `"list"`; `eq`/`ne` substitute placeholders first —
-`eq: "{since:date}"` is npm's clamp check ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D10). **No
+with no substitution — `is: list` is the string `"list"`; `eq`/`ne` and `contains`/`starts`/`ends` substitute
+placeholders first — `eq: "{since:date}"` is npm's clamp check, and `starts: "{since:date}"` above reads
+Plausible's echoed range, which it writes as instants ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D10). **No
 combinators, no nesting.** A
 list is implicitly `all` — the moment `expect:` gets an `any:` it is a predicate language, and this
 is an assertion about *someone else's* response, so it should stay dumber than the one about your

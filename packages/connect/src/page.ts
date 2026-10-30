@@ -150,8 +150,11 @@ export function nextCursor(
   }
 
   if (rows.length === 0) return null;
-  /* KEYSET READS THE LAST ROW AND NOT THE BODY, which is the difference from `cursor_param`: there
-     is no envelope, so the key is whatever the final row says it is. */
+  /* A PROVIDER THAT SAYS IT HAS NO MORE IS BELIEVED, as for the three paginators above. Vercel's last page carries
+     `pagination.next: null`, and without a `more:` here the run asked once more, for an empty page, every run. */
+  if (!more(decl_page.more, json, window, tz)) return null;
+  /* KEYSET READS THE LAST ROW AND NOT THE BODY, which is the difference from `cursor_param`: the key
+     is whatever the final row says it is. */
   const found = readPath(rows.at(-1) ?? null, decl_page.from);
   if (found === undefined || found === null || Array.isArray(found)) return null;
   const value = String(found);

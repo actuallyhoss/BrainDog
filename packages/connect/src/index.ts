@@ -99,7 +99,7 @@ export type PageDecl =
   | { kind: 'cursor_param'; param: string; from: string; more?: Expect }
   | { kind: 'offset'; param: string; size: number; more?: Expect }
   | { kind: 'page_number'; param: string; start?: number; more?: Expect }
-  | { kind: 'keyset'; param: string; from: string }
+  | { kind: 'keyset'; param: string; from: string; more?: Expect }
   | { kind: 'link_header'; stop_when: { param: string; is: string } };
 
 /**
@@ -123,7 +123,12 @@ export type FetchDecl = {
   body?: { [k: string]: Json };
   auth: AuthDecl;
   schedule: { every: Duration; at?: string; tz?: 'record'; jitter?: 'auto' };
-  window?: { grain: Grain; start: string; lookback?: Duration; max_span?: Duration };
+  /**
+   * `end: inclusive` is the PROVIDER saying its ranges include their last day (npm's `range/a:b`, Plausible's
+   * `date_range`, GA4's `endDate`), so `{until}` names the window's last instant, not the instant after it.
+   * Absent is `exclusive`, which is what every connector meant before the key existed.
+   */
+  window?: { grain: Grain; start: string; lookback?: Duration; max_span?: Duration; end?: 'exclusive' | 'inclusive' };
   /** Lint only (`42`); no run-time role. */
   source_retention?: Duration;
   /** Exactly one, never chained. `read` is name → response path. */
@@ -194,8 +199,14 @@ export const isReservedHeader = (name: string): boolean => {
 
 /* ── What a run holds ────────────────────────────────────────────────────────────────────────── */
 
-/** Half-open `[since, until)`, in milliseconds. */
-export type Window = { since: number; until: number };
+/**
+ * Half-open `[since, until)`, in milliseconds.
+ *
+ * `inclusive` IS HOW `{until}` IS WRITTEN AND NOTHING ELSE: the window is half-open either way, and a provider whose
+ * ranges include their end is asked up to `until − 1 ms`, which as a `date` is the day before. Without it npm,
+ * Plausible and GA4 were asked for today, which is not over, on every run (`window.end` in the declaration).
+ */
+export type Window = { since: number; until: number; inclusive?: true };
 
 export type PageState =
   | { kind: 'cursor_param' | 'keyset'; value: string }

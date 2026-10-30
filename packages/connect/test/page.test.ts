@@ -120,6 +120,15 @@ test('a keyset reads the last row and not the envelope', () => {
   assert.equal(refusal(() => at(KEYSET, {}, ROWS, { kind: 'keyset', value: 'in_3' })).code, 'PULL_SHAPE_MISMATCH');
 });
 
+/* VERCEL'S LAST PAGE SAYS `next: null`, and a keyset that cannot read the envelope asks once more to find nothing. */
+test('a keyset with a more: test stops on the page that says there is no more', () => {
+  const told: PageDecl = { ...KEYSET, more: { path: 'pagination.next', is_not: null } };
+  assert.deepEqual(at(told, { pagination: { next: 1768880000000 } }, ROWS), { kind: 'keyset', value: 'in_3' });
+  assert.equal(at(told, { pagination: { next: null } }, ROWS), null);
+  /* Without the test, the same body pages on, which is the extra request a run used to make. */
+  assert.deepEqual(at(KEYSET, { pagination: { next: null } }, ROWS), { kind: 'keyset', value: 'in_3' });
+});
+
 /* ── link_header ─────────────────────────────────────────────────────────────────────────────── */
 
 const LINK: PageDecl = { kind: 'link_header', stop_when: { param: 'results', is: 'false' } };

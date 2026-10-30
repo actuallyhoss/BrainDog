@@ -22,7 +22,7 @@ import { scanDates } from './date.ts';
    while `money.ts` knew about the ASCII space alone, and the two disagreeing is how a no-break space
    turned 2,642.97 into 2.00 for any caller who reached `parseMoney` without normalising first. The
    list belongs to the file that has to tell a separator from the end of a number. */
-import { scanDecimals, scanInts, scanMoney, SPACE_LIKE, type CurrencyTable } from './money.ts';
+import { BIDI_MARKS, isAnyDigit, scanDecimals, scanInts, scanMoney, SPACE_LIKE, type CurrencyTable } from './money.ts';
 
 /* ONE `Json`, FROM `where`. It was defined here when this package had no dependencies; it has one now, and
    two structurally identical definitions of the same type are two places for it to stop being identical. */
@@ -79,6 +79,72 @@ const found = (values: Json[], note: 'exact' | 'chosen' | 'defaulted' = 'exact')
 
 const INVISIBLE = new Set(['\u200b', '\u200c', '\u200d', '\ufeff']);
 
+const isUpperAscii = (ch: string | undefined): boolean => ch !== undefined && ch >= 'A' && ch <= 'Z';
+const isAsciiLetter = (ch: string | undefined): boolean =>
+  ch !== undefined && ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'));
+
+/** A currency sign: `$ \u00a2 \u00a3 \u00a4 \u00a5` and the Currency Symbols block, U+20A0\u2013U+20CF (`\u20ac \u20b9 \u20ba \u20aa \u20a6 \u2026`). */
+const isCurrencySign = (ch: string | undefined): boolean => {
+  if (ch === undefined) return false;
+  if (ch === '$' || ch === '\u00a2' || ch === '\u00a3' || ch === '\u00a4' || ch === '\u00a5') return true;
+  const c = ch.charCodeAt(0);
+  return c >= 0x20a0 && c <= 0x20cf;
+};
+
+/**
+ * Is the character at `k` part of an amount, looking away from a run of direction marks in direction `dir`?
+ *
+ * A DIGIT, A CURRENCY SIGN, OR THE NEAR END OF THREE CAPITALS standing alone (`EGP`, the shape of a code). A sign
+ * or a bracket counts only when what lies past it, over more marks, is one of those: `ar-EG` prints
+ * `U+061C - U+200F \u0661\u0662`, and the first mark touches only the minus.
+ */
+function amountAt(text: string, k: number, dir: 1 | -1, hop = true): boolean {
+  const ch = text[k];
+  if (ch === undefined) return false;
+  if (isAnyDigit(ch) || isCurrencySign(ch)) return true;
+  if (dir === 1 && isUpperAscii(ch) && isUpperAscii(text[k + 1]) && isUpperAscii(text[k + 2]) && !isAsciiLetter(text[k + 3]))
+    return true;
+  if (dir === -1 && isUpperAscii(ch) && isUpperAscii(text[k - 1]) && isUpperAscii(text[k - 2]) && !isAsciiLetter(text[k - 3]))
+    return true;
+  if (hop && (ch === '-' || ch === '\u2212' || ch === '+' || ch === '(' || ch === ')')) {
+    let past = k + dir;
+    while (BIDI_MARKS.has(text[past] ?? '')) past += dir;
+    return amountAt(text, past, dir, false);
+  }
+  return false;
+}
+
+/**
+ * The text with its direction marks (U+200E, U+200F, U+061C) taken out where they touch an amount, and kept
+ * everywhere else.
+ *
+ * AROUND A NUMBER THEY COST A READING. Right-to-left text puts them between a number and its code
+ * (`12.50 U+200F EGP`) and between a minus and its digits (`- U+200F \u0661\u0662`), so the code or the sign was not found
+ * and an anchor such as `{ after: "EGP " }` never matched. They are invisible, so taking them out there leaves the
+ * text a person saw.
+ *
+ * INSIDE WORDS THEY ARE KEPT, because there they are doing their job: a merchant's name in Arabic or Hebrew beside
+ * Latin letters needs them to be shown in the right order, and a `text` field is sliced out of this string and
+ * shown to a person. A run of marks goes only when the character just before it or just after it is a digit, a
+ * currency sign, a three-letter code, or a sign or bracket next to one of those.
+ */
+function withoutAmountMarks(text: string): string {
+  if (!text.includes('\u200e') && !text.includes('\u200f') && !text.includes('\u061c')) return text;
+  let out = '';
+  for (let i = 0; i < text.length; ) {
+    if (!BIDI_MARKS.has(text[i]!)) {
+      out += text[i];
+      i += 1;
+      continue;
+    }
+    let j = i;
+    while (j < text.length && BIDI_MARKS.has(text[j]!)) j += 1;
+    if (!amountAt(text, i - 1, -1) && !amountAt(text, j, 1)) out += text.slice(i, j);
+    i = j;
+  }
+  return out;
+}
+
 /**
  * One text, in the shape every extractor sees.
  *
@@ -87,6 +153,10 @@ const INVISIBLE = new Set(['\u200b', '\u200c', '\u200d', '\ufeff']);
  * walk past an anchor, an `enum` literal and a `match:` alike while the message still reads correctly on
  * screen. Stripping them is the difference between what the reader saw and what the scanner scanned being
  * the same string (`43 §8`).
+ *
+ * DIRECTION MARKS GO ONLY WHERE THEY TOUCH AN AMOUNT (`withoutAmountMarks`): beside a digit, a sign, a code or a
+ * currency sign they hide the code from the money reader and the number from an anchor, and inside a word they set
+ * the order a right-to-left name is shown in.
  *
  * NO UNICODE NORMALISATION (`43 §10`): NFKC would fold a full-width digit into an ASCII one and change the
  * length, and every index here is a position in the text the record stored.
@@ -105,7 +175,7 @@ export function normalise(text: string): string {
   }
 
   const lines: string[] = [];
-  for (const line of flat.split('\n')) {
+  for (const line of withoutAmountMarks(flat).split('\n')) {
     let out = '';
     let wasSpace = false;
     for (const ch of line) {

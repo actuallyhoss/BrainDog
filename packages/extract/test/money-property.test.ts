@@ -298,9 +298,8 @@ test('A MINUS IS A MINUS IN EVERY POSITION: parse(-x) is the negation of parse(x
  * spaces, and the narrow no-break space of French. The minus is `-` or `U+2212` (Swedish, Norwegian, Finnish),
  * and the Arabic locales with Latin digits put a direction mark in front of it, which must not cost the sign.
  *
- * WHAT IS LEFT OUT IS LEFT OUT FOR A REASON, and each reason has a test below: Indian grouping, Swiss grouping
- * and Arabic-Indic digits. `he-IL` puts a direction mark between the number and its code, so the code is not
- * found and nothing is read without a declared currency; that is a refusal, and a safe one.
+ * WHAT IS LEFT OUT HAS A TEST OF ITS OWN BELOW: Indian grouping, Swiss grouping, Arabic-Indic digits, and the
+ * right-to-left locales whose direction marks sit between a number and its code.
  */
 const LOCALES = [
   'en-US', 'en-GB', 'de-DE', 'de-AT', 'fr-FR', 'fr-CH', 'es-ES', 'it-IT', 'nl-NL', 'pt-BR', 'sv-SE', 'nb-NO',
@@ -373,79 +372,120 @@ test('2,000 AMOUNTS AS INTL PRINTS THEM IN 24 LOCALES READ BACK TO THE AMOUNT AN
 /**
  * LAKH GROUPING, which every Indian bank prints: `12,34,567.50`.
  *
- * `readAmount` HOLDS EVERY GROUP AFTER THE FIRST TO THREE DIGITS, so a two-digit group is not grouping and the
- * figure is refused whole. That is the safe failure and the one asserted: below one lakh the Indian and the
- * Western forms are the same string and read exactly, and from one lakh up the answer is nothing or the right
- * amount, never a fragment of it. A reader that learns lakhs keeps this test green.
+ * READ EXACTLY ON BOTH SIDES OF A LAKH. Below one the Indian and the Western forms are the same string; from one
+ * up, `readAmount` takes a figure as lakhs when every group fits (the first one or two digits, then twos, then the
+ * last three), so the record of somebody paid in rupees reads what their bank printed instead of nothing.
  */
-test('INDIAN GROUPING IS READ EXACTLY BELOW A LAKH AND IS NEVER MISREAD ABOVE ONE', () => {
+test('INDIAN GROUPING IS READ EXACTLY, BELOW A LAKH AND ABOVE ONE', () => {
   const next = rng(0x43_09_06);
   let below = 0;
   for (let i = 0; i < 600; i++) {
     const currency = (['INR', 'USD', 'JPY', 'KWD'] as const)[Math.floor(next() * 4)]!;
     const amount = amountFrom(next);
     const text = intl('en-IN', currency, 'code', amount);
-    const got = parseMoney(text, INTL);
-    const wholeUnits = Math.floor(Math.abs(amount) / 10 ** INTL[currency]!.exponent);
-    if (wholeUnits < 100_000) {
-      assert.deepEqual(got, { amount, currency }, shown(text));
-      below += 1;
-    } else if (got !== undefined) {
-      assert.deepEqual(got, { amount, currency }, `a lakh-grouped figure misread: ${shown(text)}`);
-    }
+    assert.deepEqual(parseMoney(text, INTL), { amount, currency }, shown(text));
+    if (Math.floor(Math.abs(amount) / 10 ** INTL[currency]!.exponent) < 100_000) below += 1;
   }
-  assert.ok(below > 100 && below < 600, `${below} of 600 below a lakh; the draw stopped covering one side`);
+  assert.ok(below > 100 && below < 500, `${below} of 600 below a lakh; the draw stopped covering one side`);
 });
 
 /**
- * ARABIC-INDIC DIGITS ARE NOT READ, and the property is that they are never MISREAD.
- *
- * `isDigit` is `0`–`9` and nothing else, and `43 §10` rules out the Unicode normalisation that would fold
- * `١٢٣` into `123` (it changes lengths, and every index here is a position in the stored text). So `ar-EG`'s
- * own output, `١٬٢٣٤٫٥٠ EGP`, has no token in it at all and the answer is no amount. The two that matter for
- * an Egyptian record are both here: Arabic-Indic (`U+0660`) and the Persian extended set (`U+06F0`), with
- * the Arabic thousands and decimal marks between them.
+ * A FIGURE THAT IS NEITHER WESTERN NOR LAKH STAYS REFUSED. Two conventions in one figure is a figure nobody can
+ * read without picking one, and picking is what this file does not do.
  */
-test('ARABIC-INDIC DIGITS ARE NEVER READ AS A DIFFERENT AMOUNT', () => {
+test('A FIGURE GROUPED PARTLY BY LAKHS AND PARTLY BY THOUSANDS IS NO AMOUNT', () => {
+  for (const text of ['INR 1,23,456,789', 'INR 1,234,56', 'INR 123,45,678', 'INR 1,23,4567', 'INR 1.23.456', 'INR 1,23,456.789'])
+    assert.equal(parseMoney(text, INTL), undefined, text);
+  /* The same shapes that do fit. */
+  assert.deepEqual(parseMoney('INR 1,00,000', INTL), { amount: 10_000_000, currency: 'INR' });
+  assert.deepEqual(parseMoney('INR 10,00,00,000.50', INTL), { amount: 10_000_000_050, currency: 'INR' });
+  assert.deepEqual(parseMoney('KWD 1,00,000', INTL), { amount: 100_000_000, currency: 'KWD' });
+});
+
+/**
+ * ARABIC-INDIC DIGITS, as `ar-EG`, `ar-SA` and `fa-IR` print them, read back exactly.
+ *
+ * Both systems an Egyptian record meets: Arabic-Indic (`U+0660`) and the extended set of Persian and Urdu (`U+06F0`),
+ * with `٬` grouping and `٫` as the point. `ar-EG` writes a negative as `U+061C - U+200F` before the digits and
+ * `fa-IR` as `U+200E − U+200E` before the code, so the direction marks are crossed here as well; a reader that
+ * stopped at them lost the minus, which is a debit filed as a credit. `ur-IN` groups by lakhs with `٬`.
+ */
+test('ARABIC-INDIC DIGITS READ AS THE AMOUNT THEY WRITE, IN EVERY SIGN AND EXPONENT', () => {
   const next = rng(0x43_09_07);
   for (let i = 0; i < 400; i++) {
-    const locale = (['ar-EG', 'ar-SA', 'fa-IR'] as const)[Math.floor(next() * 3)]!;
+    const locale = (['ar-EG', 'ar-SA', 'fa-IR', 'ur-IN', 'ar-IQ'] as const)[Math.floor(next() * 5)]!;
     const currency = INTL_CODES[Math.floor(next() * INTL_CODES.length)]!;
     const amount = amountFrom(next);
     const text = intl(locale, currency, 'code', amount);
-    const got = parseMoney(text, INTL);
-    if (got !== undefined) assert.deepEqual(got, { amount, currency }, `${locale}: ${shown(text)}`);
+    assert.deepEqual(parseMoney(text, INTL), { amount, currency }, `${locale}: ${shown(text)}`);
   }
+  /* The text an Egyptian bank sends in Arabic, with no code beside the figure: the declared pound fills it. */
+  assert.deepEqual(parseMoney('EGP ١٬٢٥٠٫٠٠', INTL), { amount: 125000, currency: 'EGP' });
+  assert.deepEqual(parseMoney('تم خصم مبلغ ١٢٥٠٫٠٠ جنيه من حسابك', INTL, 'EGP'), { amount: 125000, currency: 'EGP' });
+  assert.deepEqual(parseMoney(intl('ar-EG', 'EGP', 'code', -264297), INTL), { amount: -264297, currency: 'EGP' });
+  /* Arabic digits with the Latin marks, which some banks print, read by the Latin rules. */
+  assert.deepEqual(parseMoney('EGP ١,٢٣٤.٥٠', INTL), { amount: 123450, currency: 'EGP' });
 });
 
-test(
-  'ARABIC-INDIC DIGITS READ AS THE AMOUNT THEY WRITE',
-  { todo: 'money.ts reads ASCII digits only; an Arabic SMS from an Egyptian bank (EGP ١٬٢٥٠٫٠٠) is no amount until it maps U+0660–U+0669 and U+06F0–U+06F9 with U+066B and U+066C' },
-  () => {
-    assert.deepEqual(parseMoney('EGP ١٬٢٥٠٫٠٠', INTL), { amount: 125000, currency: 'EGP' });
-    assert.deepEqual(parseMoney(intl('ar-EG', 'EGP', 'code', -264297), INTL), { amount: -264297, currency: 'EGP' });
-  },
-);
+/**
+ * THE ARABIC MARKS SAY WHAT THEY ARE, AND NOTHING THAT MIXES TWO SYSTEMS IS READ.
+ *
+ * `٫` is always the point, so `EGP ١٫٢٥٠` is three decimals of a two-decimal currency and refused, where `EGP 1.250`
+ * is one thousand two hundred and fifty by the thousands rule; `٬` is always grouping, so `KWD ١٬٢٥٠` is 1,250
+ * dinars, where `KWD 1,250` is one and a quarter. A figure written in two digit systems, or with an Arabic mark
+ * beside a Latin one, has no single reading and is no amount.
+ */
+test('A NUMBER IN TWO DIGIT SYSTEMS, OR WITH TWO KINDS OF MARK, IS REFUSED RATHER THAN READ', () => {
+  assert.equal(parseMoney('EGP ١٫٢٥٠', INTL), undefined);
+  assert.deepEqual(parseMoney('KWD ١٬٢٥٠', INTL), { amount: 1_250_000, currency: 'KWD' });
+  for (const text of [
+    'EGP ١2٣', 'EGP 1٢3.00', 'EGP ١٢۳', 'EGP ١٬٢٣٤.٥٠', 'EGP ١٫٢٣٤,٥٠', 'EGP ١٬٢٣٤٫٥٠٫٠', 'EGP ١٫٢٣٤٬٥٠٠', 'EGP 12٬34',
+  ])
+    assert.equal(parseMoney(text, INTL), undefined, shown(text));
+});
 
 /**
- * SWISS GROUPING IS A WRONG NUMBER TODAY, and the only form in this file that is.
+ * SWISS GROUPING, `U+2019` where a keyboard writes `'`.
  *
- * `de-CH` groups with `U+2019`, the right single quotation mark, where a keyboard writes `'`. `isSep` holds the
- * ASCII apostrophe and not this one, so `CHF 1’234.50` tokenises as `1` and `234.50`, and the first token takes
- * the code in front of it: CHF 1.00, in the ledger, three orders of magnitude out, exactly the shape the
- * no-break space had before it was added. A refusal would be safe; this is not. Marked `todo` so the run stays
- * green and the defect stays visible, and the fix is one character in `isSep` (and `U+2018` beside it).
+ * It used to be the one wrong number in this file: `CHF 1’234.50` tokenised as `1` and `234.50`, and the first token
+ * took the code in front of it, so CHF 1,234.50 read as CHF 1.00. An apostrophe is now grouping in all three of its
+ * spellings and only grouping, so at exponent 3 it is still a thousands mark and never the point.
  */
-test(
-  'SWISS GROUPING READS AS THE AMOUNT INTL PRINTS',
-  { todo: 'money.ts isSep: add U+2019 (and U+2018), which de-CH groups with; today CHF 1’234.50 reads as CHF 1.00' },
-  () => {
-    for (const amount of [123450, -123456750, 99]) {
-      const text = intl('de-CH', 'CHF', 'code', amount);
-      assert.deepEqual(parseMoney(text, INTL), { amount, currency: 'CHF' }, shown(text));
-    }
-  },
-);
+test('SWISS GROUPING READS AS THE AMOUNT INTL PRINTS', () => {
+  const next = rng(0x43_09_09);
+  for (let i = 0; i < 400; i++) {
+    const currency = (['CHF', 'EUR', 'JPY', 'KWD'] as const)[Math.floor(next() * 4)]!;
+    const amount = amountFrom(next);
+    const text = intl('de-CH', currency, 'code', amount);
+    assert.deepEqual(parseMoney(text, INTL), { amount, currency }, shown(text));
+  }
+  assert.deepEqual(parseMoney('CHF 1’234.50', INTL), { amount: 123450, currency: 'CHF' });
+  assert.deepEqual(parseMoney('CHF 1‘234.50', INTL), { amount: 123450, currency: 'CHF' });
+  assert.deepEqual(parseMoney("KWD 1'250", INTL), { amount: 1_250_000, currency: 'KWD' });
+  assert.deepEqual(parseMoney('KWD 1’250', INTL), { amount: 1_250_000, currency: 'KWD' });
+  /* An apostrophe is never a point: refused, not five and a half. */
+  for (const text of ['CHF 5’50', "CHF 5'5", 'CHF 1,234’50', 'CHF 1’23’456'])
+    assert.equal(parseMoney(text, INTL), undefined, text);
+});
+
+/**
+ * RIGHT-TO-LEFT LOCALES WITH LATIN DIGITS, and the direction marks between a number and its code.
+ *
+ * `he-IL` prints `-1,234.50 U+00A0 U+200F EGP`; the mark hid the code, so nothing was read. `ar-AE`, `ar-MA` and
+ * `ar-IN` put `U+200F U+200E` in front of the minus.
+ */
+test('A DIRECTION MARK BETWEEN A NUMBER AND ITS CODE OR ITS SIGN COSTS NEITHER', () => {
+  const next = rng(0x43_09_0a);
+  for (let i = 0; i < 400; i++) {
+    const locale = (['he-IL', 'ar-AE', 'ar-MA', 'ar-IN', 'ur-PK'] as const)[Math.floor(next() * 5)]!;
+    const currency = INTL_CODES[Math.floor(next() * INTL_CODES.length)]!;
+    const amount = amountFrom(next);
+    const text = intl(locale, currency, 'code', amount);
+    assert.deepEqual(parseMoney(text, INTL), { amount, currency }, `${locale}: ${shown(text)}`);
+  }
+  assert.deepEqual(parseMoney('12.50 \u200fEGP', INTL), { amount: 1250, currency: 'EGP' });
+  assert.deepEqual(parseMoney('EGP\u200e -\u200f12.50', INTL), { amount: -1250, currency: 'EGP' });
+});
 
 /* ── the currency nobody wrote ──────────────────────────────────────────────────────────────────── */
 

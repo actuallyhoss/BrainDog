@@ -104,7 +104,9 @@ export const readGrantField = (ctx: SubCtx, field: string, at: string): string =
 /** One token's value, before encoding. `at` is the declaration key, so a refusal says where. */
 const valueOf = (name: string, format: Format | undefined, ctx: SubCtx, at: string): string => {
   if (name === 'since') return timeAs(ctx.window.since, format, ctx.tz);
-  if (name === 'until') return timeAs(ctx.window.until, format, ctx.tz);
+  /* A RANGE THAT INCLUDES ITS END IS ASKED UP TO THE LAST INSTANT INSIDE THE WINDOW: `until − 1 ms`, the day
+     before as a `date`, the second before as `epoch_s`. Asked for `until` itself, it served today, unfinished. */
+  if (name === 'until') return timeAs(ctx.window.inclusive === true ? ctx.window.until - 1 : ctx.window.until, format, ctx.tz);
   if (name === 'page') return pageValue(ctx.page, at);
 
   const dot = name.indexOf('.');
@@ -340,9 +342,9 @@ const wantedOf = (e: Expect, ctx: SubCtx, at: string): string => {
   if ('is_not' in e) return `anything but ${String(e.is_not)}`;
   if ('present' in e) return 'present';
   if ('absent' in e) return 'absent';
-  if ('contains' in e) return `something containing "${e.contains}"`;
-  if ('starts' in e) return `something starting "${e.starts}"`;
-  if ('ends' in e) return `something ending "${e.ends}"`;
+  if ('contains' in e) return `something containing "${String(literal(e.contains, true, ctx, at))}"`;
+  if ('starts' in e) return `something starting "${String(literal(e.starts, true, ctx, at))}"`;
+  if ('ends' in e) return `something ending "${String(literal(e.ends, true, ctx, at))}"`;
   if ('len_lte' in e) return `at most ${e.len_lte} long`;
   return `at least ${e.len_gte} long`;
 };
@@ -354,6 +356,12 @@ const wantedOf = (e: Expect, ctx: SubCtx, at: string): string => {
  * own sake: `eq: "{since:date}"` is how npm's clamp is caught — *did the server answer the window I
  * asked for* — and `is: list` is Stripe's `"object": "list"`, a bare word that must not be searched
  * for braces. Two operators for two questions rather than one operator with a flag.
+ *
+ * `contains`/`starts`/`ends` SUBSTITUTE TOO. `25 §5.1`'s own example is
+ * `{ path: query.date_range[0], starts: "{since:date}" }` — Plausible echoing its range as instants — and
+ * read bare that literal could never match anything a provider sends, so the check failed every run. The
+ * three take a string and ask about the response, as `eq` does; only `is`/`is_not` are the bare word.
+ * The 40-byte cap is on the literal as declared, which is what lint measured.
  */
 const literal = (value: Scalar, substituted: boolean, ctx: SubCtx, at: string): Scalar =>
   substituted && typeof value === 'string' ? substitute(value, ctx, at, false) : value;
@@ -382,9 +390,10 @@ const holds = (e: Expect, found: unknown, ctx: SubCtx, at: string): boolean => {
   if (bytes(needle) > LITERAL_BYTES)
     throw new PullError('PULL_REQUEST_REFUSED', at, { found: needle, wanted: `a literal of at most ${LITERAL_BYTES} bytes` });
   if (typeof found !== 'string') return false;
-  if ('contains' in e) return found.includes(e.contains);
-  if ('starts' in e) return found.startsWith(e.starts);
-  return found.endsWith(e.ends);
+  const wanted = String(literal(needle, true, ctx, at));
+  if ('contains' in e) return found.includes(wanted);
+  if ('starts' in e) return found.startsWith(wanted);
+  return found.endsWith(wanted);
 };
 
 /**
@@ -440,8 +449,10 @@ export function expect(decl: FetchDecl, json: Json, window: Window, tz: string):
  * Whether one `on_error` condition holds. `47 §4.1`, `25 §6`.
  *
  * A STATUS LIST OR A BODY PATH, and the body arm is an `Expect` read the other way up: the condition
- * HOLDS when the test PASSES, so `error_when: { path: errors, present: true }` fires on a 200 whose
- * body carries an `errors` key — which is how Cloudflare's GraphQL reports a failure.
+ * HOLDS when the test PASSES, so `error_when: { path: errors, len_gte: 1 }` fires on a 200 whose
+ * body carries a list of errors — which is how Cloudflare's GraphQL reports a failure. Not
+ * `present: true`: a success answers `"errors": null`, and a null is present, so that spelling reads
+ * every success as the provider being down.
  */
 export function matchesCond(cond: Cond, status: number, json: Json | undefined, window: Window, tz: string): boolean {
   if ('status_in' in cond) return cond.status_in.includes(status);

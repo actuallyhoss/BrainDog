@@ -155,7 +155,8 @@ type FetchDecl = {
   body?: { [k: string]: Json };                 // POST only; JSON; placeholders in string leaves only
   auth: AuthDecl;
   schedule: { every: Duration; at?: string; tz?: 'record'; jitter?: 'auto' };   // every ≥ 15m; at = HH:MM, needs every % 24h = 0
-  window?: { grain: 'hour' | 'day' | 'month'; start: string; lookback?: Duration; max_span?: Duration };
+  window?: { grain: 'hour' | 'day' | 'month'; start: string; lookback?: Duration; max_span?: Duration;
+             end?: 'exclusive' | 'inclusive' };                                       // how {until} is written
   source_retention?: Duration;                  // lint only (42); no run-time role
   probe?: { path: string; read: Record<string, string> };      // exactly one; read = name → response path
   page?: PageDecl;                              // default { kind: 'none' }
@@ -182,7 +183,7 @@ type PageDecl =
   | { kind: 'cursor_param'; param: string; from: string; more?: Expect }               // Stripe: starting_after ← data[-1].id
   | { kind: 'offset';       param: string; size: number; more?: Expect }               // next = offset + size
   | { kind: 'page_number';  param: string; start?: number; more?: Expect }             // default start 1
-  | { kind: 'keyset';       param: string; from: string }                              // next = last row's key
+  | { kind: 'keyset';       param: string; from: string; more?: Expect }               // next = last row's key
   | { kind: 'link_header';  stop_when: { param: string; is: string } };                // Sentry: results="false"
 
 type Expect = { path: string; on_fail?: 'warn' | 'review' | 'fail' } & (                // default on_fail: review
@@ -203,6 +204,7 @@ Defaults and closed lists, in one table:
 | `window.grain` | enum | `day` | `hour day month` |
 | `window.lookback` | duration | `0` | ≤ `max_span` |
 | `window.max_span` | duration | `31d` | ≤ `366d` |
+| `window.end` | enum | `exclusive` | `exclusive inclusive` — `inclusive` when the provider's range includes its last day (npm `range/a:b`, Plausible `date_range`, GA4 `endDate`); `{until}` is then the window's last instant |
 | `page.kind` | enum | `none` | `cursor_param offset page_number keyset link_header` + `none` |
 | `limits.max_pages` | int | 40 | 1–50; `lease_size × max_pages ≤ 200` (25 §9) |
 | `limits.response_bytes` | int | 2,000,000 | ≤ 2,000,000 — the row/BLOB ceiling and the `Http` cap |
@@ -231,7 +233,7 @@ ident       = [a-z] { [a-z0-9_] } ;
 | Placeholder | Value | Default format | Legal formats |
 |---|---|---|---|
 | `{since}` | the window's first instant (ms) | `instant` | the five |
-| `{until}` | the window's exclusive end (ms) | `instant` | the five |
+| `{until}` | the window's exclusive end (ms); with `window.end: inclusive`, its last instant, `until − 1 ms` — the day before as a `date` | `instant` | the five |
 | `{page}` | the paginator's next value | as-is | `int` |
 | `{probe.<name>}` | one value read by the single probe | as-is | `int` on a number |
 | `{grant.<name>}` | a non-secret field of the grant's plaintext (§4.6) | as-is | none |
@@ -248,10 +250,14 @@ The URL is then re-parsed and its `origin` compared with `base` — the one chec
 
 ```ebnf
 path  = seg { "." seg } ;
-seg   = key { index } ;
-key   = [A-Za-z_] { [A-Za-z0-9_-] } ;
+seg   = key { index } | index { index } ;               (* a bare index reads a body or a row that is a list *)
+key   = ? any characters but "." "[" "]" and white space ? ;
 index = "[" integer "]" | "[-1]" | "[]" ;            (* [] = every element; legal at most once *)
 ```
+
+**As wide as install.** `declare` checks these paths with 43 §4.4's segment, and `readPath` reads every path that
+check accepts: until 30 Oct 2026 it took only `[A-Za-z_][A-Za-z0-9_-]*` keys and no bare index, so `page.from: '[0]'`
+over rows that are arrays installed and then read no cursor, which ends the run after one page.
 
 `readPath(json, path)` returns the value, `undefined` when any step is missing, and a list when `[]` was used.
 It is `@braindog/where`'s, not this package's: `extract` reads `read.rows` with the same grammar and the record
@@ -263,7 +269,7 @@ response shape of 25 §4; there is no wildcard key, no filter, no function.
 ### 4.4 · Run-time types
 
 ```ts
-type Window    = { since: number; until: number };                          // ms, half-open [since, until)
+type Window    = { since: number; until: number; inclusive?: true };        // ms, half-open [since, until); inclusive = window.end
 type PageState = { kind: 'cursor_param' | 'keyset'; value: string } | { kind: 'offset' | 'page_number'; value: number }
                | { kind: 'link_header'; url: string } | { kind: 'none' };
 type Cursor    = { watermark: string | null;                                // RFC 3339 — exclusive end of complete coverage
@@ -461,7 +467,7 @@ the leased rows concurrently, one `runPull` each. Then, per row:
 | `cursor_param` | `readPath(json, from)` (Stripe `data[-1].id`) | `more` fails, `from` is missing, or rows are empty |
 | `offset` | `value + size` | rows `< size`, or `more` fails |
 | `page_number` | `value + 1` | rows are empty, or `more` fails |
-| `keyset` | `readPath(rows[-1], from)` | rows are empty or the key is missing |
+| `keyset` | `readPath(rows[-1], from)` | rows are empty, `more` fails (Vercel's `pagination.next` is null on the last page), or the key is missing |
 | `link_header` | the `rel="next"` URL of the `Link` header, RFC 8288 | no `next` link, **or** the link carries `stop_when.param` equal to `stop_when.is` — Sentry's `results="false"` (25 §4); presence alone never decides |
 
 Every kind also stops at `max_pages` and `rows_per_run` (step 8). A next value equal to the current one is a loop
@@ -471,8 +477,8 @@ and stops with `PULL_SHAPE_MISMATCH` at `fetch.page.from`.
 
 `eq`/`ne` compare after placeholder substitution in the literal (`eq: "{since:date}"` is npm's clamp check);
 `is`/`is_not` compare a bare literal with no substitution (`is: list` is the string `"list"` — Stripe's `object`);
-`present`/`absent` test `readPath !== undefined`; `contains`/`starts`/`ends` are byte-wise on strings, literal
-≤ 40 bytes; `len_lte`/`len_gte` apply to strings and lists. A list value from `[]` passes only when every element
+`present`/`absent` test `readPath !== undefined`; `contains`/`starts`/`ends` substitute as `eq` does and are
+byte-wise on strings, the literal as declared ≤ 40 bytes (`starts: "{since:date}"` is Plausible's echo check); `len_lte`/`len_gte` apply to strings and lists. A list value from `[]` passes only when every element
 passes. Numbers compare as numbers, everything else as strings; `null` equals only `null`.
 
 ### 5.5 · Complexity and what is measured
@@ -559,15 +565,15 @@ records every request; a stub `RecordApi` that records every `applyPull` and `ac
 
 | Fixture | Exercises | Expected |
 |---|---|---|
-| `npm-downloads` | `none` auth, `{since:date}:{until:date}` in `path`, `page: none`, series `flow` | 7 points; a second fixture with `start` clamped → `PULL_EXPECT_FAILED`, `outcome: review`, cursor unchanged, raw body kept |
+| `npm-downloads` | `none` auth, `{since:date}:{until:date}` in `path` with `window.end: inclusive` (the range includes its end, so the path ends on yesterday, never on today), `page: none`, series `flow` | 7 points; a second fixture with `start` clamped → `PULL_EXPECT_FAILED`, `outcome: review`, cursor unchanged, raw body kept |
 | `github-traffic` | `bearer`, `link_header` with an opaque cursor, `unique` kind | the next URL taken verbatim from `Link`; a Link on another host → `PULL_ORIGIN_REFUSED` |
 | `stripe-ledger` | `bearer`, `cursor_param` (`starting_after ← data[-1].id`, `more: has_more`), `expect: object is list`, register `writes`, `dedupe: [id]` | 3 pages, 250 rows, `applyPull page` × 3 with `dedupe` fields present; cursor advances per page |
-| `cloudflare-graphql` | `bearer`, POST with a JSON body containing `{grant.zone}` and `{since:instant}`, `probe:` reading `settings`, `error_when: { path: errors, present: true }` on a 200 | one probe then pages; the 200-with-`errors` body → `PULL_PROVIDER_UNAVAILABLE` |
+| `cloudflare-graphql` | `bearer`, POST with a JSON body containing `{grant.zone}` and `{since:instant}`, `probe:` reading `settings`, `error_when: { path: errors, len_gte: 1 }` on a 200 — not `present: true`, because a success answers `"errors": null` and a null is present | one probe then pages; the 200-with-`errors` body → `PULL_PROVIDER_UNAVAILABLE`; `"errors": null` is a success |
 | `plausible` | `bearer`, POST with a JSON body carrying `{since:date}`/`{until:date}` and `{grant.site_id}`, `gauge` kind | body exact; two rows in one day → the later `at` wins |
 | `posthog-endpoints` | `header` auth with `name: X-Api-Key`, `offset` paging with `size`; a sibling case with `name: Authorization` | header exact; stops when a page returns fewer than `size` rows; the sibling is `PULL_REQUEST_REFUSED` |
 | `ga4` | `jwt_rs256` mode `exchange`: RS256 signature verified with the fixture's public key, one POST to `token_url`, then `Bearer <access_token>`; `expect: metadata.subjectToThresholding is_not true` | exact claim set `{ iss, scope, aud, iat, exp }`; a thresholded page → `review` |
 | `sentry` | `link_header` with `stop_when: { param: results, is: "false" }` | stops on `results="false"` although a `next` link is present — never loops |
-| `vercel` | `bearer`, `keyset` paging, `cumulative` kind | next = last row's key; empty rows end the loop |
+| `vercel` | `bearer`, `keyset` paging with `more: { path: pagination.next, is_not: null }`, a register (a list of deployments has no cumulative figure) | next = last row's key; a page whose `pagination.next` is null ends the loop with no empty page asked for; empty rows end it too |
 | `enable-banking` (tenth, for the second `jwt_rs256` customer) | mode `present`, `kid` from the grant | `Authorization: Bearer <jwt>` with `kid` in the header, no token step |
 | `aws-cost` (eleventh, the eighth kind) | `aws_sigv4` against the reference vector | the exact `Authorization` string and `x-amz-date` of the published example |
 
@@ -694,7 +700,7 @@ ever gains it (48, not planned). Build phase 4 delivers it beside ingest and ala
 | D7 | **Four keys of 25 §3.2's example are not in v1**: `for_each` (42 §4 accepts 1–32 literals and its `Placeholder` regex has no `{each}` — an element nothing can name), `conditional`, `on_error.backoff`, `on_error.pause_after`; `limits.timeout` and `limits.max_pages` are added; 42's `calls_out` drops `for_each` | 25 §3.2, §5.3; 42 §4 (`fetch` keys, `calls_out`) |
 | D8 | **The `pull` schedule row**: states `pending \| firing \| paused`; fire → `firing` and one outbox row; the ack's `result` → `pending` with `due_at` computed by connect's `nextDue`; `dead` → `paused` plus the item; the first `due_at` at install is `now` | 25 §9; 30 §1, §8; 09 §1 |
 | D9 | **Bytes of the key hierarchy**: DEK wrap AES-256-GCM with AAD `record_id ‖ 0x1F ‖ purpose`; grant key HKDF-SHA-256, empty salt, `info = grant_id`; grant AAD `record_id ‖ 0x1F ‖ grant_id ‖ 0x1F ‖ version`; 12-byte nonces; base64url on the wire. `openSealed`/`seal` live here and the reveal route reuses them. **Landed** in `packages/host/src/sealing.ts`: the two hosts held these steps twice and byte-identically, confirmed by diffing them, with nothing enforcing it. The test came first and pins the bytes rather than a round trip, because a round trip passes just as well under a hierarchy that changed on both sides at once, which is the failure that strands every credential already deposited. Where a DEK comes from stays per host. The key type is read off `deriveKey` and never written as `CryptoKey`, which is ambient in the Worker's types and not in Node's | 12 §6; 51 |
-| D10 | **`expect:` semantics**: `is`/`is_not` compare a bare literal without substitution; `eq`/`ne` substitute placeholders first; a `[]` list is `all` | 25 §5.1 |
+| D10 | **`expect:` semantics**: `is`/`is_not` compare a bare literal without substitution; `eq`/`ne` and `contains`/`starts`/`ends` substitute placeholders first (the three string operators did not until 30 Oct 2026, so 25 §5.1's own `starts: "{since:date}"` failed every run); a `[]` list is `all` | 25 §5.1 |
 | D11 | **Window arithmetic**: `since = max(start, watermark − lookback)`, `until = min(since + max_span, end of the current grain)`, half-open; after a complete run `watermark = min(until, start of the current grain)` — today is re-asked until it ends | 25 §3.2 |
 | D12 | **Raw retention for pulls**: one `inbox_raw` row per page, `channel = pull`; a passed page keeps `sha256`, headers and byte count with `body = NULL`; a `review` page keeps its body | 25 §7 rule 8; 07 §2 |
 | D13 | **Series value shape**: `writes.unit` on the ingest (`count ms bytes money.<CUR> pct.bp`), `scale:` on the `value` mapping (integer multiplier, round half away from zero); the write-time reducer of §4.7 (`flow` sums, the four others take the latest, `n`-weighted when `n` is mapped) | 08 §3; 25 §8; 43 §4.2–§4.3 |
