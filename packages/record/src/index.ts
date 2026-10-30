@@ -25,6 +25,7 @@ import { trialsLeft } from './script-try-cap.ts';
 import {
   handedOf,
   keptQuestion,
+  keysNotReady,
   labelsOf,
   plan,
   stagedBatch,
@@ -14114,7 +14115,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          because the repair is to install something else first and the plan is where a person reads it. */
       const unheld = unresolvedFault(diff);
       if (unheld) return { ok: false as const, refusal: unheld };
-      return ok({ diff, pack: pack.value.manifest });
+      /* AND EACH KEY IT WOULD SEND THAT THE KEYCHAIN CANNOT GIVE IT YET, by label (`keysNotReady`), the same question
+         the install asks: said on the sheet before the press, with the one step that puts it in, instead of a refusal
+         after it. Empty when every key is there, or when it sends none. */
+      const keys = keysNotReady(pack.value, diff, (name, paged) => kernel.keyReady(name, paged));
+      return ok({ diff, pack: pack.value.manifest, keys });
     },
 
     /**

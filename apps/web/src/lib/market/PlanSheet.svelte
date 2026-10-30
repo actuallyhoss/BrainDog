@@ -20,6 +20,7 @@
   import { estimateOf } from '../record/actions.ts';
   import Sheet from '../ui/Sheet.svelte';
   import Button from '../ui/Button.svelte';
+  import CodeLine from '../ui/CodeLine.svelte';
   import IconWell from '../ui/IconWell.svelte';
   import type { IconName } from '../ui/icons.ts';
   import { sheetOf, words } from './plan.ts';
@@ -34,6 +35,7 @@
     oncancel,
     extra,
     fieldOf,
+    onrecheck,
   }: {
     /** The record's `Diff`, a use case's `SharedPlan`, or an array of either for "Update all". */
     diff: unknown;
@@ -47,6 +49,11 @@
     extra?: Snippet | undefined;
     /** A field by its label where the plan's own document knows it (a field an add-on lays on a list), before the record's. */
     fieldOf?: ((list: string, field: string) => string | null) | undefined;
+    /**
+     * Reads the plan again, while a key it sends is not there yet: every few seconds and when the window comes back, so
+     * a key put in from a terminal lifts the stop with no press here. Left out, the sheet says to open it again.
+     */
+    onrecheck?: (() => Promise<void>) | undefined;
   } = $props();
 
   /* A FIELD BY THE LABEL THE RECORD SHOWS, where the browser holds its list; `sheetOf` reads the id as words otherwise. */
@@ -56,6 +63,26 @@
   const several = $derived((sheet?.parts.length ?? 0) > 1);
 
   let open = $state(true);
+
+  /** How often the plan is read again while a key is missing: a terminal command takes a few seconds to type. */
+  const LOOK_EVERY = 4_000;
+  const waiting = $derived((sheet?.keys.length ?? 0) > 0 && onrecheck !== undefined);
+  $effect(() => {
+    if (!waiting || !onrecheck) return;
+    const again = onrecheck;
+    let reading = false;
+    const look = () => {
+      if (reading || document.visibilityState === 'hidden') return;
+      reading = true;
+      void again().finally(() => (reading = false));
+    };
+    const every = setInterval(look, LOOK_EVERY);
+    window.addEventListener('focus', look);
+    return () => {
+      clearInterval(every);
+      window.removeEventListener('focus', look);
+    };
+  });
 
   /** The glyph each thing a plan does is drawn with, so the sheet reads by its pictures before its words. */
   const GLYPHS: Readonly<Record<string, IconName>> = {
@@ -83,11 +110,19 @@
     <div class="plan">
       {#if sheet.summary}<p class="plan-summary">{sheet.summary}</p>{/if}
 
-      {#if sheet.stops.length > 0}
+      {#if sheet.stops.length + sheet.keys.length > 0}
         <section class="plan-group plan-stops" role="alert" aria-labelledby="plan-stops-h">
           <h3 class="plan-h" id="plan-stops-h"><IconWell name="alert" tone="danger" /><span class="plan-title">{words.stops}</span></h3>
           <ul class="plan-rows">
             {#each sheet.stops as stop, i (i)}<li class="plan-row"><span class="plan-text">{stop}</span></li>{/each}
+            <!-- A KEY NOT IN THE KEYS YET: the sentence, the one command that puts it in, and that the sheet looks again. -->
+            {#each sheet.keys as k (k.label)}
+              <li class="plan-row plan-key">
+                <span class="plan-text">{k.line}</span>
+                {#if k.command}<CodeLine text={k.command} label={k.label} words />{/if}
+                <span class="plan-detail">{onrecheck ? words.keyLooking : words.keyAgain}</span>
+              </li>
+            {/each}
           </ul>
         </section>
       {/if}
@@ -139,7 +174,7 @@
     </div>
 
     {#snippet footer()}
-      <Button weight="primary" disabled={busy || (sheet?.stops.length ?? 1) > 0} onclick={onapprove}>{sheet?.approve ?? ''}</Button>
+      <Button weight="primary" disabled={busy || (sheet ? sheet.stops.length + sheet.keys.length : 1) > 0} onclick={onapprove}>{sheet?.approve ?? ''}</Button>
       <Button weight="bare" disabled={busy} onclick={() => (open = false)}>{words.notNow}</Button>
     {/snippet}
   </Sheet>
@@ -246,6 +281,10 @@
 
   .plan-row + .plan-row {
     border-block-start: 1px solid var(--rule);
+  }
+
+  .plan-key {
+    gap: var(--sp-2);
   }
 
   .plan-text {

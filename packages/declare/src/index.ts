@@ -3835,6 +3835,50 @@ export function installOrder(coming: readonly { id: string; version: string; req
   return out;
 }
 
+/** A key an install would send that the keychain cannot give it yet: its label, why, and the record's sentence. */
+export type KeyNotReady = { label: string; code: 'REQUIRED_MISSING' | 'OUT_OF_BOUNDS'; fix: string };
+
+/**
+ * EVERY KEY AN INSTALL WOULD SEND THAT IS NOT READY, each label once, in the order its calls are planned: what the plan
+ * says before the press, so a person adds the key first instead of being refused after it. `install` asks the same
+ * and refuses on the first.
+ *
+ * A SCRIPT'S LINE CARRIES ITS LABELS JOINED WITH ", " (`scriptEgress`), SO IT IS ASKED LABEL BY LABEL. Asked as the
+ * joined string, a script that sends two keys asked the keychain for a key called "a, b" and could never install; the
+ * labels are the script declaration's own `keys`, as `labelsSent` in the kernel's `govern.ts` reads them for Decide.
+ * Read with the settings filled in, so a script whose key is `{{config:grant}}` asks for the key the setting names.
+ *
+ * MISSING READS `REQUIRED_MISSING` AND UNOPENABLE READS `OUT_OF_BOUNDS`: one is a key to add, the other is a key to add
+ * AGAIN, under the connector, and a caller that collapsed them would tell somebody to deposit a key they have already
+ * deposited. A call the record already runs unchanged asks nothing.
+ */
+export function keysNotReady(pack: Pack, diff: Diff, keyReady: NonNullable<Host['keyReady']>): KeyNotReady[] {
+  return keysNotReadyIn(settleWhen(filledWith(pack, diff.config), diff.waiting ?? []), diff, keyReady);
+}
+
+function keysNotReadyIn(filled: Pack, diff: Diff, keyReady: NonNullable<Host['keyReady']>): KeyNotReady[] {
+  const labelsOf = (c: Diff['calls_out'][number], grant: string): string[] => {
+    if (c.channel !== 'script') return [grant];
+    const script = filled.declarations.find((d) => d.kind === 'script' && isObject(d.body) && d.body.script === c.ingest);
+    const keys = script !== undefined && isObject(script.body) ? script.body.keys : undefined;
+    return Array.isArray(keys) && keys.length > 0 && keys.every((k) => typeof k === 'string') ? (keys as string[]) : [grant];
+  };
+  const out: KeyNotReady[] = [];
+  const asked = new Set<string>();
+  for (const c of diff.calls_out) {
+    if (c.change === 'same' || c.grant === null) continue;
+    for (const label of labelsOf(c, c.grant)) {
+      /* ASKED ONCE A LABEL AND A WAY OF OPENING IT, since a connector's key is held to more than a call's; SAID ONCE A LABEL. */
+      const ask = `${label}\u0000${c.paged ? 1 : 0}`;
+      if (asked.has(ask)) continue;
+      asked.add(ask);
+      const why = keyReady(label, c.paged);
+      if (why !== null && !out.some((k) => k.label === label)) out.push({ label, code: why.code, fix: why.fix });
+    }
+  }
+  return out;
+}
+
 /**
  * Apply the plan, or say why not.
  *
@@ -3920,27 +3964,10 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
      `installFault`. */
   const filled = settleWhen(filledWith(pack, diff.config), diff.waiting ?? []);
 
-  /* A SCRIPT'S LINE CARRIES ITS LABELS JOINED WITH ", " (`scriptEgress`), SO IT IS ASKED LABEL BY LABEL. Asked as the
-     joined string, a script that sends two keys asked the keychain for a key called "a, b" and could never install; the
-     labels are the script declaration's own `keys`, as `labelsSent` in the kernel's `govern.ts` reads them for Decide. */
-  const labelsOf = (c: Diff['calls_out'][number], grant: string): string[] => {
-    if (c.channel !== 'script') return [grant];
-    const script = filled.declarations.find((d) => d.kind === 'script' && isObject(d.body) && d.body.script === c.ingest);
-    const keys = script !== undefined && isObject(script.body) ? script.body.keys : undefined;
-    return Array.isArray(keys) && keys.length > 0 && keys.every((k) => typeof k === 'string') ? (keys as string[]) : [grant];
-  };
-  if (host.keyReady)
-    for (const c of diff.calls_out) {
-      if (c.change === 'same' || c.grant === null) continue;
-      for (const label of labelsOf(c, c.grant)) {
-        const why = host.keyReady(label, c.paged);
-        if (why === null) continue;
-        /* MISSING READS `REQUIRED_MISSING` AND UNOPENABLE READS `OUT_OF_BOUNDS`: one is a key to add,
-           the other is a key to add AGAIN, under the connector, and a caller that collapsed them
-           would tell somebody to deposit a key they have already deposited. */
-        return no<Applied>(why.code, why.fix, { at: 'approve' });
-      }
-    }
+  /* EVERY KEY IT SENDS IS IN THE KEYCHAIN AND CAN BE OPENED (`keysNotReady`), or nothing is written. The first one
+     that is not is the refusal: the plan names them all beforehand, so this is only a record that moved since. */
+  const notReady = host.keyReady ? keysNotReadyIn(filled, diff, host.keyReady)[0] : undefined;
+  if (notReady !== undefined) return no<Applied>(notReady.code, notReady.fix, { at: 'approve' });
 
   const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
   const handing = diff.retires.filter((r) => r.to !== undefined && r.body !== undefined).length;

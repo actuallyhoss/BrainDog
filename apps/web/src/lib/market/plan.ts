@@ -40,6 +40,11 @@ export const words = {
   updateAvailable: 'Update available',
   notNow: 'Not now',
   stops: "What stops this install",
+  /* A KEY IT SENDS THAT IS NOT IN THE KEYS YET (`planPack`'s `keys`): the one step that puts it in, a command in a
+     terminal that reads the key from standard input, and never a field on this sheet. */
+  keyMissing: (label: string) => `The key "${label}" is not in your keys yet. Pipe it into this in a terminal:`,
+  keyLooking: 'Looking again every few seconds. You can go on once the key is in.',
+  keyAgain: 'Then open this again.',
   adds: 'Adds',
   /* THE NUMBERS A PLAN ADDS, AS ONE ROW: seventeen of them named one under another buried its lists. */
   addsNumbers: (n: number) => (n === 1 ? 'and 1 number' : `and ${n.toLocaleString('en-GB')} numbers`),
@@ -159,6 +164,27 @@ function callOf(c: Record<string, unknown>, change: Call['change'], note: string
   return { line: doesOf('install', { calls_out: [made] }, names) || fallback(), note, change, ...made };
 }
 
+/**
+ * A key the install would send that the keychain cannot give it yet. `command` is the line that puts it in, for a key
+ * that is missing; a key that is there but cannot be opened by a run says the record's own sentence and no command.
+ */
+export type KeyStep = { label: string; line: string; command: string | null };
+
+/** A label as one shell word: bare when it is only letters, digits and `._-`, else in double quotes with `"$\`` escaped. */
+export const shellWord = (label: string): string => (/^[A-Za-z0-9._-]+$/u.test(label) ? label : `"${label.replace(/["$`\\]/gu, (c) => `\\${c}`)}"`);
+
+/** The command that puts a key in, as the CLI takes it: the value on standard input, never an argument. */
+export const keyCommand = (label: string): string => `braindog keys put ${shellWord(label)}`;
+
+/** The keys a plan says are not ready (`keys_missing`, put beside the diff from `planPack`'s `keys`), each label once. */
+function keysOf(d: Body): KeyStep[] {
+  return list(d.keys_missing).flatMap((k): KeyStep[] => {
+    const label = text(k.label);
+    if (label === '') return [];
+    return k.code === 'REQUIRED_MISSING' ? [{ label, line: words.keyMissing(label), command: keyCommand(label) }] : [{ label, line: text(k.fix) || words.keyMissing(label), command: null }];
+  });
+}
+
 /** One pack's part of the plan. A single add-on is one part; a use case is one part per pack, in the order they go in. */
 export type Part = { key: string; title: string; move: string; sections: Section[]; calls: Call[] };
 
@@ -167,6 +193,8 @@ export type Sheet = {
   summary: string | null;
   /** What stops the install, from every part, drawn first and in the danger colour. Any at all disables approve. */
   stops: string[];
+  /** The keys it sends that are not ready, drawn with the stops and stopping it the same way. */
+  keys: KeyStep[];
   parts: Part[];
   /** Every call from every part, for the runs-a-month estimate. */
   callOuts: CallOut[];
@@ -360,9 +388,11 @@ export function sheetOf(diff: unknown, nameOf: (id: string) => string, fieldOf?:
   if (plans.length === 0 || (Array.isArray(diff) && plans.length !== diff.length)) return null;
 
   const stops: string[] = [];
+  const keys: KeyStep[] = [];
   const parts: Part[] = [];
   const heads: { title: string; summary: string; direction: string; version: string }[] = [];
   for (const plan of plans) {
+    for (const k of keysOf(plan)) if (!keys.some((h) => h.label === k.label)) keys.push(k);
     if (isDiff(plan)) {
       const one = diffPart(plan, name, fieldOf);
       stops.push(...one.stops);
@@ -381,7 +411,7 @@ export function sheetOf(diff: unknown, nameOf: (id: string) => string, fieldOf?:
 
   const head = heads[0];
   if (plans.length > 1 || !head) {
-    return { title: words.updateAllTitle(plans.length), summary: null, stops, parts, callOuts: plans.flatMap(callOutsOf), approve: words.updateAll(plans.length) };
+    return { title: words.updateAllTitle(plans.length), summary: null, stops, keys, parts, callOuts: plans.flatMap(callOutsOf), approve: words.updateAll(plans.length) };
   }
   const approve =
     head.direction === 'upgrade'
@@ -391,5 +421,5 @@ export function sheetOf(diff: unknown, nameOf: (id: string) => string, fieldOf?:
         : head.direction === 'reinstall'
           ? words.reinstall(head.title)
           : words.install(head.title);
-  return { title: head.title || approve, summary: head.summary || null, stops, parts, callOuts: plans.flatMap(callOutsOf), approve };
+  return { title: head.title || approve, summary: head.summary || null, stops, keys, parts, callOuts: plans.flatMap(callOutsOf), approve };
 }

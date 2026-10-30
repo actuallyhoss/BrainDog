@@ -63,6 +63,10 @@ export type Refused = { ok: false; fix: string; code: string | null; first?: rea
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const refusedOf = (r: Wire<unknown>, fallback: string): Refused => (r.ok ? { ok: false, fix: fallback, code: null } : { ok: false, fix: r.refusal?.fix ?? fallback, code: r.refusal?.code ?? null });
 
+/** The labels of the keys a plan says are not in the keys yet, in order: what `again` compares to know a key went in. */
+export const keysWanted = (p: Planned | null): string =>
+  p?.kind === 'pack' && isMap(p.diff) && Array.isArray(p.diff.keys_missing) ? p.diff.keys_missing.map((k) => (isMap(k) ? String(k.label) : '')).join('\u0000') : '';
+
 /** What the plan sheet draws: the record's `Diff`, or the use case's plan whole. */
 export const diffOf = (p: Planned): unknown => (p.kind === 'pack' ? (p.after?.shown ?? p.diff) : p.plan);
 
@@ -141,9 +145,13 @@ export async function planFor(
   if (!doc) return { ok: false, fix: fallback, code: null };
   const planned = await client.planPack({ doc, source: { kind: 'local' } });
   if (!planned.ok) return refusedOf(planned, fallback);
-  const diff = isMap(planned.value) && isMap(planned.value.diff) ? planned.value.diff : null;
-  const planHash = typeof diff?.planHash === 'string' ? diff.planHash : '';
-  if (!diff || planHash === '') return { ok: false, fix: fallback, code: null };
+  const read = isMap(planned.value) && isMap(planned.value.diff) ? planned.value.diff : null;
+  const planHash = typeof read?.planHash === 'string' ? read.planHash : '';
+  if (!read || planHash === '') return { ok: false, fix: fallback, code: null };
+  /* THE KEYS IT SENDS THAT ARE NOT IN THE KEYS YET (`planPack`'s `keys`) ride beside the diff the sheet reads, as
+     `keys_missing`, so every sheet says them as a stop before the press (`plan.ts` `keysOf`). Nothing is sent back. */
+  const keys = isMap(planned.value) && Array.isArray(planned.value.keys) ? planned.value.keys.filter(isMap) : [];
+  const diff = keys.length > 0 ? { ...read, keys_missing: keys } : read;
   const approve = Array.isArray(diff.approve) ? diff.approve.filter((l): l is string => typeof l === 'string') : [];
   const own: Planned = { kind: 'pack', doc, diff, planHash, approve };
   if (!waiting || !Array.isArray(diff.conflicts) || diff.conflicts.length === 0) return { ok: true, planned: own };
