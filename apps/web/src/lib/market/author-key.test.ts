@@ -145,3 +145,18 @@ test('each person signed in reaches their own key, and nobody signed in reaches 
   assert.equal(await stores(), null);
   assert.equal(slotOf('p_ana'), 'publisher:p_ana');
 });
+
+/* RD13: AN OPEN SELF-HOST HOLDS NO SESSIONS, so `/auth/session` answered nobody, no key was made, and every add-on went
+   out unsigned. Its one person keeps a key now, and only where the host says it is open. */
+test('RD13: AN OPEN SELF-HOST KEEPS ITS ONE PERSON A KEY; A HOST THAT IS NOT OPEN STILL KEEPS NOBODY SIGNED OUT ONE', async () => {
+  const { signedInNow, OPEN_PERSON } = await import('./author-key.ts');
+  const host = (session: { status: number; body?: unknown }, methods: { status: number; body?: unknown }) =>
+    (async (path: string) => {
+      const said = path === '/auth/session' ? session : methods;
+      return new Response(JSON.stringify(said.body ?? {}), { status: said.status, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+  assert.equal(await signedInNow(host({ status: 200, body: { ok: true, value: { person: 'p_ada' } } }, { status: 200 })), 'p_ada');
+  assert.equal(await signedInNow(host({ status: 404 }, { status: 200, body: { ok: true, value: { open: true } } })), OPEN_PERSON);
+  assert.equal(await signedInNow(host({ status: 401 }, { status: 200, body: { ok: true, value: { open: false } } })), null, 'a signed-out browser on the Cloud kept a key');
+  assert.equal(await signedInNow(host({ status: 401 }, { status: 503 })), null);
+});
