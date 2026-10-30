@@ -232,12 +232,14 @@ test('tools/list is the sixteen, each with its title and every hint said, and no
   for (const name of ['record_index', 'context', 'get', 'list', 'search', 'activity', 'governance'])
     assert.equal(hints[name]?.readOnlyHint, true, `${name} reads and does not say so`);
   /* THE ADDITIVE WRITES TAKE NOTHING AWAY, so a host need not ask a person before each one as it would a delete. */
-  for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff', 'undo', 'instructions']) {
+  for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff', 'instructions']) {
     assert.equal(hints[name]?.readOnlyHint, false, name);
     assert.equal(hints[name]?.destructiveHint, false, `${name} adds and is marked as if it overwrote`);
   }
   /* AND `update` OVERWRITES A VALUE, which undo does not make safe (OpenAI's review rule). */
   assert.equal(hints.update?.destructiveHint, true);
+  /* AND `undo` TAKES A WRITE AWAY: undoing a create deletes the row (door audit D35). */
+  assert.equal(hints.undo?.destructiveHint, true);
   /* A DIRECTORY READS A MISSING readOnlyHint AS A WRITE IT CANNOT VOUCH FOR, so every listed tool says it, true or false. */
   for (const t of r.tools) assert.equal(typeof t.annotations.readOnlyHint, 'boolean', `${t.name} leaves readOnlyHint unsaid`);
   assert.equal(hints.update?.idempotentHint, true);

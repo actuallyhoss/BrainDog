@@ -30,7 +30,7 @@ test('THE COUNTS AND THE CALL: how many here and everywhere, how many more, and 
   assert.equal(capped.here, 3);
   assert.equal(capped.everywhere, 163);
   assert.equal(capped.more, 161);
-  assert.equal(capped.rest, 'list({ register: "credentials" })');
+  assert.equal(capped.rest, 'list {"register":"credentials"}');
   assert.equal(capped.rest, restCall('credentials'));
   assert.equal(capped.truncated, true);
   /* A READ THE STORE STOPPED SHORT IS COUNTED BY THE STORE, so "161 more" is every key, not the ones read. */

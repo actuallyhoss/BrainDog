@@ -103,6 +103,21 @@ export function answersTaken(row: Record<string, unknown>): string[] {
 }
 
 /**
+ * The answers a question takes, said for a refusal: each option by its id with its words beside it, `o1 ("Ship Friday")`,
+ * so an agent can tell the person which is which; "Allowed: o1, o2" told nobody anything (door audit D32).
+ */
+export function answersSaid(row: Record<string, unknown>, takes: readonly string[]): string {
+  const body = typeof row.body === 'object' && row.body !== null ? (row.body as Record<string, unknown>) : {};
+  const labels = new Map<string, string>();
+  for (const o of Array.isArray(body.options) ? body.options : []) {
+    if (typeof o !== 'object' || o === null) continue;
+    const { id, label } = o as { id?: unknown; label?: unknown };
+    if (typeof id === 'string' && typeof label === 'string' && label.trim() !== '') labels.set(id, label.trim().replace(/\s+/gu, ' ').slice(0, 60));
+  }
+  return takes.map((t) => (labels.has(t) ? `${t} ("${labels.get(t)!}")` : t)).join(', ');
+}
+
+/**
  * The chat app a key is held by, from the address the door proved for it (`token.host`, `packages/host/src/oauth.ts`
  * `sourceOf`), or `null` for any other: a key on a machine, an app on the person's own computer, or an app of an address
  * this does not name. Only these two draw a card a person presses.

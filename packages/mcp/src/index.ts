@@ -416,7 +416,8 @@ export type Tool = {
   /** `read` tools never change anything, and a client may say so to its user. */
   writes: boolean;
   /**
-   * A write that overwrites what was there, which a host asks a person about before it runs: `update` alone.
+   * A write that overwrites or takes away what was there, which a host asks a person about before it runs: `update` and
+   * `undo`, whose undoing of a create deletes the row.
    *
    * THE SPEC'S DEFAULT FOR A WRITE IS DESTRUCTIVE, and every write here inherited it, so a new task prompted in Claude
    * as a delete would. The additive writes (`create`, `propose`, `log`, `meet`, `triage`, `handoff`) add a row, a
@@ -721,14 +722,14 @@ export const TOOLS: readonly Tool[] = [
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
        below says how. */
+    /* `page` IS LISTED (door audit D33): the description names it, and a client that holds to the schema dropped it, so
+       the page never arrived. `draft: true` stays taken and not listed, a page handed in to be kept or thrown away, which
+       Try again's instruction names to the run; an agent's page is a draft whether it says so or not (`attachVisual`). */
     input: obj(
-      { spoken: str('As get takes it. Omit for your run.'), note: { type: 'string' } },
+      { spoken: str('As get takes it. Omit for your run.'), note: { type: 'string' }, page: { type: 'string' } },
       ['note'],
     ),
-    /* `page` IS TAKEN AND NOT LISTED, said once in the description above: the list sits at its ceiling to the token. So
-       is `draft: true`, a page handed in to be kept or thrown away, which Try again's instruction names to the run; an
-       agent's page is a draft whether it says so or not (`attachVisual`). */
-    quiet: ['page', 'draft'],
+    quiet: ['draft'],
     writes: true,
   },
   {
@@ -777,7 +778,7 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation; a bare name is only noted. Mail, commits and the web are not believed alone: say where honestly. Your run is session in <repo>.',
+      'A person or organisation; a bare name is only noted. Say where honestly: mail, commits and the web are not believed alone; what you saw yourself is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
@@ -825,11 +826,13 @@ export const TOOLS: readonly Tool[] = [
     name: 'undo',
     title: 'Undo a change',
     /* THE LAST ONE, FOR THE RECEIPTS: every write answers a batch and this takes it back. Only the caller's own run's
-       writes go back; the owner's Undo in the app stays the owner's. It deletes nothing it did not make, so it is not
-       destructive in the spec's sense. */
+       writes go back; the owner's Undo in the app stays the owner's. DESTRUCTIVE IN THE SPEC'S SENSE (door audit D35):
+       undoing a create deletes the row, and a client that runs non-destructive tools without asking would have run it
+       unasked. */
     description: 'Put back your own write, by its receipt\'s batch.',
     input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
     writes: true,
+    destructive: true,
     idempotent: true,
   },
 ];
@@ -1686,6 +1689,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     return { entry: at, from: at === entry ? null : entry };
   };
 
+  /**
+   * A write to a row that is not there, refused as `get` refuses it: `ROW_UNKNOWN` at `spoken`. The kernel says
+   * `VALUE_MALFORMED` at `id` ("There is no row tasks#999 in tasks"), naming a field the agent never sent.
+   */
+  const noRow = <T,>(r: Result<T>, spoken: unknown): Result<T> => {
+    const refusal = 'refusal' in r ? r.refusal : undefined;
+    if (r.ok || refusal === undefined || refusal.code !== 'VALUE_MALFORMED' || refusal.at !== 'id' || !refusal.fix.startsWith('There is no row ')) return r;
+    return missing(typeof spoken === 'string' ? spoken.trim() : String(spoken));
+  };
+
   /** A not-ok answer with the row a conflict carries made the shape the first copy was read in. A refusal as it came. */
   const failed = async (r: Result<unknown>, ctx: C, turn: Turn): Promise<Result<unknown>> => {
     const conflict = (r as { conflict?: { current?: unknown } }).conflict;
@@ -1700,11 +1713,19 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * `context` NAMES ROWS BY PREFIX, so a tool that took only `register#number` refused the id the briefing
    * had just handed over: `update LN8` was "a row is addressed as register#number".
    */
-  const locate = async (spoken: unknown, ctx: C): Promise<Result<{ register: string; seq: number }>> => {
+  const locate = async (spoken: unknown, ctx: C, asked?: { tool: string; args: Args }): Promise<Result<{ register: string; seq: number }>> => {
     const at = parse(spoken);
     if (at) return { ok: true, value: at };
     const said = typeof spoken === 'string' ? spoken.trim() : '';
-    if (!PREFIXED.test(said)) return badSpoken(ROW_OR_ID);
+    /* A NAME, AS `get` TAKES ONE: the description says `spoken` is "as get takes it", and `update {"spoken":"Kiln"}` was
+       refused a name `get` read. The one thing called that is the row; several are `NAME_AMBIGUOUS`, with the call for
+       the first as `try`, so nothing is written to a row the agent did not mean. */
+    if (!PREFIXED.test(said) && !ROW_ID.test(said)) {
+      const found = await named(said, ctx, { text: false, titles: new Map() });
+      if (found === null) return badSpoken(said === '' ? ROW_OR_ID : `${ROW_OR_ID} Nothing you can read is called ${clip(said, 60)}; search finds it by its words.`);
+      if ('one' in found) return { ok: true, value: found.one };
+      return { ok: false, refusal: ambiguous(said, found.many, asked === undefined ? undefined : callOf(asked.tool, { ...asked.args, spoken: found.many.handles[0]! })) };
+    }
     const found = await surface.get({ spoken: said }, ctx);
     if (!found.ok) return found;
     const row = found.value as { register?: unknown; seq?: unknown } | null;
@@ -1953,7 +1974,24 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const id = typeof args.withdraw === 'string' ? args.withdraw.trim() : '';
     if (!surface.withdraw) return { result: unbuilt('withdraw', 'The question stays in Decide until the person answers it.') };
     const out = await surface.withdraw({ id }, ctx);
-    if (!out.ok) return { result: out };
+    /* AT `withdraw`, THE ARGUMENT THE AGENT SENT, never the record's `id` (door audit D30); a question that is not there
+       is answered with the call that lists the open ones. */
+    if (!out.ok) {
+      const refusal = 'refusal' in out ? out.refusal : null;
+      if (refusal === null || (refusal.at !== undefined && refusal.at !== 'id')) return { result: out };
+      const gone = refusal.fix.startsWith('There is no ');
+      return {
+        result: {
+          ok: false,
+          refusal: {
+            ...refusal,
+            ...(gone ? { code: 'ROW_UNKNOWN', fix: `${refusal.fix} Your open questions are listed by governance.` } : {}),
+            at: 'withdraw',
+            ...(gone && refusal.try === undefined ? { try: callOf('governance', { register: 'suggestion', status: 'open' }) } : {}),
+          } as Refusal,
+        },
+      };
+    }
     /* SAID BY THE QUESTION'S WORDS WITH ITS HANDLE BESIDE THEM, read before the answer says it, as `log` reads one. */
     const shown = isObject(out.value) && typeof out.value.id === 'string' && out.value.id !== '' ? out.value.id : id;
     const words = await askedAs(shown, ctx);
@@ -2394,36 +2432,54 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * caller says the row forms as before.
    */
   const byName = async (said: string, args: Args, ctx: C, turn: Turn): Promise<Done | null> => {
+    const found = await named(said, ctx, turn);
+    if (found === null) return null;
+    if ('one' in found) return run.get!({ ...args, spoken: `${found.one.register}#${String(found.one.seq)}` }, ctx, turn);
+    return { result: { ok: false, refusal: ambiguous(said, found.many, callOf('get', { ...args, spoken: found.many.handles[0]! })) } };
+  };
+
+  /**
+   * The thing a name is, for `get`, `update`, `log` and `history`: `one` when exactly one row's title is that name, case
+   * and spacing aside, or a search finds one row alone; `many` with up to five handles and where each is when several
+   * are called that; `null` when nothing is.
+   */
+  const named = async (
+    said: string,
+    ctx: C,
+    turn: Turn,
+    within?: string,
+  ): Promise<{ one: { register: string; seq: number } } | { many: { handles: string[]; each: string[]; count: number } } | null> => {
     if (said === '' || said.length > 200) return null;
     const found = await surface.search({ q: said, limit: 20 }, ctx);
     if (!found.ok) return null;
     const all = (Array.isArray(found.value) ? found.value : isObject(found.value) && Array.isArray(found.value.hits) ? found.value.hits : [])
       .filter(isObject)
-      .filter((h): h is { register: string; seq: number; title?: unknown } => typeof h.register === 'string' && typeof h.seq === 'number');
+      .filter((h): h is { register: string; seq: number; title?: unknown } => typeof h.register === 'string' && typeof h.seq === 'number')
+      .filter((h) => within === undefined || h.register === within);
     const norm = (s: unknown): string => (typeof s === 'string' ? s.toLowerCase().replace(/\s+/gu, ' ').trim() : '');
     const exact = all.filter((h) => norm(h.title) === norm(said));
     const picked = exact.length > 0 ? exact : all.length === 1 ? all : [];
     if (picked.length === 0) return null;
-    if (picked.length === 1) return run.get!({ ...args, spoken: `${picked[0]!.register}#${String(picked[0]!.seq)}` }, ctx, turn);
+    if (picked.length === 1) return { one: { register: picked[0]!.register, seq: picked[0]!.seq } };
     const handles = await Promise.all(picked.slice(0, 5).map((h) => addressOf(h.register, h.seq, ctx)));
     const boot = await bootOf(ctx, turn);
     const lists = new Map(
       (boot.ok && isObject(boot.value) && Array.isArray(boot.value.registers) ? boot.value.registers : []).filter(isObject).map((r) => [String(r.id), String(r.name ?? r.id)]),
     );
     const each = picked.slice(0, 5).map((h, i) => `${handles[i]!} in ${lists.get(h.register) ?? h.register}`);
-    const more = picked.length > 5 ? ` and ${String(picked.length - 5)} more` : '';
+    return { many: { handles, each, count: picked.length } };
+  };
+
+  /** Several things called one name, each by its handle and list, with the call for the first as `try` when there is one. */
+  const ambiguous = (said: string, many: { handles: string[]; each: string[]; count: number }, tried: string | undefined): Refusal => {
+    const more = many.count > 5 ? ` and ${String(many.count - 5)} more` : '';
     return {
-      result: {
-        ok: false,
-        refusal: {
-          code: 'NAME_AMBIGUOUS',
-          fix: `${String(picked.length)} things are called ${clip(said, 60)}: ${each.join(', ')}${more}. Say which by its handle.`,
-          at: 'spoken',
-          allowed: handles,
-          try: callOf('get', { ...args, spoken: handles[0]! }),
-        } as Refusal,
-      },
-    };
+      code: 'NAME_AMBIGUOUS',
+      fix: `${String(many.count)} things are called ${clip(said, 60)}: ${many.each.join(', ')}${more}. Say which by its handle.`,
+      at: 'spoken',
+      allowed: many.handles,
+      ...(tried === undefined ? {} : { try: tried }),
+    } as Refusal;
   };
 
   /**
@@ -2702,6 +2758,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
 
     /* A HIT IS ITS SPOKEN ID, ITS TITLE AND ITS LIST. `rank` is a float the order already says. */
     search: async (args, ctx, turn) => {
+      /* NOTHING TO LOOK FOR IS NOT "nothing found" (door audit D30): an empty search answered as if it had looked. */
+      if (String(args.q ?? '').trim() === '')
+        return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'q is the words to look for, and this one is empty. To read a list whole, list it.', at: 'q', try: callOf('record_index') } as Refusal } };
       const found = await surface.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx);
       if (!found.ok) return { result: found };
       /**
@@ -2742,7 +2801,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * history measured 14 nulls and 6 row ids on the owner's record.
      */
     history: async (args, ctx, turn) => {
-      const at = await locate(args.spoken, ctx);
+      const at = await locate(args.spoken, ctx, { tool: 'get', args: { spoken: args.spoken, history: true } });
       if (!at.ok) return { result: at };
       const out = await surface.history(at.value, ctx);
       if (!out.ok) return { result: out };
@@ -2996,7 +3055,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     },
 
     update: async (args, ctx, turn) => {
-      const at = await locate(args.spoken, ctx);
+      const at = await locate(args.spoken, ctx, { tool: 'update', args });
       if (!at.ok) return { result: at };
       /* AN EMPTY PATCH IS REFUSED BEFORE THE LADDER (§6.1): on the seed it wrote a version and a receipt for a
          change of nothing, and on his record the ladder filed it as a question and refused it in the question's terms. A
@@ -3026,7 +3085,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         },
         ctx,
       );
-      return wrote(changed, 'Changed', ctx, turn);
+      return wrote(noRow(changed, args.spoken), 'Changed', ctx, turn);
     },
 
     /**
@@ -3056,9 +3115,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         if (!surface.handoff) return { result: unbuilt('log with no row', 'Name the row the note is about in spoken.') };
         out = await surface.handoff({ note }, ctx);
       } else {
-        const at = await locate(args.spoken, ctx);
+        const at = await locate(args.spoken, ctx, { tool: 'log', args });
         if (!at.ok) return { result: at };
-        out = await surface.update({ ...at.value, patch: {}, note }, ctx);
+        out = noRow(await surface.update({ ...at.value, patch: {}, note }, ctx), args.spoken);
       }
       if (!out.ok) return { result: await failed(out, ctx, turn) };
       turn.batch = batchIn(out.value);
@@ -3353,6 +3412,37 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const at = parse(args.spoken);
       return callOf(name, at ? { ...args, spoken: `${best}#${String(at.seq)}` } : { ...args, register: best });
     }
+    /* A SENTENCE JOINED BY "and" (door audit D31): the grammar says a comma joins two conditions, and this is the call
+       with the comma. */
+    if (typeof args.where === 'string' && refusal.fix.includes('Conditions are joined by a comma: '))
+      return callOf(name, { ...args, where: args.where.replace(/\s+and\s+/giu, ', ') });
+    /* A `where` THAT NAMES A FIELD THE LIST DOES NOT HAVE, `{"field":"stat"}`: the same where with the field it most
+       likely meant, wherever in the tree it was named. */
+    if (refusal.code === 'FIELD_UNKNOWN' && allowed.length > 0 && typeof refusal.at === 'string' && isObject(args.where)) {
+      const wrong = refusal.at;
+      const best = closest(wrong, allowed.map((id) => ({ id })));
+      if (best === null || best === wrong) return undefined;
+      let moved = false;
+      const mend = (node: unknown): unknown => {
+        if (Array.isArray(node)) return node.map(mend);
+        if (!isObject(node)) return node;
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(node)) {
+          if (k === 'field' && v === wrong) {
+            out[k] = best;
+            moved = true;
+          } else out[k] = k === 'all' || k === 'any' || k === 'none' ? mend(v) : v;
+        }
+        return out;
+      };
+      const where = mend(args.where);
+      return moved ? callOf(name, { ...args, where }) : undefined;
+    }
+    /* A PROJECT NOT THERE, AND THE ONES THAT ARE (`allowed`, by name): the one it most likely meant. */
+    if (refusal.code === 'ROW_UNKNOWN' && refusal.at === 'project' && allowed.length > 0 && typeof args.project === 'string') {
+      const best = closest(args.project, allowed.map((id) => ({ id })));
+      return best === null ? undefined : callOf(name, { ...args, project: best });
+    }
     if ((refusal.code === 'FIELD_UNKNOWN' || refusal.code === 'ENUM_VALUE_UNKNOWN') && allowed.length > 0 && typeof refusal.at === 'string') {
       const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
       const fields = key === null ? null : args[key];
@@ -3375,7 +3465,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (PREFIXED.test(said.toUpperCase())) return callOf(name, { ...args, spoken: said.toUpperCase() });
       /* A NAME NOTHING IS CALLED IS LOOKED FOR BY ITS WORDS: the sentence said "search finds it" and the
          refusal carried no call, so an agent wrote the search itself or resent the get. */
-      if (!NAMED.test(said)) return name === 'get' && said !== '' && !FIGURE.test(said) ? callOf('search', { q: said.slice(0, 100) }) : undefined;
+      if (!NAMED.test(said)) return ['get', 'update', 'log', 'history'].includes(name) && said !== '' && !FIGURE.test(said) ? callOf('search', { q: said.slice(0, 100) }) : undefined;
       if ((await listsOf()).some((r) => r.id === said)) return callOf('list', { register: said });
       if (name !== 'get') return undefined;
       const figures = await figuresFor(ctx, async () => []);
@@ -3386,6 +3476,34 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if ((refusal.code === 'VALUE_MALFORMED' || refusal.code === 'OUT_OF_BOUNDS') && refusal.at === 'limit' && typeof args.limit === 'number' && Number.isFinite(args.limit))
       return callOf(name, { ...args, limit: Math.min(Math.max(1, Math.round(args.limit)), name === 'activity' ? ACTIVITY_MOST : LIST_MOST) });
     return undefined;
+  }
+
+  /**
+   * A ref field given a name, `{"thing":"Kiln"}`, which the record refuses as "thing takes a row id or a spoken id like
+   * things#41": the row that name is in the list the field points at, said in the fix and sent as `try`. Several called
+   * that are listed by handle with the first as `try`; none, and the refusal stays as it came. A name and not a guess:
+   * nothing is written until the agent sends the call again.
+   */
+  async function refFor(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Refusal> {
+    if (refusal.code !== 'VALUE_MALFORMED' || typeof refusal.at !== 'string' || (refusal as { try?: unknown }).try !== undefined) return refusal;
+    const to = /takes a row id or a spoken id like ([a-z][a-z0-9_]*)#41/u.exec(refusal.fix)?.[1];
+    const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
+    const fields = key === null ? null : args[key];
+    const place = /^([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+)\])?$/u.exec(refusal.at);
+    if (to === undefined || key === null || !isObject(fields) || place === null) return refusal;
+    const field = place[1]!;
+    const index = place[2] === undefined ? null : Number(place[2]);
+    const held = fields[field];
+    const value = index === null ? held : Array.isArray(held) ? held[index] : undefined;
+    if (typeof value !== 'string' || value.trim() === '') return refusal;
+    const found = await named(value.trim(), ctx, turn, to);
+    if (found === null) return refusal;
+    const handle = 'one' in found ? `${found.one.register}#${String(found.one.seq)}` : found.many.handles[0]!;
+    const put = index === null ? handle : (held as unknown[]).map((v, i) => (i === index ? handle : v));
+    const tried = callOf(name, { ...args, [key]: { ...fields, [field]: put } });
+    if ('one' in found) return taught({ ...refusal, fix: `${refusal.fix} ${clip(value.trim(), 60)} is ${handle}.` } as Refusal, tried);
+    const more = found.many.count > 5 ? ` and ${String(found.many.count - 5)} more` : '';
+    return taught({ ...refusal, fix: `${refusal.fix} ${String(found.many.count)} are called ${clip(value.trim(), 60)}: ${found.many.each.join(', ')}${more}.`, allowed: found.many.handles } as Refusal, tried);
   }
 
   /**
@@ -3447,8 +3565,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       );
       return said({ ok: false, refusal }, refusalBrief(refusal as Record<string, unknown>));
     }
-    /* `format` IS THIS LAYER'S, and never reaches the record, which would refuse a key its method does not take. */
-    const full = args.format === 'full';
+    /* `format` IS THIS LAYER'S, and never reaches the record, which would refuse a key its method does not take. "json"
+       is the same ask in other words, and any other value is refused rather than quietly read as brief (door audit D33). */
+    if (args.format !== undefined && args.format !== null && args.format !== 'full' && args.format !== 'json' && args.format !== 'brief') {
+      const refusal = taught(
+        { code: 'ENUM_VALUE_UNKNOWN', fix: 'format is "full", which answers JSON, or left out for short lines.', at: 'format', allowed: ['full'] },
+        callOf(name, { ...args, format: 'full' }),
+      );
+      return said({ ok: false, refusal }, refusalBrief(refusal as Record<string, unknown>));
+    }
+    const full = args.format === 'full' || args.format === 'json';
     const sent: Args = Object.fromEntries(Object.entries(args).filter(([k]) => k !== 'format'));
     /* NOT SAID IN WORDS WHEN THE CALL ASKS full, whose text is the JSON: the reads only a line needs are not made. */
     const turn: Turn = { text: text && !full, titles: new Map() };
@@ -3479,6 +3605,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       /* THE LIST'S TITLE FIRST: `name` is otherwise handed the field spelled most like it, which is rarely the title. */
       const titled = await titleFor(name, sent, result.refusal, ctx);
       if (titled !== result.refusal) result = { ok: false, refusal: titled };
+      /* A REF FIELD GIVEN A NAME: the row it names, as `try`. */
+      const reffed = await refFor(name, sent, result.refusal, ctx, turn);
+      if (reffed !== result.refusal) result = { ok: false, refusal: reffed };
       const fix = await tryFor(name, sent, result.refusal, ctx, turn);
       /* A `try` THAT IS THE CALL JUST MADE IS NO TRY: the instructions say never to send a call again unchanged. */
       if (fix !== undefined && fix !== callOf(name, sent) && (result.refusal as { try?: unknown }).try === undefined)

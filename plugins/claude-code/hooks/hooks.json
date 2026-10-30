@@ -1,12 +1,12 @@
 {
-  "description": "The session's start and end, told to BrainDog by its command line. Each does nothing where the command line is not installed.",
+  "description": "The six hooks braindog install registers, told to BrainDog by its command line: the session's start and end, the beat after a tool call, and what the person told the run on the next prompt, tool call and turn end. Each does nothing where the command line is not installed, or where the profile's own settings already run them.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "command -v braindog >/dev/null 2>&1 && braindog hook start || true",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" start",
             "timeout": 10,
             "statusMessage": "Connecting to BrainDog..."
           }
@@ -15,13 +15,27 @@
     ],
     "SessionEnd": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v braindog >/dev/null 2>&1 && braindog hook end || true",
-            "timeout": 10
-          }
-        ]
+        "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" end", "timeout": 10 }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" beat", "timeout": 10 }]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" prompt", "timeout": 5 }]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" tool", "timeout": 5 }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" stop", "timeout": 5 }]
       }
     ]
   }

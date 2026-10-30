@@ -1563,6 +1563,16 @@ function resolve(
   return said;
 }
 
+/**
+ * " Conditions are joined by a comma: …" when a value holds ` and ` and another condition after it, `null` otherwise.
+ * `thing is Kiln and state is open` was "there is no things called Kiln and state is open", read as one name: a comma
+ * joins two conditions, and `and` is a word a name may hold, so the sentence is not read again, only said rightly.
+ */
+function andHint(sentence: string, said: string): string {
+  if (!/\s+and\s+\S+\s+(?:is|isn't|is not|has|lacks|before|after|over|under|between|contains|starts|ends)\b/iu.test(said)) return '';
+  return ` Conditions are joined by a comma: ${sentence.replace(/\s+and\s+/giu, ', ')}.`;
+}
+
 function refuseValue(
   sentence: string,
   schema: Schema,
@@ -1571,6 +1581,7 @@ function refuseValue(
   said: string,
   deps?: SentenceDeps,
 ): Refusal {
+  const joined = andHint(sentence, said);
   /* AN ID OF ANOTHER REGISTER IS THE WRONG ROW, NOT NO ROW. `thing is tasks#1` names a row that
      exists, and `coerce` refuses the same value written into the same field with this code, so the
      read and the write give one answer about one address. */
@@ -1586,7 +1597,7 @@ function refuseValue(
   if (decl.type === 'enum' || (decl.type === 'list' && decl.values))
     return {
       code: 'ENUM_VALUE_UNKNOWN',
-      fix: `${sentence}: ${schema.register}.${field} has no value ${said}.`,
+      fix: `${sentence}: ${schema.register}.${field} has no value ${said}.${joined}`,
       at: field,
       allowed: (decl.values ?? []).map((v) => (decl as { labels?: Readonly<Record<string, string>> }).labels?.[v] ?? v.replace(/_/g, ' ')),
     };
@@ -1611,8 +1622,8 @@ function refuseValue(
   if (decl.type === 'ref')
     return {
       code: 'REF_UNKNOWN',
-      fix: `${sentence}: there is no ${decl.to ?? 'row'} called ${said}.`,
+      fix: `${sentence}: there is no ${decl.to ?? 'row'} called ${said}.${joined}`,
       at: field,
     };
-  return { code: 'VALUE_MALFORMED', fix: `${sentence}: ${said} is not a value ${field} can hold.`, at: field };
+  return { code: 'VALUE_MALFORMED', fix: `${sentence}: ${said} is not a value ${field} can hold.${joined}`, at: field };
 }

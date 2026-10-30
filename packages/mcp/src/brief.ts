@@ -127,7 +127,13 @@ export function said(f: Field | undefined, value: unknown, look: Look, room = 60
       return typeof value === 'number' ? durationSaid(value, f.unit) : null;
     default:
   }
-  if (typeof value === 'string') return ULID.test(value) ? 'one you cannot open' : clip(value, room);
+  if (typeof value === 'string') {
+    if (ULID.test(value)) return 'one you cannot open';
+    /* A TEXT THAT OPENS ON A DAY SAYS THE DAY AS ONE READS IT (door audit D32): a person's "Met" line is "2026-08-28 · mail
+       from halden.example", and was said that way, digits first. */
+    const dated = /^(\d{4}-\d{2}-\d{2})(?![\d:T])(.*)$/su.exec(value);
+    return clip(dated === null ? value : `${day(dated[1]!, look.now)}${dated[2]!}`, room);
+  }
   if (typeof value === 'number') return grouped(value);
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
   return null;
@@ -378,6 +384,8 @@ export function rowWhole(row: Shaped, register: string, look: Look): string[] {
     const f = byId.get(id);
     if (f?.retired === true || f?.hidden_from_agents === true || !Object.hasOwn(fields, id)) continue;
     const value = fields[id];
+    /* "This is you: no" ON EVERY PERSON BUT ONE says nothing; the one it is true of is told. */
+    if (id === 'self' && value === false) continue;
     const text =
       typeof value !== 'string' ? null : f?.type === 'document' ? prose(value) : f === undefined || f.type === 'text' ? oneLine(value) : null;
     /* A DOCUMENT IS SAID AS PROSE AT ANY LENGTH, and any text past the room is cut and says how long it is. */

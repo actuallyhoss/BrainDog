@@ -124,3 +124,17 @@ test('with a login past its expiry, every call names the host, the day it lapsed
   }
   assert.ok(!JSON.stringify(replies).includes(TOKEN) && !err.includes(TOKEN), 'the expired token was printed');
 });
+
+test('a refused BRAINDOG_TOKEN is named as the one refused, since a new login would change nothing', async () => {
+  const { endedFix, tokenFromEnv } = await import('../src/bridge.ts');
+  const host = 'https://app.brain.dog/acme';
+  assert.equal(tokenFromEnv({ BRAINDOG_TOKEN: 'abc' }, 'abc'), true);
+  assert.equal(tokenFromEnv({ BRAINDOG_TOKEN: 'abc' }, 'from-the-file'), false);
+  assert.equal(tokenFromEnv({}, 'from-the-file'), false);
+  assert.equal(tokenFromEnv({ BRAINDOG_TOKEN: '' }, undefined), false);
+  const fromEnv = endedFix(host, true);
+  assert.match(fromEnv, /BRAINDOG_TOKEN/u);
+  assert.match(fromEnv, /unset it/u);
+  assert.doesNotMatch(fromEnv, /abc/u);
+  assert.match(endedFix(host), /^The login to https:\/\/app\.brain\.dog\/acme ended/u);
+});

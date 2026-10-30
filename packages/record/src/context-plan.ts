@@ -33,8 +33,9 @@
 import type { InstrKind, InstrState, InstrTo, InstrWhen, Stop } from '@braindog/kernel';
 
 import { TWO_SESSIONS, agentName, cardParts, cutTo, labeled, oneLine, since, wordCount, words, type CardAt, type CardParts } from './card.ts';
-import { decidedLately, lessonsHeld, restCall, RULE, type Lately, type Lesson } from './context-caps.ts';
+import { callSaid, decidedLately, lessonsHeld, restCall, RULE, type Lately, type Lesson } from './context-caps.ts';
 import { listFor } from './agent-lists.ts';
+import { dayWords } from './headlines.ts';
 import type { Context } from './index.ts';
 
 /* ── the budget ────────────────────────────────────────────────────────── */
@@ -142,6 +143,54 @@ export type TaskFact = {
   /** Other runs that touched it, as lines. */
   runs?: readonly string[] | undefined;
 };
+
+/* ── a task's values as a person reads them ───────────────────────────── */
+
+/** Seconds in each unit a duration is said in, largest first. */
+const DURATION_UNITS: readonly (readonly [unit: string, seconds: number, one: string])[] = [
+  ['w', 604_800, 'week'],
+  ['d', 86_400, 'day'],
+  ['h', 3_600, 'hour'],
+  ['m', 60, 'minute'],
+  ['s', 1, 'second'],
+];
+
+/**
+ * A duration the record keeps in whole seconds, in its field's unit or the largest it fills: "1 day", "2.5 hours".
+ * `context {task}` said "effort: 86400".
+ */
+export function durationWords(seconds: number, unit?: string): string {
+  const [, size, one] = DURATION_UNITS.find(([u]) => u === unit) ?? DURATION_UNITS.find(([, s]) => Math.abs(seconds) >= s) ?? DURATION_UNITS[4]!;
+  const n = Math.round((seconds / size) * 10) / 10;
+  return `${String(n)} ${n === 1 ? one : `${one}s`}`;
+}
+
+/**
+ * One value of a task's field as a person reads it, by the field's type: a day as "9 Sep", an instant as "30 Oct 19:33",
+ * a duration in words, an enum by its label, true and false as yes and no. `null` for anything the plan does not say
+ * (an object, an empty value). A text, a ref already named, and a number are said as they are.
+ */
+export function valueWords(
+  field: { type?: string; labels?: Readonly<Record<string, string>> | undefined; unit?: string | undefined } | undefined,
+  value: unknown,
+  now: number,
+): string | null {
+  if (value === null || value === undefined || value === '' || typeof value === 'object') return null;
+  switch (field?.type) {
+    case 'day':
+      return typeof value === 'string' ? dayWords(value.slice(0, 10), now) : String(value);
+    case 'instant':
+      return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u.test(value) ? `${dayWords(value.slice(0, 10), now)} ${value.slice(11, 16)}` : String(value);
+    case 'duration':
+      return typeof value === 'number' ? durationWords(value, field.unit) : String(value);
+    case 'enum':
+      return typeof value === 'string' ? (field.labels?.[value] ?? value.replace(/_/gu, ' ')) : String(value);
+    case 'bool':
+      return value === true ? 'yes' : value === false ? 'no' : String(value);
+    default:
+      return typeof value === 'boolean' ? (value ? 'yes' : 'no') : String(value);
+  }
+}
 
 /** What changed since the stamp the caller holds (`context {since}`): nothing else is said. */
 export type SinceFact = {
@@ -297,7 +346,7 @@ const laneLine = (t: LaneRow): string =>
 
 /** The lane's call: the tasks handed to this kind of agent, or that nobody holds. */
 const laneCall = (list: string, agent: string | null | undefined): string =>
-  `list({ register: ${JSON.stringify(list)}, where: {"field":"agent","is":${JSON.stringify(agent && agent.trim() ? agent.trim() : 'claude')}} })`;
+  callSaid('list', { register: list, where: { field: 'agent', is: agent && agent.trim() ? agent.trim() : 'claude' } });
 
 /** A cadence as a person says it. */
 const EVERY_SAID: Readonly<Record<string, string>> = { '1h': 'hourly', '1d': 'daily', '1w': 'weekly', '1m': 'monthly' };
@@ -456,7 +505,7 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
   /* 4 RULES AND BRIEF: his brief for this agent, then this project's rules, then everywhere's. */
   const rules = [...f.rules].filter((r) => oneLine(r.said)).sort((a, z) => Number(z.here === true) - Number(a.here === true));
   const ruleRows = [...(f.brief && oneLine(f.brief) ? [`Brief: ${words(f.brief, 300)}`] : []), ...rules.map((r) => words(r.said, 100))];
-  if (ruleRows.length > 0) fill('rules', 'Rules', ruleRows, ruleRows.length, calls.rules ?? `list({ register: "learnings", where: {"field":"kind","is":"${RULE}"} })`, { total: (totals.rules ?? 0) + (ruleRows.length - rules.length), tokens: full ? RULES_TOKENS * 4 : RULES_TOKENS });
+  if (ruleRows.length > 0) fill('rules', 'Rules', ruleRows, ruleRows.length, calls.rules ?? callSaid('list', { register: 'learnings', where: { field: 'kind', is: RULE } }), { total: (totals.rules ?? 0) + (ruleRows.length - rules.length), tokens: full ? RULES_TOKENS * 4 : RULES_TOKENS });
 
   if (depth === 'task' && f.task) {
     const t = f.task;
@@ -466,13 +515,13 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
       ...((t.tools ?? []).length > 0 ? [`Tools: ${and((t.tools ?? []).map((k) => words(k, 30)))}`] : []),
       ...(t.runs ?? []).map((r) => `Run: ${words(r, 90)}`),
     ];
-    if (needs.length > 0) fill('needs', 'Needs', needs, needs.length, `get({ spoken: "${t.spoken}" })`);
+    if (needs.length > 0) fill('needs', 'Needs', needs, needs.length, callSaid('get', { spoken: t.spoken }));
   }
 
   /* 5 WORKING HERE NOW: the lead first for a builder, then the others. A run in this tree or on this branch is warned of
      on the card (`clashLine`), never cut, and only there, so the text says it once. */
   const others = [...f.others].sort((a, z) => Number(z.role === 'lead') - Number(a.role === 'lead'));
-  if (others.length > 0) fill('here', 'Here now', others.map(otherLine), ROWS.here * times, calls.here ?? 'list({ register: "session", where: {"field":"state","is":"active"} })', { total: totals.here ?? 0 });
+  if (others.length > 0) fill('here', 'Here now', others.map(otherLine), ROWS.here * times, calls.here ?? callSaid('list', { register: 'session', where: { field: 'state', is: 'active' } }), { total: totals.here ?? 0 });
 
   /* 6 YOUR LANE: handed to this kind of agent first, then free. */
   const lane = [...f.lane].sort((a, z) => Number(z.mine) - Number(a.mine));
@@ -481,18 +530,18 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
   /* 6b NUMBERS: the key numbers it keeps here, stale ones first, then how to report one. */
   const kpis = [...(f.kpis ?? [])].sort((a, z) => Number(z.stale) - Number(a.stale));
   if (depth !== 'task' && kpis.length > 0)
-    fill('kpis', 'Numbers', kpis.map((k) => kpiLine(k, f.now)), ROWS.kpis * times, calls.kpis ?? `list({ register: "kpis", where: {"field":"owner","is":${JSON.stringify(f.agent && f.agent.trim() ? f.agent.trim() : 'claude')}} })`, { foot: KPI_HOW });
+    fill('kpis', 'Numbers', kpis.map((k) => kpiLine(k, f.now)), ROWS.kpis * times, calls.kpis ?? callSaid('list', { register: 'kpis', where: { field: 'owner', is: f.agent && f.agent.trim() ? f.agent.trim() : 'claude' } }), { foot: KPI_HOW });
 
   /* 7 DECIDED LATELY. */
   const decided = decidedLately(f.decided, f.now, Number.POSITIVE_INFINITY);
-  if (decided.length > 0) fill('decided', 'Decided', decided, ROWS.decided * times, calls.decided ?? 'governance({ state: "decided" })', { total: totals.decided ?? 0 });
+  if (decided.length > 0) fill('decided', 'Decided', decided, ROWS.decided * times, calls.decided ?? callSaid('governance', { register: 'decision' }), { total: totals.decided ?? 0 });
 
   /* 8 LEARNED HERE: after the one the card leads with. */
   if (depth !== 'task' && lessons.length > 1)
     fill('learned', 'Held', lessons.slice(1).map((l) => words(l, 100)), ROWS.learned * times, calls.learned ?? restCall('learnings'), { total: Math.max(0, (totals.learned ?? 0) - 1) });
 
   /* THE TEACHING LINES, once a run. */
-  if (f.first === true && (f.teach ?? []).length > 0) fill('teach', 'How', (f.teach ?? []).map(oneLine), (f.teach ?? []).length, 'context({ depth: "full" })');
+  if (f.first === true && (f.teach ?? []).length > 0) fill('teach', 'How', (f.teach ?? []).map(oneLine), (f.teach ?? []).length, callSaid('context', { depth: 'full' }));
 
   /* 9 ON REQUEST ONLY. */
   if (full && f.extra) {
@@ -570,7 +619,7 @@ export function factsFromContext(c: Context, at: FactsAt): ContextFacts {
       return { row, agent, name: typeof name === 'string' ? name : row.spoken };
     })
     .filter(({ agent }) => agent === '' || agent === me)
-    .map(({ row, agent, name }) => ({ name, spoken: row.spoken, version: row.version, state: row.state, mine: agent !== '' && agent === me }));
+    .map(({ row, agent, name }) => ({ name, spoken: row.spoken, version: row.version, state: row.state === null ? null : (tasks?.states?.[row.state] ?? row.state), mine: agent !== '' && agent === me }));
   const learnings = ((id) => (id === null ? undefined : c.registers.find((r) => r.id === id)))(listFor('learnings', c.registers));
   const learned: LessonFact[] = (learnings ? [...learnings.rows, ...learnings.inherited] : [])
     .filter((row) => row.state === null || row.state === 'active')

@@ -509,9 +509,30 @@ export function legacyRedirect(request: Request, legacy: string | undefined, pub
   const moved = unprefixed(path);
   const to = (rest: string) => new Response(null, { status: 308, headers: { location: `https://${home}${rest}${url.search}`, 'cache-control': 'no-store' } });
   if (host === home) return moved === null ? null : to(moved);
-  const hosts = (legacy ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
-  if (!hosts.includes(host) || !/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
+  if (!legacyHosts(legacy).includes(host) || !/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
   return to(moved ?? path);
+}
+
+/** The names in `LEGACY_HOSTS`, lower-cased, none empty. Unset or empty is none. */
+export const legacyHosts = (legacy: string | undefined): string[] =>
+  (legacy ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
+
+/**
+ * Where `/mcp`'s 401 sends a client for the protected resource's metadata (RFC 9728 §5.1): on the name the request
+ * reached, when that is the public host or one of `LEGACY_HOSTS`, and on the public host otherwise. `undefined` with no
+ * public host, so the 401 is a bare `Bearer`.
+ *
+ * THE CLIENT CHECKS THE METADATA'S `resource` AGAINST THE ADDRESS IT WAS GIVEN (RFC 9728 §3.3, the MCP SDK's
+ * `checkResourceAllowed`). A client set up with `https://brain.dog/mcp` that was sent to `app.brain.dog`'s metadata
+ * read `https://app.brain.dog/mcp` there and refused to sign in. Sent to `brain.dog`'s, it reads `https://brain.dog/mcp`
+ * (`serveOAuth` lists every legacy name as one of the resource's addresses), and the sign-in itself is the issuer's.
+ */
+export function mcpMetadataAt(request: Request, publicHost: string | undefined, legacy: string | undefined): string | undefined {
+  const home = (publicHost ?? '').trim().toLowerCase();
+  if (home === '') return undefined;
+  const reached = new URL(request.url).host.toLowerCase();
+  const name = legacyHosts(legacy).includes(reached) ? reached : home;
+  return `https://${name}/.well-known/oauth-protected-resource`;
 }
 
 /** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */

@@ -108,7 +108,7 @@ test('A SHORT SCOPE WAS `SCOPE_INSUFFICIENT`, A CODE IN NO REGISTRY, and it is `
    */
   const said = allows(token('read', 'owner'), 'write');
   assert.equal(said?.code, 'FORBIDDEN');
-  assert.equal(said?.fix, 'This needs write, and you have a read token on owner access. Ask the owner for a token with a wider scope.');
+  assert.equal(said?.fix, 'This changes the record, and this token only reads. Ask the owner for a token with a wider scope.');
   assert.deepEqual(said?.allowed, ['read']);
   assert.ok((REFUSAL_CODES as readonly string[]).includes(said?.code ?? ''), `${said?.code} is outside 30 §6`);
 
@@ -213,8 +213,8 @@ test('EXCEPT `append`, WHICH DOES NOT READ — the one rung that is not a prefix
 
 test('a refusal says what you have and what it needs, and lists what you may do', () => {
   const r = allows(token('read', 'owner'), 'write');
-  assert.match(r?.fix ?? '', /needs write/);
-  assert.match(r?.fix ?? '', /read token/);
+  assert.match(r?.fix ?? '', /changes the record/);
+  assert.match(r?.fix ?? '', /this token only reads/);
   assert.deepEqual(r?.allowed, ['read']);
 });
 

@@ -939,6 +939,16 @@ async function statuslineCommand(args: string[]): Promise<void> {
 async function hook(args: string[]): Promise<void> {
   const [which, ...more] = args;
   if (which === 'start') mark('loaded');
+  /* THE HOOK SCRIPTS BESIDE THE COMMAND, WRITTEN AT A START TOO (door audit D36): the Claude Code plugin hands its prompt,
+     tool, stop and beat hooks to them (`plugins/claude-code/hooks/run.sh`), and a machine that added the plugin and
+     never ran setup had none, so only its start and end ever ran. Three small files, the build's own. */
+  if (which === 'start' && more.length === 0) {
+    try {
+      hookScripts();
+    } catch {
+      /* A folder that cannot be written keeps the plugin's start and end, as before. */
+    }
+  }
   /*
    * THE PROMPT, TOOL AND STOP HOOKS (`inbox-file.ts`) READ ONE FILE AND SAY AT MOST ONE JSON LINE: no host, no git, no
    * budget to wait out, and nothing above it, because Claude Code reads that line as JSON. The watcher waits on the

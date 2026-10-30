@@ -113,7 +113,7 @@ test('A RUN WITHOUT THE ORDER ANSWERS NOTHING, and a run whose order names other
   /* NO ORDER AT ALL. */
   const none = refusal(await api.instructionsMine({ answer: a }, other));
   assert.equal(none.code, 'LEVEL_REQUIRED');
-  assert.match(none.fix, /Only he answers it, in BrainDog/u);
+  assert.match(none.fix, /Only the person answers it, in BrainDog/u);
 
   /* AN ORDER NAMING A, AND THE RUN ASKING FOR B. */
   await ordered(api, run, mine, [{ question: a, option: 'wait' }]);
@@ -180,7 +180,7 @@ test('"ACCEPT SG243" LETS THE RUN THAT TOOK IT ANSWER IT ONCE, AS HIS, said as h
   const told = await ordered(api, run, ctx, [{ question: a, option: 'accept' }], `accept ${a}`);
   /* THE RUN IS TOLD WHAT IT MAY ANSWER, and how. */
   const read = value<Mine>(await api.instructionsMine({}, ctx));
-  assert.match(read.lines.join(' '), new RegExp(`It lets you answer ${a} as he said, with instructions answer ${a}\\.`, 'u'));
+  assert.match(read.lines.join(' '), new RegExp(`It lets you answer ${a} as .+? said, with instructions answer ${a}\\.`, 'u'));
 
   const done = value<Mine>(await api.instructionsMine({ answer: a }, ctx));
   assert.equal(done.answered?.said, `Answered ${a} with accept, on Teodor's order (${told.id}).`);
