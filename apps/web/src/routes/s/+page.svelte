@@ -20,11 +20,15 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { AMOUNT_SPACE } from 'braindog-render';
+  import { AMOUNT_SPACE, parse } from 'braindog-render';
+  import { Block, Markdown } from 'braindog-render/svelte';
+  /* THE KINDS' AND THE CHARTS' SHEETS, as a declared page loads them (`PageView`), so a note's bar is bars here too. */
+  import '@braindog/skin/blocks-kinds.css';
+  import '@braindog/skin/blocks-charts.css';
   import { titleOf } from '$lib/title.ts';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { fieldSaid, readShared, words, type SharedBlock, type SharedColumn, type SharedRead } from '$lib/record/share-write.ts';
+  import { fieldSaid, readShared, words, type SharedRead } from '$lib/record/share-write.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Lockup from '$lib/ui/Lockup.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -38,7 +42,7 @@
     openOutside('https://brain.dog');
   };
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
-  import { cellSaid, figureSaid, headOf, plainSaid, pointSaid, takeShared, trendLine, type Said, type Where } from './reading.ts';
+  import { cellSaid, figureSaid, headOf, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Shown, type Where } from './reading.ts';
   import Sparkline from '$lib/viz/Sparkline.svelte';
 
   /* THE ONE WORD THIS SCREEN ADDS: the action under a dead link. The rest are `share-write.ts`'s. */
@@ -73,27 +77,24 @@
 
   /* THE RECORD'S CLOCK, LANGUAGE AND ZONE: "3d ago" is counted from when the owner's record was read, in its zone. */
   const where = $derived.by((): Where => {
-    if (got?.from !== 'live') return { language: 'en', zone: 'UTC', now };
+    if (got?.from !== 'live') return { language: 'en', zone: 'UTC', now, home: null };
     const t = got.page.read_at === null ? Number.NaN : Date.parse(got.page.read_at);
-    return { language: got.page.language, zone: got.page.zone, now: Number.isFinite(t) ? t : now };
+    return { language: got.page.language, zone: got.page.zone, now: Number.isFinite(t) ? t : now, home: got.page.home };
   });
 
   const head = $derived(got === null ? null : headOf(got));
 
-  /** The columns a block draws, or the one field each row keeps when the block named none. */
-  function columnsOf(b: SharedBlock): (SharedColumn & { label: string })[] {
-    if (b.columns.length > 0) return b.columns.map((c) => ({ ...c, label: c.label ?? fieldSaid(c.field) }));
-    const first = b.rows[0];
-    const field = first ? (Object.keys(first.cells)[0] ?? Object.keys(first.fields)[0]) : undefined;
-    return field === undefined ? [] : [{ field, label: fieldSaid(field) }];
-  }
+  /* WHAT THE PAGE DRAWS: its opening line under its name, and each block that has something to show (`shownBlocks`). */
+  const shown = $derived(got?.from === 'live' ? shownBlocks(got.page.blocks, where) : { lead: null, blocks: [] as Shown[] });
 
-  /** The owner's words, a paragraph to each blank line. */
-  const paragraphs = (body: string): string[] =>
-    body
-      .split(/\n\s*\n/u)
-      .map((p) => p.trim())
-      .filter((p) => p !== '');
+  /**
+   * THE OWNER'S NOTE, DRAWN AS THE APP DRAWS IT: the same parser and the same blocks a project's page uses, so a fence is
+   * its chart, its chips or its steps and never its source. A fence the renderer could not read is left out, since its
+   * source is for the owner to mend and not for whoever holds the link. Nothing in it links: the renderer draws a row or
+   * a day as a link only where it is handed where to, and here it is handed nothing.
+   */
+  const segmentsOf = (body: string) => parse(body, { page: true }).filter((s) => s.type !== 'degraded');
+  const opts = $derived({ now: where.now, zone: where.zone, home: where.home ?? null });
 </script>
 
 <svelte:head>
@@ -104,57 +105,62 @@
 </svelte:head>
 
 {#snippet value(s: Said)}
-  {#if 'money' in s}<span class="amount num">{s.money.lead}{s.money.whole}<span class="fraction">{s.money.fraction}</span>{#if s.money.iso}<span class="iso">{AMOUNT_SPACE}{s.money.iso}</span>{/if}</span>{:else}{s.text}{/if}
+  {#if 'money' in s}<span class="sum num">{s.money.lead}{s.money.whole}<span class="fraction">{s.money.fraction}</span>{#if s.money.iso}<span class="iso">{AMOUNT_SPACE}{s.money.iso}</span>{/if}</span>{:else}{s.text}{/if}
 {/snippet}
 
-{#snippet blockBody(b: SharedBlock)}
-  {@const cols = columnsOf(b)}
-  {#if b.refused}<p class="block-note">{b.refused}</p>{/if}
+{#snippet blockBody(s: Shown)}
+  {@const b = s.block}
+  {@const cols = s.columns}
+  {#if b.refused}<p class="part-note">{b.refused}</p>{/if}
   {#if b.body}
-    {#each paragraphs(b.body) as para, n (n)}<p class="block-body">{para}</p>{/each}
+    <div class="document note">
+      {#each segmentsOf(b.body) as segment, n (n)}
+        {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'markdown'}<Markdown {segment} {opts} />{/if}
+      {/each}
+    </div>
   {/if}
 
   {#if b.readings.length > 0}
-    <dl class="figures">
+    <dl class="figs">
       {#each b.readings as r, n (n)}
         {@const line = trendLine(r)}
-        <div class="figure">
-          <dt class="figure-label">{r.label ?? fieldSaid(r.metric)}</dt>
-          <dd class="figure-value num">{@render value(figureSaid(r, where))}</dd>
-          {#if line}<dd class="figure-trend"><Sparkline values={line} subject={r.label ?? fieldSaid(r.metric)} format={(n) => pointSaid(r, n, where)} /></dd>{/if}
+        <div class="fig">
+          <dt class="fig-label">{r.label ?? fieldSaid(r.metric)}</dt>
+          <dd class="fig-value num">{@render value(figureSaid(r, where))}</dd>
+          {#if line}<dd class="fig-trend"><Sparkline values={line} subject={r.label ?? fieldSaid(r.metric)} format={(n) => pointSaid(r, n, where)} /></dd>{/if}
         </div>
       {/each}
     </dl>
   {/if}
 
   {#if b.authored.length > 0}
-    <table class="rows">
+    <table class="sheet">
       <tbody>
         {#each b.authored as cells, n (n)}
-          <tr>{#each cells as c, k (k)}<td class="cell">{plainSaid(c, where)}</td>{/each}</tr>
+          <tr>{#each cells as c, k (k)}<td class="sheet-cell">{plainSaid(c, where)}</td>{/each}</tr>
         {/each}
       </tbody>
     </table>
   {/if}
 
-  {#if cols.length > 0 && b.rows.length > 0}
-    <table class="rows">
+  {#if cols.length > 0 && s.rows.length > 0}
+    <table class="sheet">
       <thead>
-        <tr>{#each cols as c (c.field)}<th class="head-cell" scope="col">{c.label}</th>{/each}</tr>
+        <tr>{#each cols as c (c.field)}<th class="sheet-head" scope="col">{c.label}</th>{/each}</tr>
       </thead>
       <tbody>
-        {#each b.rows as row, n (n)}
+        {#each s.rows as row, n (n)}
           <tr>
             {#each cols as c (c.field)}
-              <td class="cell" data-label={c.label}>{@render value(cellSaid(row, c, where))}</td>
+              <td class="sheet-cell" data-label={c.label}>{@render value(cellSaid(row, c, where))}</td>
             {/each}
           </tr>
         {/each}
       </tbody>
     </table>
-    {#if b.matched > b.rows.length}<p class="block-note">{words.sharedShowing(b.rows.length, b.matched)}</p>{/if}
-  {:else if b.rows.length === 0 && b.readings.length === 0 && b.authored.length === 0 && !b.body && b.empty}
-    <p class="block-note">{b.empty}</p>
+    {#if s.matched > s.rows.length}<p class="part-note">{words.sharedShowing(s.rows.length, s.matched)}</p>{/if}
+  {:else if s.rows.length === 0 && b.readings.length === 0 && b.authored.length === 0 && !b.body && b.empty}
+    <p class="part-note">{b.empty}</p>
   {/if}
 {/snippet}
 
@@ -188,18 +194,25 @@
     <article class="page" aria-labelledby="shared-title" lang={p.language}>
       <div class="head">
         <h1 class="title" id="shared-title">{head.title}</h1>
+        {#if shown.lead}<p class="lead">{shown.lead}</p>{/if}
         <p class="until">{head.line}</p>
       </div>
 
-      {#if p.empty}
-        <section class="block tile"><p class="block-body">{p.empty}</p></section>
+      {#if p.empty || shown.blocks.length === 0}
+        <section class="part tile"><p class="part-body">{p.empty ?? words.sharedNothing}</p></section>
       {:else}
         <div class="blocks">
-          {#each p.blocks as b, i (i)}
-            <section class="block tile" style:--span={b.span ?? 12} aria-labelledby={b.heading ? `shared-b${i}` : undefined}>
-              {#if b.heading}<h2 class="block-head" id="shared-b{i}">{b.heading}</h2>{/if}
-              {@render blockBody(b)}
-            </section>
+          {#each shown.blocks as s, i (i)}
+            {#if s.block.kind === 'section'}
+              <!-- A SECTION IS THE NAME OF WHAT FOLLOWS IT, as on the owner's page: a heading on the board, not a tile. -->
+              <h2 class="section-head">{s.block.heading}</h2>
+            {:else}
+              {@const b = s.block}
+              <section class="part tile" style:--span={b.span ?? 12} aria-labelledby={b.heading ? `shared-b${i}` : undefined} aria-label={b.heading ? undefined : copy.kindNames[b.kind]}>
+                {#if b.heading}<h2 class="part-head" id="shared-b{i}">{b.heading}</h2>{/if}
+                {@render blockBody(s)}
+              </section>
+            {/if}
           {/each}
         </div>
       {/if}
@@ -284,11 +297,64 @@
     text-wrap: balance;
   }
 
+  /* THE PAGE'S OPENING LINE, its owner's one sentence about it, under its name; when the link stops is quieter under it. */
+  .lead {
+    margin: 0;
+    max-inline-size: 68ch;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    line-height: 24px;
+    overflow-wrap: anywhere;
+  }
+
   .until {
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-head);
     line-height: 24px;
+  }
+
+  .lead + .until {
+    color: var(--ink-3);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  /* A SECTION'S NAME, on the board over the tiles it names, as the owner's page sets it. */
+  .section-head {
+    grid-column: 1 / -1;
+    margin: var(--sp-4) 0 0;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: 24px;
+  }
+
+  /* THE NOTE, AT A READING MEASURE: the renderer's blocks at the tile's width, its own headings under the tile's, never
+     over them, as a project's note is set on its row. */
+  .note {
+    display: grid;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    font-size: var(--fs-body);
+    line-height: 1.55;
+  }
+
+  .note :global(:is(p, ul, ol)) {
+    max-inline-size: 68ch;
+    margin: 0;
+  }
+
+  .note :global(:is(h1, h2, h3)) {
+    margin: var(--sp-3) 0 0;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    letter-spacing: 0;
+    line-height: 22px;
+  }
+
+  .note :global(:is(h1, h2, h3):first-child) {
+    margin-block-start: 0;
   }
 
   /* ── The blocks: flat tiles, radius 16, no border and no shadow ───────────────────────── */
@@ -299,7 +365,7 @@
     gap: var(--tile-gap);
   }
 
-  .block {
+  .part {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
@@ -314,7 +380,7 @@
     color: var(--ink);
   }
 
-  .block-head {
+  .part-head {
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-head);
@@ -323,7 +389,7 @@
     overflow-wrap: anywhere;
   }
 
-  .block-body {
+  .part-body {
     margin: 0;
     max-inline-size: 68ch;
     color: var(--ink-2);
@@ -333,7 +399,7 @@
     white-space: pre-line;
   }
 
-  .block-note {
+  .part-note {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
@@ -342,28 +408,28 @@
 
   /* ── Figures ──────────────────────────────────────────────────────────────────────────── */
 
-  .figures {
+  .figs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
     gap: var(--sp-5) var(--sp-4);
     margin: 0;
   }
 
-  .figure {
+  .fig {
     display: grid;
     align-content: start;
     gap: var(--sp-1);
     min-inline-size: 0;
   }
 
-  .figure-label {
+  .fig-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 18px;
   }
 
-  .figure-value {
+  .fig-value {
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-figure);
@@ -374,7 +440,7 @@
   }
 
   /* THE FIGURE'S TREND, UNDER ITS NUMBER: the app's own sparkline, at most its 120px and narrower in a narrow tile. */
-  .figure-trend {
+  .fig-trend {
     margin: var(--sp-1) 0 0;
     min-inline-size: 0;
   }
@@ -387,14 +453,14 @@
 
   /* ── Tables: hairlines between the rows and none round the table ──────────────────────── */
 
-  .rows {
+  .sheet {
     inline-size: 100%;
     border-collapse: collapse;
     font-size: var(--fs-body);
     line-height: 22px;
   }
 
-  .head-cell {
+  .sheet-head {
     padding: 0 var(--sp-3) var(--sp-2);
     border-block-end: 1px solid var(--rule);
     color: var(--ink-3);
@@ -403,24 +469,24 @@
     text-align: start;
   }
 
-  .cell {
+  .sheet-cell {
     padding: var(--sp-3);
     color: var(--ink);
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
 
-  .rows tr + tr .cell {
+  .sheet tr + tr .sheet-cell {
     border-block-start: 1px solid var(--rule);
   }
 
-  .head-cell:first-child,
-  .cell:first-child {
+  .sheet-head:first-child,
+  .sheet-cell:first-child {
     padding-inline-start: 0;
   }
 
-  .head-cell:last-child,
-  .cell:last-child {
+  .sheet-head:last-child,
+  .sheet-cell:last-child {
     padding-inline-end: 0;
   }
 
@@ -462,34 +528,50 @@
   /* BELOW 640px A ROW IS A STACK: each cell on its own line under its column's name, so a wide table never pushes the
      page sideways. */
   @media (width < 640px) {
-    .rows thead {
+    .sheet thead {
       display: none;
     }
 
-    .rows tr {
+    .sheet tr {
       display: grid;
       gap: var(--sp-2);
       padding-block: var(--sp-3);
     }
 
-    .rows tr + tr {
+    .sheet tr + tr {
       border-block-start: 1px solid var(--rule);
     }
 
-    .rows tr + tr .cell {
+    .sheet tr + tr .sheet-cell {
       border-block-start: 0;
     }
 
-    .cell {
+    .sheet-cell {
       padding: 0;
     }
 
-    .cell[data-label]::before {
+    .sheet-cell[data-label]::before {
       content: attr(data-label);
       display: block;
       color: var(--ink-3);
       font-size: var(--fs-meta);
       line-height: 18px;
+    }
+  }
+
+  /* A NOTE'S TIMELINE ON A PHONE: what happened under its title, not beside it, where a sentence of detail left the title
+     one letter and an ellipsis ("R…"). A timeline of amounts keeps its line on a wider screen. */
+  @media (width < 640px) {
+    .note :global(.list[data-kind='timeline'] > .item) {
+      grid-template-areas: 'marker title' '. detail';
+      grid-template-columns: 7ch minmax(0, 1fr);
+    }
+
+    .note :global(.list[data-kind='timeline'] > .item > .item-detail) {
+      color: var(--ink-2);
+      font-weight: var(--fw-regular);
+      text-align: start;
+      white-space: normal;
     }
   }
 
@@ -506,7 +588,7 @@
       grid-template-columns: repeat(12, minmax(0, 1fr));
     }
 
-    .block {
+    .part {
       grid-column: span var(--span);
     }
   }
