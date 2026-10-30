@@ -6,6 +6,7 @@
  * this file writes, because stderr ends up in an agent's logs.
  */
 
+import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -17,8 +18,19 @@ import type { Result } from '@braindog/ports';
 
 type Env = Record<string, string | undefined>;
 
-/** One bearer the hosts file keeps: a login's, or a runner's enrolment. */
-export type Held = { value: string; expires: string; label: string };
+/**
+ * One bearer the hosts file keeps: a login's, or a runner's enrolment.
+ *
+ * `from`, ON AN AGENT'S TOKEN ALONE, is `keyPrint` of the owner key in `BRAINDOG_TOKEN` it was made with (a self-host's
+ * server key): while that same key is set, the agent sends its own token rather than the key (`target`).
+ */
+export type Held = { value: string; expires: string; label: string; from?: string };
+
+/**
+ * A short one-way print of a key, to know it again without keeping it: the first 16 hex of its SHA-256. The key is
+ * long and random, so the print says nothing of it, and nothing on disk can be turned back into it.
+ */
+export const keyPrint = (key: string): string => createHash('sha256').update(key).digest('hex').slice(0, 16);
 
 /** `docs/48-SPEC-CLI.md` §4.1, with the vault grants of the plan's §2.3. */
 export type HostsFile = {
@@ -170,7 +182,12 @@ export const sameHost = (written: string, key: string) => {
   }
 };
 
-export type Target = { key: string; base: string; token?: string };
+/**
+ * Where a command goes and the bearer it sends. `from` says where that bearer came from, so a refusal can say what to
+ * change: `env` for `BRAINDOG_TOKEN`, `agent` for the token `braindog setup` made for this agent, `login` for this
+ * machine's login. No `from` is no bearer at all.
+ */
+export type Target = { key: string; base: string; token?: string; from?: 'env' | 'agent' | 'login' };
 
 /**
  * The host and its bearer. `--host` beats `BRAINDOG_HOST`, which beats the file's `default`;
@@ -193,10 +210,26 @@ export function target(flag: string | undefined, env: Env, file: string, now: nu
   if (inTheClear(url))
     throw new Error(`${key} is http, not https. BrainDog sends a token only over https, except to this machine.`);
 
-  let token = env.BRAINDOG_TOKEN || undefined;
-  if (!token && agent !== undefined) {
-    const own = Object.entries(read().hosts).find(([written]) => sameHost(written, key))?.[1]?.agents?.[agent];
-    if (isObject(own) && typeof own.value === 'string' && own.value && Date.parse(String(own.expires)) > now) token = own.value;
+  const sent = env.BRAINDOG_TOKEN || undefined;
+  let token = sent;
+  let from: Target['from'] = sent ? 'env' : undefined;
+  /*
+   * THE AGENT'S OWN TOKEN, and under `BRAINDOG_TOKEN` only one made from that very key (`from`): a self-host's server key
+   * there is the owner, a person and never a run, so an agent sending it could not hand off or read what it was told.
+   * `setup` and `mcp` make the agent its token from the key (`mintFromKey` in `setup.ts`). A hosts file that does not
+   * read is no agent token here, as it was no question while the variable won outright.
+   */
+  if (agent !== undefined) {
+    let own: Held | undefined;
+    try {
+      own = Object.entries(read().hosts).find(([written]) => sameHost(written, key))?.[1]?.agents?.[agent];
+    } catch (e) {
+      if (!sent) throw e;
+    }
+    if (isObject(own) && typeof own.value === 'string' && own.value !== '' && Date.parse(String(own.expires)) > now && (!sent || own.from === keyPrint(sent))) {
+      token = own.value;
+      from = 'agent';
+    }
   }
   if (!token) {
     const entry = Object.entries(read().hosts).find(([written]) => sameHost(written, key))?.[1]?.token;
@@ -204,9 +237,44 @@ export function target(flag: string | undefined, env: Env, file: string, now: nu
       const until = typeof entry.expires === 'string' ? Date.parse(entry.expires) : Number.NaN;
       if (until <= now) throw new Error(`The login to ${key} expired on ${String(entry.expires).slice(0, 10)}. Run braindog login ${key}.`);
       token = entry.value;
+      from = 'login';
     }
   }
-  return { key, base: url.origin, ...(token ? { token } : {}) };
+  return { key, base: url.origin, ...(token ? { token } : {}), ...(token && from ? { from } : {}) };
+}
+
+/**
+ * The sentence a command says when the host refuses its bearer (a `401`), by where the bearer came from.
+ *
+ * THE HOST SAYS ONLY `unauthorized`, ON PURPOSE (`12 §5`): it cannot tell a stranger which of a wrong key, a revoked
+ * one and an address with no BrainDog behind it this was. This side knows what it sent, so it says what to change. It
+ * never names a token's value, only where it was read from.
+ */
+export function refusedFix(to: Pick<Target, 'key' | 'from'>): string {
+  const { key } = to;
+  if (to.from === 'env') return `${key} does not take the token in BRAINDOG_TOKEN. Replace it, or unset it and run braindog login ${key}.`;
+  if (to.from === 'agent') return `${key} no longer takes the token braindog setup made for this agent. Run braindog logout ${key}, then braindog setup ${key}.`;
+  if (to.from === 'login') return `${key} did not take this machine's login: it was signed out, or there is no BrainDog at that address. Run braindog login ${key}.`;
+  return `${key} needs a sign-in, and this machine holds none for it. Run braindog login ${key}, or set BRAINDOG_TOKEN.`;
+}
+
+/**
+ * A `401` with the host's `UNAUTHORIZED`, its fix replaced by `refusedFix`'s sentence; any other answer as it came.
+ * The body is read only for a 401, so nothing else waits on it.
+ */
+export async function withRefusedFix(res: Response, to: Pick<Target, 'key' | 'from'>): Promise<Response> {
+  if (res.status !== 401) return res;
+  let body: unknown;
+  try {
+    body = await res.clone().json();
+  } catch {
+    return res;
+  }
+  if (!isObject(body) || !isObject(body.refusal) || body.refusal.code !== 'UNAUTHORIZED') return res;
+  const refusal = body.refusal;
+  const headers = new Headers(res.headers);
+  headers.delete('content-length');
+  return new Response(JSON.stringify({ ...body, refusal: { ...refusal, fix: refusedFix(to), at: refusal.at ?? 'authorization' } }), { status: 401, statusText: res.statusText, headers });
 }
 
 /**
@@ -225,7 +293,8 @@ export function clientFor(to: Target, headers: () => Promise<Record<string, stri
       /* EVERY CALL SAYS THE COMMAND'S BUILD, the ones that send no session headers too. */
       sent.set('x-braindog-cli', cliBuild());
       for (const [name, value] of Object.entries(await headers())) sent.set(name, value);
-      return fetch(input, { ...init, headers: sent, signal, redirect: 'error' });
+      /* A 401 SAYS WHAT TO CHANGE HERE, since the host says only `unauthorized` (`refusedFix`). */
+      return withRefusedFix(await fetch(input, { ...init, headers: sent, signal, redirect: 'error' }), to);
     },
   });
 }

@@ -72,7 +72,7 @@ import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
 import { runner } from './runner.ts';
 import { service } from './runner-service.ts';
-import { setup } from './setup.ts';
+import { agentTokenFromKey, setup } from './setup.ts';
 import { tools } from './tools.ts';
 import { tokenCommand } from './token.ts';
 import { update } from './update.ts';
@@ -608,6 +608,15 @@ async function mcp(args: string[]): Promise<void> {
     process.exitCode = 1;
     setTimeout(() => process.exit(1), 1_000).unref();
     return;
+  }
+  /* THE SELF-HOST'S SERVER KEY IN BRAINDOG_TOKEN IS THE OWNER, a person and never a run, so an agent sending it could not
+     hand off, log to its run or read what it was told (D4). The agent sends a token of its own instead, made from the key
+     as `token create` makes one, with no approval, and kept for the next start (`agentTokenFromKey`). A token there is
+     refused the mint, and is sent as it always was. */
+  const speaks = agent ?? agentOf(process.env);
+  if (to.from === 'env' && speaks !== undefined) {
+    const own = await agentTokenFromKey(to.key, speaks, hostsPath(process.env), { env: process.env, signal: AbortSignal.timeout(5_000) }).catch(() => null);
+    if (own !== null) to = { ...to, token: own, from: 'agent' };
   }
   /* Started now and awaited by the first request, so git runs while the client is still saying hello. */
   const where = positionOf(process.cwd());

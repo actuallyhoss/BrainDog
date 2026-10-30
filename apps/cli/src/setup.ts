@@ -48,7 +48,7 @@ import { parseArgs } from 'node:util';
 import { unbom } from './unbom.ts';
 import { applyCodexHooks, planCodexHooks } from './clients/codex-hooks.ts';
 import { CLIENTS, type Client } from './clients/index.ts';
-import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target, type Held } from './http.ts';
+import { hostKey, hostsPath, keyPrint, readHosts, sameHost, saveHosts, target, type Held } from './http.ts';
 import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, keepCopy, PLACES_SKILL, serversFileOf } from './install.ts';
 import { keepPin, pinOf, pinsFile, readPins } from './pins.ts';
 import { placeStatusLine, statusLineEntry, statusLineIn } from './statusline-place.ts';
@@ -207,6 +207,19 @@ function defaultElsewhere(key: string, file: string): boolean {
     const hosts = readHosts(file);
     const kept = Object.entries(hosts.hosts).some(([written, held]) => sameHost(written, key) && held.token !== undefined);
     return kept && (hosts.default === undefined || !sameHost(hosts.default, key));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the hosts file's default is some other host or none, for a run whose bearer is `BRAINDOG_TOKEN`: the file
+ * then may hold no login at all, and the default is still what the MCP server and the hooks reach.
+ */
+function defaultNot(key: string, file: string): boolean {
+  try {
+    const hosts = readHosts(file);
+    return hosts.default === undefined || !sameHost(hosts.default, key);
   } catch {
     return false;
   }
@@ -411,8 +424,12 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
 
   /* ── 1. sign in ──────────────────────────────────────────────────────── */
   const held = loginHeld(key, io.env, file);
+  /* BRAINDOG_TOKEN IS NO LOGIN HELD BY THIS MACHINE, and was said as one: with the self-host's server key there, the
+     hosts file stayed empty and the step said a login was held. It is said as what it is, and the host still becomes the
+     default, since the MCP server and the hooks name none and may not see the variable. */
+  const fromEnv = held && Boolean(io.env.BRAINDOG_TOKEN);
   if (held) {
-    const moves = defaultElsewhere(key, file);
+    const moves = fromEnv ? defaultNot(key, file) : defaultElsewhere(key, file);
     if (moves && !dryRun) {
       try {
         const hosts = readHosts(file);
@@ -425,11 +442,8 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
       }
       changed = true;
     }
-    io.out(
-      `1. Sign-in: this machine already holds a login to ${key}, so none was asked for${
-        moves ? `, and ${key} ${dryRun ? 'would become' : 'is now'} the host the MCP server and the hooks reach` : ''
-      }.`,
-    );
+    const reach = moves ? `, and ${key} ${dryRun ? 'would become' : 'is now'} the host the MCP server and the hooks reach` : '';
+    io.out(fromEnv ? `1. Sign-in: BRAINDOG_TOKEN is set, so no login was asked for${reach}.` : `1. Sign-in: this machine already holds a login to ${key}, so none was asked for${reach}.`);
   } else if (dryRun) {
     io.out(`1. Sign-in: this machine holds no login to ${key}, so setup would ask for one, with six digits to approve in the app.`);
   } else {
@@ -736,30 +750,84 @@ export const AGENT_TOKEN_DAYS = 90;
 export type MintAgent = (key: string, label: string, io: SetupIo) => Promise<Held | string>;
 
 /**
- * The real mint: the owner approves one `createToken` in the app with six digits (`approveOperation`, the `token`
- * reach, spent on its first use), and the record makes a `write` token with the agent's label for ninety days. His
- * settings row for the agent narrows it from there, and only he changes that row, in the app.
+ * What `mintAgent` answers when `BRAINDOG_TOKEN` was refused the mint: it holds a token, not an owner's key, so nothing
+ * is made and nothing is asked (a token sent first would be sent before the agent's own in any case).
  */
-export const mintAgent: MintAgent = async (key, label, io) => {
-  const grant = await approveOperation(key, 'token', { say: io.say, signal: io.signal, label });
-  if (typeof grant === 'number') return 'the approval in the app did not finish';
+export const NOT_AN_OWNER_KEY = 'BRAINDOG_TOKEN holds a token rather than the server key';
+
+/** One `createToken` with this bearer: the token made, or the refusal's code and sentence, or `null` for no answer. */
+async function createWith(key: string, bearer: string, label: string, signal: AbortSignal | undefined): Promise<Held | { code: string; fix: string } | null> {
   let res: Response;
   try {
     /* A REDIRECT IS REFUSED, not followed, for `clientFor`'s reason, and the error is never quoted: it could hold the bearer. */
     res = await fetch(`${new URL(key).origin}/api/createToken`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${grant.bearer}` },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
       body: JSON.stringify({ scope: 'write', label, days: AGENT_TOKEN_DAYS }),
       redirect: 'error',
-      signal: io.signal ? AbortSignal.any([io.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
   } catch {
-    return `${key} did not answer`;
+    return null;
   }
-  const said = (await res.json().catch(() => null)) as { ok?: unknown; value?: { bearer?: unknown; expires_at?: unknown }; refusal?: { fix?: unknown } } | null;
+  const said = (await res.json().catch(() => null)) as { ok?: unknown; value?: { bearer?: unknown; expires_at?: unknown }; refusal?: { code?: unknown; fix?: unknown } } | null;
   if (said?.ok === true && typeof said.value?.bearer === 'string' && typeof said.value.expires_at === 'string') return { value: said.value.bearer, expires: said.value.expires_at, label };
-  return typeof said?.refusal?.fix === 'string' ? said.refusal.fix : `${key} answered in a way this command does not recognise`;
+  return { code: typeof said?.refusal?.code === 'string' ? said.refusal.code : '', fix: typeof said?.refusal?.fix === 'string' ? said.refusal.fix : `${key} answered in a way this command does not recognise` };
+}
+
+/**
+ * The real mint, for a `write` token with the agent's label for ninety days. His settings row for the agent narrows it
+ * from there, and only he changes that row, in the app.
+ *
+ * WITH `BRAINDOG_TOKEN` SET, FROM IT AND WITH NO APPROVAL, as `token create` mints (D4): a self-host's server key is the
+ * owner, so the record makes the token, which keeps `from`, the key's print, for `target` to send it while that key is
+ * set. A token there is refused the mint (`NOT_AN_OWNER_KEY`). Otherwise the owner approves one `createToken` in the app
+ * with six digits (`approveOperation`, the `token` reach, spent on its first use).
+ */
+export const mintAgent: MintAgent = async (key, label, io) => {
+  const sent = io.env.BRAINDOG_TOKEN || undefined;
+  if (sent !== undefined) {
+    const made = await createWith(key, sent, label, io.signal);
+    if (made === null) return `${key} did not answer`;
+    return 'value' in made ? { ...made, from: keyPrint(sent) } : NOT_AN_OWNER_KEY;
+  }
+  const grant = await approveOperation(key, 'token', { say: io.say, signal: io.signal, label });
+  if (typeof grant === 'number') return 'the approval in the app did not finish';
+  const made = await createWith(key, grant.bearer, label, io.signal);
+  if (made === null) return `${key} did not answer`;
+  return 'value' in made ? made : made.fix;
 };
+
+/**
+ * An agent's token for `braindog mcp` started under `BRAINDOG_TOKEN` (D4): the one kept for this agent and this key when
+ * it is live, else one made from the key and kept, or `null` when the key is a token or the host did not answer, and
+ * the server then sends the key as it always did. One request at most, and only while no token is kept.
+ */
+export async function agentTokenFromKey(key: string, agent: string, file: string, io: { env: Record<string, string | undefined>; signal?: AbortSignal | undefined }): Promise<string | null> {
+  const sent = io.env.BRAINDOG_TOKEN || undefined;
+  if (sent === undefined) return null;
+  const kind = agentKindOf(agent);
+  const keptNow = (): string | null => {
+    try {
+      const own = Object.entries(readHosts(file).hosts).find(([written]) => sameHost(written, key))?.[1]?.agents?.[kind];
+      return own !== undefined && own.from === keyPrint(sent) && Date.parse(own.expires) > Date.now() + 86_400_000 ? own.value : null;
+    } catch {
+      return null;
+    }
+  };
+  const kept = keptNow();
+  if (kept !== null) return kept;
+  const made = await createWith(key, sent, `${await machineName()} · ${AGENT_TITLE[kind] ?? kind}`, io.signal);
+  if (made === null || !('value' in made)) return null;
+  /* ANOTHER SESSION MAY HAVE KEPT ONE MEANWHILE: theirs is kept, and this one is sent this once. */
+  if (keptNow() !== null) return made.value;
+  try {
+    keepAgent(file, key, kind, { ...made, from: keyPrint(sent) });
+  } catch {
+    /* Not kept, so the next start makes another; this session still has its own. */
+  }
+  return made.value;
+}
 
 /** An agent's own token, kept under its host beside the login, read again just before the write as `keepRunner` does. */
 function keepAgent(file: string, key: string, agent: string, held: Held): void {
@@ -772,9 +840,10 @@ function keepAgent(file: string, key: string, agent: string, held: Held): void {
 /**
  * Step 6: a token of its own for each kind of agent this run wired that has none live, each approved in the app, so a
  * settings row can bind to it and an agent is told apart by its key rather than by what it says it is. The hooks, the
- * MCP server and the commands its shell runs send it (`target` in `http.ts`). Nothing is made under `BRAINDOG_TOKEN`,
- * which every command sends before any agent's own, or on a dry run. The machine's own login is left as it is:
- * rotating it is his to do in Settings.
+ * MCP server and the commands its shell runs send it (`target` in `http.ts`). Under `BRAINDOG_TOKEN` each is made from
+ * that key with no approval when it is a self-host's server key, and none when it is a token, which every command sends
+ * before any agent's own. Nothing is made on a dry run. The machine's own login is left as it is: rotating it is his to
+ * do in Settings.
  */
 export async function agentTokens(apps: Client[], key: string, file: string, dryRun: boolean, io: SetupIo): Promise<{ changed: boolean; failed: boolean }> {
   const kinds = [...new Set(apps.map((c) => agentKindOf(c.id)))];
@@ -783,10 +852,8 @@ export async function agentTokens(apps: Client[], key: string, file: string, dry
     io.out('6. Tokens: no agent was wired here, so no token was made.');
     return { changed: false, failed: false };
   }
-  if (io.env.BRAINDOG_TOKEN) {
-    io.out('6. Tokens: BRAINDOG_TOKEN is set, and every command sends it before an agent\'s own, so no token was made for each agent.');
-    return { changed: false, failed: false };
-  }
+  /* UNDER BRAINDOG_TOKEN, ONLY A TOKEN MADE FROM THAT KEY COUNTS (`target` sends no other while it is set). */
+  const sent = io.env.BRAINDOG_TOKEN || undefined;
   let held: Record<string, Held> = {};
   try {
     held = Object.entries(readHosts(file).hosts).find(([written]) => sameHost(written, key))?.[1]?.agents ?? {};
@@ -794,14 +861,19 @@ export async function agentTokens(apps: Client[], key: string, file: string, dry
     /* A hosts file that does not read holds no token; making one below says what is wrong with it. */
   }
   /* LIVE FOR A WEEK MORE, so a token about to lapse is made again now rather than mid-session. */
-  const live = (k: string) => typeof held[k]?.value === 'string' && Date.parse(String(held[k]?.expires)) > Date.now() + 7 * 86_400_000;
+  const live = (k: string) =>
+    typeof held[k]?.value === 'string' && Date.parse(String(held[k]?.expires)) > Date.now() + 7 * 86_400_000 && (sent === undefined || held[k]?.from === keyPrint(sent));
   const owed = kinds.filter((k) => !live(k));
   if (owed.length === 0) {
     io.out(`6. Tokens: ${titles(kinds)} already ${kinds.length === 1 ? 'has a token' : 'have a token each'} of ${kinds.length === 1 ? 'its' : 'their'} own.`);
     return { changed: false, failed: false };
   }
   if (dryRun) {
-    io.out(`6. Tokens: a token of its own would be made for ${titles(owed)}, each approved in the app with six digits.`);
+    io.out(
+      sent === undefined
+        ? `6. Tokens: a token of its own would be made for ${titles(owed)}, each approved in the app with six digits.`
+        : `6. Tokens: BRAINDOG_TOKEN is set. When it is the self-host's server key, a token of its own would be made from it for ${titles(owed)}; when it is a token, none would be.`,
+    );
     return { changed: false, failed: false };
   }
   const device = await machineName();
@@ -811,9 +883,14 @@ export async function agentTokens(apps: Client[], key: string, file: string, dry
     const title = AGENT_TITLE[kind] ?? kind;
     const label = `${device} · ${title}`;
     const made = await (io.mint ?? mintAgent)(key, label, io);
+    /* A TOKEN IN BRAINDOG_TOKEN IS SENT BEFORE ANY AGENT'S OWN, so none is made, and that is no failure. */
+    if (made === NOT_AN_OWNER_KEY) {
+      io.out(`6. Tokens: ${NOT_AN_OWNER_KEY}, and every command sends it before an agent's own, so no token was made for each agent.`);
+      return { changed, failed };
+    }
     if (typeof made === 'string') {
       failed = true;
-      io.out(`6. Tokens, ${title}: no token was made, so it keeps this machine's login: ${made.replace(/\.$/u, '')}.`);
+      io.out(`6. Tokens, ${title}: no token was made, so it keeps ${sent === undefined ? "this machine's login" : 'sending BRAINDOG_TOKEN'}: ${made.replace(/\.$/u, '')}.`);
       continue;
     }
     try {
@@ -825,7 +902,7 @@ export async function agentTokens(apps: Client[], key: string, file: string, dry
       continue;
     }
     changed = true;
-    io.out(`6. Tokens, ${title}: it has a token of its own, ${label}, until ${made.expires.slice(0, 10)}. Sessions started from now on use it.`);
+    io.out(`6. Tokens, ${title}: it has a token of its own, ${label}, until ${made.expires.slice(0, 10)}${sent === undefined ? '' : ', made from the key in BRAINDOG_TOKEN'}. Sessions started from now on use it.`);
   }
   return { changed, failed };
 }

@@ -21,11 +21,11 @@ import { join } from 'node:path';
 
 import { CLIENTS, type Client } from '../src/clients/index.ts';
 import { claudeDesktopFolder, vscodeUserFolder } from '../src/clients/others.ts';
-import { hostKey, readHosts, saveHosts, target } from '../src/http.ts';
+import { hostKey, keyPrint, readHosts, saveHosts, target } from '../src/http.ts';
 import { HOOK_STATUS, keepCopy } from '../src/install.ts';
 import { logout } from '../src/logout.ts';
 import { LAUNCH } from '../../site/src/lib/launch.ts';
-import { PLUGIN_LINE, REPO_PUBLIC, agentKindOf, agentTokens, profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
+import { NOT_AN_OWNER_KEY, PLUGIN_LINE, REPO_PUBLIC, agentKindOf, agentTokens, profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
 import { keepPin, pinOf, pinsFile } from '../src/pins.ts';
 import { renderEntry } from '../src/tools.ts';
 
@@ -473,11 +473,23 @@ test('STEP 6 MAKES ONE TOKEN PER KIND OF AGENT WIRED, keeps it beside the login,
   assert.deepEqual(await agentTokens(apps, key, file, false, m.io), { changed: false, failed: false });
   assert.match(m.out[0]!, /^6\. Tokens: Claude Code, Codex and other apps already have a token each of their own\.$/u);
 
-  /* UNDER BRAINDOG_TOKEN, AND ON A DRY RUN, NOTHING IS MADE. */
-  m.io.mint = async () => assert.fail('a token was made');
+  /* UNDER BRAINDOG_TOKEN HOLDING A TOKEN, NOTHING IS MADE, AND THAT IS NO FAILURE. */
+  m.io.mint = async () => NOT_AN_OWNER_KEY;
   m.out.length = 0;
-  await agentTokens(apps, key, file, false, { ...m.io, env: { ...env, BRAINDOG_TOKEN: 'x' } });
-  assert.match(m.out[0]!, /^6\. Tokens: BRAINDOG_TOKEN is set/u);
+  assert.deepEqual(await agentTokens(apps, key, file, false, { ...m.io, env: { ...env, BRAINDOG_TOKEN: 'x' } }), { changed: false, failed: false });
+  assert.match(m.out[0]!, /^6\. Tokens: BRAINDOG_TOKEN holds a token rather than the server key/u);
+
+  /* UNDER THE SELF-HOST'S SERVER KEY (D4), EACH AGENT GETS A TOKEN MADE FROM IT, and a command inside Claude Code sends
+     that token while the same key is set, so the agent is a run and not the owner. */
+  m.io.mint = async (_key, label) => ({ value: 'bd_from_server_key_never_printed', expires: '2099-01-01T00:00:00Z', label, from: keyPrint('server-key') });
+  m.out.length = 0;
+  assert.deepEqual(await agentTokens(apps, key, file, false, { ...m.io, env: { ...env, BRAINDOG_TOKEN: 'server-key' } }), { changed: true, failed: false });
+  assert.ok(m.out.every((l) => l.includes('made from the key in BRAINDOG_TOKEN')), m.out.join('\n'));
+  assert.equal(target(key, { BRAINDOG_TOKEN: 'server-key', CLAUDECODE: '1' }, file).token, 'bd_from_server_key_never_printed');
+  assert.equal(target(key, { BRAINDOG_TOKEN: 'server-key', CLAUDECODE: '1' }, file).from, 'agent');
+  assert.equal(target(key, { BRAINDOG_TOKEN: 'another-key', CLAUDECODE: '1' }, file).token, 'another-key', 'a token made from one key was sent for another');
+  assert.equal(target(key, { BRAINDOG_TOKEN: 'server-key' }, file).token, 'server-key', 'a person at a terminal still sends the key');
+  assert.ok(!readFileSync(file, 'utf8').includes('server-key'), 'the key itself was kept');
   rmSync(file);
   m.out.length = 0;
   await agentTokens(apps, key, file, true, m.io);

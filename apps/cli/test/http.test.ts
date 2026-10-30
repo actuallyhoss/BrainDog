@@ -96,8 +96,8 @@ test('the host is --host, then BRAINDOG_HOST, then the default; the token is BRA
       'https://b.example': { token: { value: 'token-b', expires: LATER, label: 'b' } },
     },
   });
-  assert.deepEqual(target(undefined, {}, file), { key: 'https://a.example', base: 'https://a.example', token: 'token-a' });
-  assert.deepEqual(target(undefined, { BRAINDOG_HOST: 'b.example' }, file), { key: 'https://b.example', base: 'https://b.example', token: 'token-b' });
+  assert.deepEqual(target(undefined, {}, file), { key: 'https://a.example', base: 'https://a.example', token: 'token-a', from: 'login' });
+  assert.deepEqual(target(undefined, { BRAINDOG_HOST: 'b.example' }, file), { key: 'https://b.example', base: 'https://b.example', token: 'token-b', from: 'login' });
   assert.equal(target('a.example', { BRAINDOG_HOST: 'b.example' }, file).token, 'token-a');
   assert.equal(target(undefined, { BRAINDOG_TOKEN: 'from-env' }, file).token, 'from-env');
   /* A host the file does not know is still a host, and a self-host with no token answers its own machine. */
@@ -105,7 +105,7 @@ test('the host is --host, then BRAINDOG_HOST, then the default; the token is BRA
   /* With both from the environment the file is never opened, so a broken one does not matter. */
   assert.equal(target(undefined, { BRAINDOG_HOST: 'a.example', BRAINDOG_TOKEN: 'x' }, join(file, 'not-a-file')).token, 'x');
   /* The slug stays in the key and leaves the address: the token says which record. */
-  assert.deepEqual(target('https://app.brain.dog/acme', { BRAINDOG_TOKEN: 'x' }, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: 'x' });
+  assert.deepEqual(target('https://app.brain.dog/acme', { BRAINDOG_TOKEN: 'x' }, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: 'x', from: 'env' });
 });
 
 test('THE APP\'S OLD ADDRESS FOR A RECORD, /app/<slug>, IS THE SAME HOST AS /<slug>', (t) => {
@@ -122,7 +122,7 @@ test('THE APP\'S OLD ADDRESS FOR A RECORD, /app/<slug>, IS THE SAME HOST AS /<sl
   /* The token a login kept under `/acme` is the one a command pointed at `/app/acme` sends, and the slug never reaches the address. */
   const file = scratch(t);
   saveHosts(file, { hosts: { 'https://app.brain.dog/acme': { token: { value: TOKEN, expires: LATER, label: 'a' } } } });
-  assert.deepEqual(target('https://app.brain.dog/app/acme', {}, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: TOKEN });
+  assert.deepEqual(target('https://app.brain.dog/app/acme', {}, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: TOKEN, from: 'login' });
 });
 
 test('BRAIN.DOG IS THE SITE NOW, SO A RECORD WRITTEN THERE IS THE SAME RECORD ON app.brain.dog', (t) => {
@@ -135,7 +135,7 @@ test('BRAIN.DOG IS THE SITE NOW, SO A RECORD WRITTEN THERE IS THE SAME RECORD ON
   assert.equal(hostKey('https://notbrain.dog/acme'), 'https://notbrain.dog/acme', 'only the two names the site holds move');
   const file = scratch(t);
   saveHosts(file, { default: 'https://brain.dog/acme', hosts: { 'https://brain.dog/acme': { token: { value: TOKEN, expires: LATER, label: 'a' } } } });
-  assert.deepEqual(target(undefined, {}, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: TOKEN });
+  assert.deepEqual(target(undefined, {}, file), { key: 'https://app.brain.dog/acme', base: 'https://app.brain.dog', token: TOKEN, from: 'login' });
   assert.ok(sameHost('https://brain.dog/acme', 'https://app.brain.dog/acme'));
   assert.ok(sameHost('https://app.brain.dog/app/acme', 'https://app.brain.dog/acme'));
 });
