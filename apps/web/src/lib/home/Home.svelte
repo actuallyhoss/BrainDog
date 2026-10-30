@@ -402,7 +402,10 @@
   const HOME_COPY = 'Home';
   /** How long the copy waits for the desk to land beside the page before it is kept without it. */
   const DESK_WAIT_MS = 5_000;
-  const copyKey = (slug: string | null): string => JSON.stringify([apiBase(), slug]);
+  /* A PHONE KEEPS ITS OWN, read without the widgets it hides (`phoneOnly`), so a wider screen never opens on it. */
+  const copyKey = (slug: string | null, onPhone: boolean): string => JSON.stringify([apiBase(), slug, ...(onPhone ? ['phone'] : [])]);
+  /** Whether an answer was read without the widgets the phone hides (`phone-ask.ts`). */
+  const isPhoneOnly = (o: Opened | null): boolean => o?.from === 'live' && (o.page.page as { phoneOnly?: unknown }).phoneOnly === true;
   let fromCopy = $state(false);
   /** Whether the copy drew this open: the reads behind it are quiet, as the ones behind what the tab drew are. */
   let copyDrawn = false;
@@ -486,7 +489,7 @@
       void Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/plain.ts')])
         .then(([m, p]) => {
           const revive = (near: Near<unknown>): Near<CopyBody> => ({ ...near, value: p.revivedOf<CopyBody>(near.value) });
-          return m.nearLocal<unknown>(HOME_COPY, copyKey(slug), apiBase(), (late) => void drawCopy(slug, revive(late))).then((near) => (near ? revive(near) : null));
+          return m.nearLocal<unknown>(HOME_COPY, copyKey(slug, narrow.current), apiBase(), (late) => void drawCopy(slug, revive(late))).then((near) => (near ? revive(near) : null));
         })
         .then(async (near) => {
           if (near) await drawCopy(slug, near);
@@ -520,7 +523,7 @@
       }
       if (readerOf() !== reader) return;
       const kept: CopyBody = { got: out, news: said, handled: untrack(() => handled) };
-      tab.keepLocal(HOME_COPY, copyKey(slug), [l.EVERY, ...lists], p.plainOf(kept), ticket, {}, { always: true });
+      tab.keepLocal(HOME_COPY, copyKey(slug, isPhoneOnly(out) || untrack(() => narrow.current)), [l.EVERY, ...lists], p.plainOf(kept), ticket, {}, { always: true });
     });
   }
   /* THE LISTS THE COPY PUT BACK ARE ASKED AGAIN once Today has drawn, off its path, and Today reads again if one moved. */
@@ -997,11 +1000,13 @@
   /* THE BOARD'S PHONE, two columns under 720px as `Board.svelte` lays it out, which asks Today without what it hides. */
   const narrow = new MediaQuery('(width < 720px)', false);
   /** Whether Today was read without the widgets the phone hides (`phone-ask.ts`). */
-  const phoneOnly = $derived(got?.from === 'live' && (got.page.page as { phoneOnly?: unknown }).phoneOnly === true);
+  const phoneOnly = $derived(isPhoneOnly(got));
   /* AND READ AGAIN WHOLE where they are wanted: the board wider than a phone, or the editor, where a hidden widget is
      taken out of the tray. Read quietly over what is drawn, as a new version is. */
   $effect(() => {
     if (!phoneOnly || (narrow.current && !boardModel.editing && !boardModel.phoneView)) return;
+    /* NOT OVER A READ STILL OUT, which asks whole too and moves `got` when it lands, so this is asked again then if need be. */
+    if (reading) return;
     untrack(() => void reread());
   });
 
