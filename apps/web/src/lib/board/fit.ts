@@ -32,6 +32,7 @@ export function fitBoard(board: HTMLElement): void {
   }
   const marks: [HTMLElement, number][] = [];
   const before: [HTMLElement, string][] = [];
+  const recounts: [HTMLElement, number][] = [];
   for (const frame of frames) {
     const box = frame.getBoundingClientRect();
     const pad = parseFloat(getComputedStyle(frame).paddingBlockEnd) || 0;
@@ -96,7 +97,12 @@ export function fitBoard(board: HTMLElement): void {
        its first line taller than the room under the title. The first row stays and the frame clips what runs past it. */
     const first = rects.findIndex((r) => r.height > 0);
     const keepFirst = first >= 0 && !p.shown;
-    rows.forEach((row, i) => marks.push([row, !(keepFirst && i === first) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1 ? 1 : 0]));
+    const cutOf = (i: number): boolean => !(keepFirst && i === first) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1;
+    rows.forEach((row, i) => marks.push([row, cutOf(i) ? 1 : 0]));
+    /* A FOOT THAT COUNTS WHAT IT LEAVES OUT COUNTS WHAT THE FRAME CUT TOO (live check of 30 October, 5): Needs you held 4,
+       drew two, had its second cut by the frame, and said "2 more" over one question where the phone said "3 more". */
+    const counted = [...frame.querySelectorAll<HTMLElement>(FOOT)].find((f) => MORE_COUNT.test(ownText(f)));
+    if (counted) recounts.push([counted, rows.filter((_, i) => cutOf(i)).length]);
     const left = says ? past(cutAt) - (keepFirst ? 1 : 0) : 0;
     if (left > 0 && kept.length > 0) {
       delete frame.dataset.more;
@@ -106,6 +112,36 @@ export function fitBoard(board: HTMLElement): void {
   }
   for (const [row, cut] of marks) if (cut) row.dataset.cut = '';
   for (const [foot, said] of before) foot.dataset.moreBefore = said;
+  for (const [foot, cut] of recounts) recount(foot, cut);
+}
+
+/** A foot's "N more" at its start, the number it says it leaves out. */
+const MORE_COUNT = /^\s*\d[\d,]*\s+more\b/u;
+
+/** The first of a foot's own words that holds a figure, which is where its "N more" is written. */
+function countNode(foot: HTMLElement): Text | null {
+  const walk = document.createTreeWalker(foot, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) if (/\d/u.test(n.nodeValue ?? '')) return n as Text;
+  return null;
+}
+const ownText = (foot: HTMLElement): string => countNode(foot)?.data ?? '';
+
+/**
+ * THE FOOT'S "N MORE" PLUS WHAT THE FRAME CUT. What it said itself is kept on it (`data-more-own`), and what it was made
+ * to say (`data-more-wrote`), so a later fit counts from its own number, and words the page wrote again are read fresh.
+ * Written only where it changes, so the board's own watch of its words does not fit it again for nothing.
+ */
+function recount(foot: HTMLElement, cut: number): void {
+  const node = countNode(foot);
+  if (!node) return;
+  const mine = foot.dataset.moreWrote !== undefined && node.data === foot.dataset.moreWrote && foot.dataset.moreOwn !== undefined;
+  const own = mine ? foot.dataset.moreOwn! : node.data;
+  const n = Number(/\d[\d,]*/u.exec(own)?.[0]?.replace(/,/gu, '') ?? Number.NaN);
+  if (!Number.isFinite(n)) return;
+  const said = own.replace(/\d[\d,]*/u, (n + cut).toLocaleString('en-GB'));
+  foot.dataset.moreOwn = own;
+  foot.dataset.moreWrote = said;
+  if (node.data !== said) node.data = said;
 }
 
 /** The room the "N more" a widget with none of its own is given (`Board.svelte` draws it). */
