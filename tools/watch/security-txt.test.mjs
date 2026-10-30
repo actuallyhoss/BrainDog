@@ -58,10 +58,8 @@ const txt = fieldsOf(read('apps/site/static/.well-known/security.txt'));
  * WHAT THE TREE HELD ON 2026-10-14, and the change that closes each. A todo only while the value is exactly this.
  * Remove an entry once its fix lands.
  */
-const PENDING = {
-  contact: { seen: 'mailto:hello@brain.dog', fix: 'apps/site/static/.well-known/security.txt: `Contact: mailto:security@brain.dog`' },
-  site: { seen: 'support@brain.dog', fix: "the /security page's `address` becomes a `SECURITY_EMAIL = 'security@brain.dog'` in apps/site/src/lib/links.ts" },
-};
+/* NONE LEFT (30 October): the three say support@brain.dog, the one address that is routed to a person. */
+const PENDING = {};
 const todoIf = (key, value) => (key in PENDING && PENDING[key].seen === value ? `pending: ${PENDING[key].fix}` : false);
 
 const contact = txt.contact?.[0];

@@ -20,7 +20,7 @@ Ordering is by what a compromise actually costs, not by GitHub's menu order.
 - [ ] **`SECURITY.md` detected.** *Settings → Code security* shows a green tick once the file is on
       the default branch. If it does not, the file is in the wrong place — root, `.github/` or
       `docs/`, and nowhere else.
-- [ ] **Update `security@brain.dog` and `conduct@brain.dog`** to real addresses that
+- [ ] **Check `support@brain.dog` (security reports go there too) and `conduct@brain.dog`** are real addresses that
       reach a person, and check that a message to each arrives. A disclosure address that bounces is
       worse than no address, because the reporter believes they reported it.
 - [x] **`OWNER` replaced in `.github/ISSUE_TEMPLATE/config.yml` and `.github/CODEOWNERS`** with
