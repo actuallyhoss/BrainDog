@@ -940,6 +940,13 @@ export const FORECAST_DROPS_MOST = 6;
 /** How near either end of the chart the lowest point is, as a share, for its words to lean inward from it. */
 const LOW_EDGE = 0.15;
 
+/**
+ * Whether a numbered disc sits where the lowest point's words are drawn, by how far it is from the point as shares of
+ * the plot, across and down: the words take about a tenth of a wide chart and more of a phone's, so a disc within an
+ * eighth across and a sixth up or down hangs them below it. Over-cautious on purpose: words hung a disc lower cost nothing.
+ */
+const nearLow = (across: number, down: number): boolean => Math.abs(across) <= 0.125 && Math.abs(down) <= 1 / 6;
+
 /** How many movements the list under the chart names before the rest wait in Every movement, every numbered part kept. */
 export const FORECAST_NEXT_MOST = 8;
 
@@ -958,13 +965,15 @@ export function forecastSummary(model: ForecastModel, shown: Scenario): SummaryC
      and "EGP 756,443.02" beside "from EGP 729,312 today" read as two kinds of figure. The list under the chart keeps
      each movement to the cent. */
   const read = (v: number): string => forecastFigure(model, Math.round(v), 'read');
-  const changed = change === 0 || Math.round(change) === 0 ? '' : `${change > 0 ? '+' : ''}${read(change)}`;
+  /* THE CHANGE SAYS WHICH WAY IN A WORD (audit of 31 October, 23): "from £33,850 today · −£55,953" left a reader to
+     guess what the second figure was. Now "from £33,850 today, down £55,953". */
+  const changed = change === 0 || Math.round(change) === 0 ? '' : forecastChange(change > 0, read(Math.abs(change)));
   const cells: SummaryCell[] = [
     {
       key: 'end',
       label: forecastCashOn(shortDay(last.day, model.today)),
       figure: read(last.balance),
-      note: [forecastFromToday(read(model.opening)), changed].filter(Boolean).join(' · '),
+      note: [forecastFromToday(read(model.opening)), changed].filter(Boolean).join(', '),
       ...(change !== 0 ? { dir: change > 0 ? ('in' as const) : ('out' as const) } : {}),
     },
   ];
@@ -1355,7 +1364,12 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
           y: String(Math.round(Number(y(shown.lowest.balance)) * 100) / 10_000),
           figure: forecastFigure(model, Math.round(shown.lowest.balance), 'read'),
           ...(lowAt > 1 - LOW_EDGE ? { side: 'end' as const } : lowAt < LOW_EDGE ? { side: 'start' as const } : {}),
-          ...(drops.some((s) => s.day === shown.lowest.day) ? { drop: true as const } : {}),
+          /* A NUMBERED DISC NEAR THE LOWEST POINT, not only on its day (audit of 31 October, 23): the third part of a plan
+             fell the day after the lowest and its disc sat under the word "Lowest", on every look. A disc close enough
+             across and up or down to sit under the words hangs them below it. */
+          ...(drops.some((s) => s.day === shown.lowest.day || nearLow(daysBetween(start, s.day) / span - lowAt, (hi - s.balance) / (hi - lo) - (hi - shown.lowest.balance) / (hi - lo)))
+            ? { drop: true as const }
+            : {}),
         };
 
   return {
@@ -1537,6 +1551,8 @@ export const forecastLowest = (figure: string, day: string): string => `Lowest $
 export const FORECAST_LOWEST = 'Lowest';
 export const forecastCashOn = (day: string): string => `Cash on ${day}`;
 export const forecastFromToday = (figure: string): string => `from ${figure} today`;
+/** How far the end of the chart is from today, by its way: `up £1,200` or `down £55,953`. */
+export const forecastChange = (up: boolean, figure: string): string => `${up ? 'up' : 'down'} ${figure}`;
 export const forecastOnDay = (day: string): string => `on ${day}`;
 export const forecastAfter = (label: string): string => `after ${label}`;
 export const FORECAST_A_MONTH = 'a month';

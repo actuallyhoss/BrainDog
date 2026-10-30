@@ -56,10 +56,14 @@ export const LEDGER: Record<string, unknown>[] = [
        contradiction (everything was made today, and none of it by a rule), so it says the one count. `filed-for-you-30d`
        stays declared for Filing rules.
 
+       ADDED, NOT FILED (audit of 31 October, 33): the figure counts the lines that came in today, which is not the same
+       as putting them under a category, and "36 filed today." over lines from June to August read as if a rule had
+       sorted them all this morning while Filing rules said none had. A statement brought in today adds old lines today.
+
        NO GATE OF ITS OWN: a line is not a thing a tile holds, so a Ledger nothing has moved on is still not drawn. */
     kind: 'timeline',
     heading: 'Ledger',
-    body: '{{filed-today}} filed today.',
+    body: '{{filed-today}} added today.',
     icon: 'receipt',
     /* NO WIDTH OF ITS OWN, SINCE money-core 3.29.0, so the app pairs it beside the accounts on Money's home. */
     source: 'register.transactions',

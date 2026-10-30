@@ -776,8 +776,11 @@ function list(b: Block, o: RenderOptions): string {
            restated in the home currency where the host can say it. */
         if (rich) {
           const title = timelineTitle(r.cells[1]);
+          const chip = timelineChip(r.cells[TIMELINE_CHIP], plain(inline(title, o)), plain(inline(r.cells[TIMELINE_UNDER[0]] ?? '', o)));
+          /* A MOVE BETWEEN YOUR OWN ACCOUNTS IS NO MONEY IN, so its amount stays ink (`TIMELINE_BETWEEN`). */
+          const signed = chip.between ? '' : sign;
           const approx = said && o.approx ? o.approx((r.cells[2] ?? '').trim()) : null;
-          return `${head}<li class="item" data-rich=""${toneAttrs(r.tone)}${key}>${chipHtml(timelineChip(r.cells[TIMELINE_CHIP], plain(inline(title, o)), plain(inline(r.cells[TIMELINE_UNDER[0]] ?? '', o))), o)}${cell('item-title', title, o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, sign)}${cell('item-under', timelineUnder(r.cells, o.now, grouped), o)}${approx ? `<span class="item-approx num">${escape(approx)}</span>` : ''}</li>`;
+          return `${head}<li class="item" data-rich=""${toneAttrs(r.tone)}${key}>${chipHtml(chip, o)}${cell('item-title', title, o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, signed)}${cell('item-under', timelineUnder(r.cells, o.now, grouped), o)}${approx ? `<span class="item-approx num">${escape(approx)}</span>` : ''}</li>`;
         }
         /* THE GLYPH SITS WITH THE TITLE, as `List.svelte` has drawn it since a tone five hundred pixels
            from the thing it qualifies was found to qualify nothing (13 §2.3). This drew it after the

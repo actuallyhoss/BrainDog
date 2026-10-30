@@ -3,7 +3,7 @@
 import type { SeedPage } from '../../base.ts';
 import { MONEY_METRICS } from '../figures/index.ts';
 import { LEDGER_LINE_COLUMNS, MONTH_FILTER, SHOW_FILTER } from './ledger.ts';
-import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
+import { CONFIRMED_STALE } from './parts/ages.ts';
 import { LEDGER_COLUMNS } from './parts/ledger.ts';
 
 /** The figures of one account, by its name (`{{name}}`) or its spoken id (`{{spoken}}`). */
@@ -12,6 +12,21 @@ const LINES = 'account-lines:{{name}}';
 const GAP = 'account-gap:{{name}}';
 const IN_BY_MONTH = 'account-in-by-month:{{spoken}}';
 const OUT_BY_MONTH = 'account-out-by-month:{{spoken}}';
+
+/**
+ * AN ACCOUNT'S OWN LINES, AS THE LEDGER SAYS THEM, LESS THE ACCOUNT (audit of 31 October, 26): on the account's own page
+ * every line read "Software · Company card" under a title that already says Company card. The project a line is for
+ * takes the account's place under the name, "Software · Portage", and where a line is for none the category stands alone.
+ * The chip stays the sixth cell, as every ledger line's is.
+ */
+export const ACCOUNT_LINE_COLUMNS = LEDGER_LINE_COLUMNS.map((c) => (c.field === 'account' ? { field: 'thing' } : c));
+
+/**
+ * THE DAY THE BANK OR A CHECK LAST SAID WHAT IT HOLDS, AS A FACT WITH ITS NAME (audit of 31 October, 26): as a card's
+ * `when` it was drawn as a bare "1 Sep" beside the card's mark, a day of nothing. Marked out of date past a week, as
+ * every column the block's `stale:` names is.
+ */
+const CONFIRMED_FACT = { field: 'as_of', label: 'Last confirmed', as: 'fact' } as const;
 
 /**
  * ONE PAGE AN ACCOUNT, SINCE money-core 3.19.0 (things, not rows, 24 October): an account from Money opened its row's
@@ -41,7 +56,9 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
     page: 'money-account',
     title: '{{name}}',
     for: { register: 'accounts', fleeting: true },
-    icon: 'landmark',
+    /* A WALLET AND NOT A BANK (audit of 31 October, 26): a card's page wore the bank's building. A page's mark is one for
+       every account, so it is the one that is true of a bank, a card and cash alike; the card under it wears the kind. */
+    icon: 'wallet',
     requires: ['register.accounts', 'register.transactions', 'register.balances', 'register.categories'],
     pack: 'money-core',
     /* THE ACCOUNT'S LINES NARROWED AS THE LEDGER'S ARE: by what each was for, by month and by kind of line. */
@@ -56,7 +73,7 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
                  by the bank's newest word, and by its lines alone, in its own currency. */
               kind: 'stat',
               heading: '{{name}}',
-              icon: 'landmark',
+              icon: 'wallet',
               span: 12,
               cells: [
                 { metric: NOW, label: 'The bank says' },
@@ -66,9 +83,12 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
           ]
         : []),
       {
-        /* WHICH ACCOUNT, AND HOW OLD WHAT IT HOLDS IS: its kind, the digits the bank prints and its book, and the day the
-           bank or a check last said what it held, marked out of date past a week (`CONFIRMED_STALE`). The head while the
-           two figures are not declared, with the typed balance; under them otherwise, as what the account is. */
+        /* WHICH ACCOUNT, AND HOW OLD WHAT IT HOLDS IS: the digits the bank prints, its book, and the day the bank or a
+           check last said what it held, marked out of date past a week (`CONFIRMED_STALE`). The head while the two
+           figures are not declared, with the typed balance; under them otherwise, as what the account is.
+
+           ITS KIND IS THE CARD'S MARK, a card, a bank or cash, and no longer a fact as well: a card holds three facts, and
+           the day it was last confirmed is the one a person needs in words. */
         kind: 'cards',
         ...(both ? { heading: 'About this account', icon: 'info' } : { lead: true }),
         span: 12,
@@ -77,10 +97,9 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
         columns: [
           { field: 'name', as: 'title' },
           ...(both ? [] : [{ field: 'balance', as: 'figure' }]),
-          { field: 'kind', label: 'Type', as: 'fact' },
           { field: 'last4', label: 'Ending in', as: 'fact' },
           { field: 'book', label: 'Book', as: 'fact' },
-          CONFIRMED_COLUMN,
+          CONFIRMED_FACT,
         ],
         stale: CONFIRMED_STALE,
         limit: 1,
@@ -150,7 +169,7 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
         span: 12,
         source: 'register.transactions',
         where: 'account is {{spoken}}, state is not void',
-        columns: LEDGER_LINE_COLUMNS,
+        columns: ACCOUNT_LINE_COLUMNS,
         order: [{ field: 'on', dir: 'desc' }],
         limit: 50,
         empty: 'Nothing has moved yet.',

@@ -94,7 +94,12 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
     },
     {
       /* THE MONTH IN THREE NUMBERS, the Ledger's own: what went out and came in over thirty days, moves between your own
-         accounts left out, and how many a rule filed for you. How many wait for a category is the line above. */
+         accounts left out, and how many lines a bank add-on, an agent or a rule added for you. How many wait for a
+         category is the line above.
+
+         ADDED, NOT FILED (audit of 31 October, 11): the third read "Filed for you 2" while Filing rules said no rule had
+         filed anything. Both were true: the two were brought in by the bank's statement, and filing is the category a
+         rule puts on a line, which Filing rules counts. So this one says what it counts. */
       kind: 'stat',
       heading: 'Last 30 days',
       icon: 'coins',
@@ -102,7 +107,7 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       cells: [
         { metric: 'spent-30d', label: 'Spent' },
         { metric: 'received-30d', label: 'Received' },
-        { metric: 'filed-for-you-30d', label: 'Filed for you' },
+        { metric: 'filed-for-you-30d', label: 'Added for you' },
       ],
     },
     {

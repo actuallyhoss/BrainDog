@@ -17,7 +17,7 @@
     return -1;
   };
 
-  export type Plan = { day: number; title: number[]; category: number; account: number; amount: number; after: number };
+  export type Plan = { day: number; title: number[]; category: number; account: number; amount: number; after: number; chip: number };
 
   /** Where each part of a ledger line is among the table's columns, or null where it is no ledger. */
   export function cardsOf(columns: readonly TableColumn[]): Plan | null {
@@ -26,7 +26,15 @@
     if (day < 0 || amount < 0) return null;
     const title = ['payee', 'what', 'title', 'name'].map((f) => columns.findIndex((c) => c.field === f)).filter((i) => i >= 0);
     if (title.length === 0) return null;
-    return { day, title, category: pick(columns, ['category']), account: pick(columns, ['account']), amount, after: pick(columns, ['balance_after', 'available']) };
+    return {
+      day,
+      title,
+      category: columns.findIndex((c) => c.field === 'category' && c.as !== 'chip'),
+      account: pick(columns, ['account']),
+      amount,
+      after: pick(columns, ['balance_after', 'available']),
+      chip: columns.findIndex((c) => c.as === 'chip'),
+    };
   }
 
   /** A cell's words, with a link's text kept and its address dropped. */
@@ -42,10 +50,11 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { looks } from './looks.svelte.ts';
   import { at } from '../at.ts';
+  import { TIMELINE_BETWEEN } from 'braindog-render';
 
   let { columns, rows, plan }: { columns: readonly TableColumn[]; rows: readonly TableRow[]; plan: Plan } = $props();
 
-  type Line = { key: string; title: string; under: string; amount: string; after: string; href: string | null; category: string; inflow: boolean; tone: TableRow['tone'] };
+  type Line = { key: string; title: string; under: string; amount: string; after: string; href: string | null; category: string; inflow: boolean; between: boolean; tone: TableRow['tone'] };
   type Day = { day: string; lines: Line[] };
 
   const days = $derived.by(() => {
@@ -57,6 +66,8 @@
       const account = plan.account >= 0 ? plain(r.cells[plan.account]) : '';
       const amount = plain(r.cells[plan.amount]);
       const after = plan.after >= 0 ? plain(r.cells[plan.after]) : '';
+      /* A MOVE BETWEEN YOUR OWN ACCOUNTS (the chip's `between`): no "?" and no green, as the Ledger draws it. */
+      const between = plan.chip >= 0 && plain(r.cells[plan.chip]) === TIMELINE_BETWEEN;
       const line: Line = {
         key: r.key,
         title,
@@ -65,7 +76,8 @@
         after,
         href: r.href ?? null,
         category,
-        inflow: amount.startsWith('+'),
+        inflow: amount.startsWith('+') && !between,
+        between,
         tone: r.tone,
       };
       const last = out.at(-1);
@@ -83,7 +95,7 @@
       <h3 class="lc-date num">{d.day}</h3>
       <ul class="lc-lines">
         {#each d.lines as l (l.key)}
-          {@const look = looks.category(l.category)}
+          {@const look = l.between ? { glyph: 'repeat', slot: 'slate' } : looks.category(l.category)}
           <li>
             <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone}>
               <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} aria-hidden="true"

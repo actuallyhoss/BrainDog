@@ -60,6 +60,7 @@ import { BASE_PAGES, NOW, day, hours, type Fields, type SeedPage, type SeedRegis
 import {
   ACCOUNTS,
   CATEGORIES,
+  FILING_RULES,
   INSTALLMENTS,
   MONEY_AUTOMATIONS,
   MONEY_HOME_SETTING,
@@ -168,6 +169,7 @@ export const ROWS: Record<string, readonly Fields[]> = {
   obligations: OBLIGATIONS,
   accounts: ACCOUNTS,
   categories: CATEGORIES,
+  filing_rules: FILING_RULES,
   transactions: TRANSACTIONS,
   recurring: RECURRING_ITEMS,
   installments: INSTALLMENTS,
@@ -433,7 +435,8 @@ export type Seeded = { registers: number; rows: number; pages: number; metrics: 
  * `session` is the kernel's register, which the seed writes into and does not declare.
  *
  * `categories` BEFORE `transactions`, AND `obligations` BEFORE IT TOO, for the same reason: a ledger
- * row points at the category it is for and at the promise it settled. `snapshots` last of Money's,
+ * row points at the category it is for and at the promise it settled. `filing_rules` between the two: a rule points at
+ * its category, and a ledger row at the rule that filed it. `snapshots` last of Money's,
  * because nothing points at one.
  *
  * `organisations` BETWEEN THE TWO, SINCE People 3.0.0: an organisation lists the projects it is part of, and a person
@@ -447,6 +450,7 @@ export const ORDER = [
   'obligations',
   'accounts',
   'categories',
+  'filing_rules',
   'transactions',
   'recurring',
   'installments',

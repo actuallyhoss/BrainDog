@@ -16,7 +16,7 @@
  * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
  */
 
-import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
+import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING, TIMELINE_BETWEEN } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 /* THE LISTS A MODULE BRINGS, BY NAME AND WITHOUT ITS DOCUMENT (`@braindog/seed/packs/lists`): this file is on the first open. */
@@ -768,6 +768,9 @@ export function toRows(
           const to = decl(register, c.field)?.to;
           const parts = parted(c.field);
           const at = parts.length > 0 ? largestPart(parts)?.by : e.fields[c.field];
+          /* A MOVE BETWEEN YOUR OWN ACCOUNTS IS NEVER "NOT FILED" (audit of 31 October, 25): it has no category because it
+             is no spending, as `UNFILED` leaves it out of the lines to file, so it wears the move's own mark. */
+          if ((at === undefined || at === null || at === '') && e.fields.transfer === true) return TIMELINE_BETWEEN;
           /* A LINE NOTHING HAS FILED YET WEARS A QUESTION MARK. */
           if (at === undefined || at === null || at === '') return '?';
           return to !== undefined ? (names?.chips?.get(`${to}#${at}`) ?? null) : null;

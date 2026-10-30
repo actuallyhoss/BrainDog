@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SERIES_AHEAD, SERIES_DUE, SERIES_PARTIAL, seriesNice, seriesPlan, seriesValue } from './series.ts';
+import { SERIES_AHEAD, SERIES_DUE, SERIES_PARTIAL, evenPlaces, seriesNice, seriesPlan, seriesValue } from './series.ts';
 import { figureLike } from './figure.ts';
 
 const HEAD = ['Month', 'in: Money in', 'out: Money out', 'state'];
@@ -112,4 +112,10 @@ test('a series of counts by week says each week by its day on a narrow chart, an
   const run = seriesPlan([['Week', 'in: Done'], ['Week of 20 Jul', '1'], ['Week of 27 Jul', '2'], ['Week of 3 Aug', '3'], ['Week of 10 Aug', '1']]);
   assert.deepEqual(run.buckets.map((b) => b.short), ['20 Jul', '27', '3 Aug', '10'], 'the month on the first tick and where it changes');
   assert.deepEqual(seriesPlan([['Month', 'in: Paid'], ['Sep 2026', '1'], ['Oct 2026', '2']]).buckets.map((b) => b.short), ['Sep', 'Oct'], 'a month is its name');
+});
+
+test('ONE TABLE SAYS ITS MONEY ONE WAY: where one amount of a currency has pence, each of that currency does', () => {
+  assert.deepEqual(evenPlaces(['£11,050', '£19,516.90', '−£8,466.90', '—']), ['£11,050.00', '£19,516.90', '−£8,466.90', '—']);
+  /* ANOTHER CURRENCY IS ITS OWN SET, and a count is no money at all. */
+  assert.deepEqual(evenPlaces(['E£400', '£1.50', '12h']), ['E£400', '£1.50', '12h']);
 });

@@ -37,6 +37,8 @@ type Block = {
   values?: Record<string, unknown>;
   unnamed?: string[];
   refusals?: unknown[];
+  /** A card's facts over a figure, one list a card in column order (`filing-rule-filed` on each rule's card). */
+  facts?: unknown[][];
 };
 
 const OWNER = { actor: 'p_1' };
@@ -131,6 +133,16 @@ test('every figure of the page is a count, unjudged, and named to money-core', (
   }
   assert.equal(FILING_FIGURES['rule-filed']!.group_by, 'filed_by');
   assert.equal(FILING_FIGURES['filed-by-rule-30d']!.group_by, 'filed_by');
+  /* AND THE TWO THE CARDS AND THE EMPTY LINE READ (audit of 31 October): one rule's count, filled by its spoken id, and
+     how many rules there are. */
+  for (const id of ['filing-rule-filed', 'filing-rules']) {
+    const f = FILING_FIGURES[id]!;
+    assert.equal(f.pack, 'money-core');
+    assert.deepEqual(f.target, { gte: 0 });
+    assert.ok('count' in (f.value as Record<string, unknown>));
+  }
+  assert.equal(FILING_FIGURES['filing-rule-filed']!.where, 'filed_by is {{it}}');
+  assert.equal(FILING_FIGURES['filing-rules']!.source, 'register.filing_rules');
 });
 
 test('THE PAGE SHOWS SIX TILES OR FEWER: a lead is the line, and one of three is drawn', () => {
@@ -164,20 +176,18 @@ test('ON A FRESH RECORD WITH TWO RULES AND FIVE FILED ENTRIES, the figures read 
   assert.equal(lead.values?.['rules-filing-30d'], 2);
   assert.equal(lead.values?.['filed-by-rule-30d'], 5);
 
-  /* THE TABLE OF RULES HOLDS BOTH, and the bars count each by its name. */
+  /* A CARD A RULE, EACH WITH HOW MANY LINES IT FILED (audit of 31 October): the count is the card's one figure fact. */
   const rules = drawn(blocks).find((b) => b.heading === 'Rules')!;
-  assert.deepEqual(rules.rows!.map((r) => r.fields.match).sort(), ['Talabat', 'VOX']);
-  const bars = drawn(blocks).find((b) => b.heading === 'Entries each rule filed');
-  assert.ok(bars, 'two rules that filed draw their bars');
-  const drawnParts = bars.readings![0]!.reading!.groups!.map((g) => [g.label, g.value]);
-  assert.deepEqual(drawnParts, [['Talabat', 3], ['VOX', 2]], 'the most first');
-  /* AND WHAT THEY FILED LATELY, each entry beside the rule that filed it. */
+  assert.equal(rules.kind, 'cards');
+  const filed = Object.fromEntries(rules.rows!.map((r, i) => [r.fields.match, rules.facts?.[i]?.[0]]));
+  assert.deepEqual(filed, { Talabat: 3, VOX: 2 });
+  /* AND WHAT THEY FILED LATELY, the lines the rules filed, newest first. */
   const lately = drawn(blocks).find((b) => b.heading === 'Filed lately')!;
   assert.equal(lately.rows!.length, 5);
   assert.ok(lately.rows!.every((r) => r.fields.filed_by === talabat.id || r.fields.filed_by === cinema.id));
 });
 
-test('A RULE SWITCHED OFF KEEPS ITS COUNT, and one rule that filed draws no bar of one part', async () => {
+test('A RULE SWITCHED OFF KEEPS ITS COUNT, and is listed apart from the rules that are on', async () => {
   const { k, food, card } = await fresh();
   const talabat = rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
   [1, 2].forEach((n) => paid(k, card, 'TALABAT CAIRO', n));
@@ -185,8 +195,8 @@ test('A RULE SWITCHED OFF KEEPS ITS COUNT, and one rule that filed draws no bar 
   assert.equal(figure(k, 'rule-filed').value, 2);
   const { blocks } = pageOf(k);
   assert.equal(leadOf(blocks).values?.['filed-by-rule-30d'], 2);
-  assert.equal(drawn(blocks).find((b) => b.heading === 'Entries each rule filed'), undefined);
-  assert.equal(drawn(blocks).find((b) => b.heading === 'Rules')!.rows![0]!.fields.state, 'off');
+  assert.equal(drawn(blocks).find((b) => b.heading === 'Rules'), undefined, 'no rule is on, so no card is drawn');
+  assert.deepEqual(drawn(blocks).find((b) => b.heading === 'Switched off')!.rows!.map((r) => r.fields.match), ['Talabat']);
 });
 
 test('RULES THAT FILED BEFORE AND NOTHING LATELY SAY SO IN WORDS, never "0 rules filed 0"', async () => {
@@ -201,12 +211,22 @@ test('RULES THAT FILED BEFORE AND NOTHING LATELY SAY SO IN WORDS, never "0 rules
   assert.deepEqual([lead.values?.['rule-filed']], [3]);
 });
 
-test('WITH NO RULE, THE LEAD READS THE NOUGHT SENTENCE and nothing else counts', async () => {
+test('WITH NO RULE, THE LEAD SAYS SO AND OFFERS ONE, and nothing else counts', async () => {
   const { k } = await fresh();
   assert.equal(figure(k, 'rule-filed').value, 0);
   const { blocks } = pageOf(k);
-  assert.equal(leadOf(blocks).body, 'No rule has filed anything yet.');
-  assert.equal(drawn(blocks).find((b) => b.heading === 'Entries each rule filed'), undefined);
+  assert.equal(leadOf(blocks).body, 'No filing rules yet. A rule puts a line under a category as it comes in. [Add a rule](/r/filing_rules?new=1)');
+  assert.equal(drawn(blocks).find((b) => b.heading === 'Rules'), undefined);
   assert.equal(drawn(blocks).find((b) => b.heading === 'Filed lately'), undefined);
   assert.ok(drawn(blocks).length <= 7, 'six tiles or fewer beside the line');
+});
+
+test('A RULE THAT HAS FILED NOTHING SAYS SO, with its card and the way to add another', async () => {
+  const { k, food } = await fresh();
+  rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
+  const { blocks } = pageOf(k);
+  assert.equal(leadOf(blocks).body, 'No rule has filed a line yet.');
+  const rules = drawn(blocks).find((b) => b.heading === 'Rules')!;
+  assert.deepEqual(rules.rows!.map((r) => r.fields.match), ['Talabat']);
+  assert.ok(drawn(blocks).some((b) => b.kind === 'note' && b.body === '[Add a rule](/r/filing_rules?new=1)'));
 });

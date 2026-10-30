@@ -38,7 +38,7 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
   'filed-for-you-30d': {
     metric: 'filed-for-you-30d',
     pack: 'money-core',
-    name: 'Filed for you, 30 days',
+    name: 'Added for you, 30 days',
     source: 'events.transactions',
     where: 'by is agent or door or rule',
     value: { count: 'made' },
@@ -55,7 +55,7 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
   'filed-today': {
     metric: 'filed-today',
     pack: 'money-core',
-    name: 'Filed today',
+    name: 'Added today',
     source: 'events.transactions',
     value: { count: 'made' },
     format: 'int',
@@ -116,6 +116,37 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
     source: 'register.transactions',
     where: 'filed_by is set, created_at after -30d',
     value: { distinct: 'filed_by' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * HOW MANY LINES ONE RULE FILED, ALL TIME, for the rule's own card on Filing rules (audit of 31 October, 11): the page
+   * listed no rule and said what each filed only as bars, from two rules up. Read once a card, the rule filled in by its
+   * spoken id (`filing-rule-filed:{{spoken}}`), so two rules with the same text are two counts.
+   */
+  'filing-rule-filed': {
+    metric: 'filing-rule-filed',
+    pack: 'money-core',
+    name: 'Filed by this rule',
+    source: 'register.transactions',
+    where: 'filed_by is {{it}}',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /** HOW MANY FILING RULES THERE ARE, ON OR OFF, so Filing rules says "none yet" with a way to add one, and not a count of nought. */
+  'filing-rules': {
+    metric: 'filing-rules',
+    pack: 'money-core',
+    name: 'Filing rules',
+    source: 'register.filing_rules',
+    value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
     window: '30d',

@@ -200,7 +200,13 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
     if (!w) return shortOf(label);
     return i === 0 || weeks[i - 1]?.month !== w.month ? `${w.day} ${w.month}` : w.day;
   };
-  const buckets = body.map((r, i) => {
+  /* THE CELL WRITTEN TO THE MOST PLACES, so a net is said as finely as what it is the net of. */
+  const placesIn = (c: string): number => /\d\.(\d+)(?!\d)/u.exec(c)?.[1]?.length ?? 0;
+  const fine = body
+    .flatMap((r) => r.slice(1, series.length + 1))
+    .filter((c) => seriesValue(c) !== null && unitOf(c) === unitOf(template))
+    .reduce((best, c) => (placesIn(c) > placesIn(best) ? c : best), template);
+  const drawnBuckets = body.map((r, i) => {
     const label = (r[0] ?? '').trim();
     const state = stateOf(stated ? r[stateAt] : undefined);
     const v = netOf(i);
@@ -212,10 +218,18 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
       state,
       said: state === 'partial' ? SERIES_PARTIAL : state === 'due' ? SERIES_DUE : state === 'ahead' ? SERIES_AHEAD : '',
       values: series.map((_, k) => (values[i]![k] === null ? MISSING : (r[k + 1] ?? '').trim())),
-      net: v === null ? MISSING : amountLike(template, v, home, 'exact'),
+      /* SAID TO THE PENCE THE TABLE'S CELLS CARRY (`fine`), never rounded to the first cell's whole pounds: £11,050 in and
+         £19,516.90 out netted "−£8,467", a figure the two cells beside it do not make. */
+      net: v === null ? MISSING : amountLike(fine, v, home, 'exact'),
       under: net && v !== null && v < 0,
     };
   });
+  /* ONE TABLE SAYS ITS MONEY ONE WAY (audit of 31 October, 23): a month's row read "£19,516.90" beside "−£8,467", the
+     cells as the record wrote them beside a net said whole. Where any amount of a currency carries pence, every amount
+     of that currency in the table does (`evenPlaces`). */
+  const even = evenPlaces(drawnBuckets.flatMap((b) => [...b.values, b.net]));
+  const width = series.length + 1;
+  const buckets = drawnBuckets.map((b, i) => ({ ...b, values: even.slice(i * width, i * width + series.length), net: even[i * width + series.length]! }));
 
   /* A TOTAL IS ADDED IN ONE UNIT AND IN WHOLE MINOR UNITS. Each series is summed in its own cells' form, not the first
      series', so hours under money stay hours; a series whose cells name two currencies, or a currency and none, has no
@@ -321,6 +335,25 @@ export const SERIES_NONE = 'Nothing to draw yet.';
 export const SERIES_NET = 'Net';
 /** The key of the red cap on a month whose net is below zero, so the red always has its word. */
 export const SERIES_UNDER = 'More out than in';
+
+/**
+ * Amounts as one table says them: where one amount of a currency is written to its pence, each amount of that currency
+ * is, `−£8,467` beside `£19,516.90` read as `−£8,467.00`. A currency is told by its marks with the digits taken out, as
+ * `barFigures` tells one, and a cell with no digits (`—`) or no mark of a currency (an hour count) is left as it is.
+ */
+export function evenPlaces(cells: readonly string[]): string[] {
+  const markOf = (c: string): string => c.replace(/[\d.,−+\-\s\u00a0]/gu, '');
+  const placesOf = (c: string): number => /\d\.(\d+)(?!\d)/u.exec(c)?.[1]?.length ?? 0;
+  const want = new Map<string, number>();
+  for (const c of cells) if (/\d/u.test(c) && markOf(c) !== '') want.set(markOf(c), Math.max(want.get(markOf(c)) ?? 0, placesOf(c)));
+  return cells.map((c) => {
+    const n = /\d/u.test(c) && markOf(c) !== '' ? (want.get(markOf(c)) ?? 0) : 0;
+    if (n === 0 || placesOf(c) === n) return c;
+    if (placesOf(c) > 0) return c;
+    /* AFTER THE LAST DIGIT OF THE NUMBER, so `£8,467` is `£8,467.00` and `8,467 EGP` is `8,467.00 EGP`. */
+    return c.replace(/(\d)(?![\d,])/u, `$1.${'0'.repeat(n)}`);
+  });
+}
 /** The key for a bar drawn at half strength: a month not over yet, or still to come. */
 export const SERIES_PALER = 'Paler: not over yet';
 export const SERIES_PARTIAL = 'so far';

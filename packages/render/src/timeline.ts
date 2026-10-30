@@ -91,8 +91,15 @@ const TILL = /(?<![\p{L}\p{N}])(\p{Lu}{3,})\d{1,4}(?![\p{L}\p{N}])/gu;
  */
 function bankLine(text: string): string {
   const bare = text.replace(BANK_STAMP, '');
-  return /\p{Ll}/u.test(bare) ? bare : bare.replace(TILL, '$1');
+  if (/\p{Ll}/u.test(bare)) return bare;
+  /* AND THE INVOICE A PAYMENT QUOTES (audit of 31 October, 25): "RAVENSWORTH LTD INV 2026-038" is Ravensworth Ltd, and
+     the Ledger drew "Ravensworth Ltd INV 202…". Only a reference with a digit in it, at the end, after words of a name. */
+  const named = bare.replace(BANK_REF, '').trim();
+  return (named === '' ? bare : named).replace(TILL, '$1');
 }
+
+/** An invoice or a reference the bank's line ends on: `INV 2026-038`, `REF 88213`, `INVOICE NO. 41`. */
+const BANK_REF = /\s+(?:INV(?:OICE)?|REF)(?:\s*NO)?\.?\s*[#:]?\s*[A-Z0-9][A-Z0-9/-]*\d[A-Z0-9/-]*$/u;
 
 /**
  * A `rows` cell as it is drawn: the same, except that only money MOVING by nothing (`−£0`, `+£0`) is left out. A
@@ -149,8 +156,16 @@ export function wordSlot(kept: string | undefined): TimelineChipColour | null {
   return CHIP_COLOURS[h % CHIP_COLOURS.length]!;
 }
 
-/** A row's chip: the glyph it names, its colour, whether nothing has filed it, and the title's first letter. */
-export type TimelineChip = { glyph: string | null; colour: TimelineChipColour | null; unfiled: boolean; letter: string };
+/** A row's chip: the glyph it names, its colour, whether nothing has filed it, and the title's first letter. `between` is a
+ * move between a person's own accounts (`TIMELINE_BETWEEN`), whose amount is no money in or out and so wears no colour. */
+export type TimelineChip = { glyph: string | null; colour: TimelineChipColour | null; unfiled: boolean; letter: string; between?: true };
+
+/**
+ * THE CHIP OF A MOVE BETWEEN YOUR OWN ACCOUNTS (audit of 31 October, 25): such a line has no category because it is no
+ * spending, and it wore the "?" of a line nobody had filed, its money in green as if it were income. A host writes this
+ * one word in the chip's cell; it is drawn as the two arrows of a move, in the quiet slot, and its amount in ink.
+ */
+export const TIMELINE_BETWEEN = 'between';
 
 /**
  * Whether a timeline draws the money row: any row says something past its third cell. A timeline that does not keeps
@@ -179,6 +194,7 @@ export function timelineUnder(cells: readonly string[], now: number | undefined,
  */
 export function timelineChip(cell: string | undefined, title: string, kept?: string): TimelineChip {
   const words = (cell ?? '').trim().split(/\s+/u).filter(Boolean);
+  if (words.length === 1 && words[0] === TIMELINE_BETWEEN) return { glyph: 'repeat', colour: 'slate', unfiled: false, letter: '⇄', between: true };
   const unfiled = words.includes('?');
   const colour = (words.find(isColour)?.toLowerCase() as TimelineChipColour | undefined) ?? (unfiled ? null : wordSlot(kept));
   const glyph = words.find((w) => w !== '?' && !isColour(w)) ?? null;
