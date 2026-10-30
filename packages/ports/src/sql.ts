@@ -574,6 +574,35 @@ export function guardShape(text: string): void {
 }
 
 /**
+ * Where a value sent from outside holds U+0000, as a path (`rows[2].note`, a key by its own name), or `null`.
+ *
+ * FOR THE DOORS, so a caller who sends one is told where in words and with a 400, rather than meeting `guard`'s throw
+ * as a crash: the API's router and the MCP endpoint ask it of every body. A key holding one is named by its parent and
+ * `(a key)`. Iterative, so a body nested ten thousand deep cannot overflow it.
+ */
+export function nulAt(value: unknown): string | null {
+  const stack: [unknown, string][] = [[value, '']];
+  while (stack.length > 0) {
+    const [v, at] = stack.pop()!;
+    if (typeof v === 'string') {
+      if (v.includes('\u0000')) return at === '' ? 'body' : at;
+    } else if (Array.isArray(v)) {
+      for (let i = v.length - 1; i >= 0; i--) stack.push([v[i], `${at}[${i}]`]);
+    } else if (v !== null && typeof v === 'object') {
+      for (const [k, x] of Object.entries(v)) {
+        if (k.includes('\u0000')) return `${at === '' ? 'body' : at} (a key)`;
+        stack.push([x, at === '' ? k : `${at}.${k}`]);
+      }
+    }
+  }
+  return null;
+}
+
+/** What a door says to a value holding U+0000, at the path `nulAt` found. */
+export const nulSaid = (at: string): string =>
+  `${at} has a hidden character in it (U+0000, the null character), which a record cannot keep in text. Send it again without that character.`;
+
+/**
  * The seven checks of `37 §5.3`, in its order, then the statement's shape (`guardShape`), and a throw of `SqlError` at
  * the first that fails.
  *

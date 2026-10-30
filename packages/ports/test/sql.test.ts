@@ -34,6 +34,8 @@ import {
   guarded,
   mapDriverMessage,
   measureCaps,
+  nulAt,
+  nulSaid,
   type Capabilities,
   type SqlErrorCode,
 } from '../src/sql.ts';
@@ -298,6 +300,16 @@ test('A TEXT WITH U+0000 AND A VALUE PAST WHAT THE CLOUD TAKES ARE REFUSED BEFOR
   /* Counted in UTF-8 bytes, so two-byte text passes the ceiling at half the characters. */
   assert.equal(codeOf(() => guard('SELECT length(?) AS n', ['é'.repeat(DO_MEASURED.length / 2 + 1)])), 'STATEMENT_TOO_LONG');
   raw.close();
+});
+
+test('A DOOR FINDS A U+0000 BY ITS PLACE IN THE BODY, AND SAYS SO IN WORDS', () => {
+  assert.equal(nulAt({ title: 'fine', rows: [{ note: 'ok' }, { note: 'not\u0000ok' }] }), 'rows[1].note');
+  assert.equal(nulAt('a\u0000b'), 'body');
+  assert.equal(nulAt({ ['k\u0000']: 1 }), 'body (a key)');
+  assert.equal(nulAt({ a: [1, null, true, { b: 'clean' }] }), null);
+  /* The six characters a JSON text spells it with, once parsed, are not the character. */
+  assert.equal(nulAt(JSON.parse('{"cell":"{\\"a\\":\\"x\\\\u0000y\\"}"}')), null);
+  assert.match(nulSaid('rows[1].note'), /^rows\[1\]\.note has a hidden character in it \(U\+0000/);
 });
 
 test('THE SHAPE IS COUNTED FROM BELOW: WHAT THE GUARD REFUSES THE DURABLE OBJECT REFUSED, AND ITS EDGE RUNS', () => {
