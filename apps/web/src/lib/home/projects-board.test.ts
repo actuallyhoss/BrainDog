@@ -80,7 +80,7 @@ test('the headline names the late projects and the quiet numbers, and the button
       ],
     }),
   );
-  assert.equal(b.headline, 'Kiln and Lantern are a day late, and Tidewater stopped sending numbers.');
+  assert.equal(b.headline, 'Work on Kiln and Lantern is a day late, and Tidewater stopped sending numbers.');
   assert.match(b.lede ?? '', /“Check the door on two phones” was due Mon 26 Oct/u);
   assert.deepEqual(b.acts.late, { said: 'Open the 2 late tasks', href: '/r/tasks?late' });
   assert.deepEqual(b.acts.feed, { said: 'Fix the numbers feed', href: '/numbers/setup' });

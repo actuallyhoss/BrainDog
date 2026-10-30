@@ -22,6 +22,7 @@ import { cadenceOf, feedAgeOf, measureStale, type FeedMeasure } from '../page/fe
 import { EARNING_LANE, LANES_DEFAULT, inPlayOf, shownName, type Lanes } from '../shell/side.ts';
 import { isForecast } from './card-kpi.ts';
 import { counted, names } from './phrase.ts';
+import { article } from '../copy/english.ts';
 
 const DAY = 86_400_000;
 /** How many days ahead "due" reaches, and how many back a run or a task change still makes a project moving. */
@@ -511,7 +512,9 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
   const unlinked = earning.length - lines.length;
   return {
     total: summed.some((l) => !l.left) ? input.format(total, currency) : null,
-    year: summed.some((l) => !l.left) ? `about ${input.format(Math.round((total * 12) / 100_000) * 100_000, currency)} a year` : null,
+    /* A MONTH TIMES TWELVE, SAID AS THAT (31 October, AG18): "about £31,000 a year" stood over the list's "Earned in a
+       year", £22,600 between them, as if two years were meant. This is the month's rate, and says so. */
+    year: summed.some((l) => !l.left) ? `about ${input.format(Math.round((total * 12) / 100_000) * 100_000, currency)} a year at this rate` : null,
     currency,
     count: earning.length,
     lines: [...summed, ...other].map(({ currency: _c, ...l }) => l),
@@ -537,8 +540,18 @@ function headlineOf(fs: Facts[], renewals: readonly BoardRenewal[], input: Board
   if (late.length > 0) {
     const days = late.map((f) => f.lateDays);
     const same = days.every((d) => d === days[0]);
-    const verb = late.length === 1 ? 'is' : 'are';
-    clauses.push(late.length > 3 ? `${counted(late.length)} projects are late, ${names(late.map((f) => f.p.name))} among them` : `${names(late.map((f) => f.p.name))} ${verb} ${same ? lateWords(days[0]!) : 'late'}`);
+    /* THE WORK IS LATE, NOT THE PROJECT (31 October, AG19): "Kiln is four days late" was said of one task on it. */
+    const tasks = late.reduce((n, f) => n + f.late.length, 0);
+    const one = late[0]!;
+    clauses.push(
+      late.length > 3
+        ? `${counted(late.length)} projects have late work, ${names(late.map((f) => f.p.name))} among them`
+        : late.length === 1
+          ? tasks === 1
+            ? `${article(one.p.name)} ${one.p.name} task is ${lateWords(days[0]!)}`
+            : `${counted(tasks)} ${one.p.name} tasks are late`
+          : `work on ${names(late.map((f) => f.p.name))} is ${same ? lateWords(days[0]!) : 'late'}`,
+    );
   }
   if (quiet.length > 0) clauses.push(quiet.length === 1 ? `${quiet[0]!.p.name} stopped sending numbers` : `${counted(quiet.length)} projects stopped sending numbers`);
   if (due.length > 0 && clauses.length < 2) {

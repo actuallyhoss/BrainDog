@@ -443,7 +443,8 @@
         {#if p.working && f?.tone !== 'live'}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
       {:else}
         <span class="s-name" dir="auto">{name}</span>
-        {#if p.late > 0}<span class="s-late">{words.late}</span>{/if}
+        <!-- HOW MANY ARE LATE, "1 late" (AG19): a bare "late" beside the name read as the project being late. -->
+        {#if p.late > 0}<span class="s-late">{p.late.toLocaleString('en-GB')} {words.late}</span>{/if}
         {#if p.working}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
       {/if}
     </a>
