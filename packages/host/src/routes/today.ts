@@ -10,5 +10,5 @@ import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
   { name: 'today', group: 'READ+', writes: true, postRead: true, what: "Today's body drawn as previewPage draws it, with each tile's part beside it: what BrainDog did itself, what is shared out, and the project cards' late work, runs and key numbers. It changes nothing.",
-    takes: { body: 'json', page: 'text' } },
+    takes: { body: 'json', page: 'text', offer: 'json' } },
 ];

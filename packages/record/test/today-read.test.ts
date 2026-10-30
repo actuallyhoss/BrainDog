@@ -126,6 +126,19 @@ test('A BODY THAT DRAWS NO PROJECT CARDS asks nothing of them, and a body that i
   sql.close();
 });
 
+test('OFFER FALSE LEAVES THE WIDGET OFFER OUT and draws the rest as before; an offer that is not a yes or no is refused', async () => {
+  const { sql, api } = await record();
+  const without = value<TodayAnswer>(await api.today({ body: BODY, offer: false, fresh: true }, owner));
+  assert.equal(without.widget, undefined);
+  const with_ = value<TodayAnswer>(await api.today({ body: BODY, fresh: true }, owner));
+  assert.deepEqual(without.page, with_.page);
+  assert.deepEqual(without.cards, with_.cards);
+  const bad = (await api.today({ body: BODY, offer: 'no' } as never, owner)) as { ok: boolean; refusal?: { at?: string } };
+  assert.equal(bad.ok, false);
+  assert.equal(bad.refusal?.at, 'offer');
+  sql.close();
+});
+
 test('SOMEBODY HELD TO ONE LIST is answered every part as her own reads answer it, and none she may not read', async () => {
   const { sql, api } = await record();
   value(await api.invite({ person: 'p_9', name: 'Wren', registers: { things: 'read' } }, owner));

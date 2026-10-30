@@ -144,15 +144,19 @@ const asking = async <A>(ask: Ask, args: A, ctx: unknown): Promise<Result<unknow
 /**
  * Every part of Today, asked of the record one after another in this one call. `body` is what `previewPage` takes, and a
  * refusal of it is `today`'s; `decls` are the record's lists (the caller's ceiling is each part's own method's to hold).
+ *
+ * `offer: false` LEAVES THE WIDGET OFFER OUT (`widget`): it is the board's last cell, never the screen, and drawing it
+ * cost every Today read about 0.2 s of the record's time, and 2 s on the first read after the record woke (30 Oct, his
+ * record). The app asks `widgetSuggest` for it once Today has drawn.
  */
-export async function todayOf(asks: TodayAsks, body: Record<string, unknown>, decls: readonly Decl[], ctx: unknown): Promise<Result<TodayAnswer>> {
+export async function todayOf(asks: TodayAsks, body: Record<string, unknown>, decls: readonly Decl[], ctx: unknown, { offer = true }: { offer?: boolean } = {}): Promise<Result<TodayAnswer>> {
   const page = await asks.previewPage({ body } as never, ctx as never);
   if (!page.ok) return page;
   const handled = valueOf(await asking(asks.handled, {}, ctx));
   const shared = valueOf(await asking(asks.sharedOut, {}, ctx));
   const projects = cardsOver(body, decls);
   const cards = projects === null ? null : await cardsOf(asks, projects, decls, ctx);
-  const widget = asks.widgetSuggest === undefined ? null : offerOf(valueOf(await asking(asks.widgetSuggest, { board: boardRead(body, page.value), cell: true }, ctx)));
+  const widget = !offer || asks.widgetSuggest === undefined ? null : offerOf(valueOf(await asking(asks.widgetSuggest, { board: boardRead(body, page.value), cell: true }, ctx)));
   return { ok: true, value: { page: page.value, handled, shared, cards, ...(widget === null ? {} : { widget }) } };
 }
 
