@@ -66,6 +66,21 @@ test('a document is normalised to LF, and text is left exactly as it arrived', (
   assert.equal(take(f('text'), 'a\r\nb'), 'a\r\nb');
 });
 
+test('A TEXT HOLDING U+0000 IS REFUSED AT ITS FIELD, because neither host keeps one', () => {
+  /* The self-host's SQLite cut 'a\u0000b' to 'a' without a word; the Cloud kept a character its text functions read as
+     the end. Refused here with a sentence a person can act on, before the port refuses it as a fault. */
+  for (const type of ['text', 'document'] as const) {
+    const r = refuse(f(type), 'before\u0000after');
+    assert.equal(r.code, 'VALUE_MALFORMED');
+    assert.equal(r.at, 'x');
+    assert.match(r.fix, /hidden character in it \(U\+0000/);
+  }
+  assert.equal(refuse(f('list', { of: 'text' }), ['fine', 'not\u0000fine']).at, 'x[1]');
+  assert.equal(refuse(f('email'), 'a\u0000b@example.com').code, 'VALUE_MALFORMED');
+  /* Every other control character is still text, as it was. */
+  assert.equal(take(f('text'), 'tab\there'), 'tab\there');
+});
+
 /* ── money, which is the type the whole record is careful about ──────────── */
 
 test('MONEY IS AN INTEGER IN MINOR UNITS, AND A FLOAT IS REFUSED RATHER THAN ROUNDED', () => {

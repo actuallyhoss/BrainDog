@@ -113,6 +113,18 @@ function overCap(type: keyof typeof TEXT_CAPS, value: string, at: string): Coerc
   return bad('OUT_OF_BOUNDS', `${at} is ${bytes} bytes, and ${type === 'email' ? 'an email address' : type === 'url' ? 'a URL' : `a ${type}`} takes at most ${cap} bytes.`, at);
 }
 
+/**
+ * `VALUE_MALFORMED` for a text holding U+0000, or `null`.
+ *
+ * REFUSED, NOT CLEANED, as a name with a hidden character is (`host/src/invite.ts`): the self-host's SQLite cut such a
+ * text at the NUL without a word, and the Cloud kept a character its own text functions read as the end. The port
+ * refuses it as well (`guard`, `@braindog/ports`), and this is the sentence a person reads first, at the field.
+ */
+function nulRefused(value: string, at: string): Coerced | null {
+  if (!value.includes('\u0000')) return null;
+  return bad('VALUE_MALFORMED', `${at} has a hidden character in it (U+0000, the null character), which a record cannot keep in text. Send it again without that character.`, at);
+}
+
 const INT_STRING = /^-?\d+$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const CURRENCY = /^[A-Za-z]{3}$/;
@@ -547,6 +559,8 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       /* THE CAP FIRST, so a text of megabytes is refused before the credential check reads it. */
       const over = overCap(field.type, value, at);
       if (over) return over;
+      const nul = nulRefused(value, at);
+      if (nul) return nul;
       /* A CREDENTIAL NEVER GOES IN A ROW IN PLAIN TEXT, and this is the check that keeps it out of
          every text a register holds, from every caller. First, so a key sent JSON-quoted is still
          answered with where keys go.
@@ -786,7 +800,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       if (looksLikeCredential(value)) return keyRefused(at);
       const s = value.trim();
       const parts = s.split('@');
-      if (parts.length !== 2 || !parts[0] || !parts[1] || /\s/.test(s))
+      if (parts.length !== 2 || !parts[0] || !parts[1] || /[\s\u0000]/.test(s))
         return malformed(`${at} takes one address, as name@example.com.`);
       return good(`${parts[0]}@${parts[1]!.toLowerCase()}`);
     }
