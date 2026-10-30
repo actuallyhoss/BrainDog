@@ -90,7 +90,7 @@ export function slashMayWrite(actor: string, kind: string, what?: SlashWrites): 
   const may = SLASH_MAY.get(kind);
   if (may === undefined)
     throw new Error(
-      `slash wrote ${kind}. A model suggests, proposes and predicts; everything else is a person's or the record's own (30 §3).`,
+      `slash wrote ${kind}. A model suggests, proposes and predicts; everything else is a person's or BrainDog's own (30 §3).`,
     );
   if (!may(what))
     throw new Error(

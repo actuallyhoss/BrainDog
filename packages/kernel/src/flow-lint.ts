@@ -980,7 +980,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
             const field = fields.find((f) => f.id === name);
             if (!field) return bad('FIELD_UNKNOWN', `${id} sends ${name} to Slash at ${here}, and ${row} has no field called ${name}.`, `${here}.ask_slash.about`);
             const sealed = sealedAs(field);
-            if (sealed !== null) return bad('DECLARATION_INVALID', `${id} sends ${name} to Slash at ${here}, and a ${sealed} field never leaves the record.`, `${here}.ask_slash.about`);
+            if (sealed !== null) return bad('DECLARATION_INVALID', `${id} sends ${name} to Slash at ${here}, and a ${sealed} field never leaves BrainDog.`, `${here}.ask_slash.about`);
           }
       }
       /* A VARIABLE CARRIES WHAT IT WAS SET FROM. `set_var` fills `to` from the whole row, before `sendable` is anywhere
@@ -1014,7 +1014,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
           const held = via.from.spelled.replace(/\s/g, '') === '{{trigger.row}}' ? `the whole ${row ?? 'trigger'} row, ${via.from.field} in it` : via.from.field;
           return bad(
             'DECLARATION_INVALID',
-            `${id} puts ${via.spelled} in its question to Slash at ${here}, and ${via.name} holds ${held}${via.from.name === via.name ? '' : `, by way of ${via.from.name}`}: ${via.from.at} put it there with ${via.from.spelled}, and a ${via.from.type} field never leaves the record. Take ${via.spelled} out of the question, or set ${via.name} from fields that may leave.`,
+            `${id} puts ${via.spelled} in its question to Slash at ${here}, and ${via.name} holds ${held}${via.from.name === via.name ? '' : `, by way of ${via.from.name}`}: ${via.from.at} put it there with ${via.from.spelled}, and a ${via.from.type} field never leaves BrainDog. Take ${via.spelled} out of the question, or set ${via.name} from fields that may leave.`,
             `${here}.ask_slash.question`,
           );
         }
@@ -1030,8 +1030,8 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
           return bad(
             'DECLARATION_INVALID',
             found.spelled.replace(/\s/g, '') === '{{trigger.row}}'
-              ? `${id} puts the whole ${row} row in its question to Slash at ${here} with ${found.spelled}, and ${found.field} is a ${found.type} field, which never leaves the record. Name the fields the question needs instead.`
-              : `${id} puts ${found.field} in its question to Slash at ${here} with ${found.spelled}, and a ${found.type} field never leaves the record. Take it out of the question.`,
+              ? `${id} puts the whole ${row} row in its question to Slash at ${here} with ${found.spelled}, and ${found.field} is a ${found.type} field, which never leaves BrainDog. Name the fields the question needs instead.`
+              : `${id} puts ${found.field} in its question to Slash at ${here} with ${found.spelled}, and a ${found.type} field never leaves BrainDog. Take it out of the question.`,
             `${here}.ask_slash.question`,
           );
       }
@@ -1350,7 +1350,7 @@ function limitsFault(id: string, limits: unknown): Refusal | null {
     const top = most[key as keyof typeof most];
     if (typeof n !== 'number' || !Number.isInteger(n) || n < 1)
       return bad('DECLARATION_INVALID', `${id}'s limits.${key} is a whole number of at least one.`, `limits.${key}`);
-    if (n > top) return bad('OUT_OF_BOUNDS', `${id} asks for ${n} ${key.replace(/_/g, ' ')}, and the record holds it at ${top}. A limit can only lower that.`, `limits.${key}`);
+    if (n > top) return bad('OUT_OF_BOUNDS', `${id} asks for ${n} ${key.replace(/_/g, ' ')}, and BrainDog holds it at ${top}. A limit can only lower that.`, `limits.${key}`);
   }
   return null;
 }
@@ -1651,7 +1651,7 @@ function stepFault(
       /* `only: known` OR NOTHING: a rule that says some other word would be met as if it said none, and strangers would
          be added as people from a trigger its author meant to keep them out of. */
       if (spec.only !== undefined && spec.only !== 'known')
-        return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.only is known, which meets only somebody the record has reason to know, or is left out.`, `${at}.meet.only`, ['known']);
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.only is known, which meets only somebody BrainDog has reason to know, or is left out.`, `${at}.meet.only`, ['known']);
       const org = spec.kind === 'organisation';
       if (spec.name === undefined && spec.email === undefined && spec.handle === undefined && keys === undefined && !(org && spec.domain !== undefined))
         return bad(

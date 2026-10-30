@@ -490,7 +490,7 @@ export function invite(
   if (args.level !== undefined && !(LEVELS as readonly string[]).includes(args.level))
     return no<Member>('ENUM_VALUE_UNKNOWN', `${String(args.level)} is not a level.`, { at: 'level', allowed: LEVELS });
   if (args.level === undefined && Object.keys(args.registers ?? {}).length === 0)
-    return no<Member>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on the record or on a register.', {
+    return no<Member>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on all of this BrainDog or on one list.', {
       at: 'level',
     });
 
@@ -536,7 +536,7 @@ export function invite(
      and `remove` allowed it — three methods, two answers about one row, which is the split the
      predicate was extracted to end. */
   if (counts(deps.sql, args.person) && args.level !== 'owner' && owners(deps.sql) <= 1)
-    return no<Member>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'level' });
+    return no<Member>('LEVEL_REQUIRED', 'A BrainDog keeps one owner. Make somebody else an owner first.', { at: 'level' });
 
   const at = instant(deps.nowMs);
   /* THE PERSON ROW IS A MIRROR AND IS WRITTEN WITHOUT OVERWRITING WHAT IT KNOWS. An invitation that
@@ -693,7 +693,7 @@ export function remove(deps: MemberDeps, by: string, person: string, why?: strin
      was treated as the last one and could not be taken off, with a working owner sitting beside
      them. Suspension is "stop somebody without deciding about them", and the deciding was refused. */
   if (counts(deps.sql, person) && owners(deps.sql) <= 1)
-    return no<null>('LEVEL_REQUIRED', 'A record keeps one owner. Make somebody else an owner first.', { at: 'person' });
+    return no<null>('LEVEL_REQUIRED', 'A BrainDog keeps one owner. Make somebody else an owner first.', { at: 'person' });
 
   const at = instant(deps.nowMs);
   for (const row of rows) event(deps, at, by, 'access.revoke', person, row.register, null, row.level, why ?? null);
@@ -732,7 +732,7 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
 
   const held = deps.sql.all<{ register: string; level: Level }>('SELECT register, level FROM member WHERE person_id = ?', person);
   if (on && counts(deps.sql, person) && owners(deps.sql) <= 1)
-    return no<Suspended>('LEVEL_REQUIRED', 'A record keeps one owner who can act. Make somebody else an owner first.', { at: 'person' });
+    return no<Suspended>('LEVEL_REQUIRED', 'A BrainDog keeps one owner who can act. Make somebody else an owner first.', { at: 'person' });
 
   /* THE SECOND CALL SAYS WHAT THE FIRST SAID. Suspending somebody already suspended is not an error,
      and answering one is how a caller that lost its reply learns to be afraid of retrying. */

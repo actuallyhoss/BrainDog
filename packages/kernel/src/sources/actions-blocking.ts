@@ -40,7 +40,7 @@ function blockingBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
   const { predicateOf, typesOf } = kit;
   if (!deps.blocking) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what is in a project\'s way onto a page yet.', at: 'source' }) };
   if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions.blocking comes in the order the record lists its actions, so it takes no order:.', at: 'order' }) };
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions.blocking comes in the order BrainDog lists its actions, so it takes no order:.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(BLOCKING.fields, f));
   if (unknown.length)
     return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `An action in the way has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(BLOCKING.fields) }) };

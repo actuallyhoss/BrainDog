@@ -1223,7 +1223,7 @@ function holdsFault(decl: Declaration): Refusal | null {
     /* A BLOCK'S OTHER `when:` IS A FIGURE'S TEST, checked with the block. Nowhere else does a part read one. */
     if (!isHolds(when)) {
       if (decl.kind === 'page' && /^blocks\[\d+\]$/u.test(at)) continue;
-      return bad('DECLARATION_INVALID', `${said}'s when is { holds: [people] }: the lists or roles the record must hold for it to be there.`, where);
+      return bad('DECLARATION_INVALID', `${said}'s when is { holds: [people] }: the lists or roles this BrainDog must hold for it to be there.`, where);
     }
     const beside = Object.keys(when).filter((k) => k !== 'holds');
     if (beside.length > 0)
@@ -1257,7 +1257,7 @@ export function unplannedHolds(batch: readonly Declaration[]): Refusal | null {
       if (isHolds(part.when))
         return bad(
           'DECLARATION_INVALID',
-          `${at === '' ? decl.id : `${decl.id}.${at}`} waits for what the record holds, which is worked out when its add-on is planned. Install it as part of an add-on, or take the when out.`,
+          `${at === '' ? decl.id : `${decl.id}.${at}`} waits for what this BrainDog holds, which is worked out when its add-on is planned. Install it as part of an add-on, or take the when out.`,
           at === '' ? `${decl.id}.when` : `${decl.id}.${at}.when`,
         );
   return null;
@@ -1320,7 +1320,7 @@ function lookBody(decl: Declaration, installed?: Known): Refusal | null {
   if (!(LOOK_BY as readonly unknown[]).includes(body.by))
     return bad('DECLARATION_INVALID', `${id} says it was arranged by ${JSON.stringify(body.by ?? null)}; a look is by ${LOOK_BY.join(', ')}.`, 'by', [...LOOK_BY]);
   if (body.by === 'owner' && decl.pack !== undefined && decl.pack !== null)
-    return bad('DECLARATION_INVALID', `${id} comes with ${decl.pack} and says the owner arranged it. A pack's look is by rule or by slash; only the record's own is by owner.`, 'by', ['rule', 'slash']);
+    return bad('DECLARATION_INVALID', `${id} comes with ${decl.pack} and says the owner arranged it. A pack's look is by rule or by slash; only this BrainDog's own is by owner.`, 'by', ['rule', 'slash']);
   const basis = textFault(body.basis, LOOK_BASIS_BYTES, 'basis', `${id}'s basis`, 'It is what the look was composed from, so a writer knows when that moved.');
   if (basis) return basis;
   if (body.lead !== undefined && (typeof body.lead !== 'string' || !BLOCK_KEY.test(body.lead)))
@@ -2236,7 +2236,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
             if (block.kind !== 'cards')
               return bad('DECLARATION_INVALID', `${id}.${at} is ${String(block.kind)} and gives a column edit: true, which only a card's line reads. Take edit: off, or draw the block as cards.`, at);
             if (column.metric !== undefined)
-              return bad('DECLARATION_INVALID', `${id}.${at} gives a ${column.as === 'when' ? 'when' : 'trend'} column edit: true, and a ${column.as === 'when' ? 'when over a figure' : 'trend'} is a figure the record works out, never typed. Take edit: off the ${column.as === 'when' ? 'when' : 'trend'}.`, at);
+              return bad('DECLARATION_INVALID', `${id}.${at} gives a ${column.as === 'when' ? 'when' : 'trend'} column edit: true, and a ${column.as === 'when' ? 'when over a figure' : 'trend'} is a figure BrainDog works out, never typed. Take edit: off the ${column.as === 'when' ? 'when' : 'trend'}.`, at);
             if (column.or !== undefined)
               return bad('DECLARATION_INVALID', `${id}.${at} gives a column edit: true and an or:, so a line typed on could be either field. Take the or: off, or edit: off.`, at);
             if (typeof column.field !== 'string' || column.field === '')
@@ -3355,7 +3355,7 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Kn
   if (clock) return clock;
 
   if (body.project !== undefined && (typeof body.project !== 'string' || body.project === ''))
-    return bad('DECLARATION_INVALID', `${id}'s project is the id of the project it runs for, or absent for the whole record.`, 'project');
+    return bad('DECLARATION_INVALID', `${id}'s project is the id of the project it runs for, or absent for all of this BrainDog.`, 'project');
 
   if (channel === 'poll') {
     if (body.body !== undefined) return bad('DECLARATION_INVALID', `${id} is a poll, and a poll sends no body.`, 'body');
@@ -4424,7 +4424,7 @@ function createFault(
   }
 
   if (spec.bound === undefined)
-    return bad('CREATE_UNBOUNDED', `${id}: create has no bound. A generator with no ceiling fills the record.`, 'bound');
+    return bad('CREATE_UNBOUNDED', `${id}: create has no bound. A generator with no ceiling fills your BrainDog.`, 'bound');
 
   /* THE CARDINALITY IS IN THE OTHER DOCUMENT, and that is why this needs the batch. A rule crossing
      `sizes` and `colours` can only be measured against what the register declares those to hold — an
@@ -4662,7 +4662,7 @@ function onceFault(id: string, fields: readonly (FieldLike & { derived?: boolean
   return bad(
     'DECLARATION_INVALID',
     fields.some((f) => f.id === named)
-      ? `${id}'s once names ${named}, which the record works out itself, so no add-on writes it. Take it out of once.`
+      ? `${id}'s once names ${named}, which BrainDog works out itself, so no add-on writes it. Take it out of once.`
       : `${id}'s once names ${named}, and ${id} has no such field.`,
     `once[${at}]`,
     mine,
@@ -5002,7 +5002,7 @@ function fieldRules(id: string, fields: readonly Record<string, unknown>[], titl
     if (f.derived === true && (f.required === true || f.required_when !== undefined))
       return bad(
         'DECLARATION_INVALID',
-        `${said} is derived and ${f.required === true ? 'required' : 'required_when'}. The record computes a derived field and refuses every write to it, so no create could supply it and the requirement is never read. Drop the requirement, or drop derived.`,
+        `${said} is derived and ${f.required === true ? 'required' : 'required_when'}. BrainDog works out a derived field and refuses every write to it, so no create could supply it and the requirement is never read. Drop the requirement, or drop derived.`,
         at,
       );
 
@@ -5051,7 +5051,7 @@ function fieldRules(id: string, fields: readonly Record<string, unknown>[], titl
       if (f.derived === true)
         return bad(
           'DECLARATION_INVALID',
-          `${said} is derived and carries a default. The record computes a derived field and refuses every write to it, so nothing ever reads the default. Drop the default, or drop derived.`,
+          `${said} is derived and carries a default. BrainDog works out a derived field and refuses every write to it, so nothing ever reads the default. Drop the default, or drop derived.`,
           at,
         );
       /* TWO KINDS INSTALL CANNOT FULLY ANSWER FOR, and neither is waved through. A `secret` default
@@ -5063,7 +5063,7 @@ function fieldRules(id: string, fields: readonly Record<string, unknown>[], titl
       if (kind !== 'secret') {
         const held = coerce(f as unknown as FieldDecl, f.default, { refId: () => 'install' });
         if (!held.ok)
-          return bad(held.refusal.code, `${said} has a default the record cannot store. ${held.refusal.fix}`, at, held.refusal.allowed);
+          return bad(held.refusal.code, `${said} has a default BrainDog cannot store. ${held.refusal.fix}`, at, held.refusal.allowed);
         /* MEMBERSHIP IS NOT COERCION. `coerce` reads an enum value as text and leaves the list to
            the write path, which is why a default naming a value the field has not got installed
            clean and then went into the row unread: the create path fills a default without ever
@@ -5682,7 +5682,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     if ((RESERVED_FIELD_IDS as readonly string[]).includes(f.id))
       return bad(
         'FIELD_UNKNOWN',
-        `${id}.${f.id}: ${f.id} is the record's own, not a field a register may declare. It would install and then refuse every write to that field.`,
+        `${id}.${f.id}: ${f.id} is BrainDog's own, not a field a list may declare. It would install and then refuse every write to that field.`,
         f.id,
       );
 
@@ -5975,8 +5975,8 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       return bad(
         'DECLARATION_INVALID',
         PARTS[f.type]
-          ? `${id}.${f.id} is a ${f.type}, which the record stores in two halves, so it cannot be unique. Make a text field that carries what you mean by "the same one".`
-          : `${id}.${f.id} is a ${f.type}, which the record stores as more than one value, so it cannot be unique. Make a text field that carries what you mean by "the same one".`,
+          ? `${id}.${f.id} is a ${f.type}, which BrainDog stores in two halves, so it cannot be unique. Make a text field that carries what you mean by "the same one".`
+          : `${id}.${f.id} is a ${f.type}, which BrainDog stores as more than one value, so it cannot be unique. Make a text field that carries what you mean by "the same one".`,
         f.id,
       );
   }
@@ -6869,7 +6869,7 @@ export function disablePack(
 ): Result<PackToggle> {
   const asked = [id, ...(opts.alsoDisable ?? [])];
   if (asked.includes('kernel'))
-    return no<PackToggle>('PROVIDES_CONFLICT', "kernel is the record's own, and no pack or person may disable it.", { at: 'pack' });
+    return no<PackToggle>('PROVIDES_CONFLICT', "kernel is BrainDog's own, and no pack or person may disable it.", { at: 'pack' });
 
   const standing = new Map(asked.map((p) => [p, packStanding(sql, p)]));
   for (const [p, s] of standing)

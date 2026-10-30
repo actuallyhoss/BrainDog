@@ -167,7 +167,7 @@ export function extension(parts: KernelParts) {
         }
         if (asked.id === undefined && !('body' in asked.said)) return no('REF_UNKNOWN', 'There is no such visual to keep or throw away.', { at: 'visual' });
         if (asked.weight > 0 && weight() + asked.weight > VISUAL_RECORD_MOST)
-          return no('OUT_OF_BOUNDS', `The visuals here come to ${VISUAL_RECORD_MOST / 1024 / 1024} MB, the most one record keeps. Take one away or hand in smaller pictures.`, { at: 'pictures' });
+          return no('OUT_OF_BOUNDS', `The visuals here come to ${VISUAL_RECORD_MOST / 1024 / 1024} MB, the most one BrainDog keeps. Take one away or hand in smaller pictures.`, { at: 'pictures' });
         const to: Json = 'body' in asked.said ? (asked.said.body as unknown as Json) : (asked.said as unknown as Json);
         const line = asked.id === undefined ? id : parts.mint();
         const batch = w.batch ?? parts.mint();

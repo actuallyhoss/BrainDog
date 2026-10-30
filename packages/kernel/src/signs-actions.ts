@@ -114,9 +114,9 @@ const ingestName = (sql: Sql, bare: string): string => declaredName(sql, `ingest
 const KIND_WORDS: Readonly<Record<string, string>> = {
   reminder: 'A reminder',
   retry: 'A retry of something sent out',
-  purge: "The record's clean-up",
+  purge: "BrainDog's clean-up",
   rotate: 'A key rotation',
-  analyse: "The record's weekly look at itself",
+  analyse: "BrainDog's weekly look at itself",
   score: 'A scoring pass',
   digest: 'A digest',
   snapshot: 'A nightly reading',
@@ -149,7 +149,7 @@ function statusSaid(status: number | null, outcome: string | null): string {
   if (status !== null && status >= 500) return `the provider failed on its side (${status})`;
   if (status !== null && status >= 400) return `the provider turned it away (${status})`;
   if (outcome === 'held') return "the plan's limit held it";
-  if (outcome === 'refused') return 'the record refused to send it';
+  if (outcome === 'refused') return 'BrainDog refused to send it';
   if (outcome === 'dropped') return 'its answer could not be read';
   return 'its last run did not finish';
 }

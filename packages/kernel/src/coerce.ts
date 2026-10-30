@@ -122,7 +122,7 @@ function overCap(type: keyof typeof TEXT_CAPS, value: string, at: string): Coerc
  */
 function nulRefused(value: string, at: string): Coerced | null {
   if (!value.includes('\u0000')) return null;
-  return bad('VALUE_MALFORMED', `${at} has a hidden character in it (U+0000, the null character), which a record cannot keep in text. Send it again without that character.`, at);
+  return bad('VALUE_MALFORMED', `${at} has a hidden character in it (U+0000, the null character), which BrainDog cannot keep in text. Send it again without that character.`, at);
 }
 
 /**
@@ -822,7 +822,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       /* TWO SCHEMES. Anything else in a record is a link somebody will eventually click out of a
          page the record rendered, and `javascript:` and `data:` are the two that matter. */
       if (url.protocol !== 'https:' && url.protocol !== 'mailto:')
-        return malformed(`${at} is ${url.protocol.replace(':', '')}; a record holds https and mailto.`);
+        return malformed(`${at} is ${url.protocol.replace(':', '')}; BrainDog keeps https and mailto links.`);
       return good(url.href);
     }
 

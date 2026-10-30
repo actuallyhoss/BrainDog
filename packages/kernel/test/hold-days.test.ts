@@ -51,7 +51,7 @@ test('SEVEN GREEN DAYS READ 7, and the run ends where the kept days start', asyn
   assert.equal(h.days, 7);
   assert.equal(h.ended, 'start');
   assert.equal(h.on, '2026-10-01');
-  assert.match(h.said, /^7 days in a row with every watched sign green\. The record kept no readings before 2 October\.$/);
+  assert.match(h.said, /^7 days in a row with every watched sign green\. BrainDog kept no readings before 2 October\.$/);
 });
 
 test('AN EMPTY RECORD holds nothing, and says no day has been read', async () => {

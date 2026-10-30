@@ -1389,7 +1389,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
   }
   const decl = deps.trial ?? pinned(deps.sql, run.rule, run.version);
   if (!decl) {
-    finish(deps, run, 'failed', `rule.${run.rule} version ${run.version}, which this run started under, is not in the record.`);
+    finish(deps, run, 'failed', `rule.${run.rule} version ${run.version}, which this run started under, is not in this BrainDog.`);
     return null;
   }
 
@@ -2177,7 +2177,7 @@ function ask(
         'SELECT m.person_id AS id FROM member m JOIN person p ON p.id = m.person_id WHERE m.person_id = ? AND p.suspended_at IS NULL LIMIT 1',
         to,
       );
-      if (!member) return { ok: false, say: `rule.${rule} puts its question at step ${n + 1} to one member, and nobody the record holds by that id is a member now, so nothing was asked.` };
+      if (!member) return { ok: false, say: `rule.${rule} puts its question at step ${n + 1} to one member, and nobody this BrainDog holds by that id is a member now, so nothing was asked.` };
     }
     const opened = deps.ask(question, shape === 'choice' ? options : [], actor, {
       run,

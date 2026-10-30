@@ -168,7 +168,7 @@ export async function deviceStart(
   /* `report:` AND `job:` NAME THE RECORD'S OWN KEYS (`createReportKey`, `claimJob`), which the plan's count passes, and a
      login's label becomes its key's: a device named like one would connect an agent past the count. */
   if (label.startsWith('report:') || label.startsWith('job:'))
-    return no('VALUE_MALFORMED', 'A device name cannot begin report: or job:, which name keys the record makes itself. Choose another name.', { at: 'label' });
+    return no('VALUE_MALFORMED', 'A device name cannot begin report: or job:, which name keys BrainDog makes itself. Choose another name.', { at: 'label' });
 
   const reach = args.reach as Reach;
   const scope = args.scope ?? null;
@@ -408,9 +408,9 @@ export async function renameDevice(deps: TokenDeps, handle: string, label: strin
     return no('OUT_OF_BOUNDS', `A machine's name is at most ${String(MACHINE_NAME_MAX)} characters, and this is ${String(name.length)}. Choose a shorter one.`, { at: 'label' });
   if (/\p{Cc}/u.test(name)) return no('VALUE_MALFORMED', "A machine's name is one line, with no tab or line break. Type it on one line.", { at: 'label' });
   if (name.includes(SEAM.trim()))
-    return no('VALUE_MALFORMED', "A machine's name cannot hold a middle dot, which the record uses to say what the machine does. Leave it out.", { at: 'label' });
+    return no('VALUE_MALFORMED', "A machine's name cannot hold a middle dot, which BrainDog uses to say what the machine does. Leave it out.", { at: 'label' });
   if (name.startsWith('report:') || name.startsWith('job:'))
-    return no('VALUE_MALFORMED', 'A machine cannot be called report: or job:, which name keys the record makes itself. Choose another name.', { at: 'label' });
+    return no('VALUE_MALFORMED', 'A machine cannot be called report: or job:, which name keys BrainDog makes itself. Choose another name.', { at: 'label' });
 
   let found: Stored | undefined;
   for (const row of deps.sql.all<Stored>(`SELECT ${VISIBLE}, code_hash, token_hash FROM device_grant`))

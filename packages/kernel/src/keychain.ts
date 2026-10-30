@@ -628,7 +628,7 @@ export function sealedGrant(
       'WRONG_KEY',
       purpose === 'connector'
         ? 'This BrainDog’s connector key is not held by a key this host can use, so scheduled runs cannot open it.'
-        : 'This BrainDog’s own record key is behind a passphrase or a key this host cannot use, so the key that signs this post cannot be opened without a person present.',
+        : 'This BrainDog’s own key is behind a passphrase or a key this host cannot use, so the key that signs this post cannot be opened without a person present.',
       { at: 'kek_id' },
     );
 

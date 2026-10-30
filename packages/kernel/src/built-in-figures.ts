@@ -431,7 +431,7 @@ export function readTidy(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: Metric
   const d = decl as TidyDecl;
   if (d.tidy === 'tidied') {
     const days = Math.max(1, Math.round((intervalMs(decl.window ?? '7d') ?? 7 * 86_400_000) / 86_400_000));
-    const read = judged(decl, tidied(sql, ctx.nowMs, days, d.finder), `cleared by the record in ${days === 1 ? 'the last day' : `${days} days`}`);
+    const read = judged(decl, tidied(sql, ctx.nowMs, days, d.finder), `cleared by BrainDog in ${days === 1 ? 'the last day' : `${days} days`}`);
     /* EACH FINDER'S SHARE, from the same kept lines: a finder no longer registered is said by its id's own words. */
     if (d.finder !== undefined) return read;
     const by = new Map<string, number>();
@@ -520,7 +520,7 @@ export const KIND_SAID: Readonly<Record<string, string>> = {
   import: 'Imported',
   erase: 'Erased',
   migrate: 'Migrated',
-  'restore.pitr': 'Put the record back',
+  'restore.pitr': 'Put back to an earlier copy',
 };
 
 /** How many kinds "What changed" says by name before the rest are one part, and that part's key, which no kind is. */
@@ -1655,7 +1655,7 @@ export function readListsShrunk(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOf
   const from = [...then.values()].reduce((m, p) => (p.wrote_at > m ? p.wrote_at : m), '');
   const to = [...now.values()].reduce((m, p) => (p.wrote_at > m ? p.wrote_at : m), '');
   const whole = sql.one<{ n: number }>("SELECT count(*) AS n FROM event WHERE kind IN ('erase', 'restore.pitr') AND ts > ? AND ts <= ?", from, to);
-  if (Number(whole?.n ?? 0) > 0) return judged(decl, 0, 'the record was erased from or restored between the two nights, so nothing fell unexplained');
+  if (Number(whole?.n ?? 0) > 0) return judged(decl, 0, 'something was erased or put back between the two nights, so nothing fell unexplained');
   const shrunk: string[] = [];
   for (const [list, p] of then) {
     const fell = Number(p.value) - Number(now.get(list)?.value ?? 0);

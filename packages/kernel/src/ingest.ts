@@ -896,7 +896,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
         ingest: receipt?.ingest_id ?? null,
         state: already.state as Arrived['state'],
         wrote: receipt ? (JSON.parse(receipt.wrote) as string[]) : [],
-        reason: 'this arrived before, and the record kept what it did the first time',
+        reason: 'this arrived before, and BrainDog kept what it did the first time',
         redelivered: true,
       });
     }

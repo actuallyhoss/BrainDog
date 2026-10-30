@@ -801,7 +801,7 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       const tail = valued[valued.length - 1]!;
       if (erasedOrWithheld(head.from_v) || erasedOrWithheld(tail.to_v)) {
         const erased = (head.from_v ?? '').includes(ERASED_MARK) || (tail.to_v ?? '').includes(ERASED_MARK);
-        skip(id, title, erased ? `the earlier ${label} was erased` : `the record keeps no copy of the earlier ${label}`);
+        skip(id, title, erased ? `the earlier ${label} was erased` : `BrainDog keeps no copy of the earlier ${label}`);
         continue;
       }
       const from = parse(head.from_v);
@@ -1131,7 +1131,7 @@ function declaredIn(sql: Sql, lines: readonly Line[], opts: UndoOptions, skip: (
       }
       const prior = at(c.id, c.prior);
       if (!prior) {
-        skip(title, 'the record no longer holds how it read before');
+        skip(title, 'BrainDog no longer holds how it read before');
         continue;
       }
       if (erasedOrWithheld(prior.body)) {

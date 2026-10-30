@@ -53,7 +53,7 @@ test('EACH MARK ENDS THE RUN on its day: a requeue by a person, a restore, a rep
     assert.equal(h.days, 2, `${what} did not end the run`);
     assert.equal(h.ended, 'hand');
     assert.equal(h.on, dayBefore(TODAY, 3));
-    assert.match(h.said, /^2 days in a row with every watched sign green\. An operator's hand touched the record on 6 October\.$/);
+    assert.match(h.said, /^2 days in a row with every watched sign green\. An operator's hand touched this BrainDog on 6 October\.$/);
   }
 });
 

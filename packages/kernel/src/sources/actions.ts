@@ -88,7 +88,7 @@ function actionsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
   if (!deps.actions)
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its scheduled actions onto a page yet.', at: 'source' }) };
   if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions come in the order the record lists them, so it takes no order:.', at: 'order' }) };
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions come in the order BrainDog lists them, so it takes no order:.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(ACTIONS.fields, f));
   if (unknown.length)
     return {

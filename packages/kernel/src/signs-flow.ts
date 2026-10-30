@@ -205,8 +205,8 @@ function readRefused(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () 
 function whyRefused(note: string | null, log: string | null): string {
   const said = note ?? '';
   if (/ asked to write outside what it may write/u.test(said)) return 'wrote outside the lists it may write';
-  if (/ asked nothing: /u.test(said)) return 'asked a question the record would not take';
-  if (/ wrote nothing: write \d+ of \d+ was refused/u.test(said)) return 'had a write the record refused';
+  if (/ asked nothing: /u.test(said)) return 'asked a question BrainDog would not take';
+  if (/ wrote nothing: write \d+ of \d+ was refused/u.test(said)) return 'had a write BrainDog refused';
   const why = typeof log === 'string' && log !== '--redacted--' ? (log.split('\n')[0] ?? '') : '';
   if (/ ran past its wall_ms /u.test(why)) return 'ran out of time';
   if (/ spent more than its cpu_ms |exceeded CPU/iu.test(why)) return 'ran out of processing time';

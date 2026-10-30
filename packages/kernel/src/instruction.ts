@@ -642,7 +642,7 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
     for (const [n, r] of input.attach.entries()) {
       const ref = typeof r === 'string' ? r.trim() : '';
       if (ref === '' || ref.length > ATTACH_REF_MOST || /[\p{Cc}]/u.test(ref))
-        return no('VALUE_MALFORMED', 'Each row sent with it is named as the record says it, like tasks#12.', { at: `attach[${String(n)}]` });
+        return no('VALUE_MALFORMED', 'Each row sent with it is named as BrainDog says it, like tasks#12.', { at: `attach[${String(n)}]` });
       if (!attach.includes(ref)) attach.push(ref);
     }
   }
@@ -650,7 +650,7 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
     return no('VALUE_MALFORMED', 'may_change is true or false.', { at: 'may_change' });
   const job = typeof input.job === 'string' && input.job.trim() !== '' ? input.job.trim() : null;
   if (input.job !== undefined && input.job !== null && (job === null || !JOB_REF.test(job)))
-    return no('VALUE_MALFORMED', 'job is a job as the record names it, j_ and twenty-six letters and digits.', { at: 'job' });
+    return no('VALUE_MALFORMED', 'job is a job as BrainDog names it, j_ and twenty-six letters and digits.', { at: 'job' });
   if ((job !== null || attach.length > 0 || typeof input.may_change === 'boolean') && kind !== 'tell')
     return no('VALUE_MALFORMED', 'Only an instruction to do something carries rows, a job or leave to change files.', { at: job !== null ? 'job' : attach.length > 0 ? 'attach' : 'may_change' });
   if (job !== null && d.sql.one('SELECT 1 AS y FROM job WHERE id = ?', job) === undefined)

@@ -116,7 +116,7 @@ export function mintInvitation(deps: InviteDeps, by: string, args: InviteArgs, s
   /* AN INVITATION TO NOTHING IS NO INVITATION, BUT ONE TO WHAT IS SHARED WITH THE ADDRESS IS (sharing plan slice 8): a
      share made to an email waits for that person, and the link is how they come for it. */
   if (args.level === undefined && Object.keys(args.registers ?? {}).length === 0 && !waitingFor(deps.sql, email, deps.nowMs))
-    return no<Invited>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on the record or on a register, or something is shared with them first.', { at: 'level' });
+    return no<Invited>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on all of this BrainDog or on one list, or something is shared with them first.', { at: 'level' });
   /* `at` IS A PATH INTO WHAT THE CALLER SENT, and `registers` is an object keyed by slug, so the
      entry that is wrong is at `registers.<slug>`. Both branches passed the bare slug, which names a
      value rather than a place: no payload has a top-level `nope` key, and a screen given `nope` has

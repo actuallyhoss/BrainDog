@@ -1117,7 +1117,7 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
       const failed = arrivals.find((a) => !a.ok);
       if (failed) {
         outcome = 'refused';
-        say = `${ingest} ran, and its answer could not be written: ${'refusal' in failed ? failed.refusal.fix : 'the record refused it'}`;
+        say = `${ingest} ran, and its answer could not be written: ${'refusal' in failed ? failed.refusal.fix : 'BrainDog refused it'}`;
       }
     }
 

@@ -262,7 +262,7 @@ function askOf(deps: Pick<ScriptRunDeps, 'registerOf'>, script: string, writes: 
         return { why: `${script} asked a question whose answer "${label}" carries a change that is not { id, version, fields }.` };
       const register = deps.registerOf(p.id);
       if (register === null || !writes.includes(register))
-        return { why: `${script} asked a question whose answer "${label}" would change ${p.id}${register === null ? ', which names nothing in the record' : ` in ${register}`}, and it may write only to ${only}.` };
+        return { why: `${script} asked a question whose answer "${label}" would change ${p.id}${register === null ? ', which names nothing in this BrainDog' : ` in ${register}`}, and it may write only to ${only}.` };
       /* A WHOLE VERSION OR NO QUESTION. A write a run makes may leave it out, but a change made days later by whoever
          answers must say what it read, so a line edited since is not overwritten by an old reading of it. */
       if (typeof p.version !== 'number' || !Number.isSafeInteger(p.version) || p.version < 1)
@@ -335,7 +335,7 @@ export function proposalOf(deps: Pick<ScriptRunDeps, 'registerOf'>, script: stri
   if (typeof kind !== 'string' || !(SCRIPT_PROPOSAL_KINDS as readonly string[]).includes(kind))
     return no(
       'ENUM_VALUE_UNKNOWN',
-      `A script asks about rows, with a rowset or options, and ${JSON.stringify(kind ?? null)} is neither. A change to the record's lists, automations or add-ons is a person's or an agent's to propose.`,
+      `A script asks about rows, with a rowset or options, and ${JSON.stringify(kind ?? null)} is neither. A change to this BrainDog's lists, automations or add-ons is a person's or an agent's to propose.`,
       { at: 'body_kind', allowed: [...SCRIPT_PROPOSAL_KINDS] },
     );
   if (!isObject(p.body)) return no('REQUIRED_MISSING', `A ${kind} carries its body: ${kind === 'rowset' ? '{ register, rows }' : '{ options }'}.`, { at: 'body' });
@@ -567,7 +567,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   const checked = answer.ask === undefined || answer.ask === null ? null : askOf(deps, script, decl.writes, Math.min(declared ?? WRITES_CEILING, WRITES_CEILING), answer.ask);
   if (checked !== null && 'why' in checked) {
     done();
-    return refuse(`${script} wrote nothing and asked nothing: its question was not one the record can put to anybody; its log says why.`, checked.why);
+    return refuse(`${script} wrote nothing and asked nothing: its question was not one BrainDog can put to anybody; its log says why.`, checked.why);
   }
   const asked = checked?.asked ?? null;
   let filed: { id: string; joined?: true; answered?: unknown } | null = null;
@@ -672,8 +672,8 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     /* THE ACK WAS ROLLED BACK WITH THE WRITES, so it is made again on its own. */
     done();
     const why = 'refusal' in applied ? applied.refusal.fix : 'a row it updates was changed by somebody else first.';
-    if (askRefused) return refuse(`${script} wrote nothing and asked nothing: the record refused its question; its log says why.`, why);
-    if (proposeRefused >= 0) return refuse(`${script} wrote nothing and asked nothing: the record refused question ${proposeRefused + 1} of ${proposals.length} it proposed; its log says why.`, why);
+    if (askRefused) return refuse(`${script} wrote nothing and asked nothing: BrainDog refused its question; its log says why.`, why);
+    if (proposeRefused >= 0) return refuse(`${script} wrote nothing and asked nothing: BrainDog refused question ${proposeRefused + 1} of ${proposals.length} it proposed; its log says why.`, why);
     return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused; its log says why.`, why);
   }
   const n = answer.writes.length;
