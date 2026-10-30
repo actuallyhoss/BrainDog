@@ -148,8 +148,17 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
          Added in 1.23.0. Never the key: a text field goes through the kernel's credential check, so one shaped like a key
          is refused. */
       { id: 'account', label: 'Account', type: 'text', max: 280, search: true },
-      /* The kinds the vault seals (`packages/kernel/src/vault.ts`). */
-      { id: 'kind', label: 'Kind', type: 'enum', values: ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'], required: true, index: true },
+      /* The kinds the vault seals (`packages/kernel/src/vault.ts`). SAID AS THE KEYCHAIN SAYS THEM SINCE 1.28.0: a key's
+         page read "Kind: Api token" and "Ssh key", the stored value with its first letter raised. */
+      {
+        id: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        values: ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'],
+        labels: { api_token: 'API token', password: 'Password', ssh_key: 'SSH key', recovery_codes: 'Recovery codes', note: 'Note' },
+        required: true,
+        index: true,
+      },
       { id: 'project', label: 'Where it applies', type: 'ref', to: 'things', index: true, scope: { widen: 'person' } },
       { id: 'value', label: 'Locked value', type: 'secret' },
       /* For a key that is not in the Keychain: where a person finds it. */
@@ -182,8 +191,17 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
     mobile: ['name', 'kind', 'project'],
     fields: [
       { id: 'name', label: 'Name', type: 'text', required: true, max: 64, index: true, search: true },
-      { id: 'kind', label: 'Kind', type: 'enum', values: ['mcp', 'cli', 'integration'], required: true, index: true },
-      { id: 'transport', label: 'Transport', type: 'enum', values: ['stdio', 'http'], required_when: { field: 'kind', is: 'mcp' } },
+      { id: 'kind', label: 'Kind', type: 'enum', values: ['mcp', 'cli', 'integration'], labels: { mcp: 'MCP server', cli: 'Command line', integration: 'Integration' }, required: true, index: true },
+      /* HOW IT RUNS IN PLAIN WORDS SINCE 1.28.0: a tool's page read "Transport: Stdio" and "Transport: Http". The values
+         stay what an MCP client writes; only what a person reads changed. */
+      {
+        id: 'transport',
+        label: 'How it runs',
+        type: 'enum',
+        values: ['stdio', 'http'],
+        labels: { stdio: 'Runs on your machine', http: 'Reached over the web' },
+        required_when: { field: 'kind', is: 'mcp' },
+      },
       { id: 'command', label: 'Command', type: 'text', max: 512, required_when: { field: 'transport', is: 'stdio' } },
       { id: 'args', label: 'Arguments', type: 'list', of: 'text' },
       /* Text and not `url`, because `url` refuses an `http:` address and a local server has one. */
@@ -855,8 +873,11 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.25.0 IS WORDS, SO IT IS MINOR (round 1030): the first line counts the runs Open now draws, working and open and
      quiet, where "Nobody working right now" stood over runs heard just now. No list, field or figure goes.
      1.27.0 IS WORDS, SO IT IS MINOR (the recheck of 30 October, 26): the runs open now are headed Working now, as Today
-     heads the same runs, where they were headed Open now. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.27.0', requires: ['register.things'] },
+     heads the same runs, where they were headed Open now. No list, field or figure goes.
+     1.28.0 IS WORDS, SO IT IS MINOR (words-e, 30 October): a tool says how it runs, "Runs on your machine" or "Reached
+     over the web", where it said Transport: Stdio or Http, and its kind as MCP server or Command line; a key says its
+     kind as the Keychain does, API token or SSH key. Only labels change: no value, list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.28.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
