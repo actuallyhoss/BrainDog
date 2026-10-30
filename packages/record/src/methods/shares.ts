@@ -17,9 +17,10 @@
  * the owner and carries row ids, the lists and fields each block reads, addresses of other pages and whatever a block
  * kind added last month. A list of keys to take off leaks the first key nobody thought of, so `shownBlock` builds each
  * block from nothing: how it is drawn (`LOOKS`), what the record computed that names no row (`FIGURES`), and each row's
- * own values of the fields the block draws, by field type (`SHOWN_TYPES`). A kind that writes, links, or reads across
- * the record is not sent at all (`HEADING_ONLY`, `ACROSS`): its heading alone would say "Nothing is waiting on you"
- * about a record where things are.
+ * own values of the fields the block draws, by field type (`SHOWN_TYPES`). WHICH BLOCKS ARE SENT IS A LIST OF WHAT IS
+ * KEPT TOO (`SHARE_KINDS`, `shareDraws`): a kind or a source nobody put on it is not sent at all, so a source added to
+ * the kernel next month reaches no link until somebody decides it may. A block that writes, links, or reads across the
+ * record is never sent: its heading alone would say "Nothing is waiting on you" about a record where things are.
  *
  * AND IT TELLS THE TRUTH. Every cell carries its type and its value, money whole as minor units and its own
  * currency; every column and figure carries the label the owner reads; a `{{path}}` in the owner's words is filled here
@@ -119,16 +120,44 @@ const FIGURES = [
 ] as const;
 
 /**
- * The kinds a link never sends, not even their heading. `capture` and `inputs` write; a `link` block is links; `feed`,
- * `queue` and `agents` read the whole record's log and questions and name rows of every list; a `diff` names who
- * changed a row and when. A `project` block is the project's own shape (its hero, its work, who is on it, what
- * happened), which the app reads beside the page from across the record, so a link held only its heading and drew the
- * page's tab names as empty cards ("Overview", "Numbers and work").
+ * THE KINDS A LINK MAY DRAW: AN ALLOW-LIST, NOT A LIST OF WHAT IS HELD BACK (security review of 30 Oct, SEC2). Every
+ * kind the kernel admits that draws what the page itself reads. Not here, so never sent, not even their heading:
+ * `capture`, `inputs` and `form` write; a `link` block is links; `feed`, `queue` and `agents` read the whole record's
+ * log and questions and name rows of every list; a `diff` names who changed a row and when; a `project` block is the
+ * project's own shape, which the app reads beside the page from across the record. A kind added later is not sent until
+ * it is put here, which `shares-allow.test.ts` asks of every kind the kernel knows.
  */
-const HEADING_ONLY: ReadonlySet<string> = new Set(['capture', 'inputs', 'link', 'feed', 'queue', 'agents', 'diff', 'project']);
+export const SHARE_KINDS: ReadonlySet<string> = new Set([
+  'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree',
+  'comparison', 'table', 'cards', 'section', 'sparkline', 'split', 'bridge', 'series', 'forecast', 'lines', 'progress',
+  'roadmap', 'ring', 'heat', 'kpis', 'calendar', 'gallery', 'embed', 'lanes', 'drawn',
+]);
 
-/** And the computed sources that read across the whole record, whatever kind draws them, as `index.ts`'s `ACROSS` holds. */
-const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'sessions.live', 'sessions.working', 'signs']);
+/** Whether a link may draw a kind: one of `SHARE_KINDS`, or a kind a pack declares (`block.x`), which draws only on display primitives. */
+export const shareKind = (kind: string): boolean => SHARE_KINDS.has(kind) || /^block\.[a-z][a-z0-9_-]{0,31}$/u.test(kind);
+
+/**
+ * THE COMPUTED SOURCES A LINK MAY DRAW, BY NAME, beside a list's rows (`register.x`) and a figure (`metric.x`). Each reads
+ * named lists the page already shows and names no row of any other: a cash walk over the legs its block names, and the
+ * figures pinned to Home. Every other source the kernel registers (`SOURCE_MODULES`) is held back, whether it reads the
+ * whole record (`activity`, `governance.*`, `usage.*`, `exceptions`, `kpis`, `scripts`) or rows of lists the page never
+ * shows (`handoffs.open` sent agents' next steps, `deadlines` every list's rows and states): the old list of what was
+ * held back had drifted from the record's own and let all of those through.
+ */
+export const SHARE_SOURCES: ReadonlySet<string> = new Set(['forecast.runway', 'figures.home']);
+
+/** Whether a link may draw a block with this `source`: none, a list's rows, a figure, or one of `SHARE_SOURCES`. */
+export const shareDraws = (source: unknown): boolean =>
+  source === undefined ||
+  source === null ||
+  source === '' ||
+  (typeof source === 'string' && (/^(?:register|metric)\.[a-z]/u.test(source) || SHARE_SOURCES.has(source)));
+
+/**
+ * The lists that, named among what a block reads, keep it off a link: the whole record (`*`, as the kernel names a block
+ * over a source that reads across it) and the agents' runs (`session`), whose rows carry what an agent is doing next.
+ */
+const NEVER_READ: ReadonlySet<string> = new Set(['*', 'session']);
 
 /**
  * The field types whose values a shared row keeps. Absent are `ref` (another row's id), `file` (a stored file the
@@ -449,6 +478,8 @@ type Showing = {
   typed: (form: TypedForm, arg: string) => string | undefined;
   /** And a typed form in a fence's row, where a day is said as a day. */
   cell: (form: TypedForm, arg: string) => string | undefined;
+  /** The lists a block reads, as the kernel names them (`blockRegisters`), `*` for the whole record. */
+  reads: (b: BlockResult) => readonly string[];
 };
 
 /** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
@@ -485,7 +516,8 @@ const WORDS = ['heading', 'lead', 'empty', 'body'] as const;
  */
 const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> | null => {
   const { lists, figure, said, typed, cell } = showing;
-  if (typeof b.kind !== 'string' || HEADING_ONLY.has(b.kind) || (typeof b.source === 'string' && ACROSS.has(b.source))) return null;
+  if (typeof b.kind !== 'string' || !shareKind(b.kind) || !shareDraws(b.source)) return null;
+  if (showing.reads(b).some((list) => NEVER_READ.has(list))) return null;
   if (b.refusals.length > 0) return null;
   const block = b as unknown as Record<string, unknown>;
   const kept: Record<string, unknown> = {};
@@ -496,6 +528,20 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
   if (kept.body === '') delete kept.body;
 
   for (const key of FIGURES) if (block[key] !== undefined) kept[key] = block[key];
+  /* A ROW'S PROJECT AND A CARD'S NEXT STEP ARE TITLES OF ROWS OF OTHER LISTS, sent only where a column draws them (SEC2).
+     `scopes` is computed for a block that inherits by its project as well as for one that draws it, and fell back to a
+     raw row id where the title could not be read, so an id is blanked as every other address into the record is. */
+  const roles = new Set((b.columns ?? []).map((c) => c.as));
+  for (const [key, role] of [['scopes', 'scope'], ['scope_marks', 'scope'], ['nexts', 'next']] as const) {
+    if (kept[key] === undefined) continue;
+    if (!roles.has(role)) delete kept[key];
+    else if (Array.isArray(kept[key]))
+      kept[key] = (kept[key] as unknown[]).map((v) => {
+        if (typeof v !== 'string') return v;
+        const said = v.split(', ').filter((part) => !inside(part)).join(', ');
+        return said === '' ? null : said;
+      });
+  }
   if (typeof block.target === 'number') kept.target = block.target;
 
   const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
@@ -540,7 +586,7 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
 };
 
 /** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
-type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure'] };
+type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure']; reads: Showing['reads'] };
 
 /**
  * The page as a link shows it: its title, when it was read, its layout, when the link closes, the language and zone it
@@ -550,7 +596,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
   const layout = isRecord(page.layout) ? page.layout : null;
   const language = languageOf(where.language);
   const zone = typeof where.zone === 'string' && where.zone !== '' ? where.zone : typeof page.zone === 'string' && page.zone !== '' ? page.zone : 'UTC';
-  const showing: Showing = { lists, figure: where.figure, said: saidIn(language, where.home), typed: typedIn(where.now, zone, where.home), cell: typedIn(where.now, zone, where.home, true) };
+  const showing: Showing = { lists, figure: where.figure, reads: where.reads, said: saidIn(language, where.home), typed: typedIn(where.now, zone, where.home), cell: typedIn(where.now, zone, where.home, true) };
   const blocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
   return {
     title: page.title,
@@ -778,7 +824,8 @@ export function methods(deps: RecordDeps) {
          held and none chosen is no home, and every amount keeps its code. */
       const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
       const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
-      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure }));
+      const reads = (b: BlockResult): readonly string[] => kernel.blockRegisters(b as unknown as Parameters<typeof kernel.blockRegisters>[0]);
+      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads }));
     },
   };
 }
