@@ -32,6 +32,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { keptWithUndo, type Deps } from '$lib/record/pref-write.ts';
+  import { moneyInText } from '$lib/record/money.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -170,7 +171,9 @@
      else the names of three of his lists. A made-up studio stood there before. Nothing until the record answers. */
   const previewRows = $derived.by((): string[] => {
     const b = booted as { waiting?: { question?: unknown }[]; registers?: { name?: unknown; kernel?: boolean }[] } | null;
-    const asked = (b?.waiting ?? []).map((w) => (typeof w.question === 'string' ? w.question.trim() : '')).filter((q) => q !== '');
+    /* AN AMOUNT IN A QUESTION IS SAID AS EVERY SCREEN SAYS IT (`moneyInText`): the preview read "GBP 39.00" where Needs
+       you reads "£39" (audit of 31 October, A20). */
+    const asked = (b?.waiting ?? []).map((w) => (typeof w.question === 'string' ? moneyInText(w.question.trim()) : '')).filter((q) => q !== '');
     if (asked.length > 0) return asked.slice(0, 3);
     return (b?.registers ?? []).filter((r) => r.kernel !== true && typeof r.name === 'string').map((r) => String(r.name)).slice(0, 3);
   });

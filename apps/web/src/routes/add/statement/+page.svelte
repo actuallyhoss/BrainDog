@@ -37,6 +37,16 @@
   });
 
   const accounts = $derived(loader.value?.accounts ?? []);
+  /* AN ACCOUNT'S CURRENCY IS SAID ONLY WHERE THE ACCOUNTS HOLD MORE THAN ONE, and then by its name: the picker read
+     "Company card GBP", a bank code beside every account of one currency (audit of 31 October, A20). */
+  const manyCurrencies = $derived(new Set(accounts.map((a) => a.currency)).size > 1);
+  const currencyName = (code: string): string => {
+    try {
+      return new Intl.DisplayNames('en', { type: 'currency', fallback: 'none' }).of(code) ?? '';
+    } catch {
+      return '';
+    }
+  };
   const wanted = $derived(Number(page.url.searchParams.get('account') ?? ''));
   let chosen = $state<number | null>(null);
   const account = $derived<Into | null>(accounts.find((a) => a.seq === (chosen ?? wanted)) ?? accounts[0] ?? null);
@@ -166,12 +176,12 @@
         <Segmented role="group" aria-labelledby="st-account" full>
           {#each accounts as a (a.seq)}
             <button type="button" class="segment" data-on={a.seq === account.seq ? '' : undefined} aria-pressed={a.seq === account.seq} onclick={() => (chosen = a.seq)}>
-              {a.name} <span class="st-quiet">{a.currency}</span>
+              {a.name}{#if manyCurrencies && currencyName(a.currency)}{' '}<span class="st-quiet">{currencyName(a.currency)}</span>{/if}
             </button>
           {/each}
         </Segmented>
       {:else}
-        <p class="st-one"><strong>{account.name}</strong> <span class="st-quiet">{account.currency}</span></p>
+        <p class="st-one"><strong>{account.name}</strong></p>
       {/if}
     </section>
 
@@ -238,7 +248,7 @@
               <span class="st-quiet">{words.checking}</span>
             {/if}
           </p>
-          {#if reading.other > 0}<p class="st-quiet">{words.otherCurrency(reading.other, account.currency)}</p>{/if}
+          {#if reading.other > 0}<p class="st-quiet">{words.otherCurrency(reading.other)}</p>{/if}
           {#if reading.unread > 0}<p class="st-quiet">{words.unread(reading.unread)}</p>{/if}
           {#if heldFailed}<p class="st-warn">The Ledger could not be read, so no line is marked as already there.</p>{/if}
           <div class="st-table-wrap">
