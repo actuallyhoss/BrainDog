@@ -89,7 +89,7 @@ export function extension(parts: KernelParts) {
       }
       if (compares) passphraseCleared(sql);
       if (out.value.to !== to)
-        return no('VALUE_MALFORMED', 'The host re-wrapped the record key the other way from the one asked, so nothing was changed.', { at: 'passphrase' });
+        return no('VALUE_MALFORMED', 'The host re-wrapped this BrainDog’s key the other way from the one asked, so nothing was changed.', { at: 'passphrase' });
       const done = rewrapRecordKey(sql, { mint: parts.mint, nowMs: parts.clock.now(), actor }, out.value, held.nonce, parts.transaction);
       return done.ok ? ok({ on: done.value.wrapped_by === 'passphrase' }) : done;
     },

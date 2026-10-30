@@ -87,7 +87,7 @@ export function failOf(r: Result<unknown>, host: string): Fail {
       return { fail: 'refused', said: `${host} refused this sign-in for setup sync, which takes this machine's own login and never an agent app's or a narrowed key. Run braindog login ${host} on this machine, and leave BRAINDOG_TOKEN unset.` };
     return { fail: 'refused', said: fix.slice(0, 300) };
   }
-  return { fail: 'refused', said: 'The record changed under this command. Run it again.' };
+  return { fail: 'refused', said: 'Something changed under this command. Run it again.' };
 }
 
 export const isFail = (x: unknown): x is Fail => isObject(x) && typeof x.fail === 'string' && typeof x.said === 'string';

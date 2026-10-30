@@ -216,7 +216,7 @@ test('AN AMOUNT THE LOG WITHHELD IS NEVER GUESSED AT, and a move the list does n
   r.clock.advance(10 * MIN);
   value(r.k.update('tasks', made.id, { cost: { amount: 130_000, currency: 'GBP' } }, AGENT));
   const money = plan(r, { batch: lastBatch(r.sql, made.id) });
-  assert.deepEqual(money.lines, ['Leaves "Pay rent" as it is: the record keeps no copy of the earlier cost.']);
+  assert.deepEqual(money.lines, ['Leaves "Pay rent" as it is: BrainDog keeps no copy of the earlier cost.']);
 
   /* done → doing only, so a task an agent moved straight from open to done cannot be walked back to open. */
   r.clock.advance(MIN);

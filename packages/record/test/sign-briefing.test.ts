@@ -105,7 +105,7 @@ test('RED: a briefing that hands a step from a run the record does not hold', as
   const lie: Context = { ...real, handoff: { ...real.handoff!, from: 'S99' } };
   const r = await readBriefingSign({ sql, briefing: () => lie }, NOW);
   assert.equal(r.state, 'red');
-  assert.equal(r.said, 'The briefing for kiln hands a step no run on the record left.');
+  assert.equal(r.said, 'The briefing for kiln hands a step no run in this BrainDog left.');
   assert.equal((await readBriefingSign(deps, NOW)).state, 'green', 'the record’s own briefing is true');
   void api;
 });

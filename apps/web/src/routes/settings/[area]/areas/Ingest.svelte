@@ -194,6 +194,10 @@
    * channel line for them is not said twice.
    */
   let ways = $state.raw<WaySource[] | null>(null);
+  /* WHETHER THE ARRIVALS HAVE BEEN READ YET, landed or refused (polish-f L6). Until then nobody can say nothing feeds
+     the record, so the scheduled actions' "Nothing feeds your BrainDog yet" card is held: it was drawn as the doors
+     landed and taken back when the arrivals did, which is the flicker on opening this area. */
+  let waysRead = $state(false);
   /* A CALL OUT FROM THE MOMENT IT IS ASKED, closed a task after it lands (`closedAfter`): the arrivals came after the doors,
      and between the two the scheduled actions' "nothing set up" card was drawn over a record that has ways in, so the
      screen said `empty` and then `ready`. */
@@ -206,7 +210,10 @@
           ways = read === null ? null : sources.sourcesOf(read.lines, Date.now());
         })
         .catch(() => (ways = null))
-        .finally(() => closedAfter(true, at));
+        .finally(() => {
+          waysRead = true;
+          closedAfter(true, at);
+        });
     });
   });
   const wayRows = $derived(
@@ -283,7 +290,7 @@
       </ul>
     {/if}
     {#if shell.live}
-      <Actions project={null} others={feeds.length > 0 || wayRows.length > 0 || !anOwner || doors.value === null} />
+      <Actions project={null} others={!waysRead || feeds.length > 0 || wayRows.length > 0 || !anOwner || doors.value === null} />
     {/if}
     <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
          shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if

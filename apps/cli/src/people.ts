@@ -695,7 +695,7 @@ export function dryRunLines(met: readonly Cluster[], projects: readonly string[]
     const counted = new Map<string, number>();
     for (const c of here) counted.set(sameName(nameOf(c)), (counted.get(sameName(nameOf(c))) ?? 0) + 1);
     const twice = [...new Set(here.slice(0, DRY_RUN_SHOWN).map(nameOf).filter((n) => (counted.get(sameName(n)) ?? 0) > 1))];
-    if (twice.length > 0) out.push(`  ${and(twice)} ${twice.length === 1 ? 'appears' : 'appear'} more than once at different addresses, so the record decides whether each is one person.`);
+    if (twice.length > 0) out.push(`  ${and(twice)} ${twice.length === 1 ? 'appears' : 'appear'} more than once at different addresses, so BrainDog decides whether each is one person.`);
   }
   return out;
 }

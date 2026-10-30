@@ -90,7 +90,7 @@ Stripe 1.3.0 reads as an add-on: 0 lists, 0 pages and 0 example rows. Nothing wa
   Example rows: 0; suggests skills: none
   Calls out to: CALLS OUT api.stripe.com · every 1h · key "stripe" to the host its Keychain entry opens
   Refused in a scratch record: Add the key called "stripe" to the Keychain, then install. (REQUIRED_MISSING)
-Stripe 1.3.0 would be refused by a record, as said above.
+Stripe 1.3.0 would be refused by BrainDog, as said above.
 ```
 
 The refusal on the last lines is the rule working: a pack that sends a key installs only when that key is already in the Keychain. A scratch record has an empty Keychain, so `check` says so for any pack that sends one.

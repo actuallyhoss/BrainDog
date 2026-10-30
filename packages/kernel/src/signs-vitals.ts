@@ -157,7 +157,7 @@ function readAuthored(sql: Sql, nowMs: number, lasts: SignLasts = () => undefine
   const facts = [`${count(writes, 'write')} in the last ${AUTHORED_WINDOW_HOURS} hours, ${bare.length} without an author.`];
   if (bare.length <= UNAUTHORED_MOST) return reading('green', 0, `Every write in the last ${AUTHORED_WINDOW_HOURS} hours has an author.`, facts);
   const all = lists(sql);
-  const where = (register: string | null): string => (register === null ? 'the record itself' : (all.get(register)?.name ?? plain(register)));
+  const where = (register: string | null): string => (register === null ? 'this BrainDog itself' : (all.get(register)?.name ?? plain(register)));
   const nobody = tally(bare.filter(([, w]) => w.nobody).map(([, w]) => where(w.register)));
   const unbacked = tally(bare.filter(([, w]) => !w.nobody).map(([, w]) => where(w.register)));
   facts.push(...nobody.map(([name, n]) => `${count(n, 'write')} to ${name} signed by nobody.`));
@@ -188,10 +188,10 @@ function readFormat(sql: Sql): SignReading {
   const wrong = [meta === undefined || Number(meta) !== FORMAT_VERSION, Number(own) !== FORMAT_VERSION].filter(Boolean).length;
   if (meta === undefined) said.push('Its file does not say its format.');
   else if (Number(meta) !== FORMAT_VERSION) said.push(`Its file says format ${String(meta).slice(0, 20)} where this build reads format ${FORMAT_VERSION}.`);
-  if (Number(own) !== FORMAT_VERSION) facts.push(`The record says format ${String(own)} of itself.`);
+  if (Number(own) !== FORMAT_VERSION) facts.push(`This BrainDog says format ${String(own)} of itself.`);
   const behind = missing.length + newer.length + wrong;
   if (behind <= FORMAT_BEHIND_MOST) return reading('green', 0, `This BrainDog is in format ${FORMAT_VERSION} with all ${KERNEL_MIGRATION} updates in.`, facts);
-  if (said.length === 0) said.push(`The record says format ${String(own)} of itself where this build reads format ${FORMAT_VERSION}.`);
+  if (said.length === 0) said.push(`This BrainDog says format ${String(own)} of itself where this build reads format ${FORMAT_VERSION}.`);
   return reading('red', behind, said.join(' '), facts);
 }
 
@@ -304,7 +304,7 @@ export const SIGNS_VITALS: readonly SignReader[] = [
   kernel('writes-authored', 'Every write has an author', { AUTHORED_WINDOW_HOURS, UNAUTHORED_MOST }, (sql, nowMs, _tz, lasts) => readAuthored(sql, nowMs, lasts)),
   /* READ WITHOUT THE CLOCK, or by the record's day alone (a rate's age): each stands until something it read is written
      (`SignLasts`), and the kernel reads them again on a new day. */
-  kernel('format-current', 'The record is in the current format', { FORMAT_BEHIND_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readFormat(sql))),
+  kernel('format-current', 'This BrainDog is in the current format', { FORMAT_BEHIND_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readFormat(sql))),
   kernel('amounts-whole', 'Every amount is whole', { AMOUNTS_BROKEN_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readAmounts(sql))),
   kernel('rate-age', 'How old is the newest rate', { RATE_DAYS_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readRateAge(sql, nowMs, tz))),
 ];

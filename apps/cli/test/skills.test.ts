@@ -241,7 +241,7 @@ test('ROW 4, EDITED HERE AND CHANGED IN THE RECORD: the file is kept and propose
   const edited = `${readFileSync(path, 'utf8')}\nLocal note.\n`;
   writeFileSync(path, edited);
   h.bump(row, '# Release\n\nThe record moved on.\n');
-  assert.deepEqual(await h.sync(), ['Skill kiln-release changed here and in the record; kept yours and asked (SG1).']);
+  assert.deepEqual(await h.sync(), ['Skill kiln-release changed here and in your BrainDog; kept yours and asked (SG1).']);
   assert.equal(readFileSync(path, 'utf8'), edited);
   assert.deepEqual(h.proposals()[0]?.args.body, { register: 'skills', rows: [{ at: 'skills#1', version: 2, patch: { body: edited, rev: 3 } }], details: { file: path, machine: 'test-machine' } });
   assert.deepEqual(await h.sync(), []);
@@ -361,7 +361,7 @@ test('ROW 6, UNCHANGED SINCE THE LOCK AND RETIRED: the file is deleted; an edite
   touched.state = 'retired';
   assert.deepEqual(await h.sync(), [
     `Skill kiln-release was retired, so ${path} was deleted.`,
-    `Skill kiln-glaze was retired in the record and edited in ${other}, so the file was left.`,
+    `Skill kiln-glaze was retired in your BrainDog and edited in ${other}, so the file was left.`,
   ]);
   assert.equal(existsSync(path), false);
   assert.equal(existsSync(dirname(path)), false, 'the empty skill folder goes with it');
@@ -474,7 +474,7 @@ test('THE BUDGET ENDS PART WAY: what was read is acted on, nothing is registered
   assert.equal(lines.filter((l) => / written to /u.test(l)).length, 30);
   assert.ok(existsSync(h.global(numbered(3))) && existsSync(h.global(numbered(36))));
   assert.equal(existsSync(h.global(numbered(14))), false);
-  assert.deepEqual(lines.filter((l) => !/ written to /u.test(l)), ['The record holds more skills than there was time to read, so the rest wait for the next sync.']);
+  assert.deepEqual(lines.filter((l) => !/ written to /u.test(l)), ['Your BrainDog holds more skills than there was time to read, so the rest wait for the next sync.']);
   assert.equal(h.rows.length, 36, 'a file whose name was not read yet is not registered');
 
   const after = await h.sync();

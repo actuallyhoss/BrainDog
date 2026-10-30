@@ -210,7 +210,7 @@ const packReadme = (id: string, title: string, file: string): string =>
   [
     `# ${title}`,
     `What ${title} adds to a BrainDog, in one sentence.`,
-    `Edit ${file}, then run braindog addon check ${id} to see what a record would say about it.`,
+    `Edit ${file}, then run braindog addon check ${id} to see what BrainDog would say about it.`,
     `Run braindog addon test ${id} to write the rows in ${testFileName(id)} into a scratch record and check what it expects.`,
     `Publish it with braindog addon publish ${file} --kennel, signed with --sign <key file> or as the person signed in.`,
     '',
@@ -433,12 +433,12 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
   const unlistable = listingFault(written);
   for (const r of [...remote, ...(unlistable ? [unlistable] : [])]) io.out(`  ${oneLine(`${r.fix} (${r.code})`)}`);
   if (remote.length > 0) {
-    io.say(`${title} ${pack.manifest.version} would be refused by a record, as said above.`);
+    io.say(`${title} ${pack.manifest.version} would be refused by BrainDog, as said above.`);
     return 1;
   }
   const checked = await checkInScratch(read.file);
   for (const line of checked.lines) io.out(line);
-  if (!checked.ok) io.say(`${title} ${pack.manifest.version} would be refused by a record, as said above.`);
+  if (!checked.ok) io.say(`${title} ${pack.manifest.version} would be refused by BrainDog, as said above.`);
   else if (unlistable) io.say(`${title} ${pack.manifest.version} would be refused by the Kennel, as said above.`);
   return checked.ok && !unlistable ? 0 : 1;
 }
@@ -635,16 +635,16 @@ export async function keySource(io: AgentIo, call: PrefCall | null, why = 'not s
   try {
     answer = await call('boot', {});
   } catch {
-    return alone('the record did not answer.');
+    return alone('BrainDog did not answer.');
   }
   if (!answer.ok) {
     const code = refused(answer) ? answer.refusal.code : undefined;
     /* A HOST SET WITH NO LOGIN, OR ONE THE RECORD NO LONGER TAKES, IS NOT SIGNED IN, and is said as that. */
     const out = code === 'UNAUTHORIZED' || code === 'GRANT_REVOKED' || code === 'WRONG_KEY';
-    return alone(out ? 'not signed in.' : code === 'UNREACHABLE' ? 'the record did not answer.' : 'the record did not give its list.');
+    return alone(out ? 'not signed in.' : code === 'UNREACHABLE' ? 'BrainDog did not answer.' : 'BrainDog did not give its list.');
   }
   const prefs = (answer.value as { me?: { prefs?: unknown } } | null)?.me?.prefs;
-  if (typeof prefs !== 'object' || prefs === null) return alone('the record does not give its list to the command line.');
+  if (typeof prefs !== 'object' || prefs === null) return alone('BrainDog does not give its list to the command line.');
   let known = mergeKnown(readKnownKeys((prefs as Record<string, unknown>)[KNOWN_PREF]), machine);
   let told = false;
   return {
@@ -663,7 +663,7 @@ export async function keySource(io: AgentIo, call: PrefCall | null, why = 'not s
       }
       if (!kept && !told) {
         told = true;
-        io.say('The record did not keep this publisher key, so only this machine remembers it.');
+        io.say('BrainDog did not keep this publisher key, so only this machine remembers it.');
       }
     },
   };
@@ -1232,7 +1232,7 @@ async function proposePack(id: string, doc: Record<string, unknown>, question: s
   }
   const filed = (answer.value as { id?: unknown }).id;
   if (typeof filed !== 'string') {
-    io.say('The record took the question and did not say which one it is. Open Decide in the app.');
+    io.say('BrainDog took the question and did not say which one it is. Open Decide in the app.');
     return 1;
   }
   const joined = joinedSaid(answer.value);

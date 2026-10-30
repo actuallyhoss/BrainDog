@@ -134,7 +134,7 @@ async function exportFile(args: string[], io: AgentIo): Promise<number> {
   }
   const got = answer.value as { file?: unknown; doc?: unknown };
   if (typeof got.file !== 'string' || typeof got.doc !== 'object' || got.doc === null) {
-    io.say('The record answered in a shape this build does not recognise as a starter.');
+    io.say('BrainDog answered in a shape this build does not recognise as a starter.');
     return 1;
   }
   const file = resolve(io.cwd, values.out ?? got.file);
@@ -303,7 +303,7 @@ export async function proposeFile(text: string, file: { usecase: string; title: 
   }
   const id = (answer.value as { id?: unknown }).id;
   if (typeof id !== 'string') {
-    io.say('The record took the question and did not say which one it is. Open Decide in the app.');
+    io.say('BrainDog took the question and did not say which one it is. Open Decide in the app.');
     return 1;
   }
   const joined = joinedSaid(answer.value);
@@ -339,7 +339,7 @@ async function arrangementOf(host: string | undefined, io: AgentIo): Promise<{ a
     return refuse(io, answer, saidWithCode(answer));
   }
   if (!isArrangement(answer.value)) {
-    io.say('The record answered in a shape this build does not recognise as its arrangement.');
+    io.say('BrainDog answered in a shape this build does not recognise as its arrangement.');
     return 1;
   }
   return { at, value: answer.value };
@@ -407,7 +407,7 @@ async function installOffered(given: string, host: string | undefined, io: Agent
   }
   const filed = (answer.value as { id?: unknown }).id;
   if (typeof filed !== 'string') {
-    io.say('The record took the question and did not say which one it is. Open Decide in the app.');
+    io.say('BrainDog took the question and did not say which one it is. Open Decide in the app.');
     return 1;
   }
   const asked = update ? `update ${title} from ${update.from} to ${update.to}` : `set this BrainDog up for ${title}`;

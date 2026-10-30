@@ -15,7 +15,7 @@ export const words = {
   store: {
     sentence: 'Each shows its plan before anything changes.',
     suggested: 'Suggested for you',
-    suggestedNote: 'from your own record',
+    suggestedNote: 'from your own BrainDog',
     starters: 'Starters',
     startersNote: 'whole setups to begin with',
     examples: 'Example setups',

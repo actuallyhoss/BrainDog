@@ -272,7 +272,7 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       const decl = kept === null ? undefined : kernel.register(kept);
       if (ctx.principal.kind === 'system' || ctx.principal.kind === 'share' || ctx.principal.kind === 'runner')
-        return no('FORBIDDEN', 'What a machine holds is written down by the agent on it, or by a person, and never by the record itself.', { at: 'principal' });
+        return no('FORBIDDEN', 'What a machine holds is written down by the agent on it, or by a person, and never by BrainDog itself.', { at: 'principal' });
       const machine = text(args?.machine);
       if (machine === '' || machine.length > 120 || /[\n\r]/u.test(machine) || looksLikeCredential(machine))
         return no('VALUE_MALFORMED', 'machine is the name of the machine the tools were found on, one line of at most 120 characters.', { at: 'machine' });
@@ -366,7 +366,7 @@ export function methods(deps: RecordDeps) {
         }
         const made = kernel.create(TOOLS, fields, w as WriteContext);
         if (!made.ok) {
-          out.push({ name, did: 'skipped', why: 'refusal' in made ? made.refusal.fix : 'The record did not take it.' });
+          out.push({ name, did: 'skipped', why: 'refusal' in made ? made.refusal.fix : 'BrainDog did not take it.' });
           continue;
         }
         const row = heldOf(made.value);
@@ -417,7 +417,7 @@ export function methods(deps: RecordDeps) {
        */
       function stamp(h: Held, f: FoundTool, needs: string[]): SeenTool {
         const name = f.name.trim();
-        if (h.fields.state === 'retired') return { name, did: 'skipped', row: h.spoken, why: 'It is retired in the record, so it was left as it is.' };
+        if (h.fields.state === 'retired') return { name, did: 'skipped', row: h.spoken, why: 'It is retired in your BrainDog, so it was left as it is.' };
         const patch: Record<string, unknown> = {};
         const hosts = listOf(h.fields.hosts);
         if (!hosts.includes(machine)) patch.hosts = [...hosts, machine];
@@ -429,7 +429,7 @@ export function methods(deps: RecordDeps) {
         if (canon(wants) !== canon(prior)) patch.needs = wants;
         if (Object.keys(patch).length === 0) return { name, did: 'seen', row: h.spoken };
         const wrote = kernel.update(TOOLS, h.id, patch, w as WriteContext);
-        if (!wrote.ok) return { name, did: 'skipped', row: h.spoken, why: 'refusal' in wrote ? wrote.refusal.fix : 'The record did not take it.' };
+        if (!wrote.ok) return { name, did: 'skipped', row: h.spoken, why: 'refusal' in wrote ? wrote.refusal.fix : 'BrainDog did not take it.' };
         rewritten(h, wrote.value);
         return { name, did: 'seen', row: h.spoken };
       }
@@ -441,7 +441,7 @@ export function methods(deps: RecordDeps) {
        */
       function ask(h: Held, f: FoundTool, needs: string[], start: string): SeenTool {
         const name = f.name.trim();
-        if (h.fields.state === 'retired') return { name, did: 'skipped', row: h.spoken, why: 'It is retired in the record, so it was left as it is.' };
+        if (h.fields.state === 'retired') return { name, did: 'skipped', row: h.spoken, why: 'It is retired in your BrainDog, so it was left as it is.' };
         const blank = (v: unknown) => (v === undefined || v === '' || (Array.isArray(v) && v.length === 0) ? null : v);
         const change: Record<string, unknown> =
           f.kind === 'integration' ? { endpoint: blank(f.endpoint) } : { transport: blank(f.transport), command: blank(f.command), args: blank(f.args), endpoint: blank(f.endpoint) };
@@ -463,7 +463,7 @@ export function methods(deps: RecordDeps) {
           } as never,
           w as WriteContext,
         );
-        if (!filed.ok) return { name, did: 'skipped', row: h.spoken, why: 'refusal' in filed ? filed.refusal.fix : 'The record did not take the question.' };
+        if (!filed.ok) return { name, did: 'skipped', row: h.spoken, why: 'refusal' in filed ? filed.refusal.fix : 'BrainDog did not take the question.' };
         if (filed.value.answered !== undefined) return { name, did: 'skipped', row: h.spoken, why: 'This change was answered on Decide before, so it was not asked again.' };
         return { name, did: filed.value.joined ? 'waiting' : 'asked', row: h.spoken, question: filed.value.id };
       }
@@ -499,7 +499,7 @@ export function methods(deps: RecordDeps) {
             ts,
             `suggestion:${q.id}`,
             String(gone),
-            gone === 1 ? 'One of these tools is in the record already, so a yes no longer adds it again.' : `${String(gone)} of these tools are in the record already, so a yes no longer adds them again.`,
+            gone === 1 ? 'One of these tools is in your BrainDog already, so a yes no longer adds it again.' : `${String(gone)} of these tools are in your BrainDog already, so a yes no longer adds them again.`,
           );
         }
       }
@@ -539,7 +539,7 @@ export function methods(deps: RecordDeps) {
         for (const a of fresh) {
           const name = a.f.name.trim();
           said[a.i] = !filed.ok
-            ? { name, did: 'skipped', why: 'refusal' in filed ? filed.refusal.fix : 'The record did not take the question.' }
+            ? { name, did: 'skipped', why: 'refusal' in filed ? filed.refusal.fix : 'BrainDog did not take the question.' }
             : filed.value.answered !== undefined
               ? { name, did: 'skipped', why: 'Adding it for use everywhere was answered on Decide before, so it was not asked again.' }
               : { name, did: filed.value.joined ? 'waiting' : 'asked', question: filed.value.id };

@@ -167,7 +167,7 @@ export const account = {
   neverLooked: 'has not opened it',
   removeAccess: 'Remove',
   /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
-  lastOwner: 'A record keeps at least one owner.',
+  lastOwner: 'A BrainDog keeps at least one owner.',
   /* THE ONE ACTION THAT REMOVES YOUR OWN WAY BACK. `45 §5.6` gives every level change one method,
      and another owner can still do this to you — which is what a second owner is for. What is
      refused is doing it to yourself, alone, from the screen you would then be locked out of. */
@@ -274,8 +274,8 @@ export const account = {
   identityEmailMoved: (to: string) => `You now sign in with ${to}.`,
   identityEmailBehind: (n: number) =>
     n === 1
-      ? 'One of your records could not be reached just now and still shows your old address. It catches up the next time you change your name or email.'
-      : `${n} of your records could not be reached just now and still show your old address. They catch up the next time you change your name or email.`,
+      ? 'One of your BrainDogs could not be reached just now and still shows your old address. It catches up the next time you change your name or email.'
+      : `${n} of your BrainDogs could not be reached just now and still show your old address. They catch up the next time you change your name or email.`,
 
   /* `backup` AND IT WAS `sealed copy` AND `snapshot`, WHICH ARE TWO WORDS FOR ONE IDEA. A friction
      pass found them competing on the same screen: `/decide` said "The newest sealed copy is from
@@ -286,7 +286,7 @@ export const account = {
      screens down, where somebody is being told why a copy can be proved to be theirs. Above that,
      what they want to know is that there is a backup and how old it is. */
   noSnapshots: 'No backup yet',
-  noSnapshotsWhy: 'A backup is the whole record at one moment, kept so you can go back to it.',
+  noSnapshotsWhy: 'A backup is all of your BrainDog at one moment, kept so you can go back to it.',
   /* The kernel's six. `approved` is the seconds between the press and the machine's next poll, and a
      denied row is kept: "I said no to a request I did not make" is the line this table exists for. */
   deviceState: {
@@ -402,7 +402,7 @@ export const account = {
   pushUnsupported: 'This browser cannot show notifications from BrainDog. On an iPhone or iPad, add BrainDog to the Home Screen and turn this on from there.',
   pushNoService: 'The browser’s push service did not answer, so nothing was turned on. Try again in a minute.',
   pushNoRoute: 'This BrainDog cannot keep a device’s address yet, so nothing was turned on.',
-  pushNotSent: 'The record was not reached, so nothing was turned on. Try again once you are online.',
+  pushNotSent: 'BrainDog was not reached, so nothing was turned on. Try again once you are online.',
   /* WHAT OPENING THE ROW SAYS WHEN THE BROWSER WOULD NOT ANSWER WHETHER IT IS SUBSCRIBED. Off is the safe reading: a press
      then subscribes, or finds the one already held under the same key and sends it again, so nothing is doubled. */
   pushUnread: 'This browser did not say whether this device is already told, so this starts as off.',
@@ -799,7 +799,7 @@ export const account = {
   inviteListNothing: 'Nothing',
   inviteListsHint: 'A part left at Nothing stays closed.',
   inviteAddsOnlyLeavesOut:
-    'Adds only on the whole record leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
+    'Adds only on all of it leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
   inviteNewLink: 'New link',
   inviteRanOut: (gives: string, on: string) => `${gives} · ran out on ${on}`,
   /* WHAT THE LINK OPENS, ONE LINE A PART (first F14): "Bills and invoices: you can add". The whole BrainDog is
@@ -825,7 +825,7 @@ export const account = {
      nightly copies still hold the account until they age out, so both are said before anybody presses. */
   closeTitle: 'Close your account',
   closeSays:
-    'This removes your passkeys, your sessions and your sign-in email, and takes you off every record you belong to. Each record keeps its own history of what you did there, which its owner can erase. Our nightly backups still hold your account for up to 30 days, and then it is gone from them too.',
+    'This removes your passkeys, your sessions and your sign-in email, and takes you off every BrainDog you belong to. Each one keeps its own history of what you did there, which its owner can erase. Our nightly backups still hold your account for up to 30 days, and then it is gone from them too.',
   closeStart: 'Close your account',
   closeLabel: 'Your sign-in email, to confirm',
   closeHint: (email: string) => `Type ${email}. This works within 15 minutes of signing in.`,

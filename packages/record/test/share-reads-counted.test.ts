@@ -154,7 +154,7 @@ test("See as counts against whoever was seeing, as preview:<person>, and never a
   assert.ok(mine.some((r) => r.what === 'mcp:list'), JSON.stringify(mine));
   assert.ok(mine.some((r) => r.what === 'list:money' && r.via === JSON.stringify([accountant])), JSON.stringify(mine));
   const lines = value<{ lines: { who: string; via: string; said: string }[] }>(await api.shareActivity({}, owner)).lines;
-  assert.ok(lines.some((l) => l.via === 'See as' && l.said === 'Saw the record as Priya, once.'), JSON.stringify(lines));
+  assert.ok(lines.some((l) => l.via === 'See as' && l.said === 'Saw this BrainDog as Priya, once.'), JSON.stringify(lines));
 });
 
 test('the night writes one "Ended on its date" per share that ran out, once, and prunes counters past 400 days', async () => {

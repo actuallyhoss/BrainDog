@@ -202,7 +202,7 @@ test('A WRITE IS A POST, because a GET that changes something is a change a pref
   const { call, sql } = await host();
   const wrong = await call('create');
   assert.equal(wrong.status, 405);
-  assert.match(wrong.body.refusal?.fix ?? '', /changes the record/);
+  assert.match(wrong.body.refusal?.fix ?? '', /changes what this BrainDog holds/);
   sql.close();
 });
 

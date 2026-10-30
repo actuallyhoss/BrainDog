@@ -707,7 +707,7 @@ const NO_RESTORE: Refusal = {
 };
 const NO_DELETE: Refusal = {
   code: 'NOT_IN_THIS_BUILD',
-  fix: 'Deleting a record from the app is not available on this deployment yet, so nothing was deleted. Ask support to delete it.',
+  fix: 'Deleting a BrainDog from the app is not available on this deployment yet, so nothing was deleted. Ask support to delete it.',
   at: 'host',
 };
 
@@ -792,7 +792,7 @@ function endAgain(sql: Sql, ended: unknown): void {
 
 /** The `restore.pitr` event's note, one sentence for both the restore that writes it and the `restored` that does. */
 const restoredNote = (bookmark: string, who: string, kept: string | null): string =>
-  kept === null ? `restored to ${bookmark} by ${who}` : `restored to ${bookmark} by ${who}; the record as it was is kept as ${kept}`;
+  kept === null ? `restored to ${bookmark} by ${who}` : `restored to ${bookmark} by ${who}; what it held before is kept as ${kept}`;
 
 /**
  * A store of copies whose `restore` does not put rows back into this object but ends it: the Cloud's, where going back
@@ -1056,10 +1056,10 @@ const TOKEN_REACH: Record<Scope, Need[]> = {
 
 /** What a call that needs each rung does, as a token is told it: "This adds to the record". */
 const NEED_WORDS: Readonly<Record<string, string>> = {
-  read: 'reads the record',
+  read: 'reads your BrainDog',
   propose: 'asks the person',
-  append: 'adds to the record',
-  write: 'changes the record',
+  append: 'adds to your BrainDog',
+  write: 'changes your BrainDog',
   decide: 'decides',
   owner: 'is the owner’s to do',
 };
@@ -1103,18 +1103,18 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
   /* SEEING AS SOMEBODY IS READ-ONLY, LOCKED TWICE (sharing plan T11): the router refuses every route that writes, and
      this refuses every need above `read`, so a method reached some other way changes nothing either. */
   if (ctx.preview !== undefined && need !== 'read')
-    return { code: 'FORBIDDEN', fix: "You're seeing the record as somebody else. Exit See as to change things.", at: 'preview' };
+    return { code: 'FORBIDDEN', fix: "You're seeing this BrainDog as somebody else. Exit See as to change things.", at: 'preview' };
   const p = ctx.principal;
   if (p.kind === 'system') return null;
   /* A RUNNER REACHES NO RUNG, and this is the one place that says so for every guard: `guard`, `scoped`, `readable`,
      `keychain` and `admin` all come here. What a runner may do is claim, report on and stop a job, which the JOBS methods
      admit by the principal's kind and nothing on this ladder does. */
   if (p.kind === 'runner')
-    return { code: 'FORBIDDEN', fix: 'A runner claims and runs jobs, and reaches nothing else on the record.', at: 'principal' };
+    return { code: 'FORBIDDEN', fix: 'A runner claims and runs jobs, and reaches nothing else in this BrainDog.', at: 'principal' };
   /* AND A LINK TO ONE PAGE REACHES NO RUNG EITHER, for the runner's reason: all it may do is read the one page it was
      opened for, which `sharedPage` admits by the principal's kind and nothing on this ladder does. */
   if (p.kind === 'share')
-    return { code: 'FORBIDDEN', fix: 'A shared link opens its one page and reaches nothing else on the record.', at: 'principal' };
+    return { code: 'FORBIDDEN', fix: 'A shared link opens its one page and reaches nothing else in this BrainDog.', at: 'principal' };
 
   /* NOTHING ON THE RECORD REACHES NOTHING ON THE RECORD. A caller with only register-scoped rows
      arrives here with `level: null` for anything not scoped to one of them.
@@ -1145,11 +1145,11 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
       code: 'FORBIDDEN',
       fix: held
         ? person
-          ? `This belongs to the whole record, and you were invited to ${named}, and to nothing else. Open ${held.length === 1 ? 'it' : 'one of those'}, or ask the owner to invite you to the whole record.`
-          : `This call is about the record itself, and you hold ${lists} and nothing else. Name one of those, or ask the owner for a record-wide token.`
+          ? `This belongs to all of this BrainDog, and you were invited to ${named}, and to nothing else. Open ${held.length === 1 ? 'it' : 'one of those'}, or ask the owner to invite you to all of it.`
+          : `This call is about this BrainDog itself, and you hold ${lists} and nothing else. Name one of those, or ask the owner for a token for all of it.`
         : person
-          ? 'This belongs to the whole record, and you have no access to it. Ask the owner to invite you.'
-          : 'This call is about the record itself, and you hold no access to it. Ask the owner for a token.',
+          ? 'This belongs to all of this BrainDog, and you have no access to it. Ask the owner to invite you.'
+          : 'This call is about this BrainDog itself, and you hold no access to it. Ask the owner for a token.',
       allowed: ctx.registers && ctx.registers !== '*' ? [...ctx.registers] : [],
     };
   }
@@ -2489,7 +2489,7 @@ function markHolder(kernel: Kernel, people: { register: string; self: string }, 
     { question: `Mark ${name} as you?`, body_kind: 'rowset', body: { register: people.register, rows: [{ at: kernel.nameOf(row.id), version: row.version, patch: { [people.self]: true } }] } },
     'system',
   );
-  if (!put.ok) return `${name} holds the address you sign in with, and could not be marked as you yet: ${'refusal' in put ? put.refusal.fix : 'the record moved'}`;
+  if (!put.ok) return `${name} holds the address you sign in with, and could not be marked as you yet: ${'refusal' in put ? put.refusal.fix : 'something changed meanwhile'}`;
   kernel.setPref(SELF_HOLDER, SELF_MARKED, put.value.id);
   const done = kernel.decide(put.value.id, { decide: { option: 'accept', reason: `${name} holds the address you sign in with, so they are you.` } }, 'system');
   if (!done.ok) return `${name} holds the address you sign in with, so marking them as you waits on Decide.`;
@@ -2788,7 +2788,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const name = listName(list);
     return {
       code: 'FORBIDDEN',
-      fix: `${name} is kept for the owner, so adding across the whole record reaches every list but ${name}. Ask the owner to give you ${name} by name.`,
+      fix: `${name} is kept for the owner, so adding across all of this BrainDog reaches every list but ${name}. Ask the owner to give you ${name} by name.`,
       at: 'register',
     };
   };
@@ -3874,7 +3874,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        filed here as the drawing, with what it cost said beside its reason. */
     kernel.setPref(SLASH, DREW_MODEL_PREF, [...asked, draft.key].slice(-200));
     const got = await slashDescribed(draft.asked, draft.page, owner!, preview);
-    if (!got.ok) return { filed: [], dropped: [`${draft.question} was not drawn: ${'refusal' in got ? got.refusal.fix : 'the record changed while it was drawn.'}`] };
+    if (!got.ok) return { filed: [], dropped: [`${draft.question} was not drawn: ${'refusal' in got ? got.refusal.fix : 'something changed while it was drawn.'}`] };
     const first = got.value.drafts[0];
     if (first === undefined) return { filed: [], dropped: got.value.dropped.map((d) => `${draft.question} was not drawn: ${d}`) };
     const cost = got.value.cost?.said ?? null;
@@ -4319,7 +4319,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const question = kernel.question(id) ?? 'Mark this person as you?';
     const halted: { refusal: Refusal | null } = { refusal: null };
     const stop = (out: Result<unknown>): never => {
-      halted.refusal = 'refusal' in out && out.refusal ? out.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this was answered. Answer it again.' };
+      halted.refusal = 'refusal' in out && out.refusal ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this was answered. Answer it again.' };
       throw halted;
     };
     try {
@@ -4502,7 +4502,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const batch = asked.pages.filter((page) => theirs.get(page.id) === asked.pack).map((page) => ({ id: page.id, kind: 'page', body: page.body, pack: asked.pack }));
       if (batch.length > 0) {
         const put = await kernel.install(batch as never, undefined, { actor, suggestion: id });
-        if (!put.ok) return 'refusal' in put ? { ok: false, refusal: put.refusal } : no('VERSION_STALE', 'The record moved while the page was taken. Answer it again.', { at: 'id' });
+        if (!put.ok) return 'refusal' in put ? { ok: false, refusal: put.refusal } : no('VERSION_STALE', 'Something changed while the page was taken. Answer it again.', { at: 'id' });
       }
     } else {
       const declined = keptDeclined();
@@ -7709,7 +7709,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       JSON.stringify(rows.map((id) => `entry:${id}`)),
       caller.person,
     )?.actor;
-    if (by !== undefined) trust.markUntrusted(caller, by.startsWith('p_') ? 'something another person wrote' : 'something that arrived from outside the record');
+    if (by !== undefined) trust.markUntrusted(caller, by.startsWith('p_') ? 'something another person wrote' : 'something that arrived from outside BrainDog');
     return out;
   };
 
@@ -8916,7 +8916,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const named = new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(held.map(listName));
     return {
       ...stop,
-      fix: `Deciding a question is for somebody invited to the whole record, and you were invited to ${named}, and to nothing else. Ask the owner to answer it, or to invite you to the whole record.`,
+      fix: `Deciding a question is for somebody invited to all of this BrainDog, and you were invited to ${named}, and to nothing else. Ask the owner to answer it, or to invite you to all of it.`,
     };
   };
 
@@ -9000,7 +9000,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const given = asked[n]!.given;
       const said = settledAs(ctx, given, m.out);
       if (!said.ok) {
-        refused.push({ id: given, fix: 'refusal' in said ? said.refusal.fix : 'The record moved while this was answered. Answer it again.' });
+        refused.push({ id: given, fix: 'refusal' in said ? said.refusal.fix : 'Something changed while this was answered. Answer it again.' });
         continue;
       }
       /* WHAT ONE ANSWER COUNTS AFTERWARDS, each member counted as its own answer. */
@@ -11480,7 +11480,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   let shapeAsks: ShapeAsks | null = null;
   /** `page` as it reads one address, for its read by a row's spoken id to ask again (`page` below); set once `api` is. */
   let pageAgain: (args: { slug: string; filter?: unknown; walk?: unknown; shape?: unknown }, ctx: CallContext) => Promise<Result<unknown>> = () =>
-    Promise.resolve(no('INTERNAL', 'The record is still starting.'));
+    Promise.resolve(no('INTERNAL', 'This BrainDog is still starting.'));
   const api = {
     /**
      * What this record is: its registers, and how many rows each holds.
@@ -11781,7 +11781,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* ONLY SOMEBODY WITH A ROLE ON THE RECORD (a `*` row) KEEPS ROWS PRIVATE: a guest invited to some
          lists works in the open there. */
       if ('level' in ctx.principal && ctx.principal.level === null)
-        return no('FORBIDDEN', 'Only somebody with a role on the whole record can keep a row private. Ask the owner for one.', { at: 'principal' });
+        return no('FORBIDDEN', 'Only somebody with a role on all of this BrainDog can keep a row private. Ask the owner for one.', { at: 'principal' });
       if (!args?.ref) return no('REQUIRED_MISSING', 'Which row?', { at: 'ref' });
       /* A ROW SHE MAY NOT WRITE, OR NOT READ, IS ONE THAT IS NOT THERE, in the same words. */
       const missing: Refusal = { code: 'REF_UNKNOWN', fix: `There is no row called ${args.ref}.`, at: 'ref' };
@@ -11809,7 +11809,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* `deleted_at` IS THE RECORD'S, and a row does not arrive deleted. No register declares it, and
          dropping it quietly would be a write that did less than it was asked. `delete` is how a row goes. */
       if (args.fields && typeof args.fields === 'object' && Object.hasOwn(args.fields, 'deleted_at'))
-        return no('FIELD_UNKNOWN', 'deleted_at is kept by the record, and a new row cannot arrive deleted. Create it, then delete it.', { at: 'deleted_at' });
+        return no('FIELD_UNKNOWN', 'deleted_at is kept by BrainDog, and a new row cannot arrive deleted. Create it, then delete it.', { at: 'deleted_at' });
       /* NOBODY ARRIVES FOLDED INTO SOMEBODY ELSE: a merge is decided (`mergeShaped`). */
       const merges = mergeShaped(ctx, args.register, args.fields, null);
       if (merges) return { ok: false, refusal: merges };
@@ -11920,7 +11920,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         kernel.transaction(() => {
           for (const [i, sent] of rows.entries()) {
             if (Object.hasOwn(sent, 'deleted_at')) {
-              halted.refusal = { code: 'FIELD_UNKNOWN', fix: 'deleted_at is kept by the record, and a reported row cannot arrive deleted.', at: where(i, 'deleted_at') };
+              halted.refusal = { code: 'FIELD_UNKNOWN', fix: 'deleted_at is kept by BrainDog, and a reported row cannot arrive deleted.', at: where(i, 'deleted_at') };
               throw halted;
             }
             const merges = mergeShaped(ctx, binding.register, sent, null);
@@ -11930,7 +11930,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             }
             const out = kernel.create(binding.register, reportedFields(binding, sent, now, stampType) as Patch, by);
             if (!out.ok) {
-              const r: Refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this report was written. Send it again.' };
+              const r: Refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this report was written. Send it again.' };
               halted.refusal = { ...r, at: where(i, r.at) };
               throw halted;
             }
@@ -12098,7 +12098,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * It writes nothing and asks no model: each draft says whether it is already a question, and which.
      */
     async slash(args: Record<string, unknown> | undefined, ctx: CallContext) {
-      const stop = admin(ctx, 'read how the whole record is used');
+      const stop = admin(ctx, 'read how all of this BrainDog is used');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, []);
       if (extra) return { ok: false as const, refusal: extra };
@@ -14353,12 +14353,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           picked = kernel.transaction(() => {
             const folded = foldPicked(pick, actorOf(ctx));
             if (!folded.ok) {
-              halted.refusal = 'refusal' in folded ? folded.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this was merged. Answer it again.' };
+              halted.refusal = 'refusal' in folded ? folded.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this was merged. Answer it again.' };
               throw halted;
             }
             const decided = kernel.decide(args.id, { decide: { option: 'reject', reason: said } }, actorOf(ctx));
             if (!decided.ok) {
-              halted.refusal = 'refusal' in decided ? decided.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this was answered. Answer it again.' };
+              halted.refusal = 'refusal' in decided ? decided.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this was answered. Answer it again.' };
               throw halted;
             }
             return decided;
@@ -14980,7 +14980,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (member !== null && said.put !== undefined) {
         const put = said.put;
         if (put !== null && (typeof put !== 'object' || Array.isArray(put) || !Array.isArray((put as { blocks?: unknown }).blocks)))
-          return no('VALUE_MALFORMED', 'put is the board to put back, a page body with its blocks, or null to go back to the record\'s Today.', { at: 'put' });
+          return no('VALUE_MALFORMED', 'put is the board to put back, a page body with its blocks, or null to go back to the Today everyone shares.', { at: 'put' });
         return ownTodayWrite(member, [], undefined, put as Record<string, unknown> | null);
       }
       const steps = stepsOf(said.steps);
@@ -15674,7 +15674,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async restored(args: { bookmark: string; kept: string | null; by?: string; ended?: unknown }): Promise<Result<{ event: string }>> {
       if (typeof args?.bookmark !== 'string' || args.bookmark === '')
-        return no('REQUIRED_MISSING', 'Which copy was the record restored to? Name it as the list of backups does.', { at: 'bookmark' });
+        return no('REQUIRED_MISSING', 'Which copy was this BrainDog put back to? Name it as the list of backups does.', { at: 'bookmark' });
       if (args.kept !== null && typeof args.kept !== 'string') return no('VALUE_MALFORMED', 'kept is the id of the copy taken before, or null.', { at: 'kept' });
       /* WHAT THE RECORD HAD ENDED BEFORE THE REWIND IS ENDED AGAIN FIRST, in one transaction, and the record reread. */
       if (args.ended !== undefined) {
@@ -16137,7 +16137,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          one for a scheduled connector, whatever it sends. */
       const under = args.sealed_under === 'connector' ? 'connector' : 'record';
       if (agent !== null && under === 'connector')
-        return no('FORBIDDEN', "An agent's key deposit seals under the record's own key, never a connector's.", { at: 'sealed_under' });
+        return no('FORBIDDEN', "An agent's key deposit seals under this BrainDog's own key, never a connector's.", { at: 'sealed_under' });
       const label = typeof args?.label === 'string' ? args.label.trim() : '';
       if (!label || label.length > 120)
         return no('REQUIRED_MISSING', 'A key has a label a person would say, in 120 characters or fewer.', { at: 'label' });
@@ -16432,7 +16432,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          person to sign in when one flag on the token was all it lacked. A person keeps the sentence about their level. */
       if (owner) return ctx.principal.kind === 'token' ? no('FORBIDDEN', INBOX_NO_REACH, { at: 'principal' }) : { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
       if (!wholeRecord(ctx))
-        return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+        return no('FORBIDDEN', 'The inbox belongs to all of this BrainDog, and this caller is held to part of it.', { at: 'principal' });
       const given = (args ?? {}) as Record<string, unknown>;
       const extra = stray(given, ['state', 'cursor', 'limit', 'repeats', 'digest', 'id']);
       if (extra) return { ok: false, refusal: extra };
@@ -16524,7 +16524,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx);
       if (stop) return { ok: false, refusal: stop };
       if (!wholeRecord(ctx))
-        return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+        return no('FORBIDDEN', 'The inbox belongs to all of this BrainDog, and this caller is held to part of it.', { at: 'principal' });
       const extra = stray((args ?? {}) as Record<string, unknown>, ['id', 'register', 'fields']);
       if (extra) return { ok: false, refusal: extra };
       if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which arrival? Name it by its id.', { at: 'id' });
@@ -16553,7 +16553,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx);
       if (stop) return { ok: false, refusal: stop };
       if (!wholeRecord(ctx))
-        return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+        return no('FORBIDDEN', 'The inbox belongs to all of this BrainDog, and this caller is held to part of it.', { at: 'principal' });
       const extra = stray((args ?? {}) as Record<string, unknown>, ['id']);
       if (extra) return { ok: false, refusal: extra };
       if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which arrival? Name it by its id.', { at: 'id' });

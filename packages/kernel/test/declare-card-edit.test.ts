@@ -51,7 +51,7 @@ test('EDIT ON A TABLE IS REFUSED, since only a card reads it', () => {
 test('EDIT ON A TREND IS REFUSED, whether it reads a figure or a field', () => {
   const metric = page([{ field: 'name', as: 'title' }, { metric: 'project-done-by-week:{{name}}', as: 'trend', edit: true }]);
   assert.deepEqual(at(metric, KNOWN), ['DECLARATION_INVALID', 'blocks[0]']);
-  assert.match(validate(metric, KNOWN)!.fix, /a trend is a figure the record works out, never typed\. Take edit: off the trend\./u);
+  assert.match(validate(metric, KNOWN)!.fix, /a trend is a figure BrainDog works out, never typed\. Take edit: off the trend\./u);
   const field = page([{ field: 'name', as: 'title' }, { field: 'earned', as: 'trend', edit: true }]);
   assert.deepEqual(at(field, KNOWN), ['DECLARATION_INVALID', 'blocks[0]']);
   assert.match(validate(field, KNOWN)!.fix, /only a line drawn as words is typed on: title, fact, reply, next\./u);

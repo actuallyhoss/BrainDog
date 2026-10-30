@@ -193,12 +193,12 @@ const OUTSIDE: [string, Declaration[], RegExp, Declaration[]][] = [
     /* An arrival names its door by an id with no dash (`flow-lint.ts` NAME), so the door is not `ingest('diary')`'s. */
     [{ ...ingest('diary'), id: 'ingest.letters', body: { ...(ingest('diary').body as object), ingest: 'letters' } as never }],
   ],
-  ['a rule on a clock, which has no row', [{ id: 'rule.nightly', kind: 'rule', body: { rule: 'nightly', on: { every: '1d' }, steps: [{ notify: { say: 'Night.' } }] } as never }], /rule\.nightly.*across the whole record/, []],
-  ['a script that names no list', [script('ping', [], [])], /script\.ping.*across the whole record/, []],
+  ['a rule on a clock, which has no row', [{ id: 'rule.nightly', kind: 'rule', body: { rule: 'nightly', on: { every: '1d' }, steps: [{ notify: { say: 'Night.' } }] } as never }], /rule\.nightly.*across all of this BrainDog/, []],
+  ['a script that names no list', [script('ping', [], [])], /script\.ping.*across all of this BrainDog/, []],
   [
     'a door that polls into Obligations',
     [{ id: 'ingest.rate', kind: 'ingest', body: { ingest: 'rate', channel: 'poll', url: 'https://api.rate.example.test/v1', every: '1h', extract: { what: { after: 'rate ' } }, writes: { register: 'obligations' } } as never }],
-    /ingest\.rate.*across the whole record/,
+    /ingest\.rate.*across all of this BrainDog/,
     [],
   ],
 ];

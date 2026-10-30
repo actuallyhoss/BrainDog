@@ -41,4 +41,4 @@ Some changes a record refuses as an ordinary upgrade, each with its reason:
 
 ## Taking a version back
 
-A version published by mistake is yanked, not deleted: `braindog addon yank <id> <version> --reason <why>`. It is never offered again, and a record that holds it is told why. The number is used up; the fix goes out as the next version.
+A version published by mistake is yanked, not deleted: `braindog addon yank <id> <version> --reason <why>`. It is never offered again, and a BrainDog that holds it is told why. The number is used up; the fix goes out as the next version.

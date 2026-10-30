@@ -385,7 +385,7 @@ function normalise(args: MeetArgs, typed = false, token = false): Result<Said> {
   const trust = trustOf(read.source, read.where, args.untrusted === true, typed, token);
   const only = (args as { only?: unknown }).only;
   if (only !== undefined && only !== null && only !== 'known')
-    return no('VALUE_MALFORMED', "only takes known, to meet nobody the record has no reason to know.", { at: 'only', allowed: ['known'] });
+    return no('VALUE_MALFORMED', "only takes known, to meet nobody BrainDog has no reason to know.", { at: 'only', allowed: ['known'] });
 
   const kind = args.kind ?? 'person';
   if (kind !== 'person' && kind !== 'organisation')

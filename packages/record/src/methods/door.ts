@@ -350,7 +350,7 @@ export function methods(deps: RecordDeps) {
     async doorSigns(args: unknown, ctx: CallContext): Promise<DoorSigns> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop } as DoorSigns;
-      if (!whole(ctx)) return no('FORBIDDEN', 'The door’s signs count every session on the record, and this caller is held to part of it.', { at: 'principal' }) as DoorSigns;
+      if (!whole(ctx)) return no('FORBIDDEN', 'The door’s signs count every session on this BrainDog, and this caller is held to part of it.', { at: 'principal' }) as DoorSigns;
       const a = (args ?? {}) as Record<string, unknown>;
       const stray = typeof a === 'object' && !Array.isArray(a) ? Object.keys(a).find((k) => !(DOOR_SIGNS_TAKES as readonly string[]).includes(k)) : 'args';
       if (stray !== undefined)

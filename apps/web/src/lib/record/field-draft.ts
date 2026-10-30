@@ -216,14 +216,14 @@ const currencyIn = (f: FieldDecl, held: unknown, currency: string | null | undef
  * currency, and the box takes digits alone, so the sentence says why nothing was written rather than guessing one.
  */
 const words = {
-  noCurrency: 'Nothing says which currency this amount is in yet, so it was not written: this row has none, and neither does the record.',
+  noCurrency: 'Nothing says which currency this amount is in yet, so it was not written: this row has none, and neither does your BrainDog.',
   /* AND THE SAME FOR THE BOXES THAT TAKE A VALUE APART: each says what it would have written, so the
      sentence under the box is a way to fix it rather than a refusal the record would give a second later. */
   quantityShape: 'Write the amount as a number, like 2.5, with its unit beside it.',
   noUnit: 'Nothing says what this number counts yet, so it was not written: choose its unit beside it.',
   unitUnknown: (units: string) => `This field counts in ${units}: write the number alone and choose its unit beside it.`,
   jsonShape: 'This does not read as structured data yet: check its brackets, quotes and commas.',
-  dayShape: 'Write the day as the record does, like 3 Sep 2026.',
+  dayShape: 'Write the day like 3 Sep 2026.',
   /* A FILE IS CHOSEN AND NEVER TYPED, so a draft that names none came from somewhere other than the picker. */
   fileShape: 'This is not a file yet: choose one with Add a file.',
 } as const;

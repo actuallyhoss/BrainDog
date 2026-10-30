@@ -158,7 +158,7 @@ function sentenceOf(line: unknown, byHandle: ReadonlyMap<string, BriefFact>, tit
     last = m.index + m[0].length;
   }
   plain(text.slice(last));
-  if (!parts.some((p) => p.row !== undefined)) return 'A sentence was about nothing in the record.';
+  if (!parts.some((p) => p.row !== undefined)) return 'A sentence was about nothing in this BrainDog.';
   if (parts.map((p) => p.text).join('').length > WRITTEN_SENTENCE_MOST) return `A sentence ran past ${WRITTEN_SENTENCE_MOST} characters.`;
   return { parts };
 }

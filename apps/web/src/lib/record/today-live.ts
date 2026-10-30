@@ -631,7 +631,7 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const booted = await client.boot();
   if (!booted.ok) {
-    const said = 'refusal' in booted ? booted.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+    const said = 'refusal' in booted ? booted.refusal : { code: 'VERSION_STALE', fix: 'Something changed while it was being read.' };
     return { ok: false, refusal: { code: said.code, fix: said.fix } };
   }
   const b: Boot = booted.value;

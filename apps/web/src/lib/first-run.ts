@@ -93,7 +93,7 @@ export const firstRun = {
   mineTitle: 'Your BrainDog',
   mineFor: 'Make it for',
   minePages: 'Its pages',
-  mineHome: 'Its Home',
+  mineHome: 'Its Today',
   mineEntries: 'From what you said',
   mineIn: (title: string, list: string) => `${title}, in ${list}`,
   mineKeeps: 'What it keeps',

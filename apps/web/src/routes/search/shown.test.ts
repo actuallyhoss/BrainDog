@@ -23,7 +23,7 @@ import { bestOf, byMeaningOf, marked, meaningLine, sentenceOf, shownState, topOf
 
 const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
 const answered = (total: number) => ({ from: 'live' as const, value: { hits: [], total, groups: [] } });
-const refused = { from: 'refused' as const, fix: 'The record changed while it was being read.' };
+const refused = { from: 'refused' as const, fix: 'Something changed while it was being read.' };
 
 test('the five arms, in the two states the page is really in', () => {
   assert.equal(shownState('', null, null), 'idle', 'the ordinary way in from the nav');

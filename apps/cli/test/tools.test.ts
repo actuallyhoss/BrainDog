@@ -330,7 +330,7 @@ test('~/.claude.json IS ONLY READ: its bytes are the same after a scan, and a pr
   writeFileSync(h.claudeJson, before);
 
   assert.deepEqual(await h.scan(), [
-    'This folder is in no project in the record, so the 1 server of its project config was not recorded.',
+    'This folder is in no project in your BrainDog, so the 1 server of its project config was not recorded.',
     'Tool fenwick in ~/.claude.json was recorded, with 1 key deposited.',
   ]);
   assert.equal(readFileSync(h.claudeJson, 'utf8'), before);
@@ -384,7 +384,7 @@ test('A ROW THAT DIFFERS IS NOT OVERWRITTEN: a rowset update is proposed, once p
   h.add({ name: 'kiln-deploy', transport: 'stdio', command: 'npx', args: ['-y', 'kiln-mcp@1'], needs: ['KILN_API_TOKEN=credentials#7'], hosts: ['test-machine'], seen: new Date(NOW).toISOString() }, 'project');
   h.mcp({ 'kiln-deploy': { command: 'npx', args: ['-y', 'kiln-mcp@2'], env: { KILN_API_TOKEN: token } } });
 
-  assert.deepEqual(await h.scan(), ['Tool kiln-deploy in .mcp.json differs from the one in the record, so that was left as it is, and the change was asked on Decide: Change how kiln-deploy starts?']);
+  assert.deepEqual(await h.scan(), ['Tool kiln-deploy in .mcp.json differs from the one in your BrainDog, so that was left as it is, and the change was asked on Decide: Change how kiln-deploy starts?']);
   /* THE QUESTION IN WORDS, AND NO MACHINE IN IT. It read "Change tools#8 to how fly-lanternfish is set up in
      ~/.claude.json on Maras-MacBook-Pro.local?", then "Update the kiln-deploy tool to match this Mac?"; the file, the
      machine and the handle are the details, beside how it starts in the record and how it starts here. */
@@ -556,7 +556,7 @@ test('WRITE --scope user applies through claude mcp add-json, records the lock, 
   /* A person changed it by hand since. */
   writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: { 'kiln-deploy': { ...deployEntry, args: ['--my-own'] } } }));
   assert.deepEqual(await h.write({ scope: 'user' }), [
-    'Tool kiln-deploy at user scope was changed by hand since BrainDog wrote it, so it is left. Remove it with claude mcp remove kiln-deploy --scope user to take the record\'s.',
+    'Tool kiln-deploy at user scope was changed by hand since BrainDog wrote it, so it is left. Remove it with claude mcp remove kiln-deploy --scope user to take your BrainDog\'s.',
   ]);
   assert.equal(h.calls.length, 1);
 });

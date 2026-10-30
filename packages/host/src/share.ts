@@ -87,7 +87,7 @@ export const NO_SHARE_KEY: Refusal = {
 /** What the owner is told when the record's answer is not one this host can sign, which the record never sends. */
 const UNSIGNED: Refusal = {
   code: 'NOT_IN_THIS_BUILD',
-  fix: 'The record opened a link this BrainDog could not sign, so there is nothing to share. Close it under shared links and share the page again.',
+  fix: 'This BrainDog opened a link it could not sign, so there is nothing to share. Close it under shared links and share the page again.',
   at: 'host',
 };
 

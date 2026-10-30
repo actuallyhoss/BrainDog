@@ -187,7 +187,7 @@ export const decide = {
   /** Use cases an arrangement installs beside the one the record speaks in, which keeps its voice. */
   arrangeBeside: (names: string[]) => `Adds ${list(names)} beside it, in the same voice`,
   /** A use case a pack proposal adds while another speaks: that one keeps speaking. */
-  arrangeKeepsVoice: (name: string) => `${name} keeps its voice and Home`,
+  arrangeKeepsVoice: (name: string) => `${name} keeps its voice and Today`,
   arrangeTurnsOn: (names: readonly string[]) => `Turns on ${list([...names])}`,
   arrangeTurnsOff: (names: readonly string[]) => `Turns off ${list([...names])}`,
   arrangeListsLeave: (lists: readonly string[]) => `${list([...lists])} ${lists.length === 1 ? 'leaves' : 'leave'} the sidebar. What is in ${lists.length === 1 ? 'it' : 'them'} is kept.`,

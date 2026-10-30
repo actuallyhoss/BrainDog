@@ -59,7 +59,7 @@ test('A MALFORMED COUNT IS REFUSED with a sentence, and nothing is filed', async
   const fix = (r: ReturnType<typeof file>) => (r.ok ? 'ok' : 'refusal' in r ? `${r.refusal.code} ${r.refusal.fix}` : 'conflict');
   assert.equal(fix(file({ ...RED.counts, refused_pages: 1.5 })), 'VALUE_MALFORMED How many pages show a block that could not be read is a whole number of nought or more.');
   assert.equal(fix(file({ ...RED.counts, unnamed_pages: -1 })), 'VALUE_MALFORMED How many pages print a path that names nothing is a whole number of nought or more.');
-  assert.equal(fix(file({ ...RED.counts, missing_pages: '2' })), 'VALUE_MALFORMED How many pages the record does not hold is a whole number of nought or more.');
+  assert.equal(fix(file({ ...RED.counts, missing_pages: '2' })), 'VALUE_MALFORMED How many pages this BrainDog does not hold is a whole number of nought or more.');
   assert.match(fix(file({ dashes: 3 })), /^VALUE_MALFORMED "dashes" is not something Pages draw without errors counts\. It counts refused_pages/);
   assert.match(fix(file([1, 2, 3, 4])), /^VALUE_MALFORMED Pages draw without errors counts are whole numbers by name/);
   assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM sign_reading WHERE sign = 'pages-clean'")?.n, 0, 'a refused filing was kept');

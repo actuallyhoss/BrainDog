@@ -308,7 +308,7 @@ function fault(row: ProfileRow, isDefault: boolean): Result<never> | null {
   if (row.quiet !== undefined && row.quiet !== null) {
     const q = row.quiet as Partial<ProfileQuiet>;
     if (typeof q !== 'object' || !HHMM.test(String(q.from)) || !HHMM.test(String(q.to)) || (q.zone !== undefined && typeof q.zone !== 'string'))
-      return bad('quiet', 'Quiet hours are {from: "22:00", to: "07:00"}, with a zone if not the record’s.');
+      return bad('quiet', 'Quiet hours are {from: "22:00", to: "07:00"}, with a zone if not this BrainDog’s.');
   }
   if (row.caps !== undefined && row.caps !== null) {
     const c = row.caps as Record<string, unknown>;

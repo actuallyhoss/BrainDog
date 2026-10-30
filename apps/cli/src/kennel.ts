@@ -202,7 +202,7 @@ export async function yankFromKennel(
   const answer = await kennelCall<Answered>(base, 'yank', io, { method: 'POST', body: { kind, id, version, reason, ...(signature ? { signature } : {}) }, bearer });
   if (!answer.ok) return refuse(io, answer, saidWithCode(answer));
   io.answer?.({ value: answer.value });
-  io.out(`${oneLine(id)} ${oneLine(version)} is taken back on the Kennel. It is never offered again, a record that holds it is told why, and it can still be fetched by its exact version.`);
+  io.out(`${oneLine(id)} ${oneLine(version)} is taken back on the Kennel. It is never offered again, a BrainDog that holds it is told why, and it can still be fetched by its exact version.`);
   return 0;
 }
 
@@ -217,7 +217,7 @@ function reachSaid(given: Reach): string[] {
   const list = (xs: readonly string[]) => (xs.length === 0 ? 'none' : xs.join(', '));
   return [
     `  Installs first: ${list(reach.modules)}. Adds lists: ${list(reach.lists)}; pages: ${list(reach.pages)}; rules: ${list(reach.rules)}; ${reach.examples} example rows.`,
-    ...(reach.calls_out.length === 0 ? ['  Calls out to: nothing. It reads and writes only the record it is installed in.'] : reach.calls_out.map((c) => `  Calls out: ${c.line}`)),
+    ...(reach.calls_out.length === 0 ? ['  Calls out to: nothing. It reads and writes only the BrainDog it is installed in.'] : reach.calls_out.map((c) => `  Calls out: ${c.line}`)),
   ];
 }
 
@@ -341,7 +341,7 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
     const reason = values.reason?.trim() ?? '';
     const sent = await kennelCall<unknown>(base, 'review', io, { method: 'POST', body: { kind, id, version, verdict: 'list', reason, preview: preview.value }, bearer: operator });
     if (!sent.ok) return refuse(io, sent, saidWithCode(sent));
-    io.out(`${shown.title} ${oneLine(version)} is listed, with a preview of ${added.length === 1 ? 'its one page' : `its ${added.length} pages`} as a record draws them.`);
+    io.out(`${shown.title} ${oneLine(version)} is listed, with a preview of ${added.length === 1 ? 'its one page' : `its ${added.length} pages`} as BrainDog draws them.`);
     return 0;
   } finally {
     scratch.close();

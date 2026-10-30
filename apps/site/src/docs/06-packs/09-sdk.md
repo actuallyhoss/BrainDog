@@ -1,6 +1,6 @@
 # The SDK
 
-The pack SDK is the `braindog` command line: it starts a pack, checks it the way a record will read it, runs its test, and draws its pages, all on your own machine and without sending anything anywhere.
+The pack SDK is the `braindog` command line: it starts a pack, checks it the way BrainDog will read it, runs its test, and draws its pages, all on your own machine and without sending anything anywhere.
 
 ## Getting the command line
 
@@ -24,7 +24,7 @@ Each script puts one file in a `.braindog` folder in your home folder, checked a
 
 ```steps | Making a pack
 Start it | braindog addon new <id> | a folder with a list, a page, two example rows, a test and a README
-Check it | braindog addon check <folder> | every refusal a record would give, with its code
+Check it | braindog addon check <folder> | every refusal BrainDog would give, with its code
 Test it | braindog addon test <folder> | writes the test's rows and says each expectation as passed or failed
 Look at it | braindog addon preview <folder> | a scratch BrainDog on this machine with your pack in its catalogue
 Publish it | braindog addon publish <file> --kennel | when it is ready for other people
@@ -33,7 +33,7 @@ Publish it | braindog addon publish <file> --kennel | when it is ready for other
 ~~~code | As written
 ```steps | Making a pack
 Start it | braindog addon new <id> | a folder with a list, a page, two example rows, a test and a README
-Check it | braindog addon check <folder> | every refusal a record would give, with its code
+Check it | braindog addon check <folder> | every refusal BrainDog would give, with its code
 Test it | braindog addon test <folder> | writes the test's rows and says each expectation as passed or failed
 Look at it | braindog addon preview <folder> | a scratch BrainDog on this machine with your pack in its catalogue
 Publish it | braindog addon publish <file> --kennel | when it is ready for other people

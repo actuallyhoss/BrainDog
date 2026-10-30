@@ -16,6 +16,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'learned', group: 'READ+', writes: false, what: 'What the record will not ask again because of an answer, each in one plain sentence: two people kept apart, an offer turned down, a question answered no. Newest first, 50 at most. It changes nothing.',
+  { name: 'learned', group: 'READ+', writes: false, what: 'What BrainDog will not ask again because of an answer, each in one plain sentence: two people kept apart, an offer turned down, a question answered no. Newest first, 50 at most. It changes nothing.',
     takes: { limit: 'integer' } },
 ];

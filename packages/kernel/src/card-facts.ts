@@ -53,7 +53,7 @@ export function cardFactFault(id: string, at: string | number, column: unknown, 
   if (column.field !== undefined) return `${id}.${at} gives a fact both a field and a metric. A fact over a figure names the figure alone.`;
   if (column.or !== undefined) return `${id}.${at} gives a fact over a figure an or:, which is a second field to read. A fact over a figure names the figure alone.`;
   if (column.edit !== undefined && column.edit !== false)
-    return `${id}.${at} gives a fact over a figure edit: ${JSON.stringify(column.edit)}, and a figure is worked out by the record, never typed. Take edit: off the fact.`;
+    return `${id}.${at} gives a fact over a figure edit: ${JSON.stringify(column.edit)}, and a figure is worked out by BrainDog, never typed. Take edit: off the fact.`;
   if (typeof column.metric !== 'string' || !METRIC_ID.test(figureNamed(column.metric).id))
     return `${id}.${at}'s fact names a figure by its id, with {{field}} after a colon for a figure of each card, as project-open:{{name}}.`;
   if (typeof column.label !== 'string' || column.label.trim() === '')

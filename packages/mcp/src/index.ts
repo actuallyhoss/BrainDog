@@ -1290,7 +1290,7 @@ const FIXED: readonly Resource[] = [
   resource('whoami', 'Who you are here, and which verbs you reach.'),
   resource('boot', 'What this BrainDog holds, and how many rows are in each register.'),
   resource('context', 'The briefing for where you are: your session, your project, and what applies here.'),
-  resource('understand', 'What the record would link and ask next, in names. Read before meet.'),
+  resource('understand', 'What BrainDog would link and ask next, in names. Read before meet.'),
   resource('handoffs', 'The next steps runs left and nobody has taken, newest first, each with the app that left it and its project.'),
   resource('briefing', 'What matters here now: what is late, what is due, what stopped and what waits, a line each.'),
   resource('widgets', 'Every widget Today can hold, by name, and which Today shows. Suggest one with propose, body_kind widget, body {said} or {block,size}, question your reason: it lands on Today as a draft.'),
@@ -3657,7 +3657,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * read first so a handle is said by its words, and it is left out of a listing's check (`lean` false).
    */
   const understood = async (ctx: C, lean: boolean): Promise<Result<unknown>> => {
-    if (!surface.understandPlan) return unbuilt('understand', 'Meet people with an email or handle, and the record links them as it can.');
+    if (!surface.understandPlan) return unbuilt('understand', 'Meet people with an email or handle, and BrainDog links them as it can.');
     const out = await surface.understandPlan({}, ctx);
     if (!out.ok || !isObject(out.value)) return out;
     const v = out.value;
@@ -3953,7 +3953,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /* WHAT ONE THING IS, BY ITS NAME (`braindog:about/<name>`): the name is a person's words, so it is decoded and handed
        to the record as text, which holds it to a name's length and to what this caller may read. */
     if (head === 'about' && rest) {
-      if (!surface.about) return unbuilt('about', 'Search the record for the name instead.');
+      if (!surface.about) return unbuilt('about', 'Search your BrainDog for the name instead.');
       let name: string;
       try {
         name = decodeURIComponent(rest);
@@ -3964,7 +3964,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     }
     /* THE BARE ADDRESS SAYS HOW TO ASK, so the list can name the read: asked of `version`, the read rung, and of nobody's name. */
     if (head === 'about' && !rest) {
-      if (!surface.about) return unbuilt('about', 'Search the record for the name instead.');
+      if (!surface.about) return unbuilt('about', 'Search your BrainDog for the name instead.');
       const may = await surface.version(ctx);
       return may.ok ? { ok: true, value: { read: 'braindog:about/<name>', said: 'Write the name after about/ as a person says it, with a space as %20.' } } : may;
     }

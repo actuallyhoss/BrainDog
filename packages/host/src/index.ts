@@ -462,7 +462,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     setup: async (a, ctx) =>
       api.setup
         ? api.setup(a as never, ctx as never)
-        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot set a record up in one call yet, so nothing was written.', at: 'setup' } },
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This host cannot set a BrainDog up in one call yet, so nothing was written.', at: 'setup' } },
     installPack: (a, ctx) => api.installPack(a as never, ctx as never),
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
     disablePack: (a, ctx) => api.disablePack(a as never, ctx as never),
@@ -561,7 +561,7 @@ export const previewOf = (ctx: unknown): string | null => {
 };
 
 /** The one answer to a change asked while seeing as somebody. */
-export const PREVIEW_READ_ONLY: Refusal = { code: 'FORBIDDEN', fix: "You're seeing the record as somebody else. Exit See as to change things.", at: 'preview' };
+export const PREVIEW_READ_ONLY: Refusal = { code: 'FORBIDDEN', fix: "You're seeing this BrainDog as somebody else. Exit See as to change things.", at: 'preview' };
 
 /**
  * Answer one request against a set of handlers.
@@ -601,7 +601,7 @@ export async function serveApi(
       405,
       {
         ok: false,
-        refusal: { code: 'ROUTE_UNKNOWN', fix: `${name} changes the record, so it is a POST.` },
+        refusal: { code: 'ROUTE_UNKNOWN', fix: `${name} changes what this BrainDog holds, so it is a POST.` },
       },
       [['allow', 'POST']],
     );

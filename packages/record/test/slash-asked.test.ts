@@ -601,7 +601,7 @@ test('A DESCRIPTION NEVER FILES AN INGEST THAT SENDS, a rule that reaches out, o
   assert.deepEqual(sql.all('SELECT id FROM suggestion'), []);
   assert.deepEqual(out.dropped, [
     'Proposal 1 would open ingest.launchsync, a door that sends out or that others post to, and from a description Slash opens only one that fetches on a clock. Ask for it on its own.',
-    'Proposal 2 has rule.launchsync, which would run something beyond the record, and Slash never opens a door to the outside from a description. Ask for it on its own.',
+    'Proposal 2 has rule.launchsync, which would run something beyond BrainDog, and Slash never opens a door to the outside from a description. Ask for it on its own.',
     'Proposal 3 was a settings proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule, a script or a door that fetches on a clock.',
     'The model proposed nothing Slash could use, so nothing was drafted from what you described.',
   ]);
@@ -630,7 +630,7 @@ test('A RULE A DESCRIPTION BUILDS NEVER STARTS A SCRIPT, which fetches wherever 
   const described = fromModel(answer, 'test model', 3, () => 0, true);
   assert.deepEqual(described.drafts, [], JSON.stringify(described.drafts));
   assert.deepEqual(described.dropped, [
-    'Proposal 1 has rule.crm, which would start a script that may fetch beyond the record, and Slash never opens a door to the outside from a description. Ask for it on its own.',
+    'Proposal 1 has rule.crm, which would start a script that may fetch beyond BrainDog, and Slash never opens a door to the outside from a description. Ask for it on its own.',
   ]);
   /* THE CONTROL: the same answer to a plain press is filed, so the drop above is the description's. */
   assert.equal(fromModel(answer, 'test model', 3, () => 0).drafts.length, 1);

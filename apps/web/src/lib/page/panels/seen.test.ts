@@ -75,9 +75,9 @@ test('THREE PLACES, THEN "and N more"', () => {
 test('SEEN NOWHERE SAYS ONE SENTENCE, and draws no lines', () => {
   const found = seenOf(answer([], ['Sara I.']));
   assert.deepEqual(found, { name: 'Sara Idris', also: ['Sara I.'], places: [], more: 0 });
-  assert.deepEqual(seenLines(found, NOW), { lines: [], also: null, more: null, none: 'Nothing on the record mentions Sara Idris yet.' });
+  assert.deepEqual(seenLines(found, NOW), { lines: [], also: null, more: null, none: 'Nothing in your BrainDog mentions Sara Idris yet.' });
   /* A PLACE THAT IS LEFT OUT LEAVES NOTHING, so it is the same sentence. */
-  assert.equal(seenLines(seenOf(answer([{ at: 'never', where: 'Notes: Undated' }])), NOW).none, 'Nothing on the record mentions Sara Idris yet.');
+  assert.equal(seenLines(seenOf(answer([{ at: 'never', where: 'Notes: Undated' }])), NOW).none, 'Nothing in your BrainDog mentions Sara Idris yet.');
   assert.deepEqual(seenLines(null, NOW), { lines: [], also: null, more: null, none: null });
   assert.equal(seenOf({ ok: true, value: { is: null, candidates: [] } }), null, 'nothing the reader may read answers');
   /* A THING WITH NO NAME is not said by one. */

@@ -3942,7 +3942,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (spec.bound === undefined)
         return {
           code: 'CREATE_UNBOUNDED',
-          fix: `${id}: create has no bound. A generator with no ceiling fills the record.`,
+          fix: `${id}: create has no bound. A generator with no ceiling fills your BrainDog.`,
           at: 'bound',
         };
 
@@ -4677,7 +4677,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          is the path that also stops a run or redirects one. */
       if (register === INSTRUCTIONS && !door.instructs) {
         const named = Object.keys(patch).find((k) => INSTRUCTION_KERNEL_WRITTEN.includes(k));
-        if (named) return no<Entry>('IMMUTABLE_FIELD', `${named} is written by the record itself, and no caller sets it.`, { at: named });
+        if (named) return no<Entry>('IMMUTABLE_FIELD', `${named} is written by BrainDog itself, and no caller sets it.`, { at: named });
         if (w.principal?.kind === 'token')
           return no<Entry>('NEEDS_BROWSER_SESSION', 'Only a person tells an agent, signed in to BrainDog. An agent answers with instructions.', { at: 'register' });
         const was = ref === null ? null : get(ref, { includeDeleted: true });
@@ -4820,7 +4820,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
              nobody sent this one. It refuses every create that leaves the field out, and the repair
              is in the register rather than in the write. */
           if (!out.ok)
-            return no<Entry>(out.refusal.code, `${register}.${f.id} has a default the record cannot store. ${out.refusal.fix}`, { at: f.id });
+            return no<Entry>(out.refusal.code, `${register}.${f.id} has a default BrainDog cannot store. ${out.refusal.fix}`, { at: f.id });
           if (!isAbsent(out.value)) merged[f.id] = out.value;
         }
 
@@ -4834,7 +4834,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       for (const [key, value] of Object.entries(patch)) {
         if (key === 'deleted_at') continue;
         if (RESERVED.has(key) || key.startsWith('_'))
-          return no<Entry>('FIELD_UNKNOWN', `${key} is the record's, not a field you may write.`, { at: key });
+          return no<Entry>('FIELD_UNKNOWN', `${key} is BrainDog's own, not a field you may write.`, { at: key });
         const field = known.get(key);
         if (!field)
           return no<Entry>('FIELD_UNKNOWN', `${register} has no field called ${key}.`, {
@@ -4842,11 +4842,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             allowed: [...known.keys()],
           });
         if (field.derived)
-          return no<Entry>('IMMUTABLE_FIELD', `${key} is derived, so the record computes it.`, { at: key });
+          return no<Entry>('IMMUTABLE_FIELD', `${key} is derived, so BrainDog works it out.`, { at: key });
         /* THE RECORD'S OWN, on the one register the kernel declares: when a run was last heard from,
            the project it resolved to, and the token that opened it. */
         if (register === SESSION && KERNEL_WRITTEN.includes(key))
-          return no<Entry>('IMMUTABLE_FIELD', `${key} is written by the record itself, and no caller sets it.`, { at: key });
+          return no<Entry>('IMMUTABLE_FIELD', `${key} is written by BrainDog itself, and no caller sets it.`, { at: key });
         /* WHAT A RUN REPORTED ABOUT ITSELF (`RUN_FACTS`): its agent sets it through a token, and a person never does. */
         if (register === SESSION && RUN_FACTS.includes(key) && w.principal?.kind === 'person')
           return no<Entry>('IMMUTABLE_FIELD', `${key} is what the run reported about itself, and only its agent sets it.`, { at: key });
@@ -4857,7 +4857,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (field.type === 'secret' || field.of === 'secret')
           return no<Entry>(
             'IMMUTABLE_FIELD',
-            `${key} says where a key is sealed, and only the keychain writes it. Deposit the key, and the record points this field at it.`,
+            `${key} says where a key is sealed, and only the keychain writes it. Deposit the key, and BrainDog points this field at it.`,
             { at: key },
           );
         /* A MARK IS A PICTURE, NEVER A CONTROL: a project drawn as the close cross reads as a button. */
@@ -6198,7 +6198,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (named && owned(named.fields.token_id, token ?? null)) return notYours<Ended>(said);
       const run = named ?? (at.found ? byId(at.found.id) : null);
       if (!run)
-        return no<Ended>('ROW_UNKNOWN', 'This session wrote nothing to the record, so it has no run to end. Ending is for a session that wrote.', {
+        return no<Ended>('ROW_UNKNOWN', 'This session wrote nothing to this BrainDog, so it has no run to end. Ending is for a session that wrote.', {
           at: 'session',
         });
       const spoken = `${prefix}${String(run.seq)}`;
@@ -12290,7 +12290,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       transaction(() => settleSealed(sql));
       /* A RECORD REPLACED FROM A FILE IS A HAND ON IT (`hold.ts`), marked after the import so the night it
          brought back does not overwrite the mark. */
-      transaction(() => markHand(sql, 'The record was replaced from a file.', opts.by ?? 'an operator', clock.now(), recordTz()));
+      transaction(() => markHand(sql, 'This BrainDog was replaced from a file.', opts.by ?? 'an operator', clock.now(), recordTz()));
       transaction(() => lifecycleEvent('import', 'system', `import ${out!.value.rows} rows`));
       return out;
     },
@@ -12327,7 +12327,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (!Array.isArray(given) || given.some((s) => typeof s !== 'string'))
         return no('VALUE_MALFORMED', 'subjects is a list of what names the person: a name, an email.', { at: 'subjects' });
       if (given.some((s: string) => s.trim().length < 3))
-        return no('VALUE_MALFORMED', 'A subject is three characters or more, so an erasure cannot take half the record with it.', { at: 'subjects' });
+        return no('VALUE_MALFORMED', 'A subject is three characters or more, so an erasure cannot take half of this BrainDog with it.', { at: 'subjects' });
       const basis = typeof req.basis === 'string' ? req.basis.trim() : '';
       if (!basis) return no('REQUIRED_MISSING', 'Say the legal basis for the erasure. It is kept with the record of it.', { at: 'basis' });
 
@@ -12372,7 +12372,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     lifecycle(kind: 'export' | 'import' | 'restore.pitr', actor: string, note: string, to?: string): string {
       /* A RESTORE IS A HAND ON THE RECORD (`hold.ts`): the hold's run of green days ends on the day of it. */
-      if (kind === 'restore.pitr') return transaction(() => (markHand(sql, 'The record was put back to an earlier time.', actor, clock.now(), recordTz()), lifecycleEvent(kind, actor, note, to)));
+      if (kind === 'restore.pitr') return transaction(() => (markHand(sql, 'This BrainDog was put back to an earlier time.', actor, clock.now(), recordTz()), lifecycleEvent(kind, actor, note, to)));
       return lifecycleEvent(kind, actor, note, to);
     },
 

@@ -99,7 +99,7 @@ const saidFor =
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
 export const liveWords = {
-  cannot: 'This part of the page cannot be drawn from the record yet.',
+  cannot: 'This part of the page cannot be drawn yet.',
   changed: 'The page changed while it was being read.',
   /**
    * WHAT A REDUCING FIGURE SAYS WHEN THE FIELD IT ADDS UP IS ONE NOBODY HAS FILLED IN.

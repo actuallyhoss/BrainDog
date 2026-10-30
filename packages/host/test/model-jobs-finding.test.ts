@@ -52,5 +52,5 @@ test('A FINDING WITH NO SENTENCE OF ITS OWN IS STILL LOGGED, in the words the re
   const r = await record({ signal: 'query.scan', subject: 'tasks' });
   assert.equal(r.state, 'done');
   assert.equal(r.filed, 0);
-  assert.match(r.lines[0] ?? '', /The record noticed query\.scan on tasks\./u);
+  assert.match(r.lines[0] ?? '', /BrainDog noticed query\.scan on tasks\./u);
 });

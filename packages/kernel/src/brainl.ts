@@ -577,7 +577,7 @@ export async function streamBrainl(
   }
 
   const changed = (what: string): RecordChanged =>
-    new RecordChanged(`The record changed while it was being copied (${what}), so that copy was stopped: a copy is one moment of the record or nothing.`);
+    new RecordChanged(`Something changed while it was being copied (${what}), so that copy was stopped: a copy is one moment or nothing.`);
 
   function* pieces(): Generator<Uint8Array, void, undefined> {
     yield encoder.encode('#dogl 1');
@@ -681,7 +681,7 @@ async function signatureOf(
   if (rows.length !== 1)
     return no(
       rows.length === 0
-        ? 'This file carries no signature. Export it again from a record whose signing key is set up, and it will.'
+        ? 'This file carries no signature. Export it again from a BrainDog whose signing key is set up, and it will.'
         : `This file carries ${rows.length} signatures and a file has one.`,
     );
 
@@ -771,7 +771,7 @@ export function shapeRefusal(lines: readonly string[], allow = false): Refusal |
   if (allow || !isShape(lines)) return null;
   return {
     code: 'IMPORT_SHAPE',
-    fix: 'This file is a shape copy, with every word and number in it scrambled, so it opens only on a scratch record and never over a real one. Put back an export of the record instead.',
+    fix: 'This file is a shape copy, with every word and number in it scrambled, so it opens only on a scratch BrainDog and never over a real one. Put back a real export instead.',
   };
 }
 
@@ -822,7 +822,7 @@ export async function checkBrainl(lines: readonly string[], options: CheckOption
            no address for this code at all. `#dogl` is a header of the same kind as `#table`, so it
            addresses the same way `dog_sig` and `dog_manifest` do. */
         at: 'dogl',
-        fix: 'A .brainl file begins with `#dogl <version>`, and this one does not. Re-export it from the record it came from.',
+        fix: 'A .brainl file begins with `#dogl <version>`, and this one does not. Re-export it from the BrainDog it came from.',
       },
     };
   const format = Number(first.slice('#dogl '.length).trim());
@@ -856,7 +856,7 @@ export async function checkBrainl(lines: readonly string[], options: CheckOption
       ok: false,
       refusal: {
         code: 'CHECKSUM_MISMATCH',
-        fix: 'This file carries no manifest, so there is nothing to check it against. Re-export it from the record it came from.',
+        fix: 'This file carries no manifest, so there is nothing to check it against. Re-export it from the BrainDog it came from.',
       },
     };
 

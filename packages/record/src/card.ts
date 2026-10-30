@@ -562,7 +562,7 @@ function olderSlot(at: CardAt, now: number): Slot | null {
   const [y, m, d] = built.split('.').map(Number) as [number, number, number];
   const days = Math.floor((now - Date.UTC(y, m - 1, d)) / DAY_MS);
   const ago = Number.isFinite(days) && days >= 1 ? ` (built ${count(days, 'day')} ago)` : '';
-  return { label: 'Update', lead: '', items: [`This command is older than the record${ago}. ${OLDER}`], tail: none, least: 1, kept: true };
+  return { label: 'Update', lead: '', items: [`This command is older than this BrainDog${ago}. ${OLDER}`], tail: none, least: 1, kept: true };
 }
 
 /* ── the card ──────────────────────────────────────────────────────────── */

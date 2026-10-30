@@ -92,11 +92,11 @@ export const runWords = {
   allowance: (wait: string) => `Run now has been pressed as often as this hour allows. Try again in ${wait}.`,
   againSoon: 'Pressed a moment ago. Try again in a minute.',
   /* THE SHARED "nothing was saved" IS ABOUT A WRITE, and a press saves nothing a person typed. */
-  unreached: 'The record could not be reached, so it did not run. Try again in a moment.',
+  unreached: 'BrainDog could not be reached, so it did not run. Try again in a moment.',
   signIn: 'Sign in again to run it now.',
   older: 'This BrainDog cannot run an action early yet. It runs on its own clock.',
   /* THE RECORD SENT A REFUSAL WITH NO SENTENCE IN IT. Said plainly rather than left blank under the button. */
-  refusedQuietly: 'The record did not run it, and did not say why.',
+  refusedQuietly: 'BrainDog did not run it, and did not say why.',
   aria: (name: string) => `Run ${name} now`,
 } as const;
 

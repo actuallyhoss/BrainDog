@@ -240,7 +240,7 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
      of their own on the Agents page. */
   const opened = <T>(got: Awaited<ReturnType<typeof client.call<unknown>>>, value: (raw: unknown) => T): Opened<T> => {
     if (got.ok) return { first: { ok: true, value: value(got.value) }, absent: false };
-    const refusal = 'refusal' in got ? got.refusal : { code: 'VERSION_STALE', fix: 'The record moved while it was read.' };
+    const refusal = 'refusal' in got ? got.refusal : { code: 'VERSION_STALE', fix: 'Something changed while it was being read.' };
     return { first: { ok: false, refusal }, absent: notTheirs(refusal.code) };
   };
   const rules = async (): Promise<Opened> => opened(await client.call<unknown>('automations'), rulesOf);

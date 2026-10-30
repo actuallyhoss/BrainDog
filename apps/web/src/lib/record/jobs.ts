@@ -467,7 +467,7 @@ export const words = {
   lastHeard: (ago: string) => `Last heard ${ago}`,
   /* One run. */
   run1: 'Run',
-  noSuchWhy: 'It may have been from another record, or the link may be wrong.',
+  noSuchWhy: 'It may have been from another BrainDog, or the link may be wrong.',
   cancel: 'Stop this run',
   cancelling: 'Stopping this run',
   empty: 'Nothing yet.',

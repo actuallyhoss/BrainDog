@@ -66,7 +66,7 @@ export function createRecord(
       `A slug starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one. ${args.slug} is not.`,
       { at: 'slug' },
     );
-  if (!args.name.trim()) return no<Provisioned>('REQUIRED_MISSING', 'A record has a name a person would say.', { at: 'name' });
+  if (!args.name.trim()) return no<Provisioned>('REQUIRED_MISSING', 'A BrainDog has a name a person would say.', { at: 'name' });
   /* THE TIMEZONE IS CHECKED AGAINST THE RUNTIME'S OWN DATA, never against a list shipped here: a
      table of zones is a table that is wrong the next time a government moves one. */
   if (!isZone(args.tz)) return no<Provisioned>('VALUE_MALFORMED', zoneRefused(args.tz), { at: 'tz' });

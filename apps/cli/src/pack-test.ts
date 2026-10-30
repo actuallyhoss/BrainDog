@@ -88,7 +88,7 @@ export function runPackTest(scratch: Scratch, test: PackTest): TestRun {
     const put = scratch.kernel.create(row.list, row.fields, { actor: 'p_scratch', note: 'Written by braindog addon test.' });
     if (!put.ok) {
       const r = 'refusal' in put ? put.refusal : null;
-      lines.push(`  FAILED  row ${i + 1} into ${oneLine(row.list)} was refused: ${r ? oneLine(`${r.fix} (${r.code})`) : 'the record did not write it.'}`);
+      lines.push(`  FAILED  row ${i + 1} into ${oneLine(row.list)} was refused: ${r ? oneLine(`${r.fix} (${r.code})`) : 'BrainDog did not write it.'}`);
       return { passed: false, lines };
     }
     ids.push(put.value.id);
@@ -105,7 +105,7 @@ export function runPackTest(scratch: Scratch, test: PackTest): TestRun {
     } else if ('figure' in e) {
       const read = readFigure(scratch, e.figure);
       if (read === null) say(false, `the figure ${oneLine(e.figure)} reads ${shown(e.value)}; this pack declares no figure called that.`);
-      else if (!read.ok) say(false, `the figure ${oneLine(e.figure)} reads ${shown(e.value)}; the record refused it: ${'refusal' in read ? oneLine(`${read.refusal.fix} (${read.refusal.code})`) : 'it did not read.'}`);
+      else if (!read.ok) say(false, `the figure ${oneLine(e.figure)} reads ${shown(e.value)}; BrainDog refused it: ${'refusal' in read ? oneLine(`${read.refusal.fix} (${read.refusal.code})`) : 'it did not read.'}`);
       else say(near(read.value.value, e.value), `the figure ${oneLine(e.figure)} reads ${shown(e.value)}${near(read.value.value, e.value) ? '' : `; it reads ${shown(read.value.value)}`}.`);
     } else {
       /* READ AGAIN NOW, not kept from the write, so a field a later row's rule changed is read as the record holds it. */

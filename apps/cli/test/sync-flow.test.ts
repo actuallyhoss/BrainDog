@@ -559,7 +559,7 @@ test('A HOST CANNOT CHANGE WHAT IS PLACED: a changed sealed file is not placed, 
     return changed;
   });
   assert.equal(await syncPull([], b.io), 1);
-  assert.match(b.out.join('\n'), /Context folder: not placed, because its sealed file is not in the record as the bundle names it/u);
+  assert.match(b.out.join('\n'), /Context folder: not placed, because its sealed file is not in your BrainDog as the bundle names it/u);
   assert.ok(!existsSync(join(b.home, '.claude', 'context', '01-projects.md')));
 
   /* A BUNDLE THE HOST MADE UP, ITS HASH MATCHING, OPENS UNDER NO MACHINE'S KEY. */

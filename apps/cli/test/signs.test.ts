@@ -177,7 +177,7 @@ test('A RED SIGN EXITS 0 ON PURPOSE, and --strict exits 2 on any red and says wh
   assert.equal(quiet.lines[0], '1 sign is fine. 1 has not been read yet.');
 
   /* A refusal and an unreachable host keep their own codes under --strict. */
-  const narrow = await host(t, { refusal: { code: 'FORBIDDEN', fix: 'The signs are about the whole record, and this caller is held to part of it.' } });
+  const narrow = await host(t, { refusal: { code: 'FORBIDDEN', fix: 'The signs are about all of this BrainDog, and this caller is held to part of it.' } });
   assert.equal(await signsCommand(['--strict'], io(narrow.base)), 1);
   assert.equal(await signsCommand(['--strict'], io('http://127.0.0.1:9')), 3);
 });
@@ -190,10 +190,10 @@ test('BRAINDOG SIGNS SAYS PLAINLY why the record would not read them: a record o
     assert.deepEqual(one.said, ['Your BrainDog is older than this command and cannot read its signs yet. It will once it is updated.']);
     assert.deepEqual(one.lines, []);
   }
-  const narrow = await host(t, { refusal: { code: 'FORBIDDEN', fix: 'The signs are about the whole record, and this caller is held to part of it.' } });
+  const narrow = await host(t, { refusal: { code: 'FORBIDDEN', fix: 'The signs are about all of this BrainDog, and this caller is held to part of it.' } });
   const two = io(narrow.base);
   assert.equal(await signsCommand([], two), 1);
-  assert.deepEqual(two.said, ['The signs are about the whole record, and this caller is held to part of it.']);
+  assert.deepEqual(two.said, ['The signs are about all of this BrainDog, and this caller is held to part of it.']);
 
   const down = io('http://127.0.0.1:9');
   assert.equal(await signsCommand([], down), 3);

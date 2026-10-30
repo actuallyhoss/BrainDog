@@ -25,7 +25,7 @@ export const theme = {
   lookEdit: 'Edit the look',
   lookClose: 'Close the editor',
   lookHouse: 'Use the usual look',
-  lookHouseBack: 'The record is back in the usual look.',
+  lookHouseBack: 'BrainDog is back in the usual look.',
   lookMember: 'Your look goes to the owner in Needs you, and everyone sees it once they accept.',
   /** The title the editor wears when a theme refused at install opened it with its fixes staged. */
   lookFixAndInstall: 'Fix and install',
@@ -115,7 +115,7 @@ export const theme = {
     THEME_LADDER_ORDER: 'The grounds no longer step from darkest to lightest, so a panel would blur into the page.',
     THEME_VALUE_INVALID: 'One of the colours is not one BrainDog can draw.',
   } as Record<string, string>,
-  lookWhyElse: 'The record cannot draw this look as it stands.',
+  lookWhyElse: 'BrainDog cannot draw this look as it stands.',
   lookBlocked: 'Fix every pair marked Fails, then save.',
   lookNoHue: 'The accent is almost grey, and a look is built from a colour. Pick an accent with some colour in it.',
 
@@ -123,7 +123,7 @@ export const theme = {
   lookPropose: 'Send the look to the owner',
   lookInstall: 'Install the fixed look',
   lookSaving: 'Saving',
-  lookSaved: 'The record is in its new look.',
+  lookSaved: 'BrainDog is in its new look.',
   lookProposed: 'Your look is in Needs you, waiting for the owner.',
   /** The question a member's look is filed under, which the owner reads on Decide. */
   lookProposeQuestion: 'Change how your BrainDog looks?',

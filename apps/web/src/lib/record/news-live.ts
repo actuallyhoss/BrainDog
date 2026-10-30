@@ -45,7 +45,7 @@ type Reading = { value: number | null; unit: string | null; rows: number; held?:
 type Said = { code: string; fix: string };
 
 const refusalOf = (out: { ok: false; refusal: Said } | { ok: false; conflict: unknown }): Said =>
-  'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+  'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while it was being read.' };
 
 /**
  * One figure as a tile, the way a live `stat` block draws one (`page-live.ts`).

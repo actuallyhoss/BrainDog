@@ -562,7 +562,7 @@ export function methods(deps: RecordDeps) {
         const person = admin(ctx);
         if (person) return { ok: false, refusal: person };
       }
-      if (!whole(ctx)) return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+      if (!whole(ctx)) return no('FORBIDDEN', 'The inbox belongs to all of this BrainDog, and this caller is held to part of it.', { at: 'principal' });
 
       /* THE ARGUMENTS ARE READ AFTER THE DOOR, so a caller who is refused is not told what triage takes. */
       const a = (args ?? {}) as Record<string, unknown>;

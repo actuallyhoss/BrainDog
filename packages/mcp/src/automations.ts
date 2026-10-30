@@ -74,7 +74,7 @@ export const AUTOMATION_GRAMMAR = {
     once_per: '["entry"] or field ids: what makes one firing. Required when a write trigger notifies, creates, suggests, runs, calls or asks',
     enabled: 'false stops it starting, and cancels its runs still waiting',
     project: 'a project id: only rows of that project start it',
-    limits: '{"runs_per_day","steps_per_run"}, whole numbers, which can only lower the record ceilings',
+    limits: '{"runs_per_day","steps_per_run"}, whole numbers, which can only lower the ceilings BrainDog sets',
     priority: 'a number; lower runs first among rules inside one write',
   },
   triggers: {

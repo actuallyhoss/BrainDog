@@ -251,8 +251,8 @@ test('A LIST<SECRET> IS A SECRET TO THE LINT: not sent, not asked about, not cop
   const made = k.create('obligations', { what: 'Rent', keys: ['g_1'] }, { actor: 'p_1' });
   assert.equal(refusal(made as Result<unknown>)?.code, 'IMMUTABLE_FIELD');
   for (const [what, list, said] of [
-    ['about', [{ ask_slash: { question: 'Rate?', about: ['keys'], as: 'rate' } }], /sends keys to Slash at steps\[0\], and a secret field never leaves the record/],
-    ['the question', [{ ask_slash: { question: 'Rate for {{keys}}?', as: 'rate' } }], /puts keys in its question to Slash at steps\[0\] with \{\{keys\}\}, and a secret field never leaves the record/],
+    ['about', [{ ask_slash: { question: 'Rate?', about: ['keys'], as: 'rate' } }], /sends keys to Slash at steps\[0\], and a secret field never leaves BrainDog/],
+    ['the question', [{ ask_slash: { question: 'Rate for {{keys}}?', as: 'rate' } }], /puts keys in its question to Slash at steps\[0\] with \{\{keys\}\}, and a secret field never leaves BrainDog/],
     ['a set', [{ set: { field: 'note', to: '{{trigger.row.keys}}' } }], /writes note from \{\{trigger\.row\.keys\}\} at steps\[0\]/],
   ] as const) {
     const out = refusal((await k.install([steps([...list])])) as Result<unknown>);

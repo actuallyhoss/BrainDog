@@ -173,7 +173,7 @@ function checkBriefing(sql: Sql, repo: string, b: Context, nowMs: number): { wro
   const want = expectedHandoff(sql, repo, b.project?.spoken ?? null, nowMs);
   const got = b.handoff;
   const gotRow = got === null ? null : ((n) => (n === null ? null : runBySeq(sql, n)))(seqOf(got.from));
-  if (got !== null && (gotRow === null || gotRow.deleted_at !== null)) wrong.push(`The briefing for ${name} hands a step no run on the record left.`);
+  if (got !== null && (gotRow === null || gotRow.deleted_at !== null)) wrong.push(`The briefing for ${name} hands a step no run in this BrainDog left.`);
   else if (got !== null && want === null) wrong.push(`The briefing for ${name} hands a step from ${runSaid(gotRow!.doing)}, which left none here.`);
   else if (got === null && want !== null) wrong.push(`The briefing for ${name} hands no step, though ${runSaid(want.doing)} left one ${ago(nowMs - heard(want))} ago.`);
   else if (got !== null && want !== null && gotRow!.seq !== want.seq)
@@ -192,7 +192,7 @@ function checkBriefing(sql: Sql, repo: string, b: Context, nowMs: number): { wro
   for (const live of [...b.live.same_repo, ...b.live.elsewhere]) {
     const n = seqOf(live.spoken);
     const row = n === null ? null : runBySeq(sql, n);
-    if (row === null || row.deleted_at !== null) wrong.push(`The briefing for ${name} names a run as live that is not on the record.`);
+    if (row === null || row.deleted_at !== null) wrong.push(`The briefing for ${name} names a run as live that is not in this BrainDog.`);
     else if (row.state === 'done' || row.state === 'abandoned') wrong.push(`The briefing for ${name} names ${runSaid(row.doing)} as live, and it has ended.`);
     else if (row.last_seen === null || nowMs - Date.parse(row.last_seen) > BRIEFING_LIVE_MS)
       wrong.push(`The briefing for ${name} names ${runSaid(row.doing)} as live, and ${row.last_seen === null ? 'it was never heard from' : `it was last heard from ${ago(nowMs - Date.parse(row.last_seen))} ago`}.`);

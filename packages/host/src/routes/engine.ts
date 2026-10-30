@@ -19,5 +19,5 @@ export const ROUTES: readonly Route[] = [
   { name: 'engineHealth', group: 'READ+', writes: false, what: 'Whether Slash’s model answers, read from its own ledger, with the one sentence a person reads about it.' },
   /* WHAT THE MODEL WAS ASKED AND ANSWERED, READ+ as `engineHealth` is: purposes, counts, instants and a failure's
      code, with no row of the record and no person's words. `null` where the host hands the record no ledger. */
-  { name: 'engineReadings', group: 'READ+', writes: false, what: 'What Slash’s model was asked and answered in the last 30 days, purpose by purpose, and what the record does not yet understand.' },
+  { name: 'engineReadings', group: 'READ+', writes: false, what: 'What Slash’s model was asked and answered in the last 30 days, purpose by purpose, and what BrainDog does not yet understand.' },
 ];

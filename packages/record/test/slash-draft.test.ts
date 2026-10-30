@@ -125,7 +125,7 @@ test('A MODEL THAT STAYS WRONG FILES NOTHING AND SAYS WHY, after the first ask a
   assert.equal(rows.length, 1 + SLASH_REPAIRS_MOST, 'an ask was not held in the ledger');
   assert.deepEqual(out.filed, []);
   assert.equal(suggestions(sql), 0);
-  assert.ok(out.dropped.some((d) => d.startsWith('"A desk for my launch?" was dropped, because the record refused it: ')), JSON.stringify(out.dropped));
+  assert.ok(out.dropped.some((d) => d.startsWith('"A desk for my launch?" was dropped, because BrainDog refused it: ')), JSON.stringify(out.dropped));
   assert.ok(out.dropped.includes('The model proposed nothing Slash could use, so nothing was drafted from what you described.'), JSON.stringify(out.dropped));
   sql.close();
 });

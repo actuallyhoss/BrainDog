@@ -84,7 +84,7 @@ test('A MEMBER, A MEMBER\'S TOKEN AND A CALLER HELD TO PART OF THE RECORD ARE RE
     assert.equal(r.fix, 'What was imported is for the owner of this BrainDog to read, so nothing was read.');
   }
   const r = refusal(await api.imports({}, narrow));
-  assert.equal(r.fix, 'What was imported is about the whole record, and this caller is held to part of it.');
+  assert.equal(r.fix, 'What was imported is about all of this BrainDog, and this caller is held to part of it.');
   assert.equal(refusal(await api.importAdopt({ run: 'S1', yes: true }, narrow)).code, 'FORBIDDEN');
 });
 

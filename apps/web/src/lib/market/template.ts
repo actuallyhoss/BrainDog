@@ -53,7 +53,7 @@ export const templateWords = {
   title: 'Share as a template',
   lead: 'An add-on of this page alone, for somebody else to install. None of what it shows goes in: each project, person or item it filters on becomes a setting they pick.',
   reading: 'Reading the page',
-  unread: 'The record answered in a way this version of BrainDog does not read.',
+  unread: 'BrainDog answered in a way this version of the app does not read.',
   addsPage: (title: string): string => `The page ${title}`,
   setting: (label: string): string => `A setting for ${label}, which whoever installs it picks`,
   settingNow: (label: string, now: string): string => `A setting for ${label}, now ${now}, which whoever installs it picks`,

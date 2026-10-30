@@ -305,7 +305,7 @@ async function wholeList(client: Client): Promise<Record<string, unknown>[] | nu
 
 /** The record's reason a tool was skipped, as a line can carry it: its own words, or a fixed sentence. */
 function whyOf(why: unknown): string {
-  if (typeof why !== 'string' || why.trim() === '' || looksLikeKey(why)) return 'the record did not say why.';
+  if (typeof why !== 'string' || why.trim() === '' || looksLikeKey(why)) return 'BrainDog did not say why.';
   const said = why.trim().slice(0, 280);
   return /[.?!]$/.test(said) ? said : `${said}.`;
 }
@@ -538,7 +538,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
     const label = (need: string) => need.split('=')[0] ?? need;
     const here = new Set(n.needs.map(label));
     const out = await s.client.update({ register: 'tools', seq, patch: { needs: [...n.needs, ...prior.filter((p) => !here.has(label(p)))] }, version: got.version });
-    return valueOf(out) === null ? { said: '', fault: `${f.name} could not name its deposited keys in the record: ${fixOf(out)}` } : { said: keysSaid(n), fault: null };
+    return valueOf(out) === null ? { said: '', fault: `${f.name} could not name its deposited keys in your BrainDog: ${fixOf(out)}` } : { said: keysSaid(n), fault: null };
   };
 
   /**
@@ -571,7 +571,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
     }
     const projectServers = [...found.values()].filter((f) => f.scope === 'project').length;
     if (project === null && projectServers > 0)
-      said.unshift(`This folder is in no project in the record, so the ${String(projectServers)} server${projectServers === 1 ? '' : 's'} of its project config ${projectServers === 1 ? 'was' : 'were'} not recorded.`);
+      said.unshift(`This folder is in no project in your BrainDog, so the ${String(projectServers)} server${projectServers === 1 ? '' : 's'} of its project config ${projectServers === 1 ? 'was' : 'were'} not recorded.`);
     if (sending.length === 0) {
       lines.push(...said);
       return true;
@@ -626,7 +626,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
 
   const everywhere: { f: Found; key: string; shape: string; row: Record<string, unknown> }[] = [];
   /* A DRY RUN OVER A LIST LONGER THAN ONE CONTEXT READS THE WHOLE LIST, every state, so it names only what the record
-     does not hold. It said "not recorded, because the record lists more tools than one context shows" of every server
+     does not hold. It said "not recorded, because your BrainDog lists more tools than one context shows" of every server
      on his Mac, nineteen lines a scan, after a real scan had matched them all. */
   const every = s.dryRun && reg.truncated ? await wholeList(s.client) : null;
   const held = (f: Found): boolean =>
@@ -640,7 +640,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   if (s.dryRun || !(await viaSeen())) try {
     const projectServers = [...found.values()].filter((f) => f.scope === 'project');
     if (project === null && projectServers.length > 0)
-      lines.push(`This folder is in no project in the record, so the ${String(projectServers.length)} server${projectServers.length === 1 ? '' : 's'} of its project config ${projectServers.length === 1 ? 'was' : 'were'} not recorded.`);
+      lines.push(`This folder is in no project in your BrainDog, so the ${String(projectServers.length)} server${projectServers.length === 1 ? '' : 's'} of its project config ${projectServers.length === 1 ? 'was' : 'were'} not recorded.`);
 
     for (const f of found.values()) {
       if (f.scope === 'project' && project === null) continue;
@@ -662,7 +662,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
           continue;
         }
         if (reg.truncated) {
-          lines.push(`${toolSaid(f)} was not recorded, because the record lists more tools than one context shows.`);
+          lines.push(`${toolSaid(f)} was not recorded, because your BrainDog lists more tools than one context shows.`);
           continue;
         }
         if (f.scope === 'global' && project !== null) {
@@ -709,14 +709,14 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
         if (s.dryRun || Object.keys(patch).length === 0) continue;
         read.delete(row.spoken);
         const out = await s.client.update({ register: 'tools', seq, patch, version: got.version });
-        if (n.deposited > 0) lines.push(valueOf(out) === null ? `Tool ${f.name} could not name its deposited keys in the record: ${fixOf(out)}` : `Tool ${f.name} is recorded${keysSaid(n)}.`);
+        if (n.deposited > 0) lines.push(valueOf(out) === null ? `Tool ${f.name} could not name its deposited keys in your BrainDog: ${fixOf(out)}` : `Tool ${f.name} is recorded${keysSaid(n)}.`);
         continue;
       }
 
       if (lock.asked[key] === shape) continue;
       const n = await needsFor(f, prior, allow);
       if (s.dryRun) {
-        lines.push(`${toolSaid(f)} differs from the one in the record, which would be left as it is and the change proposed${keysSaid(n)}.`);
+        lines.push(`${toolSaid(f)} differs from the one in your BrainDog, which would be left as it is and the change proposed${keysSaid(n)}.`);
         continue;
       }
       const patch = f.kind === 'integration' ? { endpoint: f.endpoint } : { transport: f.transport, command: f.command, args: f.args, endpoint: f.endpoint, needs: n.needs };
@@ -739,7 +739,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       });
       const made = valueOf(out);
       if (made === null || typeof made.id !== 'string') {
-        lines.push(`${toolSaid(f)} differs from the one in the record, and the change was not proposed: ${fixOf(out)}`);
+        lines.push(`${toolSaid(f)} differs from the one in your BrainDog, and the change was not proposed: ${fixOf(out)}`);
         continue;
       }
       lock.asked[key] = shape;
@@ -747,8 +747,8 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       lines.push(
         linked(
           joined === null
-            ? `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`
-            : `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change is asked on Decide already. ${joined}`,
+            ? `${toolSaid(f)} differs from the one in your BrainDog, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`
+            : `${toolSaid(f)} differs from the one in your BrainDog, so that was left as it is${keysSaid(n)}, and the change is asked on Decide already. ${joined}`,
           s.to,
           made.id,
         ),
@@ -1037,7 +1037,7 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
         continue;
       }
       if (action === 'kept') {
-        lines.push(`Tool ${name} at ${scope} scope was changed by hand since BrainDog wrote it, so it is left. Remove it with ${app.remove(name, scope)} to take the record's.`);
+        lines.push(`Tool ${name} at ${scope} scope was changed by hand since BrainDog wrote it, so it is left. Remove it with ${app.remove(name, scope)} to take your BrainDog's.`);
         continue;
       }
       const at = scope === 'project' && s.top !== null ? s.top : s.cwd;
@@ -1134,7 +1134,7 @@ export async function tools(args: string[], io: AgentIo & { cli: string; claude?
         })
       : await writeTools({ ...base, scope: scope ?? null, cli: io.cli, claude: io.claude ?? runClaude, env: io.env });
   for (const line of lines) io.out(line);
-  if (lines.length === 0) io.out(verb === 'scan' ? 'Every server found is recorded as it is.' : 'Every tool is written as the record has it.');
+  if (lines.length === 0) io.out(verb === 'scan' ? 'Every server found is recorded as it is.' : 'Every tool is written as your BrainDog has it.');
   if (dryRun) io.out('That was a dry run, so nothing was deposited, written, sent or proposed.');
   return 0;
 }

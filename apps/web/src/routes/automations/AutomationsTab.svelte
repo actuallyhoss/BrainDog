@@ -134,7 +134,7 @@
 
   /* AN AGENT SETS THESE UP AS READILY AS A PERSON, so the empty list says what to ask one. An example a
      person reads and replaces, not a feature the code ships. */
-  const agentPrompt = 'read my record, then propose an automation that fetches the US dollar in euros from api.example.com every hour and tells me when it is over 0.95';
+  const agentPrompt = 'read my BrainDog, then propose an automation that fetches the US dollar in euros from api.example.com every hour and tells me when it is over 0.95';
 
   /* A LIST AS THE RAIL NAMES IT AND DRAWS IT: the shell's own name and glyph for it, else what its declaration says. */
   type Listed = { id: string; name: string; icon?: IconName };

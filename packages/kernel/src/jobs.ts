@@ -243,7 +243,7 @@ function toolFault(id: string, tool: unknown, at: string): Refusal | null {
   const inside = BASH.exec(tool)?.[1];
   if (inside === undefined)
     return bad(
-      `${id} names ${JSON.stringify(tool.slice(0, ECHO_CHARS_MOST))}. A job's tools are ${JOB_FILE_TOOLS.join(', ')}, the record's own tools as ${JOB_MCP_PREFIX}<tool>, and named commands as Bash(<command>).`,
+      `${id} names ${JSON.stringify(tool.slice(0, ECHO_CHARS_MOST))}. A job's tools are ${JOB_FILE_TOOLS.join(', ')}, BrainDog's own tools as ${JOB_MCP_PREFIX}<tool>, and named commands as Bash(<command>).`,
       at,
     );
   if (inside.length > JOB_COMMAND_CHARS_MOST) return bad(`${id}'s command ${at} is at most ${JOB_COMMAND_CHARS_MOST} characters.`, at);
@@ -354,7 +354,7 @@ export function jobBody(decl: { id: string; body: Record<string, unknown> }): Re
     const named = tools.findIndex((t) => typeof t === 'string' && BASH.test(t));
     if (named >= 0)
       return bad(
-        `${id} runs on Codex, which cannot hold a run to named commands: it runs any command its sandbox allows, read-only for dontAsk. Name Read, Grep, Glob and the record's own tools, or leave agent out for Claude Code.`,
+        `${id} runs on Codex, which cannot hold a run to named commands: it runs any command its sandbox allows, read-only for dontAsk. Name Read, Grep, Glob and BrainDog's own tools, or leave agent out for Claude Code.`,
         `tools[${named}]`,
       );
   }
@@ -1107,7 +1107,7 @@ const claimedBy = (deps: TokenDeps, runner: JobRunner, id: string | null): Store
  * kept as nothing.
  */
 function stripped(value: unknown, depth = 0): unknown {
-  if (typeof value === 'string') return looksLikeCredential(value) ? 'A key was printed here, and the record does not keep one.' : value;
+  if (typeof value === 'string') return looksLikeCredential(value) ? 'A key was printed here, and BrainDog does not keep one.' : value;
   if (value === null || typeof value !== 'object') return value;
   if (depth >= BODY_DEPTH_MOST) return null;
   if (Array.isArray(value)) return value.map((v) => stripped(v, depth + 1));

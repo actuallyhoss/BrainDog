@@ -322,7 +322,7 @@ export function compile(register: string, where: string | undefined, now: number
   /* A SHAPE NO CLAUSE HOLDS IS SAID, NOT DROPPED: a predicate printed without one of its conditions opens a wider list
      than it names. */
   if (conditions.some((c) => c === null))
-    return { register, clauses: [], bad: [`${(where ?? '').trim()}: the record reads this filter, and this screen cannot write it as a link.`] };
+    return { register, clauses: [], bad: [`${(where ?? '').trim()}: BrainDog reads this filter, and this screen cannot write it as a link.`] };
   const each = conditions as Clause[][];
   if (texts.length > 1 && Array.isArray(top.any)) return { register, clauses: [], any: each, bad };
   return { register, clauses: each.flat(), bad };

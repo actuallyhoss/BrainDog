@@ -198,7 +198,7 @@ function billPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | null {
       const m = r.fields[bills.amount] as { amount?: number; currency?: string } | undefined;
       return m?.amount === read.amount!.amount && m.currency === read.amount!.currency && r.fields[bills.due] === day && String(r.fields[bills.title] ?? '').toLowerCase().includes(label);
     });
-    if (again) return { skipped: `${what} is already in the record.` };
+    if (again) return { skipped: `${what} is already in your BrainDog.` };
   }
 
   const before = rowsOf(deps, bills.id).some((r) => {
@@ -220,8 +220,8 @@ function billPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | null {
     read.amount ? '' : 'No total was printed clearly, so the amount needs you.',
     read.amount && !read.amountClean ? 'The total could be read two ways, so please check it.' : '',
     dayRead ? '' : 'No due day was printed, so today is used.',
-    f.known ? '' : `${f.vendor} is new to the record.`,
-    before ? '' : 'No earlier bill from them is in the record.',
+    f.known ? '' : `${f.vendor} is new to your BrainDog.`,
+    before ? '' : 'No earlier bill from them is in your BrainDog.',
   ].filter((t) => t !== '');
   const said = read.amount ? sayMoney(read.amount) : 'amount unread';
   return {
@@ -259,7 +259,7 @@ function renewalPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | nul
     later ? '' : 'The day is earlier than the one kept.',
     dearer ? `The mail says ${sayMoney(read.amount!)}, which differs from the cost kept; the cost is left as it is.` : '',
     read.amount && !read.amountClean ? 'The price could be read two ways.' : '',
-    f.known ? '' : `${f.vendor} is new to the record.`,
+    f.known ? '' : `${f.vendor} is new to your BrainDog.`,
   ].filter((t) => t !== '');
   return {
     register: services.id,

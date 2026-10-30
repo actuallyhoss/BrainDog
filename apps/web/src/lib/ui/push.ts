@@ -244,9 +244,9 @@ export const testWords = {
   pressing: 'Sending the test',
   sent: (devices: number): string => `Sent to ${devices} ${devices === 1 ? 'device' : 'devices'}. It should arrive within a minute.`,
   /* THE PRESS IS DRAWN ONLY WHILE THIS DEVICE IS ON, so none on the record is the dead subscription the test is for. */
-  none: 'Nothing was sent: the record holds no device of yours. Turn notifications off and on again here.',
+  none: 'Nothing was sent: BrainDog holds no device of yours. Turn notifications off and on again here.',
   noRoute: 'This BrainDog cannot send a test yet, so nothing was sent.',
-  notReached: 'The record was not reached, so nothing was sent. Try again once you are online.',
+  notReached: 'BrainDog was not reached, so nothing was sent. Try again once you are online.',
 } as const;
 
 /**

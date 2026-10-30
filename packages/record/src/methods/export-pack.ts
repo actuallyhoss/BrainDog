@@ -353,7 +353,7 @@ export function methods(deps: RecordDeps) {
           if (row.body.trim() === '') return no('VALUE_MALFORMED', `The skill ${row.name} has no steps written, so there is nothing to share. Write them in Skills first.`, { at: 'skills' });
           const text = `${row.trigger}\n${row.body}`;
           if (/[^\s@<>()"']+@[^\s@<>()"']+\.[a-z]{2,}/iu.test(text) || /https?:\/\/\S+/iu.test(text))
-            return no('VALUE_MALFORMED', `The skill ${row.name} holds an email address or a link, and those stay in the record. Take it out of the skill, or leave this skill out.`, { at: 'skills' });
+            return no('VALUE_MALFORMED', `The skill ${row.name} holds an email address or a link, and those stay in your BrainDog. Take it out of the skill, or leave this skill out.`, { at: 'skills' });
           skills.push({ name: skillNameOf(row.name), trigger: row.trigger, ...(row.what === null ? {} : { what: [...row.what].slice(0, 200).join('') }), body: row.body });
         }
       }

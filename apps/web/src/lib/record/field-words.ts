@@ -48,7 +48,7 @@ export const fieldWords = {
   reason: 'Added by the owner.',
   added: (label: string) => `Everything here has ${label} now.`,
   filed: (label: string) => `${label} is waiting in Needs you for the owner.`,
-  reserved: (label: string) => `${label} is a name the record keeps for itself. Pick another.`,
+  reserved: (label: string) => `${label} is a name BrainDog keeps for itself. Pick another.`,
   /* THE ONE MORE THING A KIND NEEDS, asked under the kind and refused at it. */
   choices: 'Choices',
   choicesHelp: 'One a line, or split by commas. Two to forty.',

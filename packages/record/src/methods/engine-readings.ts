@@ -186,7 +186,7 @@ export function methods(deps: RecordDeps) {
          record always hands the question in; a method file built without it is a test of the arithmetic. */
       const across = deps.readsAcross ?? deps.readsEveryList;
       if (across !== undefined && !across(ctx))
-        return { ok: false, refusal: { code: 'FORBIDDEN', fix: "The engine's readings count across the whole record, so they are for whoever reads all of it.", at: 'principal' } };
+        return { ok: false, refusal: { code: 'FORBIDDEN', fix: "The engine's readings count across all of this BrainDog, so they are for whoever reads all of it.", at: 'principal' } };
       const read = deps.engineLedger;
       if (read === undefined) return { ok: true, value: null };
       const now = clock.now();

@@ -58,7 +58,7 @@ test("a refusal is said in the record's words, with the field named by its label
 });
 
 test('a sentence that does not name the field is said after its label', () => {
-  assert.equal(namedBy('The record could not be reached.', 'about', 'About'), 'About: The record could not be reached.');
+  assert.equal(namedBy('BrainDog could not be reached.', 'about', 'About'), 'About: BrainDog could not be reached.');
   assert.equal(namedBy('things#2.about is too long', 'about', 'About'), 'About is too long', 'the spoken id goes with the field');
   assert.equal(namedBy('roundabout is not about it', 'about', 'About'), 'roundabout is not About it', 'only the whole word');
 });

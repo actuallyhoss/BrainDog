@@ -67,7 +67,7 @@ export const words = {
   projectNone: 'No project',
   valueField: 'Value',
   valueHint: 'Locked when saved. Nobody can read it back, you included.',
-  valueAgain: 'The new value replaces the old one. What the old one opened stays on the record.',
+  valueAgain: 'The new value replaces the old one. What the old one opened stays in your BrainDog.',
   save: 'Save',
   saving: 'Saving',
   cancel: 'Cancel',

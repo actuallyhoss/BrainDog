@@ -60,7 +60,7 @@ export function methods(deps: RecordDeps) {
     async signs(_args: unknown, ctx: CallContext): Promise<Signs> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop } as Signs;
-      if (!whole(ctx)) return no('FORBIDDEN', 'The signs are about the whole record, and this caller is held to part of it.', { at: 'principal' }) as Signs;
+      if (!whole(ctx)) return no('FORBIDDEN', 'The signs are about all of this BrainDog, and this caller is held to part of it.', { at: 'principal' }) as Signs;
       const out = kernel.signs();
       if (!out.ok || inboxRead(ctx)) return out;
       return { ...out, value: { ...out.value, signs: out.value.signs.map(quietSign) } };

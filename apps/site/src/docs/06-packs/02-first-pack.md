@@ -43,13 +43,13 @@ Reading list 1.0.0 reads as an add-on: 1 lists, 1 pages and 2 example rows. Noth
   Installs in a scratch record:2 declarations and 2 example rows, and one page.
 ```
 
-`check` reads the file the way a record will, then installs it in a scratch record in memory. The lines in the middle are the plan an owner sees before installing: what the add-on adds, what it needs installed first, and every host it would call out to. The last line says the install went through.
+`check` reads the file the way BrainDog will, then installs it in a scratch BrainDog in memory. The lines in the middle are the plan an owner sees before installing: what the add-on adds, what it needs installed first, and every host it would call out to. The last line says the install went through.
 
 When something is wrong, the last line says what, with its code in brackets. Here the page was pointed at a list called `books` that nothing declares:
 
 ```code | What it prints when the file is wrong
   Refused in a scratch record: reading-list points at the books list (page.reading-list.requires), which is not here and reading-list does not declare. Install the pack that declares books first, or declare it in reading-list. (REGISTER_UNRESOLVED)
-Reading list 1.0.0 would be refused by a record, as said above.
+Reading list 1.0.0 would be refused by BrainDog, as said above.
 ```
 
 Every refusal a pack can meet is on [one page](/docs/packs/refusals), with its sentence.

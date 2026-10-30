@@ -28,7 +28,7 @@ export const automations = {
      spelling and not the person's; those words stay in the prompt, which is handed to an agent. */
   doorsNone: 'Nothing posts in yet',
   doorsNoneWhy: 'Ask an agent to set one up.',
-  doorsPrompt: 'read my record, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
+  doorsPrompt: 'read my BrainDog, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
   doorsWrites: (list: string) => `Writes to ${list}.`,
   doorsHeld: 'An address is in use. Making a new one stops the old one working.',
   doorsNotHeld: 'No address made yet.',

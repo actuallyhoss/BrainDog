@@ -138,7 +138,7 @@ export const words = {
   needTitle: 'Give it a name.',
   needStart: 'Say what starts it: a clock, a door or an automation.',
   needSource: 'Write what it does.',
-  badEvery: (every: string) => `${every} is not a clock the record reads. Write 15m, 1h, 6h or 1d.`,
+  badEvery: (every: string) => `${every} is not a clock BrainDog reads. Write 15m, 1h, 6h or 1d.`,
   badDoor: 'A door is named in lower case letters, digits, hyphens and underscores, starting with a letter.',
   badOrigin: (line: string) => `${line} is not an address it may fetch from. Write one starting https://, with no path.`,
   spent: (fetches: number, ms: number) => `${fetches === 1 ? '1 fetch' : `${fetches.toLocaleString('en-GB')} fetches`}, ${ms.toLocaleString('en-GB')} ms`,

@@ -195,7 +195,7 @@ const sendTo =
       .setPref(key as Parameters<ReturnType<typeof createClient>['setPref']>[0], value as never)
       .catch(() => null);
     if (out?.ok) return { from: 'kept' };
-    const fix = out && 'refusal' in out ? out.refusal.fix : 'The record could not be reached, so this was not kept.';
+    const fix = out && 'refusal' in out ? out.refusal.fix : 'BrainDog could not be reached, so this was not kept.';
     return { from: 'refused', fix };
   };
 

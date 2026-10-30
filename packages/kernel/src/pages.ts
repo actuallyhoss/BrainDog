@@ -3749,7 +3749,7 @@ function roleFault(block: PageBlock, register: string, schema: Schema): Refusal 
       code: 'DECLARATION_INVALID',
       fix:
         column.as === 'picture'
-          ? `as: picture leads a card with a file the record holds, and ${register}'s ${column.field} is ${type ?? 'no field'}. Name a file field.`
+          ? `as: picture leads a card with a file this BrainDog holds, and ${register}'s ${column.field} is ${type ?? 'no field'}. Name a file field.`
           : `as: hue is the card's colour, a whole number of degrees from 0 to 359, and ${register}'s ${column.field} is ${type ?? 'no field'}. Name an int field.`,
       at: 'columns',
       allowed: Object.entries(schema.fields)

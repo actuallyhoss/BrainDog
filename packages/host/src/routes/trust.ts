@@ -17,7 +17,7 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'trust', group: 'READ+', writes: false, what: 'How far each agent is trusted with each kind of change: Ask, Do and tell or Do quietly, since when, and whether it was put back to Ask. It changes nothing. Only the owner of the record reads it.',
+  { name: 'trust', group: 'READ+', writes: false, what: 'How far each agent is trusted with each kind of change: Ask, Do and tell or Do quietly, since when, and whether it was put back to Ask. It changes nothing. Only the owner of this BrainDog reads it.',
     takes: {} },
   { name: 'trustTakeBack', group: 'ADMIN', writes: true, what: 'Puts an agent back to asking before it makes one kind of change, or every kind when none is named.',
     takes: { agent: 'text', kind: 'text' } },

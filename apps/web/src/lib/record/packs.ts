@@ -103,7 +103,7 @@ const said = <T>(r: Wire<T>): Answer<T> =>
     ? r
     : 'refusal' in r
       ? { ok: false, refusal: r.refusal }
-      : { ok: false, refusal: { code: 'VERSION_STALE', fix: 'The record changed while this was sent. Try again.' } };
+      : { ok: false, refusal: { code: 'VERSION_STALE', fix: 'Something changed while this was sent. Try again.' } };
 
 export function live(client: Caller): Source {
   return {
@@ -280,7 +280,7 @@ export const words = {
   /* A BLANK SUM SAYS IT IS BLANK: its currency in front of an empty box read as a value. */
   notSet: 'Not set',
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
-  speaksAlone: 'It is the only starter on, so the record speaks in its words. This becomes a choice when a second one is on.',
+  speaksAlone: 'It is the only starter on, so BrainDog speaks in its words. This becomes a choice when a second one is on.',
   unit: 'Unit',
   units: { days: 'days', hours: 'hours', minutes: 'minutes', seconds: 'seconds' },
 } as const;

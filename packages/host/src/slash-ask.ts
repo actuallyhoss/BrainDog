@@ -336,7 +336,7 @@ const NO_BEARER: Refusal = {
 /** The sentence a host with no model behind Slash answers, and the one `/api/version` already says as `slash: false`. */
 const NO_MODEL: Refusal = {
   code: 'NOT_IN_THIS_BUILD',
-  fix: 'No model is configured behind Slash on this host, so it cannot read the record for you.',
+  fix: 'No model is configured behind Slash on this host, so it cannot read your BrainDog for you.',
 };
 
 /** The sentence a host that hands no health read answers at `/api/slash/health`. */

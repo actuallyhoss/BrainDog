@@ -35,7 +35,7 @@ export function methods(deps: RecordDeps) {
       if (owner) return { ...owner, code: 'FORBIDDEN' };
     }
     if (ctx.registers !== undefined && ctx.registers !== '*')
-      return { code: 'FORBIDDEN', fix: 'The inbox belongs to the whole record, and this caller is held to part of it.', at: 'principal' };
+      return { code: 'FORBIDDEN', fix: 'The inbox belongs to all of this BrainDog, and this caller is held to part of it.', at: 'principal' };
     return null;
   };
 

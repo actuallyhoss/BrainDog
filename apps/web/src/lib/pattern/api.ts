@@ -38,7 +38,7 @@ const PAGE = 200;
 const UNREACHED = 'BrainDog could not be reached.';
 
 const fixOf = (out: { ok: false } & ({ refusal: { fix: string } } | { conflict: unknown })): string =>
-  'refusal' in out ? out.refusal.fix : 'The record changed while this was being saved. Try again.';
+  'refusal' in out ? out.refusal.fix : 'Something changed while this was being saved. Try again.';
 
 /**
  * The samples by id, out of the inbox in every state, newest first until all are found or the walk's ceiling is met.

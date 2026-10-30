@@ -171,7 +171,7 @@ export function retypedBody(
   const was = fields.find((f) => f.id === ask.field);
   if (!was) return no('FIELD_UNKNOWN', `${name} has no field called ${ask.field}.`, { at: 'field' });
   if (was.retired === true) return no('FIELD_UNKNOWN', `${ask.field} is retired on ${name}, so there is nothing to change it into.`, { at: 'field' });
-  if (was.derived === true) return no('VALUE_MALFORMED', `${ask.field} is worked out by the record, so its type is not one to change.`, { at: 'field' });
+  if (was.derived === true) return no('VALUE_MALFORMED', `${ask.field} is worked out by BrainDog, so its type is not one to change.`, { at: 'field' });
 
   const as = ask.as;
   const moving = as.type !== undefined && (as.type !== was.type || (as.of ?? null) !== (was.of ?? null));

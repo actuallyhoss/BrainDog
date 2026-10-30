@@ -2066,7 +2066,7 @@ function ownAgentFault(sql: Sql, by: string, nowMs: number): string | null {
   if (token === null) return 'Only what BrainDog or one of your own agents files is settled by it.';
   const grant = sql.one<{ person_id: string; revoked_at: string | null; expires_at: string | null }>('SELECT person_id, revoked_at, expires_at FROM token WHERE id = ?', token);
   if (!grant || grant.revoked_at !== null || (grant.expires_at !== null && grant.expires_at <= instant(nowMs))) return 'The grant it was filed under has ended.';
-  return ownerIn(sql, grant.person_id) ? null : 'It was filed by an agent of someone who does not keep the whole record.';
+  return ownerIn(sql, grant.person_id) ? null : 'It was filed by an agent of someone who does not hold all of this BrainDog.';
 }
 
 /**
@@ -2089,7 +2089,7 @@ export function handledFault(sql: Sql, row: { body_kind: string; body: string; o
   }
   const body = parse(row.body);
   if (!body) return 'The question cannot be read.';
-  if (body.outside === true) return 'Its run read text from outside the record, so it waits for you.';
+  if (body.outside === true) return 'Its run read text from outside BrainDog, so it waits for you.';
   const rows = (body.rows ?? []) as Record<string, unknown>[];
   /* A CONFIDENT ARRIVAL IS THE ONE ADD BRAINDOG FILES ITSELF: an ingest says so in the body
      (`arrivalSure`), and only new rows of that ingest's own list count; money is read cleanly by then, every other floor stands. */
@@ -2310,7 +2310,7 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
       return {
         code: 'VALUE_MALFORMED',
         fix: whole(other)
-          ? `This change is filed as a change to ${named}, and ${String(d.id)} in it reads across the whole record, so whoever reads ${named} would read all of it. Propose ${String(d.id)} as a change of its own.`
+          ? `This change is filed as a change to ${named}, and ${String(d.id)} in it reads across all of this BrainDog, so whoever reads ${named} would read all of it. Propose ${String(d.id)} as a change of its own.`
           : `This change is filed as a change to ${named}, and ${String(d.id)} in it reads register.${other}, so whoever reads ${named} would read about ${other}. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
@@ -2327,9 +2327,9 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
         code: 'VALUE_MALFORMED',
         fix:
           was === null
-            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads a figure no live metric declares, or names no list at all, so it belongs to the whole record and not to ${named}. Propose ${String(d.id)} as a change of its own.`
+            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads a figure no live metric declares, or names no list at all, so it belongs to all of this BrainDog and not to ${named}. Propose ${String(d.id)} as a change of its own.`
             : whole(was)
-              ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
+              ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads across all of this BrainDog, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
               : `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads register.${was}, so whoever reads ${named} would be asked to change what ${was} shows. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
@@ -2341,7 +2341,7 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
           reader.other === undefined
             ? `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which names no list, so nothing here can say whose page that is. Propose ${String(d.id)} as a change of its own.`
             : whole(reader.other)
-              ? `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
+              ? `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which reads across all of this BrainDog, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
               : `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which reads register.${reader.other}, so whoever reads ${named} would be asked to change what ${reader.other} shows. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
@@ -3878,7 +3878,7 @@ function writePrediction(deps: GovernDeps, sg: string, p: Prediction, forDecl: s
   if (met(baseline, p.target))
     return no<string>(
       'OUT_OF_BOUNDS',
-      `${sg} predicts ${p.claim}, and that is already true at ${baseline}. A prediction the record already meets grades nothing.`,
+      `${sg} predicts ${p.claim}, and that is already true at ${baseline}. A prediction already met grades nothing.`,
       { at: 'body.prediction.target' },
     );
 

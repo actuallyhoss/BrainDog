@@ -105,7 +105,7 @@ export type SlashToolDeps = {
    asked `figures` for "spending month" and read the monthly forecast as what was spent, sent a whole question to
    `search`, and guessed `where` until it gave up. */
 const TOOLS: readonly SlashTool[] = [
-  { name: 'figures', args: 'words', about: 'Totals the record works out, each with its value now. Use for any money or count question: "cash", "runway", "spent this month", "spent last month", "owed to you", "late payables", "renews"' },
+  { name: 'figures', args: 'words', about: 'Totals BrainDog works out, each with its value now. Use for any money or count question: "cash", "runway", "spent this month", "spent last month", "owed to you", "late payables", "renews"' },
   { name: 'today', args: '', about: 'What is late, due today, stopped or waiting on them' },
   { name: 'search', args: 'q', about: 'Find rows by a name or one or two key words, in every list: "Ada", "Analytics", "rent". Not a whole sentence' },
   { name: 'open', args: 'id', about: 'One row whole, by its id (tasks#3) or its name; or one figure by its id (cash-now)' },
@@ -146,7 +146,7 @@ const FLOOR_SAID: Readonly<Record<Floor, string>> = {
   identity: 'It changes who someone is',
   others: 'Someone else made that row',
   addons: 'It changes an add-on',
-  outside: 'It reaches outside the record',
+  outside: 'It reaches outside BrainDog',
 };
 
 const QUALIFIED = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u;
@@ -240,7 +240,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
   const outsideOf = (lists: readonly string[]): string | null => {
     outside ??= slashOutsideLists(deps.sql);
     const hit = lists.find((l) => outside!.has(l));
-    return hit === undefined ? null : `rows that arrived from outside the record (${hit})`;
+    return hit === undefined ? null : `rows that arrived from outside BrainDog (${hit})`;
   };
 
   let lists: Promise<{ id: string; name: string; count: number | null }[]> | null = null;
@@ -367,7 +367,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
    */
   const waitsFor = (run: SlashToolRun, floor: Floor | null): string | null => {
     if (floor !== null) return `${FLOOR_SAID[floor]}, so it waits for your yes.`;
-    if (run.askOnly) return `This turn read ${run.outside ?? 'something from outside the record'}, so it waits for your yes.`;
+    if (run.askOnly) return `This turn read ${run.outside ?? 'something from outside BrainDog'}, so it waits for your yes.`;
     if (!run.asked) return 'You asked a question rather than for this, so it waits for your yes.';
     return null;
   };

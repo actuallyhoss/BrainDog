@@ -417,7 +417,7 @@ test('A PROPOSAL THAT READS ACROSS THE RECORD, OR NAMES NOTHING, STAYS WITH WHOE
   await file('A feed of the inbox?', 'page.feed', feed);
   const prose = { id: 'page.about', kind: 'page' as const, body: { page: 'about', title: 'About', blocks: [{ kind: 'note', tone: 'info', heading: 'Hello', span: 12, body: 'Nothing here counts.' }] } };
   await file('An about page?', 'page.about', prose);
-  assert.match(await refused('Give the inbox the gold rate?', 'register.inbox', { declarations: [INBOX2, GOLD] }), /ingest\.gold.*across the whole record/);
+  assert.match(await refused('Give the inbox the gold rate?', 'register.inbox', { declarations: [INBOX2, GOLD] }), /ingest\.gold.*across all of this BrainDog/);
   insert('Give the inbox the gold rate?', 'register.inbox', { declarations: [INBOX2, GOLD] });
   for (const q of ['Poll the gold rate?', 'A feed of the inbox?', 'An about page?', 'Give the inbox the gold rate?']) {
     assert.equal(await shown(owner, q), true, q);

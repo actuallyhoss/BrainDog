@@ -28,6 +28,6 @@ test('a read token asked to write is told what the call does and what the token 
   const ctx = { principal: { kind: 'token', id: 't', scope: 'read', person: 'p_x', level: 'owner' } } as CallContext;
   const r = allows(ctx, 'append');
   assert.equal(r?.code, 'FORBIDDEN');
-  assert.equal(r?.fix, 'This adds to the record, and this token only reads. Ask the owner for a token with a wider scope.');
+  assert.equal(r?.fix, 'This adds to your BrainDog, and this token only reads. Ask the owner for a token with a wider scope.');
   assert.doesNotMatch(r?.fix ?? '', /append|owner access/u);
 });

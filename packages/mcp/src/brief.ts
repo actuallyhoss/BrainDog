@@ -1259,7 +1259,7 @@ export function understoodBrief(value: Record<string, unknown>, look: Look): str
   const done = value.done !== false;
   const rest = done ? '' : ' The rest is read on later nights.';
   if (links.length === 0 && orgs === 0 && writes.length === 0 && questions.length === 0)
-    return done ? 'Nothing to link and nothing to ask: what the record holds is understood.' : `Nothing to link or ask in the next part of the record.${rest}`;
+    return done ? 'Nothing to link and nothing to ask: what your BrainDog holds is understood.' : `Nothing to link or ask in the next part of your BrainDog.${rest}`;
   const out: string[] = [];
   const head = [links.length > 0 ? `Would link ${links.join(', ')}` : '', orgs > 0 ? `would add ${counted(orgs, 'organisation')}` : ''].filter(Boolean).join(' · ');
   if (head !== '') out.push(sentence(head));

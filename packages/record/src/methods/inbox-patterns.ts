@@ -24,7 +24,7 @@ import type { RecordDeps } from './index.ts';
 const MOST_DAYS = 366;
 
 /** The sentence a caller held to some of the lists is given, as `inbox` gives it. */
-const PART = 'The inbox belongs to the whole record, and this caller is held to part of it.';
+const PART = 'The inbox belongs to all of this BrainDog, and this caller is held to part of it.';
 
 export function methods(deps: RecordDeps) {
   const { kernel, scoped, guard, admin, no, tail } = deps;

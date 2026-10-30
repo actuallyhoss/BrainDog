@@ -290,7 +290,7 @@ test('a dry run says one line per app and profile, and the two things left, and 
     '3. MCP server, Claude Code in ~/.claude: braindog would be registered at user scope, with a copy of its servers file kept first:',
     '3. MCP server, Claude Code in ~/.claude-work: braindog would be registered at user scope, with a copy of its servers file kept first:',
     '3. MCP server, Fake App: braindog would be registered, with a copy of the file kept first:',
-    '4. Tools, Fake App: what would be written at user scope, from the tools the record applies everywhere:',
+    '4. Tools, Fake App: what would be written at user scope, from the tools your BrainDog applies everywhere:',
     '   Tool old was not written, because it starts from a Windows path and this machine is not Windows.',
   ])
     assert.ok(saidStep(m.out, line) || text.includes(line), `missing: ${line}\n${text}`);

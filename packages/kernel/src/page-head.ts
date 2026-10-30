@@ -85,7 +85,7 @@ export function headerBody(raw: unknown, ctx: HeaderContext): Result<DeclaredHea
   const figure = (v: unknown, at: string): Result<string> => {
     if (typeof v !== 'string' || !FIGURE.test(v)) return no('DECLARATION_INVALID', `${at} names a figure by its id, such as open-tasks.`, { at });
     if (ctx.figures && !ctx.figures.has(v))
-      return no('METRIC_UNKNOWN', `${at} names ${v}, and the record has no figure called that. Name one it holds.`, { at, allowed: [...ctx.figures] });
+      return no('METRIC_UNKNOWN', `${at} names ${v}, and this BrainDog has no figure called that. Name one it holds.`, { at, allowed: [...ctx.figures] });
     return ok(v);
   };
 

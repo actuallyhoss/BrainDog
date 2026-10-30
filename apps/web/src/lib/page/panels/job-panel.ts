@@ -32,8 +32,8 @@ export const panelWords = {
   start: 'Start',
   open: 'Open',
   started: (title: string) => `${title} is waiting for a machine.`,
-  unreached: 'The record could not be reached. Try again in a moment.',
-  conflict: 'The record changed while this was asked. Try again.',
+  unreached: 'BrainDog could not be reached. Try again in a moment.',
+  conflict: 'Something changed while this was asked. Try again.',
 } as const;
 
 /** The project the page is drawn for: its spoken id, which a run's `about` names, and its title. */

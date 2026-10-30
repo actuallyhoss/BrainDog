@@ -12,5 +12,5 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'setDecider', group: 'ADMIN', writes: true, what: 'Hand one open question to the person who decides it, somebody who holds Decides or owns the record, or take it back with nobody named.' },
+  { name: 'setDecider', group: 'ADMIN', writes: true, what: 'Hand one open question to the person who decides it, somebody who holds Decides or owns this BrainDog, or take it back with nobody named.' },
 ];

@@ -279,7 +279,7 @@ test('A PORT THAT REOPENS THE OBJECT WRITES NO restore.pitr ITSELF, AND restored
   assert.deepEqual({ ...row }, {
     actor: 'p_owner',
     to_v: JSON.stringify(kept.id),
-    note: `restored to ${kept.id} by p_owner; the record as it was is kept as before-restore-2026-09-23`,
+    note: `restored to ${kept.id} by p_owner; what it held before is kept as before-restore-2026-09-23`,
   });
 });
 

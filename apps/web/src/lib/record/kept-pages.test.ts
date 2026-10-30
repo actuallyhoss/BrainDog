@@ -29,7 +29,7 @@ test('a page put is the page got, by its key', () => {
 test('a refused answer, or a page the record does not have, is never kept', () => {
   const store = keptPages();
   const key = pageKey(BASE, 'ledger');
-  store.put(key, { from: 'refused', fix: 'The record could not be reached.' });
+  store.put(key, { from: 'refused', fix: 'BrainDog could not be reached.' });
   store.put(key, { from: 'missing', held: [] });
   assert.equal(store.get(key), null);
   assert.equal(store.size, 0);

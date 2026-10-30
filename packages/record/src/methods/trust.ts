@@ -53,7 +53,7 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       if (!whole(ctx)) {
         return part(ctx)
-          ? no('FORBIDDEN', 'Where agents stand is about the whole record, and this caller is held to part of it.', { at: 'principal' })
+          ? no('FORBIDDEN', 'Where agents stand is about all of this BrainDog, and this caller is held to part of it.', { at: 'principal' })
           : no('FORBIDDEN', 'Where agents stand is for the owner of this BrainDog to read, so nothing was read.', { at: 'principal' });
       }
       return { ok: true, value: read.standing(deps.validFrom?.()) };
@@ -66,7 +66,7 @@ export function methods(deps: RecordDeps) {
     async trustTakeBack(args: { agent?: unknown; kind?: unknown } | undefined, ctx: CallContext): Promise<Result<Standing>> {
       const stop = admin(ctx, 'put an agent back to asking');
       if (stop) return { ok: false, refusal: stop };
-      if (part(ctx)) return no('FORBIDDEN', 'Where agents stand is about the whole record, and this caller is held to part of it.', { at: 'principal' });
+      if (part(ctx)) return no('FORBIDDEN', 'Where agents stand is about all of this BrainDog, and this caller is held to part of it.', { at: 'principal' });
       const said = (args ?? {}) as Record<string, unknown>;
       const extra = Object.keys(said).find((k) => k !== 'agent' && k !== 'kind');
       if (extra !== undefined) return { ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: `${extra} is not something this call takes. It takes agent and kind.`, at: extra, allowed: ['agent', 'kind'] } };

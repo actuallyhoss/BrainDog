@@ -28,7 +28,7 @@ test('A PATH THAT NAMES NOTHING is found with the nearest name that exists, and 
   assert.equal(f!.kind, 'names-nothing');
   assert.deepEqual(f!.where, { page: 'Home', name: 'Notes' });
   assert.equal(f!.said, '"{{revenue.monthy}}" names nothing in your BrainDog.');
-  assert.match(f!.fix, /Write \{\{revenue\.monthly\}\}, the nearest name the record has/);
+  assert.match(f!.fix, /Write \{\{revenue\.monthly\}\}, the nearest name this BrainDog has/);
   /* THE KERNEL'S ANSWER WINS where it was given: a path it says names nothing is one, whatever the names hold. */
   assert.deepEqual(kinds(of({ text: '{{projects.count}}', unnamed: ['projects.count'] })), ['names-nothing']);
   /* A CODE SPAN IS TEXT, as the renderer lifts it first. */

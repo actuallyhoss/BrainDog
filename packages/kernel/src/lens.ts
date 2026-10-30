@@ -462,7 +462,7 @@ function targetFault(t: unknown): string | null {
     if (!isTexts(t.rows) || t.rows.length === 0) return 'Name at least one row.';
     return t.rows.length > ROWS_MAX ? `A share names at most ${ROWS_MAX} rows. Share a condition instead.` : null;
   }
-  return 'What is shared is the record, lists, a project, a condition, or rows.';
+  return 'What is shared is all of this BrainDog, lists, a project, a condition, or rows.';
 }
 
 function hideFault(h: unknown): string | null {
@@ -913,7 +913,7 @@ export function checkShare(share: Share, catalog: Catalog, opts: CheckOpts = {})
   if (share.who.kind === 'email' && (!share.who.id.includes('@') || share.who.id !== share.who.id.toLowerCase()))
     return refuse('VALUE_MALFORMED', 'An email is a lower-case address.', 'who');
   if (share.effect === 'allow' && share.can === 'manage' && 'record' in share.what)
-    return refuse('FORBIDDEN', 'To let someone manage the whole record, make them an Admin.', 'can');
+    return refuse('FORBIDDEN', 'To let someone manage all of this BrainDog, make them an Admin.', 'can');
   if (share.caps?.onward === true && share.can !== 'manage') return refuse('VALUE_MALFORMED', 'Only someone who manages a share can share it on.', 'caps.onward');
 
   const t = share.what;

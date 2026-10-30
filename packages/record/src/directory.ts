@@ -114,7 +114,7 @@ export function badSlug(slug: string): string | null {
   if (!SLUG.test(slug))
     return `${slug} is not a name: it starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one.`;
   if (RESERVED.has(slug)) return `${slug} is a name the platform uses for something else.`;
-  if (SPOKEN.test(slug)) return `${slug} reads as a spoken id, like D41, and app.brain.dog/${slug} opens that item rather than a record.`;
+  if (SPOKEN.test(slug)) return `${slug} reads as a spoken id, like D41, and app.brain.dog/${slug} opens that item rather than a BrainDog.`;
   return null;
 }
 
@@ -2168,7 +2168,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
            `provision` each spend a paragraph on. */
         const held = tokenHash === null ? undefined : sql.one<{ record: string }>('SELECT record FROM dir_inbound WHERE token_sha256 = ?', tokenHash);
         if (held !== undefined && held.record !== record)
-          return no<null>('ALREADY_KNOWN', 'That forwarding address belongs to another record. Mint a new token for this one.', { at: 'tokenHash' });
+          return no<null>('ALREADY_KNOWN', 'That forwarding address belongs to another BrainDog. Mint a new token for this one.', { at: 'tokenHash' });
 
         sql.exec('DELETE FROM dir_inbound WHERE record = ?', record);
         if (tokenHash !== null) sql.exec('INSERT INTO dir_inbound (token_sha256, record) VALUES (?, ?)', tokenHash, record);
@@ -2344,7 +2344,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         const wrong = bad(args.slug);
         if (wrong) return no<Named & { person: string }>('VALUE_MALFORMED', wrong, { at: 'slug' });
         if (args.plan !== undefined && !(PLANS as readonly string[]).includes(args.plan))
-          return no<Named & { person: string }>('ENUM_VALUE_UNKNOWN', `${String(args.plan)} is not a plan. A record is on ${PLANS.join(' or ')}.`, { at: 'plan' });
+          return no<Named & { person: string }>('ENUM_VALUE_UNKNOWN', `${String(args.plan)} is not a plan. A BrainDog is on ${PLANS.join(' or ')}.`, { at: 'plan' });
         if (args.record !== undefined && !REC_ID.test(args.record))
           return no<Named & { person: string }>(
             'VALUE_MALFORMED',
@@ -2366,7 +2366,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           return no<Named & { person: string }>(
             'ALREADY_KNOWN',
             taken.released_at
-              ? `${args.slug} was the name of another record and cannot be given out again.`
+              ? `${args.slug} was the name of another BrainDog and cannot be given out again.`
               : `${args.slug} is already somebody's record.`,
             { at: 'slug' },
           );
@@ -2379,7 +2379,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         if (args.record !== undefined && sql.one('SELECT 1 FROM dir_record WHERE id = ?', args.record))
           return no<Named & { person: string }>(
             'ALREADY_KNOWN',
-            `${args.record} is already a record here. It may need a name, but it does not need creating.`,
+            `${args.record} is already a BrainDog here. It may need a name, but it does not need creating.`,
             { at: 'record' },
           );
 
@@ -2424,7 +2424,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         if (taken)
           return no<Named>(
             'ALREADY_KNOWN',
-            taken.released_at ? `${to} was the name of another record and cannot be given out again.` : `${to} is already somebody's record.`,
+            taken.released_at ? `${to} was the name of another BrainDog and cannot be given out again.` : `${to} is already somebody's record.`,
             { at: 'slug' },
           );
 
@@ -2578,7 +2578,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           return no<null>(
             'LEVEL_REQUIRED',
             owner === person
-              ? 'A record keeps its owner. Hand it over first.'
+              ? 'A BrainDog keeps its owner. Hand it over first.'
               : `This directory does not know who owns ${record}, so it cannot say who may be removed from it.`,
             { at: 'person' },
           );
@@ -2777,7 +2777,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     setPlan: (record: string, plan: Plan): Result<null> =>
       sql.transactionSync(() => {
         if (!(PLANS as readonly string[]).includes(plan))
-          return no<null>('ENUM_VALUE_UNKNOWN', `${String(plan)} is not a plan. A record is on ${PLANS.join(' or ')}.`, { at: 'plan' });
+          return no<null>('ENUM_VALUE_UNKNOWN', `${String(plan)} is not a plan. A BrainDog is on ${PLANS.join(' or ')}.`, { at: 'plan' });
         if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ?', record))
           return no<null>('OUT_OF_BOUNDS', `There is no record ${record}.`, { at: 'record' });
         sql.exec('UPDATE dir_record SET plan = ? WHERE id = ?', plan, record);

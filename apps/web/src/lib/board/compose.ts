@@ -19,7 +19,7 @@ export async function composeOn(base: string, said: string, from?: Record<string
     if (out.ok) return out.value;
     return { fix: 'refusal' in out ? out.refusal.fix : 'That could not be made.' };
   } catch {
-    return { fix: 'The record could not be reached.' };
+    return { fix: 'BrainDog could not be reached.' };
   }
 }
 

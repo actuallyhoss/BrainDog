@@ -1,6 +1,6 @@
 /**
  * `braindog usecase list|export|check|install` against a stub record on node:http: export writes the record's own file and sends the
- * rows only when named; check reads a file the way a record will, and sends nothing.
+ * rows only when named; check reads a file the way BrainDog will, and sends nothing.
  */
 
 import { test } from 'node:test';

@@ -232,7 +232,7 @@ test('ONE COMMIT IS COUNTED ONCE across checkouts of one repository, and a dry r
     '  Ada, 2 commits',
     '  Grace Hopper, 2 commits',
     '    signed as Grace Hopper <grace@navy.example> and Grace H <grace@navy.example>',
-    '  Ada appears more than once at different addresses, so the record decides whether each is one person.',
+    '  Ada appears more than once at different addresses, so BrainDog decides whether each is one person.',
   ]);
 
   const many = Array.from({ length: DRY_RUN_SHOWN + 2 }, (_, i) => line(`Person ${String(i)}`, `p${String(i)}@x.example`, i + 1)).join('\n');

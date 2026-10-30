@@ -281,7 +281,7 @@ export async function serviceOff(io: ServiceIo): Promise<number> {
   fs.remove(unit.file);
   if (os === 'linux' && before.loaded) await exec('systemctl', ['--user', 'daemon-reload']);
   io.answer?.({ value: { state: 'off', running: false } });
-  io.say('The runner service is off: the runner no longer starts at log-on. A job started from the record waits until a runner runs again.');
+  io.say('The runner service is off: the runner no longer starts at log-on. A job started from BrainDog waits until a runner runs again.');
   return 0;
 }
 

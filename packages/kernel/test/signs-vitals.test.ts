@@ -138,7 +138,7 @@ test('WRITES AUTHORED: one write signed by nobody is red with its list named; th
   line(r.sql, { actor: 'undefined', kind: 'note', note: 'said by nobody' });
   const lost = sign(r.sql, 'writes-authored');
   assert.equal(lost.state, 'red');
-  assert.ok(lost.facts?.includes('1 write to the record itself signed by nobody.'), JSON.stringify(lost.facts));
+  assert.ok(lost.facts?.includes('1 write to this BrainDog itself signed by nobody.'), JSON.stringify(lost.facts));
   r.sql.close();
 });
 

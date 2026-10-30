@@ -58,7 +58,7 @@ export const mayAnswer = (level: string, owner: boolean): boolean => owner || le
  */
 export const whyNotAnswering = (level: string, lists: readonly string[] | null = null): string =>
   lists && lists.length > 0
-    ? `Answering a question here belongs to somebody who holds the whole record, and you hold ${
+    ? `Answering a question here belongs to somebody who holds all of this BrainDog, and you hold ${
         lists.length === 1 ? 'one list' : `${lists.length} lists`
       } on it. Ask an owner if you should be answering. Reading is not affected: the questions here are the ones about ${
         lists.length === 1 ? 'your list' : 'your lists'

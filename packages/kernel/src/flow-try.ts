@@ -521,7 +521,7 @@ function tried(name: string, op: Op, row: { kind: string; state: string; answer:
     const v = typeof spec.name === 'string' ? spec.name : '';
     /* A VARIABLE SET FROM A SECRET IS NAMED AND NOT SHOWN, whatever it holds (`SEALED_SAID`). */
     const shown = sealed.has(v) ? SEALED_SAID : (row.answer ?? '');
-    return { ...base, state: 'done', answer: shown, say: sealed.has(v) ? `vars.${v} is set from a field that never leaves the record, so the try does not show it.` : `vars.${v} is set.` };
+    return { ...base, state: 'done', answer: shown, say: sealed.has(v) ? `vars.${v} is set from a field that never leaves BrainDog, so the try does not show it.` : `vars.${v} is set.` };
   }
   if (op.verb === 'stop') return { ...base, state: 'done', say: 'The run stops here.' };
   return { ...base, state: 'done', say: `The ${op.verb} went through, and was rolled back with the rest of the try.` };
@@ -542,7 +542,7 @@ function wouldSay(op: Op): string {
     /* `to:` IS NAMED AND NOT SHOWN: it is a member's id, or a hole the run fills from the row, and neither is a name a
        person reads (`flow.ts`'s `ask` says the same of its own sentence). */
     case 'ask_person':
-      return `A live run would put this question to ${text('to') === null ? "the record's people" : 'the one member it names'} and wait for the answer. Nothing was asked, and the try stops here.`;
+      return `A live run would put this question to ${text('to') === null ? "everyone on this BrainDog" : 'the one member it names'} and wait for the answer. Nothing was asked, and the try stops here.`;
     case 'ask_slash':
       return 'A live run would ask Slash here and wait up to a day for the answer. Nothing was asked, and the try stops here.';
     case 'notify':

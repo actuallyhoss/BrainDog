@@ -97,7 +97,7 @@ metric.open-items's format is null. A metric is money, int, decimal, pct, days, 
 
 ```code | Rules that could run away (REQUIRED_MISSING, CREATE_UNBOUNDED)
 rule.spawn creates about a row and declares no once_per, so it would do it on every write of the row.
-rule.spawn: create has no bound. A generator with no ceiling fills the record.
+rule.spawn: create has no bound. A generator with no ceiling fills your BrainDog.
 ```
 
 ```code | A condition the words cannot say (MATCH_OP_UNSUPPORTED)

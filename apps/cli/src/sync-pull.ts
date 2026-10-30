@@ -92,7 +92,7 @@ const isThere = (file: string): boolean => {
 async function opened(r: Ready, b: BundleRow): Promise<Entry[] | string | Fail> {
   const got = await sealedGet(r.call, r.to.key, b.key, b.sha256);
   if (isFail(got)) return got;
-  if (got === null) return 'its sealed file is not in the record as the bundle names it';
+  if (got === null) return 'its sealed file is not in your BrainDog as the bundle names it';
   const bytes = open(r.key, b.key, got);
   if (bytes === null) return "its sealed file does not open under this machine's sync key";
   const archive = unpack(bytes);

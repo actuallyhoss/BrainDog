@@ -159,7 +159,7 @@ test('A RECORD KEEPS AT LEAST ONE OWNER, and the seed has exactly one to prove t
      state on the screen a real state rather than a decoration nobody ever sees. */
   const owners = PEOPLE_ACCESS.filter((p) => p.level === 'owner' && p.since);
   assert.equal(owners.length, 1, 'more than one owner, so the last-owner refusal is unreachable');
-  assert.equal(copy.lastOwner, 'A record keeps at least one owner.');
+  assert.equal(copy.lastOwner, 'A BrainDog keeps at least one owner.');
 });
 
 test('an invitation that is out is a different fact from access', () => {

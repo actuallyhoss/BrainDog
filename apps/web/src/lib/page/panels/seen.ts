@@ -13,7 +13,7 @@
  * WHAT WAITS ON HIM IS A PLACE TOO. The read answers an open question that names the thing as "Waiting on you: Renew
  * Copperleaf's domain for another year?", and it is drawn as it came, after its day, among the other places.
  *
- * ONE SENTENCE AT NOUGHT, NOTHING ON A REFUSAL. One thing seen nowhere says "Nothing on the record mentions Copperleaf
+ * ONE SENTENCE AT NOUGHT, NOTHING ON A REFUSAL. One thing seen nowhere says "Nothing in your BrainDog mentions Copperleaf
  * yet." under the heading, so the tile never stands over an empty body. A reader the read refuses, an answer that is
  * candidates, and a host with no `about` all answer `null`, and `null` draws nothing.
  *
@@ -108,7 +108,7 @@ const joined = (names: readonly string[]): string =>
 /** The lines the panel draws: "3 Oct · Notes: Spoke to Sara at Northbank", "Also known as Sara I.", "and 4 more". */
 export function seenLines(found: Seen | null, now: number): SeenLines {
   if (!found) return { lines: [], also: null, more: null, none: null };
-  if (found.places.length === 0) return { lines: [], also: null, more: null, none: found.name === '' ? null : `Nothing on the record mentions ${found.name} yet.` };
+  if (found.places.length === 0) return { lines: [], also: null, more: null, none: found.name === '' ? null : `Nothing in your BrainDog mentions ${found.name} yet.` };
   const lines = found.places.slice(0, SEEN_SHOWN).map((p) => `${seenDay(p.day, now)} · ${p.where}`);
   const rest = found.more + Math.max(0, found.places.length - SEEN_SHOWN);
   const names = joined(found.also);

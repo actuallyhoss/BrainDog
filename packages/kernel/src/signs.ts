@@ -81,7 +81,7 @@ export const SIGN_COUNTS: Readonly<Record<string, Readonly<Record<string, string
   'pages-clean': {
     refused_pages: 'pages show a block that could not be read',
     unnamed_pages: 'pages print a path that names nothing',
-    missing_pages: 'pages the record does not hold',
+    missing_pages: 'pages this BrainDog does not hold',
     suggested_waiting: 'suggested pages wait',
   },
 };
@@ -570,7 +570,7 @@ function readCauses(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined)
   const shared = distinct.filter((ids) => ids.length > CAUSE_QUESTIONS_MOST).sort((a, b) => b.length - a.length);
   const facts = shared.slice(0, 3).map((ids) => `${ids.length} share: ${askedIn(sql, ids[0]!)}`);
   if (uncaused.length > 0) facts.push(`${count(uncaused.length, 'question carries', 'questions carry')} no cause.`);
-  if (faults.length > 0) facts.push(`${count(faults.length, 'question was', 'questions were')} opened by the record failing: ${askedIn(sql, faults[0]!.id)}`);
+  if (faults.length > 0) facts.push(`${count(faults.length, 'question was', 'questions were')} opened by something failing: ${askedIn(sql, faults[0]!.id)}`);
   const red = shared.length > 0 || uncaused.length > UNCAUSED_MOST || faults.length > 0;
   const biggest = shared[0];
   if (!red) return reading('green', open.length, open.length === 0 ? 'No question is waiting.' : `${count(open.length, 'open question')}, no two with the same cause.`, facts);
@@ -888,7 +888,7 @@ function countsOf(s: SignReader, counts: unknown): Result<Record<string, number>
 export function fileSignReading(sql: Sql, id: string, r: SignReading, nowMs: number, tz: string): Result<{ sign: string; day: string }> {
   const s = signOf(id);
   if (s === null) return no('REF_UNKNOWN', `${JSON.stringify(id).slice(0, 60)} is not a sign. The signs filed from outside are ${VITAL_SIGNS.filter((x) => x.read === null).map((x) => x.sign).join(', ')}.`);
-  if (s.read !== null) return no('FORBIDDEN', `${s.name} is read by the record itself, so nothing files it. File one of ${VITAL_SIGNS.filter((x) => x.read === null).map((x) => x.sign).join(', ')}.`);
+  if (s.read !== null) return no('FORBIDDEN', `${s.name} is read by BrainDog itself, so nothing files it. File one of ${VITAL_SIGNS.filter((x) => x.read === null).map((x) => x.sign).join(', ')}.`);
   if (r === null || typeof r !== 'object' || !['green', 'red', 'none'].includes(r.state as string))
     return no('VALUE_MALFORMED', 'A reading is { state, value, said, facts }, and its state is green, red or none.');
   if (r.value !== null && !Number.isSafeInteger(r.value)) return no('VALUE_MALFORMED', "A reading's value is a whole number, or null when there is none.");

@@ -98,7 +98,7 @@ export async function askTerminal(question: string, signal?: AbortSignal): Promi
 }
 
 const USAGE =
-  'braindog setup takes the address of one record, as in braindog setup https://app.brain.dog/<slug>, with --dry-run or --yes, --only <app>, --profile <folder> and --statusline, and nothing else.';
+  'braindog setup takes the address of one BrainDog, as in braindog setup https://app.brain.dog/<slug>, with --dry-run or --yes, --only <app>, --profile <folder> and --statusline, and nothing else.';
 
 /**
  * The real `claude`, run in the profile `env` names. NO SHELL, and its output is not relayed, as `runClaude` in
@@ -664,7 +664,7 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
 
   /* ── 4 and 5. what the record holds for every machine ────────────────── */
   if (!held && dryRun) {
-    io.out('4. Tools: not read, because this machine holds no login yet to read the record with.');
+    io.out('4. Tools: not read, because this machine holds no login yet to read your BrainDog with.');
     io.out('5. Skills: not read, for the same reason.');
     io.out(`6. Tokens: a token of its own would be made for each agent wired here, ${listOf([...new Set(here.map((c) => AGENT_TITLE[agentKindOf(c.id)] ?? c.title))])}, once signed in.`);
     io.out('That was a dry run, so nothing was signed in, written or registered.');
@@ -676,7 +676,7 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
   if (stoppedBefore(4)) return 1;
   const tools = await connect(key, io);
   if (typeof tools === 'number') {
-    io.out('4. Tools: the record could not be read, so setup stopped there.');
+    io.out('4. Tools: your BrainDog could not be read, so setup stopped there.');
     return tools;
   }
   let rows: ToolRow[] = [];
@@ -710,11 +710,11 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
       if (wrote) changed = true;
       io.out(
         shown.length === 0
-          ? `4. Tools, ${c.title}: every tool the record applies everywhere is already there as the record has it.`
+          ? `4. Tools, ${c.title}: every tool your BrainDog applies everywhere is already there.`
           : dryRun
-            ? `4. Tools, ${c.title}: what would be written at user scope, from the tools the record applies everywhere:`
+            ? `4. Tools, ${c.title}: what would be written at user scope, from the tools your BrainDog applies everywhere:`
             : wrote
-              ? `4. Tools, ${c.title}: the tools the record applies everywhere, written at user scope:`
+              ? `4. Tools, ${c.title}: the tools your BrainDog applies everywhere, written at user scope:`
               : `4. Tools, ${c.title}: nothing new was written, and this is why:`,
       );
       detail(shown);
@@ -726,7 +726,7 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
   if (stoppedBefore(5)) return 1;
   const skills = await connect(key, io);
   if (typeof skills === 'number') {
-    io.out('5. Skills: the record could not be read, so setup stopped there.');
+    io.out('5. Skills: your BrainDog could not be read, so setup stopped there.');
     return skills;
   }
   if (!skills.context.registers.some((r) => r.id === 'skills')) io.out('5. Skills: this BrainDog has no Skills list, so there is nothing to sync.');
@@ -736,7 +736,7 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
       const where = nameOf(dir, io.home);
       const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun, to: skills.to });
       if (lines.length > 0) changed = true;
-      io.out(lines.length === 0 ? `5. Skills, Claude Code in ${where}: it already holds every skill as the record has it.` : `5. Skills, Claude Code in ${where}: ${dryRun ? 'what would be synced' : 'synced'}:`);
+      io.out(lines.length === 0 ? `5. Skills, Claude Code in ${where}: it already holds every skill as your BrainDog has it.` : `5. Skills, Claude Code in ${where}: ${dryRun ? 'what would be synced' : 'synced'}:`);
       detail(lines);
     }
 

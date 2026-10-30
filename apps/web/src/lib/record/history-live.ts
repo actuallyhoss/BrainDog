@@ -473,5 +473,5 @@ export async function readUnseen(base: string, io?: Fetch): Promise<Unseen> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.whatsNew();
   if (out.ok) return { from: 'live', actors: out.value.events.map((e) => e.actor), capped: out.value.sinceCapped, upTo: out.value.upTo, ...(out.value.byWho === undefined ? {} : { byWho: out.value.byWho }) };
-  return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The record changed while it was being read.' };
+  return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'Something changed while it was being read.' };
 }

@@ -126,7 +126,7 @@ export function verbCall(verb: string, args: VerbArgs, row: VerbRow | null, now:
   const bound = own<VerbBinding>(VERBS, verb);
   if (!bound) return no('DECLARATION_UNKNOWN', `${JSON.stringify(verb)} is not a verb a page may press.`, { at: 'verb', allowed: Object.keys(VERBS) });
   if (bound.method === null)
-    return no('NOT_IN_THIS_BUILD', `${verb} is not on this host yet: the record has no single change that files these and writes the rule. Make the rule from the Inbox.`, { at: 'verb' });
+    return no('NOT_IN_THIS_BUILD', `${verb} is not on this host yet: BrainDog has no single change that files these and writes the rule. Make the rule from the Inbox.`, { at: 'verb' });
   /* AN ASK SAYS ITS OWN SENTENCE UNDER A FIELD LEFT OUT OR LEFT EMPTY, the same either way, so it is asked first. */
   if (bound.method === 'propose') return askCall(args);
   for (const [arg, spec] of Object.entries(bound.args))

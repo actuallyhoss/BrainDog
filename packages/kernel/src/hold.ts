@@ -112,8 +112,8 @@ export function holdDays(sql: Sql, today: string): Hold {
 
   for (;;) {
     const on = daySaid(want);
-    if (oldest === undefined || want < oldest) return end('start', null, days === 0 ? 'No day has been read yet.' : `The record kept no readings before ${daySaid(dayBefore(want, -1))}.`);
-    if (marks.has(want)) return end('hand', null, `An operator's hand touched the record on ${on}.`);
+    if (oldest === undefined || want < oldest) return end('start', null, days === 0 ? 'No day has been read yet.' : `BrainDog kept no readings before ${daySaid(dayBefore(want, -1))}.`);
+    if (marks.has(want)) return end('hand', null, `An operator's hand touched this BrainDog on ${on}.`);
     const kept = byDay.get(want);
     /* A DAY WITH NO ROW AT ALL is the host not reading that night, not one sign failing, so no sign is blamed. */
     if (kept === undefined) return end('missing', null, `No sign was read on ${on}.`);
@@ -144,7 +144,7 @@ const MARK_MOST = 200;
  */
 export function markHand(sql: Sql, what: string, by: string, nowMs: number, tz: string): { day: string; marks: number } {
   const day = dayIn(nowMs, zoneOr(tz));
-  const said = (what.trim() || 'An operator touched the record.').slice(0, MARK_MOST);
+  const said = (what.trim() || 'An operator touched this BrainDog.').slice(0, MARK_MOST);
   const who = (by.trim() || 'someone').slice(0, 80);
   sql.exec(
     `INSERT INTO sign_reading (sign, day, state, value, said, facts, rule, hand, read_at) VALUES (?, ?, 'none', 1, ?, json_array(?), ?, ?, ?)

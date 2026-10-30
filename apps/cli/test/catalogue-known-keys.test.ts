@@ -116,19 +116,19 @@ test('a record that refuses, or gives no list to a token, falls back to this mac
   assert.deepEqual(source.known, { 'pack:lantern': [KEY_A] });
   await source.keep('pack:tidewater', KEY_B);
   assert.deepEqual(refusing.seen.map((s) => s.method), ['boot'], 'a map the record never gave was written to it');
-  assert.deepEqual(h.said, ["Using this machine's list of publishers: the record did not give its list."]);
+  assert.deepEqual(h.said, ["Using this machine's list of publishers: BrainDog did not give its list."]);
 
   const t2 = home(t);
   const token = standIn('token');
   assert.equal((await keySource(t2.io, token.call)).on, 'machine');
-  assert.deepEqual(t2.said, ["Using this machine's list of publishers: the record does not give its list to the command line."]);
+  assert.deepEqual(t2.said, ["Using this machine's list of publishers: BrainDog does not give its list to the command line."]);
 
   const t3 = home(t);
   const gone: PrefCall = async () => {
     throw new Error('connection reset');
   };
   assert.equal((await keySource(t3.io, gone)).on, 'machine');
-  assert.deepEqual(t3.said, ["Using this machine's list of publishers: the record did not answer."]);
+  assert.deepEqual(t3.said, ["Using this machine's list of publishers: BrainDog did not answer."]);
 
   /* A host set with no login is refused at the door, and that is said as not signed in. */
   const t5 = home(t);
@@ -144,7 +144,7 @@ test('a record that refuses, or gives no list to a token, falls back to this mac
   await kept.keep('pack:lantern', KEY_A);
   await kept.keep('pack:tidewater', KEY_B);
   assert.deepEqual(JSON.parse(readFileSync(knownKeysPath(t4.io), 'utf8')), { 'pack:lantern': [KEY_A], 'pack:tidewater': [KEY_B] });
-  assert.deepEqual(t4.said, ['The record did not keep this publisher key, so only this machine remembers it.']);
+  assert.deepEqual(t4.said, ['BrainDog did not keep this publisher key, so only this machine remembers it.']);
 });
 
 /* ── pack install against a stand-in record on node:http ─────────────────── */
