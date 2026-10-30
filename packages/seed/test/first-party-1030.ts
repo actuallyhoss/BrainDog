@@ -5079,6 +5079,74 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
     },
     "window": "1d",
     "compare": "none"
+   },
+   "metric.account-now#0": {
+    "metric": "account-now",
+    "name": "This account now",
+    "source": "register.accounts",
+    "where": "name is {{it}}",
+    "value": {
+     "rolled": {
+      "balance": "balance",
+      "as_of": "as_of",
+      "checks": [
+       {
+        "register": "balances",
+        "by": "account",
+        "balance": "balance",
+        "on": "as_of"
+       },
+       {
+        "register": "transactions",
+        "by": "account",
+        "balance": "balance_after",
+        "on": "on"
+       }
+      ],
+      "moves": {
+       "register": "transactions",
+       "by": "account",
+       "on": "on",
+       "amount": "amount",
+       "direction": "direction",
+       "out": "out",
+       "where": "state is cleared"
+      }
+     }
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.account-lines#0": {
+    "metric": "account-lines",
+    "name": "This account by its lines",
+    "source": "register.accounts",
+    "where": "name is {{it}}",
+    "value": {
+     "rolled": {
+      "balance": "balance",
+      "as_of": "as_of",
+      "moves": {
+       "register": "transactions",
+       "by": "account",
+       "on": "on",
+       "amount": "amount",
+       "direction": "direction",
+       "out": "out",
+       "where": "state is cleared"
+      }
+     }
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
    }
   }
  },
