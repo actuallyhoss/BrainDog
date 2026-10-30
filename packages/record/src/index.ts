@@ -5315,7 +5315,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const figures: HeadlineFigure[] = [];
       for (const id of holes) {
         if (id.endsWith('.change')) continue;
-        const value = figureText(lead.values[id]);
+        const value = figureText(lead.values[id], today);
         /* NOR ONE THAT IS NOUGHT, which the rules line leaves out (`rulesLine`): handed it, the model wrote
            "with 0 owed on the card", a bare nought the page itself never says. */
         if (value === null || nought(value)) continue;
@@ -5331,7 +5331,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         page: {
           page: p.slug,
           title: p.title,
-          rules: rulesLine(lead.body, lead.values),
+          rules: rulesLine(lead.body, lead.values, today),
           figures,
           ...(named.items.length > 0 ? { items: named.items } : {}),
           ...(named.question === undefined ? {} : { question: named.question }),
@@ -5390,14 +5390,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     for (const d of due) {
       /* A BARE LINE, OR THE `headline` OF AN ANSWER THAT ALSO ARRANGES THE PAGE (`lineOf` in `headlines.ts`). */
       const text = answeredLine(Object.hasOwn(lines, d.page.page) ? lines[d.page.page] : undefined);
-      const fault = headlineFault(text, d.page);
+      const fault = headlineFault(text, d.page, today);
       if (fault) {
         dropped.push(`${fault} Its own line stands.`);
         continue;
       }
       /* KEPT FILLED (`filledHeadline`): each hole the model left is the figure the page was handed, so what is stored is the
          sentence a person reads and `storedHeadline` answers it. */
-      const kept: SlashHeadline = { text: filledHeadline((text as string).trim(), d.page) ?? (text as string).trim(), day: today, basis: d.basis, ...(d.facts === undefined ? {} : { facts: d.facts }) };
+      const kept: SlashHeadline = { text: filledHeadline((text as string).trim(), d.page, today) ?? (text as string).trim(), day: today, basis: d.basis, ...(d.facts === undefined ? {} : { facts: d.facts }) };
       kernel.setPref(SLASH, headlineKey(d.page.page), kept);
       said.push(d.page.page);
     }
@@ -5408,6 +5408,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       due.filter((d) => d.row !== true),
       lines,
       lookRehearsed,
+      today,
     );
     for (const page of looked.said) if (!said.includes(page)) said.push(page);
     dropped.push(...looked.dropped);

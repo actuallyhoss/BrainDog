@@ -542,11 +542,11 @@ export function groupFault(raw: unknown, page: HeadlinePage, read?: readonly unk
  * `at` IS WHAT THE CHECKS ON A HIDE AND A GROUPING ARE READ AGAINST: the keys the person pinned, the page's blocks as
  * its read answered them, and the lists as they are declared. Whoever writes the answer as a look asks `undoneFor` first: a look he put back is not written again.
  */
-export function lookAnswerOf(answer: unknown, page: HeadlinePage, at: { pinned?: readonly string[]; read?: readonly unknown[]; lists?: GroupLists } = {}): LookAnswer {
+export function lookAnswerOf(answer: unknown, page: HeadlinePage, at: { pinned?: readonly string[]; read?: readonly unknown[]; lists?: GroupLists; today?: string } = {}): LookAnswer {
   const faults: string[] = [];
   const line = typeof answer === 'string' ? answer : answer !== null && typeof answer === 'object' && !Array.isArray(answer) ? (answer as { headline?: unknown }).headline : undefined;
   const out: LookAnswer = { faults };
-  if (headlineFault(line, page) === null) out.headline = (line as string).trim();
+  if (headlineFault(line, page, at.today) === null) out.headline = (line as string).trim();
   if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) return out;
   const { lead, order, hide, next, group } = answer as { lead?: unknown; order?: unknown; hide?: unknown; next?: unknown; group?: unknown };
   if (lead !== undefined && lead !== null) {
@@ -864,6 +864,8 @@ export async function composeLooks(
   due: readonly { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[] }[],
   lines: Readonly<Record<string, unknown>>,
   rehearsed?: (page: string, title: string, body: LookBody) => string | null,
+  /** The record's day, so a line's days are said against the record's year (`dayWords`). */
+  today?: string,
 ): Promise<{ said: string[]; dropped: string[] }> {
   const said: string[] = [];
   const dropped: string[] = [];
@@ -873,7 +875,7 @@ export async function composeLooks(
     const answer = Object.hasOwn(lines, d.page.page) ? lines[d.page.page] : undefined;
     if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) continue;
     const pinned = liveLook(kernel, d.page.page)?.body.pinned ?? [];
-    const got = lookAnswerOf(answer, d.page, { pinned, lists, ...(d.read === undefined ? {} : { read: d.read }) });
+    const got = lookAnswerOf(answer, d.page, { pinned, lists, ...(d.read === undefined ? {} : { read: d.read }), ...(today === undefined ? {} : { today }) });
     dropped.push(...got.faults);
     /* THE QUESTIONS KEEP THEIR PLACE on a page that is about something else, as the kernel lays any look of Slash's. */
     const held = lookKept(
