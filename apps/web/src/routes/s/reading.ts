@@ -127,6 +127,23 @@ export function cellSaid(row: SharedRow, column: Pick<SharedColumn, 'field' | 's
 }
 
 /** A figure: an amount when its unit is a currency, a count with its unit, or the words for a reading with none. */
+/**
+ * A figure's trend as the shared page draws it: the run, a gap as no point, or `null` when there is no line worth
+ * drawing. THREE POINTS AT LEAST, the rule a card's trend keeps (`trendOf` in `braindog-render`): two make a slope and
+ * say nothing a reader can trust.
+ */
+export function trendLine(r: SharedReading): number[] | null {
+  if (r.trend === undefined) return null;
+  const line = r.trend.map((v) => (v === null ? Number.NaN : v));
+  return line.filter(Number.isFinite).length >= 3 ? line : null;
+}
+
+/** One point of a figure's trend in words, as the figure itself is written: "EGP 80,115.99", "42 %". */
+export function pointSaid(r: SharedReading, n: number, where: Where): string {
+  const s = figureSaid({ ...r, value: n }, where);
+  return 'money' in s ? s.money.text : s.text;
+}
+
 export function figureSaid(r: SharedReading, where: Where): Said {
   if (r.value === null) return { text: words.sharedNoFigure };
   if (r.unit !== null && CURRENCY.test(r.unit)) {

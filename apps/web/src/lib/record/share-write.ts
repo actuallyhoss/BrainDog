@@ -156,8 +156,12 @@ export type SharedColumn = { field: string; label?: string; as?: string; sign?: 
  */
 export type SharedRow = { cells: Record<string, SharedCell>; fields: Record<string, unknown>; state: string | null };
 
-/** One figure a block read, with the label the owner reads for it. */
-export type SharedReading = { metric: string; label?: string; value: number | null; unit: string | null };
+/**
+ * One figure a block read, with the label the owner reads for it, and how it moved: `trend` is the record's run of it, one
+ * value a day oldest first, a day with no point `null` (`trendOf` in `@braindog/kernel`'s `pages.ts`). Absent where the
+ * owner's cell drew no trend, or the record sent none.
+ */
+export type SharedReading = { metric: string; label?: string; value: number | null; unit: string | null; trend?: (number | null)[] };
 
 /**
  * One block as the reader draws it, narrowed from what the record sent.
@@ -223,7 +227,15 @@ const readingOf = (x: unknown): SharedReading | null => {
   const r = isObject(x.reading) ? x.reading : {};
   const value = typeof r.value === 'number' && Number.isFinite(r.value) ? r.value : null;
   const unit = typeof r.unit === 'string' && r.unit !== '' ? r.unit : null;
-  return { metric: x.metric, ...(typeof x.label === 'string' && x.label !== '' ? { label: x.label } : {}), value, unit };
+  /* THE TREND RIDES BESIDE THE READING, as the record sends it (`shares.ts`); a point that is not a number is a gap. */
+  const trend = Array.isArray(x.trend) ? x.trend.map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)) : null;
+  return {
+    metric: x.metric,
+    ...(typeof x.label === 'string' && x.label !== '' ? { label: x.label } : {}),
+    value,
+    unit,
+    ...(trend !== null && trend.some((v) => v !== null) ? { trend } : {}),
+  };
 };
 
 const cellOf = (x: unknown): SharedCell | null =>

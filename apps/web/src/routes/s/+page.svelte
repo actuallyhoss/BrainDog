@@ -38,7 +38,8 @@
     openOutside('https://brain.dog');
   };
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
-  import { cellSaid, figureSaid, headOf, plainSaid, takeShared, type Said, type Where } from './reading.ts';
+  import { cellSaid, figureSaid, headOf, plainSaid, pointSaid, takeShared, trendLine, type Said, type Where } from './reading.ts';
+  import Sparkline from '$lib/viz/Sparkline.svelte';
 
   /* THE ONE WORD THIS SCREEN ADDS: the action under a dead link. The rest are `share-write.ts`'s. */
   const shareWords = { whatItIs: 'See what BrainDog is' };
@@ -116,9 +117,11 @@
   {#if b.readings.length > 0}
     <dl class="figures">
       {#each b.readings as r, n (n)}
+        {@const line = trendLine(r)}
         <div class="figure">
           <dt class="figure-label">{r.label ?? fieldSaid(r.metric)}</dt>
           <dd class="figure-value num">{@render value(figureSaid(r, where))}</dd>
+          {#if line}<dd class="figure-trend"><Sparkline values={line} subject={r.label ?? fieldSaid(r.metric)} format={(n) => pointSaid(r, n, where)} /></dd>{/if}
         </div>
       {/each}
     </dl>
@@ -368,6 +371,12 @@
     line-height: 28px;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+  }
+
+  /* THE FIGURE'S TREND, UNDER ITS NUMBER: the app's own sparkline, at most its 120px and narrower in a narrow tile. */
+  .figure-trend {
+    margin: var(--sp-1) 0 0;
+    min-inline-size: 0;
   }
 
   /* AN AMOUNT'S FRACTION AND ITS CODE ARE QUIETER than its whole, as the app's own money is set. */

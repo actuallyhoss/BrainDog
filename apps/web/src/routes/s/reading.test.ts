@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import { AMOUNT_SPACE } from 'braindog-render';
 
-import { cellSaid, figureSaid, headOf, moneySaid, plainSaid, takeShared, type Said, type Where } from './reading.ts';
+import { cellSaid, figureSaid, headOf, moneySaid, plainSaid, pointSaid, takeShared, trendLine, type Said, type Where } from './reading.ts';
 
 const where: Where = { language: 'en-GB', zone: 'Europe/London', now: Date.parse('2026-10-15T12:00:00Z') };
 /** What a cell says, with the writer's own space between a code and its figure read as a plain one. */
@@ -78,4 +78,14 @@ test('a list cell says each value by its type, and a row with no cells falls bac
   const row = { cells: { tags: { type: 'list', of: 'day', value: ['2026-10-01', '2026-10-02'] } }, fields: { note: 'Rye on Fridays' }, state: null };
   assert.equal(said(cellSaid(row, { field: 'tags' }, where)), '1 Oct 2026, 2 Oct 2026');
   assert.equal(said(cellSaid(row, { field: 'note' }, where)), 'Rye on Fridays');
+});
+
+test('a trend is drawn from three points, a gap left out, and each point said as the figure is', () => {
+  const cash = { metric: 'cash', label: 'Cash', value: 8_000_00, unit: 'EGP', trend: [7_000_00, null, 7_500_00, 8_000_00] };
+  const line = trendLine(cash);
+  assert.equal(line?.length, 4);
+  assert.ok(Number.isNaN(line?.[1]));
+  assert.equal(trendLine({ ...cash, trend: [1, null, 2] }), null);
+  assert.equal(trendLine({ metric: 'cash', value: 1, unit: null }), null);
+  assert.equal(pointSaid(cash, 7_500_00, where), 'EGP 7,500');
 });
