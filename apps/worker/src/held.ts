@@ -26,6 +26,9 @@
  *
  * BOUNDED: only a POST to `/in/webhook/<rec>/<ingest>[/<token>]` whose record id is well formed, at most the door's own
  * size, at most `HELD_PER_RECORD` waiting for one record and `HELD_MOST` for the deployment. Past either, 503 as before.
+ * A request signed with its time (Stripe's `t=`) is never kept: its sender retries a 503, and a late replay would fail
+ * the signature's window. An arrival still waiting `HELD_OLDEST_MS` after it was kept moves to `gave-up` with a mail, so
+ * a record that will never take arrivals cannot fill the deployment's room.
  */
 
 import { serveIngest, servesIngest, type IngestDoor } from '@braindog/host';
@@ -50,6 +53,9 @@ export const HELD_STEPS_S: readonly number[] = [30, 120, 600, 1800, 3600, 10_800
 /** After this many failed tries the operator is mailed: the record has been unable to take arrivals for hours. */
 export const HELD_TELL_AFTER = 6;
 
+/** A kept arrival still waiting this long after it was kept is given up on, with a mail: a week. */
+export const HELD_OLDEST_MS = 7 * 86_400_000;
+
 /** How long the door waits before its second ask. */
 const SECOND_ASK_MS = 500;
 
@@ -63,10 +69,32 @@ export const isHeld = (body: unknown): body is HeldMessage =>
 /** The bucket calls this file makes. Structural, as `snapshots.ts`'s `Blobs` is, so the tests' fake fits. */
 export type HeldBucket = {
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
-  put(key: string, value: Uint8Array): Promise<unknown>;
+  put(key: string, value: Uint8Array, options?: { customMetadata?: Record<string, string> }): Promise<unknown>;
   delete(key: string): Promise<void>;
-  list(options: { prefix: string; limit?: number; cursor?: string }): Promise<{ objects: { key: string; uploaded: Date }[]; truncated: boolean; cursor?: string }>;
+  list(options: {
+    prefix: string;
+    limit?: number;
+    cursor?: string;
+    include?: 'customMetadata'[];
+  }): Promise<{ objects: { key: string; uploaded: Date; customMetadata?: Record<string, string> }[]; truncated: boolean; cursor?: string }>;
 };
+
+/**
+ * What a kept object says of its own ring, in the bucket's metadata, so the nightly sweep can tell a chain that is
+ * still ringing from one the queue lost without opening the seal: `next` is when the next ring is due (ms), `tries`
+ * how many have failed, `kept` when it was first kept (ms).
+ */
+type Ringing = { next: number; tries: number; kept: number };
+
+const ringing = (r: Ringing): Record<string, string> => ({ next: String(r.next), tries: String(r.tries), kept: String(r.kept) });
+
+function ringingOf(meta: Record<string, string> | undefined): Ringing | null {
+  if (meta === undefined) return null;
+  const next = Number(meta['next']);
+  const tries = Number(meta['tries']);
+  const kept = Number(meta['kept']);
+  return Number.isFinite(next) && Number.isFinite(tries) && Number.isFinite(kept) ? { next, tries, kept } : null;
+}
 
 export type HeldDeps = {
   bucket: HeldBucket | undefined;
@@ -99,8 +127,36 @@ export async function serveHeld(request: Request, deps: HeldDeps): Promise<Respo
   await (deps.pause ?? sleep)(SECOND_ASK_MS);
   const second = await serveIngest(again(request.url, [...request.headers], bytes), unlimited(deps.door()));
   if (second.status !== 503) return second;
+  /* A REQUEST SIGNED WITH THE TIME IS NEVER KEPT, and its sender hears 503 as before. Stripe signs `t=` into its
+     header and the door checks it against now within five minutes, so a replay from the bucket ten minutes on reads
+     as forged and is stored unverified, while Stripe, told 202, has stopped trying. Told 503, Stripe tries again for
+     three days with a fresh signature, which is the delivery this would have broken. */
+  if (timeSigned(request.headers)) {
+    op({ op: 'door', held: false, rec, why: 'time-signed' }, 'error');
+    return second;
+  }
   const kept = await hold(deps, rec, request.url, [...request.headers], bytes);
   return kept ? new Response(null, { status: 202, headers: { 'cache-control': 'no-store' } }) : second;
+}
+
+/**
+ * Headers that carry a signing time a verifier holds to a window: Stripe's, and the Svix / Standard Webhooks and Slack
+ * ones, whose senders all retry a 503 themselves.
+ */
+const TIMED_HEADERS = new Set(['stripe-signature', 'svix-timestamp', 'webhook-timestamp', 'x-slack-request-timestamp']);
+
+/**
+ * Whether a request is signed with its time, so a replay later than the verifier's window would fail its check.
+ *
+ * ANY HEADER SHAPED AS STRIPE WRITES ONE COUNTS, under whatever name: a door declared `verify: { kind: 'stripe' }` may
+ * name its own header, and the record that would say which one is the record that could not answer.
+ */
+export function timeSigned(headers: Iterable<[string, string]>): boolean {
+  for (const [name, value] of headers) {
+    if (TIMED_HEADERS.has(name.toLowerCase())) return true;
+    if (/(?:^|,)\s*t=\d+\s*(?:,|$)/u.test(value) && /(?:^|,)\s*v\d+=/u.test(value)) return true;
+  }
+  return false;
 }
 
 /** Keep one arrival and ring for it: `true` once it is in the bucket, whether or not the ring went. */
@@ -123,7 +179,9 @@ async function hold(deps: HeldDeps, rec: string, url: string, headers: [string, 
     const envelope: Envelope = { url, headers: headers.filter(([k]) => !UNKEPT.has(k.toLowerCase())), body: base64(bytes), at: new Date(now).toISOString() };
     /* THE SAME REQUEST KEPT TWICE IS ONE KEY: his two devices post every text, and the second one is the same arrival. */
     const key = `${HELD_WAIT}${rec}/${await digest(concat(utf8(url), bytes))}.held`;
-    await bucket.put(key, await seal(deps.secret, utf8(JSON.stringify(envelope))));
+    await bucket.put(key, await seal(deps.secret, utf8(JSON.stringify(envelope))), {
+      customMetadata: ringing({ next: now + stepOf(0) * 1000, tries: 0, kept: now }),
+    });
     op({ op: 'door', held: true, rec, bytes: bytes.byteLength }, 'error');
     try {
       await deps.queue.send({ held: key, tries: 0 }, { delaySeconds: stepOf(0) });
@@ -174,10 +232,22 @@ export async function redeliver(message: HeldMessage, deps: HeldDeps): Promise<R
     return 'delivered';
   }
   if (answer.status === 503 || answer.status === 429) {
+    const now = (deps.now ?? Date.now)();
+    const kept = Date.parse(envelope.at);
+    /* A WEEK IS LONG ENOUGH: a record that has refused every ring for seven days is not going to be reset back to health
+       by the next one, and what it holds is the deployment's room for every other record's outage. */
+    if (Number.isFinite(kept) && now - kept > HELD_OLDEST_MS) return giveUp(deps, bucket, message.held, sealed, rec, 'too-old');
     const tries = message.tries + 1;
     const after = Number(answer.headers.get('retry-after') ?? '');
-    const delay = answer.status === 429 && Number.isFinite(after) && after > 0 ? after : stepOf(tries);
-    await deps.queue.send({ held: message.held, tries }, { delaySeconds: Math.min(Math.max(1, Math.round(delay)), 43_200) });
+    const delay = Math.min(Math.max(1, Math.round(answer.status === 429 && Number.isFinite(after) && after > 0 ? after : stepOf(tries))), 43_200);
+    await deps.queue.send({ held: message.held, tries }, { delaySeconds: delay });
+    /* THE OBJECT SAYS WHEN ITS NEXT RING IS DUE, so the sweep leaves a live chain alone. Put after the ring is queued:
+       a put that fails costs at most one extra ring from the sweep, which the door's dedupe stores once. */
+    try {
+      await bucket.put(message.held, sealed, { customMetadata: ringing({ next: now + delay * 1000, tries, kept: Number.isFinite(kept) ? kept : now }) });
+    } catch (e) {
+      op({ op: 'door', marked: false, rec, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
     op({ op: 'door', waiting: true, rec, tries, status: answer.status }, 'error');
     if (tries === HELD_TELL_AFTER) await deps.tell?.({ why: 'waiting', rec });
     return 'waiting';
@@ -195,19 +265,25 @@ async function giveUp(deps: HeldDeps, bucket: HeldBucket, key: string, sealed: U
 }
 
 /**
- * The nightly sweep: every kept arrival older than an hour is rung again, on the slow end of the ladder. A message the
- * queue lost, or a ring that never went, is found here. A copy already in flight is harmless: the first to land deletes
- * the object and the other finds it gone. The number rung.
+ * The nightly sweep: every kept arrival whose ring is over an hour late is rung again, on the slow end of the ladder. A
+ * message the queue lost, or a ring that never went, is found here. A copy already in flight is harmless: the first to
+ * land deletes the object and the other finds it gone. The number rung.
+ *
+ * A CHAIN STILL RINGING IS LEFT ALONE. Each ring writes on the object when the next is due; the first cut rang every
+ * object older than an hour, so a record down for N nights had N+1 chains ringing each of its arrivals. An object with
+ * nothing written on it (kept before this, or by a host whose bucket keeps no metadata) is judged by its age as before.
  */
 export async function sweepHeld(deps: HeldDeps): Promise<number> {
   const bucket = deps.bucket;
   if (bucket === undefined) return 0;
   const now = (deps.now ?? Date.now)();
-  const page = await bucket.list({ prefix: HELD_WAIT, limit: HELD_MOST });
+  const page = await bucket.list({ prefix: HELD_WAIT, limit: HELD_MOST, include: ['customMetadata'] });
   let rung = 0;
   for (const o of page.objects) {
-    if (now - o.uploaded.getTime() < 3_600_000) continue;
-    await deps.queue.send({ held: o.key, tries: HELD_TELL_AFTER }, { delaySeconds: 1 });
+    const r = ringingOf(o.customMetadata);
+    const due = r === null ? o.uploaded.getTime() : r.next;
+    if (now - due < 3_600_000) continue;
+    await deps.queue.send({ held: o.key, tries: Math.max(HELD_TELL_AFTER, r?.tries ?? 0) }, { delaySeconds: 1 });
     rung += 1;
   }
   if (page.objects.length > 0) op({ op: 'door', swept: rung, waiting: page.objects.length }, rung > 0 ? 'error' : 'info');
