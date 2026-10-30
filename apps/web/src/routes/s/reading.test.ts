@@ -9,7 +9,8 @@ import { test } from 'node:test';
 
 import { AMOUNT_SPACE } from 'braindog-render';
 
-import { cellSaid, figureSaid, headOf, moneySaid, plainSaid, pointSaid, takeShared, trendLine, type Said, type Where } from './reading.ts';
+import type { SharedBlock } from '../../lib/record/share-write.ts';
+import { cellSaid, durationSaid, figureSaid, headOf, moneySaid, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Where } from './reading.ts';
 
 const where: Where = { language: 'en-GB', zone: 'Europe/London', now: Date.parse('2026-10-15T12:00:00Z') };
 /** What a cell says, with the writer's own space between a code and its figure read as a plain one. */
@@ -42,10 +43,13 @@ test('a dead or closed link reads This page is not shared., and never why', () =
 });
 
 test('a live page heads with its name and the day its link stops', () => {
-  const page = { title: 'Weekly bakes', expires_at: '2026-11-14T00:00:00.000Z', read_at: null, language: 'en', zone: 'UTC', empty: null, blocks: [] };
-  assert.deepEqual(headOf({ from: 'live', page }), { title: 'Weekly bakes', line: 'This link works until 14 Nov 2026.' });
+  const page = { title: 'Weekly bakes', expires_at: '2026-11-14T00:00:00.000Z', read_at: '2026-10-15T12:00:00.000Z', language: 'en', zone: 'UTC', home: null, empty: null, blocks: [] };
+  /* A DAY IN THE YEAR THE RECORD IS IN IS SAID WITHOUT ITS YEAR, as the app says one. */
+  assert.deepEqual(headOf({ from: 'live', page }), { title: 'Weekly bakes', line: 'This link works until 14 Nov.' });
   const east = { ...page, expires_at: '2026-11-14T03:00:00.000Z', zone: 'America/New_York' };
-  assert.equal(headOf({ from: 'live', page: east }).line, 'This link works until 13 Nov 2026.');
+  assert.equal(headOf({ from: 'live', page: east }).line, 'This link works until 13 Nov.');
+  const next = { ...page, expires_at: '2027-01-02T00:00:00.000Z' };
+  assert.equal(headOf({ from: 'live', page: next }).line, 'This link works until 2 Jan 2027.');
 });
 
 test('a money cell is drawn whole in its own currency, and turned when its row says it went out', () => {
@@ -70,13 +74,13 @@ test('a money figure says its currency, and a figure with none says so', () => {
 test('numbers follow the record language with Latin digits, not the visitor device', () => {
   assert.equal(plainSaid(1234.5, { ...where, language: 'de-DE' }), '1.234,5');
   assert.equal(plainSaid(1234.5, { ...where, language: 'ar-EG' }).replace(/[^0-9]/gu, ''), '12345');
-  assert.equal(plainSaid('2026-10-03', where), '3 Oct 2026');
+  assert.equal(plainSaid('2026-10-03', where), '3 Oct');
   assert.equal(plainSaid(true, where), 'Yes');
 });
 
 test('a list cell says each value by its type, and a row with no cells falls back to its plain value', () => {
   const row = { cells: { tags: { type: 'list', of: 'day', value: ['2026-10-01', '2026-10-02'] } }, fields: { note: 'Rye on Fridays' }, state: null };
-  assert.equal(said(cellSaid(row, { field: 'tags' }, where)), '1 Oct 2026, 2 Oct 2026');
+  assert.equal(said(cellSaid(row, { field: 'tags' }, where)), '1 Oct, 2 Oct');
   assert.equal(said(cellSaid(row, { field: 'note' }, where)), 'Rye on Fridays');
 });
 
@@ -88,4 +92,56 @@ test('a trend is drawn from three points, a gap left out, and each point said as
   assert.equal(trendLine({ ...cash, trend: [1, null, 2] }), null);
   assert.equal(trendLine({ metric: 'cash', value: 1, unit: null }), null);
   assert.equal(pointSaid(cash, 7_500_00, where), 'EGP 7,500');
+});
+
+test('an amount in the home currency is its sign alone, any other keeps its code, and noughts of pence go', () => {
+  const home: Where = { ...where, home: 'GBP' };
+  assert.equal(said(figureSaid({ metric: 'owed', value: 405_000, unit: 'GBP' }, home)), '£4,050');
+  assert.equal(said(figureSaid({ metric: 'owed', value: 405_000, unit: 'USD' }, home)), '$4,050 USD');
+  const row = { cells: { cost: { type: 'money', value: { amount: 0, currency: 'GBP' } }, bill: { type: 'money', value: { amount: 853_000, currency: 'GBP' } }, part: { type: 'money', value: { amount: 1_240, currency: 'GBP' } } }, fields: {}, state: null };
+  assert.equal(said(cellSaid(row, { field: 'cost' }, home)), '£0');
+  assert.equal(said(cellSaid(row, { field: 'bill' }, home)), '£8,530');
+  assert.equal(said(cellSaid(row, { field: 'part' }, home)), '£12.40');
+});
+
+test('effort is said in words, a share sits on its figure, and an agent is named', () => {
+  assert.equal(durationSaid(259_200, 'd', 'en-GB'), '3 days');
+  assert.equal(durationSaid(86_400, 'd', 'en-GB'), '1 day');
+  assert.equal(durationSaid(17_280, 'd', 'en-GB'), '5 hours');
+  assert.equal(durationSaid(129_600, 'd', 'en-GB'), '1.5 days');
+  const row = {
+    cells: { effort: { type: 'duration', value: 172_800, unit: 'd' }, progress: { type: 'decimal', value: 60, unit: '%' }, agent: { type: 'text', value: 'claude' } },
+    fields: {},
+    state: null,
+  };
+  assert.equal(said(cellSaid(row, { field: 'effort' }, where)), '2 days');
+  assert.equal(said(cellSaid(row, { field: 'progress' }, where)), '60%');
+  assert.equal(said(cellSaid(row, { field: 'agent' }, where)), 'Claude');
+  assert.equal(said(figureSaid({ metric: 'done', value: 42, unit: '%' }, where)), '42%');
+});
+
+const block = (b: Partial<SharedBlock>): SharedBlock => ({ kind: 'table', heading: null, lead: false, body: null, empty: null, span: null, refused: null, columns: [], rows: [], matched: 0, readings: [], authored: [], ...b });
+
+test('a block with nothing in it is no tile, the opening line is under the title, and a blank column or row is left out', () => {
+  const keys = { cells: { scope: { type: 'text', value: 'All' } }, fields: {}, state: null };
+  const tool = { cells: { name: { type: 'text', value: 'Specimen proofer' } }, fields: {}, state: null };
+  const page = shownBlocks(
+    [
+      block({ kind: 'project', heading: 'Overview' }),
+      block({ kind: 'note', lead: true, body: 'Settle how Kiln is licensed' }),
+      block({ kind: 'kpis', heading: 'Key numbers' }),
+      block({ kind: 'section', heading: 'Runs on' }),
+      block({ kind: 'cards', heading: 'Keys', columns: [{ field: 'name', label: 'Name' }, { field: 'scope', label: 'Applies to' }], rows: [keys], matched: 1 }),
+      block({ kind: 'cards', heading: 'Tools', columns: [{ field: 'name', label: 'Name' }, { field: 'note', label: 'Note' }], rows: [tool, keys], matched: 3 }),
+      block({ kind: 'steps', heading: 'The road', empty: 'Kiln has no stages yet.' }),
+      block({ kind: 'section', heading: 'Nothing under me' }),
+    ],
+    where,
+  );
+  assert.equal(page.lead, 'Settle how Kiln is licensed');
+  assert.deepEqual(page.blocks.map((s) => s.block.heading), ['Runs on', 'Tools', 'The road']);
+  const tools = page.blocks[1]!;
+  assert.deepEqual(tools.columns.map((c) => c.label), ['Name']);
+  assert.equal(tools.rows.length, 1);
+  assert.equal(tools.matched, 2);
 });

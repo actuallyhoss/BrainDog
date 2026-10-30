@@ -115,8 +115,10 @@ test('a money cell arrives whole, in its own currency, and two currencies are ne
   ]);
   const note = shown.blocks.find((b) => b.kind === 'note') as { body: string };
   const [said, ...rest] = note.body.split('\n');
-  /* EACH AMOUNT WRITTEN ONE WAY, as Money writes it against the record's home currency, whatever the language. */
-  assert.match(said!, /^Owed: (?=.*€300\.50.EUR)(?=.*£1,250\.00.GBP).*\. Also and the handbook\.$/u);
+  /* EACH AMOUNT WRITTEN ONE WAY, as Money writes it against the record's home currency, whatever the language. AND A
+     SENTENCE WITH A HOLE NOTHING FILLS IS LEFT OUT WHOLE, rather than read "Also and the handbook." */
+  assert.match(said!, /^Owed: (?=.*€300\.50.EUR)(?=.*£1,250\.00.GBP).*\.$/u);
+  assert.doesNotMatch(note.body, /Also|handbook/u);
   /* AND THE REST OF HER WORDS KEEP THEIR SPACING: a nested list keeps its indent. */
   assert.deepEqual(rest, ['', '- Sent', '  - by hand']);
   sql.close();
@@ -156,5 +158,43 @@ test('the answer carries the record\'s language and zone', async () => {
   const { sql, read } = await harness();
   const shown = await read('money');
   assert.deepEqual([shown.language, shown.zone], ['de-DE', 'Europe/Berlin']);
+  sql.close();
+});
+
+test('a note keeps what it says: a typed figure in words, a day as a day, and no sentence that names a row or a question', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  sql.exec(
+    "INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, 'rec_1', 'studio', 'Studio', 'en-GB', 'Europe/London', 1, '2026-10-01T00:00:00.000Z')",
+  );
+  const body = [
+    'Earning. {{money:1840000 GBP}} in the last twelve months.',
+    '',
+    'Open as SG31 and it blocks two quotes. It is not deferrable past {{date:2026-11-20}}.',
+    '',
+    '```timeline | Recent',
+    '{{ago:2026-08-14}} | Raised the studio tier | first increase since launch | good',
+    '```',
+    '',
+    '```note | Watch this | warn',
+    'Letting it lapse breaks links. Tracked',
+    'as {{ref:invoices#3}}.',
+    '```',
+    '',
+    'Settled by research. The comparison is D41.',
+  ].join('\n');
+  value(await api.kernel.install([INVOICES, page('notes', [{ kind: 'note', heading: 'Notes', body }])]));
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
+  const { id } = value<{ id: string }>(await direct.openShare({ slug: 'notes' }, owner));
+  const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'notes')));
+  const note = (shown.blocks.find((b) => b.kind === 'note') as { body: string }).body;
+  assert.match(note, /^Earning\. £18,400(?:\.00)?(?: GBP)? in the last twelve months\.$/mu);
+  assert.match(note, /^It is not deferrable past 20 Nov 2026/mu);
+  assert.match(note, /^\d{1,2} Aug \| Raised the studio tier/mu);
+  assert.match(note, /Letting it lapse breaks links\.\n```/u);
+  assert.match(note, /^Settled by research\.$/mu);
+  assert.doesNotMatch(note, /SG31|D41|Tracked|invoices|\{\{|\}\}|\u0000/u);
   sql.close();
 });
