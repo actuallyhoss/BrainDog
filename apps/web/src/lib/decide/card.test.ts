@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answerRowOf, answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, keptWay, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, suggestsOf, wayTail } from './card.ts';
+import { answerRowOf, answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, keptWay, leadOf, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, suggestsOf, wayTail } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
@@ -284,7 +284,9 @@ test('ONE HARD ANSWER BESIDE A SAFE ONE: the question is a call, and only the ha
   assert.equal(wayTail(card, take, primaryOf(card)), ', can’t be undone easily', 'the hard answer says nothing on its own button');
   /* A QUESTION HARD AS A WHOLE STILL SAYS IT ON THE FILLED BUTTON, as it always did, and not on the others. */
   const whole = cardOf(ask({ cost: 'undo', options: [{ key: 'a', label: 'A', because: '', recommended: true }, { key: 'b', label: 'B', because: '', recommended: false }] }), { now });
-  assert.deepEqual(whole.ways.map((w) => wayTail(whole, w, primaryOf(whole))), [', can’t be undone easily', '']);
+  assert.deepEqual(whole.ways.map((w) => wayTail(whole, w, leadOf(whole))), [', can’t be undone easily', '']);
+  /* AND THE HARD ONE IS NEVER THE FILLED ONE (audit 6g, AG11), suggested or not. */
+  assert.equal(primaryOf(whole), null);
 
   /* ENTER GIVES THE SAFE SUGGESTION, AND NEVER A SUGGESTION THAT IS THE HARD ONE; nor does the form start chosen on it. */
   assert.equal(card.enter, 'keep');
@@ -422,11 +424,12 @@ test('THE SUGGESTED ANSWER IS THE RED PRIMARY, IN ITS OWN WORDS, and the others 
   assert.equal(card.ways[0]?.key, 'keep', 'the suggested option leads the row');
   assert.equal(card.ways[0]?.label, 'Keep the subdomain', 'the primary says the answer in its own words, not Decide');
   assert.equal(card.enter, 'keep', 'Enter gives the suggestion where it costs nothing');
-  /* A HARD CARD KEEPS THE SAME PRIMARY, worded with its care, and no key answers it. */
+  /* A HARD CARD FILLS NO ANSWER (audit 6g, AG11): its lead still says its care, and no key answers it. */
   const hard = cardOf({ ...three, cost: 'undo' } as QueueQuestion, { now });
-  assert.equal(primaryOf(hard), 'keep');
+  assert.equal(primaryOf(hard), null);
+  assert.equal(leadOf(hard), 'keep');
   assert.equal(hard.enter, null);
-  assert.equal(wayTail(hard, hard.ways[0]!, primaryOf(hard)), ', can’t be undone easily');
+  assert.equal(wayTail(hard, hard.ways[0]!, leadOf(hard)), ', can’t be undone easily');
   /* A MONEY CARD IS NEVER ACCEPTED BY ENTER, whatever is suggested. */
   const paying = cardOf({ ...three, money: [{ amount: 480000, currency: 'GBP' }] } as QueueQuestion, { now, home: 'GBP' });
   assert.equal(primaryOf(paying), 'keep');

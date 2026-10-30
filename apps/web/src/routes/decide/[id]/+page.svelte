@@ -1170,7 +1170,7 @@
                 id="opt-{option.key}"
                 data-answer={option.key}
                 data-suggested={marked ? '' : undefined}
-                data-weight={(lead ?? (marked || (suggestedKey === undefined && option.key === 'accept'))) ? 'primary' : undefined}
+                data-weight={(lead ?? (marked || (suggestedKey === undefined && option.key === 'accept'))) && !hardly(option.key) ? 'primary' : undefined}
                 data-on={asked === option.key ? '' : undefined}
                 aria-pressed={asked === null ? undefined : asked === option.key}
                 disabled={!answerable || holding !== null}

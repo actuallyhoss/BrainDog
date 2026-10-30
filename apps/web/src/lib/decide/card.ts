@@ -572,9 +572,10 @@ export const wayTail = (card: Pick<Card, 'cost'>, way: Pick<Way, 'key' | 'hard'>
  * button wrapped to two lines at 390, so the button says its name and the line under the row says the care. Said of
  * the answers `wayTail` marks: bare where the filled one is the only hard one, else naming them. `''` for none.
  */
-export function hardSaid(card: Pick<Card, 'cost' | 'ways'>, primary: string | null): string {
-  const hard = card.ways.filter((w) => wayTail(card, w, primary) !== '');
+export function hardSaid(card: Pick<Card, 'cost' | 'ways'>, primary: string | null, lead: string | null = primary): string {
+  const hard = card.ways.filter((w) => wayTail(card, w, lead) !== '');
   if (hard.length === 0) return '';
+  /* BARE ONLY UNDER THE FILLED ONE; a hard answer left unfilled (`primaryOf`) is named, so it says so of itself. */
   if (hard.length === 1 && hard[0]!.key === primary) return queueWords.hardLine;
   return queueWords.hardOf(hard.map((w) => w.label).join(' and '));
 }
@@ -655,7 +656,21 @@ export function pressOf(card: Pick<Card, 'ways' | 'decline' | 'merge' | 'cost'>)
  * record's own two. The rest are the quiet fill. Filled is where the eye goes first, not a press made for anybody: Enter
  * still gives only what `enter` allows.
  */
-export const primaryOf = (card: Pick<Card, 'ways'>): string | null => (card.ways.find((w) => w.recommended) ?? card.ways[0])?.key ?? null;
+export const primaryOf = (card: Pick<Card, 'ways'> & Partial<Pick<Card, 'cost'>>): string | null => {
+  /* AN ANSWER THAT CAN'T BE UNDONE IS NEVER THE FILLED ONE (audit 6g, AG11): "Retire it" stood in the accent over "Park
+     it another year" with nothing suggested, the one press a person would take back if they could. The filled one is
+     the suggestion when it is not hard; where any answer is hard and none safe is suggested, none is filled, and the
+     line under the row names the hard one. With nothing hard, the suggestion or else the first, as before. */
+  const lead = leadOf(card);
+  const hard = (w: Pick<Way, 'key' | 'hard'>): boolean => w.hard === true || (w.key === lead && card.cost === 'undo');
+  const suggested = card.ways.find((w) => w.recommended);
+  if (suggested && !hard(suggested)) return suggested.key;
+  if (suggested || card.ways.some(hard)) return null;
+  return lead;
+};
+
+/** The answer a card leads with before any care is weighed: the suggested one, or else the first. */
+export const leadOf = (card: Pick<Card, 'ways'>): string | null => (card.ways.find((w) => w.recommended) ?? card.ways[0])?.key ?? null;
 
 /**
  * THE ANSWER A PRESS KEPT FOR THE RECORD ASKED FOR (fluid F5), if the card still offers it saying the same words. The press
