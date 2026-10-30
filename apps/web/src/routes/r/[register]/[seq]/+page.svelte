@@ -71,6 +71,7 @@
   import DayBox from '$lib/ui/DayBox.svelte';
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
   import JsonBox from '$lib/ui/JsonBox.svelte';
+  import RefPick from '$lib/ui/RefPick.svelte';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
   import { namedLines, readHistory, readNames, type Say, type SettledWords, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Docs, type Got, type RowReader } from '$lib/record/row-live.ts';
@@ -1197,11 +1198,10 @@
     property of its declared type and not of the screen it is on. The classes are `controls.css`'s, so
     this is the same field shape as the rest of the product rather than a second one that drifts.
 
-    A `ref` IS TYPED AS THE NUMBER A PERSON SAYS, beside the name of the list it points at, and not
-    picked from a menu: the rows of the other register are a read this screen has not made, and a menu
-    built from the sample would offer another record's rows. The number goes through the same
-    conversion the list writes through, and a number with no row is refused by the record in a
-    sentence that lands under the box.
+    A `ref` IS PICKED BY NAME (`RefPick`), the picker the new-row form draws, from the linked list this
+    page walked to name the row's links. It was a box holding the row's number, so a ledger line's
+    "Change category" showed `15` and refused "Insurance". The draft is still the picked row's number,
+    which goes through the same conversion the list writes through.
   -->
   {#snippet fieldEditor(f: FieldDecl, value: unknown)}
     <form
@@ -1251,6 +1251,8 @@
                its box says `s` rather than nothing. This drew `h` beside a box holding 7200 seconds. -->
           {#if f.type === 'duration'}<span class="edit-unit">{unitOf(f)}</span>{:else if f.unit}<span class="edit-unit">{f.unit}</span>{/if}
         </div>
+      {:else if f.type === 'ref' && f.to}
+        <RefPick to={f.to} label={labelOf(f)} bind:value={draft} />
       {:else if f.type === 'ref'}
         <div class="field">
           <input class="field-input num" type="text" inputmode="numeric" aria-label={labelOf(f)} bind:value={draft} />
