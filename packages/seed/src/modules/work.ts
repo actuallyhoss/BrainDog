@@ -1300,7 +1300,7 @@ export const WORK_WIDGETS = {
       id: 'next-up',
       alike: ['work-due'],
       title: 'Next up',
-      says: 'Tasks due in the next seven days, soonest first. Tick one where it is.',
+      says: 'Your tasks due in the next seven days, soonest first. Tick one where it is.',
       group: 'work',
       for: 'both',
       icon: 'check',
@@ -1309,7 +1309,10 @@ export const WORK_WIDGETS = {
         heading: 'Next up',
         icon: 'check',
         source: 'register.tasks',
-        where: 'state is not done or dropped, by before +8d',
+        /* TODAY'S OWN THIS WEEK, clause for clause (`work-due` in the app's `default-home.ts`), since the gallery says Today
+           shows this as Your work this week (`alike`): yours, open, from today to a week out. It read every task not done
+           before a week out, late and agents' ones too, and listed 7 beside Today's 2 (audit of 31 October, A35). */
+        where: 'state is open or doing, agent is empty, by after yesterday, by before +8d',
         columns: [{ field: 'what' }, { field: 'by' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
