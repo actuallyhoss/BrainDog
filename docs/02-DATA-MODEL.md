@@ -58,7 +58,7 @@ member        -- who may do what, per register: person_id, register, level, seen
 schedule      -- the single-alarm work queue: due_at, kind, payload json, state CHECK (five: pending | firing | done | failed | paused)
 outbox        -- work that must leave the object: kind, payload json, state, leased_until
 
--- VAULT ------------------------------------------------------------------------
+-- KEYCHAIN ---------------------------------------------------------------------
 vault_key     -- purpose CHECK (record|connector|signing), wrapped BLOB, nonce BLOB, wrapped_by CHECK (kek|passphrase),
               -- kek_id, salt, rewrapped_at. Exactly one wrapping per key; 'connector' is always kek (Q13); 'signing' is
               -- the record's Ed25519 private key (03 §4)

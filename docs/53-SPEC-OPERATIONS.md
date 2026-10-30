@@ -709,7 +709,7 @@ Four incidents. The first step of each is a `log` note with the time you noticed
    `UNAUTHORIZED`. The CLI has no `token revoke`, so this is a browser act, which is what ADR-060 wants of it.
 2. What it touched: an agent's write is an event whose actor is its session, `S<n>` (30 §3), or `agent:<name>`, and the
    `session` register records the token that opened each session (§13 #12). The owner reads those rows in `/audit`,
-   by the agent's name and the sessions it opened. `grant.read` cannot be among them: no token reaches VAULT (ADR-060).
+   by the agent's name and the sessions it opened. `grant.read` cannot be among them: no token reaches KEYCHAIN (ADR-060).
 3. The owner decides what to revert (`/audit`, supersession). Nothing is reverted for them.
 
 **(b) A leaked device grant.** As (a), with the runner's or the CLI's sessions. Revoke from Settings > Agents, where
@@ -864,7 +864,7 @@ Codes an operator meets, every one from 30 §6 or the adapter's list in 30 §13.
 | `CHECKSUM_MISMATCH` | 422 | `dog_manifest` disagrees with the rows; or a migration file with its row | a corrupt or edited file | *Use another backup; never edit a `.brain` by hand.* |
 | `IMPORT_NOT_EMPTY` | 422 | an import that does not replace, into a record with rows | the kernel's merge refusal; `braindog import` always replaces its own record's copy, so an operator meets this only from another caller | *Import into a new record or a fresh directory.* |
 | `WRONG_KEY` | 409 | a `kek_id` neither key in `KEK` answers to | a retired KEK, or a restore from before two rotations, never *corrupt* (12 §6.1) | *Put the old key back as `KEK`'s second key if you still hold it; else reset the Keychain.* |
-| `NEEDS_BROWSER_SESSION` | 403 | a bearer at VAULT, ADMIN or the JOBS session half | a token where the owner's browser is required; the CLI turns it into an operation grant request (48 §5.2) | *Do this from the owner's browser.* |
+| `NEEDS_BROWSER_SESSION` | 403 | a bearer at KEYCHAIN, ADMIN or the JOBS session half | a token where the owner's browser is required; the CLI turns it into an operation grant request (48 §5.2) | *Do this from the owner's browser.* |
 | `FORBIDDEN` | 403 | a write on a `lapsed` record | billing | *Read-only until billing resumes. Export is available.* |
 | `UNAUTHORIZED` | 401 | revoked, expired, or created before `TOKENS_VALID_FROM` | the body says only this (12 §8); the reason is in `wrangler tail` | — |
 | `DEVICE_CODE_EXPIRED` · `DEVICE_CODE_TRIES` | 422 | an enrolment past ten minutes · the fifth wrong code | re-run `enroll` | *Run enroll again and approve within ten minutes.* |
@@ -894,7 +894,7 @@ justifies automating it.
 
 | Actor | May | Through |
 |---|---|---|
-| The owner | ADMIN, VAULT, the JOBS session half; restore; erase; delete; the passphrase; closing their account | a browser session, never a token (ADR-060) |
+| The owner | ADMIN, KEYCHAIN, the JOBS session half; restore; erase; delete; the passphrase; closing their account | a browser session, never a token (ADR-060) |
 | The owner's CLI | DATA and READ+ on its token; `export`, `import`, the pack installs and `token create` under an operation grant: ten minutes, one command, approved in the browser (48 §5.2, D1) | `braindog login`, then the grant per command |
 | `system`, the walk | copy, re-wrap, the erasure check, the ladder with its deletion at day 90, expiring closed records' copies | the Worker's cron; every write it makes in a record is an `event` with `actor = 'system'` |
 | The operator | `wrangler` (secrets, R2, tail, a rollback by hand); the restore drill and the rehearsal on copies; `PROVISION_KEY`'s three doors; the ops record | the Cloudflare account under 2FA; the age identity; a deploy only through `deploy.yml` and the reviewer |

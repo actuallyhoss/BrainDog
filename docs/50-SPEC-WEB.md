@@ -171,7 +171,7 @@ export function write(args: { register: string; seq?: number; patch: Fields; bas
   onRefused: (r: Refusal[]) => void, onConflict: (c: Conflict, mine: Fields) => void): Promise<Result<Entry>>;
 ```
 
-`Api` is a type map over the DATA and READ+ methods of 33 §2 plus the browser-session groups VAULT, JOBS and ADMIN
+`Api` is a type map over the DATA and READ+ methods of 33 §2 plus the browser-session groups KEYCHAIN, JOBS and ADMIN
 of 30 §5; INTERNAL methods have no entry.
 
 ### 2.6 · What this app assumes of the packages it imports

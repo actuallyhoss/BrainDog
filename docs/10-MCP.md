@@ -93,7 +93,7 @@ there is no code path that reaches two records: the object boundary is the secur
 
 Token scopes are coarse on purpose: `read`, `propose`, `write`. Not per-register. A capability
 matrix nobody can reason about is a capability matrix that gets set to "all". **There is no
-`admin` scope, ever.** VAULT is a browser session only. ADMIN is a browser session, or a bearer
+`admin` scope, ever.** KEYCHAIN is a browser session only. ADMIN is a browser session, or a bearer
 carrying an **operation grant**: one named operation the owner approved from a browser session after
 seeing its summary, single-use, ten minutes, reaching exactly that method once
 ([12-SECURITY](12-SECURITY.md) §3, [ADR-060](16-DECISIONS.md)). A bearer at either group's routes
@@ -501,7 +501,7 @@ route over `/api`. A refusal list at the MCP layer, one named refusal per method
 
 | Group | Methods | The reason an agent reads |
 |---|---|---|
-| **VAULT** (4) | `listGrants` `openGrant` `bindGrant` `revokeGrant` | *a credential is the highest-value thing prompt injection could ask for*: a browser session only; every token gets `403 NEEDS_BROWSER_SESSION` |
+| **KEYCHAIN** (4) | `listGrants` `openGrant` `bindGrant` `revokeGrant` | *a credential is the highest-value thing prompt injection could ask for*: a browser session only; every token gets `403 NEEDS_BROWSER_SESSION` |
 | **JOBS** (7) | `createJob` `cancelJob` `listJobs` `jobEvents` (a browser session) · `claimJob` `postJobEvent` `readCancel` (the runner's device grant) | *a job is code execution on a machine*, the predecessor's job-surface refusal, [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2 |
 | **ADMIN** (16) | `planPack` `installPack` `uninstallPack` `setDeclaration` `ruleApply` `invite` `export` `import` `erase` `restore` `snapshot` `createToken` `listTokens` `revokeToken` `deviceApprove` `deleteRecord` | *installing a pack or erasing a record is the owner's act*: a browser session, or an operation grant the owner approved from one (§2); never an MCP token, and no `admin` scope exists |
 | **INTERNAL** (16) | `drainSchedule` `leaseOutbox` `ackOutbox` `observe` `applyMigrations` `createRecord` `arrive` `ingestVerify` `applyPull` `sealedGrant` `changed` `acceptInvite` `deviceStart` `devicePoll` `rewrapKeys` `opsReport` | *the host's own machinery*: an outbox lease or a migration is not a thing an agent does; only the host calls these |

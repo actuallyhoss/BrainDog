@@ -40,7 +40,7 @@ they say:
 | Authorise a call against scope, level or ceiling | the record, in one place (30 §10). The tools hand `ctx` on and never read it |
 | Touch a database, a port, a `node:` module or `process` | it holds `surface` and `ctx` and nothing else; the `stack` and `graph` gates hold it to that |
 | Speak the legacy HTTP+SSE transport | not carried (ADR-054) |
-| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the sixteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
+| Reach KEYCHAIN, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the sixteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
 | Decide | there is no `decide` tool, and no token holds `decide` (30 §10) |
 | Hand over a credential | there is no Keychain tool. `context` names a key by its label and what it opens, never its value (§8) |
 
@@ -704,7 +704,7 @@ what `budget.test.ts` counts (§5.9).
    absent, that is not an object is `-32602`. Neither reaches a tool.
 2. `tools(surface).call(name, args, ctx)` looks the name up with `Object.hasOwn`. A name that is not one of the
    sixteen, nor `schema` or `history` before `FOLDED_UNTIL` (§4.5), is an error result, `ROUTE_UNKNOWN` with the sixteen in `allowed`, and nothing runs. That covers every
-   VAULT, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
+   KEYCHAIN, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
 3. The tool addresses the call (§4.4). It parses `spoken` into `{ register, seq }`, or hands a prefixed id or a row id
    to the record, or hands a figure's id to `metric`, or refuses `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`;
    a tool whose method the surface does not offer refuses `NOT_IN_THIS_BUILD` with what to do instead; a `propose` of
@@ -893,7 +893,7 @@ the call.
 
 ### 6.2 · The corpus codes this package raises before any call
 
-**Not built.** There is no `REFUSED` table in `index.ts`. A VAULT, JOBS or ADMIN method name sent to `tools/call` is
+**Not built.** There is no `REFUSED` table in `index.ts`. A KEYCHAIN, JOBS or ADMIN method name sent to `tools/call` is
 `ROUTE_UNKNOWN`, with the sixteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
 (30 §10). The table below is an earlier revision's design, kept as that.
 
@@ -910,7 +910,7 @@ the call.
 
 | Code | Group | Methods (`tools/call` by name) | The `fix` an agent reads |
 |---|---|---|---|
-| `NEEDS_BROWSER_SESSION` | VAULT | `listGrants` `openGrant` `bindGrant` `revokeGrant` | *A credential is the highest-value thing prompt injection could ask for. The Keychain answers a browser session only; no token reaches it.* |
+| `NEEDS_BROWSER_SESSION` | KEYCHAIN | `listGrants` `openGrant` `bindGrant` `revokeGrant` | *A credential is the highest-value thing prompt injection could ask for. The Keychain answers a browser session only; no token reaches it.* |
 | `NEEDS_BROWSER_SESSION` | JOBS, session half | `createJob` `cancelJob` `listJobs` | *A job is code execution on a machine. Jobs are created, cancelled and listed from a browser session; ask the owner to run it from the app.* |
 | `FORBIDDEN` | JOBS, runner half | `claimJob` `postJobEvent` `readCancel` | *A job is code execution on a machine. Only the enrolled runner's device grant claims it, over /api, never over MCP.* |
 | `NEEDS_BROWSER_SESSION` | ADMIN | `planPack` `installPack` `uninstallPack` `setDeclaration` `invite` `export` `import` `erase` `restore` | *Installing a pack or erasing a record is the owner's act, from a browser session. No admin token exists.* |
@@ -928,7 +928,7 @@ Twenty-one names in `REFUSED` (4 + 3 + 3 + 9 + 1 + 1), plus one shape. The codes
 |---|---|---|
 | `UNAUTHORIZED` | 401 | HTTP 401, before the body is read (§5.1 step 4), the one refusal that is an HTTP status here |
 | `FORBIDDEN` | 403 | an error result inside HTTP 200, from the record, as when a `read` token calls `create` |
-| `NEEDS_BROWSER_SESSION` | 403 | not met over MCP: no tool names a VAULT or ADMIN method, so such a name is `ROUTE_UNKNOWN` first (§5.3) |
+| `NEEDS_BROWSER_SESSION` | 403 | not met over MCP: no tool names a KEYCHAIN or ADMIN method, so such a name is `ROUTE_UNKNOWN` first (§5.3) |
 
 Over MCP a refusal is a tool result, because a tool result is what the model reads; the HTTP status describes the
 transport exchange and nothing else (§13 D7).
@@ -1005,7 +1005,7 @@ level.
 | A script trial | `propose` with `try` runs a draft in the host's sandbox, with the caller's reads and no key opened for a token (§4.4). It writes nothing and files nothing, and the record checks the draft as an install would before it runs |
 | Error text | a 401 is one word; a throw is `internal` and a UUID; a refusal carries the record's `code`, `fix`, `at` and `allowed`. No stack, no SQL and no path crosses the wire (12 §8) |
 | Logging | a throw writes one line to the host's log, or to standard error under stdio: the reference, the method and the error, and never an argument |
-| Credentials | no tool names a VAULT method, and the record refuses every token there. `context` names a key by its label and what it opens, and shows its secret field as `{ sealed, opened, last_opened, last_by }`: never the grant, the sealed bytes or a value (ADR-010). `braindog:actions` names a key by its Keychain label |
+| Credentials | no tool names a KEYCHAIN method, and the record refuses every token there. `context` names a key by its label and what it opens, and shows its secret field as `{ sealed, opened, last_opened, last_by }`: never the grant, the sealed bytes or a value (ADR-010). `braindog:actions` names a key by its Keychain label |
 | Deciding | there is no `decide` tool, and no token reaches `decide` (30 §10). The one way a question is answered through this door is the person's press on the decision card, carried by a one-time grant the model is never shown (§15.12, [12-SECURITY](12-SECURITY.md) §5.1) |
 | Completeness | the tool list is fixed at sixteen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
 
@@ -1158,7 +1158,7 @@ the documents that still cite the earlier decision.
 | D8 | **MRTR on `propose` is off, behind `const MRTR = false`.** The client capability the 2026-07-28 revision names for an input-required answer could not be confirmed from the specification's text, so `propose` answers like every other tool, with the `decide` link to the question in the app; a `propose` carrying `inputResponses` is refused `LEVEL_REQUIRED` before any call (§5.7) | `rpc.ts`, `MRTR` and `DECIDES_NOT`; `index.ts`, `decideAt` |
 | D9 | **Types.** `McpSurface<C>` is structural, `Result` and `refused` come from `@braindog/ports`, and `src/` imports nothing of the record, so the same tools run in process and over `@braindog/client` | `index.ts` |
 | D10 | **Resources** are `braindog:<path>`, split and never resolved: the fixed addresses of `RESOURCES` and the templates of `TEMPLATES`, each fixed address and each figure read before it is listed, with the ttl of §4.7. `decisions` is `governance({ register: 'suggestion' })`; the script and automation grammars are this package's text behind `version()` | `index.ts` |
-| D11 | **No refusal list.** A VAULT, JOBS or ADMIN method name is `ROUTE_UNKNOWN` like any other name that is not a tool, and the record refuses every token at those groups (§6.2) | `index.ts`, `call` |
+| D11 | **No refusal list.** A KEYCHAIN, JOBS or ADMIN method name is `ROUTE_UNKNOWN` like any other name that is not a tool, and the record refuses every token at those groups (§6.2) | `index.ts`, `call` |
 | D12 | **Transport shape.** stdio and `POST /mcp` around one `handle`. Over HTTP: `POST` only, no `Origin`, JSON only, a bearer before the body, 1 MB, and the mirrored headers held to the body; a notification is 202 and `-32601` is 404; `no-store` and `nosniff` on every answer; no session id, and nothing streamed (§5.1) | `http.ts`, `apps/cli/src/stdio.ts` |
 | D13 | **There is no handler factory.** An earlier revision specified `createMcpHandler(api, opts)`. The code has `handle(message, surface, ctx)`, which both transports share, and `serveMcp(request, surface, ctx, options)`, to which a host passes the record's API after the bearer check `/api` uses, or `null` for a caller it does not know | `rpc.ts`, `http.ts`, both hosts |
 | D14 | **`cacheScope` is `private` for anything a record answers, and `public` only for `server/discover`**, the two values the MCP specification allows. `tools/list`, both resource lists, `resources/read` and `prompts/list` carry `private` | `rpc.ts` |

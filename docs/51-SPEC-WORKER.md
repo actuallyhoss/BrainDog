@@ -300,7 +300,7 @@ CLI whose hosts file was written before. Alpha is the same on its own names.
    `GROUPS` from `@braindog/record`; the Worker holds no method list of its own.
 2. Body over 1 MB (`Content-Length` first, then bytes) → **413** bare. Parse JSON; a parse failure → **400** bare —
    no refusal code exists for a malformed body, and the adapter's `SYNTAX` is not a refusal.
-3. `preContext` (§5.1). A bearer at a `VAULT`, `ADMIN` or session-half `JOBS` method → **403** `NEEDS_BROWSER_SESSION`
+3. `preContext` (§5.1). A bearer at a `KEYCHAIN`, `ADMIN` or session-half `JOBS` method → **403** `NEEDS_BROWSER_SESSION`
    in the Worker *and* in the record — the router check is what the gate asserts; the record's is the one that holds.
 4. `claimJob` with `?wait=<s>`: clamp `s` to 20; loop: `r = await stub.call('claimJob', args, pre)`; return on a job or
    when `s` elapses, sleeping 1,500 ms between calls; abort with the request signal (33 §11).
@@ -877,7 +877,7 @@ Only codes from 30 §6 appear in a body; the Worker mints none. The adapter's th
 
 | Condition | Answer | `fix` a person reads |
 |---|---|---|
-| bearer at `VAULT`, `ADMIN`, session-half `JOBS` | 403 `NEEDS_BROWSER_SESSION` | *Open this in the browser; no token can do it.* |
+| bearer at `KEYCHAIN`, `ADMIN`, session-half `JOBS` | 403 `NEEDS_BROWSER_SESSION` | *Open this in the browser; no token can do it.* |
 | cookie mutation without a same-origin `Origin` | 403 `FORBIDDEN` | *Reload the page and try again.* |
 | the session's record no longer holds the person | 403 `FORBIDDEN` | *You are not on this record.* |
 | `/mcp` with a cookie, or with nothing | 401, `WWW-Authenticate: Bearer`, the JSON-RPC error `-32001`; the cookie is never read | *UNAUTHORIZED*, and nothing else |
