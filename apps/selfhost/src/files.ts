@@ -109,7 +109,7 @@ const CANNOT_WRITE: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Adding a file take
  * `request.url` IS THE ROOT'S, with any `/<slug>` (or the old `/app/<slug>`) already taken off by `answer`, so one test
  * reads either address.
  */
-export async function serveFiles(request: Request, ctx: CallContext, folder: string | null): Promise<Response> {
+export async function serveFiles(request: Request, ctx: CallContext, folder: string | null, held: (sha256: string, ctx: CallContext) => boolean = () => false): Promise<Response> {
   const path = new URL(request.url).pathname;
   const one = /^\/+api\/+files\/+([^/]+)\/*$/.exec(path);
   const collection = /^\/+api\/+files\/*$/.test(path);
@@ -117,7 +117,7 @@ export async function serveFiles(request: Request, ctx: CallContext, folder: str
   const method = request.method;
   if (collection && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'PUT' });
   if (one && method !== 'GET' && method !== 'HEAD' && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'GET, HEAD, PUT' });
-  if (one && method !== 'PUT') return give(ctx, folder, one[1]!, method === 'HEAD');
+  if (one && method !== 'PUT') return give(ctx, folder, one[1]!, method === 'HEAD', held);
   return keep(request, ctx, folder, one ? one[1]! : null);
 }
 
@@ -168,11 +168,14 @@ async function keep(request: Request, ctx: CallContext, folder: string | null, a
 }
 
 /** `GET /api/files/<sha256>`: the bytes, inert, typed by their first bytes again. */
-function give(ctx: CallContext, folder: string | null, sha256: string, head: boolean): Response {
+function give(ctx: CallContext, folder: string | null, sha256: string, head: boolean, held: (sha256: string, ctx: CallContext) => boolean): Response {
   if (!readsFiles(ctx)) return refuse(403, CANNOT_READ);
   if (folder === null) return refuse(501, NO_STORE);
   /* THE HASH IS TESTED BEFORE IT IS JOINED INTO A PATH, so `..` or a separator never reaches the filesystem. */
   if (!SHA256.test(sha256)) return refuse(404, NO_FILE);
+  /* AND A FILE NAMED ONLY ON ROWS THIS CALLER CANNOT READ IS NOT THERE FOR THEM (the record's `fileHeld`), in the same
+     404 as a hash nobody holds, so the answer does not say the file exists. */
+  if (held(sha256, ctx)) return refuse(404, NO_FILE);
   let bytes: Uint8Array;
   try {
     bytes = readFileSync(join(folder, sha256));

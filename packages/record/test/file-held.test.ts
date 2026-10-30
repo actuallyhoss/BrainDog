@@ -1,0 +1,62 @@
+/**
+ * The files doors ask the record whether a file is kept from the caller (`fileHeld`) before handing the bytes over.
+ *
+ * THE DOOR CHECKED ONLY "READS FILES", so a member held off a list who knew or guessed a file's hash (or held the same
+ * PDF) read the payslip on it, or confirmed it was there. A narrowed caller now gets the bytes only when a row they can
+ * read names them in a field they are shown; a file no row names (just put, its row not saved yet) and a caller who reads
+ * the whole record are answered as before.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { createRecordApi, type CallContext } from '../src/index.ts';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+
+const NOW = Date.UTC(2026, 9, 30, 9);
+const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
+const list = (id: string) => ({
+  id: `register.${id}`,
+  kind: 'register' as const,
+  body: { id, name: id, title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'scan', type: 'file' }] } as never,
+});
+const sha = (c: string) => c.repeat(64);
+const file = (c: string) => ({ sha256: sha(c), mime: 'application/pdf', bytes: 10, name: `${c}.pdf` });
+
+async function record() {
+  const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) });
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'orchardline', name: 'Orchardline', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }).ok);
+  assert.ok((await api.kernel.install([list('payroll'), list('notes')])).ok);
+  const add = async (register: string, what: string, scan: unknown) => assert.ok((await api.create({ register, fields: { what, scan } } as never, owner)).ok, `${register} ${what}`);
+  await add('payroll', 'Sam, October', file('a'));
+  await add('notes', 'Train receipt', file('b'));
+  await add('payroll', 'Shared PDF', file('c'));
+  await add('notes', 'Shared PDF', file('c'));
+  return api;
+}
+
+test('A MEMBER HELD OFF A LIST DOES NOT GET A FILE ONLY THAT LIST NAMES', async () => {
+  const api = await record();
+  const appender: CallContext = { principal: { kind: 'person', id: 'p_book', level: 'write' }, levels: { payroll: 'append' } };
+  const notesOnly: CallContext = { principal: { kind: 'person', id: 'p_note', level: null }, registers: ['notes'], levels: { notes: 'read' } };
+  for (const ctx of [appender, notesOnly]) {
+    assert.equal(api.fileHeld(sha('a'), ctx), true, 'the payslip was handed to somebody held off payroll');
+    assert.equal(api.fileHeld(sha('b'), ctx), false, 'a file on a list they read was kept from them');
+    assert.equal(api.fileHeld(sha('c'), ctx), false, 'a file also on a list they read was kept from them');
+    /* A FILE NO ROW NAMES YET is the one just put, shown before its row is saved. */
+    assert.equal(api.fileHeld(sha('d'), ctx), false);
+  }
+});
+
+test('A FIELD HIDDEN FROM THE CALLER DOES NOT HAND THEM ITS FILE', async () => {
+  const api = await record();
+  const hidden: CallContext = { principal: { kind: 'person', id: 'p_m', level: 'write' }, hides: { notes: ['scan'] } };
+  assert.equal(api.fileHeld(sha('b'), hidden), true);
+});
+
+test('WHOEVER READS THE WHOLE RECORD IS ANSWERED AS BEFORE, and a name that is no hash is held', async () => {
+  const api = await record();
+  assert.equal(api.fileHeld(sha('a'), owner), false);
+  assert.equal(api.fileHeld(sha('a'), { principal: { kind: 'person', id: 'p_admin', level: 'decide' } }), false);
+  assert.equal(api.fileHeld('../etc', owner), true);
+});

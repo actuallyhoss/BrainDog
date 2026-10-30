@@ -16035,6 +16035,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(await kernel.mintChild(bearer, args ?? ({} as never), deps.validFrom?.()));
     },
 
+    /**
+     * Whether a file is kept from this caller: `true` when the bytes are named only by rows they cannot read, or only in
+     * fields hidden from them. INTERNAL: the files doors on both hosts ask it before handing the bytes over.
+     *
+     * THE DOOR CHECKED "READS FILES" AND THEN THE HASH, so a member held off a list who knew or guessed a file's hash (or
+     * held the same PDF) read it or confirmed it was there. Now a caller narrowed in any way (some lists, a rule on a
+     * list, a list at adds only, a field hidden) is answered the bytes only when a row they can read names them in a
+     * field they are shown. A file no row names (one just put, before its row is saved; a picture of a visual) is
+     * answered as before, and so is every caller who reads the whole record, who reads every row that could name it.
+     */
+    fileHeld(sha256: string, ctx: CallContext): boolean {
+      if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(sha256)) return true;
+      const narrowed =
+        Array.isArray(ctx.registers) ||
+        Object.values(ctx.levels ?? {}).some((level) => level === 'append') ||
+        Object.keys(ctx.wheres ?? {}).length > 0 ||
+        Object.values(ctx.hides ?? {}).some((fields) => fields.length > 0);
+      if (!narrowed) return false;
+      const naming = sql.all<{ id: string; register: string; fields: string }>('SELECT id, register, fields FROM entry WHERE fields LIKE ?', `%${sha256}%`);
+      if (naming.length === 0) return false;
+      const holds = (value: unknown): boolean =>
+        Array.isArray(value) ? value.some(holds) : typeof value === 'object' && value !== null && (value as { sha256?: unknown }).sha256 === sha256;
+      for (const row of naming) {
+        if (readable(ctx, row.register) !== null || !sight.admits(ctx, row)) continue;
+        const hidden = sight.hidden(ctx, row.register);
+        let fields: Record<string, unknown>;
+        try {
+          fields = JSON.parse(row.fields) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+        for (const [field, value] of Object.entries(fields)) if (!hidden.has(field) && holds(value)) return false;
+      }
+      return true;
+    },
+
     /** The key this record's exports are signed with, for the hosts' key doors, or `null` with no signer. INTERNAL. */
     async signingKey(): Promise<{ key_id: string; public_key: string } | null> {
       return kernel.signingKey();

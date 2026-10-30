@@ -2618,7 +2618,8 @@ async function answer(
      caption. */
   if (servesFiles(path) && 'ctx' in seen && seen.ctx.preview !== undefined && method !== 'GET' && method !== 'HEAD')
     return write(res, json(403, { ok: false, refusal: PREVIEW_READ_ONLY }), seen.cookie);
-  if (servesFiles(path) && 'ctx' in seen) return write(res, await serveFiles(request, withSession(seen.ctx, sessionOf(request.headers)), site.blobs), seen.cookie);
+  if (servesFiles(path) && 'ctx' in seen)
+    return write(res, await serveFiles(request, withSession(seen.ctx, sessionOf(request.headers)), site.blobs, (sha256, ctx) => site.api.fileHeld(sha256, ctx)), seen.cookie);
   /* AND THE APP'S OWN KEY DOORS, AFTER THE SESSION AND NOT BEFORE IT, which is the whole difference between them
      and `/api/vault/*` above: those take a bearer `contextFor` would not know, and these take the session it just
      worked out. `serveKeys` refuses a bearer and any origin this host does not answer for; who the session is

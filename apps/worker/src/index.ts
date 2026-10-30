@@ -1972,6 +1972,16 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.access(person, token ?? null);
   }
 
+  /**
+   * Whether the files door keeps a file from this caller, named only on rows they cannot read (`fileHeld`). A deleted
+   * record gives no file to anybody.
+   */
+  async fileHeld(sha256: string, ctx: CallContext): Promise<boolean> {
+    if (this.#gone) return true;
+    const api = await this.#record();
+    return api.fileHeld(sha256, ctx);
+  }
+
   /** Whether this person is on the record and an owner has stopped them, so a door can say so rather than "not on this record". */
   async memberStopped(person: string): Promise<boolean> {
     if (this.#gone) return false;
@@ -3682,6 +3692,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         bearer: bearerDeps(env),
         limit: (who, cls) => overLimit(env, who, request, cls),
         bytes: (record, n) => abusive(env, 'uploadDay', record, n),
+        held: (record, sha256, ctx) => held(env, record, (object) => object.fileHeld(sha256, ctx)),
       });
     /* EVERY OTHER PATH IS THE APP, AND `/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because
        no route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
