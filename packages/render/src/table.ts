@@ -252,6 +252,12 @@ export type TableCellBody =
   | { kind: 'text'; text: string };
 
 /**
+ * MONEY COMING IN, A CELL THE PAGE SIGNED "+" (`sign` on the column): the Ledger and the bills to tick off draw it in
+ * the good colour, and a table's money column says it the same way (`data-sign="in"`). Money going out stays ink.
+ */
+export const cellIn = (body: TableCellBody): boolean => (body.kind === 'coded' ? body.sign === '+' : body.kind === 'symbol' && body.text.startsWith('+'));
+
+/**
  * One cell, read once for both drawers: the working dot taken off its front, then the body.
  *
  * A MISSING CELL CARRIES NO DOT, which is not an oversight. `working: true` says an agent is on

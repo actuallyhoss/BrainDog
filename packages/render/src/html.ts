@@ -52,7 +52,7 @@ import {
   type TimelineChip,
 } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
-import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
+import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, cellIn, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
@@ -942,8 +942,10 @@ function table(b: Block, o: RenderOptions): string {
                 drawn.body.kind === 'missing'
                   ? `<span class="missing">${MISSING}</span>`
                   : drawn.body.kind === 'coded'
-                    ? `<span class="amount">${escape(drawn.body.sign)}<span class="amount-code">${escape(drawn.body.currency)}</span>${AMOUNT_SPACE}${escape(drawn.body.rest.slice(0, figureEnd(drawn.body.rest)))}</span>${escape(drawn.body.rest.slice(figureEnd(drawn.body.rest)))}`
-                    : escape(drawn.body.text);
+                    ? `<span class="amount"${cellIn(drawn.body) ? ' data-sign="in"' : ''}>${escape(drawn.body.sign)}<span class="amount-code">${escape(drawn.body.currency)}</span>${AMOUNT_SPACE}${escape(drawn.body.rest.slice(0, figureEnd(drawn.body.rest)))}</span>${escape(drawn.body.rest.slice(figureEnd(drawn.body.rest)))}`
+                    : cellIn(drawn.body)
+                      ? `<span class="amount" data-sign="in">${escape(drawn.body.text)}</span>`
+                      : escape(drawn.body.text);
               /* NO TONE GLYPH AND NO `data-tone` HERE, because a dialect table cannot carry either:
                  `comparisonPlan` builds its rows from cells and a block's tone belongs to the whole
                  figure. The component draws both for the register grid, which passes rows it built

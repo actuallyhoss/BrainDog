@@ -32,7 +32,7 @@
   import { markGlyphOf } from '../../src/cards.ts';
   import { glyphPath } from '../../src/inline.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
-  import { glyphColumn, intrinsicRows, sameRows, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
+  import { glyphColumn, intrinsicRows, sameRows, cellIn, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
   import { MISSING } from '../../src/format.ts';
   import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
@@ -350,7 +350,7 @@
   Rendering it once is also the only form of the fix that stays fixed. The two arms are two hundred
   lines apart and the next change to a cell will be made in whichever one the author is reading.
 -->
-{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value, home, now)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{@const end = drawn.body.rest.search(/\s|$/u)}<span class="amount">{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span>{AMOUNT_SPACE}{drawn.body.rest.slice(0, end)}</span>{drawn.body.rest.slice(end)}{:else}{drawn.body.text}{/if}{/if}{/snippet}
+{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value, home, now)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{@const end = drawn.body.rest.search(/\s|$/u)}<span class="amount" data-sign={cellIn(drawn.body) ? 'in' : undefined}>{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span>{AMOUNT_SPACE}{drawn.body.rest.slice(0, end)}</span>{drawn.body.rest.slice(end)}{:else if cellIn(drawn.body)}<span class="amount" data-sign="in">{drawn.body.text}</span>{:else}{drawn.body.text}{/if}{/if}{/snippet}
 
 {#snippet pair(row: TableRow, cell: CardCell)}
   <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>

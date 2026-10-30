@@ -935,7 +935,8 @@
   font-weight: var(--fw-medium);
 }
 
-[data-money] .list > .item > .item-detail[data-sign='in'] {
+[data-money] .list > .item > .item-detail[data-sign='in'],
+[data-money] .amount[data-sign='in'] {
   color: var(--good);
 }
 
