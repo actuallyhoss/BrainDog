@@ -58,7 +58,7 @@ export type OAuthCall =
   | { op: 'family'; row: RefreshRow }
   | { op: 'refresh_get'; hash: string }
   | { op: 'refresh_rotate'; id: string; expect_cur: string; next: Pick<RefreshRow, 'cur_hash' | 'cur_sealed' | 'prev_hash' | 'prev_sealed' | 'prev_until' | 'expires'> }
-  | { op: 'refresh_retry'; id: string; hash: string }
+  | { op: 'refresh_retry'; id: string; hash: string; expect_cur?: string }
   | { op: 'refresh_drop'; id: string }
   | { op: 'client'; client_id: string }
   | { op: 'register'; client: OAuthClient }
@@ -305,10 +305,17 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
       });
     }
     case 'refresh_retry': {
-      /* A RETRY INSIDE THE GRACE IS ANSWERED ONCE (RD4). Its grace ends here, so the replaced token presented a second
-         time is a replay after the grace, and `refresh_get` ends the family for it. */
-      const spent = sql.one<{ id: string }>('UPDATE oauth_refresh SET prev_until = 0 WHERE id = ? AND prev_hash = ? AND prev_until > ? RETURNING id', call.id, call.hash, now);
-      return spent !== undefined;
+      /* A RETRY INSIDE THE GRACE IS ANSWERED WHILE THE FAMILY HAS NOT MOVED SINCE (RE3 of the review of 30 Oct, e). It was
+         answered once (RD4), so three calls hitting expiry together with one token signed the app out: the first
+         rotated, the second spent the grace and the third ended the family. A family that has moved on still ends when
+         the replaced token comes back (the host's check), and so does any token a rotation pushed out
+         (`oauth_refresh_old`), which is the takeover RD4 was about. Nothing is written, so this only says the retry's
+         answer is still the family's. */
+      const still = sql.one<{ id: string }>(
+        'SELECT id FROM oauth_refresh WHERE id = ?1 AND prev_hash = ?2 AND prev_until > ?3 AND (?4 IS NULL OR cur_hash = ?4)',
+        call.id, call.hash, now, call.expect_cur ?? null,
+      );
+      return still !== undefined;
     }
     case 'refresh_drop':
       dropFamily(sql, call.id);

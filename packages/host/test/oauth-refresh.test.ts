@@ -70,9 +70,7 @@ function store(clock: { now: () => number }): OAuthStore {
       }
       case 'refresh_retry': {
         const row = families.get(call.id);
-        if (row === undefined || row.prev_hash !== call.hash || row.prev_until <= clock.now()) return false;
-        families.set(call.id, { ...row, prev_until: 0 });
-        return true;
+        return row !== undefined && row.prev_hash === call.hash && row.prev_until > clock.now() && (call.expect_cur === undefined || row.cur_hash === call.expect_cur);
       }
       case 'refresh_drop':
         drop(call.id);
@@ -264,15 +262,34 @@ test('RD4: A THIEF WHO ROLLS PAST THE REPLACED TOKEN LOSES THE FAMILY when the a
   assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: r4.body.refresh_token! })).status, 400, 'the thief kept the family');
 });
 
-test('RD4: A RETRY INSIDE THE GRACE IS ANSWERED ONCE; the replaced token a second time ends the family', async () => {
+/* RE3: SEVERAL CALLS HITTING EXPIRY TOGETHER present one token: the first rotates and the rest are retries. Answered once,
+   the third ended the family and the app was signed out. */
+test('RE3: EVERY RETRY INSIDE THE GRACE IS ANSWERED WHILE THE FAMILY HAS NOT MOVED; once it moves, the replaced token ends it', async () => {
   const t = await signedIn();
   const first = await firstAnswer(t);
   const app = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
-  t.clock.advance(10_000);
-  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 200);
-  t.clock.advance(10_000);
+  assert.equal(app.status, 200);
+  for (let i = 0; i < 3; i++) {
+    t.clock.advance(5_000);
+    const retry = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+    assert.equal(retry.status, 200, `retry ${i + 2} signed the app out`);
+    assert.equal(retry.body.refresh_token, app.body.refresh_token);
+  }
+  const next = await t.token({ grant_type: 'refresh_token', refresh_token: app.body.refresh_token! });
+  assert.equal(next.status, 200);
+  t.clock.advance(5_000);
   assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 400);
-  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: app.body.refresh_token! })).status, 400, 'a second retry left the family alive');
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: next.body.refresh_token! })).status, 400, 'the family outlived a replay after it moved');
+});
+
+test('RE3: THREE REFRESHES OF ONE TOKEN AT ONCE all answer, and the family carries on', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  const all = await Promise.all([0, 1, 2].map(() => t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })));
+  for (const a of all) assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.equal(new Set(all.map((a) => a.body.refresh_token)).size, 1);
+  t.clock.advance(3600_000);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: all[2]!.body.refresh_token! })).status, 200);
 });
 
 /* TWO TABS OF ONE APP REFRESHING AT THE SAME MOMENT both hold the same token; neither is signed out, and both carry on

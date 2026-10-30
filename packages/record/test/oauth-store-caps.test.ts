@@ -80,7 +80,7 @@ test('RD10: CLIENTS REGISTERED BEFORE THE PRUNE SHIPPED ARE KEPT; JUNK REGISTERE
 });
 
 /* RD4: A FAMILY REMEMBERS THE TOKENS IT LEFT BEHIND, and one of them coming back ends it. */
-test('RD4: A TOKEN THE FAMILY LEFT BEHIND ENDS IT; A RETRY INSIDE THE GRACE IS SPENT ONCE', async () => {
+test('RD4: A TOKEN THE FAMILY LEFT BEHIND ENDS IT; A RETRY IS ANSWERED ONLY INSIDE THE GRACE AND WHILE THE FAMILY HAS NOT MOVED', async () => {
   const s = store(Date.UTC(2026, 9, 1));
   const t0 = s.clock.now();
   const family = (id: string) =>
@@ -98,8 +98,12 @@ test('RD4: A TOKEN THE FAMILY LEFT BEHIND ENDS IT; A RETRY INSIDE THE GRACE IS S
 
   assert.equal(family('b'), 'ok');
   assert.equal(rotate('b', 'b1', 'b2'), true);
-  assert.equal(s.call({ op: 'refresh_retry', id: 'b', hash: 'b1' }), true);
-  assert.equal(s.call({ op: 'refresh_retry', id: 'b', hash: 'b1' }), false, 'a retry was answered twice');
+  /* RE3: EVERY RETRY INSIDE THE GRACE IS ANSWERED WHILE THE FAMILY HAS NOT MOVED, and none once it has. */
+  assert.equal(s.call({ op: 'refresh_retry', id: 'b', hash: 'b1', expect_cur: 'b2' }), true);
+  assert.equal(s.call({ op: 'refresh_retry', id: 'b', hash: 'b1', expect_cur: 'b2' }), true, 'a second retry inside the grace was refused');
+  assert.equal(s.call({ op: 'refresh_retry', id: 'b', hash: 'b1', expect_cur: 'b9' }), false, 'a retry was answered after the family moved');
+  s.move(121_000);
+  assert.equal(s.call({ op: 'refresh_retry', id: 'b', hash: 'b1' }), false, 'a retry was answered after its grace');
   assert.equal(s.call({ op: 'refresh_get', hash: 'b1' }), null);
-  assert.equal(s.call({ op: 'refresh_get', hash: 'b2' }), null, 'the replaced token came back twice and the family stayed');
+  assert.equal(s.call({ op: 'refresh_get', hash: 'b2' }), null, 'the replaced token came back after its grace and the family stayed');
 });
