@@ -155,8 +155,11 @@ export const PERSONAL = {
      this is a version beside it. Nothing is declared, taken away or reworded, so a record on 2.5.0 keeps all it holds.
      2.6.1: the card's summary is one short line. Words only, so a patch step.
      2.7.0: one figure is added, how many days in a row something was logged (`log-streak`), which the Days in a row
-     widget draws. Nothing goes, so a minor step. */
-  version: '2.7.0',
+     widget draws. Nothing goes, so a minor step.
+     2.8.0 (audit 6g, AG12): that figure goes again. A count of days running is a streak, and BrainDog keeps no game
+     score (his rule: no gamification); what was logged this week, by goal, stays, and Habits this week reads it. No
+     widget, page, list or field reads `log-streak`, so nothing a person keeps or sees goes with it: a minor step. */
+  version: '2.8.0',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -404,17 +407,6 @@ export const PERSONAL = {
         value: { sum: 'amount' },
         group_by: 'goal',
         format: 'decimal',
-        target: { gte: 0 },
-        window: '30d',
-        compare: 'none',
-      },
-      {
-        /* HOW MANY DAYS IN A ROW SOMETHING WAS LOGGED, for the Days in a row widget (2.7.0): today does not break it. */
-        metric: 'log-streak',
-        name: 'Days in a row logged',
-        source: 'register.goal_log',
-        value: { streak: { on: 'on', grain: 'day' } },
-        format: 'int',
         target: { gte: 0 },
         window: '30d',
         compare: 'none',

@@ -1198,6 +1198,34 @@ const DECLARED: Record<string, Version> = {
     declares: '35a0ceab0f8545ed',
     history: ['`metric.log-streak` is added, the days in a row `register.goal_log` holds an entry, which the Days in a row widget draws; one id added and none taken away -> 35a0ceab0f8545ed'],
   },
+  'personal@2.8.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson hands.metric.budgets-set.money-core
+      metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active metric.logged-by-goal
+      metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held metric.saved-toward-goals
+      metric.savings-active metric.savings-held metric.steps-done metric.steps-left page.goals page.home-personal
+      page.my-project register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_accounts setting.label_books
+      setting.label_categories setting.label_goal_log setting.label_goals setting.label_installments
+      setting.label_obligations setting.label_people setting.label_people__role__accountant
+      setting.label_people__role__client setting.label_people__role__collaborator setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_recurring setting.label_savings_goals
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts
+      setting.one_books setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by setting.one_recurring
+      setting.one_savings_goals setting.one_things setting.one_transactions setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty setting.voice_right_now
+      setting.voice_since_away
+    `,
+    declares: '32aff23db88fea96',
+    history: ['`metric.log-streak` goes again (audit 6g, AG12): a count of days running is a streak and BrainDog keeps no game score; `metric.logged-this-week-by-goal` stays, nothing reads the figure, one id taken away -> 32aff23db88fea96'],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -2302,6 +2330,13 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '7ad0fb8e9bdb5e06',
     history: ["The card's summary is one short line, a word outside the pack; `page.home-student` and every other declaration are 1.6.0's word for word -> 7ad0fb8e9bdb5e06"],
+  },
+  'student@1.6.2': {
+    holds: `
+      metric.courses-held metric.homework-due-7d metric.homework-later metric.homework-open metric.study-done-12w metric.study-held page.home-student page.studies register.assignments register.course_reads register.courses register.study_sessions setting.label_assignments setting.label_course_reads setting.label_courses setting.label_study_sessions setting.one_assignments setting.one_course_reads setting.one_courses setting.one_study_sessions setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'f80174fb4b380904',
+    history: ["`page.home-student` heads its twelve weeks of study by day Study done, where it said Study streak and \"your streak starts here\" (audit 6g, AG12): no game score; words only, no id added or taken away -> f80174fb4b380904"],
   },
   'team@2.29.0': {
     holds: `

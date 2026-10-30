@@ -161,7 +161,7 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
   const home = value<{ blocks: Drawn[] }>(student.k.page(homePageOf('usecase-student'))).blocks;
   /* THE CAPTURE FIRST, SINCE STUDENT 1.3.0, and no example row under anything. */
   /* THE LINE FIRST SINCE STUDENT 1.5.0, which says nothing on a new record, and the capture under it. */
-  assert.deepEqual(home.map((b) => b.heading), [undefined, 'Add homework', 'Due this week', 'This week', 'Study streak', 'Coming up']);
+  assert.deepEqual(home.map((b) => b.heading), [undefined, 'Add homework', 'Due this week', 'This week', 'Study done', 'Coming up']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(home[2]!.rows?.length ?? 0, 0, 'a new student record has nothing due');
   student.sql.close();

@@ -27,8 +27,10 @@ export const STUDENT = {
      singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
      1.6.0: Studies is part of Student now. A piece of work can carry a mark as a number, and a reading list of books and
      papers sits beside the courses. A field and a list added and nothing taken away, so a minor step.
-     1.6.1: the card's summary is one short line. Words only, so a patch step. */
-  version: '1.6.1',
+     1.6.1: the card's summary is one short line. Words only, so a patch step.
+     1.6.2 (audit 6g, AG12): Home's twelve weeks of study by day is headed Study done, where it said Study streak and
+     "your streak starts here": BrainDog keeps no game score (his rule: no gamification). Words only, so a patch step. */
+  version: '1.6.2',
   title: 'Student',
   summary: 'Your courses, assignments and grades.',
   author: 'BrainDog',
@@ -181,7 +183,7 @@ export const STUDENT = {
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: Add homework first, because a piece of
            work not written down the moment it is set is the one forgotten; then what is due this week, the week's
-           study as a strip, the study streak, and what is due after. No `nav`, because Home is already on the rail: the
+           study as a strip, the study done in twelve weeks, and what is due after. No `nav`, because Home is already on the rail: the
            display draws the page called `home-<use case>` there in place of the house figures. Every block is a whole
            row, so at 390 the page stacks in this order, the capture first. */
         page: 'home-student',
@@ -236,17 +238,18 @@ export const STUDENT = {
             empty: 'No study time planned this week.',
           },
           {
-            /* THE STUDY STREAK: every session done in the last twelve weeks on its day, each day washed by the minutes
-               studied, so a run of days reads as a run and a day off is left pale rather than counted against anybody. */
+            /* THE STUDY DONE: every session done in the last twelve weeks on its day, each day washed by the minutes
+               studied, and a day off left pale rather than counted against anybody. NOT A STREAK SINCE 1.6.2: no run of
+               days is counted or named, since BrainDog keeps no game score. */
             kind: 'heat',
-            heading: 'Study streak',
+            heading: 'Study done',
             icon: 'activity',
             span: 12,
             source: 'register.study_sessions',
             where: 'done is true, on after -84d',
             columns: [{ field: 'on' }, { field: 'minutes' }],
             when: { metric: 'study-done-12w', gt: 0 },
-            empty: 'No study done yet. Tick a session done and your streak starts here.',
+            empty: 'No study done yet. Tick a session done and it shows here.',
           },
           {
             kind: 'table',
