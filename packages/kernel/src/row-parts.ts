@@ -20,6 +20,7 @@ import type { Schema } from '@braindog/where';
 
 import { coerce, isAbsent, type FieldDecl, type Json, type Lookups } from './coerce.ts';
 import { moneyText } from './ingest.ts';
+import { splitView } from './split-view.ts';
 
 /** The parts field of a list and the money field its parts add up to, or none. */
 export type SplitField = { field: string; of: string };
@@ -40,27 +41,9 @@ export function splitOfFields(fields: readonly { id: string; type: string; parts
   return null;
 }
 
-const COLUMNS = 'id, register, seq, fields, state, version, created_at, updated_at, deleted_at';
-
-/**
- * A view of `entry` in which each split row of `register` is one row per part, every other row as it is: the part's
- * keys merged over the row's fields (`json_patch`), the row's id, number and stamps kept, and `rowid` kept for a walk
- * that breaks ties by it. Placed in front of a statement as a `WITH` named `entry`, it is what the statement reads, and
- * `main.entry` inside it is the table.
- */
-function viewOf(register: string, field: string): string {
-  const reg = register.replace(/'/gu, "''");
-  const path = `$.${field}`.replace(/'/gu, "''");
-  return (
-    `entry AS (SELECT rowid AS rowid, ${COLUMNS} FROM main.entry WHERE register <> '${reg}' OR json_type(fields, '${path}') IS NOT 'array' ` +
-    `UNION ALL SELECT e.rowid AS rowid, e.id, e.register, e.seq, json_patch(e.fields, p.value) AS fields, e.state, e.version, e.created_at, e.updated_at, e.deleted_at ` +
-    `FROM main.entry AS e, json_each(e.fields, '${path}') AS p WHERE e.register = '${reg}' AND json_type(e.fields, '${path}') = 'array')`
-  );
-}
-
 /** A statement read over the parts view, its own `WITH` kept after the view's. */
 export function overSplit(statement: string, register: string, field: string): string {
-  const view = viewOf(register, field);
+  const view = splitView(register, field);
   const lead = /^\s*WITH(\s+RECURSIVE)?\s+/iu.exec(statement);
   if (!lead) return `WITH ${view} ${statement}`;
   return `WITH${lead[1] ?? ''} ${view}, ${statement.slice(lead[0].length)}`;

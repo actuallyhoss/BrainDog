@@ -6,11 +6,12 @@
  * while the one list that moves all day is the runs, which those figures never read. The record's own version moves
  * with every run's step, so a figure held by it was read again for every agent's write.
  *
- * WHAT A READING READ IS WATCHED, NOT DECLARED. The kernel's own `Sql` hands each read to `notice`, which notes each list a statement
- * names, by a bound value or a quoted word that is one of the record's lists. A statement over the rows that names no
- * list, or one over any table but the rows and the declarations (the log, the questions, a kept line), reads past the
- * lists (`whole`), and that reading is not held, nor one over the runs: they are read again each time. A bound instant
- * (`2026-10-28T09:00:00.000Z`) is a window that moves with the clock, and its reading is held only `HELD_SHORT_MS`.
+ * WHAT A READING READ IS WATCHED, NOT DECLARED. The kernel's own `Sql` hands each read to `notice`, which notes each list
+ * a statement binds the list column to (`register = ?`, `sql-reads.ts`). A statement that reads the rows where no such
+ * binding narrows the read, or one over any table but the rows and the declarations (the log, the questions, a kept
+ * line), reads past the lists (`whole`), and that reading is not held, nor one over the runs: they are read again each
+ * time. A bound instant (`2026-10-28T09:00:00.000Z`) is a window that moves with the clock, and its reading is held
+ * only `HELD_SHORT_MS`.
  *
  * WHAT A LIST'S VERSION IS: the newest line of the log about one of its rows (walked once per line, `index.ts`), and
  * its newest row and how many it holds, so a row written with no line (an import) moves it too.
@@ -18,9 +19,11 @@
 
 import type { Param } from '@braindog/ports';
 
+import { readsOf } from './sql-reads.ts';
+
 /** What one reading read, as `notice` saw it. */
 export type ReadTrace = {
-  /** The lists its statements named. */
+  /** The lists its statements bound the list column to. */
   lists: Set<string>;
   /** It read past any one list: the rows with no list named, the log, the questions or a kept line. */
   whole: boolean;
@@ -37,41 +40,34 @@ export const traceOf = (): ReadTrace => ({ lists: new Set(), whole: false, insta
  * kept line, a walk's own words) reads past the lists, and so does one whose table this cannot name.
  */
 const HELD_TABLES = new Set(['entry', 'entry_private', 'declaration', 'pack', 'record', 'json_each', 'json_tree']);
-/** Each table a statement reads from, as `FROM t` or `JOIN t`, a schema's name taken off. */
-const TABLES = /\b(?:FROM|JOIN)\s+(?:main\.)?([A-Za-z_][A-Za-z0-9_]*)/giu;
-/** The rows' table, as a word: `entry`, never `entry_private` or `entry_fts`. */
-const ROWS = /\bentry\b/u;
-/** A quoted word that may be a list's id. */
-const QUOTED = /'([a-z][a-z0-9_]{0,31})'/gu;
 /** An instant as the kernel binds one. */
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u;
 
 /**
- * Note in `trace` what one read names: each list by a bound value or a quoted word that `known` says is one of the
- * record's lists, past every list for a table but those `listsStamp` versions or rows of no list named, and a bound
- * instant. The kernel's own `Sql` calls this for every read while a held reading is being read (`holdAcross`).
+ * Note in `trace` what one read names: each list its list column is bound to (`readsOf`, `sql-reads.ts`), past every
+ * list for a table but those `listsStamp` versions, a read of the rows no binding narrows, a write or a statement this
+ * cannot read, and a bound instant. The kernel's own `Sql` calls this for every read while a held reading is being read
+ * (`holdAcross`).
+ *
+ * A VALUE THAT IS A LIST'S ID NAMES NO LIST unless the list column is bound to it, as a sign's read is noted
+ * (`noticeSign`, review 3's P3): `actor = 'system'` or `state IN ('active', 'idle')` on a record with a list of that
+ * name read every list's rows, and the figure was held on that one list while the others moved.
+ *
+ * WHAT IT COSTS IN RE-READS. A statement that reads the rows a second time with no list of its own (a join to the row a
+ * link names), binds its list under `OR` or anywhere but its `WHERE` or a join's `ON`, or names it some other way, is
+ * read each time, where it was held on the list it named. The figures' own reads bind their list as `register = ?`,
+ * a link's hop and a split row's parts as well (`split-view.ts`), so on 30 Oct every first-party figure and page read
+ * held as before, each statement on the same lists: 225 of 235 figures are held, the other ten reading past the lists.
  */
 export function notice(trace: ReadTrace, text: string, params: readonly Param[], known: (word: string) => boolean): void {
   if (trace.whole) return;
-  for (const m of text.matchAll(TABLES))
-    if (!HELD_TABLES.has(m[1]!.toLowerCase())) {
-      trace.whole = true;
-      return;
-    }
-  let named = false;
-  for (const p of params) {
-    if (typeof p !== 'string') continue;
-    if (known(p)) {
-      trace.lists.add(p);
-      named = true;
-    } else if (INSTANT.test(p)) trace.instant = true;
+  const read = readsOf(text, params, known);
+  if (read.writes || read.unsure || read.loose > 0 || read.tables.some((t) => !HELD_TABLES.has(t))) {
+    trace.whole = true;
+    return;
   }
-  for (const m of text.matchAll(QUOTED))
-    if (known(m[1]!)) {
-      trace.lists.add(m[1]!);
-      named = true;
-    }
-  if (!named && ROWS.test(text)) trace.whole = true;
+  for (const list of read.lists) trace.lists.add(list);
+  for (const p of params) if (typeof p === 'string' && !known(p) && INSTANT.test(p)) trace.instant = true;
 }
 
 /** What `inner` read, read by `outer` too: a reading inside another is one of the things the outer one read. */
