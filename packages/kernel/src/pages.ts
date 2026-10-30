@@ -608,6 +608,15 @@ export type BlockResult = PageBlock & {
    */
   unnamed?: string[];
   /**
+   * WHAT EACH FIGURE THE BLOCK NAMES IS, AS THIS RECORD DECLARES IT, by its id with no parameter (`figuresOf`): its name,
+   * the list and `where` it is read over, what it adds up, its format, its target and the field it groups by. Every
+   * figure a cell, a `metric.` source, a series line or a `{{path}}` of the block names, filled or not. A host says a
+   * figure's words, its door and its target from this and never from a copy of the packs it was built with. Present,
+   * even empty, on every block that answers readings, values, a series or a `metric.` source, so a host can tell a
+   * record that names nothing from one built before this key; absent on any other block.
+   */
+  figures?: Record<string, FigureFacts>;
+  /**
    * The pack that added this block to a page another pack declares (`page-adds.ts`), absent on the page's own blocks. A
    * host says where the block came from with it, and leaves it out of an arrangement it saves, because the page's own
    * declaration never holds it.
@@ -616,6 +625,52 @@ export type BlockResult = PageBlock & {
   /** What this block could not do. Non-empty means the block drew nothing. */
   refusals: Refusal[];
 };
+
+/** A figure as a host draws it (`BlockResult.figures`): the keys of its declaration a tile, a sentence and a door read. */
+export type FigureFacts = Pick<MetricDecl, 'name' | 'source' | 'value'> & Partial<Pick<MetricDecl, 'where' | 'format' | 'target' | 'group_by'>>;
+
+/** The keys of a declaration a block's `figures` carries, each only where the declaration has it. */
+const FIGURE_FACTS = ['name', 'source', 'where', 'value', 'format', 'target', 'group_by'] as const;
+
+/**
+ * Every figure a block names, as the record declares it, or `undefined` for a block that answers no figure (`figures`).
+ *
+ * BY ITS ID WITH NO PARAMETER, as a host looks a figure up: `project-owed:Kiln` is `project-owed`, and its `where` still
+ * holds the `{{it}}` the host fills (`withParam`). A `{{path}}` is asked by each word between its dots as well as
+ * whole, since `{{money.owed}}` and a hole's place are read by either (`row-href.ts` `holePlaceIn`). A word that names
+ * no declared figure is left out: a built-in figure is the record's own and has no declaration to say.
+ */
+function figuresOf(deps: PageDeps, block: PageBlock, read: BlockResult): Record<string, FigureFacts> | undefined {
+  const source = typeof read.source === 'string' && read.source.startsWith('metric.') ? read.source.slice('metric.'.length) : null;
+  const lines = Array.isArray(read.series) ? read.series : [];
+  const values = read.values !== undefined && Object.keys(read.values).length > 0;
+  if (!(read.readings?.length || values || lines.length || source !== null)) return undefined;
+  const ids = new Set<string>();
+  const add = (id: unknown) => {
+    if (typeof id !== 'string') return;
+    const at = id.indexOf(':');
+    const bare = (at < 0 ? id : id.slice(0, at)).trim();
+    if (bare !== '') ids.add(bare);
+  };
+  for (const r of read.readings ?? []) add(r.metric);
+  if (source !== null) add(source);
+  for (const l of lines) add((l as { metric?: unknown } | null)?.metric);
+  for (const path of pathsOf(block, (id) => figureNamed(deps, id))) {
+    const at = path.indexOf(':');
+    const bare = at < 0 ? path : path.slice(0, at);
+    add(bare);
+    for (const word of bare.split('.')) add(word);
+  }
+  const out: Record<string, FigureFacts> = {};
+  for (const id of ids) {
+    const decl = deps.metric(id);
+    if (!decl) continue;
+    const facts: Record<string, unknown> = {};
+    for (const key of FIGURE_FACTS) if (decl[key] !== undefined) facts[key] = decl[key];
+    out[id] = facts as FigureFacts;
+  }
+  return out;
+}
 
 /** The kinds of actor a feed groups by, which the feed's own source holds (`sources/activity.ts`). */
 export { FEED_BY };
@@ -2615,7 +2670,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     if (most !== null) block = { ...block, limit: Math.min(typeof block.limit === 'number' ? block.limit : 50, most) };
   }
   try {
-    return { ...leanRows(deps, readBlockAsWritten(deps, renamed(block))), key };
+    /* A BLOCK READ BACK WITH THE FIGURES IT WAS ANSWERED IS ANSWERED THEM AGAIN, never the old ones carried over. */
+    const { figures: _was, ...read } = leanRows(deps, readBlockAsWritten(deps, renamed(block)));
+    /* AND WHAT EACH FIGURE IT NAMES IS, so a host says them from the record's declarations (`figuresOf`). */
+    const figures = read.refusals.length === 0 ? figuresOf(deps, block, read) : undefined;
+    return { ...read, ...(figures === undefined ? {} : { figures }), key };
   } catch (e) {
     return {
       ...(block !== null && typeof block === 'object' ? unacted(shorn(block)) : block),

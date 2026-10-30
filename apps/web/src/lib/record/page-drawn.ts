@@ -9,6 +9,7 @@
 import { createClient } from '@braindog/client';
 
 import { readBoot } from './boot-live.ts';
+import { figuresFor } from './figures-said.ts';
 import { blockOf, type Fetch, type LiveBlock } from './page-live.ts';
 import { learn, refMapOf, targetsOf, type RefMap, type SchemaCall } from './remote.ts';
 import { rowsOf, walkRows } from '../data/ref-rows.ts';
@@ -46,11 +47,14 @@ export async function liveOf(
   const schema: SchemaCall = (register) =>
     client.schema(register).then((out) => (out.ok || !declared.has(register) ? out : { ok: true, value: { ...declared.get(register), id: register } }));
   const lists = [...new Set(runs.flat().flatMap((b) => (!b.refusals?.length && b.source?.startsWith('register.') ? [b.source.slice('register.'.length)] : [])))];
+  /* WHAT EACH FIGURE IS, AS THE RECORD SAID, beside the lists (`figures-known.ts`): this build's own tables are asked
+     only of a record that said nothing of them, and then together with the lists rather than before them. */
+  const figuring = figuresFor(runs.flat());
   const asked = new Map<string, Promise<void>>();
   /* THE LISTS ARE LEARNT TOGETHER, AND THEIR TARGETS WALKED TOGETHER. One after another, Today's body waited ten round
      trips before it drew (1.7 s at 140 ms each); each target's rows are the tab's walk (`ref-rows.ts`) where this reads
      through the browser's own fetch, so a page drawn again asks nothing that has not moved. */
-  await Promise.all(lists.map((list) => learn(schema, list, asked)));
+  await Promise.all([...lists.map((list) => learn(schema, list, asked)), figuring]);
   const refs = new Map<string, RefMap>();
   const io = at?.io;
   const targets = [...new Set(lists.flatMap(targetsOf))];

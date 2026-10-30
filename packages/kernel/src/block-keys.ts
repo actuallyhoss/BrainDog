@@ -156,13 +156,16 @@ const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
  *
  * `says_at` IS WHICH OF A NOTE'S `says:` SENTENCES WAS SAID, whose words the read wrote into `body` (`pages.ts`
  * `saidLine`). A note read back with both is read without the body it was answered, so it chooses again.
+ *
+ * `figures` IS WHAT EACH FIGURE THE BLOCK NAMES IS, as the record declares it (`pages.ts` `figuresOf`), so a held block
+ * keeps no figure's `where` and a block read back is answered its figures again.
  */
 export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes',
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'presence', 'facts', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at', 'kpis', 'kpi_list',
+  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at', 'kpis', 'kpi_list', 'figures',
 ];
 
 /**
