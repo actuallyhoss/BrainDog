@@ -22,7 +22,7 @@ import type { Answer } from '../src/json.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 12);
 const HOST = 'https://app.example.test/marrowgate';
-const SENTENCE = /^[\w.-]+ is a shape copy, with every word and number in it scrambled, so it opens only on a scratch record and nothing was sent\.$/u;
+const SENTENCE = /^[\w.-]+ is a shape copy, with every word and number in it scrambled, so it opens only on a scratch BrainDog and nothing was sent\.$/u;
 
 /** A record's export, and the same export through the scrambler. */
 async function copies(): Promise<{ real: string[]; shaped: string[] }> {

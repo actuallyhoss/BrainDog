@@ -41,7 +41,7 @@ reading-list needs people >=1.0.0 <2.0.0, and this BrainDog has 2.2.0.
 ```
 
 - **`DEPENDENCY_UNRESOLVED`**, a pack it needs is not installed: "<pack> requires <pack>: not installed. Install the pack that declares it first, or use --with-deps."
-- On your own machine, `check` can install first only the packs BrainDog ships. For any other, it says so and stops: "It needs stripe, which is not one of BrainDog's modules, so a scratch record on this machine cannot hold it first."
+- On your own machine, `check` can install first only the packs BrainDog ships. For any other, it says so and stops: "It needs stripe, which is not one of BrainDog's modules, so a scratch BrainDog on this machine cannot hold it first."
 
 ## Lists
 

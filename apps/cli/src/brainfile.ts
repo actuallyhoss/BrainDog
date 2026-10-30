@@ -408,7 +408,7 @@ function linesOf(path: string): string[] {
 
 /** The one sentence a shape copy put back is answered with, naming the file by its name and not its folder. */
 const shapeSentence = (file: string): string =>
-  `${basename(file)} is a shape copy, with every word and number in it scrambled, so it opens only on a scratch record and nothing was sent.`;
+  `${basename(file)} is a shape copy, with every word and number in it scrambled, so it opens only on a scratch BrainDog and nothing was sent.`;
 
 /** `braindog import <file.brainl>`, and the exit code: 0 put back, 1 refused here or by the record, 3 the host did not answer. */
 export async function importFile(args: string[], io: BrainfileIo): Promise<number> {

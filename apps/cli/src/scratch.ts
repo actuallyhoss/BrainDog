@@ -180,7 +180,7 @@ export async function installInScratch(doc: Record<string, unknown> | null, now:
     return {
       ok: false,
       step: 'needs',
-      why: `It needs ${needs.others.join(', ')}, which ${needs.others.length === 1 ? 'is' : 'are'} not one of BrainDog's modules, so a scratch record on this machine cannot hold ${needs.others.length === 1 ? 'it' : 'them'} first.`,
+      why: `It needs ${needs.others.join(', ')}, which ${needs.others.length === 1 ? 'is' : 'are'} not one of BrainDog's modules, so a scratch BrainDog on this machine cannot hold ${needs.others.length === 1 ? 'it' : 'them'} first.`,
       refusal: null,
     };
   const scratch = await openScratch(now);
@@ -193,7 +193,7 @@ export async function installInScratch(doc: Record<string, unknown> | null, now:
     if (!done.ok) {
       scratch.close();
       const refusal = 'refusal' in done ? done.refusal : null;
-      return { ok: false, step: 'needs', why: `BrainDog's ${id} module, which it needs, did not install in the scratch record${refusal ? `: ${refusal.fix} (${refusal.code})` : '.'}`, refusal };
+      return { ok: false, step: 'needs', why: `BrainDog's ${id} module, which it needs, did not install in the scratch BrainDog${refusal ? `: ${refusal.fix} (${refusal.code})` : '.'}`, refusal };
     }
   }
   const before = new Set(scratch.slugs());
@@ -203,7 +203,7 @@ export async function installInScratch(doc: Record<string, unknown> | null, now:
   if (!put.ok) {
     scratch.close();
     const refusal = 'refusal' in put ? put.refusal : null;
-    return { ok: false, step: 'install', why: refusal ? `${refusal.fix} (${refusal.code})` : 'The scratch record did not install it.', refusal };
+    return { ok: false, step: 'install', why: refusal ? `${refusal.fix} (${refusal.code})` : 'The scratch BrainDog did not install it.', refusal };
   }
   return { ok: true, scratch, applied: put.value, added: scratch.slugs().filter((s) => !before.has(s)) };
 }
@@ -274,13 +274,13 @@ export async function checkInScratch(file: CatalogueFile, keep = false, now: num
   }
   const held = await installInScratch(doc, now, modules);
   if (!held.ok) {
-    lines.push(held.step === 'needs' ? `  Not planned: ${oneLine(held.why)}` : `  Refused in a scratch record: ${oneLine(held.why)}`);
+    lines.push(held.step === 'needs' ? `  Not planned: ${oneLine(held.why)}` : `  Refused in a scratch BrainDog: ${oneLine(held.why)}`);
     return { ok: false, lines, held: null };
   }
   const { applied, added } = held;
   const needs = needsOf({ ...(doc ?? {}), modules: [...modules] });
   lines.push(
-    `  Installs in a scratch record${needs.modules || needs.agents ? " after BrainDog's modules" : ''}:${applied.declarations} declarations and ${applied.seeds} example rows, and ${added.length === 1 ? 'one page' : `${added.length} pages`}.`,
+    `  Installs in a scratch BrainDog${needs.modules || needs.agents ? ' after the modules it needs' : ''}: ${applied.declarations} declarations and ${applied.seeds} example rows, and ${added.length === 1 ? 'one page' : `${added.length} pages`}.`,
   );
   let ok = true;
   for (const slug of added) {
