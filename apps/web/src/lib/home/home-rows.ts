@@ -98,8 +98,12 @@ function amountOf(b: LiveBlock, n: number): HomeLine['amount'] {
   /* THE ROW'S OWN WAY FIRST. What falls due is said "+" wherever its list names no way (`page-live.ts` signs only
      `out`), so a bill whose way is not known would read as money coming in, in the earn green: it is said unsigned,
      in the ink. */
-  const way = fields.direction;
-  if (way === 'in' || way === 'out') return { text, dir: way };
+  /* A BILL'S WAY IS SAID WITH ITS SIGN (audit 31 Oct f, AF5): obligations name it `owed_by_me` and `owed_to_me`, which
+     read as no way, so "Legal review, June £9,190" stood unsigned beside Coming up's "−£1,875". A way known is signed
+     "−" going out and "+" coming in, whatever the record's text carried. */
+  const way = fields.direction === 'owed_by_me' ? 'out' : fields.direction === 'owed_to_me' ? 'in' : fields.direction;
+  const bare = text.replace(/^[+−-]/u, '');
+  if (way === 'in' || way === 'out') return { text: `${way === 'out' ? '−' : '+'}${bare}`, dir: way };
   if (Object.hasOwn(fields, 'direction')) return { text: text.replace(/^\+/u, ''), dir: 'out' };
   return { text, dir: text.startsWith('+') ? 'in' : 'out' };
 }
