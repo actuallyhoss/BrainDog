@@ -68,16 +68,23 @@ class Held {
     const base = typeof location === 'undefined' ? null : apiBase();
     if (base !== null && this.#packsAsked !== base) {
       this.#packsAsked = base;
-      void createClient({ base })
-        .pages()
-        .then((got) => {
-          if (this.#packsAsked !== base || !got.ok) return;
-          const placed = (got.value as { pack?: unknown; nav?: { section?: unknown } | null }[]).flatMap((p) =>
-            typeof p.pack === 'string' && typeof p.nav?.section === 'string' && p.nav.section.toLowerCase() === 'money' ? [p.pack] : [],
-          );
-          this.#packs = new Set(placed);
-        })
-        .catch(() => undefined);
+      /* THE READ STARTS A MICROTASK LATER, NEVER IN HERE. This is asked from a `$derived` (PageView's `moneyPage`), and a
+         call begun in one tells the layout's calls-out count at once (`onCallsOut`), which is a write to `$state` inside a
+         derived: Svelte threw `state_unsafe_mutation` on every page that asked (audit 31 Oct A4). `ask` waits on its import
+         for the same reason. */
+      queueMicrotask(() => {
+        if (this.#packsAsked !== base) return;
+        void createClient({ base })
+          .pages()
+          .then((got) => {
+            if (this.#packsAsked !== base || !got.ok) return;
+            const placed = (got.value as { pack?: unknown; nav?: { section?: unknown } | null }[]).flatMap((p) =>
+              typeof p.pack === 'string' && typeof p.nav?.section === 'string' && p.nav.section.toLowerCase() === 'money' ? [p.pack] : [],
+            );
+            this.#packs = new Set(placed);
+          })
+          .catch(() => undefined);
+      });
     }
     return this.#packs?.has(pack) ?? false;
   }
