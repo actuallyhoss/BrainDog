@@ -12,7 +12,8 @@
  *
  * NOT THE PICTURES DRAWN WIDGETS LEFT (`drawn-pictures.ts`), which went here once (SEC23) and are now kept under the
  * person and the BrainDog they were drawn for, so the next person is never drawn one and the same person's sign-in does
- * not redraw every widget from nothing (sec-follow M3).
+ * not redraw every widget from nothing (sec-follow M3). A picture kept before that, under the code and size alone
+ * (`LEGACY_PICTURE`), is never read again and belongs to nobody it can name, so a sign-out drops it (RE11).
  *
  * THE KEYS ARE WRITTEN OUT HERE, not imported, so sign-out loads none of the screens that keep them;
  * `signed-out.test.ts` holds each to the constant its own module keeps it under.
@@ -55,6 +56,9 @@ export const SIGNED_OUT_PREFIXES = [
   'bd_slash_threads:',
 ] as const;
 
+/** A drawn widget's picture in the shape kept before it was kept per person (`<code>.<size>.<mode>`, no `whose.`). */
+export const LEGACY_PICTURE = /^bd\.drawn\.pic\.[^.]+\.[^.]+\.(?:light|dark)$/u;
+
 /** Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), never carried to the next session. */
 export const SIGNED_OUT_SESSION_KEYS = ['braindog.see-as'] as const;
 
@@ -68,13 +72,13 @@ const reach = (which: 'localStorage' | 'sessionStorage'): Store | null => {
   }
 };
 
-function drop(store: Store | null, keys: readonly string[], prefixes: readonly string[]): void {
+function drop(store: Store | null, keys: readonly string[], prefixes: readonly string[], shapes: readonly RegExp[] = []): void {
   if (!store) return;
   try {
     const gone = new Set<string>(keys);
     for (let i = 0; i < store.length; i++) {
       const k = store.key(i);
-      if (k !== null && prefixes.some((p) => k.startsWith(p))) gone.add(k);
+      if (k !== null && (prefixes.some((p) => k.startsWith(p)) || shapes.some((r) => r.test(k)))) gone.add(k);
     }
     for (const k of gone) store.removeItem(k);
   } catch {
@@ -84,6 +88,6 @@ function drop(store: Store | null, keys: readonly string[], prefixes: readonly s
 
 /** Drop what this browser keeps of what the person who just left read. Never throws. */
 export function forgetSignedOut(local: Store | null = reach('localStorage'), session: Store | null = reach('sessionStorage')): void {
-  drop(local, SIGNED_OUT_KEYS, SIGNED_OUT_PREFIXES);
+  drop(local, SIGNED_OUT_KEYS, SIGNED_OUT_PREFIXES, [LEGACY_PICTURE]);
   drop(session, SIGNED_OUT_SESSION_KEYS, []);
 }

@@ -44,11 +44,16 @@ test('A SIGN-OUT DROPS EVERY KEY OF WHAT THE PERSON READ, and keeps what is the 
        stays through a sign-out and is drawn to that person alone. */
     'bd.drawn.pics': '["w1.abc.page.light"]',
     'bd.drawn.pic.w1.abc.page.light': '{"p":"<svg/>","h":120}',
+    'bd.drawn.pic.w1.abc.wide.dark': '{"p":"<svg/>","h":120}',
+    /* ONE KEPT BEFORE THEY WERE KEPT PER PERSON is nobody's it can name, and is never read again (RE11). */
+    'bd.drawn.pic.abc.page.light': '{"p":"<svg/>","h":120}',
+    'bd.drawn.pic.abc.wide.dark': '{"p":"<svg/>","h":120}',
   });
   const session = store({ 'braindog.see-as': '{"id":"p_2","name":"Ana"}', bd_look_fix: '{}' });
   forgetSignedOut(local, session);
   assert.deepEqual([...local.held.keys()].sort(), [
     'bd.drawn.pic.w1.abc.page.light',
+    'bd.drawn.pic.w1.abc.wide.dark',
     'bd.drawn.pics',
     'bd.list-default:r:p_1:tasks',
     'bd_look_fix',
