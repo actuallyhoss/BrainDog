@@ -176,3 +176,70 @@ test('THE LINT IN SLICES FILES THE SIGN ONE TICK FILES, and keeps where it stopp
   assert.equal(sliced.api.kernel.prefsOf('braindog:signs')['pages-clean.run'], undefined);
   assert.deepEqual(await sliced.api.lintTick({ budget: onePage() }), { ran: false, why: 'today' });
 });
+
+/** Count every slice of the night's walk the record reads while `run` runs. */
+async function walking(api: Awaited<ReturnType<typeof seeded>>['api'], run: () => Promise<unknown>): Promise<number> {
+  const kernel = api.kernel as unknown as { backfill: (...a: unknown[]) => unknown };
+  const backfill = kernel.backfill;
+  let n = 0;
+  kernel.backfill = (...a: unknown[]) => {
+    n += 1;
+    return backfill.apply(api.kernel, a);
+  };
+  try {
+    await run();
+  } finally {
+    kernel.backfill = backfill;
+  }
+  return n;
+}
+
+/** Ticks with a budget of one page until the day's look says it has no more. */
+async function sliceThrough(api: Awaited<ReturnType<typeof seeded>>['api']): Promise<number> {
+  let ticks = 0;
+  let last: Awaited<ReturnType<typeof api.slashTick>>;
+  do {
+    last = await api.slashTick({ budget: onePage() });
+    ticks += 1;
+  } while ((last as { more?: true }).more === true && ticks < 2_000);
+  return ticks;
+}
+
+test('THE NIGHT\'S WALK IN SLICES KEEPS WHAT IT WROTE AS ONE WALK, and ends kept as ended', async () => {
+  const whole = await seeded();
+  const sliced = await seeded();
+  assert.ok((await whole.api.slashTick()).ran);
+  await sliceThrough(sliced.api);
+  const slash = (api: typeof whole.api) => api.kernel.prefsOf('slash');
+  assert.deepEqual(slash(sliced.api)['understand.next'], slash(whole.api)['understand.next']);
+  assert.equal((slash(sliced.api)['understand.undo'] as unknown[] | undefined)?.length, (slash(whole.api)['understand.undo'] as unknown[] | undefined)?.length);
+  /* ONE TICK WITH NO BUDGET KEEPS NOTHING BETWEEN; A WALK IN SLICES ENDS KEPT AS ENDED, with nothing of it left to file. */
+  assert.equal(slash(whole.api)['understand.run'], undefined);
+  assert.deepEqual(slash(sliced.api)['understand.run'], { day: slash(sliced.api)['slash.last'], begun: 5, end: true, asked: [], held: [], batches: [], dropped: [] });
+});
+
+test('A WALK CUT AFTER ITS LAST SLICE GOES ON WITHOUT WALKING AGAIN, and one cut partway goes on from where it stopped', async () => {
+  const { api } = await seeded();
+  assert.ok((await api.slashTick()).ran);
+  const today = api.kernel.prefsOf('slash')['slash.last'] as string;
+  const understanding = 4;
+  const cutAt = (begun: number, end: boolean): void => {
+    api.kernel.setPref('slash', 'slash.step', { day: today, next: understanding, by: 'rules', large: false });
+    api.kernel.setPref('slash', 'understand.run', { day: today, begun, end, asked: [], held: [], batches: [], dropped: [] });
+  };
+
+  /* EVERY SLICE OF THE NIGHT BEGUN: the next tick reads none of them again, and the look goes on to its next step. */
+  cutAt(5, false);
+  assert.equal(await walking(api, () => sliceThrough(api)), 0, 'a walk with no slice left walked again');
+  assert.equal((api.kernel.prefsOf('slash')['slash.step'] as { next: number }).next, 7);
+
+  /* ONE SLICE BEGUN: the walk goes on for the slices it has left, and no more. */
+  cutAt(1, false);
+  const walked = await walking(api, () => sliceThrough(api));
+  assert.ok(walked >= 1 && walked <= 4, `the walk read ${walked} slices with four left`);
+
+  /* A WALK OF ANOTHER DAY THAT NEVER ENDED is begun afresh tonight. */
+  api.kernel.setPref('slash', 'slash.step', { day: today, next: understanding, by: 'rules', large: false });
+  api.kernel.setPref('slash', 'understand.run', { day: '2000-01-01', begun: 5, end: false, asked: [], held: [], batches: [], dropped: [] });
+  assert.ok((await walking(api, () => sliceThrough(api))) >= 1, 'a walk of another day held tonight back');
+});

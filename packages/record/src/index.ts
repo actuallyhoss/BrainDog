@@ -3921,33 +3921,83 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const UNDERSTAND_NEXT = 'understand.next';
   /** Where a choice the walk asked is kept until it is answered, under a name no person holds. */
   const UNDERSTAND_ASKED = 'understand:asked';
-  const slashUnderstanding = async (): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[] }> => {
-    const dropped: string[] = [];
-    const stored = kernel.prefsOf(SLASH)[UNDERSTAND_NEXT] as Record<string, unknown> | undefined;
-    const cursor = (k: BackfillSliceName): string | null => (typeof stored?.[k] === 'string' ? (stored[k] as string) : null);
-    let after: Record<BackfillSliceName, string | null> = { ledger: cursor('ledger'), runs: cursor('runs'), services: cursor('services') };
-    const asked = new Map<string, BackfillSuggestion>();
-    const held = new Map<string, HeldAsk>();
-    const batches: string[] = [];
-    let done = false;
-    for (let n = 0; n < UNDERSTAND_SLICES && !done; n += 1) {
+  /**
+   * TONIGHT'S WALK UNDER WAY IN SLICES (`slashUnderstanding` with a budget), kept among Slash's prefs so an object that
+   * restarts goes on from it: its day, how many slices it has begun, whether a slice read to the end, and what the
+   * slices found and wrote so far, which are filed and kept for Undo once, when the walk ends, as one night's walk always
+   * was. Where each list goes on from is `UNDERSTAND_NEXT`, moved after every slice.
+   */
+  const UNDERSTAND_RUN = 'understand.run';
+  type UnderstandRun = { day: string; begun: number; end: boolean; asked: BackfillSuggestion[]; held: HeldAsk[]; batches: string[]; dropped: string[] };
+  /**
+   * The slices of tonight's walk one alarm's budget is spent by, each (`TickBudget`): a slice reads `BACKFILL_LIMIT` rows of
+   * three lists and wrote and filed as much as five pages drawn on the bench his size, so an alarm's share is two.
+   */
+  const UNDERSTAND_SLICE_UNITS = Math.ceil(TICK_PAGES / 2);
+  const understandRunOf = (): UnderstandRun | null => {
+    const raw = kernel.prefsOf(SLASH)[UNDERSTAND_RUN] as Partial<UnderstandRun> | null | undefined;
+    if (raw === null || typeof raw !== 'object' || typeof raw.day !== 'string' || !Number.isSafeInteger(raw.begun)) return null;
+    const list = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+    const words = (v: unknown): string[] => list<unknown>(v).filter((w): w is string => typeof w === 'string' && w !== '');
+    return { day: raw.day, begun: raw.begun!, end: raw.end === true, asked: list(raw.asked), held: list(raw.held), batches: words(raw.batches), dropped: words(raw.dropped) };
+  };
+  /**
+   * THE NIGHT'S WALK, AT MOST `UNDERSTAND_SLICES` SLICES, THEN WHAT IT FOUND FILED.
+   *
+   * IN SLICES, WHEN THE HOST HANDS A BUDGET (`TickBudget`), as the look's page walk and the lint's round are: five slices
+   * in one go spent about 10 s of one alarm on his record (Z4, finish loop of 30 October). A tick walks a slice, counts it
+   * (`UNDERSTAND_SLICE_UNITS`), and stops before the next once the budget is spent, answering `cut`; where it stopped is
+   * kept (`UNDERSTAND_RUN`, `UNDERSTAND_NEXT`) and the next tick goes on from there. A slice is counted begun before it
+   * runs, as a look's step is, so one the platform cut is walked again from the same place only until the night's slices
+   * are spent, and a walk again writes nothing twice, since every slice reads only rows still empty. With no budget, one
+   * tick walks every slice and files, as it always did, and keeps nothing between.
+   */
+  const slashUnderstanding = async (
+    today: string,
+    budget: TickBudget = UNBOUNDED,
+  ): Promise<{ filed: { id: string; question: string; by: string }[]; dropped: string[]; cut?: true }> => {
+    const sliced = budget !== UNBOUNDED;
+    const kept = sliced ? understandRunOf() : null;
+    /* A WALK OF ANOTHER DAY THAT NEVER ENDED keeps what it wrote where Undo finds it, and tonight's begins afresh. */
+    if (kept !== null && kept.day !== today) keepWalked(kept.batches);
+    const run: UnderstandRun = kept !== null && kept.day === today ? kept : { day: today, begun: 0, end: false, asked: [], held: [], batches: [], dropped: [] };
+    const asked = new Map(run.asked.map((one) => [one.key, one] as const));
+    const held = new Map(run.held.map((one) => [one.key, one] as const));
+    const keep = (): void => kernel.setPref(SLASH, UNDERSTAND_RUN, { ...run, asked: [...asked.values()], held: [...held.values()] });
+    let after = understandCursor();
+    let walkedNow = 0;
+    while (run.begun < UNDERSTAND_SLICES && !run.end) {
+      /* A TICK'S SHARE IS SPENT: the rest waits for the next tick, and nothing is filed until the walk ends. */
+      if (walkedNow > 0 && budget.spent()) {
+        keep();
+        return { filed: [], dropped: [], cut: true };
+      }
+      run.begun += 1;
+      walkedNow += 1;
+      if (sliced) keep();
       let walked: Backfilled;
       try {
         walked = kernel.backfill({ after });
       } catch {
-        dropped.push('The nightly read of what this BrainDog holds stopped partway, and goes on tomorrow.');
+        run.dropped.push('The nightly read of what this BrainDog holds stopped partway, and goes on tomorrow.');
         break;
+      } finally {
+        budget.spend(UNDERSTAND_SLICE_UNITS);
       }
       for (const one of walked.suggestions.flatMap(perPlace)) if (!asked.has(one.key)) asked.set(one.key, one);
       for (const one of walked.held ?? []) if (!held.has(one.key)) held.set(one.key, one);
-      batches.push(...sliceBatches(walked));
+      run.batches.push(...sliceBatches(walked));
       after = { ledger: walked.ledger.next, runs: walked.runs.next, services: walked.services.next };
-      done = after.ledger === null && after.runs === null && after.services === null;
+      run.end = after.ledger === null && after.runs === null && after.services === null;
+      kernel.setPref(SLASH, UNDERSTAND_NEXT, run.end ? null : after);
+      if (sliced) keep();
     }
-    kernel.setPref(SLASH, UNDERSTAND_NEXT, done ? null : after);
-    keepWalked(batches);
+    /* THE WALK HAS ENDED, KEPT SO BEFORE IT IS FILED: a tick the platform cut while filing comes back to a walk with no
+       slice left and nothing to file, and never walks the night again from the first row. */
+    if (sliced) kernel.setPref(SLASH, UNDERSTAND_RUN, { day: today, begun: UNDERSTAND_SLICES, end: true, asked: [], held: [], batches: [], dropped: [] } satisfies UnderstandRun);
+    keepWalked(run.batches);
     const filing = await understoodFiling([...asked.values()], [...held.values()]);
-    return { filed: filing.filed, dropped: [...dropped, ...filing.dropped] };
+    return { filed: filing.filed, dropped: [...run.dropped, ...filing.dropped] };
   };
 
   /** Each kind's batch one walk wrote, the handles `undoBackfill` takes back. */
@@ -5861,13 +5911,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** The step the day's look is on, kept before each step runs (`slashTick`): `{ day, next, by, large }`. */
   const SLASH_STEP = 'slash.step';
   /**
-   * What one step of the look but the walk counts against a tick's budget, in pages (`TickBudget`): most read the record
-   * about as much as a few pages drawn, so a budget of ten runs two or three of them an alarm; `understanding` reads as
-   * much as the whole walk (1.6 s of 3 s on the bench his size), so it spends a whole alarm's share and the steps after
-   * it wait for the next.
+   * What one step of the look counts against a tick's budget, in pages (`TickBudget`): most read the record about as much
+   * as a few pages drawn, so a budget of ten runs two or three of them an alarm.
    */
-  const LOOK_STEP_UNITS: Readonly<Record<string, number>> = { understanding: TICK_PAGES };
   const LOOK_STEP_UNITS_EACH = 4;
+  /**
+   * THE STEPS THAT SPAN TICKS, each counting its own units as it goes and kept on its step until it is done: the page walk
+   * of the headlines, and the night's walk of what the record holds (`understanding`, a slice at a time), which read as
+   * much as the whole page walk (1.6 s of 3 s on the bench his size) and spent a whole alarm's share in one go.
+   */
+  const LOOK_WALKS: ReadonlySet<string> = new Set(['understanding', 'headlines']);
   /** The day's look, step by step, in the order it always ran. */
   const LOOK_STEPS = ['file', 'skills', 'projects', 'drew', 'understanding', 'headlines', 'brief'] as const;
   /** The step today's look goes on from, or `null` when no look of today is under way (done, or never begun in steps). */
@@ -11856,8 +11909,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         while (step < LOOK_STEPS.length) {
           const name = LOOK_STEPS[step]!;
           /* KEPT BEFORE THE STEP RUNS, so a step the platform cut is not run again: the next tick starts at the one after.
-             The headlines' walk is kept as it is and moved past only once it has read every page it will. */
-          if (name !== 'headlines') keep(step + 1);
+             A walk (`LOOK_WALKS`) is kept as it is and moved past only once it is done; it keeps its own place. */
+          if (!LOOK_WALKS.has(name)) keep(step + 1);
           if (name === 'file') {
             const filed = await slashFile(undefined, true);
             out.by = filed.by;
@@ -11879,8 +11932,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             const drewAs = drewOwner();
             took(await slashDrew(drewAs === null ? null : previewerOf(this, drewAs)));
           } else if (name === 'understanding') {
-            /* THEN WHAT THE RECORD ALREADY HOLDS, READ AGAIN A SLICE A NIGHT, and what it would not settle asked once each. */
-            took(await slashUnderstanding());
+            /* THEN WHAT THE RECORD ALREADY HOLDS, READ AGAIN A SLICE A NIGHT, and what it would not settle asked once each,
+               a few slices a tick (`slashUnderstanding`). */
+            const understood = await slashUnderstanding(today, budget);
+            took(understood);
+            if (understood.cut === true) {
+              cut = true;
+              break;
+            }
+            keep(step + 1);
           } else if (name === 'headlines') {
             /* AND THE HEADLINES LAST, which file nothing on Decide and only write Slash's own prefs. */
             const said = await slashHeadlines(today, false, budget);
@@ -11895,9 +11955,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                briefing that fails never costs the day its look: the rules' cards stand. */
             out.dropped.push(...(await slashBrief(clock.now()).catch(() => [] as string[])));
           }
-          /* A STEP THAT DRAWS NO PAGE STILL COUNTS (`LOOK_STEP_UNITS`): on a Worker the clock stands still while it reads,
-             so without this every step but the walk would run in the one alarm. */
-          if (name !== 'headlines') budget.spend(LOOK_STEP_UNITS[name] ?? LOOK_STEP_UNITS_EACH);
+          /* A STEP THAT DRAWS NO PAGE STILL COUNTS (`LOOK_STEP_UNITS_EACH`): on a Worker the clock stands still while it
+             reads, so without this every step but the walks would run in the one alarm. */
+          if (!LOOK_WALKS.has(name)) budget.spend(LOOK_STEP_UNITS_EACH);
           step++;
           if (step < LOOK_STEPS.length && budget.spent()) {
             cut = true;
