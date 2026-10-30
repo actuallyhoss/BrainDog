@@ -218,10 +218,10 @@ export const account = {
 
   /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
   yourData: 'Your whole BrainDog',
-  /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`): `sqlite3 portfolio.brain "select …"`
-     works with no SDK and no reader of ours. The screen says it as "any database tool", because the
-     format's name means nothing to most of the people reading it. */
-  exportWhat: 'Readable by any database tool.',
+  /* WHAT THE FILE IS, IN PLAIN WORDS. The whole copy is a `.brainl`: text, one JSON line for each thing in it (`03 §2.1`),
+     streamed out in pages. It said "Readable by any database tool", which is the `.brain` SQLite file's promise, and this
+     button never hands that one out (finish G2). */
+  exportWhat: 'A plain text file, one line for each thing in it. Any text editor opens it, and BrainDog reads it back in.',
   /* `03 §1`: the three layers are addressable independently, and the governance layer alone IS a
      pack. A product whose only exit is all-or-nothing has three exits it is not offering. */
   takeAway: 'Part of it',

@@ -136,7 +136,7 @@ CREATE INDEX passkey_person ON passkey(person_id);
 CREATE TABLE session       (id_hash TEXT PRIMARY KEY,                -- SHA-256 hex of the cookie value
                             person_id TEXT NOT NULL, expires TEXT NOT NULL,
                             rotated_at TEXT NOT NULL,
-                            authed_at TEXT NOT NULL);                -- last passkey/magic-link proof — VAULT's 15-minute rule (§13 #16)
+                            authed_at TEXT NOT NULL);                -- last passkey/magic-link proof — KEYCHAIN's 15-minute rule (§13 #16)
 CREATE TABLE magic_link    (hash TEXT PRIMARY KEY, person_id TEXT NOT NULL, expires TEXT NOT NULL);
 CREATE TABLE invitation    (hash TEXT PRIMARY KEY, email TEXT NOT NULL, rec_id TEXT NOT NULL,
                             levels TEXT NOT NULL,                    -- json { "<register>|*": "<level>" }
@@ -240,7 +240,7 @@ to its grammar and drops what fails. Over `/mcp` the same hints come from `param
 ### 4.7 · Routes as data
 
 ```ts
-type Group = 'DATA' | 'READ+' | 'VAULT' | 'JOBS' | 'ADMIN' | 'AUTH' | 'INGRESS' | 'PUBLIC' | 'SHELL';
+type Group = 'DATA' | 'READ+' | 'KEYCHAIN' | 'JOBS' | 'ADMIN' | 'AUTH' | 'INGRESS' | 'PUBLIC' | 'SHELL';
 type Auth  = 'bearer-or-cookie' | 'cookie' | 'runner' | 'ingest' | 'share' | 'none';
 type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth: Auth; phase: 2 | 3 | 4 | 7;
                handle: (req, res, rec: OpenRecord | null, ctx: CallContext | null) => Promise<void> };
@@ -270,10 +270,9 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | Every other path, `GET /signin` included: the built app at the root, falling back to its `index.html`, contained by `realpath`, served with `frame-ancestors 'none'`; a missing file under `/_app/` is a 404. A path under `/app`, where the app was from September 23rd until October 29th 2026, is a `308` to the same path without it, so a mailed `/app/signin#magic=` link lands with its fragment (§5.19) | GET | none | SHELL | 3 |
 
 Every `/api/<method>` route comes from `ROUTES` in `packages/host/src/table.ts`, one per method, each with its group;
-INTERNAL methods have none. On October 30th 2026 that is 249 methods: 56 DATA, 90 READ+, 12 KEYCHAIN (the group this
-spec called VAULT), 84 ADMIN and 7 JOBS. Count them there rather than trusting the figure, which grows with the
-product. `restore` restores on this host (§5.13, *Amended September 28th 2026*), so §13 #10's 404 no longer holds. The `router-groups` gate (33 §8) asserts every entry has a `group`, that
-no VAULT route has `auth` other than `cookie` and no ADMIN route admits a `token` principal, and that the
+INTERNAL methods have none. On October 30th 2026 that is 249 methods: 56 DATA, 90 READ+, 12 KEYCHAIN, 84 ADMIN and 7 JOBS. Count them there rather than trusting the figure, which grows with the
+product. `restore` is one of the ADMIN ones and restores on this host (§5.13, *Amended September 28th 2026*; §13 #10). The `router-groups` gate (33 §8) asserts every entry has a `group`, that
+no KEYCHAIN route has `auth` other than `cookie` and no ADMIN route admits a `token` principal, and that the
 `METHOD_GROUPS` keys equal 30 §5's six groups less INTERNAL plus 48's three token methods.
 
 ### 4.8 · The device-grant request — 48 §4.2's wire, adopted
@@ -325,7 +324,7 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
 4. Resolve the record (§5.3) when the route needs one; a `sick` record → 503 `{ code, fix }`.
 5. Authenticate per `route.auth` (§5.4); build `CallContext`.
 6. Cookie principal on a non-GET: `Origin` must equal `config.origin`, or `Sec-Fetch-Site` must be `same-origin`; else 403 `FORBIDDEN` (12 §8's origin check).
-7. Group gate for `/api/<method>`: VAULT, ADMIN, JOBS-session with a `token` principal → 403 `NEEDS_BROWSER_SESSION`; ADMIN admits a `person` principal that came from a cookie, from `config.token`, or from an operation grant whose `ctx.op` names the method — `export` → `export`; `import` → `import`; `pack` → `planPack installPack uninstallPack`; `token` → `createToken listTokens revokeToken` (48 §13 D1) — any other `op` → 403 `FORBIDDEN`; VAULT with `now − authed_at > 15 min`, or with an `op` set, → 403 `NEEDS_BROWSER_SESSION`, `fix: "Sign in again to open the Keychain"`; runner methods with anything but the `runner` flag → 403 `FORBIDDEN`; a `runner` principal anywhere else → 403 `FORBIDDEN`.
+7. Group gate for `/api/<method>`: KEYCHAIN, ADMIN, JOBS-session with a `token` principal → 403 `NEEDS_BROWSER_SESSION`; ADMIN admits a `person` principal that came from a cookie, from `config.token`, or from an operation grant whose `ctx.op` names the method — `export` → `export`; `import` → `import`; `pack` → `planPack installPack uninstallPack`; `token` → `createToken listTokens revokeToken` (48 §13 D1) — any other `op` → 403 `FORBIDDEN`; KEYCHAIN with `now − authed_at > 15 min`, or with an `op` set, → 403 `NEEDS_BROWSER_SESSION`, `fix: "Sign in again to open the Keychain"`; runner methods with anything but the `runner` flag → 403 `FORBIDDEN`; a `runner` principal anywhere else → 403 `FORBIDDEN`.
 8. Token bucket for `token` principals: 600/min, burst 60 (10 §8) → 429 with `Retry-After`.
 9. Parse the JSON body (invalid → 400 bare); `result = api[method](body, ctx)`; write per §6. `openGrant` and `bindGrant` pass through the host's Keychain step: unwrap the DEK with `KeyStore`, derive the grant key by HKDF, decrypt or encrypt with the AAD of 12 §6, return plaintext once — the record only ever sees sealed bytes. `export` answers `200 text/plain; charset=utf-8` and streams the `.brainl` (48 §13 D3): page after page of `api.export` (`exportBrainl`), the host signing the manifest after page 0 with §5.13's `sign()` and emitting the one `dog_sig` row line in the last block (48 §13 D2's order).
 10. GET aliases: `/api/boot` → `boot({})`; `/api/pages/:slug` → `page(slug)`; `/api/schema/:register` → `schema(register)`; `/api/version` → §5.14.
@@ -544,7 +543,7 @@ take(label): 1. id = `${compactUtc(now)}-${label}`; tmp = `${dir}/snapshots/${id
              5. return { id, at, bytes: stat.size }
 list():      readdir → *.brain, newest first, with size
 prune(keep): unlink every file after the first `keep` of list()
-restore(id): throws — a self-host restore is `braindog import` into a fresh directory (33 §9; §13 #10)
+restore(id): puts the record back to one kept copy, keeping what it was as a `before-restore` copy first (amended below; §13 #10)
 ```
 
 Signing — `sign(sql, bytes)`: `SELECT wrapped, nonce, kek_id FROM vault_key WHERE purpose = 'signing'` (a
@@ -834,7 +833,7 @@ the rest of this section holds today. Held by `test/actions.test.ts`.
 | `Result.refusals` | 422 — 409 when `refusals[0].code === 'VERSION_STALE'` | `{ ok: false, refusals }` |
 | `Result.conflict` | 409 | `{ ok: false, conflict: { version, current, actor } }` |
 | no or bad credential; expired session, link or invitation; passkey `rejected`; lockout window | 401 | `{ code: 'UNAUTHORIZED' }` — and nothing else |
-| `token` principal at VAULT · ADMIN · JOBS-session; VAULT with `authed_at` over 15 min; a non-owner bearer on `auth: 'cookie'` | 403 | `{ code: 'NEEDS_BROWSER_SESSION', fix }` |
+| `token` principal at KEYCHAIN · ADMIN · JOBS-session; KEYCHAIN with `authed_at` over 15 min; a non-owner bearer on `auth: 'cookie'` | 403 | `{ code: 'NEEDS_BROWSER_SESSION', fix }` |
 | origin check failed; runner methods without the runner flag; runner elsewhere; `invite` below owner; token exchange on a multi-person Directory | 403 | `{ code: 'FORBIDDEN' }` |
 | record `sick` | 503 | `{ code: 'SCHEMA_MISMATCH' \| 'SCHEMA_NEWER', fix: 'Deploy the matching build' }` — every route of that record |
 | lockout reservation returned no row | 503 | bare |
@@ -844,7 +843,7 @@ the rest of this section holds today. Held by `test/actions.test.ts`.
 | `openGrant` with a `kek_id` the `KeyStore` cannot answer | 409 | `{ code: 'WRONG_KEY' }` |
 | body over 1 MB; attachment over 2 MB | 413 | bare |
 | attachment not one of the five image types | 415 | bare |
-| unknown `/api/<method>`, `restore`, `/ws`, a spoken id that resolves to nothing | 404 | bare |
+| unknown `/api/<method>`, `/ws`, a spoken id that resolves to nothing | 404 | bare |
 | token bucket exhausted | 429 | bare, `Retry-After` |
 | anything thrown | 500 | bare |
 
@@ -959,7 +958,7 @@ and captures `DATA`).
 | `auth_fail` reservation forced to return no row (stub) | 503 |
 | `POST /auth/token` with the right token, one person | 302-equivalent 200 and a session; with two persons → 403 `FORBIDDEN` |
 | a session at +25 h of use | the answer carries a new cookie; the old value still answers for 60 seconds, then 401 |
-| a VAULT read with a cookie whose `authed_at` is 16 min old | 403 `NEEDS_BROWSER_SESSION`, "Sign in again to open the Keychain."; after a new sign-in → 200 |
+| a KEYCHAIN read with a cookie whose `authed_at` is 16 min old | 403 `NEEDS_BROWSER_SESSION`, "Sign in again to open the Keychain."; after a new sign-in → 200 |
 | open mode: `GET /api/boot` with `Host: evil.example:<port>` | an empty 421 |
 | open mode: a `text/plain` POST whose `Origin` is another site | 403 `FORBIDDEN`, and nothing written |
 | open mode: a session cookie that names nothing | 401 and the cookie cleared; never the owner |
@@ -1137,13 +1136,13 @@ so its row is what this spec needs from it:
 | 7 | `BRAINDOG_ORIGIN` — the public origin, for magic-link URLs, the WebAuthn `rpId` and the CSRF origin check; default `http://localhost:<PORT>` | 33 §6 |
 | 8 | **How a request names its record on a multi-record host** (§5.3): one record is implicit; a bearer is found by hash; a session row carries the record; a share, email or webhook path carries its own; `/a/<sha256>` is content-addressed across records | 33 §4 (one sentence after the table); 33 §6 Data row |
 | 9 | `notify.push` on the self-host through `@pushforge/builder@2.0.5`, VAPID keys at `<data>/vapid.json` | ADR-046: "the Worker and the self-host" |
-| 10 | **Snapshots are exports**: the `VACUUM INTO` copy has its six `local` tables emptied, is vacuumed again, manifested and signed, so `braindog verify` prints 25 tables; `Snapshots.restore` throws and `restore` has no route — restore is `braindog import` into a fresh directory. **Not built**: neither `verify` nor `import` is among the eleven commands the CLI dispatches today (48 §2), so nothing prints the 25 tables and no directory is restored this way yet | 33 §6 Snapshots row: "→ strip `local` → manifest → sign"; 33 §9 Restore row: "self-host: offline, no route" |
+| 10 | **Snapshots are exports, and `restore` restores on this host** (*amended October 30th 2026*): the `VACUUM INTO` copy has its `local` tables emptied, is vacuumed again and signed in a file beside it (`<id>.brain.sig`), which `braindog verify <copy>` checks. `restore(id)` is an ADMIN route for the owner within fifteen minutes of a sign-in: it keeps the record as a `before-restore` copy, puts the copy's tables back in one transaction without the credentials the live record has ended, and writes one `restore.pitr` line. A restore into a fresh directory is `braindog init <slug> --from <file.brainl>` (§5.13, amended). This first said `restore` throws and has no route, so it answered 404; that changed on September 28th 2026 | 33 §6 Snapshots row: "→ strip `local` → manifest → sign"; 33 §9 Restore row: "self-host: offline, no route" |
 | 11 | `POST /a` uploads (the table listed only the GET); `POST /api/snapshot`, `GET /api/snapshots[/:id]` are the two owner routes 12 §8 names | 33 §4 (three rows) |
 | 12 | `invite` is the **acceptance-time** record write, called with the owner principal from `record_dir.owner_person`; minting is a Directory write and an email by the host | 33 §10 Invite row; 30 §5 ADMIN note |
 | 13 | A share recipient is a principal: `{ kind: 'share'; id; slug }`; tokens are HMAC-signed with `HKDF(KEK, 'braindog/share')`, stateless, terminally revoked by `share.close` | 33 §2 `CallContext.principal`; 30 §10 share row |
 | 14 | **48 §13 D1's device wire is adopted whole** — `POST /auth/device` / `POST /auth/device/token`, `Reach`, `device_grant.reach`, operation grants of ten minutes resolved to the approver with `ctx.op`, ADMIN admitting them by reach; two things this host adds: 48's `subject` is stored in 30 §1's `ua` column (the second free-text column the approver reads), and `verification_uri` is `${origin}/connect/approve` (`${origin}/app/connect/approve` until October 29th 2026, `${origin}/app/settings/agents` before that in October, and `${origin}/settings/agents` before push A of the one-domain move) | 30 §1 (`device_grant.ua` comment: "label · subject"); 33 §10 Device grant row; 50 (the code-entry page at `/connect/approve`) |
 | 15 | **Sign-up is closed on a self-host**: persons come from `braindog init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail | 33 §10 Sign up row: "Cloud; self-host: `init` and invitations" |
-| 16 | `session.authed_at` (a ninth column, not a ninth table) records the last proof; rotation every 24 h of use with a sliding 30-day expiry never moves it; VAULT requires it within 15 minutes | 33 §10 `session` row |
+| 16 | `session.authed_at` (a ninth column, not a ninth table) records the last proof; rotation every 24 h of use with a sliding 30-day expiry never moves it; KEYCHAIN requires it within 15 minutes | 33 §10 `session` row |
 | 17 | Lockout constants: ten compared and the eleventh refused, fifteen minutes, a capped counter, a count forgotten fifteen minutes after its first strike, an address cleared by a success; keys `ip:` `email:` `mint:` `device:`; device codes and share tokens on the record's `auth_fail` | 12 §8 (the numbers) |
 | 18 | `CallContext.session` comes from `X-BrainDog-Session`, `-Client-Id`, `-Host`, `-Repo` on `/api/*`; `/mcp` reads `_meta` | 33 §2; 48 sends them |
 | 19 | The host signs: the final page of a streamed `POST /api/export` and every snapshot use one `sign()` over the record's `vault_key(purpose = 'signing')`, unwrapped with the KEK | 33 §9 Export rows: "the Worker or the self-host signs" |
@@ -1162,7 +1161,7 @@ Twenty-four, counted.
 - [ ] `node apps/selfhost/src/main.ts init demo --owner a@b.c`, then `… serve`, on a clean `BRAINDOG_DATA`: creates `kek` (0600) and `vapid.json`, and answers `GET /api/version` with the record's version.
 - [ ] A build with `fts5: false` refuses with the exact block of §6 and exit code 1 (`boot-probe` green).
 - [ ] `main.ts init demo` creates the record, its three wrapped keys, the Directory rows and `inbound.token`, and refuses a data folder that already holds another record; `serve` writes the owner's claim link to `<data>/claim-link` (0600) and never to the log.
-- [ ] `ROUTES` passes `router-groups`: every route grouped, no bearer at VAULT, no `token` principal at ADMIN, every method in `ROUTES` routed (249, 84 of them ADMIN, on October 30th 2026), none INTERNAL.
+- [ ] `ROUTES` passes `router-groups`: every route grouped, no bearer at KEYCHAIN, no `token` principal at ADMIN, every method in `ROUTES` routed (249, 84 of them ADMIN, on October 30th 2026), none INTERNAL.
 - [ ] Magic link round-trips through the mock SMTP; the token exchange works with no SMTP; the lockout refuses the eleventh attempt and fails closed on a missing reservation.
 - [ ] Device flow on 48's wire: `login` yields a `write` token once; `runner` a 90-day bearer; `export` a ten-minute operation grant that reaches `export` and nothing else; five wrong codes deny; expiry after ten minutes.
 - [ ] A write re-arms the timer; the timer drains within 250 ms of `due_at`; a 40-day row is clamped and chained.

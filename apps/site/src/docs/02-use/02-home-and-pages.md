@@ -1,22 +1,22 @@
-# Home and pages
+# Today and pages
 
-Home is the page your BrainDog opens on. It answers four questions without a filter: what needs you, who is working, what is coming, and what happened while you were not looking. Every other page is built the same way, out of blocks, and you can arrange any of them.
+Today is the page your BrainDog opens on. It answers four questions without a filter: what needs you, who is working, what is coming, and what happened while you were not looking. Every other page is built the same way, out of blocks, and you can arrange any of them.
 
-## What Home shows
+## What Today shows
 
-Home is drawn from your starter's own Home where it has one, and from the house Home otherwise. Either way it holds the same kinds of thing:
+Today is drawn from your starter's own first page where it has one, and from the house one otherwise. Either way it holds the same kinds of thing:
 
-- **What needs you**: questions waiting in Needs you, bills falling due, anything a rule raised. Answer a question or tick a row where it is drawn, without leaving Home.
+- **What needs you**: questions waiting in Needs you, bills falling due, anything a rule raised. Answer a question or tick a row where it is drawn, without leaving Today.
 - **Right now**: the few figures that matter most, such as cash now or open work.
-- **Since you were away**: what you, your colleagues, your agents and your rules changed since you last looked. Home counts "since" from when you last left it, not from when you opened it, so nothing slips past while you are reading.
+- **Since you were away**: what you, your colleagues, your agents and your rules changed since you last looked. Today counts "since" from when you last left it, not from when you opened it, so nothing slips past while you are reading.
 
-Home keeps itself up to date. When an agent, a rule or another tab changes something, Home reads the change without a reload.
+Today keeps itself up to date. When an agent, a rule or another tab changes something, Today reads the change without a reload.
 
-A colleague who holds some of your lists and not all of BrainDog sees a Home that names their lists and opens them in one press.
+A colleague who holds some of your lists and not all of BrainDog sees a Today that names their lists and opens them in one press.
 
 ## Handled today
 
-When BrainDog settles something reversible by itself, such as filing a bill it was sure about, it says so on Home under **Handled today**. Each line says what was done and why, and has an **Undo** that puts it back. The newest five show, with a count of the rest. Nothing irreversible is ever settled this way.
+When BrainDog settles something reversible by itself, such as filing a bill it was sure about, it says so on Today, under **Handled today**. Each line says what was done and why, and has an **Undo** that puts it back. The newest five show, with a count of the rest. Nothing irreversible is ever settled this way.
 
 ## Pages
 
@@ -84,6 +84,6 @@ Every page is written in a small text format: Markdown, with fenced blocks for t
 ## Moving around
 
 - / opens the palette, to search, jump anywhere, or ask Slash.
-- g then h goes Home; g then a digit opens that item of your sidebar.
+- g then h goes to Today; g then a digit opens that item of your sidebar.
 - On a page, j and k move between blocks, and o opens the list behind one.
 - ? shows every key.

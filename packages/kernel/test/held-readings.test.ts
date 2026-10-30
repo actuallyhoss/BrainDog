@@ -8,7 +8,9 @@ import assert from 'node:assert/strict';
 
 import type { Sql } from '@braindog/ports';
 
+import { notice, traceOf } from '../src/held-readings.ts';
 import { openRecord, type Declaration, type MetricDecl } from '../src/index.ts';
+import { overSplit } from '../src/row-parts.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 2, 12);
@@ -80,4 +82,45 @@ test('A FIGURE IS HELD WHILE ITS LISTS STAND: a run moving reads it no more, and
   const after = k.metric(CASH);
   assert.ok(after.ok && after.value.value === 17_000, JSON.stringify(after));
   raw.close();
+});
+
+/** What a figure reading `text` with `params` is held on, on a record whose lists are `system`, `active`, `tasks`, `projects` and the runs. */
+function figureHeld(text: string, ...params: string[]): { whole: boolean; lists: string[] } {
+  const lists = new Set(['system', 'active', 'tasks', 'projects', 'session']);
+  const trace = traceOf();
+  notice(trace, text, params, (w) => lists.has(w));
+  return { whole: trace.whole, lists: [...trace.lists].sort() };
+}
+
+test("A VALUE THAT IS A LIST'S ID NAMES NO LIST unless the list column is bound to it (finish G4, review 3's P3)", () => {
+  /* EVERY LIST'S ROWS, read beside a word that is also a list's id: read each time, never held on that one list. */
+  assert.deepEqual(figureHeld("SELECT count(*) AS n FROM entry WHERE json_extract(fields, '$.who') = 'system'"), { whole: true, lists: [] });
+  assert.deepEqual(figureHeld("SELECT count(*) AS n FROM entry WHERE state IN ('active', 'idle') AND kind = ?", 'tasks'), { whole: true, lists: [] });
+  /* ONE LIST, BOUND: held on that list alone. */
+  assert.deepEqual(figureHeld('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', 'tasks'), { whole: false, lists: ['tasks'] });
+  assert.deepEqual(figureHeld("SELECT id FROM entry e WHERE e.register IN (?, 'projects') AND e.state = 'active'", 'tasks'), { whole: false, lists: ['projects', 'tasks'] });
+  /* A LINK'S HOP binds its own list, and is held on both. */
+  assert.deepEqual(
+    figureHeld("SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND id IN (SELECT json_extract(hop1.fields, '$.task') FROM entry AS hop1 WHERE hop1.register = ? AND hop1.deleted_at IS NULL)", 'tasks', 'projects'),
+    { whole: false, lists: ['projects', 'tasks'] },
+  );
+  /* A BINDING THAT NARROWS NOTHING: under OR, NOT or CASE, or on the kept side of a left join. */
+  assert.equal(figureHeld('SELECT count(*) AS n FROM entry WHERE register = ? OR state = ?', 'tasks', 'open').whole, true);
+  assert.equal(figureHeld('SELECT count(*) AS n FROM entry WHERE state = ? OR (deleted_at IS NULL AND register = ?)', 'open', 'tasks').whole, true);
+  assert.equal(figureHeld('SELECT count(*) AS n FROM entry WHERE NOT (register = ?)', 'tasks').whole, true);
+  assert.equal(figureHeld("SELECT count(CASE WHEN register = 'tasks' THEN 1 END) AS n FROM entry").whole, true);
+  assert.equal(figureHeld('SELECT count(*) AS n FROM entry a LEFT JOIN entry_private p ON a.register = ? AND p.entry_id = a.id', 'tasks').whole, true);
+  /* A SECOND READ OF THE ROWS WITH NO LIST OF ITS OWN reads any list's rows. */
+  assert.equal(figureHeld("SELECT p.id FROM entry e JOIN entry p ON p.id = json_extract(e.fields, '$.project') WHERE e.register = ?", 'tasks').whole, true);
+  /* A WRITE, or a statement this cannot read, is never held. */
+  assert.equal(figureHeld('UPDATE entry SET state = ? WHERE register = ? RETURNING id', 'done', 'tasks').whole, true);
+  assert.equal(figureHeld('SELECT count(*) AS n FROM', 'tasks').whole, true);
+});
+
+test("A SPLIT ROW'S PARTS ARE READ THROUGH A VIEW THAT KEEPS EACH ROW'S LIST, so a figure over them is held on its list", () => {
+  const over = overSplit('SELECT sum(json_extract(fields, ?)) AS v FROM entry WHERE register = ? AND deleted_at IS NULL', 'tasks', 'parts');
+  assert.deepEqual(figureHeld(over, '$.amount', 'tasks'), { whole: false, lists: ['tasks'] });
+  assert.equal(figureHeld(overSplit('SELECT count(*) AS n FROM entry', 'tasks', 'parts')).whole, true);
+  /* A VIEW WRITTEN BY HAND, one word off the kernel's, is no view this knows: its rows are any list's. */
+  assert.equal(figureHeld(over.replace("register <> 'tasks'", "register <> 'projects'"), '$.amount', 'tasks').whole, true);
 });

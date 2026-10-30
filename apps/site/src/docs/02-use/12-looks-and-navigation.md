@@ -54,7 +54,7 @@ The sidebar holds every place: Today, Needs you, Work, Money, Agents and People,
 
 On a phone, BrainDog uses a tab bar whichever you choose: Today and up to three more places, then Menu, which holds the rest. Pick the three under **Phone bar**, in Settings under Appearance.
 
-BrainDog may offer a page for a list that keeps growing, but it never places one in your navigation for you. See [Home and pages](/docs/use/home-and-pages).
+BrainDog may offer a page for a list that keeps growing, but it never places one in your navigation for you. See [Today and pages](/docs/use/home-and-pages).
 
 ## Arrange the sidebar
 

@@ -272,7 +272,7 @@ export function commands(live: Live): Command[] {
 }
 
 export const COMMANDS: readonly Command[] = [
-  { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, icon: 'today', aliases: ['start', 'today', 'dashboard', 'overview'] },
+  { id: 'c-home', title: copy.today, href: '/', group: copy.destinations, icon: 'today', aliases: ['start', 'home', 'dashboard', 'overview'] },
   { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide', aliases: ['questions', 'approve', 'approvals', 'pending'] },
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox', aliases: ['mail', 'messages', 'email', 'incoming'] },
   { id: 'c-keychain', title: copy.keychain, href: '/keychain', group: copy.destinations, icon: 'vault', aliases: ['vault', 'keys', 'secrets', 'passwords', 'tokens'] },

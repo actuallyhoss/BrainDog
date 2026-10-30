@@ -63,7 +63,7 @@ The owner answers everything. A colleague at the Decides level can answer questi
 
 ## Decisions afterwards
 
-Every decision is in History and in the feed on Home, with the question and its reason. Search finds decided questions too, under Decided.
+Every decision is in History and in the feed on Today, with the question and its reason. Search finds decided questions too, under Decided.
 
 ## Keys in Needs you
 

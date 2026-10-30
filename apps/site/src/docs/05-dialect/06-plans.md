@@ -27,14 +27,14 @@ On a record, a todo drawn over a list can be ticked from the page. Here it is dr
 An ordered list, numbered. A row is a title, a detail and a note.
 
 ```steps | Setting up
-Start a record | sign up, and it opens on Home | a minute
+Start a record | sign up, and it opens on Today | a minute
 Bring in what you keep | forward an email, or connect a bank | ten minutes
 Connect an agent | give it a key and the address | from your agent
 ```
 
 ~~~code | As written
 ```steps | Setting up
-Start a record | sign up, and it opens on Home | a minute
+Start a record | sign up, and it opens on Today | a minute
 Bring in what you keep | forward an email, or connect a bank | ten minutes
 Connect an agent | give it a key and the address | from your agent
 ```

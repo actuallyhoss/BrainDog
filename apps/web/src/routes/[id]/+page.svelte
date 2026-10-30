@@ -220,7 +220,7 @@
 {:else if done && refusal}
   <div class="page">
     <Empty kind="error" heading title={copy.readRefused} body={refusal?.fix}>
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+      {#snippet actions()}<Button href="/">{copy.today}</Button>{/snippet}
     </Empty>
   </div>
 {:else if done}

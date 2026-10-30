@@ -69,6 +69,11 @@ test('A VALUE THAT IS A LIST\'S ID NAMES NO LIST unless the list column is bound
   assert.ok(heldBy("SELECT count(CASE WHEN register = 'tasks' THEN 1 END) FROM entry").tables.includes('entry'));
   /* A COMMA'S JOIN reads the rows too. */
   assert.ok(heldBy('SELECT 1 FROM event, entry WHERE entry.id = ?', 'tasks').tables.includes('entry'));
+  /* A BINDING UNDER `OR`, OR ON THE KEPT SIDE OF A LEFT JOIN, narrows nothing (finish G4). */
+  assert.ok(heldBy('SELECT id FROM entry WHERE register = ? OR state = ?', 'tasks', 'open').tables.includes('entry'));
+  assert.ok(heldBy('SELECT a.id FROM entry a LEFT JOIN event v ON a.register = ? AND v.target = a.id', 'tasks').tables.includes('entry'));
+  /* AND ONE IN A JOIN'S OWN `ON` narrows the table it joins. */
+  assert.deepEqual(heldBy('SELECT v.id FROM event v LEFT JOIN entry n ON n.id = substr(v.target, 7) AND n.register = ?', 'tasks'), { lists: ['tasks'], tables: ['event'], head: true });
 });
 
 test('A WRITE WHOSE RETURNING ANSWERED NOTHING CHANGED NOTHING: the belt claiming nothing due is not a write', () => {

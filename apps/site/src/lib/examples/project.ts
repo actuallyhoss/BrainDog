@@ -114,7 +114,7 @@ Fri 25 Sep | Three name ideas from a friend | Filed to Brand
 Starts when | A task is marked done | trigger
 Only if | It is a step on the path | condition
 Then | Mark the step after it as next | step
-Then | Move its area's progress on Home | action
+Then | Move its area's progress on Today | action
 ~~~`,
     },
     {

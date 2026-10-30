@@ -54,6 +54,6 @@ If somebody invited you to their BrainDog, you do not make one. Open the link in
 
 ## What next
 
-- [Home and pages](/docs/use/home-and-pages): what your Home shows, and how to arrange a page.
+- [Today and pages](/docs/use/home-and-pages): what Today shows, and how to arrange a page.
 - [Lists and rows](/docs/use/lists-and-rows): adding and finding what you keep.
 - [Slash](/docs/use/slash): asking your BrainDog a question.
