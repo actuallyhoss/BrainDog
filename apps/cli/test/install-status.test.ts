@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { gitShell, HOOK_STATUS, HOOKS_HELD, hookCommand, installAt } from '../src/install.ts';
+import { gitShell, HOOK_END_STATUS, HOOK_STATUS, HOOKS_HELD, hookCommand, installAt } from '../src/install.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-install-status-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -32,7 +32,7 @@ const hook = (which: 'start' | 'end' | 'beat' | 'prompt' | 'tool' | 'stop') => (
   type: 'command',
   command: hookCommand(which, SCRIPTS, 'darwin'),
   timeout: which === 'start' || which === 'end' || which === 'beat' ? 10 : 5,
-  ...(which === 'start' || which === 'end' ? { statusMessage: HOOK_STATUS } : {}),
+  ...(which === 'start' ? { statusMessage: HOOK_STATUS } : which === 'end' ? { statusMessage: HOOK_END_STATUS } : {}),
 });
 
 /** The three that read the inbox file (inbox-file.ts), each its own event, added by every fresh install. */
@@ -58,7 +58,7 @@ test('a fresh install adds six hooks ending inside ten seconds, the start and en
     /* NO MATCHER: a PreToolUse group without one is every tool, which a stop has to reach. */
     assert.equal(groups[0]!.matcher, undefined, event);
     /* The beat and the inbox hooks run on every call and prompt, so a status line there would flash under the agent's own work. */
-    assert.equal(groups[0]!.hooks[0]!.statusMessage, event === 'SessionStart' || event === 'SessionEnd' ? 'Connecting to BrainDog...' : undefined, event);
+    assert.equal(groups[0]!.hooks[0]!.statusMessage, event === 'SessionStart' ? 'Connecting to BrainDog...' : event === 'SessionEnd' ? 'Saving this session to BrainDog...' : undefined, event);
   }
   assert.equal(now.hooks.PostToolUse![0]!.hooks[0]!.command, `sh "${join(SCRIPTS, 'braindog-hook.sh')}" beat`);
 
