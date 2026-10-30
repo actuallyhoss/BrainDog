@@ -78,25 +78,55 @@ const layoutDeps = new Map<string, Set<string>>();
  * naming them preloads nothing. The set is read from the bundle before Vite writes the lists.
  */
 const entryGraph = new Set<string>();
+
+/**
+ * THE LIGHT FRAME'S LIST CARRIES WHAT SIGN-IN AND SIGN-UP IMPORT. A route's own list names no chunk a route shares (the
+ * rule above), so sign-in's imports arrived one level at a time, five round trips deep, before its field drew. The light
+ * frame (`lib/shell/LightFrame.svelte`) is asked for by the root load on those screens only (`lib/shell/light.ts`), so
+ * its list preloads every chunk the light screens import but Kit's entry, all at once; the few one of them needs and the
+ * other does not are a few kilobytes, and a stranger on one of them is likely to open the other. The list is in the root
+ * layout's chunk, not the entry, so it costs the entry nothing.
+ *
+ * NOT THE APP'S FRAME. Its list was tried the same way, and a cold Today on a throttled phone drew no sooner: the screen
+ * waits on its own reads, not on the frame's chunks.
+ */
+const lightFrame = new Set<string>();
+const kitEntry = new Set<string>();
+const lightDeps = new Set<string>();
+const LIGHT_FRAME = /[\\/]src[\\/]lib[\\/]shell[\\/]LightFrame\.svelte$/u;
+const LIGHT_PAGE = /[\\/]src[\\/]routes[\\/](?:signin|signup)[\\/](?:desktop[\\/])?\+page\.svelte$/u;
+
 const entryGraphPlugin: Plugin = {
   name: 'braindog:entry-graph',
   generateBundle: {
     order: 'pre',
     handler(_, bundle) {
       entryGraph.clear();
-      const walk = (file: string) => {
+      lightFrame.clear();
+      kitEntry.clear();
+      lightDeps.clear();
+      const walk = (into: Set<string>, file: string) => {
         const chunk = bundle[file];
-        if (entryGraph.has(file) || chunk?.type !== 'chunk') return;
-        entryGraph.add(file);
-        for (const next of chunk.imports) walk(next);
+        if (into.has(file) || chunk?.type !== 'chunk') return;
+        into.add(file);
+        for (const next of chunk.imports) walk(into, next);
       };
-      for (const [file, chunk] of Object.entries(bundle)) if (chunk.type === 'chunk' && chunk.isEntry) walk(file);
+      for (const [file, chunk] of Object.entries(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        if (chunk.isEntry) walk(entryGraph, file);
+        if (/(?:^|\/)entry\/(?:start|app)\.[\w-]+\.js$/u.test(file)) walk(kitEntry, file);
+        if (chunk.facadeModuleId !== null && LIGHT_FRAME.test(chunk.facadeModuleId)) lightFrame.add(file);
+      }
+      for (const chunk of Object.values(bundle))
+        if (chunk.type === 'chunk' && chunk.moduleIds.some((id) => LIGHT_PAGE.test(id))) for (const dep of chunk.imports) walk(lightDeps, dep);
+      for (const file of kitEntry) lightDeps.delete(file);
     },
   },
 };
 
 function resolveDependencies(file: string, deps: string[], { hostId, hostType }: { hostId: string; hostType: 'html' | 'js' }) {
   if (hostType !== 'js') return deps;
+  if (lightFrame.has(file)) return [...new Set([...deps.filter((d) => d === file || !kitEntry.has(d)), ...lightDeps])];
   const kept = deps.filter((d) => d === file || !entryGraph.has(d));
   if (/(?:^|\/)nodes\/0\.[\w-]+\.js$/u.test(file)) {
     layoutDeps.set(hostId, new Set(kept));

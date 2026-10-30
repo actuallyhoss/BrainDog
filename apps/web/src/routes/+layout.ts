@@ -62,7 +62,8 @@ let opened = false;
  * WHAT THE ROOT LAYOUT IS HANDED: the shell and, beside it, the frame it draws the screen in. The app's frame
  * (`AppFrame.svelte`) for a record's screens, or the light frame (`LightFrame.svelte`) for sign-in and sign-up
  * (`lib/shell/light.ts`). Both are loaded here and neither is imported by the layout, so the one a screen does not draw
- * is never fetched, and the light one costs a record's first open nothing.
+ * is never fetched; a record's first open carries only the light frame's preload list (`vite.config.ts`), a few hundred
+ * bytes in this file's chunk.
  */
 export type Root = FrameData & { frame: typeof AppFrame | null; light: typeof LightFrame | null };
 

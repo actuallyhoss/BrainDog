@@ -6,13 +6,11 @@
  * import) before a stranger saw a field, none of which either screen draws (first hour audit, E14). The root load
  * answers them with no shell and hands over the light frame (`routes/+layout.ts`), which the root layout draws them in.
  *
- * ONE LIST, READ THREE TIMES: by the root load, by the root layout, and by the build (`vite.config.ts`), which keeps the
- * app frame's preloads out of these screens' lists. Plain TypeScript with no `$lib` import, so the build can load it.
+ * THE BUNDLE GATE COUNTS THE APP'S FRAME IN A RECORD'S FIRST LOAD (`tools/gates/bundle.mjs`), since every screen of a
+ * record still waits for it. THE BUILD NAMES THESE SCREENS AGAIN (`LIGHT_PAGE` in `vite.config.ts`), to put what they
+ * import in the light frame's preload list: a screen added here is added there.
  */
 import type { Shell } from '../record/boot-live.ts';
-
-/** The route folders drawn in the light frame, as the build finds their nodes. */
-export const LIGHT_ROUTES = ['signin', 'signup'] as const;
 
 /** Whether a path inside the record (`here()` of the address) is drawn in the light frame. */
 export const light = (inner: string): boolean => inner === '/signin' || inner.startsWith('/signin/') || inner === '/signup';
