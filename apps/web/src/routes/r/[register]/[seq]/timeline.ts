@@ -27,23 +27,37 @@ const timeOf = (iso: string): number => Date.parse(iso);
  * says "BrainDog added this" (money F9). Every other note is the record's own.
  *
  * A NOTE THAT OPENS ON ITS VERB FOLLOWS THE NAME IN LOWER CASE: an import writes
- * "Imported again from Kiln Notes.", and the line read "An agent Imported again from Kiln Notes." A note that opens on
- * a name keeps it.
+ * "Imported again from Kiln Notes.", and the line read "An agent Imported again from Kiln Notes." Any other note is
+ * said as what the writer noted.
  */
-export const noteSaid = (note: string): string => {
+export const noteSaid = (note: string, line?: Pick<Event, 'field'> & { from?: unknown }): string => {
   const said = note.trim();
   if (said === 'created') return 'added this';
+  /* A CHANGE TO ONE FIELD THAT THE WRITER LEFT NO NOTE ON is said by `noteOf` as the field and then what happened to it,
+     "email set to …", and after a name it read "An agent email set to …". The verb goes first. */
+  if (line?.field !== undefined && line.field !== '' && 'from' in line) return fieldSaid(said);
   /* AN IMPORT SAYS IT IMPORTED THIS, and the day is the line's own. The product this record came from by its old name
      is "your old notes", never that name. */
   const imported = /^imported (?:again )?from (.+?)\.?$/iu.exec(said);
   if (imported) return OLD_NAME.test(imported[1]!) ? 'imported this from your old notes' : `imported this from ${imported[1]!}`;
-  if (VERB_FIRST.test(said)) return `${said[0]!.toLowerCase()}${said.slice(1)}`;
-  /* A NOTE WITH NO VERB OF ITS OWN IS WHAT THE AGENT WROTE DOWN: "An agent Partner on Koala." is "An agent noted:
-     Partner on Koala." A note that says what somebody did ("Halden sent this.") keeps its words. */
-  const first = said.split(/(?<=[.!?])\s/u)[0] ?? said;
-  if (/^[A-Z]/u.test(said) && !PAST.test(first)) return `noted: ${said}`;
+  if (VERB_FIRST.test(said) && !DESCRIBES.test(said) && !PASSIVE.test(said)) return `${said[0]!.toLowerCase()}${said.slice(1)}`;
+  /* A NOTE THAT DOES NOT OPEN ON WHAT WAS DONE IS WHAT THE WRITER PUT DOWN: "An agent Partner on Koala." is "An agent
+     noted: Partner on Koala.", and a note that is a sentence of its own ("Halden sent this.", "Based in Osaka.") is
+     quoted the same way, since put after a name it read "An agent Halden sent this." (Q38, recheck of 30 October). */
+  if (/^[\p{Lu}\p{N}]/u.test(said)) return `noted: ${said}`;
   return said;
 };
+
+/** `noteOf`'s words for one field's change, with the verb first: "set email to …", "changed state from open to paid". */
+function fieldSaid(said: string): string {
+  const from = /^(.+?) from (.+) to (.+)$/su.exec(said);
+  if (from) return `changed ${from[1]!} from ${from[2]!} to ${from[3]!}`;
+  const to = /^(.+?) set to (.+)$/su.exec(said);
+  if (to) return `set ${to[1]!} to ${to[2]!}`;
+  const bare = /^(.+?) (set|cleared|changed)$/su.exec(said);
+  if (bare) return `${bare[2]!} ${bare[1]!}`;
+  return said;
+}
 
 /**
  * The name of a notes product a record imported from before BrainDog, which a screen never says: one named a brain (a
@@ -51,9 +65,14 @@ export const noteSaid = (note: string): string => {
  */
 export const OLD_NAME = /\bbrain\b/iu;
 /** A note that opens on a verb in the past: "Imported…", "Moved…", "Set…". */
-const VERB_FIRST = /^(?:[A-Z][a-z]+ed|Set|Put|Took|Gave|Made|Sent|Kept|Left|Met|Wrote|Ran|Undid|Got|Found|Told|Split|Paid|Read|Cut|Drew|Saw|Heard)\b/u;
-/** A verb in the past anywhere in a sentence, which makes it a sentence about something done. */
-const PAST = /\b(?:[a-z]+ed|set|put|took|gave|made|sent|kept|left|met|wrote|ran|undid|got|found|told|split|paid|cut|drew|saw|heard|is|are|was|were|has|have|had)\b/u;
+const VERB_FIRST = /^(?:[A-Z][a-z]+ed|Set|Put|Took|Gave|Made|Sent|Kept|Left|Met|Wrote|Ran|Undid|Got|Found|Told|Split|Paid|Read|Cut|Drew|Saw|Heard|Chose)\b/u;
+/**
+ * A NOTE THAT OPENS ON A WORD ENDING IN -ED AND DESCRIBES RATHER THAN SAYS WHAT WAS DONE: "Based in Osaka" is about the
+ * person, and after a name it read "An agent based in Osaka". "Need" and "Speed" only look like a verb in the past.
+ */
+const DESCRIBES = /^(?:Based|Interested|Retired|Married|Engaged|Divorced|Located|Related|Involved|Experienced|Qualified|Certified|Licensed|Skilled|Talented|Self-employed|Employed|Unemployed|Need|Needed|Seed|Speed|Feed|Red|Bed|Shed|Hundred|Limited|Detailed|Advanced|Dedicated|Preferred)\b/u;
+/** A note that says what was done TO the row and by whom ("Lifted by …"), which cannot follow who did it. */
+const PASSIVE = /^\S+\s+by\b/u;
 
 /**
  * A LINE THAT IS A WHOLE SENTENCE OF ITS OWN, for the rules that meet people and organisations: the bank text that

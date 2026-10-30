@@ -46,13 +46,25 @@ test('THE FIRST LINE SAYS WHO ADDED THE ROW, "added this", and any other note is
 });
 
 /* "An agent Imported again from Kiln Notes." The verb
-   follows the name in lower case; a note that opens on a name keeps it. */
-test('A NOTE THAT OPENS ON ITS VERB READS ON FROM THE NAME, and one that opens on a name keeps it', () => {
+   follows the name in lower case; any other note is what the writer noted. */
+test('A NOTE THAT OPENS ON ITS VERB READS ON FROM THE NAME, and any other is said as noted', () => {
   assert.equal(noteSaid('Imported again from Kiln Notes.'), 'imported this from Kiln Notes');
   assert.equal(noteSaid('Imported again from Mara Brain'), 'imported this from your old notes');
   assert.equal(noteSaid('Partner on Koala. Runs Mainichi JP.'), 'noted: Partner on Koala. Runs Mainichi JP.');
   assert.equal(noteSaid('Imported from Kiln Notes.'), 'imported this from Kiln Notes');
-  assert.equal(noteSaid('Halden sent this.'), 'Halden sent this.');
+  assert.equal(noteSaid('Halden sent this.'), 'noted: Halden sent this.');
+  assert.equal(noteSaid('Based in Osaka.'), 'noted: Based in Osaka.');
+  assert.equal(noteSaid('Lifted by the morning run.'), 'noted: Lifted by the morning run.');
+  assert.equal(noteSaid('Moved the call to Friday.'), 'moved the call to Friday.');
+});
+
+test('A CHANGE TO ONE FIELD WITH NO NOTE PUTS ITS VERB FIRST, so it reads on from who made it (Q38)', () => {
+  const edit = { field: 'state', from: 'open' };
+  assert.equal(noteSaid('state from open to paid', edit), 'changed state from open to paid');
+  assert.equal(noteSaid('email set to ada@pellvine.example', { field: 'email', from: null }), 'set email to ada@pellvine.example');
+  assert.equal(noteSaid('email cleared', { field: 'email', from: 'a@b.example' }), 'cleared email');
+  assert.equal(noteSaid('amount changed', { field: 'amount', from: '--redacted--' }), 'changed amount');
+  assert.equal(noteSaid('added this to Tidewell', { field: 'projects', from: [] }), 'added this to Tidewell');
 });
 
 test("A ROW A MEET MADE SAYS WHERE IT CAME FROM: a bank text, or a mail's sender, the person or the organisation", async () => {
