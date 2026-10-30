@@ -774,6 +774,9 @@ export type MintAgent = (key: string, label: string, io: SetupIo) => Promise<Hel
  */
 export const NOT_AN_OWNER_KEY = 'BRAINDOG_TOKEN holds a token rather than the server key';
 
+/** What an agent's `createToken` sends, written once, so the approval it is bound to and the request are the same bytes. */
+const agentBody = (label: string): string => JSON.stringify({ scope: 'write', label, days: AGENT_TOKEN_DAYS });
+
 /** One `createToken` with this bearer: the token made, or the refusal's code and sentence, or `null` for no answer. */
 async function createWith(key: string, bearer: string, label: string, signal: AbortSignal | undefined): Promise<Held | { code: string; fix: string } | null> {
   let res: Response;
@@ -782,7 +785,7 @@ async function createWith(key: string, bearer: string, label: string, signal: Ab
     res = await fetch(`${new URL(key).origin}/api/createToken`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
-      body: JSON.stringify({ scope: 'write', label, days: AGENT_TOKEN_DAYS }),
+      body: agentBody(label),
       redirect: 'error',
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
@@ -810,7 +813,7 @@ export const mintAgent: MintAgent = async (key, label, io) => {
     if (made === null) return `${key} did not answer`;
     return 'value' in made ? { ...made, from: keyPrint(sent) } : NOT_AN_OWNER_KEY;
   }
-  const grant = await approveOperation(key, 'token', { say: io.say, signal: io.signal, label });
+  const grant = await approveOperation(key, 'token', { say: io.say, signal: io.signal, label, body: agentBody(label) });
   if (typeof grant === 'number') return 'the approval in the app did not finish';
   const made = await createWith(key, grant.bearer, label, io.signal);
   if (made === null) return `${key} did not answer`;

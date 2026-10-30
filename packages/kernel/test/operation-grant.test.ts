@@ -65,7 +65,7 @@ test('AN IMPORT GRANT, APPROVED AND EXCHANGED, IS ADMITTED ONCE FOR IMPORT, AND 
   const bearer = await bearerFor('import');
 
   const first = value(await operationGrant(deps(), bearer));
-  assert.deepEqual({ ...first, handle: undefined }, { handle: undefined, reach: 'import', method: 'import', person: OWNER });
+  assert.deepEqual({ ...first, handle: undefined }, { handle: undefined, reach: 'import', method: 'import', person: OWNER, binds: null });
   assert.match(first.handle, /^[0-9a-f]{16}$/);
 
   /* The mutation this holds: a grant that is not spent admits twice. */
@@ -114,4 +114,23 @@ test('PAST ITS TEN MINUTES, FOR ANOTHER RECORD, OR APPROVED BY SOMEBODY SINCE SU
   assert.deepEqual(expired, moved);
   assert.deepEqual(expired, stopped);
   assert.deepEqual(refusalOf(await operationGrant(deps(), 'no-dot-at-all')), expired);
+});
+
+/* A GRANT NAMES THE ONE REQUEST IT IS FOR. It named only its method, so a `token` grant minted any scope, life and reach,
+   and an `import` grant took any file, while the approver saw only the word. Started with `binds` (the body's SHA-256),
+   the grant carries it to the host that spends it, which refuses any other body; only an operation may name one. */
+test('AN OPERATION GRANT STARTED FOR ONE BODY CARRIES THAT BODY’S HASH TO THE HOST, and only an operation may name one', async () => {
+  const { deps } = await setup();
+  const body = JSON.stringify({ scope: 'read', label: 'laptop', days: 30 });
+  const binds = await sha256(body);
+  const started = value(await deviceStart(deps(), { reach: 'token', label: 'test-box · braindog-cli · token', binds }));
+  value(await deviceApprove(deps(), OWNER, { user_code: started.user_code }));
+  const bearer = (value(await devicePoll(deps(), { device_code: started.device_code })) as Exchanged).bearer;
+  const grant = value(await operationGrant(deps(), bearer));
+  assert.equal(grant.method, 'createToken');
+  assert.equal(grant.binds, binds);
+
+  assert.equal(refusalOf(await deviceStart(deps(), { reach: 'login', label: 'test-box', binds })).at, 'binds');
+  assert.equal(refusalOf(await deviceStart(deps(), { reach: 'token', label: 'test-box', binds: 'not-a-hash' })).at, 'binds');
+  assert.equal(refusalOf(await deviceStart(deps(), { reach: 'token', label: 'test-box', binds: binds.toUpperCase() })).at, 'binds');
 });

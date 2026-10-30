@@ -550,7 +550,7 @@ export {
   type ProfileRow,
   type ProfileWho,
 } from './agent-profile.ts';
-export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type KeychainGrant, type Waiting } from './device.ts';
+export { BODY_BOUND, OPERATION_METHOD, REACHES, boundBody, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type KeychainGrant, type Waiting } from './device.ts';
 export { shapeGrant };
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
@@ -11674,7 +11674,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* ── device grants, 12 §6.1 ───────────────────────────── */
 
     /** A device asks for a code. INTERNAL: the host calls it from `/auth/device`, limited per address. */
-    deviceStart: (args: { reach: string; label: string; ua?: string; scope?: string }): Promise<Result<DeviceCode>> =>
+    deviceStart: (args: { reach: string; label: string; ua?: string; scope?: string; binds?: string }): Promise<Result<DeviceCode>> =>
       deviceStart(tokenDeps(), args),
 
     /** The owner types the six digits. A wrong code costs every pending request a try. */

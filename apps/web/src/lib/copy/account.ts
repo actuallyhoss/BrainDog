@@ -335,6 +335,8 @@ export const account = {
   codeChecking: 'Checking the code',
   codeWaitingTitle: 'Waiting for you',
   codeAsks: (means: string) => `asks to ${means}.`,
+  /* THE PRINT OF THE ONE REQUEST A COMMAND ASKED TO RUN, as the terminal shows it beside the code. */
+  requestPrint: (print: string) => `Only the request your terminal shows as ${print}.`,
   codeWaitingLeft: (min: number) => (min <= 1 ? 'under 1 min left' : `${min} min left`),
   codeSafe: 'Approve only codes you started. Each works once, for 10 minutes.',
   codeNotOwner: (record: string) => `Only the owner of ${record} can approve a machine. Ask them to open this page.`,

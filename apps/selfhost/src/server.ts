@@ -27,6 +27,8 @@ import {
   cookieMode,
   readSid,
   relyingParty,
+  boundRequest,
+  OTHER_REQUEST,
   sameKey,
   sameOrigin,
   serveAccount,
@@ -473,7 +475,7 @@ function validFrom(): string | undefined {
  * the same person at the same level through either, and `surface` is only what the token's listing shows as
  * where it was last used.
  */
-async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?: string, cli?: string): Promise<Known> {
+async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?: string, cli?: string, request?: Request): Promise<Known> {
   const { api, token } = site;
   /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
      differs, so how long a wrong guess took said how much of it was right. */
@@ -494,7 +496,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
      handed on as sent. */
   const seen = await api.kernel.verifyToken(sent, surface, validFrom(), cli);
   if (!seen.ok) {
-    if (door !== undefined && OPERATION_DOORS.has(door)) return operationFor(sent, api);
+    if (door !== undefined && OPERATION_DOORS.has(door)) return operationFor(sent, api, request);
     /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE DOORS A RUNNER CALLS AND NOWHERE ELSE,
        as the Worker's `runnerOf` reads it: the record builds the runner's context from its
        own device grants, held to the same cut-off, and every method but the JOBS ones refuses it. */
@@ -587,12 +589,15 @@ async function keychainToken(request: Request, site: Site | null): Promise<Resul
  * `operation` IS WHAT HOLDS IT TO ONE DOOR. `allows` refuses a context carrying it everywhere, and `admin` admits it only
  * for the method it names, so the approver's owner level reaches that one call and nothing a session would reach.
  */
-async function operationFor(sent: string, api: Api): Promise<Known> {
+async function operationFor(sent: string, api: Api, request?: Request): Promise<Known> {
   /* THE CUT-OFF IS A SECOND BEARER TO COVER HERE: a grant approved before it is
      refused unspent, as the token check above refuses a token. The record reads it through the `validFrom` it was
      built with, so this call and the key door's carry the same instant. */
   const grant = await api.operationGrant(sent);
   if (!grant.ok) return UNKNOWN();
+  /* AND FOR ONE BODY, when the command named it at the start (`boundRequest`). A door that hands no request here names
+     none, and a grant bound to a body is refused there rather than taken unchecked. */
+  if (grant.value.binds !== null && (request === undefined || !(await boundRequest(request, grant.value.binds)))) return { refused: OTHER_REQUEST };
   const held = api.kernel.access(grant.value.person);
   if (!held) return { refused: OFF };
   return {
@@ -619,7 +624,7 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
   /* ONE · A BEARER, which is an agent, the server key or an operation, and never a browser, so the origin checks below
      do not apply to it: nothing ambient sends an `Authorization` header. `door` is the method the path names, the one
      thing an operation bearer is checked against. */
-  if (sent !== undefined) return bearerFor(sent, site, 'api', door, cliOf(request));
+  if (sent !== undefined) return bearerFor(sent, site, 'api', door, cliOf(request), request);
 
   /* TWO · THE SESSION COOKIE. A BAD ONE IS A 401 AND IS CLEARED, AND NEVER FALLS THROUGH TO OPEN MODE: a
      cookie that names no session is somebody who thinks they are signed in, and answering them as the
@@ -2224,8 +2229,8 @@ export async function start(options: {
         ? {}
         : {
             device: {
-              start: ({ ip, reach, label, scope, ua }) =>
-                api.deviceStart({ reach, label, ...(scope === undefined ? {} : { scope }), ...(ua === undefined ? {} : { ua }) }, ip),
+              start: ({ ip, reach, label, scope, binds, ua }) =>
+                api.deviceStart({ reach, label, ...(scope === undefined ? {} : { scope }), ...(binds === undefined ? {} : { binds }), ...(ua === undefined ? {} : { ua }) }, ip),
               poll: ({ device_code }) => api.devicePoll({ device_code }),
             },
           }),

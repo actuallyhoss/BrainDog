@@ -2058,7 +2058,7 @@ export class Record$ extends DurableObject<Env> {
    * AN RPC AND NEVER A ROUTE, like `create`: `deviceStart` and `devicePoll` are INTERNAL, because the device has
    * no credential to check yet.
    */
-  async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
+  async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string; binds?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     return broken ? { ok: false, refusal: broken } : api.deviceStart(args, ip);
@@ -3044,7 +3044,7 @@ function bearerDeps(env: Env): BearerDeps {
        before its grant is read, so the ask again after a reset spends it once, and a 503 spends nothing. */
     operation: async (id, bearer) => {
       const out = (await held<unknown>(env, id, (record) => record.operationGrant(bearer))) as Result<OperationGrant>;
-      return out.ok ? { method: out.value.method, person: out.value.person } : null;
+      return out.ok ? { method: out.value.method, person: out.value.person, binds: out.value.binds ?? null } : null;
     },
   };
 }

@@ -15981,7 +15981,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * NO `CallContext`, because the device has no credential yet. What stands in for one is the address it came
      * from, counted before anything is written, and the approval a person gives elsewhere.
      */
-    async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
+    async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string; binds?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
       const wait = counted(`device:${ip}`);
       if (wait !== null) return { ok: false, retryAfter: wait };
       /* A PROJECT IS NAMED THE WAY A PERSON SAYS IT, `things#3`, and the grant holds its row id, which is what a

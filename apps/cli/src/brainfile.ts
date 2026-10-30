@@ -157,7 +157,8 @@ async function admin(host: { key: string; url: URL }, method: 'export' | 'import
     const approval = refusal?.code === 'NEEDS_BROWSER_SESSION' || (first.status === 401 && held === undefined);
     if (!approval) return first.result;
   }
-  const grant = await approveOperation(host.key, method, io);
+  /* BOUND TO THIS BODY (`binds`), which `post` sends as `JSON.stringify(args)` and nothing else. */
+  const grant = await approveOperation(host.key, method, { ...io, body: JSON.stringify(args) });
   if (typeof grant === 'number') return grant;
   return (await post(host, method, args, grant.bearer, io)).result;
 }

@@ -34,7 +34,7 @@ export const DEVICE_ROUTES: readonly AuthRoute[] = [
 const CODE_SECONDS = 600;
 
 /** What a device asks for. `slug` names the record on a host with more than one; `ua` and `ip` are the host's. */
-export type DeviceAsk = { slug?: string; reach: string; label: string; scope?: string; ua?: string; ip: string };
+export type DeviceAsk = { slug?: string; reach: string; label: string; scope?: string; binds?: string; ua?: string; ip: string };
 
 /** The record's half, as a host reaches it: in process on the self-host, over RPC on the Worker. */
 export type DeviceDoor = {
@@ -129,6 +129,8 @@ export async function serveDevice(request: Request, route: AuthRoute, door: Door
     reach: text(body.reach),
     label: text(body.label),
     ...(typeof body.scope === 'string' ? { scope: body.scope } : {}),
+    /* THE ONE REQUEST AN OPERATION GRANT IS FOR, by its body's SHA-256: the record checks its shape. */
+    ...(typeof body.binds === 'string' ? { binds: body.binds } : {}),
     ...(ua ? { ua: ua.slice(0, 200) } : {}),
     ip: door.ip,
   });

@@ -779,6 +779,28 @@ export function sessionContext<L extends string>(
   };
 }
 
+/**
+ * Whether a request is the one an operation grant was started for: its body's SHA-256 is the grant's `binds`, or the
+ * grant named none. Read from a copy, so the body is still there for the record.
+ *
+ * AN OPERATION GRANT NAMED ITS METHOD AND NOT ITS ARGUMENTS, so a `token` grant minted any scope, life and reach, and an
+ * `import` grant took any file, while the person approving had seen only the word. A command that names its body when
+ * it starts (`binds` on `/auth/device`) is held to that body here, on both hosts, after the grant is spent.
+ */
+export async function boundRequest(request: Request, binds: string | null | undefined): Promise<boolean> {
+  if (binds === null || binds === undefined) return true;
+  const bytes = new Uint8Array(await request.clone().arrayBuffer());
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('') === binds;
+}
+
+/** What a request under an operation grant started for another body is told. The grant is spent, so it is started again. */
+export const OTHER_REQUEST: Refusal = {
+  code: 'FORBIDDEN',
+  fix: 'This approval was for one request, and this is a different one, so nothing was done. Start the command again and approve it.',
+  at: 'operation',
+};
+
 /** The header the app sends on every call while an owner or Admin is seeing the record as somebody (§3.3). */
 export const SEE_AS_HEADER = 'x-braindog-as';
 
