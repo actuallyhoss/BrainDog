@@ -2,7 +2,7 @@
  * What somebody invited to one list is told when they reach for the record itself.
  *
  * Measured: nine methods (`inbox`, `packs`, `whoami`, `members`, `slash`, `listGrants`, `actions`, `planPack`,
- * `decide`) answering a one-list colleague with "Name one of those, or ask the owner for a record-wide token." That
+ * `decide`) answering a one-list colleague with "Name one of those, or ask the owner for a token for all of it." That
  * sentence is right for an agent's token, which is what it was written for. The colleague is a person who signed in
  * from an invitation, holds no token and was never offered one, and it is the sentence on `/inbox`, `/slash`, `/packs`
  * and every `/start` tile. A person is told about their invitation; a token is still told about tokens.
@@ -64,7 +64,7 @@ test('A PERSON INVITED TO ONE LIST IS NOT TOLD TO ASK FOR A TOKEN, by `allows` o
 test('and a token held to one list is still told about tokens, because a wider one is what its owner can mint', () => {
   const scoped = allows({ principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: null }, registers: ['tasks'] }, 'read');
   assert.equal(scoped?.code, 'FORBIDDEN');
-  assert.match(scoped!.fix, /ask the owner for a record-wide token\.$/);
+  assert.match(scoped!.fix, /ask the owner for a token for all of it\.$/);
   const bare = allows({ principal: { kind: 'token', id: 't_2', scope: 'read', person: 'p_1', level: null }, registers: [] }, 'read');
   assert.match(bare!.fix, /Ask the owner for a token\.$/);
 });

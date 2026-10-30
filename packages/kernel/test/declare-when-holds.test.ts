@@ -85,7 +85,7 @@ test('A REQUIRED FIELD MAY NOT WAIT, because a field that comes and goes cannot 
 
 test('A PART NOBODY PLANNED IS REFUSED AT THE INSTALL, and nothing is written', async () => {
   const waiting = list([{ id: 'contact', type: 'text', when: PEOPLE }]);
-  assert.match(unplannedHolds([waiting])?.fix ?? '', /register\.clients\.fields\[1\] waits for what the record holds/u);
+  assert.match(unplannedHolds([waiting])?.fix ?? '', /register\.clients\.fields\[1\] waits for what this BrainDog holds/u);
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   const out = await k.install([waiting]);
   assert.equal(out.ok, false);

@@ -782,7 +782,7 @@ test('A GENERATOR WITH NO CEILING IS REFUSED AT INSTALL, and again at run time',
   const none = await k.install([unbounded]);
   assert.equal(none.ok, false);
   assert.equal((none as { refusal: { code: string } }).refusal.code, 'CREATE_UNBOUNDED');
-  assert.match((none as { refusal: { fix: string } }).refusal.fix, /no ceiling fills the record/u);
+  assert.match((none as { refusal: { fix: string } }).refusal.fix, /no ceiling fills your BrainDog/u);
 
   /* AND A `create` THAT IS NOT AN OBJECT AT ALL INSTALLED CLEANLY AND FIRED ON NOTHING FOR EVER.
      `null`, a string and a number all fell through the same early return as "there is no create
