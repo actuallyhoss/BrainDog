@@ -36,6 +36,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.ts",
+    "conformance:compare": "node --test test/conformance/compare.run.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }
