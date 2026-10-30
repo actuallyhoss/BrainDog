@@ -76,6 +76,8 @@ password). Export the real values in the shell that runs `cargo tauri build`; th
   which takes `/download` out of the site's held list. `brain.dog/desktop/*` redirects to the bucket
   (`apps/site/static/_redirects`). It needs `CLOUDFLARE_API_TOKEN` (R2 edit) and `CLOUDFLARE_ACCOUNT_ID` in the
   environment or `signing.env`, or `wrangler login`. Commit desktop.ts with a changelog entry, then deploy the site.
+  A publish that stopped after its build (an upload that failed, or the dmg not answering yet) is finished with
+  `--upload-only`, which builds nothing and sends what `apps/desktop/dist` holds, even when that version is live.
 
 ## Not done yet
 

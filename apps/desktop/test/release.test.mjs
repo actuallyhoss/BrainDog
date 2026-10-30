@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { archiveOf, compareVersions, developerId, entitlementsFor, envFile, feedOf, teamOf, uploadsOf, withVersion } from '../../../tools/desktop/release.mjs';
+import { archiveOf, compareVersions, developerId, distMissing, entitlementsFor, envFile, feedOf, liveRefusal, teamOf, uploadsOf, withVersion } from '../../../tools/desktop/release.mjs';
 import { CONF, configPubkey, withPubkey } from '../../../tools/desktop/updater-key.mjs';
 
 test('ONLY A DEVELOPER ID SIGNS FOR OTHER MACS: an Apple Development identity is not one', () => {
@@ -75,4 +75,24 @@ test('A PROVISIONED BUILD SIGNS WITH THE ASSOCIATED DOMAINS AND THE TEAM\'S APPL
   assert.equal(teamOf(null), null);
   const conf = JSON.parse(readFileSync(CONF, 'utf8'));
   assert.equal(conf.bundle.macOS.entitlements, undefined, 'Associated Domains in the config would get an unprovisioned build killed at launch');
+});
+
+/* RD9: A PUBLISH THAT STOPPED AFTER ITS UPLOAD SAID "RUN --publish AGAIN", and the run again found its own version live
+   and stopped, after building and notarising for twenty minutes. `--upload-only` builds nothing and may finish it. */
+test('RD9: A BUILD MUST BE NEWER THAN WHAT IS LIVE; AN UPLOAD OF FILES ALREADY BUILT MAY BE THE SAME VERSION', () => {
+  assert.equal(liveRefusal('0.2.0', null, false), null);
+  assert.equal(liveRefusal('0.2.1', '0.2.0', false), null);
+  assert.match(liveRefusal('0.2.0', '0.2.0', false) ?? '', /--upload-only/u);
+  assert.match(liveRefusal('0.1.9', '0.2.0', false) ?? '', /not newer/u);
+  assert.equal(liveRefusal('0.2.0', '0.2.0', true), null);
+  assert.equal(liveRefusal('0.2.1', '0.2.0', true), null);
+  assert.match(liveRefusal('0.1.9', '0.2.0', true) ?? '', /older/u);
+});
+
+test('RD9: --upload-only NAMES WHAT dist DOES NOT HOLD FOR THE VERSION, the feed included', () => {
+  const all = ['BrainDog.dmg', archiveOf('0.2.0'), 'latest.json'];
+  assert.deepEqual(distMissing(all, '0.2.0', '0.2.0'), []);
+  assert.deepEqual(distMissing(['BrainDog.dmg', 'latest.json'], '0.2.0', '0.2.0'), [archiveOf('0.2.0')]);
+  assert.deepEqual(distMissing(all, '0.1.9', '0.2.0').length, 2);
+  assert.deepEqual(distMissing([], null, '0.2.0').sort(), [archiveOf('0.2.0'), 'BrainDog.dmg', 'latest.json'].sort());
 });
