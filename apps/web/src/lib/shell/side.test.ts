@@ -156,6 +156,15 @@ test('A PAGE A PLACE DECLARES AND THE LIST OF THE SAME NAME ARE ONE ROW: the pag
   const kids = m.places.find((p) => p.label === 'Money')?.kids ?? [];
   /* AND THE FILING RULES ARE NO ROW AT ALL (audit of 30 October, 40): they open from the Ledger they file. */
   assert.deepEqual(kids.map((k) => `${k.label} ${k.href}`), ['Accounts /p/money-accounts', 'Ledger /p/money-ledger', 'Categories /r/categories']);
+  /* AND THE PAGE ANSWERS FOR ITS LIST (F33): an account's own page is placed by its list, and read "Accounts › HSBC"
+     with no Money before it. */
+  assert.equal(litOf('/r/accounts', m), '/p/money-accounts');
+  assert.equal(litOf('/r/accounts/4', m), '/p/money-accounts');
+  assert.deepEqual(crumbOf('/p/accounts%234', m, null, 'HSBC (EGP)', null, { label: 'Accounts', href: '/r/accounts' }), [
+    { label: 'Money', href: '/p/money' },
+    { label: 'Accounts', href: '/p/money-accounts' },
+    { label: 'HSBC (EGP)' },
+  ]);
 });
 
 test('EXACTLY ONE ROW IS LIT: the row the page is on most closely, a list over its place and a project over Projects', () => {
