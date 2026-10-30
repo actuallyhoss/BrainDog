@@ -262,7 +262,7 @@
       {#each model.reserved as r (r.key)}<div class="reserve" data-size={r.size} style="grid-area:{r.area}" aria-hidden="true"></div>{/each}
       {#if model.editing && !model.asList}
         <!-- A CELL NOTHING FILLS, while editing: drawn, so a gap a smaller size left is seen as room, not as a fault. -->
-        {#each model.holes as h (h)}<div class="hole" style="grid-area:{h}" aria-hidden="true"></div>{/each}
+        {#if model.held !== null}{#each model.holes as h (h)}<div class="cell-hole" style="grid-area:{h}" aria-hidden="true"></div>{/each}{/if}
       {/if}
     </div>
     {#if mayEdit && !model.editing && todayOffer.offer !== null}
@@ -271,6 +271,22 @@
       <div class="suggest">{#await suggestPart() then { default: SuggestCell }}<SuggestCell onadd={added} {onremove} />{/await}</div>
     {/if}
   </div>
+
+  {#if model.editing && model.quietNow.length > 0}
+    <!-- ON THE BOARD WITH NOTHING TO SHOW NOW (audit 31 Oct, A17): each by its name and why, so the empty widget is not an
+         unnamed box on the board, and taking no cell it moves nothing. It shows again where it stands once it has
+         something; Hide takes it off as the tray does. -->
+    <div class="quiet" role="group" aria-label={boardWords.quietHead}>
+      <span class="tray-name"><Icon name="clock" size="s" />{boardWords.quietHead}</span>
+      {#each model.quietNow as w (w.key)}
+        <span class="quiet-one">
+          <span class="quiet-name">{model.nameOf(w.key)}</span>
+          <span class="quiet-said">{boardWords.quiet(w.key)}</span>
+          <button type="button" class="ico" aria-label={boardWords.remove(model.nameOf(w.key))} title={boardWords.remove(model.nameOf(w.key))} onclick={() => model.hide(w.key)}><Icon name="x" size="s" /></button>
+        </span>
+      {/each}
+    </div>
+  {/if}
 
   {#if model.editing && !model.asList}
     <!-- THE TRAY (§5.2): drag a widget here to hide it; it keeps its setup, and a press puts it back. -->
@@ -545,10 +561,53 @@
 
   /* ── editing ── */
 
-  .hole {
+  /* NOT `.hole`, which is the skin's red word to fill in (`blocks.css`) and drew every empty cell as a pink box. */
+  .cell-hole {
     border: 1.5px dashed var(--rule);
     border-radius: 22px;
     pointer-events: none;
+  }
+
+  /* THE WIDGETS WITH NOTHING TO SHOW NOW, over the tray: a line each, its name, why, and Hide. */
+  .quiet {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .quiet-one {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .quiet-name {
+    flex: none;
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .quiet-said {
+    min-inline-size: 0;
+    color: var(--ink-3);
+  }
+
+  /* ON A PHONE A LINE EACH, the name whole, why beside it, Hide at the end. */
+  @media (width < 720px) {
+    .quiet-one {
+      flex: 1 1 100%;
+    }
+
+    .quiet-said {
+      flex: 1;
+    }
   }
 
   /* THE BAR FLOATS OVER THE BOARD'S FOOT, so the board keeps room under its last row and the tray for it. */

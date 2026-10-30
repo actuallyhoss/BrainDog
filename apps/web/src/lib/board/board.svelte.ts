@@ -72,6 +72,8 @@ export const boardWords = {
   changedSaid: (name: string) => `${name} changed. Done keeps it.`,
   widgetHint: 'Enter to pick up, arrows to move, Shift and arrows to resize, E to change it, Delete to hide.',
   widget: 'widget',
+  quietHead: 'Nothing to show now',
+  quiet: (key: string) => (key === 'arrivals' ? 'nothing new since you last looked' : 'shows here when there is something'),
 } as const;
 
 /* A JSON COPY OF THE PHONE'S ARRANGEMENT, NOT `$state.snapshot`, whose clone sits in the Svelte chunk every screen's entry
@@ -97,7 +99,10 @@ export class BoardModel {
    * without a step of its own between them: the widgets as the record declared them, in order; the phone's arrangement;
    * the widgets drawn now (one with nothing to show takes no cell); and each widget's name, for the editor's words.
    */
-  src: { widgets: () => Widget[]; phone: () => Phone | null; shown: () => ReadonlySet<string>; names: () => ReadonlyMap<string, string>; drafts?: () => ReadonlySet<string> } = {
+  /* AND `quiet`: the widgets on the board with nothing to show now (Arrivals once seen). At rest they take no cell; while
+     the board is edited each takes its own, drawn as a named quiet tile, so it is seen, moved, sized or hidden there and
+     not left as an empty box nobody can name (audit 31 Oct, A17). */
+  src: { widgets: () => Widget[]; phone: () => Phone | null; shown: () => ReadonlySet<string>; names: () => ReadonlyMap<string, string>; drafts?: () => ReadonlySet<string>; quiet?: () => ReadonlySet<string> } = {
     widgets: () => [],
     phone: () => null,
     shown: () => new Set(),
@@ -215,6 +220,14 @@ export class BoardModel {
     return [...this.places.values()].filter((p) => !shown.has(p.key) && this.hadCell.has(p.key)).map((p) => ({ key: p.key, area: p.area, size: p.size }));
   }
 
+  /** While editing, the widgets on the board with nothing to show now, in the board's order: named beside the tray. */
+  get quietNow(): Widget[] {
+    if (!this.editing) return [];
+    const quiet = this.src.quiet?.() ?? new Set<string>();
+    const shown = this.shown;
+    return this.laidWidgets.filter((w) => quiet.has(w.key) && !shown.has(w.key));
+  }
+
   /** The board packed: only what is drawn takes a cell, and an added widget always does. */
   packed: Packed = $derived.by(() => {
     const cols = this.onPhone ? 2 : 4;
@@ -228,9 +241,12 @@ export class BoardModel {
   });
 
   /** Each widget's place, by key. */
-  /* AT REST NO HOLE IS DRAWN (`filled`): a widget beside one is drawn across it. EDITING, the board as packed, holes shown. */
+  /* AT REST NO HOLE IS DRAWN (`filled`): a widget beside one is drawn across it. EDITING, THE SAME, so entering the mode
+     moves nothing (audit 31 Oct, A17: People halved beside a hole the moment Edit was pressed). ONLY WHILE A WIDGET IS
+     HELD, by the pointer or the keys, is the board drawn as packed, holes and all, so a drag or a resize lands in whole
+     cells and the room a smaller size leaves is seen. */
   places: ReadonlyMap<string, Place> = $derived(
-    new Map((this.editing ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4)).map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }])),
+    new Map((this.editing && this.held !== null ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4)).map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }])),
   );
 
   /** A widget's place, or `null` where it takes none. */
