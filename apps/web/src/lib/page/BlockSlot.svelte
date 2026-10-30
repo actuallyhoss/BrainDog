@@ -903,7 +903,7 @@
     </div>
   {/if}
   {#if linesPlan && moneyLooks.view === 'cards'}
-    <LedgerCards columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} plan={linesPlan} />
+    <LedgerCards columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} plan={linesPlan} home={homeCurrency()} {now} />
   {:else}
   <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} />
   {/if}

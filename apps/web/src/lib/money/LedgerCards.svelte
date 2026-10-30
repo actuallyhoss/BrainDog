@@ -5,9 +5,15 @@
   read off its own columns by field, so nothing is worked out here: a column the table does not hold is a line not said.
 
   `cardsOf` answers null where the table has no day or no amount, and the page draws its table as before.
+
+  AN ADD-ON'S OWN COLUMNS STAY (V2 of 30 Oct): Tax's "Set aside" and "At", Receipts' "Receipt", any column the card has no
+  place for, are said on a line of their own under the name, each by its label. They were dropped, so the cards said
+  less than the table they stand for. AND EVERY FIGURE IS WRITTEN AS THE TABLE WRITES IT (`tableCellBody`, with the
+  record's home currency): the cards printed the stored "GBP 1,070.25" where the table beside them said "£1,070.25".
+  A TABLE WITH NO CATEGORY DRAWS NO CHIP, since a "?" on every line said "not filed" about lines nobody asked to file.
 -->
 <script module lang="ts">
-  import type { Column as TableColumn, TableRow } from 'braindog-render';
+  import { tableCellBody, type Column as TableColumn, type TableRow } from 'braindog-render';
 
   const pick = (columns: readonly TableColumn[], fields: readonly string[]): number => {
     for (const f of fields) {
@@ -17,7 +23,8 @@
     return -1;
   };
 
-  export type Plan = { day: number; title: number[]; category: number; account: number; amount: number; after: number; chip: number };
+  /** `extras` are the columns the card has no place of its own for, in the table's order, each said by its label. */
+  export type Plan = { day: number; title: number[]; category: number; account: number; amount: number; after: number; chip: number; extras: number[] };
 
   /** Where each part of a ledger line is among the table's columns, or null where it is no ledger. */
   export function cardsOf(columns: readonly TableColumn[]): Plan | null {
@@ -26,7 +33,7 @@
     if (day < 0 || amount < 0) return null;
     const title = ['payee', 'what', 'title', 'name'].map((f) => columns.findIndex((c) => c.field === f)).filter((i) => i >= 0);
     if (title.length === 0) return null;
-    return {
+    const plan = {
       day,
       title,
       category: columns.findIndex((c) => c.field === 'category' && c.as !== 'chip'),
@@ -35,6 +42,21 @@
       after: pick(columns, ['balance_after', 'available']),
       chip: columns.findIndex((c) => c.as === 'chip'),
     };
+    const placed = new Set([plan.day, ...plan.title, plan.category, plan.account, plan.amount, plan.after, plan.chip]);
+    const extras = columns.flatMap((c, i) => (placed.has(i) || c.hideLabel || c.label.trim() === '' ? [] : [i]));
+    return { ...plan, extras };
+  }
+
+  /**
+   * A cell as the table beside the cards writes it: a figure in the record's home currency ("£1,070.25", "+£4,000.00"),
+   * a day in the reader's year, other words as they are. `home` is `undefined` where the caller was never told, as the
+   * table reads it.
+   */
+  export function cellSaid(value: string | null | undefined, home?: string | null, now?: number): string {
+    const body = tableCellBody(plain(value) || null, home, now).body;
+    if (body.kind === 'missing') return '';
+    if (body.kind === 'coded') return body.amount?.text ?? `${body.sign}${body.currency} ${body.rest}`;
+    return body.text;
   }
 
   /** A cell's words, with a link's text kept and its address dropped. */
@@ -52,20 +74,39 @@
   import { at } from '../at.ts';
   import { TIMELINE_BETWEEN } from 'braindog-render';
 
-  let { columns, rows, plan }: { columns: readonly TableColumn[]; rows: readonly TableRow[]; plan: Plan } = $props();
+  let {
+    columns,
+    rows,
+    plan,
+    home,
+    now,
+  }: {
+    columns: readonly TableColumn[];
+    rows: readonly TableRow[];
+    plan: Plan;
+    /** The record's home currency, as the table is handed it; `undefined` writes figures as they came. */
+    home?: string | null | undefined;
+    /** The record's clock, so a day in this year is said without its year. */
+    now?: number | undefined;
+  } = $props();
 
-  type Line = { key: string; title: string; under: string; amount: string; after: string; href: string | null; category: string; inflow: boolean; between: boolean; tone: TableRow['tone'] };
+  type Extra = { label: string; value: string };
+  type Line = { key: string; title: string; under: string; amount: string; after: string; extras: Extra[]; href: string | null; category: string; inflow: boolean; between: boolean; tone: TableRow['tone'] };
   type Day = { day: string; lines: Line[] };
 
   const days = $derived.by(() => {
     const out: Day[] = [];
     for (const r of rows) {
-      const day = plain(r.cells[plan.day]);
+      const day = cellSaid(r.cells[plan.day], undefined, now);
       const title = plan.title.map((i) => plain(r.cells[i])).find((t) => t !== '') ?? '';
       const category = plan.category >= 0 ? plain(r.cells[plan.category]) : '';
       const account = plan.account >= 0 ? plain(r.cells[plan.account]) : '';
-      const amount = plain(r.cells[plan.amount]);
-      const after = plan.after >= 0 ? plain(r.cells[plan.after]) : '';
+      const amount = cellSaid(r.cells[plan.amount], home, now);
+      const after = plan.after >= 0 ? cellSaid(r.cells[plan.after], home, now) : '';
+      const extras = plan.extras.flatMap((i): Extra[] => {
+        const value = cellSaid(r.cells[i], home, now);
+        return value === '' ? [] : [{ label: columns[i]?.label ?? '', value }];
+      });
       /* A MOVE BETWEEN YOUR OWN ACCOUNTS (the chip's `between`): no "?" and no green, as the Ledger draws it. */
       const between = plan.chip >= 0 && plain(r.cells[plan.chip]) === TIMELINE_BETWEEN;
       const line: Line = {
@@ -74,6 +115,7 @@
         under: [category, account].filter(Boolean).join(' · '),
         amount,
         after,
+        extras,
         href: r.href ?? null,
         category,
         inflow: amount.startsWith('+') && !between,
@@ -87,6 +129,8 @@
     return out;
   });
   const afterLabel = $derived(plan.after >= 0 ? (columns[plan.after]?.label ?? '') : '');
+  /* A CHIP ONLY WHERE THE TABLE SAYS A CATEGORY: with none, a "?" on every line read as "not filed". */
+  const chipped = $derived(plan.chip >= 0 || plan.category >= 0);
 </script>
 
 <ol class="lc">
@@ -97,14 +141,21 @@
         {#each d.lines as l (l.key)}
           {@const look = l.between ? { glyph: 'repeat', slot: 'slate' } : looks.category(l.category)}
           <li>
-            <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone}>
-              <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} aria-hidden="true"
-                >{#if look}<Icon name={look.glyph as IconName} size="s" />{:else}?{/if}</span
-              >
+            <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone} data-chipless={chipped ? undefined : ''}>
+              {#if chipped}
+                <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} aria-hidden="true"
+                  >{#if look}<Icon name={look.glyph as IconName} size="s" />{:else}?{/if}</span
+                >
+              {/if}
               <span class="lc-title">{l.title || l.category || '—'}</span>
               <span class="lc-amount num" data-sign={l.inflow ? 'in' : undefined}>{l.amount}</span>
               {#if l.under}<span class="lc-under">{l.under}</span>{/if}
               {#if l.after}<span class="lc-after num"><span class="sr-only">{afterLabel} </span>{l.after}</span>{/if}
+              {#if l.extras.length > 0}
+                <span class="lc-more">
+                  {#each l.extras as x, i (i)}<span class="lc-extra">{#if x.label}<span class="lc-k">{x.label}</span>{' '}{/if}<span class="num">{x.value}</span></span>{/each}
+                </span>
+              {/if}
             </svelte:element>
           </li>
         {/each}
@@ -142,7 +193,8 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       'chip title amount'
-      'chip under after';
+      'chip under after'
+      'chip more more';
     column-gap: var(--sp-3);
     row-gap: 2px;
     align-items: center;
@@ -150,6 +202,15 @@
     padding-block: var(--sp-2);
     color: inherit;
     text-decoration: none;
+  }
+
+  /* NO CHIP, NO CHIP COLUMN: the name starts at the edge. */
+  .lc-line[data-chipless] {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title amount'
+      'under after'
+      'more more';
   }
 
   a.lc-line:hover .lc-title {
@@ -199,6 +260,21 @@
 
   .lc-amount[data-sign='in'] {
     color: var(--good);
+  }
+
+  /* THE ADD-ON'S OWN COLUMNS, each label then its value, wrapping as a sentence does. */
+  .lc-more {
+    grid-area: more;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px var(--sp-4);
+    min-inline-size: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .lc-k {
+    color: var(--ink-3);
   }
 
   .lc-after {
