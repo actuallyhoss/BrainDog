@@ -197,7 +197,7 @@ const head = (text: string, most: number): string => {
 const visible = (text: string): string => text.replace(/[\p{Cc}]/gu, ' ');
 
 const USAGE =
-  'braindog runner takes enrol <host>, repos add <name> <folder>, repos list, run [--once] [--host <host>] or allow <kind>.';
+  'braindog runner takes enrol <host>, repos add <name> <folder>, repos list, run [--once] [--host <host>], allow <kind> or service on|off|status.';
 
 /** `braindog runner <verb>`, and the exit code the verb decides. */
 export async function runner(args: string[], io: RunnerIo): Promise<number> {

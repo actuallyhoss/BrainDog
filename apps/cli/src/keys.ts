@@ -12,7 +12,8 @@
  * key back, and that still takes keychain access and nothing else.
  *
  * THE VALUE IS NEVER AN ARGUMENT. `put` reads it from standard input, because an argument is kept in shell history
- * and shown in every process list.
+ * and shown in every process list; at a terminal it asks for it with echo off (`secret`), one line, and nothing typed
+ * is shown or kept.
  *
  * AND ONE FUNCTION PRINTS A KEY, TO A PROGRAM AND NEVER TO A PERSON. `exec` reads one back and puts it into the
  * environment of the command after `--`, under one variable, and nowhere else: not standard output, not standard
@@ -43,7 +44,7 @@ import { win32 } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { unbom } from './unbom.ts';
-import { hostKey, inTheClear, readHosts, target } from './http.ts';
+import { hostKey, inTheClear, readHosts, target, type Target } from './http.ts';
 import type { Answering } from './json.ts';
 import { keysList } from './keys-list.ts';
 import { keysPutMany } from './keys-many.ts';
@@ -64,6 +65,12 @@ export type KeysIo = {
   env: Record<string, string | undefined>;
   /** Standard input read whole, or `null` when it is a terminal and nobody piped anything in. */
   stdin: () => string | null;
+  /**
+   * `put` AT A TERMINAL: one line typed or pasted after the question, with nothing echoed, or `null` when it was
+   * stopped (Ctrl+C) or there is no terminal to ask at. Absent where nothing can be asked, and then `put` says to pipe
+   * the value in, as it always did.
+   */
+  secret?: ((question: string) => Promise<string | null>) | undefined;
   /** One line to stdout, which `list` alone prints: `process.stdout` unless a test or `--json` keeps the lines. */
   out?: ((line: string) => void) | undefined;
   /** One line to stderr. */
@@ -200,7 +207,7 @@ const aFile = (path: string): boolean => {
 };
 
 /** Where a request goes and what it carries: keychain access for `scope`, or, for `put` alone, the login (`login`). */
-type Door = { key: string; base: string; bearer: string; scope: string; login: boolean };
+type Door = { key: string; base: string; bearer: string; scope: string; login: boolean; from?: Target['from'] };
 type Answer = { status: number; body: Record<string, unknown> | null };
 
 /**
@@ -243,7 +250,7 @@ function doorFor(flags: { host?: string | undefined; vault?: string | undefined 
   } catch (e) {
     return e instanceof Error ? e.message : granted;
   }
-  if (to.token) return { key: to.key, base: to.base, bearer: to.token, scope: '', login: true };
+  if (to.token) return { key: to.key, base: to.base, bearer: to.token, scope: '', login: true, ...(to.from ? { from: to.from } : {}) };
   /* NEITHER IS KEPT, and the sentence still names keychain access, which is what `tools scan` reads to say why a key it
      found was kept by name only. */
   return `No keychain access or login is kept for ${to.key}. Run braindog login ${to.key}.`;
@@ -299,6 +306,10 @@ function refusedLine(door: Door, answer: Answer): string {
   const refusal = answer.body?.ok === false && isObject(answer.body.refusal) ? answer.body.refusal : null;
   /* A LOGIN THE HOST DID NOT KNOW IS ANSWERED IN THE VAULT GRANT'S WORDS, `at: 'vault'`, because the door asks for a grant
      first and cannot tell which of the two was meant; this side knows it sent the login. */
+  /* BRAINDOG_TOKEN IS NO LOGIN TO SIGN IN AGAIN (D26): a self-host's server key, or a token the deposit door does not
+     take. Keychain access is the way in, and once it is kept it is sent before the variable. */
+  if (door.login && door.from === 'env' && (answer.status === 401 || refusal?.at === 'vault'))
+    return `${door.key} did not take the token in BRAINDOG_TOKEN for a key: only this machine's login, an agent's write token or keychain access adds one, and a self-host's server key is none of those. Run braindog login ${door.key} --keychain <project>, then put the key again.`;
   if (answer.status === 401 || (door.login && refusal?.at === 'vault'))
     return door.login
       ? `${door.key} did not take the login. Run braindog login ${door.key}, or braindog login ${door.key} --keychain <project>.`
@@ -495,14 +506,16 @@ export function variableOf(label: string): string {
     .replace(/^[0-9_]+/, '');
 }
 
-const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --keychain and --host, and reads the value from standard input.';
+const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --keychain and --host, and reads the value from standard input, or asks for it at a terminal.';
 const USAGE_EXEC = 'braindog keys exec takes one label or credentials#n, --as, --keychain and --host, then -- and the command to run.';
 const USAGE_HEADERS = 'braindog keys headers takes one label or credentials#n, --as with the header name, --keychain and --host, and nothing else.';
 const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --keychain and --host, and nothing else.';
 
 /** `braindog keys list|put|scan|exec|headers|helper`, and the exit code: for `exec`, the command's own once it has run. */
 export async function keys(args: string[], io: KeysIo): Promise<number> {
-  const [verb, ...all] = args;
+  /* `keys run` IS `keys exec`, as the top-level `run` is: the help named the pair, and the verb was refused. */
+  const [said, ...all] = args;
+  const verb = said === 'run' ? 'exec' : said;
   /* `list` READS THE INDEX AND OPENS NOTHING, so it has a file and a path of its own (`keys-list.ts`). */
   if (verb === 'list') return keysList(all, io);
   /* `scan` READS NAMES AND SENDS NOTHING, and `put --from` READS A FILE OR A FOLDER OF KEYS, so each has a file of its
@@ -511,7 +524,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
   if (verb === 'put' && all.some((a) => a === '--from' || a.startsWith('--from='))) return keysPutMany(all, io);
   if (verb !== 'put' && verb !== 'exec' && verb !== 'headers' && verb !== 'helper') {
     io.say(
-      'braindog keys takes put <label>, with the value on standard input, put --from <file or folder>, scan [<folder>], exec <label> -- <command>, headers <credential> --as <Header>, helper <credential>, or list.',
+      'braindog keys takes put <label>, with the value piped in or typed when asked, put --from <file or folder>, scan [<folder>], exec <label> -- <command>, headers <credential> --as <Header>, helper <credential>, or list.',
     );
     return REFUSED;
   }
@@ -583,15 +596,23 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
 
   let value: Plaintext | null = null;
   if (verb === 'put') {
-    const read = io.stdin();
+    let read = io.stdin();
+    /* AT A TERMINAL IT ASKS, with nothing echoed: the value is never on the screen, in argv or in shell history. A pipe
+       is read as it always was. */
+    const typed = read === null && io.secret !== undefined;
+    if (typed) read = await io.secret!('Paste or type the key, then press Enter (nothing you type is shown): ');
     if (read === null) {
-      io.say('braindog keys put reads the value from standard input, so pipe it in; a value is never an argument, because shell history keeps those.');
+      io.say(
+        typed
+          ? 'Nothing was deposited.'
+          : 'braindog keys put reads the value from standard input, so pipe it in, or run it at a terminal to be asked; a value is never an argument, because shell history keeps those.',
+      );
       return REFUSED;
     }
     /* One trailing newline is what `echo` and a file's last line add, and never part of a key. */
     value = unbom(read).replace(/\r?\n$/, '') as Plaintext;
     if (!value) {
-      io.say('Standard input was empty, so nothing was deposited.');
+      io.say(typed ? 'Nothing was typed, so nothing was deposited.' : 'Standard input was empty, so nothing was deposited.');
       return REFUSED;
     }
   }

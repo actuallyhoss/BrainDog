@@ -286,6 +286,10 @@ const version = (): string => `app ${build()} · format ${FORMAT_VERSION} · ker
  */
 const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(envelope)}\n`);
 
+/** What `--json` is, said the same at the foot of `--help` and of the whole usage. */
+const JSON_LINE =
+  '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, the sync verbs but inventory, starter preview, addon preview, init and serve do not take it.';
+
 const fullUsage = () =>
   [
     'braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>] [--statusline]',
@@ -298,7 +302,7 @@ const fullUsage = () =>
     'braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]',
     '  The keys your BrainDog holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. Never a value.',
     'braindog keys put <label> [--opens <what>] [--kind <kind>] [--keychain <project>] [--host <host>]',
-    '  Deposit the value on standard input as a key. The host seals it, and it is never an argument.',
+    '  Deposit a key. Pipe its value in on standard input, or run it at a terminal and paste or type the value when asked: nothing you type is shown. The host seals it, and it is never an argument.',
     'braindog keys put --from <file or folder> [--project <name>] [--opens <what>] [--kind <kind>] [--dry-run] [--host <host>]',
     '  Seal every key in a file of NAME=value lines, or a folder of one key a file, asking you about each on the terminal first. Names are printed, never a value.',
     'braindog keys scan [<folder>] [--project <name>] [--deposit] [--ask] [--host <host>]',
@@ -323,8 +327,8 @@ const fullUsage = () =>
     '  Print the card again: this run and where it stands, the next step, what waits on a person, what was learned here, and what else there is to ask for.',
     'braindog page pull <slug> [--host <host>] [--out <file>]',
     "  Fetch a page's declaration and write it as <page>.dog: one page, one file, in the source view's dialect.",
-    'braindog page push <file> [--host <host>]',
-    '  Read a .dog file and set it as the page. An owner in the app only: a token is refused, this CLI included.',
+    'braindog page push <file> [--wait [<time>]] [--host <host>]',
+    "  Read a .dog file and ask for it to be set as the page: one question on Decide, whose number it prints, and nothing changes until it is accepted there. The same file pushed again is the same question. With --wait it holds until the question is answered, for 30 minutes or the time given (10m, at most 30m), and exits 0 when it is accepted, 1 when it is declined and 2 when it still waits.",
     'braindog page check <file>',
     '  Validate a .dog file against the authoring grammar, locally. Nothing is sent.',
     'braindog starter list [--host <host>]',
@@ -361,8 +365,8 @@ const fullUsage = () =>
     '  --force on addon install or addon uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.',
     'braindog addon publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
     '  Add an add-on version to a catalogue folder, or submit it to the Kennel and say whether it is listed or waits for review, signed with an author key or as the person signed in.',
-    'braindog kennel review [show|list|refuse <kind> <id> <version>] [--reason <why>] [--kennel <host>] | trust <publisher>',
-    "  The Kennel operator's review, with PROVISION_KEY set: what waits; show installs one in a scratch record and prints what it reaches and calls out to; list sends it with a preview of its pages; refuse says why; trust lists a publisher's files at once.",
+    'braindog kennel review [show|list|refuse <kind> <id> <version>] [--reason <why>] [--kennel <host>] | trust <publisher> [--probe]',
+    "  The Kennel operator's review, with PROVISION_KEY set: what waits; show installs one in a scratch record and prints what it reaches and calls out to; list sends it with a preview of its pages; refuse says why; trust lists a publisher's files at once, and with --probe marks the nightly probe's key, the one publisher whose ids may begin probe-.",
     'braindog addon key <file> --author <name>',
     '  Make an author key in a file you choose, outside any repository. Keep it private: it signs what you publish.',
     'braindog addon key rotate <old key file> <new key file> --to <folder>',
@@ -372,20 +376,23 @@ const fullUsage = () =>
     'braindog automations list|show <id> [--host <host>]',
     '  Say every automation you can read, what starts it and how its runs went; or one, with its last ten runs step by step.',
     'braindog automations run <id>|cancel <run> [--host <host>]',
-    '  Start an automation now, or stop a run that has not finished. The record lets only a browser session do either, so a token is told so.',
+    "  Start an automation now, or stop a run that has not finished. Only the owner may, so these work with a self-host's server key in BRAINDOG_TOKEN; a login or an agent's token is told to use the app.",
     'braindog actions run <name> [--host <host>]',
     '  Run a scheduled action now: its next turn moves to now. A paused or held action says why it will not run, and a second press inside a minute says how long to wait.',
+    'braindog scripts list [--host <host>]',
+    '  Say every script you can read: what starts it, whether it is paused, its last run and what it reads, writes and fetches.',
     'braindog scripts resume <id> [--host <host>]',
-    '  Start a script paused by three refused runs in a row again. A browser session only, as run and cancel are.',
+    "  Start a script paused by three refused runs in a row again. The owner's, as automations run is: a self-host's server key may, and a login or an agent's token is told to use the app.",
     'braindog export [--kek <id> | --redact-grants] [--sections <data,origin,governance>] [-o <file.brainl>] [--key <pubkey|url>] [--host <host>]',
     '  Take the record as a .brainl file and check it here. A backup carries the sealed bytes and names the key they are wrapped by; with --redact-grants it is a copy to share, and cannot put the keys back.',
+    "  The owner approves the one export in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog export --mirror <folder> [--host <host>]',
     '  Write the whole record into the folder as plain files a person can read and git can diff: one file for each thing a list holds. Only what changed is written, and it asks for no approval, so it can run every night.',
     'braindog export --shape [-o <file.shape.brainl>] [--host <host>]',
     "  Take a copy of the record's shape, with every word, number and date made up, to test on. The six digits are asked once, for a standing grant that takes shape copies and reads nothing else.",
     'braindog import <file.brainl> [--key <pubkey|url>] [--host <host>]',
     "  Check the file here, then put the record back from it, in place of everything it holds now. The record takes only its own copy.",
-    '  Both ask the owner to approve the one operation in the app, with six digits, unless BRAINDOG_TOKEN is the self-host\'s server key.',
+    "  The owner approves the one import in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] [--strict] [--yes] | --draft-setup | --since <day|last>',
     "  Move another tool's export into this BrainDog through its adapter: a pack id such as one in packs/, or the path of a module. Running it again updates what it added, and no key value is ever read.",
     'braindog import --map <map.json> <export.json> [--host <host>] [--dry-run] [--strict]',
@@ -412,7 +419,7 @@ const fullUsage = () =>
     "  Mint a token for an agent and print it once. It reads unless --scope names more, and with --inbox it may also read the money inbox.",
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>] [--local]',
-    "  Serve BrainDog to an agent over stdin and stdout, passing each message to the host's own server. The agent starts it. --local serves the tools this command holds, for seven nights after the bridge.",
+    "  Serve BrainDog to an agent over stdin and stdout, passing each message to the host's own server. The agent starts it. Under a self-host's server key in BRAINDOG_TOKEN the agent gets a token of its own, made from the key and kept, so it works as a run of its own and not as the owner. --local serves the tools this command holds instead of the host's server, for a host without one.",
     'braindog hook start|end|beat|prompt|tool|stop|watch|notify',
     '  What Claude Code runs when a session starts and ends, after each tool call, on each prompt, before each tool call and when a turn ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself. On a machine that has joined setup sync, end and the day\'s first start begin braindog sync push in the background and never wait for it. prompt adds what you told the run in BrainDog, tool denies every tool but BrainDog\'s while you have stopped or paused it, and stop holds a turn once while it owes you a reply; all three read only the file the MCP server keeps fresh. notify is what Codex runs when a turn ends: when the run has not taken something you told it, this machine shows one notice saying so.',
     'braindog statusline [--beat-only]',
@@ -455,9 +462,9 @@ const fullUsage = () =>
     "  Claim the jobs approved for this machine and run each in Claude Code with only its kind's tools, sending back what it does. With --once, one job.",
     'braindog runner service on [--host <host>] | off | status',
     '  Start this machine\'s runner at log-on and keep it up, with no terminal open, writing to runner.log in your .braindog folder; off stops it and takes it out.',
-    'braindog init <slug> --owner <email>',
+    'braindog init <slug> --owner <email> [--from <file.brainl>]',
     'braindog serve [<record file>]',
-    '  Create or serve a record on this machine, through the self-host.',
+    '  Create or serve a record on this machine, through the self-host. With --from, the new record is the one in a file braindog export wrote; start it in an empty data folder.',
     'braindog update [--check]',
     '  Replace this command with the build that is out, held to its checksum, keeping the old one as braindog.mjs.prev, and place the Agent Skill and hooks again. --check only says whether it is behind.',
     'braindog --version',
@@ -465,7 +472,7 @@ const fullUsage = () =>
     '',
     `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
     'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
-    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, the sync verbs but inventory, init and serve do not take it.',
+    JSON_LINE,
   ].join('\n');
 
 /**
@@ -501,9 +508,10 @@ const GROUPS: [string, [string, string][]][] = [
   ]],
   ['Keys', [
     ['keys list', 'The keys your BrainDog holds, never a value'],
-    ['keys put <label>', 'Deposit a key read from standard input'],
+    ['keys put <label>', 'Deposit a key, piped in or typed at a hidden prompt'],
     ['keys scan [<folder>]', 'Name the keys lying in a repository'],
-    ['keys exec|run <label> -- <cmd>', 'Run a command with one key in its environment'],
+    ['keys exec <label> -- <cmd>', 'Run a command with one key in its environment'],
+    ['run <label> -- <cmd>', 'The same as keys exec, under a shorter name'],
     ['keys headers|helper <label>', 'Print a key for a program that reads it'],
   ]],
   ['Agents and sessions', [
@@ -520,12 +528,12 @@ const GROUPS: [string, [string, string][]][] = [
   ]],
   ['Records', [
     ['export / import / verify', 'Back up, restore or check a .brainl file'],
-    ['page pull|push|check', 'Fetch, set or validate a page as a .dog file'],
+    ['page pull|push|check', 'Fetch, propose or validate a page as a .dog file'],
     ['attach <file.html> --on <thing>', 'Put a page on a task, project or decision'],
     ['starter <verb>', 'Export, check, install or publish a starter'],
-    ['automations <verb>', 'List, show, run or cancel automations'],
+    ['automations list|show', 'Say the automations and how their runs went'],
     ['actions run <name>', 'Run a scheduled action now'],
-    ['scripts resume <id>', 'Start a paused script again'],
+    ['scripts list', 'Say the scripts and how their runs went'],
     ['people harvest', 'Meet the people who committed to your projects'],
     ['signs', "Say your BrainDog's vital signs"],
     ['today [add "<what>"]', 'Say Today, or put a widget on it'],
@@ -562,7 +570,7 @@ const usage = (): string =>
     '',
     `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
     'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
-    '--json answers with one JSON document on stdout; mcp, hook, setup, run and serve do not take it.',
+    JSON_LINE,
   ].join('\n');
 
 /** Whether the words before any `--` ask for help: what follows `--` is a command `keys exec` and `run` hand on. */
@@ -637,7 +645,7 @@ async function mcp(args: string[]): Promise<void> {
 
   /* SIGNED IN, THE SERVER IS THE HOST'S (`bridge.ts`): each line goes to its `POST /mcp` with the same session
      headers, read per request, so a deploy reaches an open session. `--local` keeps the server this command composes
-     for seven nights after the bridge ships, and then goes. A sign-in that ends mid-session is the bridge's to say. */
+     for a host with no server of its own, and the tests. A sign-in that ends mid-session is the bridge's to say. */
   if (values.local !== true) {
     const say = (l: string) => void process.stderr.write(`${l}\n`);
     let said: ClientInfo = {};
@@ -713,6 +721,58 @@ async function signIn(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
+/**
+ * One line from the terminal with echo off, for `keys put` at a terminal: the question on stderr, then raw mode, so
+ * nothing typed or pasted is drawn, and the line ends at Enter. Backspace and Ctrl+U edit it, Ctrl+C or Ctrl+D on an
+ * empty line stop with `null`, and any escape sequence (an arrow key, a bracketed paste's marks) is dropped. THE VALUE IS
+ * NEVER WRITTEN ANYWHERE: not echoed, not logged, not in argv or shell history. `null` off a terminal.
+ */
+function readHidden(question: string): Promise<string | null> {
+  const input = process.stdin;
+  if (!input.isTTY || typeof input.setRawMode !== 'function') return Promise.resolve(null);
+  return new Promise((done) => {
+    writeFileSync(2, question);
+    let typed = '';
+    /* 0 outside an escape sequence, 1 just after ESC, 2 inside a CSI (`ESC [` ... a final letter or `~`). */
+    let escape = 0;
+    const raw = input.isRaw;
+    const finish = (value: string | null) => {
+      input.off('data', onData);
+      input.setRawMode(raw);
+      input.pause();
+      writeFileSync(2, '\n');
+      done(value);
+    };
+    const onData = (chunk: string | Buffer) => {
+      for (const ch of typeof chunk === 'string' ? chunk : chunk.toString('utf8')) {
+        if (escape === 1) {
+          escape = ch === '[' || ch === 'O' ? 2 : 0;
+          continue;
+        }
+        if (escape === 2) {
+          if (/[A-Za-z~]/u.test(ch)) escape = 0;
+          continue;
+        }
+        if (ch === '\r' || ch === '\n') return finish(typed);
+        if (ch === '\u0003') return finish(null);
+        if (ch === '\u0004') {
+          if (typed === '') return finish(null);
+          continue;
+        }
+        if (ch === '\u001b') escape = 1;
+        else if (ch === '\u007f' || ch === '\b') typed = [...typed].slice(0, -1).join('');
+        else if (ch === '\u0015') typed = '';
+        else if (ch >= ' ') typed += ch;
+      }
+    };
+    input.setRawMode(true);
+    /* A character split across two reads is joined, not garbled. */
+    input.setEncoding('utf8');
+    input.on('data', onData);
+    input.resume();
+  });
+}
+
 /** `braindog keys list|put|scan|exec|headers`, over the real terminal, and the exit code `keys` decides. */
 async function keysCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
@@ -728,6 +788,8 @@ async function keysCommand(args: string[]): Promise<void> {
         return '';
       }
     },
+    /* `put` AT A TERMINAL ASKS, with echo off (`readHidden`); a pipe is read above as it always was. */
+    ...(process.stdin.isTTY ? { secret: readHidden } : {}),
     say: json ? json.say : say,
     /* `list` alone prints lines: kept for the one document under `--json`, and `keys`'s own stdout line otherwise. */
     out: json ? json.out : undefined,
