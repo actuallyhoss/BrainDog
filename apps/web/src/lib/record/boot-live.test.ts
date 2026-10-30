@@ -230,11 +230,32 @@ test('A MEMBER HELD TO ONE LIST IS SENT NO ROWID, and the reason still folds int
 test('access given or taken away reads as a sentence, never as "Access grant"', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'access.grant', note: null, ...over })] as never, null)[0]?.text;
   assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to everything');
-  assert.equal(at({ actor: 'p_1', target: 'person:p_1', target_kind: 'person', field: '*', to: 'owner' }), 'Started this BrainDog as its owner', 'the owner made the record, nobody was let in');
+  assert.equal(at({ actor: 'p_1', target: 'person:p_1', target_kind: 'person', field: '*', to: 'owner' }), 'Your BrainDog was made', 'the owner made the record, nobody was let in');
   assert.equal(at({ target_kind: 'member', field: 'obligations', to: 'read' }), 'Gave someone read access on Bills and invoices');
   assert.equal(at({ kind: 'access.revoke', target_kind: 'member', field: '*', from: 'write', to: null }), "Took away someone's write access to everything");
   assert.equal(at({ target_kind: 'token', to: 'propose', note: 'Claude on the laptop' }), 'Made a key that can read and propose: Claude on the laptop');
   assert.equal(at({ target_kind: 'device_grant', to: 'login' }), 'Let a device sign in');
+});
+
+test('the making of a BrainDog is one line, and her first own write keeps its own (E5)', () => {
+  const at = '2026-09-15T09:00:00.000Z';
+  const later = '2026-09-15T09:01:00.000Z';
+  const events = [
+    line({ id: 'e9', ts: later, kind: 'install', actor: 'system', target: 'pack:reading-list', target_kind: 'pack', to: '1.0.0' }),
+    line({ id: 'e8', ts: later, kind: 'create', register: 'orders', seq: 1, title: 'Chocolate cake', target: 'entry:o1', target_kind: 'entry' }),
+    line({ id: 'e7', ts: later, kind: 'update', actor: 'system', note: 'BrainDog updated 2 add-ons', pass: { said: 'BrainDog updated 2 add-ons', updated: 2, asked: 0, steps: 2, at: later } }),
+    line({ id: 'e6', kind: 'edit', register: 'people', seq: 1, title: 'Nadia', target: 'entry:n1', target_kind: 'entry', field: 'self', from: false, to: true }),
+    line({ id: 'e5', kind: 'create', register: 'people', seq: 1, title: 'Nadia', target: 'entry:n1', target_kind: 'entry' }),
+    line({ id: 'e4', kind: 'edit', actor: 'p_1', target: 'pack:usecase-shop', target_kind: 'pack', from: { speaks: false }, to: { speaks: true } }),
+    line({ id: 'e3', kind: 'install', actor: 'system', target: 'pack:money-core', target_kind: 'pack', to: '3.0.0' }),
+    line({ id: 'e2', kind: 'install', actor: 'system', target: 'pack:core', target_kind: 'pack', to: '1.0.0' }),
+    line({ id: 'e1', kind: 'access.grant', target: 'person:p_1', target_kind: 'person', field: '*', to: 'owner' }),
+  ];
+  const texts = newsOf(events as never, null).map((i) => i.text);
+  assert.equal(texts.length, 3, JSON.stringify(texts));
+  assert.match(texts[0]!, /^Added /u, 'the add-on added after her first order keeps its line');
+  assert.deepEqual(texts.slice(1), ['Added Chocolate cake', 'Your BrainDog was made']);
+  assert.ok(!texts.some((t) => /this is you|updated 2 add-ons|Bills and invoices/u.test(t)), JSON.stringify(texts));
 });
 
 test('a pack install names the list it brought, not the bare verb', () => {

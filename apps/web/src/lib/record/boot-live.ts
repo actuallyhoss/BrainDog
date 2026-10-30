@@ -861,13 +861,65 @@ function finishedDays(events: readonly EventLine[]): Set<EventLine> {
   return out;
 }
 
+/** How long after the record is made its own setting up still counts as the making (`makingOf`). */
+export const MAKING_MS = 30 * 60_000;
+
+/** The founding owner's own grant, which the record writes first when it is made (kernel `provision.ts`). */
+const isFounding = (e: EventLine): boolean => e.kind === 'access.grant' && e.target === `person:${e.actor}` && e.field === '*' && e.to === 'owner';
+
+/**
+ * THE MAKING, SAID ONCE (first-hour audit E5, 31 Oct). A minute-old BrainDog's bell held nine lines of its own setting up:
+ * "Started this BrainDog as its owner", "Added the core add-on", "Shop added beside Small business", a twelve-name "Added
+ * Bills and invoices, …", "BrainDog updated 2 add-ons", and "Nadia: this is you from no to yes", her own row's `self`
+ * read out as a change. They are one thing that happened, "Your BrainDog was made", said at the founding line.
+ *
+ * WHAT IS THE MAKING: walking up from the founding line, oldest first, every line the record or the build wrote before the
+ * person's first own write, inside `MAKING_MS`: add-ons added, updated or set (and a use case's voice), declarations, the
+ * record's setup, anything the record itself wrote, and the founder's own People row (the one set to be them). The first
+ * line of anything else ends it, so an add-on she adds from the store after her first order keeps its own line. BrainDog's
+ * own update pass inside the window is the making's too, wherever it falls.
+ *
+ * Returns the lines folded into the founding one, or `null` where the founding line is not among `events`.
+ */
+export function makingOf(events: readonly EventLine[]): { founding: EventLine; folded: Set<EventLine> } | null {
+  const at = events.findIndex(isFounding);
+  if (at === -1) return null;
+  const founding = events[at]!;
+  const t0 = Date.parse(founding.ts);
+  const within = (e: EventLine): boolean => {
+    const t = Date.parse(e.ts);
+    return Number.isFinite(t) && t >= t0 && t - t0 <= MAKING_MS;
+  };
+  const own = new Set(events.filter((e) => within(e) && e.field === 'self' && e.to === true && e.target !== null).map((e) => e.target!));
+  const setup = (e: EventLine): boolean =>
+    e.actor === 'system' ||
+    e.target_kind === 'pack' ||
+    e.kind === 'declare' ||
+    e.kind === 'setup' ||
+    (e.actor === founding.actor && e.target !== null && own.has(e.target));
+  const folded = new Set<EventLine>();
+  let mine = false;
+  for (let i = at - 1; i >= 0; i--) {
+    const e = events[i]!;
+    if (!within(e)) break;
+    if (e.kind === 'update' && e.pass !== undefined) folded.add(e);
+    else if (!mine && setup(e)) folded.add(e);
+    else mine = true;
+  }
+  /* LINES OF THE SAME INSTANT BELOW THE FOUNDING ONE are the making's too, where the log ordered them so. */
+  for (let i = at + 1; i < events.length && events[i]!.ts === founding.ts; i++) if (setup(events[i]!)) folded.add(events[i]!);
+  return { founding, folded };
+}
+
 /** The record's lines as the feed's items, newest first as they came. */
 export function newsOf(events: readonly EventLine[], me: string | null, names: ReadonlyMap<string, string> = new Map()): NewsItem[] {
   const voice = voiceTexts(events);
   const reasons = reasonsOf(events);
   const folded = finishedDays(events);
+  const making = makingOf(events);
   const said = events.flatMap((e, i): { e: EventLine; last: boolean; item: NewsItem }[] => {
-    if (folded.has(e)) return [];
+    if (folded.has(e) || making?.folded.has(e)) return [];
+    if (e === making?.founding) return [{ e, last: false, item: { at: e.ts, by: feedActor(e.actor, me, names), text: copy.feedMade, href: '/audit' } }];
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
     /* AN AUTOMATION THAT RAN IS NOT NEWS; WHAT IT CHANGED IS (live check of 30 October, 12): his bell read "Look again for
