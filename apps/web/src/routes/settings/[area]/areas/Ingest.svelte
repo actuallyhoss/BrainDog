@@ -199,7 +199,7 @@
    * sentences the first two carry are `inbound-write.ts`'s and are read from there.
    */
   const words = {
-    stepMake: 'An address for this record',
+    stepMake: 'An address for your BrainDog',
     stepForward: 'Point your mail at it',
     stepTest: 'Send one to test it',
     testLine: 'It lands in your Inbox.',

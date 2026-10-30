@@ -128,11 +128,11 @@ test('signs-line: the line that is there agrees with the record', () => {
 
 test('own-lines-you: the owner of a record nobody else writes on is never a stranger on Today', () => {
   const check = drawnScreen['own-lines-you'];
-  const feed = (over = {}) => SCREEN({ text: ['Today', 'Someone on this record added Nadia just now'], ...over });
+  const feed = (over = {}) => SCREEN({ text: ['Today', 'Someone you share with added Nadia just now'], ...over });
   const alone = [{ name: 'Mariam', tags: [] }];
   const red = check(feed({ counts: { People: alone } }), MARIAM);
   assert.equal(red.pass, false);
-  assert.match(red.saw, /^nobody but Mariam writes on this record, and Today says "Someone on this record added Nadia just now" once$/u);
+  assert.match(red.saw, /^nobody but Mariam writes on this record, and Today says "Someone you share with added Nadia just now" once$/u);
   /* A client she typed signs nothing in, so the line is still hers; a bare count of one is her alone. */
   assert.equal(check(feed({ counts: { People: [...alone, { name: 'Nadia', tags: [] }] } }), MARIAM).pass, false);
   assert.equal(check(feed({ counts: { People: 1 } }), MARIAM).pass, false);
@@ -143,7 +143,7 @@ test('own-lines-you: the owner of a record nobody else writes on is never a stra
 
 test('own-lines-you: with somebody else on the record, or for somebody who does not own it, the words may be true', () => {
   const check = drawnScreen['own-lines-you'];
-  const feed = (over = {}) => SCREEN({ text: ['Today', 'Someone on this record added Nadia just now'], counts: { People: [{ name: 'Mariam', tags: [] }] }, ...over });
+  const feed = (over = {}) => SCREEN({ text: ['Today', 'Someone you share with added Nadia just now'], counts: { People: [{ name: 'Mariam', tags: [] }] }, ...over });
   for (const apart of [feed({ counts: { People: [{ name: 'Mariam', tags: [] }, { name: 'Farid', tags: [] }] } }), feed({ counts: { People: 2 } }), feed({ owner: false }), feed({ path: '/r/people' })]) {
     assert.equal(check(apart, MARIAM).pass, null);
     assert.equal(check(apart, MARIAM).applies, false);

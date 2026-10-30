@@ -402,21 +402,21 @@ test('the install says each call on one line, and the runs a month they add agai
   assert.equal(calls.length, 2);
   assert.equal(callLine(calls[0]!), 'Watches status.kiln.example, every hour, with the key "Kiln read"');
   assert.equal(callLine(calls[1]!), 'Calls hooks.kiln.example, every hour, with no key, sends seq and amount due');
-  assert.equal(estimateOf(calls, 15_000), "About 1,460 runs a month, 10% of this record's 15,000.");
-  assert.equal(estimateOf(calls, false), 'About 1,460 runs a month, with no monthly limit on this record.');
+  assert.equal(estimateOf(calls, 15_000), "About 1,460 runs a month, 10% of your monthly 15,000.");
+  assert.equal(estimateOf(calls, false), 'About 1,460 runs a month, with no monthly limit.');
   assert.equal(callLine({ ...calls[0]!, host: null, sends: [] }), 'Watches a host it does not name, every hour, with the key "Kiln read", sends no fields');
 });
 
 test('an estimate says less than 1%, says when runs would wait, and is absent when nothing has an interval', () => {
   const one = (every: string): CallOut => ({ ingest: 'a', channel: 'pull', host: 'api.example', every, key: null, sends: null });
-  assert.equal(estimateOf([one('1d')], 15_000), "About 30 runs a month, less than 1% of this record's 15,000.");
+  assert.equal(estimateOf([one('1d')], 15_000), "About 30 runs a month, less than 1% of your monthly 15,000.");
   assert.equal(
     estimateOf(Array.from({ length: 6 }, () => one('15m')), 15_000),
-    "About 17,520 runs a month, more than this record's 15,000, so some runs would wait until the next month.",
+    "About 17,520 runs a month, more than your monthly 15,000, so some runs would wait until the next month.",
   );
   assert.equal(estimateOf([one('when paid')], true), null);
   assert.equal(estimateOf([], true), null);
-  assert.equal(estimateOf([one('1d')], true), "About 30 runs a month, counted against this record's monthly allowance.");
+  assert.equal(estimateOf([one('1d')], true), "About 30 runs a month, counted against your monthly allowance.");
 });
 
 test('a call only a rule runs keeps its line, its daily ceiling and the key note it is approved with', () => {

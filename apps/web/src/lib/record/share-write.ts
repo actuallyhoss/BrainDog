@@ -57,7 +57,7 @@ export const words = {
   sharedUntil: (day: string) => `This link works until ${day}.`,
   sharedDead: 'This page is not shared.',
   sharedDeadBody: 'Ask whoever sent the link for a new one.',
-  sharedUnreached: 'BrainDog could not reach this record.',
+  sharedUnreached: 'BrainDog could not be reached.',
   sharedRetry: 'Try again',
   sharedDetails: 'Details',
   sharedMade: 'Made with BrainDog',

@@ -103,7 +103,7 @@ export const words = {
   writes: 'Lists it writes',
   listsNoneChosen: 'none yet, press to choose',
   listsChosen: (n: number, of: number) => `${n} of ${of}`,
-  listsNone: 'This record has no lists yet.',
+  listsNone: 'There are no lists yet.',
   source: 'Source',
   sourceLabel: 'What it does, in JavaScript',
   sourceHelp: 'Tab indents. Press Escape, then Tab, to leave the box.',

@@ -220,7 +220,7 @@ export const words = {
   reconnect: 'Reconnect key',
   addTheKey: 'Add the key',
   paused: 'Paused. It runs again when you resume it.',
-  waitingFallback: 'Waiting for next month. This record has used its allowance for this month.',
+  waitingFallback: 'Waiting for next month. This month\'s allowance is used up.',
   /* The usage page. */
   usage: 'Usage',
   /* WHAT A DRAW FAULT'S DETAILS SAY, in words and never the thrown message, which named a field or a line of code to a
@@ -235,10 +235,10 @@ export const words = {
   failures: (n: number) => (n === 1 ? '1 failure' : `${n.toLocaleString('en-GB')} failures`),
   noUsage: 'Nothing has run this month',
   noUsageIn: (month: string) => `Nothing ran in ${month}`,
-  noLedger: 'This record does not report usage yet',
+  noLedger: 'This BrainDog does not report usage yet',
   /* THE LIMIT THAT HELD IT, NAMED. This said "this month's runs" whichever of the four meters had run out, so a record
      held on its fetched data was told to look at a count that was nowhere near its limit. */
-  waitingUntil: (resets: string, noun: string) => `Actions on this record are waiting until ${resets}, because it has used this month's ${noun}.`,
+  waitingUntil: (resets: string, noun: string) => `Actions are waiting until ${resets}, because this month's ${noun} is used up.`,
   noLimit: 'Counted, with no monthly limit.',
   week: (from: string, to: string) => (from === to ? from : `${from} to ${to}`),
   /* The four meters, each "Runs 1,204 of 15,000" and one sentence under its bar. */
@@ -249,7 +249,7 @@ export const words = {
   meterNear: (share: string, resets: string) => `${share} used. At the limit, actions wait until ${resets}.`,
   meterFull: (resets: string) => `Used up. Actions wait until ${resets}.`,
   meterPast: (share: string) => `${share} of the month's allowance.`,
-  binding: (noun: string) => `The limit this record is nearest is its ${noun}.`,
+  binding: (noun: string) => `The limit you are nearest is your ${noun}.`,
   /* UNDER AN HOUR IN MINUTES: "0 hours of 50 hours" stood beside "<1%" on a month that ran. */
   hours: (n: number) =>
     n > 0 && n * 60 < 1
@@ -281,10 +281,10 @@ export const words = {
   extraLine: (cost: string, cap: string) => `Extra usage is on: ${cost} so far this month, of the ${cap} cap you set.`,
   extraOff: (cost: string, when: string) => `Extra usage came to ${cost} ${when}.`,
   meterExtra: (cap: string) => `Past the allowance. Extra usage carries on up to the ${cap} cap.`,
-  waitingCap: (resets: string, cap: string) => `Actions on this record are waiting until ${resets}, because its extra usage reached the ${cap} cap.`,
+  waitingCap: (resets: string, cap: string) => `Actions are waiting until ${resets}, because extra usage reached the ${cap} cap.`,
   /* A member's page. The ledger is the owner's, and an empty one read as nothing having run. */
-  notOwner: "Limits and plans are the owner's to see. These are this record's own runs.",
-  notOwnerNone: "Usage is counted on the owner's account, so only the owner of this record sees it here.",
+  notOwner: "Limits and plans are the owner's to see. These are this BrainDog's own runs.",
+  notOwnerNone: "Usage is counted on the owner's account, so only the owner sees it here.",
   /* The month switcher and a project's slice. */
   months: 'Months',
   monthIn: (month: string) => `Usage in ${month}`,
@@ -1074,11 +1074,11 @@ export const installWords = {
     const share = pct > 0 && pct < 1 ? 'less than 1%' : `${Math.round(pct)}%`;
     const about = `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month`;
     return runs > allowance
-      ? `${about}, more than this record's ${allowance.toLocaleString('en-GB')}, so some runs would wait until the next month.`
-      : `${about}, ${share} of this record's ${allowance.toLocaleString('en-GB')}.`;
+      ? `${about}, more than your monthly ${allowance.toLocaleString('en-GB')}, so some runs would wait until the next month.`
+      : `${about}, ${share} of your monthly ${allowance.toLocaleString('en-GB')}.`;
   },
-  noLimit: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, with no monthly limit on this record.`,
-  counted: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, counted against this record's monthly allowance.`,
+  noLimit: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, with no monthly limit.`,
+  counted: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, counted against your monthly allowance.`,
   byRule: (perDay: number) => `when a rule runs it, at most ${perDay.toLocaleString('en-GB')} a day`,
   /* THE ONE APPROVAL: said under the lines, before the press. */
   asksOnce: 'Installing asks you to approve these once, and none of them runs until you do.',

@@ -83,9 +83,9 @@ export const words = {
   callChanged: 'changed',
   callsNote: 'Approving this approves these once, and none of them runs until you do.',
   touches: 'Nothing you have written is read or changed.',
-  needs: (name: string, range: string, has: string | null) => (has ? `Needs ${name} ${range}, and this record has ${has}` : `Needs ${name} ${range}, which this record does not have`),
+  needs: (name: string, range: string, has: string | null) => (has ? `Needs ${name} ${range}, and you have ${has}` : `Needs ${name} ${range}, which you do not have`),
   breaks: (name: string, version: string, range: string) => `${name} ${version} needs ${range} of this, which this version is not`,
-  format: 'This file is written for a newer BrainDog than this record runs',
+  format: 'This file is written for a newer BrainDog than yours',
   orphans: (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'item' : 'items'} would be left under a list it takes away`,
   conflict: (name: string, pack: string) => `${name} is already here, from ${pack}`,
   /* A CONFLICT ANOTHER UPDATE CLEARS (`update-order.ts`): the holder's update hands the thing over, so it is a step

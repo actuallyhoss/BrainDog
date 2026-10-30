@@ -49,7 +49,7 @@ export const words = {
   sentence: 'A CSV from your bank. Lines already in the Ledger are skipped.',
   account: 'Account',
   noAccounts: 'No open account yet.',
-  noLedger: 'This record keeps no ledger to import into.',
+  noLedger: 'There is no ledger to import into yet.',
   file: 'Statement',
   drop: 'Drop a CSV here, or choose one',
   choose: 'Choose a file',

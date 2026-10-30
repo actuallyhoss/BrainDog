@@ -83,7 +83,7 @@ test('A REFUSAL NAMES ADDRESSES, because the person reading it just typed one th
       { address: 'home-guide', title: 'Your project' },
       { address: 'guide', title: 'Guide' },
     ]),
-    'Pages on this record: home-guide (Your project) · guide.',
+    'Your pages: home-guide (Your project) · guide.',
   );
 
   /* A TITLE THAT IS THE ADDRESS IN OTHER CLOTHES ADDS NOTHING, and most of them are: eight of the
@@ -97,15 +97,15 @@ test('A REFUSAL NAMES ADDRESSES, because the person reading it just typed one th
       { address: 'installments', title: 'Instalments' },
       { address: 'agent-work', title: 'Agent work' },
     ]),
-    'Lists on this record: obligations (Money) · services · installments (Instalments) · agent-work.',
+    'Your lists: obligations (Money) · services · installments (Instalments) · agent-work.',
     'a name that folds to its own address is noise, and one letter apart is not the same word',
   );
 
   /* AN ADDRESS ON ITS OWN IS STILL AN ENTRY, which is what `v/[view]/+page.svelte:264` has always
      passed: `client.views()` answers addresses of the shape `register.id`, and there is no second
      name for a saved view to carry. */
-  assert.equal(copy.theseExist('Saved views', ['money.overdue', 'money.due']), 'Saved views on this record: money.overdue · money.due.');
-  assert.equal(copy.theseExist('Pages', [{ address: 'guide' }]), 'Pages on this record: guide.');
+  assert.equal(copy.theseExist('Saved views', ['money.overdue', 'money.due']), 'Your saved views: money.overdue · money.due.');
+  assert.equal(copy.theseExist('Pages', [{ address: 'guide' }]), 'Your pages: guide.');
 
   /* TWO ENTRIES ARE ONE ENTRY WHEN THEY ANSWER AT THE SAME ADDRESS, and never because two packs
      chose the same word. Both halves are the same measurement: the rail after `Clear the examples`
@@ -115,7 +115,7 @@ test('A REFUSAL NAMES ADDRESSES, because the person reading it just typed one th
       { address: 'home-founder', title: 'Overview' },
       { address: 'home-team', title: 'Overview' },
     ]),
-    'Pages on this record: home-founder (Overview) · home-team (Overview).',
+    'Your pages: home-founder (Overview) · home-team (Overview).',
     'two pages sharing a title are two pages, and the refusal that hides one sends its reader nowhere',
   );
   assert.equal(
@@ -123,7 +123,7 @@ test('A REFUSAL NAMES ADDRESSES, because the person reading it just typed one th
       { address: 'guide', title: 'Guide' },
       { address: 'guide', title: 'Guide' },
     ]),
-    'Pages on this record: guide.',
+    'Your pages: guide.',
   );
 
   /* AND THE HOUSE VOICE HOLDS WITH A BRACKET IN IT. `access.test.ts` walks this function with

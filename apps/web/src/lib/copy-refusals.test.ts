@@ -22,14 +22,14 @@ test('A REFUSAL WHOSE HELPFUL HALF IS A FULL STOP. `/v/nothing` on a live record
      screen printed under "There is no saved view called nothing." was "Saved views on this record:
      ." and nothing else: a refusal that trails off reads as a broken product rather than an answer,
      on the one screen whose entire job is to teach. */
-  assert.equal(copy.theseExist('Saved views', []), 'This record has no saved views yet.');
+  assert.equal(copy.theseExist('Saved views', []), 'There are no saved views yet.');
   assert.doesNotMatch(copy.theseExist('Saved views', []), /:\s*\.$/u, 'the sentence ends in a bare full stop again');
 
   /* THE SAME BRANCH IS REACHED BY THREE OTHER SCREENS, and each names its own noun, so the sentence
      is built from `kind` rather than written out four times. `/r/<unknown>` on a record whose lists
      are all at zero rows is the one a mistyped list address reaches. */
-  assert.equal(copy.theseExist('Lists', []), 'This record has no lists yet.');
-  assert.equal(copy.theseExist('Pages', []), 'This record has no pages yet.');
+  assert.equal(copy.theseExist('Lists', []), 'There are no lists yet.');
+  assert.equal(copy.theseExist('Pages', []), 'There are no pages yet.');
 });
 
 test('and it does not repeat a name, because five entries called Overview are not a list anybody reads', () => {
@@ -40,13 +40,13 @@ test('and it does not repeat a name, because five entries called Overview are no
      nothing a reader can use: two pages called Overview are told apart by which pack they sit in,
      and this sentence has no room for that. */
   const titles = ['Overview', 'People', 'Home', 'Overview', 'Ledger', 'Overview', 'Board', 'Overview', 'Dashboard'];
-  assert.equal(copy.theseExist('Pages', titles), 'Pages on this record: Overview · People · Home · Ledger · Board · Dashboard.');
+  assert.equal(copy.theseExist('Pages', titles), 'Your pages: Overview · People · Home · Ledger · Board · Dashboard.');
 
   /* AND THE ORDER IS THE ORDER IT ARRIVED IN. The caller's order is the rail's order, so sorting
      here would make the sentence disagree with the screen the reader just came from. */
-  assert.equal(copy.theseExist('Lists', ['Money', 'Work', 'Money']), 'Lists on this record: Money · Work.');
+  assert.equal(copy.theseExist('Lists', ['Money', 'Work', 'Money']), 'Your lists: Money · Work.');
   /* One name is still one name, which is the common case on a nearly empty record. */
-  assert.equal(copy.theseExist('Lists', ['Money']), 'Lists on this record: Money.');
+  assert.equal(copy.theseExist('Lists', ['Money']), 'Your lists: Money.');
 });
 
 test('A DEAD NETWORK IS ONE SENTENCE, whichever control was pressed', () => {

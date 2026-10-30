@@ -16,7 +16,7 @@ export const shareSheet = {
   shareWithPeopleOpen: 'Share with people',
   shareSheetTitle: (name: string): string => `Share ${name}`,
   /* FROM THE SHARING PAGE: a share of anything on the record, and one share kept, opened to change it. */
-  shareRecordName: 'something on this record',
+  shareRecordName: 'something in this BrainDog',
   shareWhatEverything: 'Everything here',
   shareSheetChange: 'Change this share',
   shareSave: 'Save',
@@ -108,7 +108,7 @@ export const shareSheet = {
   shareOnwardVerbs: { view: 'view', comment: 'comment on', edit: 'edit' } as Record<string, string>,
   shareOnwardEnds: 'Ends when yours does.',
   shareOnwardRungs: 'View, comment or edit. Only an owner or an Admin gives Manage.',
-  shareOnwardNobody: 'Nobody else is on this record yet. Ask the owner to add them.',
+  shareOnwardNobody: 'Nobody else is here yet. Ask the owner to add them.',
   shareOnwardPick: 'Pick somebody here',
 
   seeAsBanner: (name: string): string => `Seeing as ${name}. Nothing you do here counts.`,

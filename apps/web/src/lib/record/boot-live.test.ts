@@ -164,7 +164,7 @@ test('ANOTHER PERSON IN THE FEED IS NAMED WHEN boot SAID THE NAME, and is Someon
   const ada = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
   const cy = 'p_01M2PB0000000000000000000C';
   const events = [line({ actor: ada, kind: 'decide', title: 'Renew' }), line({ actor: cy, kind: 'decide', title: 'Renew' }), line({ actor: 'p_1', kind: 'decide', title: 'Renew' })];
-  assert.deepEqual(newsOf(events as never, 'p_1', new Map([[ada, 'Ada Lovelace']])).map((i) => i.by), ['Ada Lovelace', 'Someone on this record', 'you']);
+  assert.deepEqual(newsOf(events as never, 'p_1', new Map([[ada, 'Ada Lovelace']])).map((i) => i.by), ['Ada Lovelace', 'Someone you share with', 'you']);
   const shell = layoutOf({ ...BOOT, names: { [ada]: 'Ada Lovelace' }, whatsNew: { events: [line({ actor: ada, kind: 'decide', title: 'Renew' })], upTo: 1, sinceCapped: false } } as never);
   assert.deepEqual(shell.names, { [ada]: 'Ada Lovelace' });
   assert.equal(shell.whatsNew[0]?.by, 'Ada Lovelace');
@@ -181,7 +181,7 @@ test("THE READER'S OWN LINES ARE you, never Someone on this record and never her
   assert.deepEqual(shell.whatsNew.map((i) => i.by), ['you', 'you']);
   /* Read with no reader, which is what a caller that forgot to hand one over does, she is her name and still no id. */
   assert.deepEqual(newsOf(mine as never, null, new Map([[mariam, 'Mariam']])).map((i) => i.by), ['Mariam', 'Mariam']);
-  assert.deepEqual(newsOf(mine as never, null).map((i) => i.by), ['Someone on this record', 'Someone on this record']);
+  assert.deepEqual(newsOf(mine as never, null).map((i) => i.by), ['Someone you share with', 'Someone you share with']);
 });
 
 test('what was applied, kept on a decision, is not a line of its own in the feed', () => {
@@ -229,10 +229,10 @@ test('A MEMBER HELD TO ONE LIST IS SENT NO ROWID, and the reason still folds int
 
 test('access given or taken away reads as a sentence, never as "Access grant"', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'access.grant', note: null, ...over })] as never, null)[0]?.text;
-  assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to this record');
-  assert.equal(at({ actor: 'p_1', target: 'person:p_1', target_kind: 'person', field: '*', to: 'owner' }), 'Started this record as its owner', 'the owner made the record, nobody was let in');
+  assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to everything');
+  assert.equal(at({ actor: 'p_1', target: 'person:p_1', target_kind: 'person', field: '*', to: 'owner' }), 'Started this BrainDog as its owner', 'the owner made the record, nobody was let in');
   assert.equal(at({ target_kind: 'member', field: 'obligations', to: 'read' }), 'Gave someone read access on Bills and invoices');
-  assert.equal(at({ kind: 'access.revoke', target_kind: 'member', field: '*', from: 'write', to: null }), "Took away someone's write access to this record");
+  assert.equal(at({ kind: 'access.revoke', target_kind: 'member', field: '*', from: 'write', to: null }), "Took away someone's write access to everything");
   assert.equal(at({ target_kind: 'token', to: 'propose', note: 'Claude on the laptop' }), 'Made a key that can read and propose: Claude on the laptop');
   assert.equal(at({ target_kind: 'device_grant', to: 'login' }), 'Let a device sign in');
 });

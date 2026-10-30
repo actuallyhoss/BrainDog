@@ -37,12 +37,12 @@ export const sourceWords = {
   preview: 'As it will look',
   previewing: 'Drawing the page as it will look',
   /** A host that has no `previewPage`, or no record behind it: the text can still be applied, and says so. */
-  noPreview: 'This record cannot draw the page before it is applied. You can still apply it.',
+  noPreview: 'The page cannot be drawn before it is applied. You can still apply it.',
   line: (n: number) => `Line ${n}`,
   /** The button beside a refusal, which selects the line it is about. */
   goToLine: (n: number) => `Go to line ${n}`,
   moved: 'This page was changed somewhere else since you opened it. Your text is kept: copy it, then open the page again.',
-  unreached: 'BrainDog could not reach this record.',
+  unreached: 'BrainDog could not be reached.',
 } as const;
 
 /** The text read as a page's body, or the parser's sentence and the line it is about. */

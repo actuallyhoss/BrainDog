@@ -368,7 +368,7 @@ test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never 
   const note = twiceOn(page);
   assert.ok(note, 'People says nothing of somebody held twice');
   assert.notEqual(note.drawn, false);
-  assert.equal(note.body, '{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1).');
+  assert.equal(note.body, '{{held-twice-shown}} people may be listed twice, {{held-twice}} too many. [See them](/r/people?twice=1).');
   /* NO QUESTION IS PROMISED: nothing asks about a plain pair by night yet, so the note says the number and stops. */
   assert.doesNotMatch(String(note.body), /Decide/u);
   assert.equal((note as { values?: Record<string, unknown> }).values?.['held-twice'], 1);

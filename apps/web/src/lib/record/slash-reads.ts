@@ -38,7 +38,7 @@ export const words = {
   never: 'Never a key, a sealed field or the contents of a file.',
   saidOn: 'Slash will read on its own.',
   saidOff: 'Slash will read only when you ask.',
-  unreached: 'BrainDog could not reach this record.',
+  unreached: 'BrainDog could not be reached.',
 } as const;
 
 /**

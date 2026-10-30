@@ -40,7 +40,7 @@ export const words = {
   rows: (list: string, where: string | null) =>
     where === null ? `A table of every row in ${list}, read again each time the page opens.` : `A table of ${list} where ${where}, read again each time the page opens.`,
   note: 'A note with this answer, the day it was pinned and a mark that it was worked out, not checked.',
-  noPages: 'This record has no page an answer can go on yet.',
+  noPages: 'There is no page an answer can go on yet.',
   failed: 'Nothing was pinned, because part of this screen could not be loaded. Reload the page and try again.',
 } as const;
 

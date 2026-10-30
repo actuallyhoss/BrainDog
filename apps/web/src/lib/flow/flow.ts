@@ -776,7 +776,7 @@ export const STEP_HELP: Partial<Record<Verb, string>> = {
   meet: 'Add someone to People, or say where you met someone already there.',
   notify: 'Send you a message.',
   suggest: 'Put a question in Needs you for you to answer.',
-  ask_person: 'Ask someone on this record and wait for the answer.',
+  ask_person: 'Ask a person and wait for the answer.',
   ask_slash: 'Ask Slash a question and keep its answer.',
   call: 'Fetch from a service you declared, and keep what it answers.',
   run: 'Send it to a service you declared.',
@@ -1064,7 +1064,7 @@ export const words = {
   /* A TITLE, SO NO FULL STOP, as the design system already made Search and Decide. */
   none: 'Nothing runs on its own yet',
   noneWhy: 'An automation starts on a change, an arrival, a clock or a button, and then does its steps in order.',
-  absent: 'This record does not list its automations yet',
+  absent: 'This BrainDog does not list its automations yet',
   absentHow: 'You can still draw one and send it to Needs you.',
   steps: 'Steps',
   runs: 'Runs',

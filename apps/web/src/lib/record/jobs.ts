@@ -498,5 +498,5 @@ export const words = {
   toolGrep: 'search',
   toolGlob: 'find files',
   toolRun: (command: string) => `run ${command}`,
-  toolRecord: (tool: string) => `${tool} on this record`,
+  toolRecord: (tool: string) => `${tool} in BrainDog`,
 };

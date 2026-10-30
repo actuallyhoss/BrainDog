@@ -42,5 +42,5 @@ export function sharedLine(s: SharedOut): SharedLine | null {
   if (s.fresh.length === 1) return { words: s.fresh[0]!.said, go: 'Not you? Stop it', needs: s.needs };
   if (s.fresh.length > 1) return { words: `${s.fresh.length.toLocaleString('en-GB')} shares were made today.`, go: 'Not you? See them', needs: s.needs };
   const who = joined(s.names, s.more);
-  return { words: who === '' ? 'Part of this record is shared.' : `Shared with ${who}.`, go: 'See who', needs: false };
+  return { words: who === '' ? 'Part of your BrainDog is shared.' : `Shared with ${who}.`, go: 'See who', needs: false };
 }

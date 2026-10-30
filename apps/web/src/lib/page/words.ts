@@ -19,7 +19,7 @@ export const words = {
   /* A NEW BLOCK SHOWS A LIST. On a page that shows none yet the reader is asked which, rather than handed one. */
   bindTitle: 'Which list to show',
   bindWhy: 'This page shows no list yet. Choose the list it should show.',
-  bindNone: 'This record has no list yet, so anything added here would have nothing to show.',
+  bindNone: 'There is no list yet, so anything added here would have nothing to show.',
   /**
    * A captured line's receipt: the row by its words, the list it went to, what the line said beside its words ("Due Thu
    * 1 Oct", "Kiln"), and what was filled on the reader's behalf.

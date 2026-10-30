@@ -59,11 +59,11 @@
   const PAGES_MOST = 24;
 
   const words = {
-    yours: 'From this record',
-    reading: 'Reading this record.',
+    yours: 'From your BrainDog',
+    reading: 'Reading your BrainDog.',
     from: (page: string) => `On ${page}`,
-    none: (kinds: string) => `Nothing in this record draws ${kinds}. The specimen below stands in.`,
-    nothing: 'This record draws no chart yet. Every specimen is below.',
+    none: (kinds: string) => `Nothing in your BrainDog draws ${kinds}. The specimen below stands in.`,
+    nothing: 'Your BrainDog draws no chart yet. Every specimen is below.',
     sizes: 'Every size',
     sizesLine: 'Each chart with no points, one, two, three and thirty. Fresh ends today. Stale ends days or months ago.',
     plan: 'The plan',

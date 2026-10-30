@@ -36,7 +36,7 @@ import { words as usageWords, type Meter } from '../../lib/record/actions.ts';
 
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
-  notChargedYet: 'BrainDog does not charge for this record yet.',
+  notChargedYet: 'BrainDog does not charge for this yet.',
   /* SLASH CREDIT PACKS: the heading over the buttons, each button's own words, and what is left of them. */
   buyCredits: 'Buy credits',
   packButton: (credits: number, price: string) => `${credits.toLocaleString('en-GB')} credits, ${price}`,

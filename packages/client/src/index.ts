@@ -1067,7 +1067,7 @@ const NAMES = new Set(ROUTES.map((r) => r.name));
  */
 const unreachable = (why: string): Refusal => ({
   code: 'UNREACHABLE',
-  fix: 'BrainDog could not reach this record.',
+  fix: 'BrainDog could not be reached.',
   detail: why,
 });
 

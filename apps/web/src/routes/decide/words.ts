@@ -82,7 +82,7 @@ export const words = {
   nothingChanges: 'Nothing changes.',
 
   /** An address naming a question this record does not hold: said without the handle in the address. */
-  notHere: 'This question is not in this record.',
+  notHere: 'This question is not in this BrainDog.',
   /** A question settled elsewhere, whose decision is not among the ones read. Its title is the heading over this. */
   closedNow: 'This question is no longer open.',
 

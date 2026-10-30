@@ -35,7 +35,7 @@ export const words = {
   oneLineHint: 'What it does, in a sentence. Shown on its card in the store.',
   oneLineNeeded: 'Write the one line before publishing.',
   asks: 'What it asks permission for',
-  asksNothing: 'Nothing. It reads and writes only the record it is installed in.',
+  asksNothing: 'Nothing. It reads and writes only the BrainDog it is installed in.',
   asksCalls: (line: string): string => `Calls out: ${line}`,
   picture: 'Its picture is drawn from its own pages when BrainDog approves it, from made-up examples. Nothing of yours is in it.',
   publish: 'Publish to the store',

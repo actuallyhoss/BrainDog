@@ -57,6 +57,6 @@ export const sharing = {
   /* ── the person a share let in ── */
   sharingYouCanSee: 'What you can see here',
   sharingEndedTitle: 'Your access ended',
-  sharingEndedBody: 'Your access to this record ended. Ask its owner if you need it back.',
+  sharingEndedBody: 'Your access to this BrainDog ended. Ask its owner if you need it back.',
   sharingWelcomeClose: 'Close',
 } as const;

@@ -56,7 +56,7 @@ export type NamedLine = { pair: string; text: string; why: string; can: boolean 
 export type NamedTile = { heading: string; lines: NamedLine[]; more: string; people: number };
 
 /** The people line: how many are held twice, said as the People list says it. Empty at nought. */
-export const peopleTwiceSaid = (n: number): string => (n <= 0 ? '' : `${n === 1 ? 'One person' : `${String(n)} people`} may be on this record twice`);
+export const peopleTwiceSaid = (n: number): string => (n <= 0 ? '' : `${n === 1 ? 'One person' : `${String(n)} people`} may be listed twice`);
 
 /** Where those people are, narrowed to them: the People list with `twice=1`. */
 export const PEOPLE_TWICE_HREF = `/r/${PEOPLE}?twice=1`;

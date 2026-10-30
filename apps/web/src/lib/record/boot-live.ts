@@ -741,9 +741,9 @@ function accessText(e: EventLine): string | null {
   if (e.target_kind === 'device_grant') return given ? `Let a device sign in${label}` : `Signed a device out${label}`;
   /* THE FOUNDING OWNER'S OWN GRANT, written by themselves when the record is made (kernel `provision.ts`). It read "Gave someone
      owner access to this record" on a fresh record's Home, as if a stranger had been let in. */
-  if (given && e.target === `person:${e.actor}` && e.field === '*' && e.to === 'owner') return 'Started this record as its owner';
+  if (given && e.target === `person:${e.actor}` && e.field === '*' && e.to === 'owner') return 'Started this BrainDog as its owner';
   const list = e.field && e.field !== '*' ? (REGISTERS[e.field]?.name ?? e.field) : null;
-  const on = list ? ` on ${list}` : ' to this record';
+  const on = list ? ` on ${list}` : ' to everything';
   if (given) return level ? `Gave someone ${level} access${on}` : `Gave someone access${on}`;
   return level ? `Took away someone's ${level} access${on}` : `Took away someone's access${on}`;
 }

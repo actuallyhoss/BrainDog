@@ -121,7 +121,7 @@ export const decide = {
   arrangeLeadSettings: (name: string) => `Changes the words and settings of ${name}`,
   arrangeWhy: 'Why',
   arrangeCalls: 'Calls out once you accept',
-  arrangeCallsNote: 'Accepting approves these. Each one reaches a service outside this record, and counts toward what it calls out.',
+  arrangeCallsNote: 'Accepting approves these. Each one reaches a service outside your BrainDog, and counts toward what it calls out.',
   arrangeCallNoHost: 'A service it does not name',
   arrangeCallSends: (fields: string) => `sends ${fields}`,
   /** A pack's cadence (`every 1h`) in words: "every hour", "every 3 hours". */
@@ -174,7 +174,7 @@ export const decide = {
   arrangeNo: 'no',
   arrangeNewValue: 'a new value',
   arrangeStarts: 'What it starts',
-  arrangeStartsNote: 'Accepting starts these. Each one reaches a service outside this record on its own schedule.',
+  arrangeStartsNote: 'Accepting starts these. Each one reaches a service outside your BrainDog on its own schedule.',
   arrangeChoices: 'Your choices',
   arrangeSuggested: 'Suggested',
   arrangeCountKeys: (n: number) => `${n} ${n === 1 ? 'key' : 'keys'}`,

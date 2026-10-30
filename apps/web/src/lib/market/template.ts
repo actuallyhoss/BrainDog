@@ -58,7 +58,7 @@ export const templateWords = {
   setting: (label: string): string => `A setting for ${label}, which whoever installs it picks`,
   settingNow: (label: string, now: string): string => `A setting for ${label}, now ${now}, which whoever installs it picks`,
   reads: 'What it reads',
-  readsNothing: 'No list of this record',
+  readsNothing: 'None of your lists',
   drawn: 'The page as it is drawn now',
   drawnNone: 'Its blocks have no headings.',
   download: 'Download the file',

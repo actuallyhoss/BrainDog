@@ -28,13 +28,13 @@
   const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
   export const holeWords = {
     title: 'Find this out',
-    lead: (one: string, page: string) => `Nothing on this record answers this yet. Add a ${one} to find it out. It keeps a link back to ${page}.`,
+    lead: (one: string, page: string) => `Nothing answers this yet. Add a ${one} to find it out. It keeps a link back to ${page}.`,
     label: 'What to find out',
     add: (one: string) => `Add ${one}`,
     adding: 'Adding',
     added: (one: string) => `${cap(one)} added`,
-    noList: 'This record has no list of tasks to add this to.',
-    cannot: (list: string) => `You can read this record, and adding to ${list} is not open to you.`,
+    noList: 'There is no list of tasks to add this to.',
+    cannot: (list: string) => `You can read what is here, but adding to ${list} is not open to you.`,
     back: (page: string, href: string) => `Asked on [${page.replace(/[[\]]/gu, '')}](${href}).`,
     thisPage: 'this page',
   };

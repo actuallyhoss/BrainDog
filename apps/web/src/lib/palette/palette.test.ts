@@ -448,7 +448,7 @@ test('every customise row is named in words a person reads, and says where the c
 
 test('a look row and its toast say where the change is kept: this record, this device for now, or this device', () => {
   const where = (kept: Here['kept']) => customise('dark', { ...fresh, ...(kept ? { kept } : {}) })[0]?.detail;
-  assert.equal(where('record'), 'Yours in this record, on every device');
+  assert.equal(where('record'), 'Yours in this BrainDog, on every device');
   assert.equal(where('pending'), 'On this device for now');
   assert.equal(where('device'), 'On this device');
   /* NOTHING SAID IS THE CLAIM THAT IS NEVER WRONG. */
@@ -456,8 +456,8 @@ test('a look row and its toast say where the change is kept: this record, this d
   /* AND ONLY THE LOOK ROWS: a page's place in the nav is the person's on the record whatever the look does. */
   assert.equal(customise('hide inbox', { ...fresh, kept: 'record' })[0]?.detail, 'From your nav. Nothing is deleted.');
 
-  assert.equal(lookSaid({ from: 'kept' }, 'Dark mode'), 'Dark mode, in this record on every device you open it on.');
-  assert.equal(lookSaid({ from: 'pending' }, 'Dark mode'), 'Dark mode, on this device for now. It reaches this record the next time it can.');
+  assert.equal(lookSaid({ from: 'kept' }, 'Dark mode'), 'Dark mode, in this BrainDog on every device you open it on.');
+  assert.equal(lookSaid({ from: 'pending' }, 'Dark mode'), 'Dark mode, on this device for now. It reaches your BrainDog the next time it can.');
   assert.equal(lookSaid({ from: 'device' }, 'Dark mode'), 'Dark mode, on this device.');
   assert.equal(lookSaid({ from: 'refused', fix: 'key is one of nav.order.' }, 'Dark mode'), 'Dark mode, on this device.');
   for (const s of [where('record'), lookSaid({ from: 'kept' }, 'Dark mode'), lookSaid({ from: 'pending' }, 'Dark mode')])

@@ -194,7 +194,7 @@ for (const [what, answer] of [
     const out = await viewReader(BASE, io).read('services.lapsing');
     assert.equal(out.from, 'refused', `answered ${JSON.stringify(out)}`);
     if (out.from !== 'refused') return;
-    assert.match(out.fix, /^(Sign in again\.|BrainDog could not reach this record\.)$/u);
+    assert.match(out.fix, /^(Sign in again\.|BrainDog could not be reached\.)$/u);
   });
 
 test("any other refusal on the view itself is the record's own sentence", async () => {

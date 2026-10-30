@@ -84,7 +84,7 @@ export const actionWords = {
   newDoor: 'New web address',
   newAction: 'New scheduled action',
   doorSub: 'An address another service posts to. What arrives lands in a list, or waits in the inbox.',
-  actionSub: 'Something this record does on a clock: reads a number, sends an update or reads pages from a service.',
+  actionSub: 'Something BrainDog does on a clock: reads a number, sends an update or reads pages from a service.',
   name: 'Name',
   namePlaceholder: 'Orders from the shop',
   channel: 'What it does',

@@ -51,7 +51,7 @@ export const words = {
   searched: (q: string, n: number) => `${n === 1 ? '1 key' : `${n} keys`} for “${q}”.`,
   everyKey: 'Show every key',
   /* Over the keys, only when the read stopped before the record ran out of them. */
-  moreKeys: (n: number) => `The first ${n === 1 ? 'key is' : `${n} keys are`} listed. This record holds more.`,
+  moreKeys: (n: number) => `The first ${n === 1 ? 'key is' : `${n} keys are`} listed. There are more.`,
   /* THE BOX THAT FINDS A KEY AS IT IS TYPED, and how many keys each project's fold holds. */
   find: 'Find a key',
   keysIn: (n: number) => (n === 1 ? '1 key' : `${n} keys`),

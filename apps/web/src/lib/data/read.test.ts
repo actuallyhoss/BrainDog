@@ -47,7 +47,7 @@ test("a refusal is the record's sentence, and only the client's own code is offl
     refusal: 'The record could not be reached: timeout',
   });
   /* The client's `unreachable()` says the sentence in `fix` and the reason in `detail`; the reason is what folds. */
-  const sentence = 'BrainDog could not reach this record.';
+  const sentence = 'BrainDog could not be reached.';
   assert.deepEqual(settle<number>({ ok: false, refusal: { code: 'UNREACHABLE', fix: sentence, detail: 'timeout' } }), {
     state: 'offline',
     value: null,

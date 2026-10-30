@@ -600,7 +600,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         span: 12,
         when: { metric: 'held-twice', gt: 0 },
-        body: '{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1).',
+        body: '{{held-twice-shown}} people may be listed twice, {{held-twice}} too many. [See them](/r/people?twice=1).',
       },
       /* NO IN TOUCH TILE, SINCE People 3.5.0: "In touch, 30 days: 3" filled a whole row with one figure nobody asked for.
          The figure stays declared and the night's save of it is still kept. */

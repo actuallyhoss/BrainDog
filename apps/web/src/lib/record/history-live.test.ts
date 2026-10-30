@@ -128,8 +128,8 @@ test('WHO DID IT IS SAID BY NAME, and never as a person\'s id: You, the name the
   const names = new Map([[other, 'Ada Lovelace']]);
   assert.deepEqual(whoDid(me, me, names), { name: 'You', you: true, person: true });
   assert.deepEqual(whoDid(other, me, names), { name: 'Ada Lovelace', you: false, person: true });
-  assert.deepEqual(whoDid(stranger, me, names), { name: 'Someone on this record', you: false, person: true });
-  assert.deepEqual(whoDid(stranger, null), { name: 'Someone on this record', you: false, person: true });
+  assert.deepEqual(whoDid(stranger, me, names), { name: 'Someone you share with', you: false, person: true });
+  assert.deepEqual(whoDid(stranger, null), { name: 'Someone you share with', you: false, person: true });
   assert.equal(whoDid('rule.renewal', me).name, 'Renewal');
   assert.equal(whoDid('agent:claude', me).name, 'Claude');
   assert.equal(whoDid('you', null).you, true, 'the sample\'s own writes are not the reader\'s');

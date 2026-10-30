@@ -17,7 +17,7 @@ import { SUPPORT_EMAIL } from './shell.ts';
 export const account = {
   shownInNav: (title: string) => `${title} is back in your nav.`,
   showAgain: 'Show again',
-  perPerson: 'Kept for you on this record, on every device you sign in on.',
+  perPerson: 'Kept for you in this BrainDog, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
 
   sourcesAdd: 'Sources come with add-ons or agents.',
@@ -41,7 +41,7 @@ export const account = {
     append: 'Can add items, and read nothing',
     read: 'Can read, cannot change',
   } as Record<string, string>,
-  auditHolds: 'Every change to this record shows up here, with who made it and when.',
+  auditHolds: 'Every change to your BrainDog shows up here, with who made it and when.',
   export: 'Download a copy',
   /* The two questions an audit log exists to answer, as the labels of the two controls. */
   auditWho: 'Who',
@@ -101,7 +101,7 @@ export const account = {
      is the one thing a swatch press can do that they would not expect. AND THEN IT WAS STILL A PARAGRAPH ABOUT THE
      SCREEN: how the other colours follow, and what a press may refuse, which the refusal says in place when it happens
      (`accentRefused`). What is left is the choice itself. */
-  accentHint: "Yours alone. It wins over the record's look below, which the owner sets for everyone.",
+  accentHint: "Yours alone. It wins over the shared look below, which the owner sets for everyone.",
   /**
    * THE PALETTE THAT SHIPPED AND COULD NOT BE TURNED ON.
    *
@@ -119,7 +119,7 @@ export const account = {
      What they get is the second sentence it already had, in the words of what they see. */
   contrastHint: 'Makes text and edges stand out more, and keeps the accent you chose.',
   shot: 'Screenshot mode',
-  shotHint: 'Hides what your record holds on this screen. What is sent to this device does not change.',
+  shotHint: 'Hides what your BrainDog holds on this screen. What is sent to this device does not change.',
 
   /* the settings areas `19 §2` says an earlier draft dropped */
   /* AND SO DOES THIS ONE. **Who can see this record · 4** stood over four rows, one of which is an
@@ -140,7 +140,7 @@ export const account = {
    * level per person, so there was no matrix for either clause to be about, and the sentence read as
    * a contradiction because on that screen it was one.
    */
-  accessScope: 'A level here covers every part of this record, including ones added later. Give somebody a different level on one part and it replaces it, for that part only.',
+  accessScope: 'A level here covers every part of this BrainDog, including ones added later. Give somebody a different level on one part and it replaces it, for that part only.',
   /* THE WHOLE OF THIS AREA AT ONE PERSON. A level, an exception, a removal and an erasure are all
      one person measured against another, so on a record whose only person is you there is nothing
      for any of them to say: five greyed segments, two hints about the greying, and a red erasure
@@ -151,7 +151,7 @@ export const account = {
   /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
      the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
   noRecordLevel: 'No access',
-  noRecordLevelMeans: 'Nothing on this record itself. Only the parts named below, and nothing that is added later.',
+  noRecordLevelMeans: 'Nothing on the whole BrainDog. Only the parts named below, and nothing that is added later.',
   addException: 'Different on one part',
   removeException: 'Back to their level',
   suspendedSince: (ago: string) => `stopped ${ago}`,
@@ -198,7 +198,7 @@ export const account = {
    */
   noPasskeysWhy: (magic: boolean) =>
     magic
-      ? 'Without one, the only way back into this record is an email link.'
+      ? 'Without one, the only way back in is an email link.'
       : 'This server cannot send an email link, so without a passkey there is no way back in on your own. Ask whoever runs it.',
   addPasskey: 'Add a passkey',
   addedWhen: (ago: string) => `added ${ago}`,
@@ -305,13 +305,13 @@ export const account = {
   reachMeans: {
     login: 'sign in as you, for ninety days',
     runner: 'do work for you on this machine, for ninety days',
-    export: 'take one copy of this record, once, in the next ten minutes',
-    import: 'load items into this record, once, in the next ten minutes',
+    export: 'take one copy of your BrainDog, once, in the next ten minutes',
+    import: 'load items into your BrainDog, once, in the next ten minutes',
     pack: 'install one add-on, once, in the next ten minutes',
     token: 'make one more key, once, in the next ten minutes',
     vault: 'open the keys of one project, for thirty days',
     vaultAll: 'open the keys that belong to no project, for seven days',
-    shape: 'take copies of this record with every word scrambled, and read nothing else, for ninety days',
+    shape: 'take copies of your BrainDog with every word scrambled, and read nothing else, for ninety days',
   } as Record<string, string>,
 
   /* The code entry: the `verification_uri` every device flow prints. */
@@ -398,7 +398,7 @@ export const account = {
   pushDismissed: 'Nothing was turned on, because the browser’s question was closed without an answer.',
   pushUnsupported: 'This browser cannot show notifications from BrainDog. On an iPhone or iPad, add BrainDog to the Home Screen and turn this on from there.',
   pushNoService: 'The browser’s push service did not answer, so nothing was turned on. Try again in a minute.',
-  pushNoRoute: 'This record cannot keep a device’s address yet, so nothing was turned on.',
+  pushNoRoute: 'This BrainDog cannot keep a device’s address yet, so nothing was turned on.',
   pushNotSent: 'The record was not reached, so nothing was turned on. Try again once you are online.',
   /* WHAT OPENING THE ROW SAYS WHEN THE BROWSER WOULD NOT ANSWER WHETHER IT IS SUBSCRIBED. Off is the safe reading: a press
      then subscribes, or finds the one already held under the same key and sends it again, so nothing is doubled. */
@@ -419,7 +419,7 @@ export const account = {
   suggestPages: 'Suggest new pages',
   suggestPagesHint: 'When something you keep grows, or you keep asking the same question, BrainDog suggests a page for it. Nothing is placed for you: a suggestion waits below until you keep it.',
   suggestOff: 'Not offering anything',
-  suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
+  suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and BrainDog starts offering again.',
   perDevice: 'This setting is remembered on this device.',
 
   /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes
@@ -623,29 +623,29 @@ export const account = {
   passkeyFailed: 'The passkey was not added. Try again.',
   openBrainDog: 'Open BrainDog',
   signedOut: 'You are signed out.',
-  levelMoved: (name: string, to: string) => `${name} is set to ${to} across this record.`,
-  accessRemoved: (name: string) => `${name} no longer has access to this record.`,
+  levelMoved: (name: string, to: string) => `${name} is set to ${to} across this BrainDog.`,
+  accessRemoved: (name: string) => `${name} no longer has access to this BrainDog.`,
   exceptionRemoved: (list: string, to: string) => `${list} is back to ${to}.`,
   exceptionAdded: (name: string, list: string, level: string) => `${name} is set to ${level} on ${list}.`,
   exceptionList: 'List',
   exceptionLevel: 'Level',
   exceptionAdd: 'Add',
   exceptionCancel: 'Cancel',
-  peopleUnrouted: 'This record does not list its people yet.',
+  peopleUnrouted: 'This BrainDog does not list its people yet.',
   /* Lane F: backups, putting a copy back, erasing a person and deleting the record */
   backedUp: (id: string) => `Backed up. The copy is ${id}.`,
   sizeOnDisk: (size: string) => `${size} on disk`,
   restoreThis: 'Restore this copy',
-  restoreLive: 'Put the record back to one of the copies above. What it holds now is kept as a copy first.',
+  restoreLive: 'Put everything back to one of the copies above. What it holds now is kept as a copy first.',
   /* NO COPY ABOVE YET: "one of the copies above" over none. */
-  restoreFirst: 'Once a copy is kept, Restore this beside it puts the record back to that day.',
-  restoreConfirm: (id: string) => `Put the record back to ${id}? Everything written since then is replaced.`,
+  restoreFirst: 'Once a copy is kept, Restore this beside it puts everything back to that day.',
+  restoreConfirm: (id: string) => `Put everything back to ${id}? Everything written since then is replaced.`,
   keepAsIs: 'Keep it as it is',
-  restoredTo: (id: string, kept: string) => `The record is back to ${id}. What it held before is kept as ${kept}.`,
+  restoredTo: (id: string, kept: string) => `Everything is back to ${id}. What it held before is kept as ${kept}.`,
   eraseWho: 'Name or email',
   eraseBasis: 'Legal basis',
-  eraseWhichPerson: 'Person on this record',
-  eraseNobody: 'Not on this record',
+  eraseWhichPerson: 'Person',
+  eraseNobody: 'Nobody by that name or email',
   eraseNow: 'Erase for good',
   erasedRows: (rows: number) => `Erased. ${rows} ${rows === 1 ? "item no longer holds" : "items no longer hold"} them, and the log keeps only that it happened.`,
   recordDeleted: (record: string) => `${record} is deleted. You can close this tab.`,
@@ -654,7 +654,7 @@ export const account = {
   inviteLevelLabel: 'What they can do',
   inviteMaking: 'Making a link',
   /* Same words as `TEAMS_HELD_SAID` in the record's directory; a test holds them equal. */
-  inviteHeld: 'Inviting colleagues opens soon. Nobody else can join this record yet.',
+  inviteHeld: 'Inviting colleagues opens soon. Nobody else can join yet.',
   inviteNoMail: 'No email is sent; you pass the link on.',
   inviteLinkReady: (email: string) => `For ${email}. Shown once, so copy it now.`,
   inviteCopyLink: 'Copy link',
@@ -715,8 +715,8 @@ export const account = {
   billingPayAgain: 'Pay again',
   billingOpening: 'Opening the payment page',
   billingNotOpen: 'This BrainDog is not taking payments at the moment, so nothing here can be paid or changed.',
-  billingNoneOwned: 'Billing belongs to a record’s owner, and you own no record on this BrainDog.',
-  billingUnread: 'What this record costs could not be read just now. Try again in a minute.',
+  billingNoneOwned: 'Billing belongs to the owner, and you own no BrainDog here.',
+  billingUnread: 'What your BrainDog costs could not be read just now. Try again in a minute.',
   /* The Worker's `LAPSED_FIX` (`apps/worker/src/lapse.ts`), word for word, because the banner and a refused write must
      say the same thing about the same record. */
   lapsedFix: 'Read-only until billing resumes. Export is available.',

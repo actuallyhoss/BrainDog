@@ -37,7 +37,7 @@
   const words = {
     title: 'Design book',
     back: 'Settings',
-    lead: 'Every control and every chart, drawn by the product itself from what this record holds.',
+    lead: 'Every control and every chart, drawn by the product itself from what your BrainDog holds.',
     which: 'Which sheet',
     controls: 'Controls and lists',
     charts: 'Charts and marks',

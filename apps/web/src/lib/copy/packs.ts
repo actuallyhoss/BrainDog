@@ -47,8 +47,8 @@ export const packs = {
   packTurnOn: (name: string) => `Turn on ${name}`,
   packScopesInUse: (names: string[]) => `Its projects are still used by ${list(names)}`,
   packNothingToSet: 'This add-on has nothing to set',
-  packNotInstalled: (id: string) => `There is no add-on called ${id} on this record`,
-  packNotInstalledWhy: 'Add-ons shows the ones this record has, and the ones it could add.',
+  packNotInstalled: (id: string) => `There is no add-on called ${id} here`,
+  packNotInstalledWhy: 'Add-ons shows the ones you have, and the ones you could add.',
   packNothingToSetWhy: 'It adds the lists and pages below, and nothing about it needs choosing.',
   /* THE SENTENCE UNDER THE TITLE. The screen was `Packs`, a word nobody brings with them; it is
      `Add-ons` now, the reader's word for an installable thing with an author. The API, the docs and
@@ -122,5 +122,5 @@ export const packs = {
   catalogueQuestion: (title: string, to: string, from: string | null, keyId: string | null) =>
     `${from ? `Update ${title} from ${from} to ${to}` : `Install ${title} ${to}`} from this BrainDog's catalogue? ${keyId ? `It is signed by key ${keyId}.` : 'Nobody signed it.'}`,
   uninstalled: (pack: string) => `${pack} is uninstalled. What it held stays, and installing it again within 30 days brings back its settings and schedules.`,
-  packNotInstallable: (pack: string) => `${pack} cannot be installed on this record yet, so nothing was changed.`,
+  packNotInstallable: (pack: string) => `${pack} cannot be installed here yet, so nothing was changed.`,
 } as const;

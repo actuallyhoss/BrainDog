@@ -63,7 +63,7 @@ async function rows(client: Client, register: string, filter: string | null): Pr
 export async function loadCounter(base: string, lists: readonly { id: string; kernel?: true }[], into: string): Promise<{ ok: true; value: Loaded } | { ok: false; fix: string }> {
   const client = createClient({ base });
   const ledger = await findLedger(base, lists);
-  if (ledger === null) return { ok: false, fix: 'This record keeps no ledger, so there is no account to count.' };
+  if (ledger === null) return { ok: false, fix: 'There is no ledger yet, so there is no account to count.' };
   const [accounts, categories, byAccount] = await Promise.all([
     rows(client, ledger.account.list, 'kind is cash, state is not closed'),
     ledger.category === null ? Promise.resolve([]) : rows(client, ledger.category.list, null),

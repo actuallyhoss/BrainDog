@@ -59,7 +59,7 @@
     agentGo: 'Connect',
     /* THE STEP DONE, said in words beside its tick in the well, so it is never a colour alone. */
     agentDone: (name: string) => `${name} is connected`,
-    agentDoneDoes: 'Approved just now. It can reach this record.',
+    agentDoneDoes: 'Approved just now. It can reach your BrainDog.',
     bank: "Forward your bank's texts",
     mail: 'Forward your mail',
     file: 'Bring in a file from another app',

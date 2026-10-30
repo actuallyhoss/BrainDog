@@ -398,7 +398,7 @@ export const QUESTIONS: Question[] = [
   {
     id: 'SG27',
     title: 'Does Tallow get retired, or parked for another year?',
-    cost: 'Parking costs GBP 14.00 a year and one line of attention every time this record is read.',
+    cost: 'Parking costs GBP 14.00 a year and one line of attention every time your BrainDog is read.',
     rank: 4,
     opened: stamp(-140),
     entity: 'Tallow',
@@ -452,7 +452,7 @@ export const QUESTIONS: Question[] = [
        a price or a name; this one is whether the record still exists tomorrow. */
     rank: 1,
     opened: `${snap.at}${NIGHTLY}`,
-    entity: 'This record',
+    entity: 'Your BrainDog',
     options: [
       /* `a backup` AND IT WAS `a sealed copy`. Settings calls this a backup, and an option on the
          one question about whether the record still exists tomorrow is not the place to introduce

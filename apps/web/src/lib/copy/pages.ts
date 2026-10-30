@@ -196,7 +196,7 @@ export const pages = {
      here is a standing invitation to guess again. The record's own words are in `packages/kernel/src/pages.ts`. */
   /** The heading over one currency's chart, when a chart is drawn once per currency. */
   inCurrency: (currency: string) => `In ${currency}`,
-  noSources: 'Nothing feeds this record yet',
+  noSources: 'Nothing feeds your BrainDog yet',
   noSourcesWhy: 'A connector pulls things in on a schedule from a mailbox, a bank feed or a repository, and reports here when it fails.',
   ingestPrompt: 'read my record, then set up a connector for the mailbox I file invoices in',
 

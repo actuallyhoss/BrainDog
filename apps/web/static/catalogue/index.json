@@ -2516,12 +2516,29 @@
       "kind": "pack",
       "id": "job-starter",
       "title": "Jobs on your machine",
-      "summary": "Six kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, composing a page of this record, and Claude taking a request you send from a row, reading only or changing files in the folder you pick. You approve each kind once before it can run.",
+      "summary": "Six kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, composing a page of your BrainDog, and Claude taking a request you send from one of your lists, reading only or changing files in the folder you pick. You approve each kind once before it can run.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "c074eda919e7cc010dd1802ffe5658703df434d62760621e15d0863f2b9ea172",
+          "bytes": 8229,
+          "published_at": "2026-10-30T18:38:03.449Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Its description says a page of your BrainDog, where it said a page of this record."
+        },
         {
           "version": "1.2.0",
           "checksum": "55381ba8e26b95bbd20eb99e8134297fb3a87dcdee8fe9f2f85745d0d7c9c748",

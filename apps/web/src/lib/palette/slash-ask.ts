@@ -66,5 +66,5 @@ export const askWords = {
   open: 'Open the proposal',
   /* After the time, as in "2h ago, not answered", so it starts lower case. */
   refused: 'not answered',
-  unreached: 'BrainDog could not reach this record.',
+  unreached: 'BrainDog could not be reached.',
 } as const;

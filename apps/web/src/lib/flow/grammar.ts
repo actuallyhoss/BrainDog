@@ -34,9 +34,9 @@ export type Ceilings = { steps: number; depth: number; runsPerDay: number; vars:
 export type FlowGrammar = { triggers: readonly GrammarTrigger[]; steps: readonly GrammarStep[]; ceilings: Ceilings };
 
 /** The one line an editor reads over a record that has no `flowGrammar`. */
-export const OLDER = 'This record is older than the app, so its automations open read only.';
+export const OLDER = 'This BrainDog is older than the app, so its automations open read only.';
 /** The line when the read could not be made at all, which is not the same fact and is asked again on the next open. */
-export const UNREAD = 'BrainDog could not read how automations are written on this record, so this one opens read only.';
+export const UNREAD = 'BrainDog could not read how automations are written here, so this one opens read only.';
 
 export type GrammarState =
   | { state: 'loading' }

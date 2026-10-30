@@ -42,7 +42,7 @@ export const shelfWords = {
   placed: (name: string) => `${name} added from your shelf.`,
   remove: 'Take off',
   removed: (name: string) => `${name} is off your shelf.`,
-  gone: 'That list is not on this record any more, so this cannot be placed.',
+  gone: 'That list is not here any more, so this cannot be placed.',
   empty: 'Nothing is on your shelf yet. Make a component and keep it here.',
   full: `The shelf holds ${SHELF_MOST}. Take one off first.`,
   refused: 'The shelf could not be kept.',

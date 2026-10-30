@@ -204,7 +204,7 @@ for (const [what, answer] of [
        second meaning for these codes to carry, so they are the record's or the client's sentence like any other. */
     for (const out of [await pagesReader(BASE, io).read(), await pagesReader(BASE, io).readOne('money')]) {
       assert.equal(out.from, 'refused', `answered ${JSON.stringify(out)}`);
-      if (out.from === 'refused') assert.match(out.fix, /^(Sign in again\.|BrainDog could not reach this record\.)$/u);
+      if (out.from === 'refused') assert.match(out.fix, /^(Sign in again\.|BrainDog could not be reached\.)$/u);
     }
   });
 

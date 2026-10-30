@@ -85,7 +85,7 @@ export const words = {
   missing: (n: number) => (n === 1 ? 'One sample is not in the inbox any more, so it is left out.' : `${n} samples are not in the inbox any more, so they are left out.`),
   needsSample: 'A suggestion carries at least one message from the inbox, so whoever answers can check it.',
   needsList: 'Pick where it files first.',
-  unreached: 'BrainDog could not reach this record.',
+  unreached: 'BrainDog could not be reached.',
   retry: 'Try again',
   noSamples: 'No messages to make a rule from',
   noSamplesBody: 'Paste a message, or pick alike ones in the Inbox.',

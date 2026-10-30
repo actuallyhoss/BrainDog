@@ -26,7 +26,7 @@ import { isMoney, type FieldDecl, type MoneyValue } from '../record/schema.ts';
  * WHAT A MONEY BOX SAYS WHEN NO CURRENCY IS KNOWN. The box takes digits alone and the record refuses an amount without
  * a currency, so the sentence names the two places a person can give it one, rather than the form guessing.
  */
-export const NO_CURRENCY = "Say which currency, or set this record's currency in Settings.";
+export const NO_CURRENCY = 'Say which currency, or set your home currency in Settings.';
 
 /**
  * The currency an amount typed into this field goes in: the value's own when the box opened on one (a `currency_fixed`

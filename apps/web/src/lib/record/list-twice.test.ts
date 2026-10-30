@@ -136,7 +136,7 @@ test('a list of things is asked once by its own name, and its answer becomes the
 
 test('the people words are unchanged beside a list of things', () => {
   assert.equal(twiceWords.clear, 'Show everyone');
-  assert.equal(twiceWords.unsaved, 'A view cannot keep the people who may be on this record twice. Choose Show everyone first.');
+  assert.equal(twiceWords.unsaved, 'A view cannot keep the people who may be listed twice. Choose Show everyone first.');
 });
 
 test('a list that declares the role narrows under any name', () => {
@@ -207,8 +207,8 @@ test('a refusal comes back as the refusal, never as everyone', async () => {
 });
 
 test('the words say what is shown, how to leave, and that nobody is', () => {
-  assert.equal(twiceWords.showing, 'Showing the people who may be on this record twice');
-  assert.equal(twiceWords.none, 'Nobody is on this record twice.');
+  assert.equal(twiceWords.showing, 'Showing the people who may be listed twice');
+  assert.equal(twiceWords.none, 'Nobody is listed twice.');
   assert.ok(twiceWords.clear.length > 0);
   for (const said of Object.values(twiceWords)) {
     assert.doesNotMatch(said, /—/, said);
