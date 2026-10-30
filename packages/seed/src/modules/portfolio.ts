@@ -1795,7 +1795,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         where: 'kind is not action, scope is global',
         columns: [
           { field: 'name', as: 'title' },
-          { field: 'kind', label: 'Kind', as: 'fact' },
+          /* WHAT IT IS IN A WORD, the app's (`page-live.ts`): a key, a tool or server, a skill. "Kind key" read as a field's
+             label and its stored word. */
+          { field: 'kind', label: 'What it is', as: 'fact' },
           { field: 'used_agents', label: 'Used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],
