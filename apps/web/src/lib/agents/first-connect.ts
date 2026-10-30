@@ -43,8 +43,8 @@ function everyApp(lines: ConnectLines, install: string): AppLine[] {
   const vscode = JSON.stringify({ name: 'braindog', type: 'http', url: lines.mcp });
   return [
     { id: 'claude-code', name: 'Claude Code', mark: 'claude', what: 'Run in a terminal', line: lines.setup, button: connectWords.copyCommand, before: install },
-    { id: 'claude', name: 'Claude', mark: 'claude', what: 'Settings, Connectors, add a custom connector', line: lines.web, button: connectWords.copyAddress, before: null },
-    { id: 'chatgpt', name: 'ChatGPT', mark: 'chatgpt', what: 'Settings, Connectors, add a connector', line: lines.mcp, button: connectWords.copyAddress, before: null },
+    { id: 'claude', name: 'Claude', mark: 'claude', what: 'Customize, then Connectors, add a custom connector', line: lines.web, button: connectWords.copyAddress, before: null },
+    { id: 'chatgpt', name: 'ChatGPT', mark: 'chatgpt', what: 'Settings, then Apps, turn on developer mode, create an app', line: lines.mcp, button: connectWords.copyAddress, before: null },
     { id: 'vscode', name: 'VS Code', mark: 'vscode', what: 'Run in a terminal', line: `code --add-mcp '${vscode}'`, button: connectWords.copyCommand, before: null },
     { id: 'cursor', name: 'Cursor', mark: 'cursor', what: 'Add to mcp.json', line: lines.cursor, button: connectWords.copyEntry, before: null },
   ];
