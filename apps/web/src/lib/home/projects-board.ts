@@ -262,6 +262,8 @@ type Facts = {
   quiet: boolean;
   quietDays: number;
   feedSince: string | null;
+  /** Each of its numbers past twice how often it comes, by name and the day of its newest reading. */
+  staleNums: { name: string; newest: string }[];
   /** How old the key number it leads with is, and whether that one is past twice its cadence. */
   kpiAge: number;
   kpiStale: boolean;
@@ -290,6 +292,27 @@ export function measuresOf(kpis: readonly BoardKpi[], readings: readonly BoardRe
   }
   for (const ats of byName.values()) out.push({ newest: ats.slice().sort().at(-1)!, every: cadenceOf(ats) });
   return out;
+}
+
+/**
+ * EACH NUMBER A PROJECT KEEPS, BY ITS NAME, with its newest reading and how often it comes: a key number and the
+ * readings of the same name are one number. What the quiet tile counts (`staleNums`).
+ */
+export function namedMeasuresOf(kpis: readonly BoardKpi[], readings: readonly BoardReading[]): (FeedMeasure & { name: string })[] {
+  const out = new Map<string, FeedMeasure & { name: string }>();
+  for (const k of kpis) if (k.latestAt && !isForecast(k.name)) out.set(k.name, { name: k.name, newest: k.latestAt, every: kpiEvery(k) });
+  const byName = new Map<string, string[]>();
+  for (const r of readings) {
+    if (r.at === '' || isForecast(r.name)) continue;
+    byName.set(r.name, [...(byName.get(r.name) ?? []), r.at]);
+  }
+  for (const [name, ats] of byName) {
+    const newest = ats.slice().sort().at(-1)!;
+    const had = out.get(name);
+    if (had === undefined) out.set(name, { name, newest, every: cadenceOf(ats) });
+    else if (newest > had.newest) out.set(name, { ...had, newest });
+  }
+  return [...out.values()];
 }
 
 /** A monthly amount from money that comes every `every`. */
@@ -358,6 +381,10 @@ function factsOf(input: BoardInput): Facts[] {
       quiet: feed.quiet,
       quietDays: feed.age,
       feedSince: feed.newest,
+      staleNums: namedMeasuresOf(ks, readings.get(p.seq) ?? [])
+        .filter((m) => /^\d{4}-\d{2}-\d{2}/u.test(m.newest) && measureStale(m, today))
+        .map((m) => ({ name: m.name, newest: m.newest.slice(0, 10) }))
+        .sort((a, b) => a.newest.localeCompare(b.newest)),
       kpiAge,
       kpiStale,
       asks: asks.get(p.seq) ?? [],
@@ -590,7 +617,13 @@ export function boardOf(input: BoardInput): Board {
     .map(({ at: _a, ...l }) => l);
   const dueProjects = new Set(dueLines.map((l) => l.project)).size;
   const quietFsAll = live.filter((f) => f.quiet);
-  const quietSince = quietFsAll.map((f) => f.feedSince ?? '').filter(Boolean).sort().at(-1);
+  /* THE QUIET TILE COUNTS NUMBERS, NOT FEEDS (audit 2, B15): it said "0, all reporting" while Kiln's own page marked
+     Specimen downloads 21 days old, because Kiln's other numbers still came. Each number past twice how often it comes is
+     one line, by its project and name, with how old it is, as the project's page says it ("21 days old"). */
+  const quietNums = live
+    .flatMap((f) => f.staleNums.map((n) => ({ newest: n.newest, project: f.p.name, text: `${n.name}, ${plural(daysBetween(n.newest, input.today), 'day', 'days')} old`, href: f.p.href })))
+    .sort((a, b) => a.newest.localeCompare(b.newest));
+  const quietSince = quietNums.map((n) => n.newest).at(-1);
   const renewLines = input.renewals
     .filter((r) => daysBetween(input.today, r.day) <= 60)
     .sort((a, b) => a.day.localeCompare(b.day))
@@ -622,11 +655,10 @@ export function boardOf(input: BoardInput): Board {
       late: lateTile,
       due: { count: dueLines.length, said: dueLines.length === 0 ? 'nothing due' : `across ${plural(dueProjects, 'project', 'projects')}`, lines: dueLines.slice(0, 4), more: Math.max(0, dueLines.length - 4) },
       quiet: {
-        count: quietFsAll.length,
-        said: quietFsAll.length === 0 ? 'all reporting' : quietSince ? `since ${dayMonth(quietSince)}` : '',
-        /* SAID AS ITS OWN PAGE SAYS ITS FEED: quiet since the day its newest reading came, of any measure. */
-        lines: quietFsAll.slice(0, 4).map((f) => ({ day: null, project: f.p.name, text: f.feedSince ? `quiet since ${dayMonth(f.feedSince)}` : 'quiet', href: f.p.href })),
-        more: Math.max(0, quietFsAll.length - 4),
+        count: quietNums.length,
+        said: quietNums.length === 0 ? 'all reporting' : quietSince ? `since ${dayMonth(quietSince)}` : '',
+        lines: quietNums.slice(0, 4).map(({ newest: _n, ...l }) => ({ day: null, ...l })),
+        more: Math.max(0, quietNums.length - 4),
       },
       renewals: { count: renewLines.length, said: renewLines.length === 0 ? 'none in 60 days' : 'in 60 days', lines: renewLines.slice(0, 4), more: Math.max(0, renewLines.length - 4) },
     },
