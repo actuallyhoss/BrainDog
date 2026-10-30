@@ -38,10 +38,17 @@ import type { AuditEvent } from '../../lib/record/schema.ts';
 
 /** The words this file says of its own: a rule is named as one, beside the rule glyph its face wears. */
 export const whoWords = {
-  rule: (name: string): string => (name.trim().toLowerCase() === 'ladder' ? 'Trust rule' : `A rule: ${name}`),
+  /* A RULE IS SAID AS THE RULE IT IS, by its title in quotation marks: "The rule “Weekly review”". It read "A rule:
+     Weekly review", a label and a colon opening the line (audit of 31 October, A18). One of his imported rules, whose
+     own name is a code, is already a sentence and is said as it is. */
+  rule: (name: string): string =>
+    name.trim().toLowerCase() === 'ladder' ? 'The trust rule' : name.trim() === nameWords.importedRule ? name.trim() : `The rule “${name.trim()}”`,
   /* A RULE INSIDE A SENTENCE, by its title in quotation marks, since a rule's title is a sentence of its own: "The rule
      “Chase late payments” closed it". */
   ruleIn: (name: string): string => (name.trim().toLowerCase() === 'ladder' ? 'The trust rule' : `The rule “${name.trim()}”`),
+  /* A QUESTION A RULE ASKED THAT WAS ANSWERED IN THE SAME MOMENT is one line, and says both: "The rule “Categorise what
+     cleared” asked, BrainDog decided it". The second half keeps its own sentence, its "You" in lower case mid-line. */
+  askedThen: (asker: string, rest: string): string => `${asker} asked, ${rest.startsWith('You ') ? `you ${rest.slice(4)}` : rest}`,
   /* WHO DID IT AND WHAT, where the line's title already said what was done (`lineSaid`'s `done`): "BrainDog closed it",
      and not "A rule: Handled · closed". A verb with its own object ("gave access") takes no "it". */
   did: (who: string, done: string): string => {
@@ -112,6 +119,14 @@ export function actorSaid(by: string, me: string | null, names: ReadonlyMap<stri
   const said = saidOf(by, me, names, run_by);
   if (said.person) return said;
   return { ...said, name: said.kind === 'rule' ? whoWords.rule(lead(said.name)) : lead(said.name) };
+}
+
+/**
+ * WHAT A RULE OR A SCRIPT THAT RAN IS CALLED, bare, for the line that leads with it ("Ran Weekly review"): its name as
+ * `actor` says it, without "The rule" around it or "script" after it, since the line says which beside its face.
+ */
+export function ranName(by: string): string {
+  return lead(actor(by).name).replace(/ script$/u, '');
 }
 
 /**

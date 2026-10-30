@@ -673,6 +673,10 @@ export type AuditEvent = {
   steps?: AuditEvent[];
   /** How the line settled a suggestion, as `settlingOf` reads it; absent on a line that settled none. */
   settling?: import('./history-live.ts').Settling | null;
+  /** On a `decide` line, the question it settled (`suggestion:SG4`), which the `resolve` beside it targets. */
+  settles?: string;
+  /** Who asked the question a `decide` line settled, where the asking was folded into it (`oneDecision`). */
+  asked?: string;
 };
 
 export type PackInfo = {

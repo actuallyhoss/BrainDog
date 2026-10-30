@@ -41,3 +41,25 @@ test('Activity folds the log before it counts or draws a line', () => {
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /const kept = \$derived\(newestFirst\(oneDecision\(changesOf\(LOG, everything\)\)\)\);/u);
 });
+
+test('a decision finds its question by what it settles, and a question asked and answered in one moment is one line', () => {
+  /* Audit of 31 October (A18): "Filed 2 Ledger Post payments under Software" was asked by a rule, decided and closed by
+     BrainDog at 13:40, and drawn three times, because the decision's own target is `decision:D3`. */
+  const asked: AuditEvent = { ...ev(AT, 'suggest', 'suggestion:SG11', '', 'rule:txn-categorise') };
+  const decided: AuditEvent = { ...ev(AT, 'decide', 'decision:D3', '', 'rule:handled'), settles: 'suggestion:SG11' };
+  const closed = ev(AT, 'resolve', 'suggestion:SG11', 'Its sending plan is already under Software.', 'rule:handled');
+  const drawn = oneDecision([closed, decided, asked]);
+  assert.equal(drawn.length, 1);
+  assert.equal(drawn[0]!.kind, 'decide');
+  assert.equal(drawn[0]!.asked, 'rule:txn-categorise');
+  assert.equal(drawn[0]!.note, 'Its sending plan is already under Software.');
+});
+
+test('a question that waited for its answer, or that its own asker answered, keeps its own line', () => {
+  const waited = [ev('2026-10-24T17:40:00.000Z', 'decide', 'decision:D4', '', 'you'), ev(AT, 'suggest', 'suggestion:SG12', '', 'rule:invoice-late')].map((e) =>
+    e.kind === 'decide' ? { ...e, settles: 'suggestion:SG12' } : e,
+  );
+  assert.equal(oneDecision(waited).length, 2);
+  const own = [{ ...ev(AT, 'decide', 'decision:D5'), settles: 'suggestion:SG13' }, ev(AT, 'suggest', 'suggestion:SG13')];
+  assert.equal(oneDecision(own).length, 2);
+});
