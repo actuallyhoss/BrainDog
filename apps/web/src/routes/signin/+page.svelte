@@ -402,9 +402,16 @@
   /** Whether the first 400ms have passed with the host still out, so "Getting sign-in ready" may show. */
   let slow = $state(false);
   onMount(() => {
-    void signupMode().then((m) => (mode = m));
     const t = setTimeout(() => (slow = true), 400);
     return () => clearTimeout(t);
+  });
+  /* ASKED ONLY OF A HOST THAT SAYS IT SERVES SIGN-UP (`signup` on `/auth/methods`, the hosted app): a self-host has no such
+     door, and asking it was a 404 in the console on every sign-in. Asked once, after the host has said. */
+  let modeAsked = false;
+  $effect(() => {
+    if (modeAsked || asked?.ok !== true || asked.value.signup !== true) return;
+    modeAsked = true;
+    void signupMode().then((m) => (mode = m));
   });
 
   /* The shell is drawn synchronously and says so. While a call is out, `opened()` takes the claim back. */

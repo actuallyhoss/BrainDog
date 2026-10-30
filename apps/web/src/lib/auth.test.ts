@@ -101,6 +101,13 @@ test('methods drops `demo`, even from a host that still sends it as true', async
   assert.ok(!('demo' in out.value), JSON.stringify(out.value));
 });
 
+test('methods carries `signup` only where the host says it serves sign-up, so a self-host is never asked who may (audit 31 Oct A29)', async () => {
+  const worker = await methods(host({ '/auth/methods': () => ok({ ...METHODS, signup: true }) }).io);
+  assert.ok(worker.ok && worker.value.signup === true, JSON.stringify(worker));
+  const self = await methods(host({ '/auth/methods': () => ok(METHODS) }).io);
+  assert.ok(self.ok && !('signup' in self.value), JSON.stringify(self));
+});
+
 test('A HOST THAT DOES NOT KNOW /auth IS NO HOST, NOT A REFUSAL: the SPA fallback and a 404 both', async () => {
   assert.deepEqual(await methods(host({}).io), { ok: false, kind: 'no-host' });
   assert.deepEqual(await methods(host({ '/auth/methods': () => new Response('nope', { status: 404 }) }).io), { ok: false, kind: 'no-host' });

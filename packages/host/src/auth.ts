@@ -504,6 +504,12 @@ export type MethodsBody = {
   firstRun?: boolean;
   /** This host has a Google client and can spend a sign-in link, so the screen offers the button. Absent is no. */
   google?: true;
+  /**
+   * THIS HOST SERVES `/auth/signup/*`, the Worker and nothing else: the app asks who may sign up only where it does, since
+   * a self-host answers that door 404 and the browser printed it as an error on every sign-in (audit 31 Oct A29). Absent
+   * is no, on any answer.
+   */
+  signup?: true;
 };
 
 /** The cookie's two names. `__Host-` pins it to this host, `/` and `Secure`, so no subdomain can plant one. */
@@ -1120,7 +1126,7 @@ async function methods(door: AuthDoor, mode: CookieMode | null, sid: string | un
   const out = await door.auth({ flow: 'methods', ...(sid === undefined ? {} : { sid }) });
   if (out.status !== 200) return mode === null ? reply(503, { ok: false }) : answered(out, mode);
 
-  const nothing: MethodsBody = { passkey: false, magic: false, key: false, open: door.open === true, me: null };
+  const nothing: MethodsBody = { passkey: false, magic: false, key: false, open: door.open === true, me: null, ...(door.on === 'worker' ? { signup: true as const } : {}) };
   const clear: Header[] = mode === null || sid === undefined ? [] : [['set-cookie', clearCookie(mode)]];
   if (door.open) return reply(200, { ok: true, value: nothing }, clear);
   if (mode === null) return reply(200, { ok: true, value: { ...nothing, why: 'insecure' } satisfies MethodsBody });
@@ -1129,7 +1135,16 @@ async function methods(door: AuthDoor, mode: CookieMode | null, sid: string | un
   if (!m.configured) return reply(200, { ok: true, value: { ...nothing, why: 'not-configured' } satisfies MethodsBody }, clear);
   /* GOOGLE NEEDS THE LINK FLOWS, because a sign-in through it is a link minted and spent on the spot. */
   const magic = (await mailIsDown(door, m.magic)) ? ('down' as const) : m.magic;
-  const body: MethodsBody = { passkey: m.passkey, magic, key: m.key, open: false, me: m.me, firstRun: m.firstRun, ...(door.google === true && m.magic ? { google: true as const } : {}) };
+  const body: MethodsBody = {
+    passkey: m.passkey,
+    magic,
+    key: m.key,
+    open: false,
+    me: m.me,
+    firstRun: m.firstRun,
+    ...(door.google === true && m.magic ? { google: true as const } : {}),
+    ...(door.on === 'worker' ? { signup: true as const } : {}),
+  };
   return answered({ ...out, body }, mode);
 }
 
