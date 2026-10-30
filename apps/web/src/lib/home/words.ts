@@ -40,8 +40,11 @@ export const words = {
   today: 'Today',
   /** Bills, plans and the usual everyday spending, named for what it holds so it never reads as Coming up's repeating bills. */
   goingOut: 'Bills and usual spending, next 30 days',
-  /** The work that falls due this week, under Work's own heading (audit Q10). */
-  workDue: 'Work this week',
+  /**
+   * The work that falls due this week, under Work's own heading (audit Q10): yours, as Work's band says it (finish F51),
+   * so it never reads as Projects' "This week" or Timeline's "due in 7 days", which count agents' work and what waits on you.
+   */
+  workDue: 'Your work this week',
   /** The tile of the few key numbers that lead Today (`numbersTile`). */
   numbers: 'Numbers',
 

@@ -440,7 +440,7 @@ export type GalleryWidget = {
   template?: { block: Record<string, unknown>; blanks?: WidgetBlank[]; rows?: RowsRead };
   /** True when Today already has a widget reading the same thing: the sheet says so, and suggests it nowhere. */
   onBoard?: boolean;
-  /** The heading Today shows it under, where that is not the widget's own name ("Work this week" for Next up). */
+  /** The heading Today shows it under, where that is not the widget's own name ("Your work this week" for Next up). */
   onBoardAs?: string;
 };
 
