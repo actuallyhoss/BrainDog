@@ -187,7 +187,13 @@ test('the crumb says the place, then where you are, each step a link back but th
   /* A ROW OF A LIST NO SIDEBAR ROW LEADS TO: its list is the trail, where the bar was empty (Q38). */
   assert.deepEqual(crumbOf('/r/handoffs/3', m, null, null, null, { label: 'Handoffs', href: '/r/handoffs' }), [{ label: 'Handoffs', href: '/r/handoffs' }]);
   assert.deepEqual(crumbOf('/r/ledger/42', m, '/r/ledger', null, null, { label: 'Ledger', href: '/r/ledger' }), [{ label: 'Money', href: '/p/money' }, { label: 'Ledger', href: '/r/ledger' }]);
-  assert.deepEqual(crumbOf('/search', m, null, 'Search', null, { label: 'Ledger', href: '/r/ledger' }), [{ label: 'Search' }]);
+  /* A PAGE ABOUT A ROW, an account's or a bill's own, sits where its list sits, and its name ends the trail. */
+  assert.deepEqual(crumbOf('/p/ledger%2342', m, null, 'Rent', null, { label: 'Ledger', href: '/r/ledger' }), [
+    { label: 'Money', href: '/p/money' },
+    { label: 'Ledger', href: '/r/ledger' },
+    { label: 'Rent' },
+  ]);
+  assert.deepEqual(crumbOf('/search', m, null, 'Search'), [{ label: 'Search' }]);
 });
 
 test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT: "Projects 0 in play" headed a new shop', () => {

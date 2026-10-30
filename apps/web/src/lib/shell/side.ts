@@ -421,14 +421,24 @@ export type Crumb = { label: string; href?: string | undefined };
  * gives no title, and the crumb ends at the place it sits in, still a link back there.
  */
 export function crumbOf(path: string, m: SideModel, lit: string | null, title: string | null, heading: string | null = null, up: Crumb | null = null): Crumb[] {
-  /* A ROW OF A LIST NO SIDEBAR ROW LEADS TO still says where it sits (Q38 of the 29 Oct audit): its page names itself, so
-     with nothing lit the bar was empty and the desk had no way back. Its list, as its head names it, is the trail. */
-  if (lit === null && (title?.trim() ?? '') === '' && up && up.label.trim() !== '' && path !== up.href) return [{ label: up.label, href: up.href }];
-  const steps = placed(path, m, lit, title);
+  const steps = lit === null && up?.href && up.label.trim() !== '' && path !== up.href ? upTrail(m, up.label, up.href, title) : placed(path, m, lit, title);
   const h = heading?.trim() ?? '';
   const last = steps[steps.length - 1];
   if (h !== '' && last) last.label = h;
   return h !== '' && !last ? [{ label: h }] : steps;
+}
+
+/**
+ * A PAGE ABOUT A ROW SITS WHERE ITS LIST SITS (Q38 of the 29 Oct audit). An account's, a bill's or a service's own page,
+ * and a row of a list no sidebar row leads to, lit nothing, so the bar said the row's name alone, or nothing at all,
+ * while a person's said "People" and an organisation's "People › Organisations". The list the page's head names (`up`)
+ * is placed as the sidebar places it, every step a way back, and the page's own name ends it.
+ */
+function upTrail(m: SideModel, label: string, href: string, title: string | null): Crumb[] {
+  const t = title?.trim() ?? '';
+  const upLit = litOf(href, m);
+  const trail: Crumb[] = upLit === null ? [{ label, href }] : placed(href, m, upLit, null).map((c) => ({ ...c, href: c.href ?? upLit }));
+  return t !== '' && word(t) !== word(trail[trail.length - 1]?.label ?? '') ? [...trail, { label: t }] : trail;
 }
 
 function placed(path: string, m: SideModel, lit: string | null, title: string | null): Crumb[] {
