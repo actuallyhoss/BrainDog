@@ -5839,9 +5839,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   function worked(id: string, now: string, back: boolean): void {
     const runs = runRegister();
+    /* A REAL IS A COUNT TOO: migration 28 wrote each run's `wrote` through `json_set` with a bound number, which both
+       hosts bind as a REAL (the conformance suite's `number-storage-class`), so those runs held 5.0 and were never
+       counted again. */
     if (runs.has('wrote'))
       sql.exec(
-        "UPDATE entry SET fields = json_set(fields, '$.wrote', json_extract(fields, '$.wrote') + 1) WHERE id = ? AND json_type(fields, '$.wrote') = 'integer'",
+        "UPDATE entry SET fields = json_set(fields, '$.wrote', json_extract(fields, '$.wrote') + 1) WHERE id = ? AND json_type(fields, '$.wrote') IN ('integer', 'real')",
         id,
       );
     if (runs.has('stretch_at'))
