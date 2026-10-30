@@ -2512,11 +2512,12 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '72b8a0107776271c',
+    declares: '3a73960b7bea2133',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
       'Before 3.33.0 shipped, `page.money-forecast` opens on 12 weeks and `metric.moved-since` is added for Reports; one id added, none taken away -> 72b8a0107776271c',
+      'Before 3.33.0 shipped, `page.money-payees` and `page.money-budgets` link to their unnamed and unfiled lines with field:is:empty; no id added or taken away -> 3a73960b7bea2133',
     ],
   },
   'work@1.17.0': {
