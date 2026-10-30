@@ -65,7 +65,7 @@ function door(lines: string[], known: string[]) {
     }
     if (url.pathname !== '/api/shape') return answer(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No.' } });
     const bearer = headers.get('authorization')?.replace(/^Bearer /, '') ?? '';
-    if (!known.includes(bearer)) return answer(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That shape grant is not one this record knows.', at: 'shape' } });
+    if (!known.includes(bearer)) return answer(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That shape grant is not known here.', at: 'shape' } });
     return answer(200, { ok: true, value: lines });
   }) as typeof globalThis.fetch;
   return { seen, fetch };

@@ -2802,7 +2802,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      could be taken before the list exists (`kinds/index.ts`). */
   const unread = Object.keys(block)
     .filter((key) => !BLOCK_READS.has(key))
-    .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key this record reads.`, at: key }));
+    .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key a block reads.`, at: key }));
   /* AND A KEY ANOTHER KIND READS IS SAID HERE AS THE INSTALL SAYS IT (`block-keys.ts`). A page installed before the install
      check closed carries `lead: true` on its cards or `since: seen` on a table, and each read clean and was drawn
      without. A key written as `undefined` is no key: a caller spreading a block to clear one should not be told of it.
@@ -2953,7 +2953,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
             reading: null,
             refusal: {
               code: 'METRIC_UNKNOWN',
-              fix: `There is no metric called ${cell.metric}. A figure this record computes rather than declares is not one either.`,
+              fix: `There is no metric called ${cell.metric}. A figure BrainDog computes rather than declares is not one either.`,
               at: 'metric',
             },
           };
@@ -3015,7 +3015,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const register = block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
   const schema = register ? deps.schemaOf(register) : null;
   if (!register || !schema)
-    return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: `${block.source} is not a source this record reads.`, at: 'source' }) };
+    return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: `${block.source} is not a source here.`, at: 'source' }) };
 
   /* A DIFF READS ONE ROW'S HISTORY, not the rows a predicate matches. */
   if (block.kind === 'diff') return diffBlock(deps, block, register, schema, base, also);
@@ -3119,7 +3119,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if ((inherit && (!deps.scopeOf || !deps.inScope)) || (scoped.length && !deps.scopeOf))
     return {
       ...base,
-      refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read where a row applies yet.', at: inherit ? 'inherit' : 'columns' }),
+      refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read where a row applies yet.', at: inherit ? 'inherit' : 'columns' }),
     };
   const scope = inherit || scoped.length ? (deps.scopeOf?.(register) ?? null) : null;
   if (inherit && !scope)
@@ -3266,12 +3266,12 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     };
   const asksChanged = (block.columns ?? []).some((c) => c.field === CHANGED) && !Object.hasOwn(schema.fields, CHANGED);
   if (asksChanged && !deps.history && !deps.lastChanges)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read who changed a row onto a page yet.', at: 'columns' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read who changed a row onto a page yet.', at: 'columns' }) };
   /* `working: true` NEEDS BOTH HALVES OR NEITHER. It is one question asked of two reads, and a record
      wired for one of them would answer `false` for every row, which is a block quietly saying nobody
      is working rather than saying it cannot tell. */
   if (block.working === true && !(deps.history && deps.sessionsLive))
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read whether an agent is on a row onto a page yet.', at: 'working' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read whether an agent is on a row onto a page yet.', at: 'working' }) };
 
   const read = short && !(drawn > 0) ? [] : listed.value.rows;
   const ranged = block.kind === 'progress' && block.range === true ? rangeFault(block, register, schema, read) : null;
@@ -5133,7 +5133,7 @@ function diffBlock(
   /* LINES ARE WHAT A DIFF COMPARES, so a field that holds no text has no diff to draw. */
   if (decl.type !== 'document' && decl.type !== 'text')
     return refuse({ code: 'DECLARATION_INVALID', fix: `A diff compares text, and ${block.field} is ${decl.type}.`, at: 'field' });
-  if (!deps.history) return refuse({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read a row’s history onto a page yet.', at: 'source' });
+  if (!deps.history) return refuse({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read a row’s history onto a page yet.', at: 'source' });
   const events = deps.history(register, block.row);
   if (!events.ok) return { ...base, refusals: refused(events) ? also(events.refusal) : also() };
   const all = versionsOf(events.value, block.field).reverse();

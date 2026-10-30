@@ -98,7 +98,7 @@ test('ONLY SOMEBODY WHO MAY DECIDE IS HANDED ONE, AND A SETTLED QUESTION IS HAND
   const { k, sql, deps } = await record();
   const id = filed(k);
   const r = refusal(handQuestion(deps, id, 'p_reader', 'p_owner'));
-  assert.equal(r.fix, `${READER.name} cannot decide on this record. Name somebody who can, or nobody.`);
+  assert.equal(r.fix, `${READER.name} cannot decide here. Name somebody who can, or nobody.`);
   assert.equal(r.at, 'to');
   assert.equal(refusal(handQuestion(deps, 'SG999', 'p_ada', 'p_owner')).code, 'OUT_OF_BOUNDS');
   assert.equal(deciderOf(sql, id), null, 'a refused hand wrote nothing');
@@ -117,7 +117,7 @@ test('A PROPOSAL CAN ARRIVE ALREADY HERS, AND ONE NAMING SOMEBODY WHO CANNOT DEC
 
   const before = sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM suggestion')?.n;
   const r = refusal(k.propose({ ...ask('Which printer for the labels?'), decider: 'p_reader' }, 'p_owner'));
-  assert.equal(r.fix, `${READER.name} cannot decide on this record. Name somebody who can, or nobody.`);
+  assert.equal(r.fix, `${READER.name} cannot decide here. Name somebody who can, or nobody.`);
   assert.equal(r.at, 'decider');
   assert.equal(refusal(k.propose({ ...ask('Which printer for the tape?'), decider: 'p_nobody' }, 'p_owner')).at, 'decider');
   assert.equal(refusal(k.propose({ ...ask('Which van for the boxes?'), decider: 'p_ada' }, 'slash')).at, 'decider', 'a model names nobody');

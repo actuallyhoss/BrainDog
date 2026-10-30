@@ -1849,7 +1849,7 @@ function startScript(
     "SELECT version, body FROM declaration WHERE id = ? AND kind = 'script' AND superseded_at IS NULL AND retired = 0",
     `script.${name}`,
   );
-  if (!found) return { ok: false, say: `rule.${rule} starts a script at step ${n + 1}, and there is no script called ${name || '(no name)'} in this record.` };
+  if (!found) return { ok: false, say: `rule.${rule} starts a script at step ${n + 1}, and there is no script called ${name || '(no name)'} here.` };
   const runs = (JSON.parse(found.body) as { runs?: { rule?: unknown } }).runs;
   if (runs?.rule !== true)
     return {

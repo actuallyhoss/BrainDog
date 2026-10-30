@@ -29,7 +29,7 @@ export type Handed = { id: string; decider: string | null };
 export type Hands = { handQuestion: (id: string, to: string | null, by: string) => Result<Handed> };
 
 /** The sentence a name that cannot decide is refused with, the kernel's own words. */
-const cannot = (name: string): string => `${name} cannot decide on this record. Name somebody who can, or nobody.`;
+const cannot = (name: string): string => `${name} cannot decide here. Name somebody who can, or nobody.`;
 
 export function methods(deps: RecordDeps, given?: Hands) {
   const { kernel, admin, no, tail } = deps;

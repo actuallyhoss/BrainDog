@@ -139,7 +139,7 @@ const fewer = (block: PageBlock | Readonly<Record<string, unknown>>): string => 
 function readAcross(deps: PageDeps, block: PageBlock, base: BlockResult, window: { from: string; to: string; today: string }): BlockResult {
   const stop = (...more: BlockResult['refusals']): BlockResult => ({ ...base, window, refusals: [...base.refusals, ...more] });
   const kit = deps.kit;
-  if (!kit || !deps.lists) return stop({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what falls due across its lists onto a calendar yet.', at: 'source' });
+  if (!kit || !deps.lists) return stop({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what falls due across its lists onto a calendar yet.', at: 'source' });
   const said = kit.predicateOf(block.where, DUE, deps.ctx);
   if (said.bad.length) return stop(...said.bad);
 
@@ -284,7 +284,7 @@ export const calendar: KindModule & { across: readonly string[] } = {
 
   read(deps, block, base) {
     const kit = deps.kit;
-    if (!kit) return { ...base, refusals: [...base.refusals, { code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read a calendar onto a page yet.', at: 'kind' }] };
+    if (!kit) return { ...base, refusals: [...base.refusals, { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read a calendar onto a page yet.', at: 'kind' }] };
     const today = kit.today();
     const weeks = weeksOf(block);
     /* A STRIP IS WHOLE WEEKS FROM THIS MONDAY, the days of this week already gone among them, so the week reads whole

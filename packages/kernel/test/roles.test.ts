@@ -140,7 +140,7 @@ test('A SECOND LIST DECLARING rates: IS REFUSED, and so is one beside an fx that
   value(old.k.create('fx', { currency: 'USD', base: 'EGP', rate: 48, as_of: '2026-09-01' }, { actor: 'p_1' }));
   const beside = refused(await old.k.install([register('crypto_rates', RATE_FIELDS, { rates: RATES_ROLE })]));
   assert.equal(beside.code, 'DECLARATION_INVALID');
-  assert.match(beside.fix, /^register\.fx holds this record's rates and declares no rates:/);
+  assert.match(beside.fix, /^register\.fx holds your rates and declares no rates:/);
   assert.deepEqual(cash(old.k), CONVERTED, 'the refused install moved the rates');
   /* And fx itself taking the key is the update that ends the fallback, not a second holder. */
   value(await old.k.install([register('fx', RATE_FIELDS, { rates: RATES_ROLE })]));
@@ -325,7 +325,7 @@ test('A SECOND meets: IS REFUSED, and so is one beside a people list that holds 
   const old = await met([register('people', PEOPLE_FIELDS)]);
   const beside = refused(await old.k.install([register('contacts', CONTACTS_FIELDS, { meets: CONTACTS_ROLE })]));
   assert.equal(beside.code, 'DECLARATION_INVALID');
-  assert.match(beside.fix, /^register\.people holds this record's people and declares no meets:/);
+  assert.match(beside.fix, /^register\.people holds your people and declares no meets:/);
   assert.equal(value<Met>(old.k.meet({ name: 'Ada', email: 'ada@example.com', where: 'x' }, OWNER)).person, 'people#1');
   old.sql.close();
 

@@ -731,7 +731,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       if (!zoned)
         return malformed(`${at} is ${said}, which names no timezone. Write 2026-09-05T02:00:00Z, or the offset it was recorded in.`);
       const ms = Date.parse(said);
-      if (!Number.isFinite(ms)) return malformed(`${at} is not an instant this record can read.`);
+      if (!Number.isFinite(ms)) return malformed(`${at} is not an instant BrainDog can read.`);
       return good(instant(ms));
     }
 

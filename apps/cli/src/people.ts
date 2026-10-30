@@ -198,7 +198,7 @@ export type Reader = Pick<Client, 'boot' | 'schema' | 'list' | 'history'> & Part
 /** What a harvest says when the owner's own row could not be read, and so meets nobody. */
 export const noSelf = (dry: boolean, why: Unknown = 'unread'): string =>
   why === 'older'
-    ? `Your record's People is older than this command and cannot mark which person is you, so ${dry ? 'a run would meet nobody' : 'nobody was met'}: it could not tell your own commits from somebody else's. It will once your record is updated.`
+    ? `Your BrainDog's People is older than this command and cannot mark which person is you, so ${dry ? 'a run would meet nobody' : 'nobody was met'}: it could not tell your own commits from somebody else's. It will once your BrainDog is updated.`
     : `${why === 'unread' ? 'BrainDog could not read which person in People is you' : 'People does not say which person is you yet'}, so ${dry ? 'a run would meet nobody' : 'nobody was met'}: it could not tell your own commits from somebody else's. Run it again once People marks you.`;
 
 /**

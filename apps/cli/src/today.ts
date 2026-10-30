@@ -31,7 +31,7 @@ type Block = Record<string, unknown>;
 const line = (r: Result<unknown>, to: Target): string => {
   if (!refused(r)) return printable(fixOf(r));
   if (r.refusal.code === 'UNREACHABLE') return `${to.key} did not answer.`;
-  if (r.refusal.code === 'ROUTE_UNKNOWN' || r.refusal.code === 'NOT_IN_THIS_BUILD') return 'Your record is older than this command. It will answer once it is updated.';
+  if (r.refusal.code === 'ROUTE_UNKNOWN' || r.refusal.code === 'NOT_IN_THIS_BUILD') return 'Your BrainDog is older than this command. It will answer once it is updated.';
   return printable(fixOf(r));
 };
 
@@ -55,7 +55,7 @@ async function todayBlocks(client: ReturnType<typeof clientFor>): Promise<Result
 }
 
 /** Said where Today is still drawn from what the record holds, so there is no board to read or add to yet. */
-const NOT_KEPT = 'Today is not kept as a board yet: it is drawn from what your record holds. Add one widget to it in the app, and then it can be read and added to from here.';
+const NOT_KEPT = 'Today is not kept as a board yet: it is drawn from what your BrainDog holds. Add one widget to it in the app, and then it can be read and added to from here.';
 
 const nameOf = (b: Block): string => (typeof b.heading === 'string' && b.heading.trim() !== '' ? b.heading.trim() : String(b.kind ?? 'A widget'));
 

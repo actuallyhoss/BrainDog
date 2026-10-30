@@ -146,7 +146,7 @@ test('A FAILED NIGHT SAYS WHY IN PLAIN WORDS to the owner and her agent, and nev
     assert.ok(out.ok, JSON.stringify(out));
     const night = out.value.faults.find((f) => f.cause === 'night#export.night');
     assert.ok(night, 'the failed night is a fault');
-    assert.equal(night.why, 'Your record was too large to copy in one piece.');
+    assert.equal(night.why, 'Your BrainDog was too large to copy in one piece.');
     assert.equal(night.error, undefined);
     assert.ok(!JSON.stringify(out.value).includes('MiB'), 'nothing of the raw reason reaches the answer');
   }

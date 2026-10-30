@@ -3306,7 +3306,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if ((f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && typeof f.to === 'string' && !registers.has(f.to) && !arriving.has(f.to))
           return {
             code: 'REGISTER_UNRESOLVED',
-            fix: `${decl.id}.${f.id} points at ${f.to}, and this record holds no list called ${f.to}. Point it at a list the record holds, or declare ${f.to} in the same change.`,
+            fix: `${decl.id}.${f.id} points at ${f.to}, and there is no list called ${f.to}. Point it at a list you have, or declare ${f.to} in the same change.`,
             at: `${at}.to`,
           };
 
@@ -6166,7 +6166,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const guessed = at.found === null || at.found.by === 'adopted';
       const named = guessed && isRunName(said) ? bySeq(SESSION, Number(said.slice(prefix.length))) : undefined;
       if (named === null)
-        return no<Ended>('ROW_UNKNOWN', `${said} is no run on this record, so there is nothing to end. Leave the name out to end this session's own run.`, {
+        return no<Ended>('ROW_UNKNOWN', `${said} is not a run here, so there is nothing to end. Leave the name out to end this session's own run.`, {
           at: 'session',
         });
       if (named && owned(named.fields.token_id, token ?? null)) return notYours<Ended>(said);
@@ -8650,7 +8650,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (who === null) return null;
     const { id: actor, name } = who;
     const held = access(sql, actor, null, accessLens());
-    if (held === null) return { stop: `Stopped: ${name}, who turned this on, can no longer reach this record.` };
+    if (held === null) return { stop: `Stopped: ${name}, who turned this on, can no longer reach this BrainDog.` };
     if (held.level === 'owner') return null;
     return { name, held, ctx: { principal: { kind: 'person', id: actor }, ...(held.wheres ? { wheres: held.wheres } : {}), ...(held.writes ? { writes: held.writes } : {}) } };
   };
@@ -11319,7 +11319,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (raw.state === 'matched') {
           const filed = filedAs(id);
           if (!filed)
-            return no<ArrivalSettled>('OUT_OF_BOUNDS', 'The row this arrival was filed as is no longer in this record, so the filing cannot be taken back. Nothing was changed.', {
+            return no<ArrivalSettled>('OUT_OF_BOUNDS', 'What this arrival was filed as is no longer here, so the filing cannot be taken back. Nothing was changed.', {
               at: 'id',
             });
           const out = write(filed.register, filed.id, { deleted_at: true }, { ...w, version, batch, note: w.note ?? 'Put back in the inbox.' });
@@ -12138,8 +12138,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return no<ImportReport>(
           'OUT_OF_BOUNDS',
           theirs === null
-            ? `This file carries no record row, so it cannot say it is ${mine ?? 'this record'}. A replacing import puts a record back as itself; import a whole copy, or import this into an empty record.`
-            : `This file is ${theirs}, and this record is ${mine ?? 'not yet named'}. A replacing import puts a record back as itself; import the file into an empty record instead.`,
+            ? `This file does not say which BrainDog it came from, so it cannot say it is ${mine ?? 'this one'}. A replacing import puts a BrainDog back as itself; import a whole copy, or import this into an empty BrainDog.`
+            : `This file is ${theirs}, and this BrainDog is ${mine ?? 'not yet named'}. A replacing import puts a BrainDog back as itself; import the file into an empty BrainDog instead.`,
           { at: 'record.id' },
         );
 
@@ -12156,7 +12156,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (leftOut.length > 0)
         return no<ImportReport>(
           'OUT_OF_BOUNDS',
-          `This file leaves out ${leftOut.join(' and ')}, and a replacing import would leave this record with none of it. Export the whole record and put that back.`,
+          `This file leaves out ${leftOut.join(' and ')}, and a replacing import would leave this BrainDog with none of it. Export everything and put that back.`,
           { at: 'sections' },
         );
 
@@ -12172,7 +12172,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if ((keys > 0 && fileKeys === 0) || (sealed > 0 && fileSealed === 0))
         return no<ImportReport>(
           'OUT_OF_BOUNDS',
-          'This file was exported without the sealed bytes, and this record holds its keys and credentials in them, so a replacing import would throw them away. Export with the wrapping key named, which carries them, and put that back.',
+          'This file was exported without the sealed bytes, and this BrainDog holds its keys and credentials in them, so a replacing import would throw them away. Export with the wrapping key named, which carries them, and put that back.',
           { at: 'vault_key' },
         );
 
@@ -12269,9 +12269,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const subjects: string[] = [...(given as string[])];
       const people: string[] = [];
       if (req.personId !== undefined) {
-        if (typeof req.personId !== 'string' || !req.personId) return no('VALUE_MALFORMED', 'personId is the id of a person on this record.', { at: 'personId' });
+        if (typeof req.personId !== 'string' || !req.personId) return no('VALUE_MALFORMED', 'personId is the id of a person here.', { at: 'personId' });
         const p = sql.one<{ id: string; email: string | null; name: string | null }>('SELECT id, email, name FROM person WHERE id = ?', req.personId);
-        if (!p) return no('OUT_OF_BOUNDS', `${req.personId} is not a person on this record.`, { at: 'personId' });
+        if (!p) return no('OUT_OF_BOUNDS', `${req.personId} is not a person here.`, { at: 'personId' });
         people.push(p.id);
         for (const v of [p.email, p.name]) if (v && v !== ERASED && v.trim().length >= 3) subjects.push(v);
       }

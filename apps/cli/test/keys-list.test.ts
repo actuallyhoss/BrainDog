@@ -254,7 +254,7 @@ test('NO KEYS AND A REFUSAL ARE SAID PLAINLY, and a flag it does not take is ref
   const empty = await host(t, []);
   const one = io(empty.base);
   assert.equal(await keys(['list'], one), 0);
-  assert.deepEqual([one.lines, one.said], [[], ['Your record holds no keys yet.']]);
+  assert.deepEqual([one.lines, one.said], [[], ['Your BrainDog holds no keys yet.']]);
 
   const shut = await host(t, FIVE, { code: 'FORBIDDEN', fix: 'This login cannot read Keys.' });
   const two = io(shut.base);
@@ -331,7 +331,7 @@ test('A RECORD THAT CANNOT SAY WHICH KEYS ARE PAST is said so once, and each key
     const one = { ...io(h.base), now: () => late };
     assert.equal(await keys(['list'], one), 0, one.said.join('\n'));
     assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2027', 'expired 13 October 2026']);
-    assert.deepEqual(one.said, ['Your record did not say which keys are past their day, so each is judged by the date on this machine.', '2 keys: 2 kept elsewhere.']);
+    assert.deepEqual(one.said, ['Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.', '2 keys: 2 kept elsewhere.']);
     for (const line of one.said) assert.doesNotMatch(line, /—/u);
   }
 });
@@ -342,7 +342,7 @@ test('AN ANSWER THAT HOLDS EVERY KEY IS NOT BELIEVED when a day in it is too nea
   const zone = process.env.TZ;
   t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
   process.env.TZ = 'UTC';
-  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const unsaid = 'Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.';
   const dated = [row(1, { label: 'Ends today', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'Ended on the 1st', opens: 'A service', expires: '2026-10-01' })];
 
   /* Every key has a day and none is ahead: the answer is the whole list, and today's key is not past on this machine. */
@@ -373,7 +373,7 @@ test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLE
   const zone = process.env.TZ;
   t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
   process.env.TZ = 'UTC';
-  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const unsaid = 'Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.';
   const today = [row(1, { label: 'Ends today', opens: 'A service', expires: '2026-10-13' })];
 
   const deaf = await host(t, today, null, { today: '2026-10-14', deaf: true });
@@ -402,7 +402,7 @@ test('A RECORD WHOSE ONLY DATED KEY ENDED YESTERDAY IS BELIEVED, and the sentenc
   const zone = process.env.TZ;
   t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
   process.env.TZ = 'UTC';
-  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const unsaid = 'Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.';
   const rows = [row(1, { label: 'Ended yesterday', opens: 'A service', expires: '2026-10-12' }), row(2, { label: 'No day', opens: 'A service' })];
 
   const honest = await host(t, rows);
@@ -440,7 +440,7 @@ test('AN EMPTY ANSWER TO THE OPPOSITE QUESTION IS NOT BELIEVED BY ITSELF: the re
   const zone = process.env.TZ;
   t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
   process.env.TZ = 'UTC';
-  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const unsaid = 'Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.';
   /* 22:30 UTC on the 13th, a record that calls the 13th past: true in Cairo, where it is the 14th, and false here. */
   const late = Date.parse('2026-10-13T22:30:00Z');
   const rows = [row(1, { label: 'Ends on the 13th', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'No day', opens: 'A service' })];
@@ -497,7 +497,7 @@ test('A KEY WHOSE DAY IS TODAY ON THIS MACHINE IS NOT CALLED EXPIRED BY A HOST T
   process.env.TZ = 'America/Los_Angeles';
   const evening = Date.parse('2026-10-14T01:30:00Z');
   assert.equal(dayHere(evening), '2026-10-13');
-  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const unsaid = 'Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.';
   const rows = [row(1, { label: 'Ends today', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'Ended yesterday', opens: 'A service', expires: '2026-10-12' })];
 
   const deaf = await host(t, rows, null, { today: '2026-10-14', deaf: true });
@@ -515,7 +515,7 @@ test('A HOST THAT IGNORES THE FILTER IS NOT BELIEVED FOR ONE PROJECT’S KEYS EI
   const zone = process.env.TZ;
   t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
   process.env.TZ = 'UTC';
-  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const unsaid = 'Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.';
   const rows = [row(1, { label: 'Ends today', opens: 'A service', project: OXBOW, expires: '2026-10-13' }), row(2, { label: 'Ended on the 1st', opens: 'A service', project: LANTERN, expires: '2026-10-01' })];
 
   const deaf = await host(t, rows, null, { today: '2026-10-14', deaf: true });

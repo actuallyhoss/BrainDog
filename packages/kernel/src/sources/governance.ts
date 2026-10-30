@@ -54,7 +54,7 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
   const { predicateOf, listOf, staleAt } = kit;
   const OPEN = openSchema(kit);
   if (!deps.openQuestions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its open questions onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its open questions onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.open comes ranked by what each question would cost to get wrong, so it takes no order:.', at: 'order' }) };
   const said = predicateOf(block.where, OPEN, deps.ctx);
@@ -117,7 +117,7 @@ function laterBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: A
   const { predicateOf, listOf } = kit;
   const OPEN = openSchema(kit);
   if (!deps.laterQuestions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what was put off onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what was put off onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.later comes soonest back first, so it takes no order:.', at: 'order' }) };
   const said = predicateOf(block.where, OPEN, deps.ctx);
@@ -140,7 +140,7 @@ function apartBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: A
   const { predicateOf, listOf } = kit;
   const OPEN = openSchema(kit);
   if (!deps.apartQuestions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read agents\' suggestions onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read agents\' suggestions onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.apart comes oldest first, so it takes no order:.', at: 'order' }) };
   const said = predicateOf(block.where, OPEN, deps.ctx);
@@ -185,7 +185,7 @@ function decidedBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
   const { predicateOf, listOf } = kit;
   const DECIDED = decidedSchema(kit);
   if (!deps.decisions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what was decided onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what was decided onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.decided comes latest first, so it takes no order:.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(DECIDED.fields, f));

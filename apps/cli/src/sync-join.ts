@@ -322,7 +322,7 @@ export async function syncJoin(args: string[], io: JoinIo): Promise<number> {
       io.say(`${oneLine(machine)} was retired on ${was.at.slice(0, 10)}, and a retired name is never used again. Join under another with --name <name>.`);
       return 1;
     }
-    if (sends && (before === null || slugOf(before.machine) !== slug) && (await ask(`${machine} already sends bundles to this record. Is this that machine, set up again? [y/N] `)) !== true) {
+    if (sends && (before === null || slugOf(before.machine) !== slug) && (await ask(`${machine} already sends bundles to this BrainDog. Is this that machine, set up again? [y/N] `)) !== true) {
       io.say('Then this machine needs a name of its own. Join again with --name <name>.');
       return 1;
     }
@@ -430,7 +430,7 @@ export async function syncRetire(args: string[], io: SyncIo): Promise<number> {
     }
     const missed = isFail(rows) ? rows : wrote.find(isFail);
     if (missed !== undefined) io.out(`Bundles does not say so yet: ${missed.said} The retirement itself is sealed and kept.`);
-    else if (wrote.includes('asked')) io.out('Your record asked you about the Bundles entry on Decide. The retirement itself is sealed and kept.');
+    else if (wrote.includes('asked')) io.out('Your BrainDog asked you about the Bundles entry on Decide. The retirement itself is sealed and kept.');
   }
   io.out(`Retired ${name}. It sends and places nothing more, and the tool sign-ins it carried may now move to another machine with braindog sync pull.`);
   if (!here) return 0;

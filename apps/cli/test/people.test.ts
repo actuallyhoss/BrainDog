@@ -601,12 +601,12 @@ test('BRAINDOG PEOPLE HARVEST FAILS CLOSED when the owner’s own row cannot be 
       headers: async () => ({ 'x-braindog-host': 'box' }),
     };
     /* A People from before it could mark him says the record is older, since no mark of his would mend it. */
-    const why = self === 'none' ? 'People does not say which person is you yet' : self === 'older' ? "Your record's People is older than this command and cannot mark which person is you" : 'BrainDog could not read which person in People is you';
+    const why = self === 'none' ? 'People does not say which person is you yet' : self === 'older' ? "Your BrainDog's People is older than this command and cannot mark which person is you" : 'BrainDog could not read which person in People is you';
     assert.equal(await peopleCommand(['harvest', '--dry-run'], io), 0, self);
     assert.match(out.join('\n'), new RegExp(`^${why}, so a run would meet nobody`));
     assert.equal(await peopleCommand(['harvest'], io), 1, self);
     assert.match(said.join('\n'), new RegExp(`^${why}, so nobody was met`));
-    if (self === 'older') assert.match(said.join('\n'), /It will once your record is updated\.$/);
+    if (self === 'older') assert.match(said.join('\n'), /It will once your BrainDog is updated\.$/);
     assert.deepEqual(host.seen.filter((s) => s.method === 'meet'), [], self);
   }
 });

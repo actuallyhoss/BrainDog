@@ -403,7 +403,7 @@ export const runnerCannotOpen = (key: Key): string | null =>
  * to its own host when it is sent, so "any action can send any key" stopped being true. KEPT EXPORTED, UNUSED, until the
  * index stops re-exporting it, so a reader that filtered it out (`arrange.ts`) filters nothing rather than failing.
  */
-export const KEYS_REACH_ALL = 'Keys are not kept per project yet, so any action in this record can send any key it names.';
+export const KEYS_REACH_ALL = 'Keys are not kept per project yet, so any action here can send any key it names.';
 
 /**
  * Who else can open a key a scheduled action sends, said once at the end of an approval list.

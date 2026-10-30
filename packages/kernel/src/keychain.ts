@@ -201,7 +201,7 @@ export function bindGrant(
     return no<GrantRow>('VALUE_MALFORMED', `A grant id is g_ plus a 26-character ULID. ${args.id} is not.`, { at: 'id' });
   const sealed = args.sealed_for;
   if (sealed !== undefined && (!ID.test(sealed.id) || !Number.isInteger(sealed.version) || sealed.version < 1))
-    return no<GrantRow>('VALUE_MALFORMED', 'The bytes were sealed for a grant id and version this record cannot hold.', { at: 'sealed_for' });
+    return no<GrantRow>('VALUE_MALFORMED', 'The bytes were sealed for a grant id and version BrainDog cannot hold.', { at: 'sealed_for' });
   /* Sealed for a fresh grant while another deposit gave the row one: that deposit arrived first. */
   if (sealed !== undefined && args.id !== undefined && sealed.id !== args.id)
     return clash<GrantRow>(0, { id: args.id }, 'system');
@@ -383,7 +383,7 @@ export function openGrant(
     salt: Uint8Array | null;
   }>('SELECT wrapped, nonce, wrapped_by, kek_id, salt FROM vault_key WHERE purpose = ?', row.sealed_under);
   if (!key)
-    return no<SealedGrant>('OUT_OF_BOUNDS', 'This record has no wrapped key, so nothing in it can be opened.', {
+    return no<SealedGrant>('OUT_OF_BOUNDS', 'This BrainDog has no wrapped key, so nothing in it can be opened.', {
       at: 'id',
     });
 
@@ -402,7 +402,7 @@ export function openGrant(
   if (key.wrapped_by === 'kek' && (key.kek_id === null || key.kek_id === undefined))
     return no<SealedGrant>(
       'WRONG_KEY',
-      'This record says it is wrapped by a key and does not say which one, so nothing can be opened until it does.',
+      'This BrainDog says it is wrapped by a key and does not say which one, so nothing can be opened until it does.',
       { at: 'kek_id' },
     );
 
@@ -410,8 +410,8 @@ export function openGrant(
     return no<SealedGrant>(
       'WRONG_KEY',
       args.kek_id === undefined
-        ? `This record is wrapped by ${key.kek_id}, and you offered no key.`
-        : `This record is wrapped by ${key.kek_id}, and you offered ${args.kek_id}.`,
+        ? `This BrainDog is wrapped by ${key.kek_id}, and you offered no key.`
+        : `This BrainDog is wrapped by ${key.kek_id}, and you offered ${args.kek_id}.`,
       { at: 'kek_id' },
     );
 
@@ -613,8 +613,8 @@ export function sealedGrant(
     return no<LeasedSeal>(
       'OUT_OF_BOUNDS',
       purpose === 'connector'
-        ? 'This record has no connector key, so a connector cannot open anything.'
-        : 'This record has no record key, so the key that signs this post cannot be opened.',
+        ? 'This BrainDog has no connector key, so a connector cannot open anything.'
+        : 'This BrainDog has no record key, so the key that signs this post cannot be opened.',
       { at: 'grant' },
     );
   /* A CONNECTOR KEY IS ALWAYS WRAPPED BY A KEK (ADR-052), so a passphrase here is a record whose
@@ -627,8 +627,8 @@ export function sealedGrant(
     return no<LeasedSeal>(
       'WRONG_KEY',
       purpose === 'connector'
-        ? 'This record’s connector key is not held by a key this host can use, so scheduled runs cannot open it.'
-        : 'This record’s own record key is behind a passphrase or a key this host cannot use, so the key that signs this post cannot be opened without a person present.',
+        ? 'This BrainDog’s connector key is not held by a key this host can use, so scheduled runs cannot open it.'
+        : 'This BrainDog’s own record key is behind a passphrase or a key this host cannot use, so the key that signs this post cannot be opened without a person present.',
       { at: 'kek_id' },
     );
 

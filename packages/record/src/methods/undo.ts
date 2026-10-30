@@ -253,7 +253,7 @@ export function methods(deps: RecordDeps) {
    */
   const walkRow = (batch: string, row: UndoRow, reads: (register: string) => boolean): Result<string> => {
     const id = reads(row.register) ? sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', row.register, row.seq)?.id : undefined;
-    if (id === undefined) return no('ROW_UNKNOWN', 'That one is not in this record, so there is nothing of it to undo.', { at: 'row' });
+    if (id === undefined) return no('ROW_UNKNOWN', 'That one is not here, so there is nothing of it to undo.', { at: 'row' });
     if (walkLines(batch, id).length === 0) return no('ROW_UNKNOWN', 'This change did not touch that one, so there is nothing of it to undo here.', { at: 'row' });
     return ok(id);
   };

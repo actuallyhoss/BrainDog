@@ -887,7 +887,7 @@ export async function checkBrainl(lines: readonly string[], options: CheckOption
         refusal: {
           code: 'CHECKSUM_MISMATCH',
           at: `dog_manifest.${name}`,
-          fix: `${name} does not match the checksum in the file's own manifest. The file is damaged or has been edited; re-export it from the record it came from.`,
+          fix: `${name} does not match the checksum in the file's own manifest. The file is damaged or has been edited; re-export it from the BrainDog it came from.`,
         },
       };
     /* THE COUNT TOO. It is written beside the hash, and a manifest whose two halves disagree is a
@@ -1019,8 +1019,8 @@ export function importBrainl(
         ...(e instanceof BadLine && e.at !== undefined ? { at: e.at } : {}),
         fix:
           e instanceof BadLine
-            ? `${e.message} The file is damaged; re-export it from the record it came from.`
-            : `The file could not be read into this record: ${e instanceof Error ? e.message : String(e)}. Nothing was written.`,
+            ? `${e.message} The file is damaged; re-export it from the BrainDog it came from.`
+            : `The file could not be read into this BrainDog: ${e instanceof Error ? e.message : String(e)}. Nothing was written.`,
       },
     };
   }
@@ -1074,7 +1074,7 @@ export function importBrainl(
              it. The sentence used to be `FORMAT_NEWER_THAN_READER`'s word for word, so a person
              holding this refusal was told to upgrade a build that was never behind. The code stays
              `FILE_MALFORMED`; the words are now about the file in front of them. The catch below
-             adds "The file is damaged; re-export it from the record it came from." */
+             adds "The file is damaged; re-export it from the BrainDog it came from." */
           throw new BadLine(
             `This file's first line and its dog_meta format row disagree: the row says format ${value}, and this build reads ${readsFormat}.`,
             'dog_meta.format',

@@ -551,7 +551,7 @@ export function drainSchedule(
       /* A KIND WITH NO HANDLER DOES NOT WALK THE LADDER. Retrying code that does not exist eight
          times is not a retry — it is eight hours of pretending. The row fails once, and the
          fault keeps which kind nothing answers to. */
-      fail(sql, deps, row, `Nothing in this record handles a ${row.kind} row.`, CEILING);
+      fail(sql, deps, row, `Nothing here handles a scheduled ${row.kind}.`, CEILING);
       out.dead++;
       continue;
     }

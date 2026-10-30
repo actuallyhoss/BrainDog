@@ -925,7 +925,7 @@ export function checkShare(share: Share, catalog: Catalog, opts: CheckOpts = {})
       if (kept) return kept;
     }
   if ('project' in t) {
-    if (!catalog.lists.some((l) => l.role === 'projects')) return refuse('REGISTER_UNKNOWN', 'This record has no projects list.', 'what.project');
+    if (!catalog.lists.some((l) => l.role === 'projects')) return refuse('REGISTER_UNKNOWN', 'This BrainDog has no projects list.', 'what.project');
     for (const [i, id] of (t.lists ?? []).entries()) {
       const l = listOf(id, `what.lists.${i}`);
       if (isRefusal(l)) return l;

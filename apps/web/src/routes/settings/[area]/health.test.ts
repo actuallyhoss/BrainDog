@@ -138,7 +138,7 @@ test('A RED CHECK IS NAMED BY ITS OWN SENTENCE, with no count of the rest, and o
 /* A FAILED NIGHT, PLANTED AS THE KERNEL KEEPS ONE (`copyFailed`): a fault under `night#export.night`, never a question. */
 const NIGHT: Fault = {
   cause: 'night#export.night',
-  said: 'BrainDog could not save a copy of your record. It tries again tonight.',
+  said: 'BrainDog could not save its nightly copy. It tries again tonight.',
   count: 3,
   since: '2026-09-27T03:17:00Z',
   last: '2026-09-29T03:17:00Z',
@@ -147,7 +147,7 @@ const NIGHT: Fault = {
 test('BACKUPS SAYS WHY A NIGHT FAILED, in plain words, with how long it has been failing', () => {
   /* ON THE CLOUD NO ERROR REACHES THE READER: the reason is that it is ours to fix, and it was told. */
   assert.deepEqual(nightFailed([PAIRS, NIGHT], NOW), {
-    said: 'BrainDog could not save a copy of your record.',
+    said: 'BrainDog could not save its nightly copy.',
     why: 'We were told when it failed, and fixing it is ours. It has failed 3 times, first 2 days ago, last today.',
   });
   /* ON A SELF-HOST THE OWNER'S ERROR IS READ FOR ITS REASON, AND NEVER SAID: no path, key or byte count. */
@@ -155,8 +155,8 @@ test('BACKUPS SAYS WHY A NIGHT FAILED, in plain words, with how long it has been
   assert.equal(self?.why, 'The copy came out incomplete, so it was not kept. It failed today.');
   const reasons: [string, string][] = [
     ['The nightly copy did not run: this deployment has no BLOBS binding, so there is nowhere to put one.', 'This server has no place set up to keep copies.'],
-    ['the record would not export: schema refused', 'Your record could not be read out for the copy.'],
-    ['Durable Object is overloaded', 'Your record was too busy to be copied at the time.'],
+    ['the record would not export: schema refused', 'Your BrainDog could not be read out for the copy.'],
+    ['Durable Object is overloaded', 'Your BrainDog was too busy to be copied at the time.'],
     ['ENOSPC at /var/lib/braindog/snapshots/the-studio', 'Something went wrong while it was being saved.'],
   ];
   for (const [error, said] of reasons) {
@@ -164,8 +164,8 @@ test('BACKUPS SAYS WHY A NIGHT FAILED, in plain words, with how long it has been
     assert.doesNotMatch(said, /[#`{}/\\]|\d/u);
   }
   /* THE RECORD'S OWN PLAIN REASON COMES FIRST, on every host (`why`, the kernel's `nightWhy`), so the Cloud says it too. */
-  const told = nightFailed([{ ...NIGHT, count: 1, since: NIGHT.last, why: 'Your record was too large to copy in one piece.' }], NOW);
-  assert.equal(told?.why, 'Your record was too large to copy in one piece. It failed today.');
+  const told = nightFailed([{ ...NIGHT, count: 1, since: NIGHT.last, why: 'Your BrainDog was too large to copy in one piece.' }], NOW);
+  assert.equal(told?.why, 'Your BrainDog was too large to copy in one piece. It failed today.');
   /* NO NIGHT FAULT, NO LINE: any other fault is the index's to say, not Backups'. */
   assert.equal(nightFailed([PAIRS, MAIL], NOW), null);
   assert.equal(nightFailed(null, NOW), null);

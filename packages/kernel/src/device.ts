@@ -174,7 +174,7 @@ export async function deviceStart(
   const scope = args.scope ?? null;
   if (reach === 'vault') {
     if (!scope) return no('REQUIRED_MISSING', 'A keychain grant names the project whose keys it opens, or * for the keys of none.', { at: 'scope' });
-    if (scope !== '*' && !isProject(deps, scope)) return no('REF_UNKNOWN', `${scope} is not a project in this record.`, { at: 'scope' });
+    if (scope !== '*' && !isProject(deps, scope)) return no('REF_UNKNOWN', `${scope} is not a project here.`, { at: 'scope' });
   } else if (scope !== null) {
     return no('OUT_OF_BOUNDS', 'Only a keychain grant carries a scope.', { at: 'scope' });
   }
@@ -189,7 +189,7 @@ export async function deviceStart(
     let taken = false;
     for (const row of others) if (same(await deps.digest(`${row.id}:${userCode}`), row.code_hash)) taken = true;
     if (!taken) break;
-    if (tries === 19) return no('RATE_LIMITED', 'Too many devices are waiting to be approved on this record. Try again in a few minutes.');
+    if (tries === 19) return no('RATE_LIMITED', 'Too many devices are waiting to be approved. Try again in a few minutes.');
     userCode = sixDigits(deps.random);
   }
   const expires = instant(deps.nowMs + CODE_MS);
@@ -302,7 +302,7 @@ function lifeMs(row: Stored): number {
 export async function devicePoll(deps: TokenDeps, args: { device_code: string }): Promise<Result<Waiting | Exchanged>> {
   const id = typeof args?.device_code === 'string' ? args.device_code : '';
   const row = id ? deps.sql.one<Stored>(`SELECT ${VISIBLE}, code_hash, token_hash FROM device_grant WHERE id = ?`, id) : undefined;
-  if (!row) return no('FORBIDDEN', 'That device code is not one this record knows.', { at: 'device_code' });
+  if (!row) return no('FORBIDDEN', 'That device code is not known here.', { at: 'device_code' });
 
   const now = instant(deps.nowMs);
   const expired = no<Exchanged>('DEVICE_CODE_EXPIRED', 'Ask the device to start again.', { at: 'device_code' });
@@ -323,7 +323,7 @@ export async function devicePoll(deps: TokenDeps, args: { device_code: string })
   if (endedByCutOff(deps.validFrom, row.approved_at)) return expired;
 
   const record = deps.recordId();
-  if (!record) return no('OUT_OF_BOUNDS', 'This record has no id yet, and a bearer carries the record it is for.', { at: 'record' });
+  if (!record) return no('OUT_OF_BOUNDS', 'This BrainDog has no id yet, and a bearer carries the BrainDog it is for.', { at: 'record' });
 
   /* CLAIMED BEFORE THE FIRST AWAIT. Nothing runs between the read above and this write, so a second
      poll finds the row active and is refused instead of minting a second bearer. */
@@ -448,7 +448,7 @@ export async function keychainGrant(deps: TokenDeps, bearer: string): Promise<Re
   const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
   const record = cut < 0 ? '' : bearer.slice(0, cut);
   const secret = cut < 0 ? '' : bearer.slice(cut + 1);
-  const wrong = no<KeychainGrant>('FORBIDDEN', 'That keychain grant is not one this record knows.', { at: 'vault' });
+  const wrong = no<KeychainGrant>('FORBIDDEN', 'That keychain grant is not known here.', { at: 'vault' });
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
   const row = deps.sql.one<{
@@ -486,7 +486,7 @@ export async function shapeGrant(deps: TokenDeps, bearer: string): Promise<Resul
   const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
   const record = cut < 0 ? '' : bearer.slice(0, cut);
   const secret = cut < 0 ? '' : bearer.slice(cut + 1);
-  const wrong = no<ShapeGrant>('FORBIDDEN', 'That shape grant is not one this record knows.', { at: 'shape' });
+  const wrong = no<ShapeGrant>('FORBIDDEN', 'That shape grant is not known here.', { at: 'shape' });
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
   const row = deps.sql.one<{ id: string; approved_by: string | null; approved_at: string | null; expires: string; suspended_at: string | null }>(
@@ -524,7 +524,7 @@ export async function operationGrant(deps: TokenDeps, bearer: string): Promise<R
   const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
   const record = cut < 0 ? '' : bearer.slice(0, cut);
   const secret = cut < 0 ? '' : bearer.slice(cut + 1);
-  const wrong = no<OperationGrant>('FORBIDDEN', 'That bearer is not an operation this record is waiting for. Ask the device to start again.', {
+  const wrong = no<OperationGrant>('FORBIDDEN', 'That bearer is not an operation waiting here. Ask the device to start again.', {
     at: 'operation',
   });
   if (!record || !secret || record !== deps.recordId()) return wrong;

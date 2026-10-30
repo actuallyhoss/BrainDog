@@ -57,9 +57,9 @@ test('WHO SIGNED A LINE IS SAID IN WORDS, and never as an id', () => {
     ['p_ada', 'Ada'],
     ['p_seed', 'BrainDog'],
     ['system', 'BrainDog'],
-    ['p_zed', 'Someone on this record'],
+    ['p_zed', 'Someone you share with'],
     ['person:sam', 'Sam'],
-    ['person:p_zed', 'Someone on this record'],
+    ['person:p_zed', 'Someone you share with'],
     ['slash', 'Slash'],
     ['agent:claude', 'Claude Code'],
     [`agent:${ROW}`, 'An agent'],
@@ -67,7 +67,7 @@ test('WHO SIGNED A LINE IS SAID IN WORDS, and never as an id', () => {
     ['ingest:bank-card-used-sms', 'The bank card used sms door'],
     [`rule:${ROW}`, 'An automation'],
     ['t_9f2a', 'An agent key'],
-    [ROW, 'Someone on this record'],
+    [ROW, 'Someone you share with'],
   ];
   for (const [by, words] of cases) {
     const said = actorWords(by, names, runs);

@@ -86,7 +86,7 @@ test('ANY OTHER KEY IS REFUSED, in one sentence, before a row is read', async ()
     assert.equal(out.ok, false, `a ${what} bearer took a shape copy`);
     const refusal = 'refusal' in out ? out.refusal : null;
     assert.equal(refusal?.code, 'FORBIDDEN', what);
-    assert.equal(refusal?.fix, 'That shape grant is not one this record knows.', what);
+    assert.equal(refusal?.fix, 'That shape grant is not known here.', what);
   }
 
   /* AND A REVOKED ONE, by its handle, as Settings revokes it. */

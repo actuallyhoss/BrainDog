@@ -205,9 +205,9 @@ export function readKeysInText(sql: Sql, _ctx: unknown, decl: MetricDecl): Resul
   const value = found === null ? null : found.length;
   const why =
     found === null
-      ? 'the first walk over this record has not finished'
+      ? 'the first walk through your BrainDog has not finished'
       : found.length === 0
-        ? 'no text on this record holds a key'
+        ? 'no text in your BrainDog holds a key'
         : `${found.length === 1 ? 'one place holds' : `${found.length} places hold`} what looks like a key, the first in ${placeOf(found[0]!)}`;
   const t = decl.target;
   const met = value === null || t === undefined ? null : 'lte' in t ? value <= t.lte : value >= t.gte;

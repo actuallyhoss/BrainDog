@@ -257,7 +257,7 @@ export function actorWords(by: string, names: ReadonlyMap<string, string>, runs:
   if (agent !== undefined) return ULID.test(agent) ? 'An agent' : agentOf(agent, true);
   /* `person:<id>` IS HOW THE FOUNDING OWNER'S OWN GRANT SIGNS ITS LINE (`packages/kernel/src/provision.ts`). */
   const person = /^person:(.+)$/u.exec(who)?.[1];
-  if (person !== undefined) return names.get(person) ?? (PERSON_ID.test(person) || ULID.test(person) ? 'Someone on this record' : humanize(person));
+  if (person !== undefined) return names.get(person) ?? (PERSON_ID.test(person) || ULID.test(person) ? 'Someone you share with' : humanize(person));
   const mechanism = /^([a-z][a-z0-9-]*)[:.](.+)$/u.exec(who);
   if (mechanism) {
     const [, kind, name] = mechanism as unknown as [string, string, string];
@@ -267,7 +267,7 @@ export function actorWords(by: string, names: ReadonlyMap<string, string>, runs:
     return unsaid ? 'An automation' : humanize(kind);
   }
   if (/^t_/u.test(who)) return 'An agent key';
-  if (PERSON_ID.test(who) || ULID.test(who) || who.includes('_') || who.includes(':')) return 'Someone on this record';
+  if (PERSON_ID.test(who) || ULID.test(who) || who.includes('_') || who.includes(':')) return 'Someone you share with';
   return who;
 }
 

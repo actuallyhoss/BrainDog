@@ -169,7 +169,7 @@ const look: Look = {
   now: NOW,
   decl: (r) => ({ people: PEOPLE, tools: TOOLS_LIST, tasks: TASKS })[r],
   title: (spoken) => TITLES.get(spoken),
-  actor: (by) => (by === 'p_ada' || by === 'p_01J9ZQ8V7N2D4K6M8P0R2T4ADA' ? 'Ada' : 'Someone on this record'),
+  actor: (by) => (by === 'p_ada' || by === 'p_01J9ZQ8V7N2D4K6M8P0R2T4ADA' ? 'Ada' : 'Someone you share with'),
   decider: 'Ada',
 };
 

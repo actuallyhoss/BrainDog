@@ -5317,7 +5317,7 @@ function roleBody(key: RoleName, decl: Declaration, fields: readonly RoleField[]
       const pack = owners?.get(other) ?? null;
       return bad(
         'DECLARATION_INVALID',
-        `${other} holds this record's ${HELD[key]} and declares no ${key}:, and one list holds ${HOLDS[key]}. ` +
+        `${other} holds your ${HELD[key]} and declares no ${key}:, and one list holds ${HOLDS[key]}. ` +
           (pack === null
             ? `Declare ${key}: on ${list.id} instead, and keep ${HOLDS[key]} there.`
             : `Update ${pack}, which owns ${list.id}, to a version that declares ${key}: on it, and keep ${HOLDS[key]} there.`),
@@ -5701,7 +5701,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       const guess = typeof f.type === 'string' ? nearest(f.type) : null;
       return bad(
         'FIELD_TYPE_UNKNOWN',
-        `${id}.${f.id}: type ${JSON.stringify(f.type ?? null)} is not a field type this record knows${guess ? `; did you mean '${guess}'?` : '.'}`,
+        `${id}.${f.id}: type ${JSON.stringify(f.type ?? null)} is not a field type BrainDog knows${guess ? `; did you mean '${guess}'?` : '.'}`,
         f.id,
         FIELD_TYPES as unknown as string[],
       );
@@ -6874,7 +6874,7 @@ export function disablePack(
   const standing = new Map(asked.map((p) => [p, packStanding(sql, p)]));
   for (const [p, s] of standing)
     if (!s.known)
-      return no<PackToggle>('DECLARATION_UNKNOWN', `${p} is not a pack this record has installed.`, {
+      return no<PackToggle>('DECLARATION_UNKNOWN', `${p} is not an installed pack.`, {
         at: p === id ? 'pack' : 'alsoDisable',
       });
 
@@ -6992,7 +6992,7 @@ export async function enablePack(
 ): Promise<Result<PackToggle & { batch: Declaration[] }>> {
   type Out = PackToggle & { batch: Declaration[] };
   const s = packStanding(sql, id);
-  if (!s.known) return no<Out>('DECLARATION_UNKNOWN', `${id} is not a pack this record has installed.`, { at: 'pack' });
+  if (!s.known) return no<Out>('DECLARATION_UNKNOWN', `${id} is not an installed pack.`, { at: 'pack' });
   if (!s.disabled)
     return ok({ id, state: 'enabled', changed: false, packs: [], declarations: [], said: `${id} is already enabled, so nothing changed.`, batch: [] });
 
@@ -7501,7 +7501,7 @@ export function readPackConfig(sql: Sql, id: string): Result<PackConfig> {
     return ok({ id, version: m.version, config, values });
   }
   if (packStanding(sql, id).known) return ok({ id, version: null, config: {}, values: {} });
-  return no<PackConfig>('DECLARATION_UNKNOWN', `${id} is not a pack this record has installed.`, { at: 'id' });
+  return no<PackConfig>('DECLARATION_UNKNOWN', `${id} is not an installed pack.`, { at: 'id' });
 }
 
 /**

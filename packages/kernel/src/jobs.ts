@@ -731,7 +731,7 @@ export function createJob(deps: TokenDeps, args: CreateJobArgs, known: (spoken: 
   if (kind === '') return no('REQUIRED_MISSING', 'Name the kind of job to run, like job.release-notes.', { at: 'kind' });
   const body = kindOf(deps, kind);
   if (!body)
-    return no('DECLARATION_UNKNOWN', `${kind.slice(0, ECHO_CHARS_MOST)} is not a kind of job this record has approved. A kind is approved once, in Decide.`, { at: 'kind' });
+    return no('DECLARATION_UNKNOWN', `${kind.slice(0, ECHO_CHARS_MOST)} is not a kind of job approved here. A kind is approved once, in Decide.`, { at: 'kind' });
   const filled = argsFor(kind, body, args.args);
   if (!filled.ok) return filled as Result<never>;
   /* A FOLDER EACH RUN NAMES is a name a machine maps, or `-` for none: never a path, whatever the argument allows. */
@@ -758,7 +758,7 @@ export function createJob(deps: TokenDeps, args: CreateJobArgs, known: (spoken: 
     return no('OUT_OF_BOUNDS', `${JOBS_WAITING_MOST} jobs are already waiting for a machine. Start this once one is taken, or stop one.`, { at: 'kind' });
   const today = deps.sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM job WHERE created_at > ?', instant(deps.nowMs - 86_400_000))?.n ?? 0;
   if (today >= JOBS_A_DAY)
-    return no('OUT_OF_BOUNDS', `This record started ${JOBS_A_DAY} jobs in the last day, which is as many as one day takes. Start this tomorrow.`, { at: 'kind' });
+    return no('OUT_OF_BOUNDS', `This BrainDog started ${JOBS_A_DAY} jobs in the last day, which is as many as one day takes. Start this tomorrow.`, { at: 'kind' });
 
   const id = `j_${deps.mint()}`;
   deps.sql.exec(
@@ -778,7 +778,7 @@ export function createJob(deps: TokenDeps, args: CreateJobArgs, known: (spoken: 
 /** A job's id, as a caller sent it, or `null` when it is not one. */
 const jobIdOf = (value: unknown): string | null => (typeof value === 'string' && JOB_ID.test(value) ? value : null);
 
-const NO_SUCH_JOB = (at: string) => no<never>('REF_UNKNOWN', 'There is no job by that name on this record.', { at });
+const NO_SUCH_JOB = (at: string) => no<never>('REF_UNKNOWN', 'There is no job by that name here.', { at });
 
 /**
  * Stop one job. A job still waiting is cancelled at once; one a machine is running is flagged, and its runner reads the
@@ -942,7 +942,7 @@ export async function runnerGrant(deps: TokenDeps, bearer: string): Promise<Resu
   const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
   const record = cut < 0 ? '' : bearer.slice(0, cut);
   const secret = cut < 0 ? '' : bearer.slice(cut + 1);
-  const wrong = no<RunnerGrant>('FORBIDDEN', 'That bearer is not a runner this record knows. Enrol the machine again.', { at: 'authorization' });
+  const wrong = no<RunnerGrant>('FORBIDDEN', 'That bearer is not a known runner. Enrol the machine again.', { at: 'authorization' });
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
   const row = deps.sql.one<{
@@ -1048,7 +1048,7 @@ function take(deps: TokenDeps, runner: JobRunner, where: { host: string | null; 
  */
 export async function claimJob(deps: TokenDeps, runner: JobRunner, transaction: <T>(fn: () => T) => T, place?: RunnerPlace): Promise<Result<Claimed>> {
   const person = await approverOf(deps, runner.id);
-  if (person === null) return no('FORBIDDEN', 'This machine is no longer enrolled on this record. Enrol it again.', { at: 'principal' });
+  if (person === null) return no('FORBIDDEN', 'This machine is no longer enrolled. Enrol it again.', { at: 'principal' });
   const where = placeOf(place);
   const taken = transaction(() => {
     keepHeard(deps, runner, where);

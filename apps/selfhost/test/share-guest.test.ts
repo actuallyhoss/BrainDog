@@ -140,7 +140,7 @@ test('SHARED WITH A NEW ADDRESS: link, mailbox proof, accept, a guest who sees o
     /* TOLD THEIR ACCESS ENDED, in the owner's name, with the header the service worker deletes its copy on. */
     assert.equal(refused.access, 'ended');
     assert.match(refused.raw, /"at":"access"/);
-    assert.match(refused.raw, /Your access to Ada's record ended\. Ask Ada if you need it back\./);
+    assert.match(refused.raw, /Your access to Ada's BrainDog ended\. Ask Ada if you need it back\./);
     const after = await call('/account/records', { sid: priya });
     assert.deepEqual(after.body?.value ?? [], []);
   } finally {

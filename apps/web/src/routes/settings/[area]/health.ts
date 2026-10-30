@@ -255,8 +255,8 @@ export const isNightFault = (f: Fault): boolean => f.cause.startsWith('night#');
 const NIGHT_REASONS: readonly [RegExp, string][] = [
   [/no BLOBS binding|nowhere to put/iu, 'This server has no place set up to keep copies.'],
   [/bytes short|wrote \d+ of the|could not be read back/iu, 'The copy came out incomplete, so it was not kept.'],
-  [/would not export|cannot open the record/iu, 'Your record could not be read out for the copy.'],
-  [/overloaded|too busy|timed? ?out/iu, 'Your record was too busy to be copied at the time.'],
+  [/would not export|cannot open the record/iu, 'Your BrainDog could not be read out for the copy.'],
+  [/overloaded|too busy|timed? ?out/iu, 'Your BrainDog was too busy to be copied at the time.'],
   [/\bkey\b|seal|encrypt/iu, 'The key that locks your copies could not be used.'],
 ];
 

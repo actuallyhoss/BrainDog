@@ -192,7 +192,7 @@ export function mirrorFiles(lists: readonly MirrorList[], rowsOf: (list: string)
   }
   const spoken: Spoken = (id) => said.get(id) ?? 'something this mirror does not hold';
 
-  const top = ['# Your record', '', `${WRITTEN}${day}.`, ''];
+  const top = ['# Your BrainDog', '', `${WRITTEN}${day}.`, ''];
   for (const l of sorted) {
     if (!read(l) || !SAFE.test(l.id)) {
       top.push(`- ${l.name}: not read. ${read(l) ? 'Its name is not one a folder can take.' : l.unread}`);

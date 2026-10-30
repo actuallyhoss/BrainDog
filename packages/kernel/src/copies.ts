@@ -54,11 +54,11 @@ export const failedNote = (): string => 'failed: the copy could not be saved';
  * these fit is said as stopping partway, never left out.
  */
 const NIGHT_WHYS: readonly [RegExp, string][] = [
-  [/over \d+ ?MiB|too large|exceeded (its )?memory|memory limit|out of memory|invalid string length|array buffer allocation/iu, 'Your record was too large to copy in one piece.'],
+  [/over \d+ ?MiB|too large|exceeded (its )?memory|memory limit|out of memory|invalid string length|array buffer allocation/iu, 'Your BrainDog was too large to copy in one piece.'],
   [/cpu|time ?limit|timed? ?out|never generate a response|deadline|took too long/iu, 'The copy took longer than BrainDog allows for one.'],
-  [/would not export|could not be read for/iu, 'Your record could not be read for the copy.'],
+  [/would not export|could not be read for/iu, 'Your BrainDog could not be read for the copy.'],
   [/recipient|sealer|seal(ed|ing)?\b|\bkek\b|wrap/iu, 'The key that locks your copies could not be used.'],
-  [/bytes short|wrote \d+ of the|read back/iu, 'The copy came out shorter than your record, so it was not kept.'],
+  [/bytes short|wrote \d+ of the|read back/iu, 'The copy came out shorter than your BrainDog, so it was not kept.'],
   [/\br2\b|bucket|network|connection|fetch failed|unavailable|\b50[234]\b|internal error/iu, 'The place your copies are kept could not be reached.'],
 ];
 

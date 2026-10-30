@@ -852,7 +852,7 @@ export async function skills(args: string[], io: AgentIo): Promise<number> {
   const at = await connect(values.host, io);
   if (typeof at === 'number') return at;
   if (!at.context.registers.some((r) => r.id === 'skills')) {
-    io.out('This record has no skills register, so there is nothing to sync.');
+    io.out('This BrainDog has no Skills list, so there is nothing to sync.');
     return 0;
   }
   const dryRun = values['dry-run'] === true;

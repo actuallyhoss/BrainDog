@@ -700,7 +700,7 @@ function holeIn(id: string, decl: FlowDecl): Refusal | null {
           return hole(id, run, where, 'a rule that runs inside the write has no run to read it from', 'Give the rule steps: and on: { written: { register } } to run it as a run.');
       }
       const lone = value.match(LONE_BRACE)?.[0];
-      if (lone !== undefined) return hole(id, lone, where, 'nothing in this record fills one brace', `Write {${lone}}, with two braces, to fill it.`);
+      if (lone !== undefined) return hole(id, lone, where, 'nothing fills one brace', `Write {${lone}}, with two braces, to fill it.`);
     }
   return null;
 }
@@ -1445,7 +1445,7 @@ function shapeFault(id: string, kind: string, value: unknown, on: Record<string,
           at,
         );
       if (ms < FLOOR_MS)
-        return bad('DECLARATION_INVALID', `${id} runs every ${String(value)}, and fifteen minutes is the shortest clock this record keeps. Write 15m or more.`, at);
+        return bad('DECLARATION_INVALID', `${id} runs every ${String(value)}, and fifteen minutes is the shortest clock BrainDog keeps. Write 15m or more.`, at);
       if (month !== undefined)
         return bad('DECLARATION_INVALID', `${id} runs every ${String(value)}, so month: has nothing to choose. A month belongs to a clock of months, such as every: 3mo.`, 'on.month');
       if (day !== undefined && time === undefined)
@@ -1535,7 +1535,7 @@ function calendarFault(id: string, every: string, on: Record<string, unknown>): 
     return bad('REQUIRED_MISSING', `${id} runs every ${every} and names no month to count from. Write month: jan.`, 'on.month');
   if (months > 1 && !(typeof on.month === 'string' && MONTHS.includes(on.month)))
     return bad('DECLARATION_INVALID', `${id} counts from month ${JSON.stringify(on.month)}, and a month is one of ${MONTHS.join(', ')}.`, 'on.month', MONTHS);
-  return calendarOf(on) === null ? bad('DECLARATION_INVALID', `${id} runs every ${every}, and this record cannot read that clock.`, 'on.every') : null;
+  return calendarOf(on) === null ? bad('DECLARATION_INVALID', `${id} runs every ${every}, and BrainDog cannot read that clock.`, 'on.every') : null;
 }
 
 /** One step's own shape, not its children. `names` collects every answer name the body declares. */

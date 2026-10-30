@@ -313,7 +313,7 @@ async function push(host: string | undefined, dryRun: boolean, auto: boolean, io
       state: 'latest',
     };
     const made = await createRow(call, bundles, said, at);
-    if (made === 'asked') io.out('Your record asked you about the Bundles entry on Decide. The bundle itself is sealed and kept.');
+    if (made === 'asked') io.out('Your BrainDog asked you about the Bundles entry on Decide. The bundle itself is sealed and kept.');
     else if (isFail(made)) io.out(`The Bundles entry was not written: ${made.said} The bundle itself is sealed and kept.`);
     /* THE ONE BEFORE IT BECOMES OLDER only once this one is written, so Bundles always has this machine's latest. */
     else for (const e of latest) await updateRow(call, bundles, e, { state: 'older' }, at);

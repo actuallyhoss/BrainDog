@@ -182,7 +182,7 @@ export function extension(parts: KernelParts) {
       if (!out.ok) return out;
       /* A PERSON THIS RECORD HAS NO ROW FOR IS NOBODY WHO COULD HAVE ASKED: the record method has already admitted them
          as a member, and a member always has a mirror, so this is a record that lost it, said rather than hidden. */
-      if (out.value.name === null) return no('OUT_OF_BOUNDS', 'This record has no row for you yet, so there is no name here to change.', { at: 'person' });
+      if (out.value.name === null) return no('OUT_OF_BOUNDS', 'You are not in People yet, so there is no name to change.', { at: 'person' });
       return ok({ name: name.value });
     },
 

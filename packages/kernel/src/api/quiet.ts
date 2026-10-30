@@ -46,7 +46,7 @@ export function extension(parts: KernelParts) {
     /** The record's quiet hours as held, the window that applies and the zone it is read in. */
     quietHours(): Result<QuietHours> {
       const r = row();
-      if (r === null) return no('NOT_IN_THIS_BUILD', 'This record has not been set up yet, so it has no quiet hours to read.', { at: 'quiet' });
+      if (r === null) return no('NOT_IN_THIS_BUILD', 'This BrainDog has not been set up yet, so it has no quiet hours to read.', { at: 'quiet' });
       return ok(answer(r));
     },
 
@@ -76,7 +76,7 @@ export function extension(parts: KernelParts) {
 
       return transaction(() => {
         const r = row();
-        if (r === null) return no<QuietHours>('NOT_IN_THIS_BUILD', 'This record has not been set up yet, so it has no quiet hours to set.', { at: 'quiet' });
+        if (r === null) return no<QuietHours>('NOT_IN_THIS_BUILD', 'This BrainDog has not been set up yet, so it has no quiet hours to set.', { at: 'quiet' });
         if (r.quiet === stored) return ok(answer(r));
         sql.exec('UPDATE record SET quiet = ? WHERE singleton = 1', stored);
         /* THE LEDGER'S OWN SHAPE, WRITTEN HERE because `appendEvent` names every target an entry. `null` is "there was

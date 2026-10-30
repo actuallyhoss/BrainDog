@@ -303,7 +303,7 @@ export function applyPull(
   try {
     payload = JSON.parse(row.payload) as Record<string, unknown>;
   } catch {
-    return no<null>('VALUE_MALFORMED', `${finish.ingest} has a payload this record cannot read.`, { at: 'ingest' });
+    return no<null>('VALUE_MALFORMED', `${finish.ingest} has a payload BrainDog cannot read.`, { at: 'ingest' });
   }
   if (finish.cursor !== undefined) payload.cursor = finish.cursor;
 

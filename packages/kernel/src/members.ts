@@ -728,7 +728,7 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
     'SELECT id, suspended_at FROM person WHERE id = ?',
     person,
   );
-  if (!row) return no<Suspended>('OUT_OF_BOUNDS', `There is nobody called ${person} in this record.`, { at: 'person' });
+  if (!row) return no<Suspended>('OUT_OF_BOUNDS', `There is nobody called ${person} here.`, { at: 'person' });
 
   const held = deps.sql.all<{ register: string; level: Level }>('SELECT register, level FROM member WHERE person_id = ?', person);
   if (on && counts(deps.sql, person) && owners(deps.sql) <= 1)
@@ -771,7 +771,7 @@ export type Suspended = { person: string; suspended_at: string | null };
  * credential does not reach this record.". Neither is true of somebody an owner has stopped for a fortnight, and both
  * send them looking for a fault in their sign-in. Their rows are kept, so the sentence says what brings them back.
  */
-export const STOPPED = 'An owner of this record has stopped your access for now. Ask them to let you back in.';
+export const STOPPED = 'An owner has stopped your access for now. Ask them to let you back in.';
 
 /**
  * Whether this person is on the record and stopped: a `member` row, and a `person` row whose `suspended_at` is set.

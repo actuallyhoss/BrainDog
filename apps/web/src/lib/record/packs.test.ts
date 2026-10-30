@@ -317,8 +317,8 @@ test('A SAVE SENDS setPackConfig WITH ONLY THE VALUES, and says whether this use
   assert.equal((await openSettings(held(['usecase-founder', 'usecase-student']), 'usecase-founder')).alone, false);
   assert.equal((await openSettings(held(['usecase-founder']), 'work')).alone, false);
 
-  const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger');
-  assert.equal(no.first.ok ? '' : no.first.refusal.fix, 'ledger is not a pack this record has installed.');
+  const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not an installed pack.' } }), 'ledger');
+  assert.equal(no.first.ok ? '' : no.first.refusal.fix, 'ledger is not an installed pack.');
 });
 
 test('UNINSTALLING SENDS uninstallPack, and a refusal is the record’s sentence', async () => {

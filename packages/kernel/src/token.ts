@@ -376,7 +376,7 @@ function jobBearer(sql: Sql, label: string | undefined): boolean {
 /** The sentence a mint past the count is refused with, naming the plan and the way on. */
 export const agentsFull = (cap: AgentCap): string =>
   `${cap.plan} connects ${cap.agents} agent${cap.agents === 1 ? '' : 's'}. ` +
-  (cap.next === null ? 'Revoke one in Settings to connect another.' : `Move this record to ${cap.next} in Settings to connect more.`);
+  (cap.next === null ? 'Revoke one in Settings to connect another.' : `Move to ${cap.next} in Settings to connect more.`);
 
 export type Minted = { id: string; bearer: string; scope: Scope; reach: TokenReach[]; expires_at: string };
 
@@ -463,7 +463,7 @@ export async function createToken(
 
   const record = deps.recordId();
   if (!record)
-    return no<Minted>('OUT_OF_BOUNDS', 'This record has no id yet, and a bearer carries the record it is for.', { at: 'record' });
+    return no<Minted>('OUT_OF_BOUNDS', 'This BrainDog has no id yet, and a bearer carries the BrainDog it is for.', { at: 'record' });
 
   /* THE PLAN'S COUNT OF AGENTS, read where every key is minted: by hand, at the CLI's login, through an app's connect
      screen. A record at or over it mints none, and one moved down keeps every key it holds; nothing here revokes. A run's
@@ -700,7 +700,7 @@ const rank = (scope: Scope): number => SCOPES.indexOf(scope);
  */
 export async function verifyToken(deps: TokenDeps, bearer: string, surface?: string, build?: string): Promise<Result<Verified>> {
   const held = await heldBy(deps, bearer);
-  if (held === null) return no<Verified>('FORBIDDEN', 'That bearer is not one this record knows.', { at: 'authorization' });
+  if (held === null) return no<Verified>('FORBIDDEN', 'That bearer is not known here.', { at: 'authorization' });
   const { row, narrows } = held;
 
   const door = surface ?? null;

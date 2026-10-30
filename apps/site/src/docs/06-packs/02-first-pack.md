@@ -39,7 +39,7 @@ Reading list 1.0.0 reads as an add-on: 1 lists, 1 pages and 2 example rows. Noth
   Installs first: none
   Adds lists: Items; pages: Reading list; rules: none
   Example rows: 2; suggests skills: none
-  Calls out to: nothing. It reads and writes only this record.
+  Calls out to: nothing. It reads and writes only your BrainDog.
   Installs in a scratch record:2 declarations and 2 example rows, and one page.
 ```
 

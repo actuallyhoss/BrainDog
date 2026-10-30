@@ -192,14 +192,14 @@ test('a key trusted in the app is known at install, and a key first met here is 
   const keyId = await published(known);
   known.held[KNOWN_PREF] = { 'pack:lantern': [keyId] };
   assert.equal(await pack(['install', 'lantern', '--from', 'catalogue'], known.io), 0, known.said.join('\n'));
-  assert.ok(known.out.includes(`Signed by key ${keyId}, the key your record has seen for Orrin Vale before.`), known.out.join('\n'));
+  assert.ok(known.out.includes(`Signed by key ${keyId}, the key your BrainDog has seen for Orrin Vale before.`), known.out.join('\n'));
   assert.equal(known.seen.filter((s) => s.method === 'setPref').length, 0, 'a key already known was written again');
   assert.equal(existsSync(knownKeysPath(known.io)), false);
 
   const fresh = await signedIn(t, {});
   const freshId = await published(fresh);
   assert.equal(await pack(['install', 'lantern', '--from', 'catalogue'], fresh.io), 0, fresh.said.join('\n'));
-  assert.ok(fresh.out.includes(`Signed by key ${freshId}. Your record has not seen a key for Orrin Vale before, so it now remembers this one.`), fresh.out.join('\n'));
+  assert.ok(fresh.out.includes(`Signed by key ${freshId}. Your BrainDog has not seen a key for Orrin Vale before, so it now remembers this one.`), fresh.out.join('\n'));
   assert.deepEqual(fresh.held[KNOWN_PREF], { 'pack:lantern': [freshId] });
   assert.deepEqual(JSON.parse(readFileSync(knownKeysPath(fresh.io), 'utf8')), { 'pack:lantern': [freshId] });
   assert.deepEqual(fresh.seen.filter((s) => s.method === 'propose').length, 1);
@@ -212,7 +212,7 @@ test('a changed key is held back naming the publisher, until --trust-key keeps i
   assert.equal(await pack(['install', 'lantern', '--from', 'catalogue'], h.io), 1);
   assert.equal(
     h.said.at(-1),
-    `Lantern 1.0.0: Signed by key ${keyId}, which is not the key your record has seen for Orrin Vale before (${KEY_B}). Somebody else may have published it. It is not asked for. If Orrin Vale told you their key changed, run this again with --trust-key. Nothing was sent.`,
+    `Lantern 1.0.0: Signed by key ${keyId}, which is not the key your BrainDog has seen for Orrin Vale before (${KEY_B}). Somebody else may have published it. It is not asked for. If Orrin Vale told you their key changed, run this again with --trust-key. Nothing was sent.`,
   );
   assert.equal(h.seen.filter((s) => s.method === 'propose' || s.method === 'setPref').length, 0);
 
@@ -224,7 +224,7 @@ test('a changed key is held back naming the publisher, until --trust-key keeps i
   assert.deepEqual(h.held[KNOWN_PREF], { 'pack:lantern': [KEY_B, keyId] });
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, 1);
   assert.equal(await pack(['install', 'lantern', '--from', 'catalogue'], h.io), 0, h.said.join('\n'));
-  assert.ok(h.out.includes(`Signed by key ${keyId}, the key your record has seen for Orrin Vale before.`), h.out.join('\n'));
+  assert.ok(h.out.includes(`Signed by key ${keyId}, the key your BrainDog has seen for Orrin Vale before.`), h.out.join('\n'));
 });
 
 test('signed out, install reads and keeps this machine\'s list as before, said once', async (t) => {

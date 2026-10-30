@@ -3545,7 +3545,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   /* A QUESTION THIS RECORD CANNOT READ IS NOT A QUESTION IT CAN ANSWER. It used to resolve as
      `addressed` with a `D<n>` behind it and nothing written — the gate saying yes to something it
      had not read. */
-  if (!body) return no<Decided>('VALUE_MALFORMED', `${id} carries a body this record cannot read.`, { at: 'body' });
+  if (!body) return no<Decided>('VALUE_MALFORMED', `${id} carries a body BrainDog cannot read.`, { at: 'body' });
 
   if (row.body_kind === 'options') {
     const ids = ((body.options ?? []) as { id?: string }[]).map((o) => o.id).filter((x): x is string => typeof x === 'string');
@@ -4087,7 +4087,7 @@ function personNamed(sql: Sql, person: string): string {
 }
 
 /** The sentence a name nobody may hand a question to is refused with. */
-export const cannotDecide = (name: string): string => `${name} cannot decide on this record. Name somebody who can, or nobody.`;
+export const cannotDecide = (name: string): string => `${name} cannot decide here. Name somebody who can, or nobody.`;
 
 /** Why `person` cannot be handed a question, or `null` when they can. */
 function deciderNameFault(sql: Sql, person: unknown): string | null {

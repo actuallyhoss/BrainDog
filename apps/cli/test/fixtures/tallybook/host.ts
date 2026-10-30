@@ -46,7 +46,7 @@ async function serve(kernel: Kernel, settings: Settings): Promise<{ server: Serv
     packs: async () => ({ ok: true, value: Object.keys(settings).map((id) => ({ id, version: '1.0.0', disabled_at: null })) }),
     packConfig: async (a) => {
       const got = settings[String(a.id)];
-      return got ? { ok: true, value: { id: a.id, version: '1.0.0', ...got } } : { ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: `${String(a.id)} is not a pack this record has installed.` } };
+      return got ? { ok: true, value: { id: a.id, version: '1.0.0', ...got } } : { ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: `${String(a.id)} is not an installed pack.` } };
     },
   };
   const server = createServer((req, res) => {

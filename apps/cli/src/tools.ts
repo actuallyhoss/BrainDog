@@ -1118,7 +1118,7 @@ export async function tools(args: string[], io: AgentIo & { cli: string; claude?
   const at = await connect(values.host, io);
   if (typeof at === 'number') return at;
   if (!at.context.registers.some((r) => r.id === 'tools')) {
-    io.out('This record has no tools register, so there is nothing to do.');
+    io.out('This BrainDog has no Tools list, so there is nothing to do.');
     return 0;
   }
   const dryRun = values['dry-run'] === true;

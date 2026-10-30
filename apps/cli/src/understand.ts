@@ -116,14 +116,14 @@ const and = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -
  */
 export function dryLines(read: DryRead): string[] {
   const { looked, counts, planned, plannedAll, asked, askedAll, done, dropped } = read;
-  const rest = done ? [] : ['', 'This is the next part of what your record holds. The rest is read on later nights.'];
+  const rest = done ? [] : ['', 'This is the next part of what your BrainDog holds. The rest is read on later nights.'];
   const reads = and(looked.map(([k, n]) => readLine(k, n)));
   const over = reads === '' ? '' : ` over ${reads}`;
   if (counts.length === 0 && planned.length === 0 && asked.length === 0)
     return [
       done
-        ? `Nothing to link and nothing to ask${reads === '' ? '' : ` in ${reads}`}: everything your record holds is already understood.`
-        : `Nothing to link and nothing to ask in the next ${reads === '' ? 'part' : reads} of your record. The rest is read on later nights.`,
+        ? `Nothing to link and nothing to ask${reads === '' ? '' : ` in ${reads}`}: everything your BrainDog holds is already understood.`
+        : `Nothing to link and nothing to ask in the next ${reads === '' ? 'part' : reads} of your BrainDog. The rest is read on later nights.`,
       ...dropped.map(closed),
     ];
   const out = [`A dry run${over}: nothing was changed and nothing was asked.`];
@@ -149,7 +149,7 @@ function refusalLine(r: Result<unknown>, to: Target): string {
   const { code } = r.refusal;
   if (code === 'UNREACHABLE') return `${to.key} did not answer.`;
   if (code === 'ROUTE_UNKNOWN' || code === 'NOT_IN_THIS_BUILD')
-    return 'Your record is older than this command and cannot say this yet. It will once it is updated.';
+    return 'Your BrainDog is older than this command and cannot say this yet. It will once it is updated.';
   if (code === 'NEEDS_BROWSER_SESSION') return "Only you, signed in to the app, can read this. A key on this machine cannot.";
   return printable(fixOf(r));
 }
@@ -164,7 +164,7 @@ export async function understandCommand(args: string[], io: AgentIo): Promise<nu
     return 1;
   }
   if (values['dry-run'] !== true) {
-    io.say('braindog understand only reads, with --dry-run. Your record links what it holds on its own each night, and asks you on Decide about the rest.');
+    io.say('braindog understand only reads, with --dry-run. Your BrainDog links what it holds on its own each night, and asks you on Decide about the rest.');
     return 1;
   }
   let to: Target;

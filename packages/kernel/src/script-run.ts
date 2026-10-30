@@ -386,7 +386,7 @@ export function tryProposal(
   type Tried = { said: ScriptProposed; queued: ScriptProposal | null };
   const checked = proposalOf(deps, run.script, run.writes, p);
   if (!checked.ok) return checked as unknown as Result<Tried>;
-  if (!deps.propose) return no('NOT_IN_THIS_BUILD', 'This record files no questions from a script.', { at: 'proposal' });
+  if (!deps.propose) return no('NOT_IN_THIS_BUILD', 'This BrainDog files no questions from a script.', { at: 'proposal' });
   const propose = deps.propose;
   let tried: ReturnType<NonNullable<ScriptRunDeps['propose']>> | null = null;
   /* THE SAVEPOINT IS TAKEN BACK WHATEVER THE GATE SAID, by answering it a refusal of our own. */
@@ -646,7 +646,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
        refuses takes the run's writes and its other questions back with it. A cause already waiting joins it. */
     if (proposals.length > 0 && !deps.propose) {
       proposeRefused = 0;
-      return no('NOT_IN_THIS_BUILD', 'This record files no questions from a script.', { at: 'proposals' });
+      return no('NOT_IN_THIS_BUILD', 'This BrainDog files no questions from a script.', { at: 'proposals' });
     }
     for (const [i, p] of proposals.entries()) {
       const out = deps.propose!(p, actor);
@@ -694,7 +694,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     asked === null
       ? ''
       : put === null
-        ? " It asked a question that nobody was shown: this record does not put a script's questions to anybody yet."
+        ? " It asked a question that nobody was shown: BrainDog does not put a script's questions to anybody yet."
         : put.answered !== undefined
           ? ' Its question was answered on Decide before, so it asked nothing new.'
           : put.joined

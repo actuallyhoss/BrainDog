@@ -98,7 +98,7 @@ const add = (into: Month, more: Month): void => {
  */
 function rowsOf(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit, schema: Schema, build: (actions: ActionRow[]) => Entry[]): BlockResult {
   const name = schema.register;
-  if (!deps.actions) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its scheduled actions onto a page yet.', at: 'source' }) };
+  if (!deps.actions) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its scheduled actions onto a page yet.', at: 'source' }) };
   if (block.order?.length) return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: `${name} comes in its own order, so it takes no order:.`, at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(schema.fields, f));
   if (unknown.length)

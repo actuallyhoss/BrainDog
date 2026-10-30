@@ -107,7 +107,7 @@ function headline(signs: readonly SignRead[]): string {
  * facts, and how many of its last days it read red.
  */
 export function signLines(signs: readonly SignRead[]): string[] {
-  if (signs.length === 0) return ['Your record has no signs to read yet.'];
+  if (signs.length === 0) return ['Your BrainDog has no signs to read yet.'];
   const out = [headline(signs)];
   for (const s of signs) {
     out.push('', `${s.name}: ${WORDS[s.state]}`);
@@ -124,7 +124,7 @@ function refusalLine(r: Result<unknown>, to: Target): string {
   if (!refused(r)) return printable(fixOf(r));
   const { code } = r.refusal;
   if (code === 'UNREACHABLE') return `${to.key} did not answer.`;
-  if (code === 'ROUTE_UNKNOWN' || code === 'NOT_IN_THIS_BUILD') return 'Your record is older than this command and cannot read its signs yet. It will once it is updated.';
+  if (code === 'ROUTE_UNKNOWN' || code === 'NOT_IN_THIS_BUILD') return 'Your BrainDog is older than this command and cannot read its signs yet. It will once it is updated.';
   return printable(fixOf(r));
 }
 

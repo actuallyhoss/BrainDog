@@ -159,7 +159,7 @@ test('A RECORD WHOSE BUILD LACKS THE READ SAYS SO IN ONE LINE NAMING braindog:co
   assert.equal(none.ok, false);
   assert.equal(none.refusal?.code, 'NOT_IN_THIS_BUILD');
   const fix = none.refusal?.fix ?? '';
-  assert.match(fix, /^This record does not answer braindog:learnings yet\. /u);
+  assert.match(fix, /^This BrainDog does not answer braindog:learnings yet\. /u);
   assert.match(fix, /braindog:context/u);
   assert.ok(!fix.includes('\n') && fix.length <= 200, fix);
   assert.doesNotMatch(fix, /—/u);

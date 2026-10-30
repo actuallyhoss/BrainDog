@@ -282,7 +282,7 @@ export async function putMany(from: string, opts: PutOptions, io: KeysIo): Promi
   io.say(
     many.replaces
       ? `${keysCount(read.found.length)} to seal. Under the keychain access, a key its project already holds has its value replaced.`
-      : `${keysCount(read.found.length)} to seal. Under your login each goes in as a new key, and a name your record already holds is skipped.`,
+      : `${keysCount(read.found.length)} to seal. Under your login each goes in as a new key, and a name your BrainDog already holds is skipped.`,
   );
   let declined = 0;
   let unsent = 0;
@@ -306,7 +306,7 @@ export async function putMany(from: string, opts: PutOptions, io: KeysIo): Promi
       io.say(got.sealed === 'replaced' ? `${f.name}: sealed, in place of the value it held.` : `${f.name}: sealed.`);
     } else if ('held' in got) {
       skipped.push(f.name);
-      io.say(`${f.name}: skipped, your record already holds it.`);
+      io.say(`${f.name}: skipped, your BrainDog already holds it.`);
     } else {
       refused.push(f.name);
       io.say(`${f.name}: refused. ${got.refused}`);

@@ -93,7 +93,7 @@ function quietEntry(e: Exception, at: string): Entry {
  * has one too new for a silence to mean anything (`exceptions.ts`, the rule about absence).
  */
 function exceptionsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
-  if (!deps.exceptions) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what went quiet onto a page yet.', at: 'source' }) };
+  if (!deps.exceptions) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what went quiet onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'exceptions come the longest quiet first, so it takes no order:. Use where: kind is list for one kind.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(EXCEPTIONS.fields, f));

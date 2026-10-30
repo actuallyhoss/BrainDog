@@ -123,7 +123,7 @@ const isRun = (actor: string, SESSION_PREFIX: string): boolean => actor.startsWi
 function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { predicateOf, typesOf, markOf, agentOf, SPOKEN, SESSION, SESSION_PREFIX } = kit;
   if (!deps.inScope || !deps.scopeOf)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what a project runs on onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what a project runs on onto a page yet.', at: 'source' }) };
   const about = typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
   if (!about)
     return {

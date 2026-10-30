@@ -532,7 +532,7 @@ export async function sourceBundle(r: Ready, from: string | undefined, o: { own?
   let slug: string | undefined;
   if (from !== undefined) {
     slug = slugOf(from);
-    if (!by.has(slug)) return { none: `No machine called ${from} has sent a bundle to this record.` };
+    if (!by.has(slug)) return { none: `No machine called ${from} has sent a bundle to this BrainDog.` };
   } else
     slug = [...by]
       .filter(([s]) => o.own === true || s !== me)

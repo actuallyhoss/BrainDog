@@ -129,10 +129,10 @@ export function mintInvitation(deps: InviteDeps, by: string, args: InviteArgs, s
   }
 
   const record = deps.recordId();
-  if (!record) return no<Invited>('OUT_OF_BOUNDS', 'This record has no id yet, and an invitation link carries the record it is for.', { at: 'record' });
+  if (!record) return no<Invited>('OUT_OF_BOUNDS', 'This BrainDog has no id yet, and an invitation link carries the BrainDog it is for.', { at: 'record' });
 
   if (deps.sql.one('SELECT 1 AS x FROM member m JOIN person p ON p.id = m.person_id WHERE lower(p.email) = lower(?) LIMIT 1', email))
-    return no<Invited>('ALREADY_KNOWN', `${email} is already on this record. Change what they reach from their row instead.`, { at: 'email' });
+    return no<Invited>('ALREADY_KNOWN', `${email} already has access here. Change what they can reach instead.`, { at: 'email' });
 
   const at = instant(deps.nowMs);
   /* A NEW LINK WITHDRAWS THE OLD ONE for the same address, so there is never a second live link somebody forgot. */
@@ -209,7 +209,7 @@ export function acceptInvitation(
   /* A LEVEL IS WHAT SOMEBODY ALREADY ON THE RECORD HOLDS, and a second one would replace it. What is shared with their
      address is added to whatever they hold, so a link carrying only shares binds them for a member too. */
   if (!guest && deps.sql.one('SELECT 1 AS x FROM member WHERE person_id = ? LIMIT 1', args.person))
-    return no<Accepted>('ALREADY_KNOWN', 'You are already on this record.', { at: 'person' });
+    return no<Accepted>('ALREADY_KNOWN', 'You already have access here.', { at: 'person' });
   const why = `Accepted invitation ${invitation.id}.`;
 
   let joined: Member;
@@ -217,7 +217,7 @@ export function acceptInvitation(
     /* A GUEST HOLDS SHARES AND NO MEMBER ROW, and a suspended one is let in by nothing. The person row is the record's
        mirror, written without overwriting what it knows, as `invite` writes it. */
     if (deps.sql.one('SELECT 1 AS x FROM person WHERE id = ? AND suspended_at IS NOT NULL', args.person))
-      return no<Accepted>('LEVEL_REQUIRED', 'You were stopped on this record. Ask its owner to let you back in.', { at: 'person' });
+      return no<Accepted>('LEVEL_REQUIRED', 'Your access here was stopped. Ask the owner to let you back in.', { at: 'person' });
     deps.sql.exec(
       `INSERT INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, NULL)
        ON CONFLICT (id) DO UPDATE SET email = COALESCE(excluded.email, person.email), name = COALESCE(excluded.name, person.name)`,

@@ -409,7 +409,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       };
     }
     if (doing === 'draft') {
-      if (!surface.slashPropose) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Drafting pages is not answered by this record yet.' } };
+      if (!surface.slashPropose) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot draft pages yet.' } };
       const page = text(op['page']);
       const out = await surface.slashPropose({ asked: text(op['what']), ...(page === '' ? {} : { page }) }, ctx);
       if (!out.ok) return out as Result<never>;
@@ -509,7 +509,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         };
       }
       case 'figures': {
-        if (!surface.figures) return { text: 'This record does not list its figures here. lists() names the lists instead.' };
+        if (!surface.figures) return { text: 'This BrainDog does not list its figures here. lists() names the lists instead.' };
         const all = await surface.figures(ctx);
         if (!all.ok) return { text: fixOf(all) };
         const words = figureWords(text(args['words'] ?? args['q']));
@@ -571,7 +571,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         return adding(text(args['list'] ?? args['register']), isObject(args['fields']) ? args['fields'] : {}, run);
       case 'person': {
         const people = await whoList();
-        if (people === null) return { text: 'This record keeps no list of people.' };
+        if (people === null) return { text: 'This BrainDog keeps no list of people.' };
         const shape = shapeIn(deps.sql, people.id);
         const has = (id: string): boolean => shape?.fields.some((f) => f.id === id) ?? false;
         const fields: Args = {};
@@ -595,7 +595,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         const said = isObject(args['fields']) ? args['fields'] : isObject(args['patch']) ? args['patch'] : {};
         if (Object.keys(said).length === 0) return { text: 'change needs fields: the field ids and their new values.' };
         const shape = shapeIn(deps.sql, row.register);
-        if (shape === null) return { text: `${id} is in a list this record no longer keeps.` };
+        if (shape === null) return { text: `${id} is in a list that no longer exists.` };
         const patch = await moneyed(shape, said, row.fields);
         const stray = strays(shape, patch);
         if (stray !== null) return { text: stray };
@@ -713,7 +713,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       const spoken = /^[1-9][0-9]*$/u.test(id) ? `session#${id}` : id;
       return { text: await read('get', { spoken }), step: 'Reading the run' };
     }
-    if (!surface.signs) return { text: 'This record does not read its vital signs here.' };
+    if (!surface.signs) return { text: 'This BrainDog does not read its vital signs here.' };
     const out = await surface.signs({}, ctx);
     if (!out.ok) return { text: fixOf(out) };
     const all = isObject(out.value) && Array.isArray(out.value['signs']) ? out.value['signs'].filter(isObject) : [];

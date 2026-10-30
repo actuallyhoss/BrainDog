@@ -50,7 +50,7 @@ export const SAID: Readonly<Record<FaultFamily, string>> = Object.freeze({
   infer: 'BrainDog could not check for people who are here twice. It tries again tonight.',
   notify: 'BrainDog could not send a notification. It tries again when the next one is due.',
   pull: 'BrainDog could not bring in new things from a connected app. It tries again on the next pull.',
-  export: 'BrainDog could not save a copy of your record. It tries again tonight.',
+  export: 'BrainDog could not save its nightly copy. It tries again tonight.',
   script: 'BrainDog could not run one of your scripts. It tries again the next time it is due.',
   schedule: 'BrainDog could not do something it had planned. It tries again the next time it is due.',
   other: 'BrainDog could not finish some work of its own. It tries again later.',

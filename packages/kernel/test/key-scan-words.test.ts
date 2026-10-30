@@ -58,5 +58,5 @@ test('NOTHING FOUND IS SAID PLAINLY, and a clean record reads nought', () => {
   assert.ok(none.ok);
   assert.equal(none.value.value, 0);
   assert.equal(none.value.met, true);
-  assert.equal(none.value.why, 'no text on this record holds a key');
+  assert.equal(none.value.why, 'no text in your BrainDog holds a key');
 });

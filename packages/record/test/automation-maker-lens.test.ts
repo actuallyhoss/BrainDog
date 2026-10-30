@@ -116,7 +116,7 @@ test('ONCE HE CAN NO LONGER REACH THE RECORD, HIS RULES STOP, saying so in plain
   assert.equal(got.seen, null);
   assert.equal(got.note, null);
   assert.equal(got.run?.state, 'cancelled');
-  assert.equal(got.run?.say, 'Stopped: Otto, who turned this on, can no longer reach this record.');
+  assert.equal(got.run?.say, 'Stopped: Otto, who turned this on, can no longer reach this BrainDog.');
   assert.doesNotMatch(got.run?.say ?? '', /p_otto|rule\./u);
   sql.close();
 });

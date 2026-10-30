@@ -87,7 +87,7 @@ test('THE LADDER OF TRUST, WHAT SLASH READS, YOUR OWN KEYS AND A NEW ACTION STAN
   }
   assert.equal(panelOf({ kind: 'section', heading: 'Who acts alone', panel: 'trust' } as never), 'trust');
   assert.equal(panelOf({ kind: 'section', heading: 'Make one', panel: 'new-action' } as never), 'new-action');
-  assert.equal(PANEL_TABLE['my-keys'].says, 'Your own keys to this record');
+  assert.equal(PANEL_TABLE['my-keys'].says, 'Your own keys to this BrainDog');
 });
 
 /* THE FILES BEHIND THE LOADERS, read as text: Node cannot load a Svelte component, and the rule is in what it calls. */

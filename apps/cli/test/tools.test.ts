@@ -615,7 +615,7 @@ test('braindog tools: a wrong verb, flag or scope is exit 1, and a record withou
     'braindog tools write takes --scope user or --scope project, --host and --dry-run, and nothing else.',
   ]);
   assert.equal(await tools(['scan'], io), 0);
-  assert.deepEqual(h.out, ['This record has no tools register, so there is nothing to do.']);
+  assert.deepEqual(h.out, ['This BrainDog has no Tools list, so there is nothing to do.']);
 });
 
 test('braindog tools scan --dry-run over the command prints the lines and says it was a dry run', async (t) => {

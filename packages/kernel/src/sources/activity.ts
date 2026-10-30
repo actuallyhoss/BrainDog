@@ -33,7 +33,7 @@ const ACTIVITY: Schema = {
 function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { predicateOf, byOf, listOf, agentRows, feedRows, feedSaysFault } = kit;
   if (!deps.activity)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its activity onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its activity onto a page yet.', at: 'source' }) };
   const said = predicateOf(block.where, ACTIVITY, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const read = deps.activity(FEED_EVENTS);

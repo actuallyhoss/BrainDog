@@ -578,7 +578,7 @@ function targetSaid(e: Record<string, unknown>, look: Look): string | null {
 /** One line of a history or of the log: when, who, and what they did, and to what when it is not the row in hand. */
 export function eventLine(e: Record<string, unknown>, decl: Decl | undefined, look: Look, about: boolean): string {
   const at = typeof e.ts === 'string' ? when(e.ts, look.now) : '';
-  const by = typeof e.actor === 'string' ? look.actor(e.actor) : 'someone on this record';
+  const by = typeof e.actor === 'string' ? look.actor(e.actor) : 'someone you share with';
   const did = eventSaid(e, decl, look);
   const what = about ? targetSaid(e, look) : null;
   return [at, by, what && !did.includes(what) ? `${did} · ${what}` : did].filter(Boolean).join(' · ');
@@ -780,7 +780,7 @@ export function figureBrief(
 
 /** `record_index`: the record, each list by name with its handle and count, and the figures by id. */
 export function indexBrief(value: Record<string, unknown>): string {
-  const record = isObject(value.record) && typeof value.record.name === 'string' ? value.record.name : 'This record';
+  const record = isObject(value.record) && typeof value.record.name === 'string' ? value.record.name : 'This BrainDog';
   const registers = Array.isArray(value.registers) ? value.registers.filter(isObject) : [];
   const figures = Array.isArray(value.figures) ? value.figures.filter((f): f is string => typeof f === 'string') : [];
   const lines = [`${record} · ${counted(registers.length, 'list')}${figures.length > 0 ? ` · ${counted(figures.length, 'figure')}` : ''}`];

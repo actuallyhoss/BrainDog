@@ -177,16 +177,16 @@ function readFormat(sql: Sql): SignReading {
   const said: string[] = [];
   const facts = [`Format ${FORMAT_VERSION} is what this build reads, with ${count(KERNEL_MIGRATION, 'update')} to the layout.`];
   if (missing.length > 0) {
-    said.push(`This record is ${count(missing.length, 'update')} behind this build.`);
+    said.push(`This BrainDog is ${count(missing.length, 'update')} behind this build.`);
     facts.push(`${count(applied.filter((v) => v <= KERNEL_MIGRATION).length, 'update')} of ${KERNEL_MIGRATION} are in.`);
   }
-  if (newer.length > 0) said.push(`This record was written by a newer build, ${count(newer.length, 'update')} ahead of this one.`);
+  if (newer.length > 0) said.push(`This BrainDog was written by a newer build, ${count(newer.length, 'update')} ahead of this one.`);
   const wrong = [meta === undefined || Number(meta) !== FORMAT_VERSION, Number(own) !== FORMAT_VERSION].filter(Boolean).length;
   if (meta === undefined) said.push('Its file does not say its format.');
   else if (Number(meta) !== FORMAT_VERSION) said.push(`Its file says format ${String(meta).slice(0, 20)} where this build reads format ${FORMAT_VERSION}.`);
   if (Number(own) !== FORMAT_VERSION) facts.push(`The record says format ${String(own)} of itself.`);
   const behind = missing.length + newer.length + wrong;
-  if (behind <= FORMAT_BEHIND_MOST) return reading('green', 0, `This record is in format ${FORMAT_VERSION} with all ${KERNEL_MIGRATION} updates in.`, facts);
+  if (behind <= FORMAT_BEHIND_MOST) return reading('green', 0, `This BrainDog is in format ${FORMAT_VERSION} with all ${KERNEL_MIGRATION} updates in.`, facts);
   if (said.length === 0) said.push(`The record says format ${String(own)} of itself where this build reads format ${FORMAT_VERSION}.`);
   return reading('red', behind, said.join(' '), facts);
 }

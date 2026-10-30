@@ -81,7 +81,7 @@ test('THE SIGNS ARE SAID BY NAME, each state with a word and never a colour alon
     assert.doesNotMatch(line, /\b[a-z]+-[a-z]+(-[a-z]+)?\b/u, `${line} prints an id`);
   }
   assert.deepEqual(signLines(readSigns([SIGNS[3]])), ['The one sign is fine.', '', 'Oldest question: Fine', '  The oldest open question is 6 days old.']);
-  assert.deepEqual(signLines([]), ['Your record has no signs to read yet.']);
+  assert.deepEqual(signLines([]), ['Your BrainDog has no signs to read yet.']);
 });
 
 test('A SIGN NOT READ YET IS NEVER COUNTED AS FINE: none read says so, and some unread are counted apart from the fine', () => {
@@ -187,7 +187,7 @@ test('BRAINDOG SIGNS SAYS PLAINLY why the record would not read them: a record o
     const older = await host(t, { refusal: { code, fix: 'This host has no signs.' }, status });
     const one = io(older.base);
     assert.equal(await signsCommand([], one), 1);
-    assert.deepEqual(one.said, ['Your record is older than this command and cannot read its signs yet. It will once it is updated.']);
+    assert.deepEqual(one.said, ['Your BrainDog is older than this command and cannot read its signs yet. It will once it is updated.']);
     assert.deepEqual(one.lines, []);
   }
   const narrow = await host(t, { refusal: { code: 'FORBIDDEN', fix: 'The signs are about the whole record, and this caller is held to part of it.' } });
