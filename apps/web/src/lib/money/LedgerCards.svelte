@@ -72,7 +72,7 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { looks } from './looks.svelte.ts';
   import { at } from '../at.ts';
-  import { TIMELINE_BETWEEN } from 'braindog-render';
+  import { TIMELINE_BETWEEN, timelineTitle } from 'braindog-render';
 
   let {
     columns,
@@ -98,7 +98,9 @@
     const out: Day[] = [];
     for (const r of rows) {
       const day = cellSaid(r.cells[plan.day], undefined, now);
-      const title = plan.title.map((i) => plain(r.cells[i])).find((t) => t !== '') ?? '';
+      /* WHO WAS PAID AS THE LEDGER SAYS IT (`timelineTitle`, audit 2 B4): Tax set aside drew "RAVENSWORTH LTD INV 2026-038"
+         and Receipts "PAPERHAUS SUPPLIES" where the Ledger says "Ravensworth Ltd" and "Paperhaus Supplies". */
+      const title = timelineTitle(plan.title.map((i) => plain(r.cells[i])).find((t) => t !== '') ?? '');
       const category = plan.category >= 0 ? plain(r.cells[plan.category]) : '';
       const account = plan.account >= 0 ? plain(r.cells[plan.account]) : '';
       const amount = cellSaid(r.cells[plan.amount], home, now);

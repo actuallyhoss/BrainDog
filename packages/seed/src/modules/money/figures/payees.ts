@@ -35,12 +35,14 @@ export const PAYEE_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* HOW MANY PAYMENTS OUT IN NINETY DAYS NAME NOBODY (Q15 of 29 October), so Payees asks once to name them while any do. */
+  /* HOW MANY PAYMENTS OUT IN NINETY DAYS NAME NOBODY (Q15 of 29 October), so Payees asks once to name them while any do.
+     NOBODY IN EITHER FIELD (audit 2 B5): a line the bank named is drawn as that payee on Payees, as on the Ledger, so the
+     count is the lines Payees' "Not named yet" holds, and the lead's link opens exactly these. */
   'unnamed-paid-90d': {
     metric: 'unnamed-paid-90d',
     name: 'Paid to nobody named, 90 days',
     source: 'register.transactions',
-    where: `${LEDGER_90D}, direction is out, payee is empty`,
+    where: `${LEDGER_90D}, direction is out, payee is empty, counterparty_text is empty`,
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },

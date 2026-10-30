@@ -194,7 +194,7 @@ async function spending() {
     assert.deepEqual(b.refusals ?? [], [], `${heading} is refused`);
     return b;
   };
-  return { k, sql, night, page, block, groceries, outings };
+  return { k, sql, night, page, block, groceries, outings, account };
 }
 
 test('BUDGETS SETS EACH BUDGET AGAINST THIS MONTH, and names the money no category holds with the way to file it', async () => {
@@ -264,6 +264,20 @@ test('REPORTS AND PAYEES NARROW BY WHAT IS PICKED: the months on Reports, one pa
     whole.rows.map((r) => [r.label, r.rows, r.last]),
     [['Lantern Grill', 3, '2026-10-09']],
   );
+  /* EVERY PAYMENT NAMES SOMEBODY, SO NO LEAD ASKS TO NAME ANY (audit 2 B5): the bars are who was paid. */
+  assert.equal(m.page('money-payees').some((b) => b.lead && b.drawn !== false), false);
+});
+
+test('PAYEES NAMES A LINE BY THE BANK WHERE NOBODY PUT A PAYEE ON IT, and asks to name only the lines with no name at all', async () => {
+  const m = await spending();
+  const on = m.account.id;
+  for (const day of ['2026-10-02', '2026-10-05'])
+    value(m.k.create('transactions', { what: 'PAPERHAUS SUPPLIES', counterparty_text: 'PAPERHAUS SUPPLIES', on: day, amount: egp(120), direction: 'out', account: on, state: 'cleared' }, OWNER));
+  value(m.k.create('transactions', { what: 'HMRC VAT', on: '2026-10-06', amount: egp(500), direction: 'out', account: on, state: 'cleared' }, OWNER));
+  const bars = (m.block('money-payees', 'Who you paid, 90 days') as { wholeRead?: { rows: { label: unknown; rows: number }[] } }).wholeRead!;
+  assert.equal(bars.rows.find((r) => r.label === 'PAPERHAUS SUPPLIES')?.rows, 2, 'the bank-named lines are not one payee');
+  assert.equal(bars.rows.find((r) => r.label === null)?.rows, 1, 'only the line with no name in either field is not named');
   const lead = m.page('money-payees').find((b) => b.lead && b.drawn !== false)!;
-  assert.equal(lead.values?.['payees-paid-90d'], 3);
+  assert.equal(lead.values?.['unnamed-paid-90d'], 1);
+  assert.match(String(lead.body), /f=payee:is:empty&f=counterparty_text:is:empty/u);
 });

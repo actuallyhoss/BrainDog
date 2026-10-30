@@ -89,3 +89,47 @@ export function currencyChoices(held: string): { common: readonly string[]; othe
     other: OTHER_CURRENCIES.includes(code) ? OTHER_CURRENCIES.filter((c) => c !== code) : OTHER_CURRENCIES,
   };
 }
+
+/**
+ * A CURRENCY AS A PERSON NAMES IT, "British pound, £", for a picker or a sentence (audit 2 B3). The pickers listed bare
+ * codes, AED, AUD, … AFN, ALL, which is the bank's word and not the person's. The name is `Intl`'s singular (counted at
+ * a whole one, so "UAE dirham" and not "UAE dirhams"), its first letter raised ("Euro"), and the symbol follows only
+ * where the runtime has one that is not the code itself. A code the runtime cannot name is said as it is.
+ */
+export function currencyLabel(code: string): string {
+  const c = code.trim().toUpperCase();
+  try {
+    const part = (display: 'name' | 'narrowSymbol') =>
+      new Intl.NumberFormat('en-GB', { style: 'currency', currency: c, currencyDisplay: display, minimumFractionDigits: 0, maximumFractionDigits: 0 })
+        .formatToParts(1)
+        .find((p) => p.type === 'currency')?.value;
+    const name = part('name');
+    if (!name || name === c) return c;
+    const named = name.charAt(0).toUpperCase() + name.slice(1);
+    const symbol = part('narrowSymbol');
+    return symbol && symbol !== c && symbol !== name ? `${named}, ${symbol}` : named;
+  } catch {
+    return c;
+  }
+}
+
+/** A picker's option: the code it keeps and the name it shows. */
+export type CurrencyOption = { code: string; label: string };
+
+const byLabel = (a: CurrencyOption, b: CurrencyOption): number => a.label.localeCompare(b.label, 'en-GB');
+
+/**
+ * `currencyChoices` with each code named, for a picker to draw. THE HELD CODE STILL LEADS the common group, and the rest
+ * of each group is in the order a person reads them, by name, since codes in code order put "UAE dirham" first and
+ * "Afghan afghani" second in a list nobody can scan.
+ */
+export function currencyOptions(held: string): { common: CurrencyOption[]; other: CurrencyOption[] } {
+  const { common, other } = currencyChoices(held);
+  const named = (codes: readonly string[]): CurrencyOption[] => codes.map((code) => ({ code, label: currencyLabel(code) }));
+  const lead = held.trim().toUpperCase();
+  const first = common[0] === lead ? named([lead]) : [];
+  return {
+    common: [...first, ...named(first.length ? common.slice(1) : common).sort(byLabel)],
+    other: named(other).sort(byLabel),
+  };
+}

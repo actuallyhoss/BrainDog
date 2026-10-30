@@ -1099,8 +1099,9 @@ export const targetLine = (decl: MetricDecl, value?: number | null): string => {
   if (under && typeof value === 'number') return value <= bound ? '' : `${format(decl.format, value - bound).replace(/\.0+$/u, '')} over your limit`;
   if (under && bound === 0) return 'None expected';
   /* NOTHING IS UNDER NOTHING, so a floor of zero is a line nobody can miss, and is not said: a count's, and money's
-     "Keep above GBP 0" too. */
-  if (!under && bound === 0) return '';
+     "Keep above GBP 0" too. NOR ONE BELOW IT, which is a guard and not a goal as `markOf` reads it: Weather's −100° and
+     an account's balance, which may be anything (audit 2 B17), drew "At least −£90,071,992,547,409.91". */
+  if (!under && bound <= 0) return '';
   const figure = format(decl.format, bound).replace(/\.0+$/u, '');
   if (under) return `Limit ${figure}`;
   return `At least ${figure}`;

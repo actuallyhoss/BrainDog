@@ -16,7 +16,7 @@
  * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
  */
 
-import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, handleName, money, relative, shortDay, since, integer, MISSING, TIMELINE_BETWEEN } from 'braindog-render';
+import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, handleName, money, relative, shortDay, since, integer, MISSING, TIMELINE_BETWEEN, timelineTitle } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 /* THE LISTS A MODULE BRINGS, BY NAME AND WITHOUT ITS DOCUMENT (`@braindog/seed/packs/lists`): this file is on the first open. */
@@ -374,6 +374,9 @@ const unitAfter = (unit: string | null | undefined): string => (unit ? `${unit =
  * the seed's frozen 3 September 2026, so a live screen that passed nothing banded a record's instants against the
  * sample's day; the sample's readers in `fixtures/readers.ts` pass the sample's clock themselves.
  */
+/** The fields that hold a payee's name or the words a rule matches, which a bank sends in capitals. */
+const BANK_WORDS: ReadonlySet<string> = new Set(['transactions.payee', 'filing_rules.match']);
+
 export function display(
   register: string,
   field: string,
@@ -399,6 +402,10 @@ export function display(
   /* AN AGENT BY ITS NAME: the field holds what the agent signs with, `claude`, and a card read "claude" beside "Changed by
      Claude". A lower-case word is said with its capital, on any list; anything else is left as it was typed. */
   if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value)) return value.charAt(0).toUpperCase() + value.slice(1);
+  /* WHO WAS PAID, AND THE WORDS A FILING RULE MATCHES, IN A BANK'S CAPITALS ARE SAID AS WORDS, as the Ledger says the same
+     line (`timelineTitle`, audit 2 B4): Payees' "Usual category" read FENWICK CLOUD under a bar saying Fenwick Cloud, and
+     Filing rules titled each card in capitals. "As the bank wrote it" stays as the bank wrote it. */
+  if (typeof value === 'string' && BANK_WORDS.has(`${register}.${field}`)) return timelineTitle(value) || value;
   /* A TOOL OR A SKILL IS ITS NAME, not the handle it is filed under: Tools read "nordhaven-dns" (`rowNameSaid`). */
   if (typeof value === 'string' && field === REGISTERS[register]?.title) {
     const named = rowNameSaid(register, value);

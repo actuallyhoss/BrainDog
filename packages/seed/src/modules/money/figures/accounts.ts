@@ -30,6 +30,14 @@ const STRIPE_BELOW_ZERO = {
   ],
 };
 
+/**
+ * A BALANCE IS NEITHER GOOD NOR BAD ON ITS OWN PAGE (audit 2 B17): a card's is below nought by nature, and "The bank says
+ * −£1,240" and "The lines add up to −£1,240" both wore ⚠︎ while they agreed, which read as the two disagreeing. Where
+ * they differ, "Not in the ledger" says so, and Cash now still judges the money you hold. A figure asked by its name
+ * (`:{{it}}`) must carry a bound (`metrics.ts` refuses `{}` there), so this is the one no balance falls under.
+ */
+const ANY_BALANCE = { gte: -Number.MAX_SAFE_INTEGER };
+
 export const ACCOUNT_FIGURES: Record<string, SeedMetric> = {
   /**
    * WHAT ONE ACCOUNT HOLDS NOW, BY THE BANK'S NEWEST WORD: Cash now's own roll over the one account the page is about,
@@ -44,7 +52,7 @@ export const ACCOUNT_FIGURES: Record<string, SeedMetric> = {
     where: 'name is {{it}}',
     value: ROLLED,
     format: MONEY,
-    target: { gte: 0 },
+    target: ANY_BALANCE,
     window: '30d',
     compare: 'none',
   },
@@ -57,7 +65,7 @@ export const ACCOUNT_FIGURES: Record<string, SeedMetric> = {
     where: 'name is {{it}}',
     value: LINES_ONLY,
     format: MONEY,
-    target: { gte: 0 },
+    target: ANY_BALANCE,
     window: '30d',
     compare: 'none',
   },

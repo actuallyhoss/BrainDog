@@ -438,7 +438,9 @@
   const lists = $derived((route.data as unknown as Partial<Shell>).lists ?? []);
   const listNamed = (id: string | undefined): string | null =>
     id ? (REGISTERS[id]?.name ?? lists.find((l) => l.id === id)?.name ?? null) : null;
-  const source = $derived(listNamed(block.register));
+  /* NO DOOR TO A LIST OF ONE ROW, THE ONE THE PAGE IS ABOUT (audit 2 B17): an account's "About this account" opened with
+     the bare word "Accounts", a door to a list filtered to that account, which "Show the data" already opens. */
+  const source = $derived(/^\s*seq is (?:\d+|\{\{seq\}\})\s*$/u.test(block.where ?? '') ? null : listNamed(block.register));
 
   /* The panel the host draws under this block, by the name the section gives it (`panel-of.ts`). */
   const panel = $derived(panelOf(block));

@@ -4281,6 +4281,16 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   if (!read.ok) return read;
   const known = new Map<string, Json>();
   if (or !== null) for (const part of read.value) if (typeof part.by[0] === 'string' && part.by[0].trim() !== '' && !known.has(nameKey(part.by[0]))) known.set(nameKey(part.by[0]), part.by[0]);
+  /* A TALLY NAMES A LINE BY ITS SECOND FIELD'S OWN WORDS where they name nobody known (audit 2 B5): Payees left out
+     Paperhaus Supplies, seven lines the Ledger draws by that name, and counted them as "Not named yet". So a tally is
+     who was paid as the lines say it, each name once however it is spelt (the first spelling read), and what stays
+     unnamed is a line that holds no words in either field. Any other bar keeps the rule above. */
+  const named = (words: string): Json => {
+    if (!tally || words.trim() === '') return null;
+    const key = nameKey(words);
+    if (!known.has(key)) known.set(key, words.trim());
+    return known.get(key) ?? null;
+  };
   const heat = block.kind === 'heat';
   const from = heat ? heatFrom(today) : '';
   const drawn = (label: Json): label is string => typeof label === 'string' && label >= from && label <= today;
@@ -4296,7 +4306,7 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
     gather(total, part, done);
     if (shape.by.length === 0) continue;
     const own = part.by[0] ?? null;
-    const label = (own === null || own === '') && or !== null && typeof part.by[1] === 'string' ? (known.get(nameKey(part.by[1])) ?? null) : own;
+    const label = (own === null || own === '') && or !== null && typeof part.by[1] === 'string' ? (known.get(nameKey(part.by[1])) ?? named(part.by[1])) : own;
     if (heat && !drawn(label)) {
       outside += part.rows;
       if (typeof label === 'string') outsideDays.add(label);
