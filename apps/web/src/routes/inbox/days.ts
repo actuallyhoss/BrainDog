@@ -96,8 +96,10 @@ export function whoFiledOf(tally: Tally | null): { figure: number; parts: { labe
   return {
     figure: ruled,
     parts: [
-      { label: 'By rules this week', value: ruled, tone: 'g2' },
-      { label: 'Filed earlier', value: earlier, tone: 'g4' },
+      /* SHORT, SO EACH FITS ITS PART AND THE BAR IS LABELLED THROUGH (AF26): "By rules this week" never fitted a week's
+         few, and the bar read "Waiting" alone. The tile's figure says the week. */
+      { label: 'By rules', value: ruled, tone: 'g2' },
+      { label: 'Earlier', value: earlier, tone: 'g4' },
       { label: 'Waiting', value: waiting, tone: 'ink' },
     ],
     reading:

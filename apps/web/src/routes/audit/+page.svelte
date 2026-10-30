@@ -294,14 +294,14 @@
    */
   /* WHO WORKED OVER THE MONTH, the record's own figure (`activity-by-who`), read once after the log (AF12): its BrainDog part
      was drawn by no screen. A refusal or an older host draws nothing. */
-  let who = $state.raw<WhoPart[] | null>(null);
+  let byWho = $state.raw<WhoPart[] | null>(null);
   $effect(() => {
     if (!route.data.live) return;
     untrack(() => {
       void import('@braindog/client')
         .then(({ createClient }) => createClient({ base: apiBase() }).metric('activity-by-who'))
-        .then((out) => (who = whoPartsOf(out)))
-        .catch(() => (who = null));
+        .then((out) => (byWho = whoPartsOf(out)))
+        .catch(() => (byWho = null));
     });
   });
   let unseen = $state<{ actors: string[]; capped: boolean; byWho: ByWho | null; upTo?: Cursor | null } | null>(null);
@@ -577,7 +577,7 @@
       tally.total,
     ),
   );
-  const tiles = $derived(lanes.length > 0 || who !== null || matched.length > 0 || busy.total > 0);
+  const tiles = $derived(lanes.length > 0 || byWho !== null || matched.length > 0 || busy.total > 0);
   /* ON A PHONE THE FILTERS ARE ONE "Filter" BUTTON IN THE HEAD, and a sheet holds them (money F11): the segmented control
      and its two menus wrapped into a box over the title row at 390. */
   let filtering = $state(false);
@@ -791,7 +791,7 @@
 
 {#snippet sideTiles()}
   <div class="side">
-    {#if lanes.length > 0 || who}
+    {#if lanes.length > 0 || byWho}
       <!-- THE AGENTS' LAST DAY AS LANES, AND THE MONTH BY WHO (AF12): the month's part is the record's figure, BrainDog's
            own work among it, its sentence saying its span. -->
       <Tile icon="session" title={historyWords.whoWorked} meta={lanes.length > 0 ? historyWords.lastDay : historyWords.lastMonth}>
@@ -799,9 +799,9 @@
           <Swimlanes {lanes} start={clock - LANE_SPAN_MS} end={clock} now={clock} subject={historyWords.lanesSubject} />
           <p class="reading">{lanesSaid(lanes)}</p>
         {/if}
-        {#if who}
-          <Stacked parts={who} subject={historyWords.whoSubject} />
-          <p class="reading">{whoSaid(who)}</p>
+        {#if byWho}
+          <Stacked parts={byWho} subject={historyWords.whoSubject} />
+          <p class="reading">{whoSaid(byWho)}</p>
         {/if}
       </Tile>
     {/if}

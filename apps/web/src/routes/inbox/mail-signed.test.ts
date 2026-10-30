@@ -83,3 +83,7 @@ test('no unsigned sender says nothing new, and several are named two at a time',
   assert.equal(unsignedOf(['a@x.example', 'b@y.example']), "Mail from a@x.example and b@y.example isn't signed as it arrives, so it waits here to be filed by hand.");
   assert.equal(unsignedOf(['A', 'B', 'C', 'D']), "Mail from A, B and 2 more isn't signed as it arrives, so it waits here to be filed by hand.");
 });
+
+test('drawn away from the Inbox, the unsigned sentence says the mail waits in the Inbox (audit 6f AF13)', () => {
+  assert.equal(unsignedOf(['HSBC Alerts'], 'elsewhere'), "Mail from HSBC Alerts isn't signed as it arrives, so it waits in the Inbox to be filed by hand.");
+});

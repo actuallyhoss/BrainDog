@@ -48,7 +48,7 @@ test('the tile: rules this week as the figure, what waits in ink, and filed earl
   const tile = whoFiledOf({ waiting: 3, filed: 40, archived: 2, ruled: 12 });
   assert.ok(tile);
   assert.equal(tile.figure, 12);
-  assert.deepEqual(tile.parts.map((p) => [p.label, p.value, p.tone]), [['By rules this week', 12, 'g2'], ['Filed earlier', 28, 'g4'], ['Waiting', 3, 'ink']]);
+  assert.deepEqual(tile.parts.map((p) => [p.label, p.value, p.tone]), [['By rules', 12, 'g2'], ['Earlier', 28, 'g4'], ['Waiting', 3, 'ink']]);
   assert.equal(tile.reading, 'Rules filed 12 this week; 3 still wait for a person.');
   assert.equal(whoFiledOf({ waiting: 0, filed: 5, archived: 0, ruled: 9 })?.parts[1]?.value, 0, 'clamped, never negative');
   assert.equal(whoFiledOf({ waiting: 1, filed: 5, archived: 0, ruled: null }), null, 'an older host has no weekly count to draw');

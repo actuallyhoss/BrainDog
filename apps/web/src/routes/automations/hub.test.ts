@@ -483,10 +483,3 @@ test('WHERE THE RECORD KEEPS EVERY RULE\'S MONTH, EVERY RULE IS IN THE TILE AND 
   assert.equal(ranPeriod(2, 0), '2 times in all, none this month');
   assert.equal(ranPeriod(12), '12 times in all');
 });
-  const ledger = auto('Categorise what cleared', { path: 'inline', fired: 17, last_at: '2026-09-03T06:35:00.000Z', month_fired: 4 });
-  const quiet = auto('Tag the rent', { path: 'inline', fired: 2, last_at: '2026-08-01T06:35:00.000Z', month_fired: 0 });
-  assert.equal(monthReading([weekly, ledger, quiet], now), `Weekly review ran once, the most this month, and nothing failed. ${hubWords.rulesMonth(4)}`);
-  assert.equal(hubWords.rulesMonth(4), 'Rules that act as things change ran 4 times this month, and are not counted here.');
-  /* NONE THIS MONTH SAYS NOTHING OF THEM, whatever the whole count. */
-  assert.equal(monthReading([weekly, quiet], now), 'Weekly review ran once, the most this month, and nothing failed.');
-});

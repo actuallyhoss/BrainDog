@@ -106,6 +106,9 @@
     partial: 'Newest arrivals only',
     /* THE FIX FOR MAIL A FORWARDER UNSIGNED, in the docs (sec-follow M2). */
     unsignedFix: 'How to keep forwarded mail signed',
+    /* THE PICKER WITH NO LIST CHOSEN, and the press that asks for one (AF2). */
+    chooseList: 'Choose a list',
+    chooseFirst: 'Choose a list to file it in first.',
     learn: 'Could file themselves',
     learnWhy: 'Messages alike from one sender are learned once, as a rule, and the rest are filed as they arrive.',
     alikeFrom: (n: number, from: string) => `${n} alike from ${from}`,
@@ -472,7 +475,13 @@
    * device, as a convenience and nothing more: a browser that forgets it opens on the first list again.
    */
   const INTO = 'braindog.inbox.into';
-  const lists = $derived<readonly { id: string; name: string }[]>(route.data.lists ?? route.data.index?.registers ?? []);
+  /* AN AGENT'S OWN LISTS ARE NOT WHERE AN EMAIL GOES (AF2): Agent runs, Instructions, Learnings, Skills, Keys and Tools
+     were offered among the money lists, and with no list chosen the red button said "File it in Instructions". They are
+     left out of the picker: the lists the kernel keeps for itself, the Agents module's, and the keychain's. */
+  const AGENTS = new Set(['session', 'instructions', 'credentials', ...(moduleOf('agents')?.registers ?? [])]);
+  const lists = $derived<readonly { id: string; name: string }[]>(
+    ((route.data.lists ?? route.data.index?.registers ?? []) as readonly { id: string; name: string; kernel?: boolean }[]).filter((l) => !AGENTS.has(l.id) && l.kernel !== true),
+  );
   let into = $state(untrack(() => {
     try {
       return localStorage.getItem(INTO) ?? '';
@@ -480,10 +489,21 @@
       return '';
     }
   }));
-  /* AN AGENT'S OWN LISTS ARE NOT WHERE AN EMAIL GOES, so the first list is the first of anybody else's. They were read off
-     the seed's root, which is the whole sample, for four names the Agents module carries (`modules.ts`). */
-  const AGENTS = new Set(['session', ...(moduleOf('agents')?.registers ?? [])]);
-  const target = $derived(lists.some((l) => l.id === into) ? into : (lists.find((l) => !AGENTS.has(l.id)) ?? lists[0])?.id ?? '');
+  /* NO GUESS IN RED (AF2): with no list chosen on this device the picker opens on none and asks, and filing waits for a
+     choice. The first list was a guess, and the likeliest press filed a bank alert wherever the guess fell. */
+  const target = $derived(lists.some((l) => l.id === into) ? into : '');
+  /** Open the picker the press was nearest, when filing is asked for before a list is chosen. */
+  async function askWhere() {
+    toasts.push(words.chooseFirst, { intent: 'warn' });
+    await tick();
+    const select = document.querySelector<HTMLSelectElement>('.body .file-select, .batch .file-select, .file-into[data-where="bar"] .file-select');
+    select?.focus();
+    try {
+      select?.showPicker?.();
+    } catch {
+      /* A browser that will not open it from here leaves it focused. */
+    }
+  }
   function choose(id: string) {
     into = id;
     try {
@@ -528,7 +548,7 @@
 
   async function settle(item: InboxItem, gesture: 'file' | 'archive') {
     if (busy) return;
-    if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
+    if (gesture === 'file' && target === '') return void (lists.length === 0 ? toasts.push(copy.inboxNoLists, { intent: 'warn' }) : askWhere());
     busy = true;
     const filedIn = listOf(target);
     try {
@@ -583,7 +603,7 @@
   async function settlePicked(gesture: 'file' | 'archive') {
     const items = shown.filter((i) => picked.has(i.id));
     if (busy || items.length === 0) return;
-    if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
+    if (gesture === 'file' && target === '') return void (lists.length === 0 ? toasts.push(copy.inboxNoLists, { intent: 'warn' }) : askWhere());
     busy = true;
     const gone = new Set<string>();
     try {
@@ -688,6 +708,7 @@
     <label class="file-into" data-where={where}>
       <span class="file-label">{copy.inboxFileInto}</span>
       <select class="file-select" value={target} disabled={busy} onchange={(e) => choose(e.currentTarget.value)}>
+        {#if target === ''}<option value="" disabled>{words.chooseList}</option>{/if}
         {#each lists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
       </select>
     </label>
@@ -802,14 +823,18 @@
                     <span class="way-main">
                       <span class="way-name">{w.name}</span>
                       <span class="way-last">{lastSaid(w, (iso) => since(iso, clock))}</span>
-                      {#if w.signed}<span class="way-last">{w.signed}</span>{/if}
-                      {#if w.unsigned}<a class="way-last tap" href={UNSIGNED_HELP} target="_blank" rel="noopener noreferrer">{words.unsignedFix}</a>{/if}
+                      {#if w.signed && !w.unsigned}<span class="way-last">{w.signed}</span>{/if}
                     </span>
                     <span class="way-trend">
                       {#if drawsLine(w)}<Sparkline values={w.days} width={140} height={32} summary={lineSaid(w)} />{/if}
                       <!-- A WAY NOTHING EVER CAME BY SAYS SO ONCE, under its name, and no count repeats it. -->
                       {#if w.last !== null}<span class="way-count num">{countSaid(w.total)}</span>{/if}
                     </span>
+                    <!-- THE SENDERS WHOSE MAIL ISN'T SIGNED, AND THE FIX, ON A LINE OF THEIR OWN UNDER THE ROW (AF1): clipped to the
+                         row's one line it said "Mail from Monzo, …" and "How to keep forw…", and lost both the names and the fix. -->
+                    {#if w.unsigned}
+                      <p class="way-unsigned">{w.unsigned} <a class="tap" href={UNSIGNED_HELP} target="_blank" rel="noopener noreferrer">{words.unsignedFix}</a></p>
+                    {/if}
                   </li>
                 {/each}
               </ul>
@@ -1129,7 +1154,8 @@
                       <!-- FILING IS THE PRIMARY, and archiving follows it in words. -->
                       <div class="actions">
                         {@render fileInto('row')}
-                        <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{target ? copy.fileItIn(listOf(target)) : copy.fileIt}</Button>
+                        <!-- RED ONLY ONCE A LIST IS CHOSEN: before, the press asks where (AF2). -->
+                        <Button weight={target ? 'primary' : undefined} disabled={busy} onclick={() => settle(item, 'file')}>{target ? copy.fileItIn(listOf(target)) : copy.fileIt}</Button>
                         <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
                       </div>
                     </div>
@@ -1153,7 +1179,7 @@
       <div class="batch" role="region" aria-label={copy.inboxSelected(picked.size)}>
         <span class="batch-n num">{copy.inboxSelected(picked.size)}</span>
         {@render fileInto('row')}
-        <Button weight="primary" disabled={busy} onclick={() => settlePicked('file')}>{copy.inboxFileSelected(picked.size)}</Button>
+        <Button weight={target ? 'primary' : undefined} disabled={busy} onclick={() => settlePicked('file')}>{copy.inboxFileSelected(picked.size)}</Button>
         <Button weight="bare" disabled={busy} onclick={() => settlePicked('archive')}>{copy.inboxArchiveSelected(picked.size)}</Button>
         <Button weight="bare" onclick={() => ((picked = new Set()), (selecting = false))}>{copy.clearSelection}</Button>
       </div>
@@ -1343,6 +1369,15 @@
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
     line-height: 20px;
+  }
+
+  .way-unsigned {
+    grid-column: 2 / -1;
+    margin: 0 0 var(--sp-3);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    text-wrap: pretty;
   }
 
   .way-last {
