@@ -28,7 +28,7 @@
     oncapture?: OnCapture | undefined;
   } = $props();
 
-  const plan = $derived(capturePlan(block.rows));
+  const plan = $derived(capturePlan(block.rows, opts));
   const heading = $derived(plain(inline(block.heading ?? '', opts)).trim());
   const prompt = $derived(plan ? capturePrompt(heading, plan) : '');
   /* THE FIELD SAYS ITS OWN HEADING, so it is drawn alone: a tile reading "Add a task" over a field reading "Add a task"

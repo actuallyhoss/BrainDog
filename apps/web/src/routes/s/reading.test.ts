@@ -7,10 +7,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { AMOUNT_SPACE } from 'braindog-render';
+import { AMOUNT_SPACE, parse, toHTML } from 'braindog-render';
 
 import type { SharedBlock, SharedRow } from '../../lib/record/share-write.ts';
-import { cellSaid, durationSaid, figureSaid, headOf, moneySaid, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Where } from './reading.ts';
+import { cellSaid, durationSaid, figureSaid, headOf, moneySaid, noteOpts, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Where } from './reading.ts';
 
 const where: Where = { language: 'en-GB', zone: 'Europe/London', now: Date.parse('2026-10-15T12:00:00Z') };
 /** What a cell says, with the writer's own space between a code and its figure read as a plain one. */
@@ -152,4 +152,21 @@ test('a tool or a skill filed as a handle is said by its name, as the owner read
   assert.equal(said(cellSaid(row('fenwick'), { field: 'name' }, where)), 'Fenwick');
   assert.equal(said(cellSaid(row('kiln.example'), { field: 'name' }, where)), 'kiln.example');
   assert.equal(said(cellSaid(row('Fenwick deploy key'), { field: 'name' }, where)), 'Fenwick deploy key');
+});
+
+test('a shared note never links into the record, and keeps the links that leave it', () => {
+  const body = [
+    'See [the plan](/r/things/1), **[the list](/r/tasks)** and [the site](https://example.com).',
+    '',
+    '```link',
+    'Board | /r/projects/2',
+    'Docs | https://docs.example.com',
+    '```',
+  ].join('\n');
+  const html = toHTML(parse(body, { page: true }), noteOpts({ language: 'en', zone: 'UTC', now: Date.parse('2026-10-30T09:00:00Z') }));
+  assert.doesNotMatch(html, /href="\/r\//u);
+  assert.match(html, /the plan/u);
+  assert.match(html, /Board/u);
+  assert.match(html, /href="https:\/\/example\.com"/u);
+  assert.match(html, /href="https:\/\/docs\.example\.com"/u);
 });

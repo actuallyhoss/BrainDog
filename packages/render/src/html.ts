@@ -1373,7 +1373,7 @@ function section(b: Block, o: RenderOptions): string {
  * A block whose rows name no list draws an empty panel, which the parser never lets a fence reach.
  */
 function capture(b: Block, o: RenderOptions): string {
-  const plan = capturePlan(b.rows);
+  const plan = capturePlan(b.rows, o);
   if (!plan) return '<div class="capture"></div>';
   const said = plan.href
     ? `<a class="capture-where" href="${escape(hrefFor(o, plan.href))}">${escape(capturePromptFor(plan.label))}</a>`
@@ -2168,7 +2168,7 @@ function calendarStrip(b: Block, o: RenderOptions, weeks: number): string {
  * own would be an anchor inside an anchor. An address that leaves this BrainDog tells the page it came from nothing.
  */
 function links(b: Block, o: RenderOptions): string {
-  const lines = linkPlan(b.rows);
+  const lines = linkPlan(b.rows, o);
   if (lines.length === 0) return `<p class="links-empty">${escape(LINKS_NONE)}</p>`;
   const body = lines
     .map((l) => {

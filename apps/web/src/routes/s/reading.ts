@@ -44,6 +44,13 @@ export function headOf(got: SharedRead): { title: string; line: string } {
  */
 export type Where = { language: string; zone: string; now: number; home?: string | null };
 
+/**
+ * HOW THE OWNER'S NOTES ARE DRAWN HERE: in the record's clock, zone and home currency, and with no link into the record.
+ * No row or day is handed a link, and `links: 'away'` draws a path of the record the owner linked (in a note, a link list
+ * or a quick add) as its words, so only a link that leaves the record stays one (review 30 Oct, R10).
+ */
+export const noteOpts = (w: Where) => ({ now: w.now, zone: w.zone, home: w.home ?? null, links: 'away' as const });
+
 /** A value as it is drawn: words, or an amount in the parts `Money` sets. */
 export type Said = { text: string } | { money: Drawn & { text: string } };
 

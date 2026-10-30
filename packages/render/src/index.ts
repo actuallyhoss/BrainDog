@@ -212,7 +212,7 @@ export {
 } from './forecast.ts';
 export { forecastFigure } from './forecast.ts';
 export { addDays, daysBetween, shortDay } from './day-math.ts';
-export { UNNAMED, cellNamesNothing, inline, magnitudeOfCell, namesNothing, safeHref, text, type Inline, type InlineOptions, type Resolve } from './inline.ts';
+export { UNNAMED, cellNamesNothing, drawnLink, inline, magnitudeOfCell, namesNothing, safeHref, text, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,
   PRIMITIVES,

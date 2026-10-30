@@ -77,3 +77,10 @@ test('THE MIRROR HAS NO HOST TO ADD WITH, so it draws no field and no button: th
   assert.match(nowhere, /<p class="capture-elsewhere">Tasks cannot be added to from here\.<\/p>/u);
   assert.equal(CAPTURE_ADD, 'Add');
 });
+
+test('WHERE ONLY LINKS AWAY ARE DRAWN (a shared page), the list is named and not linked', () => {
+  const r = rows(['into', 'tasks', 'Tasks', '/r/tasks']);
+  assert.equal(capturePlan(r, { links: 'away' })?.href, null);
+  assert.equal(capturePlan(r)?.href, '/r/tasks');
+  assert.doesNotMatch(toHTML(parse(fence('into | tasks | Tasks | /r/tasks'), { page: true }), { links: 'away' }), /href=/u);
+});

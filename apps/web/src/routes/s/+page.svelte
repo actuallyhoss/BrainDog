@@ -42,7 +42,7 @@
     openOutside('https://brain.dog');
   };
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
-  import { cellSaid, figureSaid, headOf, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Shown, type Where } from './reading.ts';
+  import { cellSaid, figureSaid, headOf, noteOpts, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Shown, type Where } from './reading.ts';
   import Sparkline from '$lib/viz/Sparkline.svelte';
 
   /* THE ONE WORD THIS SCREEN ADDS: the action under a dead link. The rest are `share-write.ts`'s. */
@@ -90,11 +90,12 @@
   /**
    * THE OWNER'S NOTE, DRAWN AS THE APP DRAWS IT: the same parser and the same blocks a project's page uses, so a fence is
    * its chart, its chips or its steps and never its source. A fence the renderer could not read is left out, since its
-   * source is for the owner to mend and not for whoever holds the link. Nothing in it links: the renderer draws a row or
-   * a day as a link only where it is handed where to, and here it is handed nothing.
+   * source is for the owner to mend and not for whoever holds the link. Nothing in it links into the record (`noteOpts`):
+   * a link the owner wrote to a path of the record is drawn as its words. The answer names no other page's link, so no
+   * path is linked as one that is shared too.
    */
   const segmentsOf = (body: string) => parse(body, { page: true }).filter((s) => s.type !== 'degraded');
-  const opts = $derived({ now: where.now, zone: where.zone, home: where.home ?? null });
+  const opts = $derived(noteOpts(where));
 </script>
 
 <svelte:head>

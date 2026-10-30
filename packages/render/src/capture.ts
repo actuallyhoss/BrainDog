@@ -35,7 +35,7 @@
  * question being asked, so the read-only line does not repeat it either.
  */
 
-import { safeHref } from './inline.ts';
+import { drawnLink, safeHref, type InlineOptions } from './inline.ts';
 
 /** The kinds of row, by their first cell. Closed, because a row filed under neither is a fault. */
 export const CAPTURE_ROWS = ['into', 'set'] as const;
@@ -113,7 +113,7 @@ export type CapturePlan = {
  * list, and a drawer given null draws nothing inside the figure rather than a field that writes
  * nowhere.
  */
-export function capturePlan(rows: readonly { cells: readonly string[] }[]): CapturePlan | null {
+export function capturePlan(rows: readonly { cells: readonly string[] }[], opts: Pick<InlineOptions, 'links'> = {}): CapturePlan | null {
   const into = rows.find((r) => cell(r.cells, 0) === 'into');
   const register = into ? cell(into.cells, 1) : '';
   if (!REGISTER_ID.test(register)) return null;
@@ -125,7 +125,8 @@ export function capturePlan(rows: readonly { cells: readonly string[] }[]): Capt
     const value = cell(r.cells, 2);
     if (field !== '' && value !== '' && !Object.hasOwn(inherited, field)) inherited[field] = value;
   }
-  return { register, label: cell(into!.cells, 2) || register, href: ours(where) ? where : null, inherited };
+  /* WHERE ONLY LINKS AWAY ARE DRAWN (a shared page), the list is named and not linked (`InlineOptions.links`). */
+  return { register, label: cell(into!.cells, 2) || register, href: ours(where) ? drawnLink(where, opts) : null, inherited };
 }
 
 /** The field's placeholder and accessible name: the block's heading, or what the field is for. */

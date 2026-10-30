@@ -88,6 +88,14 @@ export type InlineOptions = {
    * the named, empty span a host without the set has always had.
    */
   iconSet?: () => Promise<unknown>;
+  /**
+   * `away`: a link is drawn only where it leaves the record, an https address or a mailto, and a path into the record
+   * is drawn as its words. A shared page passes it (review 30 Oct, R10): whoever holds its link is no reader of the
+   * record, so a link into it leads only to a sign-in, and a shared page never links into the record. It holds for a
+   * note's words, every cell drawn as words, a `link` list and a `capture`'s "add it there". Absent, every safe link
+   * is drawn.
+   */
+  links?: 'away';
 };
 
 /**
@@ -150,6 +158,10 @@ export function safeHref(href: string): string | null {
   if (/^https:\/\//i.test(h) || /^mailto:/i.test(h)) return h;
   return null;
 }
+
+/** A safe address as `opts` draw it: `null` for one that stays in the record where only links away are drawn (`links`). */
+export const drawnLink = (href: string | null, opts: Pick<InlineOptions, 'links'>): string | null =>
+  href !== null && opts.links === 'away' && !/^(?:https:\/\/|mailto:)/iu.test(href) ? null : href;
 
 /**
  * `{{money:<path>}}` OVER A FIGURE THE HOST ALREADY WROTE: a money figure or a row's money field is answered as the
@@ -432,10 +444,13 @@ function tokens(text: string, opts: InlineOptions, held = false): Inline[] {
         const raw = end === -1 ? null : text.slice(shut + 2, end);
         if (raw !== null && !/\s/u.test(raw)) {
           const label = text.slice(i + 1, shut);
-          const href = safeHref(raw);
+          const safe = safeHref(raw);
+          const href = drawnLink(safe, opts);
           push();
           // A link the host cannot resolve is plain text, not a dead anchor (36 §13 D16).
           if (href) out.push({ type: 'link', href, body: tokens(label, opts, held) });
+          // A path into the record where only links away are drawn is its words, as the author wrote them (`links`).
+          else if (safe) out.push(...tokens(label, opts, held));
           else out.push({ type: 'text', text: label });
           i = end + 1;
           continue;

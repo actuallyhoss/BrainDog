@@ -17,7 +17,7 @@
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
-  const lines = $derived(linkPlan(block.rows));
+  const lines = $derived(linkPlan(block.rows, opts));
 </script>
 
 <!-- A GLYPH AS `glyphSvg` IN `src/html.ts` DRAWS ONE: one 24 box, stroked in the words' colour. -->

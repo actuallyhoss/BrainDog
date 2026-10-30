@@ -18,7 +18,7 @@
  * What is drawn under the title is the address's own host, read off the text.
  */
 
-import { glyphName, safeHref } from './inline.ts';
+import { drawnLink, glyphName, safeHref, type InlineOptions } from './inline.ts';
 
 /** The sentence the parser degrades a block with when a row's address is none of the three. */
 export const LINK_ADDRESS = 'A link is an https address, a mailto or a path of this BrainDog.';
@@ -81,10 +81,11 @@ export type LinkLine<R> = { row: R; title: string; href: string | null; host: st
  * is a public type a host can build by hand. A row with no title is titled by its address, so no link is ever drawn
  * with nothing to press.
  */
-export function linkPlan<R extends { cells: readonly string[] }>(rows: readonly R[]): LinkLine<R>[] {
+export function linkPlan<R extends { cells: readonly string[] }>(rows: readonly R[], opts: Pick<InlineOptions, 'links'> = {}): LinkLine<R>[] {
   return rows.map((row) => {
     const url = (row.cells[1] ?? '').trim();
-    const href = url === '' ? null : linkHref(url);
+    /* WHERE ONLY LINKS AWAY ARE DRAWN (a shared page), a path into the record is the title alone (`InlineOptions.links`). */
+    const href = url === '' ? null : drawnLink(linkHref(url), opts);
     const title = (row.cells[0] ?? '').trim();
     return {
       row,
