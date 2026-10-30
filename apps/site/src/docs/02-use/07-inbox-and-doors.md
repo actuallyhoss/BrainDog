@@ -1,10 +1,10 @@
 # The inbox and doors
 
-Things arrive in your record on their own: forwarded mail, bank texts, what a phone or another service posts, what a connected service reports. A rule files what it recognises into the right list. Anything no rule claims waits in the Inbox for you.
+Things arrive in your BrainDog on their own: forwarded mail, bank texts, what a phone or another service posts, what a connected service reports. A rule files what it recognises into the right list. Anything no rule claims waits in the Inbox for you.
 
 ## Ways in
 
-```comparison | How things reach your record
+```comparison | How things reach your BrainDog
 Door | What sends to it | Where you set it up
 Forwarded mail | A forwarding rule at your mail provider | Settings, under Ingest
 A web address | A phone shortcut, a script, another service's webhook | Automations, under Doors, and Settings, under Ingest
@@ -20,7 +20,7 @@ Point a forwarding rule at it | Your mail provider posts each message to the add
 Watch the Inbox | Each message arrives as a row in the Inbox, until a rule files it | In the Inbox
 ```
 
-One record takes one mail address at a time. Making a new address replaces the old one, which is also how you deal with one that has leaked. **Stop taking forwarded mail** turns it off, and anything still posted to the old address is refused.
+Your BrainDog takes one mail address at a time. Making a new address replaces the old one, which is also how you deal with one that has leaked. **Stop taking forwarded mail** turns it off, and anything still posted to the old address is refused.
 
 A message whose forwarder did not report that the sender passed the mail checks (DKIM or SPF) is kept unfiled, rather than matched against your rules.
 

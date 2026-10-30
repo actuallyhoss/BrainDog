@@ -4,14 +4,14 @@ An automation starts on a change, an arrival, a clock, a figure, a decision or a
 
 ## Everything that runs by itself
 
-**Automations** in the sidebar is one place for everything your record does on its own, in five tabs:
+**Automations** in the sidebar is one place for everything BrainDog does on its own, in five tabs:
 
 ```comparison | The five tabs
 Tab | What it lists
 Automations | What you and your agents drew: a trigger, then steps
 Scheduled | Actions that fetch from, call or watch a web address on a clock, and write what they get to a list
 Scripts | Your scripts, with their logs, versions and what each may read, write and fetch
-Doors | The web addresses your record takes things in at
+Doors | The web addresses BrainDog takes things in at
 Runs | Every run of an automation, a scheduled action or a script, newest first, with what it said
 ```
 
@@ -71,12 +71,12 @@ Each run is listed with its state: waiting to start, running, waiting, done, fai
 
 ## Scheduled actions
 
-A scheduled action fetches from, calls or watches a web address on a clock, and files what it gets in your record. It says when it last ran and when it runs next. When something goes wrong it says what, in a way you can act on:
+A scheduled action fetches from, calls or watches a web address on a clock, and files what it gets in your BrainDog. It says when it last ran and when it runs next. When something goes wrong it says what, in a way you can act on:
 
 - the other service did not answer, and it tries again on its own;
 - the service turned the key away, and it is paused until you reconnect the key;
 - the key is not in the Keychain, and it is paused until you add it;
-- the record has used its allowance for the month, and it waits for next month.
+- this month's allowance is used up, and it waits for next month.
 
 Press **Resume** on a paused action to run it again.
 

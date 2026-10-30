@@ -60,7 +60,7 @@ Exchange rates | What one currency is worth in another
 
 ## Books: yours and a company's apart
 
-If you keep your own money and a company's in one record, put each in its own book. Every list that holds money can say which book a row is in, and each book has its own page under Money, with its own Cash now. The main page shows what you have by book, so one Cash now never mixes two people's money.
+If you keep your own money and a company's in one BrainDog, put each in its own book. Every list that holds money can say which book a row is in, and each book has its own page under Money, with its own Cash now. The main page shows what you have by book, so one Cash now never mixes two people's money.
 
 ## More than one currency
 
@@ -81,8 +81,8 @@ Money comes with rules that ask before they act:
 - Type it: press **+** for a payment, or add an account on Accounts.
 - Connect Stripe or Mercury from Add-ons, and balances and transactions arrive on their own. See [The inbox and doors](/docs/use/inbox-and-doors).
 - Forward card alerts or bank texts, and teach a rule to file them.
-- **Count the cash**, an add-on, writes down what is actually in a cash box or account and puts the difference from what the record expected into the ledger.
+- **Count the cash**, an add-on, writes down what is actually in a cash box or account and puts the difference from what BrainDog expected into the ledger.
 
 ## Ask about it
 
-Press / and ask what you owe this month, or what went on travel in August. Slash answers from these lists and shows the rows it read.
+Press Ctrl+J (⌘J on a Mac) and ask what you owe this month, or what went on travel in August. Slash answers from these lists and shows the rows it read.

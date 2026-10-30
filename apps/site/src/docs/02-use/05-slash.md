@@ -1,6 +1,6 @@
 # Slash
 
-Slash is the assistant built into every record. Ask it what you spent on food this month and it looks it up and answers with your numbers. Ask it to add a task or change a row and it does, with an undo. Anything with money, keys, sharing or deletes waits for your yes.
+Slash is the assistant built into BrainDog. Ask it what you spent on food this month and it looks it up and answers with your numbers. Ask it to add a task or change a row and it does, with an undo. Anything with money, keys, sharing or deletes waits for your yes.
 
 ## Ask
 
@@ -13,17 +13,17 @@ Read the answer | Short, with your figures, and each row it names links to that 
 Ask a follow-up | "And last month?" carries on the same conversation | In the same field
 ```
 
-Every figure in an answer comes from your record. A figure Slash could not find there is taken out, and the answer says so. When nothing in the record answers the question, Slash says that rather than guessing.
+Every figure in an answer comes from your BrainDog. A figure Slash could not find there is taken out, and the answer says so. When nothing in BrainDog answers the question, Slash says that rather than guessing.
 
 Opened with nothing typed, Slash shows what matters now, or a few questions that fit the page you are on. The **Slash** page in the sidebar lists your conversations, newest first, on every device; open one to carry on.
 
 ## Ask for a change
 
-Ask Slash to add a task, change a field, add a person, or draft a page or a rule. What you asked for and can be undone happens at once, with a receipt and **Undo** for a few seconds, and it stays in your history. A change that touches money, keys, sharing, deletes or add-ons comes back as a card instead: press Enter to do it, or Esc to leave it. A draft page or rule waits in [Needs you](/docs/use/decide) until you accept it. When Slash read text from outside your record, such as mail or an import, it asks before every change in that conversation.
+Ask Slash to add a task, change a field, add a person, or draft a page or a rule. What you asked for and can be undone happens at once, with a receipt and **Undo** for a few seconds, and it stays in your history. A change that touches money, keys, sharing, deletes or add-ons comes back as a card instead: press Enter to do it, or Esc to leave it. A draft page or rule waits in [Needs you](/docs/use/decide) until you accept it. When Slash read text from outside your BrainDog, such as mail or an import, it asks before every change in that conversation.
 
 ## What Slash notices
 
-Slash reads how your record is used and says what it noticed, such as a list that keeps growing or a question you keep asking. Under that are its suggestions, each marked as new, waiting in Needs you, or answered. One press puts the new ones in Needs you and changes nothing else. Only the owner can accept them.
+Slash reads how you use BrainDog and says what it noticed, such as a list that keeps growing or a question you keep asking. Under that are its suggestions, each marked as new, waiting in Needs you, or answered. One press puts the new ones in Needs you and changes nothing else. Only the owner can accept them.
 
 Slash also does quieter work in the background: the inbox's patterns, a digest's summary, the question an automation asks it. That work has its own allowance and never spends your asks.
 
@@ -45,8 +45,8 @@ In Settings, under Agents, the owner can give Slash a key from a model provider 
 
 ```comparison | Slash, and your agents
 Question | Slash | Your agents
-Where it lives | In every record. Press / | Claude, Codex, Cursor and any MCP client you connect
-What it reads | Your record | What the key or sign-in you gave it allows
+Where it lives | In BrainDog. Press Ctrl+J (⌘J) | Claude, Codex, Cursor and any MCP client you connect
+What it reads | Your BrainDog | What the key or sign-in you gave it allows
 What it writes | What you ask for, with an undo; money, keys, sharing and deletes wait for your yes | Proposals for you to decide, or rows directly, as you allowed
 Who pays for it | Your plan's asks, or your own key | Your agent's own provider
 ```

@@ -60,9 +60,9 @@ Press p on a list to peek at a row without leaving the list, o to open the list 
 
 ## History
 
-**History** in the sidebar lists every change to the record: who made it, what kind of change it was, and when. Filter it by who, by kind or by day. It has no delete button, because a history that can be edited is not a record.
+**History** in the sidebar lists every change in your BrainDog: who made it, what kind of change it was, and when. Filter it by who, by kind or by day. It has no delete button, because a history that can be edited cannot be trusted.
 
-Every change moves the record's version by one, so a version names a moment.
+Every change moves BrainDog's version on by one, so a version names a moment.
 
 ## Where lists come from
 
