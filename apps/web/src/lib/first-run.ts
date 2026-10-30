@@ -131,11 +131,13 @@ export const firstRun = {
    * own lists by their own names (`made.ts` `agentThings`): "It sees your orders and clients" on a shop, as the vision
    * says it (use case 6, step 6), and the house words below only where a list is named by its id alone.
    */
-  agentName: 'Claude Code',
+  /* CLAUDE, THE APP, AND NOT CLAUDE CODE (first-hour audit E22): a bakery was offered a terminal tool "that sees your
+     projects". The connect sheet still holds every other way in, Claude Code among them. */
+  agentName: 'Claude',
   agentFinds: (things: readonly string[]) =>
     things.length === 0
-      ? 'It sees what you keep here before it starts, and leaves what it did when it stops.'
-      : `It sees your ${andOf(things)} before it starts, and leaves what it did when it stops.`,
+      ? 'Ask it about what you keep here, from the Claude app.'
+      : `Ask it about your ${andOf(things)}, from the Claude app.`,
   agentProjects: 'projects',
   /* THE HOUSE WORDS SAY WHAT A LIST HOLDS, never a list's id, so a list named by its id alone reads in words. */
   agentPeople: 'the people you work with',
