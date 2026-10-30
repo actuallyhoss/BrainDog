@@ -23,6 +23,7 @@ const SUMMARY = 'Its card says what it is for in one short line. Nothing in your
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.8.0', notes: 'Personal no longer counts how many days running you logged something. What you logged this week still shows against each habit. Nothing you hold changes.' },
     { version: '2.7.0', notes: 'Personal counts your streak: how many days running you logged something. Nothing you hold changes.' },
     { version: '2.6.1', notes: SUMMARY },
     { version: '2.6.0', notes: 'A new Personal record starts with Money and the Projects it points at. People comes when you name someone, and anything else when you add it. A record you already have keeps everything it holds, and nothing on its pages changes.' },
@@ -31,6 +32,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '2.3.1', notes: NAMED('Ledger') },
   ],
   student: [
+    { version: '1.6.2', notes: 'Home calls your study by day Study done. It counts no streak. Nothing you hold changes.' },
     { version: '1.6.1', notes: SUMMARY },
     { version: '1.6.0', notes: 'Studies is part of Student now: a piece of work can carry a mark as a number, and a reading list of books and papers sits beside your courses.' },
     { version: '1.5.1', notes: NAMED('Courses') },

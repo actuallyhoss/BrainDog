@@ -68,7 +68,7 @@ test('a live run goes on top, as Jobs puts it', () => {
 });
 
 test('the words for each state', () => {
-  assert.equal(stateOf(run({ status: 'queued' })).word, 'Waiting for a machine');
+  assert.equal(stateOf(run({ status: 'queued' })).word, 'Waiting for your computer to pick it up');
   assert.equal(stateOf(run({ status: 'claimed' })).word, 'Working');
   assert.equal(stateOf(run({ status: 'ok' })).word, 'Done');
   assert.equal(stateOf(run({ status: 'cancelled' })).word, 'Stopped');

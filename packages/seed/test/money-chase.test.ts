@@ -109,7 +109,7 @@ test('a late invoice is asked about, and "Chase it" writes the day it was chosen
   const late = m.invoice();
   const chased = await m.chase(late);
   assert.equal(chased.fields.chased, '2026-11-10', 'the day somebody chose to chase is not on the invoice');
-  assert.deepEqual(notes(m, late), ['You chose to chase this in Decide.']);
+  assert.deepEqual(notes(m, late), ['You chose to chase this in Needs you.']);
   m.sql.close();
 });
 

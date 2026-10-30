@@ -501,7 +501,9 @@
       views: Object.fromEntries(Object.entries(rail.views).map(([key, list]) => [key, list.map((v) => ({ href: v.href, label: v.title, icon: 'doc' }))])),
       /* THE AGENTS' TOOLS ARE THE AGENTS': what runs by itself, and the keys they use. */
       tools: [
-        { href: '/automations', label: copy.automations, icon: 'refresh', home: placed.at.agents ?? IN_MORE },
+        /* A SCRIPT'S PAGE IS AUTOMATIONS' TOO (its Scripts tab), so it lights this row and its crumb reads "Agents ›
+           Automations › <script>" where it was the title alone (audit 6g, AG30). */
+        { href: '/automations', label: copy.automations, icon: 'refresh', home: placed.at.agents ?? IN_MORE, near: ['/scripts'] },
         { href: '/keychain', label: copy.keysPlace, icon: 'vault', home: placed.at.agents ?? IN_MORE },
       ],
       foot,

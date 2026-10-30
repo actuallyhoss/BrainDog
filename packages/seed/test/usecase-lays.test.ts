@@ -312,6 +312,12 @@ const LAID: Record<string, Laid> = {
     declares: '5719e519311f68f0',
     history: ['2.7.0 lays what 2.6.1 laid, word for word: it adds its own `metric.log-streak` and nothing it lays moved -> 5719e519311f68f0'],
   },
+  /* 2.8.0, THE STREAK FIGURE GONE AGAIN (audit 6g, AG12): it lays what 2.7.0 laid, word for word. */
+  'personal@2.8.0': {
+    lays: ['hands metric.budgets-set to money-core'],
+    declares: '5719e519311f68f0',
+    history: ['2.8.0 lays what 2.7.0 laid, word for word: it takes its own `metric.log-streak` away and nothing it lays moved -> 5719e519311f68f0'],
+  },
 };
 
 /** What is wrong with one use case's document against `LAID`, as sentences. Empty when nothing is. */

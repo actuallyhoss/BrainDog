@@ -71,6 +71,7 @@
   }
 
   .pres-dot[data-live='waiting'],
+  .pres-dot[data-live='quiet'],
   .pres-dot[data-live='held'] {
     background: var(--ink-3);
   }

@@ -259,7 +259,7 @@ test('one press is the answer, and a reason is asked for only when the record as
   const snippetAt = page.indexOf('{#snippet answer(');
   const snippet = page.slice(snippetAt, page.indexOf('{/snippet}', snippetAt));
   assert.ok(snippetAt >= 0, 'the one answer button is no longer one snippet');
-  assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={(lead ?? (marked || (suggestedKey === undefined && option.key === 'accept'))) ? 'primary' : undefined}"], 'the filled answer is not the suggested one, or Accept where nothing is suggested');
+  assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={(lead ?? (marked || (suggestedKey === undefined && option.key === 'accept'))) && !hardly(option.key) ? 'primary' : undefined}"], 'the filled answer is not the suggested one, or Accept where nothing is suggested, or it is one that cannot be undone (audit 6g, AG11)');
   const pickAt = page.indexOf('function pick(key: string) {');
   assert.doesNotMatch(page.slice(pickAt, page.indexOf('\n  }\n', pickAt)), /send\(/u, 'a choice sends its answer before Needs you');
   const pressAt = page.indexOf('async function press(key: string) {');

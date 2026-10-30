@@ -946,7 +946,16 @@ function argOf(verb: Verb, a: GrammarArg): Arg {
 const notPicked = (label: string): string => `${label} is not picked yet.`;
 
 /** A step's arguments as the inspector draws them, in the grammar's order. None for a verb the grammar does not hold. */
-export const argsFor = (verb: Verb, g: FlowGrammar | null = held()): Arg[] => (grammarStep(verb, g)?.args ?? []).map((a) => argOf(verb, a));
+export const argsFor = (verb: Verb, g: FlowGrammar | null = held()): Arg[] =>
+  (grammarStep(verb, g)?.args ?? []).filter((a) => !arm(verb, a.name)).map((a) => argOf(verb, a));
+
+/**
+ * A BRANCH'S `then` AND `else` ARE ITS ARMS, drawn as the cards under "If so" and "If not" and held on the card's node
+ * (`nodesOf`), never as a box to fill. Read as arguments, the required `then` was looked for on the `if` step it had
+ * been taken off, so every saved branch said "Then is not picked yet." in red over a rule that ran (audit 6g, AG3). A
+ * branch with nothing under it is the record's to say (`checkAutomation`).
+ */
+const arm = (verb: Verb, name: string): boolean => verb === 'if' && (name === 'then' || name === 'else');
 
 /**
  * `ARGS[verb]`, READ FROM THE TAB'S GRAMMAR AT EACH LOOK, for the inspector, which indexes it. It holds nothing of its
@@ -1301,8 +1310,46 @@ const idsSaid = (text: string, register?: string): string =>
     )
     .join('');
 
-/** A reference as a card names it: `{{counterparty_text}}`, the item's own field, by its name; `{{vars.rate}}` as `rate`. */
-const refText = (path: string): string => (path.includes('.') ? (path.split('.').pop() ?? path) : fieldName(path));
+/**
+ * A reference as a card names it: `{{counterparty_text}}`, the item's own field, by its name; `{{vars.rate}}` as `rate`.
+ *
+ * AND A FORM BY WHAT IT STANDS FOR (audit 6g, AG3). A chip read `short:amount`, `on:due`, `ago:due` and
+ * `short:amount paid so far`, and "Set chasing since to day" stood for the day the run started: now "the amount", "the
+ * due day", "how long ago", "the amount less Paid so far" and "the day it ran", so a chip reads as what goes there.
+ */
+const refText = (path: string): string => {
+  const p = path.trim();
+  const said = TRIGGER_SAID[p];
+  if (said !== undefined) return said;
+  if (p.includes('.')) return p.split('.').pop() ?? p;
+  const form = /^([a-z]+):(.+)$/u.exec(p);
+  if (form === null) return fieldName(p);
+  const [, kind, rest] = form as unknown as [string, string, string];
+  const [first = rest, less] = rest.split('-');
+  const name = fieldSaid(first);
+  switch (kind) {
+    case 'money':
+    case 'short':
+      return less === undefined ? `the ${name}` : `the ${name} less ${fieldSaid(less)}`;
+    case 'on':
+      return /\b(?:day|date)\b/iu.test(name) ? `the ${name}` : `the ${name} day`;
+    case 'ago':
+      return 'how long ago';
+    case 'until':
+      return 'how long until then';
+    case 'pct':
+      return `the ${name} as a share`;
+    default:
+      return `the ${name}`;
+  }
+};
+
+/** What a run hands every step, as a card says it. */
+const TRIGGER_SAID: Readonly<Record<string, string>> = {
+  'trigger.day': 'the day it ran',
+  'trigger.option': 'the answer',
+  'trigger.at': 'when it ran',
+};
 const andList = (items: readonly string[], joint = 'and'): string =>
   items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${joint} ${items[items.length - 1]}`;
 const cap = (s: string): string => (s === '' ? s : s[0]!.toUpperCase() + s.slice(1));
@@ -1353,10 +1400,108 @@ export function sayCondition(cond: unknown, register?: string): string {
 }
 
 function conditionWords(cond: unknown, register?: string): string {
-  if (typeof cond === 'string') return mark(idsSaid(cond.trim(), register));
+  if (typeof cond === 'string') return mark(daysSaid(idsSaid(cond.trim(), register)));
   const leaf = leafOf(cond);
   if (leaf) return `${fieldNamed(leaf.field, register)} ${COMPARE.find((c) => c.op === leaf.op)!.said} ${leaf.value}`;
-  return isObject(cond) ? 'the condition holds' : '';
+  if (!isObject(cond)) return '';
+  return treeWords(cond, register) ?? 'the condition holds';
+}
+
+/**
+ * A CONDITION TREE IN WORDS (audit 6g, AG3). Any tree the builder did not make was said "the condition holds", so
+ * Money's own chase, whose draft is written only "where there is none, and not on an invoice paid in part", read "If the
+ * condition holds, then if the condition holds". Each leaf is its field and test, "Draft to send is empty", an enum by
+ * its label, and the groups join them: `all` with and, `any` with or, `none` as not. `null` for a leaf no test here says,
+ * and the whole is then the old words rather than half a sentence.
+ */
+function treeWords(cond: unknown, register?: string): string | null {
+  if (!isObject(cond)) return null;
+  const group = 'all' in cond ? 'all' : 'any' in cond ? 'any' : 'none' in cond ? 'none' : null;
+  if (group !== null) {
+    const kids = cond[group];
+    if (!Array.isArray(kids) || kids.length === 0) return null;
+    const said = kids.map((k) => treeWords(k, register));
+    if (said.some((w) => w === null)) return null;
+    const words = said as string[];
+    if (group === 'all') return andList(words);
+    if (group === 'any') return andList(words, 'or');
+    /* NOT, said over the one thing it takes back: "not both A and B" for a pair, "neither A nor B" for two leaves. */
+    if (words.length === 1) {
+      const only = kids[0];
+      if (isObject(only) && Array.isArray(only.all) && only.all.length === 2) return `not both ${words[0]}`;
+      if (isObject(only) && ('all' in only || 'any' in only || 'none' in only)) return `not (${words[0]})`;
+      return `not ${words[0]}`;
+    }
+    return words.length === 2 ? `neither ${words[0]} nor ${words[1]}` : `none of ${andList(words, 'or')}`;
+  }
+  if (typeof cond.field !== 'string') return null;
+  const ops = Object.keys(cond).filter((k) => k !== 'field' && k !== 'via');
+  if (ops.length !== 1) return null;
+  const op = ops[0]!;
+  const v = cond[op];
+  const field = fieldNamed(cond.field, register);
+  const value = (x: unknown): string => valueSaid(cond.field as string, x, register);
+  switch (op) {
+    case 'empty':
+      return `${field} is ${v === false ? 'set' : 'empty'}`;
+    case 'present':
+      return `${field} is ${v === false ? 'empty' : 'set'}`;
+    case 'is':
+      return `${field} is ${value(v)}`;
+    case 'not':
+      return `${field} is not ${value(v)}`;
+    case 'in':
+      return Array.isArray(v) ? `${field} is ${andList(v.map(value), 'or')}` : null;
+    case 'not_in':
+      return Array.isArray(v) ? `${field} is not ${andList(v.map(value), 'or')}` : null;
+    case 'before':
+    case 'after':
+      return daysSaid(`${field} ${op} ${value(v)}`);
+    case 'contains':
+      return `${field} contains ${value(v)}`;
+    case 'starts':
+      return `${field} starts with ${value(v)}`;
+    case 'ends':
+      return `${field} ends with ${value(v)}`;
+    case 'has':
+      return `${field} has ${value(v)}`;
+    case 'lacks':
+      return `${field} lacks ${value(v)}`;
+    default: {
+      const c = COMPARE.find((x) => x.op === op);
+      return c && typeof v === 'number' ? `${field} ${c.said} ${v}` : null;
+    }
+  }
+}
+
+/** A value in a condition as the list shows it: an enum by its label, lower case unless it is a name, else as written. */
+function valueSaid(fieldId: string, v: unknown, register?: string): string {
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  if (typeof v === 'number') return String(v);
+  if (typeof v !== 'string') return '';
+  const decls = register && REGISTERS[register] ? [REGISTERS[register]] : Object.values(REGISTERS);
+  for (const r of decls) {
+    const label = (r?.fields.find((f) => f.id === fieldId) as { labels?: Record<string, string> } | undefined)?.labels?.[v];
+    if (label) return /^[A-Z][A-Z]/u.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
+  }
+  return v.replace(/_/gu, ' ');
+}
+
+const DAY_NOUN: Readonly<Record<string, string>> = { d: 'day', w: 'week', m: 'month', y: 'year' };
+
+/**
+ * A day counted from today, said: `due before -7d` is "Due more than 7 days ago", `renews before +15d` "Renews less than
+ * 15 days from now", a bare `-7d` "7 days ago". A card had printed "Due before -7d" (audit 6g, AG3).
+ */
+function daysSaid(text: string): string {
+  const span = (n: string, u: string): string => `${n} ${DAY_NOUN[u]}${n === '1' ? '' : 's'}`;
+  return text
+    .replace(/\bbefore -(\d+)([dwmy])\b/gu, (_, n: string, u: string) => `more than ${span(n, u)} ago`)
+    .replace(/\bafter -(\d+)([dwmy])\b/gu, (_, n: string, u: string) => `in the last ${span(n, u)}`)
+    .replace(/\bbefore \+(\d+)([dwmy])\b/gu, (_, n: string, u: string) => `less than ${span(n, u)} from now`)
+    .replace(/\bafter \+(\d+)([dwmy])\b/gu, (_, n: string, u: string) => `more than ${span(n, u)} from now`)
+    .replace(/(^|\s)-(\d+)([dwmy])\b/gu, (_, lead: string, n: string, u: string) => `${lead}${span(n, u)} ago`)
+    .replace(/(^|\s)\+(\d+)([dwmy])\b/gu, (_, lead: string, n: string, u: string) => `${lead}${span(n, u)} from now`);
 }
 
 /** Words matched as they are written, for a pattern built around them. */
@@ -1374,10 +1519,10 @@ const clausesJoined = (cond: string): string => (/\s(?:and|or)\s/u.test(cond) ? 
  * ONE "only when" (VERIFY H30): the fields that must change and the condition are one list, "only when Account
  * changes, Account is set and Book is empty", where it said "only when" twice.
  */
-export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
+export function sayStart(d: Draft, listSaid?: (id: string) => string, ruleSaid?: (id: string) => string): string {
   const filed = conditionOf(d);
   const cond = filed === null ? '' : clausesJoined(sayCondition(filed, 'written' in d.trigger ? (d.trigger.written.register ?? undefined) : undefined));
-  if (cond === '') return sayTrigger(d.trigger, listSaid);
+  if (cond === '') return sayTrigger(d.trigger, listSaid, ruleSaid);
   if ('written' in d.trigger && d.trigger.written.fields?.length) {
     const w = d.trigger.written;
     const p = writtenParts(w, listSaid);
@@ -1387,7 +1532,7 @@ export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
     if (set && !/\s(?:and|or)\s/u.test(set[1]!)) return `When an item in ${w.register ? (listSaid ?? ((id: string) => id))(w.register) : 'a list'} has its ${p.changes} set to ${set[1]}${p.rules}`;
     return `${p.said}, only when ${p.changes} changes, ${cond}${p.rules}`;
   }
-  return `${sayTrigger(d.trigger, listSaid)}, only when ${cond}`;
+  return `${sayTrigger(d.trigger, listSaid, ruleSaid)}, only when ${cond}`;
 }
 
 /** A written trigger's three parts: what is written where, the fields that must change, and whether other automations count. */
@@ -1406,7 +1551,7 @@ function writtenParts(w: Extract<Trigger, { written: unknown }>['written'], list
  * `listSaid` IS WHAT A LIST IS CALLED, for a caller that knows: the hub's rows hand it the shell's names, so a row says
  * "an item in Instalments" as the rail does and never the list's id. Without it the list is said as it was written.
  */
-export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) => id): string {
+export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) => id, ruleSaid?: (id: string) => string): string {
   if ('written' in t) {
     const p = writtenParts(t.written, listSaid);
     return `${p.said}${p.changes ? `, only when ${p.changes} changes` : ''}${p.rules}`;
@@ -1432,10 +1577,13 @@ export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) =
         ? `When ${figure} falls to ${c.lte} or below`
         : `When ${figure} reaches ${c.gte} or above`;
   }
-  /* THE QUESTION IS NAMED BY THE AUTOMATION THAT PUT IT, without the `rule.` an id carries, and the answer in quotes,
-     because it is matched as written. */
+  /* THE QUESTION IS NAMED BY THE AUTOMATION THAT PUT IT, by its name where the caller knows it ("Chase late payments",
+     audit 6g AG3) and else its id without the `rule.` in words, and the answer in quotes, because it is matched as
+     written. */
   if ('decided' in t) {
-    const about = t.decided.about ? ` from ${t.decided.about.replace(/^[a-z]+\./u, '').replace(/[-_]/gu, ' ')}` : '';
+    const bare = t.decided.about ? t.decided.about.replace(/^[a-z]+\./u, '') : '';
+    const named = bare === '' ? '' : (ruleSaid?.(bare) ?? bare.replace(/[-_]/gu, ' '));
+    const about = named !== '' ? ` from ${named}` : '';
     const option = t.decided.option ? `, when the answer is "${t.decided.option}"` : '';
     return `When a question${about} is decided in Needs you${option}`;
   }
@@ -1481,6 +1629,25 @@ export function learnScripts(rows: readonly { script: string; title: string }[])
 
 /** What a person calls a script: its declared title when the record has said it, else its id in words. A reference (`{{vars.which}}`) is left as the reference it is. */
 export const scriptName = (id: string): string => SCRIPT_TITLES.get(id) ?? (id.includes('\u0002') ? id : idWords(id));
+
+/**
+ * ONE CARD AS THE RULE'S WHOLE SENTENCE SAYS IT (audit 6g, AG3). A branch said only "if the condition holds", so the
+ * sentence under a rule's title ended "if the condition holds, then if the condition holds."; it now says what happens
+ * under it, "if Draft to send is empty …, write Draft to send", and a set whose words run long is said by the field it
+ * writes, since the card under the sentence holds the words.
+ */
+export function sayInWhole(n: Node, own = ''): string {
+  const lower = (t: string): string => (/^[A-Z][a-z]/u.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+  if (!isBranch(n)) {
+    const field = str(getAt(n.step, ['set', 'field']));
+    const to = str(getAt(n.step, ['set', 'to']));
+    if (verbOf(n.step) === 'set' && field !== '' && to.length > 40) return `Write ${fieldSaid(field)}`;
+    return sayStep(n.step, own);
+  }
+  const so = (n.then ?? []).map((t) => lower(sayInWhole(t, own)));
+  const not = (n.else ?? []).map((t) => lower(sayInWhole(t, own)));
+  return `${sayStep(n.step, own)}, ${so.length > 0 ? andList(so) : 'do nothing'}${not.length > 0 ? `, and if not, ${andList(not)}` : ''}`;
+}
 
 /** What one step does, in one line, with no braces. */
 /** `own` is the title of the automation the step sits in: a script step that would only repeat it says what it does instead. */

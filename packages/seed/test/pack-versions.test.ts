@@ -968,9 +968,10 @@ const DECLARED: Record<string, Version> = {
       rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
       setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
     `,
-    declares: '33693ab8adbbf728',
+    declares: 'f0fd333b99e642ce',
     history: [
       'Estate 2.6.1 of 30 October (audit 2, B14): `rule.renew-soon` asks only about a service that costs more than nothing, and `rule.renewal-kept` and `rule.renewal-cancelled` are named for what they do, since the answers read them as their reasons; no id added or taken away -> 33693ab8adbbf728',
+      'Estate 2.6.1, folded before it shipped (audit 6g, AG3): the notes `rule.renewal-kept` and `rule.renewal-cancelled` leave say Needs you, the place, where they said Decide; no id added or taken away -> f0fd333b99e642ce',
     ],
   },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */

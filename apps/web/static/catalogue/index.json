@@ -8538,8 +8538,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.7.0",
+      "latest": "2.8.0",
       "versions": [
+        {
+          "version": "2.8.0",
+          "checksum": "4a956f16d69c877cfbff5ef0d03b7131ef885a26b66dbe2fc11909ad6ef4960f",
+          "bytes": 32033,
+          "published_at": "2026-10-30T23:26:34.376Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Log",
+              "Put by",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.7.0",
           "checksum": "8f8d2f9b0d9d93dc5af63c9a3d5f2ba5a320534b1c808f763e31aef11ee96103",
@@ -9000,8 +9032,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.6.1",
+      "latest": "1.6.2",
       "versions": [
+        {
+          "version": "1.6.2",
+          "checksum": "db29c064dd8ee98e2c224e22aaaa95632e7cb0d66cde4ee2df93123bc7fd0b81",
+          "bytes": 16560,
+          "published_at": "2026-10-30T23:26:34.376Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Study sessions",
+              "Reading list"
+            ],
+            "pages": [
+              "Today",
+              "Studies"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "study-planner"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.6.1",
           "checksum": "1c17b17c0688bdac3bd7437914f6440ac7e5673c7e1e8bd889412e502a133b6b",

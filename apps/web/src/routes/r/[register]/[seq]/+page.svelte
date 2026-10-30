@@ -715,7 +715,8 @@
   /* THE ROW IS IN ONE OF ITS LIST'S FINISHED STATES: "Paid", "Cleared", "Done". */
   const done = $derived(tone === 'good');
   /* WHAT FINISHES IT, where it is still open and the reader may change it: the head's one primary (`finishOf`). */
-  const finish = $derived(changes && !archived ? finishOf(decl, stateValue) : null);
+  /* NONE ON AN AGENT'S RUN, which ends itself or is stopped from its live row (`row-finish.ts`, audit 6g AG10). */
+  const finish = $derived(changes && !archived && id !== 'session' ? finishOf(decl, stateValue) : null);
   /* WHERE ITS LIST DRAWS IT, on a list with a page of its own: that page, searched for the row's name. */
   const chartTo = $derived(row && decl ? chartOf(id, String(row.fields[decl.title] ?? '')) : null);
 

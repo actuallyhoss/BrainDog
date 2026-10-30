@@ -27,10 +27,12 @@ const ask = (over: Record<string, unknown> = {}): QueueQuestion =>
   }) as QueueQuestion;
 
 test('a hard answer says its care as a line under the row, and its button says its name', () => {
-  const hardSaid = (card as Record<string, unknown>).hardSaid as ((c: unknown, p: string | null) => string) | undefined;
+  const hardSaid = (card as Record<string, unknown>).hardSaid as ((c: unknown, p: string | null, l?: string | null) => string) | undefined;
   assert.equal(typeof hardSaid, 'function', 'no line under the row says the care');
   const hard = card.cardOf(ask({ cost: 'undo' }), { now });
-  assert.equal(hardSaid!(hard, card.primaryOf(hard)), 'Can’t be undone easily');
+  /* NOT FILLED, SO NAMED (audit 6g, AG11): the hard answer is never the accent, and its line says which it is. */
+  assert.equal(card.primaryOf(hard), null);
+  assert.equal(hardSaid!(hard, card.primaryOf(hard), card.leadOf(hard)), 'Accept can’t be undone easily');
   const safe = card.cardOf(ask(), { now });
   assert.equal(hardSaid!(safe, card.primaryOf(safe)), '', 'a safe answer says no care');
 

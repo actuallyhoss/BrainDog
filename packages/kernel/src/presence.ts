@@ -374,16 +374,16 @@ export function revivedAt(sql: Sql, ids: readonly string[]): Map<string, string>
 }
 
 /**
- * The machines and profiles runs were heard on inside the last `withinMs`, newest heard first and at most `most`: where
- * the composer offers to send an instruction. A run that names neither is left out, and every run is a row, so the caller
- * holds each to what its reader may see.
+ * The machines, profiles and agents runs were heard on inside the last `withinMs`, newest heard first and at most
+ * `most`: where and to whom the composer offers to send an instruction. A run that names none of them is left out, and
+ * every run is a row, so the caller holds each to what its reader may see.
  */
-export function placesHeard(sql: Sql, nowMs: number, withinMs: number, most: number): { id: string; host: string | null; seat: string | null }[] {
+export function placesHeard(sql: Sql, nowMs: number, withinMs: number, most: number): { id: string; host: string | null; seat: string | null; agent: string | null }[] {
   const since = new Date(nowMs - withinMs).toISOString();
-  return sql.all<{ id: string; host: string | null; seat: string | null }>(
-    `SELECT id, json_extract(fields, '$.host') AS host, json_extract(fields, '$.seat') AS seat FROM entry
+  return sql.all<{ id: string; host: string | null; seat: string | null; agent: string | null }>(
+    `SELECT id, json_extract(fields, '$.host') AS host, json_extract(fields, '$.seat') AS seat, json_extract(fields, '$.agent') AS agent FROM entry
       WHERE register = 'session' AND deleted_at IS NULL AND json_extract(fields, '$.last_seen') >= ?
-        AND (json_extract(fields, '$.host') IS NOT NULL OR json_extract(fields, '$.seat') IS NOT NULL)
+        AND (json_extract(fields, '$.host') IS NOT NULL OR json_extract(fields, '$.seat') IS NOT NULL OR json_extract(fields, '$.agent') IS NOT NULL)
       ORDER BY json_extract(fields, '$.last_seen') DESC LIMIT ?`,
     since,
     most,

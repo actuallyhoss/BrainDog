@@ -71,7 +71,7 @@
   import RunView from '$lib/flow/RunView.svelte';
   import Tried from '$lib/flow/Tried.svelte';
   import { FlowDraft } from '$lib/flow/flow.svelte.ts';
-  import { ROOT, callsIn, freshId, learnScripts, listsIn, sayStart, sayStep, triggerKind, words } from '$lib/flow/flow.ts';
+  import { ROOT, callsIn, freshId, learnScripts, listsIn, sayInWhole, sayStart, triggerKind, words } from '$lib/flow/flow.ts';
   import { wholeSentence } from '../sentence.ts';
   import { learn } from '$lib/record/remote.ts';
   import {
@@ -359,7 +359,7 @@
   const said = $derived(pageSentence(row, now));
   /* WHAT IT DOES, WHOLE: the trigger and each step in order, each step said with no title to repeat, so its script is
      named (`sayStep` with no `own`). */
-  const whole = $derived(wholeSentence(sayStart(flow.draft, listSaid), flow.draft.steps.map((n) => sayStep(n.step))));
+  const whole = $derived(wholeSentence(sayStart(flow.draft, listSaid, ruleNameOf), flow.draft.steps.map((n) => sayInWhole(n))));
   /* THE PLAN THE RUNNER NUMBERS STEPS BY, so "failed at step 3" counts the steps as the canvas draws them. */
   const places = $derived(row?.body ? planPlaces(row.body) : null);
   const durations = $derived(runDurations(runs));
@@ -773,7 +773,7 @@
               <IconWell name={triggerIcon(kind)} size="l" tone={flow.selected === 'trigger' ? 'ink' : general.length > 0 || (served !== null && served.key === null) ? 'danger' : undefined} />
               <span class="trigger-main">
                 <span class="trigger-kicker">{words.trigger}</span>
-                <span class="trigger-said">{sayStart(flow.draft, listSaid)}</span>
+                <span class="trigger-said">{sayStart(flow.draft, listSaid, ruleNameOf)}</span>
               </span>
             </button>
             {#each general as f, i (f.say)}<p class="fault" id={`flow-fault-${i}`}><span class="fault-glyph" aria-hidden="true"><Icon name="alert" /></span>{f.say}</p>{/each}

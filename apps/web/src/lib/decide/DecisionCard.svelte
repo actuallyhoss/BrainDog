@@ -77,7 +77,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
+  import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, leadOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, leave, pointerOff, settle } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
@@ -184,7 +184,9 @@
   /* The one the row fills with the accent: the suggested answer, or the first. */
   const primary = $derived(primaryOf(card));
   /** What the filled answer does, in its own words, where it says: the line under a row of buttons. */
-  const hardLine = $derived(hardSaid(card, primary));
+  /* THE CARE IS SAID OF THE ANSWER THE CARD LEADS WITH, filled or not: an unfilled hard answer still says so. */
+  const leadKey = $derived(leadOf(card));
+  const hardLine = $derived(hardSaid(card, primary, leadKey));
   const primaryDoes = $derived(card.ways.find((w) => w.key === primary)?.because.trim() ?? '');
   /* AT MOST TWO ANSWERS AND ONE QUIET LATER (`answerRowOf`): the asker's own "Later" is that Later, never beside ours. */
   const answerRow = $derived(answerRowOf(card.ways, primary));
@@ -672,7 +674,7 @@
       data-keeps
       aria-pressed={waiting?.key === way.key ? true : phase === 'asking' ? chosen?.key === way.key : undefined}
       aria-disabled={kept ? 'true' : undefined}
-      aria-describedby={wayTail(card, way, primary) !== '' ? `${uid}-hard` : undefined}
+      aria-describedby={wayTail(card, way, primary ?? leadKey) !== '' ? `${uid}-hard` : undefined}
       onclick={() => press(way)}
       >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
         ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span></span

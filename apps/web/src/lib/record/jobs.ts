@@ -428,7 +428,8 @@ export const words = {
   heading: 'Jobs',
   headingFor: (repo: string) => `Jobs for ${repo}`,
   allJobs: 'All jobs',
-  run: 'Run a job',
+  /* START, AND IT WAS "Run a job" (audit 6g, AG26): the words a person says of setting one going. */
+  run: 'Start a job',
   none: 'No jobs have run yet',
   noneFor: (repo: string) => `No jobs have run in ${repo} yet`,
   older: 'Show older jobs',
@@ -439,9 +440,10 @@ export const words = {
   started: 'Started',
   turnsLabel: 'Turns',
   took: 'Time',
-  noMachine: 'No machine yet',
+  noMachine: 'Not picked up yet',
   /* Where a run stands. */
-  queued: 'Waiting for a machine',
+  /* WHO IT WAITS ON, said as the person's own computer and not "a machine" (audit 6g, AG26). */
+  queued: 'Waiting for your computer to pick it up',
   running: 'Running',
   stopping: 'Stopping',
   lost: 'Not heard from in a minute',
@@ -460,7 +462,7 @@ export const words = {
   inRepo: (repo: string) => `Runs in ${repo}`,
   inNoRepo: 'Runs in an empty folder',
   writesShort: 'Changes files',
-  startedToast: (title: string) => `${title} is waiting for a machine.`,
+  startedToast: (title: string) => `${title} is waiting for your computer to pick it up.`,
   nobodyListening: 'No machine is listening. The job waits up to a day.',
   /* Whether a machine is listening. */
   listening: 'Listening',

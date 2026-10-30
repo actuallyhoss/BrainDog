@@ -354,7 +354,7 @@ export const ESTATE_AUTOMATIONS: Record<string, unknown>[] = [
     on: { decided: { about: 'rule.renew-soon', option: 'Keep it' } },
     /* LIVE, WHICH IT USUALLY STILL IS, and which puts it back when its day passed before the answer and `renewal-passed`
        had already called it lapsing. The note says what is left to do: the day it renews next is the person's to set. */
-    steps: [{ move: 'live' }, { note: 'You chose to keep this in Decide. Set the day it renews next once it has.' }],
+    steps: [{ move: 'live' }, { note: 'You chose to keep this in Needs you. Set the day it renews next once it has.' }],
   },
   {
     rule: 'renewal-cancelled',
@@ -363,7 +363,7 @@ export const ESTATE_AUTOMATIONS: Record<string, unknown>[] = [
     on: { decided: { about: 'rule.renew-soon', option: 'Cancel it' } },
     /* CANCELLED, THE STATE EVERY READER OF SERVICES ALREADY LEAVES OUT: the month, the year, the next ninety days and
        Money's cash walk. Cancelling with the provider is still the person's to do, and the note says so. */
-    steps: [{ move: 'cancelled' }, { note: 'You chose to cancel this in Decide. Cancel it with the provider too.' }],
+    steps: [{ move: 'cancelled' }, { note: 'You chose to cancel this in Needs you. Cancel it with the provider too.' }],
   },
 ];
 

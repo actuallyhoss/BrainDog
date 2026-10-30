@@ -144,7 +144,7 @@ test('WHAT IS SENT: a run by handle and now, a kind on a project with its when, 
 test('MACHINE AND PROFILE ARE OFFERED WHERE HIS RUNS ARE ON TWO OR MORE, narrow who is live, and are sent by name and said as a person says them', () => {
   const HARBOUR = run({ run: 'S3', seat: 'harbour', machine: 'kiln-studio', branch: 'harbour' });
   const rows = [CLAUDE, CODEX, HARBOUR];
-  const places = { machines: ['kiln-mbp'], seats: ['default', 'harbour'] };
+  const places = { machines: ['kiln-mbp'], seats: ['default', 'harbour'], agents: null };
   const c = composerOf({ to: 'agent:claude', on: 'things#1', when: null, machine: 'kiln-studio', seat: 'harbour' }, rows, PROJECTS, null, places);
   assert.deepEqual(c.machine?.map((x) => x.label), ['Any machine', 'MacBook Pro', 'Kiln studio']);
   assert.deepEqual(c.seat?.map((x) => x.label), ['Any profile', 'default', 'harbour']);
@@ -350,4 +350,13 @@ test('HIS WORDS NAME THE QUESTIONS THE RUN MAY ANSWER, each with his answer, and
   /* AND HIS THREAD SAYS WHAT IT LETS THE RUN ANSWER, then that it was. */
   assert.match(threadOf(thread({ answers: [{ question: 'SG243', option: 'accept' }], answered: [] }), ctx).trail, /Lets it answer SG243$/u);
   assert.match(threadOf(thread({ answers: [{ question: 'SG243', option: 'accept' }], answered: ['SG243'] }), ctx).trail, /Answered SG243 as you said$/u);
+});
+
+test('TELL OFFERS THE AGENTS HIS RUNS WERE HEARD AS, and Any agent, never a kind that never reached him (audit 6g, AG27)', () => {
+  const c = composerOf(PICK_FIRST, ROWS, PROJECTS, null, { machines: [], seats: [], agents: ['claude', 'codex', 'cursor'] });
+  const kinds = c.to.filter((x) => x.key.startsWith('agent:')).map((x) => x.key);
+  assert.deepEqual(kinds, ['agent:claude', 'agent:codex', 'agent:cursor']);
+  assert.equal(c.to[0]?.key, 'anyone');
+  /* A HOST OLDER THAN THE LIST offers every kind, as before. */
+  assert.ok(composerOf(PICK_FIRST, ROWS, PROJECTS).to.some((x) => x.key === 'agent:gemini'));
 });
