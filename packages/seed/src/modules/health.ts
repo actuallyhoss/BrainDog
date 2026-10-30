@@ -41,11 +41,12 @@ export const HEALTH_FIGURES = ['signs-red', 'signs-unread', 'green-days'] as con
  * record, and every one in the group is drawn. A group holding no sign is not drawn, so a record with nothing red shows
  * no empty Needs a look.
  */
-const group = (state: 'red' | 'green' | 'none', heading: string, icon: string): Record<string, unknown> => ({
+const group = (state: 'red' | 'green' | 'none', heading: string, icon: string, most?: number): Record<string, unknown> => ({
   kind: 'cards',
   heading,
   icon,
   span: 12,
+  ...(most === undefined ? {} : { most }),
   source: HEALTH_SOURCE,
   where: `state is ${state}`,
   columns: [
@@ -115,7 +116,10 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
       /* RED FIRST, since that is what the page is opened for, then what is alive, then what has not been read. */
       group('red', 'Needs a look', 'octagon-alert'),
       group('green', 'All good', 'circle-check'),
-      group('none', 'Not checked yet', 'circle-dashed'),
+      /* EVERY CHECK NOT RUN YET IS DRAWN, NONE BEHIND "Show all" (finish F54): "14 checks have not run yet." stood over
+         this group's "Show all 10", since the checks nothing was filed for are one card naming them all. Drawn whole, the
+         cards and their names add up to the sentence's count, and no second number is said. */
+      group('none', 'Not checked yet', 'circle-dashed', 24),
       /* HOW LONG IT HAS HELD, from `green-days`: days running, to yesterday, with every watched sign green (the seven-day
          hold's count, `hold.ts`). NOT "NOTHING WAS RED": the hold watches ten of the signs, and a day an automation sign
          read red still counts, so "nothing has been red" was said of days with a red sign on this page. Drawn only
