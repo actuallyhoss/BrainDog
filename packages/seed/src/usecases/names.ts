@@ -79,6 +79,7 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   'meet-senders': 'Note whoever writes in',
   'part-counts-plan': 'Count what is left of a plan',
   'part-takes-book': "File an instalment in its account's book",
+  'payment-files-paid': "File a paid bill's payment as spending",
   'payment-matches': 'Find what a payment paid',
   'payment-matches-again': 'Look again for what a recent payment paid',
   'payment-settles': 'Mark a bill paid by its payment',
