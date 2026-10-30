@@ -15,6 +15,7 @@ import { no, ok } from '@braindog/ports';
 import { readBlock, readPage, registersOfBlock, WHOLE_RECORD, type PageBlock, type PageDeps } from '../src/pages.ts';
 import { openRecord } from '../src/index.ts';
 import type { VitalSign } from '../src/signs.ts';
+import { foldUnfiled, NEVER_FILED } from '../src/sources/signs.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 7);
@@ -106,13 +107,27 @@ test('THROUGH A REAL RECORD: the record’s own signs read through the source, e
   assert.ok(signs.ok, JSON.stringify(signs));
   const read = readBlock(depsWith(signs.value.signs), TABLE);
   assert.deepEqual(read.refusals, []);
-  assert.equal(read.rows.length, signs.value.signs.length);
+  /* THE SIGNS NOTHING WAS EVER FILED FOR ARE ONE ROW (recheck of 30 October): every other sign is its own. */
+  const never = signs.value.signs.filter((s) => s.state === 'none' && s.said === NEVER_FILED);
+  assert.equal(read.rows.length, signs.value.signs.length - (never.length > 1 ? never.length - 1 : 0));
   for (const r of read.rows) {
     assert.ok(['green', 'red', 'none'].includes(String(r.fields.state)));
     assert.ok(String(r.fields.name).trim() !== '', 'a person reads a name');
     assert.ok(String(r.fields.said).trim() !== '', 'and the sign’s own sentence');
   }
-  /* A RECORD NOBODY HAS FILED FOR: the four signs the record and the host file read none, never green. */
-  assert.equal(read.rows.find((r) => r.fields.sign === 'model-answers')?.fields.state, 'none');
+  /* A RECORD NOBODY HAS FILED FOR: the signs the record and the host file read none, never green, said once together. */
+  const folded = read.rows.find((r) => r.fields.sign === 'never-filed');
+  assert.equal(folded?.fields.state, 'none');
+  assert.match(String(folded?.fields.name), /The model answers/u);
+  assert.equal(read.rows.filter((r) => r.fields.said === NEVER_FILED).length, 0, 'the sentence is never said once a sign');
   sql.close();
+});
+
+test('TWO OR MORE SIGNS NOTHING WAS FILED FOR FOLD INTO ONE LINE, where the first stood; one alone keeps its own', () => {
+  const other = { ...NONE, sign: 'tools-listed', name: 'Agents get the tool list' };
+  const read = readBlock(depsWith([RED, NONE, GREEN, other]), TABLE);
+  assert.deepEqual(read.rows.map((r) => r.fields.sign), ['arrivals-filed', 'never-filed', 'oldest-question']);
+  assert.equal(read.rows[1]!.fields.name, 'The model answers and Agents get the tool list');
+  assert.equal(read.rows[1]!.fields.said, 'Nothing has been filed for these yet.');
+  assert.deepEqual(foldUnfiled(readBlock(depsWith([NONE]), TABLE).rows).map((r) => r.fields.sign), ['model-answers']);
 });

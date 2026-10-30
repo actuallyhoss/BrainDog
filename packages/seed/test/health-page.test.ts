@@ -110,7 +110,8 @@ test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: the line says only th
   assert.deepEqual(leads(blocks), ['Nothing needs a look.']);
   for (const line of leads(blocks)) assert.doesNotMatch(line, /alive|healthy|everything/iu, line);
   assert.deepEqual(under(blocks, 'All good'), [GREEN.name]);
-  assert.deepEqual(under(blocks, 'Not checked yet'), unread.map((u) => u.name), 'every unread sign is said, by its name');
+  /* EVERY UNREAD SIGN IS SAID BY ITS NAME, and the ones nothing was ever filed for in one line, not one line each. */
+  assert.deepEqual(under(blocks, 'Not checked yet'), ['The model answers, The tools list and Rules ran this week']);
   for (const b of BLOCKS) if (b.kind === 'note') assert.doesNotMatch(String(b.body), /alive/iu, 'no line says alive of the record');
 });
 
