@@ -19,6 +19,9 @@ export function drewFirst(): void {
   heard = null;
 }
 
+/** Whether the tab's first screen has drawn already: a screen opened after it is not the first open. */
+export const firstDrawn = (): boolean => heard === null;
+
 /** The longest a read waits for the first screen. */
 export const FIRST_WAIT_MS = 1_500;
 

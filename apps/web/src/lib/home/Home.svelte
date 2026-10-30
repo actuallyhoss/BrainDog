@@ -61,7 +61,7 @@
   import { recordToday } from '$lib/record/zone.ts';
   import { partsOf } from '$lib/shell/headline.ts';
   import { barTitled, frame } from '$lib/shell/frame.svelte.ts';
-  import { onAppendOnly, recordNow, type Shell } from '$lib/record/boot-live.ts';
+  import { everyAsked, onAppendOnly, recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, said } from '$lib/voice.svelte.ts';
@@ -137,7 +137,7 @@
   import { keepPart, keptPart, tileOnce, TODAY_KEPT_MS } from '$lib/home/today-kept.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { holdPresses } from '$lib/data/held.svelte.ts';
-  import { drewFirst } from '$lib/data/first-drawn.ts';
+  import { drewFirst, firstDrawn } from '$lib/data/first-drawn.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
@@ -281,8 +281,13 @@
   /* THE LOCAL COPY IS LOOKED IN FIRST (below), for a moment at most: what it holds of the lists is the declarations
      Today was last drawn under, so a warm open asks none of them before its first read. */
   let looked = $state(false);
+  /* UNLESS TODAY IS THE TAB'S FIRST SCREEN AND EVERY LIST'S DECLARATION WAS ASKED BESIDE `boot` (`everyAsked`): a list
+     learnt is answered from that one read and asks nothing, so Today is not held behind the look in the copy (finish W3:
+     on a cold phone the look, with its code, was about 80 ms of the wait before Today was asked, for a copy that was not
+     there). A later open learns as before, the copy first: by then the record may have moved past that read. */
+  const every = everyAsked(apiBase()) && !firstDrawn();
   $effect(() => {
-    if (data.refused || (declares !== null && !tell) || !looked) return;
+    if (data.refused || (declares !== null && !tell) || !(looked || every)) return;
     const missing = data.lists.map((l) => l.id).filter((id) => REGISTERS[id] === undefined);
     /* ALL OF THEM LEARNT ALREADY: said once, so a later read of the shell does not draw Today's body again for nothing.
        AND WITH THE COPY'S PUT BACK, Today is read on them at once, and the few the copy never holds (a list of keys) are
@@ -477,6 +482,10 @@
     untrack(() => {
       if (firstHeld === null && !firstSpent && !settled) firstHeld = opened();
       firstSpent = true;
+      /* THE READ'S OWN CODE IS FETCHED NOW, beside the look in the copy and the lists' declarations, and not after them:
+         on a cold phone it was about 100 ms between the lists landing and Today being asked (finish W3). */
+      void import('$lib/record/page-drawn.ts').catch(() => null);
+      void import('./today-read.ts').catch(() => null);
       const slug = declares;
       const before = new Set(Object.keys(REGISTERS));
       /* EVERY LIST LEARNT ALREADY (Today drawn before in this tab): nothing waits for the copy. */
@@ -554,7 +563,7 @@
 
   /** A kept board drawn from the record's one `today` read, or `null` to read it as a page. */
   async function keptToday(slug: string, fresh: boolean): Promise<Opened | null> {
-    const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
+    const [m, t] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts')]);
     const base = apiBase();
     let declared: Record<string, unknown> | null = null;
     let version: number | undefined;
@@ -609,7 +618,7 @@
        it came, so the body landed as the reader moved on and a list's revisit after Today went from 30 ms to 100. */
     void import('./ProjectCards.svelte').catch(() => null);
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
-    const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
+    const [m, t] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts')]);
     const base = apiBase();
     let drawn = await m.drawnOf(asked, base, undefined, (client) => t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut));
     /* A RECORD BUILT BEFORE BOARDS refuses a board's keys (`board: is not a key a page has`): Today is asked without them
