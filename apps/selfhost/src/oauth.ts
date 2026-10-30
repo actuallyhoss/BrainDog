@@ -322,7 +322,7 @@ export function oauthHere(here: OAuthHereOptions): OAuthHere {
     const who = await personOf(request, here);
     if (!who.ok) return who;
     const ctx = who.ctx;
-    return { ok: true, record, provedAt: who.provedAt, cookie: who.cookie, mint: (args) => mintAs(here.api, ctx, args) };
+    return { ok: true, record, provedAt: who.provedAt, cookie: who.cookie, mint: (args) => mintAs(here.api, { ...ctx, door: 'oauth' }, args) };
   };
 
   const depsFor = (address: string): OAuthDeps => ({

@@ -18,6 +18,9 @@
 /** What every report key's label begins with. */
 export const REPORT_PREFIX = 'report:';
 
+/** What a job's own bearer is labelled with before its job's id (`claimJob`, the kernel's `jobs.ts`): no other key may begin so. */
+export const JOB_PREFIX = 'job:';
+
 /** The most rows one `report` call writes. A batch past it is refused whole. */
 export const REPORT_ROWS_MOST = 100;
 

@@ -22,7 +22,7 @@ import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
 import { FRESH, type CallContext } from '../index.ts';
-import { REPORT_PREFIX } from '../report.ts';
+import { JOB_PREFIX, REPORT_PREFIX } from '../report.ts';
 import type { RecordDeps } from './index.ts';
 
 /**
@@ -136,6 +136,9 @@ export function methods(deps: RecordDeps) {
       /* A REPORT KEY IS MADE BY `createReportKey` ONLY, and its label is its binding (`report.ts`). */
       if (name.startsWith(REPORT_PREFIX))
         return no('VALUE_MALFORMED', `A name that begins ${REPORT_PREFIX} belongs to a report key. Choose another name.`, { at: 'name' });
+      /* NOR A JOB'S BEARER (`claimJob`), whose label is its job and which the plan's count and the agents list pass over. */
+      if (name.startsWith(JOB_PREFIX))
+        return no('VALUE_MALFORMED', `A name that begins ${JOB_PREFIX} belongs to a job's own key. Choose another name.`, { at: 'name' });
 
       const beyond = narrowBeyond(deps, ctx, who.id, args?.narrow);
       if (beyond) return { ok: false, refusal: beyond };

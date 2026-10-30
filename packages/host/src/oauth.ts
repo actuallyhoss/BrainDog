@@ -458,10 +458,16 @@ function nameOf(said: unknown, uris: readonly string[]): string {
   /* BY CHARACTER AND NOT BY UNIT, so the cut at `NAME_MOST` never halves an emoji into a character nobody can draw. */
   const kept = typeof said === 'string' ? [...said].filter((ch) => !hidden(ch.codePointAt(0) ?? 0)).join('').trim() : '';
   const clean = [...kept].slice(0, NAME_MOST).join('').trim();
-  if (clean !== '') return clean;
+  /* A NAME THAT BEGINS AS THE RECORD'S OWN KEYS DO IS NO NAME. The name becomes the token's label, and a label `job:<id>`
+     is a job's bearer to the record (left off the agents list, its runs counted to the job, revoked when it ends) and
+     `report:` a report key's; the record refuses both, so the app is named by its host instead. */
+  if (clean !== '' && !RESERVED_LABEL.test(clean)) return clean;
   const first = uris[0];
   return first === undefined ? 'An app' : `An app at ${hostOf(first)}`;
 }
+
+/** The beginnings of a label only the record writes: a job's bearer and a report key. */
+const RESERVED_LABEL = /^(?:job|report):/iu;
 
 const isScope = (x: unknown): x is OAuthScope => typeof x === 'string' && (OAUTH_SCOPES as readonly string[]).includes(x);
 

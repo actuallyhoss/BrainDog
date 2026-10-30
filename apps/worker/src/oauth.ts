@@ -174,7 +174,7 @@ function wiring<I>(request: Request, env: OAuthEnv<I>, host: string) {
       const on = record(door.record);
       const person = ctx.principal.kind === 'person' ? ctx.principal.id : null;
       const since = person === null ? null : await directory().madeAt(person);
-      return { ok: true, record: door.record, provedAt: ctx.provedAt ?? 0, since: since ?? undefined, cookie: door.cookie, mint: (args) => mintOn(on, origin, ctx, args) };
+      return { ok: true, record: door.record, provedAt: ctx.provedAt ?? 0, since: since ?? undefined, cookie: door.cookie, mint: (args) => mintOn(on, origin, { ...ctx, door: 'oauth' }, args) };
     }
     if (door.door === 'refused')
       return { ok: false, status: door.status, say: door.status === 403 ? (door.refusal?.fix ?? REFUSED[403]) : REFUSED[door.status], retryAfter: door.retryAfter, cookie: door.cookie };

@@ -232,7 +232,7 @@ import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { withSettling } from './settling.ts';
 import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { shelfFault, shelfKept, type ShelfItem } from './shelf.ts';
-import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+import { JOB_PREFIX, REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { narrowBeyond } from './methods/own-tokens.ts';
@@ -622,6 +622,16 @@ export type CallContext = {
    * for an import cannot export, list, write or open the keychain on the approver's behalf.
    */
   operation?: string | undefined;
+
+  /**
+   * The host door that built this context, when it is one whose word the record takes on something a caller cannot say
+   * of itself: `oauth` is the Allow on an app's consent screen, which stamps the token it mints with the app it proved
+   * (`client`: its id, how it came and its host).
+   *
+   * SET ONLY BY A HOST'S OAUTH DOOR, AROUND ITS OWN `createToken`. Every other caller's `client` is dropped, so a key made
+   * by hand, at the CLI or through an operation grant is never stamped "BrainDog checked that this app is claude.ai".
+   */
+  door?: 'oauth' | undefined;
 
   /**
    * The chat app a press came from, when a host built this context from a press on the decision card inside Claude or
@@ -15306,12 +15316,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         };
       /* A REPORT KEY IS MADE BY `createReportKey` ONLY. Its label is its binding, so a token labelled like one
          here would be a report key nobody chose the register of. */
-      if (typeof args?.label === 'string' && args.label.startsWith(REPORT_PREFIX))
+      if (typeof args?.label === 'string' && args.label.trimStart().startsWith(REPORT_PREFIX))
         return no('VALUE_MALFORMED', `A label that begins ${REPORT_PREFIX} belongs to a report key. Make one with createReportKey, or choose another label.`, { at: 'label' });
+      /* NOR A JOB'S BEARER, WHICH ONLY `claimJob` MAKES. Its label is its job: a key labelled `job:<id>` here dropped out of
+         the agents list, had its runs counted to that job, passed the plan's count, and was revoked when the job ended. */
+      if (typeof args?.label === 'string' && args.label.trimStart().startsWith(JOB_PREFIX))
+        return no('VALUE_MALFORMED', `A label that begins ${JOB_PREFIX} belongs to a job's own key, which the record makes itself. Choose another label.`, { at: 'label' });
       /* A NARROWING NAMES NOTHING OUTSIDE THE MINTER'S OWN REACH (sharing plan 2.9); its shape is the kernel's to check. */
       const beyond = narrowBeyond({ kernel, sql, readable }, ctx, actorOf(ctx), args?.narrow);
       if (beyond) return { ok: false as const, refusal: beyond };
-      return tail(await kernel.createToken(actorOf(ctx), args ?? ({} as never)));
+      /* THE APP A KEY IS STAMPED WITH IS THE OAUTH DOOR'S WORD AND NOBODY ELSE'S (`CallContext.door`). A caller's own
+         `client` once went straight through, so a CLI holding a `token` grant minted a key Settings listed as "BrainDog
+         checked that this app is claude.ai", and that `appOf` read as Claude's. It is dropped, not refused, so a caller
+         that sent one still gets the key it asked for, stamped as what it is. */
+      const { client: _said, ...unstamped } = (args ?? {}) as CreateTokenArgs;
+      return tail(await kernel.createToken(actorOf(ctx), (ctx.door === 'oauth' ? (args ?? {}) : unstamped) as never));
     },
 
     /**
