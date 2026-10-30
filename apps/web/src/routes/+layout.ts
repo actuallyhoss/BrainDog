@@ -65,6 +65,16 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
      `/connect/approve`, the page a terminal prints, for the same reason: a machine is waiting on it. */
   const spared =
     inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner === '/connect/approve' || inner === '/s' || inner.startsWith('/s/');
+  /* SIGN-IN AND SIGN-UP ASK THE RECORD NOTHING (first hour audit, E14). A stranger there has no record to read, and
+     `boot` and `schemas` both came back 401, two console errors on every first visit; both screens ask the account
+     who is signed in themselves (`methods`), and draw bare, with no rail to fill. They get the shell a stranger was
+     always given, the refused one. Before `opened`, so the first screen past them is still the tab's first open. */
+  if (inner === '/signin' || inner.startsWith('/signin/') || inner === '/signup') {
+    const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
+    await voice.listen(null, api).catch(() => undefined);
+    if (typeof document !== 'undefined') void import('$lib/theme/draw.ts').then((look) => look.draw(null));
+    return { ...live.refusedShell({ code: 'UNAUTHORIZED', fix: '' }), slash: false };
+  }
   /* THE LOCAL COPY IS OPENED BEFORE ANYTHING HERE IS WAITED ON, beside `boot` (which `app.html` already asked) and never
      in front of the first paint, and its last reader verified, so the first screen's ask finds it open. */
   const first = !opened;
