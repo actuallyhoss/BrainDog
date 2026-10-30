@@ -404,6 +404,20 @@ CREATE TABLE IF NOT EXISTS dir_step (
   PRIMARY KEY (record, step)
 ) WITHOUT ROWID;
 
+-- WHAT VERIFIES EACH WEBHOOK DOOR, as the record last answered it (sec-follow M6, RD1 of the review of 30 Oct): the
+-- SHA-256 of the door's path token, or 'signed' for a door signed in a header. The arrival door's hold reads it while
+-- the record cannot answer, so only an arrival carrying the door's own token is kept, and a junk token at a made-up
+-- door name is not, as dir_inbound already does for mail. Learned from the door's own traffic while the record is up
+-- (apps/worker/src/held.ts), so a token minted again replaces the digest here on its first arrival. Digests open
+-- nothing. A NEW TABLE AND NOT A COLUMN, for the reason dir_inbound gives above: created on the next open,
+-- DIRECTORY_VERSION unmoved, and no CHECK.
+CREATE TABLE IF NOT EXISTS dir_door (
+  record TEXT NOT NULL,                     -- rec_...
+  ingest TEXT NOT NULL,                     -- the door's ingest id, as its URL names it
+  sign   TEXT NOT NULL,                     -- 64 lower-case hex, the token's SHA-256; or 'signed'. Never a token.
+  PRIMARY KEY (record, ingest)
+) WITHOUT ROWID;
+
 -- One row per record somebody pays for. A record with no row is not billed and never lapses: every record the
 -- operator provisioned has none, and a row is written only when a Stripe checkout for that record completes.
 CREATE TABLE IF NOT EXISTS dir_billing (
@@ -893,6 +907,9 @@ export const CARRIED = [
   'dir_seen',
   /* THE FUNNEL'S STEPS A RECORD HAS TAKEN: a restore that lost them would count every step again. */
   'dir_step',
+  /* WHAT VERIFIES EACH WEBHOOK DOOR, by digest: a restore that lost it would hold nothing for a record during an outage
+     until each door's next arrival taught it again. */
+  'dir_door',
   'dir_inbound',
 ] as const;
 
@@ -936,10 +953,11 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_apply: 'rowid',
   dir_seen: 'day, page, came',
   dir_step: 'record, step',
+  dir_door: 'record, ingest',
 };
 
 /** The carried tables a copy written before they existed does not name (new tables at the same Directory version). */
-const ADDED_LATER: readonly Carried[] = ['dir_apply', 'dir_seen', 'dir_step', 'dir_extra', 'dir_extra_month'];
+const ADDED_LATER: readonly Carried[] = ['dir_apply', 'dir_seen', 'dir_step', 'dir_extra', 'dir_extra_month', 'dir_door'];
 
 /** A copy's first line, then its version: `#dogdir 4`. Not `#dogl`, so `checkBrainl` and `verify` never take one for a record. */
 const COPY_HEAD = '#dogdir';
@@ -2175,6 +2193,36 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         return ok(null);
       }),
 
+    /**
+     * What verifies one webhook door of a record, as the record just answered it: a token's SHA-256 in hex, `'signed'`
+     * for a door signed in a header, or `null` for a door that is gone or verified by nothing, which takes it away.
+     * Written only when it differs, so a door's every arrival is not a write. Refused for a record not open, and for a
+     * value that is neither shape, so this can never be handed a token (RD1).
+     */
+    door$: (record: string, ingest: string, sign: string | null): Result<null> =>
+      sql.transactionSync(() => {
+        if (sign !== null && sign !== 'signed' && !DIGEST.test(sign))
+          return no<null>('VALUE_MALFORMED', 'A door is kept by the SHA-256 of its token, as 64 lower-case hex characters, or as signed. The token itself is never stored here.', { at: 'sign' });
+        if (ingest === '' || ingest.length > 256) return no<null>('VALUE_MALFORMED', 'A door is named by its ingest id.', { at: 'ingest' });
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ? AND closed_at IS NULL', record))
+          return no<null>('OUT_OF_BOUNDS', `There is no open record ${record}.`, { at: 'record' });
+        const was = sql.one<{ sign: string }>('SELECT sign FROM dir_door WHERE record = ? AND ingest = ?', record, ingest)?.sign ?? null;
+        if (was === sign) return ok(null);
+        if (sign === null) sql.exec('DELETE FROM dir_door WHERE record = ? AND ingest = ?', record, ingest);
+        else sql.exec('INSERT INTO dir_door (record, ingest, sign) VALUES (?, ?, ?) ON CONFLICT (record, ingest) DO UPDATE SET sign = excluded.sign', record, ingest, sign);
+        return ok(null);
+      }),
+
+    /** Whether an open record's door is verified by `sign` (`door$`): what the arrival door's hold asks before it keeps one. */
+    doorHolds: (record: string, ingest: string, sign: string): boolean =>
+      sql.one(
+        `SELECT 1 AS x FROM dir_door d JOIN dir_record r ON r.id = d.record AND r.closed_at IS NULL
+          WHERE d.record = ? AND d.ingest = ? AND d.sign = ?`,
+        record,
+        ingest,
+        sign,
+      ) !== undefined,
+
     /** One person, by id. */
     person: (id: string): Person | null =>
       sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE id = ?', id) ?? null,
@@ -2605,6 +2653,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         sql.exec('DELETE FROM dir_credit WHERE record = ?', record);
         /* AND EXTRA USAGE IS OFF: a closed record runs nothing. Its months stay, so what it used is still told. */
         sql.exec('DELETE FROM dir_extra WHERE record = ?', record);
+        /* AND ITS DOORS: a closed record takes no arrival, so nothing is held for it either. */
+        sql.exec('DELETE FROM dir_door WHERE record = ?', record);
         return ok(null);
       }),
 

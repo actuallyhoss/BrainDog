@@ -2660,6 +2660,20 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
+   * What verifies one webhook door of a record, as the record just answered it: a token's digest, `'signed'`, or `null`
+   * to forget the door (RD1). Never handed a token, which `door$` refuses. The arrival door's hold teaches it.
+   */
+  door$(record: string, ingest: string, sign: string | null): Refusal | null {
+    const out = this.#directory().door$(record, ingest, sign);
+    return out.ok ? null : refusalOf(out);
+  }
+
+  /** Whether an open record's door is verified by `sign`: what the hold asks before it keeps an arrival (RD1). */
+  doorHolds(record: string, ingest: string, sign: string): boolean {
+    return this.#directory().doorHolds(record, ingest, sign);
+  }
+
+  /**
    * Every record on this deployment that is still open, a page at a time. `51 §5.12` step 1.
    *
    * THE CURSOR IS THE LAST ID AND NOT AN OFFSET. A keyset page is stable while the walk runs: a
@@ -3444,7 +3458,8 @@ export default {
  */
 function heldDeps(env: Env): HeldDeps {
   return {
-    knows: (rec) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).knows(rec),
+    holds: (rec, ingest, sign) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).doorHolds(rec, ingest, sign),
+    learn: (rec, ingest, sign) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).door$(rec, ingest, sign),
     bucket: env.BLOBS,
     secret: env.SESSION_SECRET,
     queue: env.INGRESS,

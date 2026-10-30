@@ -26,6 +26,8 @@
  *
  * BOUNDED: only a POST to `/in/webhook/<rec>/<ingest>[/<token>]` whose record id is well formed, at most the door's own
  * size, at most `HELD_PER_RECORD` waiting for one record and `HELD_MOST` for the deployment. Past either, 503 as before.
+ * AND ONLY AT A DOOR THE DIRECTORY KNOWS, WITH THAT DOOR'S OWN TOKEN (`holds`, RD1): the Directory learns what verifies
+ * each door from the record's own answers while it is up (`learning`), so junk at a made-up door is never kept.
  * A request signed with its time (Stripe's `t=`) is never kept: its sender retries a 503, and a late replay would fail
  * the signature's window. An arrival still waiting `HELD_OLDEST_MS` after it was kept moves to `gave-up` with a mail, so
  * a record that will never take arrivals cannot fill the deployment's room.
@@ -47,11 +49,16 @@ export const HELD_GAVE_UP = 'held/gave-up/';
 export const HELD_PER_RECORD = 50;
 export const HELD_MOST = 500;
 /**
- * The most kept arrivals waiting from one place (an IPv4 address, an IPv6 /64), across every record (SEC7). His phone
- * and his bank's gateway each post from a handful of places; a stranger filling his fifty slots during an outage needs
- * five places at least, and every one of them a place that cannot fill anybody else's too.
+ * The most kept arrivals waiting for one record from one place (an IPv4 address, an IPv6 /64) (SEC7, and RD14 of the
+ * review of 30 Oct). It was one count across every record, so a sender that posts for many people from a few addresses
+ * (Zapier, IFTTT, a bank's gateway) had its eleventh arrival in a long outage refused for everybody. Counted per record,
+ * one person's door filling up never shuts another's. What a stranger could fill it with is the real token alone now
+ * (`holds`, RD1), so this is the guard on a token that leaked, not on junk.
  */
 export const HELD_PER_PLACE = 10;
+
+/** What the Directory keeps for a door signed in a header (`hmac_sha256`, `stripe`), in place of a token's digest. */
+export const SIGNED_DOOR = 'signed';
 
 /** The door's own ceiling for a webhook (`WEBHOOK_LIMIT` in `@braindog/host`'s `ingest.ts`): a bigger body is its 413. */
 const HOLD_LIMIT = 1_048_576;
@@ -125,11 +132,22 @@ function ringingOf(meta: Record<string, string> | undefined): Ringing | null {
 
 export type HeldDeps = {
   /**
-   * Whether the Directory holds this record now (`knows`), asked before anything is kept (SEC7). A 503 is kept whatever
-   * the URL says, because the record that would check it is the one that cannot answer, so this is the one check a
-   * stranger's post meets first: an id nobody holds is never kept, and a Directory that cannot say keeps nothing.
+   * Whether the Directory holds this record now and knows this door by what verifies it (`doorHolds`), asked before
+   * anything is kept (SEC7, RD1). A 503 is kept whatever the URL says, because the record that would check it is the one
+   * that cannot answer, so this is the one check a stranger's post meets first. `sign` is the SHA-256 hex of the URL's
+   * token, or `SIGNED_DOOR` for a request signed in a header. It asked only whether the record was held, and a junk
+   * token at a made-up door name was kept as surely as his bank's text: his record id is in the URL his phone posts to.
+   * A record nobody holds, a door the Directory was never told of, a token that is not the door's, and a Directory that
+   * cannot say all keep nothing.
    */
-  knows: (rec: string) => Promise<boolean>;
+  holds: (rec: string, ingest: string, sign: string) => Promise<boolean>;
+  /**
+   * Tell the Directory what verifies a door, as the record has just answered it (`door$`): a token's digest,
+   * `SIGNED_DOOR`, or `null` for a door that is gone or verified by nothing. Asked on the door's first ask while the
+   * record is up, so the Directory learns each door from its own traffic and follows a token minted again. Absent, it
+   * learns nothing and keeps only what it was already told.
+   */
+  learn?: (rec: string, ingest: string, sign: string | null) => Promise<unknown>;
   bucket: HeldBucket | undefined;
   /** `SESSION_SECRET`; the seal's key is derived from it and never stored. */
   secret: string | undefined;
@@ -157,7 +175,7 @@ export async function serveHeld(request: Request, deps: HeldDeps): Promise<Respo
      whole, up to the runtime's hundred megabytes, before the budget, the token or the 404 the door asks first. */
   const bytes = await bodyUpTo(request.body, HOLD_LIMIT);
   if (bytes === null) return tooLarge();
-  const first = await serveIngest(again(request.url, [...request.headers], bytes), deps.door());
+  const first = await serveIngest(again(request.url, [...request.headers], bytes), learning(deps.door(), deps));
   if (first.status !== 503) return first;
   /* THE SECOND ASK SPENDS NO SECOND BUDGET: it is the same arrival, already counted at the door. */
   await (deps.pause ?? sleep)(SECOND_ASK_MS);
@@ -178,11 +196,13 @@ export async function serveHeld(request: Request, deps: HeldDeps): Promise<Respo
     op({ op: 'door', held: false, rec, why: 'unsigned' }, 'error');
     return second;
   }
-  /* AND ONLY FOR A RECORD THE DIRECTORY HOLDS, asked now: during a Directory fault ten made-up ids filled the whole
-     deployment's room. One that cannot answer keeps nothing, and the sender hears 503 and tries again. */
+  /* AND ONLY FOR A DOOR THE DIRECTORY KNOWS, BY WHAT VERIFIES IT, asked now (RD1): the token's digest must be the one
+     the record last answered for this door, or the door one signed in a header. During a Directory fault ten made-up ids
+     filled the whole deployment's room, so one that cannot answer keeps nothing, and the sender hears 503 as before. */
+  const sign = path?.channel === 'webhook' && path.token !== undefined ? await digest(utf8(path.token)) : SIGNED_DOOR;
   let known = false;
   try {
-    known = await deps.knows(rec);
+    known = path?.channel === 'webhook' && (await deps.holds(rec, path.ingest, sign));
   } catch {
     known = false;
   }
@@ -227,6 +247,51 @@ const headerSigned = (headers: Headers): boolean => {
   return false;
 };
 
+/** What the Directory was last told of each door from this isolate, so a door's every arrival is not one more call. */
+const told = new Map<string, string | null>();
+/** At most this many doors remembered in one isolate; past it the memory starts again. */
+const TOLD_MOST = 1000;
+
+/** What verifies a door, as the Directory keeps it (`door$`): a token's digest, `SIGNED_DOOR`, or `null` for nothing. */
+async function signOf(v: Awaited<ReturnType<IngestDoor['verify']>>): Promise<string | null | undefined> {
+  if (v === null) return null;
+  /* A DOOR SWITCHED OFF IS ANSWERED 410 AND NEVER HELD, and on again it is the same door: nothing is learned from it. */
+  if (v.off === true) return undefined;
+  if (v.kind === 'path') return 'sha256' in v ? v.sha256.toLowerCase() : await digest(utf8(v.token));
+  if (v.kind === 'hmac_sha256' || v.kind === 'stripe') return SIGNED_DOOR;
+  return null;
+}
+
+/**
+ * The door, telling the Directory what verifies each door the record answers for (RD1), so the hold can keep only an
+ * arrival with the door's own token when the record cannot answer. A failure to tell is never the arrival's: it is
+ * logged and the door goes on.
+ */
+function learning(door: IngestDoor, deps: HeldDeps): IngestDoor {
+  const learn = deps.learn;
+  if (learn === undefined) return door;
+  return {
+    ...door,
+    verify: async (ask) => {
+      const v = await door.verify(ask);
+      const rec = ask.rec;
+      if (rec === undefined) return v;
+      try {
+        const sign = await signOf(v);
+        const key = `${rec}/${ask.ingest}`;
+        if (sign !== undefined && told.get(key) !== sign) {
+          await learn(rec, ask.ingest, sign);
+          if (told.size >= TOLD_MOST) told.clear();
+          told.set(key, sign);
+        }
+      } catch (e) {
+        op({ op: 'door', learned: false, rec, error: e instanceof Error ? e.message : String(e) }, 'error');
+      }
+      return v;
+    },
+  };
+}
+
 /** The place an address stands for (`ipBucket`: an IPv6 address as its /64), as a short digest, so no address is kept. */
 async function placeOf(ip: string): Promise<string> {
   return (await digest(utf8(`held-place:${ipBucket(ip)}`))).slice(0, 24);
@@ -249,7 +314,8 @@ async function hold(deps: HeldDeps, rec: string, url: string, headers: [string, 
       op({ op: 'door', held: false, rec, why: 'record-full' }, 'error');
       return false;
     }
-    if (waiting.objects.filter((o) => o.customMetadata?.['from'] === from).length >= HELD_PER_PLACE) {
+    /* ONE PLACE, ONE RECORD (RD14): a gateway posting for many people fills only each person's own share. */
+    if (waiting.objects.filter((o) => o.key.startsWith(`${HELD_WAIT}${rec}/`) && o.customMetadata?.['from'] === from).length >= HELD_PER_PLACE) {
       op({ op: 'door', held: false, rec, why: 'place-full' }, 'error');
       return false;
     }
