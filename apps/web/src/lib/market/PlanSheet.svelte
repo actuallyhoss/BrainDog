@@ -33,6 +33,7 @@
     onapprove,
     oncancel,
     extra,
+    fieldOf,
   }: {
     /** The record's `Diff`, a use case's `SharedPlan`, or an array of either for "Update all". */
     diff: unknown;
@@ -44,10 +45,12 @@
     onapprove: () => void;
     oncancel: () => void;
     extra?: Snippet | undefined;
+    /** A field by its label where the plan's own document knows it (a field an add-on lays on a list), before the record's. */
+    fieldOf?: ((list: string, field: string) => string | null) | undefined;
   } = $props();
 
   /* A FIELD BY THE LABEL THE RECORD SHOWS, where the browser holds its list; `sheetOf` reads the id as words otherwise. */
-  const sheet = $derived(sheetOf(diff, nameOf, (list, field) => REGISTERS[list]?.fields.find((f) => f.id === field)?.label ?? null));
+  const sheet = $derived(sheetOf(diff, nameOf, (list, field) => fieldOf?.(list, field) ?? REGISTERS[list]?.fields.find((f) => f.id === field)?.label ?? null));
   const estimate = $derived(sheet ? estimateOf(sheet.callOuts, hosted) : null);
   const calls = $derived(sheet ? sheet.parts.flatMap((p) => p.calls.map((c) => ({ ...c, from: p.title }))) : []);
   const several = $derived((sheet?.parts.length ?? 0) > 1);

@@ -60,10 +60,14 @@ function windowOf(w: unknown): string | null {
   return m ? words.over(Number(m[1]), m[2] as 'd' | 'w' | 'm' | 'y') : null;
 }
 
-/** What each list, page and figure is called, by id, with and without its `register.` prefix, for the plan sheet's words. */
+/**
+ * What each list, page and figure is called, by id, with and without its `register.` prefix, for the plan sheet's words;
+ * and each rule, script and setting by its kind's prefix (`rule.`, `script.`, `config.`), which the sheet drew as ids.
+ */
 export function namesOf(doc: unknown): Map<string, string> {
   const names = new Map<string, string>();
-  for (const d of declarationsOf(doc).declarations) {
+  const { declarations } = declarationsOf(doc);
+  for (const d of declarations) {
     if (isList(d)) {
       const id = str(d.register);
       const name = str(d.name) || idWords(id);
@@ -71,7 +75,27 @@ export function namesOf(doc: unknown): Map<string, string> {
     } else if (typeof d.page === 'string') names.set(d.page, str(d.title) || d.page).set(`page.${d.page}`, str(d.title) || d.page);
     else if (typeof d.metric === 'string') names.set(d.metric, str(d.name) || d.metric).set(`metric.${d.metric}`, str(d.name) || d.metric);
   }
+  for (const d of declarations) {
+    if (typeof d.rule === 'string') names.set(`rule.${d.rule}`, ruleOf(d, names));
+    else if (typeof d.script === 'string' && str(d.title) !== '') names.set(`script.${d.script}`, str(d.title));
+  }
+  const config = isMap(doc) && isMap(doc.config) ? doc.config : {};
+  for (const [key, c] of Object.entries(config)) if (isMap(c) && str(c.label) !== '') names.set(`config.${key}`, str(c.label));
   return names;
+}
+
+/**
+ * A field's label as the document gives it, for a list it declares or one it adds fields to (`extends`), or `null`. The
+ * plan sheet says the fields an add-on lays on a list by these, "Free trial ends", where the record has none yet.
+ */
+export function fieldsOf(doc: unknown): (list: string, field: string) => string | null {
+  const labels = new Map<string, string>();
+  for (const d of declarationsOf(doc).declarations)
+    if (isList(d) && Array.isArray(d.fields)) for (const f of d.fields.filter(isMap)) if (str(f.label) !== '') labels.set(`${str(d.register)}.${str(f.id)}`, str(f.label));
+  const ext = isMap(doc) && isMap(doc.extends) ? doc.extends : {};
+  for (const [list, e] of Object.entries(ext))
+    if (isMap(e) && Array.isArray(e.fields)) for (const f of e.fields.filter(isMap)) if (str(f.label) !== '') labels.set(`${list.replace(/^register\./u, '')}.${str(f.id)}`, str(f.label));
+  return (list, field) => labels.get(`${list}.${field}`) ?? null;
 }
 
 /**

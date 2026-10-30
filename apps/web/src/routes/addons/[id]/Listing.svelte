@@ -50,7 +50,7 @@
   import { glyphOf, ownIcon } from '$lib/market/ListingCard.svelte';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import PreviewPage from '$lib/market/PreviewPage.svelte';
-  import { addsOf, namesOf } from '$lib/market/adds.ts';
+  import { addsOf, fieldsOf, namesOf } from '$lib/market/adds.ts';
   import { readCounts } from '$lib/market/counts.ts';
   import { actionOf, entryOf, latestOf, listingKey, listingsOf, unlistedListing, type ListingKind } from '$lib/market/listing.ts';
   import { readVersionPreview, type PreviewRead } from '$lib/market/preview.ts';
@@ -147,6 +147,11 @@
 
   const adds = $derived(file ? addsOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : null);
   const names = $derived(file ? namesOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : new Map<string, string>());
+  /* THE FIELDS IT LAYS ON A LIST, BY THEIR LABELS, and a list it adds to by the name this record gives it ("Repeating"),
+     so the plan sheet says neither as an id. */
+  const fieldLabels = $derived(fieldsOf(file ? (file.doc ?? (file.text ? safeParse(file.text) : null)) : null));
+  const heldList = (id: string): string | null =>
+    id.startsWith('register.') ? (((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === id.slice('register.'.length))?.name ?? null) : null;
 
   /**
    * WHAT IT ADDS, AS THE BOARD'S PLAN ROWS: each kind it brings with its count and what each is called, from the file
@@ -640,7 +645,8 @@
     {#if planned}
       <PlanSheet
         diff={diffOf(planned)}
-        nameOf={(a: string, b?: string) => names.get(b ?? a) ?? moduleTitle(b ?? a)}
+        nameOf={(a: string, b?: string) => names.get(b ?? a) ?? heldList(b ?? a) ?? moduleTitle(b ?? a)}
+        fieldOf={fieldLabels}
         hosted={hostedHere(page.data as unknown as Shell)}
         {busy}
         onapprove={() => void approve()}
