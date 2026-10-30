@@ -1074,6 +1074,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'tasks-undated-yours', gt: 0 },
       },
       {
+        /* BY ITS DAY WHERE IT HAS ONE, THEN NEWEST FIRST (finish Z3): a backlog task rarely has a due day, so ordered by
+           that alone the list was in whatever order the record kept, as No due day was. An empty day sorts last. */
         kind: 'todo',
         heading: 'Later',
         icon: 'archive',
@@ -1081,7 +1083,10 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         source: 'register.tasks',
         where: 'state is backlog',
         columns: [{ field: 'what' }, { field: 'thing' }],
-        order: [{ field: 'by', dir: 'asc' }],
+        order: [
+          { field: 'by', dir: 'asc' },
+          { field: 'created_at', dir: 'desc' },
+        ],
         limit: 8,
         when: { metric: 'tasks-later', gt: 0 },
       },

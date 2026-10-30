@@ -143,6 +143,11 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   );
   assert.ok(!drawn.some((b) => b.kind === 'section' && (b as { box?: boolean }).box === true), 'a boxed section would take the capture line onto its surface');
   assert.equal(Object.hasOwn((PAGES.work!.blocks as { heading?: string }[]).find((b) => b.heading === 'Late')!, 'span'), true, 'Late names no width of its own');
+  /* LATER AND NO DUE DAY LIST WHAT HAS NO DAY NEWEST FIRST: a backlog task rarely has one, so Later is by its day where
+     it has one, then newest first. */
+  const orderOf = (heading: string) => (PAGES.work!.blocks as { heading?: string; order?: unknown }[]).find((b) => b.heading === heading)?.order;
+  assert.deepEqual(orderOf('Later'), [{ field: 'by', dir: 'asc' }, { field: 'created_at', dir: 'desc' }]);
+  assert.deepEqual(orderOf('No due day'), [{ field: 'created_at', dir: 'desc' }]);
   for (const folded of ['Not this week', 'Needs a project', 'Not moved in three months', 'Done lately'])
     assert.equal((page.blocks.find((b) => b.heading === folded) as { fold?: boolean }).fold, true, `${folded} is not folded`);
 
