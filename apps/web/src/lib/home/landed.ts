@@ -82,6 +82,9 @@ export function landedOf(
   const mine = me === null ? '' : (names.get(me) ?? '').trim();
   for (const l of lines) {
     if (!ARRIVED.has(l.kind) || (l.register !== null && own.has(l.register))) continue;
+    /* A SCRIPT'S WORK IS SETUP, NOT AN ARRIVAL (audit 6f AF11): Arrivals led with "Give each plan a page and count what is
+       left after each part added 2 to Plans", rows a script made out of what was already here. Activity says it. */
+    if (/^script:/u.test(l.actor)) continue;
     const name = displayName(l.title ?? '');
     if (name === '' || ULID.test(name)) continue;
     if (mine !== '' && l.actor === me && name === mine) continue;
