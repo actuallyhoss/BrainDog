@@ -547,6 +547,24 @@ function shapeOf(text: string): [SqlErrorCode, string] | null {
 /** Shapes already read, by their text: the kernel's statements are a few hundred texts asked again and again. */
 const SHAPES = new Map<string, [SqlErrorCode, string] | null>();
 
+/** `, ( + - * / % | & < > =`: every comma, bracket and operator a ceiling could be passed with. */
+const MARKS: ReadonlySet<number> = new Set([44, 40, 43, 45, 42, 47, 37, 124, 38, 60, 62, 61]);
+const AND_OR = /\b(?:AND|OR)\b/gi;
+
+/**
+ * Whether a text has too few commas, brackets and operators to pass any ceiling `shapeOf` counts, read in one pass.
+ *
+ * EVERY CEILING TAKES A HUNDRED OF THEM: a hundred commas for a hundred and one columns, a hundred and twenty-seven for
+ * the arguments, and `depthOf` adds one to a depth only for an operator or a bracket. So a text with fewer is let by
+ * without being read, which is nearly every statement, and the ones that are not are kept in `SHAPES`.
+ */
+function plainlyShallow(text: string): boolean {
+  let n = 0;
+  for (let i = 0; i < text.length; i++) if (MARKS.has(text.charCodeAt(i)) && ++n > 98) return false;
+  for (const _ of text.matchAll(AND_OR)) if (++n > 98) return false;
+  return true;
+}
+
 /**
  * The Durable Object's ceilings on a statement's shape, which `node:sqlite` holds far higher (2,000 columns, 1,000
  * arguments, a depth of 1,000), so a statement the self-host ran could fail on the Cloud: more than `DO_LIMITS.column`
@@ -558,13 +576,14 @@ const SHAPES = new Map<string, [SqlErrorCode, string] | null>();
  * does not read) is the driver's to refuse, and `guarded` names it after the fact. ponytail: a parser would count all of
  * them; nothing in the kernel comes near any of them, which is why this is a net and not a gate.
  *
- * A STATEMENT OF 200 CHARACTERS OR FEWER IS NEVER READ: each ceiling takes a hundred commas or operators to pass.
+ * A STATEMENT OF 200 CHARACTERS OR FEWER, OR WITH FEWER THAN A HUNDRED COMMAS, BRACKETS AND OPERATORS, IS NEVER READ
+ * (`plainlyShallow`): each ceiling takes a hundred of them to pass.
  */
 export function guardShape(text: string): void {
   if (text.length <= 200) return;
   let shape = SHAPES.get(text);
   if (shape === undefined) {
-    shape = shapeOf(text);
+    shape = plainlyShallow(text) ? null : shapeOf(text);
     if (text.length <= 20_000) {
       if (SHAPES.size >= 512) SHAPES.clear();
       SHAPES.set(text, shape);
