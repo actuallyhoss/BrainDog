@@ -274,8 +274,8 @@ export function methods(deps: RecordDeps) {
   });
 
   const SLASH: readonly Target[] = [
-    { id: 'slash-quick', kind: 'slash', label: 'Slash', detail: 'A quick answer from what the record holds.', live: true },
-    { id: 'slash-deep', kind: 'slash', label: 'Slash, thinking longer', detail: 'A longer look across the record, for a harder question.', live: true },
+    { id: 'slash-quick', kind: 'slash', label: 'Slash', detail: 'A quick answer from what your BrainDog holds.', live: true },
+    { id: 'slash-deep', kind: 'slash', label: 'Slash, thinking longer', detail: 'A longer look across your BrainDog, for a harder question.', live: true },
   ];
 
   /** Who an instruction went to, as the strip says it. */
@@ -403,7 +403,7 @@ export function methods(deps: RecordDeps) {
         if (a[key] !== undefined && a[key] !== null && typeof a[key] !== 'string') return no('VALUE_MALFORMED', `${key} is text.`, { at: key });
       if (a.may_change !== undefined && a.may_change !== null && typeof a.may_change !== 'boolean') return no('VALUE_MALFORMED', 'may_change is true or false.', { at: 'may_change' });
       if (a.attach !== undefined && a.attach !== null && (!Array.isArray(a.attach) || a.attach.some((r) => typeof r !== 'string')))
-        return no('VALUE_MALFORMED', 'attach is a list of rows as the record names them, like ["tasks#12"].', { at: 'attach' });
+        return no('VALUE_MALFORMED', 'attach is a list of rows as BrainDog names them, like ["tasks#12"].', { at: 'attach' });
       const target = text(a.target) ?? 'auto';
       const note = text(a.note) ?? '';
       const mayChange = a.may_change === true;

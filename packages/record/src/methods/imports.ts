@@ -45,7 +45,7 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       if (!whole(ctx)) {
         return part(ctx)
-          ? no('FORBIDDEN', 'What was imported is about the whole record, and this caller is held to part of it.', { at: 'principal' })
+          ? no('FORBIDDEN', 'What was imported is about all of this BrainDog, and this caller is held to part of it.', { at: 'principal' })
           : no('FORBIDDEN', 'What was imported is for the owner of this BrainDog to read, so nothing was read.', { at: 'principal' });
       }
       return { ok: true, value: { imports: read.importsFound() } };
@@ -58,7 +58,7 @@ export function methods(deps: RecordDeps) {
     async importAdopt(args: { run?: unknown; yes?: unknown } | undefined, ctx: CallContext): Promise<Result<FoundImport>> {
       const stop = admin(ctx, 'say whether an import is your own');
       if (stop) return { ok: false, refusal: stop };
-      if (part(ctx)) return no('FORBIDDEN', 'What was imported is about the whole record, and this caller is held to part of it.', { at: 'principal' });
+      if (part(ctx)) return no('FORBIDDEN', 'What was imported is about all of this BrainDog, and this caller is held to part of it.', { at: 'principal' });
       const said = (args ?? {}) as Record<string, unknown>;
       const extra = Object.keys(said).find((k) => k !== 'run' && k !== 'yes');
       if (extra !== undefined) return { ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: `${extra} is not something this call takes. It takes run and yes.`, at: extra, allowed: ['run', 'yes'] } };

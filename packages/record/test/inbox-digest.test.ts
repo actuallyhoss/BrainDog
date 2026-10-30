@@ -213,7 +213,7 @@ test('A TOKEN HELD TO ONE LIST IS REFUSED AS BEFORE, the digest and one arrival 
   for (const args of [undefined, { digest: true }, { id: ids.untriaged![0]! }]) {
     const no = refusal(await api.inbox(args as never, held));
     assert.equal(no?.code, 'FORBIDDEN');
-    assert.equal(no?.fix, 'The inbox belongs to the whole record, and this caller is held to part of it.');
+    assert.equal(no?.fix, 'The inbox belongs to all of this BrainDog, and this caller is held to part of it.');
   }
   sql.close();
 });

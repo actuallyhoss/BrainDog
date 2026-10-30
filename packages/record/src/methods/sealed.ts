@@ -154,7 +154,7 @@ export function methods(deps: RecordDeps) {
    * its children, a key narrowed by a lens, a report key and a job's key are each refused by what their row says.
    */
   const sealedStop = (ctx: CallContext): Refusal | null => {
-    if (ctx.preview !== undefined) return { code: 'FORBIDDEN', fix: "You're seeing the record as somebody else, and sealed files are only ever the owner's own.", at: 'preview' };
+    if (ctx.preview !== undefined) return { code: 'FORBIDDEN', fix: "You're seeing this BrainDog as somebody else, and sealed files are only ever the owner's own.", at: 'preview' };
     if (ctx.operation !== undefined) return SEALED_ONLY;
     const p = ctx.principal;
     if (p.kind === 'system') return null;

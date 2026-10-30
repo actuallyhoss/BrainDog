@@ -869,7 +869,7 @@ const FLOOR_SAID: Record<string, string> = {
   identity: 'It changes who someone is',
   others: 'It changes something another person made',
   addons: 'It changes an add-on',
-  outside: 'It reaches outside the record',
+  outside: 'It reaches outside BrainDog',
 };
 
 /** What a question of options is about, cut at a character so it fits the gate's 80 bytes (`checkBody`). */

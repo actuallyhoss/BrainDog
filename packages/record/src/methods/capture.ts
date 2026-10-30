@@ -222,7 +222,7 @@ export function methods(deps: RecordDeps & { createDoor?: CreateDoor | undefined
         const held = guard(ctx, 'append', row.register);
         if (held) return { ok: false, refusal: { ...held, at: `rows[${i}].register` } };
         if (Object.hasOwn(row.fields, 'deleted_at'))
-          return no('FIELD_UNKNOWN', 'deleted_at is kept by the record, and a new entry cannot arrive deleted.', { at: `rows[${i}].fields.deleted_at` });
+          return no('FIELD_UNKNOWN', 'deleted_at is kept by BrainDog, and a new entry cannot arrive deleted.', { at: `rows[${i}].fields.deleted_at` });
       }
 
       if (op !== undefined) {
@@ -258,7 +258,7 @@ export function methods(deps: RecordDeps & { createDoor?: CreateDoor | undefined
             if ('refusal' in checked) throw new Halt({ ...checked.refusal, at: `rows[${i}].fields${checked.refusal.at ? `.${checked.refusal.at}` : ''}` });
             const out = kernel.create(row.register, checked.fields, { ...by, ...(op === undefined ? {} : { opId: opOf(op, i) }) });
             if (!out.ok) {
-              const r: Refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this was kept. Send it again.' };
+              const r: Refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this was kept. Send it again.' };
               throw new Halt({ ...r, at: r.at === 'op_id' ? 'op_id' : `rows[${i}]${r.at ? `.${r.at === 'register' || r.at === 'fields' ? r.at : `fields.${r.at}`}` : ''}` });
             }
             made.push(out.value);

@@ -1698,10 +1698,10 @@ const READS_IN: ReadonlySet<string> = new Set(['poll', 'pull']);
  * added here (`test/slash-asked.test.ts`).
  */
 export const REACHES_OUT: Readonly<Record<string, string>> = {
-  run: 'run something beyond the record',
-  call: 'call out beyond the record',
+  run: 'run something beyond BrainDog',
+  call: 'call out beyond BrainDog',
   ask_slash: "send rows to Slash's model",
-  script: 'start a script that may fetch beyond the record',
+  script: 'start a script that may fetch beyond BrainDog',
   run_job: "start a job on the owner's machine",
 };
 
@@ -1808,7 +1808,7 @@ function describedScript(d: { id?: unknown; body?: unknown }, n: number): string
     return `Proposal ${n} has ${id}, which a door or a rule would start, and from a description Slash builds a script that runs only on its clock. Ask for it on its own.`;
   const read = strings(body.reads)[0];
   if (read !== undefined && strings(body.egress).length > 0)
-    return `Proposal ${n} has ${id}, which would read ${listNamed(read)} and fetch beyond the record, and Slash never sends what you keep out from a description. Ask for it on its own.`;
+    return `Proposal ${n} has ${id}, which would read ${listNamed(read)} and fetch beyond BrainDog, and Slash never sends what you keep out from a description. Ask for it on its own.`;
   return null;
 }
 
@@ -2399,13 +2399,13 @@ async function triedRules(
     try {
       got = await tryAutomation({ body, sample: row === undefined ? {} : { row } });
     } catch {
-      got = { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'The record could not try this rule.' } };
+      got = { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog could not try this rule.' } };
     }
     if (got.ok) {
       rules.push({ ...got.value, rule: id });
       continue;
     }
-    const refusal: Refusal = 'refusal' in got ? got.refusal : { code: 'RECORD_UNAVAILABLE', fix: 'The record could not try this rule.' };
+    const refusal: Refusal = 'refusal' in got ? got.refusal : { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog could not try this rule.' };
     if (refusal.at?.startsWith('sample') === true) continue;
     return { refusal: { ...refusal, at: refusal.at === undefined ? id : `${id}.${refusal.at}` } };
   }
@@ -2587,7 +2587,7 @@ function pageFaults(id: string, all: readonly DrawnBlock[]): { at: string; fix: 
     if (drawsRows(b) && typeof b.empty !== 'string' && b.when === undefined)
       faults.push({ at: `${id}.blocks[${i}]`, fix: `${named(b, i)} says nothing when it has nothing to show. Give it "empty", the sentence shown then, or a "when" that leaves it out.` });
     if (typeof b.heading === 'string' && HEADING_WORDS.test(b.heading))
-      faults.push({ at: `${id}.blocks[${i}].heading`, fix: `The heading ${named(b, i)} says the system's word. Name the person's own things instead, as the record calls them.` });
+      faults.push({ at: `${id}.blocks[${i}].heading`, fix: `The heading ${named(b, i)} says the system's word. Name the person's own things instead, as this BrainDog calls them.` });
   }
   const opening = shown.findIndex(({ b }) => b.kind === 'section');
   const ahead = opening === -1 ? shown.length : opening;
@@ -2690,7 +2690,7 @@ export async function describe(deps: {
     try {
       const got = await deps.ask(input);
       if ('spent' in got) {
-        dropped.push(asks === 0 ? `${got.spent} ${opening(DESCRIBED_NOTHING)}` : `${got.spent} So what the record refused was not mended.`);
+        dropped.push(asks === 0 ? `${got.spent} ${opening(DESCRIBED_NOTHING)}` : `${got.spent} So what BrainDog refused was not mended.`);
         stopped = asks === 0;
         break;
       }
@@ -2703,7 +2703,7 @@ export async function describe(deps: {
       large = asks === 0 && deps.name === 'included' && typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
       dropped.push(
         asks > 0
-          ? 'The model did not answer the repair, so what the record refused was not mended.'
+          ? 'The model did not answer the repair, so what BrainDog refused was not mended.'
           : large
             ? `This BrainDog is too large for the included model to read, so ${DESCRIBED_NOTHING}`
             : `The model did not answer, so ${DESCRIBED_NOTHING}`,
@@ -2741,7 +2741,7 @@ export async function describe(deps: {
       try {
         seen = await deps.preview({ to: draft.body.to, ...(Object.keys(draft.rows).length === 0 ? {} : { rows: draft.rows }) });
       } catch {
-        seen = { ok: false, refusal: { code: 'INTERNAL', fix: 'The record could not draw this change.', at: 'to' } };
+        seen = { ok: false, refusal: { code: 'INTERNAL', fix: 'BrainDog could not draw this change.', at: 'to' } };
       }
       const faults = faultsOf(seen, deps.built);
       if (seen.ok && faults.length === 0) clean.push({ ...draft, preview: seen.value });
@@ -2752,7 +2752,7 @@ export async function describe(deps: {
     if (asks > 0 && next.length === 0 && clean.length === cleanBefore) break;
     refused = next;
   }
-  for (const r of refused) dropped.push(`"${r.draft.question}" was dropped, because the record refused it: ${r.faults[0]?.fix ?? 'it would not draw.'}`);
+  for (const r of refused) dropped.push(`"${r.draft.question}" was dropped, because BrainDog refused it: ${r.faults[0]?.fix ?? 'it would not draw.'}`);
   const drafts = clean;
   if (drafts.length === 0 && !stopped) dropped.push(`The model proposed nothing Slash could use, so ${DESCRIBED_NOTHING}`);
   return { by: drafts.length > 0 ? deps.name : 'rules', drafts, dropped, large, ...(spentAsks > 0 ? { cost: { asks: spentAsks, tokens: spentTokens, said: costSaid(spentAsks) } } : {}) };

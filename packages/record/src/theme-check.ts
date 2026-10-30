@@ -74,7 +74,7 @@ export async function themeFault(pack: Pack): Promise<Refusal | null> {
   if (themes > THEMES_PER_PACK)
     return {
       code: 'PACK_MALFORMED',
-      fix: `${pack.manifest.pack} declares ${themes} themes, and a pack declares at most ${THEMES_PER_PACK}. A record is drawn in one; ship the others as packs of their own.`,
+      fix: `${pack.manifest.pack} declares ${themes} themes, and a pack declares at most ${THEMES_PER_PACK}. A BrainDog is drawn in one; ship the others as packs of their own.`,
       at: 'declarations',
     };
   for (const decl of pack.declarations) {

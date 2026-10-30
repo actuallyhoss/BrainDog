@@ -58,7 +58,7 @@ test('ONE REFUSED BLOCK AND ONE PATH THAT NAMED NOTHING READ RED, with both page
   assert.deepEqual(r.counts, { refused_pages: 1, unnamed_pages: 1, missing_pages: 1, suggested_waiting: 2 });
   assert.equal(
     r.said,
-    '1 page shows a block that could not be read: Usage. 1 page prints a path that names nothing: Plan. The record does not hold 1 page. 2 suggested pages wait.',
+    '1 page shows a block that could not be read: Usage. 1 page prints a path that names nothing: Plan. This BrainDog does not hold 1 page. 2 suggested pages wait.',
   );
   assert.deepEqual(r.facts, ['Usage: a block could not be read.', 'Plan prints {{revenue.monthly}}, naming nothing.']);
   /* A refusal's code is the record's, never a person's words. */
@@ -85,7 +85,7 @@ test('AN EMPTY CENSUS READS GREEN, with its four counts at nought', () => {
   /* What is said and not judged stays green. */
   const told = pagesCleanReading(CLEAN, censusOf([row('Garden', { held: 'web' })]), 1);
   assert.equal(told.state, 'green');
-  assert.equal(told.said, 'All 3 pages read print clean: headings and notes. The record does not hold 1 page. 1 suggested page waits.');
+  assert.equal(told.said, 'All 3 pages read print clean: headings and notes. This BrainDog does not hold 1 page. 1 suggested page waits.');
 });
 
 test('NO CENSUS READS EXACTLY AS TODAY', () => {

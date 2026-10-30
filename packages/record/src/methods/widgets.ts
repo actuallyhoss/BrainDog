@@ -683,7 +683,7 @@ export function methods(deps: RecordDeps) {
       const block = firstBlock(got.value);
       if (block === null) return no('PROPOSAL_SCHEMA', 'Slash could not make a widget from that. Say it another way, naming what it reads.', { at: 'said' });
       const { drawn, fix } = await draw(block);
-      if (fix !== null) return no('PROPOSAL_SCHEMA', `Slash made one the record could not draw: ${fix}`, { at: 'said' });
+      if (fix !== null) return no('PROPOSAL_SCHEMA', `Slash made one BrainDog could not draw: ${fix}`, { at: 'said' });
       const cost = got.value.cost?.said;
       if (drawing && block.kind !== 'drawn') return no('PROPOSAL_SCHEMA', 'Slash made a widget but did not draw it. Ask again, or use Make it.', { at: 'said' });
       const size: WidgetSize = drawing ? frames[0]! : isWidgetSize(block.size) ? block.size : 'wide';

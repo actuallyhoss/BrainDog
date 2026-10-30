@@ -344,7 +344,7 @@ export function previewer(deps: PreviewDeps) {
     const declared = new Set(batch.map((d) => d.id));
     for (const d of batch) {
       if (!whole && !HELD_KINDS.has(d.kind))
-        return no('FORBIDDEN', `Trying a ${d.kind} runs it across the whole record, so it is for people who can read all of it.`, { at: d.id });
+        return no('FORBIDDEN', `Trying a ${d.kind} runs it across all of this BrainDog, so it is for people who can read all of it.`, { at: d.id });
       const { lists, figures } = namesIn(d);
       for (const list of lists) {
         const stop = unread(ctx, list, d.id);

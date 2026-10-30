@@ -589,7 +589,7 @@ export function methods(deps: RecordDeps) {
       const asked = args?.days;
       if (asked !== undefined && !(typeof asked === 'number' && Number.isSafeInteger(asked) && asked >= 1 && asked <= SHARE_ACTIVITY_DAYS_MOST))
         return refuse('OUT_OF_BOUNDS', `days is a whole number from 1 to ${SHARE_ACTIVITY_DAYS_MOST}.`, 'days');
-      if (args?.person !== undefined && typeof args.person !== 'string') return refuse('VALUE_MALFORMED', 'person is the id of somebody on the record.', 'person');
+      if (args?.person !== undefined && typeof args.person !== 'string') return refuse('VALUE_MALFORMED', 'person is the id of somebody on this BrainDog.', 'person');
       const person = typeof args?.person === 'string' && args.person !== '' ? args.person : null;
       const since = instant(clock.now() - (typeof asked === 'number' ? asked : SHARE_ACTIVITY_DAYS) * DAY_MS);
       const only = person === null ? '' : ' AND who = ?';
@@ -656,7 +656,7 @@ export function methods(deps: RecordDeps) {
         if (g.searched > 0) said.push(`Searched ${times(g.searched)}.`);
         for (const [slug, n] of g.pages) said.push(`The ${slug} page, ${times(n)}.`);
         if (g.tools.size) said.push(`Their agent: ${together([...g.tools].map(([tool, n]) => `${tool} ${times(n)}`), 8)}.`);
-        for (const [as, n] of g.as) said.push(`Saw the record as ${personName(sql, as) ?? 'somebody no longer here'}, ${times(n)}.`);
+        for (const [as, n] of g.as) said.push(`Saw this BrainDog as ${personName(sql, as) ?? 'somebody no longer here'}, ${times(n)}.`);
         if (g.changed.length) said.push(`Changed ${together(g.changed)}.`);
         if (said.length === 0) continue;
         const via = g.via.length > 0 ? together(g.via.map((id) => shareName(id, catalog)), 8) : g.as.size > 0 ? 'See as' : 'Their own access';
@@ -883,7 +883,7 @@ export function methods(deps: RecordDeps) {
         return refuse('FORBIDDEN', 'Your share is not on right now, so you cannot share it on.', 'from');
 
       const who = typeof args?.who === 'string' ? args.who : '';
-      if (who === '' || who === me) return refuse('REQUIRED_MISSING', 'Share it on with somebody else on the record, by id.', 'who');
+      if (who === '' || who === me) return refuse('REQUIRED_MISSING', 'Share it on with somebody else on this BrainDog, by id.', 'who');
       if (sql.one('SELECT 1 AS y FROM person WHERE id = ?', who) === undefined || !onRecord(who))
         return refuse('REF_UNKNOWN', 'You can share on only with somebody already here.', 'who');
       const can = args?.can;

@@ -31,7 +31,7 @@ type SlashDescribe = (args: { asked: string; page?: string; body?: Record<string
 const builtFault = (body: unknown): string | null =>
   typeof body === 'object' && body !== null && !Array.isArray(body) && Array.isArray((body as { blocks?: unknown }).blocks)
     ? null
-    : 'body is the page as it is drawn now, with its blocks, for a page the record does not hold yet.';
+    : 'body is the page as it is drawn now, with its blocks, for a page this BrainDog does not hold yet.';
 
 export function methods(deps: RecordDeps) {
   const { admin, no } = deps;

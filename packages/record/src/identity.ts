@@ -366,7 +366,7 @@ const NOT_IN_LINK: readonly RegExp[] = [
  */
 export function saidRefused(said: string): string | null {
   if (said.length > SAID_IN_LINK) return 'The link carries at most 1,000 characters of what you said. Shorten it, or leave the rest for later.';
-  if (NOT_IN_LINK.some((r) => r.test(said))) return 'The link cannot carry a web or email address. Take it out of what you said, and add it once your record is made.';
+  if (NOT_IN_LINK.some((r) => r.test(said))) return 'The link cannot carry a web or email address. Take it out of what you said, and add it once your BrainDog is made.';
   try {
     encodeURIComponent(said);
   } catch {

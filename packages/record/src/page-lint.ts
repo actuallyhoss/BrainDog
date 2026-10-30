@@ -195,7 +195,7 @@ function answerFindings(b: BlockResult, part: string, waiting: number | null): O
       part,
       said: `${blank.length === 1 ? 'Shows a figure' : `Shows ${blank.length} figures`} with no answer${listed(blank.map((r) => r.label ?? figureWords(r.metric)))}.`,
     });
-  if ((b.refusals ?? []).length > 0) out.push({ rule: 'refused', part, said: 'Draws nothing, because the record could not read what it asks for.' });
+  if ((b.refusals ?? []).length > 0) out.push({ rule: 'refused', part, said: 'Draws nothing, because BrainDog could not read what it asks for.' });
   const rows = (b.rows ?? []).length;
   if (b.matched === 0 && rows > 0) out.push({ rule: 'none-matched', part, said: `Says nothing matched while it holds ${integer(rows)}.` });
   if (b.kind === 'queue' && !b.where && rows === 0 && waiting !== null && waiting > 0)
@@ -336,7 +336,7 @@ export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: T
 }
 
 /** What a page that will not draw prints, which is nothing: a finding on the page, never the refusal's own words. */
-const NO_DRAW = 'Does not open: the record could not draw this page.';
+const NO_DRAW = 'Does not open: BrainDog could not draw this page.';
 
 /**
  * One round over the record's pages, as many as `ROUND_MS` allows, in `pagesToLint`'s order. A PAGE THAT WILL NOT DRAW
@@ -556,7 +556,7 @@ function withCensus(base: PagesCleanReading, census: PagesCensus, suggested: num
     says(counts.unnamed_pages, 'page prints a path that names nothing', 'pages print a path that names nothing', unnamed.map((p) => p.title)),
   ].filter((s) => s !== '');
   const told = [
-    counts.missing_pages > 0 ? `The record does not hold ${counts.missing_pages === 1 ? '1 page' : `${integer(counts.missing_pages)} pages`}.` : '',
+    counts.missing_pages > 0 ? `This BrainDog does not hold ${counts.missing_pages === 1 ? '1 page' : `${integer(counts.missing_pages)} pages`}.` : '',
     says(counts.suggested_waiting ?? 0, 'suggested page waits', 'suggested pages wait'),
   ].filter((s) => s !== '');
   const red = worst.length > 0 || base.state === 'red';

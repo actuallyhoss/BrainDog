@@ -166,7 +166,7 @@ function twoWays(path: string, part: TextPart, names: TextNames): { said: string
   const [head = '', tail, ...rest] = path.split('.');
   if (tail === undefined && part.own?.includes(path) && names.figures?.includes(path))
     return {
-      said: `"{{${path}}}" is both a field here and a figure of the record, and it reads the field.`,
+      said: `"{{${path}}}" is both a field here and a figure of this BrainDog, and it reads the field.`,
       fix: 'Rename the field, or the figure, so each has a name of its own.',
     };
   if (tail === 'count' && rest.length === 0 && part.ownLists?.includes(head) && names.all.includes(path))
@@ -198,7 +198,7 @@ function partFaults(part: TextPart, names: TextNames, where: TextWhere): TextFau
       const near = nearest(p, [...(part.own ?? []), ...names.all]);
       const keep = 'or put the words in backticks to keep them as text';
       add('names-nothing', p, `"{{${p}}}" names nothing in your BrainDog.`,
-        near ? `Write {{${near}}}, the nearest name the record has, ${keep}.` : `Name a figure, a list or a field the record has, ${keep}.`);
+        near ? `Write {{${near}}}, the nearest name this BrainDog has, ${keep}.` : `Name a figure, a list or a field this BrainDog has, ${keep}.`);
       return;
     }
     const two = twoWays(p, part, names);
@@ -214,7 +214,7 @@ function partFaults(part: TextPart, names: TextNames, where: TextWhere): TextFau
       const literal = !/^[A-Za-z]/.test(arg) || (form === 'ref' && /^[a-z][a-z0-9_]*#\d+$/.test(arg));
       if (!literal) path(arg);
       else if (formatTyped(form as TypedForm, arg) === null)
-        add('bad-value', body, `"{{${body}}}" is not a value the record can read.`, SHAPE[form as TypedForm]);
+        add('bad-value', body, `"{{${body}}}" is not a value BrainDog can read.`, SHAPE[form as TypedForm]);
       continue;
     }
     if (colon > 0 && /^[a-z][a-z0-9_-]*$/.test(form) && arg !== '' && names.figures?.includes(form)) continue;
@@ -261,7 +261,7 @@ function segmentFaults(part: TextPart, names: TextNames, add: (kind: TextFaultKi
     if (DATED.test(seg.heading ?? '') || DATED.test(after)) return;
     add('undated-bar', `${seg.start}`,
       seg.heading ? `The bar "${seg.heading}" shows numbers typed in, with no day to say when they held.` : 'A bar shows numbers typed in, with no day to say when they held.',
-      'Say when in its heading, as "Revenue, March 2026", or read each number from the record with a path so it stays current.');
+      'Say when in its heading, as "Revenue, March 2026", or read each number from BrainDog with a path so it stays current.');
   });
 }
 

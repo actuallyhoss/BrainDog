@@ -215,7 +215,7 @@ function arrivedSaid(kernel: Kernel, before: readonly { at: string; holds: reado
     const words = hold.replace(/_/gu, ' ');
     return kernel.register(hold)?.name ?? ROLE_WORDS[hold] ?? words.charAt(0).toUpperCase() + words.slice(1);
   });
-  const said = names.length <= 1 ? (names[0] ?? 'the record') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
+  const said = names.length <= 1 ? (names[0] ?? 'this BrainDog') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
   return `${came.length === 1 ? '1 part' : `${came.length} parts`} that waited for ${said} arrived.`;
 }
 
@@ -1820,7 +1820,7 @@ export function arranger(d: ArrangeDeps) {
     const plain: Body = { [nameField]: name, ...(email !== null && parts.email !== undefined ? { [parts.email]: email } : {}), ...(note !== null && fields.has('note') ? { note } : {}) };
     let put = self === null ? null : kernel.create(meets.register, { ...plain, [self]: true } as never, by);
     if (put === null || !put.ok) put = kernel.create(meets.register, plain as never, by);
-    if (!put.ok) return 'refusal' in put ? { ok: false, refusal: { ...put.refusal, at: 'body.me' } } : refuse('VERSION_STALE', 'The record moved while you were being added. Press it again.', 'body.me');
+    if (!put.ok) return 'refusal' in put ? { ok: false, refusal: { ...put.refusal, at: 'body.me' } } : refuse('VERSION_STALE', 'Something changed while you were being added. Press it again.', 'body.me');
     if (self !== null) kernel.askOwnRows?.(actor);
     return ok(`${meets.register}#${put.value.seq}`);
   }
@@ -2235,7 +2235,7 @@ export function arranger(d: ArrangeDeps) {
           /* No note either way: the feed reads "You added Ada", not "You Added from a plan accepted on Decide." */
           const out = kernel.create(register, fields as never, { actor, batch });
           if (!out.ok) {
-            const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE' as const, fix: 'The record moved while the plan was written. Accept it again.' };
+            const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE' as const, fix: 'Something changed while the plan was written. Accept it again.' };
             halted.refusal = { ...refusal, at: `body.rows[${i}]${refusal.at ? `.${refusal.at}` : ''}` };
             throw halted;
           }

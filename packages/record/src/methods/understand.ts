@@ -119,7 +119,7 @@ export function methods(deps: RecordDeps) {
       if (deps.readsEveryList?.(ctx) !== true)
         return no(
           'FORBIDDEN',
-          'What the walk would link reads every list in this BrainDog, so only somebody who reads all of them is shown it. The owner sees it in the app, or with a key of theirs that reads the whole record.',
+          'What the walk would link reads every list in this BrainDog, so only somebody who reads all of them is shown it. The owner sees it in the app, or with a key of theirs that reads all of it.',
           { at: 'principal' },
         );
       if (!deps.understood) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot read what it holds again from here.');
