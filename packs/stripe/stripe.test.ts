@@ -693,7 +693,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, the key opened for
     /* AND IT SAYS WHAT THE SCRIPT COULD CARRY OUT. It reads accounts to find its own rows and books to know the one
        its setting names (1.4.0), and the host still
        tells the owner that what it reads may leave for Stripe, which is true of any script with a read and a fetch. */
-    assert.ok(approve.includes('stripe reads accounts and books and may send what it reads to api.stripe.com.'), JSON.stringify(approve));
+    assert.ok(approve.includes('“Stripe balance and payouts” reads accounts and books and may send what it reads to api.stripe.com.'), JSON.stringify(approve));
     assert.ok(api.kernel.register('accounts')?.fields.some((f) => f.id === 'arrives'), 'accounts lost arrives when the pack installed');
 
     const due = () => running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), SCRIPT.script);

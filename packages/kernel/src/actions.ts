@@ -1782,7 +1782,7 @@ export function egressOf(
 }
 
 /** The part of a `script` body its egress is read from. The whole shape is `ScriptBody` in `script.ts`, which imports this file. */
-type ScriptHeader = { script: string; runs?: { every?: unknown; door?: unknown; rule?: unknown }; egress?: unknown; keys?: unknown; reads?: unknown };
+type ScriptHeader = { script: string; title?: unknown; runs?: { every?: unknown; door?: unknown; rule?: unknown }; egress?: unknown; keys?: unknown; reads?: unknown };
 
 /**
  * A script's egress, from its header, or `null` when it fetches from nowhere.
@@ -1830,7 +1830,10 @@ function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | nul
     return host !== null && called.has(host) ? host : `no host it calls (its keychain entry opens ${JSON.stringify(opens)}), so every fetch with it is refused`;
   };
   const line = `CALLS OUT ${joinedList(hosts)} · ${when.join(' and ') || 'never'} · ${keys.length === 0 ? 'no key' : `key ${joinedList(keys.map((k) => `"${k}" to ${to(k)}`))}`}`;
-  const key_line = reads.length > 0 ? `${d.script} reads ${joinedList(reads)} and may send what it reads to ${joinedList(hosts)}.` : null;
+  /* SAID BY ITS TITLE, the words its install sheet names it by ("Read the next events from your calendar"), and its
+     lists as words: `calendar_poll reads events` was a line of code on the sheet. A script with no title is "This script". */
+  const title = typeof d.title === 'string' && d.title.trim() !== '' ? `“${d.title.trim()}”` : 'This script';
+  const key_line = reads.length > 0 ? `${title} reads ${joinedList(reads.map((r) => r.replace(/_/gu, ' ')))} and may send what it reads to ${joinedList(hosts)}.` : null;
 
   return {
     ingest: d.script,
