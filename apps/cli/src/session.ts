@@ -60,19 +60,21 @@ const BAD_STATE = `braindog session end takes --state ${STATES.slice(0, -1).join
 const NO_SESSION = 'No session is open in this folder. Start a Claude Code session here, or run braindog hook start.';
 const NO_RUN = 'The host has no open run for this folder. Start a Claude Code session here, then try again.';
 
-const SAID: Record<Line, (spoken: string) => string> = {
-  next: (spoken) => `${spoken} now carries that next step.`,
-  tried: (spoken) => `${spoken} now carries that as already tried.`,
-  note: (spoken) => `${spoken} now carries that note.`,
+/* "THIS RUN", NOT ITS ID: the person typed the line in this folder and knows which run it is; the id is the answer's,
+   under `--json`, for a program. */
+const SAID: Record<Line, () => string> = {
+  next: () => 'This run now carries that next step.',
+  tried: () => 'This run now carries that as already tried.',
+  note: () => 'This run now carries that note.',
 };
 
 /** What a host with no `end` answers: no such method at all, or a route whose record is older than it (`hooks.ts`). */
 const OLDER_HOST: ReadonlySet<string> = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
 
-const ENDED: Record<State, (spoken: string) => string> = {
-  idle: (spoken) => `${spoken} is idle.`,
-  handoff: (spoken) => `${spoken} is handed off.`,
-  done: (spoken) => `${spoken} is done.`,
+const ENDED: Record<State, () => string> = {
+  idle: () => 'This run is idle.',
+  handoff: () => 'This run is handed off.',
+  done: () => 'This run is done.',
 };
 
 /* ── the pieces every verb shares ──────────────────────────────────────── */
@@ -200,7 +202,7 @@ async function oneLine(verb: Line, rest: string[], io: AgentIo): Promise<number>
   }
   const said = text.trim();
   const body = verb === 'next' ? { next: said } : verb === 'tried' ? { tried: said } : { note: said };
-  return send(at, body, io, SAID[verb](clip(at.context.session.spoken, 40)), { run: at.context.session.spoken, left: verb });
+  return send(at, body, io, SAID[verb](), { run: at.context.session.spoken, left: verb });
 }
 
 /* ── end ───────────────────────────────────────────────────────────────── */
@@ -265,7 +267,7 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
     const ended = await at.client.call('end', position);
     if (ended.ok) {
       const to = (ended.value as { state?: unknown } | undefined)?.state === 'handoff' ? 'handoff' : 'done';
-      io.out(ENDED[to](clip(at.context.session.spoken, 40)));
+      io.out(ENDED[to]());
       io.answer?.({ value: { run: at.context.session.spoken, state: to } });
       return 0;
     }
@@ -284,7 +286,7 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
       ...(where.head === null ? {} : { head: where.head }),
     },
     io,
-    ENDED[state](clip(at.context.session.spoken, 40)),
+    ENDED[state](),
     { run: at.context.session.spoken, state },
   );
 }

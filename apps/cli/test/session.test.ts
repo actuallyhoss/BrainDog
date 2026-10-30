@@ -178,9 +178,9 @@ test('show says so when there is no project, no handoff and nobody else here', a
 
 test('NEXT, TRIED AND NOTE EACH REACH handoff UNDER THEIR OWN FIELD, and none of them names a run', async (t) => {
   const cases: [string, Record<string, unknown>, string][] = [
-    ['next', { next: 'Run the refusal gates after the build' }, 'S7 now carries that next step.'],
-    ['tried', { tried: 'a shorter budget' }, 'S7 now carries that as already tried.'],
-    ['note', { note: 'the stub answers on loopback only' }, 'S7 now carries that note.'],
+    ['next', { next: 'Run the refusal gates after the build' }, 'This run now carries that next step.'],
+    ['tried', { tried: 'a shorter budget' }, 'This run now carries that as already tried.'],
+    ['note', { note: 'the stub answers on loopback only' }, 'This run now carries that note.'],
   ];
   for (const [verb, body, line] of cases) {
     const host = await stub(t);
@@ -227,7 +227,7 @@ test('END WITH NO STATE IS THE RECORD\u2019S TO PICK, so a run its agent ended i
   assert.deepEqual(host.seen.map((s) => s.method), ['context', 'end']);
   /* A temporary folder is outside any work tree, so its position answers nothing and neither field is sent. */
   assert.deepEqual(host.seen[1]?.args, {});
-  assert.deepEqual(h.out, ['S7 is done.'], h.said.join('\n'));
+  assert.deepEqual(h.out, ['This run is done.'], h.said.join('\n'));
   assert.deepEqual(h.said, []);
 });
 
@@ -238,7 +238,7 @@ test('END WITH A NEXT STEP LEAVES IT FIRST AND THEN ENDS, and a run that left on
   assert.equal(await session(['end', '--next', 'Wire session into main.ts'], h.io), 0, h.said.join('\n'));
   assert.deepEqual(host.seen.map((s) => s.method), ['context', 'handoff', 'end']);
   assert.deepEqual(host.seen[1]?.args, { next: 'Wire session into main.ts' });
-  assert.deepEqual(h.out, ['S7 is handed off.'], h.said.join('\n'));
+  assert.deepEqual(h.out, ['This run is handed off.'], h.said.join('\n'));
 });
 
 test('END ON A HOST WITH NO end KEEPS THE OLD IDLE, as the end hook does', async (t) => {
@@ -248,7 +248,7 @@ test('END ON A HOST WITH NO end KEEPS THE OLD IDLE, as the end hook does', async
   assert.equal(await session(['end'], h.io), 0, h.said.join('\n'));
   assert.deepEqual(host.seen.map((s) => s.method), ['context', 'end', 'handoff']);
   assert.deepEqual(host.seen[2]?.args, { state: 'idle' });
-  assert.deepEqual(h.out, ['S7 is idle.'], h.said.join('\n'));
+  assert.deepEqual(h.out, ['This run is idle.'], h.said.join('\n'));
 });
 
 test('end --state handoff leaves the run to be picked up', async (t) => {
@@ -257,7 +257,7 @@ test('end --state handoff leaves the run to be picked up', async (t) => {
 
   assert.equal(await session(['end', '--state', 'handoff'], h.io), 0, h.said.join('\n'));
   assert.deepEqual(host.seen[1]?.args, { state: 'handoff' });
-  assert.deepEqual(h.out, ['S7 is handed off.'], h.said.join('\n'));
+  assert.deepEqual(h.out, ['This run is handed off.'], h.said.join('\n'));
 });
 
 test('END --STATE DONE CARRIES --NEXT, because a finished run leaves its old next step behind', async (t) => {
@@ -266,7 +266,7 @@ test('END --STATE DONE CARRIES --NEXT, because a finished run leaves its old nex
 
   assert.equal(await session(['end', '--state', 'done', '--next', 'Wire session into main.ts'], h.io), 0, h.said.join('\n'));
   assert.deepEqual(host.seen[1]?.args, { state: 'done', next: 'Wire session into main.ts' });
-  assert.deepEqual(h.out, ['S7 is done.'], h.said.join('\n'));
+  assert.deepEqual(h.out, ['This run is done.'], h.said.join('\n'));
   assert.deepEqual(h.said, []);
 });
 
