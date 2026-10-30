@@ -238,6 +238,28 @@ export async function methods(io: Io = live()): Promise<Said<Methods>> {
   return m ? { ok: true, value: m } : { ok: false, kind: 'no-host' };
 }
 
+/**
+ * WHAT A LAPSED SESSION LEFT ON THIS DEVICE GOES once the account says nobody is signed in (RE7 of the review of 30 Oct,
+ * e). Sign-in drew inside the app's frame until the split, and its 401 dropped the last shell and the local copy; the
+ * light frame reads nothing, so a session that ran out with no sign-out left both until somebody signed in again.
+ * Never on a host that lets everybody in (`open`), and never when the account could not be asked: offline is when the
+ * copies earn their keep. The local copy's module is fetched only where a shell copy or its reader's mark is kept
+ * (`braindog.boot-copy`, `braindog.last-reader`, written out so this file loads neither module), so a stranger's first
+ * visit fetches nothing more.
+ */
+export async function forgetLapsed(said: Said<Methods>): Promise<void> {
+  if (!said.ok || said.value.open || said.value.me !== null) return;
+  let kept = false;
+  try {
+    kept = globalThis.localStorage?.getItem('braindog.boot-copy') != null || globalThis.localStorage?.getItem('braindog.last-reader') != null;
+  } catch {
+    kept = false;
+  }
+  /* The last shell is among what a sign-out drops (`signed-out.ts`); the local copy is not, so it is wiped here. */
+  forgetSignedOut();
+  if (kept) await import('./data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
+}
+
 /** Sign in with a passkey this device or a nearby phone holds. */
 export async function passkeySignIn(io: Io = live()): Promise<Said<Who>> {
   const asked = await call(io, '/auth/passkey/assert/options', {});

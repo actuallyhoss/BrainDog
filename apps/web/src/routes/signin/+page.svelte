@@ -23,6 +23,7 @@
   import {
     canAutofill,
     exchangeKey,
+    forgetLapsed,
     methods,
     passkeyAutofill,
     passkeyRegister,
@@ -226,6 +227,8 @@
   async function load() {
     const at = opened();
     asked = await methods();
+    /* A SESSION THAT RAN OUT WITH NO SIGN-OUT LEFT ITS COPIES HERE (RE7): gone once the account says nobody is in. */
+    void forgetLapsed(asked);
     /* `true` whatever came back: a host without sign-in is a state this screen draws, not a refusal of
        it. The error states draw an `Empty`, which says `refused` for as long as it is on screen. */
     closed(true, at);
