@@ -1,0 +1,37 @@
+# The Mac app's Rust side, compiled: a plugin bump or a Tauri change that breaks the build is seen here rather than at
+# the owner's release sitting. Only when the app or its release tools change, on a macOS runner (the app is macOS only).
+
+name: desktop
+
+on:
+  push:
+    branches: [master]
+    paths: ['apps/desktop/**', 'tools/desktop/**', '.github/workflows/desktop.yml']
+  pull_request:
+    branches: [master]
+    paths: ['apps/desktop/**', 'tools/desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    runs-on: ${{ vars.MACOS_RUNNER || 'macos-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Outside the tree, as the release builds: a target/ inside it is what the tree-walking gates would read.
+      - name: Check the Mac app compiles
+        run: cd apps/desktop/src-tauri && PATH="$HOME/.cargo/bin:$PATH" CARGO_TARGET_DIR="${RUNNER_TEMP:-/tmp}/braindog-desktop-target" cargo check --locked
