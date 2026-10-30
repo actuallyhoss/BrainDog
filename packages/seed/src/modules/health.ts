@@ -70,7 +70,7 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
          NOUGHT IS "NOTHING NEEDS A LOOK", NEVER "ALIVE". `signs-red` reads 0 once one sign is green, however many of the
          rest are still `none` (`readVitals`, `built-in-figures.ts`), so "Everything on this record is alive." was said of
          a record with one sign read. What nought proves is that no sign read red, and the line says that and no more.
-         HOW MANY ARE UNREAD IS SAID UNDER IT, from `signs-unread`, so nought red is never read as all of it. */
+         HOW MANY ARE UNREAD IS THE "Not checked yet" GROUP BELOW, so nought red is never read as all of it. */
       {
         kind: 'note',
         lead: true,
@@ -92,20 +92,8 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
         when: { metric: 'signs-red', gt: 1 },
         body: '{{signs-red}} things need a look.',
       },
-      /* HOW MUCH THE LINE HAS NOT SEEN, from `signs-unread` (health-words-43): the signs with nothing to judge by yet. Two
-         notes, since only a lead note has its `(s)` settled, and none at all while every sign has been read. */
-      {
-        kind: 'note',
-        span: 12,
-        when: { metric: 'signs-unread', is: 1 },
-        body: 'One check has not run yet.',
-      },
-      {
-        kind: 'note',
-        span: 12,
-        when: { metric: 'signs-unread', gt: 1 },
-        body: '{{signs-unread}} checks have not run yet.',
-      },
+      /* HOW MUCH THE LINE HAS NOT SEEN IS THE "Not checked yet" GROUP'S, AND SAID ONCE (31 October, AG25): "12 checks
+         have not run yet." stood over that group, which names every one of them again. */
       /* AND WHERE THE TIDYING IS DONE: what went stale and what is here twice is counted in Settings, Tidy up, which
          links back here, so the two counts are never read as one. */
       {

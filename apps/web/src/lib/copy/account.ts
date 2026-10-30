@@ -480,7 +480,7 @@ export const account = {
   theKeyIs: 'Locked with a key kept outside BrainDog, which cannot show it to you.',
   /* NAMED BY ITS FILE ON A SELF-HOST: it began "If you run BrainDog yourself", said only to the
      person who does. `kek` in the data folder is where `braindog init` writes it (`apps/selfhost/src/main.ts`). */
-  theKeyWhere: 'It is the file named kek in the data folder. Keep a copy somewhere else.',
+  theKeyWhere: 'It is the backup key file, named kek, in the data folder. Keep a copy somewhere else.',
   restore: 'Restore',
   /**
    * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.

@@ -29,6 +29,8 @@ const SIGNS: Schema = {
     state: { type: 'enum', values: SIGN_STATES },
     value: { type: 'decimal' },
     said: { type: 'text' },
+    /* WHERE A PERSON GOES TO MEND IT (AG7), a path in this app when the sign's reader knows one; the row opens it. */
+    to: { type: 'text' },
   },
 };
 
@@ -46,7 +48,7 @@ function signEntry(s: VitalSign, at: string): Entry {
     id: `sign:${s.sign}`,
     register: SIGNS.register,
     seq: null,
-    fields: { sign: s.sign, name: s.name, state, value, said: typeof s.said === 'string' ? s.said : '' },
+    fields: { sign: s.sign, name: s.name, state, value, said: typeof s.said === 'string' ? s.said : '', ...(typeof s.to === 'string' && s.to.startsWith('/') ? { to: s.to } : {}) },
     state,
     version: 1,
     created_at: at,

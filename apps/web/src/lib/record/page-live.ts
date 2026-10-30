@@ -1002,6 +1002,19 @@ function moneySets(register: string, columns: readonly { field?: unknown }[], ro
   });
 }
 
+/** A card's cost, price or fee figure of nought, said as "Free": only a money field named for what something costs. */
+function freeSaid(register: string, columns: readonly { field?: unknown; as?: unknown }[], entries: readonly Entry[], rows: { cells: (string | null)[] }[]): void {
+  const fields = REGISTERS[register]?.fields ?? [];
+  columns.forEach((c, i) => {
+    if (c.as !== 'figure' || typeof c.field !== 'string' || !/^(cost|price|fee)$/u.test(c.field)) return;
+    if (fields.find((f) => f.id === c.field)?.type !== 'money') return;
+    entries.forEach((e, n) => {
+      const v = e.fields[c.field as string] as { amount?: unknown } | null | undefined;
+      if (rows[n] && v && typeof v === 'object' && v.amount === 0) rows[n]!.cells[i] = 'Free';
+    });
+  });
+}
+
 /** The words a ledger line waiting to clear wears under its name. */
 export const WAITING_TO_CLEAR = 'Waiting to clear';
 
@@ -1945,7 +1958,7 @@ export function blockOf(
   }
   /* THE RECORD'S VITAL SIGNS (`packages/kernel/src/pages.ts` `signsBlock`), one row a sign in the record's own order,
      which Health draws as cards grouped by state. `signs` names no register, so before this every sign card on Health
-     said it cannot be drawn. A sign is keyed by its id and opens nothing; its state is said in words, and a red one
+     said it cannot be drawn. A sign is keyed by its id; its state is said in words, and a red one
      carries the bad tone, which reaches the page with its glyph, so it is never told by colour alone. */
   if (b.source === 'signs') {
     const register = 'signs';
@@ -1958,6 +1971,8 @@ export function blockOf(
         key: `sign:${sign}`,
         cells: wordsFor(shell.columns, row.cells, e.fields, 'state', SIGN_WORDS),
         ...(e.fields.state === 'red' ? { tone: 'bad' as const } : {}),
+        /* AND OPENS WHERE IT IS MENDED (AG7): a failure opens its question, so Health's one problem has a way on. */
+        ...(typeof e.fields.to === 'string' && e.fields.to.startsWith('/') && !e.fields.to.startsWith('//') ? { href: e.fields.to } : {}),
       };
     });
     return { ...shell, register, entries, matched: entries, rows, shown: entries.length, total: Math.max(matched, entries.length), names: namesOf(refs) };
@@ -2191,6 +2206,8 @@ export function blockOf(
   if (kind === 'table') moneySets(register, columns, rows);
   /* AND A ROW DUE SOON SAYS WHEN, in words and not an amber dot alone (`soonSaid`). */
   if (kind === 'table') soonSaid(register, columns, drawnEntries, rows, now);
+  /* A COST OF NOTHING IS FREE (31 October, AG22): a free certificate's card read "£0" over "Cost". */
+  if (kind === 'cards') freeSaid(register, columns, drawnEntries, rows);
   /* A LEDGER LINE STILL WAITING TO CLEAR SAYS SO IN THE TILE (finish F3), as the Ledger lists it apart and Budgets counts
      it: Money home's Ledger drew the pending £2,500 like any cleared line. Said at the end of the line under the name. */
   if (kind === 'timeline') pendingSaid(register, columns, entries, rows);

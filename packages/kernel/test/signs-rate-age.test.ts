@@ -1,5 +1,5 @@
 /**
- * `rate-age`, "How old is the newest rate" (pairs-fx-guard-62-63#4): the vital sign beside `pairs.across_currency`.
+ * `rate-age`, "Rates are fresh enough to match transfers" (pairs-fx-guard-62-63#4): the vital sign beside `pairs.across_currency`.
  *
  * TWO CURRENCIES PAIR BY THEMSELVES ONLY ON A RATE AT MOST `PAIR_RATE_DAYS` OLD (`pairs.ts`). Past that the two rows of
  * a move stay counted as spending and income and a person is asked, and nothing on the record said why. This sign says
@@ -103,7 +103,7 @@ function sign(sql: NodeSql, nowMs = NOW, tz = 'UTC'): SignReading {
 test('ON THE LIST: named in words, read by the kernel, its threshold the one the pairing holds', () => {
   const s = reader();
   assert.ok(s, 'rate-age is not on the list');
-  assert.equal(s.name, 'How old is the newest rate');
+  assert.equal(s.name, 'Rates are fresh enough to match transfers');
   assert.ok(!/[a-z]+-[a-z]+/.test(s.name), 'the name is an id');
   assert.equal(s.hand, 'kernel');
   assert.equal(typeof s.read, 'function');

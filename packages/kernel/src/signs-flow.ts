@@ -229,7 +229,7 @@ function readSourceless(sql: Sql): SignReading {
      text, or no body that parses, is one no read can show and no person can mend. */
   const without = scripts.filter((s) => typeof s.body?.source !== 'string' || s.body.source.trim() === '');
   const facts = [`${count(scripts.length, 'script')} installed, ${without.length} without source.`];
-  if (without.length <= SCRIPTS_SOURCELESS_MOST) return reading('green', 0, 'Every installed script holds its source.', facts);
+  if (without.length <= SCRIPTS_SOURCELESS_MOST) return reading('green', 0, 'Every installed script has its code here to read.', facts);
   return reading('red', without.length, `${names(without.map((s) => s.name))} ${without.length === 1 ? 'holds' : 'hold'} no source anybody can read.`, facts);
 }
 
@@ -394,9 +394,9 @@ const kernel = (sign: string, name: string, thresholds: Record<string, number>, 
  */
 export const SIGNS_FLOW: readonly SignReader[] = [
   /* READ WITHOUT THE CLOCK: stands until something it read is written (`SignLasts`). */
-  kernel('scripts-paused', 'No script is paused', { SCRIPTS_PAUSED_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readPaused(sql))),
+  kernel('scripts-paused', 'Scripts stay switched on', { SCRIPTS_PAUSED_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readPaused(sql))),
   kernel('scripts-refused', 'Scripts finish their runs', { SCRIPTS_REFUSED_MOST }, readRefused),
-  kernel('scripts-sourceless', 'Every script holds its source', { SCRIPTS_SOURCELESS_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readSourceless(sql))),
+  kernel('scripts-sourceless', 'Scripts run from what you saved', { SCRIPTS_SOURCELESS_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readSourceless(sql))),
   kernel('automations-failed', 'Automations do not fail', { FLOW_WINDOW_DAYS, AUTOMATIONS_FAILED_MOST }, (sql, nowMs, _tz, lasts) => readFailed(sql, nowMs, lasts)),
   kernel('automations-parked', 'No run is stuck waiting on a person', { PARKED_GRACE_MS, AUTOMATIONS_PARKED_MOST }, readParked),
   kernel('automations-idle', 'Automations that have never run', { IDLE_AFTER_DAYS }, (sql, nowMs, _tz, lasts) => readIdle(sql, nowMs, lasts)),

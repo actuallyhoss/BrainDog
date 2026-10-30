@@ -230,10 +230,10 @@ function readDoorsSilent(sql: Sql, nowMs: number, tz: string, lasts: SignLasts =
     lasts(crossesAt(d.quiet, DOOR_QUIET_DAYS * DAY));
   }
   const busy = doors.filter((d) => Number(d.before) >= DOOR_BUSY_LEAST);
-  if (busy.length === 0) return reading('none', null, `No door has filed ${DOOR_BUSY_LEAST} arrivals in two weeks, so a quiet one says nothing yet.`);
+  if (busy.length === 0) return reading('none', null, `No way in has had ${DOOR_BUSY_LEAST} messages in two weeks yet, so none is watched for going quiet.`);
   const silent = busy.filter((d) => Number(d.since) === 0).map((d) => ({ ...d, name: ingestName(sql, d.ingest_id) }));
   const facts = [`${count(busy.length, 'busy door')}, ${silent.length} quiet for ${DOOR_QUIET_DAYS} days.`];
-  if (silent.length === 0) return reading('green', 0, `Every busy door has had arrivals in the last ${DOOR_QUIET_DAYS} days.`, facts);
+  if (silent.length === 0) return reading('green', 0, `Every busy way in has had messages in the last ${DOOR_QUIET_DAYS} days.`, facts);
   facts.push(...silent.map((d) => `${d.name} filed ${count(Number(d.before), 'arrival')} in the ${DOOR_BUSY_DAYS} days before, the last on ${daySaid(d.last, tz)}.`));
   const one = silent[0]!;
   return reading(
@@ -351,8 +351,8 @@ export const SIGNS_ACTIONS: readonly SignReader[] = [
   /* HOW LONG EACH STANDS BY THE CLOCK ALONE (`SignLasts`): what is paused or has died moves only with a write; what the
      plan held is counted by the month. */
   kernel('actions-paused', 'No scheduled action is paused', { ACTIONS_PAUSED_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readActionsPaused(sql, nowMs, tz))),
-  kernel('actions-held', "No run waits on the plan's limit", { ACTIONS_HELD_MOST }, (sql, nowMs, _tz, lasts) => (lasts?.(monthAfter(nowMs)), readActionsHeld(sql, nowMs))),
+  kernel('actions-held', "Runs fit the plan's limit", { ACTIONS_HELD_MOST }, (sql, nowMs, _tz, lasts) => (lasts?.(monthAfter(nowMs)), readActionsHeld(sql, nowMs))),
   kernel('schedule-failed', 'Nothing that runs by itself has died', { SCHEDULE_FAILED_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readScheduleFailed(sql, nowMs, tz))),
-  kernel('doors-silent', 'Busy doors do not go quiet', { DOOR_BUSY_LEAST, DOOR_BUSY_DAYS, DOOR_QUIET_DAYS }, readDoorsSilent),
+  kernel('doors-silent', 'Messages keep arriving', { DOOR_BUSY_LEAST, DOOR_BUSY_DAYS, DOOR_QUIET_DAYS }, readDoorsSilent),
   kernel('arrivals-unverified', 'Every arrival is verified', { UNVERIFIED_WINDOW_DAYS, UNVERIFIED_MOST }, readUnverified),
 ];

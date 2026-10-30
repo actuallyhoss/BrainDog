@@ -55,6 +55,8 @@ export type VitalSign = {
   days: { day: string; state: SignState }[];
   /** The counts a filed sign carries beside its value (`SIGN_COUNTS`), when its filing held any. */
   counts?: Record<string, number>;
+  /** Where a person goes to mend it, a path in this app, when its reader knows one (`SignReading.to`). */
+  to?: string;
 };
 
 /** What a reader answers, and what the record or host files through `fileSignReading`. */
@@ -69,6 +71,11 @@ export type SignReading = {
    * ("The backup on 3 Sep did not run") was headed "Each problem is asked once", the name of the check that caught it.
    */
   named?: string;
+  /**
+   * WHERE A PERSON GOES TO MEND IT, a path in this app (31 October, AG7): Health's "Something did not work" over "The
+   * backup on 3 Sep did not run" had nothing to press, while Needs you held the same question with "Run it now".
+   */
+  to?: string;
 };
 
 /**
@@ -585,8 +592,33 @@ function readCauses(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined)
       : `${uncaused.length} open questions carry no cause.`;
   const out = reading('red', biggest?.length ?? (faults.length || uncaused.length), said, facts);
   /* THE RECORD'S OWN FAILURE IS HEADED AS ONE, not under this check's name (30 October): Health read "Each problem is
-     asked once" over "The backup on 3 Sep did not run". */
-  return !biggest && faults.length > 0 ? { ...out, named: faults.length === 1 ? 'Something did not work' : `${faults.length} things did not work` } : out;
+     asked once" over "The backup on 3 Sep did not run".
+     AND BY WHAT FAILED, WITH ITS WAY ON (31 October, AG7): "Something did not work" over that line gave nothing to press,
+     while Needs you held the same question with "Run it now" suggested. One failure is titled by its own words, says
+     the answer suggested, and opens its question; more than one open Needs you. */
+  if (biggest || faults.length === 0) return out;
+  if (faults.length > 1) return { ...out, named: `${faults.length} things did not work`, to: '/decide' };
+  const one = faults[0]!;
+  const pick = suggestedOf(sql, one.id);
+  return {
+    ...out,
+    named: sentence(askedIn(sql, one.id)).replace(/\.$/u, ''),
+    said: pick === null ? 'It waits on you in Needs you.' : `It waits on you in Needs you, with “${pick}” suggested.`,
+    to: `/decide/${one.id}`,
+  };
+}
+
+/** The label of the answer a question suggests, when it holds options and marks one. */
+function suggestedOf(sql: Sql, id: string): string | null {
+  const row = sql.one<{ body: string | null }>('SELECT body FROM suggestion WHERE id = ?', id);
+  try {
+    const body = typeof row?.body === 'string' ? (JSON.parse(row.body) as { options?: unknown }) : null;
+    const options = Array.isArray(body?.options) ? (body.options as { label?: unknown; recommended?: unknown }[]) : [];
+    const label = options.find((o) => o?.recommended === true)?.label;
+    return typeof label === 'string' && label.trim() !== '' ? label.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 function readOldest(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
@@ -851,6 +883,7 @@ export function readSigns(sql: Sql, nowMs: number, tz: string, each?: (sign: str
     const days = Array.from({ length: 14 }, (_, i) => dayBefore(today, 14 - i)).map((day) => ({ day, state: kept.get(`${s.sign} ${day}`) ?? ('none' as const) }));
     const sign: VitalSign = { sign: s.sign, name: now.named ?? s.name, state: now.state, value: now.value, said: now.said, facts: now.facts ?? [], days };
     if (now.counts !== undefined) sign.counts = { ...now.counts };
+    if (typeof now.to === 'string' && now.to.startsWith('/')) sign.to = now.to;
     return sign;
   });
 }
@@ -973,4 +1006,10 @@ export const QUIET: Readonly<Record<string, (s: VitalSign) => string>> = {
  * the record's `signs` method, the briefing's red signs and a page's `signs` block hold the inbox's words back by one
  * rule.
  */
-export const quietSign = (s: VitalSign): VitalSign => ({ ...s, said: s.state === 'none' ? s.said : (QUIET[s.sign]?.(s) ?? s.said), facts: [] });
+export const quietSign = (s: VitalSign): VitalSign => {
+  const { to: _to, ...rest } = s;
+  const out: VitalSign = { ...rest, said: s.state === 'none' ? s.said : (QUIET[s.sign]?.(s) ?? s.said), facts: [] };
+  /* A FAILURE IS TITLED BY ITS QUESTION'S WORDS (AG7), so the title is held back with the sentence, and so is its way to the question. */
+  if (s.sign === 'questions-by-cause') out.name = VITAL_SIGNS.find((v) => v.sign === s.sign)?.name ?? s.name;
+  return out;
+};

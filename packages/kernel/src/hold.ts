@@ -44,7 +44,7 @@ export type HoldSign = (typeof HOLD_SIGNS)[number];
 /** What a person reads for each hold sign: `VITAL_SIGNS`' names, held equal by the test. */
 export const HOLD_NAMES: Readonly<Record<HoldSign, string>> = {
   'arrivals-filed': 'Arrivals file by themselves',
-  'doors-silent': 'Busy doors do not go quiet',
+  'doors-silent': 'Messages keep arriving',
   'numbers-arrive': 'Numbers arrive on schedule',
   'model-answers': 'The model answers',
   'tools-listed': 'Agents get the tool list',

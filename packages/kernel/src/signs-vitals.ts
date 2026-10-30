@@ -306,5 +306,5 @@ export const SIGNS_VITALS: readonly SignReader[] = [
      (`SignLasts`), and the kernel reads them again on a new day. */
   kernel('format-current', 'This BrainDog is in the current format', { FORMAT_BEHIND_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readFormat(sql))),
   kernel('amounts-whole', 'Every amount is whole', { AMOUNTS_BROKEN_MOST }, (sql, _nowMs, _tz, lasts) => (lasts?.(Infinity), readAmounts(sql))),
-  kernel('rate-age', 'How old is the newest rate', { RATE_DAYS_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readRateAge(sql, nowMs, tz))),
+  kernel('rate-age', 'Rates are fresh enough to match transfers', { RATE_DAYS_MOST }, (sql, nowMs, tz, lasts) => (lasts?.(Infinity), readRateAge(sql, nowMs, tz))),
 ];
