@@ -1,5 +1,5 @@
 // Runs in the page before its own scripts. Builds window.__BRAINDOG_SHELL__ exactly as
-// apps/web/src/lib/shell.ts reads it: open, notify, badge, inset, on. Only on our own origin.
+// apps/web/src/lib/shell.ts reads it: open, notify, badge, inset, on. Only on our own origin, app.brain.dog.
 (() => {
   if (location.origin !== '__ORIGIN__') return;
   const call = (cmd, args) => {
@@ -9,7 +9,7 @@
       return Promise.resolve();
     }
   };
-  const subs = { slash: new Set(), goto: new Set() };
+  const subs = { slash: new Set(), search: new Set(), goto: new Set(), saved: new Set(), unsaved: new Set() };
   window.__BRAINDOG_SHELL__ = {
     inset: 78,
     open: (url) => void call('open_outside', { url: String(url) }),
@@ -28,10 +28,11 @@
     },
   };
   const interactive = 'a,button,input,textarea,select,summary,[role=button],[contenteditable],[data-no-drag]';
-  // The title bar is overlaid, so the strip under the traffic lights drags the window.
+  // The title bar is overlaid, so the strip under the traffic lights drags the window, and a double click on it
+  // does what a double click on any Mac title bar does (zoom, or what System Settings says).
   addEventListener('mousedown', (e) => {
     if (e.button !== 0 || e.target.closest?.(interactive)) return;
-    if (e.clientY < 40 || e.target.closest?.('[data-shell-drag]')) void call('start_drag');
+    if (e.clientY < 40 || e.target.closest?.('[data-shell-drag]')) void call(e.detail === 2 ? 'title_double_click' : 'start_drag');
   }, true);
   // Any link that leaves BrainDog goes to the default browser, whatever the page did with it.
   addEventListener('click', (e) => {

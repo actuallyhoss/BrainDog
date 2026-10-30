@@ -1,6 +1,49 @@
 <!doctype html>
+<!--
+  Shown by the app (lib.rs, `offline_page`) when BrainDog has not started to load within a few seconds: no connection,
+  or app.brain.dog not answering. `?to=` is where Try again goes; it is the app's own start, and only an https address
+  (or a local one in a debug build) is followed. It also tries again by itself when the Mac comes back online.
+-->
 <meta charset="utf-8">
 <title>BrainDog</title>
 <meta name="color-scheme" content="light dark">
-<body style="font:16px system-ui;display:grid;place-items:center;height:100vh;margin:0">
-<p>BrainDog could not reach app.brain.dog. Check your connection, then reopen the app.</p>
+<style>
+  body { font: 15px/1.45 -apple-system, system-ui, sans-serif; display: grid; place-items: center; height: 100vh; margin: 0; }
+  main { max-width: 340px; padding: 0 24px; text-align: center; }
+  h1 { font-size: 17px; font-weight: 600; margin: 0 0 6px; }
+  p { margin: 0 0 18px; color: color-mix(in srgb, CanvasText 70%, Canvas); }
+  button { font: inherit; padding: 7px 16px; border-radius: 8px; border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); background: Canvas; color: CanvasText; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: default; }
+</style>
+<main>
+  <h1>BrainDog could not be reached</h1>
+  <p id="why">Check your connection, then try again.</p>
+  <button id="again" type="button">Try again</button>
+</main>
+<script>
+  (() => {
+    const raw = new URLSearchParams(location.search).get('to') || 'https://app.brain.dog/';
+    let to = 'https://app.brain.dog/';
+    try {
+      const u = new URL(raw);
+      if (u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1') to = u.href;
+    } catch (_) {}
+    const button = document.getElementById('again');
+    const why = document.getElementById('why');
+    let timer = 0;
+    const tryAgain = () => {
+      button.disabled = true;
+      button.textContent = 'Trying…';
+      location.href = to;
+      // A load that fails leaves this page where it was; say so and let the button be pressed again.
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        button.disabled = false;
+        button.textContent = 'Try again';
+        why.textContent = 'Still not reached. Check your connection, then try again.';
+      }, 15000);
+    };
+    button.addEventListener('click', tryAgain);
+    addEventListener('online', tryAgain);
+  })();
+</script>
