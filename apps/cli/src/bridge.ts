@@ -763,7 +763,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       if (stop.signal.aborted) return;
       if (got.kind === 'signed-out') {
         if (refusing === null) say('The host no longer accepts this sign-in, so every call now answers how to sign in again.');
-        refusing ??= signedOutSurface(io.signedOut ?? endedFix(target.key));
+        refusing ??= signedOutSurface(io.signedOut ?? endedFix(target.key, tokenFromEnv(env, target.token)));
         reply = await onMachine(message, refusing, message);
       } else if (got.kind === 'away') {
         reply = await away(message, id, got.maybe);
@@ -976,6 +976,17 @@ export async function hookEnding(env: Record<string, string | undefined>, cwd: s
   }
 }
 
-/** The sentence every call answers once the host has said this machine's sign-in ended, in `signedOutFix`'s words. */
-export const endedFix = (host: string): string =>
-  `The login to ${host} ended, so nothing was read or written. Tell the person to run ${loginCommand(host)} in a terminal, then start a new session. Until then do not answer from memory, and say that BrainDog is not signed in.`;
+/**
+ * The sentence every call answers once the host has said this machine's sign-in ended, in `signedOutFix`'s words.
+ *
+ * A TOKEN FROM `BRAINDOG_TOKEN` IS NOT A LOGIN, and the environment wins over the hosts file (`target`), so a new login
+ * would change nothing: the person is told the variable is the one refused, and to replace it or unset it.
+ */
+export const endedFix = (host: string, fromEnv = false): string =>
+  fromEnv
+    ? `${host} does not take the token in BRAINDOG_TOKEN, so nothing was read or written. Tell the person to replace BRAINDOG_TOKEN with a token that works there, or to unset it and run ${loginCommand(host)} in a terminal, then start a new session. Until then do not answer from memory, and say that BrainDog is not signed in.`
+    : `The login to ${host} ended, so nothing was read or written. Tell the person to run ${loginCommand(host)} in a terminal, then start a new session. Until then do not answer from memory, and say that BrainDog is not signed in.`;
+
+/** Whether the token sent is the one `BRAINDOG_TOKEN` holds, which `target` sends before any the hosts file has. */
+export const tokenFromEnv = (env: Record<string, string | undefined>, token: string | undefined): boolean =>
+  token !== undefined && token !== '' && env.BRAINDOG_TOKEN === token;
