@@ -170,14 +170,58 @@ export type Week = ReadonlyMap<string, { late: number; moved: boolean }>;
  * THE WEEK, ONE READ A PROJECT: late work as its card and its page count it (`latesOf`), and money in as its page's
  * Money tile reads it, this month's bucket. A read that fails says nothing.
  */
-export async function readWeek(base: string, list: string, play: readonly SideRow[], now = Date.now()): Promise<Week> {
-  const [lates, ins] = await Promise.all([latesOf(base, list, play.map((p) => p.seq)).catch(() => new Map<number, number>()), moneyOf(base, play, now)]);
+export async function readWeek(base: string, list: string, play: readonly SideRow[], now = Date.now(), before: Week = new Map()): Promise<Week> {
+  const [lates, ins] = await Promise.all([latesOf(base, list, play.map((p) => p.seq)).catch(() => null), moneyOf(base, play, now)]);
   return new Map(
     play.map((p, i) => {
-      const now = ins[i]?.months.find((m) => m.partial);
-      return [p.key, { late: lates.get(p.seq) ?? 0, moved: (now?.value ?? 0) > 0 }];
+      const now = ins[i] === null || ins[i] === undefined ? undefined : ins[i].months.find((m) => m.partial);
+      const had = before.get(p.key);
+      /* A READ THAT FAILED KEEPS WHAT WAS DRAWN (audit 2, B18): late work not counted is not "nothing late". */
+      return [p.key, { late: lates === null ? (had?.late ?? 0) : (lates.get(p.seq) ?? 0), moved: ins[i] === null || ins[i] === undefined ? (had?.moved ?? false) : (now?.value ?? 0) > 0 }];
     }),
   );
+}
+
+/** Where this device keeps each record's last week, by the record's base. */
+export const WEEK_KEPT_KEY = 'bd_side_week';
+
+/**
+ * THE WEEK THIS DEVICE LAST DREW FOR THE RECORD AT `base`, drawn at once on every screen while it is read again (audit 2,
+ * B18): Kiln's "late" was on Today, which reads it in its own first read, and missing on Needs you, Settings and Keys,
+ * where the week waits for the screen's reads to rest and was not in yet. Empty where nothing is kept.
+ */
+export function keptWeek(base: string, raw: string | null = readKept()): Week {
+  try {
+    const all = JSON.parse(raw ?? '{}') as Record<string, Record<string, { late?: unknown; moved?: unknown }>>;
+    const mine = all[base];
+    if (mine === null || typeof mine !== 'object') return new Map();
+    return new Map(
+      Object.entries(mine).flatMap(([key, w]) =>
+        w !== null && typeof w === 'object' && typeof w.late === 'number' && Number.isInteger(w.late) && w.late >= 0 ? [[key, { late: w.late, moved: w.moved === true }] as const] : [],
+      ),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+/** Keeps the week just read for the record at `base`, beside any other record's. */
+export function keepWeek(base: string, week: Week): void {
+  try {
+    const all = JSON.parse(readKept() ?? '{}') as Record<string, unknown>;
+    all[base] = Object.fromEntries(week);
+    globalThis.localStorage?.setItem(WEEK_KEPT_KEY, JSON.stringify(all));
+  } catch {
+    /* A browser that keeps nothing draws the week once it is read. */
+  }
+}
+
+function readKept(): string | null {
+  try {
+    return globalThis.localStorage?.getItem(WEEK_KEPT_KEY) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -36,6 +36,13 @@ export type FactKpi = {
   change: number | null;
   target: number | string | null;
   targetBy: string | null;
+  /**
+   * WHAT TODAY SAYS FOR IT, where the renderer planned it (`kpiView`): a flow's figure is its last whole period, and its
+   * change is on the one before, so the page says that figure and that period beside the change. Without it the page
+   * said its newest reading beside the change of the period before ("32 … up 33%" while Today said "28 hours, Up 33%",
+   * audit 2, B2).
+   */
+  shown?: { figure: string; when: string } | undefined;
 };
 export type FactDecided = { question: string; answer: string; at: string };
 export type FactHistory = { note: string; by: string; at: string };
@@ -231,7 +238,19 @@ export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'form
     const age = Math.max(0, daysBetween(last.at.slice(0, 10), f.today));
     const stale = age > Math.max(2 * m.every, 2);
     const pts = m.points.slice(-45).map((p) => p.v);
-    return { label: m.label, figure: figureOf(last.v, last.money, m.unit, f.format), sub: movedOf(m, f.format, f.today), points: pts, age, stale, trail: trailOf(pts, 120, 32) };
+    const shown = m.kpi?.shown;
+    const moved = movedOf(m, f.format, f.today);
+    return {
+      label: m.label,
+      figure: shown ? shown.figure : figureOf(last.v, last.money, m.unit, f.format),
+      /* THE PERIOD THE FIGURE IS OF, where it is a period's ("in the week of 24 Aug"), so the newest reading on Numbers is
+         not read as this one. */
+      sub: shown && shown.when !== '' ? (moved === '' ? shown.when : `${moved}, ${shown.when}`) : moved,
+      points: pts,
+      age,
+      stale,
+      trail: trailOf(pts, 120, 32),
+    };
   });
   /* THE FEED'S AGE AND WHETHER IT STOPPED ARE THE ONE RULE THE PROJECTS BOARD READS TOO (`feed-age.ts`), over every
      measure and not only the cells drawn. */

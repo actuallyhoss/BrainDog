@@ -258,3 +258,10 @@ test('A LIST WITH THE ID OF A FIRST-PARTY MODULE IT DOES NOT INSTALL IS REFUSED,
   const withModule = value<Record<string, unknown>>(exportUseCase({ ...PARTS, modules: ['people'], declarations: [COURSES, PEOPLE_LIKE], examples: [] }));
   value(await readShared(JSON.stringify(withModule)));
 });
+
+test("an enum's words for its values are not a credential, and a secret-named key beside them still is", async () => {
+  const { credentialKey } = await import('../src/credentials.ts');
+  const kinds = { register: 'keys', fields: [{ id: 'kind', type: 'enum', values: ['api_token', 'note'], labels: { api_token: 'API token', note: 'Note' } }] };
+  assert.equal(credentialKey(kinds), null);
+  assert.equal(credentialKey({ fields: [{ id: 'kind', type: 'enum', values: ['note'], labels: { api_token: 'sk-live' } }] }), 'api_token');
+});

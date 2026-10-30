@@ -71,6 +71,18 @@ export function credentialKey(body: Json, seen: WeakSet<object> = new WeakSet())
   seen.add(body);
   for (const [key, value] of Array.isArray(body) ? body.map((v, i) => [String(i), v] as const) : Object.entries(body)) {
     if (!Array.isArray(body) && secretName(key) && typeof value === 'string' && value.trim()) return key;
+    /* AN ENUM'S WORDS FOR ITS VALUES ARE NAMED BY THE VALUES (`labels: { api_token: 'API token' }`): a key there that is
+       one of the field's own `values` is a kind of thing, not a credential, and only what it says is walked. The Agents
+       pack's Keys list said its kinds that way in 1.28.0, and the seed was refused. */
+    if (!Array.isArray(body) && key === 'labels' && Array.isArray((body as Record<string, Json>).values) && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const values = new Set(((body as Record<string, Json>).values as Json[]).filter((v): v is string => typeof v === 'string'));
+      for (const [k, v] of Object.entries(value)) {
+        if (!values.has(k) && secretName(k) && typeof v === 'string' && v.trim()) return k;
+        const found = credentialKey(v, seen);
+        if (found) return found;
+      }
+      continue;
+    }
     const found = credentialKey(value, seen);
     if (found) return found;
   }

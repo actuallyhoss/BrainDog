@@ -1014,7 +1014,8 @@
         <!-- THE HALF THAT IS OWNER-ONLY SAYS SO IN THE RECORD'S WORDS, and it no longer takes the page with it. -->
         <Empty kind={machinesTell.kind} title={machinesTell.title} body={machinesTell.body} />
       {:else if from !== 'reading' && holding.length === 0}
-        <Empty kind="no-data-yet" title={words.noMachines} />
+        <!-- A PART OF THE SCREEN, NOT ITS ANSWER (audit 2, B18): no machine yet beside six keys settled Keys as "empty". -->
+        <Empty kind="no-data-yet" title={words.noMachines} compact />
       {/if}
       <ul class="ledger ledger-lead whos">
         {#each holding as d (d.handle)}

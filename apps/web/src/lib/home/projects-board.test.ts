@@ -94,6 +94,22 @@ test('the headline names the late projects and the quiet numbers, and the button
   assert.deepEqual(tide.chip, { tone: 'warn', text: 'numbers 29 days old' });
 });
 
+test('a number gone quiet counts on the quiet tile while the rest of its project still reports', () => {
+  const b = boardOf(
+    base({
+      kpis: [
+        { project: 'things#1', name: 'Studios licensed', figure: '52', money: null, every: '1w', latestAt: '2026-10-26', points: [1, 2, 3], move: null, stale: null, aim: null, readings: 12 },
+        { project: 'things#1', name: 'Specimen downloads', figure: '251', money: null, every: '1w', latestAt: '2026-10-06', points: [1, 2, 3], move: null, stale: '21 days old', aim: null, readings: 6 },
+      ],
+    }),
+  );
+  assert.equal(b.week.quiet.count, 1);
+  assert.equal(b.week.quiet.said, 'since 6 Oct');
+  assert.deepEqual(b.week.quiet.lines[0], { day: null, project: 'Kiln', text: 'Specimen downloads, 21 days old', href: '/p/kiln' });
+  /* Kiln's feed has not stopped, so nothing says it stopped sending numbers. */
+  assert.doesNotMatch(b.headline, /stopped sending/u);
+});
+
 test('a day written in a next step is due this week, and puts the project among the moving', () => {
   const b = boardOf(base());
   assert.equal(b.week.due.count, 1);

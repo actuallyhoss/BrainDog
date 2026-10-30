@@ -16,6 +16,11 @@
   the tab (`scope-move.ts` `placesIn`); until they arrive, and for a project this reader cannot see, a side reads
   "A project".
 
+  A NOTE IS READ AS THE NOTE (`note` in `changes.ts`): one sentence that says the change ("Adds “and through two
+  resellers”"), then each place it moves, under the heading it sits in, drawn by the app's own renderer as a project's
+  page draws it, what it held there dimmed and struck and what it would hold on the held wash. Its source diff put
+  "# Kiln" and "GBP 18,400.00" in front of the press. In the queue the place folds under its sentence.
+
   WHAT A CHANGE TAKES IN IS SAID BEFORE ITS DIFF (`takes` in `changes.ts`): under "Why: what was learned", each row
   the change adds to a list of refs by its own words, and under it what stands behind it (for a learning, the failure
   that taught it). A skill's next version was a long diff over a line of handles, and the press was taken without the
@@ -29,12 +34,17 @@
 <script lang="ts">
   /* `Diff` is drawn here outside a declared page, so its kind's sheet comes with it (`kinds/diff.css`). */
   import '@braindog/skin/kinds/diff.css';
-  import { diffPlan } from 'braindog-render';
-  import { Diff } from 'braindog-render/svelte';
+  /* AND A NOTE'S PARTS ARE ITS BLOCKS, as a declared page draws them (`PageView`), so a note's bar is bars here too. */
+  import '@braindog/skin/blocks-kinds.css';
+  import '@braindog/skin/blocks-charts.css';
+  import { diffPlan, parse } from 'braindog-render';
+  import { Block, Diff, Markdown } from 'braindog-render/svelte';
   import { apiBase } from '$lib/at.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
+  import { recordZone } from '$lib/record/zone.ts';
   import { placeNamed, placesIn, words as scopeWords, type Place, type Scope } from '$lib/record/scope-move.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
-  import { closedSaid, moreReasons, words, type Updated } from './changes.ts';
+  import { closedSaid, moreReasons, noteWords, words, type NoteChange, type Updated } from './changes.ts';
 
   let { updates, compact = false }: { updates: readonly Updated[]; compact?: boolean } = $props();
 
@@ -55,12 +65,39 @@
   const firstWhy = $derived(updates.findIndex((u) => u.why !== undefined));
   const moreWhy = $derived(firstWhy < 0 ? 0 : updates.filter((u) => u.why !== undefined).length - 1);
 
+  /* A NOTE'S PART IS DRAWN AS A PROJECT'S PAGE DRAWS IT: the renderer's blocks, at the record's clock, zone and home
+     currency. A fence the renderer could not read is left out, as the shared page leaves it. Nothing in it links. */
+  const opts = { now: Date.now(), zone: recordZone(), home: homeCurrency() };
+  const segmentsOf = (source: string) => parse(source, { page: true }).filter((s) => s.type !== 'degraded');
+
   /** One side of a move, as its chip: the project it names, or `null` for everywhere. */
   const sideOf = (to: string, said: string | null, named: string | null = null): Scope | null =>
     said === null
       ? null
       : (placeNamed(places[to] ?? null, said) ?? { spoken: said, name: named !== null && named !== said ? named : scopeWords.someProject, mark: null, hue: null });
 </script>
+
+{#snippet drawn(source: string)}
+  {#each segmentsOf(source) as segment, n (n)}
+    {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'markdown'}<Markdown {segment} {opts} />{/if}
+  {/each}
+{/snippet}
+
+{#snippet noteParts(note: NoteChange)}
+  <div class="note-parts">
+    {#each note.parts as part, n (n)}
+      <div class="note-part">
+        {#if part.under}<p class="note-under">{noteWords.under(part.under)}</p>{/if}
+        {#if part.before.length > 0}
+          <del class="note-side note-was document"><span class="vh">{words.before}: </span>{#each part.before as source, k (k)}{@render drawn(source)}{/each}</del>
+        {/if}
+        {#if part.after.length > 0}
+          <ins class="note-side note-now document"><span class="vh">{words.after}: </span>{#each part.after as source, k (k)}{@render drawn(source)}{/each}</ins>
+        {/if}
+      </div>
+    {/each}
+  </div>
+{/snippet}
 
 <ul class="changes">
   {#each updates as u, i (u.at)}
@@ -85,7 +122,23 @@
         </div>
       {/if}
       {#each u.changes as c (c.field)}
-        {#if c.long && compact}
+        {#if c.long && c.note && compact}
+          <details class="change-fold">
+            <summary class="change-line">
+              <span class="change-label">{c.label}</span>
+              <span class="change-sum">{c.note.said}</span>
+            </summary>
+            {@render noteParts(c.note)}
+          </details>
+        {:else if c.long && c.note}
+          <div class="change-field">
+            <p class="change-line">
+              <span class="change-label">{c.label}</span>
+              <span class="note-said">{c.note.said}</span>
+            </p>
+            {@render noteParts(c.note)}
+          </div>
+        {:else if c.long && compact}
           <details class="change-fold">
             <summary class="change-line">
               <span class="change-label">{c.label}</span>
@@ -272,6 +325,78 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* ── A NOTE'S CHANGE: the note's own blocks at a reading measure, what it held over what it would hold ── */
+
+  .note-said {
+    color: var(--ink);
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .note-parts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .note-part {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .note-under {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  /* EACH SIDE IS A BLOCK OF THE NOTE, not a run of text: `del` and `ins` keep their meaning for a screen reader and
+     lose the browser's own line, which each side draws its own way. */
+  .note-side {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-ctl);
+    font-size: var(--fs-body);
+    line-height: 1.55;
+    text-decoration: none;
+  }
+
+  .note-side :global(:is(p, ul, ol)) {
+    max-inline-size: 68ch;
+    margin: 0;
+  }
+
+  .note-side :global(:is(h1, h2, h3, h4)) {
+    margin: 0;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    letter-spacing: 0;
+    line-height: 22px;
+  }
+
+  /* WHAT IT HELD: its words dimmed and struck, as the diff strikes a line it takes out; a chart is only dimmed, since a
+     line across a bar reads as a broken bar. */
+  .note-was {
+    color: var(--ink-2);
+    opacity: 0.75;
+  }
+
+  .note-was :global(:is(p, li, h1, h2, h3, h4)) {
+    text-decoration-line: line-through;
+    text-decoration-color: var(--ink-3);
+  }
+
+  /* WHAT IT WOULD HOLD: in ink, on the held wash the diff puts a line it adds on. */
+  .note-now {
+    background: var(--tile-2);
+    color: var(--ink);
   }
 
   .change-fold > summary {

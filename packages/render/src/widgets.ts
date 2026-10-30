@@ -268,6 +268,21 @@ export const PREVIEW_ROWS = 6;
 /** How many points of a figure's line a preview keeps, the newest. */
 export const PREVIEW_POINTS = 28;
 
+/**
+ * THE SIZE A LIST WIDGET STARTS AT, FITTED TO ITS ROWS: a list that holds a row or two is offered one cell high, and not
+ * at its template's Tall or Large, where "People to get back to" drew one person in a box five hundred pixels tall, and
+ * cut its own name in a one-column card (audit 2, B6). Wide before Small, so the title and the row keep their width.
+ * Only ever smaller, only to a size the template allows, and only where the reading is rows and how many it holds is
+ * known; figures, a line and a reading not yet in keep the template's size.
+ */
+export function fittedSize(sizes: readonly WidgetSize[], size: WidgetSize, reading: WidgetReading | null | undefined): WidgetSize {
+  if (reading === null || reading === undefined || reading.figures !== undefined || reading.rows === undefined || reading.rows.length === 0) return size;
+  const tall = SIZE_SAID[size].rows;
+  if (tall <= 1) return size;
+  const fits = (to: WidgetSize): boolean => sizes.includes(to) && SIZE_SAID[to].rows < tall && SIZE_SAID[to].cols <= Math.max(SIZE_SAID[size].cols, 2) && reading.count <= ROWS_AT[to];
+  return (['wide', 'small'] as const).find(fits) ?? size;
+}
+
 /** A block as `previewPage` answered it, distilled to what a widget's preview draws (`WidgetReading`). */
 export function distill(t: Pick<WidgetTemplate, 'rows' | 'block'>, drawn: unknown, opts: { now?: number } = {}): WidgetReading {
   const b = isBag(drawn) ? drawn : {};
