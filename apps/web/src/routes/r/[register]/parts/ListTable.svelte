@@ -35,6 +35,7 @@
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
   import JsonBox from '$lib/ui/JsonBox.svelte';
   import FileField from '$lib/ui/FileField.svelte';
+  import RefPick from '$lib/ui/RefPick.svelte';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
@@ -400,6 +401,23 @@
             onfocusout={leftTheRow}
             onkeydown={(e) => cellKeys(e, true)}
           />
+        {:else if f?.type === 'ref' && f.to}
+          <!-- A LINK IS PICKED BY NAME, as on the row page and the new-row form, and a pressed row is the edit: it
+               commits at once, as the enum's menu does. The box's own keys (arrows, Enter on the list, Esc on the
+               list) stop at it; past them Enter commits and Esc cancels as any cell's do. The click stays in the
+               cell, or picking a row opened the row. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <span
+            class="cell-box cell-pick"
+            onclick={(e) => e.stopPropagation()}
+            onfocusout={leftTheRow}
+            onkeydown={(e) => {
+              e.stopPropagation();
+              if (!e.defaultPrevented) cellKeys(e, true);
+            }}
+          >
+            <RefPick to={f.to} label={labelOf(f)} autofocus fixed bind:value={editValue} onpick={() => commitEdit()} />
+          </span>
         {:else if f && isFile(f)}
           <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back,
                saved through the same commit as any other cell once the row is left. -->
@@ -597,6 +615,15 @@
     align-items: center;
     gap: var(--sp-1);
     min-inline-size: 0;
+  }
+
+  /* A LINK'S PICKER TAKES THE WHOLE CELL, so the name in it is not cut to its first letters. */
+  .cell-pick {
+    inline-size: 100%;
+  }
+
+  .cell-pick > :global(.pick) {
+    flex: 1;
   }
 
   .cell-unit {

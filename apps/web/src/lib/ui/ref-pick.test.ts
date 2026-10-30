@@ -47,10 +47,12 @@ test('a name typed and left means the row named exactly, else the only match, el
   assert.equal(meant(CATEGORIES, ''), null);
 });
 
-test('the row page and the new-row form both edit a link with RefPick', () => {
+test('the row page, the new-row form and the list cells all edit a link with RefPick', () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const page = readFileSync(join(here, '../../routes/r/[register]/[seq]/+page.svelte'), 'utf8');
   const form = readFileSync(join(here, 'RowForm.svelte'), 'utf8');
-  assert.match(page, /f\.type === 'ref' && f\.to\}\s*<RefPick /u);
+  const grid = readFileSync(join(here, '../../routes/r/[register]/parts/ListTable.svelte'), 'utf8');
+  assert.match(page, /f\.type === 'ref' && f\.to\}[\s\S]{0,200}?<RefPick [^>]*onpick=\{\(\) => void saveEdit\(f\)\}/u, 'a pressed row saves at once, so the list never stands over Save');
   assert.match(form, /f\.type === 'ref' && f\.to\}\s*<RefPick /u);
+  assert.match(grid, /f\?\.type === 'ref' && f\.to\}[\s\S]{0,1200}?<RefPick [^>]*fixed[^>]*onpick=\{\(\) => commitEdit\(\)\}/u, 'a cell commits the pressed row');
 });
