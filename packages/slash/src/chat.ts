@@ -719,7 +719,10 @@ export const chats = (core: Core): Chat => {
 
   const addTurn = (thread: string, role: 'you' | 'slash', text: string, actions: readonly ChatAction[] = []): void => {
     const n = (sql.one<{ n: number | null }>('SELECT MAX(n) AS n FROM slash_turn WHERE thread = ?', thread)?.n ?? 0) + 1;
-    sql.exec('INSERT INTO slash_turn (thread, n, role, text, actions, ts) VALUES (?, ?, ?, ?, ?, ?)', thread, n, role, text, JSON.stringify(actions), now());
+    /* A MODEL'S U+0000 IS DROPPED, NOT STORED: the port refuses a text holding one (`guard`), and what the model said is
+       ours to keep, where what a person typed is refused at the door instead. */
+    const kept = role === 'slash' ? text.replaceAll('\u0000', '') : text;
+    sql.exec('INSERT INTO slash_turn (thread, n, role, text, actions, ts) VALUES (?, ?, ?, ?, ?, ?)', thread, n, role, kept, JSON.stringify(actions), now());
     sql.exec('DELETE FROM slash_turn WHERE thread = ? AND n <= ?', thread, n - TURNS_KEPT);
     sql.exec('UPDATE slash_thread SET updated = ? WHERE id = ?', now(), thread);
   };
