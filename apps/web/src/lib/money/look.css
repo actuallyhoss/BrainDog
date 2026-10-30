@@ -413,6 +413,12 @@
   align-self: start;
 }
 
+/* THE GAP UNDER THE LAST TILE IS ALREADY IN ITS ROWS, so what follows the packed page (Set a budget on Budgets) starts
+   one tile gap under it and not two. */
+[data-money] .body-wrap:has(> .page[data-packed]) + .page-offer {
+  margin-block-start: 0;
+}
+
 /* A BAR ACROSS THE WHOLE PAGE IS TWO COLUMNS OF ROWS on a wide screen: one name 1,100px from its amount read as two
    things. Read across, largest first. */
 @media (width >= 1200px) {
