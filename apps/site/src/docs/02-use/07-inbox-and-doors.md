@@ -22,7 +22,19 @@ Watch the Inbox | Each message arrives as a row in the Inbox, until a rule files
 
 Your BrainDog takes one mail address at a time. Making a new address replaces the old one, which is also how you deal with one that has leaked. **Stop taking forwarded mail** turns it off, and anything still posted to the old address is refused.
 
-A message whose forwarder did not report that the sender passed the mail checks (DKIM or SPF) is kept unfiled, rather than matched against your rules.
+Your BrainDog checks each message's signature (DKIM) itself and never believes what a message says about itself. A message whose signature doesn't check is kept unfiled in the Inbox, rather than matched against your rules.
+
+## When mail arrives unsigned
+
+If the Inbox or Settings, under Ingest, says "Mail from your bank isn't signed as it arrives, so it waits here to be filed by hand", something between the sender and your BrainDog changed the message on its way, and the sender's signature no longer matches it. Those messages wait for you to file them.
+
+The usual causes, and what to change:
+
+- **A forwarding rule that rewrites.** Some providers add "Fwd:", a footer or a banner when they forward. Use the provider's automatic forwarding (Gmail: Settings, Forwarding; Outlook: Rules, Redirect to) rather than a rule that forwards a copy.
+- **A mail filter in between.** A work account's security filter may tag subjects ("[External]"), add warnings or rewrite links. Forward from an address the filter doesn't touch, or ask whoever runs it to leave mail to your BrainDog address unchanged.
+- **A script that posts mail in.** Post the raw message exactly as it arrived, every byte, with nothing re-encoded or trimmed.
+
+Send one message again after the change. When it is filed by your rules, or waits without the warning, the signature checked.
 
 Making or stopping an address needs a sign-in from the last fifteen minutes, because it decides where your statements go.
 

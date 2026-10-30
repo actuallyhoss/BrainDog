@@ -72,7 +72,7 @@
   import { actor, listName } from '$lib/record/names.ts';
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
   import { daysOf, figureOf, sentenceOf, whoFiledOf } from './days.ts';
-  import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, nothingEver, quietOf, sourcesOf } from './sources.ts';
+  import { SOURCE_DAYS, UNSIGNED_HELP, countSaid, drawsLine, lastSaid, lineSaid, nothingEver, quietOf, sourcesOf } from './sources.ts';
   import { addressCommand } from '$lib/record/inbound-write.ts';
   import { bareOrigin } from '../settings/[area]/settings-state.svelte.ts';
   import CodeLine from '$lib/ui/CodeLine.svelte';
@@ -104,6 +104,8 @@
     rulesWeek: 'Your rules',
     seeRules: 'Automations',
     partial: 'Newest arrivals only',
+    /* THE FIX FOR MAIL A FORWARDER UNSIGNED, in the docs (sec-follow M2). */
+    unsignedFix: 'How to keep forwarded mail signed',
     learn: 'Could file themselves',
     learnWhy: 'Messages alike from one sender are learned once, as a rule, and the rest are filed as they arrive.',
     alikeFrom: (n: number, from: string) => `${n} alike from ${from}`,
@@ -801,6 +803,7 @@
                       <span class="way-name">{w.name}</span>
                       <span class="way-last">{lastSaid(w, (iso) => since(iso, clock))}</span>
                       {#if w.signed}<span class="way-last">{w.signed}</span>{/if}
+                      {#if w.unsigned}<a class="way-last tap" href={UNSIGNED_HELP} target="_blank" rel="noopener noreferrer">{words.unsignedFix}</a>{/if}
                     </span>
                     <span class="way-trend">
                       {#if drawsLine(w)}<Sparkline values={w.days} width={140} height={32} summary={lineSaid(w)} />{/if}

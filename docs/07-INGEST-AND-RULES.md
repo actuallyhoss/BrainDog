@@ -10,7 +10,7 @@ The strongest single reason a hosted instance is worth $12/mo, and the mechanism
 | Channel | Is | Self-host |
 |---|---|---|
 | **webhook** | a public URL that is always up | needs your own reverse proxy. **This is what Cloud sells** |
-| **inbound email** | an address per record — `<slug>@in.brain.dog` | a forwarding webhook — `POST /in/email/<token>`, the raw RFC 5322 message as the body — or your own MX. No SMTP receive, no DKIM in-process ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §13 #3) |
+| **inbound email** | an address per record — `<slug>@in.brain.dog` | a forwarding webhook — `POST /in/email/<token>`, the raw RFC 5322 message as the body — or your own MX. No SMTP receive; the host checks DKIM itself and believes no header the message carries ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §13 #3) |
 | **pull** | a scheduled fetch of something you already own — **[25-CONNECTORS](25-CONNECTORS.md)**, which specifies the `fetch:` block this row promised and never had. The kernel's word is `pull` everywhere: `channel: pull` on the ingest, schedule kind `pull`, outbox `pull.fetch`, event kind `pull` — never `cron` | needs something awake |
 | **paste** | a box | **always works, everywhere.** The fallback that never breaks |
 | **api** | a `create`/`propose` whose payload is kept raw — the agent door | same |

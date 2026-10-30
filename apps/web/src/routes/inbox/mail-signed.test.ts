@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UNVERIFIED } from '@braindog/kernel';
-import { mailSignedOf, signedWords, sourcesOf } from './sources.ts';
+import { mailSignedOf, signedWords, sourcesOf, unsignedOf } from './sources.ts';
 
 const NOW = Date.parse('2026-10-15T12:00:00Z');
 
@@ -56,4 +56,30 @@ test('arrivals read without their reason, and a Mail well nothing came by, say n
 
 test('neither line has an em dash', () => {
   for (const line of Object.values(signedWords)) assert.doesNotMatch(line, /—/u);
+});
+
+test('each sender whose newest mail came unsigned is named once, in one sentence (sec-follow M2)', () => {
+  const ways = sourcesOf(
+    [
+      { channel: 'email', ts: '2026-10-15T09:00:00Z', reason: UNVERIFIED, from: '"HSBC Alerts" <alerts@hsbc.example>' },
+      { channel: 'email', ts: '2026-10-15T08:00:00Z', reason: UNVERIFIED, from: 'alerts@hsbc.example' },
+      { channel: 'email', ts: '2026-10-15T10:00:00Z', reason: null, from: 'Sara <sara@acme.example>' },
+      /* A SENDER WHOSE NEWEST MAIL WAS SIGNED IS NOT NAMED, whatever came before it. */
+      { channel: 'email', ts: '2026-10-14T08:00:00Z', reason: UNVERIFIED, from: 'bills@power.example' },
+      { channel: 'email', ts: '2026-10-15T07:00:00Z', reason: null, from: 'bills@power.example' },
+    ],
+    NOW,
+  );
+  const mail = ways.find((w) => w.channel === 'email');
+  const said = "Mail from HSBC Alerts isn't signed as it arrives, so it waits here to be filed by hand.";
+  assert.equal(mail?.unsigned, said);
+  assert.equal(mail?.signed, said, 'said once, in place of the line about the last mail');
+});
+
+test('no unsigned sender says nothing new, and several are named two at a time', () => {
+  const ways = sourcesOf([{ channel: 'email', ts: '2026-10-15T07:00:00Z', reason: null, from: 'sara@acme.example' }], NOW);
+  assert.equal(ways.find((w) => w.channel === 'email')?.unsigned, undefined);
+  assert.equal(unsignedOf([]), null);
+  assert.equal(unsignedOf(['a@x.example', 'b@y.example']), "Mail from a@x.example and b@y.example isn't signed as it arrives, so it waits here to be filed by hand.");
+  assert.equal(unsignedOf(['A', 'B', 'C', 'D']), "Mail from A, B and 2 more isn't signed as it arrives, so it waits here to be filed by hand.");
 });
