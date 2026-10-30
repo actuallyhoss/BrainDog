@@ -34,6 +34,8 @@ import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
 export type { AuthConfig, DirectoryAuth, DirectoryBodies, PasskeyRename, Reason, Rule, SessionAsk, SignupNeeds, SignupStart } from './identity.ts';
 export { PASSKEY_NAME_MOST, SIGNUP_UNCHECKED, passkeyName, sharedSuffix } from './identity.ts';
+/* THE PLACE AN ADDRESS STANDS FOR (an IPv6 address as its /64), for the hosts' own throttles: one rule with sign-up's. */
+export { ipBucket } from './signup-keys.ts';
 
 /** The five a person can hold on a record. The record's own ladder, mirrored where membership lives. */
 export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;

@@ -11,6 +11,7 @@
  * across `packages/**`: the kernel may not ask which runtime it is in, and a host must.
  */
 
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { Resolver } from 'node:dns/promises';
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from 'node:http';
 import { createServer as createTlsServer } from 'node:https';
@@ -53,6 +54,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
+import { keyLockout, type KeyLockout } from './key-lockout.ts';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
@@ -383,6 +385,8 @@ type Site = {
   oauth: OAuthHere;
   /** `POST /auth/signup/read` (`./first-read.ts`), built once so its in-memory count lasts the whole process. */
   firstRead: FirstReadDoor;
+  /** The server key's lockout at `/api` and `/mcp` (`./key-lockout.ts`), built once so its count lasts the whole process. */
+  keyLock: KeyLockout;
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -392,8 +396,16 @@ type Seen =
   | { bare: 421 | 503 }
   | { bare: 429; retryAfter: number };
 
-/** What a bearer comes to: somebody, or a refusal. Never a bare status, because nothing ambient sends one. */
-type Known = { ctx: CallContext } | { refused: Refusal };
+/** What a bearer comes to: somebody, a refusal, or the server key's lockout (`./key-lockout.ts`). */
+type Known = { ctx: CallContext } | { refused: Refusal } | { bare: 429; retryAfter: number };
+
+/**
+ * Two secrets compared in time that does not depend on either, and WITHOUT AN AWAIT: the SHA-256 of both, then
+ * `timingSafeEqual`. Synchronous so the server key's lock, its compare and its strike happen with nothing between them
+ * (`./key-lockout.ts`).
+ */
+const sameKeyNow = (a: string, b: string): boolean =>
+  timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
 
 /**
  * The owner, for the server key and for open mode.
@@ -474,12 +486,24 @@ function validFrom(): string | undefined {
  * the same person at the same level through either, and `surface` is only what the token's listing shows as
  * where it was last used.
  */
-async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?: string, cli?: string): Promise<Known> {
+async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', ip: string, door?: string, cli?: string): Promise<Known> {
   const { api, token } = site;
+  /* A BEARER SHAPED LIKE THE SERVER KEY IS COUNTED AGAINST THE PLACE IT CAME FROM (SEC5), and a place that missed ten
+     times in fifteen minutes is refused before anything is compared: a miss used to be a 401 and nothing else, so the
+     key could be guessed in a loop. The lock, the compare and the strike run with no await between them. */
+  const keyShaped = token !== undefined && !sent.includes('.');
+  if (keyShaped) {
+    const wait = site.keyLock.locked(ip);
+    if (wait !== null) return { bare: 429, retryAfter: wait };
+  }
   /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
      differs, so how long a wrong guess took said how much of it was right. */
-  const isKey = token !== undefined && (await sameKey(sent, token));
-  if (isKey) return owner(api, true);
+  const isKey = token !== undefined && sameKeyNow(sent, token);
+  if (isKey) {
+    site.keyLock.clear(ip);
+    return owner(api, true);
+  }
+  if (keyShaped) site.keyLock.strike(ip);
 
   /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
      one shared string would be a deployment where an agent cannot be given less than everything.
@@ -566,8 +590,10 @@ async function keychainToken(request: Request, site: Site | null): Promise<Resul
     refusal: { code: 'UNAUTHORIZED', fix: 'That bearer is neither a keychain grant nor a login this BrainDog knows.', at: 'authorization' },
   };
   const sent = presented(request);
-  if (site === null || sent === undefined) return refused;
-  const known = await bearerFor(sent, site, 'api', undefined, cliOf(request));
+  /* ONLY A LOGIN TOKEN OPENS THIS DOOR, and a token carries a `.`: anything else is refused here unread, so this door is
+     no way to try the server key past its lockout (SEC5). */
+  if (site === null || sent === undefined || !sent.includes('.')) return refused;
+  const known = await bearerFor(sent, site, 'api', '', undefined, cliOf(request));
   if (!('ctx' in known) || known.ctx.principal.kind !== 'token') return refused;
   const over = await overLimit(site, { door: 'bearer', ctx: known.ctx }, '', 'write');
   if (over !== null) {
@@ -613,14 +639,14 @@ async function operationFor(sent: string, api: Api): Promise<Known> {
  * `host` IS THE `Host` HEADER AS THE SOCKET RECEIVED IT, because in open mode it is the check: a page that
  * rebinds its own name to 127.0.0.1 reaches this port with its own name in `Host`, and gets a 421.
  */
-async function contextFor(request: Request, host: string, site: Site, door?: string): Promise<Seen> {
+async function contextFor(request: Request, host: string, site: Site, ip: string, door?: string): Promise<Seen> {
   const { api, token } = site;
   const sent = presented(request);
 
   /* ONE · A BEARER, which is an agent, the server key or an operation, and never a browser, so the origin checks below
      do not apply to it: nothing ambient sends an `Authorization` header. `door` is the method the path names, the one
      thing an operation bearer is checked against. */
-  if (sent !== undefined) return bearerFor(sent, site, 'api', door, cliOf(request));
+  if (sent !== undefined) return bearerFor(sent, site, 'api', ip, door, cliOf(request));
 
   /* TWO · THE SESSION COOKIE. A BAD ONE IS A 401 AND IS CLEARED, AND NEVER FALLS THROUGH TO OPEN MODE: a
      cookie that names no session is somebody who thinks they are signed in, and answering them as the
@@ -2187,6 +2213,8 @@ export async function start(options: {
       send: options.shared?.send,
       resolve: options.shared?.resolve,
     }),
+    /* THE SERVER KEY'S LOCKOUT, built once so a strike outlives the request that earned it (SEC5). */
+    keyLock: keyLockout(clock.now),
     /* THE FIRST READ OF A STRANGER'S SENTENCE, built once here where the origin is known, so its count lasts the process. */
     firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup, catalogue: catalogueDir ?? null }),
     snapshots: kept,
@@ -2524,7 +2552,7 @@ async function answer(
      else. The app is what makes `/signin` the same origin as the cookie it asks for. `/mcp` is taken before a
      byte of the body is read, because it reads the body only for a bearer it knows. */
   const path = new URL(url).pathname;
-  if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site));
+  if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site, ipOf(req, trustProxy)));
   /* OAUTH 2.1, BEFORE THE BODY IS WEIGHED, as `/mcp` is: its doors read at most their own few kilobytes, counted as they
      arrive, so a body is handed over unread and the hundred mebibytes below are never held for a stranger here. The
      request is built at the origin the socket was reached by (`originAt`), because the metadata names the address the
@@ -2620,7 +2648,7 @@ async function answer(
      those requests is a credential this record does not know, 401, and is still good for the one it was minted for. It
      is not told 403 under a foreign name, because telling it that would mean spending it to learn it is real. */
   const door = method === 'POST' && !foreign ? /^\/+api\/+([A-Za-z]+)\/*$/.exec(path)?.[1] : undefined;
-  const seen = await contextFor(request, req.headers.host ?? '', site, door);
+  const seen = await contextFor(request, req.headers.host ?? '', site, ipOf(req, trustProxy), door);
   /* A NAME THAT IS NOT THIS RECORD'S, TO A CALLER THIS HOST KNOWS. One record is served here, so no credential reaches
      another, and the sentence is the Directory's for a name that is not yours, whether or not it names anything. A
      caller it does not know falls through to the root's own refusal below, which never reaches the record. */
@@ -2743,16 +2771,18 @@ async function copyOf(id: string, ctx: CallContext, site: Site): Promise<Respons
  * A BEARER AND NOTHING ELSE: the path `/api` takes for one, and nothing that path falls back to. The cookie is
  * never read and open mode never applies, because an agent carries its own credential and a browser has the app.
  */
-async function agent(req: IncomingMessage, url: string, method: string, headers: [string, string][], site: Site): Promise<Response> {
+async function agent(req: IncomingMessage, url: string, method: string, headers: [string, string][], site: Site, ip: string): Promise<Response> {
   const head = new Request(url, { method, headers });
   const early = gate(head);
   if (early) return early;
   const sent = presented(head);
-  const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp', undefined, cliOf(head));
+  const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp', ip, undefined, cliOf(head));
   /* THE 401 NAMES WHERE TO SIGN IN, as the Worker's does, so an MCP client holding no token starts OAuth from it
      (RFC 9728): at the name this process was reached by, and not at all while OAuth is off. */
   const metadata = site.oauth.metadata(req.headers.host ?? '');
   if (seen === null) return unauthorized(metadata);
+  /* THE SERVER KEY'S LOCKOUT, said as every other 429 here is said. */
+  if ('bare' in seen) return json(429, { ok: false, refusal: { code: 'RATE_LIMITED', fix: 'Too many wrong keys from here. Wait, then try again.', retry_after: seen.retryAfter } }, [['retry-after', String(seen.retryAfter)]]);
   if ('refused' in seen) {
     /* A credential this record does not know is the transport's 401. One it knows, for somebody no longer on
        the record or a record nobody may act on, gets the status and the sentence `/api` gives. */
