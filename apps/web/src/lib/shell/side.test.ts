@@ -203,6 +203,9 @@ test('the crumb says the place, then where you are, each step a link back but th
     { label: 'Rent' },
   ]);
   assert.deepEqual(crumbOf('/search', m, null, 'Search'), [{ label: 'Search' }]);
+  /* A SECTION WHOSE ROW IS A PAGE OF ANOTHER NAME: Guests leads to a page called "Weather", and the bar says Weather. */
+  assert.deepEqual(crumbOf('/p/guests', m, '/p/guests', 'Weather'), [{ label: 'Guests' }, { label: 'Weather' }]);
+  assert.deepEqual(crumbOf('/p/guests', m, '/p/guests', 'Guests'), [{ label: 'Guests' }]);
 });
 
 test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT: "Projects 0 in play" headed a new shop', () => {
