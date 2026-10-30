@@ -64,7 +64,8 @@
 
 <Sheet bind:open title={copy.mergeSheetTitle(name)}>
   {#if rows === undefined}
-    <Waiting rows={3} />
+    <!-- ONLY WHILE OPEN, as `HandSheet` says. -->
+    {#if open}<Waiting rows={3} />{/if}
   {:else if rows === null}
     <p class="merge-note">{copy.handReadFailed}</p>
   {:else}

@@ -189,7 +189,9 @@
     {#if asking}
       <p class="scope-ask">{words.widenKey}</p>
     {:else if places === undefined}
-      <Waiting rows={3} />
+      <!-- ONLY WHILE THE SHEET IS OPEN: a sheet's body is in the page shut too, and a busy placeholder there for good kept
+           every page with a movable chip from ever being at rest (audit 31 Oct A30). -->
+      {#if open}<Waiting rows={3} />{/if}
     {:else if places === null}
       <p class="scope-said" role="status">{words.noPlaces}</p>
       <!-- A FAILED WALK IS NOT KEPT (`scope-move.ts` `placesIn`), so asking again reads the projects again. -->

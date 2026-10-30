@@ -216,7 +216,9 @@
 {:else if allowed}
   <Sheet bind:open title={copy.handSheetTitle(String(row.fields[decl.title] ?? ''))}>
     {#if offered === null}
-      <Waiting rows={3} />
+      <!-- ONLY WHILE OPEN: a shut sheet's body is still in the page, and a busy placeholder there for good kept the row's
+           page from ever being at rest (audit 31 Oct A30). -->
+      {#if open}<Waiting rows={3} />{/if}
     {:else if offered.from === 'refused'}
       <p class="hand-note">{offered.fix}</p>
       <Button weight="quiet" onclick={() => void ask()}>{copy.handRetry}</Button>
