@@ -32,7 +32,7 @@
  */
 
 import { copy } from '../../lib/copy.ts';
-import { words as usageWords, type Meter, type MeterKey } from '../../lib/record/actions.ts';
+import { words as usageWords, type Meter } from '../../lib/record/actions.ts';
 
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
@@ -387,7 +387,7 @@ export function thisRecord(answer: BillingAnswer | null, slug: string | null | u
   return answer.records.find((r) => r.slug === slug) ?? null;
 }
 
-/* ── what the Settings tiles draw: the meters, the nightly strip and the title's sentence ─────────── */
+/* ── what the Settings tiles draw: the meters, the nightly strip and the doors ────────────────────── */
 
 /*
  * PURE, AND HERE, so `node --test` holds every sentence a tile says. The areas draw the tiles; what each tile means is
@@ -413,15 +413,6 @@ export const tileWords = {
   /** The strip read aloud, which the reading line under it then explains. */
   stripSaid: (copied: number, n: number, missed: number) =>
     `A copy on ${copied} of the last ${n} nights` + (missed > 0 ? `, and ${missed} with none` : '') + '.',
-  /* THE TITLE ROW'S SENTENCE, in its parts. */
-  healthy: 'All healthy',
-  copyIn: "last night's copy is in",
-  noCopy: 'no copy last night',
-  nothingRunsOut: (resets: string) => `nothing runs out before ${resets}`,
-  meterFull: (noun: string, plural: boolean, resets: string) => `${noun} ${plural ? 'are' : 'is'} used up until ${resets}`,
-  meterNear: (noun: string, plural: boolean, share: string, left: number) =>
-    `${noun} ${plural ? 'are' : 'is'} at ${share}, ${left === 1 ? '1 day' : `${left} days`} to go`,
-  meterPace: (noun: string, resets: string) => `at this pace ${noun} will be used up before ${resets}`,
 };
 
 /** Where this month is, in UTC as the Worker counts it: the 29th of a 30-day month is `{ day: 29, of: 30 }`. */
@@ -545,16 +536,6 @@ export function nightsLine(nights: readonly Night[]): string {
   return tileWords.everyNight(copied.length);
 }
 
-/** The newest night that has had its chance, and whether its copy is in. `null` when no copy was ever kept. */
-export function lastNight(nights: readonly Night[]): 'copied' | 'missed' | null {
-  for (let i = nights.length - 1; i >= 0; i--) {
-    const s = nights[i]?.state;
-    if (s === 'copied' || s === 'missed') return s;
-    if (s === 'before') return null;
-  }
-  return null;
-}
-
 /* ── the doors a record takes things in at ── */
 
 /** The words the Doors tile adds: its title, and one short state a door is in. */
@@ -580,46 +561,4 @@ export function doorsLine(doors: readonly { mintable: boolean; held: boolean }[]
   const off = minted.filter((d) => !d.held).length;
   if (minted.length === 0) return doorWords.noneMade;
   return off === 0 ? doorWords.allOn(minted.length) : doorWords.someOff(off, minted.length);
-}
-
-/* ── the title row's sentence ── */
-
-const PLURAL: Record<MeterKey, boolean> = { runs: true, requests: true, bytes: false, ms: false };
-
-const upper = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
-
-/** The usage half: the meter the month turns on, against where the month is. */
-function usageSaid(meters: readonly Meter[], resets: string, now: number): { needs: string | null; fine: string | null } {
-  const top = meters.find((m) => m.binding) ?? [...meters].sort((a, b) => b.share - a.share)[0];
-  if (!top) return { needs: null, fine: null };
-  const noun = usageWords.meterNoun[top.key] ?? top.key;
-  const plural = PLURAL[top.key] ?? false;
-  const { day, of } = monthDay(now);
-  if (top.share >= 1) return { needs: tileWords.meterFull(noun, plural, resets), fine: null };
-  if (top.share >= 0.8) return { needs: tileWords.meterNear(noun, plural, shareOf(top.share), of - day + 1), fine: null };
-  /* AT THIS PACE: the share so far, spread over the whole month. "Nothing runs out" is a claim about the rest of the
-     month, so it is made only where the month's pace keeps the nearest meter under its allowance. */
-  if ((top.share * of) / day >= 1) return { needs: tileWords.meterPace(noun, resets), fine: null };
-  return { needs: null, fine: tileWords.nothingRunsOut(resets) };
-}
-
-/**
- * The sentence under "Settings", from the nightly copies and this month's meters, and the phrase inside it
- * that needs him. `null` when neither was read: a self-host with no ledger and no copies says nothing rather than
- * "all healthy" about what nobody looked at.
- */
-export function settingsSentence(o: {
-  nights: readonly Night[] | null;
-  meters: readonly Meter[] | null;
-  resets: string | null;
-  now: number;
-}): { sentence: string; needs?: string } | null {
-  const night = o.nights ? lastNight(o.nights) : null;
-  const usage = o.meters && o.resets ? usageSaid(o.meters, o.resets, o.now) : { needs: null, fine: null };
-  const needs = [night === 'missed' ? tileWords.noCopy : null, usage.needs].filter((x): x is string => x !== null);
-  const fine = [night === 'copied' ? tileWords.copyIn : null, usage.fine].filter((x): x is string => x !== null);
-  if (needs.length === 0 && fine.length === 0) return null;
-  if (needs.length === 0) return { sentence: `${tileWords.healthy}: ${fine.join(', and ')}.` };
-  const phrase = upper(needs.join(', and '));
-  return { sentence: fine.length > 0 ? `${phrase}, and ${fine.join(', and ')}.` : `${phrase}.`, needs: phrase };
 }
