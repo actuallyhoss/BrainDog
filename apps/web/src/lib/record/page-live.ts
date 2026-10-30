@@ -931,7 +931,7 @@ export function tileOf(
   const ahead = trend ? aheadOf((cell as { ahead?: unknown }).ahead) : null;
   /* THE LOWEST SAID AS FORECAST SAYS IT (live check of 30 October, 18): whole money to the unit, and "today" or the day
      as "29 Oct". Money and Today read "Lowest EGP 682,000 on Thu 29 Oct" where Forecast read "Lowest EGP 682,316 today". */
-  const lowest = ahead ? copy.cashLowest(wholeAmount(ahead.low.value, ahead.currency), lowDaySaid(ahead.low.day)) : '';
+  const lowest = ahead && trend ? copy.cashLowest(wholeAmount(ahead.low.value, ahead.currency), lowDaySaid(ahead.low.day), aheadWindowSaid(trend.length - 1)) : '';
   return {
     id: cell.metric,
     label,
@@ -997,6 +997,15 @@ function wholeAmount(minor: number, currency: string): string {
   const exp = exponentOf(currency);
   const whole = Math.round(minor / 10 ** exp) * 10 ** exp;
   return moneyWhole(whole, currency, homeCurrency())?.text ?? money(whole, currency);
+}
+
+/**
+ * How far a walk ahead looks, from its days (the trend is today and then the end of each day): "12 weeks" when it is
+ * whole weeks, as Today says its window, else "30 days".
+ */
+export function aheadWindowSaid(days: number): string {
+  if (days >= 14 && days % 7 === 0) return `${days / 7} weeks`;
+  return days === 1 ? '1 day' : `${days} days`;
 }
 
 /** The day of a lowest point as Forecast says it: "today", else "on 29 Oct", with its year only when it is not this one. */
