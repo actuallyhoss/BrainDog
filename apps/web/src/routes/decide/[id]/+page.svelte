@@ -926,6 +926,9 @@
     return key === undefined ? undefined : question?.options.find((o) => o.key === key)?.title;
   });
   const did = $derived(settled ? doesOf(about?.by, settledOption) : null);
+  /* NOR THE OPTION'S OWN REASON THE RECORD WROTE FOR A PRESS ("Answered in one press, for the option's own reason: Mark
+     an invoice as chased"), which is no words of the person's either; what the answer did is said above it (`does.ts`). */
+  const ownReason = (reason: string): boolean => /^Answered in one press, for the option's own reason: /u.test(reason.trim());
   const willDo = $derived(question && !settled ? doesBefore(about?.by, question.options) : null);
 
   /* ── what accepting does, one folded tile under the options ───────────── */
@@ -1095,7 +1098,7 @@
           <!-- THE REASON WHEN THERE IS ONE. An answer given by its press alone is a whole answer, and a pair of quotation
                marks round nothing read as a reason that failed to load. Nor is the sentence the record wrote for a press
                (`pressedOnly`) quoted on a reloaded receipt, as though the person had written it. -->
-          {#if settled.reason.trim() !== '' && !pressedOnly(settled.reason)}<p class="settled-reason">“{settled.reason}”</p>{/if}
+          {#if settled.reason.trim() !== '' && !pressedOnly(settled.reason) && !ownReason(settled.reason)}<p class="settled-reason">“{settled.reason}”</p>{/if}
           <!-- WHAT IT WAS DECIDED ON, the question's visuals, kept beside its receipt. -->
           <VisualStrip on={question.id} />
           <p class="settled-note">{copy.immutable}</p>

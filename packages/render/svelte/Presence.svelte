@@ -52,7 +52,7 @@
   } = $props();
 
   const uid = $props.id();
-  const LIVE: Record<PresenceView['live'], string> = { working: 'Working', thinking: 'Thinking', waiting: 'Waiting' };
+  const LIVE: Record<PresenceView['live'], string> = { working: 'Working', thinking: 'Thinking', waiting: 'Waiting', quiet: 'Quiet' };
 
   /** The row asking before a stop or a pause, and which; one at a time. */
   let asking = $state<{ key: string; kind: 'stop' | 'pause' } | null>(null);

@@ -639,18 +639,17 @@ export function presenceOf(
     /* `bare`, ONE RUN ON TODAY'S SHEET: no profile, which is where it runs and not what it does. */
     /* NO BRANCH ON ANY ROW: "axis-qa" is the name a branch was typed as, where what it is doing is said above it in words
        (audit of 31 October, A19). Its branch is on its own run's page. */
-    /* A RUN GONE QUIET SAYS HOW LONG, FIRST (audit 6g, AG10): its page said "Gone quiet" and nothing of when it was last
-       heard, with no Tell beside it. */
+    /* A RUN GONE QUIET SAYS WHEN IT WAS LAST HEARD, beside its word Quiet (audit 6g, AG10): its page said "Gone quiet"
+       and nothing of when, with no Tell beside it. How long it ran is no news of a run nobody hears. */
     meta: [
-      r.state === 'gone' ? `quiet for ${spanSaid(r.heard_s * 1000)}` : null,
       r.verified === true ? 'verified' : null,
       !bare && r.seat && r.seat !== 'default' ? `as ${r.seat}` : null,
       r.state === 'gone' ? null : `running ${spanSaid(r.for_s * 1000)}`,
-      r.state === 'gone' ? null : `heard ${agoSaid(r.heard_s)}`,
+      `heard ${agoSaid(r.heard_s)}`,
     ]
       .filter((x): x is string => !!x)
       .join(' · '),
-    live: r.state === 'working' || r.state === 'thinking' ? r.state : 'waiting',
+    live: r.state === 'working' || r.state === 'thinking' ? r.state : r.state === 'gone' ? 'quiet' : 'waiting',
     holds: held ? `On your word: “${held.said.replace(/\s+/gu, ' ').trim()}”` : null,
     helpers: helpers.length === 0 ? null : `+${plural(helpers.length, 'helper')}`,
     stopped: r.stopped,

@@ -301,8 +301,8 @@ export type PresenceView = {
   project: { name: string; slot: string } | null;
   /** "axis-qa · working, heard 3 min ago". */
   meta: string;
-  /** Working, thinking or waiting, which the face's dot says too. */
-  live: 'working' | 'thinking' | 'waiting';
+  /** Working, thinking, waiting, or quiet: open and not heard from lately, which the face's dot says too. */
+  live: 'working' | 'thinking' | 'waiting' | 'quiet';
   /** What it holds from him, in his words. */
   holds: string | null;
   /** "+2 helpers on axis-qa-2 and axis-qa-3". */

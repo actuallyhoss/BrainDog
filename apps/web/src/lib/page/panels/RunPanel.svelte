@@ -233,11 +233,42 @@
   });
 
   /* A RUN GONE QUIET IS STILL OPEN, so it keeps its live row, with how long it has been quiet and Tell and Stop beside it
-     (audit 6g, AG10); only an ended run has none. */
-  const me = $derived(open.find((r) => r.run === run && r.state !== 'ended') ?? null);
+     (audit 6g, AG10); only an ended run has none. The record's `presence` lists the runs present now, so a quiet one is
+     read off its own row: what a person sees of it is the same row, said as quiet. */
+  const quiet = $derived.by((): LiveRun | null => {
+    if (!held || presenceSaid(held.state, held.fields, Date.now()) !== 'quiet') return null;
+    const f = held.fields;
+    const t = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+    const heard = Date.parse(t(f.pulse_at) ?? t(f.last_seen) ?? '');
+    return {
+      run,
+      name: t(f.doing),
+      agent: t(f.agent),
+      machine: t(f.host),
+      seat: t(f.seat),
+      project: t(f.project),
+      repo: t(f.repo),
+      worktree: t(f.worktree),
+      branch: t(f.branch),
+      doing: t(f.doing),
+      state: 'gone',
+      instruction: null,
+      task: null,
+      stopped: f.stopped === 'stop' || f.stopped === 'pause' ? f.stopped : null,
+      helpers: [],
+      parent: t(f.parent),
+      for_s: 0,
+      heard_s: Number.isFinite(heard) ? Math.max(0, Math.round((recordNow() - heard) / 1000)) : 0,
+      reach: 'next_call',
+    };
+  });
+  const me = $derived(open.find((r) => r.run === run && r.state !== 'ended') ?? quiet);
   const meRow = $derived(me ? { ...presenceOf(me, open, places, toldIt ?? []), href: null, busy: holding } : null);
   const tellView = $derived.by(() => {
-    const c = composerOf({ to: `run:${run}`, on: '', when: null }, open, places);
+    /* A QUIET RUN IS TOLD AS ITSELF, read when it next checks in: the composer's runs are the ones present now, so it is
+       handed this one as waiting, or Tell would have gone to anybody. */
+    const rows = me !== null && me.state === 'gone' ? [...open.filter((r) => r.run !== run), { ...me, state: 'waiting' as const }] : open;
+    const c = composerOf({ to: `run:${run}`, on: '', when: null }, rows, places);
     return { ...c, to: c.to.filter((x) => x.key === c.toKey), busy: tellBusy, fault: tellFault };
   });
   const toldViews = $derived(toldIt ? threadOrder(toldIt).map((t) => threadOf(t, { now: recordNow(), runs: runsKnown, projects: places, undone: undoneIt })) : []);
