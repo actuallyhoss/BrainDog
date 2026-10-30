@@ -261,6 +261,18 @@ const exception = (code: string): number => (Object.hasOwn(NOT_422, code) ? (NOT
 export const httpStatus = (r: Result<unknown>): number =>
   r.ok ? 200 : conflicted(r) ? 409 : refused(r) ? exception(r.refusal.code) : 500;
 
+/**
+ * A ROUTE WHOSE ONE ASK IS A THING BY NAME answers 404 when that thing is not there, with the same body. `/p/<a slug
+ * nobody declared>` asked `page` and got a 422, which every browser logs in red as a broken call; a page that does not
+ * exist is not found. Only `page`'s `PAGE_UNKNOWN`: elsewhere that code is a value to fix (a look laid over no page, a
+ * link opened onto none) and keeps its 422. The client reads the code, never the status, so both say "missing".
+ */
+const NOT_THERE: Readonly<Record<string, string>> = { page: 'PAGE_UNKNOWN' };
+
+/** `httpStatus`, with a route's own not-found (`NOT_THERE`) at 404. */
+export const routeStatus = (name: string, r: Result<unknown>): number =>
+  !r.ok && refused(r) && Object.hasOwn(NOT_THERE, name) && NOT_THERE[name] === r.refusal.code ? 404 : httpStatus(r);
+
 export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<Result<unknown>>;
 
 /**
@@ -753,7 +765,7 @@ export async function serveApi(
        here and raised as fault `lens.firewall` naming the method, so a path that forgot to mask is found, never leaked. */
     const held = firewall(ctx, out);
     if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);
-    return json(httpStatus(held.answer), held.answer);
+    return json(routeStatus(name, held.answer), held.answer);
   } catch (e) {
     return json(500, crashed(`/api/${name}`, e));
   }
@@ -807,7 +819,7 @@ async function oneRead(name: string, args: Record<string, unknown>, handlers: Re
     const out = await handler(args, ctx);
     const held = firewall(ctx, out);
     if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);
-    return { status: httpStatus(held.answer), body: held.answer };
+    return { status: routeStatus(name, held.answer), body: held.answer };
   } catch (e) {
     return { status: 500, body: crashed(`/api/${name}`, e) };
   }

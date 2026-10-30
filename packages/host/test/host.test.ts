@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { clash, no, ok } from '@braindog/ports';
 
-import { ROUTES, handlersFor, httpStatus, serveApi } from '../src/index.ts';
+import { ROUTES, handlersFor, httpStatus, routeStatus, serveApi } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -230,6 +230,23 @@ test('a refusal carries its sentence and a status that says what to do about it'
   const nowhere = await call('schema?register=atlantis');
   assert.equal(nowhere.status, 422);
   assert.equal(nowhere.body.refusal?.code, 'REGISTER_UNKNOWN');
+  sql.close();
+});
+
+test('PH2: A PAGE THAT IS NOT THERE IS A 404 WITH THE SAME BODY, alone and inside reads, and elsewhere its code keeps its 422', async () => {
+  const { call, sql } = await host();
+  const alone = await call('page?slug=nowhere');
+  assert.equal(alone.status, 404);
+  assert.equal(alone.body.ok, false);
+  assert.equal(alone.body.refusal?.code, 'PAGE_UNKNOWN');
+  assert.ok((alone.body.refusal?.fix ?? '') !== '', 'the 404 lost the sentence a person reads');
+  const batched = await call('reads', { calls: [{ method: 'page', args: { slug: 'nowhere' } }] });
+  const one = (batched.body.value as { answers: { status: number; body: Answer }[] }).answers[0]!;
+  assert.deepEqual([one.status, one.body.refusal?.code], [404, 'PAGE_UNKNOWN']);
+  /* THE SAME CODE ON ANOTHER ROUTE IS A VALUE TO FIX: a link opened onto no page is still a 422. */
+  assert.equal(routeStatus('openShare', no('PAGE_UNKNOWN', 'There is no such page to share.')), 422);
+  assert.equal(routeStatus('page', no('REGISTER_UNKNOWN', 'x')), 422);
+  assert.equal(routeStatus('page', no('PAGE_UNKNOWN', 'x')), 404);
   sql.close();
 });
 

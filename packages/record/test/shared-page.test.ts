@@ -191,8 +191,10 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
   const { id } = value<{ id: string }>(await direct.openShare({ slug: 'notes', money: true }, owner));
   const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'notes')));
   const note = (shown.blocks.find((b) => b.kind === 'note') as { body: string }).body;
-  assert.match(note, /^Earning\. £18,400(?:\.00)?(?: GBP)? in the last twelve months\.$/mu);
-  assert.match(note, /^It is not deferrable past 20 Nov 2026/mu);
+  /* A CODE AFTER A FIGURE STANDS ACROSS A NO-BREAK SPACE (`AMOUNT_SPACE`), so the line never ends on £18,400. */
+  assert.match(note, /^Earning\. £18,400(?:\.00)?(?:\u00a0GBP)? in the last twelve months\.$/mu);
+  /* A DAY READS AS THE APP SAYS IT: the day, and how far off it is from when the page was read. */
+  assert.match(note, /^It is not deferrable past 20 Nov, in 5 weeks\.$/mu);
   assert.match(note, /^\d{1,2} Aug \| Raised the studio tier/mu);
   assert.match(note, /Letting it lapse breaks links\.\n```/u);
   assert.match(note, /^Settled by research\.$/mu);
@@ -257,5 +259,58 @@ test('AF18: WITH MONEY OFF, A LIST THAT IS MONEY IS NOT SENT AT ALL', async () =
   const said = JSON.stringify(shown.blocks);
   assert.doesNotMatch(said, /Hosting|Bills|18,400|GBP|£/u);
   assert.match(said, /The licensing tier ships in September\./u);
+  sql.close();
+});
+
+test('PH3: WITH MONEY OFF, A NOTE TABLE KEEPS EVERY ROW: an amount\'s cell is emptied whole, and a column of nothing but amounts goes', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  sql.exec(
+    "INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, 'rec_1', 'studio', 'Studio', 'en-GB', 'Europe/London', 1, '2026-10-01T00:00:00.000Z')",
+  );
+  const body = [
+    '```spec | Domains and hosting',
+    'kiln.example | renews {{until:2026-11-15}} | the apex',
+    'Object storage | {{money:4100 GBP}} a month | the binaries',
+    '```',
+    '',
+    '```comparison | Plans',
+    'Plan | Price | Seats',
+    'Studio | {{money:2900 GBP}} a month | 5',
+    'Team | {{money:9900 GBP}} a month | 20',
+    '```',
+    '',
+    '| Service | Cost | Note |',
+    '| --- | --- | --- |',
+    '| Fonts CDN | {{money:1200 GBP}} | cached |',
+    '| Mail | {{money:600 GBP}} a month | |',
+  ].join('\n');
+  value(await api.kernel.install([INVOICES, page('estate', [{ kind: 'note', heading: 'The estate', body }])]));
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
+  const read = async (money: boolean) => {
+    const { id } = value<{ id: string }>(await direct.openShare({ slug: 'estate', money }, owner));
+    const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'estate')));
+    return (shown.blocks.find((b) => b.kind === 'note') as { body: string }).body;
+  };
+  const off = await read(false);
+  assert.doesNotMatch(off, /£|GBP|a month/u);
+  /* A FENCE WHOSE CELLS MEAN THEIR PLACE keeps the place empty, so the note stays the note. */
+  assert.match(off, /^kiln\.example \| renews 15 Nov \| the apex$/mu);
+  assert.match(off, /^Object storage \|  \| the binaries$/mu);
+  /* A HEADED TABLE LOSES THE COLUMN, its head with it, and keeps each row. */
+  assert.match(off, /^Plan \| Seats$/mu);
+  assert.match(off, /^Studio \| 5$/mu);
+  assert.match(off, /^Team \| 20$/mu);
+  assert.match(off, /^\| Service \| Note \|$/mu);
+  assert.match(off, /^\| --- \| --- \|$/mu);
+  assert.match(off, /^\| Fonts CDN \| cached \|$/mu);
+  assert.match(off, /^\| Mail \|  \|$/mu);
+  /* WITH MONEY ON, nothing moves. */
+  const on = await read(true);
+  assert.match(on, /^Object storage \| £41(?:\.00)?(?: GBP)? a month \| the binaries$/mu);
+  assert.match(on, /^Plan \| Price \| Seats$/mu);
+  assert.match(on, /^\| Service \| Cost \| Note \|$/mu);
   sql.close();
 });
