@@ -5147,6 +5147,88 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
     },
     "window": "30d",
     "compare": "none"
+   },
+   "rule.invoice-chased#0": {
+    "rule": "invoice-chased",
+    "name": "Mark an invoice as chased",
+    "pack": "money-core",
+    "on": {
+     "decided": {
+      "about": "rule.invoice-late",
+      "option": "Chase it"
+     }
+    },
+    "steps": [
+     {
+      "set": {
+       "field": "chased",
+       "to": "{{trigger.day}}"
+      }
+     },
+     {
+      "note": "You chose to chase this in Decide."
+     },
+     {
+      "if": {
+       "all": [
+        {
+         "field": "chase_draft",
+         "empty": true
+        },
+        {
+         "field": "state",
+         "is": "part"
+        },
+        {
+         "field": "paid_so_far",
+         "present": true
+        }
+       ]
+      },
+      "then": [
+       {
+        "set": {
+         "field": "chase_draft",
+         "to": "The invoice for {{short:amount}} was due on {{on:due}}, and {{short:amount-paid_so_far}} of it is still to pay. Could you tell me when the rest will be paid?"
+        }
+       }
+      ]
+     },
+     {
+      "if": {
+       "all": [
+        {
+         "field": "chase_draft",
+         "empty": true
+        },
+        {
+         "none": [
+          {
+           "all": [
+            {
+             "field": "state",
+             "is": "part"
+            },
+            {
+             "field": "paid_so_far",
+             "present": true
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      "then": [
+       {
+        "set": {
+         "field": "chase_draft",
+         "to": "The invoice for {{short:amount}} was due on {{on:due}}. Could you tell me when it will be paid?"
+        }
+       }
+      ]
+     }
+    ]
    }
   }
  },
