@@ -184,6 +184,9 @@ test('THE WEEK FOLLOWS THE WHOLE COUNT WHEN THE RECORD SENT IT, and a quiet week
   assert.equal(lastLine({ ...counted, week: 3 }, NOW), 'Ran 12 times, last today. 3 this week.');
   assert.equal(lastLine({ ...counted, week: 0 }, NOW), 'Ran 12 times, last today. None this week.');
   assert.equal(lastLine(counted, NOW), 'Ran 12 times, last today.', 'a host that sends no week says none');
+  /* AND THE MONTH IN ITS PLACE WHERE THE RECORD KEEPS IT (DR2), as the tiles above and Usage say. */
+  assert.equal(lastLine({ ...counted, week: 3, month_fired: 5 }, NOW), 'Ran 12 times, last today. 5 this month.');
+  assert.equal(lastLine({ ...counted, week: 3, month_fired: 0 }, NOW), 'Ran 12 times, last today. None this month.');
 });
 
 test('A RULE THAT NEVER RAN SAYS "NEVER" AND THE RECORD\'S ONE SENTENCE ON WHY', () => {
