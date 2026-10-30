@@ -1,5 +1,5 @@
 /**
- * `braindog env diff`: how the profiles on one machine differ, by name and hash, and how each differs from the record.
+ * `braindog env diff`: how the profiles on one machine differ, by name and hash, and how each differs from your BrainDog.
  *
  * EVERY FILE IS UNDER A TEMPORARY FOLDER and `home` and `env` are always passed, so no real profile is read. The
  * record is handed in as names, or read through a client made here, so no host is asked either.
@@ -152,7 +152,7 @@ test('WHAT EACH LACKS BESIDE THE OTHERS, what differs, and CLAUDE.md when it is 
     '  work lacks the hook events SessionStart, Stop.',
     `  server lantern: ${usual} in default and work; ${verbose} in studio.`,
     `  CLAUDE.md: ${brief} in default and studio; ${shortHash('Be thorough.\n')} in work.`,
-    "This machine is not signed in to BrainDog, so the record's tools and skills were not compared.",
+    "This machine is not signed in to BrainDog, so your BrainDog's tools and skills were not compared.",
     '8 differences, by name and hash only.',
   ])
     assert.ok(lines.includes(line), `no line ${JSON.stringify(line)}:\n${lines.join('\n')}`);
@@ -179,11 +179,11 @@ test('AGAINST THE RECORD: the tools and skills each lacks, and what each holds t
   ]);
   const lines = printEnvDiff(report);
   for (const line of [
-    "Against the record's 2 tools and 2 skills that apply everywhere:",
+    "Against your BrainDog's 2 tools and 2 skills that apply everywhere:",
     '  default, studio and work lack the tool compass.',
     '  default, studio and work lack the skill gamma.',
-    '  default holds servers the record does not: [hidden name 1], ledger, quill, vault.',
-    '  default and work hold a skill the record does not: beta.',
+    '  default holds servers your BrainDog does not: [hidden name 1], ledger, quill, vault.',
+    '  default and work hold a skill your BrainDog does not: beta.',
   ])
     assert.ok(lines.includes(line), `no line ${JSON.stringify(line)}:\n${lines.join('\n')}`);
 });

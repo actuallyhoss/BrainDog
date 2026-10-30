@@ -1893,7 +1893,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string; to?: Pi
     const holds = `This import holds money in ${and(currencies)}, and this BrainDog has no home currency to add it up in.`;
     if (asked === 'asked') lines.push(`${holds} ${o.dryRun ? `Adding it up in ${String(proposed)} would be asked on Decide` : `Adding it up in ${String(proposed)} is asked on Decide`}; each amount keeps its own currency either way.`);
     else if (asked === 'before') lines.push(`${holds} Which one to add it up in was asked on Decide before.`);
-    else if (asked === 'refused') lines.push(`${holds} It could not be asked, for the reason under Refused by the record.`);
+    else if (asked === 'refused') lines.push(`${holds} It could not be asked, for the reason under Refused by BrainDog.`);
     else lines.push(`${holds} Nothing on this BrainDog keeps one, so each amount keeps its own currency and none are added together.`);
   }
   if (plan.polls.length > 0)
@@ -1983,7 +1983,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string; to?: Pi
     );
   if (report.refused.length > 0) {
     /* A DRY RUN SENT NOTHING, so the record refused nothing yet: these are the rows the kernel's coercion says it will. */
-    lines.push('', o.dryRun ? 'Would be refused by the record:' : 'Refused by the record:');
+    lines.push('', o.dryRun ? 'Would be refused by BrainDog:' : 'Refused by BrainDog:');
     for (const r of report.refused) lines.push(`- ${r.label} (${name(r.register)}): ${r.fix}`);
   }
   if (plan.changed.length > 0) {
@@ -2284,7 +2284,7 @@ const wroteAny = (report: Report): boolean =>
  * the door the import keeps whichever build the host is at, and it carries the headers, the bearer and the deadline every other request of the run carries.
  */
 async function listWithDeleted(send: typeof fetch, to: Target, args: { register: string; limit?: number; cursor?: string | null }): Promise<Result<{ rows: unknown[]; cursor: string | null }>> {
-  const lost = (why: string) => no<never>('UNREACHABLE', `The record could not be reached: ${why}`);
+  const lost = (why: string) => no<never>('UNREACHABLE', `Your BrainDog could not be reached: ${why}`);
   let res: Response;
   try {
     res = await send(`${to.base.replace(/\/+$/u, '')}/api/list`, {
@@ -2540,7 +2540,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
   const plan: Plan = planned.value;
   const fault = planFault(plan, adapter.key);
   if (fault !== null) {
-    io.say(`The ${adapter.source} adapter is not one this command can apply: ${fault}. Nothing was read from the record or sent to it.`);
+    io.say(`The ${adapter.source} adapter is not one this command can apply: ${fault}. Nothing was read from your BrainDog or sent to it.`);
     return 1;
   }
   /* WHAT IT OFFERS AND WHAT IT SAYS IS SETTLED ARE ASKED HERE, BEFORE THE HOST IS, so a throw from either stops the run
@@ -2712,7 +2712,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
     if (e instanceof BinUnread) {
       const day = lastBin ? localClock(lastBin.at, offsetOf).day : 'the run before';
       io.say(
-        `${to.key} answered ${e.lists.join(' and ')} with nothing in the bin, and the run on ${day} saw ${e.rows === 1 ? 'a row' : `${String(e.rows)} rows`} deleted there too recently for the record's sweep to have taken ${e.rows === 1 ? 'it' : 'them'}. A host that leaves deleted rows out of its answer would have every row you deleted added back as new, so nothing was written.`,
+        `${to.key} answered ${e.lists.join(' and ')} with nothing in the bin, and the run on ${day} saw ${e.rows === 1 ? 'a row' : `${String(e.rows)} rows`} deleted there too recently for BrainDog's sweep to have taken ${e.rows === 1 ? 'it' : 'them'}. A host that leaves deleted rows out of its answer would have every row you deleted added back as new, so nothing was written.`,
       );
       io.say('If the bin really was emptied, because this BrainDog was put back from a copy or is a new one at the same address, run the import again with --bin-emptied.');
       return 1;
@@ -2747,7 +2747,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
       doing: taken ? `${adapter.source} import, export of ${taken}` : `${adapter.source} import on ${today}`,
       note: `${String(t.added)} added, ${String(t.updated)} updated, ${String(t.unchanged)} unchanged, ${String(report.asked)} asked on Decide, ${String(report.refused.length)} refused.`,
     });
-    if (!ended.ok) io.say(`The import's own run could not be ended (${fixOf(ended)}), so it reads as live until the record sweeps it.`);
+    if (!ended.ok) io.say(`The import's own run could not be ended (${fixOf(ended)}), so it reads as live until BrainDog sweeps it.`);
   }
   /* A DRY RUN AND A RECORD SHORT OF ITS LISTS WROTE NOTHING, so neither is a night `--since` should report as carried.
      A run the host stopped answering part way is remembered above, marked `stopped`. */

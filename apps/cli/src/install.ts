@@ -1145,7 +1145,7 @@ export async function forcedPack(
   if (!planned.ok) return refuse(io, planned, saidOf(planned));
   const diff = (planned.value as { diff?: { planHash?: unknown; pack?: { id?: unknown; version?: unknown } } } | null)?.diff;
   if (typeof diff?.planHash !== 'string') {
-    io.say('The record answered no plan for this add-on. Read it again with braindog addon install --dry-run.');
+    io.say('BrainDog answered no plan for this add-on. Read it again with braindog addon install --dry-run.');
     return 1;
   }
   const put = await client.installPack({ doc: given.doc, planHash: diff.planHash, ...(force ? { retireWithRows: true } : {}) });

@@ -149,7 +149,7 @@ export function valueOf<T>(r: Result<T>): T | null {
 }
 
 /** The fix sentence of a refusal, or a fixed one. Never an exception's message, which could quote anything. */
-export const fixOf = (r: Result<unknown>): string => (refused(r) ? r.refusal.fix : 'The record did not take it.');
+export const fixOf = (r: Result<unknown>): string => (refused(r) ? r.refusal.fix : 'BrainDog did not take it.');
 
 /**
  * A COPY OF `packages/kernel/src/cause.ts`'s `CAUSE`, because the command line is bundled without the kernel: a letter or
@@ -623,7 +623,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     const read = reg.truncated ? await readRest(shown) : { rest: [], whole: true, late: false };
     const listed = [...shown, ...read.rest];
     const listedSpoken = new Set(listed.map((r) => r.spoken));
-    if (read.late) lines.push('The record holds more skills than there was time to read, so the rest wait for the next sync.');
+    if (read.late) lines.push('Your BrainDog holds more skills than there was time to read, so the rest wait for the next sync.');
 
     /* A LOCK ENTRY IS HONOURED ONLY FOR THE SKILL IT WAS MADE FOR: the row it names must exist and carry the skill's
        name. Otherwise the entry is dropped and the skill is matched by name, as if the lock had never held it. */
@@ -694,10 +694,10 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         lines.push(
           asked.joined !== null
             ? both
-              ? `Skill ${name} changed here and in the record; kept yours. ${joinedAt(asked.joined, asked.said)}`
+              ? `Skill ${name} changed here and in your BrainDog; kept yours. ${joinedAt(asked.joined, asked.said)}`
               : `Skill ${name} was edited in ${where(path)}; kept it. ${joinedAt(asked.joined, asked.said)}`
             : both
-              ? `Skill ${name} changed here and in the record; kept yours and asked${onDecide(asked)}`
+              ? `Skill ${name} changed here and in your BrainDog; kept yours and asked${onDecide(asked)}`
               : `Skill ${name} was edited in ${where(path)}; kept it and proposed it as version ${String(rev + 1)}${onDecide(asked)}`,
         );
         continue;
@@ -733,15 +733,15 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
       }
       if (lock[path]?.proposed_sha === now) continue;
       if (s.dryRun) {
-        lines.push(`Skill ${name} in ${where(path)} differs from the record; it would be kept and proposed as version ${String(rev + 1)}.`);
+        lines.push(`Skill ${name} in ${where(path)} differs from your BrainDog; it would be kept and proposed as version ${String(rev + 1)}.`);
         continue;
       }
       const asked = await propose(row, name, rev, text, path);
       lock[path] = { spoken: row.spoken, version: rev, sha256: sha256(got.text), ...(asked.filed ? { proposed_sha: now } : {}) };
       lines.push(
         asked.joined !== null
-          ? `Skill ${name} in ${where(path)} differs from the record; kept it. ${joinedAt(asked.joined, asked.said)}`
-          : `Skill ${name} in ${where(path)} differs from the record; kept it and proposed it as version ${String(rev + 1)}${onDecide(asked)}`,
+          ? `Skill ${name} in ${where(path)} differs from your BrainDog; kept it. ${joinedAt(asked.joined, asked.said)}`
+          : `Skill ${name} in ${where(path)} differs from your BrainDog; kept it and proposed it as version ${String(rev + 1)}${onDecide(asked)}`,
       );
     }
 
@@ -770,7 +770,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         tell(`Skill ${name} was retired, so ${where(path)} was deleted.`, `Skill ${name} was retired, so ${where(path)} would be deleted.`);
       } else if (entry.proposed_sha !== now) {
         if (!s.dryRun) lock[path] = { ...entry, proposed_sha: now };
-        lines.push(`Skill ${name} was retired in the record and edited in ${where(path)}, so the file was left.`);
+        lines.push(`Skill ${name} was retired in your BrainDog and edited in ${where(path)}, so the file was left.`);
       }
     }
 
@@ -791,7 +791,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         /* Until every name the record holds has been read, a file may be a skill it already has. */
         if (read.late) continue;
         if (!read.whole) {
-          lines.push(`Skill ${file.name} in ${where(file.path)} was not registered, because not every skill in the record could be read.`);
+          lines.push(`Skill ${file.name} in ${where(file.path)} was not registered, because not every skill in your BrainDog could be read.`);
           continue;
         }
         if (s.dryRun) {

@@ -9,7 +9,7 @@
  * nothing that writes.
  *
  * WHAT IT WOULD CARRY: each profile's auto memory (`projects/<project>/memory/`, and nothing else under `projects/`),
- * the context folder, the programs in `~/.local/bin`, ccenv's shared files, the skills the record does not hold, and
+ * the context folder, the programs in `~/.local/bin`, ccenv's shared files, the skills your BrainDog does not hold, and
  * with `--under` the `.env` files git ignores in each repository; and of each repository, the commits on no remote and
  * the changes not committed, which no sync carries and which a person moving machines should know of. WHAT IT WOULD
  * REFUSE, each with why: a sign-in, session transcripts, a plugin cache or any cache, a link, and a file whose name
@@ -62,7 +62,7 @@ export type Repo = { repo: string; worktreeOf: string | null; unpushed: number |
 
 /**
  * The plan: what it would carry, what it would refuse, each repository, the folders named with `--under`, and where
- * the skills the record holds were read from, the record or, when it could not be read, this machine's skills lock.
+ * the skills your BrainDog holds were read from, the record or, when it could not be read, this machine's skills lock.
  * On a machine that has joined setup sync, what the record keeps sealed already.
  */
 export type Inventory = { items: Item[]; refused: Refused[]; repos: Repo[]; under: string[]; skills: { from: 'record' } | { from: 'lock'; why: Unread }; sealed?: SealedSeen };
@@ -373,7 +373,7 @@ const HEADINGS: Record<Group, string> = {
   context: 'The context folder:',
   scripts: 'Programs in ~/.local/bin:',
   shared: "ccenv's shared files:",
-  skills: 'Skills the record does not hold:',
+  skills: 'Skills your BrainDog does not hold:',
   env: '.env files git ignores, by repository:',
 };
 
@@ -390,9 +390,9 @@ const WHY: Record<Why, string> = {
 };
 
 const LOCK: Record<Unread, string> = {
-  'signed-out': "This machine is not signed in to BrainDog, so the skills the record holds were read from this machine's skills lock.",
-  unreachable: "BrainDog did not answer, so the skills the record holds were read from this machine's skills lock.",
-  refused: "BrainDog would not list its skills, so the skills the record holds were read from this machine's skills lock.",
+  'signed-out': "This machine is not signed in to BrainDog, so the skills your BrainDog holds were read from this machine's skills lock.",
+  unreachable: "BrainDog did not answer, so the skills your BrainDog holds were read from this machine's skills lock.",
+  refused: "BrainDog would not list its skills, so the skills your BrainDog holds were read from this machine's skills lock.",
 };
 
 function refusedLine(r: Refused): string {
@@ -444,10 +444,10 @@ export function printInventory(inv: Inventory): string[] {
 /** What the record keeps sealed already, as lines: the files in all, then each machine with its newest bundle. */
 function sealedLines(s: SealedSeen): string[] {
   const joined = `this machine joined setup sync on ${s.host} as ${oneLine(s.machine)}`;
-  if ('unread' in s) return [`Sealed already: ${joined}, and the record did not list what it keeps. ${oneLine(s.unread)}`];
+  if ('unread' in s) return [`Sealed already: ${joined}, and BrainDog did not list what it keeps. ${oneLine(s.unread)}`];
   if (s.machines.length === 0) return [`Sealed already: ${joined}, and no machine has sent a bundle yet. braindog sync push sends this one's.`];
   return [
-    `Sealed already: ${joined}. The record keeps ${count(s.files, 'sealed file', 'sealed files')}, ${sized(s.size)}, none of them opened here:`,
+    `Sealed already: ${joined}. Your BrainDog keeps ${count(s.files, 'sealed file', 'sealed files')}, ${sized(s.size)}, none of them opened here:`,
     ...s.machines.map((m) => `  ${oneLine(m.slug)}: ${count(m.bundles, 'bundle', 'bundles')}, the newest sent ${m.newest.slice(0, 16).replace('T', ' ')} UTC`),
   ];
 }

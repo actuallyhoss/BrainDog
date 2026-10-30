@@ -83,9 +83,9 @@ type Scoped = { names: string[]; title: string; everywhere: boolean };
 type Read = { read: true; profiles: ProfileRow[] | null; scoped: Map<string, Scoped> } | { read: false; why: 'signed-out' | 'unreachable' | 'refused' };
 
 const NOT_READ: Record<'signed-out' | 'unreachable' | 'refused', string> = {
-  'signed-out': 'This machine is not signed in to BrainDog, so the record was not read: BrainDog\'s hooks and server are placed, and its tools, skills and rules wait for braindog setup <host>.',
-  unreachable: "BrainDog did not answer, so the record was not read: BrainDog's hooks and server are placed, and its tools, skills and rules wait for the next run.",
-  refused: "BrainDog would not give this machine its tools and skills, so the record was not read: BrainDog's hooks and server are placed, and nothing else.",
+  'signed-out': 'This machine is not signed in to BrainDog, so your BrainDog was not read: BrainDog\'s hooks and server are placed, and its tools, skills and rules wait for braindog setup <host>.',
+  unreachable: "BrainDog did not answer, so your BrainDog was not read: BrainDog's hooks and server are placed, and its tools, skills and rules wait for the next run.",
+  refused: "BrainDog would not give this machine its tools and skills, so your BrainDog was not read: BrainDog's hooks and server are placed, and nothing else.",
 };
 
 /** Names joined as a sentence says them: `a`, `a and b`, `a, b and c`. */
@@ -412,12 +412,12 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     }
 
     /* ── 3. the record's tools, in this profile's own servers file ───────── */
-    if (!record.read) io.out('3. Tools: the record was not read, so none was written.');
+    if (!record.read) io.out('3. Tools: your BrainDog was not read, so none was written.');
     else {
       const first = await reach();
       if (typeof first === 'number') {
         failed = true;
-        io.out('3. Tools: the record could not be read, so none was written.');
+        io.out('3. Tools: your BrainDog could not be read, so none was written.');
       } else if (!first.context.registers.some((r) => r.id === 'tools')) io.out('3. Tools: this BrainDog has no Tools list, so there is nothing to write.');
       else {
         /* A TOOL THAT NAMES OTHER PROFILES IS NOT IN THIS PROFILE'S CONTEXT, so `writeTools` never sees it here. */
@@ -443,21 +443,21 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
         });
         const said = lines.filter((line) => !line.startsWith('Nothing was changed.'));
         if (!said.some((line) => /^[+~] /u.test(line))) {
-          io.out(said.length === 0 ? `3. Tools: every tool the record applies to ${oneLine(p.name)} is already there as the record has it.` : '3. Tools: nothing new is written, and this is why:');
+          io.out(said.length === 0 ? `3. Tools: every tool your BrainDog applies to ${oneLine(p.name)} is already there.` : '3. Tools: nothing new is written, and this is why:');
           detail(said);
         } else if (planOnly) {
           changes = true;
-          io.out(`3. Tools: what would be written at user scope, from the tools the record applies to ${oneLine(p.name)}:`);
+          io.out(`3. Tools: what would be written at user scope, from the tools your BrainDog applies to ${oneLine(p.name)}:`);
           detail(said);
         } else {
           changes = true;
-          io.out(`3. Tools: what is written next at user scope, from the tools the record applies to ${oneLine(p.name)}:`);
+          io.out(`3. Tools: what is written next at user scope, from the tools your BrainDog applies to ${oneLine(p.name)}:`);
           detail(said);
           for (const tool of programs) await askAbout(tool, `the ${tool.name} tool`, p.name);
           const second = await reach();
           if (typeof second === 'number') {
             failed = true;
-            detail(['The record could not be read again, so no tool was written.']);
+            detail(['Your BrainDog could not be read again, so no tool was written.']);
           } else {
             const done = await writeTools({
               ...base,
@@ -483,7 +483,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     }
 
     /* ── 4. the record's skills, into this profile's folder ──────────────── */
-    if (!record.read) io.out('4. Skills: the record was not read, so none was synced.');
+    if (!record.read) io.out('4. Skills: your BrainDog was not read, so none was synced.');
     else {
       const folder = realOf(join(p.dir, 'skills'));
       const shared = leavesAll(sharing.get(folder) ?? [same(p.name)]);
@@ -494,7 +494,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
         const at = await reach();
         if (typeof at === 'number') {
           failed = true;
-          io.out('4. Skills: the record could not be read, so none was synced.');
+          io.out('4. Skills: your BrainDog could not be read, so none was synced.');
         } else if (!at.context.registers.some((r) => r.id === 'skills')) io.out('4. Skills: this BrainDog has no Skills list, so there is nothing to sync.');
         else {
           const leave = new Set([...scoped.keys()].filter((spoken) => spoken.startsWith('skills#') && shared(spoken)));
@@ -503,7 +503,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
             changes = true;
             if (!planOnly) wrote = true;
           }
-          io.out(lines.length === 0 ? `4. Skills: it already holds every skill the record applies to ${oneLine(p.name)}.` : `4. Skills: ${planOnly ? 'what would be synced' : 'synced'}:`);
+          io.out(lines.length === 0 ? `4. Skills: it already holds every skill your BrainDog applies to ${oneLine(p.name)}.` : `4. Skills: ${planOnly ? 'what would be synced' : 'synced'}:`);
           detail(lines);
         }
         const out = leftOut('skills', shared);
@@ -513,7 +513,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
 
     /* ── 5. the profile's rules, in a marked block of its CLAUDE.md ──────── */
     const row = record.read && record.profiles !== null ? (record.profiles.find((r) => same(r.name) === same(p.name)) ?? null) : null;
-    if (!record.read) io.out('5. Rules: the record was not read, so CLAUDE.md is left as it is.');
+    if (!record.read) io.out('5. Rules: your BrainDog was not read, so CLAUDE.md is left as it is.');
     else if (record.profiles === null) io.out('5. Rules: kept per profile by the Profiles add-on, which this BrainDog does not have.');
     else if (row === null) io.out(`5. Rules: Profiles has no row for ${oneLine(p.name)}, so its CLAUDE.md is left as it is.`);
     else {
@@ -626,7 +626,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     io.out(
       changes
         ? 'Nothing was written, because no one is at a terminal to say yes. Run braindog env apply --yes-data to write the plain data and the programs already approved here; any other program is asked about at a terminal.'
-        : 'Nothing to change: every profile already holds what the record applies to it.',
+        : 'Nothing to change: every profile already holds what your BrainDog applies to it.',
     );
     return changes || failed ? 1 : 0;
   }
@@ -639,7 +639,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
       ? `Applied to ${and([...profiles.map((p) => oneLine(p.name)), ...(withCodex ? ['Codex'] : [])])}. Sessions started from now on in each have it.`
       : failed || left.size > 0
         ? 'Nothing else changed.'
-        : 'Nothing changed: every profile already holds what the record applies to it.',
+        : 'Nothing changed: every profile already holds what your BrainDog applies to it.',
   );
   return failed || left.size > 0 ? 1 : 0;
 }

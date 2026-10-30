@@ -338,7 +338,7 @@ test('AT A TERMINAL EACH PROGRAM IS ASKED ONCE, PINNED, AND PLACED IN EVERY PROF
   assert.deepEqual(again.asked, []);
   assert.deepEqual(again.ran, []);
   assert.equal(hashOf(p.home), before, 'a run with nothing to do changed the home');
-  assert.equal(again.lines.at(-1), 'Nothing changed: every profile already holds what the record applies to it.');
+  assert.equal(again.lines.at(-1), 'Nothing changed: every profile already holds what your BrainDog applies to it.');
 });
 
 test('A CHANGED ENTRY IS ASKED ABOUT AGAIN: a yes replaces its pin, and a no leaves the old entry and names it', async () => {
@@ -484,8 +484,8 @@ test('SIGNED OUT, BRAINDOG\'S OWN HOOKS AND SERVER ARE PLACED, and the record\'s
   assert.equal(await envApply(['--profile', 'default'], run.io), 1, run.all());
   assert.deepEqual(rec.calls, [], 'the record was asked while signed out');
   assert.deepEqual(Object.keys(servers(files(p).main)), ['braindog']);
-  assert.match(run.all(), /This machine is not signed in to BrainDog, so the record was not read/);
-  assert.match(run.all(), /3\. Tools: the record was not read, so none was written\./);
+  assert.match(run.all(), /This machine is not signed in to BrainDog, so your BrainDog was not read/);
+  assert.match(run.all(), /3\. Tools: your BrainDog was not read, so none was written\./);
 });
 
 test("CODEX ON THE MACHINE GETS ITS TURN END, BRAINDOG'S AGENTS.md BLOCK AND THE SERVER, each program asked about as Codex's", async () => {

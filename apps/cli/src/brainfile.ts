@@ -83,7 +83,7 @@ function hostFor(flag: string | undefined, io: BrainfileIo): { key: string; url:
   }
   const url = new URL(key);
   if (inTheClear(url)) {
-    io.say(`${key} is http, not https. BrainDog sends a record only over https, except to this machine.`);
+    io.say(`${key} is http, not https. BrainDog sends a copy only over https, except to this machine.`);
     return null;
   }
   return { key, url };
@@ -103,7 +103,7 @@ async function post(host: { key: string; url: URL }, method: 'export' | 'import'
         fix:
           method !== 'import'
             ? `${host.key} did not answer, so nothing was exported.`
-            : `${host.key} did not answer, so this command cannot say whether the record was put back.`,
+            : `${host.key} did not answer, so this command cannot say whether your BrainDog was put back.`,
       },
     },
   });
@@ -363,7 +363,7 @@ export async function shapeExport(args: string[], io: BrainfileIo): Promise<numb
       io.say('This braindog cannot ask for a shape grant yet, so no shape copy was taken. Update braindog and run it again.');
       return 1;
     }
-    io.say('A shape copy needs a standing grant, approved once in the app with six digits. Nothing in it is a word of the record.');
+    io.say('A shape copy needs a standing grant, approved once in the app with six digits. Nothing in it is a word of yours.');
     const grant = await approveShape(host.key, io);
     if (typeof grant === 'number') return grant;
     keepShape(io.file, host.key, { value: grant.bearer, expires: grant.expires, label: grant.label });
@@ -449,7 +449,7 @@ export async function importFile(args: string[], io: BrainfileIo): Promise<numbe
   const report = (got.value ?? {}) as { tables?: unknown; rows?: unknown };
   const tables = typeof report.tables === 'number' ? report.tables : 0;
   const rows = typeof report.rows === 'number' ? report.rows : 0;
-  const record = verified?.produced.by ?? 'the record';
+  const record = verified?.produced.by ?? 'your BrainDog';
   io.out(`put back ${record} from ${file}: ${tables} tables, ${rows.toLocaleString('en')} rows, in place of what it held`);
   io.answer?.({ value: { record, tables, rows, verified } });
   return 0;

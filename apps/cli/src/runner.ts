@@ -1118,7 +1118,7 @@ function readClaim(value: unknown, to: RunnerTarget): { claim: Claim } | { idle:
   } catch {
     mcp = '';
   }
-  if (bearer === '' || mcp === '') return { bad: 'The job arrived without a key for the record, or with one for another site, so it was not run.', ...at };
+  if (bearer === '' || mcp === '') return { bad: 'The job arrived without a key for this BrainDog, or with one for another site, so it was not run.', ...at };
   return {
     claim: {
       job: { ...pinned, id: j.id, seq: j.seq, args: args as Record<string, string>, permission: pinned.permission as ClaimedJob['permission'], agent: pinned.agent, seat },

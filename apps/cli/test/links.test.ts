@@ -186,7 +186,7 @@ test('TOOLS SCAN PRINTS THE LINK to each question the record asked or holds open
 test('AND THE QUESTIONS AN OLDER HOST LEAVES TO THE SCAN: a changed start and a tool for use everywhere each carry theirs', async (t) => {
   const changed = await scanned(t, { seen: null, servers: { quill: stdio('quill') }, held: true, to: HOST });
   assert.equal(changed.length, 1, changed.join('\n'));
-  assert.match(changed[0]!, /^Tool quill in ~\/\.claude\.json differs from the one in the record, .*asked on Decide: Change how quill starts\? /u);
+  assert.match(changed[0]!, /^Tool quill in ~\/\.claude\.json differs from the one in your BrainDog, .*asked on Decide: Change how quill starts\? /u);
   assert.ok(changed[0]!.endsWith(` ${AT('SG9')}`), changed[0]);
   const everywhere = await scanned(t, { seen: null, servers: { heron: stdio('heron') }, project: true, to: HOST });
   assert.equal(everywhere.length, 1, everywhere.join('\n'));

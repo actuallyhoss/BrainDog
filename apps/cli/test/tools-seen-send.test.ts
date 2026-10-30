@@ -167,7 +167,7 @@ test('A RUN IN NO PROJECT sends no project server, and says so in one line', asy
   const h = setup(t, { seen: seenAll });
   h.project({ fenwick: stdio('fenwick'), quill: stdio('quill') });
   h.global({ lantern: stdio('lantern') });
-  assert.deepEqual(await h.scan(), ['This folder is in no project in the record, so the 2 servers of its project config were not recorded.']);
+  assert.deepEqual(await h.scan(), ['This folder is in no project in your BrainDog, so the 2 servers of its project config were not recorded.']);
   assert.deepEqual((h.of('toolsSeen')[0]!.args.found as Record<string, unknown>[]).map((f) => f.name), ['lantern']);
 });
 
@@ -268,7 +268,7 @@ test('NOTHING PRINTED HOLDS A PLANTED SECRET: a reason that looks like a key is 
   const shaped = keyShaped();
   const h = setup(t, { seen: (found) => found.map((f) => ({ name: String(f.name), did: 'skipped', why: `The record holds ${shaped} for it` })) });
   h.global({ fenwick: stdio('fenwick') });
-  assert.deepEqual(await h.scan(), ['fenwick was not recorded: the record did not say why.']);
+  assert.deepEqual(await h.scan(), ['fenwick was not recorded: BrainDog did not say why.']);
   assert.equal([...h.lines, readFileSync(h.lockFile, 'utf8')].join('\n').includes(shaped), false);
 });
 

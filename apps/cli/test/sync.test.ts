@@ -243,7 +243,7 @@ test('NOT SIGNED IN, THE SKILLS LOCK SAYS WHICH SKILLS THE RECORD HOLDS, and the
     [tilde(join(p.main, 'skills', 'kept'), p.home)],
   );
   assert.deepEqual(out.report.skills, { from: 'lock', why: 'signed-out' });
-  assert.ok(out.lines.includes("This machine is not signed in to BrainDog, so the skills the record holds were read from this machine's skills lock."), out.lines.join('\n'));
+  assert.ok(out.lines.includes("This machine is not signed in to BrainDog, so the skills your BrainDog holds were read from this machine's skills lock."), out.lines.join('\n'));
 });
 
 test('THE VERB FINDS THE PROFILES AS doctor DOES, ccenv and CODEX_HOME by the environment', async () => {

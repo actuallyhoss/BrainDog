@@ -1,7 +1,7 @@
 /**
  * `braindog env diff [--config-dir <folder>] [--host <host>] [--json]`: how the Claude Code profiles on this machine
  * differ from one another, by the names of their MCP servers, plugins, hook events and skills, with a short hash of
- * each server's entry and of each CLAUDE.md; and, when this machine is signed in, how each differs from the record's
+ * each server's entry and of each CLAUDE.md; and, when this machine is signed in, how each differs from your BrainDog's
  * tools and skills that apply everywhere.
  *
  * IT CHANGES NOTHING AND ONLY READS. One person runs several profiles on one machine (`~/.claude`, `~/.claude-<name>`
@@ -262,8 +262,8 @@ function byHash(hashes: Record<string, string | null>): string {
 }
 
 const UNREAD: Record<Unread, string> = {
-  'signed-out': "This machine is not signed in to BrainDog, so the record's tools and skills were not compared.",
-  unreachable: "BrainDog did not answer, so the record's tools and skills were not compared.",
+  'signed-out': "This machine is not signed in to BrainDog, so your BrainDog's tools and skills were not compared.",
+  unreachable: "BrainDog did not answer, so your BrainDog's tools and skills were not compared.",
   refused: 'BrainDog would not list its tools and skills, so they were not compared.',
 };
 
@@ -295,11 +295,11 @@ export function printEnvDiff(report: EnvReport): string[] {
   if (!r.read) lines.push(UNREAD[r.why]);
   else {
     const before = n;
-    under(`Against the record's ${count(r.tools, 'tool', 'tools')} and ${count(r.skills, 'skill', 'skills')} that apply everywhere:`, [
+    under(`Against your BrainDog's ${count(r.tools, 'tool', 'tools')} and ${count(r.skills, 'skill', 'skills')} that apply everywhere:`, [
       ...grouped(r.lacks).map((g) => `${lack(g)} the ${g.part === 'server' ? (g.names.length === 1 ? 'tool' : 'tools') : kind(g.part, g.names.length)} ${g.names.join(', ')}.`),
-      ...grouped(r.extra).map((g) => `${and(g.profiles)} ${g.profiles.length === 1 ? 'holds' : 'hold'} ${g.names.length === 1 ? `a ${kind(g.part, 1)}` : kind(g.part, g.names.length)} the record does not: ${g.names.join(', ')}.`),
+      ...grouped(r.extra).map((g) => `${and(g.profiles)} ${g.profiles.length === 1 ? 'holds' : 'hold'} ${g.names.length === 1 ? `a ${kind(g.part, 1)}` : kind(g.part, g.names.length)} your BrainDog does not: ${g.names.join(', ')}.`),
     ]);
-    if (n === before && report.profiles.length > 0) lines.push(`Every profile holds the record's ${count(r.tools, 'tool', 'tools')} and ${count(r.skills, 'skill', 'skills')}, and nothing beyond them.`);
+    if (n === before && report.profiles.length > 0) lines.push(`Every profile holds your BrainDog's ${count(r.tools, 'tool', 'tools')} and ${count(r.skills, 'skill', 'skills')}, and nothing beyond them.`);
   }
   lines.push(n === 0 ? 'Nothing differs.' : n === 1 ? 'One difference, by name and hash only.' : `${String(n)} differences, by name and hash only.`);
   return lines;

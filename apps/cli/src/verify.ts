@@ -151,7 +151,7 @@ async function verifyCopy(file: string, path: string, bytes: Buffer, key: string
     raw = readFileSync(`${path}.sig`, 'utf8');
   } catch {
     io.say(
-      `${file} is a self-host copy with no signature beside it (${file}.sig), so there is nothing to check it against. Copies taken before signing began, or by a record with no signing key, are unsigned. Take a new copy, or export a .brainl from the record and verify that instead.`,
+      `${file} is a self-host copy with no signature beside it (${file}.sig), so there is nothing to check it against. Copies taken before signing began, or by a BrainDog with no signing key, are unsigned. Take a new copy, or export a .brainl from the record and verify that instead.`,
     );
     return 1;
   }
@@ -195,7 +195,7 @@ async function verifyCopy(file: string, path: string, bytes: Buffer, key: string
      the one that says it is not the record's. */
   const pinned = key !== undefined;
   if (pinned && key !== public_key)
-    return no(`${file} is signed by key ${key_id}, which is not the key you named, so it is not a copy of the record you meant.`);
+    return no(`${file} is signed by key ${key_id}, which is not the key you named, so it is not a copy of the BrainDog you meant.`);
 
   const verified: Verified = {
     container: 'dog',
@@ -358,7 +358,7 @@ function describe(lines: readonly string[], pinned: boolean): Verified {
     rows: manifest.reduce((sum, [, n]) => sum + n, 0),
     manifest: 'ok',
     signature: { valid: true, key_id: keyId!, pinned },
-    produced: { at: signedAt!, by: typeof id === 'string' ? id : 'a record this file does not name' },
+    produced: { at: signedAt!, by: typeof id === 'string' ? id : 'a BrainDog this file does not name' },
     ...(missing ? { partial: order.filter((s) => present.has(s)) } : {}),
   };
 }
