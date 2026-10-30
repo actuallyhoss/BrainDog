@@ -5527,7 +5527,8 @@ function pathOf(
      and a list's state of that name exactly as `.change` is. */
   if ((ROW_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { rowsOf: head, part: tail as RowPart };
   /* `<figure>.on`, `.because` AND `.because_amount` ARE WHERE A WALK TO ZERO GOES UNDER (`crossingValue`): its day, what
-     falls due that day and its money, so a sentence says why the money runs out on the day it does. */
+     falls due that day and its money, so a sentence says why the money runs out on the day it does. `.low` and `.low_on`
+     are the lowest it reaches in twelve weeks and that day. */
   if ((CROSSING_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { crossingOf: head, part: tail as CrossingPart };
   /* `<figure>.apart`, `.converted` AND `.rate_on` ARE A MONEY FIGURE IN EACH OF ITS CURRENCIES, THE ONE AMOUNT THEY ARE
      CONVERTED INTO AND THE DAY OF THE RATES, so a line keeps pounds and dollars apart and says the sum as roughly that. */
@@ -6013,8 +6014,8 @@ function convertedValue(deps: PageDeps, decl: MetricDecl, part: ConvertedPart): 
   return { amount: Math.round(read.value.value / unit) * unit, currency: read.value.unit };
 }
 
-/** The parts of a walk to zero a sentence may name: the day it goes under, what falls due then, and that money. */
-const CROSSING_PARTS = ['on', 'because', 'because_amount'] as const;
+/** The parts of a walk to zero a sentence may name: the day it goes under, what falls due then, and that money; and the lowest it reaches and that day. */
+const CROSSING_PARTS = ['on', 'because', 'because_amount', 'low', 'low_on'] as const;
 type CrossingPart = (typeof CROSSING_PARTS)[number];
 
 /**
@@ -6029,6 +6030,14 @@ type CrossingPart = (typeof CROSSING_PARTS)[number];
  */
 function crossingValue(deps: PageDeps, decl: MetricDecl, part: CrossingPart): Json | undefined {
   if (decl.source !== WALK_SOURCE || !walksToZero((decl.value as { walk?: unknown } | undefined)?.walk) || !mayRead(deps, decl)) return undefined;
+  /* `.low` AND `.low_on` ARE THE LOWEST THE SAME WALK REACHES IN THE NEXT TWELVE WEEKS AND THE FIRST DAY IT DOES (audit
+     31 Oct f, AF4), the low point the hero's Cash now draws beside its walk (`aheadOf` over `12w`), so the line Money
+     opens on and the tile under it say one low point. A walk that cannot be one walk has none, and the clause drops. */
+  if (part === 'low' || part === 'low_on') {
+    const walked = aheadOf(deps, decl.metric, '12w');
+    if ('refusal' in walked || !walked.ahead) return undefined;
+    return part === 'low_on' ? walked.ahead.low.day : { amount: walked.ahead.low.value, currency: walked.ahead.currency };
+  }
   const read = deps.read(decl);
   const under = read.ok ? read.value.under : undefined;
   if (!under) return undefined;

@@ -181,7 +181,8 @@ test('HOME IS CALLED TODAY in the voice, and the founder\'s own page Founder ove
 /* WHERE IT IS KEPT, SINCE money-core 3.29.0: how much there is is the hero's under the line, and every line ends on the
    part that is late, a sentence the app leaves out while none is. */
 /* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0, left out whole with no card that says it. */
-const LATE = '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
+/* AND SINCE money-core 3.33.0 (AF4) WHAT IS LATE LEADS ONLY WHILE IT IS: nothing is late here, so the card alone. */
+const LATE = '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
 test('MONEY WITH TWO BOOKS OPENS ON WHERE ITS MONEY IS KEPT, and with one book on how long it lasts', async () => {
   const k = await founder();
   type Lead = Drawn & { lead?: boolean; body?: string; values?: Record<string, unknown> };

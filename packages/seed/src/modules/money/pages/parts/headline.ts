@@ -27,40 +27,60 @@ const LATE_PART = '{{installments-late.first}} is {{bad:late}}: {{installments-l
  */
 const CARD_OWES = ' {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
 
+/**
+ * MONEY LEADS WITH WHAT HURTS MOST, SINCE money-core 3.33.0 (audit of 31 October f, AF4): the line opened on "£1,240 to
+ * pay on the card" while the same page said bills £10,540 late and cash going to −£16,213 on 7 Nov. Now it opens on
+ * the bills that are late, with a part of a plan that is late named first, and when nothing is late on the low point,
+ * while the walk goes under inside the twelve weeks the hero draws (`runway-days` at 84 days or fewer, so the low is
+ * below nought). The card comes after, as the second thing. The first sentence whose `when:` holds is said (`says:`).
+ */
+const BILLS_LATE = 'Bills {{bad:late}}: {{overdue}} to pay.';
+const LOW_POINT = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.';
+const PART_LATE = { metric: 'installments-late', gt: 0 };
+const BILL_LATE = { metric: 'overdue', gt: 0 };
+const GOES_UNDER = { all: [{ metric: 'cash-now', gt: 0 }, { metric: 'runway-days', lte: 84 }] };
+
+/** The line's sentences, worst first, each with `between` (what the line says of the accounts or the year) before the card. */
+const says = (between: string): Record<string, unknown>[] => [
+  { when: { all: [PART_LATE, BILL_LATE] }, body: `${LATE_PART} Bills {{bad:late}} too: {{overdue}} to pay.${between}${CARD_OWES}` },
+  { when: BILL_LATE, body: `${BILLS_LATE}${between}${CARD_OWES}` },
+  { when: PART_LATE, body: `${LATE_PART}${between}${CARD_OWES}` },
+  { when: GOES_UNDER, body: `${LOW_POINT}${between}${CARD_OWES}` },
+  { body: `${between}${CARD_OWES}`.trim() },
+];
+
 export const HEADLINE: Record<string, unknown>[] = [
   {
-    /* THE PAGE'S LINE: where the money is kept, then, only while it is true, the part that is late and what is to pay
-       on the card. A clause whose figure has no value is left out by the writer (`leadOf`), so a record with no account
-       yet reads no sentence at all. How much there is, how it moved in a month and when it runs out are the hero's
-       (`hero.ts`), drawn under the line, so no figure is said twice on one screen. */
+    /* THE PAGE'S LINE: what is late, or the low point, then what is to pay on the card. A clause whose figure has no
+       value is left out by the writer (`leadOf`), so a record with no account yet reads no sentence at all. How much
+       there is, how it moved in a month and when it runs out are the hero's (`hero.ts`), drawn under the line. */
     kind: 'note',
     lead: true,
     span: 12,
     when: ONE_BOOK,
-    body: `${LATE_PART}${CARD_OWES}`,
+    says: says(''),
   },
   {
     /* WITH TWO BOOKS OR MORE THE LINE SAYS HOW MANY ACCOUNTS THE MONEY IS SPREAD OVER, SINCE money-core 3.30.0, so a
-       person reads that the hero's Cash now holds every book. What each book holds is on the Accounts page. Then the
-       part that is late, as on one book. */
+       person reads that the hero's Cash now holds every book, after what is late. */
     kind: 'note',
     lead: true,
     span: 12,
     when: { metric: 'books-held', gte: 2 },
-    body: `${ACCOUNTS_SAID} ${LATE_PART}${CARD_OWES}`,
+    says: says(` ${ACCOUNTS_SAID}`),
   },
 ];
 
 /**
  * THE LINE MONEY OPENS ON, SPLIT BY WHETHER THE MONEY LASTS THE YEAR. While the walk goes under inside the year,
- * the hero says the day and how long it lasts with nothing coming in, so the line says where the money is kept and no
- * more. While it does not, the hero draws no day, and the line says that on what is due the money lasts the year.
+ * the hero says the day and how long it lasts with nothing coming in, so the line says what is late and the card. While
+ * it does not, the hero draws no day, and the line says, after what is late, that on what is due the money lasts the
+ * year.
  */
 export const HEADLINE_LASTS: Record<string, unknown>[] = [
   {
     ...HEADLINE[0],
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
-    body: `${LATE_PART}${CARD_OWES}`,
   },
   {
     /* THAT IT LASTS THE YEAR IS THE LINE'S, BECAUSE NO TILE SAYS IT. The tile of when it runs out is drawn only while
@@ -73,7 +93,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
-    body: `Lasts the year on what is due. ${LATE_PART}${CARD_OWES}`,
+    says: says(' Lasts the year on what is due.'),
   },
   HEADLINE[1]!,
 ];
