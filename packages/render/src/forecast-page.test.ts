@@ -37,7 +37,7 @@ test('THE SUMMARY SAYS THE CASH AT THE HORIZON AND ITS CHANGE, THE LOWEST POINT 
   const [end, low, everyday] = forecastSummary(model, shown);
   assert.equal(end!.label, 'Cash on 26 Jan 2027', 'the day the chart ends, its year said because it is not this one');
   assert.match(end!.figure.replaceAll(' ', ' '), /344,004/u);
-  assert.match(end!.note.replaceAll(' ', ' '), /^from .*500,000 today · −/u, 'the change from today, signed');
+  assert.match(end!.note.replaceAll(' ', ' '), /^from .*500,000 today, down /u, 'the change from today, said by its way');
   assert.equal(end!.dir, 'out');
   assert.equal(low!.label, 'Lowest');
   assert.equal(low!.note, 'on 13 Jan 2027, after House, part 3 of 36', 'the lowest day and the part of the plan that took it there');
