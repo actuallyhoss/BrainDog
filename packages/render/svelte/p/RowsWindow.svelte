@@ -280,7 +280,7 @@
 {#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else if scope && value && scoped.has(column.field)}{@render scopeChip(scope, value)}{:else}{@const drawn = tableCellBody(value, home, now)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{@const end = drawn.body.rest.search(/\s|$/u)}<span class="amount" data-sign={cellIn(drawn.body) ? 'in' : undefined}>{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span>{AMOUNT_SPACE}{drawn.body.rest.slice(0, end)}</span>{drawn.body.rest.slice(end)}{:else if cellIn(drawn.body)}<span class="amount" data-sign="in">{drawn.body.text}</span>{:else}{drawn.body.text}{/if}{/if}{/snippet}
 
 {#snippet pair(row: TableRow, cell: CardCell)}
-  <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>
+  <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'} data-named={cell.named ? '' : undefined}>
     <span class="table-card-name">{cell.column.label}</span>
     <span class="table-card-value">{@render cellBody(row, cell.column, cell.value)}</span>
   </span>
@@ -298,7 +298,7 @@
       {#if title}{@render cellBody(row, title.column, title.value)}{/if}
     </span>
     {#if mark}
-      <span class="table-card-mark" data-truncate={mark.column.truncate}>
+      <span class="table-card-mark" data-truncate={mark.column.truncate} data-named={mark.named ? '' : undefined}>
         <span class="table-card-name">{mark.column.label}</span> {@render cellBody(row, mark.column, mark.value)}
       </span>
     {/if}

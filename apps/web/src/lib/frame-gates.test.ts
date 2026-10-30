@@ -150,7 +150,6 @@ const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/lib/flow/Tokens.svelte': ['.tok-box :global(.tok-pill)'], // edge
   'apps/web/src/lib/page/PageTabs.svelte': ['.tab[aria-current=\'page\'], .tab-more[data-here] .tab'], // edge
   'apps/web/src/lib/page/ProjectVisuals.svelte': ['.stop[data-kind=\'now\'] .c'], // edge
-  'apps/web/src/lib/page/kinds/calendar.css': ['.calendar-day .calendar-item::after'], // edge
   'apps/web/src/lib/ui/AgentFace.svelte': ['.agent-face-live', '.agent-face-live[data-live=\'quiet\']', '.agent-face-project'], // edge, ring
   'apps/web/src/lib/ui/BlockBar.svelte': ['.width[data-on]'], // edge
   'apps/web/src/lib/ui/Count.svelte': ['.badge[data-size=\'s\']'], // ring
@@ -174,6 +173,7 @@ const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/routes/settings/[area]/settings.css': ['.settings-place .picture-shot', '.settings-place .picture[data-on] .picture-shot', '.settings-place .picture:not([data-on]):hover .picture-shot'], // edge, ring
   'packages/skin/blocks-charts.css': ['.split-dot:not([data-step]), .ring-dot:not([data-step])', '.roadmap-item[data-date] .roadmap-bar', '.roadmap-bar[data-dragging]', '.heat-day'], // edge, ring
   'packages/skin/kinds/board.css': ['.board-col[data-drop]'], // edge
+  'packages/skin/kinds/calendar.css': ['.calendar-day .calendar-item::after'], // edge
   'packages/skin/kinds/feed.css': ['.feed-row[data-focused]'], // ring
   'packages/skin/kinds/filters.css': ['.filters-group[data-control=\'segmented\'] .filters-choice:is([aria-pressed=\'true\'], [data-on]), .filters-group[data-control=\'segmented\'] button.filters-choice[aria-pressed=\'true\']:hover'], // edge
   'packages/skin/kinds/queue.css': ['.queue-card[data-focused]', '.queue-options:has(.queue-because) > .queue-option', '.queue-options:has(.queue-because) > .queue-option:has(> .queue-act[data-on])', '.queue-card[data-selected]:not([data-focused])'], // edge, ring

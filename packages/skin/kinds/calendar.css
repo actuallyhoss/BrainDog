@@ -12,6 +12,10 @@
  * gains a width to fit (05 §6).
  *
  * No colour is written: every value is a role a theme maps, and a row's tone draws the glyph the renderer wrote.
+ *
+ * IN THE SKIN AND NOT THE APP, so every place that draws blocks has it (`blocks-kinds.css`): kept in the app's own kinds,
+ * the site's docs drew the October example as a bare table of browser defaults, 98px wider than a phone (audit 31 Oct,
+ * B19).
  */
 
 @layer components {

@@ -84,3 +84,29 @@ test('A TABLE WITH NO FIGURE HAS NO MARK, and the identifier that used to stand 
   assert.equal(plan.title, 1);
   assert.deepEqual(said(cardCells({ key: 'r', cells: ['7', 'Refund', 'in'] }, columns, plan)), ['Refund', 'in']);
 });
+
+test('A BARE COUNT AND A SECOND FIGURE SAY THEIR NAMES (B11), and a day or a lone figure does not', () => {
+  const CIRCLES: Column[] = [
+    col({ label: 'Circle', align: 'start', truncate: 'end' }),
+    col({ label: 'People', align: 'end' }),
+    col({ label: 'A month', align: 'end', truncate: 'never' }),
+    col({ label: 'Your turn', align: 'end' }),
+  ];
+  const circle = cardCells({ key: 'r', cells: ["Family gam'eya", '10', '£200', '4'] }, CIRCLES);
+  assert.equal(circle.mark?.named, undefined, 'a lone figure beside the title was named');
+  assert.deepEqual(circle.end.map((c) => [c.column.label, c.named]), [['People', true], ['Your turn', true]]);
+
+  const WENT_UP: Column[] = [
+    col({ label: 'Subscription', align: 'start', truncate: 'end' }),
+    col({ label: 'Was', align: 'end', truncate: 'never' }),
+    col({ label: 'Now', align: 'end', truncate: 'never' }),
+    col({ label: 'Since', align: 'start' }),
+  ];
+  const up = cardCells({ key: 'r', cells: ['Ledger Post', 'GBP 34.00', 'GBP 39.00', '12 Aug'] }, WENT_UP);
+  assert.equal(up.mark?.named, true);
+  assert.deepEqual(up.end.map((c) => [c.column.label, c.named]), [['Now', true]]);
+  assert.deepEqual(up.start.map((c) => [c.column.label, c.named]), [['Since', undefined]]);
+
+  const card = cardCells({ key: 'r', cells: ['Rent', 'Pell & Vine', '£1,200.00', '3 Sep'] }, PAYMENTS);
+  assert.ok([card.mark, ...card.start, ...card.end].every((c) => c?.named === undefined), 'a plain money card grew names');
+});

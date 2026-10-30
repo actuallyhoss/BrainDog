@@ -32,8 +32,11 @@ export { ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, TABLE_
  */
 export type OnCapture = (register: string, text: string, inherited: Record<string, string>) => void;
 
-/** One column of one row, as a phone card draws it. A card never holds an empty value, so `value` is text. */
-export type CardCell = { column: Column; value: string };
+/**
+ * One column of one row, as a phone card draws it. A card never holds an empty value, so `value` is text. `named` says
+ * the card shows the column's name before the value, because the value alone does not say what it is (`cardCells`).
+ */
+export type CardCell = { column: Column; value: string; named?: true };
 
 /**
  * Which columns a phone card may draw, as indexes into `columns`, decided once for the table. `-1` is none.
@@ -111,13 +114,30 @@ export function cardCells(row: TableRow, columns: readonly Column[], plan: CardP
     .map(at)
     .filter((c): c is CardCell => c !== null)
     .slice(0, CARD_VALUES);
+  const mark = at(plan.mark);
+  /* A SECOND FIGURE NAMES BOTH: "Was £34" and "Now £39", where the card said "£34" over "£39" (B11). */
+  const twoFigures = mark !== null && isFigure(mark.value) && rest.some((c) => isFigure(c.value));
+  const named = (c: CardCell): CardCell => (isCount(c.value) || (twoFigures && isFigure(c.value)) ? { ...c, named: true } : c);
+  const said = rest.map(named);
   return {
     title: at(plan.title),
-    mark: at(plan.mark),
-    start: rest.filter((c) => c.column.align !== 'end'),
-    end: rest.filter((c) => c.column.align === 'end'),
+    mark: mark && twoFigures ? { ...mark, named: true } : mark,
+    start: said.filter((c) => c.column.align !== 'end'),
+    end: said.filter((c) => c.column.align === 'end'),
   };
 }
+
+/**
+ * WHEN A CARD SAYS A COLUMN'S NAME (audit 31 Oct, B11). Most values say what they are without one: a day reads as a day,
+ * "Every month" as how often, the figure beside a title as that thing's amount. Two kinds do not. A BARE COUNT is a
+ * number with nothing to say what it counts, so a savings circle's card read "£200" over "10 4", its people and your
+ * turn; it reads "People 10" and "Your turn 4". And A SECOND FIGURE beside the first: a subscription that went up read
+ * "£34" over "£39", which is the price it was and the price it is, so both are named, "Was £34" and "Now £39".
+ */
+const isCount = (value: string): boolean => /^[+\-\u2212]?\d[\d,.]*%?$/u.test(value.trim());
+
+/** A money figure: digits with a currency's sign or code beside them. */
+const isFigure = (value: string): boolean => /\d/u.test(value) && (/\p{Sc}/u.test(value) || /(?:^|[\s\-\u2212+])[A-Z]{3}(?:\s|\u00a0)/u.test(value));
 
 /** Where the caret is, in data rows and columns. The header is not a row it can be on. */
 export type Cell = { row: number; col: number };
