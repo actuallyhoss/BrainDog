@@ -21,6 +21,12 @@ const HELD: Record<string, Held> = {
   p_adm: { level: 'decide', registers: null, levels: {} },
   p_mem: { level: 'write', registers: null, levels: {} },
   p_pri: { level: null, registers: ['tasks'], levels: { tasks: 'write' }, wheres: { tasks: { field: 'stage', is: 'Review' } } },
+  /* AN ADMIN HELD OFF PAYROLL (adds only, which reads nothing), shown some of the tasks, and kept from the deals' value. */
+  p_held: { level: 'decide', registers: null, levels: { payroll: 'append' }, wheres: { tasks: { field: 'team', is: 'Ops' } }, hides: { deals: ['value'] } },
+  /* AN ADMIN WHO REACHES ONLY TWO LISTS. */
+  p_two: { level: 'decide', registers: ['tasks', 'deals'], levels: {} },
+  /* THE BOOKKEEPER, who reads payroll. */
+  p_book: { level: 'write', registers: null, levels: {} },
 };
 
 const deps = (person: string, seeAs?: true): Deps => ({
@@ -80,4 +86,32 @@ test('every route that writes is refused under preview before its handler runs, 
   const read = await serveApi(new Request(`${ORIGIN}/api/list?register=tasks`), handlers, door.ctx);
   assert.equal(read.status, 200);
   assert.equal(ran, 1);
+});
+
+/* SEE AS IS NO WIDER THAN THE VIEWER. It read only the person's lens, so an Admin held off payroll read Sam's salary by
+   seeing as the bookkeeper who holds it. Now the preview is the person's lens held inside the viewer's. */
+test('an Admin held off a list does not read it by seeing as somebody who holds it', async () => {
+  const door = await doorOf(asked('p_book'), deps('p_held', true));
+  assert.equal(door.door, 'session');
+  if (door.door !== 'session') return;
+  assert.equal(door.ctx.preview, 'p_book');
+  assert.equal(door.ctx.wheres?.payroll, null, 'payroll was open to the preview');
+  assert.deepEqual(door.ctx.wheres?.tasks, { field: 'team', is: 'Ops' });
+  assert.deepEqual(door.ctx.hides, { deals: ['value'] });
+
+  /* BOTH RULES ON A LIST BOTH NARROW. */
+  const both = await doorOf(asked('p_pri'), deps('p_held', true));
+  assert.ok(both.door === 'session');
+  if (both.door !== 'session') return;
+  assert.deepEqual(both.ctx.wheres?.tasks, { all: [{ field: 'stage', is: 'Review' }, { field: 'team', is: 'Ops' }] });
+  assert.deepEqual(both.ctx.registers, ['tasks']);
+});
+
+test('an Admin who reaches some lists sees only those of the person, and cannot see as somebody who reaches every list', async () => {
+  const some = await doorOf(asked('p_pri'), deps('p_two', true));
+  assert.ok(some.door === 'session');
+  if (some.door === 'session') assert.deepEqual(some.ctx.registers, ['tasks']);
+  const all = await doorOf(asked('p_book'), deps('p_two', true));
+  assert.equal(all.door, 'refused');
+  if (all.door === 'refused') assert.equal(all.status, 403);
 });

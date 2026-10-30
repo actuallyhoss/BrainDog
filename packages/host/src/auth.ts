@@ -818,7 +818,59 @@ export async function seeAs<L extends string>(
   const theirs = as.length > SEE_AS_MOST ? null : await accessOf(as);
   if (theirs === null) return { refusal: { code: 'FORBIDDEN', fix: 'That person is not on this BrainDog, so there is nothing to see as them.', at: 'as' } };
   if (theirs.level === 'owner') return { refusal: { code: 'FORBIDDEN', fix: 'An owner sees everything. See as somebody else.', at: 'as' } };
-  return { ctx: { ...sessionContext({ ...who, person: as }, theirs), confirmable: false, preview: as, previewBy: who.person } };
+  const seen = within(held, theirs);
+  if (seen === null) return { refusal: { code: 'FORBIDDEN', fix: 'You see only some lists here, so you cannot see the record as somebody who sees more. Ask an owner.', at: 'as' } };
+  return { ctx: { ...sessionContext({ ...who, person: as }, seen), confirmable: false, preview: as, previewBy: who.person } };
+}
+
+/**
+ * What a viewer sees of the record seen as somebody: the person's own access, held inside the viewer's, or `null` when
+ * that cannot be said without widening the person's.
+ *
+ * NO WIDER THAN EITHER OF THEM. See as read only the person's lens, so an Admin held off a list (`payroll` at `append`,
+ * which reads nothing) read its rows by seeing as the bookkeeper who holds it. Every step here only narrows the person's
+ * lens, never adds to it, so a list or row the person could not read stays out:
+ *   - a list the viewer cannot read (a level that reads nothing) gets a rule no row meets (`null`, which reaches no row);
+ *   - a list the viewer reads only some rows of gets both rules, `all` of them;
+ *   - the fields and the history the viewer is kept from are kept from the preview too;
+ *   - when the viewer reaches only some lists, so must the preview: the two lists are met, and a person who reaches
+ *     every list cannot be cut down to the viewer's without naming lists the person never held, so it is refused.
+ * A viewer who holds the whole record unnarrowed (every owner, and an ordinary Admin) sees the person's lens as it is.
+ */
+export function within<L extends string>(viewer: HeldAccess<L>, theirs: HeldAccess<L>): HeldAccess<L> | null {
+  const levels = viewer.levels ?? {};
+  const narrowed = viewer.registers !== null || says(levels) || says(viewer.wheres) || says(viewer.hides) || says(viewer.nots);
+  if (!narrowed) return theirs;
+
+  let registers = theirs.registers;
+  if (viewer.registers !== null) {
+    if (theirs.registers === null) return null;
+    const mine = new Set(viewer.registers);
+    registers = theirs.registers.filter((list) => mine.has(list));
+  }
+
+  type Rule = Wheres[string];
+  const wheres: Wheres = { ...(theirs.wheres ?? {}) };
+  const meet = (list: string, rule: Rule): void => {
+    const had = Object.hasOwn(wheres, list) ? wheres[list] : undefined;
+    wheres[list] = rule === null || had === null ? null : had === undefined ? rule : { all: [had, rule] };
+  };
+  for (const [list, level] of Object.entries(levels) as [string, string][]) if (level === 'append') meet(list, null);
+  for (const [list, rule] of Object.entries(viewer.wheres ?? {})) meet(list, rule);
+
+  const join = <T extends string>(a: Readonly<Record<string, readonly T[]>> | undefined, b: Readonly<Record<string, readonly T[]>> | undefined) => {
+    const out: Record<string, T[]> = {};
+    for (const side of [a ?? {}, b ?? {}]) for (const [list, words] of Object.entries(side)) out[list] = [...new Set([...(out[list] ?? []), ...words])];
+    return out;
+  };
+
+  return {
+    ...theirs,
+    registers,
+    wheres,
+    hides: join(theirs.hides, viewer.hides),
+    nots: join(theirs.nots, viewer.nots),
+  };
 }
 
 /** What the operator's provisioning made, before the claim link is minted for it. */
