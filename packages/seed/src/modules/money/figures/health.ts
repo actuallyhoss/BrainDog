@@ -64,7 +64,26 @@ const RANGE_FIGURES: Record<string, SeedMetric> = Object.fromEntries(
   ]),
 );
 
+/**
+ * THE FIRST DAY MONEY MOVED IN REPORTS' WHOLE WINDOW (finish F55), the day its All line starts from: "The last 13 months"
+ * stood over three months of lines, so the line says the day the Ledger's lines start, inside the thirteen months.
+ */
+const MOVED_SINCE: Record<string, SeedMetric> = {
+  'moved-since': {
+    metric: 'moved-since',
+    name: 'First money moved, the last 13 months',
+    source: 'register.transactions',
+    where: `${MOVED}, ${REPORT_RANGES.all!.where}`,
+    value: { min: 'on' },
+    format: 'day',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+};
+
 export const HEALTH_FIGURES: Record<string, SeedMetric> = {
+  ...MOVED_SINCE,
   'kept-share-90d': {
     metric: 'kept-share-90d',
     name: 'Kept of money in, 90 days',

@@ -22,6 +22,9 @@ const MONTH_PICKER = {
   ],
 };
 
+/** What every figure here leaves out and the Ledger lists, said after the line's figures (finish F55). */
+const MOVES_APART = 'Moves between your own accounts are left out.';
+
 /** The most a block over the Ledger reads, with no month picked: the thirteen the chart of months reads. */
 const BACK = 'on after -13m, on before +1d';
 
@@ -56,12 +59,16 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'out-by-month', gt: 0 },
+      /* WITH NONE PICKED, FROM THE DAY THE LINES START (finish F55): "The last 13 months" stood over three months of
+         lines, so the line says the first day money moved inside the thirteen (`moved-since`). AND THAT MOVES BETWEEN HIS
+         OWN ACCOUNTS ARE LEFT OUT, as every figure here leaves them: the strip's "Last month 9" stood beside the Ledger's
+         "Last month 12", which lists them, and neither said why. */
       says: [
-        { when: { picked: 'months', is: 'this' }, body: 'This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left.' },
-        { when: { picked: 'months', is: 'last' }, body: 'Last month: {{received-last}} in, {{spent-last}} out, {{left-last}} left.' },
-        { when: { picked: 'months', is: 'three' }, body: 'The last 3 months: {{received-three}} in, {{spent-three}} out, {{left-three}} left.' },
-        { when: { picked: 'months', is: 'year' }, body: 'The last 12 months: {{received-year}} in, {{spent-year}} out, {{left-year}} left.' },
-        { body: 'The last 13 months: {{received-all}} in, {{spent-all}} out, {{left-all}} left.' },
+        { when: { picked: 'months', is: 'this' }, body: `This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left. ${MOVES_APART}` },
+        { when: { picked: 'months', is: 'last' }, body: `Last month: {{received-last}} in, {{spent-last}} out, {{left-last}} left. ${MOVES_APART}` },
+        { when: { picked: 'months', is: 'three' }, body: `The last 3 months: {{received-three}} in, {{spent-three}} out, {{left-three}} left. ${MOVES_APART}` },
+        { when: { picked: 'months', is: 'year' }, body: `The last 12 months: {{received-year}} in, {{spent-year}} out, {{left-year}} left. ${MOVES_APART}` },
+        { body: `Since {{moved-since}}: {{received-all}} in, {{spent-all}} out, {{left-all}} left. ${MOVES_APART}` },
       ],
     },
     {
