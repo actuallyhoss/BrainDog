@@ -14,7 +14,7 @@ import type { AddressInfo } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { BUDGET_MS, budgetOf, clientFor, hostKey, hostsPath, readHosts, sameHost, saveHosts, target, type HostsFile } from '../src/http.ts';
+import { BUDGET_MS, budgetOf, clientFor, hostKey, hostsPath, readHosts, refusedFix, sameHost, saveHosts, target, withFixOf, withRefusedFix, type HostsFile } from '../src/http.ts';
 import { normaliseRemote, sessionHeaders, type Position } from '../src/position.ts';
 
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -246,4 +246,20 @@ test('A HEADER OUTSIDE ITS GRAMMAR IS DROPPED rather than sent broken', () => {
   });
   /* A folder in another script would make fetch throw on every call; a repo is a name, never a path. */
   assert.deepEqual(sessionHeaders({ ...p, cwd: 'C:\\Users\\Zoë', repo: 'a..b', host: 'my laptop', remote: null }), { 'x-braindog-cli': 'dev+0000000' });
+});
+
+test('A 401 SAYS WHAT TO CHANGE, by where the bearer came from, and never the bearer (D5)', async () => {
+  const key = 'https://app.brain.dog/acme';
+  const unauthorized = () => new Response(JSON.stringify({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'unauthorized' } }), { status: 401, headers: { 'content-type': 'application/json' } });
+  const fixOf = async (res: Response) => ((await res.json()) as { refusal: { fix: string; at?: string } }).refusal;
+  assert.match((await fixOf(await withRefusedFix(unauthorized(), { key }))).fix, /holds none for it\. Run braindog login https:\/\/app\.brain\.dog\/acme, or set BRAINDOG_TOKEN\.$/u);
+  assert.match((await fixOf(await withRefusedFix(unauthorized(), { key, from: 'env' }))).fix, /does not take the token in BRAINDOG_TOKEN\. Replace it, or unset it and run braindog login /u);
+  assert.match((await fixOf(await withRefusedFix(unauthorized(), { key, from: 'login' }))).fix, /did not take this machine's login/u);
+  assert.match((await fixOf(await withRefusedFix(unauthorized(), { key, from: 'agent' }))).fix, /braindog setup https:\/\/app\.brain\.dog\/acme\.$/u);
+  assert.equal((await fixOf(await withRefusedFix(unauthorized(), { key }))).at, 'authorization');
+  /* ANY OTHER ANSWER IS AS IT CAME, a 403 included. */
+  const forbidden = new Response(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'no' } }), { status: 403 });
+  assert.equal((await fixOf(await withRefusedFix(forbidden, { key }))).fix, 'no');
+  assert.deepEqual(withFixOf({ ok: true, value: 1 }, { key }), { ok: true, value: 1 });
+  assert.equal(refusedFix({ key, from: 'env' }).includes('bd_'), false);
 });
