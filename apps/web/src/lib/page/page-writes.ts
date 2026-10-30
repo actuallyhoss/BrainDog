@@ -873,7 +873,31 @@ export function pageWrites(deps: WritesDeps) {
     } else {
       const field = typeof args.field === 'string' ? args.field : '';
       const to = a.verb === 'row.move' ? args.to : args.value;
-      if (field === '' || to === undefined) return (toasts.push(w.noChange, { intent: 'warn' }), { ok: false });
+      /* A YES-OR-NO FIELD NEEDS NO VALUE FROM THE PRESS (polish-i, PI4): a button "Mark as a subscription" bound to
+         `subscription` turns it on, as a switch's "true" does, and the field's own type says it is one. Worked out
+         where the list's declaration is read (`flagged`), so a list a pack extended is read as the record declares it. */
+      const flag = a.verb === 'row.update' && field !== '' && (REGISTERS[at.ref.register]?.fields.find((f) => f.id === field)?.type === 'bool' || to === undefined);
+      if (field === '' || (to === undefined && !flag)) return (toasts.push(w.noChange, { intent: 'warn' }), { ok: false });
+      if (flag) {
+        /* AN UNSET FLAG GOES BACK TO UNSET, so its Undo is never "nothing to put back". */
+        const undo = { [field]: at.fields[field] ?? null };
+        const was = at.fields[field];
+        const flagged = (decl: Declared | null): Record<string, unknown> | null => {
+          const typed = decl?.fields.find((f) => f.id === field)?.type ?? REGISTERS[at.ref!.register]?.fields.find((f) => f.id === field)?.type;
+          if (typed !== 'bool') return to === undefined ? null : { [field]: to };
+          return { [field]: to === undefined ? was !== true : (sheetMod!.doneOf(to) ?? to) };
+        };
+        const landed = await writeRow(at.ref, (_m, _ref, decl) => flagged(decl), at.title ?? label, {
+          at: place,
+          before,
+          what: {},
+          back: () => undo,
+          undone: {},
+          said: () => w.done(label, at.title),
+          mark: label,
+        });
+        return { ok: landed };
+      }
       patch = { [field]: to };
       back = Object.hasOwn(at.fields, field) ? { [field]: at.fields[field] ?? null } : null;
     }

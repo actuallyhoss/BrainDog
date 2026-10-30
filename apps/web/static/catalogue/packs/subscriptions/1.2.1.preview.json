@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T22:20:51.314Z",
+  "made_at": "2026-10-30T22:42:38.124Z",
   "pages": [
     {
       "blocks": [
@@ -37,7 +37,7 @@
           "why": "when"
         },
         {
-          "body": "Tick A subscription on a repeating payment below, or add one.",
+          "body": "Mark the repeating payments below that are subscriptions, or add one.",
           "heading": "Nothing marked yet",
           "icon": "refresh",
           "kind": "note",
@@ -91,7 +91,7 @@
           "key": "k012r9p5",
           "rows": [
             {
-              "id": "01M67EDHQJ0CZK8Q79Q97K6NK7",
+              "id": "01M67FNDXCD8BK87A99WFJDJ06",
               "register": "recurring",
               "seq": 1,
               "fields": {
@@ -113,13 +113,24 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T22:20:51.314Z",
-              "updated_at": "2026-10-30T22:20:51.314Z",
+              "created_at": "2026-10-30T22:42:38.124Z",
+              "updated_at": "2026-10-30T22:42:38.124Z",
               "deleted_at": null
             }
           ],
           "matched": 1,
-          "refusals": []
+          "refusals": [],
+          "row_actions": [
+            {
+              "verb": "row.update",
+              "label": "Mark as a subscription",
+              "args": {
+                "field": "subscription"
+              },
+              "hard": false,
+              "undo": true
+            }
+          ]
         },
         {
           "cells": [
@@ -504,7 +515,7 @@
         "register.recurring"
       ],
       "title": "Subscriptions",
-      "read_at": "2026-10-30T22:20:51.314Z",
+      "read_at": "2026-10-30T22:42:38.124Z",
       "zone": "UTC",
       "look": {
         "look": "subscriptions",

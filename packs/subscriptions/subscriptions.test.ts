@@ -138,5 +138,11 @@ test('WITH NOTHING MARKED, THE PAGE LISTS THE REPEATING PAYMENTS TO TICK, and ne
   const offered = drawn.find((b) => b.heading === 'Repeating payments');
   assert.deepEqual((offered?.rows ?? []).map((r) => r.fields.what), ['Newsletter sending'], 'money going out, not yet marked');
   assert.ok(!JSON.stringify(page.blocks).includes('Money watch'));
+  /* EACH ROW MARKED ON ITS OWN, ONE WRITE A ROW WITH ITS UNDO (polish-i, PI4), where each payment was opened one by one. */
+  const pressed = (offered as { row_actions?: { verb: string; label: string; args?: Record<string, string>; undo?: boolean }[] } | undefined)?.row_actions ?? [];
+  assert.deepEqual(
+    pressed.map((a) => [a.verb, a.label, a.args?.field, a.undo]),
+    [['row.update', 'Mark as a subscription', 'subscription', true]],
+  );
   close();
 });
