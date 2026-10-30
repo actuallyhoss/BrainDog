@@ -449,7 +449,7 @@
     const byName = new Map(placed.places.map((p) => [p.label.trim().toLowerCase(), p.key] as const));
     return navPrefs
       .relabel(data.nav.filter((n) => n.waits === true && !navPrefs.hidden.includes(n.href)))
-      .map((n) => ({ href: n.href, label: n.title, icon: n.icon, home: byName.get(n.section.trim().toLowerCase()) ?? IN_MORE }));
+      .map((n) => ({ href: n.href, label: n.title, icon: n.icon, section: n.section, home: byName.get(n.section.trim().toLowerCase()) ?? IN_MORE }));
   });
   const model = $derived(
     sideModel({

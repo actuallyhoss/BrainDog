@@ -361,10 +361,19 @@ test('A PAGE HELD OFF THE RAIL GOES UNDER ITS PLACE, OR UNDER MORE LISTS WHERE I
     counted: {},
     waiting: [
       { href: '/p/splits', label: 'Splits', icon: 'split', home: MONEY.key },
-      { href: '/p/weather', label: 'Weather', icon: 'sun', home: IN_MORE },
+      { href: '/p/weather', label: 'Weather', icon: 'sun', home: IN_MORE, section: 'Life' },
+      { href: '/p/calendar', label: 'Calendar', icon: 'calendar', home: IN_MORE, section: 'Life' },
     ],
   });
   assert.deepEqual(m.places.find((p) => p.label === 'Money')?.kids.map((k) => k.href), ['/p/money-ledger', '/p/splits']);
   assert.ok(m.more.some((k) => k.href === '/p/weather'));
   assert.equal(litOf('/p/splits', m), '/p/splits');
+  /* ITS SECTION IS DRAWN, ONCE, AS IT IS ONCE THE PAGE HOLDS SOMETHING (polish-i, PI2): "Life", opening Weather, the bar
+     saying "Life › Weather"; Calendar, filed there too, answers to the same row. */
+  const life = m.more.filter((k) => k.label === 'Life');
+  assert.equal(life.length, 1);
+  assert.equal(life[0]!.href, '/p/weather');
+  assert.ok(!m.more.some((k) => k.label === 'Weather' || k.label === 'Calendar'));
+  assert.deepEqual(crumbOf('/p/weather', m, litOf('/p/weather', m), 'Weather').map((c) => c.label), ['Life', 'Weather']);
+  assert.deepEqual(crumbOf('/p/calendar', m, litOf('/p/calendar', m), 'Calendar').map((c) => c.label), ['Life', 'Calendar']);
 });

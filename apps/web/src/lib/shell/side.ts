@@ -332,8 +332,9 @@ export function sideModel(o: {
   /**
    * PAGES HELD OFF THE RAIL WHILE THEIR LISTS ARE EMPTY (`waits` in `boot-live.ts`), by the place they go under, or
    * `IN_MORE` where their section is no place: an add-on just installed is drawn somewhere (audit 31 Oct f, AF7).
+   * `section` is the section the page files itself under, which names its row under More lists (`Life`, polish-i PI2).
    */
-  waiting?: readonly (SideLink & { home: string })[];
+  waiting?: readonly (SideLink & { home: string; section?: string | undefined })[];
 }): SideModel {
   const named = new Map([...o.places, ...o.others].map((p) => [word(p.label), p.key] as const));
   const folded = new Map<string, SideList>();
@@ -347,7 +348,7 @@ export function sideModel(o: {
     o.lists
       .filter((l) => !taken.has(l.id) && !l.facts?.projects && o.homes.get(l.id) === home)
       .flatMap((l) => [{ href: `/r/${l.id}`, label: l.name, icon: l.icon, ...shownCount(l) }, ...l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' }))]);
-  const own = (key: string): SideLink[] => [...o.tools, ...(o.waiting ?? [])].filter((t) => t.home === key).map(({ home: _, ...t }) => t);
+  const own = (key: string): SideLink[] => [...o.tools, ...(o.waiting ?? []).map(({ section: _, ...w }) => w)].filter((t) => t.home === key).map(({ home: _, ...t }) => t);
   const viewsOf = (l: SideList | undefined): SideLink[] => (l ? l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })) : []);
   /* ONE ROW FOR ONE WORD UNDER A PLACE: a page the place declares (Money's Accounts, Ledger, Filing rules) and the list
      of the same name were two rows. The page is the row, and its list is a tap away on it. */
@@ -386,10 +387,23 @@ export function sideModel(o: {
     const l = folded.get(p.key);
     return { href: p.href, label: p.label, icon: p.icon, ...(p.count !== undefined ? { count: p.count } : l ? shownCount(l) : {}) };
   });
+  /* A WAITING PAGE WHOSE SECTION IS NO PLACE IS DRAWN AS ITS SECTION (polish-i, PI2), as the section is once the page
+     holds something: Weather files itself under "Life", so More lists has a Life row that opens Weather, and the bar
+     says "Life › Weather" (`placed`). A second page of the section answers to the same row, and a section already
+     drawn under More takes the page as one of its own. */
+  const sections: SideLink[] = [];
+  for (const w of o.waiting ?? []) {
+    if (w.home !== IN_MORE) continue;
+    const { home: _, section, ...link } = w;
+    const named = section?.trim() ? section.trim() : link.label;
+    const held = [...others, ...sections].find((r) => word(r.label) === word(named));
+    if (held) held.near = [...(held.near ?? []), link.href];
+    else sections.push({ ...link, label: named });
+  }
   return {
     places,
     projects: o.projects ? { ...o.projects, kids: rows(IN_PROJECTS) } : null,
-    more: [...others, ...o.others.flatMap((p) => viewsOf(folded.get(p.key))), ...rows(IN_MORE), ...(o.waiting ?? []).filter((w) => w.home === IN_MORE).map(({ home: _, ...w }) => w)],
+    more: [...others, ...o.others.flatMap((p) => viewsOf(folded.get(p.key))), ...rows(IN_MORE), ...sections],
     foot: [...o.foot],
   };
 }
