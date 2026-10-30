@@ -42,8 +42,9 @@ export const connectWords = {
   sheetTitle: 'Connect an agent',
   sheetSub: 'Choose the app. Its first call shows here.',
   setupHint: copy.doorSetupHint,
-  webHint: 'In Claude, open Settings, Connectors, add a custom connector, and paste this address. Claude then sends you here to allow it.',
-  chatgptHint: 'In ChatGPT, open Settings, Connectors, add a connector, and paste this address. ChatGPT then sends you here to allow it.',
+  /* AS THE SITE SAYS IT (`apps/site/src/lib/connect/apps.ts`, checked against each maker's help on 17 October). */
+  webHint: 'In Claude, open Customize, then Connectors, add a custom connector, and paste this address. Claude then sends you here to allow it.',
+  chatgptHint: 'In ChatGPT, open Settings, then Apps, turn on developer mode, and create an app with this address. ChatGPT then sends you here to allow it.',
   vscodeHint: 'Run this in a terminal. VS Code then sends you here to allow it.',
   otherHint: copy.doorAnyHint,
   scriptHint: 'An app signs in. A key is for a script.',

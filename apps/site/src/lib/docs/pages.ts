@@ -82,6 +82,55 @@ export function slugOf(text: string): string {
   return slug === '' ? 'part' : slug;
 }
 
+/**
+ * The launch flags a page may hold a part back on, as `LAUNCH` in `lib/launch.ts` has them. Only the flag's value is
+ * read here, so a Node test can hand in its own.
+ */
+export type LaunchFlags = Readonly<Record<string, boolean>>;
+
+/* A PART HELD UNTIL LAUNCH: a line `<!-- launch: repo -->`, the part, and a line `<!-- /launch -->`. Each marker is a
+   line of its own, so a fence's text never opens or closes one. */
+const HELD_OPEN = /^<!-- launch: ([a-z]+) -->$/;
+const HELD_CLOSE = /^<!-- \/launch -->$/;
+
+/**
+ * A page's text with its held parts as the flags say: a part whose flag is true is kept and loses its two markers, and
+ * one whose flag is false is taken out, so neither the page, its `.md` address, its headings nor the search holds it.
+ *
+ * THE DOCS HOLD BACK WHAT THE SITE HOLDS BACK (`LAUNCH`): the plugin line named a private repository, and a stranger
+ * who followed it met a 404 (door audit D10). A marker naming no flag, or one left open, stops the build with a sentence
+ * naming the file, as a broken page does.
+ */
+export function launched(key: string, src: string, launch: LaunchFlags): string {
+  const out: string[] = [];
+  let open: string | null = null;
+  /* A PART TAKEN OUT LEAVES A BLANK LINE ON EACH SIDE; the one after it goes too, so one paragraph break stays. */
+  let dropped = false;
+  for (const line of src.split('\n')) {
+    if (dropped) {
+      dropped = false;
+      if (line.trim() === '' && (out.at(-1) ?? '').trim() === '') continue;
+    }
+    const start = HELD_OPEN.exec(line.trim());
+    if (start) {
+      const flag = start[1] ?? '';
+      if (open !== null) throw new Error(`${key} opens a launch part inside another. Close the first with <!-- /launch --> before the next.`);
+      if (!(flag in launch)) throw new Error(`${key} holds a part on "${flag}", which is not a launch flag. The flags are ${Object.keys(launch).join(', ')}.`);
+      open = flag;
+      continue;
+    }
+    if (HELD_CLOSE.test(line.trim())) {
+      if (open === null) throw new Error(`${key} closes a launch part it never opened.`);
+      dropped = launch[open] !== true;
+      open = null;
+      continue;
+    }
+    if (open === null || launch[open] === true) out.push(line);
+  }
+  if (open !== null) throw new Error(`${key} leaves the launch part on "${open}" open. Close it with <!-- /launch -->.`);
+  return out.join('\n');
+}
+
 /** The file without its title line. A file with nothing after the title has an empty body. */
 export function bodyOf(src: string): string {
   const end = src.indexOf('\n');
@@ -162,13 +211,13 @@ export function summaryOf(body: string): string {
  * A FILE THAT BREAKS THE SHAPE STOPS THE BUILD with a sentence naming it, rather than being left out:
  * a page quietly missing from the docs is found by a reader, and a failed build is found by its author.
  */
-export function docOf(key: string, src: string): Doc {
+export function docOf(key: string, src: string, launch: LaunchFlags = {}): Doc {
   const m = FILE.exec(key);
   const section = m?.[2] ?? '';
   if (!m || !isSection(section) || folderOf(section) !== `${m[1]}-${section}`) {
     throw new Error(`${key} is not in a docs section folder. The folders are ${SECTIONS.map(folderOf).join(', ')}, each holding NN-slug.md files.`);
   }
-  const text = (src.startsWith(BOM) ? src.slice(1) : src).replace(/\r\n/g, '\n');
+  const text = launched(key, (src.startsWith(BOM) ? src.slice(1) : src).replace(/\r\n/g, '\n'), launch);
   const title = TITLE.exec((text.split('\n', 1)[0] ?? '').trim())?.[1]?.trim() ?? '';
   if (title === '') throw new Error(`${key} does not open with its title. Line one of a docs page is "# Title".`);
 

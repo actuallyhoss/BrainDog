@@ -1,14 +1,14 @@
 # Needs you
 
-Needs you is where every open question in your record waits for an answer, and where every change somebody proposes waits for your yes. Nothing an agent, Slash or a colleague proposes goes in until it is answered here.
+Needs you is where every open question in your BrainDog waits for an answer, and where every change somebody proposes waits for your yes. Nothing an agent, Slash or a colleague proposes goes in until it is answered here.
 
 ## What arrives in Needs you
 
 - **Questions a rule asks**, such as whether to chase an invoice that is past due, with the options it offers: Chase it, or Not yet.
 - **Changes an agent proposes**: rows to add or change, a new list, a page, a rule.
-- **What Slash drafts**: a page, a pattern for the inbox, a way to fit the record to how you use it.
+- **What Slash drafts**: a page, a pattern for the inbox, a way to fit BrainDog to how you use it.
 - **An automation you drew**, and changes to one. It runs once you accept it.
-- **A look a colleague proposes** for the record, which the owner accepts.
+- **A look a colleague proposes** for everybody, which the owner accepts.
 - **Questions an automation asks** with its Ask a person or Suggest in Needs you steps.
 
 ## The order
@@ -37,11 +37,11 @@ Open a question (Enter) to see all of it: why it is asked, each option with its 
 
 Select questions with x. **Answer N with what is suggested** answers them all with one reason for all of them. When none of those selected has a suggested answer, answer each one instead. Group the list by what each question is about to find the ones that belong together.
 
-A proposal that rearranges the record is always answered on its own, so it is never swept into a batch.
+A proposal that rearranges your BrainDog is always answered on its own, so it is never swept into a batch.
 
 ## Accept a change
 
-A proposed change shows what it will do before you accept it. For a page, what will appear, what it reads from, and where it goes in the sidebar. For a new list, its fields and any example rows. For something that reaches outside the record, each service it will call, the key it will use and what it sends. Accepting approves those calls.
+A proposed change shows what it will do before you accept it. For a page, what will appear, what it reads from, and where it goes in the sidebar. For a new list, its fields and any example rows. For something that reaches outside BrainDog, each service it will call, the key it will use and what it sends. Accepting approves those calls.
 
 ```comparison | What you see before you accept
 If it | Needs you shows
@@ -59,7 +59,7 @@ If only part of a change could be applied, Needs you says what was done and kept
 
 ## Who can answer
 
-The owner answers everything. A colleague at the Decides level can answer questions and change rows. Changes that arrange the record itself, such as installing an add-on or adding a page, are the owner's to accept. See [Sharing and access](/docs/use/sharing).
+The owner answers everything. A colleague at the Decides level can answer questions and change rows. Changes that arrange BrainDog itself, such as installing an add-on or adding a page, are the owner's to accept. See [Sharing and access](/docs/use/sharing).
 
 ## Decisions afterwards
 

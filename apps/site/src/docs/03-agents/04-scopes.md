@@ -28,7 +28,7 @@ There is no admin scope, and there never will be one. These need somebody signed
 - making, listing and revoking tokens, report keys and door addresses;
 - installing, removing and turning off packs;
 - running an automation now, and starting a paused one again;
-- exporting the record, putting it back, and deleting it;
+- exporting your BrainDog, putting it back, and deleting it;
 - listing and revoking what each key opens.
 
 An agent that wants one of these asks with `propose`, and you decide. Some fields are marked the same way: a skill's text, for one, only changes when you accept a proposal.

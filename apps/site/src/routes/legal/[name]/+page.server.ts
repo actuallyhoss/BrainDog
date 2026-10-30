@@ -17,7 +17,7 @@ import type { EntryGenerator, PageServerLoad } from './$types';
 
 export const prerender = true;
 
-/** The texts drawn. `acceptable-use` and `refunds` sit in the folder too and are not drawn yet. */
+/** The texts drawn, the same three `LEGAL_TEXTS` names for the sitemap. `acceptable-use` and `refunds` sit in the folder too and are not drawn yet. */
 const NAMES = ['terms', 'privacy', 'processing'] as const;
 type Name = (typeof NAMES)[number];
 

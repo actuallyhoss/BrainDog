@@ -105,14 +105,14 @@ export const forPages = {
         nav: 'For small businesses',
         title: 'For small businesses · BrainDog',
         description:
-          'Money, customers and invoices in one place. Late invoices get a reminder drafted for your yes, and ' +
-          'receipts file themselves.',
+          'Money, customers and invoices in one place. A late invoice is put to you to chase, and receipts file ' +
+          'themselves.',
         tag: 'For small businesses',
         said: 'I run it on my own. Who owes me, and how long does the money last?',
         /* Automations are `apps/web/src/routes/automations/`; Needs you (once Decide) is `apps/web/src/routes/decide/`. */
         sub:
-          'Keep your money, customers and invoices in one place. Late invoices get a reminder drafted for your ' +
-          'yes, and receipts file themselves.',
+          'Keep your money, customers and invoices in one place. A late invoice is put to you to chase, and ' +
+          'receipts file themselves.',
         rows: [
           {
             head: 'Money in and out, month by month',
@@ -122,14 +122,15 @@ export const forPages = {
           },
           {
             head: 'Late invoices get chased',
-            /* An automation's trigger, condition and steps, `apps/web/src/routes/automations/`. */
-            said: 'When an invoice runs late, a reminder is drafted in your words and waits for your yes.',
+            /* Money's own rule, `invoice-late` and `invoice-chased` in `packages/seed/src/modules/money/rules.ts`: asked a week
+               after the due day, and the reminder is written only after the yes. */
+            said: 'A week after an invoice is due, you are asked whether to chase it. Say yes, and a reminder is written for you to send.',
             draw: { page: 'automations', at: 0 },
           },
           {
             head: 'Receipts file themselves',
             /* docs/07 §4, as on the personal page. */
-            said: 'Forward receipts and signed contracts, and they land under costs and customers on their own.',
+            said: 'Forward receipts by email. After a few of one kind, you are asked how to file them, and the rest land under costs on their own.',
             draw: { page: 'inbox', at: 0 },
           },
         ],

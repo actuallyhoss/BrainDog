@@ -1,6 +1,6 @@
 # What a key can do
 
-A token is how something that is not a person reaches your record: an agent, a script, a server, a machine. Each kind reaches exactly one thing, and all of them are shown to you once and stored by the record only as a fingerprint.
+A token is how something that is not a person reaches your BrainDog: an agent, a script, a server, a machine. Each kind reaches exactly one thing, and all of them are shown to you once and kept only as a fingerprint.
 
 ## Agent tokens
 
@@ -12,15 +12,15 @@ Make one in the app, or from a terminal:
 braindog token create --name "Weekly report script" --scope propose --days 30
 ```
 
-The command asks you to approve that one mint in the app with six digits, then prints the token once. It looks like `<record id>.<secret>`: the first part tells the host which record to look in, and the record keeps only the secret's SHA-256, so nothing, this product included, can show you a token again. Lost is lost; make another and revoke the first.
+The command asks you to approve that one mint in the app with six digits, then prints the token once. It looks like `<record id>.<secret>`: the first part tells the host which BrainDog to look in, and BrainDog keeps only the secret's SHA-256, so nothing, this product included, can show you a token again. Lost is lost; make another and revoke the first.
 
-The app lists every token with its scope, whose it is and when it was last used, never the token itself, and revokes one at a press. A colleague on the record can make keys for their own agents, capped by their own levels, and sees and revokes only those.
+The app lists every token with its scope, whose it is and when it was last used, never the token itself, and revokes one at a press. A colleague in your BrainDog can make keys for their own agents, capped by their own levels, and sees and revokes only those.
 
 A token stops working when it is revoked, when it runs out, when its person is removed or suspended, or when the operator ends every token made before a moment, which is how a host answers a leak.
 
 ## Reaches beyond the scope
 
-A token can be given one more reach when it is made. So far there is one: `inbox`, which lets an owner's token over the whole record read the inbox and file from it. [The inbox reach](/docs/agents/inbox) explains it.
+A token can be given one more reach when it is made. So far there is one: `inbox`, which lets an owner's token over the whole of a BrainDog read the inbox and file from it. [The inbox reach](/docs/agents/inbox) explains it.
 
 ## Every kind of credential
 

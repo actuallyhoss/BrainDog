@@ -34,7 +34,8 @@ const person = (id: keyof typeof forPages.person.who): Place => ({
 });
 
 /**
- * Every page a reader may be sent to, home aside. `/legal/*` stays out: those pages are unlinked until their texts arrive.
+ * Every page a reader may be sent to, home aside. The legal texts under `/legal/` are not places: the footer links them
+ * and the sitemap names them once `LAUNCH.legal` is on (`LEGAL_TEXTS` in `links.ts`).
  *
  * THE HEADER'S ROW (20 October): Slash, Agents, Pricing, Security, Docs, then "Sign in" and "Get early
  * access", which `+layout.svelte` draws because they are not pages of this site. Packs left the row with that design;

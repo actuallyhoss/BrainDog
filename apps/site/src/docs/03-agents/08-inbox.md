@@ -4,11 +4,11 @@ Your inbox holds whatever arrived and no rule filed: forwarded bank texts and re
 
 ## Why it is closed by default
 
-An arrival can carry anything: a bank alert, a receipt with an address on it, a message somebody forwarded by mistake. So the inbox belongs to the record's owner, and a person invited to part of the record never sees it. A token does not reach it either, whatever its scope, unless its owner gave it the reach.
+An arrival can carry anything: a bank alert, a receipt with an address on it, a message somebody forwarded by mistake. So the inbox belongs to the owner, and a person invited to part of your BrainDog never sees it. A token does not reach it either, whatever its scope, unless its owner gave it the reach.
 
 ## Giving a token the reach
 
-The reach is chosen when the token is made, by an owner, for a token over the whole record. One command gives it:
+The reach is chosen when the token is made, by an owner, for a token over the whole of your BrainDog. One command gives it:
 
 ```code | sh
 braindog token create --name triage --inbox
@@ -20,7 +20,7 @@ That token reads the inbox. To let it file arrivals and put them back as well, g
 braindog token create --name triage --scope write --inbox
 ```
 
-You approve that one mint in the app with six digits, and the token is printed once. A token made by somebody who is not an owner, or one held to part of the record, is refused at the inbox with a sentence that says what it lacks.
+You approve that one mint in the app with six digits, and the token is printed once. A token made by somebody who is not an owner, or one held to part of your BrainDog, is refused at the inbox with a sentence that says what it lacks.
 
 The reach opens the inbox and lifts nothing else. The token still acts at its scope: a read token with the reach can read the inbox and change nothing, and filing an arrival makes a row, so a token that could not create a row in that list cannot file into it.
 
@@ -59,7 +59,7 @@ inbox {"id": "<id>"}
 
 `id` answers one arrival whole, with its full body. Read a body the digest cut here. An id that is no arrival in this inbox is refused with a sentence that says so.
 
-Neither goes with `state`, `cursor`, `limit` or `repeats`, or with the other: the record refuses the extra key by name.
+Neither goes with `state`, `cursor`, `limit` or `repeats`, or with the other: the extra key is refused by name.
 
 ## Filing and setting aside
 

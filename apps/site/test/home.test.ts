@@ -55,7 +55,7 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
   assert.equal(home.chores.floor, 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.');
   assert.equal(home.tools.title, 'Your AI tools share one memory.');
   assert.equal(home.tools.say, "Each one starts from your brief and leaves a note when it's done. Nothing gets explained twice.");
-  assert.equal(home.slash.title, 'Press / and ask anything.');
+  assert.equal(home.slash.title, 'Press ⌘J and ask anything.');
   assert.equal(home.yours.title, 'It stays yours.');
   assert.deepEqual(home.yours.points.map((p) => p.text), [
     'Every change has a name on it, and an undo.',

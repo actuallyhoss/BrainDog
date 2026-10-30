@@ -73,17 +73,17 @@ export const docsWords = {
     title: 'BrainDog',
     /* The home page's sentence (`meta.home` in `lib/copy/shell.ts`), said in the third person for a reader who is not the owner. */
     summary:
-      "BrainDog is one record of a person's or a business's projects, money and people, shared by them and every AI agent they use. It tells them where things stand and asks only what matters.",
+      "BrainDog keeps a person's or a business's projects, money and people in one place, shared by them and every AI agent they use. It tells them where things stand and asks only what matters.",
     /* THE FACTS AN AI SEARCH TOOL QUOTES, one line each, plain and true on the day the site ships: what is in the app,
        how agents reach it, what it costs and who runs it. */
     factsTitle: 'What it is',
     facts: [
-      'For a business, for personal use, or both: your work, your money and your life in one record.',
+      'For a business, for personal use, or both: your work, your money and your life in one place.',
       'Today is a board of widgets you arrange: what needs you, which agents are working, how long the cash lasts, what is coming up, and any widget you ask for in plain words. A widget an agent adds stays a draft until you keep it.',
       'Needs you holds the questions only a person should answer. Money, keys, sharing and deletes always wait for a yes, and every change has a name and an undo.',
       'Projects, Work (with a timeline), People and Agents are built in. Money is a whole section: net worth, accounts, ledger, budgets by the week, month or year with what is left, forecast, coming up, payees, reports and quick add.',
       'Add-ons extend Money and the rest: subscriptions, splitting costs with friends, investments and gold (with a daily gold price), certificates, property, insurance, zakat, trips, debts and goals.',
-      'Slash: press / anywhere to ask in plain words or ask for a change, with an undo.',
+      'Slash: press ⌘J anywhere to ask in plain words or ask for a change, with an undo.',
       'Claude, ChatGPT, Codex, Cursor and VS Code connect over MCP at https://app.brain.dog/mcp, approved once with OAuth. The command line sets up a machine with `braindog setup`.',
       'Early access is invite only and free, with every feature, 3 AI tools and 20 questions to Slash a month. Paid plans are not priced yet.',
       'The app is at https://app.brain.dog. BrainDog is made by Quartz Apps LLC. Support: support@brain.dog.',
@@ -96,6 +96,6 @@ export const docsWords = {
     connect: 'Connecting',
     /* `MCP` in `lib/links.ts`, `servesMcp` in `apps/worker/src/route.ts`. The address is code; the words around it are not. */
     address: 'The address agents connect to',
-    mcp: 'Where Claude, ChatGPT, Codex, Cursor or VS Code connects to a BrainDog record. You approve it once in the app, and no key is copied anywhere.',
+    mcp: 'Where Claude, ChatGPT, Codex, Cursor or VS Code connects to a BrainDog. You approve it once in the app, and no key is copied anywhere.',
   },
 };

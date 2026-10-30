@@ -1,6 +1,6 @@
 # Home and pages
 
-Home is the page your record opens on. It answers four questions without a filter: what needs you, who is working, what is coming, and what happened while you were not looking. Every other page is built the same way, out of blocks, and you can arrange any of them.
+Home is the page your BrainDog opens on. It answers four questions without a filter: what needs you, who is working, what is coming, and what happened while you were not looking. Every other page is built the same way, out of blocks, and you can arrange any of them.
 
 ## What Home shows
 
@@ -12,7 +12,7 @@ Home is drawn from your starter's own Home where it has one, and from the house 
 
 Home keeps itself up to date. When an agent, a rule or another tab changes something, Home reads the change without a reload.
 
-A colleague who holds some of your lists and not the whole record sees a Home that names their lists and opens them in one press.
+A colleague who holds some of your lists and not all of BrainDog sees a Home that names their lists and opens them in one press.
 
 ## Handled today
 
@@ -67,11 +67,11 @@ Open a block's menu and choose **Change this**, then type one line about that bl
 
 ## Ask Slash for a page
 
-Press / and describe what you want to see. Slash drafts the page and puts it in Needs you, showing what will appear, what each block reads from and where it goes in the sidebar. Nothing is placed until you accept. See [Slash](/docs/use/slash).
+Press Ctrl+J (⌘J on a Mac) and describe what you want to see. Slash drafts the page and puts it in Needs you, showing what will appear, what each block reads from and where it goes in the sidebar. Nothing is placed until you accept. See [Slash](/docs/use/slash).
 
-## Pages the record suggests
+## Pages BrainDog suggests
 
-When a list grows, or you keep asking the same question, your record can offer a page for it. It never places one for you. Offers wait in Settings, under Navigation, until you promote one or dismiss it, and **Suggest new pages** there turns the offers off. Pages you have already placed are untouched either way.
+When a list grows, or you keep asking the same question, BrainDog can offer a page for it. It never places one for you. Offers wait in Settings, under Navigation, until you promote one or dismiss it, and **Suggest new pages** there turns the offers off. Pages you have already placed are untouched either way.
 
 ## How a page is built
 

@@ -1,10 +1,10 @@
 # Sessions, handoffs and hooks
 
-Every time an agent works in your record, the work is a session: a row with its own number, such as `S42`, that says which agent it is, on which machine, in which project and repository, and where it stands. Everything the agent writes is signed by its session, so History can say which run made a change.
+Every time an agent works in your BrainDog, the work is a session: a row with its own number, such as `S42`, that says which agent it is, on which machine, in which project and repository, and where it stands. Everything the agent writes is signed by its session, so History can say which run made a change.
 
 ## How a session starts
 
-With the hooks in place (`braindog setup` adds them to Claude Code), the start hook runs when a Claude Code session opens. It reads the repository's branch and commit, tells the record which session this is, and prints the briefing into the conversation:
+With the hooks in place (`braindog setup` adds them to Claude Code), the start hook runs when a Claude Code session opens. It reads the repository's branch and commit, tells BrainDog which session this is, and prints the briefing into the conversation:
 
 - this session and where it stands;
 - the last handoff in this project;
@@ -12,7 +12,7 @@ With the hooks in place (`braindog setup` adds them to Claude Code), the start h
 - the questions waiting on you;
 - the skills, learnings, keys and tools that apply here, keys by name only.
 
-A hook never stops a session. If the record does not answer within eight seconds, or the machine is not signed in, the hook prints one line saying why there is no briefing, and the session goes on.
+A hook never stops a session. If BrainDog does not answer within eight seconds, or the machine is not signed in, the hook prints one line saying why there is no briefing, and the session goes on.
 
 An agent without the hooks starts with the `context` tool, which answers the same briefing. `braindog context` prints it again in a terminal.
 
@@ -48,7 +48,7 @@ Idle, never done. A terminal closing is not the work finishing, and a session th
 
 ## People met along the way
 
-When an agent comes across a person in the work (a commit author, a sender, a client), it calls `meet`. The person is matched by email or by a handle such as `github:octocat`, added to People if they are new, and linked to the session's project with where they were met. A record with People switched off refuses it and writes nothing.
+When an agent comes across a person in the work (a commit author, a sender, a client), it calls `meet`. The person is matched by email or by a handle such as `github:octocat`, added to People if they are new, and linked to the session's project with where they were met. A BrainDog with People switched off refuses it and writes nothing.
 
 ## Set up a machine
 

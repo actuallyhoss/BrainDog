@@ -40,8 +40,8 @@ test('each tile hands over its own lines, and only the script holds the key form
   assert.deepEqual(lines.script, []);
   assert.deepEqual(CONNECT_TILES.filter((t) => t.key).map((t) => t.id), ['script']);
   assert.equal(CONNECT_TILES.find((t) => t.id === 'script')?.hint, 'An app signs in. A key is for a script.');
-  assert.match(CONNECT_TILES.find((t) => t.id === 'claude-web')?.hint ?? '', /Settings, Connectors, add a custom connector/u);
-  assert.match(CONNECT_TILES.find((t) => t.id === 'chatgpt')?.hint ?? '', /^In ChatGPT, open Settings, Connectors/u);
+  assert.match(CONNECT_TILES.find((t) => t.id === 'claude-web')?.hint ?? '', /Customize, then Connectors, add a custom connector/u);
+  assert.match(CONNECT_TILES.find((t) => t.id === 'chatgpt')?.hint ?? '', /^In ChatGPT, open Settings, then Apps, turn on developer mode/u);
 });
 
 test('ChatGPT pastes the address and VS Code runs the line the first screen gives it', () => {

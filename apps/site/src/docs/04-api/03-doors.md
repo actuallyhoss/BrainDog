@@ -1,10 +1,10 @@
 # Webhooks and mail-in addresses
 
-A door is how something outside gets into your record without being an agent: a service that calls a webhook, a bank text or receipt you forward by mail, or a project that reports its own numbers. Each door writes, and none of them can read anything back.
+A door is how something outside gets into your BrainDog without being an agent: a service that calls a webhook, a bank text or receipt you forward by mail, or a project that reports its own numbers. Each door writes, and none of them can read anything back.
 
 ## Webhook doors
 
-A webhook door is declared on the record like a list or a page: which list it writes to, how its payload is read, and how a sender proves who it is. `braindog:grammar/ingest` gives the declaration with one that installs, and the app's doors screen lists every door the record declares.
+A webhook door is declared like a list or a page: which list it writes to, how its payload is read, and how a sender proves who it is. `braindog:grammar/ingest` gives the declaration with one that installs, and the app's doors screen lists every door you have.
 
 A door is checked in one of two ways:
 
@@ -34,7 +34,7 @@ Forwarded mail | Five megabytes
 
 ## Forwarded mail
 
-Your record has its own address to forward mail to, which the app gives you. A message names no door, so it is matched against every door the record declares. Mail counts as checked only when the checks on who forwarded it pass; anything else is stored and left in the inbox for you.
+Your BrainDog has its own address to forward mail to, which the app gives you. A message names no door, so it is matched against every door you have. Mail counts as checked only when the checks on who forwarded it pass; anything else is stored and left in the inbox for you.
 
 ## Report keys
 

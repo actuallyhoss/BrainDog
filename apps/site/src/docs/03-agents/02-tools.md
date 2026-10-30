@@ -1,12 +1,12 @@
 # The tools, by purpose
 
-An agent reaches your record through a short list of MCP tools. Some only read; the rest write, and every write lands in History under the agent's name, like any change you make yourself.
+An agent reaches your BrainDog through a short list of MCP tools. Some only read; the rest write, and every write lands in History under the agent's name, like any change you make yourself.
 
 Each example below is the tool's name and the arguments it is sent. A row is named the way a person says it: `tasks#41`, a list and its number, or a prefixed id such as `S42`.
 
 ## Finding your way
 
-`context` is the first call and the briefing for where the agent is: what you told it, its session and project, open work, questions waiting on you, who else is working, the keys and servers it may use (by name, never a value), skills and learnings. `record_index` says what the record holds: its lists, how many rows each has, its figures and its version. It is the cheap way to learn list names. Given a list, it answers that list's fields, their types and what each may take, which is worth reading before a write.
+`context` is the first call and the briefing for where the agent is: what you told it, its session and project, open work, questions waiting on you, who else is working, the keys and servers it may use (by name, never a value), skills and learnings. `record_index` says what your BrainDog holds: its lists, how many rows each has, its figures and its version. It is the cheap way to learn list names. Given a list, it answers that list's fields, their types and what each may take, which is worth reading before a write.
 
 ```code | text
 context {}
@@ -26,7 +26,7 @@ instructions {"reply": "IN4", "said": "Sent the March invoices.", "state": "done
 
 ## Reading rows
 
-`get` reads one row or one figure. `list` reads the rows of one list, newest first, 20 unless `limit` asks for up to 500, narrowed by a predicate and paged with the `cursor` the last answer gave. Long text is cut at 280 characters and the row says so; name the field in `fields` to have it whole. `search` finds rows whose words match across every list the agent can see, up to 100. `get` with `history` also gives the writes that made the row, in order, each with who and when.
+`get` reads one row or one figure. `list` reads the rows of one list, newest first, narrowed by a predicate. A list of 60 rows or fewer comes back whole; a longer one comes 20 at a time, and `limit` asks for up to 100. The `cursor` the last answer gave reads the next page. Long text is cut at 280 characters and the row says so; name the field in `fields` to have it whole. `search` finds rows whose words match across every list the agent can see, up to 100. `get` with `history` also gives the writes that made the row, in order, each with who and when.
 
 ```code | text
 get {"spoken": "tasks#41"}
@@ -37,7 +37,7 @@ get {"spoken": "tasks#41", "history": true}
 
 ## Catching up
 
-`activity` is what changed in the whole record lately, newest first, up to 200: each write, the row it touched and who made it. It is how one session picks up after another. `governance` is what has been proposed and not yet answered, what was decided and why, and what was predicted.
+`activity` is what changed across your BrainDog lately, newest first, 20 at a time unless `limit` asks for up to 100, paged with `cursor`: each write, the row it touched and who made it. It is how one session picks up after another. `governance` is what has been proposed and not yet answered, what was decided and why, and what was predicted.
 
 ```code | text
 activity {"limit": 50}
@@ -47,7 +47,7 @@ governance {"register": "decision", "id": "D12"}
 
 ## Changing things
 
-`create` adds a row and answers with the number the record gave it. `update` changes a row and sends the version it read; a field set to null is cleared, and `deleted_at: true` deletes the row. `log` adds a note to a row and changes nothing else, and with no row named the note goes on the agent's own session. A note is one sentence, at most 280 characters.
+`create` adds a row and answers with the number it was given. `update` changes a row and sends the version it read; a field set to null is cleared, and `deleted_at: true` deletes the row. `log` adds a note to a row and changes nothing else, and with no row named the note goes on the agent's own session. A note is one sentence, at most 280 characters.
 
 ```code | text
 create {"register": "tasks", "fields": {"what": "Send the March invoices"}, "note": "Asked for in today's call."}

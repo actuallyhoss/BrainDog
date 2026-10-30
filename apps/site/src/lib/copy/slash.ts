@@ -25,7 +25,7 @@ export const slashPage = {
   head: {
     title: 'Slash knows your whole business.',
     lead:
-      'Press / anywhere in BrainDog and talk to it in plain words. Slash reads your record, answers with your numbers ' +
+      'Press ⌘J anywhere in BrainDog and talk to it in plain words. Slash reads what you keep, answers with your numbers ' +
       'and makes the changes you ask for, each with an undo. Anything with money, keys, sharing or deletes waits for your yes.',
   },
   /** The label a screen reader hears on each list of examples. */
@@ -42,7 +42,7 @@ export const slashPage = {
   find: {
     title: 'Find',
     body: [
-      "Type a few letters and everything that matches shows up at once: people, projects, invoices, notes, pages and your agents' work.",
+      "Press / and type a few letters, and everything that matches shows up at once: people, projects, invoices, notes, pages and your agents' work.",
       'It also jumps to any page and runs actions. Finding is free and never spends an ask.',
     ],
   },
@@ -67,7 +67,7 @@ export const slashPage = {
     say: 'Slash lives inside BrainDog. Your AI tools live in Claude, ChatGPT, Codex, Cursor and VS Code. Both read the same BrainDog.',
     head: ['Slash', 'Your AI tools'],
     lines: [
-      ['Where', 'In BrainDog. Press /', 'In the apps you connect'],
+      ['Where', 'In BrainDog. Press ⌘J', 'In the apps you connect'],
       ['What it reads', 'Your BrainDog', 'What you allowed it'],
       ['What it writes', 'Changes you ask for, each with an undo', 'Notes and changes, each with an undo'],
       ['Who pays', 'Your included asks, or your own key', "Your AI tool's own plan"],

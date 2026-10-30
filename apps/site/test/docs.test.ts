@@ -14,7 +14,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-import { bodyOf, docOf, type Doc } from '../src/lib/docs/pages.ts';
+import { bodyOf, docOf, launched, type Doc } from '../src/lib/docs/pages.ts';
+import { LAUNCH } from '../src/lib/launch.ts';
 import { parse } from '../../../packages/render/src/parse.ts';
 import { BUILD, missing, when } from './built.ts';
 
@@ -38,7 +39,7 @@ const read = (): { docs: Doc[]; broken: string[] } => {
   const broken: string[] = [];
   for (const [key, src] of files) {
     try {
-      docs.push(docOf(key, src));
+      docs.push(docOf(key, src, LAUNCH));
     } catch (error) {
       broken.push(error instanceof Error ? error.message : `${key}: ${String(error)}`);
     }
@@ -140,6 +141,24 @@ test('a doc page puts its title on a night strip and its text on paper at 68ch',
   const body = source('lib/docs/Body.svelte');
   assert.match(body, /\.doc-body \{[^}]*background: var\(--paper\)/, 'the page is not on paper');
   assert.match(body, /max-inline-size: 68ch/, 'the reading measure is not 68ch');
+});
+
+/**
+ * A PART HELD UNTIL LAUNCH (`launched`): kept without its markers when its flag is on, gone when it is off, and a marker
+ * naming no flag or left open stops the build. The plugin's line names the repository, so it waits on `LAUNCH.repo`.
+ */
+test('a launch part shows only when its flag is on', () => {
+  const src = '# T\n\nBefore.\n\n<!-- launch: repo -->\n## Plugin\n\nAdd it.\n<!-- /launch -->\n\nAfter.\n';
+  assert.equal(launched('k', src, { repo: true }), '# T\n\nBefore.\n\n## Plugin\n\nAdd it.\n\nAfter.\n');
+  assert.equal(launched('k', src, { repo: false }), '# T\n\nBefore.\n\nAfter.\n');
+  assert.throws(() => launched('k', src, { cli: true }), /not a launch flag/);
+  assert.throws(() => launched('k', '<!-- launch: repo -->\nx\n', { repo: true }), /open/);
+  assert.throws(() => launched('k', 'x\n<!-- /launch -->\n', { repo: true }), /never opened/);
+});
+
+test('no docs page names the repository or the plugin while LAUNCH.repo is off', { skip: LAUNCH.repo }, () => {
+  const { docs } = read();
+  for (const d of docs) assert.doesNotMatch(d.src, /actuallyhoss\/BrainDog|\/plugin (?:marketplace|install)/u, `${d.file} names the private repository`);
 });
 
 /** "EDIT ON GITHUB" ONLY ONCE THE REPOSITORY IS PUBLIC: until then the address answers 404 to everyone but the owner. */

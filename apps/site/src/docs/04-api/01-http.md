@@ -4,7 +4,7 @@ Everything an agent does over MCP, a script can do over plain HTTP: one address 
 
 ## Calling a method
 
-Each method is at `https://brain.dog/api/<method>`. The token names the record, so the address does not. A read may be a GET with its arguments in the query string, or a POST with a JSON body; a write is always a POST.
+Each method is at `https://brain.dog/api/<method>`. The token says which BrainDog it is for, so the address does not. A read may be a GET with its arguments in the query string, or a POST with a JSON body; a write is always a POST.
 
 ```code | sh
 curl -s "https://brain.dog/api/get?spoken=tasks%2341" -H "Authorization: Bearer $BRAINDOG_TOKEN"
@@ -38,16 +38,16 @@ Status | What it means | What to do
 405 | A write sent as a GET | Send it as a POST
 413 | The body is too big | Send less
 429 | Too many requests this minute | Wait the seconds in Retry-After
-503 | The record is not available for now | Try again later
+503 | BrainDog is not available for now | Try again later
 ```
 
 ## What a token may call
 
-A token reaches the record's reads and its everyday writes, each held to the token's scope and the levels of the person who made it.
+A token reaches the reads and the everyday writes, each held to the token's scope and the levels of the person who made it.
 
 ```comparison | Reads
 Method | What it answers
-boot | What the record holds, how many rows each list has, and who is asking
+boot | What your BrainDog holds, how many rows each list has, and who is asking
 whoami | Who you are here, and which verbs you reach
 schema, get, list, search, history | Lists and rows, as the MCP tools of the same names give them
 backlinks | What points at one row, from the other lists
@@ -55,7 +55,7 @@ whatsNew, recentHistory | What changed, newest first, held to what you may see
 context, sessionsLive | The briefing, and who else is working now
 pages, page, metric, figures | Pages with every block worked out, and figures
 governance, comments | Questions, decisions and predictions, and the comments on a row
-packs, packConfig, arrangement | How the record is arranged
+packs, packConfig, arrangement | How your BrainDog is arranged
 actions, automations, todayReminders, scripts | What runs on its own, and how its runs went
 views, view | A list's saved views
 usedBy | Which sessions used one key or one tool
@@ -79,7 +79,7 @@ The rest (members and invitations, tokens, packs, exports, the Keychain) takes a
 
 ## How fast
 
-Each token may make 600 reads and 120 writes a minute. Past either, the answer is 429 with the seconds to wait. [Usage and limits](/docs/api/usage) has the rest.
+Each token may make 600 reads and 120 writes a minute. Past either, the answer is 429 with the seconds to wait. [API and MCP limits](/docs/api/usage) has the rest.
 
 ## Set up a machine
 

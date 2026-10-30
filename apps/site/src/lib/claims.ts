@@ -79,7 +79,7 @@ export const CLAIMS: readonly Claim[] = [
   /* The pages for each kind of person (`copy/for.ts`). */
   { id: 'bills-file-themselves', said: 'Once it knows their shape, each lands in the right list with its amount and due day.', where: 'person.who.personal.rows.0.said', state: 'true' },
   { id: 'students-reminded', said: 'Automations remind you before things are due', where: 'person.who.student.sub', state: 'true' },
-  { id: 'late-invoice-drafted', said: 'a reminder is drafted in your words and waits for your yes.', where: 'person.who.founder.rows.1.said', state: 'true' },
+  { id: 'late-invoice-drafted', said: 'Say yes, and a reminder is written for you to send.', where: 'person.who.founder.rows.1.said', state: 'true' },
   { id: 'team-who-changed', said: 'every change says who made it.', where: 'person.who.team.sub', state: 'true' },
 
   /* The trust pages (`copy/trust.ts`) and the shared words (`copy/shell.ts`). */

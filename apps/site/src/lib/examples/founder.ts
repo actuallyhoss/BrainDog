@@ -5,7 +5,7 @@
  * 2026). September's USD 8,420.00 in and USD 3,115.00 out are the last bar of the series and the
  * sentence at the top of Home; the USD 1,850.00 owed is the two unpaid invoices on Invoices
  * (1,200.00 and 650.00); and Northwind Studio's invoice, sent on 9 September on seven days' terms,
- * is 12 days late on the 28th, which is what the Bookkeeper asks about in Needs you.
+ * is 12 days late on the 28th, which is what Money's late-invoice rule asks about in Needs you (`invoice-late`).
  */
 import type { Example } from './types.ts';
 
@@ -58,9 +58,9 @@ Paying customers | 12 | 15
       title: 'Needs you',
       glyph: 'decide',
       src: `~~~queue | Waiting on you
-q | f1 | Bookkeeper | 20 min ago | Send Northwind Studio a reminder for USD 1,200.00? | The invoice is 12 days late. They paid the last three within a week of a reminder. | call
-opt | f1 | accept | Accept | The reminder goes out today, in your words from last time | true
-opt | f1 | reject | Reject | Nothing is sent, and the invoice stays on your list |
+q | f1 | Money | 20 min ago | Northwind Studio's invoice was due 12 days ago, USD 1,200.00. Chase it? | Sent on 9 September, on seven days' terms. | call
+opt | f1 | accept | Chase it | It is marked as chased, and a reminder is written for you to send | true
+opt | f1 | reject | Not yet | Nothing changes, and the invoice stays on your list |
 ~~~`,
     },
     {
@@ -69,7 +69,7 @@ opt | f1 | reject | Reject | Nothing is sent, and the invoice stays on your list
       glyph: 'inbox',
       src: `~~~timeline | Arrived and filed
 Today 08:30 | Receipt for hosting, USD 42.00 | Filed to Costs, September
-Fri 25 Sep | Contract signed by Hollis and Park | Filed to Customers | good
+Fri 25 Sep | Receipt for a train ticket, USD 38.00 | Filed to Costs, September
 Thu 24 Sep | Receipt for design software, USD 24.00 | Filed to Costs, September
 ~~~`,
     },
@@ -91,9 +91,8 @@ Tern Labs | USD 2,400.00 | 1 Sep | Paid 3 Sep
       glyph: 'refresh',
       src: `~~~steps | Chase a late invoice
 Starts when | An invoice is 7 days past its due day | trigger
-Only if | The customer has paid you before | condition
-Then | Draft a friendly reminder | step
-Then | Ask you in Needs you before it is sent | action
+Then | Ask you in Needs you whether to chase it | action
+If you say chase it | Mark it as chased, and write a reminder for you to send | step
 ~~~`,
     },
     {
@@ -107,9 +106,9 @@ Inbox filer | Reading a receipt for hosting | 1 min ago
 ~~~
 
 ~~~agents | What they did
-Bookkeeper | 1 | proposed Send Northwind Studio a reminder | 20 min ago
 Bookkeeper | 6 | changed September's costs | today
 Inbox filer | 3 | added Receipt for hosting | today
+Bookkeeper | 1 | added Hollis and Park's invoice | Mon 21 Sep
 ~~~`,
       layout: [
         { at: 0, cols: 12 },
