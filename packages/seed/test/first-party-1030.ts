@@ -68,7 +68,9 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
    "rule.category-correction-yes#0",
    "script.category_correction#0",
    "script.ledger_twice#0",
-   "metric.moved-since#0"
+   "metric.moved-since#0",
+   "metric.filing-rule-filed#0",
+   "metric.filing-rules#0"
   ],
   "was": {
    "script.learn_category#0": {
@@ -5045,6 +5047,37 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
      "gte": 0
     },
     "window": "30d",
+    "compare": "none"
+   },
+   "metric.filed-for-you-30d#0": {
+    "metric": "filed-for-you-30d",
+    "pack": "money-core",
+    "name": "Filed for you, 30 days",
+    "source": "events.transactions",
+    "where": "by is agent or door or rule",
+    "value": {
+     "count": "made"
+    },
+    "format": "int",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.filed-today#0": {
+    "metric": "filed-today",
+    "pack": "money-core",
+    "name": "Filed today",
+    "source": "events.transactions",
+    "value": {
+     "count": "made"
+    },
+    "format": "int",
+    "target": {
+     "gte": 0
+    },
+    "window": "1d",
     "compare": "none"
    }
   }

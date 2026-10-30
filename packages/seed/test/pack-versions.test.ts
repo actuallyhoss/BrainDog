@@ -2470,10 +2470,10 @@ const DECLARED: Record<string, Version> = {
       metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check metric.cash-foreign-share metric.cash-now
       metric.categories-against-direction metric.chasing metric.currencies-held metric.days-late-in metric.due-30d
       metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-net metric.every-month-out
-      metric.filed-by-rule-30d metric.filed-for-you-30d metric.filed-today metric.held-beyond-cash metric.in-30d
-      metric.in-ahead-by-month metric.in-by-month metric.in-due-by-month metric.installments-a-month
-      metric.installments-after-next-by-plan metric.installments-due-30d metric.installments-late metric.installments-left
-      metric.installments-left-by-plan metric.installments-next-due-by-plan metric.installments-paid-by-plan
+      metric.filed-by-rule-30d metric.filed-for-you-30d metric.filed-today metric.filing-rule-filed metric.filing-rules
+      metric.held-beyond-cash metric.in-30d metric.in-ahead-by-month metric.in-by-month metric.in-due-by-month
+      metric.installments-a-month metric.installments-after-next-by-plan metric.installments-due-30d metric.installments-late
+      metric.installments-left metric.installments-left-by-plan metric.installments-next-due-by-plan metric.installments-paid-by-plan
       metric.installments-total-by-plan metric.instalments-in-no-book metric.kept-share-90d metric.lasts-no-income metric.late-in
       metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days metric.ledger-rows-7d metric.left-all metric.left-last
       metric.left-month metric.left-three metric.left-year metric.lines-by-account metric.moved-since metric.net-by-month
@@ -2512,12 +2512,13 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '3a73960b7bea2133',
+    declares: 'e00c98eb1a5acc2f',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
       'Before 3.33.0 shipped, `page.money-forecast` opens on 12 weeks and `metric.moved-since` is added for Reports; one id added, none taken away -> 72b8a0107776271c',
       'Before 3.33.0 shipped, `page.money-payees` and `page.money-budgets` link to their unnamed and unfiled lines with field:is:empty; no id added or taken away -> 3a73960b7bea2133',
+      'Before 3.33.0 shipped, `page.money-payees` draws one bar a payee, `page.money-rules` draws its rules as cards, and `metric.filing-rule-filed` and `metric.filing-rules` are added; two ids added, none taken away -> e00c98eb1a5acc2f',
     ],
   },
   'work@1.17.0': {
