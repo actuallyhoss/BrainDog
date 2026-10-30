@@ -811,6 +811,8 @@ export type AutomationRow = {
   why_idle?: string | null;
   /** Times it ran or landed its work in the last seven days. Absent from a host older than the count. */
   week?: number;
+  /** Times it ran or landed its work in this calendar month so far, UTC (`rule_month`). Absent from a host older than the count. */
+  month_fired?: number;
   /** The key rules of one shape share (same trigger, list and kinds of action), so a page can draw them as one line. A handle, never shown. */
   family?: string | null;
 };

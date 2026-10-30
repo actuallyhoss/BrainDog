@@ -183,6 +183,12 @@ test('A MONTH OF RUNS SAYS THAT RULES ACTING ON CHANGES ARE NOT AMONG THEM, wher
   assert.equal(sentenceOf({ ...view, acted: true })?.text, `1 run this month. ${said.rulesApart}`);
 });
 
+test('WHERE THE RECORD KEEPS THE MONTH, THE RULES ARE SAID BY HOW OFTEN THEY RAN IN IT (sec-follow M5)', () => {
+  const view = usageFromActions([], '2026-09', 'events', '2026-09-03', true, [{ name: 'Weekly review', month: { runs: 1, failed: 0 } }]);
+  assert.equal(sentenceOf({ ...view, acted: true, rulesRan: 17 })?.text, '1 run this month. Rules that act as things change ran 17 times this month, and are not counted here.');
+  assert.equal(sentenceOf({ ...view, acted: true, rulesRan: 0 })?.text, '1 run this month.');
+});
+
 test('a month whose runs were in no project is not split by project, and its actions name no project after them', () => {
   const none = { key: '', name: 'Everywhere', totals: { runs: 158 } } as unknown as Group;
   const kiln = { key: 'p_kiln', name: 'Kiln', totals: { runs: 3 } } as unknown as Group;

@@ -1624,12 +1624,20 @@ function countFiring(deps: RulesDeps, rule: string, batch: string): void {
  * a tried run (`flow-try.ts`) goes through `openRun` alone and counts nothing.
  */
 export function raiseStat(sql: Sql, rule: string, row: string | null, nowMs: number): void {
+  const at = instant(nowMs);
   sql.exec(
     `INSERT INTO rule_stat (rule, fired, last_at, last_row) VALUES (?, 1, ?, ?)
      ON CONFLICT (rule) DO UPDATE SET fired = fired + 1, last_at = excluded.last_at, last_row = excluded.last_row`,
     rule,
-    instant(nowMs),
+    at,
     row,
+  );
+  /* AND THE SAME FIRING ON ITS MONTH'S COUNT (`rule_month`, migration 48), the UTC month of the instant, so "this month"
+     over a rule is a count of this month and not the whole count's last date. */
+  sql.exec(
+    'INSERT INTO rule_month (rule, month, fired) VALUES (?, ?, 1) ON CONFLICT (rule, month) DO UPDATE SET fired = fired + 1',
+    rule,
+    at.slice(0, 7),
   );
 }
 
