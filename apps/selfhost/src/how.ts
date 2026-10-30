@@ -51,6 +51,22 @@ export function listenOf(e: Record<string, string | undefined>): string | undefi
 }
 
 /**
+ * The start's warning when a server key goes over plain http on every interface, or `null` when it does not.
+ *
+ * A KEY TURNS THE BIND WIDE, AND NOTHING TURNS TLS ON. With `BRAINDOG_SERVER_KEY` set and no certificate, the default
+ * interface is every one (`::`) and the origin is `http:`, so the key, every bearer and the session cookie cross the
+ * network in the clear to anybody on it, and `bd_s` at `localhost` is shared with every other port on the machine. It
+ * is said at start rather than refused: a container behind its own proxy, or a machine alone on a trusted network, is
+ * a real setup. An `https:` origin with no certificate here is a proxy in front, which is not this line's to judge.
+ */
+export function plainLine(o: { key: boolean; tls: boolean; listen: string | undefined; origin: string }): string | null {
+  if (!o.key || o.tls || !/^http:/iu.test(o.origin)) return null;
+  const bound = (o.listen ?? '::').replace(/^\[|\]$/gu, '').toLowerCase();
+  if (bound === '127.0.0.1' || bound === '::1' || bound === 'localhost') return null;
+  return '  plain http on every interface: the server key and the sign-in cookie cross the network unencrypted to anybody on it. Set BRAINDOG_TLS_CERT and BRAINDOG_TLS_KEY, serve it behind https on this machine, or set BRAINDOG_LISTEN=127.0.0.1.';
+}
+
+/**
  * The origin to serve at: `BRAINDOG_ORIGIN`, or, in the image, `http://localhost:<BRAINDOG_PORT>` when Compose publishes
  * the server on another port of the machine than the one it listens on inside. Undefined leaves `start` its own default,
  * `http://localhost:<port>`, and a certificate its names.
