@@ -125,6 +125,7 @@
   import EditCover from '$lib/board/EditCover.svelte';
   import DraftMark from '$lib/board/DraftMark.svelte';
   import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
+  import { leftBlock, phoneAsk, withLeft } from '$lib/home/phone-ask.ts';
   import { fitted, widgetsOf, type Phone } from '$lib/board/board-widgets.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { untrack } from 'svelte';
@@ -594,6 +595,11 @@
        before it reads what went quiet answers that one tile as a refusal, which is not drawn (`quietHeld`). */
     const body = todayHome(held, spoken);
     declaredBlocks = body.blocks as unknown as Record<string, unknown>[];
+    /* A PHONE ASKS NO WIDGET ITS BOARD HIDES (`phone-ask.ts`): each comes back declared with nothing drawn, and the board
+       on a wider screen or in the editor reads Today again whole (`phoneOnly`). */
+    const trim = untrack(() => narrow.current && !boardModel.editing && !boardModel.phoneView);
+    const { asked, left } = trim ? phoneAsk(body) : { asked: body, left: [] };
+    const leftOut = left as unknown as Record<string, unknown>[];
     /* AND THE DESK'S CARDS' OWN CODE WHILE THE RECORD DRAWS, so they are drawn with the page and take their parts from the
        same read: loaded after the page, the cards and their lines landed after the screen said it was ready. FETCHED
        BESIDE THE READ AND NEVER WAITED ON: their code is slower than the read, and waiting held the whole body back until
@@ -602,25 +608,28 @@
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
     const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
     const base = apiBase();
-    let drawn = await m.drawnOf(body, base, undefined, (client) => t.askToday(client, base, body as unknown as Record<string, unknown>, fresh));
+    let drawn = await m.drawnOf(asked, base, undefined, (client) => t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut));
     /* A RECORD BUILT BEFORE BOARDS refuses a board's keys (`board: is not a key a page has`): Today is asked without them
        and laid out from its own body's sizes, so an app ahead of its record still opens Today (audit 30 Oct, item 2). */
     if (drawn.from === 'refused' && /\b(board|phone|size|draft|until)\b/u.test(drawn.fix)) {
-      const { board: _b, phone: _p, ...plain } = body as unknown as Record<string, unknown>;
+      const { board: _b, phone: _p, ...plain } = asked as unknown as Record<string, unknown>;
       const blocks = ((plain.blocks ?? []) as Record<string, unknown>[]).map(({ size: _s, draft: _d, until: _u, ...own }) => own);
       const older = { ...plain, blocks };
-      const again = await m.drawnOf(older as never, base, undefined, (client) => t.askToday(client, base, older, fresh));
+      const again = await m.drawnOf(older as never, base, undefined, (client) => t.askToday(client, base, older, fresh, null, leftOut));
       if (again.from === 'live') {
         const sizes = new Map(((body as unknown as { blocks: Record<string, unknown>[] }).blocks ?? []).map((b) => [b.key, b.size] as const));
         drawn = { ...again, blocks: again.blocks.map((b) => (typeof b.key === 'string' && sizes.get(b.key) !== undefined ? { ...b, size: sizes.get(b.key) } : b)) as typeof again.blocks };
       } else drawn = again;
     }
-    if (drawn.from === 'live')
+    if (drawn.from === 'live') {
+      const at = drawn.now;
+      const blocks = withLeft(drawn.blocks, body.blocks, left, (b) => leftBlock(b, at) as unknown as LiveBlock);
       return {
         from: 'live',
-        page: { page: { page: body.page, title: body.title, ...(body.layout ? { layout: body.layout } : {}), ...(body.board ? { board: true } : {}), ...(body.phone ? { phone: body.phone } : {}) } as LivePageDecl, blocks: quietHeld(drawn.blocks) },
+        page: { page: { page: body.page, title: body.title, ...(body.layout ? { layout: body.layout } : {}), ...(body.board ? { board: true } : {}), ...(body.phone ? { phone: body.phone } : {}), ...(left.length > 0 ? { phoneOnly: true } : {}) } as LivePageDecl, blocks: quietHeld(blocks) },
         now: drawn.now,
       };
+    }
     if (drawn.from === 'refused') return { from: 'refused', fix: drawn.fix };
     return null;
   }
@@ -911,12 +920,14 @@
   const sheetBoard = $derived.by((): Record<string, unknown>[] => {
     if (!board || !live) return [];
     const keys = new Set(boardWidgets.map((w) => w.key));
+    /* A WIDGET THE PHONE DID NOT ASK FOR (`phoneOnly`) IS NOT EMPTY: nothing was drawn of it because nothing was asked. */
+    const unasked = new Set(phoneOnly ? (boardPhone?.hidden ?? []) : []);
     return live.page.blocks.flatMap((b) => {
       const x = b as unknown as Record<string, unknown>;
       if (typeof x.key !== 'string' || !keys.has(x.key)) return [];
       /* EMPTY IS A LIST THAT HELD NO ROW, or a widget not drawn at all; a figure's own rows are not what it shows. */
       const listed = ['list', 'table', 'todo', 'queue', 'feed', 'cards', 'timeline', 'spec'].includes(String(x.kind));
-      const out: Record<string, unknown> = { key: x.key, empty: !boardShown.has(x.key) || (listed && Array.isArray(x.rows) && x.rows.length === 0) };
+      const out: Record<string, unknown> = { key: x.key, empty: !unasked.has(x.key) && (!boardShown.has(x.key) || (listed && Array.isArray(x.rows) && x.rows.length === 0)) };
       for (const k of ['heading', 'source', 'where', 'metric'] as const) if (typeof x[k] === 'string') out[k] = x[k];
       /* THE NAME IT IS DRAWN UNDER (Arrivals, not the body's "Since you were away"), so the sheet says what Today says. */
       const drawnAs = boardNames.get(x.key);
@@ -983,6 +994,16 @@
   const wide = new MediaQuery('(width >= 900px)', true);
   /* A PHONE, where Needs you shows two questions and not three (today F8). */
   const phone = new MediaQuery('(width < 600px)', false);
+  /* THE BOARD'S PHONE, two columns under 720px as `Board.svelte` lays it out, which asks Today without what it hides. */
+  const narrow = new MediaQuery('(width < 720px)', false);
+  /** Whether Today was read without the widgets the phone hides (`phone-ask.ts`). */
+  const phoneOnly = $derived(got?.from === 'live' && (got.page.page as { phoneOnly?: unknown }).phoneOnly === true);
+  /* AND READ AGAIN WHOLE where they are wanted: the board wider than a phone, or the editor, where a hidden widget is
+     taken out of the tray. Read quietly over what is drawn, as a new version is. */
+  $effect(() => {
+    if (!phoneOnly || (narrow.current && !boardModel.editing && !boardModel.phoneView)) return;
+    untrack(() => void reread());
+  });
 
   type HandledFound = import('./handled.ts').Handled;
   /* WHAT BRAINDOG DID BY ITSELF TODAY, said as one line at the foot of Needs you (today F6); nought says nothing. */
@@ -1055,6 +1076,10 @@
    */
   function tilesBeside(base: string): void {
     const ver = asOf();
+    /* THE BOARD'S LAST CELL, asked apart from Today's read once it has landed (`askOffer`), once a version. */
+    void import('./today-read.ts')
+      .then((t) => tileOnce('offer', base, ver, () => t.askOffer(createClient({ base }), base)))
+      .catch(() => undefined);
     void import('./today-read.ts')
       .then((t) => t.todayHeld(base))
       .then(async (got) => {
