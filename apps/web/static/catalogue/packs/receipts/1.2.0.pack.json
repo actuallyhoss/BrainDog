@@ -1,0 +1,530 @@
+{
+  "pack": "receipts",
+  "version": "1.2.0",
+  "icon": "receipt-text",
+  "title": "Receipts",
+  "summary": "Keep a receipt on each Ledger line. Send one in on its own and it finds its line by amount and day, or asks which one. Mark the categories you keep receipts for, such as work costs or anything with a warranty, and see which lines from this month and last still want one.",
+  "changes": "Says how to start first, and shows its counts once a category keeps receipts.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.transactions": {
+      "fields": [
+        {
+          "id": "receipt",
+          "label": "Receipt",
+          "type": "file"
+        },
+        {
+          "id": "receipt_wanted",
+          "label": "Wants a receipt",
+          "type": "bool"
+        }
+      ]
+    },
+    "register.categories": {
+      "fields": [
+        {
+          "id": "wants_receipt",
+          "label": "Keep receipts",
+          "type": "bool"
+        }
+      ]
+    }
+  },
+  "widgets": [
+    {
+      "id": "receipts",
+      "title": "Receipts",
+      "says": "Payments still missing a receipt, and receipts waiting to be matched.",
+      "group": "money",
+      "for": "business",
+      "icon": "receipt",
+      "block": {
+        "kind": "stat",
+        "heading": "Receipts",
+        "icon": "receipt",
+        "cells": [
+          {
+            "metric": "receipts-missing",
+            "label": "Missing a receipt"
+          },
+          {
+            "metric": "receipts-waiting",
+            "label": "To match"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "receipts-missing"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "Missing a receipt",
+            "said": "3"
+          }
+        ]
+      },
+      "words": [
+        "expenses",
+        "paperwork"
+      ],
+      "leads": [
+        "receipts"
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "register": "receipts",
+      "name": "Receipts",
+      "icon": "receipt-text",
+      "one": "receipt",
+      "holds": "a receipt sent in on its own, with the shop, the day and the amount, until it is put on its line in the Ledger",
+      "title": "shop",
+      "mobile": [
+        "shop",
+        "on",
+        "amount"
+      ],
+      "state": "state",
+      "done": [
+        "matched",
+        "alone"
+      ],
+      "pack": "receipts",
+      "order": {
+        "field": "on",
+        "dir": "desc"
+      },
+      "fields": [
+        {
+          "id": "picture",
+          "label": "Picture",
+          "type": "file",
+          "required": true
+        },
+        {
+          "id": "shop",
+          "label": "Shop",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "on",
+          "label": "Date",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "amount",
+          "label": "Amount",
+          "type": "money"
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "waiting",
+            "matched",
+            "alone"
+          ],
+          "labels": {
+            "waiting": "Waiting for its line",
+            "matched": "On its line",
+            "alone": "Kept on its own"
+          },
+          "default": "waiting",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "line",
+          "label": "Ledger line",
+          "type": "ref",
+          "to": "transactions"
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "rule": "receipts_from_receipt",
+      "name": "Put a receipt on its Ledger line",
+      "pack": "receipts",
+      "on": {
+        "written": {
+          "register": "receipts",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "picture",
+            "amount",
+            "on",
+            "line"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "receipts_match",
+            "as": "matching"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "receipts_from_line",
+      "name": "Find a waiting receipt for a new Ledger line, or mark it as wanting one",
+      "pack": "receipts",
+      "on": {
+        "written": {
+          "register": "transactions",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "amount",
+            "on",
+            "direction",
+            "state",
+            "category"
+          ]
+        }
+      },
+      "when": "direction is out, state is cleared",
+      "steps": [
+        {
+          "script": {
+            "id": "receipts_match",
+            "as": "matching"
+          }
+        }
+      ]
+    },
+    {
+      "script": "receipts_match",
+      "title": "Match receipts and Ledger lines",
+      "pack": "receipts",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "transactions",
+        "receipts",
+        "categories"
+      ],
+      "writes": [
+        "transactions",
+        "receipts"
+      ],
+      "source": "/**\n * Receipts: a receipt sent in on its own finds its Ledger line, and a line in a category that keeps receipts says it\n * wants one.\n *\n * A RECEIPT FINDS ITS LINE BY AMOUNT AND DAY. Money out that has not been made void, in the same currency and for the\n * same amount to the smallest unit, three days either side of the receipt's day, and with no receipt yet. EXACTLY ONE\n * IS THE LINE: the picture is put on it and the receipt is marked On its line. SEVERAL ARE ONE QUESTION, with each line\n * as an answer and \"None of these\". None leaves it waiting, and each night the waiting ones look again, so a card\n * payment that lands two days later still finds its receipt.\n *\n * A RECEIPT YOU POINT AT A LINE yourself (\"Ledger line\") is put on that line at once.\n *\n * A LINE WRITTEN, money out and cleared, looks the other way: a waiting receipt with its amount and a day near its own\n * is put on it when there is exactly one. And when its category keeps receipts and it has none, it is marked \"Wants a\n * receipt\", which the Receipts page counts for this month and last.\n *\n * IT WRITES THE LINE'S RECEIPT AND ITS MARK, AND THE RECEIPT'S STATE AND LINE. The automations watch neither the mark nor\n * the state, so the only write that starts it again is a receipt put on a line, which then finds nothing left to do.\n */\n\nconst DAY_MS = 86_400_000;\nconst NEAR = 3;\nconst money = (m) => m && typeof m === 'object' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string';\nconst isDay = (d) => typeof d === 'string' && /^\\d{4}-\\d{2}-\\d{2}/.test(d);\nconst shift = (day, n) => new Date(Date.parse(day.slice(0, 10) + 'T00:00:00Z') + n * DAY_MS).toISOString().slice(0, 10);\nconst sameMoney = (a, b) => money(a) && money(b) && a.amount === b.amount && a.currency === b.currency;\nconst hasFile = (v) => v && typeof v === 'object' && typeof v.sha256 === 'string';\n\nasync function linesNear(ctx, receipt) {\n  const f = receipt.fields;\n  const rows = await ctx.record.list('transactions', {\n    all: [\n      { field: 'direction', is: 'out' },\n      { field: 'on', gte: shift(f.on, -NEAR) },\n      { field: 'on', lte: shift(f.on, NEAR) },\n      { field: 'state', not: 'void' },\n    ],\n  });\n  return rows.filter((r) => sameMoney(r.fields.amount, f.amount) && !hasFile(r.fields.receipt));\n}\n\nfunction put(ctx, receipt, line) {\n  ctx.update('transactions#' + line.seq, { receipt: receipt.fields.picture }, line.version);\n  ctx.update('receipts#' + receipt.seq, { state: 'matched', line: line.id }, receipt.version);\n}\n\nconst named = (line) => String(line.fields.what || 'A line') + ' on ' + String(line.fields.on).slice(0, 10);\n\nasync function fromReceipt(ctx, receipt) {\n  const f = receipt.fields;\n  if (f.state !== 'waiting' || !hasFile(f.picture)) return null;\n  if (typeof f.line === 'string' && f.line !== '') {\n    const line = await ctx.record.get(f.line);\n    if (line && line.register === 'transactions') put(ctx, receipt, line);\n    return null;\n  }\n  if (!money(f.amount) || !isDay(f.on)) return null;\n  const found = await linesNear(ctx, receipt);\n  if (found.length === 0) {\n    ctx.log('No line yet for the receipt from ' + String(f.shop || 'a shop') + '; it waits and looks again tonight.');\n    return null;\n  }\n  if (found.length === 1) {\n    put(ctx, receipt, found[0]);\n    return null;\n  }\n  const spoken = 'receipts#' + receipt.seq;\n  return {\n    ask: {\n      cause: 'receipts.match.' + spoken,\n      question: 'Which line is the receipt from ' + String(f.shop || 'this shop') + ' for?',\n      about: spoken,\n      options: found\n        .slice(0, 6)\n        .map((line) => ({\n          label: named(line),\n          because: 'The picture goes on this line, and the receipt is marked On its line.',\n          patches: [\n            { id: 'transactions#' + line.seq, version: line.version, fields: { receipt: f.picture } },\n            { id: spoken, version: receipt.version, fields: { state: 'matched', line: line.id } },\n          ],\n        }))\n        .concat([{ id: 'none', label: 'None of these', because: 'The receipt stays waiting for its line.' }]),\n    },\n  };\n}\n\nasync function fromLine(ctx, line) {\n  const f = line.fields;\n  if (f.direction !== 'out' || f.state !== 'cleared' || !money(f.amount) || !isDay(f.on)) return;\n  if (hasFile(f.receipt)) return;\n  const waiting = await ctx.record.list('receipts', {\n    all: [\n      { field: 'state', is: 'waiting' },\n      { field: 'on', gte: shift(f.on, -NEAR) },\n      { field: 'on', lte: shift(f.on, NEAR) },\n    ],\n  });\n  const found = waiting.filter((r) => sameMoney(r.fields.amount, f.amount) && hasFile(r.fields.picture) && !(typeof r.fields.line === 'string' && r.fields.line !== ''));\n  if (found.length === 1) {\n    put(ctx, found[0], line);\n    return;\n  }\n  if (f.receipt_wanted !== true && typeof f.category === 'string' && f.category !== '') {\n    const cat = await ctx.record.get(f.category);\n    if (cat && cat.register === 'categories' && cat.fields.wants_receipt === true) ctx.update('transactions#' + line.seq, { receipt_wanted: true }, line.version);\n  }\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (id) {\n    const row = await ctx.record.get(String(id));\n    if (!row) return null;\n    if (row.register === 'receipts') return fromReceipt(ctx, row);\n    if (row.register === 'transactions') await fromLine(ctx, row);\n    return null;\n  }\n  /* EACH NIGHT: every receipt still waiting looks for its line once more, and asks nothing. */\n  const waiting = await ctx.record.list('receipts', { all: [{ field: 'state', is: 'waiting' }] });\n  let done = 0;\n  for (const r of waiting) {\n    if (!money(r.fields.amount) || !isDay(r.fields.on) || !hasFile(r.fields.picture)) continue;\n    const found = await linesNear(ctx, r);\n    if (found.length === 1) {\n      put(ctx, r, found[0]);\n      done += 1;\n    }\n  }\n  if (done > 0) ctx.log('Put ' + done + ' waiting receipts on their lines.');\n  return null;\n}\n"
+    },
+    {
+      "metric": "receipts-missing",
+      "name": "Lines wanting a receipt",
+      "pack": "receipts",
+      "source": "register.transactions",
+      "where": "receipt_wanted is true, receipt is empty, state is cleared, on at least bom-1m",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "receipts-waiting",
+      "name": "Receipts waiting for their line",
+      "pack": "receipts",
+      "source": "register.receipts",
+      "where": "state is waiting",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "receipts-kept-month",
+      "name": "Lines with a receipt this month",
+      "pack": "receipts",
+      "source": "register.transactions",
+      "where": "receipt is set, on at least bom",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "receipts-categories",
+      "name": "Categories that keep receipts",
+      "pack": "receipts",
+      "source": "register.categories",
+      "where": "wants_receipt is true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "receipts",
+      "title": "Receipts",
+      "pack": "receipts",
+      "nav": {
+        "section": "Money",
+        "order": 75
+      },
+      "icon": "receipt-text",
+      "requires": [
+        "register.receipts",
+        "register.transactions"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{receipts-missing}} lines from this month and last want a receipt, and {{receipts-waiting}} receipts wait for their line."
+        },
+        {
+          "kind": "note",
+          "heading": "Which categories keep receipts",
+          "icon": "tag",
+          "span": 12,
+          "body": "Open a category under Money, Categories, such as Software or anything with a warranty, and switch on Keep receipts. Its lines then say when they still want one.",
+          "when": {
+            "metric": "receipts-categories",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "stat",
+          "heading": "Receipts",
+          "icon": "receipt-text",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "receipts-missing",
+              "label": "Lines wanting one"
+            },
+            {
+              "metric": "receipts-waiting",
+              "label": "Waiting for a line"
+            },
+            {
+              "metric": "receipts-kept-month",
+              "label": "Kept this month"
+            }
+          ],
+          "when": {
+            "any": [
+              {
+                "metric": "receipts-categories",
+                "gt": 0
+              },
+              {
+                "metric": "receipts-waiting",
+                "gt": 0
+              },
+              {
+                "metric": "receipts-kept-month",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a receipt",
+          "icon": "plus",
+          "span": 12,
+          "register": "receipts"
+        },
+        {
+          "kind": "queue",
+          "heading": "Which line is it?",
+          "icon": "ask",
+          "span": 12,
+          "source": "governance.open",
+          "where": "list is receipts",
+          "limit": 3,
+          "when": {
+            "metric": "questions-open-in:receipts",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Lines wanting a receipt",
+          "icon": "circle-alert",
+          "span": 12,
+          "source": "register.transactions",
+          "where": "receipt_wanted is true, receipt is empty, state is cleared, on at least bom-1m",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "category",
+              "label": "Category",
+              "width": "minmax(12ch,16ch)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "when": {
+            "metric": "receipts-missing",
+            "gt": 0
+          },
+          "empty": "Every line has its receipt."
+        },
+        {
+          "kind": "table",
+          "heading": "Waiting for their line",
+          "icon": "receipt-text",
+          "span": 12,
+          "source": "register.receipts",
+          "where": "state is waiting",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "shop",
+              "label": "Shop",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "picture",
+              "label": "Picture",
+              "width": "minmax(12ch,18ch)"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "when": {
+            "metric": "receipts-waiting",
+            "gt": 0
+          },
+          "empty": "Nothing waiting."
+        },
+        {
+          "kind": "table",
+          "heading": "Kept this month",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.transactions",
+          "where": "receipt is set, on at least bom",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "receipt",
+              "label": "Receipt",
+              "width": "minmax(12ch,18ch)"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No receipts this month yet."
+        }
+      ]
+    }
+  ]
+}

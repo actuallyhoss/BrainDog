@@ -1,10 +1,10 @@
 {
   "pack": "calendar",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "icon": "calendar",
   "title": "Calendar",
   "summary": "Your calendar's next events, read every hour from its secret ICS link in Google Calendar or Outlook, into a list you, your widgets and your agents can read. The link stays in your keys. Nothing is written back to the calendar.",
-  "changes": "Its Next meetings widget says what it shows in the sheet, with its own icon and example, as BrainDog’s copy of it did.",
+  "changes": "Its page is Events now, at its own address: BrainDog's own Calendar holds the old one, so the add-on could not be installed beside it.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -94,6 +94,9 @@
         "events",
         "schedule",
         "appointments"
+      ],
+      "leads": [
+        "events"
       ]
     },
     {
@@ -148,7 +151,10 @@
           "place": "Phone"
         }
       ],
-      "icon": "calendar-days"
+      "icon": "calendar-days",
+      "leads": [
+        "events"
+      ]
     }
   ],
   "declarations": [
@@ -270,6 +276,22 @@
       "compare": "none"
     },
     {
+      "metric": "events-later",
+      "name": "Events after today",
+      "pack": "calendar",
+      "source": "register.events",
+      "where": "gone is not true, day after today",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "metric": "events-today",
       "name": "Events today",
       "pack": "calendar",
@@ -286,8 +308,8 @@
       "compare": "none"
     },
     {
-      "page": "calendar",
-      "title": "Calendar",
+      "page": "events",
+      "title": "Events",
       "pack": "calendar",
       "nav": {
         "section": "Life",
@@ -312,11 +334,55 @@
           "kind": "note",
           "lead": true,
           "span": 12,
+          "body": "Nothing on today, and {{events-later}} coming up in the next sixty days.",
           "when": {
-            "metric": "events-ahead",
-            "gt": 0
-          },
-          "body": "{{events-today}} today, {{events-ahead}} in the next sixty days."
+            "all": [
+              {
+                "metric": "events-later",
+                "gt": 0
+              },
+              {
+                "metric": "events-today",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{events-today}} on today, and nothing after it in the next sixty days.",
+          "when": {
+            "all": [
+              {
+                "metric": "events-today",
+                "gt": 0
+              },
+              {
+                "metric": "events-later",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{events-today}} on today, and {{events-later}} coming up in the next sixty days.",
+          "when": {
+            "all": [
+              {
+                "metric": "events-ahead",
+                "gt": 0
+              },
+              {
+                "metric": "events-today",
+                "gt": 0
+              }
+            ]
+          }
         },
         {
           "kind": "table",
@@ -333,11 +399,6 @@
             {
               "field": "time",
               "label": "At",
-              "width": "7ch"
-            },
-            {
-              "field": "until",
-              "label": "Until",
               "width": "7ch"
             },
             {

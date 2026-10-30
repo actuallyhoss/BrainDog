@@ -1,0 +1,278 @@
+{
+  "format": 1,
+  "made_at": "2026-10-30T18:09:05.083Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "One circle: {{circles-month}} goes in each month, and {{circles-payouts}} comes back to you.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "is": 1,
+                "metric": "circles-count"
+              },
+              {
+                "gt": 0,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "One circle: {{circles-month}} goes in each month, and your payout has come.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "is": 1,
+                "metric": "circles-count"
+              },
+              {
+                "lt": 1,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{circles-count}} circles: {{circles-month}} goes in each month, and {{circles-payouts}} comes back to you.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 1,
+                "metric": "circles-count"
+              },
+              {
+                "gt": 0,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{circles-count}} circles: {{circles-month}} goes in each month, and every payout has come.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 1,
+                "metric": "circles-count"
+              },
+              {
+                "lt": 1,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h-4",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Start one below: give it a name, the people in it, each month's part, your turn and the first month.",
+          "heading": "No circle yet",
+          "icon": "piggy-bank",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "circles-count"
+          },
+          "key": "k03qmtve",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "In each month",
+              "metric": "circles-month"
+            },
+            {
+              "label": "Payouts to come",
+              "metric": "circles-payouts"
+            },
+            {
+              "label": "Turns to come",
+              "metric": "circles-payouts-count"
+            }
+          ],
+          "heading": "Your circles",
+          "icon": "piggy-bank",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "circles-count"
+          },
+          "key": "k0urhrdx",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Circle",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "circle_members",
+              "label": "People",
+              "width": "8ch"
+            },
+            {
+              "align": "end",
+              "field": "circle_part",
+              "label": "A month",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "circle_turn",
+              "label": "Your turn",
+              "width": "10ch"
+            },
+            {
+              "align": "end",
+              "field": "circle_payout",
+              "label": "Payout",
+              "width": "14ch"
+            },
+            {
+              "field": "circle_payout_on",
+              "label": "On",
+              "width": "13ch"
+            },
+            {
+              "field": "state",
+              "label": "Status",
+              "width": "10ch"
+            }
+          ],
+          "empty": "No circles yet.",
+          "heading": "Every circle",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "circle_payout_on"
+            }
+          ],
+          "source": "register.plans",
+          "span": 12,
+          "where": "circle_members is set",
+          "key": "k1ke4ml5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Circle",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "circle_said",
+              "label": "What it says",
+              "width": "minmax(24ch,2fr)"
+            }
+          ],
+          "empty": "Nothing to fix.",
+          "heading": "What happened",
+          "icon": "circle-alert",
+          "kind": "table",
+          "limit": 10,
+          "source": "register.plans",
+          "span": 12,
+          "where": "circle_members is set, circle_payout is empty, circle_said is set",
+          "key": "k00he8s9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Start a circle",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "plans",
+          "span": 12,
+          "key": "k04d5fd2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        }
+      ],
+      "icon": "piggy-bank",
+      "nav": {
+        "order": 36,
+        "section": "Money"
+      },
+      "pack": "savings-circle",
+      "page": "savings-circles",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "title": "Savings circles",
+      "read_at": "2026-10-30T18:09:05.083Z",
+      "zone": "UTC",
+      "look": {
+        "look": "savings-circles",
+        "basis": "r1vcxc9k",
+        "by": "rule",
+        "hide": [
+          "k1ke4ml5",
+          "k00he8s9"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

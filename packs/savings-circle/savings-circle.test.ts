@@ -65,7 +65,7 @@ const metric = async (api: Api, id: string): Promise<Reading> => said<Reading>(a
 
 test('THE FILE: savings-circle 1.0.0 on money-core, fields laid on Plans, one rule and its script, one page', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['savings-circle', '1.1.0', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['savings-circle', '1.2.0', 'Apache-2.0']);
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), []);
   assert.deepEqual(kinds('page'), ['savings-circles']);
@@ -99,6 +99,21 @@ test('A CIRCLE OF TEN WRITES TEN MONTHS OUT AND ONE PAYOUT IN, on your month, an
   said(api.kernel.update('plans', plan, { circle_turn: 5 } as never, { actor: 'p_1' }));
   await settle(api);
   assert.equal(rowsOf(api, 'installments', { all: [{ field: 'plan_row', is: plan }] }).length, 11, 'a circle with months is never made twice');
+  close();
+});
+
+test('A CIRCLE ALREADY UNDER WAY: the months before today are paid, the payout too once its day is gone, and its days are words', async () => {
+  const { api, close } = await fresh();
+  /* NOW is 26 Oct 2026: August, September and October are gone, November is not; the turn is the second month. */
+  const plan = make(api, 'plans', { name: 'Street circle', circle_members: 4, circle_part: egp(100_000), circle_turn: 2, circle_first: '2026-08-01' });
+  await settle(api);
+  const parts = rowsOf(api, 'installments', { all: [{ field: 'plan_row', is: plan }] });
+  const out = parts.filter((p) => p.fields.direction === 'out').sort((a, b) => String(a.fields.due).localeCompare(String(b.fields.due)));
+  assert.deepEqual(out.map((p) => p.fields.state), ['paid', 'paid', 'paid', 'open']);
+  assert.equal(parts.find((p) => p.fields.direction === 'in')!.fields.state, 'paid', 'the payout on 1 Sep has come');
+  const said = String(fieldsOf(api, plan).circle_said);
+  assert.match(said, /^Made 4 months from 1 Aug, and your payout on 1 Sep\. The 3 months before today are marked paid/);
+  assert.doesNotMatch(said, /\d{4}-\d{2}-\d{2}/, 'no day is said as the record keeps it');
   close();
 });
 

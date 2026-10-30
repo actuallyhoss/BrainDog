@@ -9,8 +9,10 @@
 import { forward, forwards, recordsAnswer, startRecord } from '../../gates/record.mjs';
 
 export async function open() {
-  /* WITH ONE AUTOMATION RUN AND ONE JOB (`runs`), so the screens of a run have one to draw. */
-  const record = await startRecord(0, { runs: true });
+  /* WITH ONE AUTOMATION RUN AND ONE JOB (`runs`), so the screens of a run have one to draw, AND THE APP'S OWN CATALOGUE
+     (`catalogue`), so the store lists every add-on as last published and a new one can be installed and looked at
+     before it is deployed. */
+  const record = await startRecord(0, { runs: true, catalogue: true });
   return {
     name: 'seed',
     record: 'the seed',

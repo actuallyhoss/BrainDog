@@ -1,10 +1,10 @@
 {
   "pack": "subscriptions",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icon": "refresh",
   "title": "Subscriptions",
   "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
-  "changes": "Brings its Subscriptions widget for Today, which was BrainDog’s own until now.",
+  "changes": "Its page says one subscription as one, and says what you hardly use as a sentence.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -443,7 +443,21 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{subs-count}} subscriptions: {{subs-month}} a month, {{subs-year}} a year."
+          "body": "One subscription: {{subs-month}} a month, {{subs-year}} a year.",
+          "when": {
+            "metric": "subs-count",
+            "is": 1
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{subs-count}} subscriptions: {{subs-month}} a month, {{subs-year}} a year.",
+          "when": {
+            "metric": "subs-count",
+            "gt": 1
+          }
         },
         {
           "kind": "note",
@@ -641,7 +655,7 @@
           "heading": "Hardly used",
           "icon": "circle-alert",
           "span": 12,
-          "body": "{{subs-unused}} you hardly use cost {{subs-unused-month}} a month.",
+          "body": "You hardly use {{subs-unused}} of them, and they cost {{subs-unused-month}} a month.",
           "when": {
             "metric": "subs-unused",
             "gt": 0

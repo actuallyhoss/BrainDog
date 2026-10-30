@@ -12,6 +12,11 @@
  * the payout and its day.
  *
  * IT NEVER ADDS TO A PLAN THAT HAS PARTS, so saving the plan twice does not make the circle twice. At most 60 months.
+ *
+ * A CIRCLE ALREADY UNDER WAY (2.0.0). A first month before today is a circle he joined before he wrote it down, so the
+ * months already gone are written paid, and the payout too when his turn has been: written open, each one read as late
+ * on Today and the Calendar the moment the circle was saved. The plan says so, so a month he did not pay is one he
+ * changes on Instalments. And its days are said as a person says them, "1 Oct", never `2026-10-01`.
  */
 
 const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -40,6 +45,22 @@ export function monthsOf(f) {
   return { parts, payout: { due: addMonths(f.circle_first, f.circle_turn - 1), amount: f.circle_part.amount * n }, currency: f.circle_part.currency };
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A day as a person says it: "1 Oct", with the year when it is not `year`'s. */
+export function dayWords(day, year) {
+  const said = Number(day.slice(8, 10)) + ' ' + MONTHS[Number(day.slice(5, 7)) - 1];
+  return day.slice(0, 4) === year ? said : said + ' ' + day.slice(0, 4);
+}
+
+/** What the plan says once its months are made: how many, from when, the payout's day, and what was taken as paid. */
+export function madeWords(n, first, payout, today, paid) {
+  const year = today.slice(0, 4);
+  const made = 'Made ' + n + ' months from ' + dayWords(first, year) + ', and your payout on ' + dayWords(payout, year) + '.';
+  if (paid === 0) return made;
+  return made + ' ' + (paid === 1 ? 'The month before today is' : 'The ' + paid + ' months before today are') + ' marked paid; change any you did not pay on Instalments.';
+}
+
 export default async function run(ctx) {
   const id = ctx.input && ctx.input.id;
   if (!id) return;
@@ -61,6 +82,8 @@ export default async function run(ctx) {
   }
   const account = typeof f.account === 'string' && f.account !== '' ? { account: f.account } : {};
   const n = made.parts.length;
+  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);
+  const gone = (day) => day < today;
   made.parts.forEach((p, i) => {
     ctx.write('installments', {
       what: f.name + ', month ' + (i + 1) + ' of ' + n,
@@ -71,7 +94,7 @@ export default async function run(ctx) {
       direction: 'out',
       amount: { amount: p.amount, currency: made.currency },
       due: p.due,
-      state: 'open',
+      state: gone(p.due) ? 'paid' : 'open',
       ...account,
     });
   });
@@ -82,10 +105,10 @@ export default async function run(ctx) {
     direction: 'in',
     amount: { amount: made.payout.amount, currency: made.currency },
     due: made.payout.due,
-    state: 'open',
+    state: gone(made.payout.due) ? 'paid' : 'open',
     ...account,
   });
-  say('Made ' + n + ' months from ' + f.circle_first + ', and your payout on ' + made.payout.due + '.', {
+  say(madeWords(n, f.circle_first, made.payout.due, today, made.parts.filter((p) => gone(p.due)).length), {
     circle_payout: { amount: made.payout.amount, currency: made.currency },
     circle_payout_on: made.payout.due,
   });

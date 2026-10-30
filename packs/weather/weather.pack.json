@@ -1,10 +1,10 @@
 {
   "pack": "weather",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icon": "sun",
   "title": "Weather",
   "summary": "The weather where you are, today and the next six days, from Open-Meteo: free, with no key and no account. Set your town on this page and it is kept in step every three hours.",
-  "changes": "Its Weather widget says what it shows in the sheet, with its own icon and example, as BrainDog’s copy of it did.",
+  "changes": "Temperatures read 21° and the chance of rain 70%, and the page says where to set your town.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -58,7 +58,7 @@
           },
           {
             "field": "rain",
-            "label": "Chance of rain %",
+            "label": "Rain",
             "as": "fact"
           },
           {
@@ -127,7 +127,7 @@
           },
           {
             "field": "rain",
-            "label": "Rain %"
+            "label": "Rain"
           }
         ],
         "order": [
@@ -212,19 +212,22 @@
         {
           "id": "high",
           "label": "High",
-          "type": "decimal"
+          "type": "decimal",
+          "unit": "°"
         },
         {
           "id": "low",
           "label": "Low",
-          "type": "decimal"
+          "type": "decimal",
+          "unit": "°"
         },
         {
           "id": "rain",
-          "label": "Chance of rain %",
+          "label": "Chance of rain",
           "type": "int",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "unit": "%"
         },
         {
           "id": "code",
@@ -331,7 +334,7 @@
             "metric": "weather-days",
             "lt": 1
           },
-          "body": "No weather yet. Set your town under Place on this add-on's settings, and the forecast arrives within three hours."
+          "body": "No weather yet. Set your town under Place in this add-on's settings (Add-ons, Weather), and the forecast arrives within three hours."
         },
         {
           "kind": "cards",
@@ -360,7 +363,7 @@
             },
             {
               "field": "rain",
-              "label": "Chance of rain %",
+              "label": "Rain",
               "as": "fact"
             },
             {
@@ -406,7 +409,7 @@
             },
             {
               "field": "rain",
-              "label": "Rain %",
+              "label": "Rain",
               "width": "8ch"
             }
           ],

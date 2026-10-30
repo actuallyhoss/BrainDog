@@ -1,10 +1,10 @@
 {
   "pack": "receipts",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icon": "receipt-text",
   "title": "Receipts",
   "summary": "Keep a receipt on each Ledger line. Send one in on its own and it finds its line by amount and day, or asks which one. Mark the categories you keep receipts for, such as work costs or anything with a warranty, and see which lines from this month and last still want one.",
-  "changes": "Brings its Receipts widget for Today, which was BrainDog’s own until now.",
+  "changes": "Says how to start first, and shows its counts once a category keeps receipts.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -333,6 +333,17 @@
           "body": "{{receipts-missing}} lines from this month and last want a receipt, and {{receipts-waiting}} receipts wait for their line."
         },
         {
+          "kind": "note",
+          "heading": "Which categories keep receipts",
+          "icon": "tag",
+          "span": 12,
+          "body": "Open a category under Money, Categories, such as Software or anything with a warranty, and switch on Keep receipts. Its lines then say when they still want one.",
+          "when": {
+            "metric": "receipts-categories",
+            "lt": 1
+          }
+        },
+        {
           "kind": "stat",
           "heading": "Receipts",
           "icon": "receipt-text",
@@ -350,7 +361,23 @@
               "metric": "receipts-kept-month",
               "label": "Kept this month"
             }
-          ]
+          ],
+          "when": {
+            "any": [
+              {
+                "metric": "receipts-categories",
+                "gt": 0
+              },
+              {
+                "metric": "receipts-waiting",
+                "gt": 0
+              },
+              {
+                "metric": "receipts-kept-month",
+                "gt": 0
+              }
+            ]
+          }
         },
         {
           "kind": "capture",
@@ -496,17 +523,6 @@
           ],
           "limit": 50,
           "empty": "No receipts this month yet."
-        },
-        {
-          "kind": "note",
-          "heading": "Which categories keep receipts",
-          "icon": "tag",
-          "span": 12,
-          "body": "Switch on Keep receipts on a category, such as work costs or anything with a warranty, and its lines say when they still want one.",
-          "when": {
-            "metric": "receipts-categories",
-            "lt": 1
-          }
         }
       ]
     }

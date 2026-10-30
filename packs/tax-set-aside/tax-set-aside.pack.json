@@ -1,10 +1,10 @@
 {
   "pack": "tax-set-aside",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icon": "piggy-bank",
   "title": "Tax set aside",
   "summary": "For freelancers and a small business: give a category of money in a tax rate, and every payment in it says what to put aside. See this year's set aside, what you paid the tax office, what your tax account holds against it, and the tax bills still to pay.",
-  "changes": "Brings its Tax set aside widget for Today, which was BrainDog’s own until now.",
+  "changes": "Says how to give a category its rate, and shows the tax account only once you have one.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -397,14 +397,18 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{tax-aside-year}} set aside this year, {{tax-paid-year}} paid."
+          "body": "{{tax-aside-year}} set aside this year, {{tax-paid-year}} paid.",
+          "when": {
+            "metric": "tax-rated",
+            "gt": 0
+          }
         },
         {
           "kind": "note",
           "heading": "No rate yet",
           "icon": "piggy-bank",
           "span": 12,
-          "body": "Give a category of money in a tax rate below, such as Client work at 25%, and each payment in it says what to put aside.",
+          "body": "Open a category below, such as Client work, and set Tax to set aside, say 25%. Each payment in it then says what to put aside.",
           "when": {
             "metric": "tax-rated",
             "lt": 1
@@ -423,10 +427,6 @@
             {
               "metric": "tax-paid-year",
               "label": "Paid"
-            },
-            {
-              "metric": "tax-pot",
-              "label": "In the tax account"
             },
             {
               "metric": "tax-due",
@@ -453,6 +453,25 @@
               {
                 "metric": "tax-pots",
                 "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "Tax account",
+          "icon": "landmark",
+          "span": 12,
+          "body": "{{tax-pot}} in the tax account, against {{tax-aside-year}} set aside this year.",
+          "when": {
+            "all": [
+              {
+                "metric": "tax-rated",
+                "gt": 0
+              },
+              {
+                "metric": "tax-pots",
+                "gt": 0
               }
             ]
           }
@@ -592,8 +611,8 @@
             },
             {
               "field": "tax_paid",
-              "label": "Tax payments",
-              "width": "14ch"
+              "label": "Counts as tax paid",
+              "width": "18ch"
             }
           ],
           "order": [

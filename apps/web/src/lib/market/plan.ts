@@ -177,11 +177,22 @@ export type Sheet = {
 function namer(nameOf: (id: string) => string): (id: string) => string {
   return (id) => {
     const said = nameOf(id);
-    if (said !== '' && said !== id) return said;
+    /* AN ID WITH A CAPITAL IS STILL AN ID: a namer that knew nothing better answered `rule.subscriptions_price` as
+       "Rule.subscriptions_price", and the sheet drew it. */
+    if (said !== '' && said.toLowerCase() !== id.toLowerCase()) return said;
     const bare = id.includes('.') ? id.slice(id.indexOf('.') + 1) : id;
     return (bare.charAt(0).toUpperCase() + bare.slice(1)).replace(/[_-]/gu, ' ');
   };
 }
+
+/** An id as words when nothing names it: `trial_ends` is "trial ends". */
+const spacedId = (id: string): string => id.replace(/[_-]/gu, ' ');
+
+/**
+ * What a line under Adds says beside its name. A list says its fields; a page, a rule and a script say nothing more,
+ * since "13 blocks", "0 actions" and "script" are the record's counting and not his.
+ */
+const addDetail = (id: string, summary: string): string | null => (/^(?:page|rule|script)\./u.test(id) ? null : summary || null);
 
 const section = (key: SectionKey, title: string, rows: Row[]): Section[] => (rows.length === 0 ? [] : [{ key, title, rows }]);
 
@@ -250,7 +261,10 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     ...list(d.newly_required).map((r) => row(name(text(r.id)), words.required(text(r.field), count(r.rows)))),
     ...list(d.renames).map((r) => row(words.renamed(name(text(r.from)), name(text(r.to))))),
     ...list(d.misreads).map((r) => row(name(text(r.id)), words.misread(name(text(r.reader)), text(r.where)))),
-    ...list(d.warnings).map((w) => row(text(w.say))),
+    /* A LIST THIS PLAN ADDS ARRIVES EMPTY, AS EVERY NEW LIST DOES, so that warning is said only of a list already here. */
+    ...list(d.warnings)
+      .filter((w) => !(/arrives empty/u.test(text(w.say)) && list(d.adds).some((a) => text(a.id) === text(w.at))))
+      .map((w) => row(text(w.say))),
     ...removals.map((r) => row(name(`register.${text(r.retire)}`), text(r.line))),
   ];
 
@@ -260,7 +274,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     move: installed && installed !== version ? words.updateAvailable : '',
     sections: [
       ...addsSection(
-        list(d.adds).filter((a) => !text(a.id).startsWith('metric.')).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : text(a.summary) || null)),
+        list(d.adds).filter((a) => !text(a.id).startsWith('metric.')).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : addDetail(text(a.id), text(a.summary)))),
         list(d.adds).filter((a) => text(a.id).startsWith('metric.')).length,
       ),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),
@@ -271,11 +285,15 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
         return row(name(text(k.id)), adds.length > 0 ? words.keptAdds(adds) : typeof k.rebased === 'string' ? words.keptRebased : words.keptOwn);
       })),
       ...section('stays', words.stays, list(d.stays).map((s) => row(name(text(s.id)), words.staysLine(strings(s.values), count(s.rows))))),
-      ...section('extends', words.extends, list(d.extends).filter((e) => !isMap(e.refusal)).map((e) => row(name(text(e.id)), words.extendsLine(strings(e.adds))))),
+      ...section('extends', words.extends, list(d.extends).filter((e) => !isMap(e.refusal)).map((e) => {
+        const listId = text(e.id).replace(/^register\./u, '');
+        /* EACH FIELD BY ITS LABEL, "Free trial ends", never `trial_ends`. */
+        return row(name(text(e.id)), words.extendsLine(strings(e.adds).map((f) => fieldOf?.(listId, f)?.trim() || spacedId(f))));
+      })),
       ...section('page-adds', words.pageAdds, list(d.page_adds).filter((p) => !isMap(p.refusal)).map((p) => row(name(`page.${text(p.page)}`), text(p.line) || null))),
       ...section('settings', words.settings, list(d.config).map((c) => {
         const value = typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean' ? String(c.value) : JSON.stringify(c.value ?? null);
-        return row(text(c.key).replace(/_/gu, ' '), c.from === 'kept' || c.from === 'given' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);
+        return row(name(`config.${text(c.key)}`), c.from === 'kept' || c.from === 'given' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);
       })),
       ...section('examples', words.examples, count(seeds.count) === 0 ? [] : [row(words.examplesLine(count(seeds.count)), seedRows.map((r) => `${name(`register.${text(r.register)}`)} ${words.examplesIn(count(r.rows))}`).join(', ') || null)]),
       ...section('teaches', words.skills, list(d.skills).map((s) => row(text(s.name).replace(/-/gu, ' '), words.skillLine(text(s.trigger), text(s.what))))),

@@ -38,18 +38,26 @@
 
 import { randomBytes } from 'node:crypto';
 import { argv } from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { start } from '../../apps/selfhost/src/server.ts';
 import { startCloud } from '../../apps/worker/test/cloud-serve.ts';
 import { httpStatus } from '../../packages/host/src/index.ts';
 import { NOW, ORDER, ROWS, declarations, forWrite, ingestDeclarations, installSeed, metricDeclarations, pageDeclarations } from '../../packages/seed/src/index.ts';
+import { FIRST_PARTY, firstPartyDocument } from '../../packages/seed/src/packs-entry.ts';
 
 import { budget } from './lib.mjs';
 /* THE LIVED RECORD (`lived.mjs`), the gates' second record, built by living in it rather than seeded. PRF-B06
    draws it here as a variant; until then it is handed on from this door, so a gate and the look reach both records
    through one module, and the runner reads `lived.mjs` as the library it is rather than a gate nobody registered. */
 export { buildLived, openLived } from './lived.mjs';
+
+/**
+ * The app's own catalogue folder, the one the build ships beside the shell: every add-on as it was last published, read
+ * from the disk. `catalogue: true` hands it to the record (`startRecord`), so an add-on published since the last deploy
+ * is listed in the store and installs, with the public Kennel still off.
+ */
+export const CATALOGUE = fileURLToPath(new URL('../../apps/web/static/catalogue', import.meta.url));
 
 /** Each running record's server key, by its base. Here and nowhere else. */
 const KEYS = new Map();
@@ -263,12 +271,35 @@ async function startCloudRecord() {
 }
 
 /**
+ * BrainDog's six modules installed as packs, with no example rows, the way `lived.mjs` puts them in: planned, then
+ * installed with exactly what the plan asked to approve. Before `installSeed`, whose lists and pages then land on
+ * lists and pages a pack already owns, so the record holds the seed's rows and says it holds Money 3.x.
+ */
+async function asModules(api) {
+  const owner = { principal: { kind: 'person', id: 'p_seed', level: 'owner' } };
+  for (const id of FIRST_PARTY) {
+    const doc = firstPartyDocument(id, { seeds: [] });
+    const planned = await api.planPack({ doc, source: { kind: 'local' } }, owner);
+    if (!planned.ok) throw new Error(`the gate's record could not plan the ${id} module: ${planned.refusal?.fix ?? 'no reason given'}`);
+    const { planHash, approve } = planned.value.diff;
+    const put = await api.installPack({ doc, source: { kind: 'local' }, planHash, approve }, owner);
+    if (!put.ok) throw new Error(`the gate's record could not install the ${id} module: ${put.refusal?.fix ?? 'no reason given'}`);
+  }
+}
+
+/**
  * Start one. `{ base, now, ask, setPref, close, server, variants }`, where `base` is `http://127.0.0.1:<port>`, `now` its
  * clock and `ask` and `setPref` its own doors with the gate's key (`recordAt`).
  *
- * `pollMs: 0` because nothing is ever delivered from a gate's record, and a ticker is a timer.
+ * `pollMs: 0` because nothing is ever delivered from a gate's record, and a ticker is a timer. EXCEPT WITH THE CATALOGUE,
+ * whose record runs the belt each second, so a rule an add-on installs runs its script (Splits works out who owes what,
+ * Tax set aside what to put by) and the look sees the add-on working. Outbound stays off (`actions` is never passed),
+ * so a script that would call another server, Weather's or Calendar's, is held and nothing leaves this machine.
  *
  * `fresh` MAKES IT A FIRST TODAY instead of the seed: the seed's lists and pages and a few entries (`freshen`).
+ *
+ * `catalogue` LETS ITS STORE LIST AND INSTALL every add-on in the app's own catalogue (`CATALOGUE`), with BrainDog's
+ * modules in as packs first (`asModules`) so a money add-on finds Money. The look and the command line ask for it.
  *
  * `open` IS FOR THE COMMAND LINE: `vite dev` proxies `/api` to it directly and cannot add a bearer, so that
  * record is the open self-host it always was, at the origin the dev server serves the app from.
@@ -278,7 +309,7 @@ async function startCloudRecord() {
  * call and not from a second one in the gate: `test/handles.test.mjs` holds every gate to closing what it opened in the
  * `finally` of the `try` it opened it in, and four records under one handle are one close.
  */
-export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false } = {}) {
+export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false, catalogue = false } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
   /* THE CLOUD IS ANOTHER HOST, NOT THIS ONE WITH SOMETHING ADDED, so none of what follows is asked of it. */
   if (variant === 'cloud') return startCloudRecord();
@@ -289,7 +320,7 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
     port,
     host: '127.0.0.1',
     now: NOW,
-    pollMs: 0,
+    pollMs: catalogue ? 1_000 : 0,
     sessionKey: new Uint8Array(randomBytes(32)),
     /* NO PUBLIC KENNEL. Left to the environment, the record read `https://app.brain.dog/api/kennel/v1/` for every catalogue
        index and preview, so a screen waited on another host for up to five seconds a file: `/packs/browse` asks for a
@@ -297,6 +328,11 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
        timeout before it could name a single seed, which `self-test` read as four negatives passed. A gate measures
        this record and nothing on the network. */
     kennel: { kennel: 'off', fetch: () => Promise.reject(new Error('the gates read no Kennel')), now: () => NOW },
+    /* THE APP'S OWN CATALOGUE, ASKED FOR BY THE LOOK AND THE COMMAND LINE. With the Kennel off and no folder, the store
+       listed nothing, so an add-on published since the last deploy could not be opened anywhere before that deploy. The
+       folder is on this disk, so nothing waits on the network. No gate asks for it: their sweeps measure the seed as it
+       ships, and a gate's `/packs/browse` stays the empty store it has always measured. */
+    ...(catalogue ? { catalogue: CATALOGUE } : {}),
     ...(key === undefined ? {} : { token: key }),
     ...(origin === undefined ? {} : { origin }),
   });
@@ -311,6 +347,10 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   try {
     const named = running.api.kernel.createRecord(IDENTITY);
     if (!named.ok) throw new Error(`the gate's record could not be named: ${named.refusal?.fix ?? 'no reason given'}`);
+    /* WITH THE CATALOGUE, BRAINDOG'S MODULES GO IN FIRST AS THE PACKS A PERSON'S RECORD HOLDS THEM AS (`asModules`), so
+       an add-on that needs Money finds it: the seed alone writes Money's lists as the record's own, and the store
+       refused every money add-on with "Needs Money, which this record does not have". */
+    if (catalogue && !fresh) await asModules(running.api);
     /* `fresh` IS A FIRST TODAY: the seed's lists and pages, and a few entries put in by hand (`freshen`). */
     const seeded = fresh ? await freshen(running.api.kernel) : await installSeed(running.api.kernel);
     if (!seeded.ok) throw new Error(`the gate's record could not take the seed: ${seeded.refusal?.fix ?? 'no reason given'}`);
@@ -596,7 +636,7 @@ export async function answers(origin) {
    `Origin` the proxy passes on, and an open self-host answers only its own names. */
 if (argv[1] && import.meta.url === pathToFileURL(argv[1]).href) {
   const { port } = budget('record');
-  const { base, server } = await startRecord(port, { open: true, origin: 'http://localhost:5183' });
+  const { base, server } = await startRecord(port, { open: true, origin: 'http://localhost:5183', catalogue: true });
   server.ref();
   console.log(`  record: ${base}, the seed at ${new Date(NOW).toISOString().slice(0, 10)}. Stop it with Ctrl+C.`);
 }

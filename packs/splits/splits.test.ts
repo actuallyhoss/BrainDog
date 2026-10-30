@@ -64,7 +64,7 @@ const metric = async (api: Api, id: string): Promise<Reading> => said<Reading>(a
 
 test('THE FILE: splits 1.0.0 on money-core, two lists, one script for two rules, two pages, two fields on the Ledger', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['splits', '1.1.0', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['splits', '1.2.0', 'Apache-2.0']);
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), ['splits', 'split_people']);
   assert.deepEqual(kinds('page'), ['splits', 'split-person']);
@@ -136,5 +136,8 @@ test('THE PAGES draw with nothing refused', async () => {
   assert.ok(found, 'the person has a page of their own');
   const theirs = said<{ blocks: Block[] }>(api.kernel.page(found.slug));
   for (const b of theirs.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
+  /* WHERE THEY STAND IS A CARD OVER THEIR ROW: a note filled from the row printed "to_me: [object Object]." */
+  assert.equal(theirs.blocks[0]!.kind, 'cards');
+  assert.ok(!theirs.blocks.some((b) => b.kind === 'note' && /\{\{(?:stands|way)\}\}/u.test(String((b as { body?: unknown }).body ?? ''))), 'a note fills a money field from the row');
   close();
 });
