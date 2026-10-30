@@ -616,6 +616,14 @@ export function existingRow(
         bound.push(typeof v === 'number' ? v : String(v));
         continue;
       }
+      /* AND A MONEY FIELD THE SAME, BUT FOR ITS TWO PARTS AT ONCE: a statement line holds no "available after" and an
+         alert does, so the line is asked of `duplicate` too, which still holds at least one money field to agree. */
+      if (near !== undefined && (type === 'money' || type === 'quantity')) {
+        if (v === undefined || v === null) continue;
+        terms.push(`(${sql} = ? OR json_extract(fields, '${jsonPath(field)}') IS NULL)`);
+        bound.push(typeof v === 'number' ? v : String(v));
+        continue;
+      }
       terms.push(`${sql} = ?`);
       bound.push(v === undefined || v === null ? null : typeof v === 'number' ? v : String(v));
     }
@@ -642,12 +650,15 @@ export function existingRow(
   if (duplicate === undefined) return undefined;
 
   let window = '';
+  const around: string[] = [];
   if (near !== undefined) {
     const day = extracted[near.day];
-    const around = neighbours(typeof day === 'string' ? day : '');
-    if (around === undefined) return undefined;
+    /* AS WIDE AS A PAIR THAT CAME BY TWO ROADS MAY BE APART (`NEAR_ACROSS_DAYS` in `@braindog/extract`): `duplicate`
+       holds two rows that hold the same fields to one day, as it always did. */
+    const wide = neighbours(typeof day === 'string' ? day : '', ACROSS_DAYS);
+    if (wide === undefined) return undefined;
     window = ` AND json_extract(fields, '${jsonPath(near.day)}') BETWEEN ? AND ?`;
-    bound.push(around[0], around[1]);
+    around.push(wide[0], wide[1]);
   }
 
   const where = terms.length > 0 ? ` AND ${terms.join(' AND ')}` : '';
@@ -655,9 +666,48 @@ export function existingRow(
     `SELECT id, seq, fields FROM entry WHERE register = ? AND deleted_at IS NULL${where}${window}`,
     register,
     ...bound,
+    ...around,
   );
-  return candidates.find((row) => duplicate(extracted as Record<string, Json>, JSON.parse(row.fields) as Record<string, Json>, dedupe));
+  const mine = extracted as Record<string, Json>;
+  const read = (row: { fields: string }): Record<string, Json> => JSON.parse(row.fields) as Record<string, Json>;
+  const matched = candidates.filter((row) => duplicate(mine, read(row), dedupe));
+  if (near === undefined || matched.length === 0) return matched[0];
+
+  /* THE SAME FIELDS HELD AND AGREEING IS THE SAME PAYMENT, first. */
+  const held = (x: Record<string, Json>, f: string): boolean => Object.hasOwn(x, f) && x[f] !== undefined && x[f] !== null;
+  const across = (row: Record<string, Json>): boolean => near.on.some((f) => held(mine, f) !== held(row, f));
+  const strong = matched.find((row) => !across(read(row)));
+  if (strong !== undefined) return strong;
+
+  /**
+   * A ROW MATCHED ONLY ACROSS TWO ROADS IS OURS ONLY IF NOTHING ELSE CLAIMED IT, ONE TO ONE. A statement line with no
+   * reference matches every alert of its amount and payee in its days; the first alert is its other sighting, and a
+   * second alert with another reference is a second payment. So a line already met by a row that holds what it lacks,
+   * and that is not this arrival again, belongs to that row, and the arrival is written. Two of one coffee on one day
+   * stay two.
+   */
+  const near3 = deps.sql.all<{ id: string; seq: number; fields: string }>(
+    `SELECT id, seq, fields FROM entry WHERE register = ? AND deleted_at IS NULL${window}`,
+    register,
+    ...around,
+  );
+  const day = (row: Record<string, Json>): number => Date.parse(`${String(row[near.day] ?? '')}T00:00:00Z`);
+  const at = day(mine);
+  const free = matched
+    .filter((row) => {
+      const w = read(row);
+      return !near3.some((other) => {
+        if (other.id === row.id) return false;
+        const o = read(other);
+        return duplicate(o, w, dedupe) && !duplicate(mine, o, dedupe);
+      });
+    })
+    .sort((x, y) => Math.abs(day(read(x)) - at) - Math.abs(day(read(y)) - at));
+  return free[0];
 }
+
+/** How many days either side a near key looks for a row that came by another road (`NEAR_ACROSS_DAYS`, `@braindog/extract`). */
+const ACROSS_DAYS = 3;
 
 /**
  * `43 §5.1` step 6. Where a row goes: a register, or the `by` ids that nothing matched.
@@ -697,11 +747,11 @@ export function named(dedupe: Dedupe | null | undefined): string[] {
  * THE CALENDAR HAS THE LAST WORD, as it does in `dedupe.ts`: `2026-02-30` is a shape and not a day,
  * and a window built around one would be a day out at exactly the boundary the window exists for.
  */
-function neighbours(day: string): [string, string] | undefined {
+function neighbours(day: string, days = 1): [string, string] | undefined {
   if (day.length !== 10 || day[4] !== '-' || day[7] !== '-') return undefined;
   const at = Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)));
   if (!Number.isFinite(at) || new Date(at).toISOString().slice(0, 10) !== day) return undefined;
-  return [new Date(at - 86_400_000).toISOString().slice(0, 10), new Date(at + 86_400_000).toISOString().slice(0, 10)];
+  return [new Date(at - days * 86_400_000).toISOString().slice(0, 10), new Date(at + days * 86_400_000).toISOString().slice(0, 10)];
 }
 
 /**
