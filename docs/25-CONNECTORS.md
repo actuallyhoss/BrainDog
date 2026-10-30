@@ -373,8 +373,9 @@ expect:
 
 Operators: `eq`/`ne` · `is`/`is_not` · `present`/`absent` · `contains`/`starts`/`ends` (capped at 40
 bytes, the same cap as the `where:` grammar) · `len_lte`/`len_gte`. `is`/`is_not` compare a bare literal
-with no substitution — `is: list` is the string `"list"`; `eq`/`ne` substitute placeholders first —
-`eq: "{since:date}"` is npm's clamp check ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D10). **No
+with no substitution — `is: list` is the string `"list"`; `eq`/`ne` and `contains`/`starts`/`ends` substitute
+placeholders first — `eq: "{since:date}"` is npm's clamp check, and `starts: "{since:date}"` above reads
+Plausible's echoed range, which it writes as instants ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D10). **No
 combinators, no nesting.** A
 list is implicitly `all` — the moment `expect:` gets an `any:` it is a predicate language, and this
 is an assertion about *someone else's* response, so it should stay dumber than the one about your

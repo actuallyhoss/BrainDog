@@ -267,6 +267,22 @@ test('the three string operators are byte-wise and only over a string', () => {
   assert.equal(checked({ path: 'has_more', contains: 'fals' }).ok, false);
 });
 
+/* `25 §5.1`'s OWN EXAMPLE, `starts: "{since:date}"`, which read bare could never match: Plausible echoes its range
+   as instants, and the check is whether the first one starts on the day the window asked for. */
+test('the three string operators substitute the literal, as eq does', () => {
+  const echoed = { query: { date_range: ['2026-01-01T00:00:00+02:00', '2026-01-02T00:00:00+02:00'] } };
+  const range = (e: Expect) => expect(decl({ expect: [e] }), echoed, WINDOW, TZ);
+  assert.equal(range({ path: 'query.date_range[0]', starts: '{since:date}' }).ok, true);
+  assert.equal(range({ path: 'query.date_range[0]', contains: '{since:date}T' }).ok, true);
+  assert.equal(range({ path: 'query.date_range[1]', starts: '{until:date}' }).ok, true);
+  /* A window that moved fails, and says the day it wanted rather than the placeholder. */
+  const moved = expect(decl({ expect: [{ path: 'query.date_range[0]', starts: '{since:date}' }] }), echoed, { ...WINDOW, since: Date.parse('2025-12-30T22:00:00.000Z') }, TZ);
+  assert.equal(moved.ok, false);
+  assert.ok(!moved.ok && moved.failed.wanted === 'something starting "2025-12-31"');
+  /* A brace group that is no placeholder is still literal text. */
+  assert.equal(expect(decl({ expect: [{ path: 'q', contains: '{x}' }] }), { q: 'a {x} b' }, WINDOW, TZ).ok, true);
+});
+
 test('len_lte and len_gte read a string or a list and nothing else', () => {
   assert.equal(checked({ path: 'data', len_lte: 3 }).ok, true);
   assert.equal(checked({ path: 'data', len_gte: 4 }).ok, false);

@@ -471,8 +471,8 @@ and stops with `PULL_SHAPE_MISMATCH` at `fetch.page.from`.
 
 `eq`/`ne` compare after placeholder substitution in the literal (`eq: "{since:date}"` is npm's clamp check);
 `is`/`is_not` compare a bare literal with no substitution (`is: list` is the string `"list"` — Stripe's `object`);
-`present`/`absent` test `readPath !== undefined`; `contains`/`starts`/`ends` are byte-wise on strings, literal
-≤ 40 bytes; `len_lte`/`len_gte` apply to strings and lists. A list value from `[]` passes only when every element
+`present`/`absent` test `readPath !== undefined`; `contains`/`starts`/`ends` substitute as `eq` does and are
+byte-wise on strings, the literal as declared ≤ 40 bytes (`starts: "{since:date}"` is Plausible's echo check); `len_lte`/`len_gte` apply to strings and lists. A list value from `[]` passes only when every element
 passes. Numbers compare as numbers, everything else as strings; `null` equals only `null`.
 
 ### 5.5 · Complexity and what is measured
@@ -694,7 +694,7 @@ ever gains it (48, not planned). Build phase 4 delivers it beside ingest and ala
 | D7 | **Four keys of 25 §3.2's example are not in v1**: `for_each` (42 §4 accepts 1–32 literals and its `Placeholder` regex has no `{each}` — an element nothing can name), `conditional`, `on_error.backoff`, `on_error.pause_after`; `limits.timeout` and `limits.max_pages` are added; 42's `calls_out` drops `for_each` | 25 §3.2, §5.3; 42 §4 (`fetch` keys, `calls_out`) |
 | D8 | **The `pull` schedule row**: states `pending \| firing \| paused`; fire → `firing` and one outbox row; the ack's `result` → `pending` with `due_at` computed by connect's `nextDue`; `dead` → `paused` plus the item; the first `due_at` at install is `now` | 25 §9; 30 §1, §8; 09 §1 |
 | D9 | **Bytes of the key hierarchy**: DEK wrap AES-256-GCM with AAD `record_id ‖ 0x1F ‖ purpose`; grant key HKDF-SHA-256, empty salt, `info = grant_id`; grant AAD `record_id ‖ 0x1F ‖ grant_id ‖ 0x1F ‖ version`; 12-byte nonces; base64url on the wire. `openSealed`/`seal` live here and the reveal route reuses them. **Landed** in `packages/host/src/sealing.ts`: the two hosts held these steps twice and byte-identically, confirmed by diffing them, with nothing enforcing it. The test came first and pins the bytes rather than a round trip, because a round trip passes just as well under a hierarchy that changed on both sides at once, which is the failure that strands every credential already deposited. Where a DEK comes from stays per host. The key type is read off `deriveKey` and never written as `CryptoKey`, which is ambient in the Worker's types and not in Node's | 12 §6; 51 |
-| D10 | **`expect:` semantics**: `is`/`is_not` compare a bare literal without substitution; `eq`/`ne` substitute placeholders first; a `[]` list is `all` | 25 §5.1 |
+| D10 | **`expect:` semantics**: `is`/`is_not` compare a bare literal without substitution; `eq`/`ne` and `contains`/`starts`/`ends` substitute placeholders first (the three string operators did not until 30 Oct 2026, so 25 §5.1's own `starts: "{since:date}"` failed every run); a `[]` list is `all` | 25 §5.1 |
 | D11 | **Window arithmetic**: `since = max(start, watermark − lookback)`, `until = min(since + max_span, end of the current grain)`, half-open; after a complete run `watermark = min(until, start of the current grain)` — today is re-asked until it ends | 25 §3.2 |
 | D12 | **Raw retention for pulls**: one `inbox_raw` row per page, `channel = pull`; a passed page keeps `sha256`, headers and byte count with `body = NULL`; a `review` page keeps its body | 25 §7 rule 8; 07 §2 |
 | D13 | **Series value shape**: `writes.unit` on the ingest (`count ms bytes money.<CUR> pct.bp`), `scale:` on the `value` mapping (integer multiplier, round half away from zero); the write-time reducer of §4.7 (`flow` sums, the four others take the latest, `n`-weighted when `n` is mapped) | 08 §3; 25 §8; 43 §4.2–§4.3 |
