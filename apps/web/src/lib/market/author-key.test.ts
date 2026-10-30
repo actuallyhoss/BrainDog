@@ -119,3 +119,29 @@ test('a kept key whose id is not its public half signs nothing', async () => {
   await edited.keep({ ...kept, key_id: '0000000000000000' });
   assert.equal(await authorKey(edited), null);
 });
+
+/* THE KEY IS THE PERSON'S, NOT THE BROWSER'S. One slot outlived sign-out, so whoever signed in next published or took
+   back the last person's add-ons as them. Each person reaches their own key, and nobody signed in reaches none. */
+test('each person signed in reaches their own key, and nobody signed in reaches none', async () => {
+  const { personStores, slotOf } = await import('./author-key.ts');
+  let now: string | null = 'p_ana';
+  const made: string[] = [];
+  const stores = personStores(
+    async () => now,
+    (person) => {
+      made.push(person);
+      return memoryStore();
+    },
+  );
+  const ana = await authorKey(await stores(), NOW);
+  now = 'p_ben';
+  const ben = await authorKey(await stores(), NOW);
+  assert.ok(ana && ben);
+  assert.notEqual(ana.key_id, ben.key_id, 'the next person signed with the last one’s key');
+  now = 'p_ana';
+  assert.equal((await authorKey(await stores(), NOW))?.key_id, ana.key_id, 'a person lost their own key');
+  assert.deepEqual(made, ['p_ana', 'p_ben']);
+  now = null;
+  assert.equal(await stores(), null);
+  assert.equal(slotOf('p_ana'), 'publisher:p_ana');
+});

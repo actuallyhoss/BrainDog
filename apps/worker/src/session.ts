@@ -20,7 +20,7 @@
  * is addressed, and one 403 answers every name that is not.
  */
 
-import { clearCookie, heldContext, readSid, sameOrigin, seeAs, SEE_AS_HEADER, sessionContext, sessionCookie, type HeldAccess } from '@braindog/host/auth';
+import { boundRequest, clearCookie, heldContext, OTHER_REQUEST, readSid, sameOrigin, seeAs, SEE_AS_HEADER, sessionContext, sessionCookie, type HeldAccess } from '@braindog/host/auth';
 import { shareOf } from '@braindog/host';
 import { OPERATION_METHOD } from '@braindog/kernel';
 import type { TokenReach } from '@braindog/kernel';
@@ -191,7 +191,7 @@ export type BearerDeps = {
    * The record's `operationGrant`: the method an operation bearer opens and who approved it, SPENT BY THE ASKING, or
    * `null` when the bearer is not one. Absent, and no operation bearer is taken, which is the Worker before operation grants.
    */
-  operation?: (record: string, bearer: string) => Promise<{ method: string; person: string } | null>;
+  operation?: (record: string, bearer: string) => Promise<{ method: string; person: string; binds?: string | null } | null>;
   /**
    * Whether the record's billing has lapsed, the Directory's `billing({ op: 'lapsed' })`. Asked only once the secret is
    * checked, so a stranger learns nothing from it. Absent, and no bearer is capped, which is the Worker before the lapse ladder.
@@ -292,6 +292,8 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
     if (!grant) return { status: 401 };
     if (grant.method !== asked)
       return { status: 403, refusal: { code: 'FORBIDDEN', fix: `This bearer was approved for one ${grant.method} and reaches nothing else. Start the device again for this.`, at: 'operation' } };
+    /* AND FOR ONE BODY, when the command named it at the start (`boundRequest`). */
+    if (!(await boundRequest(request, grant.binds))) return { status: 403, refusal: OTHER_REQUEST };
     const admitted = await heldBy(deps, record, grant.person, slug, nameOf);
     if ('status' in admitted) return admitted;
     return lapseOf(lapsedOf, record, grant.method, {

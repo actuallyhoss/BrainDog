@@ -150,9 +150,14 @@ const PATH = /^[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?(?:\.[A-Za-z][A-Za-z0-9_-]*(?:#\d+
  * link goes to somebody else's host wearing the shape of an internal path. `/\evil.com` is the same
  * thing — the URL parser treats a backslash in the authority position as a slash. Both were passing
  * here, out of a record whose text is written by agents.
+ *
+ * NO CONTROL CHARACTER ANYWHERE IN IT. The URL parser drops every tab, line feed and carriage return before it reads
+ * an address, so `/\t/evil.example` passed the slash test above as a path and reached the browser as `//evil.example`.
+ * Nothing a person writes as a link carries a control character, so any of them (C0, DEL and C1) is refused outright.
  */
 export function safeHref(href: string): string | null {
   const h = href.trim();
+  if (/\p{Cc}/u.test(h)) return null;
   if (h.startsWith('#')) return h;
   if (h.startsWith('/')) return /^\/[/\\]/.test(h) ? null : h;
   if (/^https:\/\//i.test(h) || /^mailto:/i.test(h)) return h;

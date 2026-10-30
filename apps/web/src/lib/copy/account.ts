@@ -335,6 +335,8 @@ export const account = {
   codeChecking: 'Checking the code',
   codeWaitingTitle: 'Waiting for you',
   codeAsks: (means: string) => `asks to ${means}.`,
+  /* THE PRINT OF THE ONE REQUEST A COMMAND ASKED TO RUN, as the terminal shows it beside the code. */
+  requestPrint: (print: string) => `Only the request your terminal shows as ${print}.`,
   codeWaitingLeft: (min: number) => (min <= 1 ? 'under 1 min left' : `${min} min left`),
   codeSafe: 'Approve only codes you started. Each works once, for 10 minutes.',
   codeNotOwner: (record: string) => `Only the owner of ${record} can approve a machine. Ask them to open this page.`,
@@ -577,6 +579,9 @@ export const account = {
   linkLandingTitle: 'Your sign-in link is here',
   claimLandingTitle: 'Your BrainDog is ready to claim',
   useLink: 'Sign in with this link',
+  /* WHOSE ACCOUNT THE LINK OPENS, said before the press, so a link somebody else sent cannot sign you in to theirs unseen. */
+  linkOpens: (kind: 'magic' | 'claim', email: string) =>
+    kind === 'claim' ? `This link is for ${email}. If that is not your address, close this page.` : `This link signs in as ${email}. If that is not your address, close this page.`,
   claimRecord: 'Claim your BrainDog',
   linkExpiredTitle: 'That link has expired or was already used',
   linkExpiredWhy: (kind: 'magic' | 'claim', canAsk: boolean) =>

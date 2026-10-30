@@ -12,6 +12,13 @@
  * NOTHING RETURNED HOLDS THE PRIVATE KEY. `authorKey` answers the key's id, its public half and a `sign` function that
  * closes over the private half; a failure answers `null` and no error is passed on, so no message can carry it.
  *
+ * ONE KEY PER PERSON, NOT PER BROWSER. The key was kept in one slot and outlived sign-out, so whoever signed in next on
+ * the same browser published or took back the last person's add-ons as them, and a trusted publisher's version lists
+ * without review. Each person's key is kept under their own id now (`publisher:<person>`), read off the session at the
+ * press, and a browser with nobody signed in has no key. THE ONE KEY KEPT BEFORE THIS, in the bare `publisher` slot,
+ * goes to the first person who asks for a key on this browser: it is the key their add-ons are pinned to, and a fresh
+ * one would have the store refuse every update to them.
+ *
  * LOADED ONLY WHEN SOMEBODY PUBLISHES: `publish.ts` imports this file with `import()` at the press, so no page pays for
  * the declare package or IndexedDB until then. The store is injectable for tests, and IndexedDB is opened only when called.
  */
@@ -41,7 +48,10 @@ export type AuthorKeyHandle = {
 const ALG = { name: 'Ed25519' } as const;
 const DB = 'braindog-author-key';
 const SHELF = 'keys';
-const SLOT = 'publisher';
+/** The one slot every key was kept in before keys were kept per person, read once to hand its key on (`indexedStore`). */
+const LEGACY_SLOT = 'publisher';
+/** The slot one person's key is kept in. */
+export const slotOf = (person: string): string => `${LEGACY_SLOT}:${person}`;
 
 const toB64 = (bytes: ArrayBuffer): string => {
   let s = '';
@@ -74,8 +84,14 @@ const asked = <T>(req: IDBRequest<T>): Promise<T> =>
     req.onerror = () => reject(new Error('indexeddb'));
   });
 
-/** The browser's IndexedDB, opened at the first read or keep and not before. `null` when the browser has none. */
-export function indexedStore(): KeyStore | null {
+/**
+ * One person's key in the browser's IndexedDB, opened at the first read or keep and not before. `null` when the browser
+ * has none.
+ *
+ * THE KEY KEPT BEFORE KEYS WERE PER PERSON is handed to the first person whose slot is empty when it is read, in the same
+ * transaction that takes it out of the old slot, so it goes to one person and never two.
+ */
+export function indexedStore(person: string): KeyStore | null {
   const idb = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
   if (idb === undefined) return null;
   let db: Promise<IDBDatabase> | null = null;
@@ -91,15 +107,28 @@ export function indexedStore(): KeyStore | null {
       db = null;
       throw e;
     }));
+  const slot = slotOf(person);
   return {
     read: async () => {
-      const got = await asked((await open()).transaction(SHELF, 'readonly').objectStore(SHELF).get(SLOT));
-      return isKept(got) ? got : null;
+      const tx = (await open()).transaction(SHELF, 'readwrite');
+      const shelf = tx.objectStore(SHELF);
+      const got = await asked(shelf.get(slot));
+      if (isKept(got)) return got;
+      const old = await asked(shelf.get(LEGACY_SLOT));
+      if (!isKept(old)) return null;
+      const landed = new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(new Error('indexeddb'));
+      });
+      shelf.put(old, slot);
+      shelf.delete(LEGACY_SLOT);
+      await landed;
+      return old;
     },
     keep: async (key) => {
       const tx = (await open()).transaction(SHELF, 'readwrite');
       const shelf = tx.objectStore(SHELF);
-      const had = await asked(shelf.get(SLOT));
+      const had = await asked(shelf.get(slot));
       if (isKept(had)) return had;
       /* KEPT ONCE THE WRITE HAS LANDED, not when it was asked: a write the browser drops (no room) answers no key, so
          nothing is signed by a key the next visit would not have, which the Kennel would refuse as a changed key. */
@@ -107,16 +136,44 @@ export function indexedStore(): KeyStore | null {
         tx.oncomplete = () => resolve();
         tx.onabort = () => reject(new Error('indexeddb'));
       });
-      shelf.add(key, SLOT);
+      shelf.add(key, slot);
       await landed;
       return key;
     },
   };
 }
 
-/** The browser's one store, made at the first call, so every press in a page shares one key in the making. */
-let browserStore: KeyStore | null | undefined;
-const theStore = (): KeyStore | null => (browserStore === undefined ? (browserStore = indexedStore()) : browserStore);
+/**
+ * Who is signed in to this browser now, by the session (`GET /auth/session`), or `null` for nobody or a session that
+ * could not be read, which keeps no key. Asked at each press, so a sign-out and another sign-in between two presses
+ * reach the second person's key and never the first's.
+ */
+async function signedInNow(): Promise<string | null> {
+  try {
+    const res = await globalThis.fetch('/auth/session', { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+    if (!res.ok) return null;
+    const person = ((await res.json()) as { value?: { person?: unknown } } | null)?.value?.person;
+    return typeof person === 'string' && person !== '' ? person : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The store of whoever is signed in at each ask: each person's made at their first press and kept, so every press of
+ * theirs in a page shares one key in the making, and `null` while nobody is. The two halves are injectable for tests.
+ */
+export function personStores(who: () => Promise<string | null> = signedInNow, make: (person: string) => KeyStore | null = indexedStore): () => Promise<KeyStore | null> {
+  const stores = new Map<string, KeyStore | null>();
+  return async () => {
+    const person = await who();
+    if (person === null) return null;
+    if (!stores.has(person)) stores.set(person, make(person));
+    return stores.get(person) ?? null;
+  };
+}
+
+const theStore = personStores();
 
 /* ── the key ────────────────────────────────────────────────────────────── */
 
@@ -170,8 +227,9 @@ async function made(store: KeyStore, now: () => Date): Promise<AuthorKeyHandle |
  * The publisher's key: made the first time and kept, loaded every time after. `null` when this browser cannot make or
  * keep one (no WebCrypto, no Ed25519, no IndexedDB), which publishes unsigned as before.
  */
-export function authorKey(store: KeyStore | null = theStore(), now: () => Date = () => new Date()): Promise<AuthorKeyHandle | null> {
-  if (store === null) return Promise.resolve(null);
+export async function authorKey(given?: KeyStore | null, now: () => Date = () => new Date()): Promise<AuthorKeyHandle | null> {
+  const store = given === undefined ? await theStore() : given;
+  if (store === null) return null;
   let out = making.get(store);
   if (out === undefined) {
     out = made(store, now);
@@ -184,13 +242,13 @@ export function authorKey(store: KeyStore | null = theStore(), now: () => Date =
 
 /** The publisher's signature over taking a version back, or `null` when this browser holds no key. */
 export async function yankSignatureFor(kind: EntryKind, id: string, version: string, reason: string, store?: KeyStore | null): Promise<Signature | null> {
-  const key = await authorKey(store === undefined ? theStore() : store);
+  const key = await authorKey(store);
   return key === null ? null : key.signYank(kind, id, version, reason);
 }
 
 /** A signature over one version, by the publisher's key, or `null` when this browser cannot sign. */
 export async function signFor(kind: string, id: string, version: string, checksum: string, store?: KeyStore | null): Promise<Signature | null> {
-  const key = await authorKey(store === undefined ? theStore() : store);
+  const key = await authorKey(store);
   return key === null ? null : key.sign(kind, id, version, checksum);
 }
 

@@ -823,7 +823,17 @@ const quietOf = (kind: OpsKind): number => OPS_QUIET_BY_KIND[kind] ?? OPS_QUIET_
 const quietWords = (ms: number): string => (ms >= 86_400_000 ? 'day' : `${Math.round(ms / 60_000)} minutes`);
 
 /* PER ISOLATE FIRST, so a burst in one isolate asks the shared gate once and not once a line. */
-const opsSent = new Map<OpsKind, number>();
+const opsSent = new Map<string, number>();
+
+/**
+ * The window a line is quiet in: its kind, and for a door's line its `why` too.
+ *
+ * A DOOR'S REASONS ARE APART. One window for every door line let a burst of junk give-ups (posts to a made-up ingest,
+ * answered 404 once the record was back) use up the hour, so the give-up of a real arrival for another reason was never
+ * mailed. Each reason now has its own window; the reasons are few and fixed by the code, so the windows are too.
+ */
+export const opsSlot = (fields: { op: OpsKind } & Record<string, OpValue>): string =>
+  fields.op === 'door' && typeof fields.why === 'string' && fields.why !== '' ? `door:${fields.why.slice(0, 64)}` : fields.op;
 
 /** The part of the Worker's `Env` an ops mail reads. */
 export type OpsEnv = MailEnv & { OPS_ALERT_TO?: string | undefined; BRAINDOG_BUILD?: string | undefined };
@@ -843,21 +853,22 @@ export type OpsEnv = MailEnv & { OPS_ALERT_TO?: string | undefined; BRAINDOG_BUI
 export async function opsAlert(
   env: OpsEnv,
   fields: { op: OpsKind } & Record<string, OpValue>,
-  claim?: (kind: OpsKind, quietMs: number) => Promise<boolean>,
+  claim?: (slot: string, quietMs: number) => Promise<boolean>,
   now = Date.now(),
 ): Promise<boolean> {
   try {
     const to = env.OPS_ALERT_TO?.trim() ?? '';
     if (to === '') return false;
     const kind = fields.op;
-    const last = opsSent.get(kind);
+    const slot = opsSlot(fields);
+    const last = opsSent.get(slot);
     const quiet = quietOf(kind);
     if (last !== undefined && now - last < quiet) return false;
-    opsSent.set(kind, now);
+    opsSent.set(slot, now);
     if (claim) {
       let due = true;
       try {
-        due = await claim(kind, quiet);
+        due = await claim(slot, quiet);
       } catch {
         /* See the header: the isolate's window is the one left. */
       }

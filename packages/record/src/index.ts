@@ -232,7 +232,7 @@ import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { withSettling } from './settling.ts';
 import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { shelfFault, shelfKept, type ShelfItem } from './shelf.ts';
-import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+import { JOB_PREFIX, REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { narrowBeyond } from './methods/own-tokens.ts';
@@ -622,6 +622,16 @@ export type CallContext = {
    * for an import cannot export, list, write or open the keychain on the approver's behalf.
    */
   operation?: string | undefined;
+
+  /**
+   * The host door that built this context, when it is one whose word the record takes on something a caller cannot say
+   * of itself: `oauth` is the Allow on an app's consent screen, which stamps the token it mints with the app it proved
+   * (`client`: its id, how it came and its host).
+   *
+   * SET ONLY BY A HOST'S OAUTH DOOR, AROUND ITS OWN `createToken`. Every other caller's `client` is dropped, so a key made
+   * by hand, at the CLI or through an operation grant is never stamped "BrainDog checked that this app is claude.ai".
+   */
+  door?: 'oauth' | undefined;
 
   /**
    * The chat app a press came from, when a host built this context from a press on the decision card inside Claude or
@@ -15306,12 +15316,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         };
       /* A REPORT KEY IS MADE BY `createReportKey` ONLY. Its label is its binding, so a token labelled like one
          here would be a report key nobody chose the register of. */
-      if (typeof args?.label === 'string' && args.label.startsWith(REPORT_PREFIX))
+      if (typeof args?.label === 'string' && args.label.trimStart().startsWith(REPORT_PREFIX))
         return no('VALUE_MALFORMED', `A label that begins ${REPORT_PREFIX} belongs to a report key. Make one with createReportKey, or choose another label.`, { at: 'label' });
+      /* NOR A JOB'S BEARER, WHICH ONLY `claimJob` MAKES. Its label is its job: a key labelled `job:<id>` here dropped out of
+         the agents list, had its runs counted to that job, passed the plan's count, and was revoked when the job ended. */
+      if (typeof args?.label === 'string' && args.label.trimStart().startsWith(JOB_PREFIX))
+        return no('VALUE_MALFORMED', `A label that begins ${JOB_PREFIX} belongs to a job's own key, which the record makes itself. Choose another label.`, { at: 'label' });
       /* A NARROWING NAMES NOTHING OUTSIDE THE MINTER'S OWN REACH (sharing plan 2.9); its shape is the kernel's to check. */
       const beyond = narrowBeyond({ kernel, sql, readable }, ctx, actorOf(ctx), args?.narrow);
       if (beyond) return { ok: false as const, refusal: beyond };
-      return tail(await kernel.createToken(actorOf(ctx), args ?? ({} as never)));
+      /* THE APP A KEY IS STAMPED WITH IS THE OAUTH DOOR'S WORD AND NOBODY ELSE'S (`CallContext.door`). A caller's own
+         `client` once went straight through, so a CLI holding a `token` grant minted a key Settings listed as "BrainDog
+         checked that this app is claude.ai", and that `appOf` read as Claude's. It is dropped, not refused, so a caller
+         that sent one still gets the key it asked for, stamped as what it is. */
+      const { client: _said, ...unstamped } = (args ?? {}) as CreateTokenArgs;
+      return tail(await kernel.createToken(actorOf(ctx), (ctx.door === 'oauth' ? (args ?? {}) : unstamped) as never));
     },
 
     /**
@@ -15434,7 +15453,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
         return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'principal' } };
-      return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never)));
+      /* AND A DEVICE LET INTO THE KEYCHAIN IS HELD TO THE KEYCHAIN'S OWN LOCK WINDOW (`keychain` above), which the owner
+         may have set to five minutes: approving a `vault` grant hands a machine what opening the keychain here would, so
+         a proof the keychain itself would refuse does not approve one either. */
+      const proved = ctx.provedAt;
+      const locked = (reach: string): Refusal | null =>
+        reach === 'vault' && proved !== undefined && clock.now() - proved > kernel.lockAfter() * 60_000
+          ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to let a device into the keychain.', at: 'principal' }
+          : null;
+      return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never), locked));
     },
 
     /**
@@ -15954,7 +15981,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * NO `CallContext`, because the device has no credential yet. What stands in for one is the address it came
      * from, counted before anything is written, and the approval a person gives elsewhere.
      */
-    async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
+    async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string; binds?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
       const wait = counted(`device:${ip}`);
       if (wait !== null) return { ok: false, retryAfter: wait };
       /* A PROJECT IS NAMED THE WAY A PERSON SAYS IT, `things#3`, and the grant holds its row id, which is what a
@@ -16006,6 +16033,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async mintChild(bearer: string, args: ChildArgs): Promise<Result<ChildMinted>> {
       if (typeof bearer !== 'string' || bearer === '') return no('REQUIRED_MISSING', 'Which key is this a child of? Send its bearer.', { at: 'parent' });
       return tail(await kernel.mintChild(bearer, args ?? ({} as never), deps.validFrom?.()));
+    },
+
+    /**
+     * Whether a file is kept from this caller: `true` when the bytes are named only by rows they cannot read, or only in
+     * fields hidden from them. INTERNAL: the files doors on both hosts ask it before handing the bytes over.
+     *
+     * THE DOOR CHECKED "READS FILES" AND THEN THE HASH, so a member held off a list who knew or guessed a file's hash (or
+     * held the same PDF) read it or confirmed it was there. Now a caller narrowed in any way (some lists, a rule on a
+     * list, a list at adds only, a field hidden) is answered the bytes only when a row they can read names them in a
+     * field they are shown. A file no row names (one just put, before its row is saved; a picture of a visual) is
+     * answered as before, and so is every caller who reads the whole record, who reads every row that could name it.
+     */
+    fileHeld(sha256: string, ctx: CallContext): boolean {
+      if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(sha256)) return true;
+      const narrowed =
+        Array.isArray(ctx.registers) ||
+        Object.values(ctx.levels ?? {}).some((level) => level === 'append') ||
+        Object.keys(ctx.wheres ?? {}).length > 0 ||
+        Object.values(ctx.hides ?? {}).some((fields) => fields.length > 0);
+      if (!narrowed) return false;
+      const naming = sql.all<{ id: string; register: string; fields: string }>('SELECT id, register, fields FROM entry WHERE fields LIKE ?', `%${sha256}%`);
+      if (naming.length === 0) return false;
+      const holds = (value: unknown): boolean =>
+        Array.isArray(value) ? value.some(holds) : typeof value === 'object' && value !== null && (value as { sha256?: unknown }).sha256 === sha256;
+      for (const row of naming) {
+        if (readable(ctx, row.register) !== null || !sight.admits(ctx, row)) continue;
+        const hidden = sight.hidden(ctx, row.register);
+        let fields: Record<string, unknown>;
+        try {
+          fields = JSON.parse(row.fields) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+        for (const [field, value] of Object.entries(fields)) if (!hidden.has(field) && holds(value)) return false;
+      }
+      return true;
     },
 
     /** The key this record's exports are signed with, for the hosts' key doors, or `null` with no signer. INTERNAL. */

@@ -85,7 +85,7 @@ import { cloudVisuals, pagesPrefix } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, resetSaid, type Cuts } from './alarm-cuts.ts';
 import { isHeld, redeliver, serveHeld, sweepHeld, type HeldDeps, type HeldMessage } from './held.ts';
-import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
+import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
@@ -95,7 +95,7 @@ import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@brain
 import { shareKeyOf, sharesOf } from './share.ts';
 import { firstReadDoorOf } from './first-read.ts';
 import { consume, pump } from './pump.ts';
-import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyRedirect, mcpMetadataAt, restoreAsked, servesAccount, servesApi, servesAppleAssociation, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
+import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyAnswer, legacyRedirect, legacyRequest, mcpMetadataAt, restoreAsked, servesAccount, servesApi, servesAppleAssociation, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { cookieDomain, withSignedIn } from './signed-in.ts';
@@ -1976,6 +1976,16 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.access(person, token ?? null);
   }
 
+  /**
+   * Whether the files door keeps a file from this caller, named only on rows they cannot read (`fileHeld`). A deleted
+   * record gives no file to anybody.
+   */
+  async fileHeld(sha256: string, ctx: CallContext): Promise<boolean> {
+    if (this.#gone) return true;
+    const api = await this.#record();
+    return api.fileHeld(sha256, ctx);
+  }
+
   /** Whether this person is on the record and an owner has stopped them, so a door can say so rather than "not on this record". */
   async memberStopped(person: string): Promise<boolean> {
     if (this.#gone) return false;
@@ -2052,7 +2062,7 @@ export class Record$ extends DurableObject<Env> {
    * AN RPC AND NEVER A ROUTE, like `create`: `deviceStart` and `devicePoll` are INTERNAL, because the device has
    * no credential to check yet.
    */
-  async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
+  async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string; binds?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     return broken ? { ok: false, refusal: broken } : api.deviceStart(args, ip);
@@ -2920,8 +2930,8 @@ const NIGHT_WAIT_MS = 1500;
 /** The Directory's window over every isolate's ops mail, for `opsAlert`. */
 const alertClaim =
   (env: Env) =>
-  (kind: OpsKind, quietMs: number): Promise<boolean> =>
-    env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).alertDue(kind, quietMs);
+  (slot: string, quietMs: number): Promise<boolean> =>
+    env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).alertDue(slot, quietMs);
 
 /**
  * One pass over one record’s outbox, with this deployment’s bindings behind it.
@@ -3038,7 +3048,7 @@ function bearerDeps(env: Env): BearerDeps {
        before its grant is read, so the ask again after a reset spends it once, and a 503 spends nothing. */
     operation: async (id, bearer) => {
       const out = (await held<unknown>(env, id, (record) => record.operationGrant(bearer))) as Result<OperationGrant>;
-      return out.ok ? { method: out.value.method, person: out.value.person } : null;
+      return out.ok ? { method: out.value.method, person: out.value.person, binds: out.value.binds ?? null } : null;
     },
   };
 }
@@ -3329,6 +3339,9 @@ export default {
    */
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const began = Date.now();
+    /* NO SESSION COOKIE IS TAKEN ON A LEGACY HOST, and one sent there is cleared (`legacyRequest`). */
+    const old = legacyRequest(request, env.LEGACY_HOSTS);
+    request = old.request;
     let answer: Response;
     try {
       answer = await route(request, env, ctx);
@@ -3344,7 +3357,10 @@ export default {
           : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
     }
     /* SIGNED IN, THE SITE SAYS SO: the readable `bd_in` cookie follows the session (`signed-in.ts`). */
-    answer = withSignedIn(answer, request, cookieDomain(env.PUBLIC_HOST, env.RP_ID));
+    answer = withSignedIn(old.legacy ? legacyAnswer(answer, false) : answer, request, cookieDomain(env.PUBLIC_HOST, env.RP_ID));
+    /* AND THE OLD COOKIE IS CLEARED AFTER THE SITE'S MARK IS SET, so clearing it on the old name never reads as a sign-out
+       of the app, whose own session is untouched. */
+    if (old.carried) answer = legacyAnswer(answer, true);
     /* ONE POINT PER REQUEST, CRASHES INCLUDED, AFTER THE ANSWER (`51 §5.18`, `telemetry.ts`). Inside `waitUntil` so the
        caller never waits on a count, and it does nothing at all while `TELEMETRY` is unbound. */
     ctx.waitUntil(telemetry(env, request, answer, Date.now() - began));
@@ -3682,6 +3698,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         bearer: bearerDeps(env),
         limit: (who, cls) => overLimit(env, who, request, cls),
         bytes: (record, n) => abusive(env, 'uploadDay', record, n),
+        held: (record, sha256, ctx) => held(env, record, (object) => object.fileHeld(sha256, ctx)),
       });
     /* EVERY OTHER PATH IS THE APP, AND `/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because
        no route pattern can pick it out, and handed to the door, which has the Directory check it before anything is

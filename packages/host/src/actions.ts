@@ -853,8 +853,10 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
     const started = Date.now();
     let requests = 0;
     let bytes = 0;
-    /* EVERY SPELLING OF THE KEY, NOT ONLY ITS BYTES (`spellingsOf` says which). Empty until a key is opened. */
-    let secret: Spelling[] = [];
+    /* EVERY SPELLING OF THE KEY, NOT ONLY ITS BYTES (`spellingsOf` says which). Empty until a key is opened, AND THE
+       TEXTS THE CALLER NAMED (`scrub`) FROM THE START: a key used as the address was opened before this was asked, and
+       goes out with no grant, so nothing here would otherwise know to strike it from the answer. */
+    const secret: Spelling[] = (request.scrub ?? []).filter((t) => typeof t === 'string' && t.length >= SHORTEST_SPELLING).flatMap((t) => spellingsOf(t));
     const scrub = (text: string): string =>
       secret.reduce<string>((out, spelling) => (typeof spelling === 'string' ? out.split(spelling).join(REDACTED) : out.replace(spelling, REDACTED)), text);
     const refuse = (code: RefusedCode, fix: string): ActionAnswer => ({
@@ -900,7 +902,7 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
         if (!options.openKey) return refuse('WRONG_KEY', `${NO_KEY_STORE} "${request.grant.label}" was not opened and nothing was sent.`);
         const opened = await options.openKey(request.grant);
         if (opened === null) return refuse('WRONG_KEY', `The key "${request.grant.label}" could not be opened on this host, so nothing was sent.`);
-        if (opened !== '') secret = spellingsOf(opened);
+        if (opened !== '') secret.push(...spellingsOf(opened));
         /* THROUGH CONNECT'S AUTH BUILDER, the one place in the tree a credential meets a request. It is handed no other
            header, so what it answers is the key's own headers and nothing the record sent. */
         let signed: Awaited<ReturnType<typeof authoriseCall>>;

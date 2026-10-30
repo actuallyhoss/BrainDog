@@ -27,6 +27,7 @@
     passkeyAutofill,
     passkeyRegister,
     passkeySignIn,
+    linkFor,
     redeemLink,
     requestLink,
     signOut,
@@ -89,6 +90,15 @@
   let asked = $state<Said<Methods> | null>(null);
   let entered = $state<{ who: Who; via: 'passkey' | 'key' | 'link' } | null>(null);
   let link = $state<Link | null>(null);
+  /* WHOSE ACCOUNT THE LINK IN THE ADDRESS OPENS (`linkFor`), asked once per link and said above its button. */
+  let linkEmail = $state<{ token: string; email: string } | null>(null);
+  $effect(() => {
+    const l = link;
+    if (l === null || linkEmail?.token === l.token) return;
+    void linkFor(l).then((email) => {
+      if (email !== null && link?.token === l.token) linkEmail = { token: l.token, email };
+    });
+  });
   let step = $state<Step>({ at: 'idle' });
   let now = $state(Date.now());
   /** Where the ways on from here go: see `onwardOf`, which is read once on arrival while the fragment is still there. */
@@ -602,6 +612,7 @@
         <div class="calm">
           <IconWell name="link" size="card" />
           <h1 class="entry-title">{view.link.kind === 'claim' ? copy.claimLandingTitle : copy.linkLandingTitle}</h1>
+          {#if linkEmail !== null && linkEmail.token === view.link.token}<p class="calm-who">{copy.linkOpens(view.link.kind, linkEmail.email)}</p>{/if}
         </div>
         <div class="doors">
           <Button weight="primary" onclick={spend} aria-busy={view.asking}>

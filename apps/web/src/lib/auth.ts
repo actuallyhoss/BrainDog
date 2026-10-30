@@ -434,6 +434,20 @@ export async function requestLink(
   return done(call(io, '/auth/magic/start', { email: email.trim(), ...(next ? { next } : {}), ...(turnstile ? { turnstile } : {}), ...(app ? { app } : {}) }));
 }
 
+/**
+ * Whose account a link that arrived in the address opens: its address, or `null` when the host does not say (an older
+ * host, a link that is spent, a network that failed). Spends nothing.
+ *
+ * SAID BEFORE THE PRESS, because a link is a way into whoever it was minted for: a stranger's own link, sent to somebody
+ * signed out, put them in the stranger's record with one press, and what they typed next landed there.
+ */
+export async function linkFor(link: Link, io: Io = live()): Promise<string | null> {
+  const out = await call(io, '/auth/magic/whose', link.kind === 'magic' ? { linkToken: link.token } : { claimToken: link.token });
+  if (!out.ok) return null;
+  const email = (out.value as { email?: unknown } | null)?.email;
+  return typeof email === 'string' && email.trim() !== '' ? email : null;
+}
+
 /** Spend a link that arrived in the address. */
 export async function redeemLink(link: Link, io: Io = live()): Promise<Said<Who>> {
   return signedIn(call(io, '/auth/magic/redeem', link.kind === 'magic' ? { linkToken: link.token } : { claimToken: link.token }));

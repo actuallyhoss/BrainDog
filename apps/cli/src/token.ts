@@ -142,7 +142,8 @@ export async function tokenCommand(args: string[], io: TokenIo): Promise<number>
   if (got === null) {
     /* THE `token` OPERATION REACH OPENS `createToken` AND NOTHING ELSE (`OPERATION_METHOD` in `packages/kernel/src/device.ts`).
        Its words read "Run braindog token again", which is this command. */
-    const grant = await (io.approve ?? ((host: string) => approveOperation(host, 'token', io)))(key);
+    /* BOUND TO THIS BODY (`binds`), which `post` sends as `JSON.stringify(asked)`. */
+    const grant = await (io.approve ?? ((host: string) => approveOperation(host, 'token', { ...io, body: JSON.stringify(asked) })))(key);
     if (typeof grant === 'number') return grant;
     got = (await post(url, key, asked, grant.bearer, io)).result;
   }

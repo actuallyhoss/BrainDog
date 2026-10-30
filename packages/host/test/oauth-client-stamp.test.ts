@@ -172,3 +172,19 @@ test('an account made twenty minutes ago may allow without signing in again, and
   assert.equal(await tries({ provedAt: month, since: month }), 401);
   assert.equal(await tries({ provedAt: month, since: now - 2 * 3_600_000 }), 401);
 });
+
+/* AN APP CALLED AS THE RECORD'S OWN KEYS ARE IS NAMED BY ITS HOST. Its name becomes the token's label, and `job:<id>` is a
+   job's bearer to the record: off the agents list, its runs counted to the job, revoked when the job ends. */
+test('an app that names itself job: or report: is named by its host instead', async () => {
+  for (const name of ['job:j_01JZ8QK3F7R2M9V4XN6TCB5HAD', 'report:payroll', 'JOB:j_x']) {
+    const d = doors();
+    const redirect = `https://app.${SITE}/callback`;
+    const reg = await d.post('/oauth/register', { client_name: name, redirect_uris: [redirect], token_endpoint_auth_method: 'none' });
+    assert.equal(reg.status, 201, await reg.clone().text());
+    const { client_id } = (await reg.json()) as { client_id: string };
+    const request = await d.hold(client_id, redirect);
+    const res = await d.post('/oauth/approve', { request, record: 'rec_invented', scope: 'read' });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(d.mints[0]?.label, `An app at app.${SITE}`, name);
+  }
+});

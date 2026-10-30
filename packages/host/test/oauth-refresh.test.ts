@@ -207,3 +207,42 @@ test('an app removed between Allow and the code gets invalid_grant, and no key',
   assert.equal(late.body.error, 'invalid_grant');
   assert.equal(late.body.access_token, undefined);
 });
+
+/* THE TOKEN JUST REPLACED, PRESENTED AGAIN INSIDE ITS GRACE, MOVES NOTHING. It rotated the family for whoever presented
+   it, so a copy replayed within the two minutes took the family over: the app's own new token was then refused and the
+   replayer held the only working one. Now the retry is handed the token the first answer gave, and the app keeps it. */
+test('A REPLAY OF THE TOKEN JUST REPLACED does not take the family over, and the app keeps refreshing', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  const app = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  assert.equal(app.status, 200);
+  t.clock.advance(30_000);
+  const replay = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.refresh_token, app.body.refresh_token, 'the replay was handed a token of its own');
+  /* The app's token is still the family's, and moves it on. */
+  const next = await t.token({ grant_type: 'refresh_token', refresh_token: app.body.refresh_token! });
+  assert.equal(next.status, 200, JSON.stringify(next.body));
+  assert.ok(await t.works(next.body.access_token));
+  /* And the old token, presented once more, answers what the family holds now only if it is still the one it replaced. */
+  t.clock.advance(10_000);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 400);
+});
+
+/* TWO TABS OF ONE APP REFRESHING AT THE SAME MOMENT both hold the same token; neither is signed out, and both carry on
+   with the one token the family has. */
+test('TWO REFRESHES OF ONE TOKEN AT ONCE both answer, with the same new token, and the family carries on', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  const [a, b] = await Promise.all([
+    t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token }),
+    t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token }),
+  ]);
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.equal(b.status, 200, JSON.stringify(b.body));
+  assert.equal(a.body.refresh_token, b.body.refresh_token);
+  assert.ok(await t.works(a.body.access_token));
+  assert.ok(await t.works(b.body.access_token));
+  t.clock.advance(3600_000);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: b.body.refresh_token! })).status, 200);
+});

@@ -50,7 +50,11 @@ export function askerOf(label: string | null, reach: DeviceRow['reach']): string
 /** What a grant may do, as a sentence starting with a capital: "Take one copy of this record, once, ...". */
 export function canOf(reach: DeviceRow['reach'], scope: string | null): string {
   const means = copy.reachMeans[reachKey(reach, scope)] ?? reach;
-  return `${means.charAt(0).toUpperCase()}${means.slice(1)}.`;
+  const said = `${means.charAt(0).toUpperCase()}${means.slice(1)}.`;
+  /* A GRANT BOUND TO ONE REQUEST (`binds`, kept as `body:<sha256>`) says the print the terminal shows beside the code,
+     so the person can see this is that request and not another asking under the same word. */
+  const bound = scope !== null && /^body:[0-9a-f]{64}$/u.test(scope) ? scope.slice('body:'.length) : null;
+  return bound === null ? said : `${said} ${copy.requestPrint(`${bound.slice(0, 4)} ${bound.slice(4, 8)}`)}`;
 }
 
 /** Minutes left on a waiting grant, rounded up, from the record's clock. */

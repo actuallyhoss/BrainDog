@@ -27,10 +27,12 @@ export const LINK_SAID = 'A link is an https address, a mailto or a path of this
 /**
  * Whether the renderer draws an address as a link: `safeHref` in `packages/render/src/inline.ts`, copied because the
  * kernel does not import the renderer (`declare.ts` says why of `BLOCK_KINDS`). A leading slash is not enough: `//host`
- * and `/\host` are another site wearing the shape of a path.
+ * and `/\host` are another site wearing the shape of a path. And no control character anywhere: the URL parser drops a
+ * tab or a line break, so `/\t/host` is `//host` by the time the browser reads it.
  */
 export function linkable(href: string): boolean {
   const h = href.trim();
+  if (/\p{Cc}/u.test(h)) return false;
   if (h.startsWith('#')) return true;
   if (h.startsWith('/')) return !/^\/[/\\]/u.test(h);
   return /^https:\/\//iu.test(h) || /^mailto:/iu.test(h);

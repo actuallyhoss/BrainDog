@@ -9,6 +9,7 @@
  */
 
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -258,7 +259,13 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
 }
 
 /** What one device flow asks the host for: a login, keychain access over one scope, or one operation. */
-type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach } | { reach: 'runner' } | { reach: 'shape' };
+type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: OperationReach; binds?: string } | { reach: 'runner' } | { reach: 'shape' };
+
+/** The SHA-256 of a request body as it will be sent, in hex: what an operation grant is bound to (`binds`). */
+export const bodyDigest = (body: string): string => createHash('sha256').update(body, 'utf8').digest('hex');
+
+/** The short print of a bound body the terminal and the app both show, so the person can see it is the same request. */
+export const bodyPrint = (binds: string): string => `${binds.slice(0, 4)} ${binds.slice(4, 8)}`;
 
 /** The operation reaches this CLI asks for, each approving one ADMIN call (`OPERATIONS` in `packages/kernel/src/device.ts`). */
 export type OperationReach = 'export' | 'import' | 'token';
@@ -340,6 +347,8 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
 
     const life = seconds(code.expires_in, 600, 1_800) || 600;
     io.say(`Open ${uri} and enter  ${userCode.slice(0, 3)} ${userCode.slice(3)}   (${Math.max(1, Math.round(life / 60))} minutes)`);
+    /* AND THE ONE REQUEST IT APPROVES, by the print the app shows beside it, when the request was named. */
+    if ('binds' in asked && typeof asked.binds === 'string') io.say(`It approves this one request, which the app shows as ${bodyPrint(asked.binds)}.`);
 
     const deadline = now() + life * 1000;
     let wait = seconds(code.interval, 5, 60);
@@ -393,12 +402,18 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
  * THE REACH IS IN THE LABEL THE APPROVER READS. `deviceStart` takes no subject, so `export` or `import` said in the
  * label is how the person at the browser knows it is not a sign-in they are approving. `token` says it too.
  */
-export async function approveOperation(raw: string, reach: OperationReach, io: FlowIo & { label?: string | undefined }): Promise<{ bearer: string } | number> {
+export async function approveOperation(
+  raw: string,
+  reach: OperationReach,
+  io: FlowIo & { label?: string | undefined; body?: string | undefined },
+): Promise<{ bearer: string } | number> {
   const host = hostOf(raw, io.say);
   if (typeof host === 'number') return host;
   /* THE REACH IS APPENDED EVEN TO A LABEL THE CALLER CHOSE, and the machine's name is cut rather than the reach. */
   const label = `${(io.label ?? `${await machineName()} · braindog-cli`).slice(0, 110)} · ${reach}`;
-  const got = await approve(host, { reach }, label, {
+  /* THE BODY IT WILL SEND, BY ITS SHA-256 (`binds`): the host takes the bearer for that body and no other, so the word
+     "token" the person approves cannot be spent on a token wider or longer than the one this command asked for. */
+  const got = await approve(host, io.body === undefined ? { reach } : { reach, binds: bodyDigest(io.body) }, label, {
     again: `Run braindog ${reach} again to ask for a new code.`,
     nothing: 'nothing was approved',
     stopped: `The approval was stopped before it finished, and nothing was ${reach === 'export' ? 'exported' : reach === 'import' ? 'sent' : 'made'}.`,

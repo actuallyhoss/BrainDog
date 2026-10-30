@@ -104,6 +104,11 @@ a revoke button. A credential you cannot see being used is a credential you cann
   it and the Worker spends it at once, so an address nobody has, a suspended person and the lockouts are all treated
   as the mailed link treats them. Only a verified `@gmail.com` address, or one on a domain Google hosts (`hd`), is
   taken. The state, the PKCE verifier and the nonce live in a ten-minute `__Host-` cookie, never in a row.
+- **A self-host with a server key and no certificate is plain http on every interface.** Setting
+  `BRAINDOG_SERVER_KEY` widens the bind to `::`, and nothing turns TLS on, so the key, bearers and the session cookie
+  cross the network unencrypted, and `bd_s` at `localhost` is shared with every port on the machine. The start says so
+  in one line (`plainLine` in `apps/selfhost/src/how.ts`); set `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY`, serve it
+  behind https on the same machine, or set `BRAINDOG_LISTEN=127.0.0.1`.
 - **The token cut-off** is `TOKENS_VALID_FROM` (`BRAINDOG_TOKENS_VALID_FROM` on a self-host): every token, device grant
   and operation grant created before the instant is refused, and the owner's list shows them "ended by the operator".
 - **Closing an account** is the person's own act (`POST /account/close`, the address typed, a sign-in within 15

@@ -13,7 +13,7 @@
  * a listing, an event and a revoke name a row by a handle derived from the id and not by the id.
  */
 
-import type { Result } from '@braindog/ports';
+import type { Refusal, Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
@@ -91,8 +91,21 @@ export type KeychainGrant = { handle: string; scope: string; person: string; exp
 /** A shape grant, checked: whose approval it carries and until when. It names no scope, since it reads one thing. */
 export type ShapeGrant = { handle: string; person: string; expires: string };
 
-/** An operation bearer, checked and spent: which reach, the method it opens, and the person who approved it. */
-export type OperationGrant = { handle: string; reach: 'export' | 'import' | 'pack' | 'token'; method: Operation; person: string };
+/**
+ * An operation bearer, checked and spent: which reach, the method it opens, the person who approved it, and the SHA-256
+ * of the one request body it was started for (`binds`, hex), or `null` for a grant started without one.
+ */
+export type OperationGrant = { handle: string; reach: 'export' | 'import' | 'pack' | 'token'; method: Operation; person: string; binds: string | null };
+
+/**
+ * What an operation grant's `scope` column holds when it was started for one request body: `body:` and the body's
+ * SHA-256 in hex. The column is a keychain grant's project otherwise, and an operation grant held none, so the bound body
+ * needs no column of its own.
+ */
+export const BODY_BOUND = 'body:';
+
+/** The bound body's SHA-256 a grant's `scope` holds, or `null` for none. */
+export const boundBody = (scope: string | null): string | null => (scope !== null && scope.startsWith(BODY_BOUND) ? scope.slice(BODY_BOUND.length) : null);
 
 type Stored = Omit<DeviceRow, 'handle' | 'ended_by'> & { id: string; code_hash: string; token_hash: string | null };
 
@@ -156,7 +169,7 @@ function isProject(deps: TokenDeps, id: string): boolean {
  */
 export async function deviceStart(
   deps: TokenDeps,
-  args: { reach: string; label: string; ua?: string; scope?: string },
+  args: { reach: string; label: string; ua?: string; scope?: string; binds?: string },
 ): Promise<Result<DeviceCode>> {
   /* `keychain` IS THE NAME A PERSON READS AND `vault` THE STORED ONE (the CHECK, and every installed CLI): it is accepted and kept as `vault`. */
   if (args?.reach === 'keychain') args = { ...args, reach: 'vault' };
@@ -171,12 +184,21 @@ export async function deviceStart(
     return no('VALUE_MALFORMED', 'A device name cannot begin report: or job:, which name keys the record makes itself. Choose another name.', { at: 'label' });
 
   const reach = args.reach as Reach;
-  const scope = args.scope ?? null;
+  let scope = args.scope ?? null;
   if (reach === 'vault') {
     if (!scope) return no('REQUIRED_MISSING', 'A keychain grant names the project whose keys it opens, or * for the keys of none.', { at: 'scope' });
     if (scope !== '*' && !isProject(deps, scope)) return no('REF_UNKNOWN', `${scope} is not a project here.`, { at: 'scope' });
   } else if (scope !== null) {
     return no('OUT_OF_BOUNDS', 'Only a keychain grant carries a scope.', { at: 'scope' });
+  }
+  /* AN OPERATION GRANT MAY NAME THE ONE REQUEST IT IS FOR, by its body's SHA-256, and the host then refuses any other
+     body under it (`binds` on `OperationGrant`). A grant that named only its method let whoever held the bearer mint any
+     scope, life and reach, or import any file, while the approver had seen only the word "token" or "import". */
+  if (args.binds !== undefined) {
+    if (!OPERATIONS.includes(reach)) return no('OUT_OF_BOUNDS', 'Only an operation grant names the request it is for.', { at: 'binds' });
+    if (typeof args.binds !== 'string' || !/^[0-9a-f]{64}$/u.test(args.binds))
+      return no('VALUE_MALFORMED', "A grant names its request by the SHA-256 of the body, as sixty-four lower-case hex characters.", { at: 'binds' });
+    scope = `${BODY_BOUND}${args.binds}`;
   }
 
   const id = b64url(deps.random(32));
@@ -214,7 +236,17 @@ export async function deviceStart(
  * under the count, and the fifth denies them all. A malformed entry costs nothing, because a typo
  * should not spend somebody else's enrolment.
  */
-export async function deviceApprove(deps: TokenDeps, person: string, args: { user_code: string }): Promise<Result<Approved>> {
+export async function deviceApprove(
+  deps: TokenDeps,
+  person: string,
+  args: { user_code: string },
+  /**
+   * What the approver's own sign-in still lacks for the grant this code names, asked once the code has matched and before
+   * anything is approved: the record's keychain asks a proof inside its own lock window for `vault`, which is shorter than
+   * the fifteen minutes every other approval takes. A refusal here spends no try, because the code was right.
+   */
+  held?: (reach: Reach) => Refusal | null,
+): Promise<Result<Approved>> {
   const code = typeof args?.user_code === 'string' ? args.user_code : '';
   if (!/^\d{6}$/.test(code)) return no('VALUE_MALFORMED', 'A device code is six digits.', { at: 'user_code' });
 
@@ -234,6 +266,8 @@ export async function deviceApprove(deps: TokenDeps, person: string, args: { use
   if (hits > 1) hit = undefined;
 
   if (hit) {
+    const stop = held?.(hit.reach) ?? null;
+    if (stop) return { ok: false, refusal: stop };
     const at = instant(deps.nowMs);
     deps.sql.exec(
       "UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'pending'",
@@ -533,12 +567,13 @@ export async function operationGrant(deps: TokenDeps, bearer: string): Promise<R
   const row = deps.sql.one<{
     id: string;
     reach: Reach;
+    scope: string | null;
     approved_by: string | null;
     approved_at: string | null;
     expires: string;
     suspended_at: string | null;
   }>(
-    `SELECT d.id AS id, d.reach AS reach, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires,
+    `SELECT d.id AS id, d.reach AS reach, d.scope AS scope, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires,
             p.suspended_at AS suspended_at
      FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
      WHERE d.token_hash = ? AND d.status = 'active'`,
@@ -553,7 +588,7 @@ export async function operationGrant(deps: TokenDeps, bearer: string): Promise<R
 
   deps.sql.exec("UPDATE device_grant SET status = 'expired', expires = ?, last_used = ? WHERE id = ? AND status = 'active'", now, now, row.id);
   const reach = row.reach as OperationGrant['reach'];
-  return ok({ handle: await handleOf(deps, row.id), reach, method: OPERATION_METHOD[reach], person: row.approved_by });
+  return ok({ handle: await handleOf(deps, row.id), reach, method: OPERATION_METHOD[reach], person: row.approved_by, binds: boundBody(row.scope) });
 }
 
 /**

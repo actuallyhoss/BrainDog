@@ -39,7 +39,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 import type { ActionRequest, Execute, OpenKey } from '@braindog/host/actions';
-import { addressed, CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads } from '@braindog/host/script';
+import { addressed, addressSecrets, CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
@@ -412,6 +412,7 @@ export class ScriptRuns {
 
     /* AN ADDRESS HELD IN THE KEYS: the label held to `keys`, the key opened here and read by `addressed`, as on the
        self-host, and the request it names sent in place of the stand-in with no key. Every check below then runs on it. */
+    let scrub: string[] = [];
     if (typeof call.address === 'string' && call.address !== '') {
       if (!decl.keys.includes(call.address))
         return refuse({ code: 'FORBIDDEN', why: `${decl.id} asked for the address in the key ${JSON.stringify(call.address)}, which it does not declare.` });
@@ -422,6 +423,8 @@ export class ScriptRuns {
       const read = addressed(decl.id, decl.egress, held, secret);
       if (!('url' in read)) return refuse(read);
       call = { ...call, url: read.url.href, asked: null, method: 'GET', headers: {}, body: null, key: null, address: null };
+      /* AND WHAT OF IT THE EXECUTOR STRIKES FROM THE ANSWER, since it goes out with no grant (`addressSecrets`). */
+      scrub = addressSecrets(secret, read.url);
     }
     let url: URL;
     try {
@@ -483,6 +486,7 @@ export class ScriptRuns {
       headers: call.headers,
       ...(call.body === null ? {} : { body: call.body }),
       grant,
+      ...(scrub.length === 0 ? {} : { scrub }),
       timeoutMs: TIMEOUT_MS,
       maxBytes: MAX_BYTES,
     });

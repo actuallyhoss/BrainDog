@@ -7,7 +7,12 @@
  * and the local copy went on sign-out; the sidebar's week, its counts, the projects' order, the Slash threads and the
  * answers beside them, the places opened last and the marks of what was seen stayed. Each of these keys holds words, ids
  * or numbers read off the record as that person, so each goes with them. What stays is the device's own: its look, its
- * nav, its notifications, a list's default (kept by person already), the publisher key.
+ * nav, its notifications, a list's default (kept by person already), and each person's publisher key, which is kept
+ * under their own id (`author-key.ts`) and is reached only by them.
+ *
+ * AND THE PICTURES DRAWN WIDGETS LEFT (`drawn-pictures.ts`): each is what a component drew from the record as the person
+ * who last saw it, keyed by its code and size alone, so the next person's board drew it at once, before their own
+ * component ran.
  *
  * THE KEYS ARE WRITTEN OUT HERE, not imported, so sign-out loads none of the screens that keep them;
  * `signed-out.test.ts` holds each to the constant its own module keeps it under.
@@ -36,6 +41,8 @@ export const SIGNED_OUT_KEYS = [
   'today-late-aside',
   'braindog:slot:aside',
   'braindog.inbox.into',
+  /* the list of drawn widgets' pictures kept (`drawn-pictures.ts`) */
+  'bd.drawn.pics',
 ] as const;
 
 /** Keys kept in `localStorage` one a page, a record or a board, by what they start with. */
@@ -46,6 +53,8 @@ export const SIGNED_OUT_PREFIXES = [
   'braindog.welcomed:',
   /* a board's unsaved arrangement (`Home.svelte`) */
   'bd_board_draft:',
+  /* each drawn widget's picture, as it last drew the record (`drawn-pictures.ts`) */
+  'bd.drawn.pic.',
 ] as const;
 
 /** Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), never carried to the next session. */

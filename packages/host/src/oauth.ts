@@ -458,10 +458,16 @@ function nameOf(said: unknown, uris: readonly string[]): string {
   /* BY CHARACTER AND NOT BY UNIT, so the cut at `NAME_MOST` never halves an emoji into a character nobody can draw. */
   const kept = typeof said === 'string' ? [...said].filter((ch) => !hidden(ch.codePointAt(0) ?? 0)).join('').trim() : '';
   const clean = [...kept].slice(0, NAME_MOST).join('').trim();
-  if (clean !== '') return clean;
+  /* A NAME THAT BEGINS AS THE RECORD'S OWN KEYS DO IS NO NAME. The name becomes the token's label, and a label `job:<id>`
+     is a job's bearer to the record (left off the agents list, its runs counted to the job, revoked when it ends) and
+     `report:` a report key's; the record refuses both, so the app is named by its host instead. */
+  if (clean !== '' && !RESERVED_LABEL.test(clean)) return clean;
   const first = uris[0];
   return first === undefined ? 'An app' : `An app at ${hostOf(first)}`;
 }
+
+/** The beginnings of a label only the record writes: a job's bearer and a report key. */
+const RESERVED_LABEL = /^(?:job|report):/iu;
 
 const isScope = (x: unknown): x is OAuthScope => typeof x === 'string' && (OAUTH_SCOPES as readonly string[]).includes(x);
 
@@ -512,12 +518,51 @@ function resourceAt(request: Request, deps: OAuthDeps): string {
   return deps.resources?.includes(reached) === true ? reached : `${deps.issuer}/mcp`;
 }
 
-/** Whether a client id is an address a metadata document may be read from: `https:`, a path, no fragment, no user. */
+/**
+ * Hosts where anybody can put a file under the host's own name: GitHub's raw and gist files, paste sites, and the public
+ * buckets of the big stores. A document served there proves only that somebody uploaded it, and the consent screen
+ * would say "BrainDog checked that this app is raw.githubusercontent.com", so an app is never read from one. Each is
+ * matched as the host or any name under it.
+ */
+const USER_CONTENT_HOSTS = [
+  'githubusercontent.com',
+  'gist.github.com',
+  'gitlab.io',
+  'pastebin.com',
+  'paste.ee',
+  'hastebin.com',
+  'dropboxusercontent.com',
+  'storage.googleapis.com',
+  'firebasestorage.googleapis.com',
+  's3.amazonaws.com',
+  'blob.core.windows.net',
+  'r2.dev',
+  'jsdelivr.net',
+  'unpkg.com',
+] as const;
+
+/** Whether a host is one where anybody can serve a file (`USER_CONTENT_HOSTS`), including a bucket's own name under S3. */
+export function isUserContentHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/\.$/u, '');
+  if (/(^|\.)s3[.-][a-z0-9-]+\.amazonaws\.com$/u.test(h)) return true;
+  return USER_CONTENT_HOSTS.some((d) => h === d || h.endsWith(`.${d}`));
+}
+
+/**
+ * Whether a metadata document came as JSON: `application/json` or a `+json` type, with any parameters. A file host that
+ * answers `text/plain` is serving somebody's upload, not an app's own document.
+ */
+export function isJsonType(type: string | null): boolean {
+  const essence = (type ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  return essence === 'application/json' || /^application\/[a-z0-9.+-]+\+json$/u.test(essence);
+}
+
+/** Whether a client id is an address a metadata document may be read from: `https:`, a path, no fragment, no user, and a host that is no file host. */
 function isDocumentUrl(id: string): boolean {
   if (id.length > URI_MOST || id.includes('#')) return false;
   try {
     const url = new URL(id);
-    return url.protocol === 'https:' && url.pathname !== '/' && url.username === '' && url.password === '';
+    return url.protocol === 'https:' && url.pathname !== '/' && url.username === '' && url.password === '' && !isUserContentHost(url.hostname);
   } catch {
     return false;
   }
@@ -877,6 +922,13 @@ const secondsLeft = (instant: string, now: number): number => Math.max(1, Math.f
  *
  * REVOKING THE PARENT IN SETTINGS ENDS THE APP. Its children answer 401 at their next call, and the next refresh finds
  * no child to mint (`deps.child` answers `null`), drops the family and answers `invalid_grant`.
+ *
+ * THE TOKEN JUST REPLACED, INSIDE ITS GRACE, IS ANSWERED AS A RETRY AND MOVES NOTHING. It is a client that never saw our
+ * answer, or a second tab of the same app that refreshed at the same moment, and both want the answer the first
+ * presentation got. So the token that answer handed out is sealed under the one it replaced (`prev_sealed` holds the
+ * parent and the new token), and a retry is handed that same token and a child of its own; the current token stays where
+ * it is. It used to rotate the family again for whoever presented the old token, which displaced the token the app
+ * held: anyone who replayed a stolen copy within the two minutes took the family over, and the app was signed out.
  */
 async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<Response> {
   const gone = 'This refresh token is not one BrainDog gave, was replaced, or has not been used for ninety days. Sign in again.';
@@ -890,35 +942,66 @@ async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<R
     if (f.client_id !== undefined && textField(f.client_id) !== row.client_id) return oauthError(400, 'invalid_grant', 'This refresh token was given to another app.');
     if (f.resource !== undefined && !isResource(textField(f.resource), deps)) return oauthError(400, 'invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
     const sealed = row.which === 'current' ? row.cur_sealed : row.prev_sealed;
-    const parent = sealed === null ? null : await openBearer(sealed, presented);
-    if (parent === null) return oauthError(400, 'invalid_grant', gone);
+    const opened = sealed === null ? null : await openBearer(sealed, presented);
+    if (opened === null) return oauthError(400, 'invalid_grant', gone);
     const now = deps.now();
+
+    if (row.which === 'previous') {
+      const held = retryOf(opened);
+      /* THE ANSWER THE FIRST PRESENTATION GOT, if the current token is still the one it handed out. Anything else is a
+         family that has moved on since, which the old token has no claim to. */
+      if (held.next !== null) {
+        if ((await digest(held.next)) !== row.cur_hash) return oauthError(400, 'invalid_grant', gone);
+        return childAnswer(row, held.parent, held.next, now, deps);
+      }
+      /* A ROW SEALED BEFORE THE RETRY WAS KEPT has only the parent, and lives at most the two-minute grace: it is answered
+         as it was then, by a rotation, so a client mid-refresh across the deploy is not signed out. */
+    }
+
+    const parent = row.which === 'previous' ? retryOf(opened).parent : opened;
     const next = b64url(random(32));
-    const retried = row.which === 'previous';
     const ok = await deps.store({
       op: 'refresh_rotate',
       id: row.id,
       expect_cur: row.cur_hash,
       next: {
         cur_hash: await digest(next), cur_sealed: await sealBearer(parent, next),
-        /* The one just presented stays good for the grace; a retry of an older one does not get a longer grace. */
-        prev_hash: hash, prev_sealed: await sealBearer(parent, presented), prev_until: retried ? row.prev_until : now + REFRESH_GRACE,
+        /* The one just presented stays good for the grace, sealed with the token it was replaced by, so a retry is handed
+           that one again; a retry of an older one does not get a longer grace. */
+        prev_hash: hash, prev_sealed: await sealBearer(`${parent}${RETRY_SPLIT}${next}`, presented), prev_until: row.which === 'previous' ? row.prev_until : now + REFRESH_GRACE,
         expires: now + TOKEN_DAYS * DAY_MS,
       },
     });
     if (!ok) continue;
-    /* MINTED AFTER THE ROTATION WINS, so two retries racing make one child, and checked against the parent every time:
-       a parent revoked since the last refresh mints nothing, and the family goes with it. */
-    const child = await deps.child(parent, CHILD_MINUTES);
-    if (child === null) {
-      await deps.store({ op: 'refresh_drop', id: row.id });
-      return oauthError(400, 'invalid_grant', REMOVED);
-    }
-    return json(200, {
-      access_token: child.bearer, token_type: 'Bearer', expires_in: secondsLeft(child.expires_at, now), scope: ladder(row.scope), refresh_token: next,
-    }, [['pragma', 'no-cache']]);
+    return childAnswer(row, parent, next, now, deps);
   }
   return oauthError(400, 'invalid_grant', gone);
+}
+
+/** Between the parent and the token that replaced the one a retry presents, in `prev_sealed`: in neither alphabet. */
+const RETRY_SPLIT = '\n';
+
+/** What a previous token's seal holds: the parent, and the token that replaced it (`null` in a row sealed before it was kept). */
+function retryOf(opened: string): { parent: string; next: string | null } {
+  const at = opened.indexOf(RETRY_SPLIT);
+  return at < 0 ? { parent: opened, next: null } : { parent: opened.slice(0, at), next: opened.slice(at + RETRY_SPLIT.length) };
+}
+
+/**
+ * A child and the family's refresh token, as a refresh answers them.
+ *
+ * MINTED AFTER THE ROTATION WINS, so two retries racing make one new token, and checked against the parent every time: a
+ * parent revoked since the last refresh mints nothing, and the family goes with it.
+ */
+async function childAnswer(row: { id: string; scope: string }, parent: string, refresh: string, now: number, deps: OAuthDeps): Promise<Response> {
+  const child = await deps.child(parent, CHILD_MINUTES);
+  if (child === null) {
+    await deps.store({ op: 'refresh_drop', id: row.id });
+    return oauthError(400, 'invalid_grant', REMOVED);
+  }
+  return json(200, {
+    access_token: child.bearer, token_type: 'Bearer', expires_in: secondsLeft(child.expires_at, now), scope: ladder(row.scope), refresh_token: refresh,
+  }, [['pragma', 'no-cache']]);
 }
 
 /**

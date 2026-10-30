@@ -159,7 +159,8 @@ test('with no BRAINDOG_CATALOGUE, the catalogue bundled in the built shell is se
       /* THE OLD ADDRESS IS THE SHELL'S, which sends a request on to where the catalogue is now. */
       const old = await get('/app/catalogue/index.json');
       assert.equal(old.status, 308, shell);
-      assert.equal(old.headers.get('location'), '/catalogue/index.json');
+      /* Under this host's own origin, which with no BRAINDOG_ORIGIN is localhost at its port. */
+      assert.equal(old.headers.get('location'), `http://localhost:${(running.server.address() as { port: number }).port}/catalogue/index.json`);
     } finally {
       await running.close();
     }

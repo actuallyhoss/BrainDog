@@ -48,7 +48,7 @@ import { NIGHTLY_AT, nightlyBackups } from './backup.ts';
 import { APP_ROOT, bakedSaid, bakedSecrets } from './baked.ts';
 import { backupData, restoreData } from './cold.ts';
 import { degradeLines, setupLine } from './first-run.ts';
-import { commandFor, inImage, listenOf, originOf, serverKeyOf } from './how.ts';
+import { commandFor, inImage, listenOf, originOf, plainLine, serverKeyOf } from './how.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
 import { initFrom } from './restore.ts';
@@ -777,6 +777,9 @@ async function serve(): Promise<void> {
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
+  /* AND WHEN THAT KEY GOES OVER PLAIN HTTP TO EVERY INTERFACE, said beside it (`plainLine`). */
+  const plain = plainLine({ key: serverKey.value !== undefined, tls: tls !== undefined, listen: listenOf(env), origin: running.signIn.origin });
+  if (plain) say(plain);
   /* AND WHEN THERE IS NO APP TO OPEN, SAID BEFORE ANY ADDRESS IS FOLLOWED. A start with no web build printed a sign-in
      address that answered a JSON 404; the root now answers a page saying the same as this line. */
   if (shell === undefined)

@@ -27,6 +27,7 @@ import {
   serveOAuthDoor,
   TOKEN_DAYS,
   DOCUMENT_MOST_BYTES,
+  isJsonType,
   type Approver,
   type Consent,
   type Minted,
@@ -90,7 +91,8 @@ const RECORD_NAME_MOST = 64;
 async function readDocument(url: string): Promise<string | null> {
   try {
     const out = await fetch(url, { method: 'GET', redirect: 'manual', headers: [['accept', 'application/json']], signal: AbortSignal.timeout(DOCUMENT_WAIT_MS) });
-    if (out.status !== 200 || out.body === null) {
+    /* AS JSON, OR NOT AT ALL: a file host answers an upload as `text/plain` (`isJsonType`). */
+    if (out.status !== 200 || out.body === null || !isJsonType(out.headers.get('content-type'))) {
       await out.body?.cancel();
       return null;
     }
@@ -174,7 +176,7 @@ function wiring<I>(request: Request, env: OAuthEnv<I>, host: string) {
       const on = record(door.record);
       const person = ctx.principal.kind === 'person' ? ctx.principal.id : null;
       const since = person === null ? null : await directory().madeAt(person);
-      return { ok: true, record: door.record, provedAt: ctx.provedAt ?? 0, since: since ?? undefined, cookie: door.cookie, mint: (args) => mintOn(on, origin, ctx, args) };
+      return { ok: true, record: door.record, provedAt: ctx.provedAt ?? 0, since: since ?? undefined, cookie: door.cookie, mint: (args) => mintOn(on, origin, { ...ctx, door: 'oauth' }, args) };
     }
     if (door.door === 'refused')
       return { ok: false, status: door.status, say: door.status === 403 ? (door.refusal?.fix ?? REFUSED[403]) : REFUSED[door.status], retryAfter: door.retryAfter, cookie: door.cookie };

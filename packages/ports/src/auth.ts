@@ -62,6 +62,9 @@ export type AuthCall =
   | { flow: 'magic.start'; email: string; ip: string }
   | { flow: 'magic.redeem'; linkToken: string; ip: string; sid?: string }
   | { flow: 'magic.redeem'; claimToken: string; ip: string; sid?: string }
+  /** Whose account a sign-in or claim link opens, asked before the press and spending nothing. */
+  | { flow: 'magic.whose'; linkToken: string; ip: string }
+  | { flow: 'magic.whose'; claimToken: string; ip: string }
   | { flow: 'passkeys'; sid: string }
   | { flow: 'passkey.remove'; sid: string; id: string }
   | { flow: 'passkey.rename'; sid: string; id: string; label: string }
@@ -274,6 +277,8 @@ export type AuthBodies = {
   'passkey.assert': Who;
   'magic.start': Record<string, never>;
   'magic.redeem': Who;
+  /** The address of the account the link signs in to, for the screen to say before anybody presses. */
+  'magic.whose': { email: string };
   passkeys: PasskeyInfo[];
   'passkey.remove': Record<string, never>;
   'passkey.rename': PasskeyInfo;

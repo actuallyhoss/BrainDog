@@ -220,3 +220,21 @@ test('THE FINAL COPY IS KEPT THIRTY DAYS UNTIL THE OWNER DECIDES OTHERWISE', () 
   // decision somebody makes in this file and its test, and `deleteCosts` in the web copy is changed with it.
   assert.equal(FINAL_KEPT_DAYS, 30);
 });
+
+/* ARRIVALS KEPT AT THE DOOR FOR A RECORD GO WITH IT. They are sealed webhook bodies, bank texts among them, and they were
+   kept for ever, waiting or given up, after the record they were for was erased. */
+test('A DELETED RECORD TAKES ITS KEPT ARRIVALS WITH IT, waiting and given up, and the night takes any left', async () => {
+  const { calls, storage, close } = fakes();
+  const waiting = `held/wait/${REC}/${'d'.repeat(64)}.held`;
+  const gaveUp = `held/gave-up/${REC}/${'e'.repeat(64)}.held`;
+  const theirs = `held/gave-up/${OTHER}/${'f'.repeat(64)}.held`;
+  const blobs = bucket([...nightly(REC), waiting, gaveUp, theirs]);
+  const said = await destroyRecord(storage, close, REC, { blobs, final: finalInto(blobs, calls) });
+  assert.deepEqual(said, { kept: FINAL, removed: 4 });
+  assert.ok(!blobs.held.has(waiting) && !blobs.held.has(gaveUp), 'a kept arrival outlived its record');
+  assert.ok(blobs.held.has(theirs), 'another record lost a kept arrival');
+
+  const left = bucket([gaveUp]);
+  assert.equal(await expireFinal(left, REC), 1);
+  assert.equal(left.held.size, 0);
+});

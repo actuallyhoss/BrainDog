@@ -187,6 +187,11 @@ export type FileDeps = {
   limit: (who: LimitDoor, cls: LimitClass) => Promise<Response | null>;
   /** A day's bytes for one record (`ABUSE.uploadDay`): `null` to go on, or the 429. Absent, and nothing is counted. */
   bytes?: ((record: string, bytes: number) => Promise<Response | null>) | undefined;
+  /**
+   * Whether the record keeps this file from this caller, named only on rows they cannot read (the record's `fileHeld`).
+   * Absent, and nothing is held back beyond "reads files", as before.
+   */
+  held?: ((record: string, sha256: string, ctx: CallContext) => Promise<boolean>) | undefined;
 };
 
 const answer = (status: number, body: unknown, extra: Record<string, string> = {}): Response =>
@@ -247,7 +252,7 @@ export async function serveFiles(request: Request, deps: FileDeps): Promise<Resp
   const over = await deps.limit({ door: door.door, ctx }, reading ? 'read' : 'write');
   if (over !== null) return withCookie(over, cookie);
 
-  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!) : await keep(request, deps.blobs, record, ctx, asked.sha256, deps.bytes);
+  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!, deps.held) : await keep(request, deps.blobs, record, ctx, asked.sha256, deps.bytes);
   return withCookie(out, cookie);
 }
 
@@ -291,10 +296,13 @@ async function keep(request: Request, blobs: FileBucket | undefined, record: str
  * A NAME THAT IS NOT A HASH AND A HASH THIS RECORD DOES NOT HOLD ARE ONE ANSWER, so the door says nothing about which
  * names exist beyond the one asked.
  */
-async function give(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext, sha256: string): Promise<Response> {
+async function give(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext, sha256: string, held?: FileDeps['held']): Promise<Response> {
   if (!readsFiles(ctx)) return refuse(403, CANNOT_READ);
   if (blobs === undefined) return refuse(501, NO_STORE);
   if (!SHA256.test(sha256)) return refuse(404, NO_FILE);
+  /* AND A FILE NAMED ONLY ON ROWS THIS CALLER CANNOT READ IS NOT THERE FOR THEM (the record's `fileHeld`), in the same
+     404 as a hash nobody holds, so the answer does not say the file exists. */
+  if (held !== undefined && (await held(record, sha256, ctx))) return refuse(404, NO_FILE);
   const key = fileKey(record, sha256);
   const fileHeaders = (meta: { size: number; httpMetadata?: { contentType?: string } }): Record<string, string> => ({
     ...FILE_HEADERS,

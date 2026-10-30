@@ -20,6 +20,7 @@
  */
 
 import { sessionOf, withSession, type IngestArrival, type IngestDoor, type IngestVerify } from '@braindog/host';
+import { clearCookie, COOKIE } from '@braindog/host/auth';
 import { fixOf, type Result, type Snapshot } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 import { badSlug } from '@braindog/record/directory';
@@ -518,6 +519,47 @@ export function legacyRedirect(request: Request, legacy: string | undefined, pub
   if (host === home) return moved === null ? null : to(moved);
   if (!legacyHosts(legacy).includes(host) || !/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
   return to(moved ?? path);
+}
+
+/**
+ * A request on a legacy host with its session cookie taken off, and whether it carried one.
+ *
+ * A SESSION COOKIE ON A LEGACY HOST IS NOBODY'S. Cookies minted on `brain.dog` before the app moved to `app.brain.dog`
+ * kept opening records there: `/api`, `/auth` and `/account` are still answered on the old name, which shares an origin
+ * with the marketing site, so any script on the site could read the record over GET with them, and their rotation went
+ * on while sign-out (from the app's origin) could never reach them. A bearer is still taken there, for an agent whose
+ * hosts file names the old address; a cookie is not, so a page there reads as signed out and the browser is told to
+ * drop it (`legacyAnswer`).
+ */
+export function legacyRequest(request: Request, legacy: string | undefined): { request: Request; legacy: boolean; carried: boolean } {
+  const host = new URL(request.url).host.toLowerCase();
+  if (!legacyHosts(legacy).includes(host)) return { request, legacy: false, carried: false };
+  const sent = request.headers.get('cookie');
+  if (sent === null) return { request, legacy: true, carried: false };
+  const session = new Set<string>([COOKIE.secure, COOKIE.local]);
+  const parts = sent.split(';');
+  const kept = parts.filter((part) => !session.has(part.slice(0, part.indexOf('=') < 0 ? part.length : part.indexOf('=')).trim()));
+  if (kept.length === parts.length) return { request, legacy: true, carried: false };
+  const stripped = new Request(request);
+  if (kept.join(';').trim() === '') stripped.headers.delete('cookie');
+  else stripped.headers.set('cookie', kept.join(';').trim());
+  return { request: stripped, legacy: true, carried: true };
+}
+
+/**
+ * The answer on a legacy host: no session cookie set there by anything below, and the one the request carried cleared.
+ * A 101 is handed back as it is, since its socket cannot be copied into a new answer.
+ */
+export function legacyAnswer(answer: Response, carried: boolean): Response {
+  if (answer.status === 101) return answer;
+  const cookies = typeof answer.headers.getSetCookie === 'function' ? answer.headers.getSetCookie() : [];
+  const session = (c: string) => c.startsWith(`${COOKIE.secure}=`) || c.startsWith(`${COOKIE.local}=`);
+  if (!carried && !cookies.some(session)) return answer;
+  const out = new Response(answer.body, answer);
+  out.headers.delete('set-cookie');
+  for (const c of cookies) if (!session(c)) out.headers.append('set-cookie', c);
+  if (carried) out.headers.append('set-cookie', clearCookie('secure'));
+  return out;
 }
 
 /** The names in `LEGACY_HOSTS`, lower-cased, none empty. Unset or empty is none. */

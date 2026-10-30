@@ -34,7 +34,6 @@
   import { reprove } from '$lib/record/keychain.ts';
   import { titleOf } from '$lib/title.ts';
   import { TONES } from 'braindog-render';
-  import { markedOf } from '@braindog/skin/agent-marks.ts';
   import AgentMark from '$lib/ui/AgentMark.svelte';
   import Button from '$lib/ui/Button.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
@@ -44,7 +43,7 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from '../signin/Entry.svelte';
   import { answer, choicesOf, readConsent, type Scope } from './consent.ts';
-  import { provenLine } from './proven.ts';
+  import { markFor, provenLine } from './proven.ts';
 
   const shell = $derived(page.data as unknown as Shell);
   const request = $derived(page.url.searchParams.get('request'));
@@ -115,8 +114,9 @@
   }
 
   const title = $derived(consent ? copy.consentNamed(consent.client_name) : copy.consentTitle);
-  /* A KNOWN AGENT WEARS ITS MAKER'S MARK, as it does on Connect your agent (first F11); any other app its initials. */
-  const marked = $derived(consent ? markedOf(consent.client_name) : null);
+  /* A KNOWN AGENT WEARS ITS MAKER'S MARK, as it does on Connect your agent (first F11), but only when its document came
+     from that maker's own host (`markFor`); any other app its initials, whatever name it chose. */
+  const marked = $derived(consent ? markFor(consent) : null);
   /** The BrainDog the app would reach, by its name, once there is one to name. */
   const recordName = $derived(choices.find((c) => c.slug === record)?.name ?? null);
 </script>
