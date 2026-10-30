@@ -38,7 +38,7 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
   'filed-for-you-30d': {
     metric: 'filed-for-you-30d',
     pack: 'money-core',
-    name: 'Filed for you, 30 days',
+    name: 'Added for you, 30 days',
     source: 'events.transactions',
     where: 'by is agent or door or rule',
     value: { count: 'made' },
@@ -55,7 +55,7 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
   'filed-today': {
     metric: 'filed-today',
     pack: 'money-core',
-    name: 'Filed today',
+    name: 'Added today',
     source: 'events.transactions',
     value: { count: 'made' },
     format: 'int',
