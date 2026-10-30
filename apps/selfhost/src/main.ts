@@ -178,6 +178,22 @@ function bootLine(s: SignIn): string {
 }
 
 /**
+ * The origin to serve at: `BRAINDOG_ORIGIN`, or, in the image, `http://localhost:<BRAINDOG_PORT>` when Compose publishes
+ * the server on another port of the machine than the one it listens on inside. Undefined leaves `start` its own default,
+ * `http://localhost:<port>`, and a certificate its names.
+ *
+ * MEASURED FROM THE CODE: `docker-compose.yml` maps `${BRAINDOG_PORT}:8080`, and the origin stayed `http://localhost:8080`,
+ * so the sign-in link and every passkey named a port nothing answered on, and a write from the page at the real port
+ * carried an `Origin` this host refused. The `.env` that sets the port is the one the container reads.
+ */
+function originOf(e: Record<string, string | undefined>, port: number, tls: boolean): string | undefined {
+  if (e.BRAINDOG_ORIGIN !== undefined) return e.BRAINDOG_ORIGIN;
+  const published = e.BRAINDOG_PORT?.trim();
+  if (tls || !inImage() || !published || !/^\d{1,5}$/u.test(published) || Number(published) === port) return undefined;
+  return `http://localhost:${published}`;
+}
+
+/**
  * The start's lines about agents: whether Claude's and ChatGPT's connectors can add this host (OAuth), and how the
  * command line connects. Never a key: `token create` prints its own, once, to whoever ran it.
  */
@@ -726,7 +742,7 @@ async function serve(): Promise<void> {
     keys: store,
     ...(listenOf(env) === undefined ? {} : { host: listenOf(env) }),
     ...(existsSync(dirFile) ? { directory: dirFile } : {}),
-    ...(env.BRAINDOG_ORIGIN === undefined ? {} : { origin: env.BRAINDOG_ORIGIN }),
+    ...(originOf(env, port, tls !== undefined) === undefined ? {} : { origin: originOf(env, port, tls !== undefined) }),
     ...(tls === undefined ? {} : { tls }),
     ...(shell === undefined ? {} : { shell }),
     ...(env.BRAINDOG_CATALOGUE === undefined ? {} : { catalogue: env.BRAINDOG_CATALOGUE }),
@@ -799,7 +815,7 @@ async function serve(): Promise<void> {
   }
   /* AND WHERE MAIL GOES, by host and port and never with what password. */
   if (smtp) say(`  ${smtpLine(smtp)}`);
-  for (const line of degradeLines(env, smtp !== undefined)) say(line);
+  for (const line of degradeLines(env, smtp !== null)) say(line);
   /* AND HOW AN AGENT GETS IN, with OAuth said either way: a default host listens on every interface at a plain-http
      origin, where OAuth is off, and nothing at start said so. */
   for (const line of agentLines({ origin: running.signIn.origin, slug: running.api.kernel.identity()?.slug, open: running.signIn.off === 'open', oauthOff: running.oauthOff })) say(line);

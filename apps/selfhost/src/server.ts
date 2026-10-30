@@ -1892,7 +1892,11 @@ export async function start(options: {
      A deployment that wants a wider bind says so by setting a token, which is the same sentence
      read from the other end. `BRAINDOG_LISTEN` is the explicit override for the case in between: a
      container that has a token and needs `0.0.0.0` to be reachable at all. */
-  const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '0.0.0.0');
+  /* AND "EVERY INTERFACE" IS BOTH FAMILIES. `0.0.0.0` is IPv4 alone, while every link this prints says `localhost`, which
+     a machine may resolve to `::1` first: with another program on `[::]:<port>`, `curl localhost:<port>` reached that
+     program and not this one (measured). `::` takes both where the machine has IPv6, and Node falls back to `0.0.0.0`
+     where it has none. */
+  const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '::');
   const trustProxy = options.trustProxy === true;
   /* SET THE MOMENT THE PORT IS KNOWN, and nothing is answered before: see below. */
   let site: Site | null = null;
@@ -1998,9 +2002,45 @@ export async function start(options: {
   const inboundMail = options.file === ':memory:' ? null : inboundDigest(joinPath(dirOf(options.file), 'inbound.token'), clock.now);
 
   const names = options.tls === undefined ? [] : certificateNames(options.tls.cert);
-  const server =
+  const serverOf = () =>
     options.tls === undefined ? createServer(answering) : createTlsServer({ cert: options.tls.cert, key: options.tls.key }, answering);
-  await new Promise<void>((resolve) => server.listen(options.port, host, resolve));
+  const server = serverOf();
+  /* A PORT THAT IS TAKEN IS A SENTENCE, not an unhandled `error` event that ended the process with a stack. */
+  const listening = (on: typeof server, at: string | undefined, port: number): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      const failed = (e: Error): void => reject(e);
+      on.once('error', failed);
+      on.listen(port, at, () => {
+        on.off('error', failed);
+        resolve();
+      });
+    });
+  try {
+    /* THE DEFAULT WILDCARD IS NODE'S OWN, `::` with its fall back to `0.0.0.0`; one the operator named is bound as named. */
+    await listening(server, options.host === undefined && host === '::' ? undefined : host, options.port);
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === 'EADDRINUSE') throw new Error(`Port ${String(options.port)} is taken by another program, so this BrainDog did not start. Stop that program, or set PORT (and BRAINDOG_PORT under Compose) to another one.`);
+    if (code === 'EADDRNOTAVAIL') throw new Error(`${host} is not an address of this machine, so this BrainDog did not start. Set BRAINDOG_LISTEN to one it has, or unset it.`);
+    throw e;
+  }
+  /* AND LOOPBACK IS BOTH LOOPBACKS. `127.0.0.1` alone left `localhost` free to resolve to `::1` and reach whatever else
+     listens there; a second socket on `[::1]` closes that. A machine with no IPv6 has nothing to close, and a program
+     already on `[::1]:<port>` is said once, since this one cannot move it. */
+  let second: typeof server | null = null;
+  if (options.host === undefined && host === '127.0.0.1') {
+    const also = serverOf();
+    try {
+      await listening(also, '::1', (server.address() as AddressInfo).port);
+      second = also;
+    } catch (e) {
+      also.close();
+      if ((e as { code?: string }).code === 'EADDRINUSE')
+        console.error(
+          `listen: another program holds [::1]:${String((server.address() as AddressInfo).port)}, so localhost may reach it rather than this BrainDog. Open it at 127.0.0.1, or stop that program.`,
+        );
+    }
+  }
 
   /* THE ORIGIN IS KNOWN ONLY NOW, when the port is, and `port: 0` is how every test starts one. Nothing
      between here and `site = …` awaits, so no request is answered before it is set. */
@@ -2217,6 +2257,7 @@ export async function start(options: {
         scheduler.stop();
         if (ticker) clearInterval(ticker);
         if (slashTicker) clearInterval(slashTicker);
+        second?.close();
         server.close(() => (gone || (sql.close(), slashSql.close()), dirSql.close(), r()));
       }),
   };
