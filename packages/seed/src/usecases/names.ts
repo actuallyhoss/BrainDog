@@ -110,6 +110,7 @@ export const SCRIPT_NAMES: Readonly<Record<string, string>> = {
   file_back: 'File what a filing rule matches',
   last_day: 'Ask whether a payment on a month end is the last day or that date',
   learn_category: 'Offer a filing rule from a category set by hand',
+  ledger_twice: 'Find lines in the Ledger written twice',
   match_payment: 'Find what a payment paid',
   move_line: 'Ask to move a repeating line on when its bill is paid',
   offer_budgets: "Offer a budget for each category from last month's spending",

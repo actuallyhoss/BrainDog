@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Fields } from '../src/pipeline.ts';
-import { isDuplicate } from '../src/dedupe.ts';
+import { bankless, isDuplicate, nearMatch } from '../src/dedupe.ts';
 
 const money = (amount: number, currency: string) => ({ amount, currency });
 
@@ -149,4 +149,74 @@ test('near: a field one side never held is unknown, not different, so an older r
   assert.equal(isDuplicate(again, old, key), true);
   assert.equal(isDuplicate(again, { ...old, ref: 'ffff0000' }, key), false, 'held by both, it must agree');
   assert.equal(isDuplicate({ ref: 'x', on: '2026-10-17', what: 'W' }, { on: '2026-10-17', what: 'W' }, key), false, 'nothing held by both is no match');
+});
+
+/* ── one payment seen by two roads (live check of 30 October, 11) ───────── */
+
+test('bankless takes off the day stamp, the words before the payee, a processor and Purchase', () => {
+  assert.equal(bankless('IPN outward transfer to AHMED EMAD SAIED ABDELAZIZ'), 'ahmed emad saied abdelaziz');
+  assert.equal(bankless('05OCT26 PAYMOB*UNITRADE Purchase'), 'unitrade');
+  assert.equal(bankless('CHILLOUT *CHILLOUT ELO'), 'chillout elo');
+  assert.equal(bankless('Woplek Office Furniture.'), 'woplek office furniture');
+  assert.equal(bankless('Purchase'), 'purchase', 'never empty');
+});
+
+const IPN = { near: { on: ['amount', 'account', 'hsbc_reference'], day: 'on', prefix: { field: 'what', chars: 12 } } };
+const CARD = { near: { on: ['amount', 'account', 'available'], day: 'on', prefix: { field: 'what', chars: 12 } } };
+const egp = (amount: number) => money(amount, 'EGP');
+
+test('a statement line and an alert for one transfer are one payment, two days apart', () => {
+  const line: Fields = { what: 'IPN outward transfer to AHMED EMAD SAIED ABDELAZIZ', amount: egp(150_150), account: 'hsbc', on: '2026-10-21', direction: 'out' };
+  const alert: Fields = { what: 'AHMED EMAD SAIED ABDELAZIZ', amount: egp(150_150), account: 'hsbc', on: '2026-10-19', direction: 'out', hsbc_reference: 'a72eba6b' };
+  assert.equal(nearMatch(alert, line, IPN), 'across');
+  assert.equal(isDuplicate(line, alert, IPN), true);
+  assert.equal(isDuplicate({ ...line, on: '2026-10-23' }, alert, IPN), false, 'four days is another payment');
+  assert.equal(isDuplicate({ ...line, amount: egp(150_100) }, alert, IPN), false, 'another amount');
+});
+
+test('a card line from a statement and the card alert are one charge, though only the alert says what was left', () => {
+  const line: Fields = { what: '05OCT26 PAYMOB*UNITRADE Purchase', amount: egp(27_747), account: 'card', on: '2026-10-07', direction: 'out' };
+  const alert: Fields = { what: 'UNITRADE', amount: egp(27_747), account: 'card', on: '2026-10-05', direction: 'out', available: egp(1_425_697) };
+  assert.equal(nearMatch(alert, line, CARD), 'across');
+});
+
+test('two alerts that both say what was left, and say it differently, are two charges', () => {
+  /* ALMOKHTBR, EGP 1,750 twice on 21 October: the limit left fell by the charge, so the shop charged twice. */
+  const one: Fields = { what: 'ALMOKHTBR', amount: egp(175_000), account: 'card', on: '2026-10-21', available: egp(3_070_281) };
+  assert.equal(isDuplicate(one, { ...one, available: egp(2_895_281) }, CARD), false);
+  assert.equal(nearMatch(one, { ...one }, CARD), 'strong');
+});
+
+test('rows that hold the same fields keep the one day, and only a pair by two roads gets three', () => {
+  const alert: Fields = { what: 'WOPLEK OFFICE FURNITURE', amount: egp(3_462_000), account: 'hsbc', on: '2026-10-17', hsbc_reference: '40175f9b' };
+  assert.equal(isDuplicate(alert, { ...alert, on: '2026-10-19' }, IPN), false);
+  const { hsbc_reference: _r, ...old } = alert;
+  assert.equal(isDuplicate(alert, { ...old, on: '2026-10-20' }, IPN), true);
+});
+
+test('one payment never goes both ways, even when the words read alike once the bank is taken off', () => {
+  const out: Fields = { what: 'IPN outward transfer to LAYLA AHMED', amount: egp(50_050), account: 'hsbc', on: '2026-10-03', direction: 'out' };
+  const back: Fields = { what: 'LAYLA AHMED', amount: egp(50_050), account: 'hsbc', on: '2026-10-03', direction: 'in', hsbc_reference: 'ffff' };
+  assert.equal(isDuplicate(out, back, IPN), false);
+  assert.equal(isDuplicate(out, { ...back, direction: 'out' }, IPN), true);
+});
+
+test('an amount is never unknown: a row with none is not the same as one with an amount', () => {
+  const key = { near: { on: ['amount', 'account'], day: 'on' } };
+  assert.equal(isDuplicate({ amount: egp(100), account: 'a', on: '2026-10-01' }, { account: 'a', on: '2026-10-01' }, key), false);
+});
+
+test('the payee key reads past a place at the end, so TALABAT CAIRO EG and Talabat are one shop', () => {
+  const line: Fields = { what: '28OCT26 TALABAT CAIRO EG Purchase', amount: egp(101_587), account: 'card', on: '2026-10-29' };
+  const alert: Fields = { what: 'Talabat', amount: egp(101_587), account: 'card', on: '2026-10-28', available: egp(8_530_227) };
+  assert.equal(isDuplicate(alert, line, CARD), true);
+  assert.equal(isDuplicate(alert, { ...line, what: '28OCT26 BREADFAST CAIRO EG Purchase' }, CARD), false, 'another shop');
+});
+
+test('two day stamps that differ are two days, though the balance after them is one', () => {
+  /* A withdrawal, a deposit of the same and a second withdrawal: one balance after, two days in the bank's words. */
+  const key = { near: { on: ['amount', 'account', 'balance_after'], day: 'on', prefix: { field: 'what', chars: 12 } } };
+  const first: Fields = { what: '16AUG26 ATM Cash Withdrawal', amount: egp(250_000), account: 'hsbc', on: '2026-08-16', balance_after: egp(3_104_025) };
+  assert.equal(isDuplicate({ ...first, what: '17AUG26 ATM Cash Withdrawal', on: '2026-08-17' }, first, key), false);
+  assert.equal(isDuplicate({ ...first, what: 'ATM Cash Withdrawal' }, first, key), true, 'a stamp on one side only is no day');
 });
