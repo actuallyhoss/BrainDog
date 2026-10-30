@@ -1,40 +1,66 @@
 #!/usr/bin/env node
 /**
- * BrainDog.dmg: builds the Mac app, signs and notarises it when this Mac holds a Developer ID, and lays the
- * download and the update feed where the site's next deploy publishes them (`brain.dog/desktop/`).
+ * BrainDog.dmg: builds the Mac app, signs and notarises it when this Mac holds a Developer ID, and publishes the
+ * download and the update feed where brain.dog serves them (`brain.dog/desktop/`).
  *
- *   node tools/desktop/release.mjs                 build for this Mac's chip
- *   node tools/desktop/release.mjs --universal     Apple silicon and Intel in one app (needs both Rust targets)
- *   node tools/desktop/release.mjs --stage         and, once it is notarised, lay it in the site for the next deploy
- *   node tools/desktop/release.mjs --dry-run       say what it would do, and build nothing
+ *   node tools/desktop/release.mjs                    build for this Mac's chip
+ *   node tools/desktop/release.mjs --universal        Apple silicon and Intel in one app (needs both Rust targets)
+ *   node tools/desktop/release.mjs --publish          and, once it is notarised, upload it and open /download
+ *   node tools/desktop/release.mjs --version 0.2.0    set the app's version first (tauri.conf.json and Cargo.toml)
+ *   node tools/desktop/release.mjs --dry-run          say what it would do, and build nothing
  *
  * TWO KINDS OF BUILD, AND IT SAYS WHICH IT MADE. With a "Developer ID Application" identity in the keychain
  * (`security find-identity -p codesigning`, the owner's Apple sitting) and notarisation's account in the
  * environment or in `apps/desktop/src-tauri/signing.env` (kept out of git, `signing.example.env` lists the names), the
- * app is signed, notarised and stapled, and `spctl` must accept it before anything is staged. With none, it builds an
- * UNSIGNED dmg: it runs on the Mac that built it, macOS refuses it anywhere else, and it is never staged.
+ * app is signed, notarised and stapled, and `spctl` must accept it before anything is published. With none, it builds
+ * an UNSIGNED dmg: it runs on the Mac that built it, macOS refuses it anywhere else, and it is never published.
+ *
+ * PASSKEYS IN THE APP need its Associated Domains (`apps/desktop/src-tauri/Entitlements.plist`), which macOS honours
+ * only with a provisioning profile that grants them. With the Developer ID profile at
+ * `apps/desktop/src-tauri/BrainDog.provisionprofile` (out of git) or `BRAINDOG_PROVISION_PROFILE`, the build embeds it
+ * and signs with the entitlements and the team's application identifier; without it the app is built without them,
+ * since a build that claims them unprovisioned is killed at launch.
  *
  * THE UPDATE IS ALWAYS SIGNED, by the updater key in the keychain (`tools/desktop/updater-key.mjs`): the build
  * reads it into its own environment and `latest.json` carries the signature the app checks against its public key.
  *
- * STAGED, NOT DEPLOYED. `--stage` copies `BrainDog.dmg`, the update archive and `latest.json` into
- * `apps/site/static/desktop/` (out of git, as the CLI's copies are) and marks `apps/site/src/lib/desktop.ts`
- * notarised, which is what lets `/download` out of the site's held list (`launch.ts`). The site deploy publishes them;
- * this script never deploys and never prints a secret.
+ * WHERE IT IS PUBLISHED. The site deploys from git and the dmg is not in git, so a file laid in the site's folder never
+ * reached brain.dog. The files go to the R2 bucket `braindog-desktop` instead, served at `download.brain.dog` (the
+ * bucket's custom domain), and `apps/site/static/_redirects` sends `brain.dog/desktop/*` there, so the addresses the app
+ * and the site already name (`latest.json`, `BrainDog.dmg`) never change. The update archive is named by version, so a
+ * cached older archive is never read against a newer signature. `latest.json` goes last, so the feed never names an
+ * archive that is not there yet. Only once the dmg answers from its public address is `DESKTOP_NOTARIZED` set
+ * (`apps/site/src/lib/desktop.ts`), which takes `/download` out of the site's held list (`launch.ts`); commit that
+ * with a changelog entry, and the next site deploy opens the page.
+ *
+ * A VERSION ALREADY LIVE IS REFUSED: the app offers only a newer version than its own, so a second release under the
+ * same number would reach nobody. `--version` raises it in both files.
+ *
+ * WHAT `--publish` NEEDS: Cloudflare credentials that may write the bucket, `CLOUDFLARE_API_TOKEN` (Workers R2 Storage:
+ * Edit) and `CLOUDFLARE_ACCOUNT_ID` in the environment or in `signing.env`, or `wrangler login` on this Mac. This
+ * script never deploys the site and never prints a secret.
  */
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { CONF, KEYCHAIN, ROOT, TAURI_CLI, configPubkey, fromKeychain } from './updater-key.mjs';
 
 const TAURI_DIR = join(ROOT, 'apps/desktop/src-tauri');
+const CARGO_TOML = join(TAURI_DIR, 'Cargo.toml');
+const ENTITLEMENTS = join(TAURI_DIR, 'Entitlements.plist');
+const PROFILE = process.env.BRAINDOG_PROVISION_PROFILE || join(TAURI_DIR, 'BrainDog.provisionprofile');
 const DIST = join(ROOT, 'apps/desktop/dist');
-const STAGE = join(ROOT, 'apps/site/static/desktop');
 const MARK = join(ROOT, 'apps/site/src/lib/desktop.ts');
 const SIGNING_ENV = join(TAURI_DIR, 'signing.env');
-/** Where the update archive is fetched from, the same folder `latest.json` is read from (`plugins.updater.endpoints`). */
-const PUBLIC = 'https://brain.dog/desktop';
+/** The addresses the app and the site name: the feed (`plugins.updater.endpoints`), the download and the archives. */
+export const PUBLIC = 'https://brain.dog/desktop';
+/** The bucket the files live in, and the public name it answers at (`brain.dog/desktop/*` redirects there). */
+export const BUCKET = 'braindog-desktop';
+export const BUCKET_PUBLIC = 'https://download.brain.dog';
+/** The Mac app's bundle identifier, which the team's application identifier is made from. */
+const BUNDLE_ID = 'dog.brain.desktop';
 const CARGO = join(process.env.HOME ?? '', '.cargo/bin');
 /**
  * WHERE CARGO BUILDS, OUTSIDE THE TREE: a release build is 1.6 GB of objects, and the gates that read every file of the
@@ -42,9 +68,13 @@ const CARGO = join(process.env.HOME ?? '', '.cargo/bin');
  */
 export const TARGET = process.env.CARGO_TARGET_DIR || join(process.env.HOME ?? '', 'Library/Caches/braindog/desktop-target');
 
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set(argv);
 const DRY = args.has('--dry-run');
 const UNIVERSAL = args.has('--universal');
+/* `--stage` WAS THE OLD NAME, when the files were laid in the site's folder; it means the same now. */
+const PUBLISH = args.has('--publish') || args.has('--stage');
+const asked = argv.indexOf('--version') >= 0 ? (argv[argv.indexOf('--version') + 1] ?? '') : null;
 const say = (line) => console.log(`  ${line}`);
 const stop = (line) => {
   say(line);
@@ -57,6 +87,9 @@ export function developerId(listing) {
   return m ? m[1] : null;
 }
 
+/** The team inside a Developer ID identity's name, "(ABCDE12345)" at its end, or `null`. */
+export const teamOf = (identity) => /\(([A-Z0-9]{10})\)$/u.exec(identity ?? '')?.[1] ?? null;
+
 /** The names `signing.env` sets, read as `KEY="value"` lines; comments and blanks ignored, nothing printed. */
 export function envFile(text) {
   const out = {};
@@ -67,6 +100,9 @@ export function envFile(text) {
   return out;
 }
 
+/** The archive's name for a version: one name per release, so a cache never pairs an old archive with a new signature. */
+export const archiveOf = (version) => `BrainDog-${version}.app.tar.gz`;
+
 /** The update feed the app reads: this version, the archive's address and its signature, for each chip it was built for. */
 export function feedOf({ version, notes, at, signature, archive, universal, arch }) {
   const url = `${PUBLIC}/${archive}`;
@@ -74,12 +110,77 @@ export function feedOf({ version, notes, at, signature, archive, universal, arch
   return { version, notes, pub_date: at, platforms: Object.fromEntries(chips.map((c) => [c, { signature, url }])) };
 }
 
+/** -1, 0 or 1 as version `a` is older, the same or newer than `b` (`major.minor.patch`; anything after is ignored). */
+export function compareVersions(a, b) {
+  const parts = (v) => String(v).split(/[-+]/u)[0].split('.').map((n) => Number.parseInt(n, 10) || 0);
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0) ? -1 : 1;
+  return 0;
+}
+
+/** The two files with the app's version written in, `version` in each, and nothing else changed. */
+export function withVersion(conf, cargo, version) {
+  if (!/^\d+\.\d+\.\d+$/u.test(version)) throw new Error(`${version} is not a version like 0.2.0`);
+  return {
+    conf: conf.replace(/("version":\s*")[^"]+(")/u, `$1${version}$2`),
+    cargo: cargo.replace(/(\[package\][^[]*?\nversion\s*=\s*")[^"]+(")/u, `$1${version}$2`),
+  };
+}
+
+/** The entitlements a provisioned build signs with: the committed ones, and the team's application identifier. */
+export function entitlementsFor(base, team) {
+  const keys =
+    `\t<key>com.apple.application-identifier</key>\n\t<string>${team}.${BUNDLE_ID}</string>\n` +
+    `\t<key>com.apple.developer.team-identifier</key>\n\t<string>${team}</string>\n`;
+  return base.replace(/<\/dict>\s*<\/plist>\s*$/u, `${keys}</dict>\n</plist>\n`);
+}
+
+/** What goes up, in order: the files the feed and the page name first, `latest.json` last. */
+export function uploadsOf(version) {
+  return [
+    { from: archiveOf(version), key: archiveOf(version), type: 'application/gzip', cache: 'public, max-age=31536000, immutable' },
+    { from: 'BrainDog.dmg', key: `BrainDog-${version}.dmg`, type: 'application/x-apple-diskimage', cache: 'public, max-age=31536000, immutable' },
+    { from: 'BrainDog.dmg', key: 'BrainDog.dmg', type: 'application/x-apple-diskimage', cache: 'public, max-age=300' },
+    { from: 'latest.json', key: 'latest.json', type: 'application/json', cache: 'no-cache' },
+  ];
+}
+
 /** The first file in a folder ending so, or `null`. */
 const found = (dir, end) => (existsSync(dir) ? (readdirSync(dir).find((f) => f.endsWith(end)) ?? null) : null);
 
-function main() {
+/** The version the live feed offers, `null` when there is none yet (or it cannot be read, which is said). */
+async function liveVersion() {
+  try {
+    const res = await fetch(`${BUCKET_PUBLIC}/latest.json`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`answered ${res.status}`);
+    return String((await res.json()).version ?? '') || null;
+  } catch (e) {
+    say(`the live feed could not be read (${e instanceof Error ? e.message : e}); going on as if none is live.`);
+    return null;
+  }
+}
+
+/** Whether an address answers 200 to a HEAD. */
+async function answers(url) {
+  try {
+    return (await fetch(url, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(15_000) })).ok;
+  } catch {
+    return false;
+  }
+}
+
+async function main() {
+  if (asked !== null) {
+    const next = withVersion(readFileSync(CONF, 'utf8'), readFileSync(CARGO_TOML, 'utf8'), asked);
+    if (!DRY) {
+      writeFileSync(CONF, next.conf);
+      writeFileSync(CARGO_TOML, next.cargo);
+    }
+    say(`${DRY ? 'would set' : 'set'} the app's version to ${asked} in tauri.conf.json and Cargo.toml`);
+  }
   const conf = JSON.parse(readFileSync(CONF, 'utf8'));
-  const version = conf.version;
+  const version = asked !== null && DRY ? asked : conf.version;
   if (!configPubkey()) stop('the updater key is not made yet: run node tools/desktop/updater-key.mjs first.');
   const key = fromKeychain(KEYCHAIN.key);
   const keyPassword = fromKeychain(KEYCHAIN.password);
@@ -87,14 +188,38 @@ function main() {
   if (!existsSync(join(CARGO, 'cargo')) && spawnSync('cargo', ['--version'], { stdio: 'ignore' }).status !== 0)
     stop('Rust is not installed: see apps/desktop/README.md, Build.');
 
+  /* BEFORE THE BUILD, so twenty minutes are not spent on a release nobody would be offered. */
+  const live = await liveVersion();
+  if (live !== null && compareVersions(version, live) <= 0) {
+    const line = `${version} is not newer than ${live}, which is live: run again with --version and a higher number.`;
+    if (PUBLISH) stop(line);
+    say(`note: ${line}`);
+  }
+
   const identity = developerId(spawnSync('security', ['find-identity', '-v', '-p', 'codesigning'], { encoding: 'utf8' }).stdout ?? '');
   const notary = { ...(existsSync(SIGNING_ENV) ? envFile(readFileSync(SIGNING_ENV, 'utf8')) : {}), ...process.env };
   const notarises = identity !== null && Boolean(notary.APPLE_ID && notary.APPLE_PASSWORD && notary.APPLE_TEAM_ID);
+  const team = notary.APPLE_TEAM_ID || teamOf(identity);
+  const provisioned = identity !== null && team !== null && existsSync(PROFILE);
   say(`BrainDog ${version} for ${UNIVERSAL ? 'Apple silicon and Intel' : `this Mac (${process.arch})`}`);
   say(identity === null ? 'no Developer ID in the keychain: building an UNSIGNED dmg, which runs only on this Mac' : `signing as ${identity}`);
   if (identity !== null) say(notarises ? 'notarising with the account in the environment' : 'no notarisation account (APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID): signed, NOT notarised');
+  if (identity !== null)
+    say(provisioned ? 'embedding the provisioning profile: passkeys work in the app' : 'no provisioning profile (BrainDog.provisionprofile): built without Associated Domains, so passkeys are refused in the app');
+
+  /* THE PROVISIONED BUILD'S EXTRA CONFIG, merged by the CLI over tauri.conf.json, with its entitlements in a temporary
+     folder: the team's identifier is written there and never into the tree. */
+  const extra = [];
+  if (provisioned && !DRY) {
+    const dir = mkdtempSync(join(tmpdir(), 'braindog-entitlements-'));
+    const plist = join(dir, 'Entitlements.plist');
+    writeFileSync(plist, entitlementsFor(readFileSync(ENTITLEMENTS, 'utf8'), team));
+    extra.push('--config', JSON.stringify({ bundle: { macOS: { entitlements: plist, files: { 'embedded.provisionprofile': PROFILE } } } }));
+  }
+  const build = ['--yes', TAURI_CLI, 'build', '--bundles', 'app,dmg', ...(UNIVERSAL ? ['--target', 'universal-apple-darwin'] : []), ...extra];
   if (DRY) {
-    say(`would run: npx ${TAURI_CLI} build --bundles app,dmg${UNIVERSAL ? ' --target universal-apple-darwin' : ''}`);
+    say(`would run: npx ${build.slice(1).join(' ')}${provisioned ? ' --config <entitlements and profile>' : ''}`);
+    if (PUBLISH) say(`would upload ${uploadsOf(version).map((u) => u.key).join(', ')} to the bucket ${BUCKET}, then open /download`);
     return;
   }
 
@@ -110,11 +235,7 @@ function main() {
     ...(identity !== null ? { APPLE_SIGNING_IDENTITY: identity } : {}),
     ...(notarises ? { APPLE_ID: notary.APPLE_ID, APPLE_PASSWORD: notary.APPLE_PASSWORD, APPLE_TEAM_ID: notary.APPLE_TEAM_ID } : {}),
   };
-  const built = spawnSync('npx', ['--yes', TAURI_CLI, 'build', '--bundles', 'app,dmg', ...(UNIVERSAL ? ['--target', 'universal-apple-darwin'] : [])], {
-    cwd: TAURI_DIR,
-    env,
-    stdio: 'inherit',
-  });
+  const built = spawnSync('npx', build, { cwd: TAURI_DIR, env, stdio: 'inherit' });
   if (built.status !== 0) stop(`the build failed (exit ${built.status}).`);
 
   const bundle = join(TARGET, ...(UNIVERSAL ? ['universal-apple-darwin'] : []), 'release/bundle');
@@ -126,28 +247,46 @@ function main() {
 
   mkdirSync(DIST, { recursive: true });
   copyFileSync(join(bundle, 'dmg', dmg), join(DIST, 'BrainDog.dmg'));
-  copyFileSync(join(bundle, 'macos', archive), join(DIST, 'BrainDog.app.tar.gz'));
-  const feed = feedOf({ version, notes: `BrainDog ${version}`, at: new Date().toISOString(), signature, archive: 'BrainDog.app.tar.gz', universal: UNIVERSAL, arch: process.arch });
+  copyFileSync(join(bundle, 'macos', archive), join(DIST, archiveOf(version)));
+  const feed = feedOf({ version, notes: `BrainDog ${version}`, at: new Date().toISOString(), signature, archive: archiveOf(version), universal: UNIVERSAL, arch: process.arch });
   writeFileSync(join(DIST, 'latest.json'), `${JSON.stringify(feed, null, 2)}\n`);
-  say(`built apps/desktop/dist/BrainDog.dmg, BrainDog.app.tar.gz and latest.json (the update signed by the updater key)`);
+  say(`built apps/desktop/dist/BrainDog.dmg, ${archiveOf(version)} and latest.json (the update signed by the updater key)`);
 
   /* NOTARISED IS WHAT GATEKEEPER SAYS, NOT WHAT THIS SCRIPT HOPED: the app must be accepted as a notarised Developer ID. */
   const checked = spawnSync('spctl', ['-a', '-vv', join(bundle, 'macos', app)], { encoding: 'utf8' });
   const verdict = `${checked.stdout ?? ''}${checked.stderr ?? ''}`;
   const accepted = checked.status === 0 && /accepted/u.test(verdict) && /Notarized Developer ID/u.test(verdict);
   if (!accepted) {
-    say(identity === null ? 'UNSIGNED: Gatekeeper refuses it on any other Mac. Not staged for brain.dog; /download stays held.' : 'NOT NOTARISED: Gatekeeper did not accept it. Not staged for brain.dog; /download stays held.');
-    if (args.has('--stage')) process.exitCode = 1;
+    say(identity === null ? 'UNSIGNED: Gatekeeper refuses it on any other Mac. Not published; /download stays held.' : 'NOT NOTARISED: Gatekeeper did not accept it. Not published; /download stays held.');
+    if (PUBLISH) process.exitCode = 1;
     return;
   }
   if (spawnSync('xcrun', ['stapler', 'staple', join(DIST, 'BrainDog.dmg')], { stdio: 'ignore' }).status !== 0) say('the dmg could not be stapled; the app inside it is.');
   say('accepted: notarised Developer ID');
-  if (!args.has('--stage')) return;
-  mkdirSync(STAGE, { recursive: true });
-  for (const f of ['BrainDog.dmg', 'BrainDog.app.tar.gz', 'latest.json']) copyFileSync(join(DIST, f), join(STAGE, f));
+  if (!PUBLISH) return;
+
+  /* UP TO THE BUCKET, with wrangler from the repository, the Cloudflare account from the environment or signing.env. */
+  const cloud = {
+    ...process.env,
+    ...(notary.CLOUDFLARE_API_TOKEN ? { CLOUDFLARE_API_TOKEN: notary.CLOUDFLARE_API_TOKEN } : {}),
+    ...(notary.CLOUDFLARE_ACCOUNT_ID ? { CLOUDFLARE_ACCOUNT_ID: notary.CLOUDFLARE_ACCOUNT_ID } : {}),
+  };
+  for (const u of uploadsOf(version)) {
+    const put = spawnSync(
+      'pnpm',
+      ['--filter', './apps/site', 'exec', 'wrangler', 'r2', 'object', 'put', `${BUCKET}/${u.key}`, '--file', join(DIST, u.from), '--content-type', u.type, '--cache-control', u.cache, '--remote'],
+      { cwd: ROOT, env: cloud, stdio: ['ignore', 'ignore', 'inherit'] },
+    );
+    if (put.status !== 0) stop(`${u.key} did not upload (exit ${put.status}). Nothing is opened; run --publish again once the bucket can be written.`);
+    say(`uploaded ${u.key}`);
+  }
+
+  /* OPEN /download ONLY WHEN THE FILES REALLY ANSWER from the address the redirect sends a visitor to. */
+  const there = (await answers(`${BUCKET_PUBLIC}/BrainDog.dmg`)) && (await answers(`${BUCKET_PUBLIC}/${archiveOf(version)}`)) && (await liveVersion()) === version;
+  if (!there) stop(`the files are uploaded but ${BUCKET_PUBLIC} does not answer them yet: check the bucket's custom domain, then run --publish again. /download stays held.`);
   writeFileSync(MARK, readFileSync(MARK, 'utf8').replace(/DESKTOP_NOTARIZED: boolean = false/u, 'DESKTOP_NOTARIZED: boolean = true'));
-  say('staged in apps/site/static/desktop/ and marked notarised in apps/site/src/lib/desktop.ts: /download opens with the next site deploy.');
-  say('commit desktop.ts with a changelog entry saying the Mac app can be downloaded, then deploy.');
+  say(`published to ${BUCKET_PUBLIC} (brain.dog/desktop/ redirects there) and marked notarised in apps/site/src/lib/desktop.ts.`);
+  say('commit desktop.ts with a changelog entry saying the Mac app can be downloaded; the next site deploy opens /download.');
 }
 
-if (process.argv[1]?.endsWith('release.mjs')) main();
+if (process.argv[1]?.endsWith('release.mjs')) await main();

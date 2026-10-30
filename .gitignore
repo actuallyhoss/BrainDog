@@ -53,7 +53,8 @@ build-*/
 
 # The CLI the deploy copies into the site before building it (deploy.yml, "Build the CLI for the site"); built, never committed.
 apps/site/static/cli/braindog.mjs*
-# The Mac app's download and update feed, laid here by `tools/desktop/release.mjs --stage` for the site deploy.
+# The Mac app's download and update feed are published to R2 now (`tools/desktop/release.mjs --publish`), never here;
+# kept out of git in case an old copy is still laid in this folder.
 apps/site/static/desktop/
 
 # What `tools/ship` writes on the machine that runs CI and the deploy: each run's logs, its scratch, and the pass marker.
