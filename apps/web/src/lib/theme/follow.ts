@@ -15,8 +15,43 @@
  * chose and the look the record installed arrive on the page together.
  */
 
-import * as accent from '../accent.ts';
+import { hexOf, nameOf } from '../accent-name.ts';
 import * as pref from '../pref.ts';
+
+/**
+ * `accent.ts`, which builds a theme from a colour, loaded only when there is a colour to put on the page or take off it.
+ *
+ * IT WAS ON EVERY OPEN, about 11 KB on a phone arriving beside Today's own code, for a page that wears the house colour.
+ * Now it loads when a colour is wanted: at once when this file loads, if the device's cookie holds one, so the colour
+ * the shell restores (`AppFrame.svelte` asks the same module) is ready as soon as it was before and the page never
+ * paints the house colour for longer than it did; and when `boot` names a swatch the device does not wear yet.
+ */
+let painter: Promise<typeof import('../accent.ts')> | null = null;
+const accentModule = (): Promise<typeof import('../accent.ts')> => {
+  painter ??= import('../accent.ts').catch((e: unknown) => {
+    painter = null;
+    throw e;
+  });
+  return painter;
+};
+if (pref.read().theme) void accentModule().catch(() => null);
+
+/**
+ * The record's `look.accent` put on the page, through `accent.adopt`, when it changes what the page wears: a swatch,
+ * or `House` over a colour this device painted. `painted` is whether the cookie held a colour before anything here
+ * wrote it, since a colour is on the page only while the cookie holds one (`accent.ts` `paint`). Nothing is loaded for
+ * a record that holds no accent, or `House` on a page already wearing it.
+ */
+function adoptAccent(name: unknown, painted: boolean): void {
+  const hex = name === 'House' ? null : hexOf(name);
+  if (hex === undefined || (hex === null && !painted)) return;
+  /* THE COOKIE AT ONCE, as `adopt` wrote it when this file held it: the shell's restore reads the cookie, so it paints
+     the record's word and never the device's older one while the module loads. */
+  pref.write({ theme: hex ?? undefined });
+  void accentModule()
+    .then((accent) => accent.adopt(name))
+    .catch(() => null);
+}
 
 /** `me.prefs` out of a `boot` answer, or `undefined` when nobody is signed in to a record (a token, a refusal). */
 export function prefsOf(boot: unknown): Record<string, unknown> | undefined {
@@ -75,7 +110,7 @@ export function unstampedOf(held: pref.Pref, prefs: Record<string, unknown>): Pa
   if (held.text !== undefined && open('look.size')) out['look.size'] = held.text;
   if (held.density !== undefined && open('look.density')) out['look.density'] = held.density;
   if (held.contrast === true && open('look.contrast')) out['look.contrast'] = true;
-  const swatch = held.theme === undefined ? undefined : accent.nameOf(held.theme);
+  const swatch = held.theme === undefined ? undefined : nameOf(held.theme);
   if (swatch !== undefined && swatch !== 'House' && open('look.accent')) out['look.accent'] = swatch;
   return out;
 }
@@ -113,12 +148,14 @@ export function follow(boot: unknown, send: pref.Send = sendToRecord): void {
   pref.follow(send);
   adopted = who ?? '';
 
+  /* WHETHER THIS DEVICE WEARS A COLOUR, read before the cookie is touched below (`adoptAccent`). */
+  const painted = pref.read().theme !== undefined;
   /* AN ANSWER THAT NAMES NOBODY STAMPS NOTHING and takes nothing off: it cannot say whose the cookie is. */
   if (person !== undefined) {
     const held = pref.read();
     if (held.who !== undefined && held.who !== person) {
       pref.forget();
-      accent.adopt('House');
+      adoptAccent('House', painted);
     } else if (held.who === undefined) {
       const owed = unstampedOf(held, prefs);
       if (Object.keys(owed).length > 0) pref.write({ unsent: { ...owed, ...held.unsent } });
@@ -128,5 +165,5 @@ export function follow(boot: unknown, send: pref.Send = sendToRecord): void {
 
   pref.resend();
   pref.adopt(prefs);
-  if (!Object.hasOwn(pref.unsent(), 'look.accent')) accent.adopt(prefs['look.accent']);
+  if (!Object.hasOwn(pref.unsent(), 'look.accent')) adoptAccent(prefs['look.accent'], painted);
 }

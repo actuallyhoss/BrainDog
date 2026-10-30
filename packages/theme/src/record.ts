@@ -203,10 +203,4 @@ export function recordTheme(
  * on the one screen whose entire subject is visible change. A suggestion that is already the default
  * is not a suggestion; the House control beside them is how you choose it.
  */
-export const ACCENTS: readonly { name: string; hex: string }[] = [
-  { name: 'Moss', hex: '#41815F' },
-  { name: 'Ink blue', hex: '#3C72CE' },
-  { name: 'Plum', hex: '#A75996' },
-  { name: 'Ochre', hex: '#A86A16' },
-  { name: 'Teal', hex: '#2B7F8A' },
-];
+export { ACCENTS } from './accents.ts';

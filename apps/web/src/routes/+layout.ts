@@ -24,6 +24,11 @@ import { exitSeeAs, seeingAs } from '$lib/sharing/see-as.svelte.ts';
 export const ssr = false;
 export const prerender = false;
 
+/* A DEVICE THAT WEARS ITS OWN COLOUR PAINTS IT AS THE APP STARTS (`accent.ts` `early`), so the first screen is drawn in
+   it and never in the house colour first; the shell's restore (`AppFrame.svelte`) still says a colour it had to drop. A
+   device in the house colour never loads that code (`theme/follow.ts`). The cookie is read as `app.html` reads it. */
+if (typeof document !== 'undefined' && /(?:^|; )bd_pref=[^;]*%22theme%22/u.test(document.cookie)) void import('$lib/accent.ts').then((accent) => accent.early()).catch(() => null);
+
 /** The screens that list the records, which wait for the list: Settings (Identity, Billing) and an app's consent. */
 const LISTS_RECORDS = /^\/(?:settings(?:\/|$)|connect$)/u;
 

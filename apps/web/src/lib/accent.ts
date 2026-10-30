@@ -41,6 +41,7 @@
 
 import { ACCENTS, recordTheme } from '@braindog/theme';
 
+import { nameOf } from './accent-name.ts';
 import * as pref from './pref.ts';
 
 /* Re-exported so a screen picking a colour imports one module rather than two, and so the five live
@@ -57,12 +58,8 @@ const adoptable = (): boolean =>
 
 type Applied = { ok: true } | { ok: false; refusals: string[]; codes: string[] };
 
-/**
- * The record's word for a colour: a swatch's name, or `House`. `undefined` is a colour no swatch wears, which the
- * record has no word for, so it stays on this device.
- */
-export const nameOf = (accent: string | null): string | undefined =>
-  accent === null ? 'House' : ACCENTS.find((a) => a.hex.toLowerCase() === accent.toLowerCase())?.name;
+/* A SWATCH'S NAME FOR A COLOUR, from the file that paints nothing (`accent-name.ts`), so the two never disagree. */
+export { nameOf };
 
 /**
  * Put a colour on this page, and remember it: in the cookie for the next first paint, and on the record as the person's
@@ -100,10 +97,11 @@ function paint(accent: string | null): Applied {
   if (accent === null) {
     if (sheet) sheet.replaceSync('');
     pref.write({ theme: undefined });
+    keepSolved(null);
     return { ok: true };
   }
 
-  const built = recordTheme(accent);
+  const built = solve(accent);
   if (!built.ok) return built;
   if (!adoptable()) {
     /* NOTHING TO ADOPT INTO IS NOT A REFUSAL. The colour is remembered, and the next load of a
@@ -112,14 +110,68 @@ function paint(accent: string | null): Applied {
     return { ok: true };
   }
 
+  adoptSheet(built.value.css);
+  pref.write({ theme: accent });
+  return { ok: true };
+}
+
+/* THE LAST COLOUR SOLVED IN THIS TAB, so the shell's restore after `early` builds nothing twice. */
+let solved: { accent: string; css: string } | null = null;
+function solve(accent: string): { ok: true; value: { css: string } } | { ok: false; refusals: string[]; codes: string[] } {
+  if (solved?.accent === accent) return { ok: true, value: { css: solved.css } };
+  const built = recordTheme(accent);
+  if (built.ok) {
+    solved = { accent, css: built.value.css };
+    keepSolved(solved);
+  }
+  return built;
+}
+
+/**
+ * THE SHEET THE DEVICE'S COLOUR WAS LAST SOLVED TO, kept on the device, so the next open paints it before its first
+ * screen without solving it again (`early`): the solve is a tenth of a second on a slow phone, spent before that paint.
+ * Only `early` reads it; the shell's `restore` solves afresh, so a sheet kept by an older build is put right the same
+ * second. A browser that keeps nothing simply solves.
+ */
+const SOLVED = 'bd_accent';
+function keptSolved(accent: string): string | null {
+  try {
+    const raw = localStorage.getItem(SOLVED);
+    const at = raw === null ? -1 : raw.indexOf('\n');
+    return raw !== null && at > 0 && raw.slice(0, at) === accent ? raw.slice(at + 1) : null;
+  } catch {
+    return null;
+  }
+}
+function keepSolved(said: { accent: string; css: string } | null): void {
+  try {
+    if (said === null) localStorage.removeItem(SOLVED);
+    else localStorage.setItem(SOLVED, `${said.accent}\n${said.css}`);
+  } catch {
+    /* A BROWSER THAT KEEPS NOTHING solves the colour again on the next open, as it always did. */
+  }
+}
+
+function adoptSheet(css: string): void {
   sheet ??= new CSSStyleSheet();
-  sheet.replaceSync(built.value.css);
+  sheet.replaceSync(css);
   /* AT THE END, AND THAT IS WHAT MAKES THE PERSON'S PICK WIN. The record's installed look (`theme/draw.ts`) is adopted
      at the front of the same list, so whichever arrives first, this sheet is the later one in `@layer theme`. */
   if (!document.adoptedStyleSheets.includes(sheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+}
 
-  pref.write({ theme: accent });
-  return { ok: true };
+/**
+ * The cookie's colour on the page as the app starts (`routes/+layout.ts`), before the first screen draws, and nothing
+ * else: no cookie written, nothing sent, and a colour the floors refuse left as it is, for the shell's `restore` to drop
+ * and say (`AppFrame.svelte`). Without it the first screen drew in the house colour until the shell had mounted.
+ */
+export function early(): void {
+  const held = pref.read().theme;
+  if (!held || !adoptable()) return;
+  const kept = keptSolved(held);
+  if (kept !== null) return adoptSheet(kept);
+  const built = solve(held);
+  if (built.ok) adoptSheet(built.value.css);
 }
 
 /**

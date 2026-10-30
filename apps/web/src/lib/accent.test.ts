@@ -357,3 +357,41 @@ test('HOUSE PAINTS THE WORKING RED, AND A SWATCH MOVES THE BUTTONS BUT NOT LATE'
     assert.match(css, /--red: #C2362F;/u, `${name} moved late off the deeper red`);
   }
 });
+
+/** A device's own store, as `early` keeps the solved sheet in it. */
+function storage(): Map<string, string> {
+  const kept = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => kept.get(k) ?? null,
+    setItem: (k: string, v: string) => void kept.set(k, v),
+    removeItem: (k: string) => void kept.delete(k),
+  };
+  return kept;
+}
+
+test('EARLY PAINTS THE COOKIE’S COLOUR BEFORE THE SHELL, and writes and sends nothing', () => {
+  const sheets = browser();
+  const kept = storage();
+  pref.write({ theme: ACCEPTED });
+  const before = pref.read();
+  accent.early();
+  assert.equal(sheets().length, 1, 'the colour was not on the page before the first screen');
+  assert.deepEqual(pref.read(), before);
+  /* AND THE NEXT OPEN PAINTS THE SHEET IT KEPT, the same text, without solving the colour again. */
+  assert.ok(kept.get('bd_accent')?.startsWith(`${ACCEPTED}\n`));
+  const text = (sheets()[0] as unknown as { text: string }).text;
+  const again = browser(`bd_pref=${encodeURIComponent(JSON.stringify({ theme: ACCEPTED }))}`);
+  accent.early();
+  assert.equal((again()[0] as unknown as { text: string } | undefined)?.text, text);
+});
+
+test('AND A COLOUR THE FLOOR REFUSES IS LEFT FOR restore TO DROP AND SAY', () => {
+  const sheets = browser();
+  storage();
+  pref.write({ theme: REFUSED });
+  accent.early();
+  assert.equal(pref.read().theme, REFUSED, 'early dropped the colour, so the shell had nothing to say');
+  assert.equal(sheets().length, 0);
+  warnings(() => accent.restore());
+  assert.equal(pref.read().theme, undefined);
+});
