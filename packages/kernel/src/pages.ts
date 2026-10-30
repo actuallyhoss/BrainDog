@@ -2445,6 +2445,20 @@ function logFilters(
 }
 
 /**
+ * A sentence ANDed with the reader's choices, NO DEEPER THAN IT WAS where that can be done: onto an `all` the choices
+ * join it, and over an `any` of plain parts each part takes them, (A or B) and C being (A and C) or (B and C). Wrapped
+ * whole, Work's "Not this week" (an `any` of `all`s) narrowed to Kiln nested three groups deep and was refused.
+ */
+function andFlat(where: Predicate | undefined, extra: readonly Predicate[]): Predicate {
+  if (where === undefined) return extra.length === 1 ? extra[0]! : { all: [...extra] };
+  const w = where as { all?: Predicate[]; any?: Predicate[] };
+  if (Array.isArray(w.all)) return { all: [...w.all, ...extra] };
+  if (Array.isArray(w.any) && w.any.every((m) => { const g = m as { all?: unknown; any?: unknown; none?: unknown }; return g.any === undefined && g.none === undefined; }))
+    return { any: w.any.map((m) => ({ all: [...(Array.isArray((m as { all?: Predicate[] }).all) ? (m as { all: Predicate[] }).all : [m]), ...extra] })) };
+  return { all: [where, ...extra] };
+}
+
+/**
  * The figures a page's line and its head's count read, with the reader's choices ANDed onto every figure over a list
  * they narrow (`register.<list>`). Every other figure, and a figure whose own sentence cannot be read here, is read as
  * declared. A narrowed figure is another figure to the read's cache, which keys a figure by its declaration whole.
@@ -2466,8 +2480,7 @@ function figuresNarrowed(deps: PageDeps, clauses: ReadonlyMap<string, readonly P
         if (got.bad.length > 0) return read(decl);
         own = got.predicate;
       } else own = decl.where;
-      const and: Predicate = own === undefined ? (extra.length === 1 ? extra[0]! : { all: [...extra] }) : { all: [own, ...extra] };
-      return read({ ...decl, where: and });
+      return read({ ...decl, where: andFlat(own, extra) });
     },
   };
 }
@@ -2498,7 +2511,7 @@ function narrowed(deps: PageDeps, block: PageBlock, clauses: ReadonlyMap<string,
     const leaf = where as Leaf | undefined;
     return leaf !== undefined && (leaf.field === 'seq' || leaf.field === 'id');
   };
-  const and = (where: Predicate | undefined): Predicate => (where === undefined ? (extra.length === 1 ? extra[0]! : { all: [...extra] }) : { all: [where, ...extra] });
+  const and = (where: Predicate | undefined): Predicate => andFlat(where, extra);
   const readings = deps.readings;
   return {
     ...deps,
