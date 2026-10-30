@@ -1315,6 +1315,11 @@ function applyStrike(sql: Sql, key: string, now: number, rule: Rule): number | n
   return null;
 }
 
+/** A person asking to move their sign-in address: five links an hour (SEC6). */
+const EMAIL_ASKS: Rule = { most: 5, window: 60 * 60_000 };
+/** One address asked for as somebody's new sign-in address: three links an hour, whoever asks (SEC6). */
+const EMAIL_TO: Rule = { most: 3, window: 60 * 60_000 };
+
 /** How long a decided application is kept: past it, the row is deleted by the next call `applications` answers. */
 export const APPLY_DECIDED_DAYS = 90;
 
@@ -2229,8 +2234,14 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
      * NOTHING MOVES UNTIL IT IS PRESSED (`emailMove`), because an address nobody has proved they read is a way to
      * hand somebody's account to a mailbox they do not own.
      *
-     * AN ADDRESS ANOTHER PERSON HOLDS IS REFUSED IN ONE SENTENCE THAT NAMES NOBODY. `dir_person`'s address is unique
-     * (`dir_person_email`), so the move could never land, and saying so now saves the person a link that cannot work.
+     * AN ADDRESS ANOTHER PERSON HOLDS IS ANSWERED AS ANY OTHER, AND MAILED NOTHING (SEC6). It was refused in a sentence
+     * ("Another account already signs in with that address"), and sign-up, the magic link and an invitation all hide
+     * that; this door undid it for anybody with a session, a guest's included. Now `token` is `null` for it, the host
+     * mails nothing, and the answer is the same `{}`. The move could never land there anyway (`dir_person_email`).
+     *
+     * AND EVERY ASK SPENDS TWO BUDGETS BEFORE ANYTHING IS LOOKED UP: the asker's (`EMAIL_ASKS`) and the address's
+     * (`EMAIL_TO`), each under its own key and never sign-in's `email:` key, so nobody can use this door to stop
+     * somebody's sign-in links. It was a free mail cannon at any address, held back only by the IP minute.
      *
      * ONE LIVE LINK A PERSON: asking again takes the last one back, so the newest mail is the only one that works and a
      * person who mistyped an address can put it right without the first link still standing.
@@ -2239,7 +2250,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
      * a restore can never revive a link the person has since replaced. Its token is kept only as an HMAC under the
      * Directory's key, as every link's is.
      */
-    emailAsk: async (person: string, email: string): Promise<Result<{ to: string; token: string }>> => {
+    emailAsk: async (person: string, email: string): Promise<Result<{ to: string; token: string | null }>> => {
+      type Asked = { to: string; token: string | null };
       if (!emailKey) return no('NOT_IN_THIS_BUILD', 'This BrainDog has no sign-in switched on, so there is no sign-in address to change.', { at: 'email' });
       const to = email.trim();
       if (!EMAIL_ADDRESS.test(to)) return no('VALUE_MALFORMED', 'That is not an email address.', { at: 'email' });
@@ -2247,13 +2259,16 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       const hash = await emailLinkHash(emailKey, token);
       return sql.transactionSync(() => {
         const me = sql.one<{ email: string; suspended_at: string | null }>('SELECT email, suspended_at FROM dir_person WHERE id = ?', person);
-        if (!me || me.suspended_at) return no<{ to: string; token: string }>('UNAUTHORIZED', 'Sign in again to change your sign-in email.', { at: 'person' });
-        if (me.email.toLowerCase() === to.toLowerCase())
-          return no<{ to: string; token: string }>('VALUE_MALFORMED', 'That is already the address you sign in with.', { at: 'email' });
-        const holder = personByEmail(to);
-        if (holder && holder.id !== person)
-          return no<{ to: string; token: string }>('ALREADY_KNOWN', 'Another account already signs in with that address. Choose a different one.', { at: 'email' });
+        if (!me || me.suspended_at) return no<Asked>('UNAUTHORIZED', 'Sign in again to change your sign-in email.', { at: 'person' });
+        if (me.email.toLowerCase() === to.toLowerCase()) return no<Asked>('VALUE_MALFORMED', 'That is already the address you sign in with.', { at: 'email' });
         const now = clock.now();
+        /* THE BUDGETS FIRST, WHOEVER HOLDS THE ADDRESS, so a refusal here says nothing about who does. */
+        for (const [key, rule] of [[`email-ask:${person}`, EMAIL_ASKS], [`email-to:${mailCanon(to)}`, EMAIL_TO]] as const) {
+          const wait = applyStrike(sql, key, now, rule);
+          if (wait !== null) return no<Asked>('RATE_LIMITED', 'You have asked for a lot of links. Try again later.', { retry_after: wait });
+        }
+        const holder = personByEmail(to);
+        if (holder && holder.id !== person) return ok<Asked>({ to, token: null });
         sql.exec('DELETE FROM dir_pending WHERE expires <= ?', now);
         sql.exec("DELETE FROM dir_pending WHERE purpose = 'email' AND json_extract(payload, '$.person') = ?", person);
         sql.exec(

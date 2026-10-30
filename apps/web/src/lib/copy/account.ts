@@ -268,7 +268,8 @@ export const account = {
   identityEmailHint: 'We mail a link to it. Nothing changes until you open that link.',
   identitySendLink: 'Send the link',
   identitySending: 'Sending',
-  identityLinkSent: (to: string) => `We sent a link to ${to}. It works for 24 hours.`,
+  /* SAID THE SAME FOR AN ADDRESS ANOTHER ACCOUNT HOLDS, which is mailed nothing: the answer cannot tell them apart (SEC6). */
+  identityLinkSent: (to: string) => `If ${to} can be used, a link is on its way there. It works for 24 hours.`,
   identityEmailMoving: 'Changing your sign-in email',
   identityEmailMoved: (to: string) => `You now sign in with ${to}.`,
   identityEmailBehind: (n: number) =>
