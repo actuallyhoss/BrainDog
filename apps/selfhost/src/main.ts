@@ -177,6 +177,21 @@ function bootLine(s: SignIn): string {
   }
 }
 
+/**
+ * The start's lines about agents: whether Claude's and ChatGPT's connectors can add this host (OAuth), and how the
+ * command line connects. Never a key: `token create` prints its own, once, to whoever ran it.
+ */
+function agentLines(o: { origin: string; slug: string | undefined; open: boolean; oauthOff: string | null }): string[] {
+  const at = `${o.origin}/${o.slug ?? '<record>'}`;
+  if (o.open)
+    return [`  agents: nobody signs in here, so the command line on this machine reaches it with BRAINDOG_HOST=${at} and no token. OAuth and agent tokens need BRAINDOG_SERVER_KEY.`];
+  const oauth =
+    o.oauthOff === null
+      ? `  oauth: on. Claude's and ChatGPT's connectors can add ${o.origin}/mcp, and you allow each one in the browser.`
+      : `  oauth: off, so Claude's and ChatGPT's connectors cannot add this host. ${o.oauthOff.replace(/^OAuth is off on this BrainDog: /u, '').replace(/^./u, (c) => c.toUpperCase())}`;
+  return [oauth, `  agents: braindog setup ${at} connects the command line and the agents on a machine; braindog token create --host ${at} makes a token for a script.`];
+}
+
 /** One clock for the whole command, so the record and the Directory agree about when it happened. */
 const clock = { now: () => Date.now() };
 
@@ -762,6 +777,10 @@ async function serve(): Promise<void> {
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
+  /* AND WHEN THERE IS NO APP TO OPEN, SAID BEFORE ANY ADDRESS IS FOLLOWED. A start with no web build printed a sign-in
+     address that answered a JSON 404; the root now answers a page saying the same as this line. */
+  if (shell === undefined)
+    say(`  app: not built, so ${running.signIn.origin} shows a page saying so and nothing else. Run pnpm --filter @braindog/web build in the repository folder, then start this again.`);
   /* AND WHERE THE ONE-TIME LINK THAT MAKES THE OWNER'S SIGN-IN IS, until they have a passkey: in a 0600 file in the data
      folder, and never in this output, which a container keeps as its log (`first-run.ts`). A person at a terminal of
      their own, outside the image, also sees it there; stdout is safe then, since a terminal is no `--json` reader. */
@@ -781,6 +800,9 @@ async function serve(): Promise<void> {
   /* AND WHERE MAIL GOES, by host and port and never with what password. */
   if (smtp) say(`  ${smtpLine(smtp)}`);
   for (const line of degradeLines(env, smtp !== undefined)) say(line);
+  /* AND HOW AN AGENT GETS IN, with OAuth said either way: a default host listens on every interface at a plain-http
+     origin, where OAuth is off, and nothing at start said so. */
+  for (const line of agentLines({ origin: running.signIn.origin, slug: running.api.kernel.identity()?.slug, open: running.signIn.off === 'open', oauthOff: running.oauthOff })) say(line);
   /* AND WHETHER ADD-ONS MAY CALL OUT, with the registry's own switch named apart, because an operator who turns one off
      should not believe the other went with it. */
   say(

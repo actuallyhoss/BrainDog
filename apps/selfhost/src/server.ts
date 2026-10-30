@@ -2209,6 +2209,9 @@ export async function start(options: {
        handle this process already holds and closes, and never through a second one somebody has to remember. */
     directorySql: dirSql,
     signIn: { origin, ways, off },
+    /* WHY OAUTH IS OFF HERE, OR NULL WHILE IT IS ON, so the start can say it: only its metadata said so before, and a
+       connector that failed to connect was the first anybody heard of it. */
+    oauthOff: site.oauth.off,
     close: () =>
       new Promise<void>((r) => {
         scheduler.stop();
@@ -2217,6 +2220,30 @@ export async function start(options: {
         server.close(() => (gone || (sql.close(), slashSql.close()), dirSql.close(), r()));
       }),
   };
+}
+
+/**
+ * Whether a request with no app to answer it is a person at a browser: a read of the root or the sign-in page, or any
+ * read that asks for HTML. A script asking anything else gets the JSON 404 it always did.
+ */
+const wantsPage = (method: string, path: string, headers: Headers): boolean =>
+  (method === 'GET' || method === 'HEAD') && (/^\/*(?:signin\/*)?$/u.test(path) || (headers.get('accept') ?? '').includes('text/html'));
+
+/**
+ * The page a browser gets when the app was never built. The server started, the start line printed a sign-in address,
+ * and that address answered a JSON 404 about record methods, which looks like a broken link rather than a missing step.
+ * 503 because the address is right and the app behind it is not there yet.
+ */
+function unbuilt(method: string): Response {
+  const page =
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>BrainDog is not built yet</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:36rem;margin:15vh auto;padding:0 16px}code{font-size:.95em}</style></head><body>' +
+    '<h1>The app is not built yet</h1><p>This BrainDog is running, and its record answers, but the app it serves was never built.</p>' +
+    '<p>In the repository folder run <code>pnpm --filter @braindog/web build</code>, then start the server again.</p></body></html>';
+  return new Response(method === 'HEAD' ? null : page, {
+    status: 503,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' },
+  });
 }
 
 const json = (status: number, body: object, extra: readonly (readonly [string, string])[] = []): Response => {
@@ -2482,7 +2509,14 @@ async function answer(
   if (/^\/+in(?:\/|$)/.test(path)) return write(res, await serveIngest(request, site.arrivals));
 
   if (!/^\/+api(?:\/|$)/.test(path))
-    return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
+    return write(
+      res,
+      shell
+        ? shell(request)
+        : wantsPage(method, path, request.headers)
+          ? unbuilt(method)
+          : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }),
+    );
 
   /* THE KEY DOORS, BEFORE ANY OTHER CREDENTIAL IS READ: their bearer is a keychain grant, which `contextFor` would
      not know, and a cookie or a login token must not reach them at all. AND ONLY AT THE ROOT: a grant names its own
