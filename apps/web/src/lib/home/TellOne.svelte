@@ -44,12 +44,13 @@
     needs: (what: readonly string[]) => `Needs ${what.join(' and ')}`,
     left: (words: readonly string[]) => `Not placed: ${words.join(', ')}`,
     addOne: 'Add it',
-    addAll: (n: number) => `Add all ${countWord(n)}`,
+    /* "BOTH" FOR TWO: "Add all two" read as a machine counting (first hour audit, E19). */
+    addAll: (n: number) => (n === 2 ? 'Add both' : `Add all ${countWord(n)}`),
     /* Some wait for what they need: the button names only what goes, never "all" over lines that stay. */
     addReady: (n: number) => (n === 1 ? 'Add the one that is ready' : `Add the ${countWord(n)} that are ready`),
     notYet: 'Nothing is added until you press.',
     undoOne: 'One Undo takes it back.',
-    undoAll: (n: number) => `One Undo takes all ${countWord(n)} back.`,
+    undoAll: (n: number) => (n === 2 ? 'One Undo takes both back.' : `One Undo takes all ${countWord(n)} back.`),
     undoAny: 'One Undo takes all of it back.',
     raced: 'Something changed on your BrainDog while this was sent. Press Add again.',
   };
