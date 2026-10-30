@@ -33,7 +33,8 @@ import { shapeFrom, type ShapeRead, type WorkRow } from './shape-answer.ts';
 import { lanesOf } from '$lib/shell/side.ts';
 import { blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/project.ts';
 import { HEALTH, daySaid, figureOf, hueOf } from '$lib/home/project-cards.ts';
-import { cardKpiOf } from '$lib/home/card-kpi.ts';
+import { cardKpiOf, type KpiAnswered } from '$lib/home/card-kpi.ts';
+import { kpiView } from 'braindog-render';
 import { pathOf, trendOf } from '$lib/record/visuals.ts';
 import { calledOf, valueSaid } from '$lib/voice.ts';
 import { money as moneyOf, monthShort } from 'braindog-render';
@@ -41,6 +42,21 @@ import { moneyShown, partsLaid, type PartsHave } from './project-parts.ts';
 import { rowHref } from '$lib/record/row-href.ts';
 import { updateRow } from '../record/page-write.ts';
 import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runsOnOf, sessionsOf, sideOf, type FactKpi, type FactTask, type FactsIn, type KpiAt } from './project-facts.ts';
+
+/**
+ * A FLOW'S FIGURE AND ITS PERIOD AS TODAY SAYS THEM (`kpiView`, on the record's clock): its last whole period, and when
+ * that was. Anything else says its newest reading, as the page already does, so nothing is handed for it.
+ */
+function shownOf(a: unknown, now: number | undefined): FactKpi['shown'] {
+  try {
+    const v = kpiView(a as KpiAnswered, { home: homeCurrency(), ...(now !== undefined ? { now } : {}) });
+    if (v.kind !== 'flow' || !v.figure) return undefined;
+    const card = cardKpiOf(a as KpiAnswered, { home: homeCurrency(), ...(now !== undefined ? { now } : {}) });
+    return { figure: card?.figure ?? v.figure.text, when: v.when };
+  } catch {
+    return undefined;
+  }
+}
 
 /** Where a project sends its numbers is set up. */
 const FEED_SETUP = '/automations?new=door&preset=numbers';
@@ -340,6 +356,7 @@ export class ShapeHold {
         change: typeof a.change === 'number' ? a.change : null,
         target: a.target ?? null,
         targetBy: a.target_by ?? null,
+        shown: shownOf(a, read.now),
       };
     });
     const lane = decl.state ? text(read.fields[decl.state]) : '';

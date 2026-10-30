@@ -117,7 +117,7 @@
   {/if}
 {/snippet}
 
-{#snippet change(k: KpiView)}
+{#snippet change(k: KpiView, row = false)}
   {#if k.change || k.when || k.aged}
     <p class="kpi-meta">
       {#if k.change}
@@ -126,7 +126,9 @@
               ><path d={k.change.dir === 'up' ? 'M6 10V2M2.5 5.5 6 2l3.5 3.5' : 'M6 2v8M2.5 6.5 6 10l3.5-3.5'}></path></svg
             >{/if}{k.change.said}</span
         >
-        <span class="kpi-against">{k.change.against}</span>
+        <!-- A TODAY ROW SAYS WHICH PERIOD A FLOW'S FIGURE IS OF ("in the week of 24 Aug") in place of the one its change is
+             on: its last whole week is not the newest reading Numbers lists (audit 2, B2), and a row has room for one. -->
+        {#if row && k.kind === 'flow' && k.when}<span class="kpi-when">{k.when}</span>{:else}<span class="kpi-against">{k.change.against}</span>{/if}
       {:else if k.when && !k.aged.endsWith(k.when)}
         <span class="kpi-against">{k.when}</span>
       {/if}
@@ -210,7 +212,7 @@
               <p class="kpi-why" data-state={state(k)}>{k.why}</p>
               {#if k.aged}<p class="kpi-meta"><span class="kpi-against" data-old="">{k.aged}</span></p>{/if}
             {:else}
-              {@render change(k)}
+              {@render change(k, true)}
             {/if}
             {#if k.stale && !(k.why && state(k) === 'stale')}
               <p class="kpi-stale-said">
