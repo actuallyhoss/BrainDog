@@ -466,10 +466,12 @@ function placed(path: string, m: SideModel, lit: string | null, title: string | 
   if (place && place.href !== lit) head.push({ label: place.label, href: place.href });
   else if (inProjects && m.projects && m.projects.href !== lit) head.push({ label: m.projects.label, ...(m.projects.href ? { href: m.projects.href } : {}) });
   const label = row?.label ?? (m.projects?.href === lit ? m.projects.label : '');
-  /* A SECTION WHOSE ROW IS A PAGE OF ANOTHER NAME (an add-on's Weather under "Life"): on that page the crumb is the
-     section and then the page's own name, the section no link to the page you are on, and the phone's bar says
-     "Weather" where it said "Life". Before, the page's name was said nowhere once the bar took it from the head. */
-  const leads = place !== undefined && place.href === lit && path === lit && place.key.startsWith('section:') && t !== '' && word(t) !== word(label);
+  /* A SECTION WHOSE ROW IS A PAGE OF ANOTHER NAME (an add-on's Weather under "Life", a place or a row under More): on
+     that page the crumb is the section and then the page's own name, the section no link to the page you are on, and
+     the phone's bar says "Weather" where it said "Life". Before, the page's name was said nowhere once the bar took it
+     from the head. A row under a place or a project is the page's own name already, and is left as it is. */
+  const owned = m.places.some((p) => p.kids.some((k) => k.href === lit)) || Boolean(inProjects);
+  const leads = path === lit && lit.startsWith('/p/') && !owned && t !== '' && word(t) !== word(label);
   const steps: Crumb[] = [...head, leads ? { label } : { label, href: lit }];
   if ((path !== lit || leads) && t !== '' && word(t) !== word(label)) steps.push({ label: t });
   /* THE LAST STEP IS WHERE YOU ARE, never a link to itself; the place a titleless page sits in stays a way back to it. */
