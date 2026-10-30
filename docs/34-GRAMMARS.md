@@ -551,8 +551,8 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Kernel tables | 27 + 4 header | 30 §1 | 30 §1 |
 | `local` tables | 6 | `token device_grant auth_fail observation job job_event` — the other 25 travel | 02 §1 |
 | Erase stores | 19 + R2 | 02 §10, in one transaction; R2 through the outbox is the twentieth | 02 §10 |
-| Record methods | 77 | 12 DATA · 13 READ+ · 4 VAULT · 7 JOBS · 22 ADMIN · 19 INTERNAL — 33 §2 | 30 §5 |
-| RPC groups | 6 | `DATA READ+ VAULT JOBS ADMIN INTERNAL` | 30 §5 |
+| Record methods | 77 | 12 DATA · 13 READ+ · 4 KEYCHAIN · 7 JOBS · 22 ADMIN · 19 INTERNAL — 33 §2 | 30 §5 |
+| RPC groups | 6 | `DATA READ+ KEYCHAIN JOBS ADMIN INTERNAL` | 30 §5 |
 | `/auth/*` routes | 10 | 33 §4 | 33 §4 |
 | DO classes | 3 | `Record Slash Directory` | 01 §1 |
 | Packages | 13 | `render ports where theme fixtures kernel declare extract record mcp slash connect host`, in build order | 31 §2 |

@@ -6,7 +6,7 @@
  * waits for is the entry chunk and everything statically reachable from it. Adding a screen must
  * not be able to move this number.
  *
- * AND THE FIRST LOAD BESIDE IT: the entry with the root layout and Today, which is what a cold open
+ * AND THE FIRST LOAD BESIDE IT: the entry with the root layout, the app's frame and Today, which is what a cold open
  * of the app waits for before it draws. Adding a screen cannot move that number either; putting a
  * package on Today's path can, and that is the one it is there to catch.
  *
@@ -264,8 +264,15 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
       return 1;
     }
   }
+  /**
+   * AND THE APP'S FRAME, WHICH THE ROOT LOAD ASKS FOR BESIDE `boot` (`routes/+layout.ts`). It was the root layout until
+   * 30 Oct and is now a chunk of its own, loaded by import() so sign-in and sign-up never fetch it (E14); every screen of
+   * a record waits for it all the same, so a row without it would be a first load smaller than the one a person waits
+   * for, and green. Found by its source in the manifest; a tree with no such chunk (the planted ones) has no frame.
+   */
+  const appFrame = Object.keys(manifest).find((k) => /(?:^|\/)src\/lib\/shell\/AppFrame\.svelte$/.test(k));
   const firstLoad = new Set(reachable);
-  for (const node of [rootLayout, today]) if (node !== undefined) for (const k of reach(node)) firstLoad.add(k);
+  for (const node of [rootLayout, today, rootLayout === undefined ? undefined : appFrame]) if (node !== undefined) for (const k of reach(node)) firstLoad.add(k);
 
   /**
    * A FILE THE MANIFEST NAMES AND THE BUILD DID NOT EMIT, WHICH IS A FINDING AND WAS A STACK TRACE.
@@ -320,7 +327,9 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
   /* THE CLAIMANT TRAVELS WITH THE FILE, because a stylesheet is named by a node and the finding above
      has to say which one. A `Map` over the pairs dedupes by file the way the `Set` here used to. */
   const allCss = [...new Map(Object.entries(manifest).flatMap(([key, n]) => (n.css ?? []).map((f) => [f, key])))];
-  const isMain = (f) => /assets\/0\.[^/]*\.css$/.test(f);
+  /* AND THE APP FRAME'S, which every screen of a record waits for as it waited for the root layout's (above). */
+  const frameCss = new Set(appFrame === undefined ? [] : (manifest[appFrame].css ?? []));
+  const isMain = (f) => /assets\/0\.[^/]*\.css$/.test(f) || frameCss.has(f);
 
   let css = 0;
   let routeCss = 0;
@@ -422,7 +431,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
   if (uncounted.length > 0) {
     console.error(`\n  bundle: the shell preloads ${uncounted.length} script(s) the first-load row did not count.\n`);
     for (const f of uncounted) console.error(`    ${f}`);
-    console.error('\n  The row is the entry, the root layout and Today with everything they import. A preload from anywhere\n  else is waited for on every first open, so it must be counted before any number is printed.\n');
+    console.error('\n  The row is the entry, the root layout, the app frame and Today with everything they import. A preload from anywhere\n  else is waited for on every first open, so it must be counted before any number is printed.\n');
     return 1;
   }
 
@@ -470,7 +479,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     },
     /* A CEILING AND NO DEBT: the number a first open of Today was measured at once the kernel and the seed left it, which
        only falls (`ledger.json`). What it holds is said in the summary line below. */
-    { name: 'first load JS, brotli', size: firstJs, budget: B.firstLoadJsBrotli, note: 'the entry, the root layout and Today' },
+    { name: 'first load JS, brotli', size: firstJs, budget: B.firstLoadJsBrotli, note: 'the entry, the root layout, the app frame and Today' },
     { name: 'entry CSS, brotli', size: css, budget: B.mainCssBrotli, note: 'tokens, a11y, blocks, rows and the shell' },
     { name: 'index.html, brotli', size: shell, budget: B.htmlBrotli, note: 'it carries no record state' },
     { name: 'UI face (Geist)', size: await font('geist.woff2'), budget: B.uiFaceBytes, note: "22 §9's budget, unchanged" },
@@ -494,7 +503,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     `\n  ${entries.length} entry chunks, ${reachable.size} statically reachable.` +
       (rootLayout === undefined
         ? ' No root layout in this build, so the first load is the entry alone.'
-        : ` The first load is ${firstLoad.size} with the root layout and Today (${manifest[today].file}), ${preloaded.length} preloaded by the shell.`) +
+        : ` The first load is ${firstLoad.size} with the root layout${appFrame === undefined ? '' : ', the app frame'} and Today (${manifest[today].file}), ${preloaded.length} preloaded by the shell.`) +
       ` ${KB(routeCss)} more CSS arrives with the routes that need it.\n`,
   );
 

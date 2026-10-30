@@ -12,7 +12,7 @@ test('THE KEY IS THE ADDRESS AND THE FILTER, the one Work keeps under', () => {
 });
 
 test('THE LAYOUT READS WORK AHEAD on a resting pointer, a touch and focus, and loads the reader only then', () => {
-  const layout = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  const layout = readFileSync(new URL('../shell/AppFrame.svelte', import.meta.url), 'utf8');
   assert.match(layout, /<svelte:document onpointerover=\{\(e\) => readAhead\(e, 60\)\} ontouchstart=\{\(e\) => readAhead\(e, 0\)\} onfocusin=\{\(e\) => readAhead\(e, 0\)\} \/>/u);
   assert.match(layout, /import\('\$lib\/work\/warm\.ts'\)/u);
   /* ONLY A LINK TO THE WORK SCREEN, by the nav's own word. The old screen is gone, so `classic` is not read. */

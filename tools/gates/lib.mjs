@@ -304,7 +304,7 @@ const SETTLED = new Set(['ready', 'empty', 'refused']);
  *
  * NOT A FOURTH VALUE OF THE CONTRACT. It is this helper saying which of two worlds the run is in, and
  * it exists because the gates have to be correct on both sides of the app change: the attribute is
- * rendered by `apps/web/src/routes/+layout.svelte`, which lands separately, and a gate that went red
+ * rendered by `apps/web/src/lib/shell/AppFrame.svelte`, which lands separately, and a gate that went red
  * over every route until it did would be a gate somebody switches off, while a gate that went green
  * would be the exact silence this contract is for. So a pre-contract build is measured the way it has
  * always been measured, the absence is said out loud once per run, and the timeout is a finding in
@@ -358,7 +358,7 @@ export function readiness(gate, timeoutMs, root, { quietMs = 0 } = {}) {
       `  ${gate}: this build carries no \`${SCREEN}\`, so the readiness contract is not live and this\n` +
         `  run waited for \`#main\` to have a child instead, which is only sound while every screen\n` +
         `  draws synchronously. Absence of even that is a finding here. Until\n` +
-        `  apps/web/src/routes/+layout.svelte renders <main id="main" ${SCREEN}={settled()}>, this\n` +
+        `  apps/web/src/lib/shell/AppFrame.svelte and LightFrame.svelte render <main id="main" ${SCREEN}={settled()}>, this\n` +
         `  gate cannot tell a drawn screen from a shell that has fetched nothing.`,
     );
   }

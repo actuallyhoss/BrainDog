@@ -87,7 +87,7 @@ test('the shell says which deployment it is, and the palette follows it', () => 
      ALONE — and it is not: the tab reads `· BrainDog Alpha` and the favicon is the alpha mark, both
      of which are legible to a reader who cannot tell the two accents apart, and both of which are
      visible from outside the window rather than only inside it. */
-  const layout = read('../routes/+layout.svelte');
+  const layout = read('./shell/AppFrame.svelte');
   assert.match(layout, /@braindog\/skin\/house\.css/u, 'the app does not import a palette it can alias');
   assert.match(layout, /mark-alpha\.svg/u, 'the deployment has no favicon of its own');
 

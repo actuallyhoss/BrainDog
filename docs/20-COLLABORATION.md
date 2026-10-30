@@ -90,7 +90,7 @@ slices of one list is one rule with an `any:`, which keeps "what can she see" a 
 | **`append`** | **`create`, `propose` and `log` — and no read.** The conservative half: an appender sees nothing, not even what it filed, unless a `read` grant on that register says so ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.1). Held on the whole record, it adds to every list but the owner-only ones (below) |
 | `write` | create, edit, and change state on granted registers |
 | **`decide`** | **settle a question: pick an option and record the binding reason** |
-| **`owner`** | everything `decide` can, plus the sixteen ADMIN methods of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — packs, declarations, rules, tokens, devices, invitations, export, import, snapshot, erase, restore, and deleting the record — and the Keychain (the VAULT group, owner-only by default). At least one per record; **never held by a token or a share link**, which is why there is no `admin` token scope ([ADR-060](16-DECISIONS.md)); a bearer reaches one ADMIN method only through an **operation grant** the owner approved in the browser, once, within ten minutes ([12-SECURITY](12-SECURITY.md) §3). *An earlier draft counted four* |
+| **`owner`** | everything `decide` can, plus the sixteen ADMIN methods of [30-BLUEPRINT](30-BLUEPRINT.md) §5 — packs, declarations, rules, tokens, devices, invitations, export, import, snapshot, erase, restore, and deleting the record — and the Keychain (the KEYCHAIN group, owner-only by default). At least one per record; **never held by a token or a share link**, which is why there is no `admin` token scope ([ADR-060](16-DECISIONS.md)); a bearer reaches one ADMIN method only through an **operation grant** the owner approved in the browser, once, within ten minutes ([12-SECURITY](12-SECURITY.md) §3). *An earlier draft counted four* |
 
 The five are the `member` table's `level` CHECK ([30-BLUEPRINT](30-BLUEPRINT.md) §1). A transition may
 name the level it needs — `transitions: { proposed: { to: [active], by: decide } }`
@@ -173,7 +173,7 @@ And there is a sharper, disqualifying reason for a record whose premise is an ap
 | `max()` never arises | there is nothing to compose |
 | Person-level is authoritative **in both directions** | which is how shared-vault products already behave |
 | **Every widening is an event** — including one caused by a *rule* change rather than a row change | precisely the event a `max()` lattice structurally cannot produce |
-| The one true deny is **structural** | the ADMIN and VAULT groups of the record's RPC surface ([30-BLUEPRINT](30-BLUEPRINT.md) §5), refused inside the object at the RPC boundary, before step 1 of the write path — never in the Worker's router, which the CLI can be pointed around. A deny at the RPC boundary cannot be widened by any grant, rule or future page; an operation grant does not widen it either — it admits one bearer to one named ADMIN operation, once, and the record checks the reach itself |
+| The one true deny is **structural** | the ADMIN and KEYCHAIN groups of the record's RPC surface ([30-BLUEPRINT](30-BLUEPRINT.md) §5), refused inside the object at the RPC boundary, before step 1 of the write path — never in the Worker's router, which the CLI can be pointed around. A deny at the RPC boundary cannot be widened by any grant, rule or future page; an operation grant does not widen it either — it admits one bearer to one named ADMIN operation, once, and the record checks the reach itself |
 
 ### Four things to refuse, each with a documented precedent
 

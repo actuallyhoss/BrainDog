@@ -15,6 +15,9 @@ import { redirect, type LoadEvent } from '@sveltejs/kit';
 
 import { apiBase, at, here, signInFirst } from '$lib/at.ts';
 import type { Shell } from '$lib/record/boot-live.ts';
+import type AppFrame from '$lib/shell/AppFrame.svelte';
+import type LightFrame from '$lib/shell/LightFrame.svelte';
+import { light, type FrameData } from '$lib/shell/light.ts';
 /* SEE AS PUTS ITS HEADER ON THE TAB'S FETCH AS THIS LOADS, before the first `boot` is asked (`see-as.svelte.ts`). */
 import { exitSeeAs, seeingAs } from '$lib/sharing/see-as.svelte.ts';
 
@@ -55,7 +58,56 @@ const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boole
 /* THE TAB'S FIRST LOAD ONLY draws from the last copy; every later load waits for `boot` as before. */
 let opened = false;
 
-export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fetch'> & Partial<Pick<LoadEvent, 'depends'>>): Promise<Shell & { slash: boolean }> {
+/**
+ * WHAT THE ROOT LAYOUT IS HANDED: the shell and, beside it, the frame it draws the screen in. The app's frame
+ * (`AppFrame.svelte`) for a record's screens, or the light frame (`LightFrame.svelte`) for sign-in and sign-up
+ * (`lib/shell/light.ts`). Both are loaded here and neither is imported by the layout, so the one a screen does not draw
+ * is never fetched; a record's first open carries only the light frame's preload list (`vite.config.ts`), a few hundred
+ * bytes in this file's chunk.
+ */
+export type Root = FrameData & { frame: typeof AppFrame | null; light: typeof LightFrame | null };
+
+type Event = Pick<LoadEvent, 'url' | 'fetch'> & Partial<Pick<LoadEvent, 'depends'>>;
+
+/**
+ * THE FRAME IS ASKED FOR BEFORE ANYTHING HERE IS WAITED ON, beside `boot`, so it loads while the record answers, and the
+ * first screen draws once both have. It is no longer the root layout (E14): a static import there put the whole shell
+ * in front of every screen, sign-in's and sign-up's too.
+ */
+export async function load(event: Event): Promise<Root> {
+  if (light(here(event.url.pathname))) return lightLoad(apiBase(event.url));
+  const frame = import('$lib/shell/AppFrame.svelte');
+  /* A LOAD THAT REDIRECTS NEVER WAITS FOR IT, so a frame that failed to load then is not an unhandled refusal. */
+  frame.catch(() => undefined);
+  const shell = await shellOf(event);
+  return { ...shell, frame: (await frame).default, light: null };
+}
+
+/**
+ * SIGN-IN AND SIGN-UP ASK THE RECORD NOTHING AND LOAD NO SHELL (first hour audit, E14). A stranger there has no record to
+ * read, and `boot` and `schemas` both came back 401, two console errors on every first visit; both screens ask the
+ * account who is signed in themselves (`methods`). They were then handed the refused shell, which loaded the record's
+ * readers (`boot-live.ts`) for a frame they no longer draw: the light frame reads nothing of the shell, and neither
+ * screen reads the layout's data, so they are handed none of it.
+ *
+ * TYPED AS THE APP'S ANSWER, because Kit gives every page the root's type and the app's pages read the shell through it.
+ * Nothing drawn on a light screen reads it: the root layout reads `frame` and `light` and nothing else there.
+ *
+ * A TAB THAT DREW A RECORD BEFORE COMING HERE (signing in as somebody else, or after signing out) puts the house voice
+ * and the house look back, as the refused shell did; on a cold open neither was ever changed, so neither is loaded.
+ * Before `opened`, so the first screen past them is still the tab's first open.
+ */
+async function lightLoad(api: string): Promise<Root> {
+  const frame = import('$lib/shell/LightFrame.svelte');
+  if (opened) {
+    const voice = await import('$lib/voice.svelte.ts');
+    await voice.listen(null, api).catch(() => undefined);
+    if (typeof document !== 'undefined') void import('$lib/theme/draw.ts').then((look) => look.draw(null));
+  }
+  return { frame: null, light: (await frame).default } as unknown as Root;
+}
+
+async function shellOf({ url, fetch, depends }: Event): Promise<FrameData> {
   /* THE RECORD THE ADDRESS NAMES. `url` and not `location`: a load runs for the address being opened, and `location`
      is the page being left until the navigation lands, so a move from acme to kiln would read acme's `boot`. */
   const api = apiBase(url);
@@ -65,16 +117,6 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
      `/connect/approve`, the page a terminal prints, for the same reason: a machine is waiting on it. */
   const spared =
     inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner === '/connect/approve' || inner === '/s' || inner.startsWith('/s/');
-  /* SIGN-IN AND SIGN-UP ASK THE RECORD NOTHING (first hour audit, E14). A stranger there has no record to read, and
-     `boot` and `schemas` both came back 401, two console errors on every first visit; both screens ask the account
-     who is signed in themselves (`methods`), and draw bare, with no rail to fill. They get the shell a stranger was
-     always given, the refused one. Before `opened`, so the first screen past them is still the tab's first open. */
-  if (inner === '/signin' || inner.startsWith('/signin/') || inner === '/signup') {
-    const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
-    await voice.listen(null, api).catch(() => undefined);
-    if (typeof document !== 'undefined') void import('$lib/theme/draw.ts').then((look) => look.draw(null));
-    return { ...live.refusedShell({ code: 'UNAUTHORIZED', fix: '' }), slash: false };
-  }
   /* THE LOCAL COPY IS OPENED BEFORE ANYTHING HERE IS WAITED ON, beside `boot` (which `app.html` already asked) and never
      in front of the first paint, and its last reader verified, so the first screen's ask finds it open. */
   const first = !opened;

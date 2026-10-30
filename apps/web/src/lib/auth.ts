@@ -2,7 +2,7 @@
  * Signing in, from the browser's side: the `/auth/*` calls and the WebAuthn half under them.
  *
  * ONLY `/signin` AND SETTINGS IMPORT THIS. The shell never does, so none of it reaches the entry chunk
- * every screen waits for, which is what the bundle gate measures. The frame's Sign out (`routes/+layout.svelte`) is the
+ * every screen waits for, which is what the bundle gate measures. The frame's Sign out (`lib/shell/AppFrame.svelte`) is the
  * one reach from the shell, and it is an `import()` made on the press, so this file is still a chunk of its own.
  *
  * NOTHING HERE THROWS AND NOTHING LOGS. Every outcome is a value the screen can tell apart from the

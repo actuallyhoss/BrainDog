@@ -99,7 +99,7 @@ test('a line names the agent, never the run, and says his words short and on one
 });
 
 test('the shell counts what came back in the badge and rings it as the app’s alert', () => {
-  const layout = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  const layout = readFileSync(new URL('../shell/AppFrame.svelte', import.meta.url), 'utf8');
   assert.match(layout, /needYouCount\(waitsNow\(\), data\.open, toldNow\(\)\.needs\.length\)/u);
   assert.match(layout, /instructionAlert\(t\)/u);
   assert.match(layout, /toldReadable\(got\.boot\.registers/u, 'read again whenever the poll re-reads boot');

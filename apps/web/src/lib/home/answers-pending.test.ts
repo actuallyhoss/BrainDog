@@ -46,7 +46,7 @@ test('every count reads through it: the rail, the tab, Today and the Decide head
   assert.match(card, /answerPressed\(question\.id\)/u, 'the press takes it off at once');
   assert.match(card, /answerTakenBack\(question\.id\)/u, 'Undo and a refusal put it back');
   assert.match(card, /answerWritten\(question\.id\)/u, 'the write is marked with its ticket');
-  const layout = read('../../routes/+layout.svelte');
+  const layout = read('../shell/AppFrame.svelte');
   assert.match(layout, /const asked = waitsTicket\(\);/u, 'the poll takes its ticket before it asks boot');
   assert.match(layout, /heardWaits\(\{ waits: m\.waitsOf\(got\.boot\), working: m\.workingOf\(got\.boot\) \}, asked\)/u);
 });

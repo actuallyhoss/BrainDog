@@ -287,7 +287,7 @@ test('after stop, nothing is asked and nothing is heard', async () => {
    `const live: 'open' | 'polling' | 'offline' = 'open'`, so the `polling` and `offline` rules under it could never match
    (§1.1). This reads the file because the layout is a component no unit test mounts. */
 test('the layout draws the hairline from the live store, not from a constant', () => {
-  const layout = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  const layout = readFileSync(new URL('../shell/AppFrame.svelte', import.meta.url), 'utf8');
   assert.ok(!layout.includes("const live: 'open' | 'polling' | 'offline' = 'open'"), 'the constant is gone');
   assert.match(layout, /from '\$lib\/data\/live\.svelte\.ts'/, 'the state comes from the store the poll writes');
   /* AN IMPORT IS NOT A READ. With only the two lines above, `data-state="open"` written back in beside the import
@@ -326,7 +326,7 @@ test('an ended refusal wipes both copies and draws the ended screen; the worker 
   assert.match(poll, /endedBy\(out\.refusal\)\) end\(out\.refusal\.fix\)/, 'the poll ends the tab on the access refusal');
   assert.match(poll, /function end\(said: string\): void \{\s*void forget\(\)[\s\S]*?void wipeLocal\(\);[\s\S]*?live\.ended = \{ said \};/, 'ending wipes the worker\'s copy and the local copy');
   assert.match(poll, /regranted\(known, epoch\)/, 'an epoch move re-boots');
-  const layout = read('../../routes/+layout.svelte');
+  const layout = read('../shell/AppFrame.svelte');
   assert.match(layout, /data\.refused\?\.at === 'access'/, 'a boot refused the same way draws the same screen');
   assert.match(layout, /<AccessEnded said=\{endedSaid\} \/>/);
   assert.match(layout, /followGrant\(me\.grant\?\.epoch \?\? null, \(\) => invalidate\('braindog:boot'\)\)/, 'the layout tells the poll the epoch it booted with, and how to boot again');

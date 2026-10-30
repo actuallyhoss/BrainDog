@@ -86,7 +86,7 @@ export type RecordApi = {
   whoami(args: Record<string, never>, ctx: CallContext): Promise<Result<Whoami>>;                       // added — §13 #1
   views(args: { register?: string }, ctx: CallContext): Promise<Result<ViewRow[]>>;                      // added September 16th 2026 — the saved views of one list, or of every list in reach
   view(args: { register: string; id: string }, ctx: CallContext): Promise<Result<ViewRow>>;              // added September 16th 2026 — one saved view, whole
-  // VAULT — 4
+  // KEYCHAIN — 4
   listGrants(args: Record<string, never>, ctx: CallContext): Promise<Result<GrantRow[]>>;
   openGrant(args: { id: string; kek_id: string }, ctx: CallContext): Promise<Result<SealedGrant>>;
   bindGrant(args: BindGrantArgs, ctx: CallContext): Promise<Result<GrantRow>>;
@@ -140,7 +140,7 @@ export type RecordApi = {
 };
 
 export const GROUPS: Record<keyof RecordApi, Group>;        // every method's group, for the router gate — §8
-export type Group = 'DATA' | 'READ+' | 'VAULT' | 'JOBS' | 'ADMIN' | 'INTERNAL';
+export type Group = 'DATA' | 'READ+' | 'KEYCHAIN' | 'JOBS' | 'ADMIN' | 'INTERNAL';
 
 export function evaluateMetric(decl: MetricDecl, ctx: EvalCtx, kernel: Kernel, sql: Sql): MetricResult;       // §5.8, synchronous
 export function runRules(fired: RulesFired, ctx: CallContext, opts?: RulesOpts): RulesOutcome;               // §5.7, the kernel's hook body
@@ -158,9 +158,9 @@ the record had to have. Recounted September 16th 2026, when the sentence still c
 |---|---|---|
 | DATA | `person` · `token` — never `share`; `slash` on `propose` only; `markRead` is `person` only; the four sealed methods the owner himself only, in his session or with his own key, as a personal list (§5.2) | `auth.ts`, step 1 of every method |
 | READ+ | `person` · `token`; `share` reaches `page` for its one slug and nothing else | `auth.ts` |
-| VAULT | `person` with level `owner`, no `op`; a bearer of any kind is `NEEDS_BROWSER_SESSION` | `auth.ts` |
+| KEYCHAIN | `person` with level `owner`, no `op`; a bearer of any kind is `NEEDS_BROWSER_SESSION` | `auth.ts` |
 | JOBS | `createJob` `cancelJob` `listJobs`: `person` `owner`; `claimJob` `postJobEvent` `readCancel`: `runner` | `auth.ts` |
-| ADMIN | `person` with level `owner`, or a `person` whose `op` names the method (an operation grant, 48 §13 D1); `createToken` `listTokens` `revokeToken` admit any `person`. `deviceApprove` admits only the owner, from a sign-in proved in the last 15 minutes: an approval hands out a 90-day bearer that works from anywhere, so it asks what VAULT asks. An earlier draft admitted any `person` | `auth.ts` |
+| ADMIN | `person` with level `owner`, or a `person` whose `op` names the method (an operation grant, 48 §13 D1); `createToken` `listTokens` `revokeToken` admit any `person`. `deviceApprove` admits only the owner, from a sign-in proved in the last 15 minutes: an approval hands out a 90-day bearer that works from anywhere, so it asks what KEYCHAIN asks. An earlier draft admitted any `person` | `auth.ts` |
 | INTERNAL | `system` — no route exists (33 §4); any other principal is `FORBIDDEN`; `export` also admits `system` for the nightly backup | `auth.ts` |
 
 `RecordApi` is what both hosts serve, one route per method, and what `packages/mcp` reaches through the tools its `TOOLS`
@@ -179,7 +179,7 @@ packages/record/
 ├── src/
 │   ├── index.ts            the exports of §2 and nothing else                                   ~20 lines
 │   ├── api.ts              createRecordApi; the method table; DATA writes (create · update · propose · log · markRead);
-│   │                       VAULT; JOBS; the ARM+WAKE tail every write shares                    ~380 lines
+│   │                       KEYCHAIN; JOBS; the ARM+WAKE tail every write shares                 ~380 lines
 │   ├── auth.ts             principal → group gate; op reach; effective levels and scope; httpStatus   ~150 lines
 │   ├── read.ts             index · search · get · list · whatsNew · boot · whoami · project · page · schema · DIALECT ·
 │   │                       sessionsLive · context · digestToday; the projection mapper      ~420 lines
@@ -411,15 +411,15 @@ Every method starts at §5.1; each method's numbered steps begin after it. `tx(f
 ```
 call(method, args, ctx):
  0. SCHEMA   kernel.refused() → return it (503) — 33 §9
- 1. GATE     group = GROUPS[method]. Allowed kinds per §2's table. A bearer (token · runner) at VAULT, ADMIN or the
+ 1. GATE     group = GROUPS[method]. Allowed kinds per §2's table. A bearer (token · runner) at KEYCHAIN, ADMIN or the
              JOBS session half → NEEDS_BROWSER_SESSION. share on anything but page(its slug) → FORBIDDEN.
              INTERNAL from anything but system → FORBIDDEN (export admits system). Any other mismatch → FORBIDDEN.
  2. OP       ctx.op set (an operation grant): the method must be in its reach — export → export · import → import ·
              pack → planPack installPack uninstallPack · token → createToken listTokens revokeToken — else FORBIDDEN;
-             VAULT with op set → NEEDS_BROWSER_SESSION, fix "Sign in again to open the Keychain" (49 §5.2 step 7 moved here).
+             KEYCHAIN with op set → NEEDS_BROWSER_SESSION, fix "Sign in again to open the Keychain" (49 §5.2 step 7 moved here).
  3. LEVELS   person, or token.person:  SELECT register, level FROM member WHERE person_id = ?
              → Map<register, Level>; the '*' row fills every register without its own row.
-             VAULT · ADMIN (except the four person-level methods) · JOBS-session: the '*' level must be owner.
+             KEYCHAIN · ADMIN (except the four person-level methods) · JOBS-session: the '*' level must be owner.
  4. VERB     the level the method needs on the register the args name — table below; a token also needs the scope
              word. Failure → FORBIDDEN at 'register' (or 'principal'), fix: "You hold <held>; this needs <needed>."
  5. SCOPE    derived.scope = { registers: every register with effective level ≥ read, rows: share.rows }
@@ -434,7 +434,7 @@ call(method, args, ctx):
 | create | `≥ append` | `write` | `create` |
 | update | `≥ write` | `write` | `update` |
 | decide | `≥ decide`, person only | — | `update` on `suggestion` with `patch.decide` or `patch.resolved_as` |
-| owner | `owner` on `'*'`, person only | — | VAULT · ADMIN (or `op` reach) · `createJob` `cancelJob` `listJobs` · `snapshot` · `deviceApprove` `listDevices` `revokeDevice`, the first from a sign-in proved in the last 15 minutes · `inbox`, a READ+ route whose every refusal below owner is `FORBIDDEN` |
+| owner | `owner` on `'*'`, person only | — | KEYCHAIN · ADMIN (or `op` reach) · `createJob` `cancelJob` `listJobs` · `snapshot` · `deviceApprove` `listDevices` `revokeDevice`, the first from a sign-in proved in the last 15 minutes · `inbox`, a READ+ route whose every refusal below owner is `FORBIDDEN` |
 | person | any level, person only | — | `markRead` `createToken` `listTokens` `revokeToken` |
 | runner | — | the `runner` kind | `claimJob` `postJobEvent` `readCancel` |
 
@@ -708,7 +708,7 @@ ends the search rather than starting one.
 
 ---
 
-### 5.4 · VAULT (`api.ts`) — owner, browser session, no `op`; the record never decrypts (ADR-062)
+### 5.4 · KEYCHAIN (`api.ts`) — owner, browser session, no `op`; the record never decrypts (ADR-062)
 
 **The two ways in, and why two.** These four are a browser session's at `/api/<method>`, except that the sealed
 shape itself is not routed: `openGrant` answers material a browser cannot open and `bindGrant` takes material a
@@ -1003,7 +1003,7 @@ same `Result`; this table is what **this layer** raises, with the `fix` a person
 | Code | Raised here when | `at` | `fix` |
 |---|---|---|---|
 | `FORBIDDEN` | the principal's kind, level, scope or `op` reach does not reach the method or register (§5.1 steps 1–4); `slash` outside `propose`; `share` outside its slug; a runner on another runner's job; a wrong device code (first four) | `principal` · `register` · `user_code` | `You hold <held>; this needs <needed>.` |
-| `NEEDS_BROWSER_SESSION` | a `token` or `runner` at VAULT, ADMIN or the JOBS session half; an `op` grant at VAULT | `principal` | `Open this from the app; a token cannot reach it.` |
+| `NEEDS_BROWSER_SESSION` | a `token` or `runner` at KEYCHAIN, ADMIN or the JOBS session half; an `op` grant at KEYCHAIN | `principal` | `Open this from the app; a token cannot reach it.` |
 | `WRONG_KEY` | `openGrant` / `ingestVerify`: `vault_key.kek_id ≠ args.kek_id` | `kek_id` | `The Keychain was wrapped by another key — rotate the KEK forward; the data is intact.` |
 | `GRANT_REVOKED` | `openGrant` / `bindGrant` / `revokeGrant` on a row with `revoked_at` | `id` | `This credential was revoked on <date>; bind a new one.` |
 | `DEVICE_CODE_EXPIRED` | `devicePoll` on a pending row past its ten minutes | `device_code` | `The code expired; ask for a new one.` |
@@ -1073,12 +1073,12 @@ replaces it with the label before a row object exists; a grant's `label` or `ope
 (12 §8; the kernel enforces the shape); content in a `notify.push` payload — a title and a URL (09 §3); a token's
 or device bearer's value after the one reply that mints it; a `local` table in an export (03 §3); a row a `share`
 link's predicate excludes (20 §1). What never happens: `slash` writing a row — refused at §5.1 and asserted by the
-`slash-actor` gate; a token reaching VAULT, ADMIN or a job's session half; a `system` method from a routable
+`slash-actor` gate; a token reaching KEYCHAIN, ADMIN or a job's session half; a `system` method from a routable
 principal — INTERNAL has no route and refuses every other kind; a device approving itself — `deviceApprove` is a
 browser session.
 
 `GROUPS` is exported so the `router-groups` gate (33 §8) can walk `apps/*`'s routes and assert each names a group,
-INTERNAL has none, and VAULT/ADMIN routes accept no bearer. Log lines from this package carry a code, an id and a
+INTERNAL has none, and KEYCHAIN/ADMIN routes accept no bearer. Log lines from this package carry a code, an id and a
 shape — never `fields`, `payload`, `note`, `body` or `ciphertext` (12 §8; the `secret-grep` gate reads this package).
 
 ---
@@ -1093,7 +1093,7 @@ through `createRecord` + `installPack` + `create`. One case per method's happy p
 
 **`test/auth.test.ts`** — the matrix, every cell a case:
 
-| Principal | DATA | READ+ | VAULT | JOBS session | JOBS runner | ADMIN | INTERNAL |
+| Principal | DATA | READ+ | KEYCHAIN | JOBS session | JOBS runner | ADMIN | INTERNAL |
 |---|---|---|---|---|---|---|---|
 | person `read` | reads ok; `create` → `FORBIDDEN`; `markRead` ok | ok | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `createToken` ok; `installPack` → `FORBIDDEN` | `FORBIDDEN` |
 | person `append` | `create` ok; `list` of that register → `FORBIDDEN`; `propose` ok | ok on read-level registers | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | as above | `FORBIDDEN` |

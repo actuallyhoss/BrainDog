@@ -72,5 +72,5 @@ test('the page the terminal prints draws the boxes at their lead size, focused, 
 
 test('the page is drawn bare and spared the first-run redirect, as the consent screen is', () => {
   assert.match(read('../../routes/+layout.ts'), /inner === '\/connect\/approve'/u);
-  assert.match(read('../../routes/+layout.svelte'), /at === '\/connect\/approve'/u);
+  assert.match(read('../shell/AppFrame.svelte'), /at === '\/connect\/approve'/u);
 });

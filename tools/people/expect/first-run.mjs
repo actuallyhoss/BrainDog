@@ -486,7 +486,7 @@ export function refusedWhy(step, out) {
 
 
 /**
- * Step 4's doors: sign up with the mailed link as the sign-up page does (`routes/signup/+page.svelte` `verify` and
+ * Step 4's doors: sign up with the mailed link as the sign-up page does (`routes/signup/Signup.svelte` `verify` and
  * `makeFree`: spend the link, make the free record with `checkout`, open it with `openOwned`, and reach it under its own
  * name), or, on a host that has no sign-up and says how its owner gets in (`host.owner`), that door. Answers how the
  * record was opened, the tab signed in to it, and the base its calls go to.
@@ -592,7 +592,7 @@ export async function walk(person, host, say = () => {}, shot = null) {
   check(expect.hard({ proposal: hard, by: hard.by ?? 'rules' }, person));
   check(expect.fields({ fields: host.firstScreen?.fields ?? null }, person));
   check(expect.quick({ ...(await firstReadAt(person.said, (s) => propose(s, ctx), () => readFirst(person.said))), model: Boolean(host.ask) }, person));
-  /* THE SIGN-UP PAGE'S PRESSES, as its steps take them (`routes/signup/+page.svelte`): Next under her sentence; on the
+  /* THE SIGN-UP PAGE'S PRESSES, as its steps take them (`routes/signup/Signup.svelte`): Next under her sentence; on the
      one question a choice (none for a name, which is typed, or where one is suggested) and Next; the one field's Send;
      the link in her mail; the passkey step's one press. The build and Today open by themselves after it. */
   const presses = [

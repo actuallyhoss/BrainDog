@@ -10,7 +10,7 @@ import { test } from 'node:test';
 
 import { words } from './words.ts';
 
-const PAGE = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+const PAGE = readFileSync(new URL('./Signup.svelte', import.meta.url), 'utf8');
 
 /** The body of `verify()`, up to the next function. */
 const VERIFY = PAGE.slice(PAGE.indexOf('async function verify('), PAGE.indexOf('const shown = read ??'));

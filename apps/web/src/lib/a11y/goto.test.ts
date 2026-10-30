@@ -96,7 +96,7 @@ test('the sheet prints the same list, and the `g` row takes it', () => {
 });
 
 test('the layout holds no table of letters, and reaches this file only by a dynamic import', () => {
-  const layout = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  const layout = readFileSync(new URL('../shell/AppFrame.svelte', import.meta.url), 'utf8');
   assert.doesNotMatch(layout, /const GOTO\b/u, 'the fixed table is back in the root layout');
   assert.doesNotMatch(layout, /^\s*import [^(]*a11y\/goto/mu, 'goto.ts is imported statically, so the entry script carries it');
   assert.match(layout, /import\('\$lib\/a11y\/goto\.ts'\)/u, 'the layout never loads goto.ts');

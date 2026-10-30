@@ -75,7 +75,7 @@ test('ENTER AND SPACE ON A HELD CONTROL ARE HELD, AND SO IS ENTER THAT SENDS WHA
 const src = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 test('THE SHELL HOLDS THE SCREEN while the quiet mark is up, a screen draws what it kept, or the shell is the copy', () => {
-  const layout = src('../../routes/+layout.svelte');
+  const layout = src('../shell/AppFrame.svelte');
   assert.match(layout, /<main id="main" class="body"[^>]*\{@attach holdIn\(\(\) => presses\.held \|\| data\.stale === true\)\}>/u);
   assert.match(layout, /:global\(#main\[data-held\] \[data-held-press\]\) \{[^}]*cursor: default;/u, 'quiet, and in the same box');
   assert.doesNotMatch(layout.slice(layout.indexOf(':global(#main[data-held]')), /^\s*(display|block-size|inline-size|margin|padding|visibility)\s*:/mu, 'nothing that moves a box');
@@ -119,7 +119,7 @@ test('A CONTROL MARKED data-keeps IS LEFT TO KEEP ITS OWN PRESS, AND ITS KEYS AR
   assert.equal(heldControl(el('SPAN', {}, answer), main), null, 'a press on the words in it is its own');
   assert.equal(heldControl(el('BUTTON', {}, card), main)?.nodeName, 'BUTTON', 'its neighbour with no mark is held');
   assert.equal(heldKey({ key: 'Enter', metaKey: false, ctrlKey: false, target: answer }, main), false, 'Enter on it reaches its click');
-  const layout = src('../../routes/+layout.svelte');
+  const layout = src('../shell/AppFrame.svelte');
   assert.match(src('../decide/DecisionCard.svelte'), /data-keeps\n/u, 'the card marks its answers');
   assert.ok(layout.includes('holdIn('), 'and the shell still holds the rest');
 });

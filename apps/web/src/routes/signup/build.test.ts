@@ -21,7 +21,7 @@ const device = browserCurrencyEnv(LOCALE, ['en-EG', 'ar-EG'], ZONE);
 const env: BuildEnv = { device, today: '2026-10-05', email: 'mariam@people.braindog.test', nav: [], locale: LOCALE };
 
 /**
- * THE PAGE'S OWN READING (`reading` in +page.svelte), the rules half: the zone, the language and the zone's currency go
+ * THE PAGE'S OWN READING (`reading` in Signup.svelte), the rules half: the zone, the language and the zone's currency go
  * in with the words. Held in a name first, so the context reads the same before and after it learns a currency.
  */
 const ctx = { zone: ZONE, locale: LOCALE, currency: zoneCurrency(ZONE, device) };
@@ -87,7 +87,7 @@ test('NOTHING TO BUILD FROM NOTHING SAID: the record\'s own /start asks instead'
 });
 
 test('THE PAGE BUILDS WITH THIS, not a copy of it', () => {
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./Signup.svelte', import.meta.url), 'utf8');
   assert.match(page, /import \{[^}]*\baccepting\b[^}]*\} from '\.\/build\.ts'/u);
   assert.match(page, /await accepting\(/u);
   assert.doesNotMatch(page, /currencyChoices\(/u, 'the page picks a currency of its own beside accepting()');

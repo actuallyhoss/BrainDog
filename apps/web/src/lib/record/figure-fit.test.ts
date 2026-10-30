@@ -156,7 +156,7 @@ function componentCss(path: string): string {
 const routeCss = ['apps/web/src/lib/page/PageView.svelte', 'apps/web/src/lib/page/PageBody.svelte', 'apps/web/src/lib/page/BlockSlot.svelte']
   .map(componentCss)
   .join('\n');
-const shellCss = componentCss('apps/web/src/routes/+layout.svelte');
+const shellCss = componentCss('apps/web/src/lib/shell/AppFrame.svelte');
 /* `blocks.css` AND THE KIND SHEETS `blocks-kinds.css` GATHERS, in its order, because a stat's steps and every other
    block's are in `kinds/` now and `PageView` loads them with the page. Read through the gathering file's own
    `@import`s, so a kind sheet added there is in this cascade without a line here. */

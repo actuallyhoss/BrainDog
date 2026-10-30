@@ -14,7 +14,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
-const shell = read('./+layout.svelte');
+const shell = read('../lib/shell/AppFrame.svelte');
 const code = shell.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, '');
 const sheet = read('../app.css');
 const css = sheet.replace(/\/\*[\s\S]*?\*\//gu, '');

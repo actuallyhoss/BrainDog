@@ -261,7 +261,7 @@ test('what the screen was drawing is read off the page as drawn', () => {
  * is never in the way of the first screen. A source read, because there is no DOM harness in this app.
  */
 test('the shell starts the watchdog once, after the first paint, with the route and what was drawing', () => {
-  const layout = readFileSync(fileURLToPath(new URL('../routes/+layout.svelte', import.meta.url)), 'utf8');
+  const layout = readFileSync(fileURLToPath(new URL('./shell/AppFrame.svelte', import.meta.url)), 'utf8');
   assert.match(layout, /import\('\$lib\/watchdog\.ts'\)/u, 'the shell does not load the watchdog');
   assert.doesNotMatch(layout, /^\s*import [^;]*from '\$lib\/watchdog\.ts'/mu, 'the watchdog is in the shell’s first chunk');
   assert.match(layout, /watchFreezes\(window,/u, 'the shell does not start the watchdog on its window');

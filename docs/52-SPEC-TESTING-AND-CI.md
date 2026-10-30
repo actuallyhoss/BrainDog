@@ -210,7 +210,7 @@ rather than this table's.
 | `graph` | every `package.json`; every `src/**` import specifier | acyclic; every workspace edge points down 31 §2's order; no undeclared import and no relative import that climbs out of its own package | — |
 | `secret-grep` | `packages/**` and `apps/**` sources | no plaintext source reaches a sink (a log, telemetry, a push, a prompt template); the `Plaintext` brand appears only at the two hosts' Keychain boundaries | — |
 | `event-kinds` | the migration's CHECK; 30 §1's CHECK; 30 §2's table and its prose; `EVENT_KINDS` | all five sources say the same number and the same members. Four of the five are not code, which is why it is a gate and not a test | — |
-| `router-groups` | each host's route table; `METHOD_GROUPS`; 30 §5's groups; 44 §2's `REFUSED` | every route declares a group; no INTERNAL method is routed; VAULT is cookie-only; ADMIN admits no token principal | — |
+| `router-groups` | each host's route table; `METHOD_GROUPS`; 30 §5's groups; 44 §2's `REFUSED` | every route declares a group; no INTERNAL method is routed; KEYCHAIN is cookie-only; ADMIN admits no token principal | — |
 | `guards` | `ROUTES` in `packages/host`; the guard each handler in `packages/record` actually calls | the group the table publishes and the check the record applies agree. It found `members` routed ADMIN and guarded `read`, on an answer carrying every colleague's email | — |
 | `closed-lists` | 34 §6's table; 30 §1's SQL block; `migrations/0001_kernel.ts`; each owner's `as const` array | counts and member sets agree across every source, for the twenty-three lists the DDL refuses in a `CHECK` | — |
 | `slash-actor` | the seed, materialised through the real write path, then offered the four writes a model may not make | 30 §3's query returns zero rows. It makes the writes before it queries, because the seed writes no `slash` event and the filter would otherwise filter nothing | — |
@@ -512,7 +512,7 @@ sentence must all say the same number; `EVENT_KINDS` in `packages/kernel` must e
 1. Import each host's route table as data — [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §4.7's `Route[]` and
    `METHOD_GROUPS`, and [51-SPEC-WORKER](51-SPEC-WORKER.md) §4's — the `handle` functions are never called.
 2. Every `group` is one of 49 §4.7's nine; no route carries `INTERNAL`; no INTERNAL method of 30 §5 has a route.
-3. Every `VAULT` route has `auth: 'cookie'`; no `ADMIN` route admits a `token` principal; the runner's three `JOBS`
+3. Every `KEYCHAIN` route has `auth: 'cookie'`; no `ADMIN` route admits a `token` principal; the runner's three `JOBS`
    routes have `auth: 'runner'` and no other route does.
 4. `METHOD_GROUPS`' keys equal 30 §5's six groups less INTERNAL, plus 48's three token methods; every DATA and READ+
    method appears in exactly one `POST /api/<method>` route.

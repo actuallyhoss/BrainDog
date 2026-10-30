@@ -49,7 +49,7 @@ test('after a press the name is quiet, and after a key it wears its ring', () =>
 });
 
 test('the layout focuses the name through it and hides the ring only on the mark', () => {
-  const layout = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  const layout = readFileSync(new URL('../shell/AppFrame.svelte', import.meta.url), 'utf8');
   assert.match(layout, /quietFocus\(h1\);/u);
   assert.match(layout, /addEventListener\('keydown', heard, opts\);\s*addEventListener\('pointerdown', heard, opts\);/u);
   assert.match(layout, /main h1\[data-quiet\]:focus/u);
