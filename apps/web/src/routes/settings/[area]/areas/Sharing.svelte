@@ -23,7 +23,7 @@
   import { createClient } from '@braindog/client';
   import { may } from '$lib/record/may.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
-  import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import { closedAfter, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -82,14 +82,15 @@
     if (team) {
       const [got, gs] = await Promise.all([readSharing(client()), readGroups(client())]);
       unrouted = !got.ok && got.code === 'ROUTE_UNKNOWN';
-      closed(got.ok || unrouted, at);
+      /* A TASK LATER, so the links part this answer draws has opened its own read by then (`closedAfter`). */
+      closedAfter(got.ok || unrouted, at);
       rows = got.ok ? got.value : null;
       groups = gs.ok ? gs.value : [];
       refused = got.ok || unrouted ? null : got.fix;
     } else {
       const got = await readMine(client());
       unrouted = !got.ok && got.code === 'ROUTE_UNKNOWN';
-      closed(got.ok || unrouted, at);
+      closedAfter(got.ok || unrouted, at);
       mine = got.ok ? got.value : null;
       refused = got.ok || unrouted ? null : got.fix;
     }
