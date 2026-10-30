@@ -473,7 +473,7 @@ export const TOOLS: readonly Tool[] = [
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
     /* AND ONE LIST'S FIELDS, WHICH WAS `schema` (agents and MCP plan §6.1, 12a): a tool of its own for one argument, folded
        here and still callable by its old name until `FOLDED_UNTIL`. */
-    description: 'Lists with item counts, and figures; register: its fields.',
+    description: 'Lists with counts, and figures; register: its fields.',
     input: obj({ register: { type: 'string' } }),
     writes: false,
   },
@@ -491,7 +491,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND `topic`, WHAT THE PERSON IS WORKING ON, which an agent with no folder says on its first call (Claude.ai,
        ChatGPT, any remote client): with no repository, remote or folder it is the one thing that places its run, in the
        project of that name or the first one formed from it. An agent that sends none is asked for it in the answer. */
-    input: obj({ task: str('Read whole, like tasks#41.'), project: { type: 'string' }, topic: str('With no folder, what they work on.') }),
+    input: obj({ task: str('Whole, like tasks#41.'), project: { type: 'string' }, topic: str('No folder: what they work on.') }),
     quiet: ['depth', 'since'],
     writes: false,
   },
@@ -502,7 +502,7 @@ export const TOOLS: readonly Tool[] = [
        The three calls are the examples, because an agent copies an example before it reads a sentence. */
     /* AND AN SG HE TOLD YOU TO ANSWER, with `option` and his words in `said` (`wordAnswer`, the owner's decision of 27
        October): the one example that says it, paid for out of the budget's last tokens. */
-    description: 'What the person told you. Empty reads it; take IN4 starts it; reply IN4 with said and state answers it; answer SG9 with option and said decides on their word.',
+    description: 'What the person told you. Empty reads; take IN4 starts; reply IN4 with said, state; answer SG9 with option and said decides on their word.',
     /* AND `answer` ALONE, A QUESTION HIS ORDER NAMED, given as he said: the line he sent says the call. */
     input: obj({
       take: { type: 'string' },
@@ -544,7 +544,7 @@ export const TOOLS: readonly Tool[] = [
     title: 'Browse entries',
     /* "NARROWED BY A PREDICATE. THE PREDICATE IS A TREE" SAID "PREDICATE" TWICE; saying it once paid for most of
        `fields` below. The list measured 2,720 before `fields` and 2,751 after, of the 2,760 `budget.test.ts` holds. */
-    description: 'Items of one list, like tasks, newest first.',
+    description: 'Items of one list, newest first.',
     input: obj(
       {
         register: { type: 'string' },
@@ -575,7 +575,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'search',
     title: 'Search everything',
-    description: 'Items matching your words, each a prefix, in every list.',
+    description: 'Items matching your words, each a prefix, in any list.',
     /* AND 100, NOT THE 50 THIS SAID, for `list`'s reason one tool up. `ftsSearch` is
        `Math.min(Math.max(1, opts.limit ?? 20), 100)` (`packages/kernel/src/fts.ts:116`). Measured over
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
@@ -738,7 +738,7 @@ export const TOOLS: readonly Tool[] = [
        read on every call of every tool. Each field's own rule stays beside the field. */
     /* TAKE AND DROP ARE A CALL OF THEIR OWN, on a step another run left: `take` picks it up, and the second of
        two sessions racing for it is told in the record's words who has it; `drop` closes one that is no longer true. */
-    description: "Keep your step true: doing once you know it, next before you stop, dead ends in tried. task starts one, done closes it. take or drop another run's step, drop with why.",
+    description: "Keep your step true: doing once known, next before you stop, dead ends in tried. task starts, done closes. take or drop another run's step; drop with why.",
     input: obj({
       next: str('One step.'),
       tried: { type: 'string' },
@@ -777,7 +777,7 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation; a name alone is only noted. Say where honestly: mail, commits and the web are not believed alone; your own run is session in <repo>.',
+      'A person or organisation; a name alone is only noted. Say where honestly: mail, commits and the web are not believed alone; your run is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
@@ -785,7 +785,7 @@ export const TOOLS: readonly Tool[] = [
         email: str('Only as seen.'),
         handle: { type: 'string' },
         keys: { type: 'array', items: { type: 'string' } },
-        org: str('Who they work for.'),
+        org: str('Their employer.'),
         domain: str('Like kiln.example.'),
         role: { type: 'string' },
         where: { type: 'string' },
@@ -804,7 +804,7 @@ export const TOOLS: readonly Tool[] = [
        `ignore` says nothing beside its name, because "or set it aside" in the description already has.
        AND ITS ARGUMENTS SAY LESS. The seven are the record's, and the two that only go with `back` and the note that only
        goes with `register` are named and left to the record's sentence, which says when each is taken. */
-    description: 'File an inbox arrival as an item, or set it aside.',
+    description: 'File an inbox arrival as an item, or set aside.',
     input: obj(
       {
         arrival: str('Its id in braindog:inbox.'),
@@ -931,7 +931,7 @@ const parse = (spoken: unknown): { register: string; seq: number } | null => {
   return m ? { register: m[1]!, seq: Number(m[2]) } : null;
 };
 
-const ROW_OR_ID = 'Name an item by its list and number, like tasks#41, or by its own id, like S42.';
+const ROW_OR_ID = 'Name an item by list and number, like tasks#41, or its id, like S42.';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -1409,7 +1409,7 @@ export const TEMPLATES = [
   { uriTemplate: 'braindog:metric/{id}', name: 'metric', description: 'One figure, with its target and how it compares.' },
   { uriTemplate: 'braindog:skill/{name}', name: 'skill', description: 'The text of one skill, and when to reach for it.' },
   { uriTemplate: 'braindog:declaration/{slug}', name: 'declaration', description: 'One page as declared, to change and propose back.' },
-  { uriTemplate: 'braindog:automation/{id}', name: 'automation', description: 'One automation as declared, with its last ten runs, each step with its outcome.' },
+  { uriTemplate: 'braindog:automation/{id}', name: 'automation', description: "One automation as declared, with its last ten runs and each step's outcome." },
   {
     uriTemplate: 'braindog:inbox/{state}',
     name: 'inbox',
