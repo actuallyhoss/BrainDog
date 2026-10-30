@@ -15,7 +15,7 @@
 import { hubWords, onDay, type HubRow } from './hub.ts';
 
 /** What a row needs to be folded: its key, its family, and its count. */
-export type Kin = Pick<HubRow, 'key' | 'family' | 'fired' | 'lastAt'>;
+export type Kin = Pick<HubRow, 'key' | 'family' | 'fired' | 'lastAt' | 'month'>;
 
 /** One family folded: its name, how many rules, their count summed, the newest firing, and the members in order. */
 export type Family<T extends Kin> = {
@@ -24,6 +24,8 @@ export type Family<T extends Kin> = {
   count: number;
   /** The members' count summed, or `null` when any member came with none, since a sum of some is not the whole. */
   fired: number | null;
+  /** The members' months summed, on the same terms: `undefined` when any member came without one. */
+  month?: number | undefined;
   lastAt: string | null;
   /** How many members never ran, from the same counts. */
   never: number;
@@ -100,7 +102,9 @@ function foldOf<T extends Kin>(key: string, list: string, did: readonly string[]
   let lastAt: string | null = null;
   for (const m of members) if (m.lastAt && (lastAt === null || Date.parse(m.lastAt) > Date.parse(lastAt))) lastAt = m.lastAt;
   const never = members.filter((m) => m.fired === 0).length;
-  return { key, name: familyName(list, did), count: members.length, fired, lastAt, never, members };
+  /* THE MONTH TOO, so the line says its period as each member's does (AF9). */
+  const month = counted && members.every((m) => typeof m.month === 'number') ? members.reduce((n, m) => n + (m.month ?? 0), 0) : undefined;
+  return { key, name: familyName(list, did), count: members.length, fired, month, lastAt, never, members };
 }
 
 /**
@@ -110,6 +114,6 @@ function foldOf<T extends Kin>(key: string, list: string, did: readonly string[]
 export function familySaid(f: Family<Kin>, now: number): string {
   if (f.fired === null) return '';
   if (f.fired === 0) return familyWords.noneRan;
-  const ran = hubWords.ranCount(f.fired, f.lastAt ? onDay(f.lastAt, now) : '').replace(/\.$/u, '');
+  const ran = hubWords.ranCount(f.fired, f.lastAt ? onDay(f.lastAt, now) : '', f.month).replace(/\.$/u, '');
   return f.never > 0 ? `${ran} · ${familyWords.someNever(f.never)}` : ran;
 }

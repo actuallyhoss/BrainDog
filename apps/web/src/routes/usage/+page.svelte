@@ -137,6 +137,11 @@
   /* A ROW A PROJECT, BUSIEST FIRST, linking to its slice. Everywhere has no slice and no link. */
   const projectRows = $derived([...groups].sort((a, b) => b.totals.runs - a.totals.runs || groupName(a).localeCompare(groupName(b))));
   const parts = $derived(view ? projectParts(view.groups) : null);
+  /* WHETHER THE WEEKS TILE IS DRAWN: only where a day of a run is known (see the tile). */
+  const weekly = $derived(view !== null && view.totals.runs > 0 && view.days.length > 0 && !(view.records.length > 0 && view.records.every((r) => r.meters.length === 0)));
+  /* AND WHETHER ANY TILE IS: an empty row of tiles still took its gaps, a band of nothing between the months and the list
+     (audit 6f AF22), on a month whose runs were all rules', which no day is kept for. */
+  const tiled = $derived(view !== null && (view.records.length > 0 || weekly || parts !== null || heat !== null));
 
   /**
    * THIS PAGE'S OWN WORDS. The rest are `actions.ts`'s
@@ -268,7 +273,7 @@
     <!-- A THROW WHILE DRAWING THE BOARD IS THIS SCREEN'S FAULT, said as one with the reason under Details, and never the
          offline sentence: by this point the record has answered. -->
     <svelte:boundary onerror={(e) => console.error(e)}>
-      <div class="tiles">
+      {#if tiled}<div class="tiles">
         <!-- THE ALLOWANCE LEADS, one tile a record the person owns: the four meters as rings, each with its own line under
              it, and the binding meter's sentence as the line that reads them. A plan with no limit has no rings; its tile
              holds the month's runs by week instead, so the week bars are not drawn twice. The plan is named beside the
@@ -316,7 +321,7 @@
 
         <!-- ONLY WHERE A DAY OF A RUN IS KNOWN: an automation's runs are counted for the month and not by day, and a figure
              over bars of nothing read as runs that happened on no day. -->
-        {#if view.totals.runs > 0 && view.days.length > 0 && !(view.records.length > 0 && view.records.every((r) => r.meters.length === 0))}
+        {#if weekly}
           <Tile icon="history" title={reading.weeks}>
             <p class="figure num">{n(view.totals.runs)}<span class="figure-unit">{reading.runs(view.totals.runs)}</span></p>
             <Bars items={weekBars(view)} subject={words.overTime} />
@@ -347,7 +352,7 @@
             </Tile>
           {/if}
         {/each}
-      </div>
+      </div>{/if}
 
       <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
       {#if view.totals.runs === 0}
@@ -656,6 +661,20 @@
 
   .use-row .line-title {
     font-size: var(--fs-body);
+  }
+
+  /* A NAME AND ITS COUNT ON ONE LINE AT EVERY WIDTH (audit 6f AF22): the phone's card put "36 runs" on a line of its own,
+     set in under the name as if under a missing well. The name wraps; the count keeps the right-hand column. */
+  .use-row .line-title {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .use-row .use-counts {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: baseline;
+    text-align: end;
   }
 
   .use-row[data-faint] .line-title {
