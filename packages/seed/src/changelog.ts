@@ -133,6 +133,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   core: [
+    { version: '1.2.1', notes: 'Health shows every check that has not run yet, so the cards add up to the count above them.' },
     { version: '1.2.0', notes: 'Health says what it found more plainly and links to Tidy up.' },
     { version: '1.1.0', notes: "Scripts calls the column that says how each script is doing Status." },
     {
@@ -201,7 +202,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.33.0',
-      notes: 'A category can be marked as a correction, not spending, such as Discrepancy, and BrainDog asks once for one whose name says so; once marked, its lines stay out of every spending and income figure. Reports says the range you picked. Paid most adds up every payment to a payee, and bank digits read as the account they end in. The next 30 days reads "Bills and usual spending", Coming up says "Repeating bills", and the lowest point reads the same on Money, Today and Forecast. Lines that look imported twice are offered to be archived, one of each kept. Snapshots, which BrainDog keeps by itself, is no longer offered a page of its own.',
+      notes: 'A category can be marked as a correction, not spending, such as Discrepancy, and BrainDog asks once for one whose name says so; once marked, its lines stay out of every spending and income figure. Reports says the range you picked. Paid most adds up every payment to a payee, and bank digits read as the account they end in. The next 30 days reads "Bills and usual spending", Coming up says "Repeating bills", and the lowest point reads the same on Money, Today and Forecast, which now opens on 12 weeks. Lines that look imported twice are offered to be archived, one of each kept. Snapshots, which BrainDog keeps by itself, is no longer offered a page of its own.',
     },
     {
       version: '3.32.2',
@@ -376,7 +377,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
-    { version: '1.20.1', notes: 'No due day lists the newest tasks first, and Later lists tasks by their due day, then the newest first.' },
+    { version: '1.20.1', notes: 'No due day lists the newest tasks first, and Later lists tasks by their due day, then the newest first. Work\'s band reads "Your work this week" and Timeline\'s lane "Tasks by due day".' },
     {
       version: '1.20.0',
       notes: "Work's project chips, and Yours and Agents, count the same open tasks as Open, kept for later left out, and its first line says none of your tasks is late rather than nothing is late.",

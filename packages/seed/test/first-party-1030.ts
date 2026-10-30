@@ -67,7 +67,8 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
    "rule.category-correction-asks#0",
    "rule.category-correction-yes#0",
    "script.category_correction#0",
-   "script.ledger_twice#0"
+   "script.ledger_twice#0",
+   "metric.moved-since#0"
   ],
   "was": {
    "script.learn_category#0": {

@@ -2476,8 +2476,8 @@ const DECLARED: Record<string, Version> = {
       metric.installments-left-by-plan metric.installments-next-due-by-plan metric.installments-paid-by-plan
       metric.installments-total-by-plan metric.instalments-in-no-book metric.kept-share-90d metric.lasts-no-income metric.late-in
       metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days metric.ledger-rows-7d metric.left-all metric.left-last
-      metric.left-month metric.left-three metric.left-year metric.lines-by-account metric.net-by-month metric.net-worth
-      metric.net-worth-nights metric.nights-missed-30d metric.out-30d metric.out-ahead-by-month metric.out-by-month
+      metric.left-month metric.left-three metric.left-year metric.lines-by-account metric.moved-since metric.net-by-month
+      metric.net-worth metric.net-worth-nights metric.nights-missed-30d metric.out-30d metric.out-ahead-by-month metric.out-by-month
       metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-over-time metric.owed-to-you metric.paid-last-by-payee
       metric.paid-times-by-payee-90d metric.paid-to-by-week metric.payees-paid-90d metric.pending-lines metric.pending-out-month
       metric.pending-out-month-count metric.plan-after-next-by-plan metric.plan-last-due metric.plan-late metric.plan-left
@@ -2512,10 +2512,11 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '8aeb6babb5fcaf3a',
+    declares: '72b8a0107776271c',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
+      'Before 3.33.0 shipped, `page.money-forecast` opens on 12 weeks and `metric.moved-since` is added for Reports; one id added, none taken away -> 72b8a0107776271c',
     ],
   },
   'work@1.17.0': {
@@ -2705,7 +2706,16 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`page.health` says what needs a look without \"on this record\", and links to Tidy up for what went stale or is here twice; words and one note added, no id added or taken away -> f7944da78d446954",
     ],
+  },  'core@1.2.1': {
+    holds: `
+      page.activity page.calendar page.health page.scripts
+    `,
+    declares: 'f519178d239ec8dc',
+    history: [
+      'Core 1.2.1 of 30 October: `page.health` shows every card not checked yet; no id added or taken away -> f519178d239ec8dc',
+    ],
   },
+
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
     holds: `
@@ -3095,10 +3105,11 @@ const DECLARED: Record<string, Version> = {
       rule.close_follow_ups rule.start_with_parent
       script.close_follow_ups script.start_with_parent
     `,
-    declares: 'ab20ffa843fb893f',
+    declares: '048d50723d738f45',
     history: [
       'Work 1.20.1 of 30 October: `page.work` lists No due day newest first; an order, no id added or taken away -> 3a5fc3181fd352f1',
       'Before 1.20.1 shipped, `page.work` lists Later by due day, then newest first; an order, no id added or taken away -> ab20ffa843fb893f',
+      'Before 1.20.1 shipped, `page.work` says "Your work this week" and `page.work-timeline` "Tasks by due day", keys kept; no id added or taken away -> 048d50723d738f45',
     ],
   },
 

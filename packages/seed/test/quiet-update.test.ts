@@ -268,8 +268,8 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   /* NO SIDE COLUMN SINCE money-core 3.29.0: the home is one column of tiles, and its pages carry what the rail held. */
   assert.equal(page.layout, undefined);
   const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
-  /* THIS WEEK IS ITS OWN BAND AGAIN, SINCE the screens scope of 24 October. */
-  assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
+  /* THIS WEEK IS ITS OWN BAND AGAIN, SINCE the screens scope of 24 October, named Your work this week since work 1.20.1. */
+  assert.equal(work.blocks.find((b) => b.heading === 'Your work this week')?.when?.metric, 'tasks-this-week-yours');
   /* AND LASTS SAYS THE DAY, over the figure the update brought with it (money-core 3.12.0): in the sentence under how long
      the money lasts with nothing coming in since 3.27.0, where it was a figure of its own, and since 3.29.0 a cell of the
      hero, beside the day it runs out on. Since 3.29.1 the day is that cell's alone, and the sentence under how long it
