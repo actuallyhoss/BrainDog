@@ -790,7 +790,7 @@ export const isWaitedOn = (kind: MailKind): boolean => WAITED_ON.has(kind);
  * The lines that mail the operator, and nothing else: every other alert is read the next morning. `model` is a model
  * that did not answer, `night` a nightly walk with a failure or a Directory copy not written.
  */
-export type OpsKind = 'crash' | 'refuse' | 'model' | 'night' | 'door';
+export type OpsKind = 'crash' | 'refuse' | 'model' | 'night' | 'door' | 'step';
 
 /** Where each one sends whoever reads it, as DEPLOYMENT.md's "## Alerts" table says it. */
 const RUNBOOK: Record<OpsKind, string> = {
@@ -800,6 +800,7 @@ const RUNBOOK: Record<OpsKind, string> = {
   model:
     'read raw on the op: model line in Workers Logs; a message that names the model means the route table (MODELS in apps/worker/src/inference.ts), one that names the account or the gateway means the provider\'s console; from the model-checks workflow, read model-checks.json in that run\'s artifacts',
   night: '53 §5.4 (docs/53-SPEC-OPERATIONS.md): read the op: walk lines with ok false from the same night in Workers Logs',
+  step: 'a record\'s alarm was reset in the same step two alarms in a row and that step is held for six hours: read the op: alarm-step lines for the rec in Workers Logs (cut, times, held), and the Record$ alarm events beside them for CPU time; the step named act:<script> is that script\'s calls into the record (apps/worker/src/alarm-cuts.ts)',
   door:
     'a webhook arrival was kept because its record could not take it: read the op: door lines for the rec in Workers Logs. "waiting" means the record has refused it for hours (read its Record$ errors); "gave-up" means the door will never take it, and the sealed request is under held/gave-up/ in BLOBS (apps/worker/src/held.ts)',
 };
