@@ -90,7 +90,7 @@ export function foldUnfiled(rows: readonly Entry[]): Entry[] {
  */
 function signsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { predicateOf, quietSign } = kit;
-  if (!deps.signs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its vital signs onto a page yet.', at: 'source' }) };
+  if (!deps.signs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its vital signs onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'signs come in the order the record lists them, so it takes no order:. Use where: state is red for the red ones.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(SIGNS.fields, f));

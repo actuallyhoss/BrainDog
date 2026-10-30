@@ -92,7 +92,7 @@ test('handing a question asks the record by its own method, and nobody leaves th
 });
 
 test('a refusal is kept in the record’s own words', async () => {
-  const fix = 'Dee Marsh cannot decide on this record. Name somebody who can, or nobody.';
+  const fix = 'Dee Marsh cannot decide here. Name somebody who can, or nobody.';
   const no = recordThat({ ok: false, refusal: { fix } });
   assert.deepEqual(await hand('', 'SG4', 'p_dee', undefined, no.send), { from: 'refused', fix });
   const moved = recordThat({ ok: false, conflict: {} });

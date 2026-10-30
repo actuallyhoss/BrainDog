@@ -144,7 +144,7 @@ test('A DIGEST WHOSE COMPUTED SECTIONS ARE ALL EMPTY IS NOT SENT, and one on a h
 });
 
 test('A BLOCK THAT REFUSES IS A SECTION THAT SAYS SO, and faults.open is no source a digest reads yet', () => {
-  const { deps } = fake({ 'handoffs.open': { refusals: [{ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read the steps runs left onto a page yet.', at: 'source' }] } });
+  const { deps } = fake({ 'handoffs.open': { refusals: [{ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read the steps runs left onto a page yet.', at: 'source' }] } });
   const parts = sectionsOf(deps, decl([{ heading: 'Stuck', source: 'handoffs.open', omit_when_empty: true }, { heading: 'Faults', source: 'faults.open' }]));
   assert.equal(parts[0]!.refusals[0]?.code, 'NOT_IN_THIS_BUILD');
   assert.equal(parts[1]!.refusals[0]?.code, 'SOURCE_UNKNOWN');

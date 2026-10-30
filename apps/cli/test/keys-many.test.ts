@@ -154,7 +154,7 @@ test('A HELD NAME IS SKIPPED AND COUNTED under the login, and replaced under the
   const login = io(h.file, { cwd: dir, held: [TWO] });
   assert.equal(await keys(['put', '--from', '.env.local'], login.io), 0, login.said.join('\n'));
   assert.equal(login.sent.length, 2, 'one request a key');
-  assert.ok(login.said.includes(`${TWO}: skipped, your record already holds it.`));
+  assert.ok(login.said.includes(`${TWO}: skipped, your BrainDog already holds it.`));
   assert.ok(login.said.includes('1 sealed, 1 skipped, 0 refused.'));
   assert.ok(login.said.includes('Every key in .env.local is sealed. The file is yours to delete.'), 'a key held already is a key in the vault');
 

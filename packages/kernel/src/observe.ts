@@ -99,7 +99,7 @@ export function observe(sql: Sql, nowMs: number, batch: readonly Observation[]):
      the exact arithmetic the detectors' thresholds are built on. */
   for (const row of batch)
     if (!(SIGNALS as readonly string[]).includes(row.kind))
-      return no<number>('ENUM_VALUE_UNKNOWN', `${row.kind} is not a signal this record observes.`, {
+      return no<number>('ENUM_VALUE_UNKNOWN', `${row.kind} is not a signal BrainDog observes.`, {
         at: 'kind',
         allowed: SIGNALS,
       });
@@ -558,13 +558,13 @@ const WEEK_MS = 7 * DAY_MS;
  */
 function governors(deps: AnalyseDeps): string | null {
   const live = Number(deps.sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE deleted_at IS NULL')?.n ?? 0);
-  if (live <= 20) return `this record holds ${live} rows, and a detector is a claim about a habit.`;
+  if (live <= 20) return `your BrainDog holds ${live} things so far, too few to show a habit.`;
 
   const days = Number(deps.sql.one<{ n: number }>('SELECT count(DISTINCT substr(ts, 1, 10)) AS n FROM event')?.n ?? 0);
-  if (days <= 3) return `this record has been written on ${days} days, which is not yet a pattern of use.`;
+  if (days <= 3) return `your BrainDog has been written to on ${days} days, which is not yet a pattern of use.`;
 
   const first = deps.sql.one<{ ts: string }>('SELECT ts FROM event ORDER BY rowid LIMIT 1')?.ts;
-  if (!first || deps.nowMs - Date.parse(first) < 14 * DAY_MS) return 'this record is under a fortnight old.';
+  if (!first || deps.nowMs - Date.parse(first) < 14 * DAY_MS) return 'your BrainDog is under a fortnight old.';
 
   /* A DEFERRED QUESTION IS NOT AN UNANSWERED ONE, and this counted it as one. `listGovernance`
      excludes deferred rows from the queue and this did not, so three questions deferred to next year

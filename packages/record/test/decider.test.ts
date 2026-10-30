@@ -82,10 +82,10 @@ test('AN OWNER HANDS A QUESTION TO A MEMBER WHO DECIDES, AND TAKES IT BACK', asy
 test('A MEMBER WHO ONLY READS CANNOT BE HANDED ONE, AND IS NAMED IN THE SENTENCE', async () => {
   const { sql, m, id } = await harness();
   const r = refusal(await m.setDecider({ id, to: 'p_reader' }, owner));
-  assert.equal(r.fix, `${READER.name} cannot decide on this record. Name somebody who can, or nobody.`);
+  assert.equal(r.fix, `${READER.name} cannot decide here. Name somebody who can, or nobody.`);
   assert.equal(r.at, 'to');
   assert.ok(!/p_reader/.test(r.fix), 'a name, never an id');
-  assert.equal(refusal(await m.setDecider({ id, to: 'p_nobody' }, owner)).fix, 'That person cannot decide on this record. Name somebody who can, or nobody.');
+  assert.equal(refusal(await m.setDecider({ id, to: 'p_nobody' }, owner)).fix, 'That person cannot decide here. Name somebody who can, or nobody.');
   assert.equal(refusal(await m.setDecider({ id, to: 7 }, owner)).at, 'to');
   assert.equal(refusal(await m.setDecider({ to: 'p_ada' }, owner)).at, 'id');
   assert.equal(deciderOf(sql, id), null, 'nothing was handed');

@@ -107,7 +107,7 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
     try {
       payload = JSON.parse(job.payload) as { ingest?: unknown };
     } catch {
-      return no<PageWrote>('VALUE_MALFORMED', 'That connector run has a payload this record cannot read.', { at: 'outbox' });
+      return no<PageWrote>('VALUE_MALFORMED', 'That connector run has a payload BrainDog cannot read.', { at: 'outbox' });
     }
     const ingest = typeof payload.ingest === 'string' ? payload.ingest : null;
     if (ingest === null)

@@ -310,7 +310,7 @@ test('an access epoch that moved boots the tab again; nobody no share let in is 
 });
 
 test('only the door\'s access refusal ends the tab: FORBIDDEN at access, and no other 403', () => {
-  assert.equal(endedBy({ code: 'FORBIDDEN', at: 'access', fix: "Your access to Ada's record ended. Ask Ada if you need it back." } as never), true);
+  assert.equal(endedBy({ code: 'FORBIDDEN', at: 'access', fix: "Your access to Ada's BrainDog ended. Ask Ada if you need it back." } as never), true);
   assert.equal(endedBy({ code: 'FORBIDDEN', at: 'principal' }), false, 'a stopped member is told otherwise');
   assert.equal(endedBy({ code: 'FORBIDDEN' }), false, 'a stranger at a name is not told their access ended');
   assert.equal(endedBy({ code: 'LEVEL_REQUIRED', at: 'access' }), false);

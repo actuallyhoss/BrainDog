@@ -156,7 +156,7 @@ test('NOTHING QUIET IS NO TILE: the record leaves the block out, refuses nothing
 });
 
 test('A HOST BUILT BEFORE THE SOURCE ANSWERS THE TILE AS A REFUSAL, AND IT IS NOT DRAWN: left at its place, and nothing else touched', () => {
-  const said = 'exceptions is not a source this record reads.';
+  const said = 'exceptions is not a source here.';
   const late = { source: 'deadlines', refusals: ['Late is not read here.'], drawn: true };
   const tile = { source: 'exceptions', refusals: [said], drawn: true };
   const fine = { source: 'exceptions', refusals: [] as string[], drawn: true };

@@ -437,6 +437,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.28.0',
+      notes: 'A tool says how it runs, Runs on your machine or Reached over the web, and whether it is an MCP server or a command line. A key says its kind as the Keychain does, such as API token or SSH key.',
+    },
+    {
       version: '1.27.0',
       notes: 'The runs on Agents are headed Working now, as Today heads them, with the quiet ones under Quiet, where they were headed Open now.',
     },

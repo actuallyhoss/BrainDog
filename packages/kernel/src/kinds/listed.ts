@@ -108,10 +108,10 @@ export function readListed(
   how: { rules: readonly ColumnRule[]; limit: number; within?: Predicate; order?: { field: string; dir?: 'asc' | 'desc' }[] },
 ): Listed | { refusals: Refusal[] } {
   const kit = deps.kit;
-  if (!kit) return { refusals: [{ code: 'NOT_IN_THIS_BUILD', fix: `This record does not read a ${kind} onto a page yet.`, at: 'kind' }] };
+  if (!kit) return { refusals: [{ code: 'NOT_IN_THIS_BUILD', fix: `This BrainDog does not read a ${kind} onto a page yet.`, at: 'kind' }] };
   const register = typeof block.source === 'string' && block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
   const schema = register === null ? null : deps.schemaOf(register);
-  if (register === null || !schema) return { refusals: [{ code: 'SOURCE_UNKNOWN', fix: `${String(block.source)} is not a source this record reads.`, at: 'source' }] };
+  if (register === null || !schema) return { refusals: [{ code: 'SOURCE_UNKNOWN', fix: `${String(block.source)} is not a source here.`, at: 'source' }] };
 
   /* EACH COLUMN NAMES A FIELD OF THE LIST, and the field is one this kind can draw in that place. The sentences are the
      general read's (`pages.ts`), so a calendar's unknown column reads as a table's does. */

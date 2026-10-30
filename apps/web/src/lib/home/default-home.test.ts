@@ -94,7 +94,7 @@ test('NO KEY NUMBER, NO TILE: a record that keeps none answers none and Today dr
   assert.equal(drawnOf(tile(undefined)), false, 'nothing answered at all');
   assert.equal(drawnOf(tile([sales])), true);
   /* A REFUSED ONE IS NEVER HIDDEN BY BEING EMPTY, but Today's own body holds it, as it holds what went quiet. */
-  const refused = tile(undefined, [{ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its key numbers onto a page yet.' }]);
+  const refused = tile(undefined, [{ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its key numbers onto a page yet.' }]);
   assert.equal(drawnOf(refused), true);
   assert.equal(quietHeld([refused])[0]!.drawn, false);
   assert.equal(quietHeld([tile([sales])])[0]!.drawn, true);

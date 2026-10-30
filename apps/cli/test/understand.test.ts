@@ -70,15 +70,15 @@ test('A DRY RUN SAYS ITS COUNTS, THE FIRST CHANGES AND ITS QUESTIONS in quiet gr
     '  Which project is glaze for.',
     '  and 2 more',
     '',
-    'This is the next part of what your record holds. The rest is read on later nights.',
+    'This is the next part of what your BrainDog holds. The rest is read on later nights.',
     '',
     'Two more questions wait for tomorrow.',
   ]);
   const none = { looked: [] as [string, number][], counts: [], planned: [], plannedAll: 0, asked: [], askedAll: 0, dropped: [] };
-  assert.deepEqual(dryLines({ ...none, done: true }), ['Nothing to link and nothing to ask: everything your record holds is already understood.']);
-  assert.deepEqual(dryLines({ ...none, done: false }), ['Nothing to link and nothing to ask in the next part of your record. The rest is read on later nights.']);
-  assert.deepEqual(dryLines({ ...none, looked: [['payments', 217], ['runs', 1]], done: true }), ['Nothing to link and nothing to ask in 217 payments and 1 run: everything your record holds is already understood.']);
-  assert.deepEqual(dryLines({ ...none, looked: [['runs', 200]], done: false }), ['Nothing to link and nothing to ask in the next 200 runs of your record. The rest is read on later nights.']);
+  assert.deepEqual(dryLines({ ...none, done: true }), ['Nothing to link and nothing to ask: everything your BrainDog holds is already understood.']);
+  assert.deepEqual(dryLines({ ...none, done: false }), ['Nothing to link and nothing to ask in the next part of your BrainDog. The rest is read on later nights.']);
+  assert.deepEqual(dryLines({ ...none, looked: [['payments', 217], ['runs', 1]], done: true }), ['Nothing to link and nothing to ask in 217 payments and 1 run: everything your BrainDog holds is already understood.']);
+  assert.deepEqual(dryLines({ ...none, looked: [['runs', 200]], done: false }), ['Nothing to link and nothing to ask in the next 200 runs of your BrainDog. The rest is read on later nights.']);
 });
 
 /** A host whose `understandPlan` answers `value`, or refuses with `refusal`. */
@@ -150,7 +150,7 @@ test('BRAINDOG UNDERSTAND --DRY-RUN SAYS PLAINLY why the record would not read i
     const older = await host(t, { refusal: { code, fix: 'This host has no understandPlan.' } });
     const two = io(older.base);
     assert.equal(await understandCommand(['--dry-run'], two), 1);
-    assert.deepEqual(two.said, ['Your record is older than this command and cannot say this yet. It will once it is updated.']);
+    assert.deepEqual(two.said, ['Your BrainDog is older than this command and cannot say this yet. It will once it is updated.']);
   }
 
   /* Somebody who does not read the whole record: the record's own reason, as it gives it. */

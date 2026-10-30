@@ -274,7 +274,7 @@ export async function exportFile(args: string[], io: BrainfileIo): Promise<numbe
   io.out(`wrote ${shown}`);
   if (redact)
     io.out(
-      '  without the sealed bytes: this is a copy to share, and braindog import will not put this record back from it while the record holds keys.',
+      '  without the sealed bytes: this is a copy to share, and braindog import will not put this BrainDog back from it while it holds keys.',
     );
   io.answer?.({ value: { file: path, redacted: redact, verified } });
   return 0;

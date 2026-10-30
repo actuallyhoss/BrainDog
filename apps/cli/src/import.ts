@@ -937,7 +937,7 @@ export async function applyPlan(
     const got = await readDecide(door);
     if (got.ok) return (decideRead = got.value);
     if (unreachable(got)) throw new Unreachable();
-    report.refused.push({ label: 'What this record has already been asked', register: 'Decide', fix: fixOf(got) });
+    report.refused.push({ label: 'What you have already been asked', register: 'Decide', fix: fixOf(got) });
     return (decideRead = null);
   };
 
@@ -1068,7 +1068,7 @@ export async function applyPlan(
         /* NO PACK HERE KEEPS ONE: there is nothing to set, and the line says so. */
       } else if (read !== null && !read.ok) {
         home.asked = 'refused';
-        report.refused.push({ label: 'Which currency this record adds money up in', register: 'Decide', fix: fixOf(read) });
+        report.refused.push({ label: 'Which currency your money adds up in', register: 'Decide', fix: fixOf(read) });
       } else if (kept !== undefined) {
         const decided = await readDecideOnce();
         home.proposed = proposed;
@@ -1084,7 +1084,7 @@ export async function applyPlan(
           if (!done.ok) {
             if (unreachable(done)) throw new Unreachable();
             home.asked = 'refused';
-            report.refused.push({ label: 'Which currency this record adds money up in', register: 'Decide', fix: fixOf(done) });
+            report.refused.push({ label: 'Which currency your money adds up in', register: 'Decide', fix: fixOf(done) });
           } else home.asked = 'asked';
         }
       }

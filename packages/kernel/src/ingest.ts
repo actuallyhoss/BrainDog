@@ -1139,7 +1139,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
          did, and the payload is the evidence for fixing it. */
       /* SAID BY THE PATTERN'S NAME AND NOT ITS LEVEL, which is a word out of a declaration nobody reading the inbox chose.
          `not a confidence` is kept, so a check that matched the sentence still finds it. */
-      const reason = `The level set on ${patternSaid(deps, matched)} is not a confidence this record knows, so nothing from this one was written.`;
+      const reason = `The level set on ${patternSaid(deps, matched)} is not a confidence BrainDog knows, so nothing from this one was written.`;
       store('review', reason);
       /* AND WHICH PATTERN HELD IT, as every other held text says, so a fixed version reads it again (`readBefore`). */
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');

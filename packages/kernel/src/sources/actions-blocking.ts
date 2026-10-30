@@ -38,7 +38,7 @@ const BLOCKING: Schema = {
  */
 function blockingBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { predicateOf, typesOf } = kit;
-  if (!deps.blocking) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what is in a project\'s way onto a page yet.', at: 'source' }) };
+  if (!deps.blocking) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what is in a project\'s way onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions.blocking comes in the order the record lists its actions, so it takes no order:.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(BLOCKING.fields, f));

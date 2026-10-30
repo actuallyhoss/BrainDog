@@ -479,7 +479,7 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
   if (fault) return invalid(base, also, fault.fix, fault.at, fault.allowed);
   for (const key of ['where', 'order', 'columns', 'cells'] as const)
     if (block[key] !== undefined) return invalid(base, also, `The key numbers come in their own order, each with what it needs, so a kpis block takes no ${key}:.`, key);
-  if (!deps.lists || !deps.readings) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its key numbers onto a page yet.', at: 'source' }) };
+  if (!deps.lists || !deps.readings) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its key numbers onto a page yet.', at: 'source' }) };
 
   const reads = deps.ctx.reads;
   const lists = deps.lists();

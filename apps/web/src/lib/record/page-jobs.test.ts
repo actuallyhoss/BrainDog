@@ -89,7 +89,7 @@ test('the press starts one run and answers its id; a refusal is said in its own 
   assert.deepEqual(yes, { ok: true, id: 'j_9' });
   assert.deepEqual(sent, [{ kind: KIND, args: { page: 'kilns' } }]);
 
-  const fix = 'job.loom-desk is not a kind of job this record has approved. A kind is approved once, in Needs you.';
+  const fix = 'job.loom-desk is not a kind of job approved here. A kind is approved once, in Needs you.';
   const no = await startPageJob({ createJob: async () => ({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix } }) }, KIND, 'kilns');
   assert.deepEqual(no, { ok: false, fix });
 

@@ -276,7 +276,7 @@ function formFault(block: Readonly<Record<string, unknown>>, stage: 'install' | 
 function afterOf(deps: PageDeps, block: Readonly<Record<string, unknown>>): string | Refusal {
   const after = typeof block.after === 'string' ? block.after : 'stay';
   if (after !== 'stay' && !deps.pages().some((p) => p.page === after))
-    return invalid(`A form's after is the page the reader goes to, and this record has no page called ${after}. Write stay, or a page it has.`, 'after');
+    return invalid(`A form's after is the page the reader goes to, and there is no page called ${after}. Write stay, or a page you have.`, 'after');
   return after;
 }
 
@@ -307,7 +307,7 @@ function readForm(deps: PageDeps, block: Readonly<Record<string, unknown>>): For
   if (argsOf(verb)) return readArgsForm(deps, block, verb);
   const register = block.register as string;
   const schema = deps.schemaOf(register);
-  if (!schema) return { code: 'SOURCE_UNKNOWN', fix: `A form adds a row to ${register}, and this record holds no list called ${register}.`, at: 'register' };
+  if (!schema) return { code: 'SOURCE_UNKNOWN', fix: `A form adds a row to ${register}, and there is no list called ${register}.`, at: 'register' };
   const fields: FormField[] = [];
   for (const [i, raw] of (block.fields as Record<string, unknown>[]).entries()) {
     const at = `fields[${i}]`;

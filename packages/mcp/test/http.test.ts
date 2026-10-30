@@ -194,7 +194,7 @@ test('INITIALIZE, THEN A TOOL CALL: no session is minted, and one a client sends
   /* THE WHOLE ANSWER IS `structuredContent`, and the text beside it is the brief one a model reads first. */
   const result = (await read(call)).wire?.result as { content: { text: string }[]; structuredContent: unknown };
   assert.deepEqual(result.structuredContent, { registers: [{ id: 'obligations', name: 'Obligations' }], version: 41 });
-  assert.match(result.content[0]!.text, /^This record · 1 list\b/u);
+  assert.match(result.content[0]!.text, /^This BrainDog · 1 list\b/u);
   assert.deepEqual(calls.map((c) => c.method), ['boot', 'version']);
   assert.ok(calls.every((c) => c.ctx === ctx), 'the tools were not handed the host\'s context');
 });

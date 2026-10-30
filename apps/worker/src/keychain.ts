@@ -97,7 +97,7 @@ export type GrantDeps = {
    the same as a bearer that record does not know. */
 const UNKNOWN: Result<KeychainGrantSeen> = {
   ok: false,
-  refusal: { code: 'FORBIDDEN', fix: 'That keychain grant is not one this record knows.', at: 'vault' },
+  refusal: { code: 'FORBIDDEN', fix: 'That keychain grant is not known here.', at: 'vault' },
 };
 
 /** 64 KiB, which is more than a private key or an env file of keys. */

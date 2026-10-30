@@ -63,7 +63,7 @@ function stepEntry(h: OpenStep, { SESSION, agentOf }: SourceKit): Entry {
 function handoffsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { predicateOf, typesOf, projectsOf, SPOKEN } = kit;
   const HANDOFFS = handoffsSchema(kit);
-  if (!deps.handoffs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read the steps runs left onto a page yet.', at: 'source' }) };
+  if (!deps.handoffs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read the steps runs left onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'handoffs.open comes the newest step first, so it takes no order:. Use where: mark is next for the ones to take now.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(HANDOFFS.fields, f));

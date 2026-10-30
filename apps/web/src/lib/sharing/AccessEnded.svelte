@@ -1,5 +1,5 @@
 <!--
-  The whole screen for somebody whose access to the record ended: "Your access to Ada's record
+  The whole screen for somebody whose access to the record ended: "Your access to Ada's BrainDog
   ended. Ask Ada if you need it back."
 
   THE DOOR'S OWN SENTENCE, WITH THE OWNER'S NAME IN IT. The record or the Directory refuses the next call `at: 'access'`

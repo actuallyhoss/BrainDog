@@ -76,7 +76,7 @@ function scriptEntry(s: ScriptRow, at: string): Entry {
  */
 function scriptsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { predicateOf, typesOf } = kit;
-  if (!deps.scripts) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its scripts onto a page yet.', at: 'source' }) };
+  if (!deps.scripts) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its scripts onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'scripts come in the order the record lists them, so it takes no order:. Use where: status is paused for the paused ones.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(SCRIPTS.fields, f));

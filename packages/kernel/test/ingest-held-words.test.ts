@@ -159,7 +159,7 @@ test('THE STABLE PHRASES A CHECK MATCHES ARE KEPT, with the fields by their labe
   );
   assert.equal(
     (await held(WAYS[7]!.body, true)).reason,
-    'The level set on Bank alerts is not a confidence this record knows, so nothing from this one was written.',
+    'The level set on Bank alerts is not a confidence BrainDog knows, so nothing from this one was written.',
   );
   assert.equal(
     (await held(WAYS[9]!.body, true, true)).reason,

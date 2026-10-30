@@ -497,7 +497,7 @@ export async function syncDrill(args: string[], io: SyncIo): Promise<number> {
       { host: r.joined.machine, ref: source.ref.id, sent_by: source.manifest.machine, at: stamp, grade: passed ? 'pass' : 'fail', files, matched, fails: problems, state: 'latest' },
       r.to.key,
     );
-    if (made === 'asked') io.out('Your record asked you about the Drills entry on Decide.');
+    if (made === 'asked') io.out('Your BrainDog asked you about the Drills entry on Decide.');
     else if (isFail(made)) io.out(`The Drills entry was not written: ${made.said}`);
     /* THE ONE BEFORE IT BECOMES OLDER only once this one is written, so Drills always has a latest to measure. */
     else for (const row of rows) if (stateOf(row) === 'latest') await updateRow(r.call, drills, row, { state: 'older' }, r.to.key);

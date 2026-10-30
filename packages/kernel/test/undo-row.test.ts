@@ -104,7 +104,7 @@ test('a row of a list she cannot read is not in the record, and the other row is
   const r = await record();
   const hidden = undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, { reads: () => false });
   assert.equal(refused(hidden)?.code, 'ROW_UNKNOWN');
-  assert.match(fixOf(hidden as never), /not in this record/);
+  assert.match(fixOf(hidden as never), /is not here/);
 
   const b = value(undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.b.seq } }));
   value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, b.hash, 'p_mara'));

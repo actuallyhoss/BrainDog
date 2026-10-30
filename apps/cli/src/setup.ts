@@ -647,7 +647,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     return tools;
   }
   let rows: ToolRow[] = [];
-  if (!tools.context.registers.some((r) => r.id === 'tools')) io.out('4. Tools: this record has no tools register, so there is nothing to write.');
+  if (!tools.context.registers.some((r) => r.id === 'tools')) io.out('4. Tools: this BrainDog has no Tools list, so there is nothing to write.');
   else {
     /*
      * EVERY APP THROUGH `writeTools`, which reads each through the table and writes only what differs, leaves an entry
@@ -696,7 +696,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     io.out('5. Skills: the record could not be read, so setup stopped there.');
     return skills;
   }
-  if (!skills.context.registers.some((r) => r.id === 'skills')) io.out('5. Skills: this record has no skills register, so there is nothing to sync.');
+  if (!skills.context.registers.some((r) => r.id === 'skills')) io.out('5. Skills: this BrainDog has no Skills list, so there is nothing to sync.');
   else if (profiles.length === 0) io.out(`5. Skills: ${noClaude}, so no skill was synced.`);
   else
     for (const dir of profiles) {

@@ -255,7 +255,7 @@ test('a `source:` that resolves to nothing says it is not one the record reads',
   for (const source of ['block.0', 'nonsense']) {
     const block = declared({ source });
     assert.ok(block.refusals.some((r) => r.startsWith(source)), `${source} was accepted`);
-    assert.match(block.refusals.join(' '), /is not a source this record reads/u);
+    assert.match(block.refusals.join(' '), /is not a source here/u);
     assert.equal(draw(block).refusal?.kind, 'error');
   }
 });

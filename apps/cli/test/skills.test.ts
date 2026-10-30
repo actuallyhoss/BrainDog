@@ -646,7 +646,7 @@ test('braindog skills: a wrong verb or flag is exit 1, a record without skills i
   assert.deepEqual(h.said, ['braindog skills takes sync, --host and --dry-run, and nothing else.', 'braindog skills takes sync, --host and --dry-run, and nothing else.']);
 
   assert.equal(await skills(['sync'], h.io), 0);
-  assert.deepEqual(h.out, ['This record has no skills register, so there is nothing to sync.']);
+  assert.deepEqual(h.out, ['This BrainDog has no Skills list, so there is nothing to sync.']);
 
   const closed = createServer();
   await new Promise<void>((done) => closed.listen(0, '127.0.0.1', done));

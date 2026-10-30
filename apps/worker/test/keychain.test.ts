@@ -22,7 +22,7 @@ const OTHER = 'rec_01J8ZC0000000000000000000C';
 const GRANT = `${REC}.fake-keychain-grant-for-tests`;
 const LOGIN = `${REC}.fake-login-token-for-tests`;
 const SEEN: KeychainGrantSeen = { handle: 'feedfacefeedface', scope: '*', person: 'p_1', expires: '2099-01-01T00:00:00.000Z' };
-const FORBIDDEN: Result<KeychainGrantSeen> = { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That keychain grant is not one this record knows.', at: 'vault' } };
+const FORBIDDEN: Result<KeychainGrantSeen> = { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That keychain grant is not known here.', at: 'vault' } };
 
 function deps() {
   const asked: string[] = [];

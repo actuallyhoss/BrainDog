@@ -129,7 +129,7 @@ test('A KEY THIS RECORD DOES NOT READ IS SAID, and it used to be ignored', () =>
     ({ k, sql }) => {
       const said = (k.block({ kind: 'note', heading: 'Typo', body: 'x', wehn: { metric: 'open-count', gt: 0 } } as never).refusals ?? []) as { fix: string; at?: string }[];
       assert.equal(said.length, 1, 'the unreadable key was not named');
-      assert.match(said[0]?.fix ?? '', /wehn: is not a key this record reads/u);
+      assert.match(said[0]?.fix ?? '', /wehn: is not a key a block reads/u);
       assert.equal(said[0]?.at, 'wehn', 'the refusal does not point at the key');
       sql.close();
     },
@@ -146,7 +146,7 @@ test('and it survives a block that is wrong about a second thing as well', () =>
       const said = (k.block({ kind: 'table', source: 'forecast.runway', limti: 5 } as never).refusals ?? []) as { code: string; fix: string; at?: string }[];
       assert.equal(said.length, 2, 'both mistakes were not reported at once');
       assert.ok(
-        said.some((r) => /limti: is not a key this record reads/u.test(r.fix)),
+        said.some((r) => /limti: is not a key a block reads/u.test(r.fix)),
         'the misspelt key was dropped by the source refusal',
       );
       assert.ok(
@@ -163,7 +163,7 @@ test('and it is said on a stat block too, which returns before every other check
      not be reported however the check was written after it. */
   return record().then(({ k, sql }) => {
     const said = (k.block({ kind: 'stat', cells: [{ metric: 'open-count' }], hedaing: 'Typo' } as never).refusals ?? []) as { fix: string }[];
-    assert.match(said[0]?.fix ?? '', /hedaing: is not a key this record reads/u);
+    assert.match(said[0]?.fix ?? '', /hedaing: is not a key a block reads/u);
     sql.close();
   });
 });

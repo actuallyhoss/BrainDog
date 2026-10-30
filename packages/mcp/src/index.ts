@@ -1165,7 +1165,7 @@ const HOME_OF_A_USE_CASE = /^home-[a-z0-9][a-z0-9-]*$/u;
  */
 const unbuilt = (name: string, instead: string): Result<never> => ({
   ok: false,
-  refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This record does not answer ${name} yet. ${instead}` },
+  refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This BrainDog does not answer ${name} yet. ${instead}` },
 });
 
 /** The most lessons one read of the record's `learnings` answers, which is the most its `limit` takes (`methods/learnings.ts`). */
@@ -1176,7 +1176,7 @@ const SEARCH_MOST = 100;
 
 const nowhere = (uri: string): Result<never> => ({
   ok: false,
-  refusal: { code: 'ROUTE_UNKNOWN', fix: `There is nothing at ${uri}. Read braindog:boot for what this record holds.`, at: 'uri' },
+  refusal: { code: 'ROUTE_UNKNOWN', fix: `There is nothing at ${uri}. Read braindog:boot for what this BrainDog holds.`, at: 'uri' },
 });
 
 /**
@@ -1284,8 +1284,8 @@ export function offerPaged(arrangement: unknown, word: string, page: number): Re
 
 /** The resources with no parameter. Each is asked before it is listed, like everything else. */
 const FIXED: readonly Resource[] = [
-  resource('whoami', 'Who you are to this record, and which verbs you reach.'),
-  resource('boot', 'What this record holds, and how many rows are in each register.'),
+  resource('whoami', 'Who you are here, and which verbs you reach.'),
+  resource('boot', 'What this BrainDog holds, and how many rows are in each register.'),
   resource('context', 'The briefing for where you are: your session, your project, and what applies here.'),
   resource('understand', 'What the record would link and ask next, in names. Read before meet.'),
   resource('handoffs', 'The next steps runs left and nobody has taken, newest first, each with the app that left it and its project.'),
@@ -3763,7 +3763,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (home === null)
         return {
           ok: false,
-          refusal: { code: 'PAGE_UNKNOWN', fix: 'This record declares no Home page. context says what leads here, and resources/list names the pages you can read.', at: 'uri' },
+          refusal: { code: 'PAGE_UNKNOWN', fix: 'This BrainDog declares no Home page. context says what leads here, and resources/list names the pages you can read.', at: 'uri' },
         };
       slug = home.slug;
     }

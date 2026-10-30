@@ -418,7 +418,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
       if (typeof first === 'number') {
         failed = true;
         io.out('3. Tools: the record could not be read, so none was written.');
-      } else if (!first.context.registers.some((r) => r.id === 'tools')) io.out('3. Tools: this record has no tools register, so there is nothing to write.');
+      } else if (!first.context.registers.some((r) => r.id === 'tools')) io.out('3. Tools: this BrainDog has no Tools list, so there is nothing to write.');
       else {
         /* A TOOL THAT NAMES OTHER PROFILES IS NOT IN THIS PROFILE'S CONTEXT, so `writeTools` never sees it here. */
         const only = (c: Context): Context => ({
@@ -495,7 +495,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
         if (typeof at === 'number') {
           failed = true;
           io.out('4. Skills: the record could not be read, so none was synced.');
-        } else if (!at.context.registers.some((r) => r.id === 'skills')) io.out('4. Skills: this record has no skills register, so there is nothing to sync.');
+        } else if (!at.context.registers.some((r) => r.id === 'skills')) io.out('4. Skills: this BrainDog has no Skills list, so there is nothing to sync.');
         else {
           const leave = new Set([...scoped.keys()].filter((spoken) => spoken.startsWith('skills#') && shared(spoken)));
           const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: p.dir, top: null, dryRun: planOnly, until: Infinity, to: at.to, leave });
@@ -514,7 +514,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     /* ── 5. the profile's rules, in a marked block of its CLAUDE.md ──────── */
     const row = record.read && record.profiles !== null ? (record.profiles.find((r) => same(r.name) === same(p.name)) ?? null) : null;
     if (!record.read) io.out('5. Rules: the record was not read, so CLAUDE.md is left as it is.');
-    else if (record.profiles === null) io.out('5. Rules: kept per profile by the Profiles add-on, which this record does not have.');
+    else if (record.profiles === null) io.out('5. Rules: kept per profile by the Profiles add-on, which this BrainDog does not have.');
     else if (row === null) io.out(`5. Rules: Profiles has no row for ${oneLine(p.name)}, so its CLAUDE.md is left as it is.`);
     else {
       const claudeMd = join(p.dir, 'CLAUDE.md');

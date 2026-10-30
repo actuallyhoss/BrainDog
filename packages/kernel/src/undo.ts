@@ -216,13 +216,13 @@ function scoped(sql: Sql, scope: UndoScope): Result<Scoped> {
     const key =
       given === '' ? '' : (sql.one<{ k: string }>('SELECT coalesce(batch, id) AS k FROM event WHERE id = ? OR batch = ? ORDER BY rowid LIMIT 1', given, given)?.k ?? given);
     const lines = key === '' ? [] : byKeys([key]);
-    if (lines.length === 0) return no('ROW_UNKNOWN', 'There is no change with that mark in this record, so there is nothing to undo.', { at: 'batch' });
+    if (lines.length === 0) return no('ROW_UNKNOWN', 'There is no change with that mark here, so there is nothing to undo.', { at: 'batch' });
     return ok({ keys: [key], lines, decisions: decisionsOf([key]), empty: 'That change left nothing that can be put back.' });
   }
   if ('decision' in scope) {
     const id = typeof scope.decision === 'string' ? scope.decision.trim() : '';
     const made = id === '' ? undefined : sql.one<{ batch: string | null }>("SELECT batch FROM event WHERE kind = 'decide' AND target = ? ORDER BY rowid DESC LIMIT 1", `decision:${id}`);
-    if (!made) return no('ROW_UNKNOWN', 'That decision is not in this record, so there is nothing to undo.', { at: 'decision' });
+    if (!made) return no('ROW_UNKNOWN', 'That decision is not here, so there is nothing to undo.', { at: 'decision' });
     /* A DECISION FROM BEFORE ITS EVENT CARRIED A BATCH cannot be told apart from the writes around it. */
     if (made.batch === null)
       return no('ROW_UNKNOWN', 'That decision was made before decisions kept what they changed, so it cannot be undone from here. Change the rows it wrote instead.', { at: 'decision' });
@@ -253,7 +253,7 @@ function onlyRow(sql: Sql, scope: UndoScope, lines: readonly Line[], opts: UndoO
     return no('VALUE_MALFORMED', 'Say the one to undo by its list and number: { register: "tasks", seq: 3 }.', { at: 'row' });
   const register = r.register.trim();
   const id = opts.reads && !opts.reads(register) ? undefined : sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', register, r.seq)?.id;
-  if (id === undefined) return no('ROW_UNKNOWN', 'That one is not in this record, so there is nothing of it to undo.', { at: 'row' });
+  if (id === undefined) return no('ROW_UNKNOWN', 'That one is not here, so there is nothing of it to undo.', { at: 'row' });
   if (!lines.some((l) => l.target === `entry:${id}`))
     return no('ROW_UNKNOWN', 'This change did not touch that one, so there is nothing of it to undo here.', { at: 'row' });
   return ok(id);
@@ -675,7 +675,7 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
     const decl = lists(row.register);
     const title = titleOf(row, decl);
     if (!decl) {
-      skip(id, title, `its list is no longer in this record`);
+      skip(id, title, `its list is no longer here`);
       continue;
     }
     const target = `entry:${id}`;
@@ -1126,7 +1126,7 @@ function declaredIn(sql: Sql, lines: readonly Line[], opts: UndoOptions, skip: (
         continue;
       }
       if (live.retired) {
-        skip(title, 'it has been taken out of this record since');
+        skip(title, 'it has been taken out since');
         continue;
       }
       const prior = at(c.id, c.prior);
@@ -1150,7 +1150,7 @@ function declaredIn(sql: Sql, lines: readonly Line[], opts: UndoOptions, skip: (
       }
       const gone = goneList(sql, prior.kind, was);
       if (gone !== null) {
-        skip(title, `the list it reads, ${named(gone)}, is no longer in this record`);
+        skip(title, `the list it reads, ${named(gone)}, is no longer here`);
         continue;
       }
       const word = KIND_WORD[live.kind] ?? live.kind;

@@ -654,7 +654,7 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
   if ((job !== null || attach.length > 0 || typeof input.may_change === 'boolean') && kind !== 'tell')
     return no('VALUE_MALFORMED', 'Only an instruction to do something carries rows, a job or leave to change files.', { at: job !== null ? 'job' : attach.length > 0 ? 'attach' : 'may_change' });
   if (job !== null && d.sql.one('SELECT 1 AS y FROM job WHERE id = ?', job) === undefined)
-    return no('ROW_UNKNOWN', 'There is no such job on this record.', { at: 'job' });
+    return no('ROW_UNKNOWN', 'There is no such job here.', { at: 'job' });
 
   const place: { machine?: string; seat?: string } = {};
   for (const [key, grammar, fix] of [

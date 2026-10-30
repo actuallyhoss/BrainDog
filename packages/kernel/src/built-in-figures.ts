@@ -448,12 +448,12 @@ export function readTidy(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: Metric
     return withNames(judged(decl, total, 'stale now, every kind added up'), namesSaid(parts, 'stale'));
   }
   const finder = finderOf(d.finder);
-  if (finder === undefined) return judged(decl, null, 'nothing on this record counts these');
+  if (finder === undefined) return judged(decl, null, 'nothing here counts these');
   let one: number;
   try {
     one = finder.find(sql, ctx.nowMs).stale;
   } catch {
-    return judged(decl, null, 'this could not be counted on this record');
+    return judged(decl, null, 'this could not be counted here');
   }
   return judged(decl, one, 'stale now');
 }
@@ -1162,9 +1162,9 @@ export function readSign(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'>, d
     case 'arrivals-oldest-days':
     case 'arrivals-newest-hours': {
       const doors = doorsOf(sql);
-      if (doors.length === 0) return reading(null, 'no door: nothing on this record takes messages in');
+      if (doors.length === 0) return reading(null, 'no door: nothing here takes messages in');
       const patterns = said === null ? null : doors.filter((d) => d.ingest === said || d.door === said).map((d) => `ingest:${d.ingest}`);
-      if (patterns !== null && patterns.length === 0) return reading(null, `no door called ${said} on this record`);
+      if (patterns !== null && patterns.length === 0) return reading(null, `no door called ${said} here`);
       if (s.sign === 'arrivals-newest-hours') {
         const newest = sql.one<{ ts: string | null }>("SELECT max(ts) AS ts FROM inbox_raw WHERE state <> 'erased' AND (state <> 'untriaged' OR reason IS NULL OR reason <> ?)", UNVERIFIED_REASON)?.ts;
         if (newest === null || newest === undefined) return reading(null, 'nothing has come in yet');
@@ -1191,19 +1191,19 @@ export function readSign(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'>, d
     }
     case 'feeds-behind': {
       const feeds = feedsOf(sql);
-      if (feeds.length === 0) return reading(null, 'no feed: nothing on this record runs on a clock');
+      if (feeds.length === 0) return reading(null, 'no feed: nothing here runs on a clock');
       const behind = feeds.filter((f) => nowMs - f.lastGoodMs > 2 * f.everyMs).length;
       return reading(behind, 'feeds whose last good run is older than twice their period');
     }
     case 'rules-fired-7d': {
       const rules = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")?.n ?? 0;
-      if (rules === 0) return reading(null, 'no rule: nothing on this record runs by itself');
+      if (rules === 0) return reading(null, 'no rule: nothing here runs by itself');
       const since = new Date(nowMs - 7 * 86_400_000).toISOString();
       const fired = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM automation_run WHERE state = 'done' AND finished_at >= ?", since)?.n ?? 0;
       return reading(fired, 'rule runs that ended well in the last seven days');
     }
     default:
-      return reading(null, 'not a sign this record reads');
+      return reading(null, 'not a sign BrainDog reads');
   }
 }
 
@@ -1266,7 +1266,7 @@ export function readVitals(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
     }
     if (ctx.signs === undefined) return judged(decl, null, 'the vital signs are not read here yet');
     const all = ctx.signs();
-    if (all.length === 0) return judged(decl, null, 'this record has no vital signs to read');
+    if (all.length === 0) return judged(decl, null, 'there are no vital signs to read');
     return judged(decl, all.filter((s) => s.state === 'none').length, 'signs not read yet');
   }
   if (ctx.asOfMs !== undefined) {
@@ -1293,7 +1293,7 @@ export function readRatesAge(ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 
   const today = dayOfRead(ctx);
   const rates = ctx.fx?.().rates ?? [];
   const newest = rates.reduce<string | null>((n, r) => (ctx.asOfMs !== undefined && r.as_of > today ? n : n === null || r.as_of > n ? r.as_of : n), null);
-  if (newest === null) return judged(decl, null, 'no exchange rate on this record');
+  if (newest === null) return judged(decl, null, 'no exchange rate yet');
   const days = Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${newest}T00:00:00Z`)) / 86_400_000));
   return judged(decl, days, 'days since the newest exchange rate');
 }
@@ -1347,7 +1347,7 @@ const emptyField = (field: string): string =>
  */
 export function readProjectsUnplaced(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
   const places = placesList(sql);
-  if (places === null) return judged(decl, null, 'no list on this record holds projects');
+  if (places === null) return judged(decl, null, 'no list holds projects');
   if (places.fields.length === 0) return judged(decl, null, 'the projects name no repository or folder field');
   const n = sql.one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL
@@ -1386,7 +1386,7 @@ export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
     "SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body) AND json_extract(body, '$.scopes') IS NOT NULL ORDER BY id LIMIT 1",
   );
   const projects = head === undefined ? null : (JSON.parse(head.body) as { id?: unknown; title?: unknown });
-  if (projects === null || typeof projects.id !== 'string') return none('no list on this record holds projects');
+  if (projects === null || typeof projects.id !== 'string') return none('no list holds projects');
   const list = projects.id;
   const title = typeof projects.title === 'string' ? projects.title : 'name';
   const spoken = SPOKEN_ROW_AT.exec(said);
@@ -1491,10 +1491,10 @@ export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
 export function readKeysUnopenable(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: MetricDecl): Result<Reading> {
   if (decl.metric === KEYS_UNOPENED.metric) {
     const unopened = countKeysUnopened(sql, ctx.nowMs);
-    return judged(decl, unopened, unopened === null ? 'no list on this record seals a value' : 'sealed keys nobody has opened in six months');
+    return judged(decl, unopened, unopened === null ? 'no list seals a value' : 'sealed keys nobody has opened in six months');
   }
   const lists = sealedLists(sql);
-  if (lists.length === 0) return judged(decl, null, 'no list on this record seals a value');
+  if (lists.length === 0) return judged(decl, null, 'no list seals a value');
   let n = 0;
   for (const { list, sealed, done } of lists) {
     const named = sealed.map(fieldOf);
@@ -1526,7 +1526,7 @@ export function readMarksUnknown(sql: Sql, _ctx: unknown, decl: MetricDecl): Res
       const mark = body.identity?.mark;
       return typeof body.id === 'string' && typeof mark === 'string' && mark !== '' ? [{ list: body.id, mark }] : [];
     });
-  if (lists.length === 0) return judged(decl, null, 'no list on this record gives its things a picture');
+  if (lists.length === 0) return judged(decl, null, 'no list gives its things a picture');
   let n = 0;
   for (const { list, mark } of lists) {
     const words = sql.all<{ word: unknown; n: number }>(
@@ -1561,12 +1561,12 @@ export function countHeldTwiceBy(count: (sql: Sql) => number | null, shown?: (sq
 export function readPeopleTwice(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
   if (decl.metric === PEOPLE_TWICE_SHOWN.metric) {
     const shown = heldTwiceShown ? heldTwiceShown(sql) : null;
-    if (shown === null) return judged(decl, null, 'no list on this record holds people');
+    if (shown === null) return judged(decl, null, 'no list holds people');
     if (shown === 0) return judged(decl, null, 'nobody is held more than once');
     return judged(decl, shown, 'people who may be held more than once, by name or marked as you');
   }
   const n = heldTwice ? heldTwice(sql) : null;
-  if (n === null) return judged(decl, null, 'no list on this record holds people');
+  if (n === null) return judged(decl, null, 'no list holds people');
   return judged(decl, n, 'people held more than once, by name or marked as you');
 }
 

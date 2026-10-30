@@ -759,7 +759,7 @@ export const EARLIER_TICKETS: Body = {
   name: 'Earlier tickets',
   one: 'earlier ticket',
   icon: 'task',
-  holds: 'the tickets this record kept before the board moved onto Tickets; each one was copied there when Team was updated',
+  holds: 'the tickets you kept before the board moved onto Tickets; each one was copied there when Team was updated',
   title: 'what',
   mobile: ['what', 'state', 'owner'],
   state: 'state',

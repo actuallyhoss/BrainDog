@@ -417,7 +417,7 @@ test('WITHOUT THE PROFILES ADD-ON IT SAYS SO ONCE, every profile gets what appli
   assert.ok(existsSync(join(p.main, 'skills', 'beta', 'SKILL.md')));
   assert.equal(readFileSync(join(p.main, 'CLAUDE.md'), 'utf8'), MINE);
   assert.equal(readFileSync(join(p.studio, 'CLAUDE.md'), 'utf8'), MINE_CRLF);
-  assert.equal(run.lines.filter((l) => l === '5. Rules: kept per profile by the Profiles add-on, which this record does not have.').length, 3);
+  assert.equal(run.lines.filter((l) => l === '5. Rules: kept per profile by the Profiles add-on, which this BrainDog does not have.').length, 3);
 });
 
 test('RULES CHANGED IN PROFILES CHANGE THE BLOCK ALONE, and rules taken out leave the person\'s file as it was', async () => {

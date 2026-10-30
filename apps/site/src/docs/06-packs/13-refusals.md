@@ -46,7 +46,7 @@ reading-list needs people >=1.0.0 <2.0.0, and this record has 2.2.0.
 ## Lists
 
 ```code | Fields (FIELD_TYPE_UNKNOWN, FIELDS_OVER_CAP, INDEXES_OVER_CAP, STATE_NOT_ENUM)
-items.price: type "currency" is not a field type this record knows; did you mean 'money'?
+items.price: type "currency" is not a field type BrainDog knows; did you mean 'money'?
 items declares 74 fields. The ceiling is 64: a register with more than that is a database, not a register.
 items: 9 indexed fields; the ceiling is 8.
 items.state: state is a reserved id and is always an enum.

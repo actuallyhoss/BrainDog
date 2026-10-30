@@ -81,7 +81,7 @@ function door(lines: string[], opts: { report?: { tables: number; rows: number }
     if (file !== REC)
       return answer(422, {
         ok: false,
-        refusal: { code: 'OUT_OF_BOUNDS', fix: `This file is ${String(file)}, and this record is ${REC}. A replacing import puts a record back as itself.`, at: 'record.id' },
+        refusal: { code: 'OUT_OF_BOUNDS', fix: `This file is ${String(file)}, and this BrainDog is ${REC}. A replacing import puts a BrainDog back as itself.`, at: 'record.id' },
       });
     return answer(200, { ok: true, value: opts.report ?? { tables: 25, rows: 9 } });
   };
@@ -99,7 +99,7 @@ function door(lines: string[], opts: { report?: { tables: number; rows: number }
     const method = url.pathname.replace(/^\/api\//, '');
     if (auth === `Bearer ${SERVER_KEY}`) return handle(method, body);
     if (auth === `Bearer ${GRANT}`) {
-      if (spent || reach !== method) return answer(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That bearer is not an operation this record is waiting for.', at: 'operation' } });
+      if (spent || reach !== method) return answer(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That bearer is not an operation waiting here.', at: 'operation' } });
       spent = true;
       return handle(method, body);
     }
@@ -207,7 +207,7 @@ test('--redact-grants IS A COPY TO SHARE, and it says it cannot put the keys bac
   const r = rig(t, LOCAL, d.fetch, { BRAINDOG_TOKEN: SERVER_KEY });
   assert.equal(await exportFile(['--redact-grants', '-o', 'share.brainl'], r.io), 0, r.said.join('\n'));
   assert.deepEqual(d.api()[0]!.body, { redactGrants: true });
-  assert.ok(r.out.some((l) => l.includes('copy to share') && l.includes('will not put this record back')), r.out.join('\n'));
+  assert.ok(r.out.some((l) => l.includes('copy to share') && l.includes('will not put this BrainDog back')), r.out.join('\n'));
 
   const before = d.seen.length;
   assert.equal(await exportFile(['--redact-grants', '--kek', KEK], r.io), 1);

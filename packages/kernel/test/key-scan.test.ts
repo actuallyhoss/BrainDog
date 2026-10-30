@@ -103,7 +103,7 @@ test('THE FINDING CLEARS ONCE THE KEY IS MOVED, and a record with none reads nou
   assert.ok(read.ok);
   assert.equal(read.value.value, 0);
   assert.equal(read.value.met, true);
-  assert.equal(read.value.why, 'no text on this record holds a key');
+  assert.equal(read.value.why, 'no text in your BrainDog holds a key');
   sql.close();
 });
 

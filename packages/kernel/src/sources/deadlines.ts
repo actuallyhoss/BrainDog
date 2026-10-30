@@ -167,7 +167,7 @@ export function moneyValue(v: Json | undefined): { amount: number; currency: str
 function deadlinesBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { predicateOf, localDays, readableZone } = kit;
   if (!deps.lists)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what falls due across its lists onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what falls due across its lists onto a page yet.', at: 'source' }) };
   const horizon = block.horizon ?? DEADLINES_HORIZON;
   if (typeof horizon !== 'number' || !Number.isInteger(horizon) || horizon < 0 || horizon > DEADLINES_HORIZON_MOST)
     return {

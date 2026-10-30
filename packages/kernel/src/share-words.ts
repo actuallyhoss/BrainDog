@@ -165,7 +165,7 @@ export const ACCESS_ENDED_AT = 'access';
 
 /**
  * The door's sentence for a person whose access ended (§3.4), with the owner's name where the door knows it: "Your access
- * to Ada's record ended. Ask Ada if you need it back."
+ * to Ada's BrainDog ended. Ask Ada if you need it back."
  */
 export const accessEndedSaid = (owner: string | null | undefined): string =>
-  owner ? `Your access to ${owner}'s record ended. Ask ${owner} if you need it back.` : 'Your access to this record ended. Ask its owner if you need it back.';
+  owner ? `Your access to ${owner}'s BrainDog ended. Ask ${owner} if you need it back.` : 'Your access to this BrainDog ended. Ask its owner if you need it back.';

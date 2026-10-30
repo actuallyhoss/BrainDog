@@ -182,13 +182,13 @@ test('a page whose list is gone, or that was taken out since, is left with the r
   const gone = await record();
   const scope = await changed(gone, 'Say more when the page is empty?', BEFORE, AFTER);
   gone.sql.exec("UPDATE declaration SET retired = 1 WHERE id = 'register.things'");
-  assert.deepEqual(value<UndoPlan>(undoPlan(gone.sql, scope)).lines, ['Leaves "Work" as it is: the list it reads, "Projects", is no longer in this record.']);
+  assert.deepEqual(value<UndoPlan>(undoPlan(gone.sql, scope)).lines, ['Leaves "Work" as it is: the list it reads, "Projects", is no longer here.']);
   gone.sql.close();
 
   const out = await record();
   const taken = await changed(out, 'Say more when the page is empty?', BEFORE, AFTER);
   out.sql.exec("UPDATE declaration SET retired = 1 WHERE id = 'page.work' AND superseded_at IS NULL");
-  assert.deepEqual(value<UndoPlan>(undoPlan(out.sql, taken)).lines, ['Leaves "Work" as it is: it has been taken out of this record since.']);
+  assert.deepEqual(value<UndoPlan>(undoPlan(out.sql, taken)).lines, ['Leaves "Work" as it is: it has been taken out since.']);
   out.sql.close();
 });
 

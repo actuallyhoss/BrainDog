@@ -506,7 +506,7 @@ export function reachLines(given: Reach): string[] {
     `  Adds lists: ${list(reach.lists)}; pages: ${list(reach.pages)}; rules: ${list(reach.rules)}`,
     `  Example rows: ${reach.examples}; suggests skills: ${list(reach.skills)}`,
     ...(reach.widgets?.length ? [`  Widgets for Today: ${list(reach.widgets)}`] : []),
-    reach.calls_out.length === 0 ? '  Calls out to: nothing. It reads and writes only this record.' : `  Calls out to: ${reach.calls_out.map((c) => c.line).join('; ')}`,
+    reach.calls_out.length === 0 ? '  Calls out to: nothing. It reads and writes only your BrainDog.' : `  Calls out to: ${reach.calls_out.map((c) => c.line).join('; ')}`,
   ];
 }
 
@@ -535,7 +535,7 @@ export function changeLines(given: Changes): string[] {
 export function trustLine(given: Trust, named: string, on: 'record' | 'machine' = 'machine'): string {
   const trust = printable(given);
   const author = oneLine(named);
-  const [Seer, seer] = on === 'record' ? ['Your record', 'your record'] : ['This machine', 'this machine'];
+  const [Seer, seer] = on === 'record' ? ['Your BrainDog', 'your BrainDog'] : ['This machine', 'this machine'];
   switch (trust.kind) {
     case 'unsigned':
       return 'Unsigned: nothing says who published it beyond the catalogue it came from.';

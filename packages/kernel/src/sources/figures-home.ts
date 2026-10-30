@@ -29,12 +29,12 @@ function homeFigures(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
       ...base,
       refusals: also({
         code: 'DECLARATION_INVALID',
-        fix: 'figures.home draws the figures this record pins to Home, so it takes no cells:. Take the cells off, or take the source off to draw the cells.',
+        fix: 'figures.home draws the figures pinned to Home, so it takes no cells:. Take the cells off, or take the source off to draw the cells.',
         at: 'cells',
       }),
     };
   if (!deps.metrics)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read the figures pinned to Home onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read the figures pinned to Home onto a page yet.', at: 'source' }) };
   const pinned = pinnedOf(deps.metrics(), (d) => mayRead(deps, d));
   /* READ BY THE STAT ARM ITSELF, handed a block of those cells and nothing else, so a pinned figure's reading, target
      and refusal are exactly what the same figure named in `cells:` answers, and there is one reading of a cell. */

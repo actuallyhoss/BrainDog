@@ -27,7 +27,7 @@ export function namedOf(kit: SourceKit): Named | null {
 /** The refusal for a block that names `doing_said` on a kit with no reader of a run's name, or `null` when it may be read. */
 export function saidRefusal(block: PageBlock, kit: SourceKit): { code: 'NOT_IN_THIS_BUILD'; fix: string; at: string } | null {
   if (namedOf(kit) !== null || !(block.columns ?? []).some((c) => c.field === DOING_SAID)) return null;
-  return { code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what a run said it is doing onto a page yet. Use doing.', at: 'columns' };
+  return { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what a run said it is doing onto a page yet. Use doing.', at: 'columns' };
 }
 
 /**
@@ -121,9 +121,9 @@ export function withSaid(deps: PageDeps, block: PageBlock, rows: Run[], projects
 function workingBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
   const { projectsOf, SESSION } = kit;
   if (!deps.sessionsWorking)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its working runs onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its working runs onto a page yet.', at: 'source' }) };
   const schema = deps.schemaOf(SESSION);
-  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This record keeps no runs.', at: 'source' }) };
+  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This BrainDog keeps no runs.', at: 'source' }) };
   if (block.where !== undefined)
     return {
       ...base,

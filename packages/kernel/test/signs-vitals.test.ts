@@ -170,13 +170,13 @@ test('FORMAT CURRENT: a record that opened is green; one left two updates behind
   const green = sign(r.sql, 'format-current');
   assert.equal(green.state, 'green');
   assert.equal(green.value, 0);
-  assert.equal(green.said, `This record is in format ${FORMAT_VERSION} with all ${KERNEL_MIGRATION} updates in.`);
+  assert.equal(green.said, `This BrainDog is in format ${FORMAT_VERSION} with all ${KERNEL_MIGRATION} updates in.`);
   /* A FILE LEFT BEHIND, as one written by an older build reads before it is opened. */
   r.sql.exec('DELETE FROM migration WHERE version > ?', KERNEL_MIGRATION - 2);
   const behind = sign(r.sql, 'format-current');
   assert.equal(behind.state, 'red');
   assert.equal(behind.value, 2);
-  assert.equal(behind.said, 'This record is 2 updates behind this build.');
+  assert.equal(behind.said, 'This BrainDog is 2 updates behind this build.');
   r.sql.close();
 
   const s = await record();
@@ -197,7 +197,7 @@ test('FORMAT CURRENT: a record that opened is green; one left two updates behind
   s.sql.exec("INSERT INTO migration (version, applied_at, checksum) VALUES (?, ?, 'x')", KERNEL_MIGRATION + 1, at(NOW));
   const newer = sign(s.sql, 'format-current');
   assert.equal(newer.state, 'red');
-  assert.equal(newer.said, 'This record was written by a newer build, 1 update ahead of this one.');
+  assert.equal(newer.said, 'This BrainDog was written by a newer build, 1 update ahead of this one.');
   s.sql.close();
 });
 

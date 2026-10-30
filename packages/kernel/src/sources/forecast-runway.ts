@@ -113,7 +113,7 @@ function forecastBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
      tell "wait" from "you made this up". */
   const walk = deps.runway(opened.value, block.from, reach, undefined, into);
   if (!walk)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not compute a cash walk.', at: 'source' }) };
   /* A BALANCE IN ONE CURRENCY AND MOVEMENTS IN ANOTHER ARE NOT ONE WALK. */
   if (opened.unit !== null && walk.currency !== null && opened.unit !== walk.currency)
     return {

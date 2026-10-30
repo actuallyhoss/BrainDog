@@ -222,7 +222,7 @@ async function askKeys(top: string, found: Scanned, doc: ScanDoc, opts: ScanOpti
   const decl = await client.call('schema', { register: KEYS });
   if (!decl.ok) {
     if (refused(decl) && decl.refusal.code === 'REGISTER_UNKNOWN') {
-      io.say('Your record keeps no list of keys yet, so nothing was asked.');
+      io.say('Your BrainDog keeps no list of keys yet, so nothing was asked.');
       return 1;
     }
     return refuse(io, decl, line(decl));

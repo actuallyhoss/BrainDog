@@ -158,7 +158,7 @@ const listed = (names: readonly string[]): string => (names.length < 2 ? names.j
 
 /** The one sentence for the whole: how many, and how many of them are sealed here. `where` is "" for every key. */
 export function countLine(keys: readonly KeyRead[], where: string): string {
-  if (keys.length === 0) return where === '' ? 'Your record holds no keys yet.' : `No key ${where === EVERYWHERE ? 'applies everywhere' : `applies to ${where}`}.`;
+  if (keys.length === 0) return where === '' ? 'Your BrainDog holds no keys yet.' : `No key ${where === EVERYWHERE ? 'applies everywhere' : `applies to ${where}`}.`;
   const sealed = keys.filter((k) => k.sealed).length;
   const parts = [...(sealed > 0 ? [`${String(sealed)} sealed`] : []), ...(sealed < keys.length ? [`${String(keys.length - sealed)} kept elsewhere`] : [])];
   const place = where === '' ? '' : where === EVERYWHERE ? ' that apply everywhere' : ` in ${where}`;
@@ -192,7 +192,7 @@ export function dayHere(now: number): string {
   return `${String(d.getFullYear())}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 }
 
-const UNSAID = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+const UNSAID = 'Your BrainDog did not say which keys are past their day, so each is judged by the date on this machine.';
 
 /**
  * WHICH KEYS ARE PAST THEIR DAY, ASKED OF THE RECORD AND NOT WORKED OUT HERE. Today is a day in the record's zone, and
@@ -292,7 +292,7 @@ const refusalLine = (r: Result<unknown>, to: Target): string =>
     ? `${to.key} did not answer.`
     : /* A RECORD WITH NO KEYS LIST SAYS SO, not "There is no register called credentials". */
       refused(r) && r.refusal.code === 'REGISTER_UNKNOWN'
-      ? 'This record keeps no keys yet. Deposit one with braindog keys put <label>.'
+      ? 'This BrainDog keeps no keys yet. Deposit one with braindog keys put <label>.'
       : printable(fixOf(r));
 
 /**
@@ -370,7 +370,7 @@ async function read(host: string | undefined, wanted: string | undefined, everyw
     if (ids.size === 0) {
       /* THE NAME TYPED IS NOT SAID BACK (`keys.ts`): a value pasted in its place would be printed to stderr. */
       const yours = printable([...new Set(names.values())].sort((a, b) => a.localeCompare(b)));
-      sinks.say(`No project of yours has that name. ${yours.length === 0 ? 'Your record holds no projects yet.' : `Yours are ${listed(yours)}.`}`);
+      sinks.say(`No project of yours has that name. ${yours.length === 0 ? 'Your BrainDog holds no projects yet.' : `Yours are ${listed(yours)}.`}`);
       return 1;
     }
     rows = rows.filter((r) => ids.has(of(r)));

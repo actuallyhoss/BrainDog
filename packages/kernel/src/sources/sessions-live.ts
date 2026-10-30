@@ -51,9 +51,9 @@ export function presenceFrom(kit: SourceKit, run: { state?: string | null; field
 function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): LiveResult {
   const { predicateOf, projectsOf, isQuiet, SESSION } = kit;
   if (!deps.sessionsLive)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its live runs onto a page yet.', at: 'source' }) };
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read its live runs onto a page yet.', at: 'source' }) };
   const schema = deps.schemaOf(SESSION);
-  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This record keeps no runs.', at: 'source' }) };
+  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This BrainDog keeps no runs.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.live comes the most recently seen first, so it takes no order:.', at: 'order' }) };
   const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => f !== 'seq' && f !== DOING_SAID && !Object.hasOwn(schema.fields, f));

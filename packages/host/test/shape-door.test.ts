@@ -72,7 +72,7 @@ test('A LOGIN, A GRANT NOBODY MADE OR JUNK IS REFUSED BY THE RECORD, in the one 
   for (const bearer of [await h.grant('login'), `${REC}.not-a-secret-anyone-made`, 'junk']) {
     const res = await serveShape(post({ authorization: `Bearer ${bearer}` }), h.door);
     assert.equal(res.status, 403, bearer.slice(0, 12));
-    assert.deepEqual((await body(res)).refusal, { code: 'FORBIDDEN', fix: 'That shape grant is not one this record knows.', at: 'shape' });
+    assert.deepEqual((await body(res)).refusal, { code: 'FORBIDDEN', fix: 'That shape grant is not known here.', at: 'shape' });
   }
 });
 

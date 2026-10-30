@@ -100,7 +100,7 @@ test('A LIST THE PLAN RETIRES IS NOT HELD AGAINST THE BATCH: rates: beside a key
   ];
   const k = await kernel(register('fx', RATE_FIELDS));
   const rates = register('rates', RATE_FIELDS, { rates: { currency: 'currency', base: 'base', rate: 'rate', as_of: 'as_of' } });
-  assert.match(k.lint([rates])?.fix ?? '', /register\.fx holds this record's rates/u, 'the live fx is in the way');
+  assert.match(k.lint([rates])?.fix ?? '', /register\.fx holds your rates/u, 'the live fx is in the way');
   const { known, owners } = planned(k, [], ['register.fx']);
   assert.equal(k.lint([rates], known, owners), null, said(k.lint([rates], known, owners)));
 });
@@ -162,7 +162,7 @@ test('A HELD fx UPDATED BESIDE A rates THE SAME BATCH BRINGS is told what the ar
   for (const batch of [[fx, RATES], [RATES, fx]]) {
     const out = k.lint(batch);
     assert.equal(out?.code, 'DECLARATION_INVALID', said(out));
-    assert.match(out?.fix ?? '', /register\.fx holds this record's rates and declares no rates:/u, said(out));
+    assert.match(out?.fix ?? '', /register\.fx holds your rates and declares no rates:/u, said(out));
     assert.doesNotMatch(out?.fix ?? '', /has sat beside/u, said(out));
   }
 });
