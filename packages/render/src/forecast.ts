@@ -724,6 +724,9 @@ export const listedSteps = <T extends { label: string }>(steps: readonly T[]): T
  * listed fifty-two lines of the same amount between the bills a person reads the list for. The monthly amount is the
  * one the record measured (`spent`); a walk that came without it is said from its own weekly shares.
  */
+/** NO ".00" ON A WHOLE AMOUNT IN A LIST (recheck of 30 October, 34), as Coming up and Money's tiles say one; real pence stay. */
+const WHOLE_PENCE = /\.00(?=$|\s[A-Z]{3}$)/u;
+
 export function forecastEveryday(model: ForecastModel, shown: Scenario): string {
   if (!shown.steps.some(isEveryday)) return '';
   const weeks = model.steps.filter(isEveryday);
@@ -737,7 +740,8 @@ export function forecastEveryday(model: ForecastModel, shown: Scenario): string 
 function everydaySaid(model: ForecastModel, monthly: number): string {
   const m = model.measured;
   const over = !m ? '' : m.from === m.to ? `, measured in ${shortMonth(m.from, model.today)}` : `, measured from ${shortMonth(m.from, model.today)} to ${shortMonth(m.to, model.today)}`;
-  return `${FORECAST_EVERYDAY}${over}: ${forecastPerMonth(forecastFigure(model, Math.abs(monthly), 'read'))}`;
+  /* IN WHOLE UNITS, as a sentence says money (recheck of 30 October, 34): "EGP 128,980.97 a month" kept its pennies. */
+  return `${FORECAST_EVERYDAY}${over}: ${forecastPerMonth(forecastFigure(model, Math.round(Math.abs(monthly)), 'read'))}`;
 }
 
 /** The round number at or above `n`, 1, 2 or 5 times a power of ten, and never less than one of the money's units. */
@@ -1014,7 +1018,7 @@ export function forecastNext(model: ForecastModel, shown: Scenario, plan: Pick<F
   return {
     rows: [
       ...(said ? [{ everyday: true as const, said }] : []),
-      ...kept.map((s) => ({ n: numbered.get(s) ?? null, dir: s.delta > 0 ? ('in' as const) : ('out' as const), day: shortDay(s.day, model.today), label: s.label, amount: `${s.delta > 0 ? '+' : ''}${forecastFigure(model, s.delta)}` })),
+      ...kept.map((s) => ({ n: numbered.get(s) ?? null, dir: s.delta > 0 ? ('in' as const) : ('out' as const), day: shortDay(s.day, model.today), label: s.label, amount: `${s.delta > 0 ? '+' : ''}${forecastFigure(model, s.delta).replace(WHOLE_PENCE, '')}` })),
     ],
     more: listed.length - kept.length,
   };

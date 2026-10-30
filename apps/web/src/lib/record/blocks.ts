@@ -201,7 +201,7 @@ function barRows(block: BlockResult): string[] {
   const split = link ? null : splitAtOf(REGISTERS[block.register ?? '']);
   /* A LINE THAT HOLDS NO LABEL IS ADDED TO THE ONE ITS SECOND FIELD NAMES (`or:`), only where those words are a label
      another line holds (live check of 30 October, 10), as the record adds up its whole (`orOf` in the kernel's pages). */
-  const or = block.kind === 'bar' || block.kind === 'split' ? block.columns[0]?.or : undefined;
+  const or = block.kind === 'bar' || block.kind === 'split' ? (block.columns[0] as { or?: string } | undefined)?.or : undefined;
   const known = new Map<string, unknown>();
   if (or !== undefined && or !== by)
     for (const e of block.matched) {

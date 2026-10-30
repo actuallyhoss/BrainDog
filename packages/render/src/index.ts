@@ -286,6 +286,7 @@ export {
   headlineMoney,
   axisFigure,
   barFigure,
+  barFigures,
   zeroFigure,
   type Home,
 } from './format.ts';
