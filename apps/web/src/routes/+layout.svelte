@@ -348,8 +348,6 @@
       const own = rail.things.find(([section]) => section === i.label)?.[1] ?? [];
       return own.length > 0 ? { ...i, near: [...i.near, ...own.map((e) => e.href)] } : i;
     });
-  /* THE PHONE'S FOUR, and Menu after them (`TabBar.svelte`): Today, Needs you, Projects, Money, or the four picked. */
-  const tabs = $derived(withThings(tabsOf(rail.places, 4, navPrefs.tabs)));
   /* READ AT ONCE, so a phone's first draw is already a phone's (the Projects tab draws the list, not the desk page). */
   let narrow = $state(typeof matchMedia === 'function' && matchMedia('(width < 900px)').matches);
   $effect(() => {
@@ -384,6 +382,14 @@
       [...rail.places, ...rail.rest].find((p) => p.key.replace(/^section:/u, '').trim().toLowerCase() === 'projects') ??
       null,
   );
+  /* A RECORD THAT KEEPS NO PROJECT HAS NO PROJECTS TAB (first-hour audit E7): the sidebar opens its projects only once
+     one is kept (`holdsProjects`), and the phone's bar put an empty Projects where the rail has Money. Known by a project's
+     own page under the place, or the projects list's count; the first project brings the tab back. */
+  const keepsNoProject = $derived(
+    projectsPlace !== null && !rail.things.some(([section]) => section === projectsPlace.label) && !sideLists.some((l) => l.facts?.projects === true && l.count > 0),
+  );
+  /* THE PHONE'S FOUR, and Menu after them (`TabBar.svelte`): Today, Needs you, Projects, Money, or the four picked. */
+  const tabs = $derived(withThings(tabsOf(keepsNoProject ? rail.places.filter((p) => p !== projectsPlace) : rail.places, 4, navPrefs.tabs)));
   /* ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE, at its own address (`MENU`); the desk draws Today there. */
   const phoneMenu = $derived(narrow && placeOf(here(page.url.pathname), page.url.searchParams) === MENU);
   $effect(() => {
