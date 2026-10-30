@@ -4,7 +4,7 @@
   "icon": "messages-square",
   "title": "Pad second opinion",
   "summary": "A second opinion written under each note on the pad. It asks your BrainDog's model about every note with no reply, so each note spends some of your allowance.",
-  "changes": "Its description says your BrainDog's model and your allowance, where it said the record's. Nothing it does has changed.",
+  "changes": "Its description is in plainer words. Nothing it does has changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

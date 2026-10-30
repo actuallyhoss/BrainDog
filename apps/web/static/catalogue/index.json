@@ -718,9 +718,9 @@
       "versions": [
         {
           "version": "3.0.4",
-          "checksum": "02fb116fd380822409cfe942c914b10a2847f28f2f6d3501f219a5980dc7b083",
-          "bytes": 27943,
-          "published_at": "2026-10-30T19:02:17.634Z",
+          "checksum": "eca21f8fdaec6b6e86394aece7b23d3723278e2fc8ed2d182e13ac11dc743620",
+          "bytes": 27903,
+          "published_at": "2026-10-30T19:15:57.332Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -739,7 +739,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "Its description says BrainDog keeps the count, where it said the record did. Nothing it does has changed.",
+          "notes": "Its description is in plainer words. Nothing it does has changed.",
           "preview": true
         },
         {
@@ -3887,9 +3887,9 @@
       "versions": [
         {
           "version": "1.2.2",
-          "checksum": "4081857e67e0d8acf8ab5d30f9aba84844c191035b2e3db899136693f7afb746",
-          "bytes": 2144,
-          "published_at": "2026-10-30T19:02:17.634Z",
+          "checksum": "ecd7fc30dabb4fa87aea8ace8bf438547c21520b42b519d932af7c7d499738e3",
+          "bytes": 2106,
+          "published_at": "2026-10-30T19:15:57.332Z",
           "bump": "patch",
           "reach": {
             "modules": [],
@@ -3904,7 +3904,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "Its description says it spends none of your allowance, where it said it keeps on any record. Nothing it does has changed.",
+          "notes": "Its description says it spends none of your allowance. Nothing it does has changed.",
           "preview": true
         },
         {
@@ -4021,9 +4021,9 @@
       "versions": [
         {
           "version": "1.0.2",
-          "checksum": "3571a79cf89d1a1bd73fc24dd16958f541dba4e06fc37e95bdd81bdc6606dd55",
-          "bytes": 1456,
-          "published_at": "2026-10-30T19:02:17.634Z",
+          "checksum": "82402665da7c43b34fc7a162c33973fac42a33e06b051c06f9f385b22bc7954f",
+          "bytes": 1402,
+          "published_at": "2026-10-30T19:15:57.332Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -4038,7 +4038,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "Its description says your BrainDog's model and your allowance, where it said the record's. Nothing it does has changed."
+          "notes": "Its description is in plainer words. Nothing it does has changed."
         },
         {
           "version": "1.0.1",
@@ -6111,9 +6111,9 @@
       "versions": [
         {
           "version": "1.2.1",
-          "checksum": "51d7c6671640af932e05bf037e300a05174cbbe56e6596ad2616293703223487",
-          "bytes": 27227,
-          "published_at": "2026-10-30T19:02:17.634Z",
+          "checksum": "40b3c235a8606ba614848ae00dcee9e6fd77465c73bd0cc8bf1f92e3e33d8813",
+          "bytes": 27158,
+          "published_at": "2026-10-30T19:15:57.332Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -6138,7 +6138,7 @@
               "Splits"
             ]
           },
-          "notes": "Its description says a person's splits close by themselves when you are square, where it said their rows. Nothing it does has changed.",
+          "notes": "Its description is in plainer words. Nothing it does has changed.",
           "preview": true
         },
         {
@@ -6798,9 +6798,9 @@
       "versions": [
         {
           "version": "1.0.2",
-          "checksum": "1f4c18359bfdf54c74e2629ee56cb10b37adfffe601d48f74444a05f58d8513e",
-          "bytes": 6079,
-          "published_at": "2026-10-30T19:02:17.634Z",
+          "checksum": "6893da84a8373ff1f3e23d80f4d7b96f3ae7f75cb7446438ced6a23f55eb909f",
+          "bytes": 6027,
+          "published_at": "2026-10-30T19:15:57.332Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -6815,7 +6815,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "Its description says BrainDog works out a task's priority, where it said the record did. Nothing it does has changed."
+          "notes": "Its description is in plainer words. Nothing it does has changed."
         },
         {
           "version": "1.0.1",
@@ -7331,7 +7331,7 @@
           "version": "1.2.1",
           "checksum": "c8437aec06a1bbb8438f03b348d50668f140b7037afff51c4f8880c212c29181",
           "bytes": 14446,
-          "published_at": "2026-10-30T19:04:33.352Z",
+          "published_at": "2026-10-30T19:15:57.332Z",
           "bump": "patch",
           "reach": {
             "modules": [],

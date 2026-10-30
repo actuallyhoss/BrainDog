@@ -4,7 +4,7 @@
   "icon": "edit",
   "title": "Pad",
   "summary": "Notes beside the work, each with room for a reply under it. It asks no model, so it spends none of your allowance.",
-  "changes": "Its description says it spends none of your allowance, where it said it keeps on any record. Nothing it does has changed.",
+  "changes": "Its description says it spends none of your allowance. Nothing it does has changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

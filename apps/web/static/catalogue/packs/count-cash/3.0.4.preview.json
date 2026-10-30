@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T19:02:17.634Z",
+  "made_at": "2026-10-30T19:15:57.332Z",
   "pages": [
     {
       "blocks": [
@@ -78,7 +78,7 @@
         "register.cash_counts"
       ],
       "title": "Cash counts",
-      "read_at": "2026-10-30T19:02:17.634Z",
+      "read_at": "2026-10-30T19:15:57.332Z",
       "zone": "UTC",
       "look": {
         "look": "cash-counts",

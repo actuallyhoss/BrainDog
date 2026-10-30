@@ -4,7 +4,7 @@
   "icon": "list-ordered",
   "title": "Task tiers",
   "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and BrainDog works out its priority and writes the sum as the reason.",
-  "changes": "Its description says BrainDog works out a task's priority, where it said the record did. Nothing it does has changed.",
+  "changes": "Its description is in plainer words. Nothing it does has changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
