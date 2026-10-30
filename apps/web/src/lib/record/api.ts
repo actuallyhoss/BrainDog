@@ -362,6 +362,12 @@ export const stepWords = {
 const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
 
 /**
+ * A field's unit after its figure. A PERCENTAGE AND A DEGREE SIT ON THE FIGURE, "60%" and "21°", as every share and every
+ * temperature on the screen is written; another unit keeps its space, "3 h".
+ */
+const unitAfter = (unit: string | null | undefined): string => (unit ? `${unit === '%' || unit === '°' ? '' : ' '}${unit}` : '');
+
+/**
  * `now` IS THE RECORD'S INSTANT, and it defaults to this browser's. A screen reading a real record passes
  * the one `boot` answered with, so an `instant` is banded against the day the record thinks it is. The default was
  * the seed's frozen 3 September 2026, so a live screen that passed nothing banded a record's instants against the
@@ -412,7 +418,9 @@ export function display(
       return since(String(value), now);
     case 'int':
       /* A WHOLE NUMBER DECLARED TO SIT BETWEEN 1000 AND 9999 IS A YEAR, NOT A COUNT: "2026", never "2,026". */
-      return typeof f.min === 'number' && typeof f.max === 'number' && f.min >= 1000 && f.max <= 9999 ? String(Math.trunc(Number(value))) : integer(Number(value));
+      if (typeof f.min === 'number' && typeof f.max === 'number' && f.min >= 1000 && f.max <= 9999) return String(Math.trunc(Number(value)));
+      /* AND ITS UNIT, AS A DECIMAL'S: Weather's chance of rain is "70%", not "70" under a heading that said the percent. */
+      return `${integer(Number(value))}${unitAfter(f.unit)}`;
     case 'duration': {
       /* SECONDS IN, THE DECLARED UNIT OUT. The record holds one unit and the field says how to say
          it, which is the only arrangement in which two durations can be added: `0.2` on its own is
@@ -434,8 +442,7 @@ export function display(
          not: `1200 d` was a number nobody reads as one thousand two hundred. */
       const n = Number(value);
       const shown = Number.isFinite(n) ? n.toLocaleString('en-GB', { maximumFractionDigits: 3 }) : String(value);
-      /* A PERCENTAGE SITS ON ITS FIGURE, "60%", as every share on the screen is written; another unit keeps its space. */
-      return `${shown}${f.unit ? `${f.unit === '%' ? '' : ' '}${f.unit}` : ''}`;
+      return `${shown}${unitAfter(f.unit)}`;
     }
     case 'bool':
       return value ? 'yes' : 'no';
