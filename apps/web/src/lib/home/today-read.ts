@@ -75,6 +75,46 @@ export function wasBehind(base: string): boolean {
 
 /** The records built before `today` took `offer`, which still answer the offer in Today's read. */
 const offerIn = new Set<string>();
+/** The records built before `today` took `shape`, asked without it. */
+const shapeless = new Set<string>();
+
+/** The shape of screen Today is asked on: a phone (under 720px, Home's `narrow`), which asks without what it hides, or wider. */
+export type TodayShape = 'phone' | 'wide';
+
+/** What `app.html` left of the Today it asked beside `boot`: where, on what shape of screen, and its answer read whole. */
+type Early = { url?: unknown; shape?: unknown; at?: unknown };
+
+/** SHA-256 of `text`, hex, as the record digests what it was asked (`todayLast` in `packages/record`). */
+async function digestOf(text: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * TODAY AS THE PAGE ASKED IT BESIDE `boot` (`app.html`), with the body this shape of screen asked last time: taken once,
+ * by the first read that asks on that shape at that address, and drawn only when the record says it drew what this read
+ * asks (`asked`, the digest of `[{ body } or { page }, offer]`). Anything else is `null`, and the read asks as it always
+ * did: a guess that was wrong costs the request the page sent early and nothing else.
+ */
+async function earlyToday(base: string, shape: TodayShape, what: Record<string, unknown>, offer: boolean): Promise<{ ok: true; value: TodayAnswer } | null> {
+  const g = globalThis as { __bdToday?: Early | undefined };
+  const early = g.__bdToday;
+  if (early === undefined || early.url !== `${base}/api/today` || early.shape !== shape || !(early.at instanceof Promise)) return null;
+  g.__bdToday = undefined;
+  try {
+    /* READ WHOLE BY THE PAGE AS IT LANDED (`app.html`), so an answer nobody takes is still a finished request. */
+    const res = (await early.at) as { ok?: unknown; body?: unknown } | null;
+    if (res?.ok !== true || typeof res.body !== 'string') return null;
+    const said = JSON.parse(res.body) as { ok?: unknown; value?: unknown } | null;
+    const value = said?.ok === true ? (said.value as (TodayAnswer & { asked?: unknown }) | null) : null;
+    if (value === null || typeof value !== 'object' || typeof value.asked !== 'string') return null;
+    if (value.asked !== (await digestOf(JSON.stringify([what, offer])))) return null;
+    const { asked: _asked, ...answer } = value;
+    return { ok: true, value: answer };
+  } catch {
+    return null;
+  }
+}
 
 /** One widget of the board as `widgetSuggest` reads it (`boardRead` in the record's `today.ts`). */
 export type BoardRead = { key: string; heading?: string; source?: string; where?: string; metric?: string; empty: boolean };
@@ -121,13 +161,25 @@ export function boardReadOf(body: Record<string, unknown>, page: unknown, left: 
  * drawn (`askOffer`). A record built before `offer` refuses it, and is asked as before, with the offer in the read.
  * `left` is what a phone left out of `body` (`phone-ask.ts`), which the offer still reads as on the board.
  */
-export async function askToday(client: Pick<Client, 'call'>, base: string, body: Record<string, unknown>, fresh = false, kept: string | null = null, left: readonly Record<string, unknown>[] = []): Promise<PageSaid> {
+export async function askToday(
+  client: Pick<Client, 'call'>,
+  base: string,
+  body: Record<string, unknown>,
+  fresh = false,
+  kept: string | null = null,
+  left: readonly Record<string, unknown>[] = [],
+  shape?: TodayShape,
+): Promise<PageSaid> {
   /* A KEPT TODAY (`kept`, its slug) IS ASKED BY ITS SLUG, and a host without `today` has no such read: the caller reads the
      page itself. */
   if (without.has(base)) return kept === null ? client.call<PageAnswer>('previewPage', { body }) : (UNKEPT as PageSaid);
   const apart = !offerIn.has(base);
-  const asked = { ...(kept === null ? { body } : { page: kept }), ...(fresh ? { fresh: true } : {}), ...(apart ? { offer: false } : {}) };
-  const out = client.call<TodayAnswer>('today', asked);
+  const what = kept === null ? { body } : { page: kept };
+  /* THE FIRST READ OF AN OPEN SAYS THE SHAPE OF SCREEN IT WAS ASKED ON (`shape`), so the record remembers its body for the
+     next open to ask beside `boot` (`earlyToday`). */
+  const shaped = shape !== undefined && !fresh && !shapeless.has(base);
+  const asked = { ...what, ...(fresh ? { fresh: true } : {}), ...(apart ? { offer: false } : {}), ...(shaped ? { shape } : {}) };
+  const out = (async () => (shape !== undefined && !fresh ? await earlyToday(base, shape, what, !apart) : null) ?? client.call<TodayAnswer>('today', asked))();
   const entry: Held = { base, token: tokenNow(), at: Date.now(), answer: out.then((o) => (o.ok ? o.value : null), () => null) };
   held = entry;
   const got = await out;
@@ -145,7 +197,12 @@ export async function askToday(client: Pick<Client, 'call'>, base: string, body:
   if (held === entry) held = null;
   if ('refusal' in got && apart && got.refusal.at === 'offer') {
     offerIn.add(base);
-    return askToday(client, base, body, fresh, kept, left);
+    return askToday(client, base, body, fresh, kept, left, shape);
+  }
+  /* A RECORD BUILT BEFORE `shape` refuses it, and is asked without it from then on. */
+  if ('refusal' in got && shaped && got.refusal.at === 'shape') {
+    shapeless.add(base);
+    return askToday(client, base, body, fresh, kept, left, shape);
   }
   if ('refusal' in got && UNSERVED.has(got.refusal.code)) {
     without.add(base);

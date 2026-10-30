@@ -152,3 +152,41 @@ test('SOMEBODY HELD TO ONE LIST is answered every part as her own reads answer i
   assert.deepEqual(got.shared, shared.ok ? shared.value : null);
   sql.close();
 });
+
+test('LAST DRAWS TODAY WITH THE BODY THIS SCREEN ASKED LAST TIME, says what it drew, and after a restart reads it from the store', async () => {
+  const sql = openSqlite();
+  const store = new Map<string, unknown>();
+  const kept = {
+    get: async (k: string) => structuredClone(store.get(k)),
+    put: async (k: string, v: unknown) => void store.set(k, structuredClone(v)),
+    delete: async (k: string) => store.delete(k),
+  };
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), kept });
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAT', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok((await installSeed(api.kernel)).ok);
+  /* NOTHING ASKED YET ON A PHONE: nothing to draw, answered as nothing and never refused (the page asks it unseen). */
+  assert.equal(value<TodayAnswer | null>(await api.today({ last: 'phone' }, owner)), null);
+  const drawn = value<TodayAnswer>(await api.today({ body: BODY, offer: false, shape: 'phone' }, owner));
+  for (let waited = 0; ![...store.keys()].some((k) => k.startsWith('today.last.')) && waited < 2_000; waited += 10) await new Promise((r) => setTimeout(r, 10));
+  const digest = async (text: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const last = value<TodayAnswer>(await api.today({ last: 'phone' }, owner))!;
+  assert.equal(last.asked, await digest(JSON.stringify([{ body: BODY }, false])));
+  const { asked: _asked, ...rest } = last;
+  assert.deepEqual(rest, drawn);
+  /* A WIDER SCREEN HAS ITS OWN, and a fresh read is not remembered. */
+  assert.equal(value<TodayAnswer | null>(await api.today({ last: 'wide' }, owner)), null);
+  await api.today({ body: { ...BODY, title: 'Fresh' }, fresh: true, shape: 'wide' }, owner);
+  assert.equal(value<TodayAnswer | null>(await api.today({ last: 'wide' }, owner)), null);
+  /* `last` IS ASKED BY ITSELF, and a shape is a phone or wide. */
+  assert.equal((await api.today({ last: 'phone', body: BODY }, owner)).ok, false);
+  assert.equal((await api.today({ last: 'tablet' }, owner)).ok, false);
+  assert.equal((await api.today({ body: BODY, shape: 'tablet' }, owner)).ok, false);
+  /* ANOTHER READER HAS NONE OF THE OWNER'S. */
+  const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'read' } };
+  const theirs = await api.today({ last: 'phone' }, member);
+  assert.ok(!theirs.ok || theirs.value === null);
+  /* AFTER A RESTART, FROM BESIDE THE RECORD. */
+  const again = await createRecordApi({ sql, clock: fixedClock(NOW), kept });
+  assert.equal(value<TodayAnswer | null>(await again.today({ last: 'phone' }, owner))?.asked, last.asked);
+  sql.close();
+});

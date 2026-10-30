@@ -127,6 +127,12 @@ export type TodayAnswer = {
    * the person turned suggestions off, or one was answered today. Asked in this same read, so the cell costs no request.
    */
   widget?: unknown;
+  /**
+   * WHAT WAS ASKED, AS A DIGEST, on an answer to `last` (Today asked beside `boot` with the body this screen asked last
+   * time): the SHA-256 of `[{ body } or { page }, offer]` as JSON. The app draws the answer only when the body it then
+   * builds digests the same, and asks as it always did otherwise.
+   */
+  asked?: string;
 };
 
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);

@@ -106,13 +106,17 @@ let installed = false;
 
 /**
  * Put the header on this tab's fetch, once, and listen for the Sharing page's ask. While seeing as somebody, the page's
- * early `boot` is dropped unread.
+ * early `boot` and Today are dropped unread.
  */
 export function install(): void {
   if (installed || typeof globalThis.fetch !== 'function' || globalThis.location === undefined) return;
   installed = true;
   globalThis.fetch = seeing(globalThis.fetch.bind(globalThis), seeingAs, () => globalThis.location?.origin);
-  if (current !== null) (globalThis as { __bdBoot?: unknown }).__bdBoot = undefined;
+  if (current !== null) {
+    const early = globalThis as { __bdBoot?: unknown; __bdToday?: unknown };
+    early.__bdBoot = undefined;
+    early.__bdToday = undefined;
+  }
   globalThis.addEventListener?.(SEE_AS_EVENT, (e) => {
     const who = askedOf((e as CustomEvent<unknown>).detail);
     if (who !== null) enterSeeAs(who);
