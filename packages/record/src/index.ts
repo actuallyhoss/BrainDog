@@ -5919,7 +5919,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * live run is named from. `pages.ts` `registersOf` names them when it is handed `ListsBeside`, which `kernel.pages` and
    * `kernel.blockRegisters` now hand it; the record reads the same declarations here too, over every list of projects.
    *
-   * MEASURED BEFORE (`test/audit-layouts-privacy.test.ts`):
+   * MEASURED BEFORE (`test/blocks-hold-hidden-lists.test.ts`):
    * Wren, invited to Areas alone, was drawn `GBP 44,500` from a hidden list's `salary` by `{ field: salary, as: next }`,
    * the done share of the same steps by `as: ring`, and `Secret Kiln`, a row of a projects list she may not open, by
    * `as: scope` and by a live run's card. A miss was worse: `as: next` over a field nobody declared answered
@@ -5973,7 +5973,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * list she may not open.
    *
    * `source` IS NOT HERE YET. `register.diary` on a refused table is the same kind of name, and
-   * `test/scoped-audit.test.ts` finds that block by it; the test has to find it another way before `source` can go.
+   * `test/one-list-member-doors.test.ts` finds that block by it; the test has to find it another way before `source` can go.
    */
   const WRITTEN = ['from', 'cells', 'opening', 'sell', 'about'] as const;
 
@@ -6289,7 +6289,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `each` key, a `source` of `metric.<id>`, and a bare `{{id}}` in prose, which in a template is the row's field when
    * the list declares one by that name. AND A PROGRESS BLOCK'S `spent` AND `toward`, which `touches` does not walk: held
    * by `heldBy` and not renamed, a Payroll figure there answered `FORBIDDEN` where a figure nobody declared answered
-   * `METRIC_UNKNOWN`, which said the record keeps it (`test/audit-layouts-privacy.test.ts`).
+   * `METRIC_UNKNOWN`, which said the record keeps it (`test/blocks-hold-hidden-lists.test.ts`).
    */
   const unplaced = (ctx: CallContext, block: unknown, forList: unknown): { block: unknown; back: Map<string, string> } => {
     const back = new Map<string, string>();
@@ -6365,7 +6365,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const asks: { register: string; where: unknown; inner: boolean }[] = own !== null && b.where !== undefined ? [{ register: own, where: b.where, inner: false }] : [];
     /* A RING'S `of:` IS A SENTENCE OVER THE SAME LIST, resolved the same way, and it was not asked: a ring over Budgets
        with `of: project is Secret Kiln` drew its count while `project is Nothing Here` answered `REF_UNKNOWN`, the
-       title oracle into a projects list above, one key along (`test/audit-layouts-privacy.test.ts`). */
+       title oracle into a projects list above, one key along (`test/blocks-hold-hidden-lists.test.ts`). */
     const of = (block as { of?: unknown }).of;
     if (own !== null && of !== undefined) asks.push({ register: own, where: of, inner: false });
     for (const leg of Array.isArray(b.from) ? (b.from as unknown[]) : [])
