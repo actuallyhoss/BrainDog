@@ -96,7 +96,7 @@ export async function answerCall<C>(surface: McpSurface<C>, args: Record<string,
   if (typeof args.grant !== 'string' || args.grant === '' || typeof s.chatAnswer !== 'function') return refusedAs({ ...SHOW_THE_CARD });
   try {
     const out = await s.chatAnswer({ grant: args.grant, option: args.option }, ctx);
-    if (!out.ok) return refusedAs('refusal' in out ? (out.refusal as unknown as Record<string, unknown>) : { code: 'VERSION_STALE', fix: 'The record moved while this was answered. Answer it in BrainDog.' });
+    if (!out.ok) return refusedAs('refusal' in out ? (out.refusal as unknown as Record<string, unknown>) : { code: 'VERSION_STALE', fix: 'Something changed while this was answered. Answer it in BrainDog.' });
     const value = out.value;
     return { content: [{ type: 'text', text: value.said }], structuredContent: value as unknown as Record<string, unknown> };
   } catch {

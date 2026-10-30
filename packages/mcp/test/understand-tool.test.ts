@@ -99,11 +99,11 @@ test('A RECORD WITHOUT UNDERSTAND PLAN IS A SENTENCE THAT SAYS WHAT TO DO INSTEA
 test('NOTHING TO LINK IS SAID AS SUCH, whether or not the walk read to the end', () => {
   assert.equal(
     understoodBrief({ kinds: [], writes: [], more: 0, questions: [], asks: {}, done: true }, look),
-    'Nothing to link and nothing to ask: what the record holds is understood.',
+    'Nothing to link and nothing to ask: what your BrainDog holds is understood.',
   );
   assert.equal(
     understoodBrief({ kinds: [{ kind: 'payments', looked: 40, linked: 0 }], writes: [], questions: [], done: false }, look),
-    'Nothing to link or ask in the next part of the record. The rest is read on later nights.',
+    'Nothing to link or ask in the next part of your BrainDog. The rest is read on later nights.',
   );
 });
 
