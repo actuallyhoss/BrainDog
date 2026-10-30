@@ -30,7 +30,7 @@ import { parseArgs } from 'node:util';
 import type { Refusal, Result } from '@braindog/ports';
 import { isShape } from '@braindog/kernel';
 
-import { inTheClear, isLoopback, readHosts, saveHosts, type Held, type HostsFile } from './http.ts';
+import { inTheClear, isLoopback, readHosts, saveHosts, withFixOf, type Held, type HostsFile } from './http.ts';
 import { refuse, type Answer } from './json.ts';
 import * as signIn from './login.ts';
 import { approveOperation, heldLogin } from './login.ts';
@@ -130,7 +130,9 @@ async function post(host: { key: string; url: URL }, method: 'export' | 'import'
   }
   const envelope = body as { ok?: unknown; refusal?: unknown };
   if (typeof body !== 'object' || body === null || typeof envelope.ok !== 'boolean' || (envelope.ok === false && typeof envelope.refusal !== 'object')) return gone();
-  return { status: res.status, result: body as Result<unknown> };
+  /* A 401 TO BRAINDOG_TOKEN SAYS TO CHANGE IT (`refusedFix`), since the host says only `unauthorized`. */
+  const result = body as Result<unknown>;
+  return { status: res.status, result: res.status === 401 && bearer !== undefined && bearer === io.env.BRAINDOG_TOKEN ? withFixOf(result, { key: host.key, from: 'env' }) : result };
 }
 
 /**

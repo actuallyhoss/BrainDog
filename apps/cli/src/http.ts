@@ -258,6 +258,13 @@ export function refusedFix(to: Pick<Target, 'key' | 'from'>): string {
   return `${key} needs a sign-in, and this machine holds none for it. Run braindog login ${key}, or set BRAINDOG_TOKEN.`;
 }
 
+/** An answer already read, with an `UNAUTHORIZED` refusal's fix replaced by `refusedFix`'s sentence; any other as it is. */
+export function withFixOf(r: Result<unknown>, to: Pick<Target, 'key' | 'from'>): Result<unknown> {
+  const refusal = r.ok ? null : (r as { refusal?: unknown }).refusal;
+  if (!isObject(refusal) || refusal.code !== 'UNAUTHORIZED') return r;
+  return { ...r, refusal: { ...refusal, fix: refusedFix(to) } } as Result<unknown>;
+}
+
 /**
  * A `401` with the host's `UNAUTHORIZED`, its fix replaced by `refusedFix`'s sentence; any other answer as it came.
  * The body is read only for a 401, so nothing else waits on it.
