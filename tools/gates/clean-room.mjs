@@ -11,6 +11,7 @@
  * Usage:  node tools/gates/clean-room.mjs [root]
  */
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
@@ -39,12 +40,32 @@ function privateTripwires() {
  */
 const TRIPWIRES = ['brain.ps1', 'BRAIN_TOKEN', 'brain_api', 'brain-worker', ...privateTripwires()];
 
-async function walk(dir, out = []) {
+/**
+ * What git ignores under `root`, as git names it from there: a file by its path, a folder wholly ignored by its path
+ * and a `/`. Nothing outside a git checkout.
+ *
+ * ASKED OF GIT, NEVER TYPED HERE. A checkout holds what nobody committed: a history scrub's copies of old trees, a
+ * plan's scratch notes, a session's exports. Each is ignored, and each was read as the tree (29 Oct: `.notes/` and
+ * `braindog-finish-plan-scratchpad/` named the predecessor while saying what this gate guards), so a clean commit went
+ * red on the one machine that kept them. A list of their names here would miss the next one.
+ */
+function ignoredIn(root) {
+  try {
+    const out = execFileSync('git', ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'], { cwd: root, encoding: 'utf8' });
+    return new Set(out.split('\0').filter((p) => p !== ''));
+  } catch {
+    return new Set();
+  }
+}
+
+async function walk(root, dir = root, ignored = ignoredIn(root), out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     if (SKIP.has(e.name)) continue;
     const p = join(dir, e.name);
-    if (e.isDirectory()) await walk(p, out);
-    else if (/\.(ts|js|mjs|svelte|css|json|md|yml|yaml)$/.test(e.name)) out.push(p);
+    const rel = relative(root, p).replace(/\\/g, '/');
+    if (e.isDirectory()) {
+      if (!ignored.has(`${rel}/`)) await walk(root, p, ignored, out);
+    } else if (/\.(ts|js|mjs|svelte|css|json|md|yml|yaml)$/.test(e.name) && !ignored.has(rel)) out.push(p);
   }
   return out;
 }

@@ -9,6 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1223,18 +1224,41 @@ test('THE MINOR UNIT IS ISO 4217’S, AND ONE TABLE SAYS IT', async () => {
 });
 
 /**
- * Every source file in the tree, so a check can be about the tree and not about a list of files
- * somebody remembered. The skipped names are outputs and caches, never authored.
+ * What git ignores under `root`, as git names it from there: a file by its path, a folder wholly ignored by its path
+ * and a `/`. Nothing outside a git checkout.
+ *
+ * ASKED OF GIT, NEVER TYPED HERE. A checkout holds what nobody committed: a history scrub's copies of old trees, a
+ * plan's scratch notes, a session's exports. Each is ignored, and each was read as the tree (29 Oct: the scrub's
+ * `tip-checkout` copies of `ingest.ts` declared "their own" `exponentOf`), so a clean commit went red on the one
+ * machine that kept them. A list of their names here would miss the next one.
  */
-function* sources(dir: string): Generator<string> {
-  const SKIP = new Set(['node_modules', '.git', '.svelte-kit', '.wrangler', '.scratch', '.claude', 'dist', 'coverage', 'shots']);
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (SKIP.has(entry.name) || entry.name.startsWith('build')) continue;
-      yield* sources(path);
-    } else if (/\.(?:m|c)?[jt]s$|\.svelte$/u.test(entry.name)) yield path;
+function ignoredIn(root: string): Set<string> {
+  try {
+    const out = execFileSync('git', ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'], { cwd: root, encoding: 'utf8' });
+    return new Set(out.split('\0').filter((p) => p !== ''));
+  } catch {
+    return new Set();
   }
+}
+
+/**
+ * Every source file in the tree, so a check can be about the tree and not about a list of files
+ * somebody remembered. The skipped names are outputs and caches, never authored, and so is whatever git ignores.
+ */
+function* sources(root: string): Generator<string> {
+  const SKIP = new Set(['node_modules', '.git', '.svelte-kit', '.wrangler', '.scratch', '.claude', 'dist', 'coverage', 'shots']);
+  const ignored = ignoredIn(root);
+  function* walk(dir: string): Generator<string> {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      const rel = relative(root, path).split(sep).join('/');
+      if (entry.isDirectory()) {
+        if (SKIP.has(entry.name) || entry.name.startsWith('build') || ignored.has(`${rel}/`)) continue;
+        yield* walk(path);
+      } else if (/\.(?:m|c)?[jt]s$|\.svelte$/u.test(entry.name) && !ignored.has(rel)) yield path;
+    }
+  }
+  yield* walk(root);
 }
 
 test('NO FOURTH COPY: nothing outside the two tables works a currency exponent out for itself', () => {

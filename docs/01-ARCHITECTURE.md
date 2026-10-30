@@ -281,26 +281,39 @@ start rather than because a table asserted it.
 | `better-sqlite3` | ✅ bundles its own SQLite with `SQLITE_ENABLE_FTS5` and `SQLITE_ENABLE_JSON1` on by default | **not built.** The Node minor is pinned, so the older Node it would serve does not arise; `node:sqlite` is the only driver ([37-SPEC-PORTS](37-SPEC-PORTS.md) §13 D9; [ADR-038](16-DECISIONS.md)). *An earlier draft kept it as the alternative* |
 | `bun:sqlite` | ⚠️ on macOS it links Apple's system `libsqlite3`, which *"doesn't support extensions"*; it nests transactions via `SAVEPOINT`; its parameter ceilings differ | **unsupported.** Node bundles its own SQLite on every platform — the *"on macOS Node loads Apple's libsqlite3"* sentence an earlier draft carried applies to Bun alone |
 
-**The resolution, and it makes the adapter design stronger rather than weaker:** the storage adapter
-measures `caps` — SQLite version, FTS5, JSON1 — at open, and **the conformance suite has an FTS5 case**
-([33-CONTRACTS](33-CONTRACTS.md) §3). A build that fails it is **refused at boot**, naming the driver,
-with the message in [30-BLUEPRINT](30-BLUEPRINT.md) §13 — **there is no degraded mode.** An earlier
+**The resolution, and it makes the adapter design stronger rather than weaker:** a build without FTS5
+is **refused when the record opens** — **there is no degraded mode.** The kernel meets a missing `fts5` at
+migration 1's `CREATE VIRTUAL TABLE entry_fts`, or, for a file migrated on another machine, at a `LIMIT 0`
+read of that table, and from then on every method answers `RECORD_UNAVAILABLE` at `sqlite.fts5`, naming
+the SQLite version and what to run instead, the message of [30-BLUEPRINT](30-BLUEPRINT.md) §13
+(`packages/kernel/src/migrate.ts`, held by `packages/kernel/test/boot-probe.test.ts`). The port also
+measures `caps` — SQLite version, FTS5, JSON1 — by doing (`measureCaps` and `bootProbe` in
+`packages/ports/src/sql.ts`, held by `packages/ports/test/sql.test.ts`). An earlier
 draft had `contains` falling back to `LIKE` on such a build; that sentence is deleted, because a third
 compilation with different semantics is exactly the *"two backends refuse identically"* rule of
 [02-DATA-MODEL](02-DATA-MODEL.md) §6 being broken quietly. `Capabilities.fts5` is therefore always true
 past boot.
 
-The Durable Object's other ceilings travel with it. `DO_LIMITS` is a constant the Node adapter enforces
-**above the driver** — parameter count (100) counted before `prepare`, LIKE pattern length (50) checked
-on every bound pattern, statement length (100 KB) before `exec`, compound-select depth (5) and
-expression depth (100) as properties of the compiler's output asserted by the property test — throwing
-the same closed error vocabulary the DO adapter maps to ([33-CONTRACTS](33-CONTRACTS.md) §1). *That* is
-what "Node refuses first" means. `node:sqlite` has no `limits` constructor option and no `setLimit`;
+The Durable Object's other ceilings travel with it. `DO_LIMITS` (`packages/ports/src/sql.ts`) is
+enforced **above the driver** by `guard`: the parameter count (100), the statement's length in UTF-8
+bytes (100,000) and its compound-select terms (5) before the statement runs, and the LIKE pattern's
+length (50 bytes) on every bound pattern. Expression depth (100) needs a parser, so the guard names it
+after the driver refuses it. Both hosts wrap their port in it (`guarded`: the self-host's `node:sqlite`
+in `apps/selfhost/src/server.ts`, the Durable Object's storage in `apps/worker/src/index.ts`), and so
+does every kernel test (`packages/kernel/test/sqlite.ts`), each throwing the same closed error
+vocabulary ([33-CONTRACTS](33-CONTRACTS.md) §1). *That* is what "Node refuses first" means. `node:sqlite` has no `limits` constructor option and no `setLimit`;
 an earlier draft of [30-BLUEPRINT](30-BLUEPRINT.md) §13 passed one, and it was silently ignored.
 
-> **This is exactly what the conformance suite is for.** A portability claim that is only ever
-> asserted in a table is a claim nobody has run — in either direction. See
-> [30-BLUEPRINT](30-BLUEPRINT.md) §13 and [33-CONTRACTS](33-CONTRACTS.md) §3.
+> **No conformance suite runs yet.** [33-CONTRACTS](33-CONTRACTS.md) §3 specifies one: the same record
+> cases run on both hosts, a reference result from the Durable Object, and a gate that every host ran the
+> same number of cases. None of it is built. Every record test runs on `node:sqlite` behind the guard, and
+> so does the Worker's own harness (`apps/worker/test/cloud-harness.ts` runs `Record$` over `node:sqlite`,
+> because local workerd cannot rewind a Durable Object). The ceilings above were measured once on local
+> workerd through Miniflare (wrangler 4.129.0) and are held by `packages/ports/test/sql.test.ts`, not
+> measured again on each run. So a statement the guard passes and the Durable Object still refuses, for a
+> reason the guard does not count, is found on the Worker and not by a test. A portability claim that is
+> only ever asserted in a table is a claim nobody has run, in either direction; building the suite is
+> open work (F30 of the finish queue). See [30-BLUEPRINT](30-BLUEPRINT.md) §13.
 
 ---
 

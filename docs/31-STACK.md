@@ -429,7 +429,7 @@ braindog/
 │   └── worker/       the single Cloudflare deployment · three DO classes — Record, Slash, Directory — ~60 lines each
 ├── packages/
 │   ├── connect/      ingest with fetch: · placeholders · formats · expect: · probe: · metric_point
-│   ├── declare/      8 kinds · 16 field types · one schemas.ts · ./yaml — the one YAML parser (ADR-063)
+│   ├── declare/      every kind (`KINDS`) · 16 field types · one schemas.ts · ./yaml — the one YAML parser (ADR-063)
 │   ├── extract/      10 extractors + 3 combinators. No regex, ever — a scoped lint rule says so
 │   ├── fixtures/     9 records (8 pages + corpus) · row JSON + rows/gen.mjs for the generated corpora · a pack corpus
 │   ├── host/         ROUTES · httpStatus · resolveContext · serveApi · the MCP wiring — what both hosts share (ADR-064)

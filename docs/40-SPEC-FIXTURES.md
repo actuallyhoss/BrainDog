@@ -230,8 +230,8 @@ of [04-PACKS](04-PACKS.md) §2 (`pack` `version` `summary` `author: fixtures` `l
 | `burn-rate` | — | `block.burnRate` · `page.runway` | — | packs `money-core: "^1"` |
 | `reactor-core` | — | `block.reactorCore` (`primitive: lattice`) · `page.core` | — | **primitives 2** |
 
-Seven of the eight kinds appear (`theme` does not: `packages/theme` sits below this package and keeps its own
-corpus). Every value type but `file` is declared at least once — `secret` on `credentials` (declared, never
+Seven of the eight kinds of the day appear (`theme` does not: `packages/theme` sits below this package and keeps its own
+corpus; `script`, `job` and `look` came after this corpus, and `KINDS` in `packages/kernel/src/declare.ts` keeps them all). Every value type but `file` is declared at least once — `secret` on `credentials` (declared, never
 valued), `email` and `url` under `.example` hosts (§8), `quantity` on `plan_steps.effort`, `duration` on
 `tasks.estimate`, `decimal` on `fx.rate`, `json` on `company.meta`, `instant` on `tasks.started`, `bool` on
 `services.auto_renew`. Register options exercised: `series: true` with `key:` (`snapshots`); `transitions:` with

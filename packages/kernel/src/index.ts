@@ -1670,10 +1670,10 @@ function readSortCursor(cursor: string, order: string): Param[] | null {
 /**
  * money-core's `snapshots`, which the kernel knows by name the way `evalContext` knows `fx` by name.
  *
- * A REGISTER OF ROWS THE RECORD WRITES ITSELF is not something the declaration grammar can express:
- * `04 §5`'s eight kinds are register, page, block, ingest, rule, metric, theme and digest, and none
- * of them schedules a write into a register. Until one of them can, the alternative to naming this
- * register here is the Ledger page drawing an empty table for ever, which is what it did.
+ * A REGISTER OF ROWS THE RECORD WRITES ITSELF was not something the declaration grammar could express:
+ * `04 §5`'s eight kinds were then register, page, block, ingest, rule, metric, theme and digest, and none
+ * of them scheduled a write into a register. Without one, the alternative to naming this register here
+ * was the Ledger page drawing an empty table for ever, which is what it did.
  */
 const NIGHT_REGISTER = 'snapshots';
 

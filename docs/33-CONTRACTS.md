@@ -661,7 +661,7 @@ the one home; a count is never a budget — it is read from the owning enumerati
 | `graph` | script | the package graph is acyclic and every import points down the thirteen-package order `render → ports → where → theme → fixtures → kernel → declare → extract → record → mcp → slash → connect → host` (31 §2); `mcp` imports `record`'s type only; apps import packages and never each other |
 | `licence-closure` | script | `npm pack --dry-run --json` of both packages: no `@braindog/`, no `../../`, both LICENSE files start with the right words (31 §4) |
 | `clean-room` | script | no identifier from `clean-room.txt` in any tracked text file outside `docs/` — the predecessor tripwire |
-| `no-declarations-in-kernel` | script | the kernel declares nothing of the eight kinds except `register.session` and `register.instructions` |
+| `no-declarations-in-kernel` | script | the kernel declares no declaration of any kind (`KINDS` in `packages/kernel/src/declare.ts`) except `register.session` and `register.instructions` |
 | `closed-lists` | script | every list in [34-GRAMMARS](34-GRAMMARS.md) §6 matches its owner's enumeration and its CHECK — the record's `DIALECT` constant against `render`'s kinds among them |
 | `event-kinds` | script | the `event.kind` CHECK has forty members and the prose says forty |
 | `refusal-fixtures` | script | every code in 30 §6 has a fixture that produces it, and no fixture lacks a code; the script checks the names, the `via`-keyed runners of 40 §6 check production |

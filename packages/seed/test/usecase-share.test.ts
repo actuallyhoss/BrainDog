@@ -19,7 +19,7 @@ test('EVERY BUILT-IN USE CASE, AS A FILE, READS THROUGH readShared UNCHANGED', a
     assert.ok(read.ok, `${u.usecase}: ${read.ok ? '' : JSON.stringify((read as { refusal?: unknown }).refusal)}`);
     assert.equal(read.value.usecase.version, u.version);
   }
-  assert.equal(builtInFile('nobody'), null);
+  assert.equal(builtInFile('nobody', '2026-09-17'), null);
 });
 
 test('A CARD SHOWS THE RAIL, THE LISTS AND HOME FROM THE DECLARATIONS, AND THE VOICE A HEADING READS', () => {

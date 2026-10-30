@@ -23,6 +23,7 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, NOW, firstPartyDocument } from '../src/index.ts';
 import type { ModuleIngest as SeedIngest } from '../src/index.ts';
 import { USE_CASES, useCaseDocument } from '../src/usecases/index.ts';
+import { dayOf } from '../src/usecases/dates.ts';
 import { asMoneyCore180 } from './money-core-earlier.ts';
 import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgFile, handingAsShipped } from './pack-files.ts';
 
@@ -162,7 +163,7 @@ test('THE PACK DECLARES THE TWELVE AND THE BALANCE READING, needs money-core 3.1
 
 test('NO STARTER USE CASE INSTALLS IT: not one of them carries a `From HSBC:` pattern any more', () => {
   for (const u of USE_CASES) {
-    const doc = JSON.stringify(useCaseDocument(u.usecase));
+    const doc = JSON.stringify(useCaseDocument(u.usecase, dayOf(NOW)));
     assert.ok(!doc.includes('bank-hsbc-eg'), `${u.usecase} names the bank pack`);
     for (const m of u.modules) assert.deepEqual(ingestsOf(firstPartyDocument(m)).filter((i) => HSBC.includes(i)), [], `${u.usecase} installs ${m} with an HSBC wording`);
   }

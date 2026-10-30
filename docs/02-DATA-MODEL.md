@@ -491,7 +491,7 @@ because nothing tells it apart from a key.
 
 Each type is a validator, a form control, a renderer, a `where:` compilation and a line in the MCP
 schema. **A seventeenth is five pieces of work and a new way to be wrong**, which is the same
-argument the eight pack kinds rest on, and it is why the two below were added only after a stress
+argument the pack kinds rest on, and it is why the two below were added only after a stress
 test showed exactly what their absence cost.
 
 > ### The two that were added, and why an earlier draft was wrong to stop at fourteen

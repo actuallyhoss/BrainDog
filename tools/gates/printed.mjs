@@ -85,6 +85,18 @@ export const ALLOWED = [
 /** On an address drawn as not found on purpose (`routes.mjs` `missing`), the record's not found is the answer asked for. */
 const MISSING = new Set(['Not Found', 'Unprocessable Entity'].map(statusOf));
 
+/**
+ * THE WORKER'S OWN LOAD, LOST, IS NOT THE SCREEN'S ERROR. The app registers `service-worker.js` for its offline copy
+ * (`offline.ts` `keep`) and catches a registration that fails (`live.svelte.ts` `follow`), but WebKit also writes the
+ * failure to the page's console as a script error, which Playwright hands on as an uncaught one. Under a full run's
+ * load, or when the gate moves the page on while the registration is still out, WebKit loses the script's request and
+ * says only that it failed "due to access control checks": `webkit: connected/settings/agents @390` on 29 Oct, the
+ * one WebKit case left after the worker's kept answers were read whole (9e332db). That sentence names a request that
+ * never finished, on the worker's address and no other, and nothing the screen drew; a worker that loaded and was
+ * wrong says something else (a bad answer, a script error) and is still red.
+ */
+export const WORKER_LOST = /\/service-worker\.js due to access control checks/u;
+
 /** The status a console line says the browser was answered with, or `null` for any other line. */
 const ANSWERED = /^Failed to load resource: the server responded with a status of (\d+)\b/u;
 
@@ -111,6 +123,7 @@ export function checkScreen({ where, text = '', code = [], errors = [], failed =
     const first = String(e?.text ?? '').split('\n')[0];
     const said = ANSWERED.exec(first);
     if (e?.kind === 'console' && said && answered(Number(said[1]))) continue;
+    if (WORKER_LOST.test(first)) continue;
     if (e?.kind === 'uncaught') out.push(`${where}  threw an uncaught error: ${first}`);
     else if (e?.kind === 'console') out.push(`${where}  wrote an error to the console: ${first}`);
   }

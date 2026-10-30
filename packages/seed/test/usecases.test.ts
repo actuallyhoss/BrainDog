@@ -13,6 +13,10 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 
 import { FIRST_PARTY, NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { MODULE_ORDER, USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, useCase, useCaseDocument } from '../src/usecases/index.ts';
+import { dayOf } from '../src/usecases/dates.ts';
+
+/** The record's own day: an example's `+3d` is counted from it, never from the machine's, which turns over at midnight. */
+const TODAY = dayOf(NOW);
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -60,7 +64,7 @@ test('THE MODULES A USE CASE MAY NAME ARE THE FIRST-PARTY PACKS, in install orde
 
 test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its example rows and its voice', async () => {
   for (const u of USE_CASES) {
-    const doc = useCaseDocument(u.usecase);
+    const doc = useCaseDocument(u.usecase, TODAY);
     if (!doc) {
       assert.equal(u.pack, null);
       continue;
@@ -93,7 +97,7 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
 test('A CARRIED PACK WITHOUT ITS MODULES IS REFUSED, naming what to install', async () => {
   const founder = useCase('founder')!;
   const { k, sql } = await record();
-  const out = (await put(k, useCaseDocument('founder'))) as { ok: boolean; refusal?: { code: string } };
+  const out = (await put(k, useCaseDocument('founder', TODAY))) as { ok: boolean; refusal?: { code: string } };
   assert.equal(out.ok, false);
   assert.equal(out.refusal?.code, 'REGISTER_UNRESOLVED');
   assert.ok(founder.modules.includes('portfolio'));
@@ -211,7 +215,7 @@ test('THE SAME WORDS ALWAYS RANK THE SAME, and each reason is a phrase of what w
 test('EVERY LABEL NAMES A LIST, FIELD OR VALUE THAT THE USE CASE INSTALLS', () => {
   let some = 0;
   for (const u of USE_CASES) {
-    const declared = [...modulesFor(u, u.modules).filter((id) => id !== 'agents').map((id) => firstPartyDocument(id)), useCaseDocument(u.usecase)]
+    const declared = [...modulesFor(u, u.modules).filter((id) => id !== 'agents').map((id) => firstPartyDocument(id)), useCaseDocument(u.usecase, TODAY)]
       .flatMap((doc) => ((doc?.declarations ?? []) as Record<string, unknown>[]))
       .filter((d) => typeof d.register === 'string' && Array.isArray(d.fields));
     for (const key of Object.keys(u.labels)) {

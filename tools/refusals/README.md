@@ -17,9 +17,30 @@ node --experimental-strip-types tools/refusals/run-via.mjs rpc        # and name
 Exit 0 when every fixture agreed with its surface, 1 when one did not or was not driven, 2 when
 this runner drove nothing at all.
 
+## Where each `via` stands
+
+Every one of the nine has a driver. The fixtures behind each are counted with
+`grep -h '^via:' fixtures/refusals/*.yaml | awk '{print $2}' | sort | uniq -c`, and the sizes are not written here,
+because they move with the corpus.
+
+| `via` | Driven by |
+|---|---|
+| `rpc` | `run-via.mjs rpc`, through `rpc.mjs`, against a self-host over a socket; each fixture it cannot drive is printed with its reason (`SCENES` in `rpc.mjs`). Three slices are also held beside their raisers: `packages/host/test/refusals-rpc.test.ts`, `apps/selfhost/test/refusals-rpc.test.ts` and `packages/client/test/refusals-rpc.test.ts` |
+| `lint` | `run-via.mjs lint` |
+| `install` | `packages/record/test/refusals-install.test.ts`: every fixture but the three theme codes, skipped by name because nothing on the install path calls `theme`'s checks |
+| `write` | `packages/kernel/test/refusals-write.test.ts` |
+| `where` | `run-via.mjs where` |
+| `pull` | `packages/connect/test/refusals-pull.test.ts` for the ones raised in `packages/connect`, and `packages/host/test/refusals-pull.test.ts` for the ones raised in `packages/host/src/actions.ts` |
+| `import` | `packages/kernel/test/refusals-import.test.ts` |
+| `ask` | `packages/slash/test/refusals-ask.test.ts` |
+| `render` | `apps/web/test/refusals-render.test.ts` |
+
+`run-via.mjs <via>` names the runner of every via it does not drive itself (`DRIVERS` there). The sections below
+say how each runner came to be, in the order they were built, and every count in them is the count of its day.
+
 ## Two of the nine runners already existed
 
-`docs/40-SPEC-FIXTURES.md` §6 says none of the eight exists. It is stale by one day. `e74a563b`, *"The first two via runners, so a fixture is driven instead of merely
+`docs/40-SPEC-FIXTURES.md` §6 said none of the eight existed, a day after two did. `e74a563b`, *"The first two via runners, so a fixture is driven instead of merely
 counted"*, Sunday 20 September 2026, added:
 
 | `via` | Fixtures | Runner |
@@ -35,9 +56,9 @@ would cost.
 ## Why `lint` was built third
 
 Counted from the corpus on 21 September 2026, `grep -h '^via:' fixtures/refusals/*.yaml | sort |
-uniq -c`:
+uniq -c`, and each via's state that day (the table above is today's):
 
-| `via` | Fixtures | State |
+| `via` | Fixtures | State on 21 September |
 |---|---|---|
 | `rpc` | 30 | no driver |
 | `lint` | **27** | **driven here** |
@@ -411,7 +432,7 @@ which is the form `fixtures/corpus.ts` reads and `refusal-fixtures.mjs` skips:
 
 - 24 entries become `pack: { … }`.
 - `pack-over-cap.yaml` becomes `usecase: "…"`, a document over 256 KB.
-- `kind-unknown.yaml` becomes `decl: { … }`, one declaration outside the eight kinds.
+- `kind-unknown.yaml` becomes `decl: { … }`, one declaration of no kind `KINDS` lists (`packages/kernel/src/declare.ts`).
 
 Then delete `lint-inputs.json` and the `borrowed` path in `run-via.mjs`, and the runner reads the
 corpus alone. Two entries are worth a decision rather than a paste: `fields-over-cap.yaml` needs 65

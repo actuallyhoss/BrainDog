@@ -1,6 +1,6 @@
 /**
- * What the Settings tiles say: the meters as bars, the last thirty nights as a strip, and the sentence
- * under the title. Every number is the record's own answer, and a night is only called missed when it really had none.
+ * What the Settings tiles say: the meters as bars, the last thirty nights as a strip, and the doors. Every number is
+ * the record's own answer, and a night is only called missed when it really had none.
  */
 
 import { test } from 'node:test';
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import type { Meter } from '../../lib/record/actions.ts';
 import {
-  doorState, doorsLine, doorWords, meterBars, monthDay, nightParts, nightsLine, nightsOf, nightsSaid, settingsSentence, shareOf, tileWords,
+  doorState, doorsLine, doorWords, meterBars, monthDay, nightParts, nightsLine, nightsOf, nightsSaid, shareOf, tileWords,
 } from './billing.ts';
 
 /** 29 September 2026, 14:00 UTC: day 29 of a 30-day month, well after the night's copy has run. */
@@ -90,39 +90,6 @@ test("before six in the morning, tonight's copy is due and not missed", () => {
 test('copies that cannot be dated are left out rather than guessed', () => {
   const nights = nightsOf([{ at: 'not a time' }], NOW);
   assert.equal(nights.every((n) => n.state === 'before'), true);
-});
-
-test('the title sentence says all healthy only about what it read', () => {
-  const nights = nightsOf(nightly(1), NOW);
-  const calm = [meter('runs', 0.3, true), meter('requests', 0.1)];
-  assert.deepEqual(settingsSentence({ nights, meters: calm, resets: '1 October', now: NOW }), {
-    sentence: "All healthy: last night's copy is in, and nothing runs out before 1 October.",
-  });
-  assert.deepEqual(settingsSentence({ nights, meters: null, resets: null, now: NOW }), { sentence: "All healthy: last night's copy is in." });
-  assert.equal(settingsSentence({ nights: null, meters: null, resets: null, now: NOW }), null);
-  /* A RECORD WITH NO COPY EVER KEPT is not told its copy is in, nor that one was missed. */
-  assert.equal(settingsSentence({ nights: nightsOf([], NOW), meters: null, resets: null, now: NOW }), null);
-});
-
-test('and the phrase that needs him is the one drawn red', () => {
-  const missed = nightsOf(nightly(1, 28), NOW);
-  const near = [meter('runs', 0.91, true)];
-  assert.deepEqual(settingsSentence({ nights: missed, meters: null, resets: null, now: NOW }), { sentence: 'No copy last night.', needs: 'No copy last night' });
-  assert.deepEqual(settingsSentence({ nights: nightsOf(nightly(1), NOW), meters: near, resets: '1 October', now: NOW }), {
-    sentence: "Runs are at 91%, 2 days to go, and last night's copy is in.",
-    needs: 'Runs are at 91%, 2 days to go',
-  });
-  const full = settingsSentence({ nights: null, meters: [meter('bytes', 1, true)], resets: '1 October', now: NOW });
-  assert.equal(full?.needs, 'Fetched data is used up until 1 October');
-});
-
-test('"nothing runs out" is said only where the pace keeps the nearest meter under its allowance', () => {
-  /* 40% by the 10th of a 30-day month is 120% by the end of it. */
-  const tenth = Date.UTC(2026, 8, 10, 12);
-  const said = settingsSentence({ nights: null, meters: [meter('runs', 0.4, true)], resets: '1 October', now: tenth });
-  assert.equal(said?.needs, 'At this pace runs will be used up before 1 October');
-  const calm = settingsSentence({ nights: null, meters: [meter('runs', 0.2, true)], resets: '1 October', now: tenth });
-  assert.equal(calm?.sentence, 'All healthy: nothing runs out before 1 October.');
 });
 
 test('a door is on while an address is in use, off with none, and the line counts only the doors an address opens', () => {

@@ -862,7 +862,7 @@ a `theme` declaration and hands the JSON to `record`, which calls `build`.
 
 | # | Decision | Amend |
 |---|---|---|
-| D1 | **JSON in, not YAML.** `parseTheme` takes the dialect's JSON form; `declare` owns YAML → JSON for all eight kinds (31 §2). The YAML of 28 §1 is the authoring form; the wire to this package is its JSON | 28 §1: note the two forms; 35 §4 row 39 wording "the YAML dialect" → "the dialect's JSON form" |
+| D1 | **JSON in, not YAML.** `parseTheme` takes the dialect's JSON form; `declare` owns YAML → JSON for every kind of declaration (31 §2). The YAML of 28 §1 is the authoring form; the wire to this package is its JSON | 28 §1: note the two forms; 35 §4 row 39 wording "the YAML dialect" → "the dialect's JSON form" |
 | D2 | **The light ladder anchors at the top.** `s3` = L 0.99 and the ladder descends 0.022 to `bg` 0.924 and `sunk` 0.902. 28 §3 step 1's `bg = 0.99` in light leaves no room for three lighter surfaces, and 13 §2.2 measured the predecessor's light `s3` as the lightest surface and `sunk` the darkest, which is also why 28 step 2 names `sunk` the worst light ground. Dark keeps `bg` 0.16 ascending 0.028 | 28 §3 step 1 |
 | D3 | **The solve is a 24-step bisection on OKLab L over the quantised, gamut-mapped colour**, returning the boundary hex that meets the target (§5.6). "bisect" in 28 §3 gets its definition | 28 §3 step 2 |
 | D4 | **Separability is searched, not repaired.** Step 5 is a two-stage grid over contrast targets (and chroma 0.14 → 0.08) for the three intents and `accent-text`, maximising the minimum simulated ΔE. Replaces 28's "solve for 4.5, then run the separability solve" and "retry once with relaxed chroma" | 28 §3 steps 5, 7 |
