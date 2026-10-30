@@ -314,6 +314,14 @@ const needsKey = (fields: Record<string, unknown>): boolean =>
 export const PLUGIN_LINE =
   'Claude Code also takes BrainDog as a plugin, for a profile this command did not set up: /plugin marketplace add actuallyhoss/BrainDog, then /plugin install braindog@braindog.';
 
+/**
+ * WHETHER THE REPOSITORY IS PUBLIC, and so whether `PLUGIN_LINE` is said at all: until it is, the marketplace it names
+ * answers anyone but its owner with a 404, and the line sent people to a page they could not open. The site's launch flag
+ * for the same fact is `LAUNCH.repo` (`apps/site/src/lib/launch.ts`); this command is published on its own and cannot
+ * read the site, so `test/setup.test.ts` holds the two equal, and the owner's word flips both.
+ */
+export const REPO_PUBLIC = false;
+
 /** Names as a sentence says them: `A`, `A and B`, `A, B and C`. */
 const listOf = (names: string[]): string => (names.length < 2 ? (names[0] ?? 'no app') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
 
@@ -706,7 +714,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
 
   /* WHAT IS LEFT, IN THE WORDS TO TYPE, before the closing line, so the last thing read is whether anything changed. */
   for (const line of whatIsLeft(rows, tools, key, io)) io.out(line);
-  if (claude) io.out(PLUGIN_LINE);
+  if (claude && REPO_PUBLIC) io.out(PLUGIN_LINE);
   if (dryRun) io.out('That was a dry run, so nothing was signed in, written, registered or proposed.');
   else if (!changed) io.out(`Nothing changed: this machine was already set up from ${key}.`);
   else io.out(`This machine is set up from ${key}. Every session started from now on in ${listOf(here.map((c) => c.title))} has it.`);

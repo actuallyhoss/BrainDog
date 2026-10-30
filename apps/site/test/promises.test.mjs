@@ -229,3 +229,11 @@ test('"Coming soon" is said only where the owner asked for it, and only while bi
   /* AND THE REST STILL HOLDS: open source is refused while the repository is private. */
   if (!LAUNCH.repo) assert.deepEqual(notYet([['site.pricing.extra.soon', 'BrainDog is open source.']]), ['site.pricing.extra.soon: BrainDog is open source.']);
 });
+
+test('the self-host README names the repository to clone only once LAUNCH.repo is on', () => {
+  /* THE CLONE LINE IS THE ONE ADDRESS THE README GAVE A STRANGER, and while the repository is private it answers 404.
+     It comes back with the flag: a README that still starts from "your copy" once the repository is public fails here. */
+  const readme = readFileSync(new URL('../../selfhost/README.md', import.meta.url), 'utf8');
+  const clone = /git clone https:\/\/github\.com\/actuallyhoss\/BrainDog/u.test(readme);
+  assert.equal(clone, LAUNCH.repo, LAUNCH.repo ? 'the README does not say how to clone the public repository' : 'the README tells people to clone a private repository');
+});
