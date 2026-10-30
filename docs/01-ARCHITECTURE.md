@@ -313,7 +313,7 @@ an earlier draft of [30-BLUEPRINT](30-BLUEPRINT.md) §13 passed one, and it was 
 > (`apps/worker/test/conformance.run.ts`, Miniflare and esbuild reached through wrangler, as
 > `kernel-in-do.test.ts` does). The cases cover values of every kind and the BLOB shape, the guard's ceilings,
 > transactions and `attempt()`'s rollback, FTS5 with the record's tokenizer, the JSON and SQL the kernel uses,
-> the Durable Object's limits the guard does not count, migrations in order, a row of every field type,
+> the Durable Object's limits on a statement's shape, migrations in order, a row of every field type,
 > versions and conflicts, search, the keychain's bytes, and the alarm and outbox. Each host writes what it saw
 > to `packages/host/test/conformance/_results/`, and `compare.run.ts` holds the two equal case by case and
 > checks both ran the same cases. `pnpm conformance` at the root runs all three; each half runs alone with
@@ -321,15 +321,17 @@ an earlier draft of [30-BLUEPRINT](30-BLUEPRINT.md) §13 passed one, and it was 
 > `pnpm --filter @braindog/host conformance:compare`.
 >
 > A case one host is known to fail names the host and why (`drift`) and runs there as a `todo`, so the
-> report shows it on every run without going red. Known at the time of writing: the self-host's port answers
-> a nested `transactionSync` with `fn()` where the Durable Object's is a savepoint; `node:sqlite` cuts a
-> bound string at its first U+0000; and the guard does not count the Durable Object's expression depth (100),
-> columns (100), function arguments (32) or value length (2 MB), which `node:sqlite` allows far past. Two
-> more are measured only on Node and left to the compare: `node:sqlite` binds every JavaScript number as a
-> REAL (`CAST(1 AS TEXT)` is `1.0`), and whether the Durable Object enforces `decision.supersedes`'s foreign
-> key. No reference trace is committed yet (`packages/ports/conformance/reference.json` in 33 §3), and the
-> kernel's own tests still run on `packages/kernel/test/sqlite.ts`, which counts three of the guard's checks
-> and leaves `node:sqlite`'s foreign keys on. See [30-BLUEPRINT](30-BLUEPRINT.md) §13.
+> report shows it on every run without going red. One is left: the SQLite `node:sqlite` bundles writes a REAL
+> as text to fifteen significant digits where the Durable Object's writes it exactly (`real-as-text-past-fifteen-digits`).
+> The four the suite found first are fixed on both hosts: a nested `transactionSync` is a savepoint on each; a text
+> holding U+0000 is refused (the kernel at the field, the guard at the bind); and the guard counts the Durable Object's
+> expression depth (100), columns (100), function arguments (127, measured, where the documentation says 32) and
+> value length (4 MB, measured, where it says 2 MB; the kernel holds a row's fields to 2 MB). Both hosts bind every
+> JavaScript number as a REAL (`CAST(1 AS TEXT)` is `1.0` on each, measured on 30 Oct 2026); a bigint binds an
+> INTEGER on both. No reference trace is committed yet (`packages/ports/conformance/reference.json` in 33 §3), and the
+> kernel's own tests still run on `packages/kernel/test/sqlite.ts`, which counts three of the guard's checks, makes a
+> nested transaction a savepoint and turns `node:sqlite`'s foreign keys off, as the hosts do.
+> See [30-BLUEPRINT](30-BLUEPRINT.md) §13.
 
 ---
 
