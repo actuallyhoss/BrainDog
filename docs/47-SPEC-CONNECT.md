@@ -248,10 +248,14 @@ The URL is then re-parsed and its `origin` compared with `base` — the one chec
 
 ```ebnf
 path  = seg { "." seg } ;
-seg   = key { index } ;
-key   = [A-Za-z_] { [A-Za-z0-9_-] } ;
+seg   = key { index } | index { index } ;               (* a bare index reads a body or a row that is a list *)
+key   = ? any characters but "." "[" "]" and white space ? ;
 index = "[" integer "]" | "[-1]" | "[]" ;            (* [] = every element; legal at most once *)
 ```
+
+**As wide as install.** `declare` checks these paths with 43 §4.4's segment, and `readPath` reads every path that
+check accepts: until 30 Oct 2026 it took only `[A-Za-z_][A-Za-z0-9_-]*` keys and no bare index, so `page.from: '[0]'`
+over rows that are arrays installed and then read no cursor, which ends the run after one page.
 
 `readPath(json, path)` returns the value, `undefined` when any step is missing, and a list when `[]` was used.
 It is `@braindog/where`'s, not this package's: `extract` reads `read.rows` with the same grammar and the record

@@ -80,8 +80,24 @@ test('what is wrong with a path is a sentence, and a good one has none', () => {
   assert.equal(pathFault('data[]'), null);
   assert.equal(pathFault(''), 'an empty path');
   assert.match(pathFault('data[].rows[].id') ?? '', /fans out more than once/);
-  for (const bad of ['1data', '.data', 'data.', 'data..id', 'data[a]', 'data[', 'a b', 'data[1]x'])
+  for (const bad of ['.data', 'data.', 'data..id', 'data[a]', 'data[', 'a b', 'data[1]x', 'a]b'])
     assert.notEqual(pathFault(bad), null, bad);
+});
+
+/* WHAT INSTALL ACCEPTS IS READ HERE. `declare` takes a bare index and a key of anything but a dot, a bracket or a
+   space, and a path it installed that this could not read gave `undefined` on every page: `page.from: '[0]'`
+   read no cursor, which is the end of the run, so a provider with forty pages looked like one with one. */
+test('a bare index and any key install accepts are read, at the root and below it', () => {
+  const rows: Json = [['2026-01-13', 4], ['2026-01-14', 7]];
+  assert.deepEqual(readPath(rows, '[0]'), ['2026-01-13', 4]);
+  assert.equal(readPath(rows, '[-1][0]'), '2026-01-14');
+  assert.deepEqual(readPath(rows, '[].[1]'), [4, 7]);
+  assert.deepEqual(readPath(rows, '[]'), rows);
+  assert.equal(readPath({ data: [[1, 2]] }, 'data.[0].[1]'), 2);
+  for (const key of ['@id', '$ref', '1data', 'atom:entry', 'été', 'x-y_z'])
+    assert.equal(readPath({ [key]: 'ok' }, key), 'ok', key);
+  for (const good of ['[0]', '[-1].id', '[]', '@id', '1data', 'a.[0]'])
+    assert.equal(pathFault(good), null, good);
 });
 
 /* A PATH LINT REFUSED READS AS MISSING RATHER THAN THROWING. A connector must not die halfway
