@@ -16,7 +16,7 @@
 
 import { wrote, type Client } from '@braindog/client';
 
-import { versionKept } from '../data/local-tab.ts';
+import { versionHeard, versionKept } from '../data/local-tab.ts';
 import { onForgetToday } from './today-kept.ts';
 import { hearOffer } from '../board/offer-heard.ts';
 
@@ -106,10 +106,13 @@ async function earlyToday(base: string, shape: TodayShape, what: Record<string, 
     const res = (await early.at) as { ok?: unknown; body?: unknown } | null;
     if (res?.ok !== true || typeof res.body !== 'string') return null;
     const said = JSON.parse(res.body) as { ok?: unknown; value?: unknown } | null;
-    const value = said?.ok === true ? (said.value as (TodayAnswer & { asked?: unknown }) | null) : null;
+    const value = said?.ok === true ? (said.value as (TodayAnswer & { asked?: unknown; version?: unknown }) | null) : null;
     if (value === null || typeof value !== 'object' || typeof value.asked !== 'string') return null;
     if (value.asked !== (await digestOf(JSON.stringify([what, offer])))) return null;
-    const { asked: _asked, ...answer } = value;
+    const { asked: _asked, version, ...answer } = value;
+    /* ASKED BEFORE THE TAB HEARD THE RECORD MOVE: drawn, as Today as the record last drew it is, and asked again at once. */
+    const heard = versionHeard();
+    if (typeof version === 'number' && heard !== null && heard > version) answer.behind = true;
     return { ok: true, value: answer };
   } catch {
     return null;

@@ -12849,8 +12849,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const was = await lastToday(ctx, said.last as TodayShape);
         /* NOTHING ASKED ON A SCREEN LIKE THIS YET: answered as nothing, never refused, since the page asks it unseen. */
         if (was === undefined) return ok(null);
+        /* AND THE VERSION IT WAS ASKED AT, taken before it is drawn: a tab that has heard a newer one by the time it takes
+           this answer draws it as behind and asks again (`earlyToday`). */
+        const at = versionFor(ctx);
         const got = await todayFor({ ...was.what, ...(was.offer ? {} : { offer: false }) }, ctx);
-        return got.ok ? ok({ ...got.value, asked: was.asked }) : got;
+        return got.ok ? ok({ ...got.value, asked: was.asked, version: at }) : got;
       }
       if (said.shape !== undefined && !TODAY_SHAPES.includes(said.shape as never)) return no('VALUE_MALFORMED', 'shape is phone or wide, the screen Today is asked on.', { at: 'shape', allowed: [...TODAY_SHAPES] });
       const { shape, ...asked } = said;

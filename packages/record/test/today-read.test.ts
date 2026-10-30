@@ -171,7 +171,8 @@ test('LAST DRAWS TODAY WITH THE BODY THIS SCREEN ASKED LAST TIME, says what it d
   const digest = async (text: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const last = value<TodayAnswer>(await api.today({ last: 'phone' }, owner))!;
   assert.equal(last.asked, await digest(JSON.stringify([{ body: BODY }, false])));
-  const { asked: _asked, ...rest } = last;
+  assert.equal(typeof last.version, 'number');
+  const { asked: _asked, version: _version, ...rest } = last;
   assert.deepEqual(rest, drawn);
   /* A WIDER SCREEN HAS ITS OWN, and a fresh read is not remembered. */
   assert.equal(value<TodayAnswer | null>(await api.today({ last: 'wide' }, owner)), null);

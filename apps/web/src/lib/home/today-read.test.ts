@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { heardLocal } from '../data/local-tab.ts';
 import { forgetToday } from './today-kept.ts';
-import { askOffer, askToday, boardReadOf, cardsHeld, todayHeld, type TodayAnswer } from './today-read.ts';
+import { askOffer, askToday, boardReadOf, cardsHeld, todayHeld, wasBehind, type TodayAnswer } from './today-read.ts';
 import { onOfferHeard } from '../board/offer-heard.ts';
 
 const BASE = 'https://x.test/api';
@@ -185,4 +185,16 @@ test('A KEPT TODAY IS GUESSED BY ITS SLUG, and a record built before `shape` is 
   assert.equal((await askToday(old as never, 'https://old-shape.test', BODY, false, null, [], 'wide')).ok, true);
   await askToday(old as never, 'https://old-shape.test', BODY, false, null, [], 'wide');
   assert.deepEqual(asked.map((a) => 'shape' in a), [true, false, false]);
+});
+
+test('TODAY ASKED BESIDE BOOT BEFORE THE TAB HEARD THE RECORD MOVE is drawn as behind, so the screen asks again at once', async () => {
+  forgetToday();
+  heardLocal(12);
+  const c = said();
+  const value = { ...ANSWER, asked: await sha(JSON.stringify([{ body: BODY }, false])), version: 11 };
+  (globalThis as { __bdToday?: unknown }).__bdToday = { url: 'https://h.test/api/today', shape: 'phone', at: Promise.resolve({ ok: true, body: JSON.stringify({ ok: true, value }) }) };
+  assert.equal((await askToday(c as never, 'https://h.test', BODY, false, null, [], 'phone')).ok, true);
+  assert.deepEqual(c.args, []);
+  assert.equal(wasBehind('https://h.test'), true);
+  heardLocal(null);
 });

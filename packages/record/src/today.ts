@@ -133,6 +133,8 @@ export type TodayAnswer = {
    * builds digests the same, and asks as it always did otherwise.
    */
   asked?: string;
+  /** On an answer to `last`, the record's version for this reader as it was asked, so a tab that heard a newer one asks again. */
+  version?: number;
 };
 
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);
