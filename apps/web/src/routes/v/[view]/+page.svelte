@@ -365,7 +365,7 @@
         {#if refused.register}
           <Button href="/r/{refused.register}">{copy.openUnfiltered(REGISTERS[refused.register]?.name ?? refused.register)}</Button>
         {/if}
-        <Button href="/">{copy.home}</Button>
+        <Button href="/">{copy.today}</Button>
       {/snippet}
     </Empty>
   </div>
@@ -389,7 +389,7 @@
          list it will not describe, where there is no list of anything true to offer, so it offers
          none. -->
     <Empty kind="error" heading title={copy.noSuch('saved view', key)}>
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+      {#snippet actions()}<Button href="/">{copy.today}</Button>{/snippet}
     </Empty>
   </div>
 {:else}

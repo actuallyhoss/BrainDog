@@ -30,7 +30,7 @@ A list draws up to 2,000 rows at a time and says so when it stops there. The way
 
 Once a list is filtered or searched, **Save as a view** keeps what is on screen under a name. Views are listed under Views in the sidebar, and a view is the same list with the same rows, only fewer of them. Back to the saved view undoes any filter you add on top.
 
-**Put this on a page** does the same for a page: the filter becomes a block. See [Home and pages](/docs/use/home-and-pages).
+**Put this on a page** does the same for a page: the filter becomes a block. See [Today and pages](/docs/use/home-and-pages).
 
 ## Change rows
 

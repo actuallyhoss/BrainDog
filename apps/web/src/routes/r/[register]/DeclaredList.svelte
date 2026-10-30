@@ -189,7 +189,7 @@
   <!-- THE RECORD SAID NO TO THE LIST, AND ITS SENTENCE IS THE BODY, as on the screen as it was. -->
   <div class="declared-said">
     <Empty kind="error" heading title={copy.screenFailed} body={refused}>
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+      {#snippet actions()}<Button href="/">{copy.today}</Button>{/snippet}
     </Empty>
   </div>
 {:else if !decl || got === null || got.list !== register}

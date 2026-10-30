@@ -1,6 +1,6 @@
 # Resources
 
-Beside its tools, your BrainDog offers MCP resources: documents an agent reads by address, such as your Home page with every figure worked out, or the grammar a page declaration is written in. A client that reads resources learns more for fewer tokens.
+Beside its tools, your BrainDog offers MCP resources: documents an agent reads by address, such as your Today page with every figure worked out, or the grammar a page declaration is written in. A client that reads resources learns more for fewer tokens.
 
 ## What a resource is
 
@@ -61,7 +61,7 @@ braindog:inbox/{state} | The newest hundred in one state, or one arrival whole b
 
 The inbox states are `untriaged`, `review`, `skipped`, `matched`, `proposed`, `ignored` and `all`. `skipped` is where a skip rule that is too wide shows itself.
 
-`braindog:page/home` is the place to start when an agent needs to know what leads in this BrainDog: it answers the Home page with every block worked out.
+`braindog:page/home` is the place to start when an agent needs to know what leads in this BrainDog: it answers the Today page with every block worked out.
 
 ## Set up a machine
 

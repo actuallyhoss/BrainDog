@@ -36,7 +36,7 @@ They accept | New to BrainDog, they prove the address from a mail, then add a pa
 
 An invitation that has not been accepted is listed with the level it gives and the day it runs out. Make a **New link** if it ran out.
 
-A colleague who holds some lists and not all of BrainDog lands on a Home that names their lists. The rest belongs to its owner, who can see everything they add.
+A colleague who holds some lists and not all of BrainDog lands on a Today that names their lists. The rest belongs to its owner, who can see everything they add.
 
 ## Different on one list
 
