@@ -33,6 +33,8 @@ import { parseArgs } from 'node:util';
 import type { Automation, AutomationRow, AutomationRun, ScriptRow } from '@braindog/client';
 import { fixOf, type Result } from '@braindog/ports';
 
+import { RULE_NAMES } from '@braindog/seed/usecases/names';
+
 import { printable } from './clip.ts';
 import { refuse as refuseAll } from './json.ts';
 import { connect, type AgentIo } from './skills.ts';
@@ -71,9 +73,14 @@ const when = (iso: string): string => {
   return m === null || month === undefined ? iso : `${String(Number(m[2]))} ${month} ${m[3]!} UTC`;
 };
 
-/** An automation's name as a person reads it: its own when it has one, else its id in words ("budget-near" is "Budget near"). */
+/**
+ * An automation's name as a person reads it: its own when it has one, else the name the app gives it (`RULE_NAMES`,
+ * "Chase late payments" for `invoice-late`, audit 31 Oct g AG34), else its id in words.
+ */
 const titleOf = (a: Pick<AutomationRow, 'name' | 'rule'>): string => {
   if (a.name !== a.rule && a.name.trim() !== '') return a.name.trim().replace(/[.!?]$/u, '');
+  const known = RULE_NAMES[a.rule.replace(/^rule\./u, '')];
+  if (known !== undefined) return known;
   const words = a.rule.replace(/^rule\./u, '').replace(/[-_]+/gu, ' ').trim();
   return words === '' ? a.rule : words.charAt(0).toUpperCase() + words.slice(1);
 };
@@ -137,6 +144,27 @@ function month(m: AutomationRow['month']): string | null {
   return `This month ${plural(m.runs, 'run', 'runs')}${parts.length ? `: ${parts.join(', ')}` : ''}.`;
 }
 
+/** `3 Sep` from the record's instant: the day alone, as the app says when a rule last ran. */
+const dayOnly = (iso: string): string => {
+  const m = /^\d{4}-(\d\d)-(\d\d)/u.exec(iso);
+  const month = m === null ? undefined : MONTHS[Number(m[1]) - 1];
+  return m === null || month === undefined ? iso : `${String(Number(m[2]))} ${month}`;
+};
+
+/**
+ * HOW OFTEN IT RAN, AS THE APP SAYS IT (AG34): "Ran 2 times, last 3 Sep." from the record's count, which counts an
+ * inline rule's firings too, where "No run yet" read only the runs it keeps. A failed last run follows, as on the app's
+ * row. A host older than the count is said as before.
+ */
+function ranLine(a: AutomationRow): string {
+  if (typeof a.fired !== 'number') return a.last === null ? 'No run yet.' : `Last run ${a.last.state} at ${when(a.last.at)}${a.last.say ? `: ${closed(a.last.say)}` : '.'}`;
+  if (a.fired <= 0) return `Has not run yet.${a.why_idle ? ` ${closed(printable(a.why_idle))}` : ''}`;
+  const times = a.fired === 1 ? 'once' : a.fired >= 1000 ? 'over 1,000 times' : `${String(a.fired)} times`;
+  const at = typeof a.last_at === 'string' ? dayOnly(a.last_at) : null;
+  const ran = `Ran ${times}${at === null ? '' : a.fired === 1 ? `, on ${at}` : `, last ${at}`}.`;
+  return a.last?.state === 'failed' ? `${ran} Last run failed at ${when(a.last.at)}${a.last.say ? `: ${closed(a.last.say)}` : '.'}` : ran;
+}
+
 function listLine(a: AutomationRow, named: Named = asIs): string {
   const said = [
     /* THE NAME FIRST, AND THE ID AFTER IT AS THE WORD `show` AND `run` TAKE: the line opened on the id, whose `-` and `_`
@@ -146,7 +174,7 @@ function listLine(a: AutomationRow, named: Named = asIs): string {
     a.enabled ? null : 'Turned off.',
     origin(a),
     a.next === null ? null : `Next ${when(a.next)}.`,
-    a.last === null ? 'No run yet.' : `Last run ${a.last.state} at ${when(a.last.at)}${a.last.say ? `: ${closed(a.last.say)}` : '.'}`,
+    ranLine(a),
     a.open > 0 ? `${plural(a.open, 'run', 'runs')} open.` : null,
     month(a.month),
   ].filter((s): s is string => s !== null);
