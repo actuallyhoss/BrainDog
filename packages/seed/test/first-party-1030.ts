@@ -1,5 +1,5 @@
 /**
- * MONEY-CORE 3.30.0 (taken back from 3.32.2: the live check's patch, whose one page outside the round is `page.money-rules`, and file-paid, which adds `rule.payment-files-paid` and `script.file_paid` and changes `script.learn_category`), PEOPLE 4.0.0 AND PORTFOLIO 1.30.0 AS c78754bdd (master before round 1030) DECLARED THEM, as the parts this build changed or
+ * MONEY-CORE 3.30.0 (taken back from 3.32.2: the live check's patch, whose one page outside the round is `page.money-rules`, and file-paid, which adds `rule.payment-files-paid` and `script.file_paid` and changes `script.learn_category`; and round 1031, which adds the correction rules, `script.ledger_twice`, the figures by range, and changes the spending figures and pages), PEOPLE 4.0.0 AND PORTFOLIO 1.30.0 AS c78754bdd (master before round 1030) DECLARED THEM, as the parts this build changed or
  * added, so every rebuild of an older version starts from what a record held before the round (`before1030`).
  *
  * GENERATED, NOT HAND-WRITTEN, as `founder-shipped.ts` is: at that commit, `firstPartyDocument(id, { seeds: [] })` for each
@@ -16,7 +16,7 @@ type Before = { version: string; now: string; added: readonly string[]; was: Rea
 const BEFORE_1030: Readonly<Record<string, Before>> = {
  "money-core": {
   "version": "3.30.0",
-  "now": "3.32.2",
+  "now": "3.33.0",
   "added": [
    "metric.balance-by-account#0",
    "metric.accounts-open#0",
@@ -51,7 +51,23 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
    "rule.category-stays-yes#0",
    "script.category_stays#0",
    "rule.payment-files-paid#0",
-   "script.file_paid#0"
+   "script.file_paid#0",
+   "metric.received-last#0",
+   "metric.spent-last#0",
+   "metric.left-last#0",
+   "metric.received-three#0",
+   "metric.spent-three#0",
+   "metric.left-three#0",
+   "metric.received-year#0",
+   "metric.spent-year#0",
+   "metric.left-year#0",
+   "metric.received-all#0",
+   "metric.spent-all#0",
+   "metric.left-all#0",
+   "rule.category-correction-asks#0",
+   "rule.category-correction-yes#0",
+   "script.category_correction#0",
+   "script.ledger_twice#0"
   ],
   "was": {
    "script.learn_category#0": {
@@ -3341,6 +3357,1694 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
      "wall_ms": 30000
     },
     "source": "function budgetWarnings(categories, entries, month) {\n  const spent = new Map();\n  for (const e of entries) {\n    const by = e.fields.category;\n    const amount = e.fields.amount;\n    if (typeof by !== 'string' || by === '' || !amount || typeof amount.amount !== 'number' || typeof amount.currency !== 'string') continue;\n    const per = spent.get(by) ?? new Map();\n    per.set(amount.currency, (per.get(amount.currency) ?? 0) + amount.amount);\n    spent.set(by, per);\n  }\n  const writes = [];\n  for (const c of categories) {\n    const budget = c.fields.budget;\n    if (!budget || typeof budget.amount !== 'number' || !(budget.amount > 0) || typeof budget.currency !== 'string') continue;\n    const used = spent.get(c.id)?.get(budget.currency) ?? 0;\n    const alert = typeof c.fields.budget_alert === 'number' && c.fields.budget_alert >= 1 && c.fields.budget_alert <= 100 ? c.fields.budget_alert : null;\n    const level = used > budget.amount ? 'over' : alert !== null && used * 100 >= budget.amount * alert ? 'near' : null;\n    if (level === null) continue;\n    const told = c.fields.warned_month === month ? c.fields.budget_warned : null;\n    if (told === level || told === 'over') continue;\n    writes.push({ id: c.spoken, version: c.version, fields: { budget_warned: level, warned_month: month } });\n  }\n  return writes;\n}\nexport default async function run(ctx) {\n  const today = typeof ctx.today === 'function' ? ctx.today() : String(ctx.now()).slice(0, 10);\n  const [y, m] = today.split('-').map(Number);\n  const month = today.slice(0, 7);\n  const from = `${month}-01`;\n  const to = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;\n\n  const PAGE = 50;\n  const every = async (list, tests) => {\n    const rows = [];\n    let below = null;\n    for (;;) {\n      const all = [...tests, ...(below === null ? [] : [{ field: 'seq', lt: below }])];\n      const page = await ctx.record.list(list, { all });\n      for (const r of page) rows.push({ id: r.id, spoken: `${list}#${r.seq}`, version: r.version, fields: r.fields });\n      if (page.length < PAGE) return rows;\n      below = Math.min(...page.map((r) => r.seq));\n    }\n  };\n\n  const categories = await every('categories', [\n    { field: 'state', is: 'live' },\n    { field: 'budget', present: true },\n  ]);\n  if (categories.length === 0) {\n    ctx.log('No category has a budget, so there is nothing to warn about.');\n    return null;\n  }\n  const entries = await every('transactions', [\n    { field: 'state', is: 'cleared' },\n    { field: 'transfer', is: false },\n    { field: 'direction', is: 'out' },\n    { field: 'on', gte: from },\n    { field: 'on', lt: to },\n  ]);\n  const writes = budgetWarnings(categories, entries, month);\n  for (const w of writes) ctx.update(w.id, w.fields, w.version);\n  ctx.log(writes.length === 0 ? 'No budget passed its warning this month since the last run.' : `${writes.length} budget warning(s) marked for ${month}.`);\n  return { marked: writes.length };\n}"
+   },
+   "page.money-book#0": {
+    "page": "money-book",
+    "title": "{{name}}",
+    "for": {
+     "register": "books"
+    },
+    "nav": {
+     "section": "Money",
+     "order": 20
+    },
+    "icon": "book",
+    "requires": [
+     "register.books",
+     "register.accounts",
+     "register.obligations",
+     "register.transactions",
+     "register.recurring",
+     "register.installments"
+    ],
+    "pack": "money-core",
+    "blocks": [
+     {
+      "kind": "note",
+      "lead": true,
+      "tone": "warn",
+      "span": 12,
+      "when": {
+       "metric": "categories-against-direction",
+       "is": 1
+      },
+      "body": "1 category is marked the other way from how the Ledger books it. [See Categories](/r/categories)."
+     },
+     {
+      "kind": "note",
+      "lead": true,
+      "tone": "warn",
+      "span": 12,
+      "when": {
+       "metric": "categories-against-direction",
+       "gt": 1
+      },
+      "body": "{{categories-against-direction}} categories are marked the other way from how the Ledger books them. [See Categories](/r/categories)."
+     },
+     {
+      "kind": "stat",
+      "lead": true,
+      "heading": "What you have",
+      "icon": "wallet",
+      "span": 4,
+      "cells": [
+       {
+        "metric": "book-cash:{{name}}",
+        "label": "Cash now"
+       }
+      ]
+     },
+     {
+      "kind": "forecast",
+      "heading": "Cash ahead",
+      "icon": "chart-line",
+      "span": 8,
+      "source": "forecast.runway",
+      "opening": {
+       "metric": "book-cash:{{name}}"
+      },
+      "from": [
+       {
+        "register": "obligations",
+        "on": "due",
+        "amount": "amount",
+        "where": "state is open or part, repeats is not monthly or quarterly or yearly, book is {{name}}",
+        "incoming": {
+         "field": "direction",
+         "is": "owed_to_me"
+        }
+       },
+       {
+        "register": "recurring",
+        "on": "next_due",
+        "amount": "amount",
+        "where": "state is live, book is {{name}}",
+        "incoming": {
+         "field": "direction",
+         "is": "in"
+        },
+        "every": {
+         "field": "every",
+         "months": {
+          "monthly": 1,
+          "quarterly": 3,
+          "yearly": 12
+         },
+         "weeks": {
+          "weekly": 1,
+          "fortnightly": 2
+         },
+         "twice": {
+          "twice_monthly": [
+           1,
+           15
+          ]
+         }
+        },
+        "ends": "ends",
+        "days": "day_of_month",
+        "weekend": "weekend"
+       },
+       {
+        "register": "installments",
+        "on": "due",
+        "amount": "amount",
+        "where": "state is open, book is {{name}}",
+        "incoming": {
+         "field": "direction",
+         "is": "in"
+        },
+        "group": "plan"
+       },
+       {
+        "register": "accounts",
+        "on": "arrives",
+        "amount": "balance",
+        "where": "liquid is false, arrives is set, kind is bank, book is {{name}}",
+        "incoming": {
+         "field": "kind",
+         "is": "bank"
+        }
+       }
+      ],
+      "horizon": 84,
+      "horizons": [
+       84,
+       180,
+       365,
+       730,
+       1825,
+       "last"
+      ],
+      "axis": "fit",
+      "knobs": [
+       "horizon",
+       "late",
+       "spend",
+       "count",
+       "grow",
+       "drift"
+      ],
+      "late": "days-late-in",
+      "under": 30,
+      "empty": "Nothing dated ahead yet."
+     },
+     {
+      "kind": "stat",
+      "heading": "This month",
+      "icon": "coins",
+      "span": 12,
+      "cells": [
+       {
+        "metric": "book-in-month:{{name}}",
+        "label": "In this month"
+       },
+       {
+        "metric": "book-out-month:{{name}}",
+        "label": "Out this month"
+       },
+       {
+        "metric": "book-net-month:{{name}}",
+        "label": "Net"
+       }
+      ],
+      "when": {
+       "metric": "book-net-month:{{name}}",
+       "empty": false
+      }
+     },
+     {
+      "kind": "stat",
+      "heading": "What is due",
+      "icon": "scale",
+      "span": 12,
+      "cells": [
+       {
+        "metric": "book-owed-to:{{name}}",
+        "label": "Due to come in"
+       },
+       {
+        "metric": "book-owed-by:{{name}}",
+        "label": "Due to go out"
+       },
+       {
+        "metric": "book-lasts-until:{{name}}",
+        "label": "Money lasts until"
+       }
+      ]
+     },
+     {
+      "kind": "note",
+      "span": 12,
+      "when": {
+       "metric": "book-lasts-until:{{name}}",
+       "beyond": true
+      },
+      "body": "Lasts the year on what is due."
+     },
+     {
+      "kind": "series",
+      "heading": "In and out, by month",
+      "icon": "chart-column",
+      "span": 12,
+      "series": [
+       {
+        "metric": "book-in-by-month:{{name}}",
+        "label": "Money in"
+       },
+       {
+        "metric": "book-out-by-month:{{name}}",
+        "label": "Money out",
+        "dir": "out"
+       }
+      ],
+      "back": 12,
+      "net": true,
+      "when": {
+       "metric": "book-net-by-month:{{name}}",
+       "empty": false
+      },
+      "empty": "Nothing moved in {{name}}."
+     },
+     {
+      "kind": "cards",
+      "heading": "Accounts",
+      "icon": "landmark",
+      "span": 8,
+      "source": "register.accounts",
+      "where": "book is {{name}}, state is not closed",
+      "columns": [
+       {
+        "field": "name",
+        "as": "title"
+       },
+       {
+        "field": "balance",
+        "as": "figure"
+       },
+       {
+        "field": "kind",
+        "label": "Type",
+        "as": "fact"
+       },
+       {
+        "field": "as_of",
+        "label": "Last confirmed",
+        "as": "when"
+       }
+      ],
+      "order": [
+       {
+        "field": "seq",
+        "dir": "asc"
+       }
+      ],
+      "stale": {
+       "field": "as_of",
+       "after": "7d",
+       "figure": "account-ages"
+      },
+      "empty": "No accounts yet."
+     },
+     {
+      "kind": "capture",
+      "heading": "Add an account",
+      "icon": "plus",
+      "span": 4,
+      "register": "accounts",
+      "where": "book is {{spoken}}"
+     },
+     {
+      "kind": "section",
+      "heading": "Coming and going",
+      "icon": "calendar",
+      "span": 12,
+      "fold": true
+     },
+     {
+      "kind": "calendar",
+      "heading": "Due in the next 30 days",
+      "icon": "calendar",
+      "span": 8,
+      "source": "register.obligations",
+      "where": "state is open or part, due after yesterday, due before +31d, book is {{name}}",
+      "columns": [
+       {
+        "field": "what"
+       },
+       {
+        "field": "due"
+       }
+      ],
+      "back": 0,
+      "ahead": 1,
+      "empty": "Nothing due in 30 days."
+     },
+     {
+      "kind": "bridge",
+      "heading": "The next 30 days",
+      "icon": "scale",
+      "span": 4,
+      "source": "forecast.runway",
+      "opening": {
+       "metric": "book-cash:{{name}}"
+      },
+      "from": [
+       {
+        "register": "obligations",
+        "on": "due",
+        "amount": "amount",
+        "where": "state is open or part, repeats is not monthly or quarterly or yearly, book is {{name}}",
+        "incoming": {
+         "field": "direction",
+         "is": "owed_to_me"
+        }
+       },
+       {
+        "register": "recurring",
+        "on": "next_due",
+        "amount": "amount",
+        "where": "state is live, book is {{name}}",
+        "incoming": {
+         "field": "direction",
+         "is": "in"
+        },
+        "every": {
+         "field": "every",
+         "months": {
+          "monthly": 1,
+          "quarterly": 3,
+          "yearly": 12
+         },
+         "weeks": {
+          "weekly": 1,
+          "fortnightly": 2
+         },
+         "twice": {
+          "twice_monthly": [
+           1,
+           15
+          ]
+         }
+        },
+        "ends": "ends",
+        "days": "day_of_month",
+        "weekend": "weekend"
+       },
+       {
+        "register": "installments",
+        "on": "due",
+        "amount": "amount",
+        "where": "state is open, book is {{name}}",
+        "incoming": {
+         "field": "direction",
+         "is": "in"
+        },
+        "group": "plan"
+       },
+       {
+        "register": "accounts",
+        "on": "arrives",
+        "amount": "balance",
+        "where": "liquid is false, arrives is set, kind is bank, book is {{name}}",
+        "incoming": {
+         "field": "kind",
+         "is": "bank"
+        }
+       }
+      ],
+      "horizon": 30,
+      "empty": "Nothing in the next 30 days."
+     },
+     {
+      "kind": "split",
+      "heading": "Where this month's money went",
+      "donut": true,
+      "icon": "chart-pie",
+      "span": 12,
+      "source": "register.transactions",
+      "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom, book is {{name}}",
+      "columns": [
+       {
+        "field": "category"
+       },
+       {
+        "field": "amount"
+       }
+      ],
+      "limit": 6,
+      "unset": "Uncategorised",
+      "when": {
+       "metric": "book-spent-month:{{name}}",
+       "gt": 0
+      }
+     },
+     {
+      "kind": "timeline",
+      "heading": "What moved",
+      "icon": "receipt",
+      "span": 12,
+      "source": "register.transactions",
+      "where": "state is not void, book is {{name}}",
+      "columns": [
+       {
+        "field": "on"
+       },
+       {
+        "field": "what"
+       },
+       {
+        "field": "amount",
+        "sign": {
+         "field": "direction",
+         "minus": "out"
+        }
+       }
+      ],
+      "order": [
+       {
+        "field": "on",
+        "dir": "desc"
+       }
+      ],
+      "limit": 12,
+      "empty": "Nothing has moved yet."
+     }
+    ]
+   },
+   "page.money-forecast#0": {
+    "page": "money-forecast",
+    "title": "Forecast",
+    "nav": {
+     "section": "Money",
+     "order": 15
+    },
+    "icon": "chart-line",
+    "requires": [
+     "register.accounts",
+     "register.obligations",
+     "register.transactions",
+     "register.recurring",
+     "register.installments"
+    ],
+    "pack": "money-core",
+    "blocks": [
+     {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "body": "With nothing coming in, cash lasts to {{lasts-no-income.on}}."
+     },
+     {
+      "kind": "forecast",
+      "heading": "Cash ahead",
+      "icon": "chart-line",
+      "span": 12,
+      "source": "forecast.runway",
+      "opening": {
+       "metric": "cash-now"
+      },
+      "recorded": "cash-now",
+      "from": [
+       {
+        "register": "obligations",
+        "on": "due",
+        "amount": "amount",
+        "where": "state is open or part, repeats is not monthly or quarterly or yearly",
+        "incoming": {
+         "field": "direction",
+         "is": "owed_to_me"
+        }
+       },
+       {
+        "register": "recurring",
+        "on": "next_due",
+        "amount": "amount",
+        "where": "state is live",
+        "incoming": {
+         "field": "direction",
+         "is": "in"
+        },
+        "every": {
+         "field": "every",
+         "months": {
+          "monthly": 1,
+          "quarterly": 3,
+          "yearly": 12
+         },
+         "weeks": {
+          "weekly": 1,
+          "fortnightly": 2
+         },
+         "twice": {
+          "twice_monthly": [
+           1,
+           15
+          ]
+         }
+        },
+        "ends": "ends",
+        "days": "day_of_month",
+        "weekend": "weekend"
+       },
+       {
+        "register": "installments",
+        "on": "due",
+        "amount": "amount",
+        "where": "state is open",
+        "incoming": {
+         "field": "direction",
+         "is": "in"
+        },
+        "group": "plan"
+       },
+       {
+        "register": "accounts",
+        "on": "arrives",
+        "amount": "balance",
+        "where": "liquid is false, arrives is set, kind is bank",
+        "incoming": {
+         "field": "kind",
+         "is": "bank"
+        }
+       },
+       {
+        "register": "services",
+        "on": "renews",
+        "amount": "cost",
+        "where": "state is not cancelled",
+        "every": {
+         "field": "cycle",
+         "months": {
+          "monthly": 1,
+          "yearly": 12,
+          "two_yearly": 24
+         }
+        }
+       },
+       {
+        "register": "transactions",
+        "on": "on",
+        "amount": "amount",
+        "where": "state is cleared, transfer is false, stays is not true",
+        "incoming": {
+         "field": "direction",
+         "is": "in"
+        },
+        "everyday": {
+         "months": 3
+        }
+       }
+      ],
+      "horizon": 91,
+      "horizons": [
+       91,
+       183,
+       365,
+       "last"
+      ],
+      "axis": "fit",
+      "knobs": [
+       "horizon",
+       "late",
+       "spend",
+       "count",
+       "grow",
+       "drift",
+       "sell"
+      ],
+      "late": "days-late-in",
+      "under": 30,
+      "when": {
+       "metric": "cash-accounts",
+       "gt": 0
+      },
+      "empty": "Nothing is dated ahead yet."
+     },
+     {
+      "kind": "series",
+      "heading": "In and out, by month ahead",
+      "icon": "chart-column",
+      "span": 12,
+      "series": [
+       {
+        "metric": "in-by-month",
+        "then": "in-ahead-by-month",
+        "label": "Money in"
+       },
+       {
+        "metric": "out-by-month",
+        "then": "out-ahead-by-month",
+        "label": "Money out",
+        "dir": "out"
+       }
+      ],
+      "back": 1,
+      "ahead": 3,
+      "net": true,
+      "when": {
+       "metric": "cash-accounts",
+       "gt": 0
+      },
+      "empty": "Nothing dated ahead yet."
+     },
+     {
+      "kind": "table",
+      "heading": "Instalments, the year ahead",
+      "icon": "credit-card",
+      "span": 12,
+      "source": "register.installments",
+      "where": "state is open, due before +366d",
+      "columns": [
+       {
+        "field": "what",
+        "label": "Description",
+        "width": "minmax(14ch,1fr)"
+       },
+       {
+        "field": "due",
+        "label": "Due",
+        "width": "12ch",
+        "align": "end"
+       },
+       {
+        "field": "amount",
+        "label": "Amount",
+        "width": "15ch",
+        "align": "end",
+        "sign": {
+         "field": "direction",
+         "minus": "out"
+        }
+       }
+      ],
+      "order": [
+       {
+        "field": "due",
+        "dir": "asc"
+       }
+      ],
+      "limit": 12,
+      "when": {
+       "metric": "installments-left",
+       "gt": 0
+      },
+      "empty": "No instalments due this year."
+     },
+     {
+      "kind": "table",
+      "heading": "What repeats",
+      "icon": "refresh",
+      "span": 12,
+      "source": "register.recurring",
+      "where": "state is live",
+      "columns": [
+       {
+        "field": "what",
+        "label": "Description",
+        "width": "minmax(14ch,1fr)"
+       },
+       {
+        "field": "every",
+        "label": "Every",
+        "width": "12ch"
+       },
+       {
+        "field": "next_due",
+        "label": "Next",
+        "width": "12ch",
+        "align": "end"
+       },
+       {
+        "field": "amount",
+        "label": "Amount",
+        "width": "15ch",
+        "align": "end",
+        "sign": {
+         "field": "direction",
+         "minus": "out"
+        }
+       }
+      ],
+      "order": [
+       {
+        "field": "next_due",
+        "dir": "asc"
+       }
+      ],
+      "limit": 12,
+      "empty": "Nothing repeats yet."
+     },
+     {
+      "kind": "bar",
+      "heading": "Left to pay, by plan",
+      "icon": "chart-bar",
+      "span": 12,
+      "source": "metric.installments-left-by-plan",
+      "when": {
+       "metric": "installments-left",
+       "gt": 0
+      },
+      "empty": "Nothing is being paid in parts."
+     }
+    ]
+   },
+   "metric.book-spent-month#0": {
+    "metric": "book-spent-month",
+    "name": "Paid out of one book this month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom, book is {{it}}",
+    "value": {
+     "count": "id"
+    },
+    "format": "int",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.runway-days#0": {
+    "metric": "runway-days",
+    "name": "Days the money lasts",
+    "pack": "money-core",
+    "source": "forecast.runway",
+    "legs": [
+     {
+      "register": "obligations",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open or part, repeats is not monthly or quarterly or yearly",
+      "incoming": {
+       "field": "direction",
+       "is": "owed_to_me"
+      }
+     },
+     {
+      "register": "recurring",
+      "on": "next_due",
+      "amount": "amount",
+      "where": "state is live",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "every": {
+       "field": "every",
+       "months": {
+        "monthly": 1,
+        "quarterly": 3,
+        "yearly": 12
+       },
+       "weeks": {
+        "weekly": 1,
+        "fortnightly": 2
+       },
+       "twice": {
+        "twice_monthly": [
+         1,
+         15
+        ]
+       }
+      },
+      "ends": "ends",
+      "days": "day_of_month",
+      "weekend": "weekend"
+     },
+     {
+      "register": "installments",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "group": "plan"
+     },
+     {
+      "register": "accounts",
+      "on": "arrives",
+      "amount": "balance",
+      "where": "liquid is false, arrives is set, kind is bank",
+      "incoming": {
+       "field": "kind",
+       "is": "bank"
+      }
+     },
+     {
+      "register": "transactions",
+      "on": "on",
+      "amount": "amount",
+      "where": "state is cleared, transfer is false, stays is not true",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "everyday": {
+       "months": 3
+      }
+     }
+    ],
+    "opening": {
+     "metric": "cash-now"
+    },
+    "value": {
+     "walk": "days_to_zero",
+     "within": "365d"
+    },
+    "format": "days",
+    "target": {
+     "gte": 365
+    },
+    "window": "30d",
+    "compare": "none",
+    "home": 2,
+    "snapshot": {
+     "grain": "day",
+     "into": "series.runway-days"
+    }
+   },
+   "metric.lasts-no-income#0": {
+    "metric": "lasts-no-income",
+    "name": "Days the money lasts with no income",
+    "pack": "money-core",
+    "source": "forecast.runway",
+    "legs": [
+     {
+      "register": "obligations",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open or part, repeats is not monthly or quarterly or yearly, direction is owed by me",
+      "incoming": {
+       "field": "direction",
+       "is": "owed_to_me"
+      }
+     },
+     {
+      "register": "recurring",
+      "on": "next_due",
+      "amount": "amount",
+      "where": "state is live, direction is out",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "every": {
+       "field": "every",
+       "months": {
+        "monthly": 1,
+        "quarterly": 3,
+        "yearly": 12
+       },
+       "weeks": {
+        "weekly": 1,
+        "fortnightly": 2
+       },
+       "twice": {
+        "twice_monthly": [
+         1,
+         15
+        ]
+       }
+      },
+      "ends": "ends",
+      "days": "day_of_month",
+      "weekend": "weekend"
+     },
+     {
+      "register": "installments",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open, direction is out",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "group": "plan"
+     },
+     {
+      "register": "transactions",
+      "on": "on",
+      "amount": "amount",
+      "where": "state is cleared, transfer is false, stays is not true",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "everyday": {
+       "months": 3
+      }
+     }
+    ],
+    "opening": {
+     "metric": "cash-now"
+    },
+    "value": {
+     "walk": "days_to_zero",
+     "within": "1825d"
+    },
+    "format": "days",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.runs-out-on#0": {
+    "metric": "runs-out-on",
+    "name": "The day the money runs out",
+    "pack": "money-core",
+    "source": "forecast.runway",
+    "legs": [
+     {
+      "register": "obligations",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open or part, repeats is not monthly or quarterly or yearly",
+      "incoming": {
+       "field": "direction",
+       "is": "owed_to_me"
+      }
+     },
+     {
+      "register": "recurring",
+      "on": "next_due",
+      "amount": "amount",
+      "where": "state is live",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "every": {
+       "field": "every",
+       "months": {
+        "monthly": 1,
+        "quarterly": 3,
+        "yearly": 12
+       },
+       "weeks": {
+        "weekly": 1,
+        "fortnightly": 2
+       },
+       "twice": {
+        "twice_monthly": [
+         1,
+         15
+        ]
+       }
+      },
+      "ends": "ends",
+      "days": "day_of_month",
+      "weekend": "weekend"
+     },
+     {
+      "register": "installments",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "group": "plan"
+     },
+     {
+      "register": "accounts",
+      "on": "arrives",
+      "amount": "balance",
+      "where": "liquid is false, arrives is set, kind is bank",
+      "incoming": {
+       "field": "kind",
+       "is": "bank"
+      }
+     },
+     {
+      "register": "transactions",
+      "on": "on",
+      "amount": "amount",
+      "where": "state is cleared, transfer is false, stays is not true",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "everyday": {
+       "months": 3
+      }
+     }
+    ],
+    "opening": {
+     "metric": "cash-now"
+    },
+    "value": {
+     "walk": "zero_on",
+     "within": "365d"
+    },
+    "format": "day",
+    "target": {
+     "gte": 47482
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.in-ahead-by-month#0": {
+    "metric": "in-ahead-by-month",
+    "name": "Coming in, by month ahead",
+    "pack": "money-core",
+    "source": "forecast.runway",
+    "legs": [
+     {
+      "register": "obligations",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open or part, repeats is not monthly or quarterly or yearly",
+      "incoming": {
+       "field": "direction",
+       "is": "owed_to_me"
+      }
+     },
+     {
+      "register": "recurring",
+      "on": "next_due",
+      "amount": "amount",
+      "where": "state is live",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "every": {
+       "field": "every",
+       "months": {
+        "monthly": 1,
+        "quarterly": 3,
+        "yearly": 12
+       },
+       "weeks": {
+        "weekly": 1,
+        "fortnightly": 2
+       },
+       "twice": {
+        "twice_monthly": [
+         1,
+         15
+        ]
+       }
+      },
+      "ends": "ends",
+      "days": "day_of_month",
+      "weekend": "weekend"
+     },
+     {
+      "register": "installments",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "group": "plan"
+     },
+     {
+      "register": "accounts",
+      "on": "arrives",
+      "amount": "balance",
+      "where": "liquid is false, arrives is set, kind is bank",
+      "incoming": {
+       "field": "kind",
+       "is": "bank"
+      }
+     },
+     {
+      "register": "transactions",
+      "on": "on",
+      "amount": "amount",
+      "where": "state is cleared, transfer is false, stays is not true",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "everyday": {
+       "months": 3
+      }
+     }
+    ],
+    "value": {
+     "walk": "in",
+     "within": "125d"
+    },
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.out-ahead-by-month#0": {
+    "metric": "out-ahead-by-month",
+    "name": "Going out, by month ahead",
+    "pack": "money-core",
+    "source": "forecast.runway",
+    "legs": [
+     {
+      "register": "obligations",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open or part, repeats is not monthly or quarterly or yearly",
+      "incoming": {
+       "field": "direction",
+       "is": "owed_to_me"
+      }
+     },
+     {
+      "register": "recurring",
+      "on": "next_due",
+      "amount": "amount",
+      "where": "state is live",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "every": {
+       "field": "every",
+       "months": {
+        "monthly": 1,
+        "quarterly": 3,
+        "yearly": 12
+       },
+       "weeks": {
+        "weekly": 1,
+        "fortnightly": 2
+       },
+       "twice": {
+        "twice_monthly": [
+         1,
+         15
+        ]
+       }
+      },
+      "ends": "ends",
+      "days": "day_of_month",
+      "weekend": "weekend"
+     },
+     {
+      "register": "installments",
+      "on": "due",
+      "amount": "amount",
+      "where": "state is open",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "group": "plan"
+     },
+     {
+      "register": "accounts",
+      "on": "arrives",
+      "amount": "balance",
+      "where": "liquid is false, arrives is set, kind is bank",
+      "incoming": {
+       "field": "kind",
+       "is": "bank"
+      }
+     },
+     {
+      "register": "transactions",
+      "on": "on",
+      "amount": "amount",
+      "where": "state is cleared, transfer is false, stays is not true",
+      "incoming": {
+       "field": "direction",
+       "is": "in"
+      },
+      "everyday": {
+       "months": 3
+      }
+     }
+    ],
+    "value": {
+     "walk": "out",
+     "within": "125d"
+    },
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.in-by-month#0": {
+    "metric": "in-by-month",
+    "name": "Money in, by month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is in, on after -13m",
+    "value": {
+     "sum": "amount"
+    },
+    "group_by": "on",
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.out-by-month#0": {
+    "metric": "out-by-month",
+    "name": "Money out, by month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on after -13m",
+    "value": {
+     "sum": "amount"
+    },
+    "group_by": "on",
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.net-by-month#0": {
+    "metric": "net-by-month",
+    "name": "Left over, by month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -13m",
+    "value": {
+     "sum": {
+      "product": [
+       "amount",
+       {
+        "lookup": "sign",
+        "by": "direction"
+       }
+      ]
+     }
+    },
+    "lookups": {
+     "sign": {
+      "in": 1,
+      "out": -1
+     }
+    },
+    "group_by": "on",
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.spent-by-category-month#0": {
+    "metric": "spent-by-category-month",
+    "name": "Spent this month, by category",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom",
+    "value": {
+     "sum": "amount"
+    },
+    "group_by": "category",
+    "format": "money",
+    "target": {
+     "setting": "most_spent_on_one_category"
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.uncategorised-share-30d#0": {
+    "metric": "uncategorised-share-30d",
+    "name": "Out with no category, 30 days",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on after -30d",
+    "value": {
+     "ratio": {
+      "of": {
+       "empty": "category"
+      },
+      "per": {
+       "count": "id"
+      }
+     }
+    },
+    "format": "pct",
+    "target": {
+     "lte": 0.2
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.spent-last-month#0": {
+    "metric": "spent-last-month",
+    "name": "Spent last month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom-1m, on before bom",
+    "value": {
+     "sum": "amount"
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.spent-by-category-last-month#0": {
+    "metric": "spent-by-category-last-month",
+    "name": "Spent last month, by category",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom-1m, on before bom",
+    "value": {
+     "sum": "amount"
+    },
+    "group_by": "category",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.spent-by-category-to-date-last-month#0": {
+    "metric": "spent-by-category-to-date-last-month",
+    "name": "Spent last month to this day, by category",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom-1m, on at most -1m",
+    "value": {
+     "sum": "amount"
+    },
+    "group_by": "category",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.spent-vs-last-month#0": {
+    "metric": "spent-vs-last-month",
+    "name": "Spent this month against last, by category",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom",
+    "value": {
+     "diff": {
+      "of": {
+       "sum": "amount"
+      },
+      "per": {
+       "sum": "amount"
+      },
+      "before": "month_ago"
+     }
+    },
+    "group_by": "category",
+    "format": "money",
+    "target": {
+     "lte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.budget-passed-on#0": {
+    "metric": "budget-passed-on",
+    "name": "The day a category passed its budget",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, on at least bom, category is {{it}}",
+    "value": {
+     "running": {
+      "sum": "amount",
+      "order": "on",
+      "until": {
+       "gte": {
+        "field": "budget",
+        "of": "category"
+       }
+      }
+     }
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.book-in-month#0": {
+    "metric": "book-in-month",
+    "name": "Money into one book this month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on at least bom, direction is in, book is {{it}}",
+    "value": {
+     "sum": "amount"
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.book-out-month#0": {
+    "metric": "book-out-month",
+    "name": "Money out of one book this month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on at least bom, direction is out, book is {{it}}",
+    "value": {
+     "sum": "amount"
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.book-net-month#0": {
+    "metric": "book-net-month",
+    "name": "Left over in one book this month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on at least bom, book is {{it}}",
+    "value": {
+     "sum": {
+      "product": [
+       "amount",
+       {
+        "lookup": "sign",
+        "by": "direction"
+       }
+      ]
+     }
+    },
+    "lookups": {
+     "sign": {
+      "in": 1,
+      "out": -1
+     }
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.book-in-by-month#0": {
+    "metric": "book-in-by-month",
+    "name": "Money into one book, by month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -13m, direction is in, book is {{it}}",
+    "value": {
+     "sum": "amount"
+    },
+    "group_by": "on",
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.book-out-by-month#0": {
+    "metric": "book-out-by-month",
+    "name": "Money out of one book, by month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -13m, direction is out, book is {{it}}",
+    "value": {
+     "sum": "amount"
+    },
+    "group_by": "on",
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.book-net-by-month#0": {
+    "metric": "book-net-by-month",
+    "name": "Left over in one book, by month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -13m, book is {{it}}",
+    "value": {
+     "sum": {
+      "product": [
+       "amount",
+       {
+        "lookup": "sign",
+        "by": "direction"
+       }
+      ]
+     }
+    },
+    "lookups": {
+     "sign": {
+      "in": 1,
+      "out": -1
+     }
+    },
+    "group_by": "on",
+    "bucket": "month",
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.unfiled-spent-month#0": {
+    "metric": "unfiled-spent-month",
+    "name": "Spent this month with no category",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, category is empty, on at least bom",
+    "value": {
+     "sum": "amount"
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.unfiled-month#0": {
+    "metric": "unfiled-month",
+    "name": "Entries this month with no category",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is out, category is empty, parts is empty, on at least bom",
+    "value": {
+     "count": "id"
+    },
+    "format": "int",
+    "target": {
+     "lte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.payees-paid-90d#0": {
+    "metric": "payees-paid-90d",
+    "name": "Payees paid, 90 days",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -90d, on before +1d, direction is out, payee is set",
+    "value": {
+     "distinct": "payee"
+    },
+    "format": "int",
+    "target": {
+     "gte": 0
+    },
+    "window": "90d",
+    "compare": "none"
+   },
+   "metric.paid-times-by-payee-90d#0": {
+    "metric": "paid-times-by-payee-90d",
+    "name": "Times paid, by payee, 90 days",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -90d, on before +1d, direction is out",
+    "value": {
+     "count": "id"
+    },
+    "group_by": "payee",
+    "format": "int",
+    "target": {
+     "gte": 0
+    },
+    "window": "90d",
+    "compare": "none"
+   },
+   "metric.paid-last-by-payee#0": {
+    "metric": "paid-last-by-payee",
+    "name": "Last paid, by payee",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -90d, on before +1d, direction is out",
+    "value": {
+     "max": "on"
+    },
+    "group_by": "payee",
+    "format": "day",
+    "target": {
+     "gte": 0
+    },
+    "window": "90d",
+    "compare": "none"
+   },
+   "metric.kept-share-90d#0": {
+    "metric": "kept-share-90d",
+    "name": "Kept of money in, 90 days",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on after -90d, on before +1d",
+    "value": {
+     "ratio": {
+      "of": {
+       "sum": {
+        "product": [
+         "amount",
+         {
+          "lookup": "sign",
+          "by": "direction"
+         }
+        ]
+       }
+      },
+      "per": {
+       "sum": {
+        "product": [
+         "amount",
+         {
+          "lookup": "in_only",
+          "by": "direction"
+         }
+        ]
+       }
+      }
+     }
+    },
+    "lookups": {
+     "sign": {
+      "in": 1,
+      "out": -1
+     },
+     "in_only": {
+      "in": 1,
+      "out": 0
+     }
+    },
+    "format": "pct",
+    "target": {
+     "gte": 0.2
+    },
+    "window": "90d",
+    "compare": "none"
+   },
+   "metric.received-month#0": {
+    "metric": "received-month",
+    "name": "Money in this month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, direction is in, on at least bom",
+    "value": {
+     "sum": "amount"
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
+   },
+   "metric.left-month#0": {
+    "metric": "left-month",
+    "name": "Left over this month",
+    "source": "register.transactions",
+    "where": "state is cleared, transfer is false, stays is not true, on at least bom",
+    "value": {
+     "sum": {
+      "product": [
+       "amount",
+       {
+        "lookup": "sign",
+        "by": "direction"
+       }
+      ]
+     }
+    },
+    "lookups": {
+     "sign": {
+      "in": 1,
+      "out": -1
+     }
+    },
+    "format": "money",
+    "target": {
+     "gte": 0
+    },
+    "window": "30d",
+    "compare": "none"
    }
   }
  },

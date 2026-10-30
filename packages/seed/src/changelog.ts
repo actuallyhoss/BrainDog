@@ -200,6 +200,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.33.0',
+      notes: 'A category can be marked as a correction, not spending, such as Discrepancy, and BrainDog asks once for one whose name says so; once marked, its lines stay out of every spending and income figure. Reports says the range you picked. Paid most adds up every payment to a payee, and bank digits read as the account they end in. The next 30 days reads "Bills and usual spending", Coming up says "Repeating bills", and the lowest point reads the same on Money, Today and Forecast. Lines that look imported twice are offered to be archived, one of each kept.',
+    },
+    {
       version: '3.32.2',
       notes: 'A payment that pays a bill and was filed under a category whose money stays yours, such as Transfers, is filed under the bill\'s category and counts as spending: the Northwind premium paid by bank transfer goes under Insurance. A category you file by hand is left as it is.',
     },

@@ -875,12 +875,18 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   (`rule.payment-files-paid`, `script.file_paid`, and `script.settle_matched_line` for a line), and a category the bill
  *   filed offers no filing rule (`script.learn_category`). A rule and its script added, nothing taken away, and every
  *   record on 3.32.1 gains them as it updates, so a patch step as he asked.
+ * - money-core 3.33.0 (round 1031, the live check's money items): a category can be ticked "A correction, not spending"
+ *   (`categories.correction`), asked once for a category whose name says so (`rule.category-correction-asks`,
+ *   `rule.category-correction-yes`, `script.category_correction`), and every spending and income figure leaves those
+ *   lines out; Reports' sentence follows the picked range (`metric.received-last` and eleven more by range); Paid most
+ *   adds every line to a payee; the 30-day figure is "Bills and usual spending"; lines imported twice are offered to be
+ *   archived (`script.ledger_twice`). Fields, rules, scripts and figures added, nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.0',
   portfolio: '1.30.1',
   people: '4.2.1',
-  'money-core': '3.32.2',
+  'money-core': '3.33.0',
   estate: '2.6.0',
   work: '1.20.0',
 };
