@@ -213,6 +213,24 @@ test('a partial run resumes the range it stopped in, whatever the watermark says
   assert.equal(rfc3339(w?.until ?? 0), '2026-01-12T22:00:00Z');
 });
 
+/* HOW `{until}` IS WRITTEN IS THE DECLARATION'S, on a fresh window and on a resumed one, and absent means the
+   exclusive end every connector meant before `window.end` existed. */
+test('window.end inclusive marks the window, fresh or resumed, and nothing else does', () => {
+  const inclusive = decl({ window: { grain: 'day', start: '2026-01-01', end: 'inclusive' } });
+  const now = at('2026-01-15T14:00:00Z');
+  assert.equal(windowFor(inclusive, fresh, 0, now, CAIRO)?.inclusive, true);
+  const partial: Cursor = {
+    watermark: null,
+    window: { since: '2026-01-05T22:00:00Z', until: '2026-01-12T22:00:00Z', page: null, n: 1, rows: 10 },
+  };
+  assert.equal(windowFor(inclusive, partial, 0, now, CAIRO)?.inclusive, true);
+  assert.equal(windowFor(WINDOWED, fresh, 0, now, CAIRO)?.inclusive, undefined);
+  const exclusive = decl({ window: { grain: 'day', start: '2026-01-01', end: 'exclusive' } });
+  assert.equal(windowFor(exclusive, fresh, 0, now, CAIRO)?.inclusive, undefined);
+  /* The range itself does not move: the same since and until as the exclusive declaration. */
+  assert.equal(windowFor(inclusive, fresh, 0, now, CAIRO)?.until, windowFor(WINDOWED, fresh, 0, now, CAIRO)?.until);
+});
+
 /* NO `window:` MEANS THE RUN IS NOT A RANGE. `{since}` and `{until}` are refused at lint for such a
    declaration, so both are the slot and neither is ever substituted into anything. */
 test('a declaration with no window asks about one instant', () => {

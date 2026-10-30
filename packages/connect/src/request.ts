@@ -104,7 +104,9 @@ export const readGrantField = (ctx: SubCtx, field: string, at: string): string =
 /** One token's value, before encoding. `at` is the declaration key, so a refusal says where. */
 const valueOf = (name: string, format: Format | undefined, ctx: SubCtx, at: string): string => {
   if (name === 'since') return timeAs(ctx.window.since, format, ctx.tz);
-  if (name === 'until') return timeAs(ctx.window.until, format, ctx.tz);
+  /* A RANGE THAT INCLUDES ITS END IS ASKED UP TO THE LAST INSTANT INSIDE THE WINDOW: `until − 1 ms`, the day
+     before as a `date`, the second before as `epoch_s`. Asked for `until` itself, it served today, unfinished. */
+  if (name === 'until') return timeAs(ctx.window.inclusive === true ? ctx.window.until - 1 : ctx.window.until, format, ctx.tz);
   if (name === 'page') return pageValue(ctx.page, at);
 
   const dot = name.indexOf('.');

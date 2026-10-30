@@ -155,7 +155,8 @@ type FetchDecl = {
   body?: { [k: string]: Json };                 // POST only; JSON; placeholders in string leaves only
   auth: AuthDecl;
   schedule: { every: Duration; at?: string; tz?: 'record'; jitter?: 'auto' };   // every ≥ 15m; at = HH:MM, needs every % 24h = 0
-  window?: { grain: 'hour' | 'day' | 'month'; start: string; lookback?: Duration; max_span?: Duration };
+  window?: { grain: 'hour' | 'day' | 'month'; start: string; lookback?: Duration; max_span?: Duration;
+             end?: 'exclusive' | 'inclusive' };                                       // how {until} is written
   source_retention?: Duration;                  // lint only (42); no run-time role
   probe?: { path: string; read: Record<string, string> };      // exactly one; read = name → response path
   page?: PageDecl;                              // default { kind: 'none' }
@@ -203,6 +204,7 @@ Defaults and closed lists, in one table:
 | `window.grain` | enum | `day` | `hour day month` |
 | `window.lookback` | duration | `0` | ≤ `max_span` |
 | `window.max_span` | duration | `31d` | ≤ `366d` |
+| `window.end` | enum | `exclusive` | `exclusive inclusive` — `inclusive` when the provider's range includes its last day (npm `range/a:b`, Plausible `date_range`, GA4 `endDate`); `{until}` is then the window's last instant |
 | `page.kind` | enum | `none` | `cursor_param offset page_number keyset link_header` + `none` |
 | `limits.max_pages` | int | 40 | 1–50; `lease_size × max_pages ≤ 200` (25 §9) |
 | `limits.response_bytes` | int | 2,000,000 | ≤ 2,000,000 — the row/BLOB ceiling and the `Http` cap |
@@ -231,7 +233,7 @@ ident       = [a-z] { [a-z0-9_] } ;
 | Placeholder | Value | Default format | Legal formats |
 |---|---|---|---|
 | `{since}` | the window's first instant (ms) | `instant` | the five |
-| `{until}` | the window's exclusive end (ms) | `instant` | the five |
+| `{until}` | the window's exclusive end (ms); with `window.end: inclusive`, its last instant, `until − 1 ms` — the day before as a `date` | `instant` | the five |
 | `{page}` | the paginator's next value | as-is | `int` |
 | `{probe.<name>}` | one value read by the single probe | as-is | `int` on a number |
 | `{grant.<name>}` | a non-secret field of the grant's plaintext (§4.6) | as-is | none |
@@ -267,7 +269,7 @@ response shape of 25 §4; there is no wildcard key, no filter, no function.
 ### 4.4 · Run-time types
 
 ```ts
-type Window    = { since: number; until: number };                          // ms, half-open [since, until)
+type Window    = { since: number; until: number; inclusive?: true };        // ms, half-open [since, until); inclusive = window.end
 type PageState = { kind: 'cursor_param' | 'keyset'; value: string } | { kind: 'offset' | 'page_number'; value: number }
                | { kind: 'link_header'; url: string } | { kind: 'none' };
 type Cursor    = { watermark: string | null;                                // RFC 3339 — exclusive end of complete coverage
@@ -563,7 +565,7 @@ records every request; a stub `RecordApi` that records every `applyPull` and `ac
 
 | Fixture | Exercises | Expected |
 |---|---|---|
-| `npm-downloads` | `none` auth, `{since:date}:{until:date}` in `path`, `page: none`, series `flow` | 7 points; a second fixture with `start` clamped → `PULL_EXPECT_FAILED`, `outcome: review`, cursor unchanged, raw body kept |
+| `npm-downloads` | `none` auth, `{since:date}:{until:date}` in `path` with `window.end: inclusive` (the range includes its end, so the path ends on yesterday, never on today), `page: none`, series `flow` | 7 points; a second fixture with `start` clamped → `PULL_EXPECT_FAILED`, `outcome: review`, cursor unchanged, raw body kept |
 | `github-traffic` | `bearer`, `link_header` with an opaque cursor, `unique` kind | the next URL taken verbatim from `Link`; a Link on another host → `PULL_ORIGIN_REFUSED` |
 | `stripe-ledger` | `bearer`, `cursor_param` (`starting_after ← data[-1].id`, `more: has_more`), `expect: object is list`, register `writes`, `dedupe: [id]` | 3 pages, 250 rows, `applyPull page` × 3 with `dedupe` fields present; cursor advances per page |
 | `cloudflare-graphql` | `bearer`, POST with a JSON body containing `{grant.zone}` and `{since:instant}`, `probe:` reading `settings`, `error_when: { path: errors, len_gte: 1 }` on a 200 — not `present: true`, because a success answers `"errors": null` and a null is present | one probe then pages; the 200-with-`errors` body → `PULL_PROVIDER_UNAVAILABLE`; `"errors": null` is a success |

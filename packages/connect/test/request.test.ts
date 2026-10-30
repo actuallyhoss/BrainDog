@@ -71,6 +71,20 @@ test('the two instants format five ways, and the day is the record’s day and n
   assert.equal(at('/{until:date}'), '/2026-01-02');
 });
 
+/* AN INCLUSIVE RANGE IS ASKED UP TO ITS LAST INSTANT. npm's `range/a:b`, Plausible's `date_range` and GA4's
+   `endDate` include `b`, so `{until:date}` written as the exclusive end asked for today, which is not over, on
+   every run. `window.end: inclusive` writes the last instant inside the window instead; the window is the same. */
+test('an inclusive end writes until as the last instant inside the window, in every format', () => {
+  const at = (path: string) =>
+    resolveRequest(decl({ path }), null, GRANT, {}, { ...WINDOW, inclusive: true }, TZ).url.pathname;
+  assert.equal(at('/{until:date}'), '/2026-01-01');
+  assert.equal(at('/{until:epoch_s}'), '/1767304799');
+  assert.equal(at('/{until:epoch_ms}'), '/1767304799999');
+  assert.equal(at('/{until}'), '/2026-01-01T21%3A59%3A59.999Z');
+  /* `{since}` is the first instant either way. */
+  assert.equal(at('/{since:date}'), '/2026-01-01');
+});
+
 test('a page value is the paginator’s, and there is no page without one', () => {
   assert.equal(resolve({ path: '/p/{page}' }, { kind: 'page_number', value: 3 }).url.pathname, '/p/3');
   assert.equal(refusal(() => resolve({ path: '/p/{page}' })).code, 'PULL_REQUEST_REFUSED');

@@ -199,11 +199,14 @@ export function windowFor(
   nowMs: number,
   tz: string,
 ): Window | null {
+  /* HOW `{until}` IS WRITTEN IS THE DECLARATION'S, so a resumed window takes it from there too and not from the
+     cursor, which never held it. */
+  const inclusive = decl.window?.end === 'inclusive' ? ({ inclusive: true } as const) : {};
   const held = cursor.window;
   if (held !== undefined) {
     const since = Date.parse(held.since);
     const until = Date.parse(held.until);
-    if (!Number.isNaN(since) && !Number.isNaN(until)) return { since, until };
+    if (!Number.isNaN(since) && !Number.isNaN(until)) return { since, until, ...inclusive };
   }
 
   const declared = decl.window;
@@ -225,7 +228,7 @@ export function windowFor(
   /* NOTHING TO FETCH IS NOT A FAILURE. A connector caught up at 00:05, whose grain is a day, has no
      complete bucket it has not already read, and the run that says so writes nothing and asks for
      nothing. `since >= until` is the whole of that condition. */
-  return since >= until ? null : { since, until };
+  return since >= until ? null : { since, until, ...inclusive };
 }
 
 /**

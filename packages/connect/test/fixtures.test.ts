@@ -199,9 +199,10 @@ const NPM: Fixture = {
     path: '/downloads/range/{since:date}:{until:date}/braindog',
     auth: { kind: 'none' },
     schedule: { every: '24h' },
-    window: { grain: 'day', start: '2026-01-13' },
+    /* `range/a:b` INCLUDES `b`, so `{until:date}` is the window's last day and not today. */
+    window: { grain: 'day', start: '2026-01-13', end: 'inclusive' },
     page: { kind: 'none' },
-    expect: [{ path: 'start', eq: '{since:date}' }],
+    expect: [{ path: 'start', eq: '{since:date}' }, { path: 'end', eq: '{until:date}' }],
     read: { format: 'json', rows: 'downloads' },
   },
   map: {
@@ -222,12 +223,13 @@ const npmBody = (start: string, end: string, counts: number[]): unknown => ({
 });
 
 test('npm: one request for the window, seven days, seven points, and the watermark at the start of today', async () => {
-  const { out, wrote, seen } = await run(NPM, [{ body: npmBody('2026-01-13', '2026-01-20', NPM_COUNTS) }]);
+  const { out, wrote, seen } = await run(NPM, [{ body: npmBody('2026-01-13', '2026-01-19', NPM_COUNTS) }]);
 
   assert.equal(out.outcome, 'ok', out.error?.fix);
-  /* THE WINDOW IS CAIRO'S WEEK, and `{until:date}` is the exclusive end: today, which is not yet whole. */
+  /* THE WINDOW IS CAIRO'S WEEK, and npm's range includes its end, so the last day asked for is yesterday. Asked
+     for `2026-01-20`, which is the exclusive end, npm served today too, unfinished, on every run. */
   assert.equal(seen.length, 1);
-  assert.equal(seen[0]?.url.href, 'https://api.npmjs.org/downloads/range/2026-01-13:2026-01-20/braindog');
+  assert.equal(seen[0]?.url.href, 'https://api.npmjs.org/downloads/range/2026-01-13:2026-01-19/braindog');
   assert.equal(seen[0]?.init.headers.authorization, undefined, 'an unauthenticated API was sent a credential');
 
   /* A ZERO npm REPORTED IS A ZERO WRITTEN. Absence is the gap; a measured zero is a point. */
@@ -243,11 +245,11 @@ test('npm: one request for the window, seven days, seven points, and the waterma
 });
 
 test('npm: a clamped range is a review with the body kept, no points, and a cursor that has not moved', async () => {
-  const CLAMPED: Fixture = { ...NPM, fetch: { ...NPM.fetch, window: { grain: 'day', start: '2024-01-01' } } };
+  const CLAMPED: Fixture = { ...NPM, fetch: { ...NPM.fetch, window: { grain: 'day', start: '2024-01-01', end: 'inclusive' } } };
   /* ASKED FOR TWO YEARS, ANSWERED EIGHTEEN MONTHS, STATUS 200. */
-  const { out, wrote, seen } = await run(CLAMPED, [{ body: npmBody('2024-07-20', '2026-01-20', [3, 5, 4]) }]);
+  const { out, wrote, seen } = await run(CLAMPED, [{ body: npmBody('2024-07-20', '2026-01-19', [3, 5, 4]) }]);
 
-  assert.equal(seen[0]?.url.pathname, '/downloads/range/2024-01-01:2026-01-20/braindog');
+  assert.equal(seen[0]?.url.pathname, '/downloads/range/2024-01-01:2026-01-19/braindog');
   assert.equal(out.outcome, 'review');
   assert.equal(out.error?.code, 'PULL_EXPECT_FAILED');
   /* WHAT THE SERVER SAID AND WHAT THE WINDOW ASKED, which is the whole of the sentence a person reads. */
@@ -703,7 +705,13 @@ const PLAUSIBLE: Fixture = {
     method: 'POST',
     auth: { kind: 'bearer', grant: 'plausible-stats' },
     schedule: { every: '24h' },
-    window: { grain: 'day', start: '2026-01-18' },
+    /* `date_range` INCLUDES ITS SECOND DAY, and Plausible echoes the range it served as instants, which the two
+       `starts` checks read (`25 §5.1`). */
+    window: { grain: 'day', start: '2026-01-18', end: 'inclusive' },
+    expect: [
+      { path: 'query.date_range[0]', starts: '{since:date}' },
+      { path: 'query.date_range[1]', starts: '{until:date}' },
+    ],
     body: {
       site_id: '{grant.site_id}',
       metrics: ['visitors'],
@@ -738,7 +746,7 @@ test('Plausible: the body is exact, and of two readings in one day the later one
           query: {
             site_id: 'braindog.app',
             metrics: ['visitors'],
-            date_range: ['2026-01-18T00:00:00+02:00', '2026-01-20T23:59:59+02:00'],
+            date_range: ['2026-01-18T00:00:00+02:00', '2026-01-19T23:59:59+02:00'],
             dimensions: ['time:hour'],
             filters: [],
             order_by: [['time:hour', 'asc']],
@@ -758,7 +766,7 @@ test('Plausible: the body is exact, and of two readings in one day the later one
   assert.deepEqual(JSON.parse(seen[0]?.init.body ?? 'null'), {
     site_id: 'braindog.app',
     metrics: ['visitors'],
-    date_range: ['2026-01-18', '2026-01-20'],
+    date_range: ['2026-01-18', '2026-01-19'],
     dimensions: ['time:hour'],
   });
 
@@ -882,7 +890,8 @@ const GA4: Fixture = {
       scope: GA4_SCOPE,
     },
     schedule: { every: '24h' },
-    window: { grain: 'day', start: '2026-01-13' },
+    /* `endDate` IS INCLUSIVE, so the last day asked for is yesterday and not today. */
+    window: { grain: 'day', start: '2026-01-13', end: 'inclusive' },
     body: {
       dateRanges: [{ startDate: '{since:date}', endDate: '{until:date}' }],
       dimensions: [{ name: 'date' }],
@@ -974,7 +983,7 @@ test('GA4: one signed assertion exchanged once, the token presented, and the rep
   assert.equal(report?.url.href, 'https://analyticsdata.googleapis.com/v1beta/properties/312847561:runReport');
   assert.equal(report?.init.headers.authorization, 'Bearer ya29.c.fixtureNotReal');
   assert.deepEqual(JSON.parse(report?.init.body ?? 'null'), {
-    dateRanges: [{ startDate: '2026-01-13', endDate: '2026-01-20' }],
+    dateRanges: [{ startDate: '2026-01-13', endDate: '2026-01-19' }],
     dimensions: [{ name: 'date' }],
     metrics: [{ name: 'activeUsers' }],
     keepEmptyRows: true,
