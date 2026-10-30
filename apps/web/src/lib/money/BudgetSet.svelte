@@ -43,7 +43,12 @@
   let busy = $state<number | null>(null);
 
   const isPeriod = (v: unknown): v is Period => v === 'week' || v === 'month' || v === 'year';
-  const shown = (minor: number | null): string => (minor === null ? '' : String(Math.round(minor) / 100).replace(/\.0+$/u, ''));
+  /* THE DIGITS GROUPED (finish F5): "7000" read as a code beside the bars' "£7,000". Pennies only where there are some. */
+  const shown = (minor: number | null): string => {
+    if (minor === null) return '';
+    const whole = Math.round(minor) % 100 === 0;
+    return (Math.round(minor) / 100).toLocaleString('en-GB', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+  };
 
   /** The categories one spends in that are not put away, as the list's own fields say it. */
   const spending = (): string =>
