@@ -3084,8 +3084,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * The rows that name a file, and in which of their fields, for `fileHeld`: every file on every row, walked once and
    * kept while the record stands (the newest line of the log and the newest row), so a gallery of dozens of pictures
-   * reads the record once and not once per picture (RD6). A write that leaves neither mark (a repair) can leave the
-   * map a step behind; a file it adds is then answered as a file no row names, which is how it was answered before.
+   * reads the record once and not once per picture (RD6). A write that leaves neither mark (a repair, an erasure) can
+   * leave the map a step behind, so `fileHeld` checks every answer that hands bytes over against the row it rests on,
+   * and walks again when that is wrong (RE6).
    */
   let fileRefsKept: { at: string; by: Map<string, { id: string; register: string; fields: string[] }[]> } | null = null;
   const fileRefs = (sha256: string): readonly { id: string; register: string; fields: string[] }[] => {
@@ -16148,13 +16149,36 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         Object.values(ctx.hides ?? {}).some((fields) => fields.length > 0);
       /* A record with no private row keeps nothing from a caller who reads all of it, and is not walked for them. */
       if (!narrowed && sql.one<{ y: number }>('SELECT 1 AS y FROM entry_private LIMIT 1') === undefined) return false;
-      const naming = fileRefs(sha256);
-      if (naming.length === 0) return false;
-      if (!narrowed && kernel.privateAmong(naming.map((row) => row.id)).size === 0) return false;
-      for (const row of naming) {
-        if (readable(ctx, row.register) !== null || !sight.admits(ctx, row)) continue;
-        const hidden = sight.hidden(ctx, row.register);
-        if (row.fields.some((field) => !hidden.has(field))) return false;
+      /* EVERY ANSWER THAT HANDS THE BYTES OVER IS CHECKED AGAINST THE ROW ITSELF FIRST (RE6 of the review of 30 Oct, e).
+         The map is kept by the newest line of the log and the newest row, and a write that leaves neither (the kernel's
+         `json_set` repairs, an erasure) left it a step behind in the leak's direction: a file put on a private row that
+         way was a file no row named, and served. So a file the map says no row names is looked for once in `entry`, and
+         the row a yes rests on is asked whether it still names the file; either one wrong walks the record again. */
+      const somewhere = (): boolean => sql.one<{ y: number }>('SELECT 1 AS y FROM entry WHERE instr(fields, ?) > 0 LIMIT 1', sha256) !== undefined;
+      const names = (id: string): boolean => sql.one<{ y: number }>('SELECT 1 AS y FROM entry WHERE id = ? AND instr(fields, ?) > 0', id, sha256) !== undefined;
+      for (const fresh of [false, true]) {
+        if (fresh) fileRefsKept = null;
+        const naming = fileRefs(sha256);
+        if (naming.length === 0) {
+          if (fresh || !somewhere()) return false;
+          continue;
+        }
+        if (!narrowed && kernel.privateAmong(naming.map((row) => row.id)).size === 0) {
+          if (fresh || naming.some((row) => names(row.id))) return false;
+          continue;
+        }
+        let by: string | null = null;
+        for (const row of naming) {
+          if (readable(ctx, row.register) !== null || !sight.admits(ctx, row)) continue;
+          const hidden = sight.hidden(ctx, row.register);
+          if (row.fields.some((field) => !hidden.has(field))) {
+            by = row.id;
+            break;
+          }
+        }
+        /* KEPT IS NEVER CHECKED AGAIN: a map a step behind can only keep too much, which the next write corrects. */
+        if (by === null) return true;
+        if (fresh || names(by)) return false;
       }
       return true;
     },

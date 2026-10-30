@@ -77,3 +77,30 @@ test('RD6: A FILE ON A PRIVATE ROW IS KEPT FROM EVERYBODY BUT ITS MAKER, AND A C
   assert.ok((await api.create({ register: 'notes', fields: { what: 'Same scan', scan: file('e') } } as never, ada)).ok);
   assert.equal(api.fileHeld(sha('e'), bo), false);
 });
+
+/* RE6: THE MAP OF WHICH ROWS NAME WHICH FILE IS KEPT BY THE NEWEST LOG LINE AND ROW, so a write that left neither put a
+   file on a private row and the map, a step behind, served it as a file no row named. */
+test('RE6: A FILE PUT ON A PRIVATE ROW BY A WRITE THAT LOGS NOTHING IS STILL KEPT, and one taken off a row is no longer served by it', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'orchardline', name: 'Orchardline', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }).ok);
+  assert.ok((await api.kernel.install([list('notes')])).ok);
+  const ada: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' }, credentialed: true };
+  const bo: CallContext = { principal: { kind: 'person', id: 'p_bo', level: 'write' }, credentialed: true };
+  const made = await api.create({ register: 'notes', fields: { what: 'Private scan', scan: file('e') } } as never, ada);
+  assert.ok(made.ok);
+  const { id, seq } = (made as { value: { id: string; seq: number } }).value;
+  assert.ok((await api.makePrivate({ ref: `notes#${seq}` }, ada)).ok);
+  const open = await api.create({ register: 'notes', fields: { what: 'Open scan', scan: file('g') } } as never, ada);
+  assert.ok(open.ok);
+  const openId = (open as { value: { id: string } }).value.id;
+  /* THE MAP IS WALKED NOW, with the private row naming e and the open one naming g. */
+  assert.equal(api.fileHeld(sha('e'), bo), true);
+  assert.equal(api.fileHeld(sha('g'), bo), false);
+  /* A REPAIR THAT LOGS NOTHING puts f on the private row, and moves g there from the open row. */
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.scan', json(?)) WHERE id = ?`, JSON.stringify([file('e'), file('f'), file('g')]), id);
+  sql.exec(`UPDATE entry SET fields = json_remove(fields, '$.scan') WHERE id = ?`, openId);
+  assert.equal(api.fileHeld(sha('f'), bo), true, 'a file on a private row was served because the map had not seen it');
+  assert.equal(api.fileHeld(sha('g'), bo), true, 'a file now only on a private row was served by the row it left');
+  assert.equal(api.fileHeld(sha('f'), ada), false, 'the maker lost her own file');
+});
