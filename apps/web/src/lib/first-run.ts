@@ -39,8 +39,8 @@ export const firstRun = {
   readByRulesAny: 'Simple rules read this. Check what was heard, and tell it more.',
   /* BEFORE THE PRESS, UNDER THE FIELD: what the press does with the words, and never who reads them. It said "a model
      reads what you wrote" on a host where no model does, above "Simple rules read this":
-     which reads them is said after, by what read them. */
-  readOnPress: "Pressing That's me sets this up from what you wrote. Nothing is kept until you keep it.",
+     which reads them is said after, by what read them. That nothing is kept yet is said once, in the promises under it. */
+  readOnPress: "Pressing That's me sets this up from what you wrote.",
 
   /* POINT AT AN EXPORT: a file from another app, read on this device and shown before anything is saved. */
   exportPoint: 'Or bring in a file',

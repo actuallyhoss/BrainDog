@@ -118,8 +118,9 @@
     }
   }
 
-  /* FROM 900PX THE SHEET STANDS 48 UNDER THE BRAND ROW. With a rail, the sheet keeps its 440 and the rail takes the rest
-     of 1040, both from the same top edge. */
+  /* FROM 900PX THE SHEET STANDS 48 UNDER THE BRAND ROW. With a rail, the sheet keeps its 440 and the rail beside it is
+     as wide as its short lines need, both from the same top edge, and the pair is centred as one: a rail given the rest
+     of 1040 held the sheet left of centre with an empty third on its right (audit f, AF24). */
   @media (width >= 900px) {
     .entry {
       row-gap: var(--sp-7);
@@ -127,9 +128,9 @@
     }
 
     .entry-board[data-paired] {
-      grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 440px) minmax(0, 320px);
       column-gap: var(--sp-6);
-      inline-size: min(1040px, 100%);
+      inline-size: min(calc(440px + var(--sp-6) + 320px), 100%);
     }
   }
 
@@ -151,7 +152,8 @@
   }
 
   /* `tabindex="-1"` moves focus to a title when a step changes, for a screen reader; it is never in the tab order. */
-  .entry :global(.entry-title:focus:not(:focus-visible)) {
+  .entry :global(.entry-title:focus:not(:focus-visible)),
+  .entry :global(.empty-title:focus:not(:focus-visible)) {
     /* focus-ok: the title takes focus only by script, as a step changes, so a reader is told where it is; a ring there would read as a control. */
     outline: none;
   }

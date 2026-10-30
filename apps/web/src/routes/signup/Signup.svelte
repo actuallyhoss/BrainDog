@@ -783,7 +783,9 @@
     }
     step = 'describe';
     await tick();
-    field?.focus();
+    /* UNDER A THUMB THE FIELD WAITS FOR A TAP: focused on load, the phone's keyboard covered That's me and the promises
+       before a word was read. A keyboard and mouse still land in it. */
+    if (!onPhone) field?.focus();
   }
 
   /* ── keeping it: one email ───────────────────────────────────────────────── */
@@ -1259,8 +1261,10 @@
       {#snippet actions()}<Button weight="primary" onclick={() => void ask()}>{copy.askAgain}</Button>{/snippet}
     </Empty>
   {:else if step === 'closed'}
+    <!-- THE QUESTION, AND ITS ANSWER IS THE BUTTON: "Sign in." said in the line and again on the button was one way said
+         twice. -->
     <h1 class="entry-title">{copy.signupClosedTitle}</h1>
-    <p class="entry-lede">{copy.signupClosedWhy}</p>
+    <p class="entry-lede">{words.haveAsk}</p>
     <div class="go"><Button weight="primary" href="/signin">{copy.signIn}</Button></div>
   {:else if step === 'invite-only'}
     <Apply {siteKey} />

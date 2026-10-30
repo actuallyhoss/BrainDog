@@ -312,9 +312,38 @@
     if (step.at !== 'asking') step = { at: 'idle' };
   }
 
+  /**
+   * FOCUS FOLLOWS THE STEP (audit f, AF15). A press that changes the screen took its own button away, and focus fell to
+   * `<body>`: after "Email me a sign-in link", a spent link and a lockout a keyboard started again from the top, and a
+   * screen reader heard the status line at best. So once somebody has pressed something, a screen that is a message
+   * (`SAYS`) puts focus on its heading or its sentence, and any other screen does so only where focus was lost. Nothing
+   * moves on arrival: the skip link stays the first Tab.
+   */
+  const SAYS = new Set<string>(['link-sent', 'link-expired', 'locked', 'rejected', 'unreachable', 'signed-in', 'open']);
+  let col = $state<HTMLElement | undefined>(undefined);
+  let pressed = false;
+  let shownAs = '';
+  $effect(() => {
+    const name = view.name;
+    if (name === shownAs) return;
+    shownAs = name;
+    if (!pressed || name === 'asking' || name === 'loading') return;
+    void tick().then(() => land(SAYS.has(name)));
+  });
+
+  function land(always: boolean): void {
+    const was = document.activeElement;
+    if (!always && was !== null && was !== document.body && was.isConnected) return;
+    const to = col?.querySelector<HTMLElement>('.act h1, .act .empty-title') ?? col?.querySelector<HTMLElement>('h1') ?? null;
+    if (to === null) return;
+    if (!to.hasAttribute('tabindex')) to.setAttribute('tabindex', '-1');
+    to.focus();
+  }
+
   /** One press: the step says it is out, and what came back decides the next one. */
   async function run<T>(how: How, work: () => Promise<Said<T>>, then: (value: T) => void) {
     if (step.at === 'asking') return;
+    pressed = true;
     fromGoogle = null;
     step = { at: 'asking', how };
     held = false;
@@ -437,6 +466,7 @@
   let retried = $state('');
 
   function again() {
+    pressed = true;
     retried = '';
     step = { at: 'idle' };
     asked = null;
@@ -477,7 +507,7 @@
   });
 
   /** What the line under the ways in says: only the ways that are drawn. */
-  const lede = $derived(doors ? copy.signInLede(doors.magic, doors.passkey) : null);
+  const lede = $derived(doors ? copy.signInLede(doors.magic, doors.google === true, doors.passkey) : null);
 
   /** Who may sign up here, for the foot's one line; `null` until the host says, and then no line is drawn. */
   let mode = $state<SignupMode | null>(null);
@@ -520,10 +550,11 @@
 
 <!-- THE ENTRY FRAME EVERY WAY IN SHARES (`Entry.svelte`): the brand on the ground, one sheet under it, this column in it. -->
 <Entry>
-  <div class="col">
+  <div class="col" bind:this={col}>
     <!-- THE TASK AS THE HEADING, where a way in is offered (or about to be): a state screen ("Check your email", "You're
-         signed in", "BrainDog did not answer") is its own heading instead, and draws no title over it (first F7). -->
-    {#if view.name === 'loading' || (doors && !noDoor)}
+         signed in", "BrainDog did not answer") is its own heading instead, and draws no title over it (first F7). A spent
+         link leads with what happened, its ways in under it (audit f, AF17). -->
+    {#if view.name === 'loading' || (doors && !noDoor && view.name !== 'link-expired')}
       <div class="intro">
         <h1 class="entry-title">{copy.signInTitle}</h1>
         {#if doors && lede}<p class="entry-lede">{lede}</p>{/if}
@@ -570,7 +601,7 @@
         </div>
       {:else if view.name === 'link-expired'}
         <div class="said">
-          <Empty kind="error" title={copy.linkExpiredTitle} body={copy.linkExpiredWhy(view.link, view.ways?.magic === true)} />
+          <Empty kind="error" heading title={copy.linkExpiredTitle} body={copy.linkExpiredWhy(view.link, view.ways?.magic === true)} />
         </div>
       {:else if view.name === 'link-sent'}
         <div class="calm" role="status">

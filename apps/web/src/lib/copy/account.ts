@@ -516,9 +516,13 @@ export const account = {
      `shell.ts`, because the palette says it too. */
   /* THE TASK, NOT THE SLOGAN (site 2b): a returning person came to sign in, and the slogan is the site's. */
   signInTitle: 'Sign in to BrainDog',
-  /* WHAT THE WAYS BELOW DO, naming only the ones drawn: a host with no mail is never promised a link. */
-  signInLede: (magic: boolean, passkey: boolean): string | null =>
-    magic && passkey ? "We'll email you a link, or use your passkey." : magic ? "We'll email you a link." : passkey ? 'Use your passkey.' : null,
+  /* THE WAYS BELOW, naming only the ones drawn: a host with no mail is never promised a link, and Google, the second
+     button, is named with the others (audit f, AF17). One way alone is said as what it does. */
+  signInLede: (magic: boolean, google: boolean, passkey: boolean): string | null => {
+    const ways = [magic ? 'Email' : null, google ? 'Google' : null, passkey ? 'a passkey' : null].filter((w): w is string => w !== null);
+    if (ways.length > 1) return `${ways.slice(0, -1).join(', ')} or ${ways.at(-1)}.`;
+    return magic ? "We'll email you a link." : passkey ? 'Use your passkey.' : null;
+  },
   /* DRAWN ONLY AFTER 400MS (first F15): a host that answers at once shows nothing at all. */
   checkingWays: 'Getting sign-in ready',
   withPasskey: 'Use a passkey',

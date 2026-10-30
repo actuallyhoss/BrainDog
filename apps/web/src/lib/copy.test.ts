@@ -282,3 +282,12 @@ test('THE SIDEBAR, THE PALETTE, THE INBOX AND DECIDE DO NOT SAY "LIST"', () => {
   assert.doesNotMatch(copy.purposes.list!, /\blists?\b/iu);
   assert.doesNotMatch(copy.kinds.table!, /\blists?\b/iu);
 });
+
+test('THE SIGN-IN LEDE NAMES EVERY WAY DRAWN, Google among them, and only those (audit f, AF17)', () => {
+  assert.equal(copy.signInLede(true, true, true), 'Email, Google or a passkey.');
+  assert.equal(copy.signInLede(true, false, true), 'Email or a passkey.');
+  assert.equal(copy.signInLede(false, true, true), 'Google or a passkey.');
+  assert.equal(copy.signInLede(true, false, false), "We'll email you a link.");
+  assert.equal(copy.signInLede(false, false, true), 'Use your passkey.');
+  assert.equal(copy.signInLede(false, true, false), null);
+});

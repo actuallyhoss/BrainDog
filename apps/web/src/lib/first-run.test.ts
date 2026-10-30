@@ -186,7 +186,9 @@ test('THE RULES SAY THEY READ IT FOR ANY CAUSE, and the month spent keeps its ow
   assert.match(firstRun.readByRules, /out of asks this month/u, 'the spent month still says why');
   assert.notEqual(firstRun.readByRulesAny, firstRun.readByRules);
   /* BEFORE THE PRESS: what Next does, plain, with no dash a person would read as an em dash. */
-  assert.equal(firstRun.readOnPress, "Pressing That's me sets this up from what you wrote. Nothing is kept until you keep it.");
+  assert.equal(firstRun.readOnPress, "Pressing That's me sets this up from what you wrote.");
+  /* NOTHING-KEPT IS THE SECOND PROMISE under the button, and is not said twice on one screen. */
+  assert.doesNotMatch(firstRun.readOnPress, /kept|saved/u);
   /* It never says a model reads the words, which the host may not have. */
   assert.doesNotMatch(firstRun.readOnPress, /model/u);
   for (const w of [firstRun.readByRulesAny, firstRun.readOnPress]) assert.doesNotMatch(w, /—/u, w);
