@@ -40,7 +40,7 @@ const CARD_OWES = ' {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}
  * are late, and Heads up says it no more.
  */
 const BILLS_SEEN = '/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today';
-const BILLS_LATE = `Bills {{bad:late}}: [{{overdue}} to pay](${BILLS_SEEN}).`;
+const BILLS_LATE = `Bills {{bad:late}}: [{{overdue}}](${BILLS_SEEN}) to pay.`;
 const LOW_POINT = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.';
 const PART_LATE = { metric: 'installments-late', gt: 0 };
 const BILL_LATE = { metric: 'overdue', gt: 0 };
@@ -48,7 +48,7 @@ const GOES_UNDER = { all: [{ metric: 'cash-now', gt: 0 }, { metric: 'runway-days
 
 /** The line's sentences, worst first, each with `between` (what the line says of the accounts or the year) before the card. */
 const says = (between: string): Record<string, unknown>[] => [
-  { when: { all: [PART_LATE, BILL_LATE] }, body: `${LATE_PART} Bills {{bad:late}} too: [{{overdue}} to pay](${BILLS_SEEN}).${between}${CARD_OWES}` },
+  { when: { all: [PART_LATE, BILL_LATE] }, body: `${LATE_PART} Bills {{bad:late}} too: [{{overdue}}](${BILLS_SEEN}) to pay.${between}${CARD_OWES}` },
   { when: BILL_LATE, body: `${BILLS_LATE}${between}${CARD_OWES}` },
   { when: PART_LATE, body: `${LATE_PART}${between}${CARD_OWES}` },
   { when: GOES_UNDER, body: `${LOW_POINT}${between}${CARD_OWES}` },

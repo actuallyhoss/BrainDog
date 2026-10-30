@@ -68,5 +68,6 @@ test('BILLS LATE ARE SAID ONCE, ON THE FIRST LINE, THE FIGURE THE LINK TO THEM (
   assert.equal(bads(nodes).length, 1, 'late in the danger colour');
   const link = nodes.find((n): n is Extract<Inline, { type: 'link' }> => n.type === 'link');
   assert.ok(link?.href.startsWith('/r/obligations?'), 'the figure late opens the bills that are late');
-  assert.equal(text(link!.body), '3 to pay');
+  assert.equal(text(link!.body), '3', 'the figure alone, so a phone\'s tap target keeps the space after it');
+  assert.equal(text(nodes), 'Bills late: 3 to pay.');
 });
