@@ -23,6 +23,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 import { copy } from '../copy.ts';
 import { iconFor, type SearchHit, type SearchResult } from './api.ts';
 import { REGISTERS } from './held.ts';
+import { rowNameSaid } from './names.ts';
 import { everyGovernance } from './governance.ts';
 import { terms, tokensOf } from './find.ts';
 import { learn } from './remote.ts';
@@ -121,7 +122,8 @@ export function groupsOf(
     const decl = REGISTERS[h.register];
     const group = byRegister.get(h.register) ?? [];
     group.push({
-      title: h.title,
+      /* A TOOL OR A SKILL BY ITS NAME: the palette read "Tools: fenwick" (audit of 31 October, A19). */
+      title: rowNameSaid(h.register, h.title),
       detail: '',
       ...(h.by === 'meaning' ? { meaning: true as const } : {}),
       href: `/r/${h.register}/${h.seq}`,

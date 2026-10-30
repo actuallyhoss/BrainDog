@@ -106,7 +106,7 @@
   import { METRICS } from '$lib/record/declared.ts';
   import { handFor } from '$lib/record/hand.ts';
   import type { Backlink } from '$lib/record/api.ts';
-  import { listName, personWords } from '$lib/record/names.ts';
+  import { listName, personWords, rowNameSaid } from '$lib/record/names.ts';
   import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
   import ScopeMove from './ScopeMove.svelte';
   import Timeline from './Timeline.svelte';
@@ -1125,7 +1125,7 @@
 
 <svelte:window {onkeydown} />
 
-<svelte:head><title>{titleOf(row && decl && String(row.fields[decl.title] ?? ""), decl?.name)}</title></svelte:head>
+<svelte:head><title>{titleOf(row && decl && rowNameSaid(id, String(row.fields[decl.title] ?? "")), decl?.name)}</title></svelte:head>
 
 {#if waiting}
   <!-- Bars until the row has been read. -->
@@ -1331,7 +1331,7 @@
        (`.row-head` below): a name, a chip, a primary and a "…" on one row cut "Chase Halden on 2026-041" to "Chase
        Halden…". -->
   <div class="row-head">
-  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : String(row.fields[decl.title] ?? '')} sentence={headLine}>
+  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : rowNameSaid(id, String(row.fields[decl.title] ?? ''))} sentence={headLine}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
            person saw on an invoice was the one that puts `obligations#1` on the clipboard, ahead of anything that does
@@ -1360,7 +1360,7 @@
         <SendButton
           bind:this={sender}
           kind={id}
-          attach={[{ ref: `${id}#${row.seq}`, label: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }]}
+          attach={[{ ref: `${id}#${row.seq}`, label: rowNameSaid(id, String(row.fields[decl.title] ?? '')) || `${decl.one} ${row.seq}` }]}
           project={pj ? `${id}#${row.seq}` : null}
         />
       {/if}
@@ -1371,17 +1371,17 @@
       <!-- "SHARE": this row with somebody here, a group or an email, for an owner or an Admin, from the
            head's "⋯", so the head keeps its primary and its "⋯". -->
       {#if live && !archived}
-        <ShareLazy bind:open={sharingOpen} subject={{ kind: 'row', list: id, seq: row.seq, id: row.id ?? null, name: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }} />
+        <ShareLazy bind:open={sharingOpen} subject={{ kind: 'row', list: id, seq: row.seq, id: row.id ?? null, name: rowNameSaid(id, String(row.fields[decl.title] ?? '')) || `${decl.one} ${row.seq}` }} />
       {/if}
       <!-- THE HEAD'S "…", LAST: the row's link, Archive, and Edit where the primary is the finishing verb. A 36px square in the buttons' shape, named for a screen reader by the
            hidden words and for a pointer by its tooltip. A new field for the list is at the foot of "Add a field". -->
       <!-- NOT BEHIND `live`: a row painted from the local copy kept the whole menu away until the record answered, and a
            menu that comes and goes as the page re-reads is one that opens nothing. Every verb that writes asks `changes`. -->
       {#if row}
-        <Menu label={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)} align="end">
+        <Menu label={copy.moreOn(rowNameSaid(id, String(row.fields[decl.title] ?? '')) || decl.one)} align="end">
           {#snippet trigger()}
-            <span class="head-more" title={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)}
-              ><Icon name="more" size="l" /><span class="head-vh">{copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)}</span></span
+            <span class="head-more" title={copy.moreOn(rowNameSaid(id, String(row.fields[decl.title] ?? '')) || decl.one)}
+              ><Icon name="more" size="l" /><span class="head-vh">{copy.moreOn(rowNameSaid(id, String(row.fields[decl.title] ?? '')) || decl.one)}</span></span
             >
           {/snippet}
           {#if changes && !archived}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
@@ -1413,7 +1413,7 @@
     {/if}
 
     <!-- THE CONVERSATION: what was sent from this row and what came back, under its head, once something was. -->
-    {#if live && row.seq !== null}<SendStrip ref="{id}#{row.seq}" kind={id} label={String(row.fields[decl.title] ?? '')} />{/if}
+    {#if live && row.seq !== null}<SendStrip ref="{id}#{row.seq}" kind={id} label={rowNameSaid(id, String(row.fields[decl.title] ?? ''))} />{/if}
 
     <div class="board">
       <div class="main">

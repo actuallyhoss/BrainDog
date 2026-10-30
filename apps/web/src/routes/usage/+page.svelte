@@ -386,7 +386,7 @@
               {#each actionRows as a, i (`${a.project} ${a.name} ${i}`)}
                 <li>
                   <div class="line use-row" data-faint={a.faint ? '' : undefined}>
-                    <span class="line-title">{a.name}<span class="use-in"> · {a.project}</span></span>
+                    <span class="line-title">{a.name}<span class="use-in">{` · ${a.project}`}</span></span>
                     <span class="line-when use-counts">{countsOf(a)}</span>
                   </div>
                 </li>

@@ -254,6 +254,7 @@ export {
   dateSaid,
   datesIn,
   slugWords,
+  handleName,
   day,
   dayShort,
   monthShort,

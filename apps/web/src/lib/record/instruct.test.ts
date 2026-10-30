@@ -169,14 +169,14 @@ test('MACHINE AND PROFILE ARE OFFERED WHERE HIS RUNS ARE ON TWO OR MORE, narrow 
 
 /* ── the runs open now ────────────────────────────────────────────────── */
 
-test('A RUN ROW IS THE AGENT, WHAT IT SAID, WHERE AND WHEN, its helpers folded under it with their branches', () => {
+test('A RUN ROW IS THE AGENT, WHAT IT SAID, WHERE AND WHEN, its helpers folded under it, and no branch typed as a slug', () => {
   assert.deepEqual(leadsOf(ROWS).map((r) => r.run), ['S1', 'S2']);
   const row = presenceOf(CLAUDE, ROWS, PROJECTS);
   assert.deepEqual([row.name, row.doing, row.project], ['Claude', 'Variable axis QA, instances 3 of 9', { name: 'Kiln', slot: 'blue' }]);
-  assert.equal(row.meta, 'axis-qa · running 3 h 30 min · heard 3 min ago');
-  assert.equal(presenceOf({ ...CLAUDE, seat: 'harbour' }, ROWS, PROJECTS).meta, 'as harbour · axis-qa · running 3 h 30 min · heard 3 min ago');
+  assert.equal(row.meta, 'running 3 h 30 min · heard 3 min ago');
+  assert.equal(presenceOf({ ...CLAUDE, seat: 'harbour' }, ROWS, PROJECTS).meta, 'as harbour · running 3 h 30 min · heard 3 min ago');
   assert.equal(presenceOf({ ...CLAUDE, seat: 'default' }, ROWS, PROJECTS).meta, row.meta, 'the default profile is not said');
-  assert.equal(row.helpers, '+1 helper, on axis-qa-2');
+  assert.equal(row.helpers, '+1 helper');
   assert.equal(row.href, '/r/session/1');
 });
 

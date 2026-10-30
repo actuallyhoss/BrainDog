@@ -7,8 +7,10 @@
  * of the same name replaces the global one where it applies, so the list held "review-pr" twice. The file carries a
  * skill by its name, so one of each name is offered: the one that applies everywhere when there is one.
  *
- * PLAIN NODE LOADS THIS FILE: no import.
+ * PLAIN NODE LOADS THIS FILE: its one import is the renderer's, for how a handle is said.
  */
+
+import { handleName } from 'braindog-render';
 
 export const words = {
   /* THE PAGE'S SENTENCE (agents F27): what the file is, in the words a person uses for it, and what stays out. */
@@ -37,18 +39,8 @@ export const words = {
 /** One skill as the share offers it: the row the file carries, its title, and when to use it. */
 export type SkillOffer = { seq: number; title: string; trigger: string };
 
-/** Short words a folder name uses that a person would not: a pull request is a branch to review. */
-const SAID: Readonly<Record<string, string>> = { pr: 'a branch' };
-
-/** A skill's folder name in words: "review-pr" reads "Review a branch", "log-handoff" "Log handoff". */
-export const skillTitle = (name: string): string => {
-  const said = name
-    .split(/[-_]+/u)
-    .filter((w) => w !== '')
-    .map((w) => SAID[w.toLowerCase()] ?? w)
-    .join(' ');
-  return said.charAt(0).toUpperCase() + said.slice(1);
-};
+/** A skill's folder name in words, as every screen says it (`handleName`): "review-pr" reads "Review PR", "log-handoff" "Log handoff". */
+export const skillTitle = (name: string): string => handleName(name);
 
 /**
  * The skills a share offers, one per name, in the order the record lists them. A retired skill is left out, and of two

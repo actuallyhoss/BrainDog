@@ -83,7 +83,7 @@ test('only a line not drawn before is washed, and the first read washes nothing'
 
 test('a handle is said as a name, and no lowercase slug reaches a line on the seed', () => {
   const [r] = landedOf([line('a', { title: 'nordhaven-dns' })], lists, null, NOW);
-  assert.equal(r?.name, 'Nordhaven dns');
+  assert.equal(r?.name, 'Nordhaven DNS');
   const lines = TOOLS.map((t, i) => line(`t${i}`, { title: String(t.name), register: 'tools', seq: i + 1 }));
   const drawn = landedOf(lines, lists, null, NOW, new Map(), lines.length);
   assert.equal(drawn.length, TOOLS.length);

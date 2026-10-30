@@ -122,7 +122,7 @@ test("THE READER DRAWS THE DIRECTORY'S OWN ANSWER: the plan line and the Slash l
   assert.deepEqual(view.days, [{ day: '2026-09-02', runs: 1 }, { day: '2026-09-09', runs: 1 }, { day: '2026-09-15', runs: 1 }]);
   assert.deepEqual(
     view.groups.map((g) => [g.name, g.totals.runs]),
-    [['the-studio · kiln', 2], [words.everywhereUsage, 1]],
+    [['the-studio · Kiln', 2], [words.everywhereUsage, 1]],
   );
   assert.equal(side?.plan, 'Free');
   assert.equal(side?.slash, 'Slash was not asked anything this month.');

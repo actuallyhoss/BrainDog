@@ -118,7 +118,9 @@
   const viewOf = (r: LiveRun): PresenceView => {
     /* ONE RUN ALONE (Today's sheet) SAYS NO PROFILE AND NO BRANCH. */
     const v = presenceOf(r, rows, projects, threads, { bare: run !== null });
-    return { ...v, href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
+    /* ON A PROJECT'S OWN PAGE A ROW DOES NOT SAY THE PROJECT: "on Kiln" on Kiln's page said where he already is, and its
+       "on" sat alone on its line where the name wrapped (audit of 31 October, A19). */
+    return { ...v, ...(project !== null ? { project: null } : {}), href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
   };
 
   /* THE ONE-LINE ROW: who and where ("Claude Code in Lanternfish"), the last thing it did under it,

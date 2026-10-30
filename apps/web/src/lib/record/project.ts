@@ -6,6 +6,8 @@
  * relative-imported so `project.test.ts` can hold the rules without a component.
  */
 
+import { handleName } from 'braindog-render';
+
 import { briefFromNote } from './brief.ts';
 import { actor, humanize } from './names.ts';
 
@@ -123,7 +125,8 @@ const HANDLE = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
  * THE NAME A THING IT RUNS ON IS SAID BY: its own words, and where they are a handle ("pinwheel-metrics") the same words
  * spaced and capitalised ("Pinwheel metrics"), so no key or tool is drawn in the record's own spelling (five raw key handles on one project page). Words a person wrote with a capital or a space stay as written.
  */
-export const thingName = (title: string): string => (HANDLE.test(title) ? humanize(title) : title);
+/* AS EVERY SCREEN SAYS A TOOL'S OR A SKILL'S HANDLE (`handleName`): "Fenwick", "Nordhaven DNS", "Review PR". */
+export const thingName = (title: string): string => (HANDLE.test(title) ? (title.includes('.') ? humanize(title) : handleName(title)) : title);
 
 /** The rows of the lists a block draws, as names. The title is the first cell; a detail is the second only. */
 export function rowsOf(block: Pointed, groups: readonly Pointing[]): DataRow[] {

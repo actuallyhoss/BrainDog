@@ -14,6 +14,7 @@
  */
 
 import { RULE_NAMES, SCRIPT_NAMES } from '@braindog/seed/usecases/names';
+import { handleName } from 'braindog-render';
 
 import { copy } from '../copy/frame.ts';
 import { REGISTERS } from './held.ts';
@@ -83,6 +84,16 @@ export function humanize(id: string): string {
     .trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+/** The lists whose rows are named by the handle an agent types them as: a tool (`fenwick`) and a skill (`review-pr`). */
+const HANDLED: ReadonlySet<string> = new Set(['tools', 'skills']);
+
+/**
+ * A ROW'S NAME AS A PERSON READS IT: a tool or a skill by its name ("Fenwick", "Review PR", "Nordhaven DNS") rather than
+ * the handle it is filed under (audit of 31 October, A19), and every other row by its title as written. Only for drawing:
+ * a field being edited, a search and a merge keep the title as it is stored.
+ */
+export const rowNameSaid = (register: string, title: string): string => (HANDLED.has(register) ? handleName(title) : title);
 
 /**
  * What a list is called, by its id: the name its declaration gives, else its id in words.
