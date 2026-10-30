@@ -478,7 +478,7 @@ Effective level for a token = `min(scopeLevel(scope), memberLevel)` with `read �
 
 **`create` · `update`** (`api.ts`) — the write path's host
 
-1. Verb per §5.1 (`create ≥ append`; `update ≥ write`). No `register` → `REQUIRED_MISSING` at `register`; an `update` with no `seq` → `REQUIRED_MISSING` at `seq`, and one that is not a whole number from 1 → `VALUE_MALFORMED` at `seq`. A `create` whose fields carry `deleted_at` → `FIELD_UNKNOWN` at `deleted_at`, *"deleted_at is kept by the record, and a new row cannot arrive deleted. Create it, then delete it."* A row does not arrive deleted, and dropping the key quietly would be a write that did less than it was asked; `delete` is how a row goes. *(September 16th 2026.)*
+1. Verb per §5.1 (`create ≥ append`; `update ≥ write`). No `register` → `REQUIRED_MISSING` at `register`; an `update` with no `seq` → `REQUIRED_MISSING` at `seq`, and one that is not a whole number from 1 → `VALUE_MALFORMED` at `seq`. A `create` whose fields carry `deleted_at` → `FIELD_UNKNOWN` at `deleted_at`, *"deleted_at is kept by BrainDog, and a new row cannot arrive deleted. Create it, then delete it."* A row does not arrive deleted, and dropping the key quietly would be a write that did less than it was asked; `delete` is how a row goes. *(September 16th 2026.)*
 2. REPLAY: `r = kernel.replay(op_id)` → defined → return it (41 §2: the row as it is now, the original rowid as `version`; 33 §2).
 3. `out = kernel.transaction(() => kernel.write(register, id ?? null, patch, { ctx, opId: op_id, version, cascade: true, rules: fired => runRules(fired, ctx) }))` — 30 §4 steps 1–10 and 12a, one synchronous transaction; `update` passes `ref` through `kernel.update(register, ref, patch, w)` so `{ seq }` resolves inside (41 §2). A refusal is a return value, so the step-R observation commits; only a thrown `TypeError` or an unmapped `SqlError` rolls back and propagates to the host as a bare 500 (41 §2; 12 §8).
 4. `{ nextDueMs, outboxPending } = kernel.pendingWork()`.
@@ -1014,7 +1014,7 @@ same `Result`; this table is what **this layer** raises, with the `fix` a person
 | `OUT_OF_BOUNDS` | `note` outside 1–280; a `list` `limit` below 1; an unknown grant, token or outbox id; `applyPull` on an unleased outbox row | `note` · `limit` · `id` · `outbox` | `A note is one sentence: 1–280 characters.` |
 | `ENUM_VALUE_UNKNOWN` | `body_kind`, an `observe` kind, a job `end` status, a `createToken` scope outside its list | the path | `One of: <list>.` |
 | `TRANSITION_ILLEGAL` | `decide` / `resolved_as` on a suggestion that is not `open` | `status` | `SG23 was resolved on <date> as <resolved_as>.` |
-| `LEVEL_REQUIRED` | `invite` would leave no `owner` on `'*'` | `levels` | `A record keeps at least one owner.` |
+| `LEVEL_REQUIRED` | `invite` would leave no `owner` on `'*'` | `levels` | `A BrainDog keeps one owner. Make somebody else an owner first.` |
 | `CREATE_OVER_BOUND` | a rule's `create` would exceed `bound` at run time | `then[i].create.bound` | `<n> combinations for a bound of <bound>; raise the bound or narrow each:.` |
 | `IMPORT_NOT_EMPTY` | `createRecord` on a record that has its row (the kernel raises it for `import`) | `record` | `This record exists; create a new one.` |
 | `SCHEMA_MISMATCH` · `SCHEMA_NEWER` | `kernel.refused()` at step 0 — every method, 503 | `migration` | `Deploy the build that matches this database.` |

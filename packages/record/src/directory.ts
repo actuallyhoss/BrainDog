@@ -2446,7 +2446,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
             'ALREADY_KNOWN',
             taken.released_at
               ? `${args.slug} was the name of another BrainDog and cannot be given out again.`
-              : `${args.slug} is already somebody's record.`,
+              : `${args.slug} is already somebody's BrainDog.`,
             { at: 'slug' },
           );
 
@@ -2503,7 +2503,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         if (taken)
           return no<Named>(
             'ALREADY_KNOWN',
-            taken.released_at ? `${to} was the name of another BrainDog and cannot be given out again.` : `${to} is already somebody's record.`,
+            taken.released_at ? `${to} was the name of another BrainDog and cannot be given out again.` : `${to} is already somebody's BrainDog.`,
             { at: 'slug' },
           );
 

@@ -2594,9 +2594,9 @@ export class Directory$ extends DurableObject<Env> {
     const wrong = d.bad(slug);
     if (wrong) return { refusal: { code: 'VALUE_MALFORMED', fix: wrong, at: 'slug' } };
     const held = d.claimed(slug);
-    if (held === 'taken') return { refusal: { code: 'ALREADY_KNOWN', fix: `${slug} is already a record here.`, at: 'slug' } };
+    if (held === 'taken') return { refusal: { code: 'ALREADY_KNOWN', fix: `${slug} is already somebody's BrainDog here.`, at: 'slug' } };
     if (held === 'released')
-      return { refusal: { code: 'ALREADY_KNOWN', fix: `${slug} was the name of another record and is never given out again.`, at: 'slug' } };
+      return { refusal: { code: 'ALREADY_KNOWN', fix: `${slug} was the name of another BrainDog and is never given out again.`, at: 'slug' } };
     const person = d.person$(email, name ?? undefined);
     if (!person.ok) return { refusal: refusalOf(person) };
     return { person: { id: person.value.id, email: person.value.email, name: person.value.name } };

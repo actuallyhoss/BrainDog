@@ -166,9 +166,9 @@ export async function initFrom(o: {
   const wrong = directory.bad(o.slug);
   if (wrong) return refuse(wrong);
   const held = directory.claimed(o.slug);
-  if (held === 'taken') return refuse(`${o.slug} is already somebody's record here. A copy goes into an empty data folder.`);
+  if (held === 'taken') return refuse(`${o.slug} is already somebody's BrainDog here. A copy goes into an empty data folder.`);
   if (held === 'released')
-    return refuse(`${o.slug} was the name of another record and cannot be given out again. Every link that still says it would read the wrong record.`);
+    return refuse(`${o.slug} was the name of another BrainDog and cannot be given out again. Every link that still says it would open the wrong one.`);
   /* ONE RECORD, ONE FILE. Two names reaching two files that each say they are one record id is the tenant map lying, and
      the second import would be a second copy nobody could tell from the first. */
   if (directory.knows(record)) {

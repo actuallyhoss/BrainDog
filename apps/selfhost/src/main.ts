@@ -353,9 +353,9 @@ async function init(args: readonly string[]): Promise<void> {
 
   const held = directory.claimed(slug);
   if (held === 'taken')
-    return refuse(`${slug} is already somebody's record here, and init makes a record once. Serve it with ${commandFor('serve')}, or make a new one in an empty data folder.`);
+    return refuse(`${slug} is already somebody's BrainDog here, and init makes one once. Serve it with ${commandFor('serve')}, or make a new one in an empty data folder.`);
   if (held === 'released')
-    return refuse(`${slug} was the name of another record and cannot be given out again. Every link that still says it would read the wrong record.`);
+    return refuse(`${slug} was the name of another BrainDog and cannot be given out again. Every link that still says it would open the wrong one.`);
 
   /* AND A RECORD FILE THAT ALREADY HOLDS A RECORD IS NEVER ADOPTED. `49 §5.22` step 2 refuses on the
      directory existing at all, and relaxing that to "the Directory does not name this slug" opened a

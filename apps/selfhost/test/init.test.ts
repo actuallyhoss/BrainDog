@@ -166,7 +166,7 @@ test('AND A SECOND INIT IS A REFUSAL, not a second record', async () => {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
     const again = run(data, 'init', 'the-studio', '--owner', 'bo@example.com');
     assert.equal(again.code, 1);
-    assert.match(again.said, /is already somebody's record here/);
+    assert.match(again.said, /is already somebody's BrainDog here/);
 
     const dirSql = openSqlite(join(data, 'directory.sqlite'));
     assert.equal(dirSql.all('SELECT 1 FROM dir_record').length, 1, 'a refused init left a second record behind');
@@ -363,7 +363,7 @@ test('AND A NAME WITH NO RECORD BEHIND IT IS NOT REISSUED, nor half-created', as
     rmSync(join(data, 'the-studio'), { recursive: true, force: true });
     const again = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
     assert.equal(again.code, 1);
-    assert.match(again.said, /is already somebody's record here/);
+    assert.match(again.said, /is already somebody's BrainDog here/);
     assert.equal(existsSync(join(data, 'the-studio')), false, 'a refused init rebuilt the record it refused');
 
     const after = openSqlite(join(data, 'directory.sqlite'));

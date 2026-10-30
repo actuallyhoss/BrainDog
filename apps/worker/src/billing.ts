@@ -544,8 +544,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const wrong = badSlug(slug);
     if (wrong !== null) return no('VALUE_MALFORMED', wrong, { at: 'slug' });
     const held = await deps.claimed(slug);
-    if (held === 'taken') return no('ALREADY_KNOWN', `${slug} is already a record here.`, { at: 'slug' });
-    if (held === 'released') return no('ALREADY_KNOWN', `${slug} was the name of another record and is never given out again.`, { at: 'slug' });
+    if (held === 'taken') return no('ALREADY_KNOWN', `${slug} is already somebody's BrainDog here.`, { at: 'slug' });
+    if (held === 'released') return no('ALREADY_KNOWN', `${slug} was the name of another BrainDog and is never given out again.`, { at: 'slug' });
     const named = personName(body['name']);
     if (!named.ok) return named;
     const name = named.value;
