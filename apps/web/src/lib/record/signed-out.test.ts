@@ -29,6 +29,7 @@ test('A SIGN-OUT DROPS EVERY KEY OF WHAT THE PERSON READ, and keeps what is the 
     bd_side_counts: '{}',
     bd_side_order: '{}',
     bd_slash_threads: '[]',
+    'bd_slash_threads:https://x.test/api:p_1': '[]',
     bd_send_convos: '[]',
     bd_opened: '[]',
     'braindog.seen.money': '{}',
@@ -93,7 +94,8 @@ test('EACH KEY IS THE ONE ITS OWN MODULE KEEPS, so a renamed key is not left beh
   assert.ok(src('../page/byline.ts').includes('`braindog.seen.${slug}`'));
   assert.ok(src('../sharing/sharing.ts').includes("'braindog.welcomed'") && src('../sharing/sharing.ts').includes('`${WELCOMED}:${base}`'));
   assert.ok(src('../home/Home.svelte').includes('`bd_board_draft:${apiBase()}`'));
-  assert.deepEqual([...SIGNED_OUT_PREFIXES], ['braindog.seen.', 'braindog.welcomed:', 'bd_board_draft:']);
+  assert.ok(src('../palette/slash-chat.ts').includes('`${THREADS_KEY}:${base}:${person}`'));
+  assert.deepEqual([...SIGNED_OUT_PREFIXES], ['braindog.seen.', 'braindog.welcomed:', 'bd_board_draft:', 'bd_slash_threads:']);
   assert.ok(src('../sharing/see-as.svelte.ts').includes(`'${SIGNED_OUT_SESSION_KEYS[0]}'`));
 });
 

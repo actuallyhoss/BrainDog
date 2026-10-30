@@ -51,6 +51,8 @@ export const SIGNED_OUT_PREFIXES = [
   'braindog.welcomed:',
   /* a board's unsaved arrangement (`Home.svelte`) */
   'bd_board_draft:',
+  /* Slash's threads, one list a person a BrainDog (`slash-chat.ts` `threadsKey`) */
+  'bd_slash_threads:',
 ] as const;
 
 /** Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), never carried to the next session. */
