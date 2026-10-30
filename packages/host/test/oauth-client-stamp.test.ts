@@ -50,6 +50,8 @@ function memoryStore(): OAuthStore {
         return null;
       case 'refresh_rotate':
         return false;
+      case 'refresh_retry':
+        return false;
       case 'refresh_drop':
         return 'ok';
     }
