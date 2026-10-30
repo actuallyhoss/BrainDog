@@ -57,6 +57,12 @@ export const HELD_MOST = 500;
  */
 export const HELD_PER_PLACE = 10;
 
+/**
+ * The most kept arrivals waiting at one door of a record (sec-follow M6): a token that leaked for one door fills that
+ * door's share and never the whole record's, so his bank door keeps room while another door is flooded.
+ */
+export const HELD_PER_DOOR = 30;
+
 /** What the Directory keeps for a door signed in a header (`hmac_sha256`, `stripe`), in place of a token's digest. */
 export const SIGNED_DOOR = 'signed';
 
@@ -112,14 +118,20 @@ export type HeldBucket = {
  * still ringing from one the queue lost without opening the seal: `next` is when the next ring is due (ms), `tries`
  * how many have failed, `kept` when it was first kept (ms).
  */
-type Ringing = { next: number; tries: number; kept: number; from?: string | undefined };
+type Ringing = { next: number; tries: number; kept: number; from?: string | undefined; door?: string | undefined; signed?: boolean | undefined };
 
-/** `from` is the place it came from, as a digest (`placeOf`), so the bucket counts by place and never holds an address. */
+/**
+ * `from` is the place it came from, as a digest (`placeOf`), so the bucket counts by place and never holds an address;
+ * `door` the door it came to, as a digest (`doorOf`); `signed` that it came signed in a header, which a crowded record
+ * makes room for first (`hold`).
+ */
 const ringing = (r: Ringing): Record<string, string> => ({
   next: String(r.next),
   tries: String(r.tries),
   kept: String(r.kept),
   ...(r.from === undefined ? {} : { from: r.from }),
+  ...(r.door === undefined ? {} : { door: r.door }),
+  ...(r.signed === true ? { signed: '1' } : {}),
 });
 
 function ringingOf(meta: Record<string, string> | undefined): Ringing | null {
@@ -210,7 +222,10 @@ export async function serveHeld(request: Request, deps: HeldDeps): Promise<Respo
     op({ op: 'door', held: false, rec, why: 'unknown' }, 'error');
     return second;
   }
-  const kept = await hold(deps, rec, request.url, [...request.headers], bytes, await placeOf(request.headers.get('cf-connecting-ip') ?? ''));
+  const kept = await hold(deps, rec, request.url, [...request.headers], bytes, await placeOf(request.headers.get('cf-connecting-ip') ?? ''), {
+    door: await doorOf(rec, path?.channel === 'webhook' ? path.ingest : ''),
+    signed: sign === SIGNED_DOOR,
+  });
   return kept ? new Response(null, { status: 202, headers: { 'cache-control': 'no-store' } }) : second;
 }
 
@@ -297,8 +312,21 @@ async function placeOf(ip: string): Promise<string> {
   return (await digest(utf8(`held-place:${ipBucket(ip)}`))).slice(0, 24);
 }
 
+/** The door an arrival came to, as a short digest, so the bucket counts by door and names no door in its metadata. */
+async function doorOf(rec: string, ingest: string): Promise<string> {
+  return (await digest(utf8(`held-door:${rec}/${ingest}`))).slice(0, 24);
+}
+
 /** Keep one arrival and ring for it: `true` once it is in the bucket, whether or not the ring went. */
-async function hold(deps: HeldDeps, rec: string, url: string, headers: [string, string][], bytes: Uint8Array, from: string): Promise<boolean> {
+async function hold(
+  deps: HeldDeps,
+  rec: string,
+  url: string,
+  headers: [string, string][],
+  bytes: Uint8Array,
+  from: string,
+  at: { door: string; signed: boolean },
+): Promise<boolean> {
   const bucket = deps.bucket;
   if (bucket === undefined || !deps.secret) return false;
   const now = (deps.now ?? Date.now)();
@@ -309,21 +337,43 @@ async function hold(deps: HeldDeps, rec: string, url: string, headers: [string, 
       op({ op: 'door', held: false, rec, why: 'full' }, 'error');
       return false;
     }
-    const mine = waiting.objects.filter((o) => o.key.startsWith(`${HELD_WAIT}${rec}/`)).length;
-    if (mine >= HELD_PER_RECORD) {
-      op({ op: 'door', held: false, rec, why: 'record-full' }, 'error');
-      return false;
+    const mine = waiting.objects.filter((o) => o.key.startsWith(`${HELD_WAIT}${rec}/`));
+    const atDoor = mine.filter((o) => o.customMetadata?.['door'] === at.door);
+    /* A RECORD OR A DOOR THAT IS FULL MAKES ROOM ONLY FOR AN ARRIVAL SIGNED IN A HEADER, by moving its oldest unsigned
+       one to `gave-up`, with the mail every give-up sends (sec-follow M6). Never for an unsigned one: then a token that
+       leaked could push his own waiting bank texts out, one new post at a time. */
+    const crowded = mine.length >= HELD_PER_RECORD ? mine : atDoor.length >= HELD_PER_DOOR ? atDoor : null;
+    if (crowded !== null) {
+      const oldest = at.signed
+        ? crowded
+            .filter((o) => o.customMetadata?.['signed'] !== '1')
+            .sort((a, b) => (Number(a.customMetadata?.['kept']) || a.uploaded.getTime()) - (Number(b.customMetadata?.['kept']) || b.uploaded.getTime()))[0]
+        : undefined;
+      const sealed = oldest === undefined ? null : await bucket.get(oldest.key);
+      if (oldest === undefined || sealed === null) {
+        op({ op: 'door', held: false, rec, why: crowded === mine ? 'record-full' : 'door-full' }, 'error');
+        return false;
+      }
+      await giveUp(deps, bucket, oldest.key, new Uint8Array(await sealed.arrayBuffer()), rec, 'crowded');
     }
     /* ONE PLACE, ONE RECORD (RD14): a gateway posting for many people fills only each person's own share. */
     if (waiting.objects.filter((o) => o.key.startsWith(`${HELD_WAIT}${rec}/`) && o.customMetadata?.['from'] === from).length >= HELD_PER_PLACE) {
       op({ op: 'door', held: false, rec, why: 'place-full' }, 'error');
       return false;
     }
-    const envelope: Envelope = { url, headers: headers.filter(([k]) => !UNKEPT.has(k.toLowerCase())), body: base64(bytes), at: new Date(now).toISOString(), from };
+    const envelope: Envelope = {
+      url,
+      headers: headers.filter(([k]) => !UNKEPT.has(k.toLowerCase())),
+      body: base64(bytes),
+      at: new Date(now).toISOString(),
+      from,
+      door: at.door,
+      ...(at.signed ? { signed: true } : {}),
+    };
     /* THE SAME REQUEST KEPT TWICE IS ONE KEY: his two devices post every text, and the second one is the same arrival. */
     const key = `${HELD_WAIT}${rec}/${await digest(concat(utf8(url), bytes))}.held`;
     await bucket.put(key, await seal(deps.secret, utf8(JSON.stringify(envelope))), {
-      customMetadata: ringing({ next: now + stepOf(0) * 1000, tries: 0, kept: now, from }),
+      customMetadata: ringing({ next: now + stepOf(0) * 1000, tries: 0, kept: now, from, door: at.door, signed: at.signed }),
     });
     op({ op: 'door', held: true, rec, bytes: bytes.byteLength }, 'error');
     try {
@@ -392,7 +442,7 @@ export async function redeliver(message: HeldMessage, deps: HeldDeps): Promise<R
        to ring for a week and end as a mail about nothing. The put holds only while the object is the one read (R2's
        `etagMatches`, which fails on an object deleted since); one gone or kept again since is left as it is, and the
        ring just queued finds it gone or rings the new one. A bucket that says no etag is read again first. */
-    const meta = ringing({ next: now + delay * 1000, tries, kept: Number.isFinite(kept) ? kept : now, from: envelope.from });
+    const meta = ringing({ next: now + delay * 1000, tries, kept: Number.isFinite(kept) ? kept : now, from: envelope.from, door: envelope.door, signed: envelope.signed });
     let marked: unknown;
     try {
       marked =
@@ -476,7 +526,7 @@ export async function pruneGaveUp(bucket: HeldBucket, now: number): Promise<numb
 
 /* ── the pieces ───────────────────────────────────────────────────────────── */
 
-type Envelope = { url: string; headers: [string, string][]; body: string; at: string; from?: string };
+type Envelope = { url: string; headers: [string, string][]; body: string; at: string; from?: string; door?: string; signed?: boolean };
 
 /** Headers the runtime sets for itself, which a rebuilt request must not carry over. */
 const UNKEPT = new Set(['host', 'content-length', 'connection', 'transfer-encoding']);
