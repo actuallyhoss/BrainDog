@@ -1392,7 +1392,7 @@ mails nobody.
 
 ---
 
-## ADR-060 · No admin token; VAULT is a browser session only, ADMIN a session or one operation grant
+## ADR-060 · No admin token; VAULT (now KEYCHAIN) is a browser session only, ADMIN a session or one operation grant
 
 **Decided.** Token scopes are `read propose write` and nothing else — **there is no `admin` scope,
 ever**, and no standing token reaches ADMIN. The VAULT group (`listGrants openGrant bindGrant
