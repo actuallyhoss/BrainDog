@@ -205,7 +205,7 @@ const CALLS: readonly Call[] = [
   { name: 'what changed', want: 200, path: '/api/recentHistory?limit=5' },
   { name: 'the pages', want: 200, path: '/api/pages' },
   { name: 'a page', want: 200, path: '/api/page?slug=desk' },
-  { name: 'a page that is not there', want: 422, path: '/api/page?slug=nowhere' },
+  { name: 'a page that is not there', want: 404, path: '/api/page?slug=nowhere' },
   { name: 'the figures', want: 200, path: '/api/figures' },
   { name: 'a figure', want: 200, path: '/api/metric?metric=open-tasks' },
   { name: 'a figure that is not there', want: 422, path: '/api/metric?metric=nothing-counted' },
