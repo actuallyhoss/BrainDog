@@ -4,8 +4,9 @@
   The page itself is `Signup.svelte`, and it reads a sentence with the whole starter catalogue (every use case and the
   parts each makes), the rules that place the words, the build and the record's client: a few hundred kilobytes a
   stranger waited for before the screen said anything. So this draws the step sign-up opens on, the page's name and
-  "Getting sign-in ready", in the frame every entry screen stands in, and asks for the page once that has painted. The
-  page opens on the same step, and asks who may sign up as it always did, so the swap moves nothing on screen.
+  "Getting sign-in ready", in the frame every entry screen stands in, and asks for the page once that has painted. Who
+  may sign up is asked here as it draws (`early.ts`), beside the page's load, and the page opens on the same step with
+  the answer in hand, so the swap moves nothing on screen and the field shows as the page arrives.
 
   A MAILED LINK OPENS ON ITS OWN STEP, "Making your BrainDog", which is what the page says while it spends the link.
 -->
@@ -15,10 +16,14 @@
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Entry from '../signin/Entry.svelte';
+  import { askEarly, asksFirst } from './early.ts';
   import { words } from './words.ts';
 
   /* THE ADDRESS'S OWN LINK (`arrivalOf` in `lib/signup.ts` reads it, and wipes it, once the page is here). */
   const verifying = typeof location !== 'undefined' && /^#verify=/u.test(location.hash);
+
+  /* WHO MAY SIGN UP IS ASKED NOW, while the page loads, and the page takes the answer when it comes (`early.ts`). */
+  if (typeof location !== 'undefined' && asksFirst(location.hash)) askEarly();
 
   let Page = $state<Component | null>(null);
   /* THE PAGE DID NOT ARRIVE (the connection dropped, or a release replaced its files): said, with the way to ask again. */
