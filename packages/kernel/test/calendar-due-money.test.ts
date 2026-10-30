@@ -131,3 +131,16 @@ test('A CALENDAR OVER DEADLINES TAKES THE AMOUNT AS ITS THIRD COLUMN AND NO OTHE
   assert.equal(said(['title', 'day']), '');
   assert.match(said(['title', 'day', 'row']), /title, day/u);
 });
+
+test('A RENEWAL THAT COSTS NOTHING IS NO MONEY FALLING DUE: its day stays a deadline, with no amount, and "amount is set" leaves it out', async () => {
+  const k = await record();
+  const out = k.create('obligations', { what: 'Wildcard certificate', due: '2026-10-27', amount: usd(0), repeats: 'none' }, OWNER);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.ok(!drawn(k).some((line) => line.includes('Wildcard certificate')), 'the calendar of money draws no £0.00 bill');
+  const money = (k.block({ kind: 'table', source: 'deadlines', horizon: 30, where: 'amount is set, day after yesterday' } as never).rows ?? []).map((r) => String(r.fields.title));
+  assert.ok(!money.includes('Wildcard certificate'), 'Coming up lists no £0.00 bill');
+  const due = (k.block({ kind: 'table', source: 'deadlines', horizon: 30, where: 'day after yesterday' } as never).rows ?? []).find((r) => r.fields.title === 'Wildcard certificate');
+  assert.ok(due, 'its day is still a deadline');
+  assert.equal(due.fields.amount, null);
+  assert.equal(due.fields.direction, null);
+});

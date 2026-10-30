@@ -138,9 +138,15 @@ export function walkedOf(schema: Schema, field: string, legs: readonly unknown[]
   return [each.length === 1 ? each[0]! : { any: each }];
 }
 
-/** A stored money value as a reader is shown it, its amount and currency and nothing else, or `null`. */
+/**
+ * What falls due in money on one row, its amount and currency and nothing else, or `null`.
+ *
+ * NOUGHT IS NO MONEY FALLING DUE (finish F1, 30 Oct): a renewal that costs nothing, a free certificate, read "£0.00" as a
+ * bill on Coming up. Its day still falls due, so it stays a deadline, with no amount, and every list that asks
+ * `amount is set` (Coming up, Money's calendar, Today's tile) leaves it out as one.
+ */
 export function moneyValue(v: Json | undefined): { amount: number; currency: string } | null {
-  return v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.amount === 'number' && typeof v.currency === 'string'
+  return v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.amount === 'number' && v.amount !== 0 && typeof v.currency === 'string'
     ? { amount: v.amount, currency: v.currency }
     : null;
 }
