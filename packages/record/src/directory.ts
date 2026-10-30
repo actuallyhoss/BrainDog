@@ -73,6 +73,9 @@ const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
  */
 const DIGEST = /^[0-9a-f]{64}$/;
 
+/** The most webhook doors one record tells the Directory of at once (`doors$`): far past any record's, and a bound. */
+const DOORS_MOST = 200;
+
 /** Names the platform owns, or that would read as one. A slug is a path segment before it is a name. */
 const RESERVED = new Set([
   /* 33 §4's own top-level surface, first: a slug that shadowed one of these would be a name the
@@ -2210,6 +2213,34 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         if (was === sign) return ok(null);
         if (sign === null) sql.exec('DELETE FROM dir_door WHERE record = ? AND ingest = ?', record, ingest);
         else sql.exec('INSERT INTO dir_door (record, ingest, sign) VALUES (?, ?, ?) ON CONFLICT (record, ingest) DO UPDATE SET sign = excluded.sign', record, ingest, sign);
+        return ok(null);
+      }),
+
+    /**
+     * Every webhook door of a record at once, as the record reads them itself (DR1): what `door$` learns one arrival at a
+     * time, told by the record on its first alarm after a deploy and after a token is minted, so the held store knows a
+     * door before its first arrival. The record's doors become exactly these; a door not named is forgotten. Written
+     * only where a row differs, so a record telling the same doors again writes nothing. Every check before the first
+     * write, for `inbound$`'s reason; at most `DOORS_MOST`, so one record cannot fill the table.
+     */
+    doors$: (record: string, doors: readonly { ingest: string; sign: string }[]): Result<null> =>
+      sql.transactionSync(() => {
+        if (!Array.isArray(doors) || doors.length > DOORS_MOST) return no<null>('VALUE_MALFORMED', `A BrainDog tells at most ${String(DOORS_MOST)} doors at once.`, { at: 'doors' });
+        const want = new Map<string, string>();
+        for (const d of doors) {
+          if (typeof d?.sign !== 'string' || (d.sign !== 'signed' && !DIGEST.test(d.sign)))
+            return no<null>('VALUE_MALFORMED', 'A door is kept by the SHA-256 of its token, as 64 lower-case hex characters, or as signed. The token itself is never stored here.', { at: 'sign' });
+          if (typeof d.ingest !== 'string' || d.ingest === '' || d.ingest.length > 256) return no<null>('VALUE_MALFORMED', 'A door is named by its ingest id.', { at: 'ingest' });
+          want.set(d.ingest, d.sign);
+        }
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ? AND closed_at IS NULL', record))
+          return no<null>('OUT_OF_BOUNDS', `There is no open record ${record}.`, { at: 'record' });
+        const had = sql.all<{ ingest: string; sign: string }>('SELECT ingest, sign FROM dir_door WHERE record = ?', record);
+        for (const h of had) if (!want.has(h.ingest)) sql.exec('DELETE FROM dir_door WHERE record = ? AND ingest = ?', record, h.ingest);
+        const was = new Map(had.map((h) => [h.ingest, h.sign]));
+        for (const [ingest, sign] of want)
+          if (was.get(ingest) !== sign)
+            sql.exec('INSERT INTO dir_door (record, ingest, sign) VALUES (?, ?, ?) ON CONFLICT (record, ingest) DO UPDATE SET sign = excluded.sign', record, ingest, sign);
         return ok(null);
       }),
 

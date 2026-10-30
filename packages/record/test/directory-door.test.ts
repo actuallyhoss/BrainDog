@@ -50,3 +50,21 @@ test('A TOKEN ITSELF IS NEVER TAKEN', () => {
   assert.equal(out.ok, false);
   assert.equal(out.refusal?.code, 'VALUE_MALFORMED');
 });
+
+test('A RECORD TELLS ALL ITS DOORS AT ONCE (DR1): the set becomes exactly what it names, and a token is refused', () => {
+  const { d, sql, record } = studio();
+  value(d.door$(record, 'gone', SIGN));
+  value(d.doors$(record, [{ ingest: 'bank', sign: SIGN }, { ingest: 'hook', sign: 'signed' }]));
+  assert.equal(d.doorHolds(record, 'bank', SIGN), true, 'known before its first arrival');
+  assert.equal(d.doorHolds(record, 'hook', 'signed'), true);
+  assert.equal(d.doorHolds(record, 'gone', SIGN), false, 'a door the record no longer names is forgotten');
+  value(d.doors$(record, [{ ingest: 'bank', sign: 'b'.repeat(64) }]));
+  assert.equal(d.doorHolds(record, 'bank', SIGN), false, 'a token minted again replaces the old');
+  assert.equal(d.doorHolds(record, 'hook', 'signed'), false);
+  const out = d.doors$(record, [{ ingest: 'bank', sign: 'tok-123' }]) as { ok: boolean; refusal?: { code: string } };
+  assert.equal(out.ok, false);
+  assert.equal(d.doorHolds(record, 'bank', 'b'.repeat(64)), true, 'a refusal writes nothing');
+  value(d.close(record));
+  assert.equal((d.doors$(record, []) as { ok: boolean }).ok, false);
+  assert.equal(sql.one('SELECT 1 AS x FROM dir_door'), undefined);
+});

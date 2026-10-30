@@ -141,6 +141,8 @@ export const hubWords = {
   turnedOff: (n: number) => `${n.toLocaleString('en')} off`,
   turnedOn: (n: number) => `${n.toLocaleString('en')} on`,
   thisWeek: (n: number) => (n === 0 ? 'None this week.' : `${n.toLocaleString('en')} this week.`),
+  /* AND THE MONTH, where the record keeps it (`month_fired`, DR2): the tiles above and Usage both say "this month". */
+  thisMonth: (n: number) => (n === 0 ? 'None this month.' : `${n.toLocaleString('en')} this month.`),
 
   /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
   runsMonth: 'Runs this month',
@@ -305,6 +307,8 @@ export type Counted = AutomationRow & {
   family?: string | null | undefined;
   /** Runs in the last seven days, when the record counts them. */
   week?: number | undefined;
+  /** Runs this calendar month, UTC, when the record keeps the month (`rule_month`). */
+  month_fired?: number | undefined;
 };
 
 /** When a count's last firing was, as a person says a day: today, yesterday, "on 3 Oct", and the year when not this one. */
@@ -331,7 +335,10 @@ export function countSaid(row: Counted, now: number): string {
   if (typeof row.fired !== 'number') return '';
   if (row.fired <= 0) return [hubWords.neverRan, row.why_idle?.trim() ?? ''].filter(Boolean).join(' ');
   const when = row.last_at ? onDay(row.last_at, now) : '';
-  /* THE WEEK FOLLOWS THE WHOLE COUNT, so a busy rule and a quiet one read differently at a glance. */
+  /* THE MONTH FOLLOWS THE WHOLE COUNT, so a busy rule and a quiet one read differently at a glance, in the month the
+     tiles above and Usage count in (DR2): the row said "3 this week" under "Runs this month". The week only from a host
+     older than the month's count. */
+  if (typeof row.month_fired === 'number') return `${hubWords.ranCount(row.fired, when)} ${hubWords.thisMonth(row.month_fired)}`;
   return typeof row.week === 'number' ? `${hubWords.ranCount(row.fired, when)} ${hubWords.thisWeek(row.week)}` : hubWords.ranCount(row.fired, when);
 }
 
