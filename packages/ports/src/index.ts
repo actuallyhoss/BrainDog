@@ -16,7 +16,7 @@
  * The storage port, its guard and its boot probe (`37 §2.4`). `Param`, `Row` and `Sql` moved there from here with
  * the guard, so the port and the checks every adapter runs in front of it are read in one file.
  */
-export { DO_LIMITS, SQL_ERROR_CODES, SqlError, bootProbe, guard, guardScript, guarded, mapDriverMessage, measureCaps } from './sql.ts';
+export { DO_LIMITS, DO_MEASURED, SQL_ERROR_CODES, SqlError, bootProbe, guard, guardScript, guardShape, guarded, mapDriverMessage, measureCaps } from './sql.ts';
 export type { Capabilities, Param, Row, Sql, SqlErrorCode } from './sql.ts';
 
 /**

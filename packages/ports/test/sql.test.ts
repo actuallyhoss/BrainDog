@@ -24,11 +24,13 @@ import { test } from 'node:test';
 import type { Param, Row, Sql } from '../src/index.ts';
 import {
   DO_LIMITS,
+  DO_MEASURED,
   SQL_ERROR_CODES,
   SqlError,
   bootProbe,
   guard,
   guardScript,
+  guardShape,
   guarded,
   mapDriverMessage,
   measureCaps,
@@ -238,11 +240,23 @@ test('A SCRIPT REFUSES A TRANSACTION KEYWORD AFTER ANY SEMICOLON, AND RUNS NOTHI
 test('WHAT THE GUARD CANNOT COUNT AHEAD IT NAMES AFTER THE DRIVER, AND WHAT IT CANNOT NAME IT LEAVES ALONE', () => {
   const raw = bare();
   const sql = guarded(raw);
-  /* Expression depth needs a parser, so it is the one ceiling left to the driver (`37 §10` #5). Node refuses at 1,001
-     terms where the DO refused `SELECT ?+?+...` at 101; both say `Expression tree is too large`. */
+  /* A RUN OF ONE OPERATOR IS COUNTED AHEAD: the DO answered 100 `OR` terms and refused 101, and so does the guard now,
+     where Node alone answered up to 1,000. */
+  assert.doesNotThrow(() => sql.one(`SELECT ${Array(100).fill('1').join(' OR ')} AS v`));
+  let counted: unknown;
+  try {
+    sql.one(`SELECT ${Array(101).fill('1').join(' OR ')} AS v`);
+  } catch (e) {
+    counted = e;
+  }
+  assert.ok(counted instanceof SqlError, String(counted));
+  assert.equal(counted.code, 'EXPR_TOO_DEEP');
+  assert.match(counted.message, /at least 101 deep; the ceiling is 100/);
+  /* A DEPTH THE GUARD DOES NOT READ (a run of NOT, which `depthOf` leaves uncounted rather than risk counting one too
+     many) is the driver's, and the driver's sentence is named after the fact: Node refuses past 1,000. */
   let deep: unknown;
   try {
-    sql.one(`SELECT ${Array(1001).fill('1').join(' OR ')} AS v`);
+    sql.one(`SELECT ${'NOT '.repeat(1001)}1 AS v`);
   } catch (e) {
     deep = e;
   }
@@ -265,6 +279,58 @@ test('WHAT THE GUARD CANNOT COUNT AHEAD IT NAMES AFTER THE DRIVER, AND WHAT IT C
   assert.equal(codeOf(() => sql.exec('INSERT INTO u VALUES (?)', 'a')), 'CONSTRAINT');
   assert.throws(() => sql.exec('INSERT INTO u VALUES (?)', 'a'), { message: 'UNIQUE constraint failed: u.k' });
   raw.close();
+});
+
+test('A TEXT WITH U+0000 AND A VALUE PAST WHAT THE CLOUD TAKES ARE REFUSED BEFORE EITHER DRIVER BINDS THEM', () => {
+  const raw = bare();
+  const sql = guarded(raw);
+  sql.exec('CREATE TABLE v (x)');
+  /* Measured: `node:sqlite` stored 'a\u0000b' as 'a', and the DO stored three characters its `length()` reads as one. */
+  assert.equal(codeOf(() => sql.exec('INSERT INTO v (x) VALUES (?)', 'a\u0000b')), 'SYNTAX');
+  assert.throws(() => guard('SELECT ?', ['a\u0000b']), /parameter 1 holds the character U\+0000/);
+  /* The same bytes bound as bytes are a BLOB, and kept whole. */
+  sql.exec('INSERT INTO v (x) VALUES (?)', Uint8Array.of(97, 0, 98));
+  assert.deepEqual(plain(sql.all('SELECT length(x) AS n FROM v')), [{ n: 3 }]);
+  /* The DO answered 4,194,304 bytes and refused 4,194,305, as a string and as bytes. */
+  assert.doesNotThrow(() => guard('SELECT length(?) AS n', ['o'.repeat(DO_MEASURED.length)]));
+  assert.equal(codeOf(() => guard('SELECT length(?) AS n', ['o'.repeat(DO_MEASURED.length + 1)])), 'STATEMENT_TOO_LONG');
+  assert.equal(codeOf(() => guard('SELECT length(?) AS n', [new Uint8Array(DO_MEASURED.length + 1)])), 'STATEMENT_TOO_LONG');
+  /* Counted in UTF-8 bytes, so two-byte text passes the ceiling at half the characters. */
+  assert.equal(codeOf(() => guard('SELECT length(?) AS n', ['é'.repeat(DO_MEASURED.length / 2 + 1)])), 'STATEMENT_TOO_LONG');
+  raw.close();
+});
+
+test('THE SHAPE IS COUNTED FROM BELOW: WHAT THE GUARD REFUSES THE DURABLE OBJECT REFUSED, AND ITS EDGE RUNS', () => {
+  const n = (k: number, each: (i: number) => string, sep: string) => Array.from({ length: k }, (_, i) => each(i)).join(sep);
+  /* Each pair as the DO answered it on workerd 1.20260903.1: the first runs there, the second is refused there. */
+  const pairs: [string, string, string, SqlErrorCode][] = [
+    ['+ chain', `SELECT ${n(100, () => '1', ' + ')} AS v`, `SELECT ${n(101, () => '1', ' + ')} AS v`, 'EXPR_TOO_DEEP'],
+    ['AND chain', `SELECT 1 AS v WHERE ${n(100, () => '1', ' AND ')}`, `SELECT 1 AS v WHERE ${n(101, () => '1=1', ' AND ')}`, 'EXPR_TOO_DEEP'],
+    ['nested calls', `SELECT ${'abs('.repeat(99)}1${')'.repeat(99)} AS v`, `SELECT ${'abs('.repeat(100)}1${')'.repeat(100)} AS v`, 'EXPR_TOO_DEEP'],
+    ['nested brackets', `SELECT ${'1 + ('.repeat(99)}1${')'.repeat(99)} AS v`, `SELECT ${'1 + ('.repeat(100)}1${')'.repeat(100)} AS v`, 'EXPR_TOO_DEEP'],
+    ['|| chain', `SELECT ${n(100, () => "'a'", ' || ')} AS v`, `SELECT ${n(101, () => "'a'", ' || ')} AS v`, 'EXPR_TOO_DEEP'],
+    ['arguments', `SELECT json_array(${n(127, String, ', ')}) AS v`, `SELECT json_array(${n(128, String, ', ')}) AS v`, 'SYNTAX'],
+    ['table', `CREATE TABLE t (${n(100, (i) => `c${i} TEXT`, ', ')}, PRIMARY KEY (c0, c1))`, `CREATE TABLE t (${n(101, (i) => `c${i}`, ', ')})`, 'TOO_MANY_COLUMNS'],
+    ['results', `SELECT ${n(100, (i) => `${i} AS c${i}`, ', ')}`, `SELECT ${n(101, (i) => `${i} AS c${i}`, ', ')}`, 'TOO_MANY_COLUMNS'],
+    ['values', `VALUES (${n(100, String, ', ')})`, `VALUES (${n(101, String, ', ')})`, 'TOO_MANY_COLUMNS'],
+  ];
+  for (const [what, runs, refused, code] of pairs) {
+    assert.doesNotThrow(() => guardShape(runs), what);
+    assert.equal(codeOf(() => guardShape(refused)), code, what);
+  }
+  /* WHAT THE DO RAN THAT A CARELESS COUNT WOULD REFUSE: a BETWEEN's AND, a long IN list, many CASE arms, a sum of brackets,
+     and a hundred comparisons joined by OR each holding its own AND. */
+  for (const runs of [
+    `SELECT 1 AS v WHERE ${n(60, (i) => `x BETWEEN ${i} AND ${i + 1}`, ' AND ')}`,
+    `SELECT 1 AS v WHERE 1 IN (${n(500, String, ', ')})`,
+    `SELECT CASE ${n(60, (i) => `WHEN ${i} THEN ${i}`, ' ')} END AS v`,
+    `SELECT ${n(100, () => '(1)', ' + ')} AS v`,
+    `SELECT 1 AS v WHERE ${n(60, (i) => `(1 = ${i} AND 2 = 2)`, ' OR ')}`,
+    `SELECT coalesce(${n(120, String, ', ')}) AS v`,
+  ])
+    assert.doesNotThrow(() => guardShape(runs), runs.slice(0, 40));
+  /* AND IN A SCRIPT, statement by statement, as a migration runs. */
+  assert.equal(codeOf(() => guardScript(`CREATE TABLE a (x); CREATE TABLE b (${n(101, (i) => `c${i}`, ', ')});`)), 'TOO_MANY_COLUMNS');
 });
 
 test('THE WRAPPER KEEPS THE PORT IT WRAPS: ITS TRANSACTIONS, ITS ROWS, AND WHATEVER ELSE THE HOST HUNG ON IT', () => {
@@ -295,6 +361,11 @@ test('THE DRIVER MESSAGES MAP TO THE THIRTEEN, AND THE WORKER SENTENCES ARE THE 
     ['LIKE or GLOB pattern too complex: SQLITE_ERROR', 'LIKE_TOO_LONG'],
     ['too many SQL variables at offset 213: SQLITE_ERROR', 'TOO_MANY_PARAMS'],
     ['statement too long: SQLITE_TOOBIG', 'STATEMENT_TOO_LONG'],
+    /* Workerd's own sentences for the shapes `guardShape` counts, measured on 30 Oct 2026. */
+    ['string or blob too big: SQLITE_TOOBIG', 'STATEMENT_TOO_LONG'],
+    ['too many arguments on function json_array at offset 7: SQLITE_ERROR', 'SYNTAX'],
+    ['too many terms in GROUP BY clause: SQLITE_ERROR', 'TOO_MANY_COLUMNS'],
+    ['too many columns in result set: SQLITE_ERROR', 'TOO_MANY_COLUMNS'],
     ['Value is too large to be represented as a JavaScript number: 9007199254740993', 'INT_OUT_OF_RANGE'],
     [
       'To execute a transaction, please use the state.storage.transaction() or state.storage.transactionSync() APIs instead of the SQL BEGIN TRANSACTION or SAVEPOINT statements.',
