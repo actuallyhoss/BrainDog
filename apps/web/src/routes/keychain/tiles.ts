@@ -331,6 +331,7 @@ export const dated = {
   expired: (when: string) => `Expired ${when}`,
   usedBy: 'Used by',
   usedByNone: 'Nothing names this key yet.',
+  usedByMany: (n: number) => `Used by ${n.toLocaleString('en')} things`,
   details: 'Details',
   locked: 'Locked',
   lockedWhy: 'The Keychain locked itself after a while with no one here. Sign in again to open your keys.',
@@ -342,9 +343,12 @@ export const dated = {
 /** "Changed 3 weeks ago", or `null` for a key whose grant dates nothing. */
 export const changedSaid = (k: KeyRow, now: number = Date.now()): string | null => (k.changed ? dated.changed(sinceWords(k.changed, now)) : null);
 
-/** "Expires in 2 weeks" or "Expired 3 days ago", from the register's deadline, or `null` for a key with none. */
+/**
+ * "Expires in 2 weeks" or "Expired 3 days ago", from the register's deadline, or `null` for a key with none. AND NONE FOR
+ * A KEY WITH NO VALUE (AF14): "No value yet" beside "Expired 6 weeks ago" was a value that never was, gone stale.
+ */
 export function expiresSaid(k: KeyRow, now: number = Date.now()): string | null {
-  if (!k.expires) return null;
+  if (!k.expires || !k.sealed) return null;
   const said = relativeWords(k.expires, now);
   return Date.parse(`${k.expires}T12:00:00Z`) < now - 43_200_000 ? dated.expired(said) : dated.expires(said);
 }

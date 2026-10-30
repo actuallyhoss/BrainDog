@@ -74,8 +74,9 @@ export const shell = {
   lists: 'Your things',
   packs: 'Add-ons',
   keychain: 'Keychain',
-  /* THE SIDEBAR'S ONE ROW FOR KEYS, which opens the Keychain. */
-  keysPlace: 'Keys',
+  /* THE SIDEBAR'S ONE ROW FOR KEYS, which opens the Keychain, and is called that (audit 6f AF14): the rail and the
+     crumb said Keys while the screen, its tab and Settings said Keychain. */
+  keysPlace: 'Keychain',
   settings: 'Settings',
   /* ACTIVITY, AND IT WAS HISTORY: the owner's old tool called the same screen Activity, and it is a row of the flat nav now. */
   audit: 'Activity',

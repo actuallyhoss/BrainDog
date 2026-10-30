@@ -496,7 +496,8 @@
   async function askWhere() {
     toasts.push(words.chooseFirst, { intent: 'warn' });
     await tick();
-    const select = document.querySelector<HTMLSelectElement>('.body .file-select, .batch .file-select, .file-into[data-where="bar"] .file-select');
+    /* THE ONE IN VIEW: the open row's on a phone, the selection's bar, else the toolbar's. */
+    const select = [...document.querySelectorAll<HTMLSelectElement>('.body .file-select, .batch .file-select, .file-into[data-where="bar"] .file-select')].find((el) => el.getClientRects().length > 0);
     select?.focus();
     try {
       select?.showPicker?.();
