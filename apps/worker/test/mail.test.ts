@@ -133,11 +133,11 @@ test('EVERY LETTER WEARS THE ONE PAGE: the mark from brain.dog, a card of at mos
 test('THE BUTTON SAYS WHAT IT DOES, and a link that works once also shows itself under it as text', () => {
   const button = (kind: MailKind, vars = {}) => /<a href="[^"]*" target="_blank" style="display:inline-block;[^"]*">([^<]*)<\/a>/u.exec(letterOf(kind, { link: LINK, ...vars }).html)?.[1];
   assert.equal(button('signin'), 'Sign in to BrainDog');
-  assert.equal(button('signup.verify'), 'Finish making your record');
+  assert.equal(button('signup.verify'), 'Finish making your BrainDog');
   assert.equal(button('invite.prove'), 'Accept the invitation');
   assert.equal(button('email.change'), 'Confirm this address');
   assert.equal(button('welcome', { record: 'Acme' }), 'Open Acme');
-  assert.equal(button('lapse.0'), 'Open your record');
+  assert.equal(button('lapse.0'), 'Open your BrainDog');
   assert.match(letterOf('signin', { link: LINK }).html, /Or paste this link into your browser:<br><a href="https:\/\/app\.brain\.dog\/signin#magic=abc"/u);
   assert.doesNotMatch(letterOf('welcome', { link: LINK, record: 'Acme' }).html, /Or paste this link/u);
 });
@@ -212,7 +212,7 @@ test("A RECORD'S OWN MAIL IS DRAWN IN THE SAME PAGE: a digest's sections, figure
   assert.match(letter.html, /font-size:28px[^>]*>£10,540\.00<\/p>/u);
   assert.match(letter.html, />Pell &amp; Vine<\/td>/u);
   assert.match(letter.html, />A \| B &lt;b&gt;<\/td>/u);
-  assert.match(letter.html, /sent because a digest on a BrainDog record you own is set to mail this address\./u);
+  assert.match(letter.html, /sent because a digest on a BrainDog you own is set to mail this address\./u);
   assert.match(letter.html, /mailto:support@brain\.dog/u);
   assert.doesNotMatch(letter.text, /```|^#/mu);
   assert.ok(letter.text.startsWith('Monday\n\nCash\n----\n\nCash: £10,540.00\n\nOverdue\n-------\n\nWho  |  Amount\nPell & Vine  |  £400.00\nA | B <b>  |  £12.00\n\n'), letter.text);
@@ -222,7 +222,7 @@ test("A RECORD'S OWN MAIL IS DRAWN IN THE SAME PAGE: a digest's sections, figure
 
 test('AN URGENT NOTICE IS ITS SENTENCE AND ITS REASON: the sentence is the title, and the text keeps both', () => {
   const letter = recordLetter('Invoice 12 is 30 days overdue', 'Invoice 12 is 30 days overdue\n\nThe rule chase asked for it.');
-  assert.ok(letter.text.startsWith('Invoice 12 is 30 days overdue\n\nThe rule chase asked for it.\n\nThis mail is from BrainDog, sent because a BrainDog record you own has something that needs you now.'));
+  assert.ok(letter.text.startsWith('Invoice 12 is 30 days overdue\n\nThe rule chase asked for it.\n\nThis mail is from BrainDog, sent because a BrainDog you own has something that needs you now.'));
   assert.match(letter.html, /<h1[^>]*>Invoice 12 is 30 days overdue<\/h1><p class="bd-ink2"[^>]*>The rule chase asked for it\.<\/p><\/td>/u);
   assert.doesNotMatch(letter.text, /Write to/u);
 });

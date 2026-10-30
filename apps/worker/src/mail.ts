@@ -135,21 +135,21 @@ type Part = { say: string } | { link: string };
 /** Why each mail was sent, the footer's first sentence, so a mail nobody expected still says where it came from. */
 const WHY: Record<MailKind, string> = {
   signin: 'because somebody asked to sign in with this address',
-  'signup.verify': 'because somebody asked to make a BrainDog record with this address',
-  'signup.known': 'because somebody asked to make a BrainDog record with this address',
-  'invite.prove': 'because somebody accepted an invitation to a BrainDog record with this address',
+  'signup.verify': 'because somebody asked to make a BrainDog with this address',
+  'signup.known': 'because somebody asked to make a BrainDog with this address',
+  'invite.prove': 'because somebody accepted an invitation to a BrainDog with this address',
   'invite.ready': 'because this address was invited to make a BrainDog account',
   'passkey.added': 'because the passkeys that sign in with this address changed',
   'passkey.removed': 'because the passkeys that sign in with this address changed',
   'sessions.ended': 'because every session for this address ended',
   'email.change': 'because somebody asked to sign in to BrainDog with this address instead of their old one',
   'email.changed': 'because the address that signs in to this BrainDog account changed',
-  'lapse.0': 'about billing for a record this address pays for or owns',
-  'lapse.60': 'about billing for a record this address pays for or owns',
-  'lapse.83': 'about billing for a record this address pays for or owns',
-  'lapse.90': 'about billing for a record this address pays for or owns',
-  'lapse.back': 'about billing for a record this address pays for or owns',
-  welcome: 'because a BrainDog record was made for this address',
+  'lapse.0': 'about billing for a BrainDog this address pays for or owns',
+  'lapse.60': 'about billing for a BrainDog this address pays for or owns',
+  'lapse.83': 'about billing for a BrainDog this address pays for or owns',
+  'lapse.90': 'about billing for a BrainDog this address pays for or owns',
+  'lapse.back': 'about billing for a BrainDog this address pays for or owns',
+  welcome: 'because a BrainDog was made for this address',
   'usage.notice': "about your BrainDog's usage this month",
 };
 
@@ -160,7 +160,7 @@ const WHY: Record<MailKind, string> = {
  * had one before sees the same mail, and a filter somebody wrote against it still matches.
  */
 function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subject: string; parts: Part[] } {
-  const record = v.record || 'Your record';
+  const record = v.record || 'Your BrainDog';
   const link: Part[] = v.link ? [{ link: v.link }] : [];
   switch (kind) {
     case 'signin':
@@ -174,18 +174,18 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
       };
     case 'signup.verify':
       return {
-        subject: 'Finish making your BrainDog record',
+        subject: 'Finish making your BrainDog',
         parts: [
-          { say: 'Here is your link to finish making your BrainDog record. It proves this address is yours, and it works once.' },
+          { say: 'Here is your link to finish making your BrainDog. It proves this address is yours, and it works once.' },
           ...link,
-          { say: 'If you did not ask for a BrainDog record, you can ignore this message and nothing is made.' },
+          { say: 'If you did not ask for a BrainDog, you can ignore this message and nothing is made.' },
         ],
       };
     case 'signup.known':
       return {
         subject: 'Sign in to BrainDog',
         parts: [
-          { say: 'Somebody asked to make a BrainDog record with this address, and this address can already sign in. Here is a link to sign in instead. It works once.' },
+          { say: 'Somebody asked to make a BrainDog with this address, and this address can already sign in. Here is a link to sign in instead. It works once.' },
           ...link,
           { say: 'If you did not ask, you can ignore this message.' },
         ],
@@ -255,8 +255,8 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
       return {
         subject: `${record} is read-only until billing resumes`,
         parts: [
-          { say: `The last payment for ${v.record || 'your record'} did not go through, so it is read-only until billing resumes. Everything in it is still there, and you can export it at any time.` },
-          ...(v.until ? [{ say: `If billing has not resumed by ${v.until}, the record is deleted that day.` }] : []),
+          { say: `The last payment for ${v.record || 'your BrainDog'} did not go through, so it is read-only until billing resumes. Everything in it is still there, and you can export it at any time.` },
+          ...(v.until ? [{ say: `If billing has not resumed by ${v.until}, it is deleted that day.` }] : []),
           ...link,
         ],
       };
@@ -265,7 +265,7 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
       return {
         subject: kind === 'lapse.83' ? `Last notice: ${record} will be deleted` : `${record} will be deleted`,
         parts: [
-          { say: `${v.record || 'Your record'} has been read-only since its billing stopped.` },
+          { say: `${v.record || 'Your BrainDog'} has been read-only since its billing stopped.` },
           { say: v.until ? `It is deleted on ${v.until} unless billing resumes before then. Export it first if you want to keep a copy.` : 'It is deleted unless billing resumes. Export it first if you want to keep a copy.' },
           ...link,
         ],
@@ -274,23 +274,23 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
       return {
         subject: `${record} has been deleted`,
         parts: [
-          { say: `${v.record || 'Your record'} was deleted today, because its billing did not resume.` },
+          { say: `${v.record || 'Your BrainDog'} was deleted today, because its billing did not resume.` },
           ...(v.until ? [{ say: `BrainDog keeps one final copy of it until ${v.until}.` }] : []),
         ],
       };
     case 'lapse.back':
       return {
         subject: `${record} can be written again`,
-        parts: [{ say: `Billing for ${v.record || 'your record'} has resumed, so it can be written again. Nothing in it was lost.` }, ...link],
+        parts: [{ say: `Billing for ${v.record || 'your BrainDog'} has resumed, so it can be written again. Nothing in it was lost.` }, ...link],
       };
     case 'welcome':
       return {
-        subject: 'Your BrainDog record is ready',
+        subject: 'Your BrainDog is ready',
         parts: [
           /* "OPEN IT HERE:" WENT WITH THE BARE LINK IT POINTED AT: the letter now has a button saying the same. */
-          { say: v.record ? `${v.record} is ready.` : 'Your record is ready.' },
+          { say: v.record ? `${v.record} is ready.` : 'Your BrainDog is ready.' },
           ...link,
-          ...(v.asked ? [{ say: `The name ${v.asked} was taken before the payment went through, so the record was made as ${v.record || 'the next free name'}.` }] : []),
+          ...(v.asked ? [{ say: `The name ${v.asked} was taken before the payment went through, so it was made as ${v.record || 'the next free name'}.` }] : []),
         ],
       };
     /* THE ONE SENTENCE THE DIRECTORY ALREADY WROTE, printed whole: `notice()` decided the words against the
@@ -312,7 +312,7 @@ function actionOf(kind: MailKind, record: string): string {
     case 'signup.known':
       return 'Sign in to BrainDog';
     case 'signup.verify':
-      return 'Finish making your record';
+      return 'Finish making your BrainDog';
     case 'invite.prove':
       return 'Accept the invitation';
     case 'invite.ready':
@@ -320,7 +320,7 @@ function actionOf(kind: MailKind, record: string): string {
     case 'email.change':
       return 'Confirm this address';
     default:
-      return record ? `Open ${record}` : 'Open your record';
+      return record ? `Open ${record}` : 'Open your BrainDog';
   }
 }
 
@@ -644,8 +644,8 @@ function htmlOf(chunks: Chunk[]): string {
  */
 const recordWhy = (because: string): string =>
   because.startsWith('digest.')
-    ? 'because a digest on a BrainDog record you own is set to mail this address'
-    : 'because a BrainDog record you own has something that needs you now';
+    ? 'because a digest on a BrainDog you own is set to mail this address'
+    : 'because a BrainDog you own has something that needs you now';
 
 /**
  * A mail a record wrote (a digest, an urgent notice), in the same page as every letter above.
