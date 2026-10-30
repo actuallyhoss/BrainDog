@@ -440,8 +440,10 @@ export function expect(decl: FetchDecl, json: Json, window: Window, tz: string):
  * Whether one `on_error` condition holds. `47 §4.1`, `25 §6`.
  *
  * A STATUS LIST OR A BODY PATH, and the body arm is an `Expect` read the other way up: the condition
- * HOLDS when the test PASSES, so `error_when: { path: errors, present: true }` fires on a 200 whose
- * body carries an `errors` key — which is how Cloudflare's GraphQL reports a failure.
+ * HOLDS when the test PASSES, so `error_when: { path: errors, len_gte: 1 }` fires on a 200 whose
+ * body carries a list of errors — which is how Cloudflare's GraphQL reports a failure. Not
+ * `present: true`: a success answers `"errors": null`, and a null is present, so that spelling reads
+ * every success as the provider being down.
  */
 export function matchesCond(cond: Cond, status: number, json: Json | undefined, window: Window, tz: string): boolean {
   if ('status_in' in cond) return cond.status_in.includes(status);

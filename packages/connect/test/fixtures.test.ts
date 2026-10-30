@@ -13,9 +13,9 @@
  * `map:` no provider could satisfy, so each declaration carries the `map:` a person would install, and
  * `43`'s `extract` reads it. A field the shape cannot reach comes back `missing`, and a test says so.
  *
- * WHERE A FIXTURE DEPARTS FROM `47 §9`'s TABLE, IT SAYS WHY BESIDE IT: Cloudflare's `error_when` (the table's
- * `present: true` fires on every success), and Vercel's register (there is no cumulative figure in a list of
- * deployments). Everything else is the table's row.
+ * WHERE A FIXTURE DEPARTS FROM `47 §9`'s TABLE, IT SAYS WHY BESIDE IT: Vercel's register (there is no cumulative
+ * figure in a list of deployments). Cloudflare's `error_when` departed too until the table took `len_gte: 1`, since
+ * `present: true` fires on every success. Everything else is the table's row.
  */
 
 import { test } from 'node:test';
@@ -547,13 +547,13 @@ const CF_QUERY =
 const CF_ZONE = '023e105f4ecef8ad9ca31a8372d0c353';
 
 /**
- * `error_when` READS `errors` BY LENGTH, AND `47 §9`'s `present: true` IS NOT USED, ON PURPOSE.
+ * `error_when` READS `errors` BY LENGTH, AND `present: true` (WHAT `47 §9` ONCE SPELLED) IS NOT USED, ON PURPOSE.
  *
  * Cloudflare's GraphQL answers a success as `{"data": {...}, "errors": null}`. `present` asks whether the
  * path reached anything, and a JSON `null` is something — so `present: true` fires on every successful
  * answer, and the connector reads as a provider that is always down. `len_gte: 1` is true of a list with an
  * error in it and false of `null`, which is the question actually being asked. The test after the success
- * case pins the trap, so the table's spelling is not copied back in.
+ * case pins the trap, so the old spelling is not copied back in.
  */
 const CLOUDFLARE: Fixture = {
   id: 'cloudflare-graphql',
@@ -674,7 +674,7 @@ test('Cloudflare: a 200 carrying errors is the provider being unavailable, and n
   assert.equal(out.cursor.watermark, null);
 });
 
-test('Cloudflare: errors present:true, as 47 §9 spells it, fires on every success, because null is present', async () => {
+test('Cloudflare: errors present:true, as 47 §9 once spelled it, fires on every success, because null is present', async () => {
   const PRESENT: Fixture = {
     ...CLOUDFLARE,
     fetch: { ...CLOUDFLARE.fetch, on_error: { error_when: [{ path: 'errors', present: true }] } },
