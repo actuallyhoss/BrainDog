@@ -139,7 +139,25 @@ export const columnHeading = (register: string, c: { field: string; label?: stri
   if (typeof one === 'string' && one) return one.charAt(0).toUpperCase() + one.slice(1);
   /* AND A FIELD THE LIST DECLARES IS SAID BY ITS LABEL, never its id: a bill's card headed its figure "amount". */
   const f = list?.fields.find((d) => d.id === c.field);
-  return f ? labelOf(f) : c.field;
+  if (f) return labelOf(f);
+  /* AND NEVER THE ID ITSELF (polish-f L4): an add-on's list switched to its Table look, or read before its declaration
+     arrived, headed its columns "tax_part" and "line.amount". A path through a link is said by the field it ends on, in
+     the list the link points at; anything else is the id said as words, as a label is when a pack gives none. */
+  const dot = c.field.indexOf('.');
+  if (dot > 0) {
+    const via = list?.fields.find((d) => d.id === c.field.slice(0, dot));
+    const to = via?.to === undefined ? undefined : REGISTERS[via.to];
+    const end = c.field.slice(dot + 1);
+    const there = to?.fields.find((d) => d.id === end);
+    return there ? labelOf(there) : idWords(end.slice(end.lastIndexOf('.') + 1));
+  }
+  return idWords(c.field);
+};
+
+/** A field id said as words when nothing labels it: `tax_part` is "Tax part", `paid-on` is "Paid on". */
+const idWords = (id: string): string => {
+  const said = id.replace(/[_-]+/gu, ' ').trim();
+  return said === '' ? id : said.charAt(0).toUpperCase() + said.slice(1);
 };
 
 /** A label is the field id with `_` as a space, until a pack needs a different word (50 §10). */
