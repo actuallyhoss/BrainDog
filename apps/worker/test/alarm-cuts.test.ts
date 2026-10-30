@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, stepOf } from '../src/alarm-cuts.ts';
+import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, resetSaid, stepOf } from '../src/alarm-cuts.ts';
 
 const T0 = Date.parse('2026-10-29T07:00:00Z');
 
@@ -43,4 +43,12 @@ test('A STORED VALUE THAT IS NOT A COUNT IS NONE', () => {
   assert.equal(cutsOf(undefined), null);
   assert.equal(cutsOf('look'), null);
   assert.deepEqual(cutsOf({ step: 'look', times: 2, at: T0 }), { step: 'look', times: 2, at: T0 });
+});
+
+/* R4 (review of 30 October): an alarm that threw was counted as cut, so the platform's retries held `act` for six hours. */
+test('A STEP THAT THREW IS NOT A CUT; THE PLATFORM SAYING IT RESET THE OBJECT IS ONE', () => {
+  assert.equal(resetSaid('Durable Object storage operation exceeded timeout which caused object to be reset.'), true);
+  assert.equal(resetSaid('Durable Object reset because its code was updated.'), true);
+  assert.equal(resetSaid('The Directory did not answer: fetch failed'), false);
+  assert.equal(resetSaid('presets were not found'), false);
 });

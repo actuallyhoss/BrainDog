@@ -49,3 +49,11 @@ export function cutsOf(value: unknown): Cuts | null {
   const { step, times, at } = value as Record<string, unknown>;
   return typeof step === 'string' && typeof times === 'number' && typeof at === 'number' ? { step, times, at } : null;
 }
+
+/**
+ * Whether an alarm that threw was cut, by what the throw says: the platform's words for an object it reset ("... caused
+ * object to be reset", "Durable Object reset because its code was updated"). Any other throw is a step that failed and
+ * finished, and its step is cleared, so the platform's own retry of the alarm does not count it as a cut (review of 30
+ * October, R4): two failed tries held `act`, and every automation, connector and script with it, for six hours.
+ */
+export const resetSaid = (message: string): boolean => /\breset\b/iu.test(message);
