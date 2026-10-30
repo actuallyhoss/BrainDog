@@ -47,6 +47,8 @@ export const feedFold = (cells: readonly string[]): string => (cells[FOLD_CELL] 
  * mark with nothing past it, and no mark at all.
  */
 export const FEED_GROUPS: Record<FeedBy, string> = { agent: 'Agents', rule: 'Rules', you: 'You' };
+/** Who BrainDog's own lines say they are by, the app's word for it (`nameWords.brainDog`), and their group's head. */
+export const FEED_OWN = 'BrainDog';
 export const FEED_NOTHING_NEW = 'Nothing new.';
 export const FEED_NO_MARK = 'Nothing to catch up on yet. From your next visit, what changed while you were away shows here.';
 /** The line between the new rows of a group and the ones that were there last time, in words. */
@@ -144,7 +146,14 @@ export function feedPlan<R extends { cells: readonly string[] }>(rows: readonly 
     return { groups, empty, lone: false, days: true };
   }
 
-  const groups = FEED_BY.map((by) => group(by, FEED_GROUPS[by], lines.filter((m) => m.by === by).map(line))).filter((g) => g.rows.length > 0);
+  /* BRAINDOG'S OWN WORK IS ITS OWN GROUP, AFTER THE RULES. The host signs BrainDog's own answers as rules (`rule:handled`,
+     its own updates, the record's own night work) and says each one's who as BrainDog, so Today's "What changed" read
+     "Rules" over lines that were nobody's rule; Activity counts them as BrainDog (polish-f L3). */
+  const own = (m: Line): boolean => m.by === 'rule' && (m.row.cells[1] ?? '').trim() === FEED_OWN;
+  const groups = [
+    ...FEED_BY.map((by) => group(by, FEED_GROUPS[by], lines.filter((m) => m.by === by && !own(m)).map(line))),
+    group('rule', FEED_OWN, lines.filter(own).map(line)),
+  ].filter((g) => g.rows.length > 0);
   /* ONE GROUP NEEDS NO HEAD. "Rules" alone over every line of "Since you were away" named a group with nothing beside
      it to tell it from (the home review), so a feed of one kind of actor is its lines alone. */
   return { groups, empty, lone: groups.length === 1, days: false };
