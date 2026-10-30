@@ -32,7 +32,7 @@
 
 import { NOBODY, instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
-import { writeAmount } from 'braindog-render';
+import { TYPED, dateSaid, formatTyped, writeAmount, type TypedForm } from 'braindog-render';
 import { ok } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
@@ -76,6 +76,11 @@ export type SharedPage = {
   /** The record's language (a BCP 47 tag) and its zone (an IANA name), which a number, an amount and a day are read in. */
   language: string;
   zone: string;
+  /**
+   * The record's home currency, or `null` for a record with none: an amount in it is written by its sign alone ("£4,050"),
+   * as every screen of the app writes it, and any other keeps its code. Two currencies are still never one sum.
+   */
+  home: string | null;
   /** One calm line when no block of the page can be shown through a link, and `null` while one can. */
   empty: string | null;
   blocks: Record<string, unknown>[];
@@ -86,7 +91,7 @@ export type SharedPage = {
  * `{ amount, currency }` in minor units, never added to another; a choice carries the word the owner reads for it; a
  * list says the type of what it holds.
  */
-export type SharedCell = { type: FieldType; of?: FieldType; value: Json; label?: string };
+export type SharedCell = { type: FieldType; of?: FieldType; value: Json; label?: string; unit?: string };
 
 /** The host's answer to whether it can make a read-only link, and why not (`sharesOf` at the Worker's door). */
 export type SharesAnswer = { can: boolean; why?: string };
@@ -116,9 +121,11 @@ const FIGURES = [
 /**
  * The kinds a link never sends, not even their heading. `capture` and `inputs` write; a `link` block is links; `feed`,
  * `queue` and `agents` read the whole record's log and questions and name rows of every list; a `diff` names who
- * changed a row and when.
+ * changed a row and when. A `project` block is the project's own shape (its hero, its work, who is on it, what
+ * happened), which the app reads beside the page from across the record, so a link held only its heading and drew the
+ * page's tab names as empty cards ("Overview", "Numbers and work").
  */
-const HEADING_ONLY: ReadonlySet<string> = new Set(['capture', 'inputs', 'link', 'feed', 'queue', 'agents', 'diff']);
+const HEADING_ONLY: ReadonlySet<string> = new Set(['capture', 'inputs', 'link', 'feed', 'queue', 'agents', 'diff', 'project']);
 
 /** And the computed sources that read across the whole record, whatever kind draws them, as `index.ts`'s `ACROSS` holds. */
 const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'sessions.live', 'sessions.working', 'signs']);
@@ -208,7 +215,16 @@ const rowShown = (row: Entry, drawn: readonly string[], lists: ReadonlyMap<strin
     if (shown === undefined) continue;
     if (plain(shown)) fields[id] = shown;
     const word = field.type === 'enum' && typeof shown === 'string' ? field.labels?.[shown] : undefined;
-    cells[id] = { type: field.type, ...(field.type === 'list' && field.of !== undefined ? { of: field.of } : {}), value: shown, ...(word === undefined ? {} : { label: word }) };
+    /* AND THE UNIT A NUMBER IS SAID IN: a duration is held in seconds and said in its field's unit, a share is "60%". */
+    const declared = (field as { unit?: unknown }).unit;
+    const unit = typeof declared === 'string' && declared !== '' ? declared : undefined;
+    cells[id] = {
+      type: field.type,
+      ...(field.type === 'list' && field.of !== undefined ? { of: field.of } : {}),
+      value: shown,
+      ...(word === undefined ? {} : { label: word }),
+      ...(unit === undefined || !['duration', 'decimal', 'int'].includes(field.type) ? {} : { unit }),
+    };
   }
   return { fields, cells, state: row.state };
 };
@@ -281,23 +297,159 @@ const saidIn = (language: string, home: string | null) => {
   };
 };
 
+/** Where something that names a row, or a hole nothing fills, stood in a note: a character no sentence holds. */
+const GONE = '\u0000';
+
 /**
- * The owner's words with every `{{path}}` filled, and one the record holds nothing for printing nothing at all. ONLY THE
- * SPACE AROUND AN EMPTIED PATH CLOSES UP: the rest of her words keep their spacing, which in a note's body is a nested
- * list's indent and a line's break.
+ * How one `{{…}}` is said on a shared page, or `undefined` for one that names nothing a link may show.
+ *
+ * A TYPED FORM WITH ITS VALUE WRITTEN IN (`{{money:1840000 GBP}}`, `{{date:2026-09-20}}`, `{{ago:2026-08-14}}`) IS SAID
+ * AS THE APP SAYS IT, through the renderer's own `formatTyped`, at the moment and in the zone the record read the page,
+ * and an amount through the one writer against the home currency. The page used to look each up as a path, find
+ * nothing, and print nothing: "licensed direct. in the last twelve months", "not deferrable past .". `{{ref:…}}` names
+ * a row and is never said; `{{icon:…}}` is a glyph a link does not draw.
  */
-const filledIn = (text: string, values: Record<string, Json>, said: (v: Json | undefined) => string | undefined): string => {
+const tokenSaid = (values: Record<string, Json>, said: (v: Json | undefined) => string | undefined, typed: (form: TypedForm, arg: string) => string | undefined) =>
+  (key: string): string | undefined => {
+    if (Object.hasOwn(values, key)) return said(values[key]);
+    const colon = key.indexOf(':');
+    if (colon > 0) {
+      const form = key.slice(0, colon).trim();
+      const arg = key.slice(colon + 1).trim();
+      if (form === 'icon') return '';
+      if ((TYPED as readonly string[]).includes(form)) {
+        if (form === 'ref') return undefined;
+        /* A PATH, as the renderer tells one: a literal starts with a digit or a minus, a path with a letter. */
+        if (/^[A-Za-z]/u.test(arg)) return said(Object.hasOwn(values, arg) ? values[arg] : undefined);
+        return typed(form as TypedForm, arg);
+      }
+    }
+    return undefined;
+  };
+
+/** A typed form's literal in words, at `now` in `zone`, an amount against `home`. `undefined` for one that does not parse. */
+const typedIn = (now: number, zone: string, home: string | null, asDay = false) => (form: TypedForm, arg: string): string | undefined => {
+  if (asDay && (form === 'date' || form === 'day' || form === 'until' || form === 'ago')) return /^\d{4}-\d{2}-\d{2}$/u.test(arg) ? dateSaid(arg, now) : undefined;
+  if (form === 'money') {
+    const m = /^(-?\d+)\s+([A-Z]{3})$/u.exec(arg);
+    return m ? (writeAmount({ minor: BigInt(m[1]!), currency: m[2]! }, home, 'read')?.text ?? undefined) : undefined;
+  }
+  try {
+    return formatTyped(form, arg, now, zone) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The owner's words with every `{{…}}` filled, and one the record holds nothing for printing `gone`: nothing at all in a
+ * heading, and the mark a note's sentences are judged by (`noteShown`). ONLY THE SPACE AROUND AN EMPTIED PATH CLOSES UP:
+ * the rest of her words keep their spacing, which in a note's body is a nested list's indent and a line's break.
+ */
+const filledIn = (text: string, fill: (key: string) => string | undefined, gone = ''): string => {
   if (!text.includes('{{')) return text;
   const out = text.replace(/([ \t]*)\{\{\s*([^}]*?)\s*\}\}([ \t]*)/gu, (_whole, before: string, key: string, after: string) => {
-    const v = said(Object.hasOwn(values, key) ? values[key] : undefined);
+    const v = fill(key);
     if (v !== undefined && v !== '') return `${before}${v}${after}`;
+    if (v === undefined && gone !== '') return `${before}${gone}${after}`;
     return before !== '' && after !== '' ? before : `${before}${after}`;
   });
   return text.trim() === text ? out.trim() : out;
 };
 
+/**
+ * A SPOKEN ID IN THE OWNER'S PROSE: a question's (`SG31`), a decision's (`D41`), a run's (`S42`), an instruction's
+ * (`IN3`), a row's handle (`tasks#3`) or a minted id. Each names something a link does not open. A bare `S` or `D` and
+ * one digit is left alone, since "S3" and "D3" are more often words than ids.
+ */
+const SPOKEN_ID = /(?<![\w#/.@-])(?:SG\d+|IN\d+|D\d{2,}|S\d{2,}|[a-z][a-z0-9_]*#\d+|[0-9A-HJKMNP-TV-Z]{26})(?![\w-]|\.\w)/gu;
+
+/** A paragraph with every sentence that held something gone left out: the rest of what she wrote, read as she wrote it. */
+const sentencesKept = (text: string): string =>
+  text
+    .split(/(?<=[.!?…])\s+(?=\S)/u)
+    .filter((sentence) => !sentence.includes(GONE))
+    .join(' ')
+    .trim();
+
+/**
+ * A note's body as a link shows it.
+ *
+ * THE NOTE IS DRAWN BY THE APP'S OWN RENDERER on the shared page, fences and all, so its words are sent as she wrote
+ * them, and only what a link may not show is changed. A SENTENCE THAT NAMED A ROW, A QUESTION OR A DECISION, OR HELD A
+ * HOLE NOTHING FILLS, IS LEFT OUT WHOLE: "Open as SG31 and it blocks two quotes." cannot be said without its id, and
+ * "Tracked as ." is not a sentence. In a fence's row the cell is emptied, since its row is the fence's shape; a heading
+ * loses the word alone. Lines with nothing gone keep their own breaks.
+ */
+const noteShown = (body: string, fill: (key: string) => string | undefined, cellFill: (key: string) => string | undefined): string => {
+  /* A FENCE'S ROW SAYS A DAY AS A DAY ("14 Aug"), since its first cell is a column of them (a timeline's), and prose says
+     it as a sentence does ("3 weeks ago"). So each line is filled by what it is. */
+  const lines = wordsShown(body).split('\n');
+  let inFence = false;
+  const filled = lines.map((line) => {
+    const t = line.trim();
+    if (/^(?:```|~~~)/u.test(t)) {
+      inFence = !inFence;
+      return filledIn(line, cellFill, GONE);
+    }
+    const row = line.includes('|') && (inFence || t.startsWith('|'));
+    return filledIn(line, row ? cellFill : fill, GONE);
+  });
+  const text = filled.join('\n').replace(SPOKEN_ID, GONE);
+  if (!text.includes(GONE)) return text;
+  const out: string[] = [];
+  let para: string[] = [];
+  let fenced = false;
+  const flush = () => {
+    if (para.length === 0) return;
+    if (para.some((line) => line.includes(GONE))) {
+      const kept = sentencesKept(para.map((line) => line.trim()).join(' '));
+      if (kept !== '') out.push(kept);
+    } else out.push(...para);
+    para = [];
+  };
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (/^(?:```|~~~)/u.test(t)) {
+      flush();
+      fenced = !fenced;
+      out.push(line.replaceAll(GONE, ''));
+    } else if (t === '') {
+      flush();
+      out.push(line);
+    } else if (line.includes('|') && (fenced || t.startsWith('|'))) {
+      flush();
+      out.push(line.replaceAll(GONE, ''));
+    } else if (/^#{1,6}\s/u.test(t)) {
+      flush();
+      out.push(line.replaceAll(GONE, '').replace(/[ \t]{2,}/gu, ' ').trimEnd());
+    } else {
+      const item = /^(\s*(?:[-*+]|\d+[.)])\s+)(.*)$/u.exec(line);
+      if (item === null) {
+        para.push(line);
+        continue;
+      }
+      flush();
+      if (!item[2]!.includes(GONE)) out.push(line);
+      else {
+        const kept = sentencesKept(item[2]!);
+        if (kept !== '') out.push(`${item[1]}${kept}`);
+      }
+    }
+  }
+  flush();
+  return out.join('\n').replaceAll(GONE, '').replace(/\n{3,}/gu, '\n\n').trim();
+};
+
 /** What one block is shown with: the lists' declarations, a figure's name, and how a value is said in the record's language. */
-type Showing = { lists: ReadonlyMap<string, RegisterDecl>; figure: (metric: string) => string | undefined; said: (v: Json | undefined) => string | undefined };
+type Showing = {
+  lists: ReadonlyMap<string, RegisterDecl>;
+  figure: (metric: string) => string | undefined;
+  said: (v: Json | undefined) => string | undefined;
+  typed: (form: TypedForm, arg: string) => string | undefined;
+  /** And a typed form in a fence's row, where a day is said as a day. */
+  cell: (form: TypedForm, arg: string) => string | undefined;
+};
 
 /** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
 type ColumnShown = { field: string; label: string; as?: string; sign?: { field: string; minus: string } };
@@ -332,14 +484,16 @@ const WORDS = ['heading', 'lead', 'empty', 'body'] as const;
  * Every column says the label the owner reads over it: hers, else the field's, else the field's id as words.
  */
 const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> | null => {
-  const { lists, figure, said } = showing;
+  const { lists, figure, said, typed, cell } = showing;
   if (typeof b.kind !== 'string' || HEADING_ONLY.has(b.kind) || (typeof b.source === 'string' && ACROSS.has(b.source))) return null;
   if (b.refusals.length > 0) return null;
   const block = b as unknown as Record<string, unknown>;
   const kept: Record<string, unknown> = {};
   for (const key of LOOKS) if (block[key] !== undefined) kept[key] = block[key];
   const values: Record<string, Json> = isRecord(block.values) ? (block.values as Record<string, Json>) : {};
-  for (const key of WORDS) if (typeof kept[key] === 'string') kept[key] = filledIn(wordsShown(kept[key]), values, said);
+  const fill = tokenSaid(values, said, typed);
+  for (const key of WORDS) if (typeof kept[key] === 'string') kept[key] = key === 'body' ? noteShown(kept[key], fill, tokenSaid(values, said, cell)) : filledIn(wordsShown(kept[key]), fill);
+  if (kept.body === '') delete kept.body;
 
   for (const key of FIGURES) if (block[key] !== undefined) kept[key] = block[key];
   if (typeof block.target === 'number') kept.target = block.target;
@@ -377,7 +531,7 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
     kept.authored = authored.map((row) => ({
       cells:
         isRecord(row) && Array.isArray(row.cells)
-          ? row.cells.map((c) => (!isScalar(c) || inside(c) ? '' : typeof c === 'string' ? filledIn(wordsShown(c), values, said) : c))
+          ? row.cells.map((c) => (!isScalar(c) || inside(c) ? '' : typeof c === 'string' ? filledIn(wordsShown(c), fill) : c))
           : [],
     }));
 
@@ -386,7 +540,7 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
 };
 
 /** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
-type ReadIn = { language: unknown; zone: unknown; home: string | null; figure: Showing['figure'] };
+type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure'] };
 
 /**
  * The page as a link shows it: its title, when it was read, its layout, when the link closes, the language and zone it
@@ -396,7 +550,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
   const layout = isRecord(page.layout) ? page.layout : null;
   const language = languageOf(where.language);
   const zone = typeof where.zone === 'string' && where.zone !== '' ? where.zone : typeof page.zone === 'string' && page.zone !== '' ? page.zone : 'UTC';
-  const showing: Showing = { lists, figure: where.figure, said: saidIn(language, where.home) };
+  const showing: Showing = { lists, figure: where.figure, said: saidIn(language, where.home), typed: typedIn(where.now, zone, where.home), cell: typedIn(where.now, zone, where.home, true) };
   const blocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
   return {
     title: page.title,
@@ -411,6 +565,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
     expires_at,
     language,
     zone,
+    home: where.home,
     empty: blocks.length === 0 ? NOTHING_SHOWN : null,
     blocks,
   };
@@ -619,7 +774,11 @@ export function methods(deps: RecordDeps) {
       if (!out.ok) return { ok: false, refusal: SHUT };
       const identity = kernel.identity();
       const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;
-      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home: kernel.homeCurrency(), figure }));
+      /* THE HOME CURRENCY AS THE APP READS IT (`homeOf`): the one the record chose, else the one its money is all in. Two
+         held and none chosen is no home, and every amount keeps its code. */
+      const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
+      const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
+      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure }));
     },
   };
 }
