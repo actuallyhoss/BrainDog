@@ -70,9 +70,16 @@ export function passSentence(pass: Pick<UpdatePass, 'updated' | 'asked'>): strin
   return `${did}. ${held}.`;
 }
 
+/**
+ * THE RULES THE RECORD ANSWERS FOR ITSELF WITH: `rule:handled` when it settles his own arranging, `rule:additive` and
+ * `rule:update` for its own updates. They are the record's, as the page names them (`names.ts`, `OWN_RULE`), and were
+ * counted with his rules. The trust ladder keeps its own name, and so its place among the rules.
+ */
+const OWN_RULES: ReadonlySet<string> = new Set(['rule:handled', 'rule:additive', 'rule:update']);
+
 /** Whose kind an actor is: the reader, a person, an agent, a rule or automation, or the record itself. */
 export function whoOf(actor: string, reader: string | null, isRun: (a: string) => boolean = (a) => /^[A-Z]+[1-9][0-9]*$/u.test(a)): keyof ByWho {
-  if (actor === 'system' || actor === SEED_ACTOR || actor === 'slash') return 'record';
+  if (actor === 'system' || actor === SEED_ACTOR || actor === 'slash' || OWN_RULES.has(actor)) return 'record';
   if (reader !== null && actor === reader) return 'you';
   if (actor.startsWith('agent:') || isRun(actor)) return 'agents';
   if (/^[a-z][a-z0-9-]*[.:]/u.test(actor)) return 'rules';

@@ -158,6 +158,14 @@ test('working now is ten minutes, and no longer', () => {
   assert.equal(lanesSaid([]), '');
 });
 
+test("what changed counts BrainDog's own rules as BrainDog, never as rules", () => {
+  const log = [ev(iso(29, 9), 'rule:handled', 'state'), ev(iso(29, 8), 'rule:update', 'edit'), ev(iso(29, 7), 'rule:salary', 'create'), ev(iso(29, 6), 'system', 'edit')];
+  assert.deepEqual(tallyOf(log, null, NO_NAMES).groups, [
+    { group: 'rule', count: 1 },
+    { group: 'record', count: 3 },
+  ]);
+});
+
 test('what changed counts who and what, and says the biggest share', () => {
   const log = [
     ev(iso(29, 9), 'agent:claude', 'create'),

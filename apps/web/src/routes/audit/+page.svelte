@@ -96,6 +96,7 @@
     tallySaid,
     thingOf,
     type ByWho,
+    type Group,
     type Told,
   } from './lines.ts';
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
@@ -545,12 +546,14 @@
       tone: 'var(--ink-2)',
     })),
   );
+  /* EACH GROUP SAID BY WHO IT IS, so the parts add up to the whole above them: BrainDog's own rules (`rule:handled`,
+     its own updates) are BrainDog's, as their lines say (`actor`), and were counted "by rules" with every other line
+     that was not an agent's or yours, people's included (Z2, finish loop of 30 October). */
   const tallyMeta = $derived.by(() => {
-    const agents = tally.groups.find((g) => g.group === 'agent')?.count ?? 0;
-    const yours = tally.groups.find((g) => g.group === 'you')?.count ?? 0;
-    /* THE REST ARE SCRIPTS, RULES AND BRAINDOG ITSELF, said so the parts add up to the whole above them. */
-    const rest = tally.total - agents - yours;
-    return [agents ? historyWords.byAgents(agents) : '', yours ? historyWords.byYou(yours) : '', rest > 0 ? historyWords.byRest(rest) : ''].filter(Boolean).join(' · ') || undefined;
+    const n = (group: Group): number => tally.groups.find((g) => g.group === group)?.count ?? 0;
+    const said = { agent: historyWords.byAgents, you: historyWords.byYou, person: historyWords.byPeople, rule: historyWords.byRules, record: historyWords.byBrainDog };
+    const order: Group[] = ['agent', 'you', 'person', 'rule', 'record'];
+    return order.flatMap((group) => (n(group) > 0 ? [said[group](n(group))] : [])).join(' · ') || undefined;
   });
   const tallyReading = $derived(
     tallySaid(

@@ -127,6 +127,11 @@ test('WHO DID IT: the record is never an agent or a person', () => {
   assert.equal(whoOf('S42', 'p_1'), 'agents');
   assert.equal(whoOf('rule:salary', 'p_1'), 'rules');
   assert.equal(whoOf('ingest:mail', 'p_1'), 'rules');
+  /* BRAINDOG'S OWN RULES ARE BRAINDOG'S, as Activity names them; the trust ladder stays a rule. */
+  assert.equal(whoOf('rule:handled', 'p_1'), 'record');
+  assert.equal(whoOf('rule:additive', 'p_1'), 'record');
+  assert.equal(whoOf('rule:update', 'p_1'), 'record');
+  assert.equal(whoOf('rule:ladder', 'p_1'), 'rules');
   assert.deepEqual(byWhoOf([{ actor: 'system' }, { actor: 'S1' }, { actor: 'p_1' }], 'p_1'), { you: 1, people: 0, agents: 1, rules: 0, record: 1 });
 });
 
