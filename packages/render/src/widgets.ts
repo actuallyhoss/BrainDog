@@ -550,9 +550,20 @@ export function exampleMoney(text: string, home: string | null): string {
   });
 }
 
-/** A line a bank shouted, said as a name: "FENWICK CLOUD" as "Fenwick Cloud". Anything already in mixed case is left. */
+/** A name typed as a slug: small letters and digits joined by hyphens or underscores ("sam-site"). */
+const SLUG = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+$/u;
+
+/**
+ * A line a bank shouted, said as a name: "FENWICK CLOUD" as "Fenwick Cloud". Anything already in mixed case is left.
+ * AND A NAME TYPED AS A SLUG, said in words as the sidebar says it (the web's `shownName`): the Projects in play preview
+ * listed "sam-site" where the sidebar said "Sam site" (live check of 30 October, 19).
+ */
 export function plainName(text: string | undefined): string | undefined {
   if (text === undefined) return undefined;
+  if (SLUG.test(text)) {
+    const words = text.replace(/[-_]+/gu, ' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
   if (!/[A-Z]{3}/u.test(text) || /[a-z]/u.test(text)) return text;
   /* THREE LETTERS OR FEWER ARE INITIALS, as `readable` keeps them: the exchange rate's "USD" read "Usd" (live check of
      30 October, 19). */
