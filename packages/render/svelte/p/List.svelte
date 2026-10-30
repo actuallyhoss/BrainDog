@@ -382,7 +382,7 @@
               {opts}
             />{#if row.tone}{' '}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
           >
-          <span class="item-detail" data-sign={timelineIn(said) ? 'in' : undefined}><Text nodes={inline(said, opts)} {opts} /></span>
+          <span class="item-detail" data-sign={timelineIn(said) && !chip.between ? 'in' : undefined}><Text nodes={inline(said, opts)} {opts} /></span>
           <span class="item-under"><Text nodes={inline(timelineUnder(row.cells, opts.now, grouped), opts)} {opts} /></span>
           {#if approx}<span class="item-approx num">{approx}</span>{/if}
           {@render rowActs(row)}
