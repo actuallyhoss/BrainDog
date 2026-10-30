@@ -54,7 +54,6 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
   import Human from './Human.svelte';
-  import { words } from './words.ts';
   import { signupMode, type SignupMode } from '$lib/signup.ts';
 
   const here = support();
