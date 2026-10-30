@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T18:27:24.651Z",
+  "made_at": "2026-10-30T22:20:51.314Z",
   "pages": [
     {
       "blocks": [
@@ -37,7 +37,7 @@
           "why": "when"
         },
         {
-          "body": "Add one below, or mark a line in Repeating as a subscription. Money watch finds payments that repeat.",
+          "body": "Tick A subscription on a repeating payment below, or add one.",
           "heading": "Nothing marked yet",
           "icon": "refresh",
           "kind": "note",
@@ -49,6 +49,76 @@
           "key": "k0xe07gw",
           "rows": [],
           "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Payment",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            }
+          ],
+          "empty": "No repeating payments yet.",
+          "heading": "Repeating payments",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "amount"
+            }
+          ],
+          "source": "register.recurring",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "subs-count"
+          },
+          "where": "state is live, direction is out, subscription is not true",
+          "key": "k012r9p5",
+          "rows": [
+            {
+              "id": "01M67EDHQJ0CZK8Q79Q97K6NK7",
+              "register": "recurring",
+              "seq": 1,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Studio rent",
+                "direction": "out",
+                "amount": {
+                  "amount": 165000,
+                  "currency": "GBP"
+                },
+                "every": "monthly",
+                "next_due": "2026-10-01",
+                "started": "2024-12-02",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
           "refusals": []
         },
         {
@@ -434,15 +504,20 @@
         "register.recurring"
       ],
       "title": "Subscriptions",
-      "read_at": "2026-10-30T18:27:24.651Z",
+      "read_at": "2026-10-30T22:20:51.314Z",
       "zone": "UTC",
       "look": {
         "look": "subscriptions",
-        "basis": "r1l177v5",
+        "basis": "r1vqtrms",
         "by": "rule",
+        "lead": "k012r9p5",
         "hide": [
           "k1jztu91"
-        ]
+        ],
+        "next": {
+          "row": "recurring#1",
+          "text": "Studio rent is 29 days late"
+        }
       },
       "declared_version": 1
     }

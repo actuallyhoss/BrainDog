@@ -373,7 +373,23 @@
   const shared = $derived(sharedNotes(entries));
   const foot = $derived(holdsFoot(holds ?? null, Object.fromEntries(entries.map(([k, d]) => [k, labelOf(k, d)])), name));
   /** Drawn: not folded, or the fold is open, or it holds a change or a refusal somebody must see. */
-  const drawnHere = (key: string): boolean => unfoldedMore || !fold.folded.includes(key) || key in pending.values || key in pending.wrong || fixAt === key;
+  const drawnHere = (key: string): boolean => unfoldedMore || !fold.folded.includes(key) || key in pending.values || key in pending.wrong || fixAt === key || asked === key;
+  /**
+   * A SETTING ASKED FOR BY THE ADDRESS (`?set=place`, audit 31 Oct f, AF8): Weather's empty page links "Set your town"
+   * here, and the field is drawn, brought into view and focused once the settings have read, so nobody hunts for Place.
+   */
+  const asked = $derived(page.url.searchParams.get('set'));
+  let focusedFor = '';
+  $effect(() => {
+    const key = asked;
+    if (from !== 'ready' || key === null || !settings || !(key in settings.config) || focusedFor === `${id}:${key}`) return;
+    focusedFor = `${id}:${key}`;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`set-${key}`);
+      el?.scrollIntoView({ block: 'center' });
+      (el?.matches('input, select, textarea') ? el : el?.querySelector<HTMLElement>('input, select, textarea'))?.focus({ preventScroll: true });
+    });
+  });
   /* A LIST'S LINES ARE COMPARED HERE, and its blank draft is kept out of `changesOf`, which would read the empty box as
      the setting cleared. A list that held nothing and still holds nothing has not moved. */
   const pending = $derived.by(() => {

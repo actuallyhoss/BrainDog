@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T18:09:05.083Z",
+  "made_at": "2026-10-30T22:20:51.314Z",
   "pages": [
     {
       "blocks": [
@@ -14,6 +14,59 @@
             "metric": "tax-rated"
           },
           "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Tax account",
+          "icon": "landmark",
+          "kind": "note",
+          "says": [
+            {
+              "body": "{{tax-pot}} in the tax account, against {{tax-aside-year}} set aside this year and {{tax-due}} of tax bills to pay.",
+              "when": {
+                "gt": 0,
+                "metric": "tax-rated"
+              }
+            },
+            {
+              "body": "{{tax-pot}} in the tax account, against {{tax-due}} of tax bills to pay."
+            }
+          ],
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "tax-pots"
+          },
+          "key": "k1y12sqj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{tax-reserve}} in {{tax-reserves.first}}, against {{tax-due}} of tax bills to pay. Tick Holds the tax money on that account to keep it here.",
+          "heading": "Tax account",
+          "icon": "landmark",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "lt": 1,
+                "metric": "tax-pots"
+              },
+              {
+                "gt": 0,
+                "metric": "tax-reserves"
+              }
+            ]
+          },
+          "key": "k1y12sqj-2",
           "rows": [],
           "matched": 0,
           "refusals": [],
@@ -80,35 +133,14 @@
               {
                 "lt": 1,
                 "metric": "tax-pots"
+              },
+              {
+                "lt": 1,
+                "metric": "tax-reserves"
               }
             ]
           },
           "key": "k0bm1vpc",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
-        },
-        {
-          "body": "{{tax-pot}} in the tax account, against {{tax-aside-year}} set aside this year.",
-          "heading": "Tax account",
-          "icon": "landmark",
-          "kind": "note",
-          "span": 12,
-          "when": {
-            "all": [
-              {
-                "gt": 0,
-                "metric": "tax-rated"
-              },
-              {
-                "gt": 0,
-                "metric": "tax-pots"
-              }
-            ]
-          },
-          "key": "k1y12sqj",
           "rows": [],
           "matched": 0,
           "refusals": [],
@@ -290,7 +322,7 @@
           "key": "k0hm3mok",
           "rows": [
             {
-              "id": "01M6700HHVETW7N5WQ126SDR4Z",
+              "id": "01M67EDHQJ9KJDH1JG0C55N50X",
               "register": "categories",
               "seq": 5,
               "fields": {
@@ -308,12 +340,12 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             },
             {
-              "id": "01M6700HHVETW7N5WQ1CP97MGS",
+              "id": "01M67EDHQJ9KJDH1JG0PTWY8HE",
               "register": "categories",
               "seq": 7,
               "fields": {
@@ -331,12 +363,12 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             },
             {
-              "id": "01M6700HHVETW7N5WQ0QXCNEVZ",
+              "id": "01M67EDHQJ9KJDH1JG02C2RV64",
               "register": "categories",
               "seq": 3,
               "fields": {
@@ -354,12 +386,12 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             },
             {
-              "id": "01M6700HHVETW7N5WQ0NSEVESX",
+              "id": "01M67EDHQJ9KJDH1JFZY0B05M0",
               "register": "categories",
               "seq": 2,
               "fields": {
@@ -377,12 +409,12 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             },
             {
-              "id": "01M6700HHVETW7N5WQ0VHX5PP8",
+              "id": "01M67EDHQJ9KJDH1JG04TT2MYR",
               "register": "categories",
               "seq": 4,
               "fields": {
@@ -400,12 +432,12 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             },
             {
-              "id": "01M6700HHVETW7N5WQ0KE8KQH0",
+              "id": "01M67EDHQJ9KJDH1JFZQ24XGVW",
               "register": "categories",
               "seq": 1,
               "fields": {
@@ -423,12 +455,12 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             },
             {
-              "id": "01M6700HHVETW7N5WQ176QR2X7",
+              "id": "01M67EDHQJ9KJDH1JG0JTRZN4Z",
               "register": "categories",
               "seq": 6,
               "fields": {
@@ -446,12 +478,12 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             },
             {
-              "id": "01M6700HHVETW7N5WQ1G35G63D",
+              "id": "01M67EDHQJ9KJDH1JG0QFF3FHR",
               "register": "categories",
               "seq": 8,
               "fields": {
@@ -469,8 +501,8 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T18:09:05.083Z",
-              "updated_at": "2026-10-30T18:09:05.083Z",
+              "created_at": "2026-10-30T22:20:51.314Z",
+              "updated_at": "2026-10-30T22:20:51.314Z",
               "deleted_at": null
             }
           ],
@@ -491,7 +523,7 @@
         "register.obligations"
       ],
       "title": "Tax set aside",
-      "read_at": "2026-10-30T18:09:05.083Z",
+      "read_at": "2026-10-30T22:20:51.314Z",
       "zone": "UTC",
       "look": {
         "look": "tax-set-aside",

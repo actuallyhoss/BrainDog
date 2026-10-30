@@ -267,9 +267,9 @@
       "versions": [
         {
           "version": "2.0.1",
-          "checksum": "5fcc39597ce467c1c2a658e83485ced5921be0d588e1be273689956b8fed14e0",
-          "bytes": 26306,
-          "published_at": "2026-10-30T18:27:24.651Z",
+          "checksum": "4bb794e5effe57ae479c2ac724af8ccb4f2671b5b31a88692f19d2451df2eb8e",
+          "bytes": 26329,
+          "published_at": "2026-10-30T22:20:51.314Z",
           "bump": "patch",
           "reach": {
             "modules": [],
@@ -294,7 +294,7 @@
               "Today's events"
             ]
           },
-          "notes": "Says to put the link in your keys from a terminal, with braindog keys put \"Calendar link\", which reads it from standard input."
+          "notes": "Says to put the link in your keys where Install asks for it, or from a terminal with braindog keys put \"Calendar link\", which reads it from standard input."
         },
         {
           "version": "2.0.0",
@@ -6670,9 +6670,9 @@
       "versions": [
         {
           "version": "1.2.1",
-          "checksum": "18c4ae3029eb9a3e5622038c688abfeb5848babae8c4708917bb86df95b4bda1",
-          "bytes": 21248,
-          "published_at": "2026-10-30T18:27:24.651Z",
+          "checksum": "5a97ebbd46544abab5f19429d7c8a7fcb637a1d550f601e62cc2b989bb48331e",
+          "bytes": 22314,
+          "published_at": "2026-10-30T22:20:51.314Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -6692,7 +6692,7 @@
               "Subscriptions"
             ]
           },
-          "notes": "A month, by category says the ones with no category as No category, so its parts add up to the whole.",
+          "notes": "A month, by category says the ones with no category as No category, so its parts add up to the whole. With nothing marked yet, its page lists your repeating payments to tick, and no longer points to Money watch.",
           "preview": true
         },
         {
@@ -6884,10 +6884,10 @@
       "versions": [
         {
           "version": "1.2.0",
-          "checksum": "3d65578251ba00d2458fd0cb56bbc513d926d5e9fb9dbe1aa521e5915e19901b",
-          "bytes": 19163,
-          "published_at": "2026-10-30T18:09:05.083Z",
-          "bump": "patch",
+          "checksum": "8f98c9863219f6549a578eaf103d773201c095fee4e7265ede59e9de4ded49f2",
+          "bytes": 21580,
+          "published_at": "2026-10-30T22:20:51.314Z",
+          "bump": "minor",
           "reach": {
             "modules": [
               "money-core"
@@ -6907,7 +6907,7 @@
               "Tax set aside"
             ]
           },
-          "notes": "Says how to give a category its rate, and shows the tax account only once you have one.",
+          "notes": "Says how to give a category its rate, and shows the tax account only once you have one. It says what an account named for tax holds against the tax bills, before one is marked as holding the tax money.",
           "preview": true
         },
         {
@@ -7329,9 +7329,9 @@
       "versions": [
         {
           "version": "1.2.1",
-          "checksum": "c8437aec06a1bbb8438f03b348d50668f140b7037afff51c4f8880c212c29181",
-          "bytes": 14446,
-          "published_at": "2026-10-30T19:15:57.332Z",
+          "checksum": "f9ee472014620e72e34813362ad80133d6f5018db2516a23e815a74d85c13f41",
+          "bytes": 14515,
+          "published_at": "2026-10-30T22:20:51.314Z",
           "bump": "patch",
           "reach": {
             "modules": [],
@@ -7356,7 +7356,7 @@
               "The week's weather"
             ]
           },
-          "notes": "The week's weather in Add a widget reads like today's, in whole degrees, where it showed dates and bare numbers. Nothing it does has changed.",
+          "notes": "The week's weather in Add a widget reads like today's, in whole degrees, where it showed dates and bare numbers. Before a forecast, its page says No forecast yet and links to where you set your town.",
           "preview": true
         },
         {
