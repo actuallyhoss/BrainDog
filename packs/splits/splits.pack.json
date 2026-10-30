@@ -1,10 +1,10 @@
 {
   "pack": "splits",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icon": "split",
   "title": "Splits",
   "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their rows close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
-  "changes": "Brings its Splits widget for Today, which was BrainDog’s own until now.",
+  "changes": "Says who owes whom in plain words: owes you, you owe them, square. A person’s page says where they stand as a card, where it printed the stored words.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -37,7 +37,7 @@
     {
       "id": "splits",
       "title": "Splits",
-      "says": "What comes back to you from shared costs, and what goes back from you.",
+      "says": "What you are owed from shared costs, and what you owe.",
       "group": "money",
       "for": "personal",
       "icon": "split",
@@ -48,11 +48,11 @@
         "cells": [
           {
             "metric": "splits-to-me",
-            "label": "Comes back to you"
+            "label": "You are owed"
           },
           {
             "metric": "splits-to-them",
-            "label": "Goes back from you"
+            "label": "You owe"
           }
         ]
       },
@@ -71,7 +71,7 @@
       "example": {
         "figures": [
           {
-            "label": "Comes back to you",
+            "label": "You are owed",
             "said": "¤180"
           }
         ]
@@ -190,8 +190,8 @@
             "to_them"
           ],
           "labels": {
-            "to_me": "Comes back to me",
-            "to_them": "Goes back to them"
+            "to_me": "Owes you",
+            "to_them": "You owe them"
           }
         },
         {
@@ -259,8 +259,8 @@
             "square"
           ],
           "labels": {
-            "to_me": "Comes back to me",
-            "to_them": "Goes back to them",
+            "to_me": "Owes you",
+            "to_them": "You owe them",
             "square": "Square"
           },
           "index": true
@@ -472,7 +472,73 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{splits-to-me}} comes back to you and {{splits-to-them}} goes back from you, across {{splits-people-open}} people."
+          "body": "You are owed {{splits-to-me}} and you owe {{splits-to-them}}, across {{splits-people-open}} people.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-to-me",
+                "gt": 0
+              },
+              {
+                "metric": "splits-to-them",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "You are owed {{splits-to-me}}.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-to-me",
+                "gt": 0
+              },
+              {
+                "metric": "splits-to-them",
+                "lte": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "You owe {{splits-to-them}}.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-to-me",
+                "lte": 0
+              },
+              {
+                "metric": "splits-to-them",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Everyone is square.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-held",
+                "gt": 0
+              },
+              {
+                "metric": "splits-people-open",
+                "lt": 1
+              }
+            ]
+          }
         },
         {
           "kind": "note",
@@ -493,11 +559,11 @@
           "cells": [
             {
               "metric": "splits-to-me",
-              "label": "Comes back to you"
+              "label": "You are owed"
             },
             {
               "metric": "splits-to-them",
-              "label": "Goes back from you"
+              "label": "You owe"
             },
             {
               "metric": "splits-open",
@@ -689,10 +755,34 @@
       ],
       "blocks": [
         {
-          "kind": "note",
+          "kind": "cards",
           "lead": true,
           "span": 12,
-          "body": "{{stands}}, {{way}}."
+          "source": "register.split_people",
+          "where": "name is {{name}}",
+          "columns": [
+            {
+              "field": "stands",
+              "label": "Stands at",
+              "as": "figure"
+            },
+            {
+              "field": "way",
+              "label": "Which way",
+              "as": "fact"
+            },
+            {
+              "field": "open",
+              "label": "Open splits",
+              "as": "fact"
+            },
+            {
+              "field": "since",
+              "label": "Open since",
+              "as": "fact"
+            }
+          ],
+          "limit": 4
         },
         {
           "kind": "capture",

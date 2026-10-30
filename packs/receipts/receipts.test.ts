@@ -64,7 +64,7 @@ const picture = (n: number) => ({ sha256: String(n).repeat(64).slice(0, 64), mim
 
 test('THE FILE: receipts 1.0.0 on money-core, one list, a receipt on the Ledger, one script for two rules and the night', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['receipts', '1.1.0', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['receipts', '1.2.0', 'Apache-2.0']);
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), ['receipts']);
   assert.deepEqual(kinds('page'), ['receipts']);

@@ -263,8 +263,39 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "da84357cb163697993290465cb0c64e3dc014f53a6d38db8ddadec74b77433c1",
+          "bytes": 26307,
+          "published_at": "2026-10-30T18:09:05.083Z",
+          "bump": "major",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Events"
+            ],
+            "pages": [
+              "Events"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "calendar.google.com",
+                "line": "CALLS OUT calendar.google.com, outlook.office365.com and outlook.live.com · every 1h · key \"Calendar link\" to the host its keychain entry opens",
+                "key": "Calendar link"
+              }
+            ],
+            "widgets": [
+              "Next meetings",
+              "Today's events"
+            ]
+          },
+          "notes": "Its page is Events now, at its own address: BrainDog's own Calendar holds the old one, so the add-on could not be installed beside it."
+        },
         {
           "version": "1.2.0",
           "checksum": "b9107a68191bfee96df1df05dc2b1f52f47d39d0fa39f3d95f7e2734c3da9b5c",
@@ -5035,8 +5066,38 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "fc1561737970d7f67deb4752af5a882ff237f71642d461a0e951f897c0075741",
+          "bytes": 18782,
+          "published_at": "2026-10-30T18:09:05.083Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Receipts"
+            ],
+            "pages": [
+              "Receipts"
+            ],
+            "rules": [
+              "Put a receipt on its Ledger line",
+              "Find a waiting receipt for a new Ledger line, or mark it as wanting one"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Receipts"
+            ]
+          },
+          "notes": "Says how to start first, and shows its counts once a category keeps receipts.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "c133758ce90698abf588cd4f3391970dea2ec6b5f9b4c8289e507081e343ae64",
@@ -5552,8 +5613,35 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "67420983d5c4b8a40099daa874e87e7a815ce23ea8dea408984a86f1d6df68aa",
+          "bytes": 16892,
+          "published_at": "2026-10-30T18:09:05.083Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Savings circles"
+            ],
+            "rules": [
+              "Write a savings circle's months and your payout"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Savings circle"
+            ]
+          },
+          "notes": "A circle already under way marks the months before today paid, and says its days as 1 Oct. Its page says one circle as one.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "dae701aff3fe49ea20676e6e47f6c5638cfdc50efc16e93fc8299464b2f3d62e",
@@ -5902,8 +5990,40 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "fec4f0d15578665176caaab21b40a1d3b2f4f1c7e4b96fee9338c842c7b5eb26",
+          "bytes": 27243,
+          "published_at": "2026-10-30T18:09:05.083Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Splits",
+              "Where each person stands"
+            ],
+            "pages": [
+              "Splits",
+              "{{name}}"
+            ],
+            "rules": [
+              "Write the split of a Ledger line marked shared",
+              "Work out a split and where that person stands"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Splits"
+            ]
+          },
+          "notes": "Says who owes whom in plain words: owes you, you owe them, square. A person’s page says where they stand as a card, where it printed the stored words.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "63bf5415b52dd40482e7ebffbc37670dfd0d7e3fedfdfec58425e0ba95359495",
@@ -6397,8 +6517,35 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "4f9b9a96d356a2b8286cc7dcf59f1e606810e4a649e2d91a0610de18d4dd3bcf",
+          "bytes": 21231,
+          "published_at": "2026-10-30T18:09:05.083Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Subscriptions"
+            ],
+            "rules": [
+              "Keep a subscription's old price when its amount changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Subscriptions"
+            ]
+          },
+          "notes": "Its page says one subscription as one, and says what you hardly use as a sentence.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "b2e687a079440028c488f35ef7ba6613f27cd43c4e5bc34a60a378173d6f32a1",
@@ -6536,8 +6683,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "3d65578251ba00d2458fd0cb56bbc513d926d5e9fb9dbe1aa521e5915e19901b",
+          "bytes": 19163,
+          "published_at": "2026-10-30T18:09:05.083Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Tax set aside"
+            ],
+            "rules": [
+              "Work out the tax to set aside on a Ledger line",
+              "Work this year's lines out again when a category's tax rate changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Tax set aside"
+            ]
+          },
+          "notes": "Says how to give a category its rate, and shows the tax account only once you have one.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "4d9efa1d309ccf79227c6335bdb23b3cb6d8667f70537af765b09fbde94b8578",
@@ -6953,8 +7128,40 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "e45221442595804e496917e8bc536e85db7ba67f0416508610cd237581fbb365",
+          "bytes": 14480,
+          "published_at": "2026-10-30T18:09:05.083Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Weather"
+            ],
+            "pages": [
+              "Weather"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "geocoding-api.open-meteo.com",
+                "line": "CALLS OUT geocoding-api.open-meteo.com and api.open-meteo.com · every 3h · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Weather",
+              "The week's weather"
+            ]
+          },
+          "notes": "Temperatures read 21° and the chance of rain 70%, and the page says where to set your town.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "bf04e7b7c3bac809b584ecaba348ce87145fb49ebd2e17cbd484fcec211cea33",
