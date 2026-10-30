@@ -88,6 +88,28 @@ export function readSigns(value: unknown): SignRead[] {
 /** A sentence closed with a full stop only when it has none of its own. */
 const closed = (s: string): string => (/[.!?]$/.test(s) ? s : `${s}.`);
 
+/** The signs a terminal can print for the codes a person reads most; any other currency keeps its code. */
+const SIGN: Readonly<Record<string, string>> = { GBP: '£', EUR: '€', USD: '$', JPY: '¥', INR: '₹' };
+
+/** The runtime's tender list, so "ISO 4217" in a sentence is the standard's name and not four thousand of anything. */
+const TENDER: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
+
+/**
+ * MONEY IN A SIGN'S SENTENCE AS A PERSON SAYS IT (audit 6g, AG1). A rule's question keeps its amount the way the record
+ * writes money into a sentence, "GBP 2,400.00", and the oldest question's fact printed it so: now "£2,400", the pence
+ * kept only where they are not round, and "EGP 58,185.54" for a currency with no sign here.
+ */
+export function moneySaid(text: string): string {
+  return text.replace(/\b([A-Z]{3}) ([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\b/gu, (hit, code: string, minus: string, whole: string, fraction?: string) => {
+    if (!TENDER.has(code)) return hit;
+    const digits = whole.replace(/,/gu, '').replace(/\B(?=(?:\d{3})+$)/gu, ',');
+    const cents = fraction !== undefined && /^\.0+$/u.test(fraction) ? '' : (fraction ?? '');
+    const sign = SIGN[code];
+    const less = minus === '' ? '' : '−';
+    return sign === undefined ? `${code} ${less}${digits}${cents}` : `${less}${sign}${digits}${cents}`;
+  });
+}
+
 /**
  * The one line for the whole. A sign not read yet is never counted as fine: a record where nothing could be read said
  * "All 16 signs are fine, or not read yet.", which a person reads as fine.
@@ -111,8 +133,8 @@ export function signLines(signs: readonly SignRead[]): string[] {
   const out = [headline(signs)];
   for (const s of signs) {
     out.push('', `${s.name}: ${WORDS[s.state]}`);
-    if (s.said !== '') out.push(`  ${closed(s.said)}`);
-    for (const fact of s.facts.slice(0, FACTS_SHOWN)) out.push(`  ${closed(fact)}`);
+    if (s.said !== '') out.push(`  ${closed(moneySaid(s.said))}`);
+    for (const fact of s.facts.slice(0, FACTS_SHOWN)) out.push(`  ${closed(moneySaid(fact))}`);
     const reds = s.days.filter((d) => d === 'red').length;
     if (s.days.length > 0) out.push(`  Red on ${String(reds)} of the last ${String(s.days.length)} ${s.days.length === 1 ? 'day' : 'days'}.`);
   }

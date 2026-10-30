@@ -222,7 +222,9 @@ export function decisionOf(row: Row, settled?: Row): Question {
   const id = String(row.id);
   return {
     id,
-    title: text(row.question) || id,
+    /* DRAWN IN THE RECORD'S CURRENCY, as an open question's title is (`questionOf`): a rule's question keeps "GBP
+       4,800.00", and the page of a question once answered printed it so, in its heading and its tab (audit 6g, AG1). */
+    title: moneyInText(text(row.question)) || id,
     cost: '',
     rank: 0,
     opened: text(row.ts),
@@ -613,7 +615,7 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
 
   if (decision) {
     const settled = await linkedRow(client, 'suggestion', row.suggestion);
-    return { from: 'live', value: { question: decisionOf(row, settled), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [], ...keptApplied(row, settled) } };
+    return { from: 'live', value: { question: decisionOf(row, settled), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [], ...(settled ? { about: aboutOf(settled) } : {}), ...keptApplied(row, settled) } };
   }
 
   /* THE WORDS THE QUESTION WAS ASKED IN, from `boot`'s waiting list and else from the row itself. `boot` names only the
@@ -630,8 +632,10 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
   }
   const by = await linkedRow(client, 'decision', row.decision);
   const decided = by ? decisionOf(by).decided : undefined;
-  const question = by ? { ...drawn, title: text(by.question) || id, ...(decided ? { decided } : {}) } : drawn;
-  return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true, calls: [], ...keptApplied(by, row) } };
+  const question = by ? { ...drawn, title: moneyInText(text(by.question)) || id, ...(decided ? { decided } : {}) } : drawn;
+  /* AND WHAT IT WAS ABOUT AND WHO ASKED, kept once it is answered, so the receipt still links the invoice it chased and
+     can say what the answer set going (`does.ts`). */
+  return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true, calls: [], about: aboutOf(row), ...keptApplied(by, row) } };
 }
 
 const sentOf = (out: Wire<unknown>): Sent =>

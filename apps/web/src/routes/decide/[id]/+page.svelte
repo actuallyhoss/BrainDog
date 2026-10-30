@@ -80,6 +80,7 @@
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import { aboutLine, aboutOf, sideOf, words as sideWords } from './side.ts';
+  import { doesBefore, doesOf } from './does.ts';
   import { amountAnswer, moneyRowOf } from '$lib/decide/money-row.ts';
   import { rowHref } from '$lib/record/row-href.ts';
   import { listName, nameWords, runByIn, type RunBy } from '$lib/record/names.ts';
@@ -918,6 +919,15 @@
   );
 
 
+  /* WHAT THE ANSWER SET GOING, said on the receipt with a link to what it is about (`does.ts`), and what it would set
+     going, said under the answers before the press. */
+  const settledOption = $derived.by(() => {
+    const key = committed?.option ?? question?.decided?.option;
+    return key === undefined ? undefined : question?.options.find((o) => o.key === key)?.title;
+  });
+  const did = $derived(settled ? doesOf(about?.by, settledOption) : null);
+  const willDo = $derived(question && !settled ? doesBefore(about?.by, question.options) : null);
+
   /* ── what accepting does, one folded tile under the options ───────────── */
 
   /** Still open here: neither settled on this screen nor closed on the record. */
@@ -1079,6 +1089,9 @@
             </span>
           </p>
           <p class="settled-choice">{settled.title}</p>
+          {#if did && aboutRow}
+            <p class="settled-did">{did.lead} {#if aboutRow.href}<a class="gate-link" href={at(aboutRow.href)}>{aboutRow.title}</a>{:else}{aboutRow.title}{/if}. {did.tail}</p>
+          {/if}
           <!-- THE REASON WHEN THERE IS ONE. An answer given by its press alone is a whole answer, and a pair of quotation
                marks round nothing read as a reason that failed to load. Nor is the sentence the record wrote for a press
                (`pressedOnly`) quoted on a reloaded receipt, as though the person had written it. -->
@@ -1195,6 +1208,7 @@
                   {#each question.options as option (option.key)}{@render answer(option, question, amountAnswer(option.title, moneyRow.amount), /^chase\b/iu.test(option.title.trim()) || (!question.options.some((o) => /^chase\b/iu.test(o.title.trim())) && suggestedKey === option.key))}{/each}
                   {@render later()}
                 </div>
+                {#if willDo}<p class="dc-will">{willDo}</p>{/if}
                 {@render hardUnder(question)}
               {:else if two}
                 <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, with Not now beside them. -->
@@ -1440,7 +1454,7 @@
     {#if aside}
     <Tile class="gate-aside">
       <!-- WHAT IT IS ABOUT, FIRST: the row by its title, a link to it, and its list, amount and how late under it. -->
-      {#if asking && aboutRow}
+      {#if aboutRow}
         <section class="aside-part" aria-labelledby="gate-about-h">
           <h2 class="gate-h" id="gate-about-h">{sideWords.about}</h2>
           <p class="gate-about">
@@ -1929,6 +1943,13 @@
     font-size: var(--fs-meta);
   }
 
+  /* WHAT THE ANSWER SETS GOING, one quiet line under the buttons (`does.ts`). */
+  .dc-will {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
   .commit-date-box {
     position: relative;
     display: inline-grid;
@@ -2076,6 +2097,14 @@
   .settled-reason {
     margin: 0;
     color: var(--ink-2);
+  }
+
+  /* WHAT IT SET GOING, with the thing it is about one press away. */
+  .settled-did {
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    max-inline-size: var(--measure);
   }
 
   .settled-note {
