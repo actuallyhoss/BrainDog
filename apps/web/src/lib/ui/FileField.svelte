@@ -20,7 +20,9 @@
   import Icon from './Icon.svelte';
 
   let {
-    value = $bindable(''),
+    /* NO FALLBACK: a form binds a field it has not filled yet as `undefined`, and a bound prop with a fallback refuses that
+       (`props_invalid_value`), which left the Ledger loading for good once Receipts put a file field on it. */
+    value = $bindable(),
     label,
     id,
     describedby,
@@ -52,7 +54,7 @@
   /** The six types the store takes; SVG is never one. The picker offers these, and a phone offers its camera for them. */
   const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,application/pdf';
 
-  const file = $derived<FileValue | null>(fileOf(value));
+  const file = $derived<FileValue | null>(fileOf(value ?? ''));
   const picture = $derived(file !== null && file.mime.startsWith('image/'));
 
   let picker = $state<HTMLInputElement | undefined>(undefined);
