@@ -151,7 +151,7 @@ async function verifyCopy(file: string, path: string, bytes: Buffer, key: string
     raw = readFileSync(`${path}.sig`, 'utf8');
   } catch {
     io.say(
-      `${file} is a self-host copy with no signature beside it (${file}.sig), so there is nothing to check it against. Copies taken before signing began, or by a BrainDog with no signing key, are unsigned. Take a new copy, or export a .brainl from the record and verify that instead.`,
+      `${file} is a self-host copy with no signature beside it (${file}.sig), so there is nothing to check it against. Copies taken before signing began, or by a BrainDog with no signing key, are unsigned. Take a new copy, or export a .brainl from your BrainDog and verify that instead.`,
     );
     return 1;
   }

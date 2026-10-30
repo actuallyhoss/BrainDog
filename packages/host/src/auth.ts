@@ -79,7 +79,7 @@ export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
      the level they actually hold there. `usage` above answers for records this person OWNS; this
      answers for every one they can open at all, which is the wider question the sidebar asks. */
   { path: '/account/records', method: 'GET', on: 'both', needs: 'session', what: 'Which records you can reach, each with its name and the level you hold there.' },
-  { path: '/account/billing', method: 'GET', on: 'worker', needs: 'session', what: 'Each record you own, whether it is paid for, and whether this host takes payment at all.' },
+  { path: '/account/billing', method: 'GET', on: 'worker', needs: 'session', what: 'Each BrainDog you own, whether it is paid for, and whether this host takes payment at all.' },
   { path: '/account/billing/checkout', method: 'POST', on: 'worker', needs: 'session', what: 'A payment page for a new record, `{ slug, name?, tz?, plan? }`, for paying again, `{ record, plan? }`, or for Slash credits, `{ record, pack }`.' },
   { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a BrainDog you own, `{ record }`, or `{ record, plan }` to switch its plan.' },
   { path: '/account/billing/extra', method: 'POST', on: 'worker', needs: 'session', what: 'Extra usage past the allowance for a paid record you own, under a monthly cap: `{ record, cap_cents }`, 0 turning it off.' },

@@ -437,7 +437,7 @@ const fullUsage = () =>
     'braindog env check [--profile <name>] [--json]',
     "  Run claude mcp list in each profile and say each server as connected, needing a sign-in, or failed, by name only. claude is asked about once, as a program, and it changes nothing else.",
     'braindog sync inventory [--under <folder>] [--host <host>] [--json]',
-    "  List what a setup sync would carry from this machine, by name and size: auto memory, the context folder, your programs, ccenv's shared files and the skills your BrainDog does not hold, and with --under each repository's ignored .env files and what it has not pushed or committed. Then what it would refuse and why, and on a machine that has joined, what the record keeps sealed already by machine. It opens no file it lists, nothing sealed, and changes nothing.",
+    "  List what a setup sync would carry from this machine, by name and size: auto memory, the context folder, your programs, ccenv's shared files and the skills your BrainDog does not hold, and with --under each repository's ignored .env files and what it has not pushed or committed. Then what it would refuse and why, and on a machine that has joined, what your BrainDog keeps sealed already by machine. It opens no file it lists, nothing sealed, and changes nothing.",
     'braindog sync join [--name <machine>] [--new-key] [--host <host>]',
     "  Join setup sync, with the Setup sync add-on installed: name this machine and keep the sync key in its Keychain, Credential Manager or secret service. The first machine makes the key and asks twice for a new sync passphrase; every other machine asks for it once. The passphrase is typed at the terminal, never shown, kept or sent.",
     'braindog sync push [--dry-run] [--host <host>]',
