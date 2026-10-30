@@ -2687,7 +2687,7 @@ const SKIP_REASON_MOST = 120;
  * nothing to say why.
  *
  * ONLY A WEBHOOK, because it is the only channel whose door this record's host terminates with a URL a sender is given
- * (`packages/host/src/ingest.ts`). Mail is verified by the forwarder's own `Authentication-Results`, and `pull`, `call`
+ * (`packages/host/src/ingest.ts`). Mail is verified by the host's own DKIM check (`packages/host/src/dkim.ts`), and `pull`, `call`
  * and `poll` are fetched by the record itself, so a `verify:` on any of them would be a promise nothing keeps.
  *
  * A SIGNATURE NAMES ITS KEY BY THE KEYCHAIN LABEL, AND BY NOTHING ELSE. `hmac_sha256` was refused by name until a door

@@ -11,6 +11,7 @@
  * across `packages/**`: the kernel may not ask which runtime it is in, and a host must.
  */
 
+import { Resolver } from 'node:dns/promises';
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from 'node:http';
 import { createServer as createTlsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
@@ -20,7 +21,7 @@ import { env } from 'node:process';
 import {
   grantAad, grantKey, openSealed,
   engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveKeychain, servesKeys, servesSlash, servesKeychain, sessionOf, slashRecordMeter, withSession,
-  type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type KeychainDoor,
+  type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type KeychainDoor, type TxtLookup,
 } from '@braindog/host';
 import {
   clearCookie,
@@ -963,8 +964,13 @@ function inboundDigest(file: string, now: () => number): () => Promise<string | 
  * `cloudIngest` makes for a Worker (`apps/worker/src/route.ts`): there the digest is a key into the
  * Directory's index, here it is one comparison, and neither side is given the token.
  */
-function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (() => Promise<string | null>) | null, open: OpenKey, folder: string | null): IngestDoor {
+function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (() => Promise<string | null>) | null, open: OpenKey, folder: string | null, txt: TxtLookup = dnsTxt): IngestDoor {
   return {
+    /* MAIL IS CHECKED HERE, AGAINST THE SENDER'S KEYS IN DNS, AND NO LINE IN IT IS BELIEVED (SEC1). This host's mail
+       door is `POST /in/email/<token>` and nothing else, so a forwarder's `Authentication-Results` arrived over the same
+       door a stranger holding the token posts to, and believing it filed a forged bank debit. A forwarder that posts the
+       message as it was sent keeps its DKIM signature whole, and that signature is what is read now. */
+    dkim: txt,
     /* A SIGNED DOOR'S KEY IS OPENED HERE, under this host's key store, and handed to the record for the one answer:
        `keyOpener` is the opener every scheduled action uses, and its `grant.read` is the audit trail of each
        check. The Cloud-shaped URL stays a path token's alone, so a signed door has the one URL `49 §231` writes. */
@@ -1011,6 +1017,21 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
     ...(folder === null ? {} : { keep: async ({ bytes }: { bytes: Uint8Array }) => keepAttachment(folder, bytes) }),
   };
 }
+
+/**
+ * TXT records from the machine's own resolver, in the shape `dkim.ts` asks for: a name with none is `[]`, a resolver
+ * that did not answer is `null` (`temperror`, so the message is stored unverified and nothing is filed from it).
+ * Four seconds at most, so five signatures cannot hold a forwarder's POST for long.
+ */
+const dnsTxt: TxtLookup = async (name) => {
+  try {
+    const records = await new Resolver({ timeout: 4_000, tries: 1 }).resolveTxt(name);
+    return records.map((chunks) => chunks.join(''));
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    return code === 'ENOTFOUND' || code === 'ENODATA' ? [] : null;
+  }
+};
 
 export type Started = Awaited<ReturnType<typeof start>>;
 
@@ -1094,6 +1115,8 @@ export async function start(options: {
   host?: string | undefined;
   /** The belt under the doorbell: a tick that catches an abandoned lease. `0` turns it off. */
   pollMs?: number;
+  /** Where DKIM keys are looked up for posted mail. Absent is the machine's resolver; a test hands its own keys. */
+  txt?: TxtLookup | undefined;
   /**
    * The host's key store. `33 §1` port 8, `49 §2`'s `HostDeps.keys`.
    *
@@ -2137,7 +2160,7 @@ export async function start(options: {
       health: engineHealth,
     },
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
-    arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail, keyOpener(api, options.keys), blobsFolder(options.file)),
+    arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail, keyOpener(api, options.keys), blobsFolder(options.file), options.txt),
     /* A LINK TO ONE PAGE, built here once so its read budget outlives a request, as the arrivals' does. */
     shared: sharedDoorOf(api, handlers, shareKey, clock.now),
     /* AND EVERY CALLER'S MINUTE, built here once for the same reason (`overLimit`), and what `limits` says of it. */

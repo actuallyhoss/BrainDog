@@ -55,6 +55,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 
+import { verdictValue, type TxtLookup } from './dkim.ts';
 import { verifyStripe } from './stripe-sign.ts';
 
 /** The two channels this route terminates. `30 §1`'s five, minus the three that do not arrive over HTTP. */
@@ -185,7 +186,25 @@ export type IngestDoor = {
    * ABSENT IS A HOST WITH NO FILE STORE, and every attachment is then named and sized and nothing more.
    */
   keep?(ask: { rec: string; name: string; type: string; bytes: Uint8Array<ArrayBuffer> }): Promise<{ sha256: string; mime: string } | null>;
+  /**
+   * The DNS this host asks for DKIM keys, so mail posted to `POST /in/email/<token>` can be checked HERE (`dkim.ts`).
+   *
+   * ABSENT IS A HOST THAT CHECKS NOTHING POSTED OVER HTTP, and every message posted there is stored unverified, which is
+   * the Cloud's answer: its mail arrives through Email Routing, whose handler checks the signatures itself and hands the
+   * verdict over as `serveIngest`'s third argument. The self-host has no MX, so its only mail door is the HTTP one and it
+   * checks the bytes it was posted. What neither host does is believe a line the message carries (SEC1).
+   */
+  dkim?: TxtLookup;
 };
+
+/**
+ * This host's own verdict on a message, handed over beside it by the code that checked it: the value of an
+ * `Authentication-Results` line (`braindog; dkim=pass header.d=bank.example`).
+ *
+ * AN ARGUMENT AND NEVER A HEADER, because anything in a request can be written by whoever sends it. Only code in this
+ * process can pass it: the Worker's Email Routing handler (`apps/worker/src/email.ts`) does, and an HTTP request cannot.
+ */
+export type MailStamp = { readonly verdict: string };
 
 /**
  * One attachment as the arrival names it, in the shape a `file` field holds (`kernel/src/coerce.ts`), less `sha256` when
@@ -550,13 +569,12 @@ function results(value: string): Resinfo[] {
 }
 
 /**
- * Whether a forwarder said this message is who it claims to be.
+ * Whether this host's own verdict (`said`) says the message is who its `From:` claims to be.
  *
- * THE TOP `Authentication-Results` AND ONLY THE TOP ONE, because every line below it was typed by
- * somebody this record has no reason to trust. Measured against the first cut, which
- * searched the joined value of every hop: a message whose own head carried
- * `Authentication-Results: anything-the-sender-typed; dkim=pass`, forwarded by an MTA that had just
- * written `dkim=fail ... spf=fail` above it, was stored `verified: true`.
+ * NO LINE IN THE MESSAGE IS READ AS A VERDICT, NOT EVEN THE TOP ONE (SEC1, 30 Oct). The first cut searched the joined
+ * value of every hop and a sender's own `Authentication-Results: x; dkim=pass` passed; the second read only the top
+ * line, as a forwarder writes it, and that still passed a stranger who posted the whole message to
+ * `POST /in/email/<token>` with a top line of their own. `said` is handed in by the code that checked the signatures.
  *
  * AND THE VERDICT MUST BE ABOUT THE `From:` THAT A PERSON WILL READ, which is the forgery after that
  * one and the reason this function stopped being a substring search. DKIM says "the holder of the key
@@ -585,12 +603,10 @@ function results(value: string): Resinfo[] {
  * where this function cannot say which address the alignment was against and the record cannot say
  * which one its `match:` read. An absent verdict is `false` too, and the row is stored either way.
  */
-const forwarderPassed = (head: (readonly [string, string])[]): boolean => {
+const forwarderPassed = (head: (readonly [string, string])[], said: string): boolean => {
   const from = head.filter(([name]) => name === 'from');
   const claimed = from.length === 1 && from[0] !== undefined ? fromDomains(from[0][1]) : [];
   if (claimed.length === 0) return false;
-  const said = head.find(([name]) => name === 'authentication-results')?.[1];
-  if (said === undefined) return false;
   return results(said).some(
     (r) =>
       r.result === 'pass' &&
@@ -657,7 +673,7 @@ async function stripeSigned(request: Request, body: string, v: Extract<IngestVer
  * the failure that matters: it is the one that fills a record. A stranger guessing ids gets 404s, which
  * cost a lookup and no row.
  */
-export async function serveIngest(request: Request, door: IngestDoor | undefined): Promise<Response> {
+export async function serveIngest(request: Request, door: IngestDoor | undefined, stamp?: MailStamp): Promise<Response> {
   const path = servesIngest(new URL(request.url).pathname);
   if (path === null) return nothing(404);
   /* A HOST THAT WIRED NO DOOR HAS NO ROUTE, which is `auth.ts`'s answer for an unset operator key: the
@@ -681,7 +697,7 @@ export async function serveIngest(request: Request, door: IngestDoor | undefined
     ]);
 
   try {
-    return path.channel === 'email' ? await mail(request, door, key) : await hook(request, door, path);
+    return path.channel === 'email' ? await mail(request, door, key, stamp) : await hook(request, door, path);
   } catch {
     /* NOTHING THROWS ACROSS THIS BOUNDARY, for the reason `serveApi` gives: a handler that threw left
        the socket open and the request hanging, and on the self-host the server then never closed. A
@@ -737,7 +753,7 @@ async function hook(request: Request, door: IngestDoor, path: Extract<IngestPath
   });
 }
 
-async function mail(request: Request, door: IngestDoor, hash: string): Promise<Response> {
+async function mail(request: Request, door: IngestDoor, hash: string, stamp: MailStamp | undefined): Promise<Response> {
   if (door.inbound === undefined) return nothing(404);
   /* THE TOKEN ITSELF NEVER LEAVES THIS FILE. What crosses to the host is the digest the budget was
      already keyed on, so a host that keeps an index of inbound tokens keeps an index of digests. */
@@ -760,9 +776,18 @@ async function mail(request: Request, door: IngestDoor, hash: string): Promise<R
      `=?utf-8?q?alerts=40hsbc.example?= <bot@evil.example>` spells no bank domain until it is decoded, so alignment
      read raw would pass it on `evil.example`'s signature while the record's `match:` read the decoded bank address. */
   const head = headLines(text).map(([name, value]) => [name, words(value)] as const);
+  /* WHOSE VERDICT IS READ (SEC1): the one handed over beside the bytes by the code that checked them, else this host's
+     own DKIM check of the bytes it was posted, else none, and none is unverified. Never a line in the message: the
+     token is the only thing that opens this door, it is handed to third parties by design, and anyone holding it could
+     post `Authentication-Results: x; dkim=pass header.d=<bank>` above a `From:` of the bank's and have a debit filed. */
+  const said =
+    stamp !== undefined ? stamp.verdict : door.dkim !== undefined ? await verdictValue(bytes, door.dkim, Math.floor(Date.now() / 1000)) : null;
   const read = readMime(bytes, text);
   const files = read === null ? [] : await keepAll(door, rec, read.files);
-  const headers = joinHead(head.filter(([name]) => name !== FILES_HEADER));
+  /* A VERDICT THIS HOST REACHED OVER HTTP IS PUT FIRST IN THE ROW'S HEAD, as the Email Routing handler puts its own on top
+     of the bytes, so whoever reads the row reads this host's finding before anything the message says about itself. */
+  const shown = stamp === undefined && said !== null ? [['authentication-results', said] as const, ...head] : head;
+  const headers = joinHead(shown.filter(([name]) => name !== FILES_HEADER));
   if (files.length > 0) headers[FILES_HEADER] = JSON.stringify(files);
   return store(door, {
     rec,
@@ -774,7 +799,7 @@ async function mail(request: Request, door: IngestDoor, hash: string): Promise<R
        `sha256` names. A message that was plain text already is stored exactly as it arrived. */
     body: read === null ? text : text.slice(0, bodyAt(text)) + read.text,
     sha256: await digest(bytes),
-    verified: forwarderPassed(head),
+    verified: said !== null && forwarderPassed(head, said),
   });
 }
 
