@@ -57,6 +57,11 @@ test('goto takes only an address of the app, and reads one from before the move 
   assert.equal(appPath('/app?x=1'), '/?x=1');
   for (const bad of [undefined, '', 'decide', 'https://evil.example/x', '//evil.example', '/../etc', '/app/../etc', '/x\\evil', 'javascript:alert(1)', '/api/export', '/auth/logout', '/oauth/authorize', '/app/api/boot'])
     assert.equal(appPath(bad), null, String(bad));
+  /* SEC4: `/app` comes off with every slash behind it, so what is left is never another host. */
+  for (const odd of ['/app//evil.example', '/app///evil.example/x', '/app/%2F%2Fevil.example']) {
+    const to = appPath(odd);
+    assert.ok(to === null || (to.startsWith('/') && !to.startsWith('//')), `${odd} went to ${to}`);
+  }
 });
 
 test('the Mac notifications switch defaults off in a browser and keeps what is set', async () => {

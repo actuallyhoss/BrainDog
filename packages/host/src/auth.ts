@@ -660,7 +660,10 @@ export const HOST_DOORS: ReadonlySet<string> = new Set(['api', 'auth', 'account'
  */
 export function appNext(next: unknown): string | null {
   const safe = safeNext(next);
-  const path = /^\/app(?=[/?#]|$)/.test(safe) ? `/${safe.slice(4).replace(/^\//, '')}` : safe;
+  /* EVERY SLASH AFTER `/app` GOES, AND THE RESULT IS CHECKED AGAIN (SEC4): taking one slash turned `/app//evil.example`
+     into `//evil.example`, another host, after `safeNext` had passed it. What is checked is what will be followed. */
+  const path = /^\/app(?=[/?#]|$)/.test(safe) ? `/${safe.slice(4).replace(/^\/+/, '')}` : safe;
+  if (path !== '/' && safeNext(path) === '/') return null;
   const first = /^\/([^/?#]*)/.exec(path)?.[1] ?? '';
   return HOST_DOORS.has(first) ? null : path;
 }

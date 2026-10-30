@@ -122,3 +122,15 @@ test('appNext IS A PAGE OF THE APP OR NOTHING: a door is refused, and an address
   assert.equal(appNext('//evil.example/x'), '/');
   assert.equal(appNext('https://evil.example/'), '/');
 });
+
+/* SEC4 (security review of 30 Oct): `/app` WAS TAKEN OFF AFTER `safeNext`, AND ONE SLASH WITH IT, so `/app//evil.example/x`
+   came back `//evil.example/x` and was mailed and followed as another host. */
+test('SEC4: appNext NEVER ANSWERS ANOTHER HOST, HOWEVER THE /app IN FRONT OF IT IS SPELLED', () => {
+  for (const next of ['/app//evil.example/x', '/app///evil.example', '/app/%2F/x', '/app/%2F%2Fevil.example', '/app//%2Fevil.example']) {
+    const to = appNext(next);
+    if (to === null) continue;
+    assert.ok(to.startsWith('/') && !to.startsWith('//'), `${next} came back ${to}`);
+    assert.ok(!decodeURIComponent(to).startsWith('//'), `${next} decodes to another host: ${to}`);
+  }
+  assert.equal(appNext('/app//evil.example/x'), '/evil.example/x');
+});
