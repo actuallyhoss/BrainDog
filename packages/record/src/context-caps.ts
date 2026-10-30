@@ -57,6 +57,8 @@ export type CapOptions<T> = {
   used?: ((row: T) => readonly (string | null | undefined)[]) | undefined;
   /** The counts the store gave when the read stopped short of every row; the rows handed in otherwise. */
   counted?: { here?: number | undefined; everywhere?: number | undefined } | undefined;
+  /** The rows counted, as a `where` the rest's call carries: this project's and those that apply everywhere. */
+  where?: unknown;
 };
 
 /** The newest of the times handed in, or `''` when there is none, which sorts as never used. */
@@ -75,8 +77,19 @@ function byUse<T>(rows: readonly T[], used: CapOptions<T>['used']): T[] {
     .map(({ row }) => row);
 }
 
-/** The call that lists every row of a list, which an agent makes when the five it was given are not the ones it needs. */
-export const restCall = (register: string): string => `list({ register: ${JSON.stringify(register)} })`;
+/**
+ * A call as every answer writes one, and as an agent sends it back: the tool, a space, its arguments as JSON
+ * (`list {"register":"tasks"}`). It was written as JavaScript, `list({ register: "tasks" })`, here alone.
+ */
+export const callSaid = (tool: string, args?: Readonly<Record<string, unknown>>): string =>
+  args === undefined || Object.keys(args).length === 0 ? tool : `${tool} ${JSON.stringify(args)}`;
+
+/**
+ * The call that lists the rest of a list, which an agent makes when the five it was given are not the ones it needs:
+ * held to `where` when the rows counted were (this project's and those that apply everywhere), so the rest it lists are
+ * the ones the count said were left, and not the whole list.
+ */
+export const restCall = (register: string, where?: unknown): string => callSaid('list', { register, ...(where === undefined ? {} : { where }) });
 
 /**
  * One list's rows for `context`: at most five, this project's first and then those that apply everywhere, each most
@@ -92,7 +105,7 @@ export function capRegister<T>(rows: readonly T[], inherited: readonly T[], opts
   const kept = full ? mine.slice(0, FULL_ROWS) : mine.slice(0, BRIEF_ROWS);
   const also = full ? theirs.slice(0, FULL_ROWS) : theirs.slice(0, BRIEF_ROWS - kept.length);
   const more = here + everywhere - kept.length - also.length;
-  return { rows: kept, inherited: also, here, everywhere, more, rest: more > 0 ? restCall(opts.register) : null, truncated: more > 0 };
+  return { rows: kept, inherited: also, here, everywhere, more, rest: more > 0 ? restCall(opts.register, opts.where) : null, truncated: more > 0 };
 }
 
 /* ── the questions, and what was decided ───────────────────────────────── */

@@ -187,6 +187,7 @@ import {
   tileValuesOf,
   HEADLINES_OWED,
   headlineBasis,
+  dayWords,
   headlineFault,
   headlineKey,
   holesOf,
@@ -258,7 +259,7 @@ import { landRetype } from './methods/retype.ts';
 import { byMeaning } from './near.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
 import { OLDER, agentName, card as cardOf, type CardAt } from './card.ts';
-import { factsFromContext, planContext, planText, type KpiFact, type TaskFact, type ToldFact } from './context-plan.ts';
+import { factsFromContext, planContext, planText, valueWords, type KpiFact, type TaskFact, type ToldFact } from './context-plan.ts';
 import { BRIEF_ROWS, capRegister, DECIDED, decidedHere, peopleHere, projectWaiting, rulesOf, type Decision, type Placed } from './context-caps.ts';
 import { choiceOf } from './decided.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
@@ -1914,7 +1915,20 @@ export type Context = {
    * leaves, five in all unless `format: 'full'` asked for twenty of each (`capRegister`). `here` and
    * `everywhere` count every open row of each, `more` how many this answer leaves out, and `rest` the call that lists them.
    */
-  registers: { id: string; name: string; role?: string; rows: Brief[]; inherited: Brief[]; truncated: boolean; here?: number; everywhere?: number; more?: number; rest?: string | null }[];
+  registers: {
+    id: string;
+    name: string;
+    role?: string;
+    rows: Brief[];
+    inherited: Brief[];
+    truncated: boolean;
+    here?: number;
+    everywhere?: number;
+    more?: number;
+    rest?: string | null;
+    /** The state values a person reads differently, value to label (`backlog` is "Later"), when the list declares any. */
+    states?: Record<string, string>;
+  }[];
   /** The people linked to this project, most recently in touch first, each with their role and organisation. */
   people: PersonBrief[];
   /** How many people other than the record's own are linked here, sent only when there are more than `people` holds. */
@@ -10056,26 +10070,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** The task `context { task }` hands whole, as the plan says it: its words, its other fields by label, its history. */
   const taskFact = (ctx: CallContext, t: TaskInHand): TaskFact => {
     const decl = kernel.register(t.register);
-    const shown = (v: unknown): string | null => {
+    const now = clock.now();
+    /* EACH VALUE AS A PERSON READS IT (door audit D9): "Due: 9 Sep", "Effort: 1 day", "State: Later", where it said
+       "Due: 2026-09-09" and "effort: 86400". A ref by the words of the row it names. */
+    const shown = (v: unknown, f?: (typeof decl & {})['fields'][number]): string | null => {
       if (v === null || v === undefined || v === '' || typeof v === 'object') return null;
+      if (f !== undefined && f.type !== 'ref' && f.type !== 'text') return valueWords({ ...f, unit: (f as { unit?: string }).unit }, v, now);
       if (typeof v !== 'string') return String(v);
       const row = kernel.get(v);
       /* A ROW THE TASK POINTS AT THAT SHE IS NOT SHOWN IS LEFT OUT, never named and never its id. */
       if (row !== null && (readable(ctx, row.register) !== null || !sight.admits(ctx, row))) return null;
       return row === null ? v : (kernel.titleOfRow(row.id) ?? v);
     };
+    const fieldOf = (id: string | undefined) => (id === undefined ? undefined : decl?.fields.find((f) => f.id === id));
     const fields: Record<string, string> = {};
     for (const f of decl?.fields ?? []) {
       if (f.retired || f.id === decl?.title || f.id === decl?.state || f.id === 'note') continue;
-      const v = shown(t.fields[f.id]);
-      if (v !== null) fields[f.label ?? f.id.replace(/_/gu, ' ')] = v;
+      const v = shown(t.fields[f.id], f);
+      const label = f.label ?? f.id.replace(/_/gu, ' ');
+      if (v !== null) fields[label.slice(0, 1).toUpperCase() + label.slice(1)] = v;
     }
     const note = t.fields.note;
     return {
       name: (decl === undefined ? null : shown(t.fields[decl.title])) ?? t.spoken,
       spoken: t.spoken,
       version: t.version,
-      state: decl?.state === undefined ? null : shown(t.fields[decl.state]),
+      state: decl?.state === undefined ? null : shown(t.fields[decl.state], fieldOf(decl.state)),
       fields,
       note: typeof note === 'string' && note.trim() !== '' ? note : null,
       history: t.history,
@@ -10205,9 +10225,52 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       )
       .filter((e) => e.field === null || !hidden.has(e.field))
       .map((e) => {
-        const who = e.actor.startsWith('p_') ? personNamed(sql, e.actor) : e.actor;
-        const what = e.kind === 'note' ? `noted "${e.note ?? ''}"` : e.kind === 'create' ? 'made it' : e.field !== null ? `set ${e.field}${e.to_v !== null && e.to_v.length <= 60 ? ` to ${e.to_v}` : ''}` : e.kind;
-        return `${e.ts.slice(0, 16).replace('T', ' ')} ${who} ${what}`;
+        /* IN WORDS (door audit D9): "30 Oct 19:33, you changed Due to 9 Sep", where it said "2026-10-30 19:33 The owner
+           edit". A run is said by its handle, a person by name, and a field by its label with its value as one reads. */
+        const a = e.actor;
+        const who = a.startsWith('p_')
+          ? personNamed(sql, a)
+          : a === 'slash'
+            ? 'Slash'
+            : a === 'system' || a === 'rule:ladder' || a === 'rule:additive' || a === 'rule:update' || a === 'rule:handled'
+              ? 'BrainDog'
+              : a.startsWith('rule:') || a.startsWith('script:')
+                ? 'a rule'
+                : a.startsWith('ingest:')
+                  ? 'an import'
+                  : a.startsWith('agent:')
+                    ? 'an agent'
+                    : a;
+        const field = e.field === null ? undefined : decl?.fields.find((f) => f.id === e.field);
+        const label = field === undefined ? (e.field ?? '').replace(/_/gu, ' ') : (field.label ?? field.id.replace(/_/gu, ' '));
+        const toValue = (() => {
+          if (e.to_v === null || e.to_v.length > 60) return null;
+          let v: unknown = e.to_v;
+          try {
+            v = JSON.parse(e.to_v);
+          } catch {
+            /* stored as text */
+          }
+          return field?.type === 'ref' ? null : valueWords(field, v, clock.now());
+        })();
+        const what =
+          e.kind === 'note'
+            ? `noted "${e.note ?? ''}"`
+            : e.kind === 'create'
+              ? 'made it'
+              : e.kind === 'delete'
+                ? 'deleted it'
+                : e.kind === 'restore'
+                  ? 'put it back'
+                  : e.field !== null
+                    ? `set ${label}${toValue === null ? '' : ` to ${toValue}`}`
+                    : e.kind === 'link'
+                      ? 'linked it'
+                      : e.kind === 'tag' || e.kind === 'untag'
+                        ? 'changed its tags'
+                        : 'changed it';
+        const when = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u.test(e.ts) ? `${dayWords(e.ts.slice(0, 10), clock.now())} ${e.ts.slice(11, 16)}` : e.ts.slice(0, 16);
+        return `${when}, ${who} ${what}`;
       });
     return ok({ spoken: kernel.nameOf(row.id), register: row.register, list: decl?.name ?? row.register, version: row.version, fields: { ...row.fields }, project, history });
   };
@@ -10448,12 +10511,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const kept = new Set(first.map((p) => p.row.id));
         return { rows: rows.filter((row) => kept.has(row.id)), inherited: inherited.filter((row) => kept.has(row.id)) };
       })();
+      /* THE ROWS COUNTED, AS THE REST'S CALL LISTS THEM: this project's and those that apply everywhere, open ones only,
+         so "and 5 more" lists those five and not every row of the list (door audit D9). */
+      const placedHere = home ? (f.type === 'list' ? { field: f.id, has: kernel.nameOf(home.id) } : { field: f.id, is: kernel.nameOf(home.id) }) : null;
+      const anywhere = { field: f.id, empty: true };
+      const scoped = placedHere === null ? anywhere : { any: [placedHere, anywhere] };
+      const restWhere = decl.state !== undefined && done.length > 0 ? { all: [scoped, { field: decl.state, not_in: [...done] }] } : scoped;
       const capped = capRegister(lead.rows, lead.inherited, {
         register: id,
         format,
         ...(fades ? {} : { used }),
         counted: fades ? { here: Math.max(rows.length, counted.here ?? 0), everywhere: Math.max(inherited.length, counted.everywhere ?? 0) } : counted,
+        where: restWhere,
       });
+      /* THE STATES AS A PERSON READS THEM, so the Lane says "Later" where every list does, and never "backlog". */
+      const stateField = decl.state === undefined ? undefined : decl.fields.find((field) => field.id === decl.state);
+      const states = stateField?.labels;
       registers.push({
         id,
         name: decl.name,
@@ -10465,6 +10538,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         everywhere: capped.everywhere,
         more: capped.more,
         rest: capped.rest,
+        ...(states !== undefined && Object.keys(states).length > 0 ? { states: { ...states } } : {}),
       });
       if (fades) learned.push(...rows.map((row) => brief(decl, f.id, row, 'project')), ...inherited.map((row) => brief(decl, f.id, row, 'global')));
     }
@@ -13755,7 +13829,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!found.ok) return found as Result<never>;
         task = found.value;
       }
-      const told = briefing(asked, { ...(typeof said.project === 'string' ? { project: said.project.trim() } : {}), depth, ...(task === null ? {} : { task }) });
+      /* A TASK ASKED WITH NO PROJECT IS READ WHERE THE TASK IS (door audit D9): the card said "No project here" over a
+         task of Kiln's. */
+      const project = typeof said.project === 'string' ? said.project.trim() : (task?.project ?? null);
+      const told = briefing(asked, { ...(project === null ? {} : { project }), depth, ...(task === null ? {} : { task }) });
       return ok(sight.mask(ctx, { ...told, depth, ...(task === null ? {} : { task }) })) as Out;
     },
 

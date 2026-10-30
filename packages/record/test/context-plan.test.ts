@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FULL_BUDGET, KPI_HOW, PLAN_BUDGET, PLAN_CARD_LINES, PLAN_CARD_WORDS, factsFromContext, kpiLine, planContext, planText, tokensOf, type ContextFacts, type LessonFact, type ToldFact } from '../src/context-plan.ts';
+import { FULL_BUDGET, KPI_HOW, PLAN_BUDGET, PLAN_CARD_LINES, PLAN_CARD_WORDS, factsFromContext, kpiLine, planContext, planText, tokensOf, valueWords, durationWords, type ContextFacts, type LessonFact, type ToldFact } from '../src/context-plan.ts';
 import { decidedLately, lessonsHeld } from '../src/context-caps.ts';
 import { TWO_SESSIONS, wordCount, type CardParts } from '../src/card.ts';
 import { createRecordApi, type CallContext, type Context } from '../src/index.ts';
@@ -134,8 +134,8 @@ test('A CUT SECTION SAYS HOW MANY IT LEFT AND THE EXACT CALL', () => {
   const lane = plan.sections.find((s) => s.id === 'lane');
   assert.ok(lane?.more, JSON.stringify(plan.sections.map((s) => s.id)));
   assert.equal(lane.more.n + lane.lines.length, 90);
-  assert.match(lane.more.call, /^list\(\{ register: "tasks", where: \{"field":"agent","is":"claude"\} \}\)$/u);
-  assert.match(planText(plan), new RegExp(`and ${String(lane.more.n)} more: list`, 'u'));
+  assert.equal(lane.more.call, 'list {"register":"tasks","where":{"field":"agent","is":"claude"}}');
+  assert.match(planText(plan), new RegExp(`and ${String(lane.more.n)} more: list \\{`, 'u'));
 });
 
 test('THE LANE: tasks handed to this kind of agent lead, each with its handle and version', () => {
@@ -332,7 +332,7 @@ test('NUMBERS KEEPS TO THE BUDGET: on a record the size of his it is said within
   const many = Array.from({ length: 6 }, (_, i) => ({ name: `Number ${String(i)}`, every: '1w', last: iso(AT - DAY), stale: false }));
   const cut = lines(planText(planContext(his({ kpis: many }), { budget: 1_200 })));
   const at = cut.findIndex((l) => l.startsWith('Numbers'));
-  assert.match(cut[at + 4]!, /^ {9}and 2 more: list\(\{ register: "kpis"/u);
+  assert.match(cut[at + 4]!, /^ {9}and 2 more: list \{"register":"kpis"/u);
   assert.equal(cut[at + 5], `         ${KPI_HOW}`);
   /* NONE KEPT, NO SECTION. */
   assert.ok(!planContext(his(), { budget: 1_200 }).sections.some((s) => s.id === 'kpis'));
@@ -364,4 +364,19 @@ test('FROM THE SEED: Claude on Kiln is told the three numbers it keeps there, th
   const codex = await plan(as('codex', 'tok_2'));
   assert.ok(!codex.includes('Numbers  '), codex);
   sql.close();
+});
+
+test('A TASK’S VALUES ARE SAID AS A PERSON READS THEM, and every more line is a call an agent sends as it reads it', () => {
+  const now = Date.UTC(2026, 9, 30, 12);
+  assert.equal(valueWords({ type: 'day' }, '2026-09-09', now), '9 Sep');
+  assert.equal(valueWords({ type: 'day' }, '2027-01-13', now), '13 Jan 2027');
+  assert.equal(valueWords({ type: 'instant' }, '2026-10-30T19:33:00.000Z', now), '30 Oct 19:33');
+  assert.equal(valueWords({ type: 'duration' }, 86_400, now), '1 day');
+  assert.equal(durationWords(9_000), '2.5 hours');
+  assert.equal(valueWords({ type: 'enum', labels: { backlog: 'Later' } }, 'backlog', now), 'Later');
+  assert.equal(valueWords({ type: 'enum' }, 'in_progress', now), 'in progress');
+  assert.equal(valueWords({ type: 'bool' }, true, now), 'yes');
+  /* NO MORE LINE IS WRITTEN AS JAVASCRIPT. */
+  const text = planText(planContext(his({ kpis: Array.from({ length: 9 }, (_, i) => ({ name: `N${String(i)}`, every: '1w', last: null, stale: true })) }), { depth: 'full' }));
+  assert.doesNotMatch(text, /\b[a-z_]+\(\{/u, text);
 });
