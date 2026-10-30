@@ -1,7 +1,7 @@
 # 42 · `packages/declare` — specification
 
 The seventh package in the build order of [31-STACK](31-STACK.md) §2. It owns the *shape* of everything modular:
-the manifest of [04-PACKS](04-PACKS.md) §2, the eight declaration kinds, YAML → canonical JSON, the lint of 04 §5,
+the manifest of [04-PACKS](04-PACKS.md) §2, the declaration kinds (eight when this was written; `KINDS` in `packages/kernel/src/declare.ts` keeps them, with `script`, `job` and `look` since), YAML → canonical JSON, the lint of 04 §5,
 the install plan and its diff (04 §3), the one-transaction install, and the retire-not-remove uninstall (04 §4).
 Derives from 04 · 06 §1.1 · 07 §6 · 08 §2 · 09 §4 · 25 §3 · 34 §4–§6 · 30 §1, §6, §11 · 31 §9.
 
@@ -17,7 +17,7 @@ and then does exactly that, once, in one transaction.
 | It does | It refuses to do |
 |---|---|
 | turn pack text into canonical JSON (RFC 8785) and back into typed `Pack`/`Declaration` objects | parse YAML anywhere but its own `./yaml` subpath — the record, the Worker and the self-host API receive JSON only ([30-BLUEPRINT](30-BLUEPRINT.md) §7) |
-| validate the manifest and the eight kinds against closed Valibot schemas built at module scope ([31-STACK](31-STACK.md) §9, ADR-040) | evaluate anything: no template, no expression, no regex from pack text ([04-PACKS](04-PACKS.md) §7) |
+| validate the manifest and every kind of declaration against closed Valibot schemas built at module scope ([31-STACK](31-STACK.md) §9, ADR-040) | evaluate anything: no template, no expression, no regex from pack text ([04-PACKS](04-PACKS.md) §7) |
 | run every check of 04 §5 — shape, per-declaration, cross-declaration, and against a record's declaration state | touch SQL — the install transaction is the kernel's (`installDeclarations` / `retireDeclarations`, [41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.6); `declare` builds the batch and calls them through a `Host` the record hands it — `braindog pack lint` runs from a file with no record (31 §2: `declare ⇏ kernel`) |
 | compute the `Diff` of 04 §3 and its `planHash` | run the sixteen theme checks — `theme` owns them and `record` merges their refusals (31 §2: `declare ⇎ theme`) |
 | turn a `Diff` into the kernel's `InstallBatch` — declaration bodies, retirements, the pack row, seeds tagged `example`, the plan's version — so one transaction applies all of it or none; refuse a conflict, an orphaning retire, or a plan the caller did not see | write a row a person could have written — the only rows it causes are seeds tagged `example` |
@@ -87,7 +87,7 @@ packages/declare/
 ├── package.json        "@braindog/declare" · private · "exports": { ".": "./src/index.ts", "./yaml": "./src/yaml.ts" }
 ├── src/
 │   ├── index.ts        re-exports · normalise() · checksum() · toRefusals() · the types                 ~120 lines
-│   ├── schemas.ts      every Valibot schema at module scope: shared pieces, manifest, the eight kinds  ~800 lines
+│   ├── schemas.ts      every Valibot schema at module scope: shared pieces, manifest, each kind        ~800 lines
 │   ├── lint.ts         the Registry · stage B/C/D checks in 04 §5 order · the value scans of §8        ~450 lines
 │   ├── plan.ts         Installed × Pack → Diff · summaries · base · planHash                            ~250 lines
 │   ├── install.ts      install() · uninstall(): the InstallBatch of §5.5, its pre-checks, seeds tagged — no SQL  ~120 lines
@@ -201,7 +201,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `summary` | text ≤ 140 bytes | yes | — | — |
 | `author` | text ≤ 80 | yes | — | — |
 | `license` | `^[A-Za-z0-9.+-]{1,64}$` — SPDX syntax, not the list | yes | — | — |
-| `declarations` | 1–256 objects, each with exactly one kind key | yes | — | the eight kinds |
+| `declarations` | 1–256 objects, each with exactly one kind key | yes | — | the kinds of `KINDS` |
 | `requires` | `{ format?: int ≥ 1, primitives?: int ≥ 1, packs?: { PackId: Range } }` | no | `{ format: 1, primitives: 1, packs: {} }` | — |
 | `seeds` | `[{ register: Id, fields: object, note? }]`, at most eight per register | no | `[]` | — |
 | `provides` | `[DeclId]` — **derived**; written out, it must equal the derived set (`PROVIDES_MISMATCH`) | no | derived | — |

@@ -260,15 +260,15 @@ export default function closedLists(
    * of those sentences went stale at once and two were simply wrong, and the only reason it was ever
    * noticed was somebody counting by eye. This is that count, run every time instead.
    *
-   * "KIND" IS NOT A WORD THIS CORPUS OWNS ONCE. Pack declarations have their own eight kinds
-   * (`04-PACKS` §1: "is not one of the eight kinds of declaration"), schedule actions their own, a job's
+   * "KIND" IS NOT A WORD THIS CORPUS OWNS ONCE. Pack declarations have their own kinds (`KINDS` in
+   * `packages/kernel/src/declare.ts`, "is not one of the 11 kinds of declaration"), schedule actions their own, a job's
    * transcript its own nine, `event.kind` its own thirty-nine (`event-kinds.mjs`), and ordinary English
    * says "two kinds of X" about nothing in particular. A bare "sixteen kinds" is therefore ambiguous
    * EVERYWHERE EXCEPT `packages/render`, the one place "kind" has no other referent to be. Outside it, a
    * spelled-out count is read as a claim about BLOCK kinds only when the word `block` sits right against
    * it (`sixteen block kinds`, `nineteen kinds of block`) because none of this corpus's OTHER closed
-   * lists ever say that about themselves. Matching bare `kind(s)` everywhere would report `04 §1`'s eight
-   * pack kinds as a wrong count of twenty-nine; matching nothing outside `packages/render` would miss
+   * lists ever say that about themselves. Matching bare `kind(s)` everywhere would report a count of the
+   * pack kinds as a wrong count of block kinds; matching nothing outside `packages/render` would miss
    * every doc written ABOUT this exact list. This is the narrowest rule that gets both right. It is not
    * a parser of English, and it does not try to catch every phrasing (`kinds.ts`'s own "Twenty-five,
    * counted." names no word "kind" at all and this gate cannot see it either).

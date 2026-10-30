@@ -81,7 +81,7 @@ wire shapes — never prose.
 | 39 | `packages/theme` — DTCG wire format, the YAML dialect, the contrast-driven generator, the sixteen checks | 28 · 13 §2 · 22 §7 | fourth |
 | 40 | `packages/fixtures` — the eight reference pages, row corpora, the pack corpus, the seed manifest | 22 §10 · 31 §2 · 33 §8 | fifth; text only |
 | 41 | `packages/kernel` — migrations for the twenty-seven tables and the header tables, the write path, counters, events, `entry_fts`, refusals | 30 §1–§4, §6, §11 · 02 · 34 §3–§5 | sixth; the record's core |
-| 42 | `packages/declare` — the eight declaration kinds' schemas, YAML → JSON, lint, the install plan and diff | 04 · 06 §1.1 · 07 §6 · 08 §2 · 09 §4 · 25 §3 · 34 §6 | seventh |
+| 42 | `packages/declare` — the declaration kinds' schemas (eight then; `KINDS` keeps them now), YAML → JSON, lint, the install plan and diff | 04 · 06 §1.1 · 07 §6 · 08 §2 · 09 §4 · 25 §3 · 34 §6 | seventh |
 | 43 | `packages/extract` — the ten extractors and three combinators, the money and date parsers | 07 §3–§4 · 25 | eighth; phase B |
 | 44 | `packages/mcp` — the sixteen tools, resources, `instructions`, one JSON-RPC core over stdio and streamable HTTP, budgets | 10 · 33 §2, §4 | ninth |
 | 45 | `packages/record` — the RPC surface in six groups, `CallContext`, `Result`, pagination, projection, the outbox and schedule protocols | 30 §5, §8–§10 · 33 §2 · 09 | tenth |

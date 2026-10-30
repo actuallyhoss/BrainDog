@@ -7,8 +7,8 @@
  * `packages/kernel/test/refusals-write.test.ts` for `via: write` and
  * `apps/web/test/refusals-render.test.ts` for `via: render`, and both drive their surface for real.
  * `docs/40-SPEC-FIXTURES.md` §6 said none of the eight existed, a day after
- * two did, and `40 §6` went on saying it until September 22nd 2026. So the gap is not "no runner drives a fixture", it is "seven of nine vias have no
- * driver and there is no one place that says which". Five of nine as of the `where` driver below:
+ * two did, and `40 §6` went on saying it until September 22nd 2026. So the gap was not "no runner drives a fixture", it was "seven of nine vias
+ * had no driver and there was no one place that said which". Five of nine as of the `where` driver below:
  * `install`, `rpc`, `import`, `pull` and `ask`, which is what `DRIVERS` says in sentences. Four since
  * `packages/record/test/refusals-install.test.ts` began driving `install` on September 22nd 2026, and
  * none later the same day: `rpc`, `import`, `pull` and `ask` each have a runner beside the file their
@@ -31,8 +31,8 @@
  * `compile` answers with a LIST of refusals where every `lint` surface answers with one, so the shared
  * comparison had nowhere to put "this input was refused twice over".
  *
- * WHY `lint` WAS THE FIRST DRIVER HERE. It has the most fixtures of any via with no runner (27 of 119,
- * against `rpc`'s 30 which are already claimed by nothing and need a seeded record and a principal),
+ * WHY `lint` WAS THE FIRST DRIVER HERE. It had the most fixtures of any via with no runner on September 21st 2026 (27
+ * of 119, against `rpc`'s 30, which nothing drove then and which need a seeded record and a principal),
  * and its harness is the cheapest measurable: `validate()` in `packages/kernel/src/declare.ts` is a
  * synchronous pure function over one declaration, and `normalise()` in
  * `packages/declare/src/index.ts` is one `await` over one document. No SQLite, no record, no HTTP,

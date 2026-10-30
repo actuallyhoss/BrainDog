@@ -138,7 +138,7 @@ weakest evidence.
 
 ## Q3 · Does the pack format survive a second author?
 
-**The question.** The eight pack kinds and sixteen value types are one person's model of a business.
+**The question.** The pack kinds (eight when this was asked; `KINDS` keeps them now) and sixteen value types are one person's model of a business.
 Gate 5 measures it — 5 packs by somebody who is not the owner, at 6 months — but that is *after* 62–63
 days of platform work as first estimated (≈126–195 re-costed — [15-ROADMAP](15-ROADMAP.md) §4).
 

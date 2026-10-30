@@ -3,7 +3,7 @@
  *
  * NOTHING WROTE ONE, SO THE HISTORY WAS A LINE WITH ONE POINT ON IT. `register.snapshots` shipped in
  * money-core 1.2.0, the Ledger page draws "Night by night" from it, and an exhaustive read of the
- * four candidate writers found none: `declare.ts`'s eight kinds schedule nothing into a register,
+ * four candidate writers found none: `declare.ts`'s eight kinds of the day scheduled nothing into a register,
  * `rules.ts`'s `create:` fills its fields with `fill()`, which reads the triggering row and nothing
  * else, the `snapshot` schedule arm writes `metric_point`, and `digest.ts` writes one event row and
  * sends. So a record could run for a year and the table would say *No night has been recorded yet*.

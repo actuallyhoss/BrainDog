@@ -993,7 +993,7 @@ first two artefacts of 30 §14 and share the phase.
 | Package | Which needs |
 |---|---|
 | `kernel` 41 | `jsonPath` for the index DDL; `searchText` for step 7 of the write path; `derive` and `evaluate` for `required_when:` and `immutable_when:` |
-| `declare` 42 | `parse` · `validate` · `flatten` · `print` · `Refusal` — every `where:` in the eight kinds is checked through them at lint |
+| `declare` 42 | `parse` · `validate` · `flatten` · `print` · `Refusal` — every `where:` in every kind of declaration is checked through them at lint |
 | `extract` 43 | `compile` over `INBOX_RAW` for `match:` |
 | `record` 45 | `compile` for `list`, pages, rules, metrics, alarms, locks, predictions; `evaluate` for the write path |
 | `apps/web` 50 | the browser entry for the query builder (21 §4) |
