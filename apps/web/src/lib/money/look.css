@@ -927,6 +927,18 @@
   font-weight: var(--fw-medium);
 }
 
+/* A BILL'S AMOUNT IS INK AND AN INVOICE'S GREEN, as the Ledger says money out and in (recheck of 30 October, 18): the
+   bills to tick off read every amount in grey. */
+[data-money] .list[data-kind='todo'] > .item > .item-detail {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .list > .item > .item-detail[data-sign='in'] {
+  color: var(--good);
+}
+
 [data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > .item-marker:not(:empty) {
   margin-inline-end: var(--sp-2);
 }
@@ -1023,6 +1035,15 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
+    /* TO THE SCREEN'S EDGE, as a phone's strip of chips runs (recheck of 30 October, 35): it stopped a gutter short,
+       so the chips were cut about 25px from the edge with the gutter empty beside them. */
+    margin-inline-end: calc(-1 * var(--gutter));
+    padding-inline-end: calc(24px + var(--gutter));
+    mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
+  }
+
+  [data-money] .filters-group:not([data-control='segmented']):dir(rtl) {
+    mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
   }
 
   [data-money] .filters-group::before {

@@ -1907,6 +1907,8 @@ export function blockOf(
         ...(at ? { href: `/r/${at[1]}/${at[2]}` } : {}),
       };
     });
+    /* AND ITS AMOUNTS AS ONE SET, as every table's money column is (`moneySets`): no ".00" down whole amounts. */
+    if (kind === 'table') moneySets('deadlines', b.columns ?? [], rows as { cells: (string | null)[] }[]);
     return { ...shell, register: 'deadlines', entries, matched: entries, rows, shown: entries.length, total: matched };
   }
   /* KEY NUMBERS ARE NOT ROWS OF A LIST: the record answers them as the block's `kpis`, which ride on it whole and are

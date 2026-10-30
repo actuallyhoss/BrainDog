@@ -756,7 +756,7 @@ function list(b: Block, o: RenderOptions): string {
       const key = ` data-row="${escape(rowKey(r, i))}"`;
       if (b.kind === 'todo') {
         const lines = todoLines(r.cells, o.now, r.done === true);
-        return `<li class="item"${key}><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${todoTitleHTML(r.cells[0], o)}${cell('item-detail', lines.detail, o)}${todoMeta(lines.meta, o)}</li>`;
+        return `<li class="item"${key}><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${todoTitleHTML(r.cells[0], o)}${cell('item-detail', lines.detail, o, timelineIn(lines.detail) ? ' data-sign="in"' : '')}${todoMeta(lines.meta, o)}</li>`;
       }
       if (b.kind === 'timeline') {
         /* A GROUPED TIMELINE SAYS EACH DAY ONCE, over its rows, and the rows under it leave their own date blank

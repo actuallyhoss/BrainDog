@@ -75,7 +75,9 @@
       const el = e.target instanceof Element ? e.target : document.scrollingElement;
       if (!el) return;
       const y = el.scrollTop;
-      const was = last.get(el) ?? y;
+      /* FROM THE TOP, where every page opens: a scroller's first move was its own baseline, so one fling down (a jump to
+         a list) left the + on the amounts it stopped over (recheck of 30 October, 35). */
+      const was = last.get(el) ?? 0;
       const foot = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
       away = !foot && y > was + 2 ? true : y < was - 2 || foot ? false : away;
       last.set(el, y);
