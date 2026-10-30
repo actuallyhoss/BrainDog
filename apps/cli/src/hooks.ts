@@ -31,7 +31,7 @@ import { mark } from './hook-trace.ts';
 import { seedInbox, toldAtStart } from './inbox-file.ts';
 import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import type { AgentIo } from './skills.ts';
-import { startOwed, startWork, topOf, WORK_MS, WORK_STEP_MS } from './session-start.ts';
+import { startOffer, startOwed, startWork, topOf, WORK_MS, WORK_STEP_MS } from './session-start.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -707,7 +707,9 @@ export async function hookStart(io: Io): Promise<void> {
       return named === undefined || !card.includes(`(${named})`);
     });
     seed(ids);
-    io.write(`${stale === null ? '' : `${stale}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${card}`);
+    /* NO YES TO COPY THIS MACHINE'S SKILLS YET (`skills-consent.ts`): said once, under the card, with the command that asks. */
+    const offer = run.context !== undefined && (event.source === 'startup' || event.source === 'resume') ? startOffer(io, to, run.context) : null;
+    io.write(`${stale === null ? '' : `${stale}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${card}${offer === null ? '' : `\n${offer}`}`);
     mark('card');
     /*
      * THE START WORK, AFTER THE CARD AND NEVER WAITED FOR. The skills sync and the tools scan held

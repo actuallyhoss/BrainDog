@@ -16,6 +16,11 @@
  *
  * IT RUNS ONLY WHEN AN APP STARTS A SESSION. Nothing here is on a clock or at night.
  *
+ * AND ONLY AFTER A YES (`skills-consent.ts`, audit 31 Oct g AG4). A start for a host the person has not said yes to at
+ * a terminal, by `braindog skills sync`, copies nothing either way: no skill goes up, nothing is written into the
+ * Claude Code folder, and no MCP server is recorded. It says so once (`offLine`), in the start hook's card or on the
+ * server's stderr and in its next tool answer, with the command that asks.
+ *
  * NOTHING IT SAYS REACHES THE PROTOCOL. Every line goes to the caller's `say`, which the MCP server points at stderr,
  * and no line quotes an error, because an error could quote anything.
  */
@@ -33,6 +38,7 @@ import { CLIENTS } from './clients/index.ts';
 import { clientFor, hostsPath, type Target } from './http.ts';
 import { cliBuild, git, sessionHeaders, type Agent, type Position } from './position.ts';
 import { syncSkills } from './skills.ts';
+import { skillsAllowed, tellOnce } from './skills-consent.ts';
 import { depositor, scanTools } from './tools.ts';
 
 type Env = Record<string, string | undefined>;
@@ -63,6 +69,8 @@ export function startOwed(io: StartIo, to: Target, at: Position, context: Contex
   const wants = (id: string) => context.registers.some((r) => r.id === id);
   if (!wants('skills') && !wants('tools')) return false;
   const home = io.home ?? homedir();
+  /* NO YES FOR THIS HOST, NO WORK: nothing is owed, so no process is started for it. */
+  if (!skillsAllowed(home, to.key)) return false;
   const place = placeOf(io.env, home, to, at, top);
   const kept = readTags(home)[tagKey(place)];
   if (underWay(kept, now)) return false;
@@ -79,6 +87,15 @@ const placeOf = (env: Env, home: string, to: Target, at: Position, top: string |
   folder: top ?? resolve(at.cwd),
   configDir: env.CLAUDE_CONFIG_DIR || join(home, '.claude'),
 });
+
+/**
+ * The one line a start says when the record keeps skills or tools and this host has no yes, the first time only
+ * (`tellOnce`); `null` otherwise. Reads two files and asks nothing.
+ */
+export function startOffer(io: StartIo, to: Target, context: Context): string | null {
+  if (!context.registers.some((r) => r.id === 'skills' || r.id === 'tools')) return null;
+  return tellOnce(io.home ?? homedir(), to.key);
+}
 
 /** The repository's top folder `at` stands in, or `null` outside one. */
 export async function topOf(at: Position): Promise<string | null> {
@@ -113,6 +130,8 @@ export async function startWork(
   const wants = (id: string) => context.registers.some((r) => r.id === id);
   if (!wants('skills') && !wants('tools')) return [];
   const home = io.home ?? homedir();
+  /* Never without the yes, whoever calls (`startOwed` already says so for the hook). */
+  if (!skillsAllowed(home, to.key)) return [];
   const top = await topOf(at);
   const configDir = io.env.CLAUDE_CONFIG_DIR || join(home, '.claude');
   /* NOTHING MOVED SINCE THE LAST TIME IT RAN WHOLE, HERE: no request, and the start is the attach alone. */
@@ -375,6 +394,8 @@ export type FromServer = {
   ms: number;
   /** One line for the server's log, on stderr. */
   say: (line: string) => void;
+  /** A line to say once in the next tool answer too, so the agent can pass it on: how to turn the start work on. */
+  tell?: ((line: string) => void) | undefined;
   /** This machine's name; the network name `positionOf` reads when left out. */
   machine?: string | undefined;
   now?: (() => number) | undefined;
@@ -382,8 +403,11 @@ export type FromServer = {
   wait?: ((ms: number) => Promise<void>) | undefined;
 };
 
-/** What came of it, for a test: the work ran, it ran today already, the app has its own hook, or the record did not answer. */
-export type Outcome = 'ran' | 'already' | 'hooked' | 'away' | 'failed';
+/**
+ * What came of it, for a test: the work ran, it ran today already, the app has its own hook, the record did not answer,
+ * or there is no yes for this host (`off`), so nothing was asked of the record.
+ */
+export type Outcome = 'ran' | 'already' | 'hooked' | 'away' | 'failed' | 'off';
 
 /**
  * The start work for a session an app started through `braindog mcp`. Never throws: a failure is one line on `say`
@@ -402,6 +426,15 @@ export async function startFromServer(s: FromServer): Promise<Outcome> {
     if (hooked && !(await owedHere(s))) return 'hooked';
     const at = await s.where;
     const home = s.io.home ?? homedir();
+    /* NO YES FOR THIS HOST: nothing is asked of the record and nothing is copied, and the way on is said once. */
+    if (!skillsAllowed(home, s.to.key)) {
+      const line = tellOnce(home, s.to.key);
+      if (line !== null) {
+        s.say(line);
+        s.tell?.(line);
+      }
+      return 'off';
+    }
     const machine = s.machine ?? (at.host || hostname());
     if (hooked) {
       /* ONCE THE HOOK'S OWN TIME IS OVER, so the two never sync at once, and only if it is still owed then. */

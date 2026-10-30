@@ -20,7 +20,8 @@ import { fileURLToPath } from 'node:url';
 import { hookStart, hookWork, type WorkJob } from '../src/hooks.ts';
 import type { Target } from '../src/http.ts';
 import type { Agent, Position } from '../src/position.ts';
-import { afterHello, dayOf, markStarted, startedPath, startedToday, startFromServer, startOwed, startTag, startTagPath, startWork, START_WORK_MS, WORK_MS } from '../src/session-start.ts';
+import { allowSkills, consentPath, offLine } from '../src/skills-consent.ts';
+import { afterHello, dayOf, markStarted, startedPath, startedToday, startFromServer, startOffer, startOwed, startTag, startTagPath, startWork, START_WORK_MS, WORK_MS } from '../src/session-start.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -162,7 +163,7 @@ test('A FILE THAT IS NOT ONE THIS COMMAND WROTE reads as nothing started, and is
 /* ── from the MCP server ───────────────────────────────────────────────── */
 
 /** `startFromServer` as `mcp()` calls it, with what it said kept and the clock at `now`. */
-function fromServer(p: ReturnType<typeof place>, base: string, cwd: string, agent: Agent | undefined, now = NOON) {
+function fromServer(p: ReturnType<typeof place>, base: string, cwd: string, agent: Agent | undefined, now = NOON, tell?: (line: string) => void) {
   const said: string[] = [];
   const to: Target = { key: base, base, token: TOKEN };
   const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), CLAUDE_CONFIG_DIR: p.configDir };
@@ -174,6 +175,7 @@ function fromServer(p: ReturnType<typeof place>, base: string, cwd: string, agen
     headers: async () => ({ 'x-braindog-cwd': cwd, 'x-braindog-host': MACHINE, ...(agent === undefined ? {} : { 'x-braindog-agent': agent }) }),
     ms: 8_000,
     say: (l) => void said.push(l),
+    tell,
     now: () => now,
   });
   return { outcome, said };
@@ -182,6 +184,7 @@ function fromServer(p: ReturnType<typeof place>, base: string, cwd: string, agen
 test('THE SERVER DOES THE START WORK ONCE A DAY for a machine, a folder and an app: a second start that day does nothing', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
 
   const first = fromServer(p, h.base, kiln, 'codex');
@@ -208,6 +211,7 @@ test('THE SERVER DOES THE START WORK ONCE A DAY for a machine, a folder and an a
 test('ANOTHER FOLDER, ANOTHER APP OR THE NEXT DAY runs the start work again', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
   const atlas = p.folder('atlas');
   assert.equal(await fromServer(p, h.base, kiln, 'codex').outcome, 'ran');
@@ -235,6 +239,7 @@ test('A HOST THAT IS AWAY is one line, marks nothing, and leaves the work to the
   const port = (closed.address() as AddressInfo).port;
   await new Promise<void>((done) => closed.close(() => done()));
   const kiln = p.folder('kiln');
+  allowSkills(p.home, `http://127.0.0.1:${String(port)}`);
   const gone = fromServer(p, `http://127.0.0.1:${String(port)}`, kiln, 'codex');
   assert.equal(await gone.outcome, 'away');
   assert.equal(gone.said.length, 1);
@@ -242,6 +247,7 @@ test('A HOST THAT IS AWAY is one line, marks nothing, and leaves the work to the
   assert.equal(startedToday(p.home, MACHINE, kiln, 'codex', NOON), false);
 
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   assert.equal(await fromServer(p, h.base, kiln, 'codex').outcome, 'ran', 'the next start, with the host back');
 });
 
@@ -267,6 +273,7 @@ test('A FAILURE NEVER THROWS: it is one fixed line, and quotes nothing', async (
 test('THE START HOOK DOES THE WORK WHENEVER WHAT IT READS MOVED, whatever the server marked for the day', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
   const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), BRAINDOG_HOST: h.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: p.configDir };
   markStarted(p.home, MACHINE, kiln, 'claude', Date.now());
@@ -295,6 +302,7 @@ test('THE START HOOK DOES THE WORK WHENEVER WHAT IT READS MOVED, whatever the se
 test('NOTHING MOVED, NOTHING ASKED: a start where the rows and the files are as the work last left them is the attach alone', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
   const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), BRAINDOG_HOST: h.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: p.configDir };
   const w = worker(env, p.home, h.base);
@@ -330,6 +338,7 @@ test('NOTHING MOVED, NOTHING ASKED: a start where the rows and the files are as 
 test('THE CARD NEVER WAITS FOR THE WORK: it is printed before the work starts, and a subagent gets one line and no work', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
   const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), BRAINDOG_HOST: h.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: p.configDir };
   const said: string[] = [];
@@ -375,6 +384,7 @@ test('THE CARD NEVER WAITS FOR THE WORK: it is printed before the work starts, a
 test('A LIST CUT SHORT IS SYNCED ONCE A DAY, and a run under way is not started again beside it', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
   const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), CLAUDE_CONFIG_DIR: p.configDir };
   const to: Target = { key: h.base, base: h.base, token: TOKEN };
@@ -429,6 +439,7 @@ test('A TAG IS THE RECORD’S ROWS AND THE MACHINE’S FILES: a cut-short list h
 test("A HOOK THAT RAN OUT OF TIME LEAVES THE WORK OWED, and Claude Code's server does it once the hook's time is over", async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
   const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), CLAUDE_CONFIG_DIR: p.configDir };
   const to: Target = { key: h.base, base: h.base, token: TOKEN };
@@ -457,6 +468,51 @@ test("A HOOK THAT RAN OUT OF TIME LEAVES THE WORK OWED, and Claude Code's server
   /* PAID: the next server of the window has nothing owed, and asks nothing. */
   assert.equal(await server(), 'hooked');
   assert.equal(h.seen.length, 2);
+});
+
+/* ── no yes, no work (audit 31 Oct g, AG4) ─────────────────────────────── */
+
+test('WITHOUT A YES THE SERVER ASKS NOTHING AND COPIES NOTHING, and says how to turn it on once, on stderr and in a tool answer', async (t) => {
+  const p = place(t);
+  const h = await stubHost(t);
+  const kiln = p.folder('kiln');
+  const mine = join(p.configDir, 'skills', 'my-notes', 'SKILL.md');
+  mkdirSync(dirname(mine), { recursive: true });
+  writeFileSync(mine, 'Private.\n');
+  const told: string[] = [];
+  const first = fromServer(p, h.base, kiln, 'codex', NOON, (l) => void told.push(l));
+  assert.equal(await first.outcome, 'off');
+  assert.deepEqual(first.said, [offLine()]);
+  assert.deepEqual(told, [offLine()]);
+  assert.equal(h.seen.length, 0, 'the record was asked something');
+  assert.equal(existsSync(p.skillFile), false, "the record's skill was written into the Claude Code folder");
+  assert.equal(existsSync(startedPath(p.home)), false);
+
+  const again = fromServer(p, h.base, kiln, 'cursor', NOON + 3_600_000);
+  assert.equal(await again.outcome, 'off');
+  assert.deepEqual(again.said, [], 'the way on was said twice');
+  assert.equal(h.seen.length, 0);
+  assert.ok(!readFileSync(consentPath(p.home), 'utf8').includes(TOKEN));
+});
+
+test('WITHOUT A YES THE START HOOK STARTS NO WORK, and says the way on once, under its card', async (t) => {
+  const p = place(t);
+  const h = await stubHost(t);
+  const kiln = p.folder('kiln');
+  const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), BRAINDOG_HOST: h.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: p.configDir };
+  const said: string[] = [];
+  const hook = (id: string) =>
+    hookStart({ env, stdin: JSON.stringify({ cwd: kiln, session_id: id, source: 'startup' }), cwd: kiln, home: p.home, device: 'MacBook', write: (text) => void said.push(text), work: () => void said.push('work') });
+  await hook('claude-run-1');
+  assert.deepEqual(said, [`Connected to BrainDog. Call context.\n${offLine()}`]);
+  said.length = 0;
+  await hook('claude-run-2');
+  assert.deepEqual(said, ['Connected to BrainDog. Call context.'], 'the way on was said twice, or work was started');
+  assert.equal(startOwed({ env, home: p.home }, { key: h.base, base: h.base, token: TOKEN }, positionAt(kiln), CONTEXT as never, null), false);
+  assert.deepEqual(await startWork({ env, home: p.home }, { key: h.base, base: h.base, token: TOKEN }, positionAt(kiln), CONTEXT as never, {}, Date.now() + 8_000), []);
+  assert.equal(existsSync(p.skillFile), false);
+  assert.equal(startOffer({ env, home: p.home }, { key: h.base, base: h.base }, CONTEXT as never), null);
+  assert.deepEqual(h.seen.map((s) => s.method).filter((m) => m !== 'heard'), ['attach', 'attach']);
 });
 
 /* ── after the first initialize ────────────────────────────────────────── */
@@ -536,6 +592,7 @@ function envFor(p: ReturnType<typeof place>, base: string): NodeJS.ProcessEnv {
 test('BRAINDOG MCP --AGENT CODEX does the start work after its hello is answered, on stderr, and nothing of it reaches stdout', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
+  allowSkills(p.home, h.base);
   const kiln = p.folder('kiln');
   const env = envFor(p, h.base);
 

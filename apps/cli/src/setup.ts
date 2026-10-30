@@ -54,6 +54,7 @@ import { keepPin, pinOf, pinsFile, readPins } from './pins.ts';
 import { placeStatusLine, statusLineEntry, statusLineIn } from './statusline-place.ts';
 import { approveOperation, login, machineName } from './login.ts';
 import { connect, isObject, syncSkills, valueOf, type AgentIo, type Connected } from './skills.ts';
+import { skillsAllowed } from './skills-consent.ts';
 import { writeTools } from './tools.ts';
 
 type Env = Record<string, string | undefined>;
@@ -734,7 +735,8 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
   else
     for (const dir of profiles) {
       const where = nameOf(dir, io.home);
-      const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun, to: skills.to });
+      /* NOTHING OF THIS MACHINE'S GOES UP WITHOUT THE YES `braindog skills sync` asks for (`skills-consent.ts`). */
+      const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun, to: skills.to, upload: skillsAllowed(io.home, skills.to.key) });
       if (lines.length > 0) changed = true;
       io.out(lines.length === 0 ? `5. Skills, Claude Code in ${where}: it already holds every skill as your BrainDog has it.` : `5. Skills, Claude Code in ${where}: ${dryRun ? 'what would be synced' : 'synced'}:`);
       detail(lines);
