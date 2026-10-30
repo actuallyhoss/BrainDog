@@ -16100,13 +16100,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     fileHeld(sha256: string, ctx: CallContext): boolean {
       if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(sha256)) return true;
-      const naming = fileRefs(sha256);
-      if (naming.length === 0) return false;
       const narrowed =
         Array.isArray(ctx.registers) ||
         Object.values(ctx.levels ?? {}).some((level) => level === 'append') ||
         Object.keys(ctx.wheres ?? {}).length > 0 ||
         Object.values(ctx.hides ?? {}).some((fields) => fields.length > 0);
+      /* A record with no private row keeps nothing from a caller who reads all of it, and is not walked for them. */
+      if (!narrowed && sql.one<{ y: number }>('SELECT 1 AS y FROM entry_private LIMIT 1') === undefined) return false;
+      const naming = fileRefs(sha256);
+      if (naming.length === 0) return false;
       if (!narrowed && kernel.privateAmong(naming.map((row) => row.id)).size === 0) return false;
       for (const row of naming) {
         if (readable(ctx, row.register) !== null || !sight.admits(ctx, row)) continue;
