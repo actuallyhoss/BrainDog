@@ -212,3 +212,11 @@ test('the payee key reads past a place at the end, so TALABAT CAIRO EG and Talab
   assert.equal(isDuplicate(alert, line, CARD), true);
   assert.equal(isDuplicate(alert, { ...line, what: '28OCT26 BREADFAST CAIRO EG Purchase' }, CARD), false, 'another shop');
 });
+
+test('two day stamps that differ are two days, though the balance after them is one', () => {
+  /* A withdrawal, a deposit of the same and a second withdrawal: one balance after, two days in the bank's words. */
+  const key = { near: { on: ['amount', 'account', 'balance_after'], day: 'on', prefix: { field: 'what', chars: 12 } } };
+  const first: Fields = { what: '16AUG26 ATM Cash Withdrawal', amount: egp(250_000), account: 'hsbc', on: '2026-08-16', balance_after: egp(3_104_025) };
+  assert.equal(isDuplicate({ ...first, what: '17AUG26 ATM Cash Withdrawal', on: '2026-08-17' }, first, key), false);
+  assert.equal(isDuplicate({ ...first, what: 'ATM Cash Withdrawal' }, first, key), true, 'a stamp on one side only is no day');
+});

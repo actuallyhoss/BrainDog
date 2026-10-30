@@ -172,3 +172,8 @@ test('a line is written as the Ledger stores it, its balance only where the Ledg
   });
   assert.equal('after' in fieldsOf({ ...one, balance: null }, l as never, 'acc-1', balance), false);
 });
+
+test('two descriptions that start with two different days are two lines', () => {
+  assert.ok(!sameLine(line('2026-08-16', '16AUG26 ATM Cash Withdrawal', 250000), line('2026-08-17', '17AUG26 ATM Cash Withdrawal', 250000)));
+  assert.ok(sameLine(line('2026-08-16', '16AUG26 ATM Cash Withdrawal', 250000), line('2026-08-16', 'ATM Cash Withdrawal', 250000)));
+});

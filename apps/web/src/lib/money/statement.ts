@@ -266,6 +266,10 @@ const utc = (day: string): number => Date.UTC(Number(day.slice(0, 4)), Number(da
 /** Whether two words for a payee name one: the first letters as written, or with the bank taken off, or the payee key. */
 function samePayee(a: string, b: string): boolean {
   if (fold(a).slice(0, PREFIX) === fold(b).slice(0, PREFIX)) return true;
+  /* TWO DAY STAMPS THAT DIFFER ARE TWO DAYS, in the bank's own words (`16AUG26` and `17AUG26`). */
+  const stamp = (t: string): string | null => /^\d{1,2}[a-z]{3}(?:\d{2}|\d{4})$/u.exec(fold(t).split(' ')[0] ?? '')?.[0] ?? null;
+  const [sa, sb] = [stamp(a), stamp(b)];
+  if (sa !== null && sb !== null && sa !== sb) return false;
   const [x, y] = [bankless(a), bankless(b)];
   if (x.slice(0, PREFIX) === y.slice(0, PREFIX)) return true;
   const key = bankKey(x);

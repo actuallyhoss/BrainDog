@@ -87,7 +87,16 @@ export function twiceOf(rows) {
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const leans = (r) => LEANS.some((f) => has(r.fields[f])) || r.fields.transfer === true;
   const names = (r) => [r.fields.what, r.fields.counterparty_text, r.fields.payee].filter((t) => typeof t === 'string' && t.trim() !== '').map(bankless);
-  const onePayee = (a, b) => names(a).some((x) => names(b).some((y) => x.slice(0, PREFIX) === y.slice(0, PREFIX)));
+  /* TWO DAY STAMPS THAT DIFFER ARE TWO DAYS, in the bank's own words (`16AUG26` and `17AUG26`). */
+  const stampOf = (r) => {
+    const m = /^(\d{1,2}[a-z]{3}(?:\d{2}|\d{4}))\b/u.exec(String(r.fields.what ?? '').trim().toLowerCase());
+    return m ? m[1] : null;
+  };
+  const onePayee = (a, b) => {
+    const [sa, sb] = [stampOf(a), stampOf(b)];
+    if (sa !== null && sb !== null && sa !== sb) return false;
+    return names(a).some((x) => names(b).some((y) => x.slice(0, PREFIX) === y.slice(0, PREFIX)));
+  };
 
   const groups = new Map();
   for (const r of rows) {

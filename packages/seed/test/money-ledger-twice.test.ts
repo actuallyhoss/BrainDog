@@ -115,3 +115,9 @@ test('the script reads and writes the Ledger alone, once a day, and its source h
   const source = String(LEDGER_TWICE_SCRIPT.source);
   for (const f of ['function bankless', 'function twiceOf', 'function twiceAsk', 'export default async function run']) assert.ok(source.includes(f), f);
 });
+
+test('two lines whose descriptions start with two different days are two', () => {
+  const a = row({ what: '16AUG26 ATM Cash Withdrawal', amount: egp(250_000), on: '2026-08-16' });
+  const b = row({ what: '17AUG26 ATM Cash Withdrawal', amount: egp(250_000), on: '2026-08-17', hsbc_reference: 'x' });
+  assert.equal(twiceOf([a, b]).length, 0);
+});

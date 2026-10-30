@@ -124,6 +124,12 @@ function dayStamp(word: string): boolean {
   return true;
 }
 
+/** The day stamp a description starts with (`05oct26`), folded, or `null`. */
+function stampOf(text: string): string | null {
+  const first = foldForComparison(text).split(' ')[0] ?? '';
+  return dayStamp(first) ? first : null;
+}
+
 /**
  * A description with what a bank wraps a payee in taken off, for comparison and nothing else: the day stamp a statement
  * line starts with (`05OCT26`), the words before the payee (`IPN outward transfer to`), a processor's name before its
@@ -181,6 +187,11 @@ function samePrefix(a: Fields, b: Fields, field: string, chars: number): boolean
   if (!lHas && !rHas) return true;
   if (!lHas || !rHas) return false;
   if (foldForComparison(l).slice(0, chars) === foldForComparison(r).slice(0, chars)) return true;
+  /* TWO DAY STAMPS THAT DIFFER ARE TWO DAYS: `16AUG26 ATM Cash Withdrawal` and `17AUG26 ATM Cash Withdrawal` leaving
+     one balance are a withdrawal, a deposit and a second withdrawal, and the bank said so in its own words. */
+  const ls = stampOf(l);
+  const rs = stampOf(r);
+  if (ls !== null && rs !== null && ls !== rs) return false;
   const lb = bankless(l);
   const rb = bankless(r);
   if (lb.slice(0, chars) === rb.slice(0, chars)) return true;
