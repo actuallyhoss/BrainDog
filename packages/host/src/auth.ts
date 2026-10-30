@@ -362,7 +362,7 @@ export async function serveAccount(request: Request, door: AccountDoor): Promise
   const route = ACCOUNT_ROUTES.find((r) => r.path === path);
   if (!route) return unserved();
   if (request.method !== route.method)
-    return refusal(405, { code: 'FORBIDDEN', fix: `${route.path} is a ${route.method}.` }, [['allow', route.method]]);
+    return refusal(405, { code: 'ROUTE_UNKNOWN', fix: `${route.path} takes a ${route.method}.` }, [['allow', route.method]]);
 
   /* UNTOUCHED: no cookie read, no origin asked, no byte of the body consumed. */
   if (route.needs === 'stripe') return door.webhook ? door.webhook(request) : unserved();
@@ -1064,7 +1064,7 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
   /* The path is not repeated back. A link pasted into the path rather than the fragment would be a token. */
   if (!route) return refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no sign-in route at that address.' });
   if (request.method !== route.method)
-    return refusal(405, { code: 'FORBIDDEN', fix: `${route.path} is a ${route.method}.` }, [['allow', route.method]]);
+    return refusal(405, { code: 'ROUTE_UNKNOWN', fix: `${route.path} takes a ${route.method}.` }, [['allow', route.method]]);
 
   if (route.needs === 'operator') return operated(request, route, door);
   /* A DEVICE HAS NO COOKIE AND NO PAGE, so its two routes are answered before the checks a browser's are. */

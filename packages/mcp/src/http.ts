@@ -9,7 +9,8 @@
  * THE ORDER IS THE ARGUMENT. Every step before the bearer reads
  * only the request line and the headers, so a stranger's body is never parsed:
  *
- *   1. POST only: 405, `Allow: POST`. GET and DELETE are how earlier revisions opened a stream and ended a session.
+ *   1. POST only: 405, `Allow: POST`, and one sentence. GET and DELETE are how earlier revisions opened a stream and
+ *      ended a session.
  *   2. Any `Origin`: 403. Only a browser page sends one, and no page is served this endpoint. There is no CORS.
  *   3. A body that is not `application/json`: 415.
  *   4. No caller: 401, `WWW-Authenticate: Bearer`, naming the OAuth metadata when the host has it. The host checks
@@ -73,7 +74,13 @@ const isJson = (request: Request): boolean =>
  * this first so a request is refused in the same order on both hosts.
  */
 export function gate(request: Request): Response | null {
-  if (request.method !== 'POST') return bare(405, [['allow', 'POST']]);
+  /* WITH A SENTENCE AND THE CODE EVERY OTHER DOOR ANSWERS A METHOD WITH, for a person who opened the address in a
+     browser or curled it; a client reads the status and `Allow`, as before. */
+  if (request.method !== 'POST')
+    return new Response(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/mcp takes a POST of one JSON-RPC message, with a bearer.' } }), {
+      status: 405,
+      headers: [['content-type', 'application/json; charset=utf-8'], ...BASE, ['allow', 'POST']],
+    });
   if (request.headers.has('origin')) return bare(403);
   if (!isJson(request)) return bare(415);
   return null;

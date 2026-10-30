@@ -135,8 +135,9 @@ test('EVERY ROUTE IN THE SHARED TABLE IS WIRED HERE TOO', async () => {
       /* THE CODE, NOT THE STATUS. `page?slug=nonsense` is a legitimate 404 from a route that IS
          served, and asserting on the status could not tell that from a route that is not, which is
          the whole thing this test exists to catch. `ROUTE_UNKNOWN` is the one signal that means it. */
-      assert.notEqual(res.body.refusal?.code, 'ROUTE_UNKNOWN', `${route.name} is in the table and not served`);
+      /* THE METHOD FIRST: a 405 answers `ROUTE_UNKNOWN` too, with `Allow`, so it is told apart here by its status. */
       assert.notEqual(res.status, 405, `${route.name} disagrees with the table about its method`);
+      assert.notEqual(res.body.refusal?.code, 'ROUTE_UNKNOWN', `${route.name} is in the table and not served`);
     }
   } finally {
     await s.close();
