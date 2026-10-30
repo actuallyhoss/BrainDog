@@ -1,6 +1,6 @@
 /**
- * The first screen after sign-up, "Connect your agent": one line per app, and the sign that turns when the record hears
- * its first agent. PURE, so `node --test` can import it; `routes/start/Made.svelte` draws it.
+ * The first screen after sign-up: what to do first on Today, then "Connect an AI app" for whoever uses one, with one
+ * line per app and the sign that turns when the record hears its first agent. PURE, so `node --test` can import it; `routes/start/Made.svelte` draws it.
  *
  * NO LINE CARRIES A KEY. An MCP app signs in by OAuth and `braindog setup` signs in itself (`connectLines`), so a
  * command or an address is all this page ever shows.
@@ -15,13 +15,16 @@ import { connectWords, type Heard } from './connect.ts';
 export type AppLine = { id: string; name: string; mark: MarkedAgent | AppMark; what: string; line: string; button: string; /** A line to run first, shown above `line` and copied with it, or `null`. */ before: string | null };
 
 export const firstWords = {
-  title: 'Connect your agent',
+  /* WHAT A PERSON DOES NEXT IN THE APP LEADS (first hour audit, E3): the screen opened on a terminal command, for a
+     bakery, while the site says nobody needs to be technical. Today's card is the first act; an agent is the second. */
+  title: 'Start with one real thing',
+  sub: 'On Today, type something that happened, like an order, a bill or somebody you met. BrainDog puts it where it belongs, and one Undo takes it back.',
   /* WHAT WAS JUST MADE, first, by its places: the screen opened on a terminal command and never said. */
   made: (places: readonly string[]) => (places.length === 0 ? 'Your BrainDog is made.' : `Your BrainDog is made, with ${firstRun.and(places)}.`),
-  sub: 'Pick the app you use and paste its line. Your agent then reads this BrainDog and writes back to it.',
+  agentTitle: 'Connect an AI app, if you use one',
+  agentSub: 'Claude, ChatGPT and coding apps can read and update your BrainDog once connected. You can also do this later in Settings, under Agents.',
   waiting: 'Waiting for your agent…',
   connected: (who: string) => `Connected: ${who}`,
-  skip: 'Skip for now',
   go: 'Go to Today',
 } as const;
 

@@ -38,3 +38,10 @@ test('the sign waits, then names the agent and the machine', () => {
   assert.equal(signOf([{ tile: 'claude-code', app: 'Claude Code', machine: 'MacBook', at }]).said, 'Connected: Claude Code on MacBook');
   assert.equal(signOf([{ tile: 'other', app: 'Cursor', machine: null, at }]).said, 'Connected: Cursor');
 });
+
+test('WHAT TO DO IN THE APP LEADS, AND THE AGENT IS THE SECOND STEP, said as optional (first hour audit, E3)', () => {
+  assert.doesNotMatch(firstWords.title, /agent|connect/iu, 'the first title is about an agent again');
+  assert.match(firstWords.sub, /Today/u);
+  assert.match(firstWords.agentTitle, /if you use one/u);
+  assert.equal(firstWords.go, 'Go to Today');
+});
