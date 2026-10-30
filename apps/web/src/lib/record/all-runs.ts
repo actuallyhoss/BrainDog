@@ -16,7 +16,7 @@ import { since } from 'braindog-render';
 import { presenceOf } from '@braindog/kernel';
 import { createClient } from '@braindog/client';
 import { rowOf, rowsOf as rulesOf, type AutomationRow, type RunRow } from '../flow/source.ts';
-import type { ActionRow } from './actions.ts';
+import { ruleMonthOf, type ActionRow } from './actions.ts';
 
 /** A list read as a screen opens on it: its answer, and whether the host has no such read at all. */
 type Opened<T = AutomationRow[]> = { first: { ok: true; value: T } | { ok: false; refusal: { code: string; fix: string } }; absent: boolean };
@@ -230,7 +230,17 @@ export function jobLines(rows: readonly { id: string; title: string | null; kind
 export const notTheirs = (code: string): boolean => code === 'ROUTE_UNKNOWN' || code === 'NEEDS_BROWSER_SESSION' || code === 'FORBIDDEN';
 
 /** `agentRuns` is how many runs the record's list of runs holds, the count its door says, or `null` where it was not read. */
-export type AllRuns = { from: 'ready'; lines: RunLine[]; short: boolean; day: AgentDay | null; agentRuns: number | null } | { from: 'refused'; fix: string };
+export type AllRuns =
+  | {
+      from: 'ready';
+      lines: RunLine[];
+      short: boolean;
+      day: AgentDay | null;
+      agentRuns: number | null;
+      /** How many times the record's own rules ran this month, as each rule's month counts it (`ruleMonthOf`). */
+      rulesMonth: number;
+    }
+  | { from: 'refused'; fix: string };
 
 /** Reads every source side by side and merges them, newest first. */
 export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
@@ -290,5 +300,6 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
   const jobRows = jobs.ok ? jobLines(jobs.value.jobs, now) : [];
   const lines = [...runLines(autoRows, runs, actionRows, scriptRows, now), ...agents, ...jobRows].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const agentRuns = sessions.ok && isBag(sessions.value) && typeof sessions.value.matched === 'number' ? sessions.value.matched : null;
-  return { from: 'ready', lines, short: failed.length > 0, day: agentDay(sessionRows, now), agentRuns };
+  const rulesMonth = autoRows.reduce((n, a) => n + ruleMonthOf(a as Parameters<typeof ruleMonthOf>[0]), 0);
+  return { from: 'ready', lines, short: failed.length > 0, day: agentDay(sessionRows, now), agentRuns, rulesMonth };
 }

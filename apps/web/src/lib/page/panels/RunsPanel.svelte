@@ -1,6 +1,7 @@
 <!--
-  Recent runs on the Agents page (`panel: run-list`): the last runs as compact rows, newest first, agent runs, jobs,
-  automation runs, scheduled actions and scripts in one list, then the door to every run.
+  Recent runs on the Agents page (`panel: run-list`): the last runs as compact rows, newest first, agents' runs and jobs
+  in one list, then the door to every run. BrainDog's own rules, scripts and scheduled actions are Automations', said
+  here as one line of how many times the rules ran this month (audit 6g, AG13).
 
   ONE ROW A RUN (the Agents page of 23 October): what ran wears its mark (an agent's own, the rest their kind's glyph),
   then what it did, its project as a quiet chip, how it ended and when. Eight are drawn and the rest are one press away;
@@ -41,13 +42,20 @@
        ones still open, so the one number beside the list is the sidebar's. */
     all: 'All agent runs',
     times: (n: number) => `${n.toLocaleString('en')}×`,
+    /* THE RECORD'S OWN RULES, ONE LINE (audit 6g, AG13): they are Automations' to list. */
+    rules: (n: number) => `BrainDog's rules ran ${n === 1 ? 'once' : `${n.toLocaleString('en')} times`} this month`,
   } as const;
+
+  /* AGENTS' RUNS AND JOBS ONLY (audit 6g, AG13): the list opened on five of BrainDog's own rules and scripts, "Link the
+     parts of a new plan 2× Ran", with the one agent run fifth. Rules, scripts and scheduled actions are Automations'. */
+  const OWN: ReadonlySet<RunLine['kind']> = new Set(['agent', 'job']);
 
   let lines = $state.raw<RunLine[]>([]);
   let short = $state(false);
   let drew = $state<boolean | null>(null);
   let all = $state(false);
   let projects = $state.raw<Map<string, Project>>(new Map());
+  let rulesMonth = $state(0);
 
   async function load(): Promise<void> {
     const out = await readAllRuns(apiBase(), recordNow());
@@ -57,9 +65,10 @@
       return;
     }
     /* A RUN AT WORK IS SAID UNDER At work, so it is not a second time here. */
-    lines = out.lines.filter((l) => l.live !== true);
+    lines = out.lines.filter((l) => l.live !== true && OWN.has(l.kind));
+    rulesMonth = out.rulesMonth;
     short = out.short;
-    drew = lines.length > 0;
+    drew = lines.length > 0 || rulesMonth > 0;
     const keys = lines.map((l) => l.project).filter((p): p is string => typeof p === 'string');
     if (keys.some((k) => !projects.has(k))) projects = await control(apiBase()).projects(keys.map((project) => ({ project }) as LiveRun));
   }
@@ -95,7 +104,7 @@
 {:else}
   <div class="runs">
     {#if short}<p class="runs-note">{runsWords.short}</p>{/if}
-    <ul class="runs-list">
+    {#if shown.length > 0}<ul class="runs-list">
       {#each shown as { line, n } (line.key)}
         {@const project = line.project ? (projects.get(line.project)?.name ?? null) : null}
         <li class="runs-line" data-bad={line.bad ? '' : undefined} {@attach line.path && ownMenu((p) => ((menuLine = line), (point = p)))}>
@@ -111,11 +120,12 @@
           </span>
         </li>
       {/each}
-    </ul>
+    </ul>{/if}
     <p class="runs-foot">
       {#if folded.length > SHOWN && !all}<button type="button" class="runs-more" onclick={() => (all = true)}>{words.more(folded.length - SHOWN)}</button>{/if}
       <a class="runs-door" href={at('/r/session')}>{words.all}<Icon name="arrow" size="s" /></a>
       <a class="runs-door" href={at('/jobs?start')}>{runsWords.runAJob}</a>
+      {#if rulesMonth > 0}<a class="runs-door" href={at('/automations')}>{words.rules(rulesMonth)}<Icon name="arrow" size="s" /></a>{/if}
     </p>
   </div>
 {/if}
