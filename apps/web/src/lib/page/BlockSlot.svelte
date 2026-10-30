@@ -786,6 +786,24 @@
       const row: Row = { cells: [], ref: { register: ref.slice(0, at), seq: Number(ref.slice(at + 1)), version: 0 } };
       return verbs.onmenu(row, document.body, point);
     };
+
+  /**
+   * WHAT A TABLE'S ROW MAY HAVE PRESSED ON IT (`row_actions`, polish-i PI4), drawn in its last column and handed to the
+   * page's one `act` with the record row its key names (`register#seq`), at the version the page read: Subscriptions'
+   * "Mark as a subscription" on each repeating payment, one write a row with its Undo. Only where the page can write.
+   */
+  const tableActions = $derived.by(() => {
+    const said = (block as { row_actions?: unknown }).row_actions;
+    return writes && Array.isArray(said) && said.length > 0 ? (said as readonly unknown[]) : undefined;
+  });
+  const tableAct = (action: Parameters<Writes['act']>[0], row?: unknown, value?: unknown): unknown => {
+    const key = row && typeof row === 'object' ? (row as { key?: unknown }).key : undefined;
+    const at = typeof key === 'string' ? key.lastIndexOf('#') : -1;
+    const seq = typeof key === 'string' && at > 0 ? Number(key.slice(at + 1)) : NaN;
+    const register = typeof key === 'string' && at > 0 ? key.slice(0, at) : '';
+    const ref = register !== '' && Number.isInteger(seq) ? { register, seq, version: block.entries.find((e) => e.seq === seq)?.version ?? 0 } : null;
+    return writes?.act(action, ref ? { ...(row as object), ref } : row, value, { block, at: i, before: [] });
+  };
 </script>
 
 {#if block.heading}
@@ -913,7 +931,7 @@
   {:else}
   <!-- AND THE LEDGER VIEW SAYS WHO WAS PAID AS THE CARDS DO (`ledger-lines.ts`): words, not the bank's capitals. -->
   {@const shown = folded ? all.slice(0, folded.shown) : all}
-  <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} />
+  <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} rowActions={tableActions} act={tableActions ? tableAct : undefined} />
   {/if}
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}

@@ -37,7 +37,7 @@
   import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
   import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
-  import { ROW_ACTIONS_HEAD, type OnAct } from '../../src/actions.ts';
+  import { ROW_ACTIONS_HEAD, rowActionsTrack, type OnAct } from '../../src/actions.ts';
   import Actions from '../Actions.svelte';
   import { pointed, type Point } from '../menu-at.ts';
   import { windowed } from '../../src/rows-window.ts';
@@ -174,7 +174,7 @@
      where the column sits. */
   const scoped = $derived(new Set((scope?.columns ?? []).map((i) => columns[i]?.field).filter((f): f is string => f !== undefined)));
 
-  const tracks = $derived(columns.map((c) => c.width).join(' ') + (acts ? ' auto' : ''));
+  const tracks = $derived(columns.map((c) => c.width).join(' ') + (acts ? ` ${rowActionsTrack(rowActions)}` : ''));
   /* One function for the groups AND the step they are counted in, because `aria-rowindex` is
      `group * step + i` and the two disagreeing is a table that announces a different row than the
      one on screen. It is also where `chunk={0}` stops being an endless loop during render. */
@@ -709,5 +709,28 @@
 
   :global(.table-cards > li > .table-card-acts) {
     flex: none;
+  }
+
+  /* A ROW'S ONE ACTION, SHOWN ON A PHONE (`rowActionsPlan`), goes under the card's words rather than beside them, so a
+     label such as "Mark as a subscription" never squeezes the title into a column. */
+  :global(.table-cards > li:has(> .table-card-acts > .actions:not([data-fold]))) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  :global(.table-cards > li > .table-card-acts:has(> .actions:not([data-fold]))) {
+    padding: 0 var(--sp-1) var(--sp-2);
+  }
+
+  /* AT THE START OF THE LINE, UNDER THE TITLE, AND TOLD AS A PRESS BY ITS FILL: quiet grey words at the far edge of a
+     line of their own read as a note, not a button. */
+  :global(.table-cards > li > .table-card-acts > .actions:not([data-fold])) {
+    justify-content: flex-start;
+  }
+
+  :global(.table-cards > li > .table-card-acts > .actions:not([data-fold]) .actions-btn) {
+    background: var(--tile-2);
+    color: var(--ink);
   }
 </style>

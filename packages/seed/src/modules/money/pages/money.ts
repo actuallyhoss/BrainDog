@@ -85,7 +85,7 @@ export const MONEY_PAGE: SeedPage = {
     ...INSTALMENTS,
     BUDGETS_GLANCE,
     BUDGETS_ALL,
-    /* Heads up's heading, then whether Cash now adds up, then its lines: an old balance, and money late in or out. Not
+    /* Heads up's heading, then whether Cash now adds up, then its lines: an old balance, and money late coming in (money late going out is the first line's). Not
        the line on categories marked the other way, empty on nearly every record, nor the Last confirmed cards and the
        box beside them, whose old balance line opens the same form. */
     HEADS_UP[0]!,

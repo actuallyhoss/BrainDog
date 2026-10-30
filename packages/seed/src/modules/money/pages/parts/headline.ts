@@ -19,7 +19,7 @@ const ACCOUNTS_SAID = 'Spread over {{cash-by-account.groups}} account(s).';
  * sentence of its own after the money. Its figures are `installments-late`'s first row, so on a record with nothing
  * late the sentence has no figure that reads and goes whole (`leadOf`), and the line is what it was.
  */
-const LATE_PART = '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+const LATE_PART = '{{installments-late.first}} is {{bad:late}}: [{{installments-late.first_amount}}](/r/installments?f=state:is:open&f=direction:is:out&f=due:before:today), due {{ago:installments-late.first_due}}.';
 
 /**
  * AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.20.0 (B8 of 24 October): a card is not cash, so it is on no tile, and the
@@ -34,7 +34,13 @@ const CARD_OWES = ' {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}
  * while the walk goes under inside the twelve weeks the hero draws (`runway-days` at 84 days or fewer, so the low is
  * below nought). The card comes after, as the second thing. The first sentence whose `when:` holds is said (`says:`).
  */
-const BILLS_LATE = 'Bills {{bad:late}}: {{overdue}} to pay.';
+/**
+ * THE LATE PART IS THE WAY IN, SINCE money-core 3.34.0 (polish-i, PI1): Heads up said "Bills late: £10,540 to pay. See
+ * them" under a first line that already said it. The figure late is the link now, to the bills or the plan's part that
+ * are late, and Heads up says it no more.
+ */
+const BILLS_SEEN = '/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today';
+const BILLS_LATE = `Bills {{bad:late}}: [{{overdue}}](${BILLS_SEEN}) to pay.`;
 const LOW_POINT = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.';
 const PART_LATE = { metric: 'installments-late', gt: 0 };
 const BILL_LATE = { metric: 'overdue', gt: 0 };
@@ -42,7 +48,7 @@ const GOES_UNDER = { all: [{ metric: 'cash-now', gt: 0 }, { metric: 'runway-days
 
 /** The line's sentences, worst first, each with `between` (what the line says of the accounts or the year) before the card. */
 const says = (between: string): Record<string, unknown>[] => [
-  { when: { all: [PART_LATE, BILL_LATE] }, body: `${LATE_PART} Bills {{bad:late}} too: {{overdue}} to pay.${between}${CARD_OWES}` },
+  { when: { all: [PART_LATE, BILL_LATE] }, body: `${LATE_PART} Bills {{bad:late}} too: [{{overdue}}](${BILLS_SEEN}) to pay.${between}${CARD_OWES}` },
   { when: BILL_LATE, body: `${BILLS_LATE}${between}${CARD_OWES}` },
   { when: PART_LATE, body: `${LATE_PART}${between}${CARD_OWES}` },
   { when: GOES_UNDER, body: `${LOW_POINT}${between}${CARD_OWES}` },

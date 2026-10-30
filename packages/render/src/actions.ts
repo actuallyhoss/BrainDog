@@ -118,14 +118,29 @@ export const ROW_ACTIONS_HEAD = 'Actions';
  * A ROW IS QUIETER THAN A BLOCK: its first action is shown and the rest wait in the row's one menu, and nothing takes
  * the accent's fill, because a column of filled buttons down a list is the loudest thing on the page and none of them
  * is the page's one primary. ON A PHONE NONE IS SHOWN and every one is in the menu, so a row keeps one button and its
- * words keep the width. A hard action keeps its mark and its word wherever it lands.
+ * words keep the width; a row with only one shows that one, under the card's words. A hard action keeps its mark and its word wherever it lands.
  */
 export function rowActionsPlan(list: readonly unknown[] | null | undefined, { narrow = false }: { narrow?: boolean } = {}): ActionsPlan {
   const planned = actionsPlan(list, { narrow: false });
   const all = [...planned.shown, ...planned.menu].map((p) => ({ ...p, primary: false }));
-  const cut = narrow ? 0 : ROW_ACTIONS_SHOWN;
+  /* A ROW WITH ONE ACTION SHOWS IT ON A PHONE TOO (polish-i, PI4): folded it was "More 1", a menu of one press behind
+     another, on every card of Subscriptions' repeating payments. The card draws it under its words (`Table.svelte`), so
+     the words keep the width. */
+  const cut = narrow ? (all.length === 1 ? 1 : 0) : ROW_ACTIONS_SHOWN;
   if (all.length <= cut) return { shown: all, menu: [], fold: null };
   return { shown: all.slice(0, cut), menu: all.slice(cut), fold: narrow ? 'sheet' : 'menu' };
+}
+
+/**
+ * THE WIDTH OF A TABLE'S ACTIONS COLUMN, DECLARED AND NOT `auto` (polish-i, PI4): a table is one `--cols` track list on
+ * its grid root whose rows are each a grid of their own, so an `auto` track was sized row by row, and the head row,
+ * whose cell holds only a hidden "Actions", drew Amount and How often a button's width right of their figures. Wide
+ * enough for the first label shown, and the menu's button beside it when more fold.
+ */
+export function rowActionsTrack(list: readonly unknown[] | null | undefined): string {
+  const plan = rowActionsPlan(list, { narrow: false });
+  const first = plan.shown[0]?.label.length ?? 0;
+  return `${Math.max(6, first + 3 + (plan.menu.length > 0 ? 4 : 0))}ch`;
 }
 
 /**

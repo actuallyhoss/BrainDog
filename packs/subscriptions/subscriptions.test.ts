@@ -138,5 +138,25 @@ test('WITH NOTHING MARKED, THE PAGE LISTS THE REPEATING PAYMENTS TO TICK, and ne
   const offered = drawn.find((b) => b.heading === 'Repeating payments');
   assert.deepEqual((offered?.rows ?? []).map((r) => r.fields.what), ['Newsletter sending'], 'money going out, not yet marked');
   assert.ok(!JSON.stringify(page.blocks).includes('Money watch'));
+  /* EACH ROW MARKED ON ITS OWN, ONE WRITE A ROW WITH ITS UNDO (polish-i, PI4), where each payment was opened one by one. */
+  const pressed = (offered as { row_actions?: { verb: string; label: string; args?: Record<string, string>; undo?: boolean }[] } | undefined)?.row_actions ?? [];
+  assert.deepEqual(
+    pressed.map((a) => [a.verb, a.label, a.args?.field, a.undo]),
+    [['row.update', 'Mark as a subscription', 'subscription', true]],
+  );
+  close();
+});
+
+test('ONCE ONE IS MARKED, THE REST STAY UNDER OTHER REPEATING PAYMENTS, each still marked on its own (polish-i, PI4)', async () => {
+  const { api, close } = await fresh();
+  make(api, 'recurring', { what: 'Newsletter sending', direction: 'out', amount: gbp(3_900), every: 'monthly', next_due: '2026-11-10', subscription: true });
+  make(api, 'recurring', { what: 'Design suite', direction: 'out', amount: gbp(5_400), every: 'monthly', next_due: '2026-11-12' });
+  await settle(api);
+  const page = said<{ blocks: (Block & { row_actions?: unknown[] })[] }>(await api.page({ slug: 'subscriptions' }, owner));
+  const drawn = page.blocks.filter((b) => b.drawn !== false);
+  assert.ok(!drawn.some((b) => b.heading === 'Repeating payments'), 'the first-run list goes once one is marked');
+  const rest = drawn.find((b) => b.heading === 'Other repeating payments');
+  assert.deepEqual((rest?.rows ?? []).map((r) => r.fields.what), ['Design suite']);
+  assert.equal(rest?.row_actions?.length, 1);
   close();
 });

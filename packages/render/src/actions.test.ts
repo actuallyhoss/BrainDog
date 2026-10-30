@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { compile, compileModule } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import type { Component } from 'svelte';
-import { actionLabels, actionsPlan, HARD_MARK, HARD_WORD, rowActionsPlan, tableSourceRow, type Action, type OnAct } from './actions.ts';
+import { actionLabels, actionsPlan, HARD_MARK, HARD_WORD, rowActionsPlan, rowActionsTrack, tableSourceRow, type Action, type OnAct } from './actions.ts';
 import { parse, type Block } from './parse.ts';
 
 /* `parity.test.ts`'s hook, so `Block.svelte` can be drawn on the server here. */
@@ -151,8 +151,8 @@ test('a row shows its first action and folds the rest into one menu', () => {
   assert.ok(rowActionsPlan(make(4)).shown.every((p) => !p.primary), 'a row takes no accent fill');
 });
 
-test('on a phone a row shows none and every action is in its menu', () => {
-  assert.deepEqual(rowCounts(make(1), true), [[], ['Brew'], 'sheet']);
+test('on a phone a row shows none and every action is in its menu, save a row with only one, which shows it', () => {
+  assert.deepEqual(rowCounts(make(1), true), [['Brew'], [], null]);
   assert.deepEqual(rowCounts(make(4), true), [[], ['Brew', 'Steep', 'Pour', 'Stir'], 'sheet']);
   assert.deepEqual(rowCounts([], true), [[], [], null]);
 });
@@ -207,4 +207,11 @@ test('with no act a table and a list with row actions draw as they always did, a
     assert.match(preview, new RegExp(`<p class="block-actions">Steeped · Toss \\(${HARD_WORD}\\)</p>`, 'u'));
   }
   assert.equal(HARD_MARK, '!');
+});
+
+test('A TABLE\'S ACTIONS COLUMN HAS A DECLARED WIDTH, never auto, so its head row and its rows line up (polish-i, PI4)', () => {
+  const one = [{ verb: 'row.update', label: 'Mark as a subscription', args: { field: 'subscription' } }];
+  assert.equal(rowActionsTrack(one), `${'Mark as a subscription'.length + 3}ch`);
+  assert.match(rowActionsTrack([...one, { verb: 'row.delete', label: 'Delete' }]), /^\d+ch$/u);
+  assert.equal(rowActionsTrack([]), '6ch');
 });

@@ -54,26 +54,8 @@ export const HEADS_UP: Record<string, unknown>[] = [
     body: 'Invoices {{bad:late}}: {{late-in}} to come in. [See them](/r/obligations?f=direction:is:owed_to_me&f=state:in:open,part&f=due:before:today)',
     when: { metric: 'late-in', gt: 0 },
   },
-  {
-    /* A PART OF A PLAN THAT IS LATE IS LATE AS A BILL IS, SINCE money-core 3.18.0: first
-       in this line, by name, with its amount and its day, and the bills after it. One line and not a second, because
-       Money is at the twenty-four blocks a page declares: the sentence said is the first of `says` that holds. */
-    kind: 'note',
-    tone: 'bad',
-    span: 12,
-    says: [
-      {
-        when: { all: [{ metric: 'installments-late', gt: 0 }, { metric: 'overdue', gt: 0 }] },
-        body: '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. Bills late too: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)',
-      },
-      {
-        when: { metric: 'installments-late', gt: 0 },
-        body: '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. [See it](/r/installments?f=state:is:open&f=direction:is:out&f=due:before:today)',
-      },
-      { body: 'Bills {{bad:late}}: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)' },
-    ],
-    when: { any: [{ metric: 'overdue', gt: 0 }, { metric: 'installments-late', gt: 0 }] },
-  },
+  /* NO "BILLS LATE" LINE SINCE money-core 3.34.0 (polish-i, PI1): the page's first line says what is late, a part of a
+     plan first, and its figure is the link to them (`headline.ts`). Said here too it was the same fact twice. */
   {
     /* A CATEGORY MARKED ONE WAY THAT HOLDS MONEY GOING THE OTHER, SINCE money-core 3.16.0: an import
        that filed money coming in under a category marked "Money out" leaves every figure by category wrong in silence.

@@ -23,7 +23,7 @@
   import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
   import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
-  import { ROW_ACTIONS_HEAD, type OnAct } from '../../src/actions.ts';
+  import { ROW_ACTIONS_HEAD, rowActionsTrack, type OnAct } from '../../src/actions.ts';
   import { revealTop, windowOf, ROW_PX, ROWS_OVERSCAN } from '../../src/rows-window.ts';
   import Actions from '../Actions.svelte';
   import { pointed, type Point } from '../menu-at.ts';
@@ -94,7 +94,7 @@
   const cols = $derived(columns.length + (acts ? 1 : 0));
   const markArt = (glyph: string): string | null => glyphPath(glyph, icon ? { icon } : {});
   const scoped = $derived(new Set((scope?.columns ?? []).map((i) => columns[i]?.field).filter((f): f is string => f !== undefined)));
-  const template = $derived(columns.map((c) => c.width).join(' ') + (acts ? ' auto' : ''));
+  const template = $derived(columns.map((c) => c.width).join(' ') + (acts ? ` ${rowActionsTrack(rowActions)}` : ''));
 
   /* THE LINES AS `Table` DRAWS THEM: each group under its heading, a heading being a line of the grid. The window is
      cut from the lines, so a heading takes its place in the height like any row. */
