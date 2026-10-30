@@ -6,6 +6,7 @@
  * test can check them without a DOM.
  */
 
+import { barFigures, headlineFigure, MISSING, type Home } from './format.ts';
 import { slotOf } from './slot.ts';
 
 /** Two decimals at most, and no trailing zeros, so an attribute stays short and exact. */
@@ -123,3 +124,10 @@ export const SPLIT_SHARE = 'Share';
 export const SPLIT_NONE = 'none';
 /** What a part of money below nought says where its share would be. */
 export const SPLIT_OWED = 'owed';
+
+/**
+ * THE LEGEND'S FIGURES AS ONE SET (audit 2 B13): each said as a headline says it, then all whole or all to the same
+ * places (`barFigures`), so Services' "Each month, by type" no longer reads £174.23 beside £58 beside £10.02.
+ */
+export const splitFigures = (cells: readonly (string | undefined)[], home?: Home): string[] =>
+  barFigures(cells.map((c) => headlineFigure(c || MISSING, home)), home);

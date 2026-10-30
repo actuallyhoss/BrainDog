@@ -42,7 +42,7 @@ import { daySaid } from '@braindog/where';
 import { day as longDay, money, parse, shortDay, since, sinceWords, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
-import { bankCode, exponentOf, isPictureMime } from 'braindog-render';
+import { exponentOf, isPictureMime, timelineTitle } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { decl as fieldDecl, display, homeCurrency, labelOf, ROW_ID, unnamed, walkTable, type BlockResult } from './api.ts';
 /* WHO ASKED A QUEUE'S QUESTION, in the words the card that answers it uses. */
@@ -222,15 +222,22 @@ function barRows(block: BlockResult): string[] {
       const v = e.fields[by];
       if (typeof v === 'string' && v.trim() !== '' && !known.has(nameKey(v))) known.set(nameKey(v), v);
     }
-  const labelOfRow = (e: { fields: Record<string, unknown> }): unknown => {
-    const v = e.fields[by];
-    if ((v === undefined || v === null || v === '') && or !== undefined && typeof e.fields[or] === 'string') return known.get(nameKey(e.fields[or] as string)) ?? v;
-    return v;
-  };
   /* A TALLY (`tally:`): how many rows each bar adds up and the newest day among them. A line of the record's whole carries
      both for its label (`TALLY_TIMES`, `TALLY_LAST`), the same count on each currency's line of one label, so a label's
      count is its largest and a bar's is its labels' added up; a row of the list counts once and says its own day. */
   const tally = block.kind === 'bar' && (block as { tally?: unknown }).tally === true;
+  /* AND A TALLY NAMES A LINE BY THE SECOND FIELD'S OWN WORDS where they name nobody known (audit 2 B5), each name once
+     however it is spelt, as the record's whole does (`wholeOf` in the kernel's pages): what stays unnamed holds neither. */
+  const labelOfRow = (e: { fields: Record<string, unknown> }): unknown => {
+    const v = e.fields[by];
+    if ((v === undefined || v === null || v === '') && or !== undefined && typeof e.fields[or] === 'string') {
+      const words = e.fields[or] as string;
+      const key = nameKey(words);
+      if (tally && words.trim() !== '' && !known.has(key)) known.set(key, words.trim());
+      return known.get(key) ?? v;
+    }
+    return v;
+  };
   const dayField = tally ? (REGISTERS[block.register ?? '']?.fields.find((f) => f.type === 'day' && f.id === 'on') ?? REGISTERS[block.register ?? '']?.fields.find((f) => f.type === 'day'))?.id : undefined;
   /* A SPLIT ROW IS ONE PAYMENT (review of 30 October, R14): its parts each add their amount, and the row is counted once, by
      its id, so one £90 payment over three categories says "once" and not "3 times". */
@@ -270,7 +277,8 @@ function barRows(block: BlockResult): string[] {
       continue;
     }
     /* A PAYEE THAT IS A BANK'S CODE IS SAID AS WHAT IT IS (Q15 of 29 October): "0140" on Payees is a transfer to that account. */
-    const key = (said !== null && (by === 'payee' || by === 'counterparty_text') ? (bankCode(said) ?? said) : said) ?? 'Nobody in particular';
+    /* AND A NAME IN THE BANK'S CAPITALS IS SAID AS WORDS, as the Ledger says the same line (`timelineTitle`, audit 2 B4). */
+    const key = (said !== null && (by === 'payee' || by === 'counterparty_text') ? timelineTitle(said) || said : said) ?? 'Nobody in particular';
     const hue = tint ? e.fields[tint] : undefined;
     if (!tints.has(key) && typeof hue === 'number' && Number.isFinite(hue)) tints.set(key, String(hue));
     /* A SPLIT BY A LINK TO ROWS THAT WEAR A COLOUR (a category) DRAWS EACH PART IN THAT COLOUR: the last word of the chip. */
@@ -317,7 +325,9 @@ function barRows(block: BlockResult): string[] {
   if (!block.unset || unset.length === 0 || !block.register) return drawn;
   const sum = total(unset);
   const shown = sum.mixed.length ? mixedFix(sum.mixed) : (written(sum, fromOf(unset).length > 0) ?? String(sum.amount));
-  return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, `${by} is empty`)), shown) + convertedNote(fromOf(unset))];
+  /* A TALLY'S UNNAMED LINES HOLD NEITHER FIELD, so the row opens exactly those (audit 2 B5). */
+  const none = tally && or !== undefined && or !== by ? `${by} is empty, ${or} is empty` : `${by} is empty`;
+  return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, none)), shown) + convertedNote(fromOf(unset))];
 }
 
 /**

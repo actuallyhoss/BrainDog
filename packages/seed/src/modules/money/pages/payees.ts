@@ -8,8 +8,14 @@ import type { SeedPage } from '../../base.ts';
  */
 const LEDGER_90D = 'state is cleared, transfer is false, stays is not true, corrects is not true, on after -90d, on before +1d';
 
-/** Where the lines no payee was put on open, the name box first. */
-const NAME_THEM = '/r/transactions?f=payee:is:empty&f=direction:is:out&f=transfer:is:false';
+/**
+ * WHERE THE PAYMENTS NAMING NOBODY OPEN: THE SAME LINES THE FIGURE COUNTS (audit 2 B5). It opened every line out with no
+ * payee, a pending one and any age among them, so the Ledger said "11 of 36 match, £17,015.74" under a lead of 10 and
+ * £14,515.74. Now it is the figure's own sentence as chips, `LEDGER_90D` and all: cleared, not between your accounts,
+ * not a correction, the last ninety days, money out, and no name in either field.
+ */
+const NAME_THEM =
+  '/r/transactions?f=state:in:cleared&f=transfer:in:false&f=stays:not-in:true&f=corrects:not-in:true&f=on:after:-90d&f=on:before:%2B1d&f=direction:in:out&f=payee:is:empty&f=counterparty_text:is:empty';
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: who money goes to and comes from, ONE LINE A PAYEE.
@@ -40,48 +46,29 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
   filters: [{ field: 'payee', control: 'chips' }],
   blocks: [
     {
-      /* THE PAYEES, AND THE PAYMENTS NAMING NOBODY IN THE SAME LINE while there are any, so that count is said once. */
+      /* THE PAYMENTS THAT NAME NOBODY, SAID ONCE AND ONLY WHILE THERE ARE ANY, with the way to name them (audit 2 B5). A
+         line the bank named is a payee by those words, as the Ledger draws it, so what is left is a line with no name in
+         either field; the bars below are who was paid, and their own empty line says when nobody was. The lead said
+         "6 payees paid" over a bar of Paperhaus Supplies' seven lines counted as nobody. */
       kind: 'note',
       lead: true,
       span: 12,
-      when: { all: [{ metric: 'payees-paid-90d', gt: 0 }, { metric: 'unnamed-paid-90d', lt: 1 }] },
-      body: '{{payees-paid-90d}} payee(s) paid in 90 days.',
-    },
-    {
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { all: [{ metric: 'payees-paid-90d', gt: 0 }, { metric: 'unnamed-paid-90d', gt: 0 }] },
-      body: `{{payees-paid-90d}} payee(s) paid in 90 days, and {{unnamed-paid-90d}} payment(s) name nobody yet. [Name them](${NAME_THEM})`,
-    },
-    {
-      /* AND WHEN EVERY PAYMENT OUT NAMES NOBODY, the page opens on that, with the way to name them, in one line. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { all: [{ metric: 'payees-paid-90d', lt: 1 }, { metric: 'unnamed-paid-90d', gt: 0 }] },
-      body: `No payee named yet on {{unnamed-paid-90d}} payment(s) in 90 days. [Name them](${NAME_THEM})`,
-    },
-    {
-      kind: 'note',
-      lead: true,
-      span: 12,
-      /* ONLY WHEN NOTHING WENT OUT AT ALL (recheck of 30 October, N5): payments naming nobody are still payments, and
-         "No payees paid" over a list of them said the page was empty while it was not. The line above asks to name them. */
-      when: { all: [{ metric: 'payees-paid-90d', lt: 1 }, { metric: 'unnamed-paid-90d', lt: 1 }] },
-      body: 'Nothing paid out in 90 days.',
+      when: { metric: 'unnamed-paid-90d', gt: 0 },
+      body: `In 90 days, {{unnamed-paid-90d}} payment(s) have no name yet. [Name them](${NAME_THEM})`,
     },
     {
       /* EVERY PAYEE, ONE BAR EACH, the most paid first: what was paid, added up where it is drawn so two currencies are two
-         amounts, and beside it how many times and the day of the last (`tally:`). The payments that name nobody are the
-         bar's last line, "Not named yet", which opens them; how many they are is the lead's to say. */
+         amounts, and beside it how many times and the day of the last (`tally:`). A line with no payee is the payee the
+         bank named (`or:`, as the bank wrote it, said in words), so Paperhaus Supplies is a bar of its own. The payments
+         that name nobody in either field are the bar's last line, "Not named yet", which opens them; how many they are
+         is the lead's to say. */
       kind: 'bar',
       heading: 'Who you paid, 90 days',
       icon: 'store',
       span: 12,
       source: 'register.transactions',
       where: `${LEDGER_90D}, direction is out`,
-      columns: [{ field: 'payee', or: 'what' }, { field: 'amount' }],
+      columns: [{ field: 'payee', or: 'counterparty_text' }, { field: 'amount' }],
       unset: 'Not named yet',
       tally: true,
       limit: 30,
@@ -120,7 +107,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       span: 12,
       source: 'register.transactions',
       where: `${LEDGER_90D}, direction is in`,
-      columns: [{ field: 'payee', or: 'what' }, { field: 'amount' }],
+      columns: [{ field: 'payee', or: 'counterparty_text' }, { field: 'amount' }],
       unset: 'Not named yet',
       tally: true,
       limit: 15,

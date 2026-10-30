@@ -8,7 +8,7 @@
 <script lang="ts">
   import PartChip from './p/PartChip.svelte';
   import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
-  import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from '../src/split.ts';
+  import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitFigures, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
   import { partsRing } from '../src/ring.ts';
   import Text from './Text.svelte';
@@ -18,6 +18,7 @@
   const rows = $derived(block.rows.filter((r) => !r.hole));
   const holes = $derived(block.rows.filter((r) => r.hole));
   const values = $derived(rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts)))));
+  const figures = $derived(splitFigures(rows.map((r) => r.cells[1]), opts.home));
   const plan = $derived(splitPlan(values));
   const said = (r: Row | undefined) => text(inline(r?.cells[0] ?? '', opts));
   /* A PART'S OWN COLOUR WHERE THE HOST KNOWS ITS CHIP (`opts.partLook`, Money's categories), so the ring, the bar and the
@@ -122,7 +123,7 @@
         <li class="split-item" data-intent={row.tone}>
           {#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={said(row).slice(0, 1).toLocaleUpperCase('en')} {opts} />{:else}<span class="split-dot" data-step={part?.step} data-slot={splitSlot(row.cells[3])} aria-hidden="true"></span>{/if}
           <span class="split-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
-          <span class="split-value num"><Text nodes={inline(headlineFigure(row.cells[1] || MISSING, opts.home), opts)} {opts} /></span>
+          <span class="split-value num"><Text nodes={inline(figures[i] ?? MISSING, opts)} {opts} /></span>
           {#if share}<span class="split-share num">{share}</span>{/if}
           <span class="split-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
           {#if row.tone}

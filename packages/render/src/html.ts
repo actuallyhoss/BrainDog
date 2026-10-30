@@ -55,7 +55,7 @@ import {
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, cellIn, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
-import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
+import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitFigures, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_PALER, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPlan } from './lines.ts';
@@ -1059,6 +1059,7 @@ function split(b: Block, o: RenderOptions): string {
             `<rect class="split-seg" data-step="${p.step}"${slotAttr(rows[p.at]!)}${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="${lateFill('fill', late)}"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
         )
         .join('')}${plan.cuts ? `<path class="split-cut" d="${plan.cuts}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>`;
+  const figures = splitFigures(rows.map((r) => r.cells[1]), o.home);
   const legend = rows.length
     ? `<ul class="split-legend">${rows
         .map((r, i) => {
@@ -1066,7 +1067,7 @@ function split(b: Block, o: RenderOptions): string {
           if (!splitListed(plan, values[i]!)) return '';
           const part = partOf(i);
           const share = splitShare(plan, i, values[i]!, plain(inline(r.cells[1] ?? '', o)));
-          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''}${slotAttr(r)} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING, o.home), o), o)}</span>${share ? `<span class="split-share num">${escape(share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''}${slotAttr(r)} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(figures[i] ?? MISSING, o), o)}</span>${share ? `<span class="split-share num">${escape(share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
         })
         .join('')}</ul>`
     : '';
