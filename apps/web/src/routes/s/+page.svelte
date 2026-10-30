@@ -559,22 +559,6 @@
     }
   }
 
-  /* A NOTE'S TIMELINE ON A PHONE: what happened under its title, not beside it, where a sentence of detail left the title
-     one letter and an ellipsis ("R…"). A timeline of amounts keeps its line on a wider screen. */
-  @media (width < 640px) {
-    .note :global(.list[data-kind='timeline'] > .item) {
-      grid-template-areas: 'marker title' '. detail';
-      grid-template-columns: 7ch minmax(0, 1fr);
-    }
-
-    .note :global(.list[data-kind='timeline'] > .item > .item-detail) {
-      color: var(--ink-2);
-      font-weight: var(--fw-regular);
-      text-align: start;
-      white-space: normal;
-    }
-  }
-
   /* THE PHONE: the page's name at its phone size. */
   @media (width < 900px) {
     .title {

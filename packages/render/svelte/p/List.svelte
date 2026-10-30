@@ -46,6 +46,7 @@
     timelineDays,
     timelineDetails,
     timelineIn,
+    timelineWordy,
     timelineNets,
     timelineRich,
     timelineTitle,
@@ -388,7 +389,8 @@
           {@render rowActs(row)}
         </li>
       {:else}
-      <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
+      <!-- A DETAIL OF WORDS IS MARKED (`timelineWordy`), so a phone puts it under its title (`kinds/timeline.css`). -->
+      <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined} data-wordy={timelineWordy(said) ? '' : undefined}>
         <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
              its own source. -->

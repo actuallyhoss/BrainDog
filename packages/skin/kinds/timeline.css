@@ -113,6 +113,46 @@
     display: none;
   }
 
+  /* ON A PHONE A DETAIL OF WORDS GOES UNDER ITS TITLE (`timelineWordy`): beside it, a sentence of detail left a project
+     note's log one word and an ellipsis ("Raise…") and ran its "2 months ago" into the title. The title takes the line
+     and wraps, the day sits quiet at its end, and the detail reads under them in the quieter ink. A detail that is a
+     figure keeps its line at the end, as everywhere. One rule for the app and the shared page (`routes/s`). */
+  @media (width < 640px) {
+    .list[data-kind='timeline'] > .item[data-wordy] {
+      grid-template-areas:
+        'title marker'
+        'detail detail';
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: baseline;
+      row-gap: 2px;
+      padding-block: var(--sp-2);
+    }
+
+    .list[data-kind='timeline'][data-days] > .item[data-wordy] {
+      grid-template-areas:
+        'title'
+        'detail';
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .list[data-kind='timeline'] > .item[data-wordy] > .item-title {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .list[data-kind='timeline'] > .item[data-wordy] > .item-marker {
+      align-self: baseline;
+      justify-self: end;
+    }
+
+    .list[data-kind='timeline'] > .item[data-wordy] > .item-detail {
+      color: var(--ink-2);
+      font-weight: var(--fw-regular);
+      text-align: start;
+      white-space: normal;
+    }
+  }
+
   /* MONEY COMING IN IS THE ONE AMOUNT IN COLOUR. Money going out stays ink: red is for late, over and owed. */
   .list[data-kind='timeline'] > .item > .item-detail[data-sign='in'] {
     color: var(--good);

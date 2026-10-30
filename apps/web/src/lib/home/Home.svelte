@@ -913,6 +913,12 @@
     if (landed.length > 0) keys.add('arrivals');
     return keys;
   });
+  /* ON THE BOARD WITH NOTHING TO SHOW NOW (Arrivals once seen, a list with no rows): named while the board is edited.
+     Not a vital sign, which is said under Needs you and is never a tile of its own; not before Today has been read. */
+  const boardQuiet = $derived.by((): ReadonlySet<string> => {
+    if (!deskedRaw) return new Set();
+    return new Set(boardWidgets.map((w) => w.key).filter((k) => !boardShown.has(k) && k !== 'signs' && k !== 'signs-many'));
+  });
   const boardNames = $derived.by((): ReadonlyMap<string, string> => {
     const out = new Map<string, string>();
     for (const b of deskedRaw ?? []) {
@@ -953,7 +959,7 @@
       }),
     );
   });
-  boardModel.src = { widgets: () => boardWidgets, phone: () => boardPhone, shown: () => boardShown, names: () => boardNames, drafts: () => boardDrafts };
+  boardModel.src = { widgets: () => boardWidgets, phone: () => boardPhone, shown: () => boardShown, names: () => boardNames, drafts: () => boardDrafts, quiet: () => boardQuiet };
   /* THE DRAFT IS KEPT ON THIS DEVICE UNDER THE RECORD IT IS FOR. */
   boardModel.draftKey = `bd_board_draft:${apiBase()}`;
 

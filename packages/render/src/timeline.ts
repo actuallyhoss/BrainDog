@@ -281,3 +281,14 @@ export function figureSum(said: readonly string[], signed = false): string | nul
 
 /** Whether an amount as drawn is money coming in, written with a `+` in front: the one amount a ledger draws in colour. */
 export const timelineIn = (text: string): boolean => /^\+/u.test(text.trim());
+
+/**
+ * WHETHER A ROW'S DETAIL IS WORDS RATHER THAN A FIGURE: two words or more once the figures, the currency and the inline
+ * marks are left out ("first increase since launch", "Hobnail cancelled", not "£2,400", "EGP 467,915" or "£1,200 a
+ * month"). On a phone such a detail goes under its title (`kinds/timeline.css`), where beside it a sentence had left the
+ * title one word and an ellipsis ("Raise…"); a figure keeps its place at the line's end.
+ */
+export function timelineWordy(text: string): boolean {
+  const words = text.replace(/\{\{\s*[\w-]+\s*:|\}\}/gu, ' ').match(/\p{L}{2,}/gu) ?? [];
+  return words.length >= 2;
+}

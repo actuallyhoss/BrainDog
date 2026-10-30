@@ -259,10 +259,10 @@
     >
       {@render children()}
       <!-- A CELL HELD WHILE TODAY LOADS for a widget being read again: a quiet empty tile, so the board keeps its shape. -->
-      {#each model.reserved as r (r.key)}<div class="reserve" style="grid-area:{r.area}" aria-hidden="true"></div>{/each}
+      {#each model.reserved as r (r.key)}<div class="reserve" data-size={r.size} style="grid-area:{r.area}" aria-hidden="true"></div>{/each}
       {#if model.editing && !model.asList}
         <!-- A CELL NOTHING FILLS, while editing: drawn, so a gap a smaller size left is seen as room, not as a fault. -->
-        {#each model.holes as h (h)}<div class="hole" style="grid-area:{h}" aria-hidden="true"></div>{/each}
+        {#if model.held !== null}{#each model.holes as h (h)}<div class="cell-hole" style="grid-area:{h}" aria-hidden="true"></div>{/each}{/if}
       {/if}
     </div>
     {#if mayEdit && !model.editing && todayOffer.offer !== null}
@@ -271,6 +271,22 @@
       <div class="suggest">{#await suggestPart() then { default: SuggestCell }}<SuggestCell onadd={added} {onremove} />{/await}</div>
     {/if}
   </div>
+
+  {#if model.editing && model.quietNow.length > 0}
+    <!-- ON THE BOARD WITH NOTHING TO SHOW NOW (audit 31 Oct, A17): each by its name and why, so the empty widget is not an
+         unnamed box on the board, and taking no cell it moves nothing. It shows again where it stands once it has
+         something; Hide takes it off as the tray does. -->
+    <div class="quiet" role="group" aria-label={boardWords.quietHead}>
+      <span class="tray-name"><Icon name="clock" size="s" />{boardWords.quietHead}</span>
+      {#each model.quietNow as w (w.key)}
+        <span class="quiet-one">
+          <span class="quiet-name">{model.nameOf(w.key)}</span>
+          <span class="quiet-said">{boardWords.quiet(w.key)}</span>
+          <button type="button" class="ico" aria-label={boardWords.remove(model.nameOf(w.key))} title={boardWords.remove(model.nameOf(w.key))} onclick={() => model.hide(w.key)}><Icon name="x" size="s" /></button>
+        </span>
+      {/each}
+    </div>
+  {/if}
 
   {#if model.editing && !model.asList}
     <!-- THE TRAY (§5.2): drag a widget here to hide it; it keeps its setup, and a press puts it back. -->
@@ -385,6 +401,59 @@
     will-change: auto;
   }
 
+  /* ON A PHONE AT REST A TILE ENDS WHERE WHAT IT SHOWS ENDS (audit 31 Oct, A16): the phone's tiles are one column of
+     full-width frames, and a frame of fixed rows left Late and handed back one line and 200px of nothing over its
+     "5 more", and Your work this week its two tasks over 350px of it. So the rows are as tall as what is drawn in them,
+     and each frame is held to its cells as most (`--most`): what runs past that is cut by `fit.ts` as before, and the
+     frame then closes up under what it kept. Two smalls side by side share their row, as tall as the taller.
+     EDITING, THE CELLS ARE FIXED, so a drag or a resize is measured in whole cells and every frame shows its size. */
+  .board-root:not([data-editing]) .board[data-cols='2'] {
+    grid-auto-rows: auto;
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-board-key]) {
+    --most: var(--row);
+    max-block-size: var(--most);
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key]:is([data-size='tall'], [data-size='large'])) {
+    --most: calc(2 * var(--row) + var(--gap));
+  }
+
+  /* A DRAFT TAKES A ROW MORE (`grow` in `board.svelte.ts`), so its Keep bar sits under the widget it asks about. */
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key]:has(> [data-draft-mark])) {
+    max-block-size: calc(var(--most) + var(--row) + var(--gap));
+  }
+
+  /* AND THE "N MORE" A FRAME WITH NONE OF ITS OWN IS GIVEN (`fit.ts`) TAKES ITS OWN LINE under what it kept, as the
+     frame no longer ends below the rows with room for it laid over: in the flow, after the block. A part of Today's own
+     (Working now) is a card inside a bare frame, so its count stays laid over the card's foot, and the card makes room. */
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more]::after) {
+    position: static;
+    order: 1;
+    flex: none;
+    padding-block-start: var(--sp-2);
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more]:has(> .desk-part)::after) {
+    position: absolute;
+    inset-inline-start: var(--sp-4);
+    padding-block-start: 0;
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more] > .desk-part > .tile) {
+    padding-block-end: calc(var(--sp-4) + 24px);
+  }
+
+  /* A CELL HELD WHILE TODAY LOADS KEEPS ITS SIZE'S HEIGHT, having nothing in it to be as tall as. */
+  .board-root:not([data-editing]) .board[data-cols='2'] .reserve {
+    min-block-size: var(--row);
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] .reserve:is([data-size='tall'], [data-size='large']) {
+    min-block-size: calc(2 * var(--row) + var(--gap));
+  }
+
   .board :global([data-board-key] > :is(.block-slice, .block-more)) {
     flex: none;
     margin-block-start: auto;
@@ -492,10 +561,53 @@
 
   /* ── editing ── */
 
-  .hole {
+  /* NOT `.hole`, which is the skin's red word to fill in (`blocks.css`) and drew every empty cell as a pink box. */
+  .cell-hole {
     border: 1.5px dashed var(--rule);
     border-radius: 22px;
     pointer-events: none;
+  }
+
+  /* THE WIDGETS WITH NOTHING TO SHOW NOW, over the tray: a line each, its name, why, and Hide. */
+  .quiet {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .quiet-one {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .quiet-name {
+    flex: none;
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .quiet-said {
+    min-inline-size: 0;
+    color: var(--ink-3);
+  }
+
+  /* ON A PHONE A LINE EACH, the name whole, why beside it, Hide at the end. */
+  @media (width < 720px) {
+    .quiet-one {
+      flex: 1 1 100%;
+    }
+
+    .quiet-said {
+      flex: 1;
+    }
   }
 
   /* THE BAR FLOATS OVER THE BOARD'S FOOT, so the board keeps room under its last row and the tray for it. */

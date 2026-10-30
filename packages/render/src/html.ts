@@ -45,6 +45,7 @@ import {
   timelineDays,
   timelineDetails,
   timelineIn,
+  timelineWordy,
   timelineNets,
   timelineRich,
   timelineTitle,
@@ -787,7 +788,7 @@ function list(b: Block, o: RenderOptions): string {
            detail instead, so the two renderers differed on every timeline row that carried a tone, and
            no shape here was a timeline with one. */
         const marker = grouped ? '<span class="item-marker num"></span>' : cell('item-marker num', timelineCell(r.cells[0], o.now), o);
-        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', timelineTitle(r.cells[1]), o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, sign)}</li>`;
+        return `${head}<li class="item"${toneAttrs(r.tone)}${key}${timelineWordy(said) ? ' data-wordy=""' : ''}>${marker}${cell('item-title', timelineTitle(r.cells[1]), o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, sign)}</li>`;
       }
       return `<li class="item"${key}>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })
