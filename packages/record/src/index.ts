@@ -15855,6 +15855,44 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
+     * What verifies each of this record's webhook doors, as a host's held store keeps it (DR1): the SHA-256 of a path
+     * door's token in lower-case hex, or `'signed'` for a door signed in a header whose key is in the keychain. A door
+     * verified by nothing, or a path door nobody minted a token for, is left out. INTERNAL, and no route reaches it.
+     *
+     * THE SAME ANSWER `ingestVerify` GIVES, WITHOUT OPENING ANY KEY: a signed door is named signed when its key is held,
+     * since the hold keeps only a request signed in a header for it and the record checks the signature on replay. A
+     * door switched off is named as it would be on, because on again is the same address. Read once a deploy and after
+     * a mint, from the alarm, so the Directory knows every door before its first arrival and not only after it.
+     */
+    webhookSigns(): { ingest: string; sign: string }[] {
+      const rows = sql.all<{ id: string; body: string }>(
+        "SELECT id, body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0 ORDER BY id",
+      );
+      const out: { ingest: string; sign: string }[] = [];
+      let grants: ReturnType<typeof kernel.grants> | undefined;
+      for (const row of rows) {
+        const ingest = row.id.startsWith('ingest.') ? row.id.slice('ingest.'.length) : '';
+        if (ingest === '') continue;
+        let decl: { channel?: unknown; verify?: { kind?: unknown; key?: unknown } };
+        try {
+          decl = JSON.parse(row.body) as typeof decl;
+        } catch {
+          continue;
+        }
+        if (decl.channel !== 'webhook') continue;
+        const v = decl.verify;
+        if (v?.kind === 'path') {
+          const held = heldDigest(ingest);
+          if (held !== undefined) out.push({ ingest, sign: held.toLowerCase() });
+        } else if ((v?.kind === 'hmac_sha256' || v?.kind === 'stripe' || v?.kind === 'github') && typeof v.key === 'string') {
+          grants ??= kernel.grants();
+          if (grantChosen(grants, v.key) !== undefined) out.push({ ingest, sign: 'signed' });
+        }
+      }
+      return out;
+    },
+
+    /**
      * Make the token a webhook ingest's URL carries, and show it once. ADMIN, routed as `/api/ingestMint`.
      *
      * THE SHAPE IS THE FORWARDING ADDRESS'S (`serveInbound` in `apps/worker/src/inbound.ts`), in the same order:

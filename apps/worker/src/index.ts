@@ -461,6 +461,15 @@ const BOOTED = 'braindog.booted';
 /** Where the record's answers kept beside it go in this object's store (`RecordDeps.kept`). */
 const KEPT_PREFIX = 'braindog.kept.';
 
+/**
+ * Where an object keeps that its webhook doors are still to be told to the Directory (`#doors`, DR1): set by the first
+ * open of a build and by a mint, cleared by the alarm that tells them.
+ */
+const DOORS_DUE = 'braindog.doors-due';
+
+/** The door that mints a webhook token (`ingestMint`): a mint answered well makes the doors due again (`#doors`). */
+const MINT_PATH = /^\/+api\/+ingestMint\/*$/u;
+
 /** Where an object keeps the alarm step it is in, so an alarm cut off by the runtime is named by the next one (`#step`). */
 const ALARM_STEP = 'braindog.alarm-step';
 
@@ -1102,11 +1111,19 @@ export class Record$ extends DurableObject<Env> {
     const app = this.env.BRAINDOG_BUILD ?? '';
     let last: unknown;
     try {
-      last = await this.ctx.storage.get(BOOTED);
+      /* AND WHETHER THE DOORS ARE STILL TO BE TOLD, in the same read, so a request to an object evicted before its alarm
+         still asks for that alarm (`#doors`). */
+      const got = await this.ctx.storage.get([BOOTED, DOORS_DUE]);
+      last = got.get(BOOTED);
+      this.#doorsDue ??= got.get(DOORS_DUE) === true;
     } catch {
       last = undefined;
     }
     if (app !== '' && last === app) return;
+    /* A NEW BUILD TELLS THE DIRECTORY ITS DOORS ONCE (DR1): the hold's table was learned only from arrivals, so right
+       after the deploy that brought it a bank's text in an outage was refused until that door's next arrival. Not with
+       no build named (a dev run), where every open would be a new one. */
+    if (app !== '') await this.#doorsMark(false);
     const refusal = api.kernel.refused();
     op({ op: 'boot', rec: recOf(api), app: app || null, kernel: KERNEL_MIGRATION, fts5: refusal?.at !== 'sqlite.fts5' }, refusal ? 'error' : 'info');
     if (app === '') return;
@@ -1128,6 +1145,8 @@ export class Record$ extends DurableObject<Env> {
   override async alarm(): Promise<void> {
     if (this.#gone || this.#armed) return;
     const api = await this.#record();
+    /* THE DOORS FIRST, AND ON A LAPSED RECORD TOO: a step that waited behind the lapse would keep asking for the alarm. */
+    await this.#doors(api);
     /* A LAPSED RECORD RUNS THE DRAIN AND NOTHING ELSE: its reminders still land, and no
        connector, call, poll, script, automation or Slash ask starts. An automation run that has not started waits under
        the lapse's sentence, which is the record's one message about it; no run writes a held event of its own. The
@@ -1201,6 +1220,68 @@ export class Record$ extends DurableObject<Env> {
        question. Neither jobs `#act` released nor questions left in the outbox are schedule rows, so nothing else here
        would set it back. */
     if (more || asked || modelled || looked || linted) await this.#alarm.set(Date.now());
+  }
+
+  /** Whether this object's doors are still to be told (`DOORS_DUE`), read from storage once an object's life. */
+  #doorsDue: boolean | undefined;
+
+  /**
+   * The doors are to be told again: written down, so an object evicted before its alarm still tells them, and with
+   * `arm` the alarm asked for now. The first open of a build does not arm it, because that open may be the alarm's own,
+   * which tells them in the same pass; a request after it does (`#answer`). A storage that cannot write keeps it in
+   * memory for this object's life.
+   */
+  async #doorsMark(arm: boolean): Promise<void> {
+    this.#doorsDue = true;
+    try {
+      await this.ctx.storage.put(DOORS_DUE, true);
+    } catch {
+      /* Kept in memory; the next build's first open marks it again. */
+    }
+    if (arm) await this.#soon();
+  }
+
+  /**
+   * Tell the Directory every webhook door this record has (DR1, `doors$`), when they are due and never otherwise, so
+   * the held store keeps a bank's text from the first outage after a deploy or a mint, and not only after that door's
+   * next arrival taught it (`learning` in `held.ts`, which still follows a door between). One read of the record's
+   * ingest declarations and one Directory call, once a deploy; an alarm with nothing due reads one boolean in memory.
+   *
+   * A TELL THAT FAILS IS LOGGED AND LEFT DUE, and is tried at the next alarm; it never stops the alarm's own work.
+   */
+  async #doors(api: RecordApi): Promise<void> {
+    if (this.#doorsDue === undefined) {
+      try {
+        this.#doorsDue = (await this.ctx.storage.get(DOORS_DUE)) === true;
+      } catch {
+        return;
+      }
+    }
+    if (!this.#doorsDue || api.kernel.refused()) return;
+    const rec = recOf(api);
+    if (rec === null) return;
+    try {
+      const refused = await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).doors$(rec, api.webhookSigns());
+      if (refused !== null) {
+        op({ op: 'door', told: false, rec, code: refused.code }, 'error');
+        /* A REFUSAL IS NOT A FAULT A RETRY MENDS (a closed record, a door the Directory will not take), so it is not
+           asked again until the next build or mint, and the doors are learned from arrivals as before. */
+      }
+      this.#doorsDue = false;
+      await this.ctx.storage.delete(DOORS_DUE);
+    } catch (e) {
+      op({ op: 'door', told: false, rec, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
+  }
+
+  /** The alarm, set for now unless it is already set sooner. */
+  async #soon(): Promise<void> {
+    try {
+      const at = await this.#alarm.get();
+      if (at === null || at > Date.now()) await this.#alarm.set(Date.now());
+    } catch (e) {
+      console.error('the alarm could not be set:', e instanceof Error ? e.message : String(e));
+    }
   }
 
   /**
@@ -2372,12 +2453,20 @@ export class Record$ extends DurableObject<Env> {
     const path = new URL(request.url).pathname;
     /* AND THE LOOK IS ONLY ASKED HERE, NEVER RUN (`slashDue`): work due wakes the alarm now, which does it in slices. */
     if (!pollAsked(request.method, path) && !/^\/+api\/+boot\/*$/u.test(path) && !(await this.lapsed())) this.ctx.waitUntil(this.#lookSoon(api));
+    /* AND DOORS STILL TO BE TOLD ASK FOR THE ALARM THAT TELLS THEM (`#doors`): one boolean in memory once they are told. */
+    if (this.#doorsDue === true) this.ctx.waitUntil(this.#soon());
     /* THE METHOD ROUTER'S HANDLERS, WITH THE KEYCHAIN PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
        (`withKeychainPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
        below serve the same table. */
     const handlers = withKeychainPassphrase(handlersFor(api), api, passphraseRoot(this.env.KEK, () => api.kernel.identity()?.id ?? null));
     /* A RESTORE THE PORT HAS ARMED ENDS THIS OBJECT, and nothing is written here from the arm on: `#arming` sets `#armed`
        as the bookmark is armed, which is before `restore` answers, and the Worker's `reopen` ends the object after. */
+    /* A WEBHOOK TOKEN MINTED AGAIN IS A DOOR CHANGED, told to the Directory by the alarm it asks for (DR1, `#doors`). */
+    if (request.method === 'POST' && MINT_PATH.test(path)) {
+      const out = await serveApi(request, handlers, ctx);
+      if (out.ok) this.ctx.waitUntil(this.#doorsMark(true));
+      return out;
+    }
     if (!restoreAsked(request.method, new URL(request.url).pathname)) return serveApi(request, handlers, ctx);
     /* AND THE OBJECT KEEPS WHAT ITS RESTORE SAID, in case the Worker never comes back to say it (`#left`). Counted in
        flight until the answer is read, so `stranded` cannot hand the next request an object this restore is still in. */
@@ -2665,6 +2754,15 @@ export class Directory$ extends DurableObject<Env> {
    */
   door$(record: string, ingest: string, sign: string | null): Refusal | null {
     const out = this.#directory().door$(record, ingest, sign);
+    return out.ok ? null : refusalOf(out);
+  }
+
+  /**
+   * Every webhook door of a record, as the record reads them itself (DR1): told from its alarm once a deploy and after a
+   * mint (`Record$` `#doors`), so the hold knows a door before its first arrival. Digests and `'signed'` only.
+   */
+  doors$(record: string, doors: { ingest: string; sign: string }[]): Refusal | null {
+    const out = this.#directory().doors$(record, doors);
     return out.ok ? null : refusalOf(out);
   }
 
