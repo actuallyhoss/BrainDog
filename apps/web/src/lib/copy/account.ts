@@ -217,7 +217,7 @@ export const account = {
   lockoutHow: '10 failed tries lock sign-in for 15 minutes.',
 
   /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
-  yourData: 'The whole record',
+  yourData: 'Your whole BrainDog',
   /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`): `sqlite3 portfolio.brain "select …"`
      works with no SDK and no reader of ours. The screen says it as "any database tool", because the
      format's name means nothing to most of the people reading it. */
@@ -232,9 +232,9 @@ export const account = {
   /* identity — `33 §10`: login is account-level, so this lives outside the record */
   you: 'You',
   signedInAs: 'Signed in as',
-  onThisRecord: 'On this record',
-  identityOutside: 'One sign-in for every record you hold.',
-  yourRecords: 'Records you can open',
+  onThisRecord: 'In this BrainDog',
+  identityOutside: 'One sign-in for every BrainDog you have.',
+  yourRecords: 'BrainDogs you can open',
   thisOne: 'you are here',
 
   /* identity: a person changes their own name and sign-in email. The name is the record's `renamePerson`; the
@@ -786,7 +786,7 @@ export const account = {
   accessStopped: (name: string) => `${name} is stopped. Everything they hold is kept for when you let them back in.`,
   accessLetBack: (name: string) => `${name} is back in, with what they held.`,
   inviteReachLabel: 'What the invitation opens',
-  inviteWholeRecord: 'The whole record',
+  inviteWholeRecord: 'All of it',
   inviteChosenLists: 'Only some of it',
   inviteListNothing: 'Nothing',
   inviteListsHint: 'A part left at Nothing stays closed.',

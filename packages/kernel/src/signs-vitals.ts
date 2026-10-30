@@ -214,7 +214,7 @@ export function amountFault(v: unknown): Fault | null {
 
 function readAmounts(sql: Sql): SignReading {
   const holding = [...lists(sql).values()].filter((l) => l.money.length > 0);
-  if (holding.length === 0) return reading('none', null, 'No list on this record holds an amount.');
+  if (holding.length === 0) return reading('none', null, 'No list holds an amount yet.');
   let held = 0;
   const broken: { list: string; what: string | null; why: Fault }[] = [];
   for (const l of holding)
@@ -230,7 +230,7 @@ function readAmounts(sql: Sql): SignReading {
         if (why !== null) broken.push({ list: l.name, what: typeof t === 'string' && t.trim() !== '' ? t.trim().slice(0, 60) : null, why });
       }
     }
-  if (held === 0) return reading('none', null, 'No amount is held on this record yet.');
+  if (held === 0) return reading('none', null, 'No amount is kept yet.');
   const facts = [`${count(held, 'amount')} held, ${broken.length} not whole or without a currency.`];
   if (broken.length <= AMOUNTS_BROKEN_MOST) return reading('green', 0, 'Every amount is whole, with its currency.', facts);
   facts.push(...broken.map((b) => `${b.what ?? 'One amount'} in ${b.list} ${FAULT_SAID[b.why]}.`));
@@ -273,13 +273,13 @@ function crossing(sql: Sql): string[] {
  */
 function readRateAge(sql: Sql, nowMs: number, tz: string): SignReading {
   const at = crossing(sql);
-  if (at.length === 0) return reading('none', null, 'No list on this record matches a move between two currencies.');
+  if (at.length === 0) return reading('none', null, 'No list matches a move between two currencies.');
   const facts = [`${names(at)} ${at.length === 1 ? 'matches' : 'match'} a move between two currencies.`];
   const today = dayIn(nowMs, tz);
   const newest = newestRate(sql, today);
   if (newest === null) {
     const ahead = newestRate(sql, DAY_LAST);
-    if (ahead === null) return reading('none', null, 'This record holds no rate yet, so a move between two currencies is not matched by itself.', facts);
+    if (ahead === null) return reading('none', null, 'No exchange rate is kept yet, so a move between two currencies is not matched by itself.', facts);
     return reading('none', null, `The newest rate is dated ${daySaid(ahead.as_of, today)}, in ${count(daysAhead(today, ahead.as_of), 'day')}, so none is in force yet and a move between two currencies is not matched by itself.`, facts);
   }
   const said = `The newest rate is from ${daySaid(newest.as_of, today)}, ${newest.days === 0 ? 'today' : `${count(newest.days, 'day')} old`}.`;

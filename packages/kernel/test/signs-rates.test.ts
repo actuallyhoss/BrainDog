@@ -98,7 +98,7 @@ test('ONE CURRENCY READS NONE, however old its rates, and so do no money and no 
   const one = read(await record(['EGP', 'EGP'], [AGO(40)]));
   assert.equal(one.state, 'none');
   assert.equal(one.value, null);
-  assert.equal(one.said, 'Every amount on this record is in EGP, so no exchange rate is needed.');
+  assert.equal(one.said, 'Every amount is in Egyptian Pound, so no exchange rate is needed.');
   assert.equal(read(await record([], [AGO(40)])).state, 'none');
   const unrated = read(await record(['EGP', 'USD'], []));
   assert.equal(unrated.state, 'none', 'nought would say the rates are fresh on a record that has none');

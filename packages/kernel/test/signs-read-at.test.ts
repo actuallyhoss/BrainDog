@@ -38,7 +38,7 @@ for (const [what, readAt] of [
     const s = modelAnswers(await filedAt(readAt));
     assert.equal(s.state, 'none');
     assert.equal(s.value, null);
-    assert.equal(s.said, 'Not read on any day this record can tell.');
+    assert.equal(s.said, 'No day it was read is known.');
     assert.deepEqual(s.facts, ['It last read green: The model answered 9 of 9 asks this week.']);
     assert.doesNotMatch(s.said, /NaN|Invalid|—/);
   });

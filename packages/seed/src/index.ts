@@ -115,8 +115,8 @@ export const LEARNINGS: Fields[] = [
   { lesson: 'Run the mastering pass before signing off an axis instance.', because: 'Three instances were signed off before mastering, and two had to be reopened when the outlines changed underneath them.', kind: 'method', project: 1, topic: 'axis-qa', confirmed_on: day(-3) },
   { lesson: 'kilnfonts.example is the address every delivered licence PDF links to.', because: 'A 2024 licence PDF was opened against a staging copy without the domain, and its download link led nowhere.', kind: 'fact', project: 1, topic: 'domains', confirmed_on: day(-26) },
   { lesson: 'Match a Fenwick invoice line to a service by renewal date, not by amount.', because: 'Two Fenwick services share one monthly total, so matching on the amount picked the wrong service in the September reconciliation.', kind: 'method', project: 3, topic: 'reconcile', confirmed_on: day(0) },
-  { lesson: 'Attach the rows a proposal read, or the record refuses it.', because: 'A merge of two services was proposed without the rows behind it, was refused, and the run had to list the services again.', kind: 'method', project: null, topic: 'proposals', confirmed_on: day(-1) },
-  { lesson: 'Money in this record is an integer in minor units, with its currency beside it.', because: 'A total was once read as pounds when it held pence, and a summary quoted a figure one hundred times too large.', kind: 'fact', project: null, topic: 'money' },
+  { lesson: 'Attach what a proposal read to it, or it is refused.', because: 'A merge of two services was proposed without the rows behind it, was refused, and the run had to list the services again.', kind: 'method', project: null, topic: 'proposals', confirmed_on: day(-1) },
+  { lesson: 'Money is kept as a whole number of pence or cents, with its currency beside it.', because: 'A total was once read as pounds when it held pence, and a summary quoted a figure one hundred times too large.', kind: 'fact', project: null, topic: 'money' },
   { lesson: 'Chase an unpaid invoice once it is 30 days past its date.', because: 'Two invoices sat unpaid for a month in the spring, and nobody noticed until the quarter closed.', kind: 'method', project: null, topic: 'invoices', state: 'superseded', why: 'Halden pays on 45-day terms, so a chaser at 30 days arrived before anything was late.' },
   { lesson: 'Chase Halden Type Co only once their 45-day terms have run out.', because: 'The chaser for invoice 2026-041 went out at 30 days, and Halden replied that nothing was due yet.', kind: 'method', project: 2, topic: 'invoices', supersedes: 6, confirmed_on: day(-9) },
 ];
@@ -785,7 +785,7 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
       },
       decided: {
         option: 'accept',
-        reason: 'Both are live and both renew; an invoice line nobody wrote down is the thing this record exists to stop.',
+        reason: 'Both are live and both renew; an invoice line nobody wrote down is the thing BrainDog is here to stop.',
       },
     },
     {

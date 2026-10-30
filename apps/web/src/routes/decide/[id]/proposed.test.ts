@@ -145,7 +145,7 @@ test('a script says where it calls out, what it may send, and carries its source
   ]);
   assert.equal(script?.source, body.source);
   const quiet = proposedOf('change', { to: { id: 'script.tidy', kind: 'script', body: { script: 'tidy', runs: { rule: true }, egress: [], keys: [], reads: [], writes: ['notes'], source: 'x' } } });
-  assert.deepEqual(quiet?.appears[0]?.lines, [{ label: 'Calls out', value: 'Nothing outside this record' }]);
+  assert.deepEqual(quiet?.appears[0]?.lines, [{ label: 'Calls out', value: 'Nothing outside your BrainDog' }]);
 });
 
 /* THE RECORD FILES THE LINE WITH THE KEYCHAIN IN HAND (`egressOf(d.body, titleOfRow, opensOf)` where a change is filed), and
@@ -191,7 +191,7 @@ test('a digest that posts out says where, when and what, in the line the record 
   assert.match(line, /collector\.example\.com/u);
   /* AND ONE THAT STAYS WITH THE OWNER SAYS SO, as a script that fetches nothing does. */
   const quiet = proposedOf('change', { to: { id: 'digest.in', kind: 'digest', body: { ...HOOK_BODY, channels: ['email'], webhook: undefined } } });
-  assert.deepEqual(quiet?.appears[0]?.lines, [{ label: 'Calls out', value: 'Nothing outside this record' }]);
+  assert.deepEqual(quiet?.appears[0]?.lines, [{ label: 'Calls out', value: 'Nothing outside your BrainDog' }]);
 });
 
 /* A PATTERN'S INGEST COMES IN TWO SHAPES, and Decide drew one. `slash/src/jobs.ts` files the bare body; an agent files the

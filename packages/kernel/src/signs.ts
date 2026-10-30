@@ -261,7 +261,7 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
     UNVERIFIED,
   );
   /* NO PATTERN IS NOT NOTHING TO JUDGE BY WHILE MESSAGES WAIT: a pattern retired or lost leaves them waiting all the same. */
-  if (fed.size === 0 && waiting.length === 0) return reading('none', null, 'Nothing on this record takes messages in yet.');
+  if (fed.size === 0 && waiting.length === 0) return reading('none', null, 'Nothing takes messages in yet.');
   const since = new Date(nowMs - ARRIVALS_WINDOW_DAYS * DAY).toISOString();
   const recent = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM inbox_raw WHERE state <> 'erased' AND ts >= ? AND ${VOUCHED}`, since, UNVERIFIED)?.n ?? 0);
   if (waiting.length === 0 && recent === 0) return reading('none', null, `Nothing has come in for ${ARRIVALS_WINDOW_DAYS} days, so there is nothing to judge by.`);
@@ -388,7 +388,7 @@ const ARRIVED = '(mp.series, mp.source) IN (SELECT series, source FROM arrived)'
  * of them, and "No numbers come in on this record yet" stood over 2,527. The sign judges what
  * arrives on a clock, so that is what it says is missing.
  */
-const NO_NUMBER_FEED = 'No number arrives on a schedule on this record, so there is nothing to judge by.';
+const NO_NUMBER_FEED = 'No number arrives on a schedule yet, so there is nothing to judge by.';
 
 function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
   const feeds = feedsOn(sql);
@@ -485,7 +485,7 @@ const sentence = (said: string): string => {
 const everAsked = (sql: Sql): boolean => sql.one('SELECT 1 AS x FROM suggestion LIMIT 1') !== undefined;
 
 function readCauses(sql: Sql, nowMs: number): SignReading {
-  if (!everAsked(sql)) return reading('none', null, 'Nothing has been asked on this record yet.');
+  if (!everAsked(sql)) return reading('none', null, 'Nothing has been asked yet.');
   /* THE CAUSE IS THE QUESTION'S OWN, the column `propose` keeps every cause it filed or derived in (migration 31), else
      the body's (a tail question from before the column writes it, and Slash's reading keeps its key, `understand_key`),
      ELSE THE KIND OF CHANGE STAMPED ON IT WITH WHAT IT IS ABOUT, ELSE NONE. Read off the body alone, every question an
@@ -545,7 +545,7 @@ function readCauses(sql: Sql, nowMs: number): SignReading {
 }
 
 function readOldest(sql: Sql, nowMs: number, tz: string): SignReading {
-  if (!everAsked(sql)) return reading('none', null, 'Nothing has been asked on this record yet.');
+  if (!everAsked(sql)) return reading('none', null, 'Nothing has been asked yet.');
   const oldest = sql.one<{ id: string; at: string }>(`SELECT id, opened_at AS at FROM suggestion WHERE ${OPEN} ORDER BY opened_at LIMIT 1`, new Date(nowMs).toISOString());
   if (oldest === undefined) return reading('green', 0, 'No question is waiting.');
   const days = Math.max(0, Math.floor((nowMs - Date.parse(oldest.at)) / DAY));
@@ -583,7 +583,7 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
     `SELECT ${HEARD} AS heard, ${AGENT} AS agent FROM entry WHERE register = 'session' AND deleted_at IS NULL AND state IN ('active', 'idle') AND ${HEARD} < ? ORDER BY heard`,
     new Date(nowMs - RUN_SILENT_MS).toISOString(),
   );
-  if (runs.length === 0 && silent.length === 0) return reading('none', null, `No agent has run on this record in ${RUNS_WINDOW_DAYS} days.`);
+  if (runs.length === 0 && silent.length === 0) return reading('none', null, `No agent has run in the last ${RUNS_WINDOW_DAYS} days.`);
   const ended = runs.filter((r) => r.state === 'done' || r.state === 'abandoned' || r.state === 'handoff');
   const abandoned = ended.filter((r) => r.state === 'abandoned').length;
   const swept = ended.filter((r) => Number(r.swept) === 1).length;
@@ -649,6 +649,18 @@ function ratesHeld(sql: Sql): Rate[] {
 }
 
 /**
+ * A CURRENCY BY ITS NAME, never its bank code: Health read "Every amount on this record is in GBP" (audit of 31 October,
+ * A20, A21). The runtime's own English name ("British Pound"), or the code where the runtime has none.
+ */
+function currencyWords(code: string): string {
+  try {
+    return new Intl.DisplayNames('en', { type: 'currency', fallback: 'none' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/**
  * THE SAME AGE THE `rates-age-days` FIGURE READS, by the figure's own reader over the record's rates, judged by the line
  * its note names (`RATES_STALE_DAYS`): never a second count of how old a rate is. Red names the cure in the words an
  * agent looks for on offer, a feed of rates, so the skill "Keep a record current" can put it in its one question.
@@ -659,12 +671,12 @@ function ratesHeld(sql: Sql): Rate[] {
 function readRatesCurrent(sql: Sql, nowMs: number, tz: string): SignReading {
   const held = currenciesHeld(sql);
   if (held.length < 2)
-    return reading('none', null, held.length === 0 ? 'No money is written on this record yet, so no exchange rate is needed.' : `Every amount on this record is in ${held[0]}, so no exchange rate is needed.`);
-  const facts = [`Money on this record is in more than one currency, ${held.join(' and ')} among them.`];
+    return reading('none', null, held.length === 0 ? 'No money is written down yet, so no exchange rate is needed.' : `Every amount is in ${currencyWords(held[0]!)}, so no exchange rate is needed.`);
+  const facts = [`Money is kept in more than one currency, ${held.map(currencyWords).join(' and ')} among them.`];
   const decl = BUILT_IN_FIGURES['rates-age-days'];
   const age = decl === undefined ? null : readRatesAge({ nowMs, tz, fx: () => ({ home: homeCurrency(sql), rates: ratesHeld(sql) }) }, decl);
   const days = age?.ok ? age.value.value : null;
-  if (days === null) return reading('none', null, 'This record holds no exchange rate yet. A feed of rates would bring them in.', facts);
+  if (days === null) return reading('none', null, 'No exchange rate is kept yet. A feed of rates would bring them in.', facts);
   const said = `The newest exchange rate is ${days === 0 ? 'from today' : `${count(days, 'day')} old`}.`;
   if (days <= RATES_STALE_DAYS) return reading('green', days, said, facts);
   facts.push(`An amount converted on a rate more than ${count(RATES_STALE_DAYS, 'day')} old is marked stale.`);
@@ -733,7 +745,7 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
      would stand forever. Written so a time that cannot be read reads as old. */
   const t = Date.parse(row.read_at);
   if (!(nowMs - t <= FILED_STANDS_MS))
-    return reading('none', null, Number.isNaN(t) ? 'Not read on any day this record can tell.' : `Not read since ${dateSaid(t, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
+    return reading('none', null, Number.isNaN(t) ? 'No day it was read is known.' : `Not read since ${dateSaid(t, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
   const kept = factsOf(row.facts);
   return reading(row.state, row.value === null ? null : Number(row.value), row.said, kept.facts, kept.counts);
 }
