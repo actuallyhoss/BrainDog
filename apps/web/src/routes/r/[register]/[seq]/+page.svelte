@@ -91,6 +91,7 @@
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
   import { choicesOf, finishOf, stateSaid } from './lead.ts';
   import { addedSaid, daySaid, dueSaid, importKeysOnly, localDay, rowWords, sentenceOf } from './said.ts';
+  import { linkedCells, linkedState } from './linked.ts';
   import {
     aboutOf,
     figureReader,
@@ -231,7 +232,7 @@
     stopEdit();
     const at = opened();
     reader ??= rowReader(apiBase());
-    links ??= linkReader(apiBase());
+    links ??= linkReader(apiBase(), undefined, recordNow);
     /* THE LOCAL COPY'S PAGE AT ONCE, the three reads together, while the record is asked as ever (`kept-row.ts`). */
     const mark = localTicket();
     /* One later than the wait is drawn when it lands, while the record has not answered: `got` is its answer once it has. */
@@ -1644,19 +1645,27 @@
             href={rel.total > rel.rows.length ? rel.href : undefined}
             hrefLabel={rel.total > rel.rows.length ? `${rowWords.all} ${rel.total}` : undefined}
           >
-            <!-- A LEDGER, SO ITS AMOUNTS ARE EXACT: a linked invoice reads '£1,200.00', to the penny, as every other
-                 ledger does, not the sentence's rounded '£1,200'. -->
+            <!-- AMOUNTS AS THE REST OF THE APP SAYS THEM, "+£3,030" in and "−£3,030" out, pence only where they are not
+                 round; and THE DOT HAS A WORD, "Paid", "38 days late", "Due in 5 days", so the state is never a colour
+                 alone (`linked.ts`). -->
+            {@const relDecl = REGISTERS[rel.register]}
             <ul class="items" aria-label="{rel.name} · {rel.label}">
-              {#each rel.rows as r (r.key)}
-                {@const rest = r.cells.slice(1).filter((c): c is string => Boolean(c))}
+              {#each rel.rows as r, i (r.key)}
+                {@const fields = rel.raw?.[i]}
+                {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency()))}
+                {@const stands = fields ? linkedState(relDecl, fields, clock) : null}
                 <li>
                   <a class="item item-link" href={at(r.href ?? '')}>
                     <span class="item-main">
-                      <span class="item-title" dir="auto">{moneyInText(r.cells[0] || r.key, homeCurrency(), 'exact')}</span>
-                      {#if rest.length > 0}<span class="item-detail">{rest.map((c) => moneyInText(c, homeCurrency(), 'exact')).join(' · ')}</span>{/if}
+                      <span class="item-title" dir="auto">{moneyInText(r.cells[0] || r.key, homeCurrency())}</span>
+                      {#if rest.length > 0}<span class="item-detail">{rest.join(' · ')}</span>{/if}
                     </span>
-                    {#if r.tone}
-                      <span class="item-when" data-intent={r.tone}><span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span></span>
+                    {#if r.tone || stands}
+                      <span class="item-when item-stands" data-intent={r.tone}
+                        >{#if r.tone}<span class="glyph" role={stands ? undefined : 'img'} aria-hidden={stands ? 'true' : undefined} aria-label={stands ? undefined : TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}{#if stands}<span
+                            class="stands-word">{stands}</span
+                          >{/if}</span
+                      >
                     {/if}
                   </a>
                 </li>
@@ -2458,6 +2467,18 @@
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  /* A POINTING ROW'S STATE: its dot, then its word, the word in the tone's ink where the tone is late or close. */
+  .item-stands {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-2);
+  }
+
+  .item-stands:is([data-intent='bad'], [data-intent='warn']) .stands-word {
+    color: var(--tone);
   }
 
   /* ── the handoff ───────────────────────────────────────────────────── */

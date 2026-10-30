@@ -220,7 +220,7 @@ export async function shapeFrom(base: string, said: unknown, io?: NonNullable<Cl
   }
   const fields = entryOf(r, raw, refs).fields as Readonly<Record<string, unknown>>;
   /* WHAT POINTS AT IT, grouped as a row's page groups it. */
-  const links = isObject(said.links) && Array.isArray(said.links.from) ? await linkReader(base, io).answered(said.links as unknown as BacklinksValue, n) : null;
+  const links = isObject(said.links) && Array.isArray(said.links.from) ? await linkReader(base, io, recordNow).answered(said.links as unknown as BacklinksValue, n) : null;
   const incoming = links?.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], name: g.name, rows: g.rows })) : [];
   /* WHAT WAS SAID OF IT. AN ID IS NOT A NAME: a line by someone the page has not named is shown without its byline. */
   const lines = Array.isArray(said.history) ? linesOf(r, said.history as (Event & Suggested)[]) : [];

@@ -60,7 +60,7 @@ function missed(out: object): Linked {
  * keeps its maps. A register this reader may not list is left out, and its refs draw as the id they
  * arrived as rather than as a wrong name.
  */
-export function linkReader(base: string, io?: Fetch): LinkReader {
+export function linkReader(base: string, io?: Fetch, clock: () => number = Date.now): LinkReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const maps = new Map<string, RefMap>();
   const asked = new Map<string, Promise<void>>();
@@ -89,7 +89,9 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
 
   /** The groups of a `backlinks` answer, each list's rows named by this record. */
   async function answered(value: BacklinksValue, seq: number): Promise<Linked> {
-    const now = Date.now();
+    /* THE RECORD'S CLOCK where the page hands it (`recordNow`): a bill due 7 Oct on a record whose today is 3 Sep is not
+       late, whatever day this browser says it is. */
+    const now = clock();
     const groups: Backlink[] = [];
     for (const g of value.from) {
       /* A LIST THIS BUILD DOES NOT SHIP IS ASKED FOR FIRST: a use case's own lists are declared by the record alone. */
