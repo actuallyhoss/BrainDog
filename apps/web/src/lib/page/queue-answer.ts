@@ -58,9 +58,12 @@ export const queueWords = {
    * been read again", which Decide does and this card does not, so the card says only what happened.
    */
   moved: 'Something this would change has changed since it was proposed, so nothing was written.',
-  /** A rule that asked, by its name, so a reader knows a person did not. */
+  /**
+   * A rule that asked, by its title as he wrote it ("Chase late payments"), beside the rule glyph its face wears, which
+   * says a person did not. It opened "A rule: chase late payments", a label and a lowered name (recheck of 30 October).
+   */
   /* THE TRUST LADDER'S OWN QUESTIONS ARE ASKED BY A RULE NAMED `ladder`, said as what it is (Q12 of 29 October). */
-  rule: (name: string) => (name.trim().toLowerCase() === 'ladder' ? 'Trust rule' : `A rule: ${name}`),
+  rule: (name: string) => (name.trim().toLowerCase() === 'ladder' ? 'Trust rule' : name.trim()),
   /** The line a card becomes once it is answered: what was chosen, by whom, and when. */
   answered: (option: string, when: string) => `${option} · you, ${when}`,
   /** A question put off (`governance.later`): the day it comes back to the reader. */
@@ -84,21 +87,15 @@ export function compactOf<T>(queue: readonly T[], total: number = queue.length, 
 }
 
 /**
- * A rule's name as the middle of a sentence: its first letter lowered, unless the name opens on a run of capitals (an
- * initialism such as "SMS"), which keeps its spelling.
- */
-const inSentence = (name: string): string => (/^\p{Lu}{2}/u.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1));
-
-/**
- * Who opened a question, as a face and a name: "Claude", "A rule: chase late payments", "Slash", "You", a person by the
+ * Who opened a question, as a face and a name: "Claude", "Chase late payments" (a rule), "Slash", "You", a person by the
  * name the record gave them, never `p_seed` or `rule:cash-stale`.
  *
- * `actor` SAYS EVERY SHAPE, and this adds one thing to it: a rule's name is said as a rule's, because on a card with no
- * face beside it ("Keep balances current" in the renderer's by-line) a rule's name reads as a person's request.
+ * `actor` SAYS EVERY SHAPE, and this adds one thing to it: the trust ladder's rule is said as "Trust rule". Any other rule
+ * is its title as written, with its kind kept, so the face beside it wears the rule glyph.
  */
 export function proposer(who: string, me: string | null = null, names: ReadonlyMap<string, string> = new Map(), run_by: RunBy | null = null): Actor {
   const said = actor(who, me, names, run_by);
-  return said.kind === 'rule' ? { name: queueWords.rule(inSentence(said.name)), kind: 'rule' } : said;
+  return said.kind === 'rule' ? { name: queueWords.rule(said.name), kind: 'rule' } : said;
 }
 
 /** What an option is, where the card can draw it: its colours, a few words or a figure, or a picture the page serves. */
