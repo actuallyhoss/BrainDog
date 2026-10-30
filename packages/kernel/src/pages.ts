@@ -3295,9 +3295,12 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (unit !== null && limitField !== undefined) {
     const other = rows.map((r) => r.fields[limitField]).find((v): v is { currency: string } => typeof v === 'object' && v !== null && typeof (v as { currency?: unknown }).currency === 'string' && (v as { currency: string }).currency !== unit);
     /* A ROW IN ANOTHER CURRENCY IS SET AGAINST THE FIGURE AT THE RATE THE RECORD HOLDS, when it holds one (a goal in
-       dollars on a record kept in pounds); the reader converts the row's limit the same way. With no rate it is refused. */
+       dollars on a record kept in pounds); the reader converts the row's limit the same way. With no rate it is refused.
+       ON THE RECORD'S OWN DAY, the one the reader converts on: the machine's day let a record on a held clock (an as-of
+       read, a test) ask for a rate on a day it has not reached. */
     const rates = deps.ctx.fx?.().rates ?? [];
-    const convertible = other !== undefined && rateFor(rates, other.currency, unit, new Date().toISOString().slice(0, 10)) !== null;
+    const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
+    const convertible = other !== undefined && rateFor(rates, other.currency, unit, today) !== null;
     if (other && !convertible)
       return {
         ...base,
