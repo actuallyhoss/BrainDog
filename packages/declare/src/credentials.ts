@@ -71,6 +71,10 @@ export function credentialKey(body: Json, seen: WeakSet<object> = new WeakSet())
   seen.add(body);
   for (const [key, value] of Array.isArray(body) ? body.map((v, i) => [String(i), v] as const) : Object.entries(body)) {
     if (!Array.isArray(body) && secretName(key) && typeof value === 'string' && value.trim()) return key;
+    /* AN ENUM'S `labels` ARE THE WORDS FOR ITS VALUES, keyed by the values: `{ api_token: 'API token' }` names a kind of
+       key and holds none (Agents 1.28.0 refused the whole seed for it). What a label says is still read for a secret's
+       shape (`credentialValue`); only its key is not a name. */
+    if (key === 'labels' && !Array.isArray(body) && typeof value === 'object' && value !== null && !Array.isArray(value)) continue;
     const found = credentialKey(value, seen);
     if (found) return found;
   }
