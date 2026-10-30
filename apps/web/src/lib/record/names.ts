@@ -213,6 +213,66 @@ export function runByIn(v: unknown): RunBy | null {
   return { run: said(by.run), agent: said(by.agent) ?? '', client: said(by.client), parent: said(by.parent) };
 }
 
+/* ── a run or an instruction named inside a note ────────────────────────── */
+
+/**
+ * THE WORDS A NOTE SAYS IN PLACE OF A RUN'S OR AN INSTRUCTION'S HANDLE. The record keeps "Taken by S42." on the
+ * instruction a run took and on the run whose step it took, and "Stopped by IN4." on a run an instruction stopped.
+ */
+export const handleWords = {
+  tookThis: 'Took this.',
+  takenBy: (who: string) => `Taken by ${who}.`,
+  anAgent: 'an agent',
+  anotherAgent: 'another agent',
+  endedBefore: (onward: boolean) => `The agent it was sent to ended before it saw this${onward ? '; it goes to the next one' : ''}.`,
+  passedOver: (who: string) => `Passed over: ${who} worked here after this step was left.`,
+  replaced: 'Replaced by a newer instruction.',
+  byInstruction: (did: string) => `${did} by an instruction.`,
+  lifted: 'Lifted by a later instruction.',
+} as const;
+
+/** A run's handle, `S42`, alone as a word. */
+const RUN_HANDLE = /^S[1-9]\d{0,14}$/u;
+
+/** A run's or an instruction's handle standing alone as a word in a sentence, as `spoken-names.ts` finds one. */
+const HANDLE_IN = /(?<![\w#/.-])(?:S|IN)[1-9]\d{0,14}(?![\w#-])/gu;
+
+/**
+ * A NOTE AS A PERSON READS IT, with the handles the record wrote into it said in words, at the point it is drawn and
+ * never by rewriting what the record keeps (Z1, finish loop of 30 October): Activity read "Taken by S42.".
+ *
+ * `by` IS WHO SIGNED THE LINE, and `run_by` who that run is where the record says. A run that took a thing signs the
+ * note naming itself, so "Taken by S42." signed by S42 is "Took this." under its own name. A handle that is not the
+ * line's own is a run or an instruction the caller holds nothing about, so it is said by what it is ("an agent", "an
+ * instruction"), and only in the sentences the record writes, so a note that happens to hold "S3" is left as written.
+ */
+export function handlesSaid(note: string, by: string | null = null, run_by: RunBy | null = null): string {
+  if (!/(?:S|IN)[1-9]/u.test(note)) return note;
+  const said = note.trim();
+  const own = by?.trim() ?? '';
+  const self = (handle: string): boolean => RUN_HANDLE.test(handle) && handle === own;
+  /* THE LINE'S OWN RUN BY WHAT IT IS, without "helping", since it is said inside a sentence. */
+  const named = run_by !== null && (run_by.run ?? own) === own ? (runWord(run_by.client, true) ?? runWord(run_by.agent, false)) : null;
+  const taken = /^Taken by (S[1-9]\d*)\.$/u.exec(said);
+  if (taken) return self(taken[1]!) ? handleWords.tookThis : handleWords.takenBy(handleWords.anAgent);
+  const ended = /^S[1-9]\d* ended before it saw this(; it goes to the next run)?\.$/u.exec(said);
+  if (ended) return handleWords.endedBefore(ended[1] !== undefined);
+  const passed = /^Passed over: (S[1-9]\d*) worked here after this step was left\.$/u.exec(said);
+  if (passed) return handleWords.passedOver(self(passed[1]!) ? (named ?? handleWords.anAgent) : handleWords.anotherAgent);
+  if (/^Redirected: IN[1-9]\d*\.$/u.test(said)) return handleWords.replaced;
+  const held = /^(Stopped|Paused|Resumed) by IN[1-9]\d*\.$/u.exec(said);
+  if (held) return handleWords.byInstruction(held[1]!);
+  if (/^Lifted by IN[1-9]\d*\.$/u.test(said)) return handleWords.lifted;
+  /* ANY OTHER SENTENCE NAMES ONLY THE LINE'S OWN RUN, which is the one handle known to be a run here. */
+  if (!RUN_HANDLE.test(own)) return note;
+  return note.replace(HANDLE_IN, (h: string, at: number) => {
+    if (h !== own) return h;
+    if (named !== null) return named;
+    const opens = at === 0 || /[.!?:]\s+$/u.test(note.slice(0, at));
+    return opens ? nameWords.agent : handleWords.anAgent;
+  });
+}
+
 /**
  * THE WORDS `actor` HAS SAID FOR SOMETHING THAT IS NOT A PERSON, on this tab, and the kind each belonged to.
  *

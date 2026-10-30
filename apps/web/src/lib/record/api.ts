@@ -41,7 +41,7 @@ import { listLine } from './tags.ts';
 import { shownName } from '../shell/side.ts';
 import { largestPart, partsOf, splitAtOf, splitSaid } from './split.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
-import { actor, nameWords, runByIn, type RunBy } from './names.ts';
+import { actor, handlesSaid, handleWords, nameWords, runByIn, type RunBy } from './names.ts';
 import type { Byline } from './byline.ts';
 
 /* THE DECLARATIONS EVERY HELPER BELOW READS, which are `held.ts`'s and not a copy: a list the record taught this tab is
@@ -1714,13 +1714,24 @@ export type Parts = {
 const agentNamed = (who: string, run_by: RunBy | null = null): string => (who === 'you' ? who : actor(who, null, new Map(), runByIn(run_by)).name);
 
 /**
+ * A ROW'S NOTE WITH ITS HANDLES IN WORDS (`handlesSaid`): an instruction a run took reads "took Write the notes" beside
+ * the run's name, as the verbs of `agentDoing` read, where it read "Taken by S42.".
+ */
+function agentNote(r: FeedRow): string | null {
+  if (r.note === null) return null;
+  const note = handlesSaid(r.note, r.who, runByIn(r.run_by ?? null));
+  const thing = r.thing ?? r.target;
+  return note === handleWords.tookThis && thing ? `took ${thing}` : note;
+}
+
+/**
  * An `agents` block's rows as the renderer reads them: `who | count | what | when`. The agent is named as a person reads
  * it, and what it did is the event's note, or the verb and the row it was done to (`agentDoing`).
  */
 export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.who === null ? '' : agentNamed(r.who, r.run_by ?? null), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
+    cells: [r.who === null ? '' : agentNamed(r.who, r.run_by ?? null), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? r.target, agentNote(r)), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));

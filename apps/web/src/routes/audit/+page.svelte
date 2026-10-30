@@ -17,7 +17,7 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { listName as declaredName, ruleNameSaid } from '$lib/record/names.ts';
+  import { handlesSaid, listName as declaredName, ruleNameSaid } from '$lib/record/names.ts';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import Button from '$lib/ui/Button.svelte';
@@ -695,10 +695,12 @@
   {@const thing = pass !== null ? null : ran !== null && ranTitle !== null ? { text: ranTitle, href: ran.href, list: null } : (t.many ?? (declared === null && e.target ? thingFor(e.target) : null))}
   <!-- THE LINE AS ONE SENTENCE (`lineSaid`): no second verb where the title already says what was done, a question in
        quotation marks, and a note that does not say the title again, its days said as a person says them. -->
+  <!-- A RUN OR AN INSTRUCTION THE NOTE NAMES BY ITS HANDLE IS SAID IN WORDS ("Taken by S42." is "Took this."). -->
+  {@const told = handlesSaid(t.note, e.by, e.run_by ?? null)}
   {@const said = lineSaid(
     kindOf(e.kind).word,
     thing?.text ?? null,
-    declared === null && pass === null ? (ran !== null && ranTitle !== null && t.count === 1 ? ranSaid(t.note, ranTitle, ran.id) : t.note) : '',
+    declared === null && pass === null ? (ran !== null && ranTitle !== null && t.count === 1 ? ranSaid(told, ranTitle, ran.id) : told) : '',
     t.many === null && /^(?:suggestion|decision|prediction):/u.test(e.target ?? ''),
     clock,
   )}

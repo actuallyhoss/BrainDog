@@ -16,7 +16,7 @@
   
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { actor } from '$lib/record/names.ts';
+  import { actor, handlesSaid } from '$lib/record/names.ts';
   import { commentWords, COMMENT_MOST, overBy, readThread, resolveComment, sayComment, threadsOf, WAYS, type Heard, type Line, type Way } from '$lib/record/comments.ts';
   import type { Line as Event } from '$lib/record/history-live.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -193,7 +193,7 @@
           {@const whole = m.event.settled ? null : lineWhole(m.event.by, m.event.note)}
           <li class="event">
             <Face name={w.name} kind={w.kind} run={runOf(m.event.by)} size="s" />
-            <p class="event-line">{#if whole}{whole}{:else}<span class="by">{m.event.settled ?? w.name}</span> {noteSaid(m.event.note, m.event)}{/if}</p>
+            <p class="event-line">{#if whole}{whole}{:else}<span class="by">{m.event.settled ?? w.name}</span> {noteSaid(handlesSaid(m.event.note, m.event.by), m.event)}{/if}</p>
             <time class="when" datetime={m.event.at}>{whenSaid(m.event.at, now)}</time>
           </li>
         {:else if m.thread.comment.resolved}
