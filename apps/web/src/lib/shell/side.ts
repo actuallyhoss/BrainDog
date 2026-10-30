@@ -482,16 +482,34 @@ function placed(path: string, m: SideModel, lit: string | null, title: string | 
 
 /** The counts this device last drew for the places it reads them for, by place key, so a read never blanks a number. */
 export const COUNTS_KEY = 'bd_side_counts';
+/** Bump when the kept shape changes. Before 2 it was every record's counts by base alone, for whoever was signed in. */
+export const COUNTS_VERSION = 2;
 
-/** A kept count, read safely: a whole number not under zero, else nothing. */
-export function countKept(raw: string | null, base: string, key: string): number | null {
+const bag = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * THE COUNTS KEPT FOR `base` AND `person`, by place key, read safely: whole numbers not under zero, `{}` for another
+ * record's. `null` for an entry to drop: the old shape, another person's, one with nobody to draw it for (no shell kept
+ * beside it, `keptPerson`), or one that does not read. ONE ENTRY, FOR ONE RECORD AND ONE PERSON, as the sidebar's list
+ * and week are: kept by record alone, the next person to sign in on a shared device was drawn the last one's counts
+ * (review 3, P1).
+ */
+export function countsKept(raw: string | null, base: string, person: string | null): Record<string, number> | null {
+  if (raw === null) return {};
   try {
-    const v = (raw ? JSON.parse(raw) : {}) as Record<string, Record<string, unknown>>;
-    const n = v[base]?.[key];
-    return typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : null;
+    const e: unknown = JSON.parse(raw);
+    if (!bag(e) || e.v !== COUNTS_VERSION || typeof e.base !== 'string' || typeof e.person !== 'string' || !bag(e.counts)) return null;
+    if (e.base !== base) return {};
+    if (person === null || e.person !== person) return null;
+    return Object.fromEntries(Object.entries(e.counts).filter((kv): kv is [string, number] => typeof kv[1] === 'number' && Number.isSafeInteger(kv[1]) && kv[1] >= 0));
   } catch {
     return null;
   }
+}
+
+/** The entry to keep for `base` and `person`: what was kept for them, with `now` over it. */
+export function countsEntry(raw: string | null, base: string, person: string, now: Record<string, number>): string {
+  return JSON.stringify({ v: COUNTS_VERSION, base, person, counts: { ...(countsKept(raw, base, person) ?? {}), ...now } });
 }
 
 /** What this device keeps of the lists' facts, by record and list, so the next draw places each list at once. */

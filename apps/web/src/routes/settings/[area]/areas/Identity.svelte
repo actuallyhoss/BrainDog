@@ -10,6 +10,7 @@
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
+  import { forgetSignedOut } from '$lib/record/signed-out.ts';
   import { passkeysSaid } from '$lib/ui/signing-in.ts';
   import { PEOPLE } from '$lib/who.ts';
   import { createClient } from '@braindog/client';
@@ -330,6 +331,8 @@
     closed(true, mark);
     closing = false;
     if (answer?.ok === true) {
+      /* AN ACCOUNT CLOSED ENDS ITS SESSIONS: what this browser kept of what they read goes now, as on a sign-out. */
+      forgetSignedOut();
       closedNow = true;
       return;
     }

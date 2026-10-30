@@ -39,7 +39,24 @@ const here = (): Store | null => {
 };
 
 /** Who the shell this browser keeps for `base` was read for, or `null` where it keeps none. */
-const personOf = (base: string, now: number, store: Store): string | null => readCopy(base, now, store)?.me?.person ?? null;
+const personOf = (base: string, now: number, store: Store): string | null => {
+  const person = readCopy(base, now, store)?.me?.person;
+  return typeof person === 'string' && person !== '' ? person : null;
+};
+
+/**
+ * WHO WHAT THE SIDEBAR KEEPS IS KEPT FOR: the person the shell this browser keeps for `base` was read for, or `null`.
+ * The week and the counts are kept for one record and one person, as this list is, and drawn only beside that shell
+ * (review 3, P1), so a sign-out, a refusal or a switch takes them out of reach with it.
+ */
+export function keptPerson(base: string, now: number = Date.now(), store: Store | null = here()): string | null {
+  if (!store) return null;
+  try {
+    return personOf(base, now, store);
+  } catch {
+    return null;
+  }
+}
 
 /** Keep the list the sidebar just drew for the record at `base`, beside the shell kept for it. */
 export function keepSide(base: string, copy: SideCopy, now: number = Date.now(), store: Store | null = here()): void {
