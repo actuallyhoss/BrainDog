@@ -232,21 +232,24 @@ function barRows(block: BlockResult): string[] {
      count is its largest and a bar's is its labels' added up; a row of the list counts once and says its own day. */
   const tally = block.kind === 'bar' && (block as { tally?: unknown }).tally === true;
   const dayField = tally ? (REGISTERS[block.register ?? '']?.fields.find((f) => f.type === 'day' && f.id === 'on') ?? REGISTERS[block.register ?? '']?.fields.find((f) => f.type === 'day'))?.id : undefined;
-  const tallies = new Map<string, { labels: Map<string, number>; rows: number; last: string | null }>();
-  const tallyOf = (key: string, e: { fields: Record<string, unknown> }, label: unknown): void => {
+  /* A SPLIT ROW IS ONE PAYMENT (review of 30 October, R14): its parts each add their amount, and the row is counted once, by
+     its id, so one £90 payment over three categories says "once" and not "3 times". */
+  const tallies = new Map<string, { labels: Map<string, number>; rows: Set<string>; bare: number; last: string | null }>();
+  const tallyOf = (key: string, e: { id?: unknown; fields: Record<string, unknown> }, label: unknown): void => {
     if (!tally) return;
-    const at = tallies.get(key) ?? { labels: new Map<string, number>(), rows: 0, last: null };
+    const at = tallies.get(key) ?? { labels: new Map<string, number>(), rows: new Set<string>(), bare: 0, last: null };
     const times = e.fields[TALLY_TIMES];
     const own = typeof e.fields[TALLY_LAST] === 'string' ? (e.fields[TALLY_LAST] as string) : dayField && typeof e.fields[dayField] === 'string' ? (e.fields[dayField] as string).slice(0, 10) : null;
     if (typeof times === 'number') at.labels.set(String(label), Math.max(at.labels.get(String(label)) ?? 0, times));
-    else at.rows += 1;
+    else if (typeof e.id === 'string' && e.id !== '') at.rows.add(e.id);
+    else at.bare += 1;
     if (own !== null && (at.last === null || own > at.last)) at.last = own;
     tallies.set(key, at);
   };
   const tallyNote = (key: string): string => {
     const at = tallies.get(key);
     if (!at) return '';
-    const times = at.rows + [...at.labels.values()].reduce((n, t) => n + t, 0);
+    const times = at.rows.size + at.bare + [...at.labels.values()].reduce((n, t) => n + t, 0);
     return times > 0 ? tallySaid(times, at.last, recordToday(clockOf(block))) : '';
   };
   for (const e of split && split.of === of ? rowsBySplit(block.matched, split.field) : block.matched) {

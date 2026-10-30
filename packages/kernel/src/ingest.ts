@@ -576,7 +576,7 @@ export function existingRow(
   register: string,
   dedupe: Dedupe | null | undefined,
   extracted: Record<string, unknown>,
-): { id: string; seq: number } | undefined {
+): { id: string; seq: number; sure?: boolean } | undefined {
   /* `null` AS WELL AS ABSENT, because this value is read back out of a JSON column: a declaration
      stored with the key written and left empty comes back holding one rather than missing one. */
   if (dedupe === undefined || dedupe === null) return undefined;
@@ -677,7 +677,7 @@ export function existingRow(
   const held = (x: Record<string, Json>, f: string): boolean => Object.hasOwn(x, f) && x[f] !== undefined && x[f] !== null;
   const across = (row: Record<string, Json>): boolean => near.on.some((f) => held(mine, f) !== held(row, f));
   const strong = matched.find((row) => !across(read(row)));
-  if (strong !== undefined) return strong;
+  if (strong !== undefined) return { id: strong.id, seq: strong.seq, sure: true };
 
   /**
    * A ROW MATCHED ONLY ACROSS TWO ROADS IS OURS ONLY IF NOTHING ELSE CLAIMED IT, ONE TO ONE. A statement line with no
@@ -703,7 +703,10 @@ export function existingRow(
       });
     })
     .sort((x, y) => Math.abs(day(read(x)) - at) - Math.abs(day(read(y)) - at));
-  return free[0];
+  /* SURE ONLY WHEN ONE ROW WAS LEFT TO BE IT. Two free lines of one amount are two payments this arrival may be either
+     of; the nearer is taken, and nothing of this arrival is written onto it (`nearFill`). */
+  const first = free[0];
+  return first === undefined ? undefined : { id: first.id, seq: first.seq, sure: free.length === 1 };
 }
 
 /** How many days either side a near key looks for a row that came by another road (`NEAR_ACROSS_DAYS`, `@braindog/extract`). */
@@ -1416,12 +1419,14 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       /* A SKIP IS NEVER SILENT: it keeps the row it repeats, on its `match` line, and says it by its name,
          amount and day, so the Inbox can offer "It is a second one" on the text itself. */
       const reason = repeatSaid(deps, register, existing, matched.dedupe);
-      /* AND WHAT THE KEPT ROW NEVER SAID OF ITS MONEY, the second sighting says onto it: a statement line merged into the
-         alert that wrote the payment first brought the balance after it, and the alert's line kept none (recheck of 30
-         October). Only under a near key, which is one payment seen by two roads, and only a money field the kept row
-         holds nothing in. A refusal leaves the row as it was: the skip stands. */
-      const fill = Array.isArray(matched.dedupe) ? null : moneyUnsaid(deps, register, existing.id, extracted);
-      if (fill !== null) deps.write(register, existing.id, fill, `ingest:${matched.ingest}`);
+      /* AND WHAT THE KEPT ROW NEVER SAID, the second sighting says onto it when that row was the only one it could be
+         (`nearFill`): its reference, so the row is claimed and a second payment of the same amount with another reference
+         is written beside it (review of 30 October, R11), and the balance after it (recheck of 30 October). A refusal
+         leaves the row as it was: the skip stands. WHAT WAS WRITTEN IS NAMED on a `filled` line before the
+         repeat mark, so "It is a second one" takes exactly that back (R12). */
+      const fill = nearFill(deps, register, existing, matched.dedupe, extracted);
+      if (fill !== null && deps.write(register, existing.id, fill, `ingest:${matched.ingest}`).ok)
+        note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', JSON.stringify(Object.keys(fill).sort()), { field: 'filled', from: existing.id });
       store('skipped', reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'skipped', { field: 'repeats', from: existing.id });
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason, repeats: existing.id });
@@ -3474,6 +3479,9 @@ function readBefore(sql: Sql, patterns: readonly IngestDecl[], most: number): st
 /**
  * A text skipped as a repeat, filed after all as a second one: "It is a second one" in the Inbox. It runs again
  * with its pattern's repeat check off for this one run, so it is written beside the row it looked like.
+ *
+ * AND WHAT THE SKIP WROTE ONTO THAT ROW IS TAKEN BACK (review of 30 October, R12): the reference and balance it gave
+ * the row, named on its `filled` line, were this text's and not that row's. A field changed since by anyone is left.
  */
 export function fileAsSecond(deps: IngestDeps, raw: string): Result<Arrived> {
   const row = deps.sql.one<{ id: string; ts: string; channel: string; headers: string | null; body: string | null; sha256: string; state: string; reason: string | null }>(
@@ -3498,7 +3506,7 @@ export function fileAsSecond(deps: IngestDeps, raw: string): Result<Arrived> {
         return { ...rest, on_conflict: 'new' as const };
       }),
   };
-  return runArrival(
+  const filed = runArrival(
     once,
     {
       channel: row.channel as Channel,
@@ -3511,16 +3519,80 @@ export function fileAsSecond(deps: IngestDeps, raw: string): Result<Arrived> {
     { id: row.id, state: row.state, reason: row.reason, ts: row.ts },
     {},
   );
+  if (filed.ok) unfill(deps, raw, pattern.ingest);
+  return filed;
+}
+
+/**
+ * Take back what a skip wrote onto the row it kept (`nearFill`), as its `filled` line names it: each field still as the
+ * skip left it is cleared. One a person or anything else wrote since (a later line on that field) is theirs, and stays.
+ */
+function unfill(deps: IngestDeps, raw: string, ingest: string): void {
+  const line = deps.sql.one<{ rowid: number; from_v: string | null; to_v: string | null }>(
+    "SELECT rowid, from_v, to_v FROM event WHERE kind = 'match' AND target = ? AND field = 'filled' ORDER BY rowid DESC LIMIT 1",
+    `inbox_raw:${raw}`,
+  );
+  if (line === undefined || line.from_v === null || line.to_v === null) return;
+  const kept = deps.sql.one<{ register: string }>('SELECT register FROM entry WHERE id = ? AND deleted_at IS NULL', line.from_v);
+  if (kept === undefined) return;
+  let said: unknown;
+  try {
+    said = JSON.parse(line.to_v);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(said)) return;
+  const clear: Record<string, null> = {};
+  for (const field of said) {
+    if (typeof field !== 'string') continue;
+    const since = deps.sql.one<{ n: number }>('SELECT 1 AS n FROM event WHERE target = ? AND field = ? AND rowid > ? LIMIT 1', `entry:${line.from_v}`, field, line.rowid);
+    if (since === undefined) clear[field] = null;
+  }
+  if (Object.keys(clear).length > 0) deps.write(kept.register, line.from_v, clear, `ingest:${ingest}`);
 }
 
 /** Three letters a month is said by in a reason: `7 Oct`. */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * Why a text was skipped as a repeat, by the row it repeats: "Looks like a repeat of Corner Shop, EGP 120.00, 7 Oct."
- * Its title, its first money field and the day it moved, each left out where the row has none. Never a list's id or a
- * row's number.
+ * What a near skip writes onto the row it keeps, as a patch, or `null` for nothing.
+ *
+ * THE KEY'S OWN WORDS THE ROW NEVER HELD, ALWAYS: a statement line has no reference, so an alert that met it gave it none,
+ * and a second alert of the same amount with another reference met the same line and was skipped too, a real payment
+ * never in the Ledger (review of 30 October, R11). Taking the reference claims the line, and the next alert with another
+ * reference finds no row and is written. Words and numbers only: an account or a choice is not this arrival's to give.
+ *
+ * AND THE MONEY IT HOLDS NOTHING IN (`moneyUnsaid`): a statement line merged into the alert that wrote the payment first
+ * brought the balance after it, and the alert's line kept none (recheck of 30 October). Under a key that names a balance
+ * (`available`, `balance_after`) that balance is the claim.
+ *
+ * NOTHING AT ALL UNLESS THE MATCH IS SURE (`sure` from `existingRow`): with two lines of one amount free, which one this
+ * alert is cannot be told, and its balance on the wrong one is a wrong confirmed balance (R12). Nor its reference: a line
+ * holding one reads as an alert that met the other line, which then belongs to it, and the next alert is written beside
+ * two lines it is one of. Unclaimed, both lines stay free, and two lines answer two alerts.
  */
+export function nearFill(
+  deps: Pick<IngestDeps, 'sql' | 'schemaOf'>,
+  register: string,
+  existing: { id: string; sure?: boolean },
+  dedupe: Dedupe | null | undefined,
+  extracted: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (dedupe === undefined || dedupe === null || Array.isArray(dedupe) || existing.sure === false) return null;
+  const fields = deps.schemaOf(register)?.fields ?? {};
+  const row = parsed(deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', existing.id)?.fields) ?? {};
+  const patch: Record<string, unknown> = {};
+  for (const field of dedupe.near.on) {
+    const type = fields[field]?.type;
+    if (type !== 'text' && type !== 'int' && type !== 'number') continue;
+    if (row[field] !== undefined && row[field] !== null) continue;
+    const v = extracted[field];
+    if ((typeof v === 'string' && v.trim() !== '') || (typeof v === 'number' && Number.isFinite(v))) patch[field] = v;
+  }
+  Object.assign(patch, moneyUnsaid(deps, register, existing.id, extracted) ?? {});
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
 /**
  * The money fields an arrival says that the row it repeats holds nothing in, as a patch, or `null` when there are none:
  * what a second sighting of one payment adds to the first (a statement's balance after it, an alert's available).
@@ -3537,6 +3609,11 @@ export function moneyUnsaid(deps: Pick<IngestDeps, 'sql' | 'schemaOf'>, register
   return Object.keys(patch).length > 0 ? patch : null;
 }
 
+/**
+ * Why a text was skipped as a repeat, by the row it repeats: "Looks like a repeat of Corner Shop, EGP 120.00, 7 Oct."
+ * Its title, its first money field and the day it moved, each left out where the row has none. Never a list's id or a
+ * row's number.
+ */
 function repeatSaid(deps: IngestDeps, register: string, existing: { id: string }, dedupe: Dedupe | undefined): string {
   const fields = deps.schemaOf(register)?.fields ?? {};
   const row = parsed(deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', existing.id)?.fields) ?? {};

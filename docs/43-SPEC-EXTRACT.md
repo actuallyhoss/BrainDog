@@ -250,7 +250,8 @@ money   = [ "(" ] [ sign ] [ cur ws? ] number [ ws? cur ] [ ")" ]      ; parenth
 sign    = "-" | "−" | "+"
 cur     = code | symbol                                                 ; code: 3 upper-case letters in the table, whole token
 number  = digits { grp digits3 } [ dec digits ] | lakh [ dec digits ] | digits [ dec digits ]
-lakh    = digits1-2 { ( "," | "٬" ) digits2 } ( "," | "٬" ) digits3        ; Indian grouping, at least three groups
+lakh    = digits1-2 { ( "," | "٬" ) digits2 } ( "," | "٬" ) digits3        ; Indian grouping, at least three groups;
+                                                                        ; "," only in INR, PKR, NPR, LKR, BDT
 grp     = "," | "." | " " | "'" | "’" | "‘" | "٬"                        ; a run of groups uses ONE character
 dec     = "." | "," | "٫"
 digit   = "0"–"9" | "٠"–"٩" (U+0660) | "۰"–"۹" (U+06F0)                ; one system per number
@@ -271,7 +272,7 @@ wherever they stand (`ar-EG` prints `؜-‏١٢`, `he-IL` prints `12.50 ‏EGP`)
 | **one separator, last group exactly 3 digits** | **thousands, unless e = 3, then decimal** | `1.250` → 125000 · `KWD 1.250` → 1250 |
 | two or more separators | all but the last are one grouping character over groups of exactly 3; a last separator that differs is the decimal point; one that is the same needs a 3-digit last group | `1,250.00` → 125000 · `1.250,00` → 125000 · `1 250,00` → 125000 · `1,250,000` → 125000000 |
 | first group | 1–3 digits when grouping | `1250,000` → nothing |
-| lakh grouping | with `,` or `٬` only, and only when every group fits: first 1–2 digits, then 2s, then the last 3 | `1,25,000` → 12500000 · `12,34,567.50` → 123456750 · `1,23,456,789` → nothing |
+| lakh grouping | with `٬` in any currency, or `,` in INR, PKR, NPR, LKR or BDT only, and only when every group fits: first 1–2 digits not starting with 0, then 2s, then the last 3 | `INR 1,25,000` → 12500000 · `INR 12,34,567.50` → 123456750 · `EGP ١٬٢٥٬٠٠٠` → 12500000 · `EGP 1,25,000` → nothing · `INR 1,23,456,789` → nothing · `INR 00,12,345` → nothing |
 | a currency adjacent before and after that differ | no candidate | |
 | a symbol two table rows share | not a currency; `declared` or nothing | `$` with USD and CAD in the table |
 | \|amount\| > 2^53 − 1 | no candidate | |
@@ -645,8 +646,8 @@ every test is `{ EGP: {2}, USD: {2, '$'}, CAD: {2, '$'}, EUR: {2, '€'}, JPY: {
 | `JPY 12.5` | | undefined — more precision than the currency |
 | `EGP 12.345` | | 1234500 EGP — the only valid reading at exponent 2 |
 | `EGP 1,250.000` | | undefined — three decimals at exponent 2 |
-| `EGP 1,25,000` | | 12500000 EGP — lakh grouping |
-| `EGP 1,23,456,789` · `EGP 1250,000` | | undefined — lakhs and thousands in one figure / first group too long |
+| `EGP 1,25,000` · `EGP 10,20,300` · `EGP 1250,000` | | undefined — groups not of three (lakhs only in a lakh currency) / first group too long |
+| `EGP 1,23,456,789` | | undefined — lakhs and thousands in one figure |
 | `EGP 1’250.00` · `KWD 1’250` · `EGP 5’50` | | 125000 EGP · 1250000 KWD · undefined — an apostrophe only groups |
 | `EGP ١٬٢٥٠٫٠٠` · `EGP ١٫٢٥٠` · `EGP ١2٣` | | 125000 EGP · undefined (three decimals) · undefined (two digit systems) |
 | `12.50 ‏EGP` (U+200F before the code) | | 1250 EGP — the direction mark is skipped |

@@ -34,6 +34,8 @@ const PREFIX_CHARS = 12;
 export const NEAR_ACROSS_DAYS = 3;
 /** The field a row says which way its money went in, in every list that keeps money (`in` or `out`). */
 const WAY = 'direction';
+/** The fields a row says the balance after it in, in every list that keeps money: a statement's, and an alert's. */
+const BALANCES = ['balance_after', 'available'] as const;
 
 /**
  * Canonical equality for one field.
@@ -251,6 +253,9 @@ export function nearMatch(a: Fields, b: Fields, dedupe: Dedupe): 'strong' | 'acr
   /* ONE PAYMENT NEVER GOES BOTH WAYS. Its way is not in every key (a bank's door reads it from which text came), and with
      the bank's words taken off, money to a person and money back from them read alike. */
   if (held(a, WAY) && held(b, WAY) && !sameField(a, b, WAY)) return null;
+  /* AND ONE PAYMENT LEAVES ONE BALANCE (review of 30 October, R11). Its balance is not in every key either: an alert keyed
+     by its reference may meet a line that took another alert's balance, and two balances after are two payments. */
+  for (const f of BALANCES) if (held(a, f) && held(b, f) && !sameField(a, b, f)) return null;
 
   /* A DAY FOR TWO ROWS THAT HOLD THE SAME FIELDS, AND THREE FOR A PAIR THAT CAME BY TWO ROADS (`NEAR_ACROSS_DAYS`). */
   const l = utcDay(a[day]);

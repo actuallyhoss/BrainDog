@@ -243,3 +243,41 @@ test('A WALK CUT AFTER ITS LAST SLICE GOES ON WITHOUT WALKING AGAIN, and one cut
   api.kernel.setPref('slash', 'understand.run', { day: '2000-01-01', begun: 5, end: false, asked: [], held: [], batches: [], dropped: [] });
   assert.ok((await walking(api, () => sliceThrough(api))) >= 1, 'a walk of another day held tonight back');
 });
+
+/* R3 (review of 30 October): the walk was kept in memory alone, so an object reset while drawing one page began again
+   from Home in the next, reached the same page and was reset again, and the day's look stalled on its headlines. */
+test('A HEADLINES WALK WHOSE OBJECT WAS RESET MID-PAGE GOES ON PAST THAT PAGE IN THE NEXT OBJECT, and asks once', async () => {
+  const s = await seeded();
+  let kept: { order: string[]; at: number; again: boolean } | undefined;
+  for (let ticks = 0; ticks < 2_000; ticks++) {
+    const last = await s.api.slashTick({ budget: onePage() });
+    kept = s.api.kernel.prefsOf('slash')['headlines.walk'] as typeof kept;
+    if (kept !== undefined && kept.at >= 2) break;
+    assert.equal((last as { more?: true }).more, true, 'the look ended before its headlines walk was kept');
+  }
+  assert.ok(kept !== undefined && kept.again === false, 'the walk never kept its place');
+  /* THE PAGE BEING DRAWN WHEN THE OBJECT WENT: its place is already past it. */
+  const bad = kept.order[kept.at - 1]!;
+
+  /* A NEW OBJECT OVER THE SAME RECORD, with nothing in memory. */
+  const { heard, model } = writing();
+  const fresh = await createRecordApi({ sql: s.sql, clock: s.clock, slashModel: model });
+  const seen: string[] = [];
+  const kernel = fresh.kernel as unknown as { page: (...a: unknown[]) => unknown };
+  const page = kernel.page;
+  kernel.page = (...a: unknown[]) => {
+    if (heard.length === 0) seen.push(String(a[0]));
+    return page.apply(fresh.kernel, a);
+  };
+  let ticks = 0;
+  let last: Awaited<ReturnType<typeof fresh.slashTick>>;
+  do {
+    last = await fresh.slashTick({ budget: onePage() });
+    ticks += 1;
+  } while ((last as { more?: true }).more === true && ticks < 2_000);
+  kernel.page = page;
+  assert.ok(ticks < 2_000, 'the look never ended in the new object');
+  assert.ok(!seen.includes(bad), `the new object drew ${bad} again, the page its walk was drawing when the object went`);
+  assert.ok(heard.length <= 1, 'the walk asked more than once');
+  assert.equal(fresh.kernel.prefsOf('slash')['headlines.walk'], undefined, 'the walk kept its place after it ended');
+});

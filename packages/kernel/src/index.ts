@@ -8293,7 +8293,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const amount = q.value === null ? 'NULL' : fieldSqlIn(schema, q.value);
       const unit = type === 'money' ? `json_extract(fields, '${jsonPath(q.value!)}.currency')` : type === 'quantity' ? `json_extract(fields, '${jsonPath(q.value!)}.unit')` : 'NULL';
       const on = q.dated === null || q.value === null ? 'NULL' : `CASE WHEN ${amount} IS NULL THEN NULL ELSE substr(${fieldSqlIn(schema, q.dated)}, 1, 10) END`;
-      const cols = [...by.map((e, n) => `${e} AS b${n}`), `${unit} AS unit`, `${on} AS day`, `COALESCE(SUM(${amount}), 0) AS sum`, `COUNT(*) AS n`, `COUNT(${amount}) AS said`];
+      const cols = [...by.map((e, n) => `${e} AS b${n}`), `${unit} AS unit`, `${on} AS day`, `COALESCE(SUM(${amount}), 0) AS sum`, `COUNT(*) AS n`, `COUNT(${amount}) AS said`, 'COUNT(DISTINCT id) AS entries'];
       const group = Array.from({ length: by.length + 2 }, (_, n) => n + 1).join(', ');
       /* THE SAME ROWS `list` READS FOR THE PAGE'S READER, so a sum is never over a row kept private from them. */
       const kept = admitClause(q.register, undefined, viewer);
@@ -8320,7 +8320,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           return v;
         }
       };
-      return ok(rows.map((r) => ({ by: q.by.map((_, n) => label(r[`b${n}`], held[n]!)), unit: typeof r.unit === 'string' ? r.unit : null, day: typeof r.day === 'string' ? r.day : null, sum: Number(r.sum), rows: Number(r.n), said: Number(r.said) })));
+      return ok(rows.map((r) => ({ by: q.by.map((_, n) => label(r[`b${n}`], held[n]!)), unit: typeof r.unit === 'string' ? r.unit : null, day: typeof r.day === 'string' ? r.day : null, sum: Number(r.sum), rows: Number(r.n), said: Number(r.said), entries: Number(r.entries) })));
     },
     /*
      * THE NEWEST EVENTS, for a `feed` or an `agents` block. A row's event names the row as a page names it,

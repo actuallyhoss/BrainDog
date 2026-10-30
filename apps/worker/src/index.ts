@@ -81,7 +81,7 @@ import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { cloudSealed } from './sealed.ts';
 import { cloudVisuals, pagesPrefix } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
-import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, type Cuts } from './alarm-cuts.ts';
+import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, resetSaid, type Cuts } from './alarm-cuts.ts';
 import { isHeld, redeliver, serveHeld, sweepHeld, type HeldDeps, type HeldMessage } from './held.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
@@ -1140,40 +1140,56 @@ export class Record$ extends DurableObject<Env> {
       return;
     }
     await this.#cutOff(api);
-    await this.#step(api, 'drain', () => api.kernel.drain(this.#alarm));
-    /* EVERY STEP BUT THE DRAIN MAY BE HELD after two alarms in a row were cut in it (`alarm-cuts.ts`), and then answers
-       what a pass with nothing to do answers. */
-    const more = await this.#step(api, 'act', () => this.#act(api), false);
-    const asked = await this.#step(api, 'ask', () => this.#ask(api), false);
-    const modelled = await this.#step(api, 'model', () => this.#model(api), false);
-    /* THE LOOK AND THE LINT, EACH A SHARE OF THIS ALARM (`ALARM_STEP_MS`, `ALARM_STEP_PAGES`). Each drew every page it
-       read in one go, the look up to 49 s and the lint up to 27 s, and the platform reset the object. Now each stops
-       when its share is spent, keeps where it stopped, and answers `more`, and the alarm is set for now below, so the
-       rest is the next alarm's and requests are answered in between. */
-    const looked = await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore, budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) }), false);
-    /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
-    const linted = await this.#step(
-      api,
-      'lint',
-      () =>
-        api
-          .lintTick({ budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) })
-          .then((out) => out.ran === false && out.more === true)
-          .catch((e: unknown) => {
-            console.error('lint:', e instanceof Error ? e.message : String(e));
-            return false;
-          }),
-      false,
-    );
-    /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
-       replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
-    await this.#step(api, 'signs', (): void => {
-      try {
-        fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now());
-      } catch (e) {
-        console.error('signs:', e instanceof Error ? e.message : String(e));
-      }
-    });
+    /* A STEP THAT THREW WAS NOT CUT (review of 30 October, R4): the step written down is cleared before the throw goes on, so
+       the platform's own retry of this alarm does not read it as a reset, count a cut, and after two hold the step for six
+       hours with a mail that says it was cut. Only an object reset mid-step leaves it written. */
+    let more: boolean;
+    let asked: boolean;
+    let modelled: boolean;
+    let looked: boolean;
+    let linted: boolean;
+    try {
+      await this.#step(api, 'drain', () => api.kernel.drain(this.#alarm));
+      /* EVERY STEP BUT THE DRAIN MAY BE HELD after two alarms in a row were cut in it (`alarm-cuts.ts`), and then answers
+         what a pass with nothing to do answers. */
+      more = await this.#step(api, 'act', () => this.#act(api), false);
+      asked = await this.#step(api, 'ask', () => this.#ask(api), false);
+      modelled = await this.#step(api, 'model', () => this.#model(api), false);
+      /* THE LOOK AND THE LINT, EACH A SHARE OF THIS ALARM (`ALARM_STEP_MS`, `ALARM_STEP_PAGES`). Each drew every page it
+         read in one go, the look up to 49 s and the lint up to 27 s, and the platform reset the object. Now each stops
+         when its share is spent, keeps where it stopped, and answers `more`, and the alarm is set for now below, so the
+         rest is the next alarm's and requests are answered in between. */
+      looked = await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore, budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) }), false);
+      /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
+      linted = await this.#step(
+        api,
+        'lint',
+        () =>
+          api
+            .lintTick({ budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) })
+            .then((out) => out.ran === false && out.more === true)
+            .catch((e: unknown) => {
+              console.error('lint:', e instanceof Error ? e.message : String(e));
+              return false;
+            }),
+        false,
+      );
+      /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
+         replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
+      await this.#step(api, 'signs', (): void => {
+        try {
+          fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now());
+        } catch (e) {
+          console.error('signs:', e instanceof Error ? e.message : String(e));
+        }
+      });
+    } catch (e) {
+      const said = e instanceof Error ? e.message : String(e);
+      op({ op: 'alarm-step', rec: recOf(api), threw: true, error: said }, 'error');
+      /* NOT WHEN THE PLATFORM SAYS IT RESET THE OBJECT ("... caused object to be reset"): that is a cut, said as a throw. */
+      if (!resetSaid(said)) await this.#stepDone();
+      throw e;
+    }
     await this.#stepDone();
     /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
        `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`

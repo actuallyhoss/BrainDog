@@ -338,8 +338,9 @@
   let got = $state<Opened | null>(null);
   /** Whether the first read has come back, so a host that cannot draw Today's body is told from one still reading. */
   let settled = $state(false);
-  /** A read of Home's own is out: `listen` waits for it rather than asking again on top of it. */
-  let reading = false;
+  /** A read of Home's own is out: `listen` waits for it rather than asking again on top of it. STATE, because the board
+      asks Today whole again once it ends (the `phoneOnly` effect), and a plain flag never woke that effect again (R6). */
+  let reading = $state(false);
 
   /**
    * WHAT WAS NEW WHEN HOME'S PAGE WAS LAST READ, which the mark is stamped with on leaving: the record's own cursor for
@@ -666,7 +667,9 @@
     readKey = key;
     readFailed = false;
     /* DRAWN FROM WHAT TODAY LAST DREW, the screen is settled at once, and the read is not bracketed: it lands over it. */
-    const was = untrack(() => got) === null ? keptPart<KeptBody>('body', key) : null;
+    /* NOT A PHONE'S COPY ON A BOARD WIDER THAN A PHONE: the key holds no width, and the copy holds four widgets empty. */
+    const kept = untrack(() => got) === null ? keptPart<KeptBody>('body', key) : null;
+    const was = kept !== null && isPhoneOnly(kept.got) && !untrack(() => narrow.current) ? null : kept;
     if (was) {
       got = was.got;
       news = was.news;
@@ -700,6 +703,9 @@
            nothing, every tile left its cell until the next read. */
         if (out?.from !== 'live' && (was || (untrack(() => got)?.from === 'live' && !untrack(() => fromCopy)))) {
           readFailed = true;
+          /* AND THE SCREEN IS NOT MARKED REFUSED over the page it keeps (review of 30 October, R7): it is closed as drawn,
+             since it is, and the next read asks again (`readFailed`). */
+          ok = true;
           return;
         }
         if (slug === null && out?.from === 'live') tilesBeside(apiBase());
@@ -1023,10 +1029,17 @@
   const phoneOnly = $derived(isPhoneOnly(got));
   /* AND READ AGAIN WHOLE where they are wanted: the board wider than a phone, or the editor, where a hidden widget is
      taken out of the tray. Read quietly over what is drawn, as a new version is. */
+  /* ONCE FOR EACH ANSWER DRAWN: a whole read that fails leaves `got` as it was, and is not asked again until another
+     answer lands, or the effect, now woken by every read's end, would ask it again on every failure. */
+  let wholeAsked: Opened | null = null;
   $effect(() => {
     if (!phoneOnly || (narrow.current && !boardModel.editing && !boardModel.phoneView)) return;
-    /* NOT OVER A READ STILL OUT, which asks whole too and moves `got` when it lands, so this is asked again then if need be. */
+    /* NOT OVER A READ STILL OUT: it may have been asked narrow and trimmed, so this runs again when it ends (`reading` is
+       state) and asks whole then if what landed is still the phone's (review of 30 October, R6). */
     if (reading) return;
+    const now = untrack(() => got);
+    if (now === wholeAsked) return;
+    wholeAsked = now;
     untrack(() => void reread());
   });
 

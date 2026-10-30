@@ -194,3 +194,17 @@ test('a connector that routes sends each row where that row says, and keeps the 
   assert.equal((JSON.parse(sql.one<{ wrote: string }>('SELECT wrote FROM ingest_receipt')!.wrote) as string[]).length, 1);
   sql.close();
 });
+
+/* R5 (review of 30 October): the port refuses U+0000 in any text, so a page whose raw body held one threw at the insert,
+   was never kept, its cursor never moved, and the connector fetched and failed the same page on every run. */
+test('a page whose body holds U+0000 is kept with U+FFFD in its place, and its rows and cursor go on', async () => {
+  const { k, sql } = await record();
+  const out = k.applyPage(page({ raw: { sha256: 'b'.repeat(64), headers: {}, bytes: 9, body: 'ref\u0000what', state: 'review', reason: 'held\u0000' } }));
+  assert.ok(out.ok, fixOf(out));
+  assert.deepEqual(out.value, { wrote: 2, kept: 0 });
+  const kept = sql.one<{ body: string; reason: string; sha256: string }>("SELECT body, reason, sha256 FROM inbox_raw WHERE channel = 'pull'")!;
+  assert.equal(kept.body, 'ref�what');
+  assert.equal(kept.reason, 'held�');
+  assert.equal(kept.sha256, 'b'.repeat(64), 'the hash is the one taken over the bytes as they came');
+  sql.close();
+});

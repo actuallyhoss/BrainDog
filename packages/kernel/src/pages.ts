@@ -1309,7 +1309,11 @@ export type WholeAsk = {
  * or unit the amounts were in (`null` for a bare number), their day, their sum, and how many rows there were and how
  * many of them held a value. Two currencies are two groups, so nothing is added across them here.
  */
-export type WholePart = { by: Json[]; unit: string | null; day: string | null; sum: number; rows: number; said: number };
+/**
+ * `rows` counts what was added up, a split row once a part; `entries`, where a host says it, counts the rows themselves,
+ * so a split row is one (review of 30 October, R14). Absent, it is `rows`.
+ */
+export type WholePart = { by: Json[]; unit: string | null; day: string | null; sum: number; rows: number; said: number; entries?: number };
 
 /** One part of a block that adds up: a label as the rows hold it, never a name made up here. */
 export type WholeRow = {
@@ -4121,6 +4125,8 @@ function wholeParts(deps: PageDeps, ask: WholeAsk, split: string | null = null):
     return long ? { ok: false, refusal: long } : (late() ?? got);
   }
   const groups = new Map<string, WholePart>();
+  /* EACH GROUP'S ROWS BY ID, so a split row's parts under one label count it once (`entries`). */
+  const ids = new Map<string, Set<string>>();
   let cursor: string | undefined;
   let walked = 0;
   do {
@@ -4140,8 +4146,13 @@ function wholeParts(deps: PageDeps, ask: WholeAsk, split: string | null = null):
       const on = ask.dated === null || amount === null ? null : row.fields[ask.dated];
       const day = typeof on === 'string' && on.length >= 10 ? on.slice(0, 10) : null;
       const key = JSON.stringify([by, amount?.unit ?? null, day]);
-      const group = groups.get(key) ?? { by, unit: amount?.unit ?? null, day, sum: 0, rows: 0, said: 0 };
+      const group = groups.get(key) ?? { by, unit: amount?.unit ?? null, day, sum: 0, rows: 0, said: 0, entries: 0 };
       group.rows += 1;
+      const seen = ids.get(key) ?? new Set<string>();
+      const id = (row as { id?: unknown }).id;
+      if (typeof id !== 'string' || id === '' || !seen.has(id)) group.entries = (group.entries ?? 0) + 1;
+      if (typeof id === 'string' && id !== '') seen.add(id);
+      ids.set(key, seen);
       if (amount) {
         group.sum += amount.n;
         group.said += 1;
@@ -4159,10 +4170,11 @@ function wholeParts(deps: PageDeps, ask: WholeAsk, split: string | null = null):
 const SUMMED: ReadonlySet<string> = new Set(['int', 'decimal', 'duration', 'money', 'quantity']);
 
 /** What some rows add up to while they are being gathered: how many, and their amounts by currency and day. */
-type Gathered = { rows: number; said: number; done: number; bare: number; amounts: Amount[] };
-const gathered = (): Gathered => ({ rows: 0, said: 0, done: 0, bare: 0, amounts: [] });
+type Gathered = { rows: number; entries: number; said: number; done: number; bare: number; amounts: Amount[] };
+const gathered = (): Gathered => ({ rows: 0, entries: 0, said: 0, done: 0, bare: 0, amounts: [] });
 const gather = (into: Gathered, part: WholePart, done: boolean): void => {
   into.rows += part.rows;
+  into.entries += part.entries ?? part.rows;
   into.said += part.said;
   if (done) into.done += part.rows;
   if (part.said === 0) return;
@@ -4322,12 +4334,14 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   const kept = heat ? parts : parts.slice(0, WHOLE_PARTS);
   const rows = kept.map(({ label, who, sum, last, figure: { converted: _at, ...f } }): WholeRow => {
     const share = heat && whole !== null ? { of: figure(wholes.get(label as string) ?? gathered()).value } : shape.done ? { of: sum.rows } : {};
-    return { label, ...(who === undefined ? {} : { who }), rows: sum.rows, ...f, ...share, ...(last === undefined ? {} : { last }) };
+    /* ROWS, NOT PARTS: a payee's one payment split over three categories is one row of his (`entries`, R14). */
+    return { label, ...(who === undefined ? {} : { who }), rows: sum.entries, ...f, ...share, ...(last === undefined ? {} : { last }) };
   });
   const past = parts.slice(kept.length);
   const tail = gathered();
   for (const g of past) {
     tail.rows += g.sum.rows;
+    tail.entries += g.sum.entries;
     tail.said += g.sum.said;
     tail.done += g.sum.done;
     tail.bare += g.sum.bare;
@@ -4338,7 +4352,7 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
     rows,
     ...figureTotal(figure(total)),
     ...(heat && whole !== null ? { of: figure(every).value } : shape.done ? { of: total.rows } : {}),
-    ...(past.length > 0 ? { rest: { labels: past.length, rows: tail.rows, ...rest } } : {}),
+    ...(past.length > 0 ? { rest: { labels: past.length, rows: tail.entries, ...rest } } : {}),
     ...(heat ? { outside, outsideDays: outsideDays.size } : {}),
   });
 }

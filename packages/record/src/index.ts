@@ -5369,6 +5369,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   let headlineWalk: { day: string; again: boolean; order: string[]; at: number; due: HeadlineDue[]; stamp: string } | null = null;
   /**
+   * AND ITS PLACE AS ONE OF SLASH'S PREFS, written before each page is drawn (review of 30 October, R3): a page whose draw
+   * runs past what the platform allows resets the object, and a walk kept in memory alone began again from Home, reached
+   * the same page and was reset again, so the look stalled on the headlines step all day. A new object goes on from the
+   * page AFTER the one being drawn, and draws again only the pages already found owed (`owed`), since what was found is
+   * not kept: a page's blocks as read are too big for a pref.
+   */
+  const HEADLINE_WALK = 'headlines.walk';
+  type KeptWalk = { day: string; again: boolean; order: string[]; at: number; stamp: string; owed: string[] };
+  const keptWalkOf = (): KeptWalk | null => {
+    const raw = kernel.prefsOf(SLASH)[HEADLINE_WALK] as Partial<KeptWalk> | null | undefined;
+    if (raw === null || typeof raw !== 'object' || typeof raw.day !== 'string' || typeof raw.again !== 'boolean' || !Number.isSafeInteger(raw.at)) return null;
+    const words = (v: unknown): string[] => (Array.isArray(v) ? v.filter((w): w is string => typeof w === 'string') : []);
+    return { day: raw.day, again: raw.again, order: words(raw.order), at: raw.at!, stamp: typeof raw.stamp === 'string' ? raw.stamp : '', owed: words(raw.owed) };
+  };
+  const forgetWalk = (): void => {
+    headlineWalk = null;
+    if (keptWalkOf() !== null) kernel.setPref(SLASH, HEADLINE_WALK, null);
+  };
+  /** Whether a later look's walk was cut and waits to go on today, in this object or kept by one before it. */
+  const walkAgainOn = (today: string): boolean => {
+    if (headlineWalk !== null) return headlineWalk.day === today && headlineWalk.again;
+    const kept = keptWalkOf();
+    return kept !== null && kept.day === today && kept.again;
+  };
+  /**
    * THE LAST WALK THAT LEFT NOTHING OWED: the day, the record as it read it, and when. While the record has not moved since
    * (`changeStamp`), the day holds and `LOOK_REWALK_MS` has not passed, a later tick of the day has nothing to find, so it
    * draws no page (`slashHeadlinesAgain`). A walk that left a page out (`HEADLINE_PAGES_MOST`, or an answer too long for
@@ -5383,7 +5408,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const prefs = kernel.prefsOf(SLASH);
     const asked = askedOn(prefs[HEADLINES_ASKED], today);
     if (asked.asks >= HEADLINE_ASKS_DAY) {
-      headlineWalk = null;
+      forgetWalk();
       return { said: [], dropped: [] };
     }
     const pressing = pressingRead(today);
@@ -5397,13 +5422,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        begun again from Home and the first page. */
     const listed = kernel.pages();
     let walk = headlineWalk !== null && headlineWalk.day === today && headlineWalk.again === again ? headlineWalk : null;
-    if (walk === null) {
-      const first: HeadlineDue[] = [];
+    /* NONE IN MEMORY: ONE AN OBJECT BEFORE THIS ONE KEPT (`HEADLINE_WALK`), the same day and kind of look. */
+    const kept = walk === null ? keptWalkOf() : null;
+    const resumed = kept !== null && kept.day === today && kept.again === again && kept.order.length > 0 ? kept : null;
+    const homeDue = (): HeadlineDue[] => {
       const home = homeReading(pressing);
-      if (home !== null) {
-        const basis = homeBasis(home, today);
-        if (owed(HOME_PAGE, basis, undefined)) first.push({ page: home, basis });
-      }
+      if (home === null) return [];
+      const basis = homeBasis(home, today);
+      return owed(HOME_PAGE, basis, undefined) ? [{ page: home, basis }] : [];
+    };
+    if (walk === null && resumed !== null) walk = { day: today, again, order: resumed.order, at: Math.min(resumed.at, resumed.order.length), due: homeDue(), stamp: resumed.stamp };
+    if (walk === null) {
+      const first: HeadlineDue[] = homeDue();
       /* AND THE PAGES PER ROW, A PROJECT'S AMONG THEM (the thinking scope of 24 October): a project's hero said its
          rules' line alone. Pages somebody wrote first, then a page per row, the row touched last first, all under the same
          `HEADLINE_PAGES_MOST`: a page left out is still owed, and a later ask of the day takes it. */
@@ -5411,34 +5441,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const ordered = [...listed.filter((p) => p.about === null), ...listed.filter((p) => p.about !== null).sort((a, b) => touched(b).localeCompare(touched(a)))];
       walk = { day: today, again, order: ordered.map((p) => p.slug), at: 0, due: first, stamp: changeStamp() };
     }
-    headlineWalk = walk;
     const bySlug = new Map(listed.map((p) => [p.slug, p] as const));
-    const due0 = walk.due;
-    let drawn = 0;
-    while (walk.at < walk.order.length) {
-      if (due0.length >= HEADLINE_PAGES_MOST) break;
-      /* A TICK'S SHARE OF THE WALK IS SPENT: the rest waits for the next tick, and nothing is asked until it is read. */
-      if (drawn > 0 && budget.spent()) return { said: [], dropped: [], cut: true };
-      const p = bySlug.get(walk.order[walk.at]!);
-      walk.at++;
-      /* A PAGE GONE SINCE THE WALK BEGAN is passed over, as a page that does not draw is. */
-      if (p === undefined) continue;
-      /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
-      if (p.nav === null || p.slug === HOME_PAGE) continue;
+    /** What one page is owed, drawn now, or `null` for a page that does not draw, has no figures, or is owed nothing. */
+    const dueOf = (p: (typeof listed)[number]): HeadlineDue | null => {
       const row = p.about !== null;
-      drawn++;
-      budget.spend();
       const read = kernel.page(p.slug, undefined, { viewer: NOBODY });
-      if (!read.ok) continue;
+      if (!read.ok) return null;
       const plain = leadBlockOf(read.value.blocks);
-      if (plain === null) continue;
+      if (plain === null) return null;
       /* A PAGE PER ROW IS WRITTEN FROM ITS TILES TOO (`tiledLead`), and so asked again when one of them moves. */
       const lead = row ? tiledLead(plain, read.value.blocks) : plain;
       const basis = headlineBasis(p.slug, lead);
       /* WHAT IS LATE OR DUE ON A LIST IS NOT NAMED ON A PAGE ABOUT ONE ROW: the late task may be another project's. */
       const named = row ? { items: [], question: undefined } : pressingOf(pressing, listsRead(read.value.blocks));
       const facts = factsBasis(named.items, named.question);
-      if (!owed(p.slug, basis, facts)) continue;
+      if (!owed(p.slug, basis, facts)) return null;
       /* HOW FAR EACH FIGURE MOVED, asked of the record in one block over every figure the note names, so the model can say
          "up on last month" from the record's own arithmetic rather than its guess. */
       const holes = [...new Set([...holesOf(lead.body), ...(row ? Object.keys(tileValuesOf(read.value.blocks)) : [])])];
@@ -5461,12 +5478,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const change = typeof changes[`${id}.change`] === 'string' ? (changes[`${id}.change`] as string) : undefined;
         figures.push({ id, value, ...(change === undefined ? {} : { change }) });
       }
-      if (figures.length === 0) continue;
+      if (figures.length === 0) return null;
       /* AND WHAT ITS LOOK IS MADE OF, in the same ask (`compose-look.ts`): its blocks by key and a few rows it draws, so the
          model may answer an order and one next step beside the line, at no ask beyond it. */
       /* NOT ON A PAGE PER ROW, whose order is its template's: one row's page is not arranged apart from the rest. */
       const look = row ? { blocks: [], rows: [] } : lookInputOf(read.value.blocks, (list) => kernel.register(list)?.title ?? null, groupListsOf(kernel));
-      due0.push({
+      return {
         page: {
           page: p.slug,
           title: p.title,
@@ -5482,12 +5499,50 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* THE BLOCKS AS READ, kept beside the ask and never sent in it: where the questions are, for the look step. */
         read: read.value.blocks,
         ...(row ? { row: true as const } : {}),
-      });
+      };
+    };
+    /* A WALK AN OBJECT BEFORE THIS ONE KEPT: what it had found owed is drawn again, and the walk goes on past the page it
+       was drawing when it went. */
+    if (resumed !== null)
+      for (const slug of resumed.owed) {
+        if (walk.due.length >= HEADLINE_PAGES_MOST) break;
+        const p = bySlug.get(slug);
+        if (p === undefined || p.nav === null || p.slug === HOME_PAGE) continue;
+        budget.spend();
+        const d = dueOf(p);
+        if (d !== null) walk.due.push(d);
+      }
+    headlineWalk = walk;
+    const due0 = walk.due;
+    let drawn = 0;
+    while (walk.at < walk.order.length) {
+      if (due0.length >= HEADLINE_PAGES_MOST) break;
+      /* A TICK'S SHARE OF THE WALK IS SPENT: the rest waits for the next tick, and nothing is asked until it is read. */
+      if (drawn > 0 && budget.spent()) return { said: [], dropped: [], cut: true };
+      const p = bySlug.get(walk.order[walk.at]!);
+      walk.at++;
+      /* A PAGE GONE SINCE THE WALK BEGAN is passed over, as a page that does not draw is. */
+      if (p === undefined) continue;
+      /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
+      if (p.nav === null || p.slug === HOME_PAGE) continue;
+      drawn++;
+      budget.spend();
+      /* KEPT BEFORE THE PAGE IS DRAWN, ITS PLACE ALREADY PAST IT: an object reset in the draw goes on from the next. */
+      kernel.setPref(SLASH, HEADLINE_WALK, {
+        day: walk.day,
+        again: walk.again,
+        order: walk.order,
+        at: walk.at,
+        stamp: walk.stamp,
+        owed: due0.filter((d) => d.page.page !== HOME_PAGE).map((d) => d.page.page),
+      } satisfies KeptWalk);
+      const d = dueOf(p);
+      if (d !== null) due0.push(d);
     }
     /* THE WALK HAS READ WHAT IT WILL: a page it left unread is one `HEADLINE_PAGES_MOST` left out, still owed. */
     const leftOut = walk.at < walk.order.length;
     const walked = walk.stamp;
-    headlineWalk = null;
+    forgetWalk();
     let due = due0;
     /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`): each page whose basis moved
        is kept with when it was first seen owed (`HEADLINES_OWED`), and none is asked about until `HEADLINE_OWED_MS` after
@@ -5579,7 +5634,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * walk was cut again, so the host comes back for the rest.
    */
   const slashHeadlinesAgain = async (today: string, budget: TickBudget = UNBOUNDED): Promise<boolean> => {
-    if (headlineWalk !== null && headlineWalk.day === today && headlineWalk.again) return (await slashHeadlines(today, true, budget)).cut === true;
+    if (walkAgainOn(today)) return (await slashHeadlines(today, true, budget)).cut === true;
     if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return false;
     headlinesLooked = clock.now();
     const prefs = kernel.prefsOf(SLASH);
@@ -5593,7 +5648,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** Whether `slashHeadlinesAgain` would draw a page now: what a request asks before it wakes the alarm for it (`slashTick`'s `defer`). */
   const headlinesAgainDue = (today: string): boolean => {
     if (!deps.slashModel?.headline) return false;
-    if (headlineWalk !== null && headlineWalk.day === today && headlineWalk.again) return true;
+    if (walkAgainOn(today)) return true;
     if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return false;
     const prefs = kernel.prefsOf(SLASH);
     if (askedOn(prefs[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return false;
