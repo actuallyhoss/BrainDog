@@ -37,7 +37,7 @@
 
 import { NOBODY, instant, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
-import { TYPED, dateSaid, formatTyped, writeAmount, type TypedForm } from 'braindog-render';
+import { TYPED, dateSaid, formatTyped, kindSpec, splitRow, writeAmount, type TypedForm } from 'braindog-render';
 import { ok } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
@@ -409,6 +409,84 @@ const sentencesKept = (text: string): string =>
     .join(' ')
     .trim();
 
+/** Every `{{…}}` key in a piece of text, as `filledIn` reads them. */
+const keysIn = (text: string): string[] => [...text.matchAll(/\{\{\s*([^}]*?)\s*\}\}/gu)].map((m) => m[1]!);
+
+/** A cell put back as `splitRow` reads it, with its own pipes and backslashes escaped. */
+const cellWritten = (cell: string): string => cell.replace(/[\\|]/gu, (c) => `\\${c}`);
+
+/** A table's rule line under its head (`|---|:--:|`), which holds no value. */
+const RULE = /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$/u;
+
+/**
+ * A NOTE'S TABLE WITH ITS AMOUNTS KEPT OFF (PH3), before anything is filled: each table's rows, a fence's or lines led by
+ * `|`, as `money` says which `{{…}}` is an amount the link keeps off.
+ *
+ * A CELL THAT HELD AN AMOUNT IS EMPTIED WHOLE, since its other words say the amount ("{{money:4100 GBP}} a month" left
+ * "Object storage | a month"). AND A COLUMN WHOSE EVERY VALUE IS AN AMOUNT GOES, its head and rule with it, where a
+ * table's columns are named by a head: lines led by `|`, and a fence whose first row is its head (`comparison`,
+ * `cards`). A fence whose cells mean their place (`spec` is name, value, note) keeps the place empty, since the next cell
+ * would move into it. Every row stays.
+ */
+const moneyCellsOut = (lines: readonly string[], money: (key: string) => boolean): string[] => {
+  const out = [...lines];
+  const amountIn = (cell: string): boolean => keysIn(cell).some(money);
+  /* ONE TABLE: the indices of its rows, whether its first row is a head, and whether a whole column may go. */
+  const table = (at: readonly number[], headed: boolean, ruled: boolean, piped: boolean, drops: boolean) => {
+    const rows = at.map((i) => {
+      const line = out[i]!;
+      const lead = /^\s*/u.exec(line)![0];
+      let cells = splitRow(line.trim());
+      if (piped) cells = cells.slice(line.trim().startsWith('|') ? 1 : 0, line.trim().endsWith('|') && !line.trim().endsWith('\\|') ? -1 : undefined);
+      return { i, lead, cells };
+    });
+    const body = rows.filter((_, n) => !(headed && n === 0) && !(ruled && n === 1));
+    if (!body.some((r) => r.cells.some(amountIn))) return;
+    const width = Math.max(...rows.map((r) => r.cells.length));
+    const gone = new Set<number>();
+    if (drops)
+      for (let c = 0; c < width; c++) {
+        const said = body.map((r) => r.cells[c] ?? '').filter((cell) => cell !== '');
+        if (said.length > 0 && said.every(amountIn)) gone.add(c);
+      }
+    for (const [n, r] of rows.entries()) {
+      const isBody = !(headed && n === 0) && !(ruled && n === 1);
+      if (!(isBody && r.cells.some(amountIn)) && !r.cells.some((_, c) => gone.has(c))) continue;
+      const cells = r.cells.flatMap((cell, c) => (gone.has(c) ? [] : [isBody && amountIn(cell) ? '' : cell]));
+      const written = cells.map(cellWritten).join(' | ');
+      out[r.i] = piped ? `${r.lead}| ${written} |` : `${r.lead}${written}`;
+    }
+  };
+  let i = 0;
+  while (i < out.length) {
+    const t = out[i]!.trim();
+    const fence = /^(?:`{3,}|~{3,})\s*([A-Za-z]+(?:\.[A-Za-z0-9_-]+)?)?/u.exec(t);
+    if (fence !== null) {
+      const spec = fence[1] === undefined ? undefined : kindSpec(fence[1]);
+      const at: number[] = [];
+      let j = i + 1;
+      for (; j < out.length && !/^(?:```|~~~)/u.test(out[j]!.trim()); j++) if (out[j]!.includes('|') && out[j]!.trim() !== '') at.push(j);
+      /* A KIND THIS RECORD'S RENDERER DOES NOT NAME (a pack's) is read as rows that mean their place; a fence with no
+         kind, or one of words or code, has no cells. */
+      const rows = spec === undefined ? fence[1] !== undefined : spec.prose !== true && spec.verbatim !== true;
+      if (rows && at.length > 0) table(at, spec?.header === true, false, false, spec?.header === true);
+      i = j + 1;
+      continue;
+    }
+    if (t.startsWith('|')) {
+      const at: number[] = [];
+      let j = i;
+      for (; j < out.length && out[j]!.trim().startsWith('|'); j++) at.push(j);
+      const ruled = at.length > 1 && RULE.test(out[at[1]!]!.trim());
+      table(at, ruled, ruled, true, true);
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  return out;
+};
+
 /**
  * A note's body as a link shows it.
  *
@@ -418,10 +496,16 @@ const sentencesKept = (text: string): string =>
  * "Tracked as ." is not a sentence. In a fence's row the cell is emptied, since its row is the fence's shape; a heading
  * loses the word alone. Lines with nothing gone keep their own breaks.
  */
-const noteShown = (body: string, fill: (key: string) => string | undefined, cellFill: (key: string) => string | undefined): string => {
+const noteShown = (
+  body: string,
+  fill: (key: string) => string | undefined,
+  cellFill: (key: string) => string | undefined,
+  money?: (key: string) => boolean,
+): string => {
   /* A FENCE'S ROW SAYS A DAY AS A DAY ("14 Aug"), since its first cell is a column of them (a timeline's), and prose says
      it as a sentence does ("3 weeks ago"). So each line is filled by what it is. */
-  const lines = wordsShown(body).split('\n');
+  const said = wordsShown(body).split('\n');
+  const lines = money === undefined ? said : moneyCellsOut(said, money);
   let inFence = false;
   const filled = lines.map((line) => {
     const t = line.trim();
@@ -578,7 +662,8 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
   for (const key of LOOKS) if (block[key] !== undefined) kept[key] = block[key];
   const values: Record<string, Json> = isRecord(block.values) ? (block.values as Record<string, Json>) : {};
   const fill = tokenSaid(values, said, typed);
-  for (const key of WORDS) if (typeof kept[key] === 'string') kept[key] = key === 'body' ? noteShown(kept[key], fill, tokenSaid(values, said, cell)) : filledIn(wordsShown(kept[key]), fill);
+  const amount = showing.money ? undefined : amountKey(values);
+  for (const key of WORDS) if (typeof kept[key] === 'string') kept[key] = key === 'body' ? noteShown(kept[key], fill, tokenSaid(values, said, cell), amount) : filledIn(wordsShown(kept[key]), fill);
   if (kept.body === '') delete kept.body;
 
   for (const key of FIGURES) if (block[key] !== undefined) kept[key] = block[key];
@@ -631,7 +716,9 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
     kept.authored = authored.map((row) => ({
       cells:
         isRecord(row) && Array.isArray(row.cells)
-          ? row.cells.map((c) => (!isScalar(c) || inside(c) ? '' : typeof c === 'string' ? filledIn(wordsShown(c), fill) : c))
+          ? row.cells.map((c) =>
+              !isScalar(c) || inside(c) ? '' : typeof c === 'string' ? (amount !== undefined && keysIn(c).some(amount) ? '' : filledIn(wordsShown(c), fill)) : c,
+            )
           : [],
     }));
 
@@ -639,12 +726,29 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
   return kept;
 };
 
+/** Whether a value is an amount, or a list of nothing but amounts: what `moneyKept` says as nothing. */
+const amountValue = (v: unknown): boolean => moneyShown(v) !== undefined || (Array.isArray(v) && v.length > 0 && v.every((m) => moneyShown(m) !== undefined));
+
+/**
+ * Whether one `{{…}}` is an amount a link that keeps money off says as nothing: a path to one, `{{money:…}}` written in or
+ * naming a path, or another typed form naming a path to one. The same keys `moneyKept` and `typedKept` empty.
+ */
+const amountKey = (values: Record<string, Json>) => (key: string): boolean => {
+  if (Object.hasOwn(values, key)) return amountValue(values[key]);
+  const colon = key.indexOf(':');
+  if (colon <= 0) return false;
+  const form = key.slice(0, colon).trim();
+  const arg = key.slice(colon + 1).trim();
+  if (form === 'money') return true;
+  return (TYPED as readonly string[]).includes(form) && /^[A-Za-z]/u.test(arg) && Object.hasOwn(values, arg) && amountValue(values[arg]);
+};
+
 /**
  * HOW A VALUE IS SAID ON A LINK THAT KEEPS MONEY OFF: an amount is said as nothing at all, which a note reads as a hole
  * (`GONE`), so the sentence that held "£18,400" is left out whole and a heading loses the word alone.
  */
 const moneyKept = (money: boolean, said: Showing['said']): Showing['said'] =>
-  money ? said : (v) => (moneyShown(v) !== undefined || (Array.isArray(v) && v.length > 0 && v.every((m) => moneyShown(m) !== undefined)) ? undefined : said(v));
+  money ? said : (v) => (amountValue(v) ? undefined : said(v));
 const typedKept = (money: boolean, typed: Showing['typed']): Showing['typed'] => (money ? typed : (form, arg) => (form === 'money' ? undefined : typed(form, arg)));
 
 /** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
