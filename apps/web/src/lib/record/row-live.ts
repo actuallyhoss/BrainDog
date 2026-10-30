@@ -47,9 +47,14 @@ export type Docs = Record<string, DocValues>;
  */
 export function spokenTargets(fields: Readonly<Record<string, unknown>>, walked: readonly string[]): string[] {
   const out: string[] = [];
-  for (const v of Object.values(fields)) {
-    const to = typeof v === 'string' ? /^([a-z][a-z0-9_]*)#[1-9][0-9]*$/u.exec(v)?.[1] : undefined;
+  const add = (to: string | undefined) => {
     if (to !== undefined && !walked.includes(to) && !out.includes(to)) out.push(to);
+  };
+  for (const v of Object.values(fields)) {
+    if (typeof v === 'string') add(/^([a-z][a-z0-9_]*)#[1-9][0-9]*$/u.exec(v)?.[1]);
+    /* AND A KEY A TOOL NEEDS, held in its list as `header:Authorization=credentials#1` or `NAME=credentials#3`: the walk
+       names the key, so the tool's page says "Sends the Fenwick deploy key in a header" (`tool-facts.ts`). */
+    else if (Array.isArray(v)) for (const e of v) if (typeof e === 'string') add(/=([a-z][a-z0-9_]*)#[1-9][0-9]*$/u.exec(e)?.[1]);
   }
   return out;
 }

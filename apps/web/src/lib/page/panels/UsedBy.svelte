@@ -10,14 +10,15 @@
   A refusal draws nothing, since `usedBy` answers a row the reader cannot read as one that is not there, and a row
   nobody used says so in one sentence.
 
-  Mounted by a key's or a tool's row page, which hands over the row as a person says it, `credentials#3`.
+  Mounted by a key's or a tool's row page, which hands over the row's spoken id, `credentials#3`, to ask with; it is never drawn.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { createClient } from '@braindog/client';
-  import { since } from 'braindog-render';
+  import { agentNamed, since } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
   import { runPath, type UsedByRun } from '$lib/record/keychain.ts';
+  import { machineSaid } from '$lib/record/machine-name.ts';
   import { closed, opened } from '../../ui/screen.svelte.ts';
 
   let { spoken }: { spoken: string } = $props();
@@ -26,6 +27,7 @@
     heading: 'Who used it',
     none: 'No run has used this yet. An agent that opens it is named here.',
     count: (n: number) => (n === 1 ? 'once' : `${n.toLocaleString('en-GB')} times`),
+    anAgent: 'An agent',
   };
 
   let runs = $state<UsedByRun[] | null>(null);
@@ -52,9 +54,12 @@
       <ul class="used-list">
         {#each runs as u (u.run)}
           {@const href = runPath(u.run)}
+          {@const who = agentNamed(u.agent ?? undefined) || words.anAgent}
           <li class="used-row">
-            <span class="used-run">{#if href}<a href={at(href)}>{u.run}</a>{:else}{u.run}{/if}{#if u.agent}{' '}({u.agent}){/if}</span>
-            <span class="used-what">{[u.machine, words.count(u.count), since(u.at, Date.now())].filter(Boolean).join(' · ')}</span>
+            <!-- THE RUN BY ITS AGENT AND ITS MACHINE BY ITS NAME, never "S42 (claude)" over "kiln-mbp": the agent's name opens
+                 the run, and the machine is said as every screen says one (`machineSaid`). -->
+            <span class="used-run">{#if href}<a href={at(href)}>{who}</a>{:else}{who}{/if}</span>
+            <span class="used-what">{[u.machine ? machineSaid(u.machine, (runs ?? []).map((r) => r.machine ?? '').filter(Boolean)) : null, words.count(u.count), since(u.at, Date.now())].filter(Boolean).join(' · ')}</span>
           </li>
         {/each}
       </ul>
