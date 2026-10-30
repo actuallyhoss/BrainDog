@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.30.2',
+      notes: 'A card\'s key number is ticked as "Shown first".',
+    },
+    {
       version: '1.30.1',
       notes: 'A project that leaves the board reads Closed, where it read Finished: its status, the fold in the sidebar and the figures that count them.',
     },

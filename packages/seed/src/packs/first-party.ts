@@ -900,11 +900,13 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   point when cash goes under within 12 weeks, the card second (`page.money`).
  * - money-core 3.33.0, before it shipped (polish-i, PI1): the first line's late figure is the link to the late bills,
  *   and Heads up no longer repeats it (`page.money`).
+ * - portfolio 1.30.2 (audit 31 Oct g, AG22): a card's key number field reads "Shown first", where it read "Leads the
+ *   card". Words only, so a patch step.
  * - work 1.20.1, before it shipped (audit 31 Oct f, AF20): Work's folded groups say how many they hold (`page.work`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.1',
-  portfolio: '1.30.1',
+  portfolio: '1.30.2',
   people: '4.2.2',
   'money-core': '3.33.0',
   estate: '2.6.1',

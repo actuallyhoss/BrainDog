@@ -5388,7 +5388,7 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
  },
  "portfolio": {
   "version": "1.30.0",
-  "now": "1.30.1",
+  "now": "1.30.2",
   "added": [],
   "was": {
    "register.things#0": {

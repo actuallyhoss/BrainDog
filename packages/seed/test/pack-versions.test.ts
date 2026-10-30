@@ -2716,9 +2716,10 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: 'd1e4904c80834e27',
+    declares: 'f06ef80069526206',
     history: [
       'People 4.2.2 of 30 October: `page.people` says who may be listed twice in plainer words; no id added or taken away -> d1e4904c80834e27',
+      'Before 4.2.2 shipped, `page.people` offers "Add a person" in its head; no id added or taken away -> f06ef80069526206',
     ],
   },
 
@@ -2746,10 +2747,11 @@ const DECLARED: Record<string, Version> = {
     holds: `
       page.activity page.calendar page.health page.scripts
     `,
-    declares: '76619a71f70182cd',
+    declares: 'b4b0857fc5935c85',
     history: [
       'Core 1.2.1 of 30 October: `page.health` shows every card not checked yet; no id added or taken away -> f519178d239ec8dc',
       'Before 1.2.1 shipped, `page.scripts` says "Every script you have"; no id added or taken away -> 76619a71f70182cd',
+      'Before 1.2.1 shipped, `page.health` drops its two "checks have not run yet" lines and the signs read in plain words; no id added or taken away -> b4b0857fc5935c85',
     ],
   },
 
@@ -3059,6 +3061,24 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 1.17.0: `page.portfolio` says its place on the rail, `nav.place` 30, lowest first; no id added or taken away -> accdb3abd217d7d7",
     ],
   },
+  'portfolio@1.30.2': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning
+      metric.projects-live metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track
+      metric.projects-parked metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: '9e3c40db2ccbc3c3',
+    history: [
+      'Portfolio 1.30.2 (audit 31 Oct g, AG22): `register.things` key-number field `headline` reads "Shown first"; no id added or taken away -> 9e3c40db2ccbc3c3',
+    ],
+  },
+
   /* WHAT WAS WORKED ON A PROJECT THIS WEEK, a figure over tasks and so Work's (batch 46). 1.17.0 IS RELEASED. */
   'work@1.18.0': {
     holds: `

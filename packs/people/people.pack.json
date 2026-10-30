@@ -126,6 +126,7 @@
       "nav": { "section": "People", "order": 10, "place": 50 },
       "icon": "people",
       "requires": [ "register.people", "register.organisations" ],
+      "header": { "action": { "verb": "row.create", "label": "Add a person" } },
       "blocks": [
         {
           "kind": "note",
