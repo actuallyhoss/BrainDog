@@ -71,6 +71,8 @@ export function read<T>(
 
   /** `opened()` tokens for the calls still out, by ticket, so a screen that goes away can close what it opened. */
   const out = new Map<number, number>();
+  /** And the tokens `ask` opens around a question asked out loud, for the same reason (review of 30 October, R8). */
+  const asks = new Set<number>();
   let gone = false;
 
   /**
@@ -81,10 +83,12 @@ export function read<T>(
    */
   async function ask(k: string | null, quiet = false): Promise<void> {
     const asked = quiet || k === null ? null : opened();
+    if (asked !== null) asks.add(asked);
     try {
       await asking_(k, quiet);
     } finally {
-      if (asked !== null) closedAfter(true, asked);
+      /* GONE ALREADY, the teardown closed it: a screen that is not there draws nothing to close after. */
+      if (asked !== null && asks.delete(asked) && !gone) closedAfter(true, asked);
     }
   }
 
@@ -214,6 +218,10 @@ export function read<T>(
     gone = true;
     for (const at of out.values()) closed(true, at);
     out.clear();
+    /* AND THE QUESTION ASKED OUT LOUD AROUND THEM, which held the route unsettled until its fetch came back, or for good
+       where it hung (R8). */
+    for (const at of asks) closed(true, at);
+    asks.clear();
   });
 
   return {
