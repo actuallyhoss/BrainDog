@@ -157,7 +157,8 @@ export type HeldDeps = {
    * Tell the Directory what verifies a door, as the record has just answered it (`door$`): a token's digest,
    * `SIGNED_DOOR`, or `null` for a door that is gone or verified by nothing. Asked on the door's first ask while the
    * record is up, so the Directory learns each door from its own traffic and follows a token minted again. Absent, it
-   * learns nothing and keeps only what it was already told.
+   * learns nothing and keeps only what it was already told. The record also tells all its doors at once from its alarm,
+   * once a deploy and after a mint (`Record$` `#doors`, DR1), so a door is known before its first arrival.
    */
   learn?: (rec: string, ingest: string, sign: string | null) => Promise<unknown>;
   bucket: HeldBucket | undefined;
