@@ -272,3 +272,23 @@ test('the words for the reasons the queue’s card leaves out count them plainly
   assert.equal(moreReasons(1), 'and one more reason');
   assert.equal(moreReasons(51), 'and 51 more reasons');
 });
+
+test('a note is read as the note: the place it moves, under its heading, and the words it adds', async () => {
+  const { noteChangeOf, notePartsOf, phraseSaid } = await import('./changes.ts');
+  const before = '# Kiln\n\nEarning, licensed direct. {{money:1840000 GBP}} in the last twelve months.\n\n## Money\n\n```bar | By channel\nDirect | 11200\n```\n';
+  const after = before.replace('licensed direct.', 'licensed direct and through two resellers.');
+  assert.deepEqual(notePartsOf(before), ['# Kiln', 'Earning, licensed direct. {{money:1840000 GBP}} in the last twelve months.', '## Money', '```bar | By channel\nDirect | 11200\n```']);
+  const note = noteChangeOf(before, after, 'Kiln', undefined, 'GBP');
+  assert.equal(note.said, 'Adds “and through two resellers”');
+  assert.equal(note.parts.length, 1);
+  /* The heading is the row's own name, drawn over it already. */
+  assert.equal(note.parts[0]!.under, null);
+  assert.equal(note.parts[0]!.before.length, 1);
+  assert.equal(note.parts[0]!.after.length, 1);
+  assert.equal(noteChangeOf(before, after, 'Other').parts[0]!.under, 'Kiln');
+  assert.equal(phraseSaid('Pay £5 now.', 'Pay now.'), 'Takes out “£5”');
+  assert.equal(phraseSaid('Ship in May.', 'Ship in June.'), 'Changes “May” to “June”');
+  /* No figure is said with its code where the record keeps pounds. */
+  assert.equal(phraseSaid('Raised.', 'Raised {{money:1840000 GBP}}.', undefined, 'GBP'), 'Adds “£18,400”');
+  assert.equal(noteChangeOf('# A\n\none\n\ntwo', '# A\n\nuno\n\ntwo\n\nthree').said, 'Changes 2 places');
+});

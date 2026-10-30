@@ -359,7 +359,7 @@
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. A merge's
      patches are the card's names, and drawn as a diff they were the record's handles and a deleted day. */
-  const updates = $derived(question && live && !merge ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers, live.names)) : []);
+  const updates = $derived(question && live && !merge ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers, live.names), homeCurrency()) : []);
 
   /* A QUESTION THAT GATHERED SEVERAL, each arrival joining the one already open (`kernel/ingest.ts` `openRowset`), says
      how many it holds beside its title, so a reader never accepts twelve having read one. */

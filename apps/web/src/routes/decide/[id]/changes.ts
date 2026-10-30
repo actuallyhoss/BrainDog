@@ -8,7 +8,7 @@
  * PURE: the declarations, the rows and the formatter are handed in, so `node --test` reads it.
  */
 
-import { TYPED, day, diffRows, formatTyped, type Block, type TypedForm } from 'braindog-render';
+import { TYPED, day, diffRows, formatTyped, writeAmount, type Block, type TypedForm } from 'braindog-render';
 
 /**
  * AN INSTANT THE FORMATTER HANDED BACK UNTOUCHED IS DRAWN AS A DAY, the way every other date in the
@@ -40,7 +40,7 @@ export const words = {
 export type Moved = { to: string; before: string | null; after: string | null; said?: { before: string | null; after: string | null } };
 
 export type Change =
-  | { field: string; label: string; long: true; block: Block }
+  | { field: string; label: string; long: true; block: Block; note?: NoteChange }
   | { field: string; label: string; long: false; before: string | null; after: string | null; scope?: Moved };
 
 /**
@@ -112,18 +112,174 @@ const text = (v: unknown): string => (v === null || v === undefined ? '' : typeo
  * argument does not parse stays as the author typed it.
  */
 const TOKEN = new RegExp(String.raw`\{\{(${TYPED.join('|')}):([^{}|]*)\}\}`, 'gu');
-export const filled = (s: string, now?: number): string =>
-  s.replace(TOKEN, (whole, form: string, arg: string) => formatTyped(form as TypedForm, arg, now) ?? whole);
+
+/**
+ * AN AMOUNT IS THE ONE WRITER'S, against the record's home currency: "£18,400" on a record kept in pounds, as every
+ * other screen says it, and never the formatter's bare "GBP 18,400.00". A record with no home keeps the formatter's.
+ */
+const moneySaid = (arg: string, home: string | null): string | null => {
+  const m = /^(-?\d+)\s+([A-Z]{3})$/u.exec(arg.trim());
+  return m ? (writeAmount({ minor: BigInt(m[1]!), currency: m[2]! }, home, 'read')?.text ?? null) : null;
+};
+
+export const filled = (s: string, now?: number, home: string | null = null): string =>
+  s.replace(TOKEN, (whole, form: string, arg: string) => (form === 'money' && home !== null ? moneySaid(arg, home) : formatTyped(form as TypedForm, arg, now)) ?? whole);
 
 /** A `diff` block, as a fence of `- `, `+ ` and two-space rows would parse, with typed tokens filled. */
-export const diffBlock = (before: string, after: string): Block => ({
+export const diffBlock = (before: string, after: string, home: string | null = null): Block => ({
   type: 'block',
   kind: 'diff',
-  rows: diffRows(filled(before), filled(after)).map((line) => ({ cells: [line] })),
+  rows: diffRows(filled(before, undefined, home), filled(after, undefined, home)).map((line) => ({ cells: [line] })),
   raw: '',
   start: 0,
   end: 0,
 });
+
+/* ── A NOTE'S CHANGE ─────────────────────────────────────────────────────────
+   A note (a `document` field) is read as the note, drawn by the app's own renderer, and never as its source. Its
+   source diff put "# Kiln", "## 1 · Where the money comes from" and "GBP 18,400.00" in front of the press that
+   accepts it. So a note's change is the parts of the note that move, each as written before and as it would read
+   after, with the heading it sits under, and one sentence that says the change where a sentence can. */
+
+/**
+ * ONE PLACE A NOTE CHANGES: the parts (a paragraph, a list, a heading or a fence, each whole) it held there and the
+ * ones it would hold, in the note's own source for the renderer to draw, and the heading they sit under.
+ */
+export type NotePart = { under: string | null; before: string[]; after: string[] };
+export type NoteChange = { parts: NotePart[]; said: string };
+
+export const noteWords = {
+  adds: (what: string) => `Adds “${what}”`,
+  takesOut: (what: string) => `Takes out “${what}”`,
+  changes: (was: string, now: string) => `Changes “${was}” to “${now}”`,
+  places: (n: number) => (n === 1 ? 'Changes one place' : `Changes ${String(n)} places`),
+  under: (heading: string) => `Under “${heading}”`,
+} as const;
+
+/** A note's source as its parts: a fence whole, a heading alone, and every other run of lines up to a blank one. */
+export function notePartsOf(source: string): string[] {
+  const out: string[] = [];
+  let run: string[] = [];
+  let fence: string | null = null;
+  const flush = () => {
+    if (run.length > 0) out.push(run.join('\n'));
+    run = [];
+  };
+  for (const line of source.replace(/\r\n?/gu, '\n').split('\n')) {
+    const t = line.trim();
+    if (fence !== null) {
+      run.push(line);
+      if (t.startsWith(fence) && t.replace(/[`~]/gu, '') === '') {
+        fence = null;
+        flush();
+      }
+      continue;
+    }
+    const open = /^(`{3,}|~{3,})/u.exec(t);
+    if (open) {
+      flush();
+      fence = open[1]!;
+      run.push(line);
+    } else if (t === '') flush();
+    else if (/^#{1,6}\s/u.test(t)) {
+      flush();
+      out.push(t);
+    } else run.push(line);
+  }
+  flush();
+  return out;
+}
+
+type Op = { op: 'same' | 'del' | 'add'; part: string };
+
+/** The longest run the two lists share, as same, taken out and put in, in the note's order. */
+function opsOf(a: readonly string[], b: readonly string[]): Op[] {
+  const n = a.length;
+  const m = b.length;
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+  const out: Op[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      out.push({ op: 'same', part: a[i]! });
+      i++;
+      j++;
+    } else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) out.push({ op: 'del', part: a[i++]! });
+    else out.push({ op: 'add', part: b[j++]! });
+  }
+  while (i < n) out.push({ op: 'del', part: a[i++]! });
+  while (j < m) out.push({ op: 'add', part: b[j++]! });
+  return out;
+}
+
+const HEADING = /^#{1,6}\s+(.*)$/u;
+const isFence = (part: string): boolean => /^\s*(?:`{3,}|~{3,})/u.test(part);
+
+/** What a part says as plain words: its tokens filled, its marks of emphasis and its list bullets gone. */
+const plainOf = (part: string, now: number | undefined, home: string | null): string =>
+  filled(part, now, home)
+    .replace(/^#{1,6}\s+/u, '')
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gmu, '')
+    .replace(/\*\*|__|[*`]/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+
+/** Words, runs of marks and runs of space, so "direct." and "direct and … resellers." share "direct" and ".". */
+const tokensOf = (s: string): string[] => s.match(/[\p{L}\p{N}]+(?:['’][\p{L}]+)*|\s+|[^\s\p{L}\p{N}]+/gu) ?? [];
+
+/** Past this, a phrase is not quoted: the parts drawn under it say it. */
+const PHRASE = 80;
+
+/**
+ * THE ONE SENTENCE A CHANGE OF ONE PART IS: the words put in ("Adds “and through two resellers”"), taken out, or the
+ * words that took the place of others, found by what the two sides share at each end. `null` where no short phrase says
+ * it: a fence, a part added or taken out whole, or a rewrite past a phrase.
+ */
+export function phraseSaid(before: string, after: string, now?: number, home: string | null = null): string | null {
+  if (isFence(before) || isFence(after)) return null;
+  const a = tokensOf(plainOf(before, now, home));
+  const b = tokensOf(plainOf(after, now, home));
+  let p = 0;
+  while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let s = 0;
+  while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+  const was = a.slice(p, a.length - s).join('').trim();
+  const put = b.slice(p, b.length - s).join('').trim();
+  if (was.length > PHRASE || put.length > PHRASE) return null;
+  if (was === '' && put !== '') return noteWords.adds(put);
+  if (put === '' && was !== '') return noteWords.takesOut(was);
+  if (was !== '' && put !== '') return noteWords.changes(was, put);
+  return null;
+}
+
+/**
+ * A NOTE'S CHANGE: the places it moves, each with the heading it sits under (left out where that heading is the row's
+ * own name, which is drawn over it already), and the sentence that says it.
+ */
+export function noteChangeOf(before: string, after: string, title: string | null = null, now?: number, home: string | null = null): NoteChange {
+  const ops = opsOf(notePartsOf(before), notePartsOf(after));
+  const parts: NotePart[] = [];
+  let under: string | null = null;
+  let open: NotePart | null = null;
+  for (const o of ops) {
+    if (o.op === 'same') {
+      open = null;
+    } else {
+      if (open === null) {
+        const said = under === null ? null : plainOf(under, now, home);
+        open = { under: said !== null && said !== '' && said !== title?.trim() ? said : null, before: [], after: [] };
+        parts.push(open);
+      }
+      (o.op === 'del' ? open.before : open.after).push(o.part);
+    }
+    if (o.op !== 'del' && HEADING.test(o.part.trim())) under = o.part.trim();
+  }
+  const one = parts.length === 1 && parts[0]!.before.length === 1 && parts[0]!.after.length === 1 ? parts[0]! : null;
+  const phrase = one ? phraseSaid(one.before[0]!, one.after[0]!, now, home) : null;
+  return { parts, said: phrase ?? noteWords.places(Math.max(parts.length, 1)) };
+}
 
 /** Whether a field's change is prose to diff rather than a value to show twice. */
 export function isLong(type: string, before: unknown, after: unknown): boolean {
@@ -189,6 +345,7 @@ export function updatesOf(
   registers: Readonly<Record<string, Decl | undefined>>,
   rows: Readonly<Record<string, readonly Row[] | undefined>>,
   show: (register: string, field: string, value: unknown) => string | null,
+  home: string | null = null,
 ): Updated[] {
   if (!body) return [];
   const out: Updated[] = [];
@@ -230,7 +387,14 @@ export function updatesOf(
               scope: { to: f.to, before: placeSaid(before), after: placeSaid(after), said: { before: show(list, field, before), after: show(list, field, after) } },
             }
           : isLong(f?.type ?? 'text', before, after)
-            ? { field, label, long: true, block: diffBlock(text(before), text(after)) }
+            ? {
+                field,
+                label,
+                long: true,
+                block: diffBlock(text(before), text(after), home),
+                /* A NOTE IS READ AS THE NOTE: the places it moves, drawn by the renderer, and not its source. */
+                ...(f?.type === 'document' ? notePartOf(text(before), text(after), titleOf(decl, row), home) : {}),
+              }
             : { field, label, long: false, before: dated(show(list, field, before)), after: dated(show(list, field, after)) },
       );
     }
@@ -252,6 +416,18 @@ export function updatesOf(
   }
   return out;
 }
+
+/** A note's change where one part of it moves; a change of spacing alone keeps the line diff that shows it. */
+const notePartOf = (before: string, after: string, title: string | null, home: string | null): { note?: NoteChange } => {
+  const note = noteChangeOf(before, after, title, undefined, home);
+  return note.parts.length > 0 ? { note } : {};
+};
+
+/** A row's own name, as its list declares its title, or `null`. */
+const titleOf = (decl: Decl | undefined, row: Row): string | null => {
+  const t = decl?.title ? row.fields[decl.title] : undefined;
+  return typeof t === 'string' && t.trim() !== '' ? t.trim() : null;
+};
 
 /** The keys a create row may carry that are the proposal's and not the row's fields. */
 const NOT_FIELDS = new Set(['at', 'patch', 'version', 'register']);
