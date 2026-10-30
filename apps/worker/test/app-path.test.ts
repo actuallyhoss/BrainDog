@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import type { AuthResult, Who } from '@braindog/ports';
 
 import { assetsReader, type Assets } from '../src/catalogue.ts';
-import { appPath, atRoot, legacyRedirect, unprefixed } from '../src/route.ts';
+import { appPath, atRoot, legacyHosts, legacyRedirect, mcpMetadataAt, unprefixed } from '../src/route.ts';
 import { appEntry, type EntryDeps } from '../src/session.ts';
 
 const SOURCE = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
@@ -294,4 +294,20 @@ test('THE WORKER ASKS ABOUT THE OLD ADDRESSES FIRST, then reads the app, and ser
   assert.match(SOURCE, /bearerOf\(request, 'api', bearerDeps\(env\), slug\)/u, 'the slug does not reach bearerOf');
   assert.match(SOURCE, /directory\.auth\(\{ flow: 'session', sid, \.\.\.\(slug === undefined \? \{\} : \{ slug \}\) \}\)/u, 'the Directory is not asked about the slug');
   assert.match(SOURCE, /relyingParty\(`https:\/\/\$\{host\}`, this\.env\.RP_ID\)/u, 'RP_ID is not read');
+});
+
+/* ── the old name's sign-in ───────────────────────────────────────────── */
+
+test('/MCP’S 401 ON THE OLD NAME NAMES THE OLD NAME’S METADATA, so a client set up with brain.dog/mcp can sign in', () => {
+  const at = (url: string) => mcpMetadataAt(new Request(url, { method: 'POST' }), 'app.brain.dog', 'brain.dog');
+  /* THE CLIENT CHECKS THE METADATA'S `resource` AGAINST THE ADDRESS IT WAS GIVEN: brain.dog's metadata names brain.dog/mcp. */
+  assert.equal(at('https://brain.dog/mcp'), 'https://brain.dog/.well-known/oauth-protected-resource');
+  assert.equal(at('https://BRAIN.dog/mcp'), 'https://brain.dog/.well-known/oauth-protected-resource');
+  assert.equal(at('https://app.brain.dog/mcp'), 'https://app.brain.dog/.well-known/oauth-protected-resource');
+  /* A NAME THAT IS NEITHER IS SENT TO THE PUBLIC HOST, never echoed back: the Host header is the caller's to write. */
+  assert.equal(at('https://evil.example/mcp'), 'https://app.brain.dog/.well-known/oauth-protected-resource');
+  assert.equal(mcpMetadataAt(new Request('https://brain.dog/mcp'), 'app.brain.dog', undefined), 'https://app.brain.dog/.well-known/oauth-protected-resource');
+  assert.equal(mcpMetadataAt(new Request('https://brain.dog/mcp'), undefined, 'brain.dog'), undefined);
+  assert.deepEqual(legacyHosts(' brain.dog, ,Alpha.brain.dog '), ['brain.dog', 'alpha.brain.dog']);
+  assert.ok(SOURCE.includes('mcpMetadataAt(request, env.PUBLIC_HOST, env.LEGACY_HOSTS)'), 'the 401 no longer names the metadata where it was reached');
 });

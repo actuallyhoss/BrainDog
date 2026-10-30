@@ -39,7 +39,7 @@ import type { CallContext } from '@braindog/record';
 import type { SwitcherRow } from '@braindog/record/directory';
 import type { OAuthAnswers, OAuthCall } from '@braindog/record/oauth';
 
-import { inward, isRecordId, servesOAuth, servesOAuthMeta } from './route.ts';
+import { inward, isRecordId, legacyHosts, servesOAuth, servesOAuthMeta } from './route.ts';
 import { doorOf, withCookie, type Deps as SessionDeps, type Held } from './session.ts';
 
 /**
@@ -58,7 +58,7 @@ const DOCUMENT_WAIT_MS = 5_000;
  * imports it and holds the Durable Object classes, and so a test can hand `serveOAuth` plain objects for both.
  */
 type Namespace<I> = { idFromName(name: string): I; get(id: I): unknown };
-export type OAuthEnv<I> = { PUBLIC_HOST?: string | undefined; DIRECTORY: Namespace<I>; RECORD: Namespace<I> };
+export type OAuthEnv<I> = { PUBLIC_HOST?: string | undefined; LEGACY_HOSTS?: string | undefined; DIRECTORY: Namespace<I>; RECORD: Namespace<I> };
 
 /** The Directory's calls this file makes, each an RPC the object already answers, `oauth` with it (a request to `index.ts`). */
 type DirectoryCalls = {
@@ -205,6 +205,13 @@ function wiring<I>(request: Request, env: OAuthEnv<I>, host: string) {
       throw new Error(`The record could not mint an app's key: ${refusal?.code ?? 'CONFLICT'}.`);
     },
     fetchDocument: readDocument,
+    /* THE OLD NAME IS THE SAME RESOURCE. `brain.dog/mcp` still answers (`legacyRedirect` spares it), and an app set up
+       with it, the Claude Code plugin's first address among them, checks the metadata's `resource` against it: its 401
+       sends it to `brain.dog`'s metadata (`mcpMetadataAt`), which names `brain.dog/mcp` from here, and a token minted for
+       either name works at both. */
+    resources: legacyHosts(env.LEGACY_HOSTS)
+      .filter((h) => h !== host.toLowerCase())
+      .map((h) => `https://${h}/mcp`),
   };
   return { deps, session, directory };
 }

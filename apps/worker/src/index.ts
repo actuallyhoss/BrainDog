@@ -93,7 +93,7 @@ import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@brain
 import { shareKeyOf, sharesOf } from './share.ts';
 import { firstReadDoorOf } from './first-read.ts';
 import { consume, pump } from './pump.ts';
-import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
+import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyRedirect, mcpMetadataAt, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { cookieDomain, withSignedIn } from './signed-in.ts';
@@ -4323,8 +4323,9 @@ async function agent(request: Request, env: Env): Promise<Response> {
   if (early) return early;
   const found = await bearerOf(request, 'mcp', bearerDeps(env));
   /* THE 401 NAMES WHERE TO SIGN IN, so an MCP client that holds no token starts OAuth from it (RFC 9728).
-     Without a public host there is no address to name, and the 401 is as it was. */
-  const metadata = env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}/.well-known/oauth-protected-resource` : undefined;
+     On the name it reached, so a client set up with `brain.dog/mcp` reads `brain.dog/mcp` as the resource
+     (`mcpMetadataAt`). Without a public host there is no address to name, and the 401 is as it was. */
+  const metadata = mcpMetadataAt(request, env.PUBLIC_HOST, env.LEGACY_HOSTS);
   if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent(metadata);
   /* THE TOKEN'S MINUTE BEFORE THE RECORD READS THE BODY, and always the MCP budget (`RL_MCP`, else the read one): which tool is called is inside a
      body nobody has parsed yet (`classOf`), and the record still decides whether a write is allowed. */

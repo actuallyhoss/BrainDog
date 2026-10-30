@@ -1,5 +1,5 @@
 {
   "mcpServers": {
-    "braindog": { "type": "http", "url": "https://brain.dog/mcp" }
+    "braindog": { "type": "http", "url": "https://app.brain.dog/mcp" }
   }
 }
