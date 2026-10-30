@@ -63,7 +63,7 @@ The preview a listing carries is the record's drawing of the pack's pages, never
 braindog addon yank reading-list 1.2.0 --reason "The due dates were read a day early."
 ```
 
-A yanked version is never offered again, and a record that holds it is told why. Its number is used up, so the fix goes out as the next version.
+A yanked version is never offered again, and a BrainDog that holds it is told why. Its number is used up, so the fix goes out as the next version.
 
 ## What a published version is
 
