@@ -36,7 +36,7 @@ function rng(seed: number) {
  * How many days after its due date each party pays, by the number a person says. Halden pays on 45
  * days whatever the terms say, which is what Halden Type Co's own row says too (`ORGANISATIONS` in `people.ts`).
  */
-const LATE_BY: Record<number, number> = { 1: 45, 2: 12, 3: 3, 4: 0, 5: 0, 6: 5 };
+export const LATE_BY: Record<number, number> = { 1: 45, 2: 12, 3: 3, 4: 0, 5: 0, 6: 5 };
 
 /** The month a day falls in, `back` months before it, by name: "October". */
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -51,9 +51,10 @@ const monthOf = (iso: string, back: number): string => MONTH_NAMES[(Number(iso.s
  * plan or a renewal) names the month it is due in. "Studio rent" left the list: the rent is the repeating item, one
  * amount a month, and a bill of any other size called rent was a second rent.
  *
- * THE DRAWS STAY IN THEIR ORDER AND THEIR NUMBER, and every amount, day and state is the one it was. Lateness is still
- * the drawn party's habit, so each paid row was paid on the day it was before, and every night of cash worked back from
- * them reads the same.
+ * THE DRAWS STAY IN THEIR ORDER AND THEIR NUMBER, and every amount, due day and state is the one it was. A paid row is
+ * settled on the habit of the party it names (review 30 Oct, R15): an invoice to Halden 45 days late, to Ravensworth 12,
+ * and a cost with nobody named on its day. It was the drawn number's habit, which is no longer the party's, so an
+ * invoice to Halden could be paid on Ravensworth's 12 days. The nights worked back from the rows follow on their own.
  */
 const COSTS = ['Hosting, quarterly', 'Font licence renewal', 'Legal review', 'Print run', 'Photography day rate', 'Translation batch', 'Cloud storage, annual', 'Audit fee', 'Courier account', 'Studio repairs'];
 /** What a client is invoiced for, one for each cost above, drawn by the same number. */
@@ -106,8 +107,8 @@ function generatedObligations(count: number): Fields[] {
       thing: Math.floor(r() * 4) + 1,
       note: '',
       category: owedToMe ? 'client_work' : (spent[kind] ?? 'other'),
-      /* Paid when the party pays, never later than yesterday: each party is late by its own habit. */
-      ...(state === 'paid' ? { settled: day(Math.min(dueIn + (LATE_BY[drawn] ?? 0), -1)) } : {}),
+      /* Paid when the party pays, never later than yesterday: each party is late by its own habit, the one it names. */
+      ...(state === 'paid' ? { settled: day(Math.min(dueIn + (party === null ? 0 : (LATE_BY[party] ?? 0)), -1)) } : {}),
     });
   }
   return out;
