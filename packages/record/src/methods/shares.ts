@@ -640,10 +640,64 @@ export function methods(deps: RecordDeps) {
 
   /** The `share.open` of one link, or `undefined` for an id this record never opened. */
   const openedOf = (id: string) =>
-    sql.one<{ actor: string; slug: string | null; opened_at: string; expires_at: string | null }>(
-      "SELECT actor, field AS slug, ts AS opened_at, to_v AS expires_at FROM event WHERE target = ? AND kind = 'share.open' LIMIT 1",
+    sql.one<{ actor: string; slug: string | null; opened_at: string; expires_at: string | null; bound: string | null }>(
+      "SELECT actor, field AS slug, ts AS opened_at, to_v AS expires_at, from_v AS bound FROM event WHERE target = ? AND kind = 'share.open' LIMIT 1",
       `share:${id}`,
     );
+
+  /**
+   * How many times a page's declaration has been taken out: its newest retired version, or 0. A page taken out and a
+   * page of the same name written later share an id and not this number, so a link made before it opens neither.
+   */
+  const cutOf = (page: string): number =>
+    sql.one<{ v: number | null }>("SELECT max(version) AS v FROM declaration WHERE id = ? AND kind = 'page' AND retired = 1", `page.${page}`)?.v ?? 0;
+
+  /**
+   * What a link was made for (SEC3): the page's declaration, and for a page of a row, the row's list and number. The
+   * slug alone was what a link followed, and a slug is a row's title: rename Acme to Zed and Beta to Acme, and a link
+   * made for Acme's page served Beta's. Written on the link's `share.open` as JSON, in `from_v`, which no line of the
+   * history prints for a link (its `note` is printed, so it stays empty).
+   */
+  type Bound = { page: string; cut: number; register?: string; seq?: number };
+  const boundFor = (slug: string): Bound | null => {
+    const here = kernel.pages().find((p) => p.slug === slug);
+    if (here === undefined) return null;
+    if (here.template === null || here.about === null) return { page: slug, cut: cutOf(slug) };
+    if (typeof here.about.seq !== 'number') return null;
+    return { page: here.template, cut: cutOf(here.template), register: here.about.register, seq: here.about.seq };
+  };
+  const boundOf = (said: string | null): Bound | null => {
+    if (said === null) return null;
+    try {
+      const b = JSON.parse(said) as Partial<Bound>;
+      if (typeof b.page !== 'string' || typeof b.cut !== 'number') return null;
+      if (b.register === undefined) return { page: b.page, cut: b.cut };
+      return typeof b.register === 'string' && typeof b.seq === 'number' ? { page: b.page, cut: b.cut, register: b.register, seq: b.seq } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * The slug a link's page has now, or `null` when what it was made for is gone or has become something else.
+   *
+   * A PAGE OF A ROW IS FOUND BY ITS ROW, so a renamed row's link follows the row to its new address and never stays on
+   * the old one when another row takes it. A page somebody wrote is found by its address, and must still be a page
+   * somebody wrote and never taken out since. A link opened before links were bound carries nothing to find it by, and
+   * is read by its slug as it always was; every such link closes within `SHARE_DAYS_MOST` of being opened.
+   */
+  const whereNow = (opened: { slug: string | null; bound: string | null }): string | null => {
+    if (opened.slug === null) return null;
+    if (opened.bound === null) return opened.slug;
+    const bound = boundOf(opened.bound);
+    if (bound === null || cutOf(bound.page) !== bound.cut) return null;
+    const pages = kernel.pages();
+    const here =
+      bound.register === undefined
+        ? pages.find((p) => p.slug === opened.slug && p.template === null)
+        : pages.find((p) => p.template === bound.page && p.about !== null && p.about.register === bound.register && p.about.seq === bound.seq);
+    return here?.slug ?? null;
+  };
 
   /** When a link was closed, or `null` while it is open. `share.close` is for good, so the first one is the one. */
   const closedAt = (id: string): string | null =>
@@ -713,17 +767,20 @@ export function methods(deps: RecordDeps) {
         return no('OUT_OF_BOUNDS', `A link opens for a whole number of days from 1 to ${SHARE_DAYS_MOST}, and ${SHARE_DAYS} unless you say.`, { at: 'days' });
       if (!kernel.pages().some((p) => p.slug === slug)) return no('PAGE_UNKNOWN', 'There is no such page to share.', { at: 'slug' });
       if (personalPage(slug)) return no('FORBIDDEN', 'This page shows a personal list, which only the owner reads, so no link can open it.', { at: 'slug' });
+      const bound = boundFor(slug);
+      if (bound === null) return no('PAGE_UNKNOWN', 'There is no such page to share.', { at: 'slug' });
       const now = clock.now();
       const id = mint();
       const expires_at = instant(now + days * DAY_MS);
       sql.exec(
-        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v) VALUES (?, ?, ?, 'share.open', ?, 'share', ?, ?)",
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, from_v) VALUES (?, ?, ?, 'share.open', ?, 'share', ?, ?, ?)",
         mint(),
         instant(now),
         ctx.principal.id,
         `share:${id}`,
         slug,
         expires_at,
+        JSON.stringify(bound),
       );
       return tail(ok({ id, slug, expires_at }));
     },
@@ -766,8 +823,8 @@ export function methods(deps: RecordDeps) {
       const stop = admin(ctx, 'list the links to your pages');
       if (stop) return { ok: false, refusal: stop };
       const titles = new Map(kernel.pages().map((p) => [p.slug, p.title]));
-      const rows = sql.all<{ target: string; slug: string | null; opened_at: string; expires_at: string | null; closed_at: string | null }>(
-        `SELECT o.target AS target, o.field AS slug, o.ts AS opened_at, o.to_v AS expires_at,
+      const rows = sql.all<{ target: string; slug: string | null; opened_at: string; expires_at: string | null; closed_at: string | null; bound: string | null }>(
+        `SELECT o.target AS target, o.field AS slug, o.ts AS opened_at, o.to_v AS expires_at, o.from_v AS bound,
                 (SELECT MIN(c.ts) FROM event c WHERE c.target = o.target AND c.kind = 'share.close') AS closed_at
            FROM event o
           WHERE o.target >= ? AND o.target < ? AND o.kind = 'share.open'
@@ -782,7 +839,9 @@ export function methods(deps: RecordDeps) {
         rows.map((r) => ({
           id: r.target.slice('share:'.length),
           slug: r.slug ?? '',
-          title: titles.get(r.slug ?? '') ?? '',
+          /* THE TITLE OF WHAT THE LINK OPENS NOW, found as the link finds it (`whereNow`), so a slug another row has
+             taken since is not shown under this link's name. Empty when it opens nothing. */
+          title: titles.get(whereNow(r) ?? '') ?? '',
           opened_at: r.opened_at,
           expires_at: r.expires_at ?? r.opened_at,
           closed_at: r.closed_at,
@@ -812,11 +871,13 @@ export function methods(deps: RecordDeps) {
       const ends = Date.parse(opened.expires_at);
       if (!Number.isFinite(ends) || clock.now() >= ends) return { ok: false, refusal: SHUT };
       if (closedAt(link.id) !== null || !ownsNow(opened.actor)) return { ok: false, refusal: SHUT };
-      if (!kernel.pages().some((p) => p.slug === link.slug)) return { ok: false, refusal: SHUT };
+      /* THE PAGE THE LINK WAS MADE FOR, found by its declaration and row and not by the slug (SEC3). */
+      const slug = whereNow(opened);
+      if (slug === null || !kernel.pages().some((p) => p.slug === slug)) return { ok: false, refusal: SHUT };
       /* AND A PAGE THAT CAME TO SHOW A PERSONAL LIST AFTER ITS LINK WAS OPENED NO LONGER OPENS. */
-      if (personalPage(link.slug)) return { ok: false, refusal: SHUT };
+      if (personalPage(slug)) return { ok: false, refusal: SHUT };
       /* A LINK IS NOBODY, so a row its maker kept private is not on the shared page. */
-      const out = kernel.page(link.slug, undefined, { viewer: NOBODY });
+      const out = kernel.page(slug, undefined, { viewer: NOBODY });
       if (!out.ok) return { ok: false, refusal: SHUT };
       const identity = kernel.identity();
       const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;
