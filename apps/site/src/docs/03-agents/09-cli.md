@@ -53,7 +53,8 @@ braindog session next <text> | Leave the one next step
 braindog session tried <text> | Add a dead end
 braindog session note <text> | Add a line of reasoning
 braindog session end | End it. --state says idle, handoff or done, and --next leaves a last step
-braindog skills sync | Write your skills where Claude Code reads them, keep a local edit and propose it, and add a skill kept by hand
+braindog skills sync | Keep this machine's skills in step with a BrainDog you own: it says what it would copy and asks once, then writes your skills where Claude Code reads them, proposes a local edit and adds a skill kept by hand
+braindog skills off | Take that yes back: no session copies your skills or records your MCP servers
 braindog tools scan | Record the MCP servers in .mcp.json and ~/.claude.json. A key found there is put in the Keychain, and only its name is recorded
 braindog tools write | Show the Claude Code entries your tools become. --scope user or --scope project writes that one
 ```
