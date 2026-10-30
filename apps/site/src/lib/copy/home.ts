@@ -104,7 +104,8 @@ export const home = {
 
   slash: {
     name: 'Slash',
-    title: 'Press / and ask anything.',
+    /* ⌘J IS ASK, as the app's bar shows it; / is find (audit E18). */
+    title: 'Press ⌘J and ask anything.',
     say: 'Ask about your business in plain words and it answers with your numbers. Ask for a change and it makes it, with an undo. Money, keys, sharing and deletes wait for your yes.',
     tries: 'Try',
     more: 'How Slash works',

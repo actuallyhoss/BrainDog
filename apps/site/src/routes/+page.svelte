@@ -13,7 +13,7 @@
    *   money    Your money, in one place: the app's Money home on Maya's two books, and the add-ons.
    *   chores   red: it does the chores, you make the calls, with questions the desk does not show.
    *   tools    night: your AI tools share one memory, the notes and the connect line.
-   *   slash    Press / and ask anything, the bar and its answer.
+   *   slash    Press ⌘J and ask anything, the bar and its answer.
    *   yours    It stays yours, and free while in early access: the page's last call to action.
    *   faq      Questions.
    *

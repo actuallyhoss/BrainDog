@@ -16,9 +16,9 @@ export const shell = {
         'shares it with Claude and Cursor. Free in early access.',
     },
     slash: {
-      title: 'Slash: press / and ask anything · BrainDog',
+      title: 'Slash: press ⌘J and ask anything · BrainDog',
       description:
-        'Press / anywhere in BrainDog and ask in plain words. Slash answers with your numbers and makes the changes ' +
+        'Press ⌘J anywhere in BrainDog and ask in plain words. Slash answers with your numbers and makes the changes ' +
         'you ask for, each with an undo.',
     },
     pricing: {
