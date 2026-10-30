@@ -674,8 +674,13 @@
     void Promise.all([readBody(slug, spoken, held), slug === null || slug === KEPT_HOME ? null : Promise.race([handledLanded, first])])
       .then(([out]) => {
         if (slug !== declares) return;
-        /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`). */
-        if (was && out?.from !== 'live') return;
+        /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`): what this tab drew, and what
+           the record answered it before, when Today is read again over lists learnt again. Replaced by a refusal or
+           nothing, every tile left its cell until the next read. */
+        if (out?.from !== 'live' && (was || (untrack(() => got)?.from === 'live' && !untrack(() => fromCopy)))) {
+          readFailed = true;
+          return;
+        }
         if (slug === null && out?.from === 'live') tilesBeside(apiBase());
         got = out;
         fromCopy = false;
