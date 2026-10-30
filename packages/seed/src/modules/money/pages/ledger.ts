@@ -149,5 +149,12 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       limit: LEDGER_PAGE_LINES,
       empty: 'No lines match.',
     },
+    {
+      /* THE DOOR TO THE FILING RULES (audit of 30 October, 40): they left Money's More in the sidebar, where a person
+         looking for their money read "Filing rules" and "Snapshots" among the pages, so the page they shape opens them. */
+      kind: 'note',
+      span: 12,
+      body: 'Your [filing rules](/p/money-rules) file lines like these as they come in.',
+    },
   ],
 };
