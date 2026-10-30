@@ -10339,6 +10339,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* AND WHEN THAT ROW LAST CHANGED, because a template's pages now come in a stable order (the order written) and the
            rail's five are the rows touched last, which it can only choose with the time beside each (`boot-live.ts`). */
         about: p.row ? { register: p.row.register, seq: p.row.seq, updated_at: p.row.updated_at } : null,
+        /* AND THAT ROW'S ID, which a row with no number (`series: true`) is found by alone: a shared link to its page is
+           bound to it (`boundFor` in the record's `methods/shares.ts`). Beside `about` and not in it, because `about` is
+           copied whole into `boot`. */
+        row: p.row ? p.row.id : null,
         icon: typeof p.decl.icon === 'string' ? p.decl.icon : null,
         /* THE TEMPLATE A PAGE WAS MADE FROM, by its own `page`, and `null` for a page somebody wrote. Its declaration is
            the template's, so a reader of a page's source (`arrangement({ page })`) finds it by this. `fill` leaves

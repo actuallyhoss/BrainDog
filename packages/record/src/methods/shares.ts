@@ -658,13 +658,16 @@ export function methods(deps: RecordDeps) {
    * made for Acme's page served Beta's. Written on the link's `share.open` as JSON, in `from_v`, which no line of the
    * history prints for a link (its `note` is printed, so it stays empty).
    */
-  type Bound = { page: string; cut: number; register?: string; seq?: number };
+  /* A ROW WITH NO NUMBER (a list of `series: true`, whose rows carry no `seq`) IS BOUND BY ITS ID (RD11). Such a page
+     could not be shared at all once links were bound, "There is no such page to share". */
+  type Bound = { page: string; cut: number; register?: string; seq?: number; row?: string };
   const boundFor = (slug: string): Bound | null => {
     const here = kernel.pages().find((p) => p.slug === slug);
     if (here === undefined) return null;
     if (here.template === null || here.about === null) return { page: slug, cut: cutOf(slug) };
-    if (typeof here.about.seq !== 'number') return null;
-    return { page: here.template, cut: cutOf(here.template), register: here.about.register, seq: here.about.seq };
+    if (typeof here.about.seq === 'number') return { page: here.template, cut: cutOf(here.template), register: here.about.register, seq: here.about.seq };
+    if (typeof here.row === 'string') return { page: here.template, cut: cutOf(here.template), register: here.about.register, row: here.row };
+    return null;
   };
   const boundOf = (said: string | null): Bound | null => {
     if (said === null) return null;
@@ -672,7 +675,9 @@ export function methods(deps: RecordDeps) {
       const b = JSON.parse(said) as Partial<Bound>;
       if (typeof b.page !== 'string' || typeof b.cut !== 'number') return null;
       if (b.register === undefined) return { page: b.page, cut: b.cut };
-      return typeof b.register === 'string' && typeof b.seq === 'number' ? { page: b.page, cut: b.cut, register: b.register, seq: b.seq } : null;
+      if (typeof b.register !== 'string') return null;
+      if (typeof b.seq === 'number') return { page: b.page, cut: b.cut, register: b.register, seq: b.seq };
+      return typeof b.row === 'string' ? { page: b.page, cut: b.cut, register: b.register, row: b.row } : null;
     } catch {
       return null;
     }
@@ -695,7 +700,13 @@ export function methods(deps: RecordDeps) {
     const here =
       bound.register === undefined
         ? pages.find((p) => p.slug === opened.slug && p.template === null)
-        : pages.find((p) => p.template === bound.page && p.about !== null && p.about.register === bound.register && p.about.seq === bound.seq);
+        : pages.find(
+            (p) =>
+              p.template === bound.page &&
+              p.about !== null &&
+              p.about.register === bound.register &&
+              (bound.row === undefined ? p.about.seq === bound.seq : p.row === bound.row),
+          );
     return here?.slug ?? null;
   };
 
