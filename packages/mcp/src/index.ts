@@ -1971,7 +1971,24 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const id = typeof args.withdraw === 'string' ? args.withdraw.trim() : '';
     if (!surface.withdraw) return { result: unbuilt('withdraw', 'The question stays in Decide until the person answers it.') };
     const out = await surface.withdraw({ id }, ctx);
-    if (!out.ok) return { result: out };
+    /* AT `withdraw`, THE ARGUMENT THE AGENT SENT, never the record's `id` (door audit D30); a question that is not there
+       is answered with the call that lists the open ones. */
+    if (!out.ok) {
+      const refusal = 'refusal' in out ? out.refusal : null;
+      if (refusal === null || (refusal.at !== undefined && refusal.at !== 'id')) return { result: out };
+      const gone = refusal.fix.startsWith('There is no ');
+      return {
+        result: {
+          ok: false,
+          refusal: {
+            ...refusal,
+            ...(gone ? { code: 'ROW_UNKNOWN', fix: `${refusal.fix} Your open questions are listed by governance.` } : {}),
+            at: 'withdraw',
+            ...(gone && refusal.try === undefined ? { try: callOf('governance', { register: 'suggestion', status: 'open' }) } : {}),
+          } as Refusal,
+        },
+      };
+    }
     /* SAID BY THE QUESTION'S WORDS WITH ITS HANDLE BESIDE THEM, read before the answer says it, as `log` reads one. */
     const shown = isObject(out.value) && typeof out.value.id === 'string' && out.value.id !== '' ? out.value.id : id;
     const words = await askedAs(shown, ctx);
@@ -2738,6 +2755,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
 
     /* A HIT IS ITS SPOKEN ID, ITS TITLE AND ITS LIST. `rank` is a float the order already says. */
     search: async (args, ctx, turn) => {
+      /* NOTHING TO LOOK FOR IS NOT "nothing found" (door audit D30): an empty search answered as if it had looked. */
+      if (String(args.q ?? '').trim() === '')
+        return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'q is the words to look for, and this one is empty. To read a list whole, list it.', at: 'q', try: callOf('record_index') } as Refusal } };
       const found = await surface.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx);
       if (!found.ok) return { result: found };
       /**
@@ -3388,6 +3408,37 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (best === null) return undefined;
       const at = parse(args.spoken);
       return callOf(name, at ? { ...args, spoken: `${best}#${String(at.seq)}` } : { ...args, register: best });
+    }
+    /* A SENTENCE JOINED BY "and" (door audit D31): the grammar says a comma joins two conditions, and this is the call
+       with the comma. */
+    if (typeof args.where === 'string' && refusal.fix.includes('Conditions are joined by a comma: '))
+      return callOf(name, { ...args, where: args.where.replace(/\s+and\s+/giu, ', ') });
+    /* A `where` THAT NAMES A FIELD THE LIST DOES NOT HAVE, `{"field":"stat"}`: the same where with the field it most
+       likely meant, wherever in the tree it was named. */
+    if (refusal.code === 'FIELD_UNKNOWN' && allowed.length > 0 && typeof refusal.at === 'string' && isObject(args.where)) {
+      const wrong = refusal.at;
+      const best = closest(wrong, allowed.map((id) => ({ id })));
+      if (best === null || best === wrong) return undefined;
+      let moved = false;
+      const mend = (node: unknown): unknown => {
+        if (Array.isArray(node)) return node.map(mend);
+        if (!isObject(node)) return node;
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(node)) {
+          if (k === 'field' && v === wrong) {
+            out[k] = best;
+            moved = true;
+          } else out[k] = k === 'all' || k === 'any' || k === 'none' ? mend(v) : v;
+        }
+        return out;
+      };
+      const where = mend(args.where);
+      return moved ? callOf(name, { ...args, where }) : undefined;
+    }
+    /* A PROJECT NOT THERE, AND THE ONES THAT ARE (`allowed`, by name): the one it most likely meant. */
+    if (refusal.code === 'ROW_UNKNOWN' && refusal.at === 'project' && allowed.length > 0 && typeof args.project === 'string') {
+      const best = closest(args.project, allowed.map((id) => ({ id })));
+      return best === null ? undefined : callOf(name, { ...args, project: best });
     }
     if ((refusal.code === 'FIELD_UNKNOWN' || refusal.code === 'ENUM_VALUE_UNKNOWN') && allowed.length > 0 && typeof refusal.at === 'string') {
       const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;

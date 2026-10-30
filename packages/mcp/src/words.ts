@@ -299,13 +299,22 @@ export function closest(said: string, among: readonly { id: string; name?: strin
   return best?.id ?? null;
 }
 
-/** How many single characters change one word into the other. */
+/**
+ * How many single characters change one word into the other, two letters swapped counting as one: `emial` is one from
+ * `email`, the commonest typo there is, and counted as two it was too far for a five-letter word and got no `try`.
+ */
 function distance(a: string, b: string): number {
   if (Math.abs(a.length - b.length) > 2) return 3;
+  let before: number[] = [];
   let row = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i++) {
     const next = [i];
-    for (let j = 1; j <= b.length; j++) next.push(Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)));
+    for (let j = 1; j <= b.length; j++) {
+      let d = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, before[j - 2]! + 1);
+      next.push(d);
+    }
+    before = row;
     row = next;
   }
   return row[b.length]!;

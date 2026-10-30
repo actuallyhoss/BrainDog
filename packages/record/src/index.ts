@@ -11448,7 +11448,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             return no(
               'REGISTER_UNKNOWN',
               `No register you can read numbers its rows ${/^[A-Z]+/.exec(said)?.[0] ?? said}. A suggestion (SG) or a decision (D) is read with governance.`,
-              { at: 'spoken' },
+              { at: 'spoken', ...(/^(?:SG|D)[1-9][0-9]*$/u.test(said) ? { try: `governance ${JSON.stringify({ id: said })}` } : {}) },
             );
           const owned = kernel.get(said) ?? folded(said);
           {
@@ -13820,8 +13820,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const asked = depth === 'full' ? { ...placed, session: { ...(placed.session ?? {}), format: 'full' } as SessionHints } : placed;
       if (typeof said.project === 'string') {
         const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
-        if (!holder || readable(ctx, holder.id) !== null || projectAsked(ctx, holder, said.project) === null)
-          return no('ROW_UNKNOWN', `There is no project you can read called ${said.project.trim()}, or more than one.`, { at: 'project' });
+        if (!holder || readable(ctx, holder.id) !== null || projectAsked(ctx, holder, said.project) === null) {
+          /* AND THE PROJECTS THERE ARE, by name, the ones she is shown (door audit D29), so the agent asks again by one
+             of them and does not guess a second time. */
+          const got = holder && readable(ctx, holder.id) === null ? kernel.list({ register: holder.id, limit: 50 }, kernel.scope(ctx, holder.id)) : null;
+          const names = got?.ok
+            ? [...new Set(got.value.rows.filter((r) => sight.admits(ctx, r)).flatMap((r) => ((t) => (t === null ? [] : [t.trim()]))(text(r.fields[holder!.title]))))].slice(0, 12)
+            : [];
+          const there = names.length === 0 ? '' : ` Projects here: ${names.join(', ')}.`;
+          return no('ROW_UNKNOWN', `There is no project you can read called ${said.project.trim()}, or more than one.${there}`, {
+            at: 'project',
+            ...(names.length === 0 ? {} : { allowed: names }),
+          });
+        }
       }
       let task: TaskInHand | null = null;
       if (typeof said.task === 'string') {
