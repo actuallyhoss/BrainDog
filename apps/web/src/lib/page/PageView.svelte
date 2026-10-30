@@ -181,7 +181,17 @@
   const headKicker = $derived(declared?.kicker ?? declared?.back?.label ?? live?.page.page.nav?.section);
   const headBelow = $derived(!!declared && (!!declared.state || !!declared.search || (!!declared.back && !backInKicker)));
   function pressHead() {
-    if (declared?.action) void writes.act(declared.action);
+    const a = declared?.action;
+    if (!a) return;
+    /* AN ADD OVER NO ONE ROW TYPES ITS NAME (AG9): into the page's own line where it has one, as Work's "What needs
+       doing?" is, and otherwise on its list's line, `/r/<list>?add=1`. Pressed bare it read "Nothing was added". */
+    if (a.verb === 'row.create') {
+      const line = document.querySelector<HTMLInputElement>('main .capture-input');
+      if (line) return void line.focus();
+      const register = all.find((b) => typeof b.register === 'string' && b.register !== '' && writes.capturable(b))?.register ?? all.find((b) => typeof b.register === 'string' && REGISTERS[b.register])?.register;
+      if (register) return void goto(at(`/r/${register}?add=1`));
+    }
+    void writes.act(a);
   }
   /* WHAT IS TYPED IN THE SEARCH IS THE ADDRESS'S, so a narrowed page is a link and Back undoes it. The field keeps what
      is being typed while the address catches up, and takes the address's word when Back or a link changes it. */

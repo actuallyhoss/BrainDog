@@ -1603,6 +1603,16 @@
   let capture = $state('');
   /* THE PHONE'S CAPTURE SHEET, which the head's "+" opens (`parts/CapturePlus.svelte`) and `CaptureLine` draws below 640px. */
   let captureOpen = $state(false);
+  /* AND A LINK CAN ASK FOR IT, `/r/people?add=1` (AG9): a page's "Add a person" opens the name line, not every field. */
+  $effect(() => {
+    if (page.url.searchParams.get('add') !== '1' || !adds) return;
+    captureOpen = true;
+    untrack(() => {
+      const next = new URLSearchParams(page.url.searchParams);
+      next.delete('add');
+      void goto(next.size ? `?${next}` : page.url.pathname, { replaceState: true, noScroll: true, keepFocus: true });
+    });
+  });
 
   /* ── writes ───────────────────────────────────────────────────────────────── */
 
@@ -3000,9 +3010,14 @@
 
   /* THE ADD SHEET'S EXAMPLE, from the list itself: the newest row's name, so the line shows what a name here looks like. */
   const captureExample = $derived.by(() => {
+    /* NEVER SOMEBODY ALREADY HERE (AG9): "What is it? e.g. S. Marchetti" asked for a person the list already held. A
+       list of people or organisations asks for a name, with its own made-up example. */
+    if (captureNamed !== null) return null;
     const e = standing.find((x) => x.seq > 0 && !added.has(x.seq));
     return e ? titleSaid(e) : null;
   });
+  /* WHO A LIST OF PEOPLE OR ORGANISATIONS ASKS FOR, by name ("Who?"), and not "What is it?". */
+  const captureNamed = $derived<'person' | 'org' | null>(meetsOf(decl) ? 'person' : orgRoleOf(decl) ? 'org' : null);
 
   /** The toolbar's primary: the add line opens, or takes the caret again where it is already open. */
   function openCapture() {
@@ -3242,7 +3257,7 @@
       {#if !adds && !madeByAgents}
         <p class="reach">{reachWords.readOnly(decl.name)}</p>
       {:else if !arriving}
-        <CaptureLine one={decl.one} example={captureExample} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
+        <CaptureLine one={decl.one} example={captureExample} named={captureNamed} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
       {/if}
 
       {#if rows.length === 0 && twice && filters.length === 0 && q === '' && result.total > 0}

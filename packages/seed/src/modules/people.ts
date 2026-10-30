@@ -525,6 +525,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
     nav: { section: 'People', order: 10, place: 50 },
     icon: 'people',
     requires: ['register.people', 'register.organisations'],
+    /* ADD A PERSON ON THE PAGE'S HEAD (31 October, AG9): the page had Share and "…" only, and adding somebody was a
+       button on the whole list, two presses away. It opens the list's name line ("Who?"). */
+    header: { action: { verb: 'row.create', label: 'Add a person' } },
     blocks: [
       {
         /* THE PAGE'S ONE LINE, said from the figures, so the line and the chart under it cannot disagree. A clause whose

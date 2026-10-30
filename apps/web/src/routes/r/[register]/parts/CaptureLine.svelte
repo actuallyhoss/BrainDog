@@ -31,6 +31,7 @@
   let {
     one,
     example = null,
+    named = null,
     value = $bindable(''),
     open = $bindable(false),
     captureRow,
@@ -39,6 +40,8 @@
     one: string;
     /** A name from the list itself, shown in the field as what a name here looks like. */
     example?: string | null;
+    /** A list of people or of organisations, asked for by name ("Who?") with an example nobody here holds. */
+    named?: 'person' | 'org' | null;
     value?: string;
     /** The sheet, which the toolbar's primary and the phone's "+" open. */
     open?: boolean;
@@ -50,7 +53,7 @@
   /* This part's own words. */
   const words = {
     title: (what: string) => `New ${what}`,
-    ask: (eg: string | null) => (eg ? `What is it? e.g. ${eg}` : 'What is it?'),
+    ask: (eg: string | null) => (named === 'person' ? 'Who? e.g. Sam Lee' : named === 'org' ? 'Name, e.g. Northwind Ltd' : eg ? `What is it? e.g. ${eg}` : 'What is it?'),
     allFields: 'Fill in the rest',
     close: 'Close',
   } as const;

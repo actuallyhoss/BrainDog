@@ -27,6 +27,7 @@ import {
 } from '@braindog/where';
 import { exponentOf } from 'braindog-render';
 
+import { meetsOf, orgRoleOf } from './folk.ts';
 import { REGISTERS, seqTitled, TITLES } from './held.ts';
 import type { FieldDecl } from './schema.ts';
 
@@ -385,6 +386,19 @@ const spokenValue = (register: string, field: string, held: string): string => {
  * by the half it understood is a list that looks narrowed and is not. The surface that owns the predicate refuses in
  * its own words; this returns the honest wide address.
  */
+/**
+ * A CLAUSE THE LIST ALREADY KEEPS BY ITSELF (31 October, AG8): a list of people or organisations draws nobody folded
+ * into another and stands you apart as You (`folk.ts`), so "not merged" and "not you" are its standing scope. Carried as
+ * chips, Today's "All people" opened "6 of 6 match." under "Merged into is empty" and "This is you is not true" in red.
+ */
+function standing(register: string, c: Clause): boolean {
+  const decl = REGISTERS[register];
+  const meets = meetsOf(decl);
+  const org = orgRoleOf(decl);
+  if (c.op === 'empty' && (c.field === meets?.merged_into || c.field === org?.merged_into)) return true;
+  return c.field === meets?.self && c.op === 'is not' && c.values.length === 1 && String(c.values[0]) === 'true';
+}
+
 export function registerHref(register: string, where: string | undefined): string {
   const w = compile(register, where);
   if (w.bad.length) return `/r/${register}`;
@@ -400,7 +414,7 @@ export function registerHref(register: string, where: string | undefined): strin
    * THE SIX COMPARE WORDS STILL OPEN IT WIDE, in a group or out of one, as `chips-compare.test.ts` pins.
    */
   if (w.any?.some((member) => member.length !== 1)) return `/r/${register}`;
-  const clauses = w.any ? w.any.flat() : w.clauses;
+  const clauses = (w.any ? w.any.flat() : w.clauses).filter((c) => w.any || !standing(register, c));
   if (clauses.some((c) => c.op === 'contains' || c.op === 'gt' || c.op === 'gte' || c.op === 'lt' || c.op === 'lte' || c.op === 'between'))
     return `/r/${register}`;
   /* AND A VALUE HOLDING A COMMA, WHICH A QUOTED SENTENCE CAN CARRY AND A CHIP CANNOT: `what is "Studio rent, June"`
