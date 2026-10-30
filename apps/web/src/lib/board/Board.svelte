@@ -13,7 +13,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { SIZE_WORDS, type WidgetSize } from 'braindog-render';
 
@@ -38,6 +38,7 @@
     onremove,
     onmake,
     widgets = [],
+    loading = false,
   }: {
     model: BoardModel;
     children: Snippet;
@@ -53,7 +54,42 @@
     onmake?: ((draft: { block: Record<string, unknown>; size: WidgetSize; said: string }) => unknown) | undefined;
     /** The board's widgets as drawn (key, heading, source, where, empty), so the sheet does not offer what is on it. */
     widgets?: readonly Record<string, unknown>[];
+    /** Whether the screen is still waiting for the record's own answer (a copy or this tab's memory drawn meanwhile). */
+    loading?: boolean;
   } = $props();
+
+  /* THE BOARD HOLDS ITS CELLS WHILE IT LOADS (live check of 30 October, item 8): every widget drawn keeps its cell
+     (`holdCells`) until the record's own answer is in and nothing has changed for `SETTLE_MS`; then what is drawn is what
+     takes a cell (`settle`). Nothing slides meanwhile: the board is marked still (`data-still`), which the page's
+     recomposition reads (`recompose.ts`), and stays so a frame past the settling, so its last packing is not played. */
+  const SETTLE_MS = 1200;
+  $effect(() => {
+    void model.shown;
+    untrack(() => model.holdCells());
+  });
+  $effect(() => {
+    if (!model.settling) return;
+    void model.shown;
+    if (loading) return;
+    const t = setTimeout(() => model.settle(), SETTLE_MS);
+    return () => clearTimeout(t);
+  });
+  /* AND NEVER LONGER THAN `SETTLE_MOST_MS`, whatever the screen still waits for. */
+  const SETTLE_MOST_MS = 10_000;
+  onMount(() => {
+    const t = setTimeout(() => model.settle(), SETTLE_MOST_MS);
+    return () => clearTimeout(t);
+  });
+  let still = $state(true);
+  $effect(() => {
+    if (model.settling) {
+      still = true;
+      return;
+    }
+    let on = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => on && (still = false)));
+    return () => (on = false);
+  });
 
   /* FOUR COLUMNS FROM 720px, TWO UNDER IT (§3.2). */
   const four = new MediaQuery('(width >= 720px)', true);
@@ -158,7 +194,7 @@
 
 <svelte:window onkeydown={keys} />
 
-<div class="board-root" data-board-root data-editing={model.editing ? '' : undefined} data-phone-view={model.phoneView ? '' : undefined}>
+<div class="board-root" data-board-root data-still={still && !model.editing ? '' : undefined} data-editing={model.editing ? '' : undefined} data-phone-view={model.phoneView ? '' : undefined}>
   {#if kept && !model.editing}
     <div class="draft-left" role="status">
       <span>{boardWords.draftLeft}</span>
@@ -221,6 +257,8 @@
       }}
     >
       {@render children()}
+      <!-- A CELL HELD WHILE TODAY LOADS for a widget being read again: a quiet empty tile, so the board keeps its shape. -->
+      {#each model.reserved as r (r.key)}<div class="reserve" style="grid-area:{r.area}" aria-hidden="true"></div>{/each}
       {#if model.editing && !model.asList}
         <!-- A CELL NOTHING FILLS, while editing: drawn, so a gap a smaller size left is seen as room, not as a fault. -->
         {#each model.holes as h (h)}<div class="hole" style="grid-area:{h}" aria-hidden="true"></div>{/each}
@@ -403,6 +441,12 @@
     text-decoration: none;
   }
 
+  /* LATE'S "N MORE" SITS AT THE TILE'S FOOT, as All people and Activity do beside it, not under its last line with an
+     empty band below it (live check of 30 October, 22: the phone's Late and urgent). */
+  .board :global([data-board-key] .tile > .late-more) {
+    margin-block-start: auto;
+  }
+
   .board :global(:is(.late-more, .queue-more, .tile-link, .block-more, .kb-all, .p-more):not(:has(svg))::after) {
     content: '→';
   }
@@ -436,6 +480,12 @@
   /* A ROW ITS FRAME CANNOT HOLD WHOLE IS NOT DRAWN (`fit.ts`), and the frame's foot rises to meet what is. */
   .board :global([data-board-key] [data-cut]) {
     display: none;
+  }
+
+  .reserve {
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    pointer-events: none;
   }
 
   /* ── editing ── */

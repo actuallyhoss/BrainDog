@@ -177,11 +177,50 @@ export class BoardModel {
     return this.onPhone ? phoneWidgets(laptop, a.phone) : laptop;
   }
 
+  /**
+   * WHILE TODAY LOADS THE BOARD HOLDS ITS CELLS (live check of 30 October, item 8): a widget that had a cell keeps it
+   * until the board has settled, so a tile whose data is read again (the copy drawn first, then the record's answer, then
+   * a list learnt again) does not leave its cell for a frame and slide every tile under it up and back. `Board.svelte`
+   * ends the settling once the record's own answer is in and the board has been still a moment; it is packed once more
+   * then, without a slide, if a widget really went.
+   */
+  settling = $state(true);
+  /** The widgets that had a cell while settling. */
+  hadCell = $state.raw<ReadonlySet<string>>(new Set());
+
+  /** Note the widgets drawn now as having a cell, while settling. */
+  holdCells(): void {
+    if (!this.settling) return;
+    const now = this.shown;
+    if ([...now].every((k) => this.hadCell.has(k))) return;
+    this.hadCell = new Set([...this.hadCell, ...now]);
+  }
+
+  /** The board has settled: what is drawn is what takes a cell from now on. */
+  settle(): void {
+    this.settling = false;
+    this.hadCell = new Set();
+  }
+
+  /** What takes a cell: what is drawn, and while settling what had a cell. */
+  private get placing(): ReadonlySet<string> {
+    if (!this.settling || this.editing || this.hadCell.size === 0) return this.shown;
+    return new Set([...this.hadCell, ...this.shown]);
+  }
+
+  /** Cells held for a widget that is not drawn this moment, as grid areas: drawn as a quiet empty tile. */
+  get reserved(): { key: string; area: string }[] {
+    if (!this.settling || this.editing) return [];
+    const shown = this.shown;
+    return [...this.places.values()].filter((p) => !shown.has(p.key) && this.hadCell.has(p.key)).map((p) => ({ key: p.key, area: p.area }));
+  }
+
   /** The board packed: only what is drawn takes a cell, and an added widget always does. */
   packed: Packed = $derived.by(() => {
     const cols = this.onPhone ? 2 : 4;
     const fresh = new Set(this.added.map((b) => String(b.key)));
-    const items = this.laidWidgets.filter((w) => this.shown.has(w.key) || fresh.has(w.key) || this.held === w.key);
+    const placing = this.placing;
+    const items = this.laidWidgets.filter((w) => placing.has(w.key) || fresh.has(w.key) || this.held === w.key);
     /* A DRAFT ON THE PHONE TAKES A ROW MORE AT REST, so its Keep / Try again / Throw away bar sits in that row and the widget
        it asks about is seen whole above it (a chart under the bar was hidden). Editing, it is laid at its size. */
     const drafts = cols <= 2 && !this.editing ? (this.src.drafts?.() ?? new Set<string>()) : new Set<string>();
@@ -221,6 +260,7 @@ export class BoardModel {
   /** Start editing from the board as it stands (§5.1). Nothing moves: each widget only gains its outline and handles. */
   enter(): void {
     if (this.editing) return;
+    this.settle();
     const start = clone(this.declared);
     this.from = start;
     this.now = clone(start);

@@ -54,7 +54,11 @@
   let busy = $state(false);
   const offer = $derived(given ?? todayOffer.offer);
   const removal = $derived(offer?.remove !== undefined);
-  const hidden = $derived(offer === null || widgetHeld.gone.includes(offer.key) || (removal && onremove === undefined));
+  /* A WIDGET THAT WOULD DRAW NOTHING IS NOT OFFERED (live check of 30 October, 22): "People to get back to" was a tall
+     empty card with "You are in touch with everyone" at its foot, and Gold price said "No gold rate yet". Its reading is
+     what the record drew of it; with no figure and no line there is nothing to show him. */
+  const blank = $derived(!removal && offer?.reading !== undefined && (offer.reading.figures?.length ?? 0) === 0 && (offer.reading.rows?.length ?? 0) === 0);
+  const hidden = $derived(offer === null || blank || widgetHeld.gone.includes(offer.key) || (removal && onremove === undefined));
   const cols = $derived(offer === null ? 1 : SIZE_SAID[offer.size].cols);
   const rows = $derived(offer === null ? 1 : SIZE_SAID[offer.size].rows);
 
