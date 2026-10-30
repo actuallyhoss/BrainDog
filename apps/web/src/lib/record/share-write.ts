@@ -64,6 +64,7 @@ export const words = {
   sharedShowing: (shown: number, of: number) => `Showing ${shown} of ${of}`,
   sharedNoRows: 'Nothing here yet',
   sharedNoFigure: 'No figure',
+  sharedNothing: 'This page has nothing a link can show.',
   sharedYes: 'Yes',
   sharedNo: 'No',
 } as const;
@@ -145,7 +146,7 @@ export function linkState(row: ShareRow, now: number): 'open' | 'ran-out' | 'clo
  * and for a choice the word the owner reads for it. Money is `{ amount, currency }` in minor units, whole, and a list
  * says the type of what it holds. WRITTEN OUT, NOT IMPORTED, as the link's own types above are.
  */
-export type SharedCell = { type: string; of?: string; value: unknown; label?: string };
+export type SharedCell = { type: string; of?: string; value: unknown; label?: string; unit?: string };
 
 /** A column a shared block keeps: the field it draws, the label the owner reads, its role, and a money column's sign. */
 export type SharedColumn = { field: string; label?: string; as?: string; sign?: { field: string; minus: string } };
@@ -172,6 +173,8 @@ export type SharedReading = { metric: string; label?: string; value: number | nu
 export type SharedBlock = {
   kind: string;
   heading: string | null;
+  /** The page's opening line (`lead: true` on a note), said under the title rather than in a tile of its own. */
+  lead: boolean;
   body: string | null;
   empty: string | null;
   span: number | null;
@@ -194,6 +197,8 @@ export type SharedPage = {
   read_at: string | null;
   language: string;
   zone: string;
+  /** The record's home currency, whose amounts are written by their sign alone, or `null` (an older record sends none). */
+  home: string | null;
   empty: string | null;
   blocks: SharedBlock[];
 };
@@ -245,6 +250,7 @@ const cellOf = (x: unknown): SharedCell | null =>
         value: x.value,
         ...(typeof x.of === 'string' ? { of: x.of } : {}),
         ...(typeof x.label === 'string' && x.label !== '' ? { label: x.label } : {}),
+        ...(typeof x.unit === 'string' && x.unit !== '' ? { unit: x.unit } : {}),
       }
     : null;
 
@@ -287,6 +293,7 @@ export function blockShared(x: unknown): SharedBlock {
   return {
     kind: typeof b.kind === 'string' ? b.kind : '',
     heading: filled(text(b.heading), values),
+    lead: b.lead === true,
     body: filled(text(b.body), values),
     empty: filled(text(b.empty), values),
     span: typeof b.span === 'number' && Number.isInteger(b.span) && b.span >= 1 && b.span <= 12 ? b.span : null,
@@ -346,6 +353,7 @@ export async function readShared(origin: string, token: string, io?: Fetch): Pro
       read_at: typeof v.read_at === 'string' ? v.read_at : null,
       language: languageOf(v.language),
       zone: zoneOf(v.zone),
+      home: typeof v.home === 'string' && /^[A-Z]{3}$/u.test(v.home) ? v.home : null,
       empty: text(v.empty),
       blocks: (Array.isArray(v.blocks) ? v.blocks : []).map(blockShared),
     },
