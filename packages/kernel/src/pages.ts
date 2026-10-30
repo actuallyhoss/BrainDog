@@ -38,7 +38,7 @@ import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { splitOf, rowsBySplit } from './row-parts.ts';
 import { kindModule } from './kinds/index.ts';
-import { sourceModule } from './sources/index.ts';
+import { sourceReadsWhole, sourceModule } from './sources/index.ts';
 import { ACTIONS_BLOCKING } from './sources/actions-blocking.ts';
 import { FEED_BY } from './sources/activity.ts';
 import { RUNS_ON_LISTS } from './sources/runs-on.ts';
@@ -5277,11 +5277,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
        name the record's `reaches` already answers only for a ceiling of the whole record, so asking whether a
        caller may read it is asking whether they read all of it. It is never a list's id: `declare.ts` refuses
        a register id that is not lower-case letters, digits and underscores. */
-    if (sourceModule(block.source)?.whole) named.add(WHOLE_RECORD);
     /* AND SO IS A SOURCE THE RECORD READS ACROSS ITSELF (`HostSource.whole`), such as its census of pages; one that
-       answers each reader only what they may read, such as `lists`, names nothing. Never asked over a registered name. */
-    else if (typeof block.source === 'string' && !block.source.startsWith('register.') && !sourceModule(block.source) && beside?.hostSources?.(block.source)?.whole)
-      named.add(WHOLE_RECORD);
+       answers each reader only what they may read, such as `lists`, names nothing. Never asked over a registered name.
+       Both are asked of the one list the record and a shared link hold by too (`sourceReadsWhole`). */
+    if (sourceReadsWhole(block.source, beside?.hostSources)) named.add(WHOLE_RECORD);
     /* WHAT A PROJECT RUNS ON READS THE KEYS, TOOLS AND SKILLS LISTS AND THE PROJECT `about:` NAMES, each whether or not
        this record holds it, and the scheduled actions beside them, which belong to no list and so are `*`: a key's
        label and an action's host are held back from a member who may not read all of them, as `actions` holds them. */

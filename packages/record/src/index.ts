@@ -148,8 +148,10 @@ import {
   egressOf,
   grantChosen,
   intervalMs,
-  /* RENAMED, because `ACROSS` in this file is the set of page sources that read across the record (`page`). */
+  /* RENAMED, because `ACROSS` in this file was the set of page sources that read across the record (`page`), which is
+     the kernel's `sourceReadsWhole` now. */
   ACROSS as READS_ACROSS,
+  sourceReadsWhole,
   ANY_LIST,
   touches,
   type Wheres,
@@ -6289,13 +6291,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       .map((p) => ({ slug: p.slug, title: p.title, template: p.template }));
 
   /**
-   * The computed sources that read across the whole record rather than any one list: the log, the scheduled actions and
-   * the questions, open, put off and answered. Measured: the actions and the open questions on a Desk page handed a
-   * member invited to Obligations a diary rowset's question and a bank key's host and label, while `governance` and
-   * `actions` both held those back from her. The record asks the source itself rather than waiting for `kernel.blockRegisters` to name something for it, so the
-   * block is held whether or not the kernel's answer carries a name for the whole record.
+   * Whether a block's source reads across the whole record rather than any one list: the log, the scheduled actions,
+   * the questions, open, put off and answered, and every other source marked `whole`. Measured: the actions and the open
+   * questions on a Desk page handed a member invited to Obligations a diary rowset's question and a bank key's host and
+   * label, while `governance` and `actions` both held those back from her. The record asks the source itself rather than
+   * waiting for `kernel.blockRegisters` to name something for it, so the block is held whether or not the kernel's answer
+   * carries a name for the whole record. THE KERNEL'S ONE LIST (`sourceReadsWhole`), which a shared link holds back by too: this
+   * kept its own set, and it lacked `kpis`, `scripts`, `governance.apart` and `actions.blocking`.
    */
-  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs', 'exceptions', 'usage.days', 'usage.actions', 'usage.projects', 'pages']);
+  const across = (ctx: CallContext, source: unknown): source is string => sourceReadsWhole(source, hostSourcesOf({ kernel, ctx, readable }));
+
+  /** What a person is told of a block held for reading across the whole BrainDog, by what it reads. */
+  const acrossFix = (source: string): string =>
+    source === 'activity'
+      ? 'What happened across this BrainDog is shown to people who can read all of it.'
+      : source === 'actions' || source.startsWith('usage.') || source === 'scripts'
+        ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
+        : source === 'exceptions'
+          ? 'What went quiet across this BrainDog is shown to people who can read all of it.'
+          : source === 'pages'
+            ? 'The pages across this BrainDog are shown to people who can read all of it.'
+            : source.startsWith('governance.')
+              ? 'The questions asked across this BrainDog are shown to people who can read all of it.'
+              : 'This reads across the whole BrainDog, so it is shown to people who can read all of it.';
 
   /**
    * The lists one block reads that `kernel.blockRegisters` may not name: each leg of a cash walk, and `session` for a
@@ -6565,7 +6583,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        refuses her; a figure's said `source: metric.diary-count`. The web
        reads neither off a refused block: `blockOf` draws the shell, headed from `refusals`, the moment one is
        there. A source that names a view and no list stays, since it says nothing she could not guess: the `log`
-       ones, and the three below, which are the kernel's computed sources that `ACROSS` does not hold. */
+       ones, and the three below, which are the kernel's computed sources that `sourceReadsWhole` does not hold. */
     if (!log && typeof b.source === 'string' && b.source !== 'forecast.runway' && b.source !== 'sessions.live' && b.source !== 'sessions.working') {
       delete kept.source;
       delete kept.columns;
@@ -6643,22 +6661,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        written, and a token held to the paper jobs was drawn "File at court" off a feed block (measured). */
     const narrow = Object.keys(ctx.wheres ?? {}).length > 0;
     const log: Refusal | null =
-      typeof b.source === 'string' && ACROSS.has(b.source) && (!whole || narrow || allows(ctx, 'read') !== null)
-        ? {
-            code: 'FORBIDDEN',
-            fix:
-              b.source === 'activity'
-                ? 'What happened across this BrainDog is shown to people who can read all of it.'
-                : b.source === 'actions' || b.source.startsWith('usage.')
-                  ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
-                  : b.source === 'exceptions'
-                    ? 'What went quiet across this BrainDog is shown to people who can read all of it.'
-                    : b.source === 'pages'
-                      ? 'The pages across this BrainDog are shown to people who can read all of it.'
-                      : 'The questions asked across this BrainDog are shown to people who can read all of it.',
-            at: 'source',
-          }
-        : null;
+      across(ctx, b.source) && (!whole || narrow || allows(ctx, 'read') !== null) ? { code: 'FORBIDDEN', fix: acrossFix(b.source), at: 'source' } : null;
     const beyond =
       log ??
       [...kernel.blockRegisters(b, { hostSources: hostSourcesOf({ kernel, ctx, readable }) }), ...alsoReads(b)]
@@ -13349,7 +13352,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                reads the runs, and what agents did and the questions to whoever a page draws them for (`heldBy`). Kept for
                everybody, a member invited to one list read what each run was doing. */
             if (s.source === 'sessions.working' || s.source === 'handoffs.open') return readable(ctx, SESSION) === null;
-            if (s.source === 'activity' || s.source.startsWith('governance.')) return heldBy(ctx, { kind: 'queue', source: s.source } as never).log === null;
+            if (across(ctx, s.source)) return heldBy(ctx, { kind: 'queue', source: s.source } as never).log === null;
             return true;
           });
           return { ...d, sections, carrying: carryingOf(sections).length, headline: headline(d.name, carryingOf(sections)) };

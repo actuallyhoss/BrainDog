@@ -312,7 +312,7 @@ import { ROWSET_LIST_SQL, builtInFigure, openSteps, readOpenQuestions } from './
 import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
-export { SOURCE_MODULES, sourceModule, type Source } from './sources/index.ts';
+export { SOURCE_MODULES, sourceModule, sourceReadsWhole, wholeSources, type Source } from './sources/index.ts';
 export { scriptRows, type ScriptRow } from './script-rows.ts';
 import { RESUMED_MS, beatRun, presentRuns, pulseRun, revivedAt, seatRun, workingRuns } from './presence.ts';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (migration 42, `instruction.ts`, `agent-profile.ts`). */

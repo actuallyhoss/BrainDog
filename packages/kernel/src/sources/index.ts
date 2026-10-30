@@ -107,3 +107,26 @@ export const SOURCE_MODULES: Record<string, Source> = {
 export function sourceModule(name: string | undefined): Source | undefined {
   return name !== undefined && Object.hasOwn(SOURCE_MODULES, name) ? SOURCE_MODULES[name] : undefined;
 }
+
+/**
+ * WHETHER A BLOCK OVER `name` READS ACROSS THE WHOLE RECORD: THE ONE LIST OF THEM, which the kernel names `*`
+ * (`registersOf`), the record holds from a member who does not read all of it (`heldBy`, the pages census, the text
+ * faults, a digest's sections) and a shared link never draws (`shares.ts`). It is the `whole` mark on a registered
+ * source above, or on a source the record hands the page reader (`HostSource.whole`, such as its census of pages),
+ * asked through `hostSources` where the caller has one. Each place used to keep its own set of names, and they drifted:
+ * the record's lacked `kpis`, `scripts`, `governance.apart` and `actions.blocking`, the census's and the text faults'
+ * lacked more, and the share's lacked `exceptions`, `usage.*` and `pages`. A source added with `whole` is now held from
+ * members and from links the day it is added.
+ *
+ * A list (`register.x`) or a figure (`metric.x`) is never one, and a registered name never asks the host's table, so a
+ * host source cannot shadow a kernel one.
+ */
+export function sourceReadsWhole(name: unknown, hostSources?: (name: string) => { whole?: true } | undefined): boolean {
+  if (typeof name !== 'string' || name === '' || name.startsWith('register.') || name.startsWith('metric.')) return false;
+  const module = sourceModule(name);
+  if (module) return module.whole === true;
+  return hostSources?.(name)?.whole === true;
+}
+
+/** Every registered source that reads across the whole record, as `sourceReadsWhole` answers of each. For tests and lists. */
+export const wholeSources = (): string[] => Object.keys(SOURCE_MODULES).filter((name) => sourceReadsWhole(name));
