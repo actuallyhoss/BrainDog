@@ -300,9 +300,12 @@
   type Part = { id: string; label: string; icon: IconName; count: string | null; live: boolean };
   let parts = $state.raw<Part[]>([]);
   let inView = $state<string | null>(null);
+  /** The part last pressed in the rail, which wins over a part beside it on the same row. */
+  let picked: string | null = null;
   $effect(() => {
     if (mode !== 'full' || opened === null) return void (parts = []);
     void path;
+    picked = null;
     let main: HTMLElement | null = null;
     let wait: ReturnType<typeof setTimeout> | undefined;
     const take = (): void => {
@@ -328,15 +331,22 @@
       clearTimeout(wait);
       wait = setTimeout(take, 120);
     });
-    /* WHICH PART IS IN VIEW: the last whose top has reached the page's top, else the first. */
+    /* WHICH PART IS IN VIEW: the lowest whose top has reached the page's top, else the first. TWO SIDE BY SIDE ARE ONE
+       ROW, and the first of them is the one meant: Money beside Overview was lit on a project's first screen (recheck,
+       low notes). */
     const spy = (): void => {
       if (!main) return;
       const top = main.getBoundingClientRect().top + 96;
       let at: string | null = null;
+      let atTop = -Infinity;
       for (const p of untrack(() => parts)) {
         const el = document.getElementById(p.id);
-        if (el && el.getBoundingClientRect().top <= top) at = p.id;
+        const y = el?.getBoundingClientRect().top;
+        if (y !== undefined && y <= top && y > atTop + 1) (at = p.id), (atTop = y);
       }
+      /* A PART PRESSED IN THE RAIL STAYS LIT while it shares the row that is in view. */
+      const was = picked === null ? undefined : document.getElementById(picked)?.getBoundingClientRect().top;
+      if (picked !== null && was !== undefined && Math.abs(was - atTop) <= 1) at = picked;
       inView = at ?? untrack(() => parts)[0]?.id ?? null;
     };
     let frameAsk = 0;
@@ -359,6 +369,7 @@
     const el = document.getElementById(id);
     if (!el) return;
     inView = id;
+    picked = id;
     el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
 

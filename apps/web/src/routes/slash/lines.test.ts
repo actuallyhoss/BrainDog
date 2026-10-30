@@ -175,8 +175,8 @@ test('EACH SUGGESTION ON DECIDE SAYS HOW LONG IT WAITS, from the day the record 
   };
   const all = suggestedOf(dated, [], NOON);
   const of = (q: string) => all.find((s) => s.question === q);
-  assert.equal(of('Add Watch?')?.waits, 'Waits until 28 Oct', 'the day the draft was asked with');
-  assert.equal(of('Add a desk for the launch?')?.waits, 'Waits until 20 Oct', 'the record\u2019s own waiting, with no draft');
+  assert.equal(of('Add Watch?')?.waits, 'Offered until 28 Oct', 'the day the draft was asked with');
+  assert.equal(of('Add a desk for the launch?')?.waits, 'Offered until 20 Oct', 'the record\u2019s own waiting, with no draft');
   assert.equal(of('Give Logbook a page of its own?')?.waits, null, 'one not asked yet waits on nobody');
   assert.equal(of('Turn off Notes?')?.waits, null, 'one answered waits no more');
   /* NONE HANDED, NONE SAID: the reading as it is today draws exactly what it drew. */

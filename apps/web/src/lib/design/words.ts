@@ -13,7 +13,7 @@ export const penWords = {
   /** The line under the pen's heading, which says what an offer is before anybody presses anything. */
   hint: 'Each of these is offered, never applied. Show it to see what would change, keep it, or say not this one and it will not be offered again on any device.',
   nothing: 'Nothing waiting',
-  nothingWhy: 'When this record has something to suggest, it waits here until you keep it or say no.',
+  nothingWhy: 'When BrainDog has something to suggest, it waits here until you keep it or say no.',
   /** An icon offer's why: the word in the name the glyph was read from. */
   iconKept: (name: string) => `${name} has its new icon.`,
   kept: (title: string) => `Kept: ${title}.`,

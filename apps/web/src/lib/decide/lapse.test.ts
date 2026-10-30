@@ -34,15 +34,15 @@ const offer = (over: Record<string, unknown> = {}): QueueQuestion =>
 
 test('AN ARRANGEMENT WITH A DAY SAYS HOW LONG IT WAITS, its last day, in words', () => {
   const card = cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-27' } }), { now });
-  assert.equal(card.lapses, 'Waits until 27 Oct');
+  assert.equal(card.lapses, 'Offered until 27 Oct');
   assert.doesNotMatch(card.lapses ?? '', /\d{4}-\d{2}-\d{2}/u, 'no ISO day is drawn');
   assert.doesNotMatch(card.lapses ?? '', /—/u, 'no em dash');
   /* NOTHING TAKES AN OFFER BACK BY ITSELF YET, so the line promises nothing of the kind. */
   assert.doesNotMatch(card.lapses ?? '', /taken? back|takes/u);
   /* A HOST THAT HOLDS THE BODY hands it, and the question need not carry it. */
-  assert.equal(cardOf(offer(), { now, body: { ...BODY, lapses: '2026-10-27' } }).lapses, 'Waits until 27 Oct');
+  assert.equal(cardOf(offer(), { now, body: { ...BODY, lapses: '2026-10-27' } }).lapses, 'Offered until 27 Oct');
   /* Another year says its year. */
-  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2027-01-04' } }), { now }).lapses, 'Waits until 4 Jan 2027');
+  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2027-01-04' } }), { now }).lapses, 'Offered until 4 Jan 2027');
 });
 
 test('A QUESTION WITH NO DAY DRAWS EXACTLY WHAT IT DREW: no line, and the rest of the card unchanged', () => {
@@ -65,10 +65,10 @@ test('THE LINE NAMES NOBODY, whoever asked: an agent, an app or a person', () =>
 });
 
 test('A DAY ALREADY COME IS SAID AS TODAY, never as a day gone by', () => {
-  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-13' } }), { now }).lapses, 'Waits until today');
-  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-01' } }), { now }).lapses, 'Waits until today');
-  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-14' } }), { now }).lapses, 'Waits until today');
-  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-15' } }), { now }).lapses, 'Waits until 15 Oct');
+  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-13' } }), { now }).lapses, 'Offered until tonight');
+  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-01' } }), { now }).lapses, 'Offered until tonight');
+  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-14' } }), { now }).lapses, 'Offered until tonight');
+  assert.equal(cardOf(offer({ arranged: { ...BODY, lapses: '2026-10-15' } }), { now }).lapses, 'Offered until 15 Oct');
 });
 
 test('A MALFORMED DAY DRAWS NOTHING', () => {

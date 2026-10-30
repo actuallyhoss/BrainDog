@@ -80,10 +80,11 @@
   const offers = $derived(navPrefs.suggest ? waiting(shell.pen, gone) : []);
   const waitingCount = $derived(navPrefs.suggest ? penCount(shell.pen, gone) : 0);
   const idOf = (o: Offer): string => o.item.id;
-  const titleOf = (o: Offer): string => o.item.title;
+  /* A PAGE OFFERED FOR A LIST IS SAID AS ONE, not as the list's bare name ("Snapshots" read as a page called that). */
+  const titleOf = (o: Offer): string => (o.item.kind === 'page' && o.item.list !== undefined ? `A page for ${o.item.title}` : o.item.title);
   const whyOf = (o: Offer): string => o.item.why;
   /**
-   * THE DAY AN OFFER STOPS WAITING, in Decide's own words ("Waits until 27 Oct", `card.ts`), on the reader's own calendar:
+   * THE DAY AN OFFER STOPS WAITING, in Decide's own words ("Offered until 27 Oct", `card.ts`), on the reader's own calendar:
    * a day already come is said as today. An offer from a host older than `lapses` says nothing.
    */
   const lapseOf = (o: Offer): string | null => {

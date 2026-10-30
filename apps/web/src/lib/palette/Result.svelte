@@ -57,7 +57,7 @@
   <span class="result-words">
     <span class="result-head">
       <!-- THE TITLE AND ITS COUNT ARE ONE LINE at every width (VERIFY P9): on a phone the count dropped to a line of its own. -->
-      <span class="result-name"><span class="result-title">{title}</span>{#if folded && folded > 1}<span class="result-folded num">{folded}</span>{/if}</span>
+      <span class="result-name"><span class="result-title">{title}</span>{#if folded && folded > 1}<span class="result-folded num">{folded.toLocaleString('en-GB')} times</span>{/if}</span>
       {#if line}<span class="result-line">{line}</span>{/if}
     </span>
     {#if status}<span class="result-status" data-tone={tone}>{status.charAt(0).toUpperCase()}{status.slice(1)}</span>{/if}
