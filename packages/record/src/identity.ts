@@ -1022,6 +1022,30 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         return { status: 200, body: outcome, session: { sid: next.sid } };
       }
 
+      /**
+       * Whose account a sign-in or claim link opens, asked by the screen before the press, and nothing spent.
+       *
+       * A LINK IN SOMEBODY ELSE'S HAND SIGNS YOU IN TO THEIR ACCOUNT. A stranger's own link, sent as `/signin#magic=…`,
+       * put a signed-out reader into the stranger's record with one press, and what they typed next landed there (login
+       * CSRF). The screen now says the address before the button, so the reader sees it is not theirs.
+       *
+       * THE ADDRESS IS ANSWERED ONLY TO THE LINK'S HOLDER, who could spend it and read it anyway; every miss strikes the
+       * asking address as a redeem does, so the question is no cheaper way to try tokens.
+       */
+      case 'magic.whose': {
+        const claim = 'claimToken' in call;
+        const token = 'claimToken' in call ? call.claimToken : call.linkToken;
+        const hash = typeof token === 'string' && MINTED.test(token) ? await hmac('l:', token) : null;
+        const stop = reserve(flow, `ip:${text(call.ip)}`, now);
+        if (stop) return stop;
+        if (hash === null) return rejected(flow, 'shape');
+        const link = sql.one<{ person: string }>('SELECT person FROM dir_link WHERE hash = ? AND purpose = ? AND expires > ?', hash, claim ? 'claim' : 'magic', now);
+        if (!link) return rejected(flow, 'link');
+        const person = livePerson(link.person);
+        if (!person) return rejected(flow, 'suspended');
+        return { status: 200, body: { email: person.email } };
+      }
+
       case 'passkeys': {
         const found = await current(call.sid, now);
         if (!found) return rejected(flow, 'session', { session: 'clear' });

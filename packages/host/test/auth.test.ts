@@ -52,6 +52,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'POST /auth/passkey/assert both',
       'POST /auth/magic/start both',
       'POST /auth/magic/redeem both',
+      'POST /auth/magic/whose both',
       'GET /auth/passkeys both',
       'POST /auth/passkey/remove both',
       'POST /auth/passkey/rename both',
@@ -79,7 +80,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
 test('every flow has one route, named by the rule, and only reads are GETs', () => {
   const flows: AuthFlow[] = [
     'methods', 'session', 'key.exchange', 'passkey.register.options', 'passkey.register', 'passkey.assert.options',
-    'passkey.assert', 'magic.start', 'magic.redeem', 'passkeys', 'passkey.remove', 'logout', 'switch', 'claim.mint',
+    'passkey.assert', 'magic.start', 'magic.redeem', 'magic.whose', 'passkeys', 'passkey.remove', 'logout', 'switch', 'claim.mint',
     'sessions', 'logout.all', 'keychain.lock', 'suspend',
   ];
   for (const flow of flows) {

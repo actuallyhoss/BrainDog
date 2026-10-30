@@ -577,6 +577,9 @@ export const account = {
   linkLandingTitle: 'Your sign-in link is here',
   claimLandingTitle: 'Your BrainDog is ready to claim',
   useLink: 'Sign in with this link',
+  /* WHOSE ACCOUNT THE LINK OPENS, said before the press, so a link somebody else sent cannot sign you in to theirs unseen. */
+  linkOpens: (kind: 'magic' | 'claim', email: string) =>
+    kind === 'claim' ? `This link is for ${email}. If that is not your address, close this page.` : `This link signs in as ${email}. If that is not your address, close this page.`,
   claimRecord: 'Claim your BrainDog',
   linkExpiredTitle: 'That link has expired or was already used',
   linkExpiredWhy: (kind: 'magic' | 'claim', canAsk: boolean) =>

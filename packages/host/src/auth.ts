@@ -453,6 +453,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/passkey/assert', method: 'POST', flow: 'passkey.assert', on: 'both', needs: 'nothing', what: 'Sign in with a passkey.' },
   { path: '/auth/magic/start', method: 'POST', flow: 'magic.start', on: 'both', needs: 'nothing', what: 'Send a sign-in link. An address nobody has gets the same answer and no mail.' },
   { path: '/auth/magic/redeem', method: 'POST', flow: 'magic.redeem', on: 'both', needs: 'nothing', what: 'Spend a sign-in or claim link, once.' },
+  { path: '/auth/magic/whose', method: 'POST', flow: 'magic.whose', on: 'both', needs: 'nothing', what: 'The address of the account a sign-in or claim link opens, said before the press. Spends nothing.' },
   { path: '/auth/passkeys', method: 'GET', flow: 'passkeys', on: 'both', needs: 'session', what: 'Your passkeys, never their keys.' },
   { path: '/auth/passkey/remove', method: 'POST', flow: 'passkey.remove', on: 'both', needs: 'session', what: 'Remove one of your passkeys, the last one included.' },
   { path: '/auth/passkey/rename', method: 'POST', flow: 'passkey.rename', on: 'both', needs: 'session', what: 'Give one of your passkeys a name of your choosing. `{ id, label }`.' },
@@ -1037,6 +1038,8 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
       return typeof body.claimToken === 'string'
         ? { flow, claimToken: body.claimToken, ip, ...presented }
         : { flow, linkToken: text(body.linkToken), ip, ...presented };
+    case 'magic.whose':
+      return typeof body.claimToken === 'string' ? { flow, claimToken: body.claimToken, ip } : { flow, linkToken: text(body.linkToken), ip };
     case 'passkey.remove':
       return { flow, sid: sid ?? '', id: text(body.id) };
     case 'switch':
