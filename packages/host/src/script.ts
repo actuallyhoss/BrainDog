@@ -481,6 +481,23 @@ export function addressed(script: string, egress: readonly string[], grant: Scri
 }
 
 /**
+ * What of an address held in the keys the executor strikes from the answer (`ActionRequest.scrub`), longest first: the
+ * key as it was kept, the URL as sent, its path with its query, and each part of either long enough to be a token. A
+ * provider that echoes the address, whole or only its path or its token, hands the script nothing of the secret.
+ *
+ * A SHORT PART IS LEFT, because `calendar` or `basic.ics` is no secret and striking it would garble every answer; the
+ * executor drops anything under eight characters in any case (`spellingsOf`).
+ */
+export function addressSecrets(secret: string, url: URL): string[] {
+  const texts = new Set<string>([secret.trim(), url.href, `${url.pathname}${url.search}`, url.search.slice(1)]);
+  for (const segment of url.pathname.split('/')) if (segment.length >= 16) texts.add(segment);
+  url.searchParams.forEach((value) => {
+    if (value.length >= 8) texts.add(value);
+  });
+  return [...texts].filter((t) => t.length >= 8 && t !== '/').sort((a, b) => b.length - a.length);
+}
+
+/**
  * The refusal for a script that declares the keychain's `slash` key, asked before its sandbox starts, or `null`.
  *
  * BEFORE THE SANDBOX AND NOT ONLY AT THE FETCH, so a script that names the key and never uses it is refused all the
@@ -514,6 +531,9 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
 
     const fetch = async (sent: HostRequest): Promise<HostResponse> => {
       let asked = sent;
+      /* WHAT OF A KEY USED AS THE ADDRESS THE EXECUTOR STRIKES FROM ITS ANSWER (`addressSecrets`): it goes out with no
+         grant, so `sendAction` would not otherwise know it is a secret. */
+      let scrub: string[] = [];
       if (kept.stop !== null) throw new Error(kept.stop.why);
       /* BEFORE THE KEY IS LOOKED UP, so a write by an agent's trial reaches neither the keychain nor the socket. A rejected
          promise like a refused key's: the script may catch it and go on reading. */
@@ -532,6 +552,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
           throw new Error(read.why);
         }
         asked = { ...asked, url: read.url.href, key: null, address: null };
+        scrub = addressSecrets(secret, read.url);
       }
       const grant = asked.key === null ? null : options.grantOf(asked.key);
       if (asked.key !== null && grant === null) throw new Error(`The key "${asked.key}" is not in the keychain, so nothing was sent.`);
@@ -553,6 +574,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
         headers: asked.headers,
         ...(asked.body === null ? {} : { body: asked.body }),
         grant,
+        ...(scrub.length === 0 ? {} : { scrub }),
         timeoutMs: ACTION_TIMEOUT_MS,
         maxBytes: ACTION_MAX_BYTES,
       };

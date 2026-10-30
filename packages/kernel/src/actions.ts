@@ -155,6 +155,13 @@ export type ActionRequest = {
    * credential meets a request.
    */
   auth?: ActionAuth;
+  /**
+   * Texts the executor strikes out of what it hands back, beside the spellings of a key it opens itself: a key used as
+   * the address (a script's `address`), which is opened before the executor and sent with no key, so the executor never
+   * learns it is a secret. A provider that echoes its URL (a 404 page, some calendar feeds) would otherwise hand the link
+   * to the script.
+   */
+  scrub?: readonly string[];
   timeoutMs: number;
   maxBytes: number;
 };
