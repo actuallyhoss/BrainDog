@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SPLIT_ZERO, splitPlan, splitSentence, splitSlot } from './split.ts';
+import { SPLIT_ZERO, splitFigures, splitPlan, splitSentence, splitSlot } from './split.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -111,4 +111,9 @@ test('AN AMOUNT BELOW NOUGHT SAYS IT IS OWED where a share would be; a count bel
   assert.match(html, /<span class="split-label">Stripe available<\/span><span class="split-value num">−[^<]*9\.61[^<]*<\/span><span class="split-share num">owed<\/span>/u);
   assert.match(html, /<td class="num">owed<\/td>/u, 'and the fold of numbers says it too');
   assert.doesNotMatch(toHTML(parse('```split\nOpen | 9\nMoved back | −2\n```')), /owed/u);
+});
+
+test('a split legend says its figures as one set: all whole, or all to the same places (audit 2 B13)', () => {
+  assert.deepEqual(splitFigures(['£174.23', '£58.00', '£10.02']), ['£174.23', '£58.00', '£10.02']);
+  assert.deepEqual(splitFigures(['£174.00', '£58.00']), ['£174', '£58']);
 });

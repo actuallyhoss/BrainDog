@@ -1388,3 +1388,10 @@ test('A WHOLE NUMBER DECLARED BETWEEN 1000 AND 9999 IS PRINTED AS A YEAR, NOT WI
   const src = readFileSync(new URL('./api.ts', import.meta.url), 'utf8');
   assert.match(src, /f\.min >= 1000 && f\.max <= 9999 \? String\(Math\.trunc\(Number\(value\)\)\)/u);
 });
+
+test('a payee and the words a filing rule matches are said as words, the bank\'s own words stay (audit 2 B4)', () => {
+  assert.equal(display('transactions', 'payee', 'PAPERHAUS SUPPLIES'), 'Paperhaus Supplies');
+  assert.equal(display('transactions', 'payee', 'Bridge Street Coffee'), 'Bridge Street Coffee');
+  assert.equal(display('filing_rules', 'match', 'FENWICK CLOUD'), 'Fenwick Cloud');
+  assert.equal(display('transactions', 'counterparty_text', 'PAPERHAUS SUPPLIES'), 'PAPERHAUS SUPPLIES');
+});
