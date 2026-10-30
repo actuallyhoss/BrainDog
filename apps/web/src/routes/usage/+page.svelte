@@ -663,20 +663,6 @@
     font-size: var(--fs-body);
   }
 
-  /* A NAME AND ITS COUNT ON ONE LINE AT EVERY WIDTH (audit 6f AF22): the phone's card put "36 runs" on a line of its own,
-     set in under the name as if under a missing well. The name wraps; the count keeps the right-hand column. */
-  .use-row .line-title {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .use-row .use-counts {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: baseline;
-    text-align: end;
-  }
-
   .use-row[data-faint] .line-title {
     color: var(--ink-2);
   }
@@ -739,7 +725,9 @@
       row-gap: 2px;
     }
 
-    .use-counts {
+    /* ONLY A PROJECT'S HEADING SETS ITS COUNTS PAST A WELL: an action's row has none, and its "36 runs" sat indented under
+       its name as if under a missing icon (audit 6f AF22). */
+    .use-group-h .use-counts {
       flex-basis: 100%;
       padding-inline-start: calc(var(--well-l) + var(--sp-3));
     }

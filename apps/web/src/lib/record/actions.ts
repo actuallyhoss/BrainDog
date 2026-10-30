@@ -25,7 +25,7 @@
 import { bytes as fmtBytes, since, writeAmount } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { humanize } from './names.ts';
+import { humanize, titleOf } from './names.ts';
 import { keptRead, wroteOutside } from '@braindog/client';
 import type { RECONNECT_STATE, ReconnectState } from './keychain.ts';
 
@@ -646,7 +646,7 @@ export function usageFromActions(rows: readonly ActionRow[], month: string, from
     const key = title === undefined ? '' : a.project!;
     const name = title ?? words.everywhereUsage;
     /* IN WORDS, NEVER AN ID (AF10): a rule declared with no name of its own is read back as "weekly-review". */
-    const named: Named = { name: spokenName(a.name, [a.id, a.rule]), faint: key === '', runs, requests: 0, bytes: 0, failures: a.month?.failed ?? 0 };
+    const named: Named = { name: ruleSpoken(a.name, [a.id, a.rule]), faint: key === '', runs, requests: 0, bytes: 0, failures: a.month?.failed ?? 0 };
     add(totals, named);
     const p = projects.get(key) ?? { name, faint: key === '', ...zero() };
     add(p, named);
@@ -688,7 +688,7 @@ export function namesOf(o: {
   const out = new Map<string, string>(o.actions ? projectNames(o.actions) : []);
   for (const a of o.automations ?? []) {
     /* THE LEDGER NAMES A RULE'S RUN `rule:<id>` (`@braindog/host` `meteredOf`); both ids are kept, as either can be it. */
-    const name = spokenName(a.name, [a.id, a.rule]);
+    const name = ruleSpoken(a.name, [a.id, a.rule]);
     out.set(`rule:${a.id}`, name);
     if (a.rule) out.set(`rule:${a.rule}`, name);
   }
@@ -713,6 +713,19 @@ function spokenName(name: string, ids: readonly (string | undefined)[]): string 
   if (bare === '') return humanize(ids.find((id) => id !== undefined && id !== '') ?? '');
   const isId = ids.some((id) => id !== undefined && (id === bare || id.replace(/^rule\./u, '') === bare));
   return isId || SLUG.test(bare) ? humanize(bare) : bare;
+}
+
+/**
+ * A RULE'S NAME AS AUTOMATIONS AND ACTIVITY SAY IT (AF9, AF10): where the record answered its id for a name, the
+ * product's own name for a rule it ships (`titleOf`, "Categorise what cleared"), else the id in words, so Usage never
+ * says "Txn categorise" for the rule the next screen calls something else.
+ */
+function ruleSpoken(name: string, ids: readonly (string | undefined)[]): string {
+  const bare = name.trim();
+  const id = ids.find((x) => x !== undefined && x !== '')?.replace(/^rule\./u, '');
+  const isId = bare === '' || ids.some((x) => x !== undefined && (x === bare || x.replace(/^rule\./u, '') === bare));
+  if (isId) return titleOf({ id: id ?? bare, kind: 'rule' });
+  return SLUG.test(bare) ? titleOf({ id: bare, kind: 'rule' }) : bare;
 }
 
 /** An amount of one meter, as a person reads it. */
