@@ -1875,13 +1875,15 @@
     translate: -50% calc(var(--sp-2) + 18px);
   }
 
+  /* AT THE END THE WORDS END ON THE DOT, not a step past it: past it, "−£127,490" ran into the value axis's "−£150k"
+     beside the plot (polish-f L8). */
   .forecast-low-label[data-side='end'] {
     justify-items: end;
-    translate: calc(-100% + var(--sp-2)) var(--sp-2);
+    translate: -100% var(--sp-2);
   }
 
   .forecast-low-label[data-side='end'][data-drop] {
-    translate: calc(-100% + var(--sp-2)) calc(var(--sp-2) + 18px);
+    translate: -100% calc(var(--sp-2) + 18px);
   }
 
   .forecast-low-label[data-side='start'] {
