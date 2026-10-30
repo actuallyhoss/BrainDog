@@ -17,6 +17,7 @@ import { FILE_BACK_SCRIPT } from './scripts/file-back.js';
 import { FILE_PAID_RULE, FILE_PAID_SCRIPT } from './scripts/file-paid.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
+import { LEDGER_TWICE_SCRIPT } from './scripts/ledger-twice.js';
 import { OFFER_BUDGETS_SCRIPT } from './scripts/offer-budgets.js';
 import { MATCH_PAYMENT_SCRIPT } from './scripts/match-payment.js';
 import { CARD_OWED } from './scripts/card-owed.js';
@@ -534,6 +535,11 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   OFFER_BUDGETS_SCRIPT,
   /* AND THE DAILY MARK THE TWO BUDGET RULES ABOVE TELL OF (`scripts/budget-watch.js`). */
   BUDGET_WATCH_SCRIPT,
+  /* LINES WRITTEN TWICE, ONE QUESTION A NIGHT AT MOST (live check of 30 October, 11): one payment that reached the Ledger
+     by an alert and by a statement, or by an alert sent again, is asked about once, and yes archives the copy and moves
+     what was set on it to the line kept (`scripts/ledger-twice.js`). Picking the answer is the writes, so no automation
+     here acts on it. */
+  LEDGER_TWICE_SCRIPT,
 ];
 
 /**
