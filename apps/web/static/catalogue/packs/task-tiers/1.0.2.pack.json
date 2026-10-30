@@ -1,0 +1,96 @@
+{
+  "pack": "task-tiers",
+  "version": "1.0.2",
+  "icon": "list-ordered",
+  "title": "Task tiers",
+  "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and BrainDog works out its priority and writes the sum as the reason.",
+  "changes": "Its description says BrainDog works out a task's priority, where it said the record did. Nothing it does has changed.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "work": ">=1.19.0"
+    }
+  },
+  "extends": {
+    "register.tasks": {
+      "fields": [
+        {
+          "id": "rev",
+          "label": "Brings money",
+          "type": "int",
+          "min": 0,
+          "max": 25
+        },
+        {
+          "id": "unblock",
+          "label": "Unblocks other work",
+          "type": "int",
+          "min": 0,
+          "max": 25
+        },
+        {
+          "id": "clock",
+          "label": "Has a clock on it",
+          "type": "int",
+          "min": 0,
+          "max": 25
+        },
+        {
+          "id": "cheap",
+          "label": "Cheap to do",
+          "type": "int",
+          "min": 0,
+          "max": 25
+        }
+      ]
+    }
+  },
+  "declarations": [
+    {
+      "rule": "task_tier",
+      "name": "Work out a task's priority from its four numbers",
+      "on": {
+        "written": {
+          "register": "tasks",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "rev",
+            "unblock",
+            "clock",
+            "cheap"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "task_tier",
+            "as": "tiered"
+          }
+        }
+      ]
+    },
+    {
+      "script": "task_tier",
+      "title": "A task's priority from its four numbers",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "tasks"
+      ],
+      "writes": [
+        "tasks"
+      ],
+      "source": "/**\n * Task tiers: a task's four judgements added up, and the tier they come to written on the task with its reason.\n *\n * STARTED BY THE PACK'S AUTOMATION WHEN A TASK IS CREATED OR ONE OF THE FOUR CHANGES, which hands it the task's id.\n * The four are whole numbers from 0 to 25 that a person or an agent gives: Brings money, Unblocks other work, Has a\n * clock on it, and Cheap to do. Together they come to at most 100.\n *\n * THE BANDS. Under 40 is Low, 40 to 59 is Normal, 60 to 79 is High, and 80 or more is Urgent. These are the values\n * Work's own Priority already takes, so every page and filter that reads Priority reads the tier.\n *\n * THE REASON IS THE SUM, SAID IN A LINE: \"Money 20, unblocks 15, clock 25, cheap 5: 65 of 100.\" It is written into\n * Work's Why this tier, so a list ordered by tier can be argued with by the person reading it.\n *\n * WORDS A PERSON WROTE ARE KEPT. Whatever Why this tier already says stays after the line. A line this script wrote\n * before is replaced by the new one, so the words are not doubled and an old sum is not left standing.\n *\n * WHAT IT LEAVES ALONE. A task with none of the four is not given a tier, so one somebody typed stands. A number\n * nobody gave counts as nothing. A task already at its tier with its line is not written again.\n *\n * WHEN ALL FOUR ARE CLEARED THE LINE LEAVES. A sum of numbers that are gone is no reason, so the line this script\n * wrote is taken off the start of Why this tier and the words after it stay. Priority is left where it was: it is\n * the person's to change now. A reason with no line at its start was typed by somebody, and is not touched.\n *\n * IT WRITES TWO FIELDS, Priority and Why this tier, and the automation watches neither, so this script does not start\n * itself again.\n *\n * IT HANDS BACK THE VERSION IT READ, so a reason somebody changed while this ran is not written over. Such a run is\n * refused and writes nothing; the task's next change in one of the four works the tier out again.\n */\n\nconst FOUR = ['rev', 'unblock', 'clock', 'cheap'];\n/** The most one judgement counts for, which is what the field itself takes. */\nconst MOST = 25;\n\n/** The line a run of this script wrote, at the start of a reason, with the space after it. */\nconst WRITTEN = /^Money \\d+, unblocks \\d+, clock \\d+, cheap \\d+: \\d+ of 100\\.\\s*/;\n\nconst given = (v) => typeof v === 'number' && Number.isFinite(v);\n/** One judgement as a whole number from 0 to 25. The field refuses anything else, and a row written before it did not. */\nconst counted = (v) => (given(v) ? Math.min(MOST, Math.max(0, Math.round(v))) : 0);\n\nconst tierOf = (sum) => (sum >= 80 ? 'urgent' : sum >= 60 ? 'high' : sum >= 40 ? 'normal' : 'low');\n\nexport default async function run(ctx) {\n  const task = await ctx.record.get(String(ctx.input.id));\n  if (task === null) {\n    ctx.log('The task that started this run is gone, so nothing was written.');\n    return;\n  }\n  const f = task.fields;\n  const was = typeof f.why === 'string' ? f.why : '';\n  if (!FOUR.some((id) => given(f[id]))) {\n    if (WRITTEN.test(was)) {\n      ctx.log('This task has none of the four numbers any more, so the sum was taken out of its reason and its tier was left as it is.');\n      ctx.update(`tasks#${task.seq}`, { why: was.replace(WRITTEN, '').trim() }, task.version);\n      return;\n    }\n    ctx.log('This task has none of the four numbers, so its tier was left as it is.');\n    return;\n  }\n\n  const [rev, unblock, clock, cheap] = FOUR.map((id) => counted(f[id]));\n  const sum = rev + unblock + clock + cheap;\n  const line = `Money ${rev}, unblocks ${unblock}, clock ${clock}, cheap ${cheap}: ${sum} of 100.`;\n  const words = was.replace(WRITTEN, '').trim();\n  const why = words === '' ? line : `${line} ${words}`;\n  const priority = tierOf(sum);\n\n  if (f.priority === priority && f.why === why) return;\n  ctx.update(`tasks#${task.seq}`, { priority, why }, task.version);\n}\n"
+    }
+  ]
+}

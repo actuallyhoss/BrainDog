@@ -97,7 +97,7 @@ const ledger = (sql: Sql): { what: string; direction: string; amount: { amount: 
 test('1.4.1 ADDS TWO BLOCKS TO MONEY WITH HEADS UP, IN THE MAIN COLUMN, and a way into the counter on Money and on an account, and the plan finds the pages on a record holding money-core', async () => {
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(file.value.pack.manifest.version, '3.0.3');
+  assert.equal(file.value.pack.manifest.version, '3.0.4');
   const adds = shipped().adds as { page: string; after: string; block: { kind: string; heading: string; area?: string; when?: unknown; where?: string } }[];
   assert.deepEqual(
     adds.map((a) => [a.page, a.after, a.block.kind, a.block.heading, a.block.area]),

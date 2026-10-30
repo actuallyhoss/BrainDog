@@ -710,12 +710,38 @@
       "kind": "pack",
       "id": "count-cash",
       "title": "Count the cash",
-      "summary": "Count the cash note by note and coin by coin, or by its total, and the record keeps it as a balance check and files the difference from what it thought was there, as lines you describe or as Discrepancy.",
+      "summary": "Count the cash note by note and coin by coin, or by its total, and BrainDog keeps it as a balance check and files the difference from what it expected, as lines you describe or as Discrepancy.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "3.0.3",
+      "latest": "3.0.4",
       "versions": [
+        {
+          "version": "3.0.4",
+          "checksum": "02fb116fd380822409cfe942c914b10a2847f28f2f6d3501f219a5980dc7b083",
+          "bytes": 27943,
+          "published_at": "2026-10-30T19:02:17.634Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Its description says BrainDog keeps the count, where it said the record did. Nothing it does has changed.",
+          "preview": true
+        },
         {
           "version": "3.0.3",
           "checksum": "865828c06f83a36b5a5cc0f824594fe50e92420e2e65bedc8e03feaaf322a8b5",
@@ -3853,12 +3879,34 @@
       "kind": "pack",
       "id": "pad",
       "title": "Pad",
-      "summary": "Notes beside the work, each with room for a reply under it. It asks no model, so it keeps on any record.",
+      "summary": "Notes beside the work, each with room for a reply under it. It asks no model, so it spends none of your allowance.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "1.2.2",
       "versions": [
+        {
+          "version": "1.2.2",
+          "checksum": "4081857e67e0d8acf8ab5d30f9aba84844c191035b2e3db899136693f7afb746",
+          "bytes": 2144,
+          "published_at": "2026-10-30T19:02:17.634Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Notes"
+            ],
+            "pages": [
+              "Pad"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Its description says it spends none of your allowance, where it said it keeps on any record. Nothing it does has changed.",
+          "preview": true
+        },
         {
           "version": "1.2.1",
           "checksum": "f1503fab2e856ecf85d31add58641d2c1420bbd0b4ffedb8c0809c03cfed6f21",
@@ -3965,12 +4013,33 @@
       "kind": "pack",
       "id": "pad-second-opinion",
       "title": "Pad second opinion",
-      "summary": "A second opinion written under each note on the pad. It asks your record's model about every note with no reply, so each note spends some of its allowance.",
+      "summary": "A second opinion written under each note on the pad. It asks your BrainDog's model about every note with no reply, so each note spends some of your allowance.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "3571a79cf89d1a1bd73fc24dd16958f541dba4e06fc37e95bdd81bdc6606dd55",
+          "bytes": 1456,
+          "published_at": "2026-10-30T19:02:17.634Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [
+              "Write a second opinion under each note"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Its description says your BrainDog's model and your allowance, where it said the record's. Nothing it does has changed."
+        },
         {
           "version": "1.0.1",
           "checksum": "76e2f3d56945989198855179a708c63e363be4bfddd0f695741f21cec4d7f7f3",
@@ -6034,12 +6103,44 @@
       "kind": "pack",
       "id": "splits",
       "title": "Splits",
-      "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their rows close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
+      "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their splits close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "51d7c6671640af932e05bf037e300a05174cbbe56e6596ad2616293703223487",
+          "bytes": 27227,
+          "published_at": "2026-10-30T19:02:17.634Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Splits",
+              "Where each person stands"
+            ],
+            "pages": [
+              "Splits",
+              "{{name}}"
+            ],
+            "rules": [
+              "Write the split of a Ledger line marked shared",
+              "Work out a split and where that person stands"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Splits"
+            ]
+          },
+          "notes": "Its description says a person's splits close by themselves when you are square, where it said their rows. Nothing it does has changed.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "fec4f0d15578665176caaab21b40a1d3b2f4f1c7e4b96fee9338c842c7b5eb26",
@@ -6689,12 +6790,33 @@
       "kind": "pack",
       "id": "task-tiers",
       "title": "Task tiers",
-      "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and the record works out its priority and writes the sum as the reason.",
+      "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and BrainDog works out its priority and writes the sum as the reason.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "1f4c18359bfdf54c74e2629ee56cb10b37adfffe601d48f74444a05f58d8513e",
+          "bytes": 6079,
+          "published_at": "2026-10-30T19:02:17.634Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [
+              "Work out a task's priority from its four numbers"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Its description says BrainDog works out a task's priority, where it said the record did. Nothing it does has changed."
+        },
         {
           "version": "1.0.1",
           "checksum": "6b1388c090d3955430f8ad28b0fd4e87a3a41f3a1e167fab4405476953b77565",

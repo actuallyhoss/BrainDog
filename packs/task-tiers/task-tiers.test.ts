@@ -63,7 +63,7 @@ test('THE PACK CARRIES tier.js AS ITS SOURCE, byte for byte; it fetches nothing 
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'task-tiers');
-  assert.equal(file.value.pack.manifest.version, '1.0.1');
+  assert.equal(file.value.pack.manifest.version, '1.0.2');
   /* THE REASON'S FIELD AND THE THREAD STATES IT SITS BESIDE ARRIVED WITH WORK 1.19.0. */
   assert.deepEqual(PACK.requires.packs, { work: '>=1.19.0' });
 });

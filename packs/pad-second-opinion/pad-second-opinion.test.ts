@@ -91,7 +91,7 @@ test('the file passes as an add-on opened from disk, its folder is its id, and i
   assert.equal(file.pack.manifest.pack, 'pad-second-opinion');
   assert.equal(new URL('.', import.meta.url).pathname.split('/').filter(Boolean).at(-1), 'pad-second-opinion');
   assert.deepEqual(file.pack.manifest.requires.packs, { pad: '>=1.2.0 <2.0.0' }, 'it must need a pad that no longer holds the same rule');
-  assert.equal(opinion().version, '1.0.1');
+  assert.equal(opinion().version, '1.0.2');
 });
 
 test('ITS SUMMARY SAYS IT ASKS THE RECORD\'S MODEL AND SPENDS ITS ALLOWANCE, so nobody adds it without knowing', () => {

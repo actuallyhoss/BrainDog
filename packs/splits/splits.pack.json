@@ -1,10 +1,10 @@
 {
   "pack": "splits",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "split",
   "title": "Splits",
-  "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their rows close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
-  "changes": "Says who owes whom in plain words: owes you, you owe them, square. A person’s page says where they stand as a card, where it printed the stored words.",
+  "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their splits close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
+  "changes": "Its description says a person's splits close by themselves when you are square, where it said their rows. Nothing it does has changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
