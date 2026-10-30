@@ -1252,7 +1252,8 @@
           {#if f.type === 'duration'}<span class="edit-unit">{unitOf(f)}</span>{:else if f.unit}<span class="edit-unit">{f.unit}</span>{/if}
         </div>
       {:else if f.type === 'ref' && f.to}
-        <RefPick to={f.to} label={labelOf(f)} bind:value={draft} />
+        <!-- A PRESSED ROW IS SAVED AT ONCE, so the open list never stands over Save. -->
+        <RefPick to={f.to} label={labelOf(f)} bind:value={draft} onpick={() => void saveEdit(f)} />
       {:else if f.type === 'ref'}
         <div class="field">
           <input class="field-input num" type="text" inputmode="numeric" aria-label={labelOf(f)} bind:value={draft} />

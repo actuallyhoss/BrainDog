@@ -23,6 +23,9 @@
     required = false,
     describedBy,
     invalid = false,
+    autofocus = false,
+    fixed = false,
+    onpick,
   }: {
     /** The list the link points at. */
     to: string;
@@ -33,6 +36,18 @@
     required?: boolean | undefined;
     describedBy?: string | undefined;
     invalid?: boolean | undefined;
+    /** The box takes the caret as it is drawn: a grid cell that just became this editor. */
+    autofocus?: boolean | undefined;
+    /**
+     * The list is raised to the page's top layer (a manual popover) and placed under the box on the screen: a grid's row
+     * clips anything that hangs out of a cell, and its table is a containing block a `position: fixed` list lands in.
+     */
+    fixed?: boolean | undefined;
+    /**
+     * A row pressed or chosen with Enter, after the value holds it. A row page and a grid cell save on it, so the list
+     * never stands between a pick and Save. A name typed and left is not a pick: it only fills the box.
+     */
+    onpick?: ((value: string) => void) | undefined;
   } = $props();
 
   const uid = $props.id();
@@ -51,6 +66,29 @@
   let open = $state(false);
   let active = $state(0);
   let ul = $state<HTMLUListElement | null>(null);
+  let box = $state<HTMLInputElement | null>(null);
+  /* WHERE A FIXED LIST STANDS: under the box, as wide as it or 240px, and kept there while anything scrolls. */
+  let at = $state('');
+
+  function place() {
+    const r = (box?.closest(".field") ?? box)?.getBoundingClientRect();
+    if (!r) return;
+    const width = Math.min(Math.max(r.width, 240), window.innerWidth - 16);
+    const left = Math.min(Math.max(r.left, 8), window.innerWidth - width - 8);
+    at = `position: fixed; inset-block-start: ${String(r.bottom + 4)}px; inset-inline-start: ${String(left)}px; inline-size: ${String(width)}px; inset-inline-end: auto;`;
+  }
+
+  $effect(() => {
+    if (!fixed || !open || !ul) return;
+    place();
+    if (typeof ul.showPopover === 'function' && !ul.matches(':popover-open')) ul.showPopover();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  });
 
   $effect(() => {
     if (!typing) query = picked?.label ?? '';
@@ -74,11 +112,12 @@
     void Promise.resolve().then(() => ul?.scrollIntoView({ block: 'nearest' }));
   }
 
-  function pick(o: RefOption | null) {
+  function pick(o: RefOption | null, chosen = false) {
     value = o === null ? '' : String(o.value);
     typing = false;
     query = o?.label ?? '';
     open = false;
+    if (chosen) onpick?.(value);
   }
 
   /* A BOX LEFT WITHOUT A PICK: the row its words name, none when it was emptied, else the row it held. */
@@ -119,7 +158,7 @@
     } else if (e.key === 'Enter' && open && rows.length > 0) {
       /* ENTER PICKS while the list is open, and does not send the form; a second Enter saves. */
       e.preventDefault();
-      pick(rows[Math.min(active, rows.length - 1)] ?? null);
+      pick(rows[Math.min(active, rows.length - 1)] ?? null, true);
     } else if (e.key === 'Enter' && typing) {
       settle();
     } else if (e.key === 'Escape' && open) {
@@ -136,6 +175,7 @@
 <div class="pick">
   <div class="field">
     <span class="pick-icon" aria-hidden="true"><Icon name={icon} size="s" /></span>
+    <!-- svelte-ignore a11y_autofocus -->
     <input
       class="field-input"
       {id}
@@ -151,8 +191,10 @@
       aria-describedby={describedBy}
       aria-invalid={invalid ? 'true' : undefined}
       placeholder={words.search(list)}
+      {autofocus}
       {required}
       bind:value={query}
+      bind:this={box}
       onfocus={(e) => {
         /* THE NAME IT HOLDS IS SELECTED, so the first letter typed starts a search rather than adding to it. */
         e.currentTarget.select();
@@ -171,7 +213,7 @@
     />
   </div>
   {#if open}
-    <ul class="pick-rows" id={listId} role="listbox" aria-label={label} bind:this={ul}>
+    <ul class="pick-rows" id={listId} role="listbox" aria-label={label} style={fixed ? at : undefined} popover={fixed ? 'manual' : undefined} bind:this={ul}>
       {#each rows as o, i (o === null ? 'none' : o.value)}
         <!-- THE KEYS ARE THE BOX'S (arrows, Enter, Esc), which keeps the caret: an option is pressed, never focused. -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -182,7 +224,7 @@
           aria-selected={i === active}
           data-none={o === null ? '' : undefined}
           onmousedown={(e) => e.preventDefault()}
-          onclick={() => pick(o)}
+          onclick={() => pick(o, true)}
           onmousemove={() => (active = i)}
         >
           {#if o === null}
@@ -228,6 +270,12 @@
     background: var(--tile);
     border: 1px solid var(--rule-strong);
     border-radius: var(--r-pop);
+  }
+
+  /* IN THE TOP LAYER the browser's own popover box is taken back: its margin, its inset and its colours. */
+  .pick-rows[popover] {
+    margin: 0;
+    color: var(--ink);
   }
 
   .pick-row {
