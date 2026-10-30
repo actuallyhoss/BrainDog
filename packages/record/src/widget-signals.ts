@@ -7,7 +7,7 @@
  * - S3, something new: an add-on that ships widgets installed in the last fortnight, a new savings goal.
  * - S4, time: three bills due in the next seven days, a trip inside a fortnight.
  * - S5, a project opened daily, a key number pinned with no numbers widget.
- * - S6, removal: a widget on the board that has drawn nothing for three weeks.
+ * - S6, removal: a widget on the board that has drawn nothing for three weeks, and has been on the board that long.
  *
  * WHOSE USE. S1 reads only the asking person's threads. Page opens are counted for the whole record (`observation`) and,
  * since migration 47, for each person beside it (`observation_who`). A record one person uses reads the whole record's
@@ -280,11 +280,48 @@ function pinned(read: SignalRead): WidgetSignal[] {
 /** S6: drawn this many days with nothing in what it reads. */
 export const EMPTY_DAYS = 21;
 
+/**
+ * SINCE WHEN A WIDGET HAS STOOD ON THE BOARD, as best the record knows it: the later of the record's birth and the day
+ * the widget went on. A widget can't have been empty for three weeks on a record younger than that (E1, 31 Oct: a
+ * minute-old BrainDog was asked to take Working now off Today "after three weeks").
+ *
+ * - A member's own Today (`home.today`) keeps no history, only when it was last arranged: that is the date read, so the
+ *   question waits three weeks after any change to it rather than guess.
+ * - The record's Today is `page.home`: the oldest version in the unbroken run of versions, newest back, that holds the
+ *   widget's key. A widget the newest version does not hold was not put there by the record (a board handed from the
+ *   screen), and is taken as put there now.
+ * - No `page.home` at all: the board is the app's first one, there since the record was made.
+ */
+function onBoardSince(read: SignalRead, key: string, ownBoardKept: boolean): string {
+  const now = new Date(read.nowMs).toISOString();
+  const born = read.sql.one<{ at: string | null }>('SELECT created_at AS at FROM record WHERE singleton = 1')?.at ?? now;
+  let added: string | null = null;
+  if (ownBoardKept) {
+    added = read.sql.one<{ at: string }>("SELECT updated_at AS at FROM pref WHERE person_id = ? AND key = 'home.today'", read.person)?.at ?? now;
+  } else {
+    const versions = read.sql.all<{ at: string; has: number }>(
+      "SELECT created_at AS at, EXISTS (SELECT 1 FROM json_each(body, '$.blocks') WHERE json_extract(value, '$.key') = ?) AS has FROM declaration WHERE id = 'page.home' AND kind = 'page' ORDER BY version DESC",
+      key,
+    );
+    if (versions.length > 0) {
+      added = now;
+      for (const v of versions) {
+        if (!v.has) break;
+        added = v.at;
+      }
+    }
+  }
+  return added !== null && added > born ? added : born;
+}
+
 function emptyForWeeks(read: SignalRead): WidgetSignal[] {
   const before = new Date(read.nowMs - EMPTY_DAYS * DAY_MS).toISOString();
+  const ownKept = read.person !== null && read.sql.one("SELECT 1 AS y FROM pref WHERE person_id = ? AND key = 'home.today'", read.person) !== undefined;
   const out: WidgetSignal[] = [];
   for (const b of read.board) {
     if (!b.empty || typeof b.source !== 'string') continue;
+    /* ON THE BOARD THREE WEEKS FIRST: an empty list on day 0 has had nothing to show for minutes, not weeks. */
+    if (onBoardSince(read, b.key, ownKept) > before) continue;
     /* WHAT IT READS HAS NOT MOVED IN THREE WEEKS: a list with nothing written since, or no agent heard from since. */
     const list = b.source === 'sessions.working' ? 'session' : b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
     if (list === null || (list !== 'session' && !read.lists.has(list))) continue;
