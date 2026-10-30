@@ -511,14 +511,16 @@ const moneyReading = (reading: unknown): boolean =>
   isRecord(reading) && ((typeof reading.unit === 'string' && /^[A-Z]{3}$/u.test(reading.unit)) || holdsMoney(reading.parts) || holdsMoney(reading.groups) || holdsMoney(reading.noRate));
 
 /**
- * A block with money kept off it, or `null` for a block that is money through and through: a cash walk, a block over a
- * list that is money (`moneyList`), or the runway. Otherwise a column of an amount goes (and its cells with it, since a
+ * A block with money kept off it, or `null` for a block that is money through and through: a cash walk, a block whose
+ * rows are a list that is money (`moneyList`), or the runway. Otherwise a column of an amount goes (and its cells with it, since a
  * row keeps only what its columns draw), a figure read in a currency goes, and a computed key that holds an amount goes.
  */
 const moneyFree = (b: BlockResult, showing: Showing): BlockResult | null => {
   if (b.walk !== undefined || b.walks !== undefined || b.source === 'forecast.runway') return null;
   const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
-  const lists = [...showing.reads(b), ...(list === undefined ? [] : [list]), ...b.rows.map((r) => r.register)];
+  /* THE LISTS ITS ROWS COME FROM, not every list its figures count: "Open 7" over the work stays beside "Still to come
+     in", which goes as a figure in a currency. */
+  const lists = [...(list === undefined ? [] : [list]), ...b.rows.map((r) => r.register)];
   if (lists.some((l) => moneyList(showing.lists.get(l)))) return null;
   const typeOf = (field: string): FieldType | undefined => (list === undefined ? undefined : showing.lists.get(list)?.fields.find((f) => f.id === field)?.type);
   const block = b as unknown as Record<string, unknown>;
@@ -526,6 +528,9 @@ const moneyFree = (b: BlockResult, showing: Showing): BlockResult | null => {
   if (b.columns !== undefined) kept.columns = b.columns.filter((c) => c.sign === undefined && typeOf(c.field) !== 'money');
   if (b.readings !== undefined) kept.readings = b.readings.filter((r) => !moneyReading(r.reading));
   for (const key of FIGURES) if (holdsMoney(block[key])) delete kept[key];
+  /* AND HOW ITS MONEY WAS CONVERTED, which is about amounts and nothing else. */
+  delete kept.fx;
+  delete kept.walkFx;
   return kept as unknown as BlockResult;
 };
 
