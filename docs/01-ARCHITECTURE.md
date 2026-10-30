@@ -299,21 +299,37 @@ enforced **above the driver** by `guard`: the parameter count (100), the stateme
 bytes (100,000) and its compound-select terms (5) before the statement runs, and the LIKE pattern's
 length (50 bytes) on every bound pattern. Expression depth (100) needs a parser, so the guard names it
 after the driver refuses it. Both hosts wrap their port in it (`guarded`: the self-host's `node:sqlite`
-in `apps/selfhost/src/server.ts`, the Durable Object's storage in `apps/worker/src/index.ts`), and so
-does every kernel test (`packages/kernel/test/sqlite.ts`), each throwing the same closed error
+in `apps/selfhost/src/server.ts`, the Durable Object's storage in `apps/worker/src/index.ts`), and every
+kernel test holds three of its checks (`sqlGuard` in `packages/kernel/test/sqlite.ts`: parameters,
+compound terms and LIKE patterns), each throwing the same closed error
 vocabulary ([33-CONTRACTS](33-CONTRACTS.md) §1). *That* is what "Node refuses first" means. `node:sqlite` has no `limits` constructor option and no `setLimit`;
 an earlier draft of [30-BLUEPRINT](30-BLUEPRINT.md) §13 passed one, and it was silently ignored.
 
-> **No conformance suite runs yet.** [33-CONTRACTS](33-CONTRACTS.md) §3 specifies one: the same record
-> cases run on both hosts, a reference result from the Durable Object, and a gate that every host ran the
-> same number of cases. None of it is built. Every record test runs on `node:sqlite` behind the guard, and
-> so does the Worker's own harness (`apps/worker/test/cloud-harness.ts` runs `Record$` over `node:sqlite`,
-> because local workerd cannot rewind a Durable Object). The ceilings above were measured once on local
-> workerd through Miniflare (wrangler 4.129.0) and are held by `packages/ports/test/sql.test.ts`, not
-> measured again on each run. So a statement the guard passes and the Durable Object still refuses, for a
-> reason the guard does not count, is found on the Worker and not by a test. A portability claim that is
-> only ever asserted in a table is a claim nobody has run, in either direction; building the suite is
-> open work (F30 of the finish queue). See [30-BLUEPRINT](30-BLUEPRINT.md) §13.
+> **The conformance suite is built, and it is not in CI's required set.** One list of cases
+> (`packages/host/test/conformance/cases.ts`, [33-CONTRACTS](33-CONTRACTS.md) §3) runs on both hosts, each
+> case on a fresh database behind the host's own port and alarm: on the self-host through `openSqlite` and
+> `nodeScheduler` (`apps/selfhost/test/conformance.run.ts`), and in a real Durable Object on local workerd
+> through `storageSql`/`guardedSql` cut from `apps/worker/src/index.ts` and `alarmScheduler`
+> (`apps/worker/test/conformance.run.ts`, Miniflare and esbuild reached through wrangler, as
+> `kernel-in-do.test.ts` does). The cases cover values of every kind and the BLOB shape, the guard's ceilings,
+> transactions and `attempt()`'s rollback, FTS5 with the record's tokenizer, the JSON and SQL the kernel uses,
+> the Durable Object's limits the guard does not count, migrations in order, a row of every field type,
+> versions and conflicts, search, the keychain's bytes, and the alarm and outbox. Each host writes what it saw
+> to `packages/host/test/conformance/_results/`, and `compare.run.ts` holds the two equal case by case and
+> checks both ran the same cases. `pnpm conformance` at the root runs all three; each half runs alone with
+> `pnpm --filter @braindog/selfhost conformance` or `pnpm --filter @braindog/worker conformance`, then
+> `pnpm --filter @braindog/host conformance:compare`.
+>
+> A case one host is known to fail names the host and why (`drift`) and runs there as a `todo`, so the
+> report shows it on every run without going red. Known at the time of writing: the self-host's port answers
+> a nested `transactionSync` with `fn()` where the Durable Object's is a savepoint; `node:sqlite` cuts a
+> bound string at its first U+0000; and the guard does not count the Durable Object's expression depth (100),
+> columns (100), function arguments (32) or value length (2 MB), which `node:sqlite` allows far past. Two
+> more are measured only on Node and left to the compare: `node:sqlite` binds every JavaScript number as a
+> REAL (`CAST(1 AS TEXT)` is `1.0`), and whether the Durable Object enforces `decision.supersedes`'s foreign
+> key. No reference trace is committed yet (`packages/ports/conformance/reference.json` in 33 §3), and the
+> kernel's own tests still run on `packages/kernel/test/sqlite.ts`, which counts three of the guard's checks
+> and leaves `node:sqlite`'s foreign keys on. See [30-BLUEPRINT](30-BLUEPRINT.md) §13.
 
 ---
 
