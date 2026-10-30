@@ -172,6 +172,7 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
       version: at,
       ...(e.pass === undefined ? {} : { pass: e.pass, steps: (e.steps ?? []).flatMap((s) => toLine(s) ?? []) }),
       ...(settling === null ? {} : { settling }),
+      ...(e.kind === 'decide' && typeof e.settles === 'string' && e.settles !== '' ? { settles: `suggestion:${e.settles}` } : {}),
     };
   };
   for (const e of out.value.events) {

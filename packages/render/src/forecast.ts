@@ -907,9 +907,10 @@ export type ForecastPlan = {
   /**
    * THE LOWEST POINT, SAID BESIDE ITS DOT (money-core 3.29.0): where it sits (shares across and down), the figure, and
    * which way its words lean at the chart's ends, or `null` where the lowest is today, which today's label already says.
-   * `drop` is set where a numbered part of a plan sits on the same day, so the words hang below its disc.
+   * `drop` is set where a numbered part of a plan sits on the same day, so the words hang below its disc. `foot` is set
+   * where they hang past the plot's foot (`lowFoot`), and the month names are set under them.
    */
-  lowLabel: { at: string; y: string; figure: string; side?: 'start' | 'end'; drop?: true } | null;
+  lowLabel: { at: string; y: string; figure: string; side?: 'start' | 'end'; drop?: true; foot?: true } | null;
   /** The month names under the chart; `edge` is the start's own month, set at the left edge rather than centred. */
   ticks: { at: string; label: string; edge?: true }[];
   /** The start and the end of the time axis, for the scrub. */
@@ -1211,6 +1212,19 @@ export function nowPlace(points: readonly { x: number; y: number }[], dot: { x: 
   return best !== null && (best.n === 0 || best.place !== 'start-far') ? best.place : (order[0] ?? 'above');
 }
 
+/** The lowest point's label as a share of the plot's height on a phone: "Lowest" over its figure, two lines of 16px. */
+const LOW_TALL = 0.2;
+/** How much lower the label hangs where a numbered part of a plan sits on the same day: its 16px disc and a gap. */
+const LOW_DROP = 0.11;
+
+/**
+ * WHETHER THE LOWEST POINT'S WORDS HANG PAST THE PLOT'S FOOT. They stand under the dot, where nothing of the line can be,
+ * since the line never goes lower; under a dot at the foot they hung onto the month names, "Lowest −£16,213" over "Nov"
+ * (audit of 31 October, A23). Where they would, the label says so (`foot`) and both drawers set the month names under
+ * it, rather than moving the words off their dot or the axis off its round steps. `y` is the dot's share down.
+ */
+export const lowFoot = (y: number, drop: boolean): boolean => y + NOW_GAP + LOW_TALL + (drop ? LOW_DROP : 0) > 1;
+
 /**
  * The `data-place` both drawers set on today's label, or `null` where it sits where it always did: over the dot, or under
  * it with the flag near, which `data-near-flag` already says.
@@ -1356,6 +1370,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       .map((s) => `M${x(s.day)} ${y(s.balance)}h0`)
       .join(' ');
   const lowAt = daysBetween(start, shown.lowest.day) / span;
+  /* A NUMBERED DISC NEAR THE LOWEST POINT, not only on its day (audit of 31 October, 23): the third part of a plan fell
+     the day after the lowest and its disc sat under the word "Lowest", on every look. A disc close enough across and up
+     or down to sit under the words hangs them below it. */
+  const lowDrop = drops.some((s) => s.day === shown.lowest.day || nearLow(daysBetween(start, s.day) / span - lowAt, (hi - s.balance) / (hi - lo) - (hi - shown.lowest.balance) / (hi - lo)));
   const lowLabel: ForecastPlan['lowLabel'] =
     shown.lowest.day === model.today
       ? null
@@ -1364,12 +1382,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
           y: String(Math.round(Number(y(shown.lowest.balance)) * 100) / 10_000),
           figure: forecastFigure(model, Math.round(shown.lowest.balance), 'read'),
           ...(lowAt > 1 - LOW_EDGE ? { side: 'end' as const } : lowAt < LOW_EDGE ? { side: 'start' as const } : {}),
-          /* A NUMBERED DISC NEAR THE LOWEST POINT, not only on its day (audit of 31 October, 23): the third part of a plan
-             fell the day after the lowest and its disc sat under the word "Lowest", on every look. A disc close enough
-             across and up or down to sit under the words hangs them below it. */
-          ...(drops.some((s) => s.day === shown.lowest.day || nearLow(daysBetween(start, s.day) / span - lowAt, (hi - s.balance) / (hi - lo) - (hi - shown.lowest.balance) / (hi - lo)))
-            ? { drop: true as const }
-            : {}),
+          ...(lowDrop ? { drop: true as const } : {}),
+          ...(lowFoot(shareOf(shown.lowest.day, shown.lowest.balance).y, lowDrop) ? { foot: true as const } : {}),
         };
 
   return {

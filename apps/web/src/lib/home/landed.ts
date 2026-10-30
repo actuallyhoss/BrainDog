@@ -8,7 +8,7 @@
  * Pure, so `landed.test.ts` holds the rules.
  */
 
-import { since } from 'braindog-render';
+import { handleName, since } from 'braindog-render';
 
 import { actor, type ActorKind } from '../record/names.ts';
 
@@ -57,13 +57,12 @@ const SLUG = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/u;
 
 /**
  * THE NAME A LINE SAYS: the row's title as the list declares it, and where that is a handle ("nordhaven-dns") the same
- * words spaced and capitalised ("Nordhaven dns"), so no slug is ever drawn as a name.
+ * words spaced and capitalised ("Nordhaven DNS"), so no slug is ever drawn as a name.
  */
 export function displayName(title: string): string {
   const name = title.replaceAll(/\s*—\s*/gu, ', ').trim();
-  if (!SLUG.test(name)) return name;
-  const words = name.replaceAll(/[-_]+/gu, ' ');
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  /* AS EVERY OTHER SCREEN SAYS A HANDLE (`handleName`): "Nordhaven DNS", not "Nordhaven dns". */
+  return SLUG.test(name) ? handleName(name) : name;
 }
 
 /** The lines to draw, newest first. */

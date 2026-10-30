@@ -18,6 +18,7 @@
   import { exampleMoney } from 'braindog-render';
   import Icon from '$lib/ui/Icon.svelte';
   import { isGlyph } from '$lib/ui/icons.ts';
+  import { moneyInText } from '$lib/record/money.ts';
   import { FIGS_AT, ROWS_SHOWN, figureSaid, rowLine, rowShare, sheetWords } from './widget-read.ts';
 
   let {
@@ -52,7 +53,8 @@
   const rows = $derived.by((): Line[] => {
     if (reading?.rows)
       return reading.rows.slice(0, ROWS_SHOWN[size]).map((r: ReadRow) => ({
-        title: r.title,
+        /* A SENTENCE THE RECORD STORED SAYS ITS AMOUNT AS EVERY SCREEN DOES: "£39", never "GBP 39.00" (audit of 31 October, A20). */
+        title: moneyInText(r.title),
         line: rowLine(r, home),
         share: rowShare(r),
         ...(r.amount ? { amount: figureSaid({ value: r.amount.amount, unit: r.amount.currency, format: 'money' }, home) } : {}),

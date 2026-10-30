@@ -57,7 +57,7 @@
   /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
      the target of an access row) all printed raw `p_` ids on a record with more than one person on
      it. `who.ts` holds the reason and the measurement. */
-  import { actorSaid, byMatches, didSaid, offeredActors, runsIn, targetSaid } from './who.ts';
+  import { actorSaid, byMatches, didSaid, offeredActors, ranName, runsIn, targetSaid, whoWords } from './who.ts';
   /* WHAT THE LOG SAYS, IN WORDS AND IN FIGURES: the sentence, the bands, a row by its title and list, a burst as one
      line, and the three tiles' counts and readings. `lines.ts` holds each rule and why. */
   import {
@@ -690,7 +690,7 @@
   {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
   <!-- A RULE OR A SCRIPT THAT RAN LEADS WITH ITS TITLE ("Ran Meet payees"), and says what it is beside its face. -->
   {@const ran = ranOf(e)}
-  {@const ranTitle = ran === null ? null : names.has(`${ran.kind}:${ran.id}`) ? ruleNameSaid(names.get(`${ran.kind}:${ran.id}`)!) : actorSaid(e.by, null, new Map()).name.replace(/^A rule: /u, '').replace(/ script$/u, '')}
+  {@const ranTitle = ran === null ? null : names.has(`${ran.kind}:${ran.id}`) ? ruleNameSaid(names.get(`${ran.kind}:${ran.id}`)!) : ranName(e.by)}
   <!-- ONE PASS OF BRAINDOG'S OWN UPDATE (`passOf`) says the record's sentence as its whole line, and names nothing of its own. -->
   {@const pass = passOf(e)}
   {@const settled = pass === null ? settledOf(e, me, names) : null}
@@ -708,6 +708,9 @@
     clock,
   )}
   {@const note = said.note}
+  <!-- WHO DID IT, and before them who asked, where a question asked and answered in one moment is one line (`oneDecision`). -->
+  {@const did = ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : said.done ? didSaid(e.by, me, names, e.run_by ?? null, said.done) : by.name}
+  {@const doer = e.asked ? whoWords.askedThen(actorSaid(e.asked, me, names).name, said.done ? did : didSaid(e.by, me, names, e.run_by ?? null, 'answered')) : did}
   <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE, and every other well is neutral: "Created"
        wore the green of done on a hundred lines at once (money F11). Nothing here is red: a log is history, not need. -->
   {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : undefined}
@@ -733,7 +736,7 @@
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.you && myName ? myName : by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : said.done ? didSaid(e.by, me, names, e.run_by ?? null, said.done) : by.name)}{#if said.done && (settled !== null || ran !== null)}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}<!--
+            >{settled ?? doer}{#if said.done && (settled !== null || ran !== null)}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}<!--
               WHERE IT HAPPENED, in the same run of quiet words, so it wraps with them on a phone: the list a row is in.
             -->{#if thing?.list}<span class="where-chip">{' · '}{thing.list}</span>{/if}</span
           >

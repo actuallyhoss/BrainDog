@@ -41,12 +41,12 @@ export const words = {
      its versions with the one on this record marked; and who made it, under what licence, and where it is offered. */
   about: {
     reaches: 'What it reaches',
-    reachesNothing: 'Only this record.',
+    reachesNothing: 'Only what is in your BrainDog.',
     madeBy: 'Made by',
     author: 'Author',
     listedAt: 'Offered',
     tiers: { builtin: 'Part of BrainDog', store: 'In the store', unlisted: 'By its name only', link: 'By link only' },
-    onHere: 'On this record',
+    onHere: 'In your BrainDog',
     partOf: 'Part of BrainDog',
     on: (version: string): string => `On · ${version}`,
     off: (version: string): string => `Off · ${version}`,
@@ -85,7 +85,7 @@ export const words = {
   verified: 'Verified',
   reviewed: 'Reviewed by BrainDog',
   signedBy: (key: string): string => `Signed with key ${key}`,
-  callsNothing: 'Nothing outside this record.',
+  callsNothing: 'Nothing outside your BrainDog.',
   callsOut: (hosts: readonly string[]): string => `Calls out to ${hosts.join(', ')}`,
   adds: 'What it adds',
   addsLists: 'Lists',
@@ -104,7 +104,7 @@ export const words = {
   },
   ruleWritten: (list: string): string => `When something in ${list} is written, it acts on it`,
   ruleScheduled: 'Runs on a schedule',
-  ruleOther: 'Runs when something happens in the record',
+  ruleOther: 'Runs when something changes in your BrainDog',
   examples: (n: number): string => (n === 0 ? 'No examples' : n === 1 ? '1 example' : `${n} examples`),
   /* A VERSION'S TAG, OR NONE: "Adds something" on every row said nothing (agents F25), and "New" on every minor from 1.4
      to 1.13 said nothing either (P46). A major is still said, since it takes something away. */

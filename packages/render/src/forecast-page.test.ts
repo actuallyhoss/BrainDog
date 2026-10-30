@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { baseKnobs, forecastModel, forecastNext, forecastPlan, forecastSummary, hasIncome, knobsMoved, scenario, FORECAST_NEXT_MOST } from './forecast.ts';
+import { baseKnobs, forecastModel, forecastNext, forecastPlan, forecastSummary, hasIncome, knobsMoved, lowFoot, scenario, FORECAST_NEXT_MOST } from './forecast.ts';
 import { toHTML } from './html.ts';
 import { parse } from './parse.ts';
 
@@ -55,7 +55,7 @@ test('THE LOWEST POINT IS SAID ON THE LINE, hung under the numbered part beside 
   const rising = forecastModel(rows('opening | 2026-10-27 | Cash now | EGP 1,000.00\nstep | 2026-10-28 | Pay | EGP 500.00\nhorizon | 30 |  |'))!;
   assert.equal(forecastPlan(rising, scenario(rising, baseKnobs(rising))).lowLabel, null, 'the lowest is today, which today says');
   const html = toHTML(parse(`\`\`\`forecast\n${SOURCE.trim()}\n\`\`\``, { page: true }));
-  assert.match(html, /<span class="forecast-low-label num" data-side="end" data-drop="" style="[^"]*" aria-hidden="true"><span class="forecast-low-word">Lowest<\/span>/u);
+  assert.match(html, /<span class="forecast-low-label num" data-side="end" data-drop=""(?: data-foot="")? style="[^"]*" aria-hidden="true"><span class="forecast-low-word">Lowest<\/span>/u);
   assert.match(html, /<dl class="forecast-summary"><div class="forecast-sum" data-key="end">/u);
 });
 
@@ -98,4 +98,14 @@ test('IF INCOME STOPPED IS THE SAME WALK WITH EVERY MOVEMENT OF MONEY IN LEFT OU
   assert.equal(scenario(model, baseKnobs(model)).crossed, null);
   const none = forecastModel(rows('opening | 2026-10-27 | Cash now | EGP 1,000.00\nstep | 2026-11-01 | Rent | EGP −100.00\nhorizon | 30 |  |'))!;
   assert.equal(hasIncome(none), false, 'a walk with nothing coming in has nothing to stop');
+});
+
+test('THE LOWEST POINT\'S WORDS THAT HANG PAST THE PLOT\'S FOOT SAY SO, so the month names go under them (audit of 31 October, A23)', () => {
+  assert.equal(lowFoot(0.5, false), false, 'a dot halfway down has room under it');
+  assert.equal(lowFoot(0.96, false), true, 'a dot at the foot does not');
+  assert.equal(lowFoot(0.7, true), true, 'nor one with a numbered disc over its words, near the foot');
+  const model = forecastModel(WALK)!;
+  const plan = forecastPlan(model, scenario(model, baseKnobs(model)));
+  const dot = Number(plan.lowLabel!.y);
+  assert.equal(plan.lowLabel!.foot === true, lowFoot(dot, plan.lowLabel!.drop === true));
 });

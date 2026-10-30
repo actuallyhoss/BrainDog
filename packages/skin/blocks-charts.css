@@ -1893,6 +1893,17 @@
     translate: calc(-1 * var(--sp-2)) calc(var(--sp-2) + 18px);
   }
 
+  /* WORDS THAT HANG PAST THE PLOT'S FOOT (`data-foot`, `lowFoot` in `src/forecast.ts`) set the month names under them:
+     under a dot at the foot, "Lowest" and its figure sat on "Nov". Two lines of 16px and the gap over them, and the disc's
+     18px more where a part of a plan sits on the same day. */
+  .forecast-plot:has(.forecast-low-label[data-foot]) + .forecast-ticks {
+    margin-block-start: calc(32px + var(--sp-2));
+  }
+
+  .forecast-plot:has(.forecast-low-label[data-foot][data-drop]) + .forecast-ticks {
+    margin-block-start: calc(50px + var(--sp-2));
+  }
+
   .forecast-low-word {
     color: var(--ink-3);
     font-weight: 400;

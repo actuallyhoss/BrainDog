@@ -25,6 +25,7 @@
 import { bytes as fmtBytes, since, writeAmount } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { humanize } from './names.ts';
 import { keptRead, wroteOutside } from '@braindog/client';
 import type { RECONNECT_STATE, ReconnectState } from './keychain.ts';
 
@@ -512,7 +513,9 @@ export type Names = ReadonlyMap<string, string>;
 
 const NO_NAMES: Names = new Map();
 
-const nameOf = (names: Names, raw: string): string => names.get(raw) ?? raw;
+/* AN ACTION OR A PROJECT THE LEDGER HOLDS NO NAME FOR IS SAID IN WORDS, never as its slug: Usage read "weekly-review"
+   (audit of 31 October, A19). */
+const nameOf = (names: Names, raw: string): string => names.get(raw) ?? humanize(raw);
 
 const isGlobal = (scope: string | null): boolean => scope === null || scope === '' || scope === 'global';
 
@@ -612,7 +615,7 @@ export function usageFromActions(rows: readonly ActionRow[], month: string, from
     const p = projects.get(key) ?? { name: title, faint: global, ...zero() };
     add(p, r.month);
     projects.set(key, p);
-    const named: Named = { name: r.ingest, faint: global, runs: r.month.runs, requests: r.month.requests, bytes: r.month.bytes, failures: r.month.failures };
+    const named: Named = { name: humanize(r.ingest), faint: global, runs: r.month.runs, requests: r.month.requests, bytes: r.month.bytes, failures: r.month.failures };
     actions.push(named);
     scoped.push({ key, scope: key, name: title, named });
     for (const d of r.days) days.set(d.day, (days.get(d.day) ?? 0) + d.runs);
@@ -961,8 +964,9 @@ async function nobodySignedIn(io: Fetch, base: string): Promise<boolean> {
 export const countsOf = (t: Totals): string =>
   [
     t.runs === 1 ? '1 run' : `${t.runs.toLocaleString('en-GB')} runs`,
-    t.requests === 1 ? '1 request' : `${t.requests.toLocaleString('en-GB')} ${words.requests}`,
-    fmtBytes(t.bytes),
+    /* WHAT A ROW DID NOT DO IS NOT SAID: "1 run · 0 requests · 0 B" was two counts of nothing beside the one. */
+    t.requests === 0 ? '' : t.requests === 1 ? '1 request' : `${t.requests.toLocaleString('en-GB')} ${words.requests}`,
+    t.bytes > 0 ? fmtBytes(t.bytes) : '',
     /* RUN TIME WHERE THE LEDGER COUNTED ANY: it was never shown, and it is one of the four things a plan limits. */
     t.ms !== undefined && t.ms > 0 ? words.hours(t.ms / 3_600_000) : '',
     t.failures > 0 ? words.failures(t.failures) : '',

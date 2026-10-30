@@ -302,9 +302,9 @@ const READ_RECORD = ['record_index', 'context', 'get', 'list', 'search', 'activi
  * the owner before anything changes. Each only fills in the choices under More, where every one can still be changed.
  */
 export const PRESETS: readonly KindPreset[] = [
-  { id: 'look', label: 'Look and tell me', said: 'Reads your record and files, and changes nothing.', tools: [...READ_RECORD, ...FILE_TOOLS], commands: '', permission: 'dontAsk', writes: false },
+  { id: 'look', label: 'Look and tell me', said: 'Reads your BrainDog and its files, and changes nothing.', tools: [...READ_RECORD, ...FILE_TOOLS], commands: '', permission: 'dontAsk', writes: false },
   { id: 'code', label: 'Work on code', said: 'Reads and changes files in its folder, and can see the changes.', tools: [...FILE_TOOLS], commands: 'git status\ngit diff', permission: 'acceptEdits', writes: true },
-  { id: 'tidy', label: 'Tidy my record', said: 'Reads your record and asks you before anything changes.', tools: [...RECORD_TOOLS], commands: '', permission: 'dontAsk', writes: false },
+  { id: 'tidy', label: 'Tidy my BrainDog', said: 'Reads your BrainDog and asks you before anything changes.', tools: [...RECORD_TOOLS], commands: '', permission: 'dontAsk', writes: false },
 ];
 
 /** The draft with a preset's choices filled in, and everything a person typed kept. */

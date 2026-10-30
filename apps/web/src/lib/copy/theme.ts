@@ -17,7 +17,7 @@ export type LookWay = 'darken' | 'lighten';
 /* ── the look and its editor ────────────────────────────────────────────── */
 
 export const theme = {
-  lookTitle: "The record's look",
+  lookTitle: 'How your BrainDog looks',
   lookHint:
     'Every colour this record is drawn in, in light and in dark, for everybody who opens it.',
   lookOwn: 'This record has a look of its own.',

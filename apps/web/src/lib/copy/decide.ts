@@ -92,7 +92,7 @@ export const decide = {
   proposalScriptGoesOn:
     'The run goes on without waiting for it: what the script writes lands when BrainDog runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.',
   proposalCallsOut: 'Calls out',
-  proposalCallsNothing: 'Nothing outside this record',
+  proposalCallsNothing: 'Nothing outside your BrainDog',
   proposalMaySend: 'May send',
   proposalSource: (name: string) => `The source of ${name}`,
   decideSelected: (n: number) => `${n} selected`,

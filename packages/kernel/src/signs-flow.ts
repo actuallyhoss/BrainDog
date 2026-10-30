@@ -117,7 +117,7 @@ function installedScripts(sql: Sql): Script[] {
 
 function readPaused(sql: Sql): SignReading {
   const scripts = installedScripts(sql);
-  if (scripts.length === 0) return reading('none', null, 'No script is installed on this record.');
+  if (scripts.length === 0) return reading('none', null, 'No script is installed yet.');
   /* THE ROW PAUSING WRITES (`script-run.ts`'s `pauseAfterRefusals`): every installed script has one, door and rule ones too. */
   const paused = scripts.filter((s) => sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'script' AND key = ?", s.bare)?.state === 'paused');
   const facts = [`${count(scripts.length, 'script')} installed, ${paused.length} paused.`];
@@ -145,7 +145,7 @@ function earlier(who: readonly string[], verb: 'refused' | 'failed'): string {
 
 function readRefused(sql: Sql, nowMs: number, tz: string): SignReading {
   const scripts = installedScripts(sql);
-  if (scripts.length === 0) return reading('none', null, 'No script is installed on this record.');
+  if (scripts.length === 0) return reading('none', null, 'No script is installed yet.');
   /* THE LAST RUN THAT RAN THE SOURCE NOW INSTALLED, as the pause reads it: `ok` or `refused`, signed by this version.
      A run held, dropped or failed by the host never ran the source, and a fixed version starts with a clean slate. */
   const last = scripts.flatMap((s) => {
@@ -210,7 +210,7 @@ function whyRefused(note: string | null, log: string | null): string {
 
 function readSourceless(sql: Sql): SignReading {
   const scripts = installedScripts(sql);
-  if (scripts.length === 0) return reading('none', null, 'No script is installed on this record.');
+  if (scripts.length === 0) return reading('none', null, 'No script is installed yet.');
   /* THE LIVE BODY IS WHAT A READ OF THE SCRIPT ANSWERS (SHL-D08's `script`), so a script whose live body holds no source
      text, or no body that parses, is one no read can show and no person can mend. */
   const without = scripts.filter((s) => typeof s.body?.source !== 'string' || s.body.source.trim() === '');
@@ -298,7 +298,7 @@ function readParked(sql: Sql, nowMs: number, tz: string): SignReading {
     `SELECT r.id, r.rule, s.at FROM automation_run r JOIN automation_step s ON s.run = r.id AND s.n = r.step
       WHERE r.state = 'waiting' AND s.state = 'waiting' AND s.kind = 'ask_person' ORDER BY s.at`,
   );
-  if (waiting.length === 0 && switchedOn(sql).length === 0) return reading('none', null, 'No automation is switched on on this record.');
+  if (waiting.length === 0 && switchedOn(sql).length === 0) return reading('none', null, 'No automation is switched on yet.');
   /* PAST ITS WAIT: the run's own wake, armed for the end of the wait, is due and has not taken it. A run with no wake row
      at all waits for good, so it is judged by the step's default wait from when it asked. */
   const fallback = intervalMs(ASK_PERSON_WAIT) ?? 7 * DAY;
@@ -317,7 +317,7 @@ function readParked(sql: Sql, nowMs: number, tz: string): SignReading {
 
 function readIdle(sql: Sql, nowMs: number): SignReading {
   const on = switchedOn(sql);
-  if (on.length === 0) return reading('none', null, 'No automation is switched on on this record.');
+  if (on.length === 0) return reading('none', null, 'No automation is switched on yet.');
   const old = new Date(nowMs - IDLE_AFTER_DAYS * DAY).toISOString();
   /* NEVER RUN: no run of the runner, and for a rule that finishes inside a write, no line of the log signed by it. */
   const idle = on.filter(

@@ -158,7 +158,7 @@ function statusSaid(status: number | null, outcome: string | null): string {
  * NOTHING HERE CALLS OUT ON A CLOCK. An action is a web call a record makes on a schedule (`ACTION_KINDS`), and "no
  * action runs on a schedule" stood beside scripts and digests that run daily, so it says which.
  */
-const NO_WEB_CALL = 'No web call runs on a schedule on this record.';
+const NO_WEB_CALL = 'No web call runs on a schedule yet.';
 
 /* ── actions-paused ────────────────────────────────────────────────────── */
 
@@ -194,7 +194,7 @@ function readScheduleFailed(sql: Sql, _nowMs: number, tz: string): SignReading {
     const theirs = sql.all<{ kind: string; key: string }>("SELECT kind, key FROM schedule WHERE state <> 'done'").filter(
       (r) => !UPKEEP_KINDS.includes(r.kind) && !(r.kind === SIGNS_ROW.kind && r.key === SIGNS_ROW.key),
     );
-    if (theirs.length === 0) return reading('none', null, 'Nothing on this record runs by itself yet.');
+    if (theirs.length === 0) return reading('none', null, 'Nothing runs by itself yet.');
     return reading('green', 0, 'Nothing that runs by itself has stopped after failing.', [`${count(theirs.length, 'job')} on the schedule.`]);
   }
   const named = failed.map((r) => ({ name: jobName(sql, r.kind, r.key), at: r.due_at }));
@@ -326,7 +326,7 @@ const kernel = (sign: string, name: string, thresholds: Record<string, number>, 
  */
 export const SIGNS_ACTIONS: readonly SignReader[] = [
   kernel('actions-paused', 'No scheduled action is paused', { ACTIONS_PAUSED_MOST }, readActionsPaused),
-  kernel('actions-held', "The plan's limit holds no run", { ACTIONS_HELD_MOST }, (sql, nowMs) => readActionsHeld(sql, nowMs)),
+  kernel('actions-held', "No run waits on the plan's limit", { ACTIONS_HELD_MOST }, (sql, nowMs) => readActionsHeld(sql, nowMs)),
   kernel('schedule-failed', 'Nothing that runs by itself has died', { SCHEDULE_FAILED_MOST }, readScheduleFailed),
   kernel('doors-silent', 'Busy doors do not go quiet', { DOOR_BUSY_LEAST, DOOR_BUSY_DAYS, DOOR_QUIET_DAYS }, readDoorsSilent),
   kernel('arrivals-unverified', 'Every arrival is verified', { UNVERIFIED_WINDOW_DAYS, UNVERIFIED_MOST }, readUnverified),

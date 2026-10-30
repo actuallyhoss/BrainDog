@@ -133,7 +133,11 @@
             <h1 class="h-title" dir="auto">{name}</h1>
             {#if hold.dateLine || status.health}
               <p class="h-status">
-                {hold.dateLine}{#if status.health}{#if hold.dateLine}{' · '}{/if}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span>{/if}
+                <!-- THE LAST FACT, THE DOT AND THE HEALTH WRAP AS ONE, so a phone never ends a line on a stray " · " with
+                     "At risk" alone under it (audit of 31 October, A28). -->
+                {#if status.health && hold.dateLine}{@const parts = hold.dateLine.split(' · ')}{#if parts.length > 1}{parts.slice(0, -1).join(' · ')}{' · '}{/if}<span class="h-keep"
+                    >{parts.at(-1)}{' · '}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span></span
+                  >{:else}{hold.dateLine}{#if status.health}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span>{/if}{/if}
               </p>
             {/if}
           </div>
@@ -489,6 +493,10 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
+  }
+
+  .h-keep {
+    white-space: nowrap;
   }
 
   .h-health {

@@ -145,8 +145,8 @@ test('NOTHING ON A SCHEDULE is said as that: no web call on a schedule, and no n
   const r = await record();
   const signs = readSigns(r.sql, START, 'UTC');
   const said = (id: string) => signs.find((s) => s.sign === id)!.said;
-  assert.equal(said('actions-paused'), 'No web call runs on a schedule on this record.');
-  assert.equal(said('actions-held'), 'No web call runs on a schedule on this record.');
-  assert.equal(said('numbers-arrive'), 'No number arrives on a schedule on this record, so there is nothing to judge by.');
+  assert.equal(said('actions-paused'), 'No web call runs on a schedule yet.');
+  assert.equal(said('actions-held'), 'No web call runs on a schedule yet.');
+  assert.equal(said('numbers-arrive'), 'No number arrives on a schedule yet, so there is nothing to judge by.');
   r.sql.close();
 });

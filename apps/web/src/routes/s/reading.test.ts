@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import { AMOUNT_SPACE } from 'braindog-render';
 
-import type { SharedBlock } from '../../lib/record/share-write.ts';
+import type { SharedBlock, SharedRow } from '../../lib/record/share-write.ts';
 import { cellSaid, durationSaid, figureSaid, headOf, moneySaid, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Where } from './reading.ts';
 
 const where: Where = { language: 'en-GB', zone: 'Europe/London', now: Date.parse('2026-10-15T12:00:00Z') };
@@ -144,4 +144,12 @@ test('a block with nothing in it is no tile, the opening line is under the title
   assert.deepEqual(tools.columns.map((c) => c.label), ['Name']);
   assert.equal(tools.rows.length, 1);
   assert.equal(tools.matched, 2);
+});
+
+test('a tool or a skill filed as a handle is said by its name, as the owner reads it', () => {
+  const row = (name: string) => ({ cells: { name: { type: 'text', value: name } }, fields: {}, state: null }) as unknown as SharedRow;
+  assert.equal(said(cellSaid(row('outline-check'), { field: 'name' }, where)), 'Outline check');
+  assert.equal(said(cellSaid(row('fenwick'), { field: 'name' }, where)), 'Fenwick');
+  assert.equal(said(cellSaid(row('kiln.example'), { field: 'name' }, where)), 'kiln.example');
+  assert.equal(said(cellSaid(row('Fenwick deploy key'), { field: 'name' }, where)), 'Fenwick deploy key');
 });

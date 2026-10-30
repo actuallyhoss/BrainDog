@@ -863,6 +863,22 @@ export function slugWords(name: string): string {
   return [first.charAt(0).toUpperCase() + first.slice(1), ...words.slice(1)].join(' ');
 }
 
+/** Names a handle spells as one lower-case word that a person writes with capitals of their own. */
+const BRANDS: Readonly<Record<string, string>> = { braindog: 'BrainDog', github: 'GitHub', gitlab: 'GitLab', youtube: 'YouTube', linkedin: 'LinkedIn' };
+
+/**
+ * A TOOL'S OR A SKILL'S HANDLE, SAID AS ITS NAME. It is filed as the agent types it (`fenwick`, `review-pr`,
+ * `nordhaven-dns`), and that is what the palette, a project's page and a list drew: "Tools: fenwick". `slugWords` leaves
+ * one lower-case word alone, since on a page it may be a person's own; a handle is never that, so here one word is a
+ * name too: "Fenwick", "Review PR", "Nordhaven DNS", "BrainDog". Anything that is not a handle comes back as written.
+ */
+export function handleName(name: string): string {
+  const said = name.trim();
+  if (Object.hasOwn(BRANDS, said)) return BRANDS[said]!;
+  if (/^[a-z][a-z0-9]*$/u.test(said)) return Object.hasOwn(INITIALISMS, said) ? INITIALISMS[said]! : said.charAt(0).toUpperCase() + said.slice(1);
+  return slugWords(said);
+}
+
 /**
  * A STORED VALUE AS A WORD. A board groups on a status and a chips block counts by a kind, and
  * both drew the value the record keeps: `open 8` over a column, `6 saas` in a row of chips. The

@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { copy } from '../../lib/copy.ts';
 import { actorOf } from '../../lib/record/api.ts';
 import type { AuditEvent } from '../../lib/record/schema.ts';
-import { actorSaid, byMatches, didSaid, offeredActors, personIn, runsIn, targetSaid } from './who.ts';
+import { actorSaid, byMatches, didSaid, offeredActors, personIn, ranName, runsIn, targetSaid, whoWords } from './who.ts';
 
 /** The decider on the driven record, the id the screen printed raw. */
 const DECIDER = 'p_01M1KJ7RG0TYYA0AX15QPGJJ4';
@@ -62,7 +62,7 @@ test('AN ACTOR THAT IS NOT A PERSON IS SAID BY ITS NAME, and still leads with a 
   assert.equal(actorSaid('system', null, NO_NAMES).name, 'BrainDog');
   assert.equal(actorSaid('slash', null, NO_NAMES).name, 'Slash');
   /* A RULE SAYS IT IS ONE, so its name is never read as a person's. */
-  assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'A rule: Renewal');
+  assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'The rule “Renewal”');
   assert.equal(actorSaid('rule.renewal', null, NO_NAMES).kind, 'rule');
   assert.equal(actorSaid('agent:claude', null, NO_NAMES).name, 'Claude');
   for (const by of ['system', 'slash', 'rule.renewal', 'agent:claude'])
@@ -140,7 +140,7 @@ test('A PERSON AND A RULE READ AS THEY DID, whatever run_by is handed over besid
   const names = new Map([['p_01M1KJ7RG0TYYA0AX15QPGJJ4', 'Mona']]);
   assert.equal(actorSaid('p_01M1KJ7RG0TYYA0AX15QPGJJ4', null, names, CODE).name, 'Mona');
   assert.equal(actorSaid('you', null, NO_NAMES, CODE).you, true);
-  assert.equal(actorSaid('rule.renewal', null, NO_NAMES, CODE).name, 'A rule: Renewal');
+  assert.equal(actorSaid('rule.renewal', null, NO_NAMES, CODE).name, 'The rule “Renewal”');
   assert.equal(actorSaid('agent:claude', null, NO_NAMES, CODE).name, 'Claude');
 });
 
@@ -172,4 +172,12 @@ test('BRAINDOG UNDER ANY OF ITS NAMES IS ONE CHIP, and that chip keeps all of it
 
 test('A QUESTION IS ASKED ABOUT WHAT IT NAMES', () => {
   assert.equal(didSaid('rule:txn-categorise', null, NO_NAMES, null, 'asked'), 'The rule “Categorise what cleared” asked about it');
+});
+
+test('A RULE IS SAID AS THE RULE IT IS, never a label and a colon, and one asked-and-answered line says both', () => {
+  /* Audit of 31 October (A18): "A rule: Weekly review · The week is reviewed." */
+  assert.equal(actorSaid('rule:invoice-late', null, NO_NAMES).name, 'The rule “Chase late payments”');
+  assert.equal(ranName('rule:invoice-late'), 'Chase late payments');
+  assert.equal(whoWords.askedThen('The rule “Categorise what cleared”', 'BrainDog decided it'), 'The rule “Categorise what cleared” asked, BrainDog decided it');
+  assert.equal(whoWords.askedThen('The rule “Chase late payments”', 'You decided it'), 'The rule “Chase late payments” asked, you decided it');
 });

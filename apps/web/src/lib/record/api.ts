@@ -16,7 +16,7 @@
  * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
  */
 
-import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING, TIMELINE_BETWEEN } from 'braindog-render';
+import { addDays, agentDoing, dateSaid, day as fmtDay, diffRows, handleName, money, relative, shortDay, since, integer, MISSING, TIMELINE_BETWEEN } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 /* THE LISTS A MODULE BRINGS, BY NAME AND WITHOUT ITS DOCUMENT (`@braindog/seed/packs/lists`): this file is on the first open. */
@@ -41,7 +41,7 @@ import { listLine } from './tags.ts';
 import { shownName } from '../shell/side.ts';
 import { largestPart, partsOf, splitAtOf, splitSaid } from './split.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
-import { actor, handlesSaid, handleWords, nameWords, runByIn, type RunBy } from './names.ts';
+import { actor, handlesSaid, handleWords, nameWords, rowNameSaid, runByIn, type RunBy } from './names.ts';
 import type { Byline } from './byline.ts';
 
 /* THE DECLARATIONS EVERY HELPER BELOW READS, which are `held.ts`'s and not a copy: a list the record taught this tab is
@@ -391,6 +391,13 @@ export function display(
   /* AN AGENT BY ITS NAME: the field holds what the agent signs with, `claude`, and a card read "claude" beside "Changed by
      Claude". A lower-case word is said with its capital, on any list; anything else is left as it was typed. */
   if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value)) return value.charAt(0).toUpperCase() + value.slice(1);
+  /* A TOOL OR A SKILL IS ITS NAME, not the handle it is filed under: Tools read "nordhaven-dns" (`rowNameSaid`). */
+  if (typeof value === 'string' && field === REGISTERS[register]?.title) {
+    const named = rowNameSaid(register, value);
+    if (named !== value) return named;
+  }
+  /* AND THE SKILL A LEARNING BEARS ON IS SAID BY ITS NAME: How the brain changed read "Bears on: axis-qa". */
+  if (register === 'learnings' && field === 'topic' && typeof value === 'string' && value.trim() !== '') return handleName(value);
   const f = decl(register, field);
   if (!f) return typed === undefined ? undeclared(value) : answered(typed, value, now, names);
   switch (f.type) {

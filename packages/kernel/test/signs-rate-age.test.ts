@@ -183,7 +183,7 @@ test('NONE, in its own words, with no rate on the record', async () => {
   const got = sign(empty.sql);
   assert.equal(got.state, 'none');
   assert.equal(got.value, null);
-  assert.equal(got.said, 'This record holds no rate yet, so a move between two currencies is not matched by itself.');
+  assert.equal(got.said, 'No exchange rate is kept yet, so a move between two currencies is not matched by itself.');
   empty.sql.close();
   /* AND WITH NO LIST TO HOLD ONE. */
   const bare = await record([LEDGER(ACROSS)]);
@@ -219,7 +219,7 @@ test('NONE, saying the day, where every rate the record holds is dated ahead', a
 });
 
 test('NONE, in other words, where no list matches a move between two currencies, however old its rates are', async () => {
-  const said = 'No list on this record matches a move between two currencies.';
+  const said = 'No list matches a move between two currencies.';
   for (const decls of [[LEDGER(PAIRS), FX], [LEDGER(), FX], [FX]]) {
     const r = await record(decls, [AGO(40)]);
     const got = sign(r.sql);

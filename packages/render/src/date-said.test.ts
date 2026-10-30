@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dateSaid, datesIn, slugWords } from './format.ts';
+import { dateSaid, datesIn, handleName, slugWords } from './format.ts';
 
 const NOW = Date.parse('2026-09-03T12:00:00Z');
 
@@ -31,4 +31,13 @@ test('A NAME KEPT AS A SLUG IS SAID AS WORDS, and a person\'s own words are left
   assert.equal(slugWords('write_release_notes'), 'Write release notes');
   assert.equal(slugWords('Review the PR'), 'Review the PR');
   assert.equal(slugWords('kiln'), 'kiln', 'one word is not a slug, and may be a name');
+});
+
+test('A TOOL OR A SKILL IS SAID BY ITS NAME, one word included', () => {
+  assert.equal(handleName('fenwick'), 'Fenwick');
+  assert.equal(handleName('review-pr'), 'Review PR');
+  assert.equal(handleName('nordhaven-dns'), 'Nordhaven DNS');
+  assert.equal(handleName('outline-check'), 'Outline check');
+  assert.equal(handleName('braindog'), 'BrainDog');
+  assert.equal(handleName('Fenwick Cloud'), 'Fenwick Cloud');
 });

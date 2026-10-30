@@ -521,7 +521,7 @@ export const DECIDED: Question[] = [
       { key: 'accept', title: 'Add both', body: 'Object storage and the Workers plan, with the renewal dates from the invoice.', recommended: true },
       { key: 'ignore', title: 'Leave them out', body: 'The invoice stays in the inbox and the services stay unrecorded.' },
     ],
-    decided: { option: 'accept', reason: 'Both are live and both renew; an invoice line nobody wrote down is the thing this record exists to stop.', by: 'you', at: stamp(-3) },
+    decided: { option: 'accept', reason: 'Both are live and both renew; an invoice line nobody wrote down is the thing BrainDog is here to stop.', by: 'you', at: stamp(-3) },
   },
 ]
   /**

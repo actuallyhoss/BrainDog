@@ -612,7 +612,6 @@ export function presenceOf(
   const name = agentNamed(r.agent) ?? (r.name?.trim() || controlWords.aRun);
   const project = r.project === null ? null : (projects.get(r.project) ?? null);
   const helpers = rows.filter((h) => h.parent === r.run);
-  const branches = [...new Set(helpers.map((h) => h.branch).filter((b): b is string => b !== null && b !== r.branch))];
   const held = r.instruction === null ? null : (threads.find((t) => t.id === r.instruction) ?? null);
   const on = project ? ` on ${project.name}` : '';
   const doing = r.doing?.trim() || null;
@@ -625,16 +624,15 @@ export function presenceOf(
     project: project ? { name: project.name, slot: slotOf(project.hue) } : null,
     /* THE PROFILE IT RUNS UNDER, BY NAME, where it is one of his own and not the default one (migration 44). */
     /* "verified" FIRST WHERE ITS KEY PROVES ITS APP: "Claude Code · verified · as studio · main". */
-    /* `bare`, ONE RUN ON TODAY'S SHEET: no profile and no branch, which are where it runs and not what it does. */
-    meta: [r.verified === true ? 'verified' : null, !bare && r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, bare ? null : r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
+    /* `bare`, ONE RUN ON TODAY'S SHEET: no profile, which is where it runs and not what it does. */
+    /* NO BRANCH ON ANY ROW: "axis-qa" is the name a branch was typed as, where what it is doing is said above it in words
+       (audit of 31 October, A19). Its branch is on its own run's page. */
+    meta: [r.verified === true ? 'verified' : null, !bare && r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
       .filter((x): x is string => !!x)
       .join(' · '),
     live: r.state === 'working' || r.state === 'thinking' ? r.state : 'waiting',
     holds: held ? `On your word: “${held.said.replace(/\s+/gu, ' ').trim()}”` : null,
-    helpers:
-      helpers.length === 0
-        ? null
-        : `+${plural(helpers.length, 'helper')}${branches.length > 0 ? `, on ${branches.slice(0, 3).join(', ')}${branches.length > 3 ? ` and ${String(branches.length - 3)} more` : ''}` : ''}`,
+    helpers: helpers.length === 0 ? null : `+${plural(helpers.length, 'helper')}`,
     stopped: r.stopped,
     /* WHEN, NOT HOW: "its next tool call, through its hooks" was plumbing on the run's own sheet. */
     reach: hooks ? 'Pause and Stop take effect at its next step.' : `${name} keeps working until it next checks in with BrainDog. Pause and Stop take effect then.`,

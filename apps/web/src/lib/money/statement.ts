@@ -69,7 +69,7 @@ export const words = {
   already: 'Already in the Ledger',
   fresh: (n: number) => (n === 1 ? '1 new line' : `${n.toLocaleString('en')} new lines`),
   skipped: (n: number) => (n === 1 ? '1 already in the Ledger' : `${n.toLocaleString('en')} already in the Ledger`),
-  otherCurrency: (n: number, code: string) => `${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`} not in ${code}, left out.`,
+  otherCurrency: (n: number) => `${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`} in another currency, left out.`,
   unread: (n: number) => `${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`} missing a date, amount or description, left out.`,
   more: (n: number) => `and ${n.toLocaleString('en')} more`,
   add: (n: number) => (n === 1 ? 'Add 1 line' : `Add ${n.toLocaleString('en')} lines`),
