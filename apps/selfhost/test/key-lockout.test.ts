@@ -1,0 +1,69 @@
+/**
+ * SEC5 (security review of 30 Oct): THE SERVER KEY COULD BE GUESSED WITHOUT LIMIT OVER `/api` AND `/mcp`. Each miss was a
+ * 401 and nothing more, so a loop of `Authorization: Bearer <guess>` at `GET /api/boot` from anywhere that reached the
+ * port was a loop with no end, and a hit was the owner. Now ten misses from one place lock it for fifteen minutes, and
+ * a place is an IPv4 address or an IPv6 /64.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { KEY_TRIES, keyLockout } from '../src/key-lockout.ts';
+import { start } from '../src/server.ts';
+
+test('SEC5: TEN MISSES ARE COMPARED, THE ELEVENTH IS NOT, AND THE LOCK OUTLASTS A RIGHT KEY UNTIL IT ENDS', () => {
+  let at = 0;
+  const lock = keyLockout(() => at);
+  for (let i = 0; i < KEY_TRIES.most; i++) {
+    assert.equal(lock.locked('203.0.113.9'), null, `miss ${i + 1} was refused before it was compared`);
+    lock.strike('203.0.113.9');
+  }
+  assert.ok(lock.locked('203.0.113.9') !== null);
+  /* ANOTHER PLACE IS NOT LOCKED BY IT. */
+  assert.equal(lock.locked('203.0.113.10'), null);
+  at += KEY_TRIES.window + 1;
+  assert.equal(lock.locked('203.0.113.9'), null, 'the lock never ended');
+});
+
+test('SEC5: AN IPv6 /64 IS ONE PLACE, so a fresh address per guess is the same guesser', () => {
+  const lock = keyLockout(() => 0);
+  for (let i = 0; i < KEY_TRIES.most; i++) lock.strike(`2001:db8:1:2::${(i + 1).toString(16)}`);
+  assert.ok(lock.locked('2001:db8:1:2:ffff:ffff:ffff:ffff') !== null);
+  assert.equal(lock.locked('2001:db8:1:3::1'), null);
+});
+
+test('SEC5: THE RIGHT KEY CLEARS THE PLACE IT CAME FROM, so an owner who mistyped can carry on', () => {
+  const lock = keyLockout(() => 0);
+  for (let i = 0; i < KEY_TRIES.most - 1; i++) lock.strike('198.51.100.1');
+  lock.clear('198.51.100.1');
+  for (let i = 0; i < KEY_TRIES.most - 1; i++) lock.strike('198.51.100.1');
+  assert.equal(lock.locked('198.51.100.1'), null);
+});
+
+test('SEC5: OVER HTTP, THE ELEVENTH GUESS AT /api AND /mcp IS 429 AND NEVER COMPARED', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-keylock-'));
+  const KEY = 'k'.repeat(40);
+  const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0, token: KEY, host: '127.0.0.1' });
+  const port = (running.server.address() as { port: number }).port;
+  const boot = (bearer: string) => fetch(`http://127.0.0.1:${port}/api/boot`, { headers: { authorization: `Bearer ${bearer}` } });
+  try {
+    for (let i = 0; i < KEY_TRIES.most; i++) assert.equal((await boot(`guess-${i}`)).status, 401, `guess ${i + 1}`);
+    assert.equal((await boot('guess-eleven')).status, 429);
+    /* THE RIGHT KEY DURING THE LOCK IS REFUSED THE SAME WAY, so the lock is no oracle. */
+    assert.equal((await boot(KEY)).status, 429);
+    const mcp = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${KEY}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    assert.equal(mcp.status, 429);
+    /* AN AGENT'S TOKEN IS ITS OWN CHECK AND IS NOT HELD BY THE KEY'S LOCK: a dotted bearer is still answered. */
+    assert.equal((await boot('rec_x.not-a-real-token')).status, 401);
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

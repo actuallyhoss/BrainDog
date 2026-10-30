@@ -154,7 +154,8 @@ export type PersonChange = { name?: string | undefined; email?: string | undefin
  * the answer never waits for a mail server.
  */
 export type EmailDoor = {
-  ask: (person: string, email: string) => Promise<Result<{ to: string; token: string }>>;
+  /** `token` is `null` for an address somebody else signs in with: nothing is mailed, and the answer is the same (SEC6). */
+  ask: (person: string, email: string) => Promise<Result<{ to: string; token: string | null }>>;
   move: (person: string, token: string) => Promise<Result<{ from: string; to: string; records: string[] }>>;
   mirror: (record: string, person: string, change: PersonChange) => Promise<Result<unknown>>;
   mail: (kind: 'email.change' | 'email.changed', to: string, link?: string) => void;
@@ -216,13 +217,26 @@ export async function renamedName(answer: Response): Promise<string | null> {
 
 /**
  * `POST /account/email`: a link to the new address, and `{}` whatever it was, so the answer never carries the link.
- * An address somebody else signs in with is refused by the Directory in a sentence that names nobody.
+ *
+ * `{}` FOR AN ADDRESS SOMEBODY ELSE SIGNS IN WITH TOO, AND NO MAIL (SEC6). It was refused in its own sentence, which
+ * told any session, a guest's included, who has an account here. And a sign-in in the last fifteen minutes is asked for
+ * at this step as it is at the confirming one, so a session left open on a shared screen cannot start the move.
  */
 async function emailAsked(door: EmailDoor, origin: string, who: Who, body: Record<string, unknown>): Promise<Result<unknown>> {
+  const now = door.now ?? Date.now;
+  if (now() - who.provedAt > FRESH)
+    return {
+      ok: false,
+      refusal: {
+        code: 'NEEDS_BROWSER_SESSION',
+        fix: 'Sign in again to change your sign-in email. It has been more than fifteen minutes since you last did.',
+      },
+    };
   const typed = text(body.email).trim();
   if (typed === '') return { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Type the new address you want to sign in with.', at: 'email' } };
   const out = await door.ask(who.person, typed);
   if (!out.ok) return out;
+  if (out.value.token === null) return { ok: true, value: {} };
   /* THE LANDING IS IDENTITY, IN WHICHEVER RECORD THE SESSION IS ON (`/settings/...` names none), and the token is
      in the fragment, which no server, proxy or `Referer` ever reads, as a sign-in link's is. */
   door.mail('email.change', out.value.to, `${origin}/settings/identity#email=${out.value.token}`);
@@ -680,7 +694,10 @@ export const HOST_DOORS: ReadonlySet<string> = new Set(['api', 'auth', 'account'
  */
 export function appNext(next: unknown): string | null {
   const safe = safeNext(next);
-  const path = /^\/app(?=[/?#]|$)/.test(safe) ? `/${safe.slice(4).replace(/^\//, '')}` : safe;
+  /* EVERY SLASH AFTER `/app` GOES, AND THE RESULT IS CHECKED AGAIN (SEC4): taking one slash turned `/app//evil.example`
+     into `//evil.example`, another host, after `safeNext` had passed it. What is checked is what will be followed. */
+  const path = /^\/app(?=[/?#]|$)/.test(safe) ? `/${safe.slice(4).replace(/^\/+/, '')}` : safe;
+  if (path !== '/' && safeNext(path) === '/') return null;
   const first = /^\/([^/?#]*)/.exec(path)?.[1] ?? '';
   return HOST_DOORS.has(first) ? null : path;
 }

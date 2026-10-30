@@ -60,8 +60,25 @@ const firstOf = (path: string): string => /^\/([^/?#]*)/.exec(path)?.[1] ?? '';
  * The address an old one under `/app` names now: `/app/acme/r/tasks` is `/acme/r/tasks` and `/app` is `/`. Any other
  * address comes back as it was. Read where an address from before the move can still arrive: a mailed `next`, a link
  * a person kept in a note.
+ *
+ * EVERY SLASH AFTER `/app` GOES, NOT ONE (SEC4). Taking one left `/app//evil.example/x` as `//evil.example/x`, which a
+ * browser reads as another host: a `next` that passed every check as typed became an open redirect once `/app` was off.
  */
-export const fromLegacy = (path: string): string => (/^\/app(?=[/?#]|$)/.test(path) ? `/${path.slice(4).replace(/^\//, '')}` : path);
+export const fromLegacy = (path: string): string => (/^\/app(?=[/?#]|$)/.test(path) ? `/${path.slice(4).replace(/^\/+/, '')}` : path);
+
+/**
+ * Whether an address can only ever be a path on this origin: one leading `/`, no backslash or control character, and
+ * none once it is decoded either, since `/%2F%2Fevil.example` decodes to a host as `safeNext` reads it on the server.
+ */
+export function pathOnly(path: string): boolean {
+  const bad = (p: string): boolean => !p.startsWith('/') || p.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(p);
+  if (bad(path)) return false;
+  try {
+    return !bad(decodeURIComponent(path));
+  } catch {
+    return false;
+  }
+}
 
 /** The slug an app address names and the address inside the record, or `null` for an address outside the app. */
 export function split(pathname: string): { slug: string | null; rest: string } | null {
@@ -160,5 +177,8 @@ export function onward(search: string = globalThis.location?.search ?? ''): stri
   /* A `next` FROM BEFORE THE MOVE IS READ AS THE ADDRESS IT NAMES NOW, after it is resolved and not before, so
      `/app/../auth/session` is still `/auth/session`, a door, and is refused. */
   const path = fromLegacy(url.pathname);
-  return url.origin === HERE && split(path) !== null ? `${path}${url.search}${url.hash}` : `${BASE}/`;
+  /* AND THE CHECKS AGAIN ON THE ADDRESS THAT WILL BE OPENED, after `/app` is off (SEC4): what is checked is what is
+     followed, and the address as typed is neither. */
+  if (url.origin !== HERE || !pathOnly(path) || new URL(path, HERE).origin !== HERE) return `${BASE}/`;
+  return split(path) !== null ? `${path}${url.search}${url.hash}` : `${BASE}/`;
 }

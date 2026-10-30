@@ -17,9 +17,10 @@
  * the owner and carries row ids, the lists and fields each block reads, addresses of other pages and whatever a block
  * kind added last month. A list of keys to take off leaks the first key nobody thought of, so `shownBlock` builds each
  * block from nothing: how it is drawn (`LOOKS`), what the record computed that names no row (`FIGURES`), and each row's
- * own values of the fields the block draws, by field type (`SHOWN_TYPES`). A kind that writes, links, or reads across
- * the record is not sent at all (`HEADING_ONLY`, `ACROSS`): its heading alone would say "Nothing is waiting on you"
- * about a record where things are.
+ * own values of the fields the block draws, by field type (`SHOWN_TYPES`). WHICH BLOCKS ARE SENT IS A LIST OF WHAT IS
+ * KEPT TOO (`SHARE_KINDS`, `shareDraws`): a kind or a source nobody put on it is not sent at all, so a source added to
+ * the kernel next month reaches no link until somebody decides it may. A block that writes, links, or reads across the
+ * record is never sent: its heading alone would say "Nothing is waiting on you" about a record where things are.
  *
  * AND IT TELLS THE TRUTH. Every cell carries its type and its value, money whole as minor units and its own
  * currency; every column and figure carries the label the owner reads; a `{{path}}` in the owner's words is filled here
@@ -119,16 +120,44 @@ const FIGURES = [
 ] as const;
 
 /**
- * The kinds a link never sends, not even their heading. `capture` and `inputs` write; a `link` block is links; `feed`,
- * `queue` and `agents` read the whole record's log and questions and name rows of every list; a `diff` names who
- * changed a row and when. A `project` block is the project's own shape (its hero, its work, who is on it, what
- * happened), which the app reads beside the page from across the record, so a link held only its heading and drew the
- * page's tab names as empty cards ("Overview", "Numbers and work").
+ * THE KINDS A LINK MAY DRAW: AN ALLOW-LIST, NOT A LIST OF WHAT IS HELD BACK (security review of 30 Oct, SEC2). Every
+ * kind the kernel admits that draws what the page itself reads. Not here, so never sent, not even their heading:
+ * `capture`, `inputs` and `form` write; a `link` block is links; `feed`, `queue` and `agents` read the whole record's
+ * log and questions and name rows of every list; a `diff` names who changed a row and when; a `project` block is the
+ * project's own shape, which the app reads beside the page from across the record. A kind added later is not sent until
+ * it is put here, which `shares-allow.test.ts` asks of every kind the kernel knows.
  */
-const HEADING_ONLY: ReadonlySet<string> = new Set(['capture', 'inputs', 'link', 'feed', 'queue', 'agents', 'diff', 'project']);
+export const SHARE_KINDS: ReadonlySet<string> = new Set([
+  'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree',
+  'comparison', 'table', 'cards', 'section', 'sparkline', 'split', 'bridge', 'series', 'forecast', 'lines', 'progress',
+  'roadmap', 'ring', 'heat', 'kpis', 'calendar', 'gallery', 'embed', 'lanes', 'drawn',
+]);
 
-/** And the computed sources that read across the whole record, whatever kind draws them, as `index.ts`'s `ACROSS` holds. */
-const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'sessions.live', 'sessions.working', 'signs']);
+/** Whether a link may draw a kind: one of `SHARE_KINDS`, or a kind a pack declares (`block.x`), which draws only on display primitives. */
+export const shareKind = (kind: string): boolean => SHARE_KINDS.has(kind) || /^block\.[a-z][a-z0-9_-]{0,31}$/u.test(kind);
+
+/**
+ * THE COMPUTED SOURCES A LINK MAY DRAW, BY NAME, beside a list's rows (`register.x`) and a figure (`metric.x`). Each reads
+ * named lists the page already shows and names no row of any other: a cash walk over the legs its block names, and the
+ * figures pinned to Home. Every other source the kernel registers (`SOURCE_MODULES`) is held back, whether it reads the
+ * whole record (`activity`, `governance.*`, `usage.*`, `exceptions`, `kpis`, `scripts`) or rows of lists the page never
+ * shows (`handoffs.open` sent agents' next steps, `deadlines` every list's rows and states): the old list of what was
+ * held back had drifted from the record's own and let all of those through.
+ */
+export const SHARE_SOURCES: ReadonlySet<string> = new Set(['forecast.runway', 'figures.home']);
+
+/** Whether a link may draw a block with this `source`: none, a list's rows, a figure, or one of `SHARE_SOURCES`. */
+export const shareDraws = (source: unknown): boolean =>
+  source === undefined ||
+  source === null ||
+  source === '' ||
+  (typeof source === 'string' && (/^(?:register|metric)\.[a-z]/u.test(source) || SHARE_SOURCES.has(source)));
+
+/**
+ * The lists that, named among what a block reads, keep it off a link: the whole record (`*`, as the kernel names a block
+ * over a source that reads across it) and the agents' runs (`session`), whose rows carry what an agent is doing next.
+ */
+const NEVER_READ: ReadonlySet<string> = new Set(['*', 'session']);
 
 /**
  * The field types whose values a shared row keeps. Absent are `ref` (another row's id), `file` (a stored file the
@@ -449,6 +478,8 @@ type Showing = {
   typed: (form: TypedForm, arg: string) => string | undefined;
   /** And a typed form in a fence's row, where a day is said as a day. */
   cell: (form: TypedForm, arg: string) => string | undefined;
+  /** The lists a block reads, as the kernel names them (`blockRegisters`), `*` for the whole record. */
+  reads: (b: BlockResult) => readonly string[];
 };
 
 /** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
@@ -485,7 +516,8 @@ const WORDS = ['heading', 'lead', 'empty', 'body'] as const;
  */
 const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> | null => {
   const { lists, figure, said, typed, cell } = showing;
-  if (typeof b.kind !== 'string' || HEADING_ONLY.has(b.kind) || (typeof b.source === 'string' && ACROSS.has(b.source))) return null;
+  if (typeof b.kind !== 'string' || !shareKind(b.kind) || !shareDraws(b.source)) return null;
+  if (showing.reads(b).some((list) => NEVER_READ.has(list))) return null;
   if (b.refusals.length > 0) return null;
   const block = b as unknown as Record<string, unknown>;
   const kept: Record<string, unknown> = {};
@@ -496,6 +528,20 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
   if (kept.body === '') delete kept.body;
 
   for (const key of FIGURES) if (block[key] !== undefined) kept[key] = block[key];
+  /* A ROW'S PROJECT AND A CARD'S NEXT STEP ARE TITLES OF ROWS OF OTHER LISTS, sent only where a column draws them (SEC2).
+     `scopes` is computed for a block that inherits by its project as well as for one that draws it, and fell back to a
+     raw row id where the title could not be read, so an id is blanked as every other address into the record is. */
+  const roles = new Set((b.columns ?? []).map((c) => c.as));
+  for (const [key, role] of [['scopes', 'scope'], ['scope_marks', 'scope'], ['nexts', 'next']] as const) {
+    if (kept[key] === undefined) continue;
+    if (!roles.has(role)) delete kept[key];
+    else if (Array.isArray(kept[key]))
+      kept[key] = (kept[key] as unknown[]).map((v) => {
+        if (typeof v !== 'string') return v;
+        const said = v.split(', ').filter((part) => !inside(part)).join(', ');
+        return said === '' ? null : said;
+      });
+  }
   if (typeof block.target === 'number') kept.target = block.target;
 
   const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
@@ -540,7 +586,7 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
 };
 
 /** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
-type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure'] };
+type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure']; reads: Showing['reads'] };
 
 /**
  * The page as a link shows it: its title, when it was read, its layout, when the link closes, the language and zone it
@@ -550,7 +596,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
   const layout = isRecord(page.layout) ? page.layout : null;
   const language = languageOf(where.language);
   const zone = typeof where.zone === 'string' && where.zone !== '' ? where.zone : typeof page.zone === 'string' && page.zone !== '' ? page.zone : 'UTC';
-  const showing: Showing = { lists, figure: where.figure, said: saidIn(language, where.home), typed: typedIn(where.now, zone, where.home), cell: typedIn(where.now, zone, where.home, true) };
+  const showing: Showing = { lists, figure: where.figure, reads: where.reads, said: saidIn(language, where.home), typed: typedIn(where.now, zone, where.home), cell: typedIn(where.now, zone, where.home, true) };
   const blocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
   return {
     title: page.title,
@@ -594,10 +640,64 @@ export function methods(deps: RecordDeps) {
 
   /** The `share.open` of one link, or `undefined` for an id this record never opened. */
   const openedOf = (id: string) =>
-    sql.one<{ actor: string; slug: string | null; opened_at: string; expires_at: string | null }>(
-      "SELECT actor, field AS slug, ts AS opened_at, to_v AS expires_at FROM event WHERE target = ? AND kind = 'share.open' LIMIT 1",
+    sql.one<{ actor: string; slug: string | null; opened_at: string; expires_at: string | null; bound: string | null }>(
+      "SELECT actor, field AS slug, ts AS opened_at, to_v AS expires_at, from_v AS bound FROM event WHERE target = ? AND kind = 'share.open' LIMIT 1",
       `share:${id}`,
     );
+
+  /**
+   * How many times a page's declaration has been taken out: its newest retired version, or 0. A page taken out and a
+   * page of the same name written later share an id and not this number, so a link made before it opens neither.
+   */
+  const cutOf = (page: string): number =>
+    sql.one<{ v: number | null }>("SELECT max(version) AS v FROM declaration WHERE id = ? AND kind = 'page' AND retired = 1", `page.${page}`)?.v ?? 0;
+
+  /**
+   * What a link was made for (SEC3): the page's declaration, and for a page of a row, the row's list and number. The
+   * slug alone was what a link followed, and a slug is a row's title: rename Acme to Zed and Beta to Acme, and a link
+   * made for Acme's page served Beta's. Written on the link's `share.open` as JSON, in `from_v`, which no line of the
+   * history prints for a link (its `note` is printed, so it stays empty).
+   */
+  type Bound = { page: string; cut: number; register?: string; seq?: number };
+  const boundFor = (slug: string): Bound | null => {
+    const here = kernel.pages().find((p) => p.slug === slug);
+    if (here === undefined) return null;
+    if (here.template === null || here.about === null) return { page: slug, cut: cutOf(slug) };
+    if (typeof here.about.seq !== 'number') return null;
+    return { page: here.template, cut: cutOf(here.template), register: here.about.register, seq: here.about.seq };
+  };
+  const boundOf = (said: string | null): Bound | null => {
+    if (said === null) return null;
+    try {
+      const b = JSON.parse(said) as Partial<Bound>;
+      if (typeof b.page !== 'string' || typeof b.cut !== 'number') return null;
+      if (b.register === undefined) return { page: b.page, cut: b.cut };
+      return typeof b.register === 'string' && typeof b.seq === 'number' ? { page: b.page, cut: b.cut, register: b.register, seq: b.seq } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * The slug a link's page has now, or `null` when what it was made for is gone or has become something else.
+   *
+   * A PAGE OF A ROW IS FOUND BY ITS ROW, so a renamed row's link follows the row to its new address and never stays on
+   * the old one when another row takes it. A page somebody wrote is found by its address, and must still be a page
+   * somebody wrote and never taken out since. A link opened before links were bound carries nothing to find it by, and
+   * is read by its slug as it always was; every such link closes within `SHARE_DAYS_MOST` of being opened.
+   */
+  const whereNow = (opened: { slug: string | null; bound: string | null }): string | null => {
+    if (opened.slug === null) return null;
+    if (opened.bound === null) return opened.slug;
+    const bound = boundOf(opened.bound);
+    if (bound === null || cutOf(bound.page) !== bound.cut) return null;
+    const pages = kernel.pages();
+    const here =
+      bound.register === undefined
+        ? pages.find((p) => p.slug === opened.slug && p.template === null)
+        : pages.find((p) => p.template === bound.page && p.about !== null && p.about.register === bound.register && p.about.seq === bound.seq);
+    return here?.slug ?? null;
+  };
 
   /** When a link was closed, or `null` while it is open. `share.close` is for good, so the first one is the one. */
   const closedAt = (id: string): string | null =>
@@ -667,17 +767,20 @@ export function methods(deps: RecordDeps) {
         return no('OUT_OF_BOUNDS', `A link opens for a whole number of days from 1 to ${SHARE_DAYS_MOST}, and ${SHARE_DAYS} unless you say.`, { at: 'days' });
       if (!kernel.pages().some((p) => p.slug === slug)) return no('PAGE_UNKNOWN', 'There is no such page to share.', { at: 'slug' });
       if (personalPage(slug)) return no('FORBIDDEN', 'This page shows a personal list, which only the owner reads, so no link can open it.', { at: 'slug' });
+      const bound = boundFor(slug);
+      if (bound === null) return no('PAGE_UNKNOWN', 'There is no such page to share.', { at: 'slug' });
       const now = clock.now();
       const id = mint();
       const expires_at = instant(now + days * DAY_MS);
       sql.exec(
-        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v) VALUES (?, ?, ?, 'share.open', ?, 'share', ?, ?)",
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, from_v) VALUES (?, ?, ?, 'share.open', ?, 'share', ?, ?, ?)",
         mint(),
         instant(now),
         ctx.principal.id,
         `share:${id}`,
         slug,
         expires_at,
+        JSON.stringify(bound),
       );
       return tail(ok({ id, slug, expires_at }));
     },
@@ -720,8 +823,8 @@ export function methods(deps: RecordDeps) {
       const stop = admin(ctx, 'list the links to your pages');
       if (stop) return { ok: false, refusal: stop };
       const titles = new Map(kernel.pages().map((p) => [p.slug, p.title]));
-      const rows = sql.all<{ target: string; slug: string | null; opened_at: string; expires_at: string | null; closed_at: string | null }>(
-        `SELECT o.target AS target, o.field AS slug, o.ts AS opened_at, o.to_v AS expires_at,
+      const rows = sql.all<{ target: string; slug: string | null; opened_at: string; expires_at: string | null; closed_at: string | null; bound: string | null }>(
+        `SELECT o.target AS target, o.field AS slug, o.ts AS opened_at, o.to_v AS expires_at, o.from_v AS bound,
                 (SELECT MIN(c.ts) FROM event c WHERE c.target = o.target AND c.kind = 'share.close') AS closed_at
            FROM event o
           WHERE o.target >= ? AND o.target < ? AND o.kind = 'share.open'
@@ -736,7 +839,9 @@ export function methods(deps: RecordDeps) {
         rows.map((r) => ({
           id: r.target.slice('share:'.length),
           slug: r.slug ?? '',
-          title: titles.get(r.slug ?? '') ?? '',
+          /* THE TITLE OF WHAT THE LINK OPENS NOW, found as the link finds it (`whereNow`), so a slug another row has
+             taken since is not shown under this link's name. Empty when it opens nothing. */
+          title: titles.get(whereNow(r) ?? '') ?? '',
           opened_at: r.opened_at,
           expires_at: r.expires_at ?? r.opened_at,
           closed_at: r.closed_at,
@@ -766,11 +871,13 @@ export function methods(deps: RecordDeps) {
       const ends = Date.parse(opened.expires_at);
       if (!Number.isFinite(ends) || clock.now() >= ends) return { ok: false, refusal: SHUT };
       if (closedAt(link.id) !== null || !ownsNow(opened.actor)) return { ok: false, refusal: SHUT };
-      if (!kernel.pages().some((p) => p.slug === link.slug)) return { ok: false, refusal: SHUT };
+      /* THE PAGE THE LINK WAS MADE FOR, found by its declaration and row and not by the slug (SEC3). */
+      const slug = whereNow(opened);
+      if (slug === null || !kernel.pages().some((p) => p.slug === slug)) return { ok: false, refusal: SHUT };
       /* AND A PAGE THAT CAME TO SHOW A PERSONAL LIST AFTER ITS LINK WAS OPENED NO LONGER OPENS. */
-      if (personalPage(link.slug)) return { ok: false, refusal: SHUT };
+      if (personalPage(slug)) return { ok: false, refusal: SHUT };
       /* A LINK IS NOBODY, so a row its maker kept private is not on the shared page. */
-      const out = kernel.page(link.slug, undefined, { viewer: NOBODY });
+      const out = kernel.page(slug, undefined, { viewer: NOBODY });
       if (!out.ok) return { ok: false, refusal: SHUT };
       const identity = kernel.identity();
       const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;
@@ -778,7 +885,8 @@ export function methods(deps: RecordDeps) {
          held and none chosen is no home, and every amount keeps its code. */
       const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
       const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
-      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure }));
+      const reads = (b: BlockResult): readonly string[] => kernel.blockRegisters(b as unknown as Parameters<typeof kernel.blockRegisters>[0]);
+      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads }));
     },
   };
 }

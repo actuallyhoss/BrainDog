@@ -88,15 +88,33 @@ export type OAuthAnswer = OAuthAnswers[OAuthCall['op']];
 /**
  * The ceilings on what a stranger can make this store hold, each a named number.
  *
- * CLIENTS ARE KEPT, REQUESTS AND CODES ARE NOT. A registered client is what an app reconnects with after its token
- * ends, so it is never pruned, and registration is counted per address (`COUNTED_MOST`) as the other bound. A request
- * lives ten minutes and a code sixty seconds, and each is pruned before a new one is written, so their ceilings bound
- * what one burst can hold rather than what a day can.
+ * A request lives ten minutes and a code sixty seconds, and each is pruned before a new one is written, so their
+ * ceilings bound what one burst can hold rather than what a day can.
+ *
+ * A CLIENT THAT NEVER CONNECTED IS PRUNED NOW (SEC8). Registrations were never pruned, so fifty thousand of them, each
+ * a few thousand characters of addresses, answered `full` to every app after for good. A registered client is what an
+ * app reconnects with after its token ends, so one that has a live family, or connected within `CLIENT_USED_KEEP`, is
+ * kept; one registered `CLIENT_UNUSED_KEEP` ago that never connected is junk, and goes. A metadata document's row is a
+ * copy the host reads again after a day (`DOCUMENT_LIFE` in `packages/host/src/oauth.ts`), so past it, with no family,
+ * it goes too.
  */
 const CLIENTS_MOST = 50_000;
 const REQUESTS_MOST = 10_000;
 const CODES_MOST = 10_000;
 const FAMILIES_MOST = 50_000;
+/**
+ * The most sign-ins one registered app may have waiting at once (SEC8). One app on one machine waits on one person;
+ * a hundred is a stranger holding the deployment's room with one client id. A metadata document's id is not held to it,
+ * because one such id (an app like Claude's) is shared by everybody who uses that app, and a cap on it would be a way to
+ * shut that app out for all of them; those are held by the per-place counts at the door instead.
+ */
+const REQUESTS_PER_CLIENT = 100;
+const DAY = 86_400_000;
+const CLIENT_UNUSED_KEEP = 30 * DAY;
+const CLIENT_USED_KEEP = 180 * DAY;
+const DOCUMENT_KEEP = DAY;
+/** At most this many clients are pruned on one registration, so the prune is one bounded statement. */
+const PRUNE_MOST = 500;
 
 /**
  * What one address may ask of `/oauth/register` or `/oauth/authorize` in a window, as device starts are counted, and
@@ -123,7 +141,24 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS oauth_refresh_cur ON oauth_refresh(cur_hash)',
   'CREATE INDEX IF NOT EXISTS oauth_refresh_prev ON oauth_refresh(prev_hash)',
   'CREATE INDEX IF NOT EXISTS oauth_refresh_expires ON oauth_refresh(expires)',
+  'CREATE INDEX IF NOT EXISTS oauth_refresh_client ON oauth_refresh(client_id)',
+  'CREATE INDEX IF NOT EXISTS oauth_request_client ON oauth_request(client_id)',
+  /* WHEN A CLIENT LAST STARTED A FAMILY, so a client that connected is told apart from junk that never did (SEC8). */
+  'CREATE TABLE IF NOT EXISTS oauth_client_used (client_id TEXT PRIMARY KEY, at INTEGER NOT NULL)',
 ];
+
+/**
+ * The clients nothing holds on to: a registration that never connected and is a month old, one that last connected half
+ * a year ago, and a metadata document's copy a day old, each with no family, no waiting sign-in and no code.
+ */
+const PRUNE = `DELETE FROM oauth_client WHERE rowid IN (
+  SELECT c.rowid FROM oauth_client c
+   WHERE ((c.source = 'dcr' AND c.created_at <= ?1) OR (c.source = 'cimd' AND c.created_at <= ?2))
+     AND NOT EXISTS (SELECT 1 FROM oauth_refresh r WHERE r.client_id = c.client_id)
+     AND NOT EXISTS (SELECT 1 FROM oauth_request q WHERE q.client_id = c.client_id)
+     AND NOT EXISTS (SELECT 1 FROM oauth_code k WHERE json_extract(k.request, '$.client_id') = c.client_id)
+     AND NOT EXISTS (SELECT 1 FROM oauth_client_used u WHERE u.client_id = c.client_id AND u.at > ?3)
+   LIMIT ?4)`;
 
 /**
  * One strike for a key in the Directory's `dir_fail`, in one statement, answering the count and when the window began.
@@ -194,6 +229,7 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
           'INSERT INTO oauth_refresh (id, client_id, record, scope, cur_hash, cur_sealed, prev_hash, prev_sealed, prev_until, expires, ends) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           r.id, r.client_id, r.record, r.scope, r.cur_hash, r.cur_sealed, r.prev_hash, r.prev_sealed, r.prev_until, r.expires, r.ends,
         );
+        sql.exec('INSERT INTO oauth_client_used (client_id, at) VALUES (?, ?) ON CONFLICT (client_id) DO UPDATE SET at = excluded.at', r.client_id, now);
         return 'ok' as const;
       });
     }
@@ -226,6 +262,10 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
       /* A METADATA DOCUMENT READ AGAIN REPLACES ITS OWN ROW, which is how a day-old copy is refreshed. A registered
          client's id is minted fresh by the host, so for one of those the conflict never happens. */
       const known = sql.one<{ one: number }>('SELECT 1 AS one FROM oauth_client WHERE client_id = ?', c.client_id) !== undefined;
+      if (!known) {
+        sql.exec(PRUNE, now - CLIENT_UNUSED_KEEP, now - DOCUMENT_KEEP, now - CLIENT_USED_KEEP, PRUNE_MOST);
+        sql.exec('DELETE FROM oauth_client_used WHERE at <= ? AND client_id NOT IN (SELECT client_id FROM oauth_client)', now - CLIENT_USED_KEEP);
+      }
       if (!known && count(sql, 'oauth_client') >= CLIENTS_MOST) return 'full';
       sql.exec(
         `INSERT INTO oauth_client (client_id, name, redirect_uris, source, created_at) VALUES (?, ?, ?, ?, ?)
@@ -243,6 +283,10 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
       return sql.transactionSync(() => {
         sql.exec('DELETE FROM oauth_request WHERE expires <= ?', now);
         if (count(sql, 'oauth_request') >= REQUESTS_MOST) return 'full' as const;
+        /* ONE REGISTERED APP HOLDS AT MOST ITS SHARE (SEC8): one client and a thousand addresses held every request. */
+        const dcr = sql.one<{ one: number }>("SELECT 1 AS one FROM oauth_client WHERE client_id = ? AND source = 'dcr'", r.client_id) !== undefined;
+        if (dcr && Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM oauth_request WHERE client_id = ?', r.client_id)?.n ?? 0) >= REQUESTS_PER_CLIENT)
+          return 'full' as const;
         sql.exec(`INSERT INTO oauth_request (${HELD}) VALUES (?, ?, ?, ?, ?, ?, ?)`, r.id, r.client_id, r.redirect_uri, r.challenge, r.scope, r.state, r.expires);
         return 'ok' as const;
       });

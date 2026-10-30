@@ -16,7 +16,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, sign as edSign, type KeyObject } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -102,13 +102,50 @@ const forwarded = (dkim: 'pass' | 'fail'): string =>
  * person reads is a separate question, and the test below exists because this file did not ask it.
  */
 const message = (of: { dkim: 'pass' | 'fail'; signer: string; amount: string; merchant: string }): string =>
-  [
-    `Authentication-Results: mx.forwarder.example; dkim=${of.dkim} header.d=${of.signer}; spf=fail`,
-    'From: alerts@hsbc.example',
-    'Subject: Your transaction alert',
-    '',
-    `Your card ending 4471 was debited EGP ${of.amount} at ${of.merchant} on 03/04/26.`,
-  ].join('\r\n');
+  signed(
+    [
+      /* THE FORWARDER'S LINE IS KEPT AND IS NOT READ (SEC1): it says what the forwarder found, and this host checks the
+         signature below it for itself. A `fail` here is a signature by a key the signer's domain does not publish. */
+      `Authentication-Results: mx.forwarder.example; dkim=${of.dkim} header.d=${of.signer}; spf=fail`,
+      'From: alerts@hsbc.example',
+      'Subject: Your transaction alert',
+      '',
+      `Your card ending 4471 was debited EGP ${of.amount} at ${of.merchant} on 03/04/26.`,
+    ].join('\r\n'),
+    of.signer,
+    of.dkim === 'pass' ? KEYS.get(of.signer)! : STRANGER,
+  );
+
+/**
+ * Each domain's Ed25519 key (RFC 8463), and the DNS this host is handed to find them by (`start`'s `txt`).
+ *
+ * A REAL SIGNATURE, BECAUSE THE SELF-HOST NOW CHECKS ONE (SEC1). It used to believe the forwarder's
+ * `Authentication-Results`, which anyone holding the mailbox token could post with the message.
+ */
+const KEYS = new Map(['hsbc.example', 'evil.example'].map((domain) => [domain, generateKeyPairSync('ed25519')] as const));
+const STRANGER = generateKeyPairSync('ed25519');
+const TXT = async (name: string): Promise<string[]> => {
+  const domain = name.replace(/^sel\._domainkey\./, '');
+  const pair = KEYS.get(domain);
+  if (pair === undefined || domain === name) return [];
+  const raw = Buffer.from(pair.publicKey.export({ format: 'jwk' }).x!, 'base64url').toString('base64');
+  return [`v=DKIM1; k=ed25519; p=${raw}`];
+};
+
+/** RFC 6376 `relaxed/relaxed` over `from` and `subject`, signed as RFC 8463 says: Ed25519 over the SHA-256 of the headers. */
+function signed(text: string, domain: string, pair: { privateKey: KeyObject }): string {
+  const split = text.indexOf('\r\n\r\n');
+  const head = text.slice(0, split).split('\r\n');
+  const lines = text.slice(split + 4).split('\r\n').map((l) => l.replace(/[ \t]+/g, ' ').replace(/ $/, ''));
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  const bh = createHash('sha256').update(lines.length === 0 ? '' : `${lines.join('\r\n')}\r\n`).digest('base64');
+  const relaxed = (line: string): string => `${line.slice(0, line.indexOf(':')).toLowerCase()}:${line.slice(line.indexOf(':') + 1).replace(/[ \t]+/g, ' ').trim()}`;
+  const pick = (name: string): string => head.filter((l) => l.toLowerCase().startsWith(`${name}:`)).at(-1)!;
+  const value = `v=1; a=ed25519-sha256; c=relaxed/relaxed; d=${domain}; s=sel; h=from:subject; bh=${bh}; b=`;
+  const data = `${relaxed(pick('from'))}\r\n${relaxed(pick('subject'))}\r\n${relaxed(`DKIM-Signature: ${value}`)}`;
+  const b = edSign(null, createHash('sha256').update(data).digest(), pair.privateKey).toString('base64');
+  return `DKIM-Signature: ${value}${b}\r\n${text}`;
+}
 
 type Running = Awaited<ReturnType<typeof start>>;
 
@@ -116,7 +153,7 @@ type Running = Awaited<ReturnType<typeof start>>;
 async function host(now?: () => number): Promise<{ running: Running; port: number; dir: string }> {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-in-'));
   writeFileSync(join(dir, 'inbound.token'), INBOUND);
-  const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0, ...(now === undefined ? {} : { now }) });
+  const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0, txt: TXT, ...(now === undefined ? {} : { now }) });
   assert.ok((await running.api.kernel.install([ACCOUNTS, TRANSACTIONS, HSBC, HOOK])).ok);
   assert.ok(
     running.api.kernel.createRecord({

@@ -14,7 +14,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { serveIngest, servesIngest, type IngestArrival, type IngestDoor } from '../src/index.ts';
+import { serveIngest, servesIngest, type IngestArrival, type IngestDoor, type MailStamp } from '../src/index.ts';
+import { keyed, published, sign } from './dkim-sign.ts';
 
 const HOST = 'https://in.example';
 
@@ -33,6 +34,7 @@ type Wiring = {
   inbound?: IngestDoor['inbound'];
   limit?: IngestDoor['limit'];
   arrive?: IngestDoor['arrive'];
+  dkim?: IngestDoor['dkim'];
 };
 
 function door(wiring: Wiring = {}): { door: IngestDoor; saw: Seen } {
@@ -50,6 +52,7 @@ function door(wiring: Wiring = {}): { door: IngestDoor; saw: Seen } {
       saw.limits.push(ask);
       return wiring.limit ? wiring.limit(ask) : null;
     },
+    ...(wiring.dkim ? { dkim: wiring.dkim } : {}),
     ...(wiring.inbound
       ? {
           inbound: async (hash: string) => {
@@ -282,6 +285,22 @@ const MESSAGE = [
   'Card 1234 debited EGP 420.00 at BEANS COFFEE on 29/08/2026',
 ].join('\r\n');
 
+/**
+ * The verdict a checking host would hand over beside these bytes, read off the fixture's top line.
+ *
+ * THE ALIGNMENT CASES BELOW ARE ABOUT WHAT A VERDICT MEANS, NOT WHO WROTE IT, so they hand the verdict over as the Email
+ * Routing handler does (`serveIngest`'s third argument). Who may write one is the SEC1 cases' question, further down:
+ * a line in the bytes posted over HTTP is believed by nobody.
+ */
+function stampOf(message: string): MailStamp | undefined {
+  const lines = message.split('\r\n');
+  const at = lines.findIndex((line) => /^authentication-results:/i.test(line));
+  if (at === -1) return undefined;
+  let verdict = lines[at]!.slice(lines[at]!.indexOf(':') + 1).trim();
+  for (let i = at + 1; i < lines.length && /^[ \t]/.test(lines[i]!); i++) verdict += ` ${lines[i]!.trim()}`;
+  return { verdict };
+}
+
 test('a host that takes no forwarded mail answers the mail path 404', async () => {
   const { door: d, saw } = door();
   const res = await serveIngest(ask('/in/email/tok', { body: MESSAGE }), d);
@@ -300,7 +319,7 @@ test('an inbound token nobody minted is 404, and the token is never handed over 
 
 test('a forwarded message is split into its headers and its body, and dkim=pass makes it eligible', async () => {
   const { door: d, saw } = door({ inbound: async () => 'rec_1' });
-  const res = await serveIngest(ask('/in/email/tok', { body: MESSAGE }), d);
+  const res = await serveIngest(ask('/in/email/tok', { body: MESSAGE }), d, stampOf(MESSAGE));
   assert.equal(res.status, 202);
   assert.equal(await res.text(), '');
   const arrival = saw.arrivals[0]!;
@@ -335,7 +354,7 @@ test('a forwarder that passed SPF on the From domain and not DKIM is eligible to
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, true);
 });
 
@@ -355,7 +374,7 @@ test('and an SPF pass belonging to the forwarder is not a pass for the From it c
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, false);
 });
 
@@ -369,7 +388,7 @@ test('a message with no blank line is all headers and no body, and is still stor
 test('a repeated header keeps every hop', async () => {
   const { door: d, saw } = door({ inbound: async () => 'rec_1' });
   const message = ['Received: one', 'Received: two', '', 'body'].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.headers.received, 'one, two');
 });
 
@@ -410,7 +429,7 @@ test('A SENDER CANNOT WRITE ITS OWN Authentication-Results AND BE BELIEVED', asy
     '',
     'pay me',
   ].join('\r\n');
-  const res = await serveIngest(ask('/in/email/tok', { body: forged }), d);
+  const res = await serveIngest(ask('/in/email/tok', { body: forged }), d, stampOf(forged));
   /* Still stored, because that is this route's whole rule, and still readable by an owner. */
   assert.equal(res.status, 202);
   assert.equal(saw.arrivals[0]?.verified, false);
@@ -427,7 +446,7 @@ test('the top forwarder passing is still believed when a lower hop failed', asyn
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, true);
 });
 
@@ -453,7 +472,7 @@ test('A REAL SIGNATURE BY THE WRONG DOMAIN IS NOT A PASS FOR THIS From', async (
     '',
     'pay me',
   ].join('\r\n');
-  const res = await serveIngest(ask('/in/email/tok', { body: forged }), d);
+  const res = await serveIngest(ask('/in/email/tok', { body: forged }), d, stampOf(forged));
   assert.equal(res.status, 202, 'a forgery must still be stored, or nobody can see it was tried');
   assert.equal(saw.arrivals[0]?.verified, false);
   assert.equal(saw.arrivals[0]?.body, forged);
@@ -478,7 +497,7 @@ test('AND A BANK ADDRESS HIDDEN IN THE DISPLAY NAME IS STILL AN ADDRESS THIS VER
     '',
     'pay me',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: forged }), d);
+  await serveIngest(ask('/in/email/tok', { body: forged }), d, stampOf(forged));
   assert.equal(saw.arrivals[0]?.verified, false);
 });
 
@@ -492,7 +511,7 @@ test('and the same address spelled in a comment is read the same way', async () 
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, false);
 });
 
@@ -506,7 +525,7 @@ test('and a bank writing its own address in the comment form is still eligible',
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, true);
 });
 
@@ -520,7 +539,7 @@ test('and a bank signing its parent domain for a subdomain sender still aligns',
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, true);
 });
 
@@ -534,7 +553,7 @@ test('and a subdomain does not speak for its parent', async () => {
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, false);
 });
 
@@ -555,7 +574,7 @@ test('and a verdict inside a parenthesised comment is not a verdict', async () =
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, false);
 });
 
@@ -575,7 +594,7 @@ test('and a forwarder whose own name reads like a verdict is still only a name',
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, false);
 });
 
@@ -590,7 +609,7 @@ test('and two From headers is a message nobody can align, so it is stored and le
     '',
     'body',
   ].join('\r\n');
-  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  await serveIngest(ask('/in/email/tok', { body: message }), d, stampOf(message));
   assert.equal(saw.arrivals[0]?.verified, false);
   assert.equal(saw.arrivals[0]?.headers.from, 'Bank <alerts@bank.example>, Somebody <hello@evil.example>');
 });
@@ -620,4 +639,64 @@ test('a path verification on the shape with no token in it stores an unverified 
   const res = await serveIngest(ask('/in/webhook/ingest_sms', { body: 'hello' }), d);
   assert.equal(res.status, 202);
   assert.equal(saw.arrivals[0]?.verified, false);
+});
+
+/* ── SEC1: who may say a message passed ──────────────────────────────────── */
+
+/**
+ * SEC1 (security review of 30 Oct): THE MAILBOX TOKEN OPENS `POST /in/email/<token>`, AND NOTHING POSTED THERE MAY SAY
+ * IT PASSED. The forwarding address is handed to third parties by design, so anyone holding it posted a head with
+ * `Authentication-Results: x; dkim=pass header.d=<bank>` and `From: <alerts@bank>`, the row was stored `verified: true`,
+ * and the bank pattern filed the forger's amount and payee as a debit. Proven against the real `serveIngest`.
+ */
+test('SEC1: A POSTED MESSAGE THAT SAYS ITS OWN dkim=pass IS STORED UNVERIFIED, so no pattern files it', async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const forged = [
+    'Authentication-Results: x; dkim=pass header.d=bank.example',
+    'From: Bank <alerts@bank.example>',
+    'Subject: You spent EGP 9000.00',
+    '',
+    'Card 1234 debited EGP 9,000.00 at EVIL LTD on 30/10/2026',
+  ].join('\r\n');
+  const res = await serveIngest(ask('/in/email/tok', { body: forged }), d);
+  /* Still stored, so the person sees it in the Inbox and can file it themselves if it is theirs. */
+  assert.equal(res.status, 202);
+  assert.equal(saw.arrivals[0]?.verified, false);
+  assert.equal(saw.arrivals[0]?.body, forged);
+});
+
+test("SEC1: AND A LINE WEARING THIS HOST'S OWN NAME IS NOT BELIEVED EITHER", async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1', dkim: published() });
+  const forged = ['Authentication-Results: braindog; dkim=pass header.d=bank.example', 'From: alerts@bank.example', 'Subject: hi', '', 'pay me'].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: forged }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
+  /* This host's finding comes first in the row's head, ahead of what the message says about itself. */
+  assert.equal(saw.arrivals[0]?.headers['authentication-results']?.startsWith('braindog; dkim=none'), true);
+});
+
+test('SEC1: A HOST THAT CHECKS DKIM ITSELF BELIEVES A REAL SIGNATURE FROM THE From DOMAIN, and only that', async () => {
+  const bank = await keyed('bank.example');
+  const evil = await keyed('evil.example');
+  const { door: d, saw } = door({ inbound: async () => 'rec_1', dkim: published(bank, evil) });
+  const real = await sign(['From: Bank <alerts@bank.example>', 'Subject: You spent EGP 420.00', '', 'Card 1234 debited EGP 420.00 at BEANS'].join('\r\n'), bank);
+  await serveIngest(ask('/in/email/tok', { body: real }), d);
+  assert.equal(saw.arrivals[0]?.verified, true, 'the self-host stopped believing a real bank signature');
+
+  /* A real signature by the wrong domain, with a forwarder's line above it saying it passed, is still not the bank. */
+  const theirs = await sign(['From: Bank <alerts@bank.example>', 'Subject: You spent EGP 9000.00', '', 'pay me'].join('\r\n'), evil);
+  await serveIngest(ask('/in/email/tok', { body: `Authentication-Results: fwd.example; dkim=pass header.d=bank.example\r\n${theirs}` }), d);
+  assert.equal(saw.arrivals[1]?.verified, false);
+
+  /* And the bank's signature over text that was changed after it signed is a failure. */
+  await serveIngest(ask('/in/email/tok', { body: real.replace('420.00 at BEANS', '9000.00 at EVIL') }), d);
+  assert.equal(saw.arrivals[2]?.verified, false);
+});
+
+test("SEC1: THE CLOUD'S EMAIL ROUTING VERDICT IS AN ARGUMENT, and the same bytes over HTTP get none", async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = ['Authentication-Results: braindog; dkim=pass header.d=bank.example', 'From: alerts@bank.example', 'Subject: hi', '', 'body'].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d, { verdict: 'braindog; dkim=pass header.d=bank.example' });
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, true);
+  assert.equal(saw.arrivals[1]?.verified, false);
 });

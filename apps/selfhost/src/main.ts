@@ -693,6 +693,12 @@ async function serve(): Promise<void> {
     return refuse(
       `${serverKey.name} is set but empty. Put a long random value in it (openssl rand -base64 32 | tr '+/' '-_' | tr -d '='), or remove the line to run on loopback only with nobody signing in.`,
     );
+  /* AND A SHORT ONE IS A KEY SOMEBODY CAN GUESS (SEC5): it is the owner to whoever presents it, on every interface. The
+     lockout slows a guess at `/api` and `/mcp`; it cannot make eight characters into a secret. */
+  if (serverKey.value !== undefined && serverKey.value.trim().length < 32)
+    return refuse(
+      `${serverKey.name} is shorter than 32 characters, so it could be guessed. Put a long random value in it (openssl rand -base64 32 | tr '+/' '-_' | tr -d '='), or remove the line to run on loopback only with nobody signing in.`,
+    );
   const secret = env.BRAINDOG_SESSION_SECRET;
   if (secret !== undefined && secret.length < 32)
     return refuse('BRAINDOG_SESSION_SECRET is shorter than 32 characters. Make it 32 random bytes in base64url, or unset it to derive one from the key file.');

@@ -132,3 +132,15 @@ test("THE MAC APP'S CHALLENGE RIDES IN THE LINK AS ?app=, beside next, and only 
   for (const bad of ['short', `${challenge}x`, `${'c'.repeat(42)}/`, 7])
     assert.match(await mailed(undefined, bad), /^https:\/\/studio\.example\/signin#magic=/, `${String(bad)} rode in the link`);
 });
+
+/* SEC4 (security review of 30 Oct): `/app` WAS TAKEN OFF AFTER `safeNext`, AND ONE SLASH WITH IT, so `/app//evil.example/x`
+   came back `//evil.example/x` and was mailed and followed as another host. */
+test('SEC4: appNext NEVER ANSWERS ANOTHER HOST, HOWEVER THE /app IN FRONT OF IT IS SPELLED', () => {
+  for (const next of ['/app//evil.example/x', '/app///evil.example', '/app/%2F/x', '/app/%2F%2Fevil.example', '/app//%2Fevil.example']) {
+    const to = appNext(next);
+    if (to === null) continue;
+    assert.ok(to.startsWith('/') && !to.startsWith('//'), `${next} came back ${to}`);
+    assert.ok(!decodeURIComponent(to).startsWith('//'), `${next} decodes to another host: ${to}`);
+  }
+  assert.equal(appNext('/app//evil.example/x'), '/evil.example/x');
+});

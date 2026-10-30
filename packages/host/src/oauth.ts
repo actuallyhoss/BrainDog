@@ -38,6 +38,7 @@ import type { TokenClient } from '@braindog/kernel';
 import { FRESH } from '@braindog/record';
 import { ABUSE, tooManyLine } from './abuse.ts';
 import type { CodeRequest, HeldRequest, OAuthAnswers, OAuthCall, OAuthClient } from '@braindog/record/oauth';
+import { ipBucket } from '@braindog/record/directory';
 
 import { sameOrigin } from './auth.ts';
 
@@ -72,6 +73,30 @@ const REDIRECTS_MOST = 10;
 const URI_MOST = 2000;
 const NAME_MOST = 80;
 const STATE_MOST = 1024;
+/** Every redirect address one app registers, together (SEC8): what one registration can make the store keep. */
+const REDIRECTS_TOTAL_MOST = 2048;
+
+/**
+ * Where `/oauth/register` and `/oauth/authorize` count a caller (SEC8): an IPv6 address as its /64, which is what one
+ * home or one cheap server is handed, and a second, wider count over its /48, so a whole allocation of /64s is not an
+ * endless supply of fresh counts. The raw address was the key, and a /64 is 2^64 of them.
+ */
+const WIDE_MOST = 100;
+function placesOf(address: string | null): { place: string; wide: string | null } {
+  const place = ipBucket(address ?? '') || 'unknown';
+  if (!place.endsWith('::/64')) return { place, wide: null };
+  const hextets = place.slice(0, -'::/64'.length).split(':');
+  while (hextets.length < 3) hextets.push('0');
+  return { place, wide: `${hextets.slice(0, 3).join(':')}::/48` };
+}
+
+/** The count at the door for one `kind`: the place's, then its /48's, and the first that says wait. */
+async function counted(deps: OAuthDeps, kind: 'register' | 'authorize'): Promise<number | null> {
+  const { place, wide } = placesOf(deps.address);
+  const wait = await deps.store({ op: 'count', key: `${kind}:${place}` });
+  if (wait !== null || wide === null) return wait;
+  return deps.store({ op: 'count', key: `${kind}48:${wide}`, most: WIDE_MOST });
+}
 
 /** The HKDF info a code's sealing key is derived under: one key for this job and no other, as `braindog/share` is. */
 const CODE_INFO = 'braindog/oauth-code';
@@ -613,7 +638,7 @@ export const authorizationServer = (issuer: string, documents: boolean) => ({
  * will read it and the addresses that passed `redirectWrong`, with the grant this server actually gives.
  */
 async function register(request: Request, deps: OAuthDeps): Promise<Response> {
-  const wait = await deps.store({ op: 'count', key: `register:${deps.address ?? 'unknown'}` });
+  const wait = await counted(deps, 'register');
   if (wait !== null) return tooMany(wait);
   const body = await bodyOf(request);
   if (body === null || body.form) return oauthError(400, 'invalid_client_metadata', `Registration takes a JSON object of at most ${BODY_MOST_BYTES} bytes.`);
@@ -626,6 +651,8 @@ async function register(request: Request, deps: OAuthDeps): Promise<Response> {
     if (wrong !== null) return oauthError(400, 'invalid_redirect_uri', wrong);
   }
   const addresses = uris as string[];
+  if (addresses.reduce((n, u) => n + u.length, 0) > REDIRECTS_TOTAL_MOST)
+    return oauthError(400, 'invalid_redirect_uri', `An app's redirect addresses come to at most ${REDIRECTS_TOTAL_MOST} characters together.`);
   if (f.token_endpoint_auth_method !== undefined && f.token_endpoint_auth_method !== 'none')
     return oauthError(400, 'invalid_client_metadata', 'BrainDog registers public clients only: token_endpoint_auth_method is none, and the app proves itself with PKCE.');
   if (f.grant_types !== undefined && !(Array.isArray(f.grant_types) && f.grant_types.includes('authorization_code')))
@@ -700,7 +727,7 @@ export const REQUEST_GONE = 'This sign-in has expired or was already answered. G
  */
 async function authorize(request: Request, deps: OAuthDeps): Promise<Response> {
   const title = 'BrainDog could not connect this app';
-  const wait = await deps.store({ op: 'count', key: `authorize:${deps.address ?? 'unknown'}` });
+  const wait = await counted(deps, 'authorize');
   if (wait !== null) return sentences(429, title, [tooManyLine(wait)], [['retry-after', String(wait)]]);
   const q = new URL(request.url).searchParams;
   const id = q.get('client_id');

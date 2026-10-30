@@ -167,6 +167,22 @@ test('A FORWARDED MESSAGE REACHES THE RECORD THE DIGEST NAMES, AND THE TOKEN ITS
   assert.equal(JSON.stringify(arrival).includes(TOKEN), false, 'the inbound token was written into the stored row');
 });
 
+/**
+ * SEC1 (security review of 30 Oct): MAIL POSTED TO THE CLOUD'S HTTP DOOR IS STORED UNVERIFIED, WHATEVER IT SAYS. The
+ * Cloud's mail comes in through Email Routing, whose handler checks DKIM itself and hands the verdict to `serveIngest`
+ * beside the bytes (`email.ts`). Over HTTP the token is the only key, and a stranger holding it wrote
+ * `Authentication-Results: x; dkim=pass header.d=bank.example` and had the bank pattern file their debit.
+ */
+test('SEC1: A POSTED MESSAGE WRITING ITS OWN dkim=pass, EVEN IN THIS HOST\'S NAME, IS STORED UNVERIFIED', async () => {
+  for (const said of ['x', 'braindog']) {
+    const { door, seen } = mailDoor();
+    const forged = [`Authentication-Results: ${said}; dkim=pass header.d=bank.example`, 'From: Bank <alerts@bank.example>', 'Subject: You spent EGP 9,000.00', '', 'pay me'].join('\r\n');
+    const res = await serveIngest(mail(TOKEN, forged), door);
+    assert.equal(res.status, 202, 'a forgery is still stored, so the person can see it was tried');
+    assert.equal(seen.arrives[0]?.[1].verified, false, `a line written by ${said} was believed`);
+  }
+});
+
 test('A DIGEST NOBODY REGISTERED IS A 404, AND IT COSTS NO OBJECT', async () => {
   const { door, seen } = mailDoor({ recordFor: () => null });
   const res = await serveIngest(mail('some-address-nobody-issued'), door);

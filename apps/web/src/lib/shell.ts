@@ -3,7 +3,7 @@
  * or hear the shell; in a browser each does the web thing, and the Mac app will hook `__BRAINDOG_SHELL__` later.
  */
 
-import { fromLegacy, split } from './at.ts';
+import { fromLegacy, pathOnly, split } from './at.ts';
 
 /**
  * What the Mac app says: `slash` opens Ask (⌥Space, ⌘J), `search` opens the search (⌘K), `goto` moves the window, and
@@ -115,5 +115,7 @@ export function applyInset(): void {
 export function appPath(arg: string | undefined): string | null {
   if (typeof arg !== 'string' || arg.length > 512 || /[\\\u0000-\u001f]|\.\./.test(arg) || !arg.startsWith('/') || arg.startsWith('//')) return null;
   const path = fromLegacy(arg);
+  /* CHECKED AGAIN ONCE `/app` IS OFF (SEC4): `/app//evil.example` passed every check above as typed. */
+  if (!pathOnly(path.replace(/[?#].*$/, ''))) return null;
   return split(path.replace(/[?#].*$/, '')) === null ? null : path;
 }

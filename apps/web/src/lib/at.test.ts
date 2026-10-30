@@ -56,6 +56,20 @@ test('fromLegacy takes off the `/app` the app had, and nothing else', () => {
     assert.equal(fromLegacy(kept), kept, kept);
 });
 
+/* SEC4 (security review of 30 Oct): `/app` WAS TAKEN OFF AFTER THE CHECKS, AND ONE SLASH WITH IT. A link to
+   `/signin?next=/app//evil.example/phish` passed the `//` check as typed and came out `//evil.example/phish`, another
+   host, so "Open BrainDog" after a passkey sign-in left the site. */
+test('SEC4: A NEXT UNDER /app WITH A HOST BEHIND IT NEVER LEAVES THE ORIGIN', () => {
+  assert.equal(fromLegacy('/app//evil.example/x'), '/evil.example/x');
+  assert.equal(fromLegacy('/app///evil.example'), '/evil.example');
+  for (const next of ['/app//evil.example/phish', '/app///evil.example', '/app/%2F/x', '/app/%2F%2Fevil.example', '/app//\\evil.example']) {
+    const to = onward(`?${new URLSearchParams({ next })}`);
+    assert.ok(to.startsWith('/') && !to.startsWith('//'), `${next} went to ${to}`);
+    assert.equal(new URL(to, 'https://app.example').origin, 'https://app.example', next);
+    assert.ok(!decodeURIComponent(to).startsWith('//'), `${next} decodes to another host: ${to}`);
+  }
+});
+
 test('SIGN-IN, AN INVITATION AND A SHARED PAGE NAME NO RECORD, so a slug is never added to them', () => {
   assert.equal(at('/signin', '/acme/r/tasks'), '/signin');
   assert.equal(at('/invite', '/acme/'), '/invite');

@@ -49,7 +49,8 @@ export { engineLedgerRead, mentionsAttached, type EngineLedger, type EngineLedge
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason
    the keychain, key and session doors are: both hosts import one module to get the whole surface, and a door
    one host can find and the other cannot is exactly the drift this file's header is about. */
-export { EMAIL_LIMIT, FILES_HEADER, messageHeaders, serveIngest, servesIngest, type IngestArrival, type IngestChannel, type IngestDoor, type IngestFile, type IngestPath, type IngestVerify, type IngestInbound, type IngestTurnedAway } from './ingest.ts';
+export { AUTHSERV as MAIL_AUTHSERV, verdict as dkimVerdict, verdictValue, type TxtLookup } from './dkim.ts';
+export { EMAIL_LIMIT, FILES_HEADER, messageHeaders, serveIngest, servesIngest, type MailStamp, type IngestArrival, type IngestChannel, type IngestDoor, type IngestFile, type IngestPath, type IngestVerify, type IngestInbound, type IngestTurnedAway } from './ingest.ts';
 export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, seal, type Bytes, type DerivedKey } from './sealing.ts';
 /* `crashed` IS EXPORTED FOR THE OTHER TWO DOORS, the Worker's router and the self-host's outer catch.
    `serveApi` below is the first of three places a crash is answered, and three answers to one crash is the drift this

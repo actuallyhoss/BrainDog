@@ -2796,7 +2796,7 @@ export class Directory$ extends DurableObject<Env> {
    * `POST /account/email`: a link good for a day, minted for a person's new sign-in address and not yet moved.
    * `packages/host/src/auth.ts`'s `EmailDoor.ask`, reached over RPC because only the Directory holds the address book.
    */
-  emailAsk(person: string, email: string): Promise<Result<{ to: string; token: string }>> {
+  emailAsk(person: string, email: string): Promise<Result<{ to: string; token: string | null }>> {
     return this.#directory().emailAsk(person, email);
   }
 
@@ -3444,6 +3444,7 @@ export default {
  */
 function heldDeps(env: Env): HeldDeps {
   return {
+    knows: (rec) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).knows(rec),
     bucket: env.BLOBS,
     secret: env.SESSION_SECRET,
     queue: env.INGRESS,
@@ -4453,7 +4454,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     ...(env.AUTH_MAIL_FROM && env.EMAIL && (env.SESSION_SECRET ?? '').length >= 32
       ? {
           email: {
-            ask: (p: string, e: string) => directory.emailAsk(p, e) as unknown as Promise<Result<{ to: string; token: string }>>,
+            ask: (p: string, e: string) => directory.emailAsk(p, e) as unknown as Promise<Result<{ to: string; token: string | null }>>,
             move: (p: string, t: string) => directory.emailMove(p, t) as unknown as Promise<Result<{ from: string; to: string; records: string[] }>>,
             mirror: (record: string, person: string, change: { name?: string | undefined; email?: string | undefined }) =>
               env.RECORD.get(env.RECORD.idFromName(record)).mirrorPerson(person, change) as unknown as Promise<Result<unknown>>,
