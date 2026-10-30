@@ -41,7 +41,7 @@ import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { metric, pages, readBlock } from './fixtures/readers.ts';
 import { blockOf as liveBlockOf } from './page-live.ts';
-import { draw, sectionWell, toSegments } from './blocks.ts';
+import { draw, sectionWell, tallySaid, toSegments } from './blocks.ts';
 import { copy } from '../copy.ts';
 
 /** The rows a block DRAWS, through the one conversion every surface uses, because a sign is a drawing. */
@@ -567,4 +567,10 @@ test('A BLOCK WITH NO LINES OF ITS OWN STILL DRAWS ITS BODY AS IT DID, inside it
   const segments = toSegments(note);
   assert.equal(segments.length, 1);
   assert.deepEqual(drawnRows(note).map((r) => r.cells), [['{{filed-today}} filed today.']]);
+});
+
+test('A TALLY BAR SAYS HOW MANY TIMES AND THE DAY OF THE LAST, in words', () => {
+  assert.equal(tallySaid(4, '2026-08-24', '2026-09-03'), '4 times · last 24 Aug');
+  assert.equal(tallySaid(1, '2026-06-08', '2026-09-03'), 'once · 8 Jun');
+  assert.equal(tallySaid(2, null), '2 times');
 });

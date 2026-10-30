@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dayThisYear, rowsCell, timelineCell, timelineDays, timelineTitle } from './timeline.ts';
+import { TIMELINE_BETWEEN, dayThisYear, rowsCell, timelineCell, timelineChip, timelineDays, timelineTitle } from './timeline.ts';
 
 const rows = (...days: string[]) => days.map((d) => ({ cells: [d, 'something'] }));
 
@@ -62,4 +62,19 @@ test('A BANK LINE READS AS A NAME: its own date stamp and a till number run onto
   assert.equal(timelineTitle('Rent2'), 'Rent2');
   assert.equal(timelineTitle('HMRC VAT Q3'), 'HMRC VAT Q3');
   assert.equal(timelineTitle('22OCT26'), '22OCT26');
+});
+
+test('A BANK LINE QUOTING AN INVOICE IS SAID WITHOUT IT: Ravensworth Ltd, never "Ravensworth Ltd INV 2026-038"', () => {
+  assert.equal(timelineTitle('RAVENSWORTH LTD INV 2026-038'), 'Ravensworth Ltd');
+  assert.equal(timelineTitle('PREFAB REF 88213'), 'Prefab');
+  /* A REFERENCE WITH NO DIGIT IS A WORD OF THE NAME, and a person's own words are left as they are. */
+  assert.equal(timelineTitle('TRANSFER TO TAX RESERVE'), 'Transfer to Tax Reserve');
+  assert.equal(timelineTitle('Invoice ref 2026-1'), 'Invoice ref 2026-1');
+});
+
+test('A MOVE BETWEEN YOUR OWN ACCOUNTS WEARS THE MOVE, never the "?" of a line nobody filed', () => {
+  const chip = timelineChip(TIMELINE_BETWEEN, 'Transfer to Tax Reserve');
+  assert.equal(chip.unfiled, false);
+  assert.equal(chip.between, true);
+  assert.equal(chip.glyph, 'repeat');
 });
