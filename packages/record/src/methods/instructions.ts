@@ -256,7 +256,15 @@ export type Thread = Told & { seen: { run: string; how: SeenHow; at: string }[];
  * he is shown from the last `PLACES_DAYS` days, and those on his Profiles and Places when that add-on is on. Names
  * only, never a folder, and only to whoever reads the runs already.
  */
-export type Places = { machines: string[]; seats: string[] };
+export type Places = {
+  machines: string[];
+  seats: string[];
+  /** The kinds of agent heard on those runs (`claude`, `codex`), so Tell offers the agents he has and not every kind (audit 6g, AG27). */
+  agents: string[];
+};
+
+/** An agent's kind as a run names it and `instruct` takes it after `agent:`, one of the kinds a profile may be. */
+const AGENT_KIND = new RegExp(`^(?:${PROFILE_KINDS.filter((k) => k !== 'other' && k !== 'runner' && k !== 'script').join('|')})$`, 'u');
 
 /** How far back the runs are read for the machines and profiles the composer offers. */
 export const PLACES_DAYS = 30;
@@ -382,6 +390,7 @@ export function methods(deps: RecordDeps) {
     const shown = guard(ctx, 'read', 'session') === null ? sight.admitted(ctx, 'session', runs.map((r) => r.id)) : new Set<string>();
     const machines: string[] = [];
     const seats: string[] = [];
+    const agents: string[] = [];
     /* ONLY A NAME `instruct` TAKES IS OFFERED: a profile he called "Second account" on his Profiles list is no name a run
        says, and offered, it would only be refused. */
     const add = (list: string[], v: unknown, grammar: RegExp): void => {
@@ -392,6 +401,7 @@ export function methods(deps: RecordDeps) {
       if (!shown.has(r.id)) continue;
       add(machines, r.host, MACHINE_NAME);
       add(seats, r.seat, SEAT_NAME);
+      add(agents, r.agent, AGENT_KIND);
     }
     /* THE OWNER'S PROFILES AND PLACES, the add-on's lists found by what they are and not by an id: the list playing
        `profiles`, and the one with a link to it and a `host`. Each is personal, so its owner alone is let through. */
@@ -415,7 +425,7 @@ export function methods(deps: RecordDeps) {
         ))
           add(machines, r.host, MACHINE_NAME);
     }
-    return { machines, seats };
+    return { machines, seats, agents };
   };
 
   /**

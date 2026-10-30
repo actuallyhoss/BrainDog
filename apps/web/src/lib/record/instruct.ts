@@ -121,15 +121,24 @@ export type RunKnown = { agent: string | null; project: string | null; branch: s
 export type Project = { key: string; name: string; hue: number | null };
 
 /** The machines and Claude Code profiles the composer may offer, by name (`Places` in `methods/instructions.ts`). */
-export type Places = { machines: string[]; seats: string[] };
+export type Places = {
+  machines: string[];
+  seats: string[];
+  /**
+   * The kinds of agent his runs were heard as lately (`claude`, `codex`), or `null` from a host older than the list, which
+   * then offers every kind as before. Tell offers these and the ones at work now, and never Gemini, Copilot or Windsurf
+   * on a record none of them has ever reached (audit 6g, AG27).
+   */
+  agents: string[] | null;
+};
 
-export const NO_PLACES: Places = { machines: [], seats: [] };
+export const NO_PLACES: Places = { machines: [], seats: [], agents: null };
 
 /** What a host answered for `places`, kept to names and nothing else. */
 export function placesFrom(v: unknown): Places {
   const names = (x: unknown): string[] => (Array.isArray(x) ? x.filter((n): n is string => typeof n === 'string' && n.trim() !== '').map((n) => n.trim()) : []);
   const o = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
-  return { machines: names(o.machines), seats: names(o.seats) };
+  return { machines: names(o.machines), seats: names(o.seats), agents: Array.isArray(o.agents) ? names(o.agents) : null };
 }
 
 /* ── the words ──────────────────────────────────────────────────────────── */
@@ -476,7 +485,10 @@ export function composerOf(
   const leads = leadsOf(rows).filter((r) => scoped === null || r.project === scoped);
   const to: InstructChoice[] = [
     { key: 'anyone', label: controlWords.anyone },
-    ...AGENT_KINDS.map((k) => ({ key: `agent:${k}`, label: AGENT_NAMES[k] ?? k })),
+    ...AGENT_KINDS.filter((k) => places.agents === null || places.agents.includes(k) || rows.some((r) => r.agent === k) || pick.to === `agent:${k}`).map((k) => ({
+      key: `agent:${k}`,
+      label: AGENT_NAMES[k] ?? k,
+    })),
     ...leads.map((r) => runChoice(r, leads, projects)),
   ];
   const toKey = to.some((c) => c.key === pick.to) ? pick.to : 'anyone';
