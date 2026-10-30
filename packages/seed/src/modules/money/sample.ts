@@ -38,10 +38,33 @@ function rng(seed: number) {
  */
 const LATE_BY: Record<number, number> = { 1: 45, 2: 12, 3: 3, 4: 0, 5: 0, 6: 5 };
 
+/** The month a day falls in, `back` months before it, by name: "October". */
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const monthOf = (iso: string, back: number): string => MONTH_NAMES[(Number(iso.slice(5, 7)) - 1 - back + 12) % 12]!;
+
+/**
+ * EACH ROW IS TITLED BY ITS WAY AND ITS MONTH. The tail drew one name from a list of costs whichever way the money went,
+ * and a month from its place in the list, so a client owed the studio for "Studio rent, June" and "Cloud storage,
+ * annual, May", and "Translation batch, January" fell due 8 November (audit A14). Money in is now the work a client is
+ * invoiced for, from one of the two clients; money out is a cost, with the accountant on the audit fee and nobody named
+ * on the rest. The month is the one the work was done in, the month before the row is due, and a cost paid ahead (a
+ * plan or a renewal) names the month it is due in. "Studio rent" left the list: the rent is the repeating item, one
+ * amount a month, and a bill of any other size called rent was a second rent.
+ *
+ * THE DRAWS STAY IN THEIR ORDER AND THEIR NUMBER, and every amount, day and state is the one it was. Lateness is still
+ * the drawn party's habit, so each paid row was paid on the day it was before, and every night of cash worked back from
+ * them reads the same.
+ */
+const COSTS = ['Hosting, quarterly', 'Font licence renewal', 'Legal review', 'Print run', 'Photography day rate', 'Translation batch', 'Cloud storage, annual', 'Audit fee', 'Courier account', 'Studio repairs'];
+/** What a client is invoiced for, one for each cost above, drawn by the same number. */
+const WORK = ['Retainer', 'Brand work', 'Type licensing', 'Design sprint', 'Workshop', 'Website build', 'Illustration licence', 'Specimen design', 'Newsletter design', 'Signage design'];
+/** A cost paid ahead of the time it covers, which names the month it is due in. */
+const AHEAD = new Set(['Hosting, quarterly', 'Font licence renewal', 'Cloud storage, annual']);
+/** Who a cost is with, where the sample holds them: the accountant (People's fourth) on the audit fee. */
+const COST_PARTY: Record<string, number> = { 'Audit fee': 4 };
+
 function generatedObligations(count: number): Fields[] {
   const r = rng(20260903);
-  const kinds = ['Hosting, quarterly', 'Font licence renewal', 'Legal review', 'Print run', 'Photography day rate', 'Translation batch', 'Cloud storage, annual', 'Audit fee', 'Courier account', 'Studio rent'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   /* WHAT EACH KIND OF ROW IS SPENT ON, and money in is client work whatever it was called: a print run
      invoiced to a client is income from the work, not a print cost. */
   const spent: Record<string, string> = {
@@ -54,7 +77,7 @@ function generatedObligations(count: number): Fields[] {
     'Cloud storage, annual': 'software',
     'Audit fee': 'professional',
     'Courier account': 'production',
-    'Studio rent': 'premises',
+    'Studio repairs': 'premises',
   };
   const out: Fields[] = [];
   for (let i = 0; i < count; i++) {
@@ -65,22 +88,26 @@ function generatedObligations(count: number): Fields[] {
     // that ARE still open mean something on Home.
     const paid = dueIn < -45 ? r() > 0.08 : dueIn < -10 ? r() > 0.45 : false;
     /* THE DRAWS STAY IN THEIR ORDER, so every row keeps the values it had before it had a category. */
-    const kind = kinds[Math.floor(r() * kinds.length)]!;
-    const party = Math.floor(r() * 6) + 1;
+    const at = Math.floor(r() * COSTS.length);
+    const kind = COSTS[at]!;
+    const drawn = Math.floor(r() * 6) + 1;
     const amount = gbp(Math.round(r() * 900 + 20) * 1000);
     const state = paid ? 'paid' : r() > 0.9 ? 'part' : 'open';
+    const due = day(dueIn);
+    /* A CLIENT PAYS IN: Halden (People's first) or Ravensworth (its second), by the party drawn. */
+    const party = owedToMe ? (drawn % 2 === 1 ? 1 : 2) : (COST_PARTY[kind] ?? null);
     out.push({
-      what: `${kind}, ${months[(i * 5) % 12]}`,
+      what: owedToMe ? `${WORK[at]!}, ${monthOf(due, 1)}` : `${kind}, ${monthOf(due, AHEAD.has(kind) ? 0 : 1)}`,
       party,
       direction: owedToMe ? 'owed_to_me' : 'owed_by_me',
       amount,
-      due: day(dueIn),
+      due,
       state,
       thing: Math.floor(r() * 4) + 1,
       note: '',
       category: owedToMe ? 'client_work' : (spent[kind] ?? 'other'),
       /* Paid when the party pays, never later than yesterday: each party is late by its own habit. */
-      ...(state === 'paid' ? { settled: day(Math.min(dueIn + (LATE_BY[party] ?? 0), -1)) } : {}),
+      ...(state === 'paid' ? { settled: day(Math.min(dueIn + (LATE_BY[drawn] ?? 0), -1)) } : {}),
     });
   }
   return out;

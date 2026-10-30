@@ -37,7 +37,7 @@ export const words = {
   shareLinkLabel: 'Read-only link',
   shareCopy: 'Copy the link',
   shareCopied: 'Link copied',
-  shareUntil: (day: string) => `It works until ${day}, or until you close it in Settings under Links.`,
+  shareUntil: (day: string) => `It works until ${day}, or until you close it in Settings, under People & sharing.`,
   shareAnother: 'Make another link',
   shareDone: 'Done',
   shareAsking: 'Checking whether this BrainDog makes links',
