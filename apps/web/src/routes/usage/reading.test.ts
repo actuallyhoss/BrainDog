@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { daysOf, usageFromLedger, words, type AccountUsage, type Allowed, type Group, type UsageView } from '../../lib/record/actions.ts';
+import { daysOf, usageFromActions, usageFromLedger, words, type AccountUsage, type Allowed, type Group, type UsageView } from '../../lib/record/actions.ts';
 import { asksOf, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
 const t = (runs: number, held = 0) => ({ runs, requests: runs * 2, bytes: runs * 1_000, ms: runs * 10, failures: 0, held });
@@ -175,4 +175,10 @@ test('X22: the month before is offered only from the month the record was made',
 test('the page keeps the sample and the clock out of its words', () => {
   const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
   assert.doesNotMatch(page, /\bNOW\b|'sample'/u);
+});
+
+test('A MONTH OF RUNS SAYS THAT RULES ACTING ON CHANGES ARE NOT AMONG THEM, where one acted (finish F53)', () => {
+  const view = usageFromActions([], '2026-09', 'events', '2026-09-03', true, [{ name: 'Weekly review', month: { runs: 1, failed: 0 } }]);
+  assert.equal(sentenceOf(view)?.text, '1 run this month.');
+  assert.equal(sentenceOf({ ...view, acted: true })?.text, `1 run this month. ${said.rulesApart}`);
 });

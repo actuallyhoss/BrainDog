@@ -493,6 +493,11 @@ export type UsageView = {
    */
   fired?: number;
   /**
+   * Whether a rule that acts as a change lands, and leaves no run, acted in the month on screen (finish F53): its work is
+   * none of the runs counted here, so the sentence says where its count is.
+   */
+  acted?: boolean;
+  /**
    * The month the earliest record in the view was made, `YYYY-MM`, so the switcher offers no month from before it
    * ("August" on a record made in September). `null` where the host does not say.
    */
@@ -575,7 +580,16 @@ function groupsOf(rows: readonly Scoped[]): Group[] {
  * An automation as the record's `automations` read answers it, as far as usage reads it: its name, where it applies and
  * what it ran this month (`month.runs`, of which `month.failed` failed).
  */
-export type AutomationRuns = { name: string; project?: string | null; month?: { runs?: number; failed?: number } | null; week?: number };
+export type AutomationRuns = {
+  name: string;
+  project?: string | null;
+  month?: { runs?: number; failed?: number } | null;
+  week?: number;
+  /** `inline` for a rule that acts as a change lands and leaves no run; its whole count and when it last acted. */
+  path?: 'inline' | 'run';
+  fired?: number;
+  last_at?: string | null;
+};
 
 /**
  * The record's own events, summed: what `/usage` draws when there is no ledger. Nothing about limits.
@@ -927,7 +941,8 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
     const autos = automations?.ok && Array.isArray(automations.value) ? automations.value : [];
     return drawn(() => {
       const fired = autos.reduce((n, a) => n + (typeof a.week === 'number' && a.week > 0 ? a.week : 0), 0);
-      const view = { ...usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current, autos), ...(fired > 0 ? { fired } : {}) };
+      const acted = autos.some((a) => a.path === 'inline' && (a.fired ?? 0) > 0 && typeof a.last_at === 'string' && a.last_at.slice(0, 7) === range.month);
+      const view = { ...usageFromActions(current ? events.value : [], range.month, 'events', current ? range.to : undefined, current, autos), ...(fired > 0 ? { fired } : {}), ...(acted ? { acted } : {}) };
       return member ? { ...view, owner: false } : view;
     });
   }

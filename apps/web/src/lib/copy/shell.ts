@@ -245,7 +245,8 @@ export const shell = {
   /** Under a cash figure whose line is the walk ahead: where it is lowest, said roughly, and on which day. */
   /** `day` is "today" or "on 29 Oct", as Forecast says the lowest point. `window` is how far the walk looks, "12 weeks",
    *  said as Today says it ("Lowest in the next 13 weeks"), so the low is never read as the lowest ever (finish F2). */
-  cashLowest: (amount: string, day: string, window: string) => `Lowest in the next ${window}: ${amount} ${day}`,
+  /*  THE MINUS HELD TO ITS FIGURE (finish F49): a wrapped line broke "−" from "£16,213", so a word joiner follows it. */
+  cashLowest: (amount: string, day: string, window: string) => `Lowest in the next ${window}: ${amount.replace(/^([−-])/u, '$1\u2060')} ${day}`,
   /* A BAR'S OWN NOTE, beside the bar and not under the chart: what its money was kept in before it was said in home. */
   convertedFrom: (codes: string) => `converted from ${codes}`,
   /**

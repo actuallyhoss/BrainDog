@@ -153,7 +153,7 @@ export function readsAsOnBoard(block: Bag, board: readonly (BoardRead & { where?
 
 /**
  * The tile on Today that reads what a widget reads, or `null`. Its heading goes with it, so the sheet can say which tile
- * shows it: "Next up" is Today's "Work this week" and "Since you were last here" its "Arrivals", and "Today already shows
+ * shows it: "Next up" is Today's "Your work this week" and "Since you were last here" its "Arrivals", and "Today already shows
  * this" under a name Today does not use read as wrong (the validator's recheck of 30 October, 11).
  */
 export function onBoardAs(block: Bag, board: readonly (BoardRead & { where?: string; metric?: string })[], alike: readonly string[] = []): BoardRead | null {

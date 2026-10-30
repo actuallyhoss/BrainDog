@@ -145,7 +145,11 @@ export const hubWords = {
   /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
   runsMonth: 'Runs this month',
   runsMonthSubject: 'Runs this month, by automation',
-  runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'} by automations`,
+  /* RUNS, AND NOT WHAT A RULE DID AS A CHANGE LANDED (finish F53): "1 run by automations" stood over a Ledger row saying
+     "Ran 17 times", which the month's runs never held. The count is the runs; the line under the bars says where the
+     rules' own counts are (`rulesApart`). */
+  runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
+  rulesApart: 'Rules that act as things change are not counted here; their rows below say how often they ran.',
   endedTitle: 'How runs ended',
   endedSubject: 'Runs this month that finished',
   endedOf: (n: number) => `of ${n.toLocaleString('en')}`,
@@ -443,23 +447,39 @@ export function endedSplit(rows: readonly AutomationRow[]): { runs: number; fail
   return { runs, failed, ok: runs - failed };
 }
 
-/** The line under "Runs this month": the busiest, and the one that failed most. */
-export function monthReading(rows: readonly AutomationRow[]): string {
+/**
+ * Whether a rule that acts as things change, which leaves no run, did so this month (`fired` and `last_at`, the record's
+ * whole count): its work is on its row and not in the month's runs, so the tile says the two apart.
+ */
+function actedThisMonth(rows: readonly AutomationRow[], now: number): boolean {
+  const month = new Date(now).toISOString().slice(0, 7);
+  return rows.some((r) => r.path === 'inline' && (r.fired ?? 0) > 0 && typeof r.last_at === 'string' && r.last_at.slice(0, 7) === month);
+}
+
+/**
+ * The line under "Runs this month": the busiest, and the one that failed most. AND, WHERE A RULE ACTED ON A CHANGE THIS
+ * MONTH, that its count is on its row (finish F53): a rule that files as entries land leaves no run, so "Ran 17 times"
+ * on the Ledger's row was never in this tile's one run.
+ */
+export function monthReading(rows: readonly AutomationRow[], now = Date.now()): string {
   const ran = ranThisMonth(rows);
   const top = ran[0];
   if (!top) return '';
   const worst = [...ran].filter((r) => r.month.failures > 0).sort((a, b) => b.month.failures - a.month.failures || b.month.runs - a.month.runs)[0];
   const lead = `${top.name} ran ${times(top.month.runs)}, the most this month`;
-  if (!worst) return `${lead}, and nothing failed.`;
-  if (worst === top) return `${lead}, and ${spell(worst.month.failures)} of those failed.`;
-  return `${lead}; ${worst.name} failed ${spell(worst.month.failures)} of ${worst.month.runs.toLocaleString('en')}.`;
+  const said = !worst
+    ? `${lead}, and nothing failed.`
+    : worst === top
+      ? `${lead}, and ${spell(worst.month.failures)} of those failed.`
+      : `${lead}; ${worst.name} failed ${spell(worst.month.failures)} of ${worst.month.runs.toLocaleString('en')}.`;
+  return actedThisMonth(rows, now) ? `${said} ${hubWords.rulesApart}` : said;
 }
 
 /** The line under "How runs ended": the share that finished, and where the failures are. */
 export function endedReading(rows: readonly AutomationRow[]): string {
   const split = endedSplit(rows);
   if (!split) return '';
-  if (split.failed === 0) return `Every one of the ${split.runs.toLocaleString('en')} runs this month finished.`;
+  if (split.failed === 0) return split.runs === 1 ? 'The one run this month finished.' : `Every one of the ${split.runs.toLocaleString('en')} runs this month finished.`;
   /* NEVER 100% WITH A FAILURE IN IT. A share is rounded down while anything failed, so one failure in three hundred reads
      as 99% and not as the whole. */
   const share = Math.floor((split.ok / split.runs) * 100);

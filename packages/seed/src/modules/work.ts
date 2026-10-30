@@ -1004,9 +1004,14 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'tasks-waiting', gt: 0 },
       },
       {
-        /* YOURS FROM TODAY TO A WEEK OUT, what `tasks-this-week-yours` counts. */
+        /* YOURS FROM TODAY TO A WEEK OUT, what `tasks-this-week-yours` counts. NAMED YOUR WORK THIS WEEK (finish F51):
+           "This week 2" stood beside Projects' "This week 5" and Timeline's "6 due in 7 days", which count what agents
+           hold and what waits on you too. This band is what is left once Waiting on you and With an agent take theirs,
+           so its name says it is yours. Today's tile of the same rows has the same name. THE KEY IT HAD as "This week",
+           so a look that placed it still finds it. */
         kind: 'todo',
-        heading: 'This week',
+        key: 'k1e53uhc',
+        heading: 'Your work this week',
         icon: 'calendar-days',
         span: 6,
         source: 'register.tasks',
@@ -1252,8 +1257,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         body: '{{tasks-overdue}} past their date, {{tasks-due-7d}} due in 7 days',
       },
       {
+        /* TASKS BY DUE DAY, NOT IN PLAY (finish F52): "In play 15" counted tasks where in play means projects everywhere
+           else, the sidebar's and Projects' 3. THE KEY IT HAD as "In play", so a look that placed it still finds it. */
         kind: 'roadmap',
-        heading: 'In play',
+        key: 'k0bndy4b',
+        heading: 'Tasks by due day',
         span: 12,
         source: 'register.tasks',
         where: 'by is set, state is not done or dropped',
@@ -1264,7 +1272,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 200,
-        empty: 'No task in play has a due day yet.',
+        empty: 'No open task has a due day yet.',
       },
     ],
   },

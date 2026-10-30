@@ -5,23 +5,47 @@ import { FORECAST } from './parts/forecast.ts';
 
 /**
  * CASH AHEAD AS THE PAGE'S ONE ANSWER: the walk Money draws (`parts/forecast.ts`, the legs every walk reads), opening on
- * three months, with six months and a year a press away up front and To the end after them. The renderer says the cash
- * at the horizon, the lowest point and what took it there, and everyday spending at its three-month average over the
- * chart, marks every salary, premium and part of a plan on the line and lists them under it, and asks "If income
- * stopped" beside the lengths (`packages/render/src/forecast.ts`).
+ * the same twelve weeks Money and Today read their lowest over, with six months and a year a press away up front and To
+ * the end after them. The renderer says the cash at the horizon, the lowest point and what took it there, and everyday
+ * spending at its three-month average over the chart, marks every salary, premium and part of a plan on the line and
+ * lists them under it, and asks "If income stopped" beside the lengths (`packages/render/src/forecast.ts`).
  *
- * NO `headline: under`: this page's line says how long the money lasts with nothing coming in, not when it runs out on
- * what is due, so the chart says its own sentence.
+ * TWELVE WEEKS FIRST (finish F50): the page opened on three months and said "Lowest −£22,628 on 1 Dec" while Money and
+ * Today said "Lowest in the next 12 weeks: −£16,213 on 7 Nov", two lowests of one walk. One window, one lowest.
+ *
+ * `headline: under` KEPT (finish F50): the page's line now says the day the chart goes under, as Money's Lasts does, so
+ * the chart does not say it again. The line said only how long the money lasts with nothing coming in, "22 Sep", over a
+ * chart that says income comes in and goes under on "30 Oct".
  */
-const { headline: _headline, ...WALK } = FORECAST[0]!;
-
 const CASH_AHEAD: Record<string, unknown> = {
-  ...WALK,
-  /* A QUARTER FIRST, then half a year and a year, the lengths a person plans by, and To the end for a plan that runs
-     on for years. The record walks the longest of them within two years unasked, and further when To the end is asked. */
-  horizon: 91,
-  horizons: [91, 183, 365, 'last'],
+  ...FORECAST[0]!,
+  horizon: 84,
+  horizons: [84, 183, 365, 'last'],
 };
+
+/**
+ * THE PAGE'S LINE LEADS WITH THE CASE THE CHART DRAWS (finish F50): what is due and expected, the day it goes under, as
+ * Money's hero says it ("Lasts 30 Oct"), then how long it lasts with nothing coming in. While it lasts the year on what is
+ * due, the line says so, as Money's does (`HEADLINE_LASTS`). Below nought the chart opens under, and Money's Runs out says
+ * that, so the line says only how long it would last with nothing coming in, which reads nothing there.
+ */
+const NOTHING_IN = 'With nothing coming in it lasts to {{lasts-no-income.on}}.';
+const LINES: Record<string, unknown>[] = [
+  {
+    kind: 'note',
+    lead: true,
+    span: 12,
+    when: { all: [{ metric: 'cash-now', gte: 0 }, { metric: 'runway-days', beyond: false }] },
+    body: `Cash lasts to {{runs-out-on}} on what is due and expected. ${NOTHING_IN}`,
+  },
+  {
+    kind: 'note',
+    lead: true,
+    span: 12,
+    when: { all: [{ metric: 'cash-now', gte: 0 }, { metric: 'runway-days', beyond: true }] },
+    body: `Cash lasts the year on what is due and expected. ${NOTHING_IN}`,
+  },
+];
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: Money is a section with a page per job, and this is the walk ahead.
@@ -37,15 +61,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
   requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments'],
   pack: 'money-core',
   blocks: [
-    {
-      /* THE LINE: what the walk counts, then how long the cash lasts if no money came in, and what falls due that day.
-         A clause whose figure has no value is left out by the writer, so a record with nothing that runs it out reads
-         the first sentence alone. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      body: 'With nothing coming in, cash lasts to {{lasts-no-income.on}}.',
-    },
+    ...LINES,
     CASH_AHEAD,
     {
       /* EACH MONTH AHEAD, IN AND OUT, AS THE WALK MOVES IT: this month so far and what the walk still moves in it, then
