@@ -62,6 +62,6 @@ test('a widget picked up keeps the same share of it under the pointer when its f
   assert.deepEqual(heldAt(was, now, 550, 270), { dx: 217.5, dy: 70 });
   /* A frame that did not change keeps the grip where the pointer is. */
   assert.deepEqual(heldAt(was, was, 550, 270), { dx: 450, dy: 70 });
-  /* A frame that grew to the left, and a press just outside it, stay inside the widget. */
+  /* A press just outside the frame is kept on the widget's edge. */
   assert.deepEqual(heldAt({ left: 0, top: 0, width: 100, height: 100 }, { left: 0, top: 0, width: 200, height: 100 }, 120, -5), { dx: 200, dy: 0 });
 });
