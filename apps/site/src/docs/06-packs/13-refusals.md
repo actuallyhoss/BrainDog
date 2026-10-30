@@ -168,7 +168,7 @@ job.reading-notes's argument title says how long it may be, a whole number from 
 
 A new version is planned against what the record holds, so some refusals arrive only then.
 
-- **`PLAN_STALE`**, the record changed after the plan was made: "This BrainDog has moved, or the pack has, since the plan you approved. Read the plan again."
+- **`PLAN_STALE`**, what the plan would do changed after it was made: "What this would install changed after the plan was read, so nothing was installed. Read the plan again."
 - **`FIELD_TYPE_CHANGED`**, a field's type changed under rows: "<list>.<field>: <old type> → <new type> changes a type, and <n> rows were written under the old one. Retire the field and add a new one."
 - **`ID_RENAMED`**, an id changed: "<old id> → <new id> renames a spoken id, so <list>#<n> in a note would stop resolving."
 - **`REQUIRED_ON_POPULATED`**, a field made required on a list with rows: "<list>.<field> is required and <n> rows have none. Give it a default, or fill those rows first."

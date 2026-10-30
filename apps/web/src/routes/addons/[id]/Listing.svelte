@@ -338,6 +338,11 @@
 
   let busy = $state(false);
   let planned = $state.raw<Planned | null>(null);
+  /** The sheet open is a plan read again because the one approved changed under it (`approve`). */
+  let moved = $state(false);
+  $effect(() => {
+    if (planned === null) moved = false;
+  });
   /** A Kennel entry asked for on Decide: the proposal id, empty when the record named none. */
   let filed = $state<string | null>(null);
 
@@ -425,6 +430,18 @@
         const asked = await askOnDecide(client, entry, action?.kind === 'update' ? action.from : null);
         if (asked.ok) filed = asked.id;
         else refused = asked;
+      } else if (out.code === 'PLAN_STALE' && !out.first && file) {
+        /* THE PLAN SAYS SOMETHING ELSE NOW: the record installs a plan that only moved in time by itself, so this one
+           changed what the add-on would do. Read again and shown, with one line over it, never a refusal to press past. */
+        const held = states;
+        const fresh = await planFor(client, listing, file, held, copy.writeRaced, () => waitingOf(fetch, kennel, held));
+        if (fresh.ok) {
+          planned = fresh.planned;
+          moved = true;
+        } else {
+          planned = null;
+          refused = fresh;
+        }
       } else {
         wentIn(out);
         planned = null;
@@ -665,11 +682,14 @@
         onapprove={() => void approve()}
         oncancel={() => (planned = null)}
         onrecheck={again}
-        extra={waits.length > 0 ? told : undefined}
+        extra={waits.length > 0 || moved ? told : undefined}
       />
     {/if}
 
     {#snippet told()}
+      {#if moved}
+        <p class="told-note" role="status">{sheetWords.planMoved}</p>
+      {/if}
       {#if waits.length > 0}
         <section class="told" aria-labelledby="told-waits-h">
           <h3 class="told-h" id="told-waits-h">{sheetWords.waits}</h3>

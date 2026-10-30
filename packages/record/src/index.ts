@@ -28,6 +28,7 @@ import {
   keysNotReady,
   labelsOf,
   plan,
+  samePlan,
   stagedBatch,
   uninstall,
   type Brought,
@@ -14449,9 +14450,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * Apply the plan somebody approved, and nothing else.
      *
-     * THE HASH IS THE APPROVAL. `planHash` carries the record's version and the pack's checksum, so
-     * a record that moved and a pack that was edited between the plan and the install are both
-     * `PLAN_STALE` — and the second one is the case no version number can see.
+     * THE HASH IS THE APPROVAL. `planHash` carries the record's version and a digest of what the plan says, the pack's
+     * checksum among it, so a pack that was edited between the plan and the install is `PLAN_STALE` — the case no
+     * version number can see — and so is a record that moved in a way that changes the plan. A record that moved and
+     * left the plan as it was read installs it (`samePlan`).
      *
      * AND WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS. A plan whose
      * `calls_out` has a `new` or `changed` action carries `approve`, the lines for them, and the install arms them only
@@ -14477,7 +14479,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          caller that updates a use case does it (`arrange.ts` `carryUpdate`). */
       const from = state.packs.find((p) => p.id === pack.value.manifest.pack)?.version ?? null;
       const spoke = speakingNow(kernel);
-      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[], undefined, args.retireWithRows === true ? { retireWithRows: true } : {});
+      /* A BRAINDOG THAT MOVED WITHOUT MOVING THE PLAN INSTALLS WHAT WAS READ (`declare` `samePlan`). A minute-old record
+         files arrivals, headlines and rules after the first thing it is told, and the first add-on installed after
+         that was refused `PLAN_STALE` one time in five, "This BrainDog has moved", for a plan that would have done
+         exactly what the sheet showed (first hour audit, E2). The plan made now is the one installed, and only a plan
+         that says something else is sent back to be read. */
+      const approved = samePlan(args.planHash, diff.planHash) ? diff.planHash : args.planHash;
+      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), approved, (approve ?? []) as string[], undefined, args.retireWithRows === true ? { retireWithRows: true } : {});
       if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, pack.value.manifest.pack, from, actorOf(ctx));
       /* AND WHAT A PAGE THIS UPDATE KEPT GOES WITHOUT IS ASKED ABOUT (`keptAsk`), as the night's update asks it. */
       if (put.ok)

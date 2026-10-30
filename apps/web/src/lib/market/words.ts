@@ -122,6 +122,9 @@ export const words = {
   /* WHAT WAITS, SAID AS SENTENCES under the plan (`offer.ts` `waitsOf`). */
   waits: 'What waits',
   waitsNote: 'They arrive once you have what they wait for.',
+  /* THE PLAN CHANGED BETWEEN READING IT AND PRESSING INSTALL (`PLAN_STALE`, after the record re-planned and found it
+     says something else): the fresh plan is shown with this over it, and nothing was installed. Never "you". */
+  planMoved: 'Something in your BrainDog changed what this add-on would do, so nothing was installed yet. This is the plan as it is now.',
   /* WHAT A PART WAITS FOR WHEN IT NAMES A ROLE AND NOT A LIST (`@braindog/declare` `when.ts`): whichever list plays the
      role will do, so it is said in plain words and never as one list's name. */
   waitsOn: { rates: 'exchange rates', meets: 'a list of people', org: 'a list of organisations' } as Readonly<Record<string, string>>,

@@ -11,11 +11,13 @@
  * dependency and the rows that would be orphaned, in one screen, instead of failing on the first of
  * them and making somebody discover the rest one round trip at a time.
  *
- * AND THE PLAN IS A PROMISE ABOUT ONE MOMENT. `planHash` is `<record_version>.<sha256 of the pack
- * and the declaration state it was planned against>`: the integer half catches a record that moved,
+ * AND THE PLAN IS A PROMISE ABOUT ONE MOMENT. `planHash` is `<record_version>.<sha256 of what the
+ * plan says, the pack's checksum among it>` (`saysOf`): the integer half catches a record that moved,
  * and the hash half catches a pack that was edited between the plan and the install — which no
- * version number can see. Approving a diff and installing a different one is the failure this
- * prevents, and it is not hypothetical when the thing being approved is a file in an editor.
+ * version number can see — and any change to what the plan would do. Approving a diff and installing a
+ * different one is the failure this prevents, and it is not hypothetical when the thing being approved
+ * is a file in an editor. `install` asks for both halves; the record's own door asks only for the second
+ * (`samePlan`), because a record that moved without moving the plan installs what was read.
  *
  * A PACK CANNOT READ A ROW, and `touches` says so by construction rather than by measurement. It
  * declares shape and it seeds examples; it has no verb that reads what is already there. That is
@@ -2177,7 +2179,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   const calls = callsOf(pack, installed);
   const scripts = scriptSources(pack.declarations, installed);
 
-  return {
+  const said: Omit<Diff, 'planHash'> = {
     pack: {
       id: mine,
       version: pack.manifest.version,
@@ -2221,13 +2223,51 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     unresolved,
     base,
     ...(remote === null ? {} : { remote }),
-    /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
-       between the plan and the install — which no version number can see, and which is exactly what
-       happens when the thing being approved is a file in somebody's editor. */
-    planHash: `${installed.record_version}.${await digest(
-      jcs({ pack: pack.checksum, base, ...(config.length > 0 ? { config } : {}), ...(held.waiting.length > 0 ? { waiting: held.waiting } : {}) } as unknown as Json),
-    )}`,
   };
+  /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
+     between the plan and the install — which no version number can see, and which is exactly what
+     happens when the thing being approved is a file in somebody's editor. The hash half is over what the plan SAYS
+     (`saysOf`): the pack's checksum is in it, and so is every change, setting and call out it shows, so two plans with
+     one hash half are one plan, read at two moments (`samePlan`). */
+  return { ...said, planHash: `${installed.record_version}.${await digest(jcs(saysOf(said)))}` };
+}
+
+/**
+ * WHAT A PLAN SAYS IT WILL DO, without the moment it was read in: the plan less `base`, the versions of the packs it
+ * leans on or that lean on it (whether each range holds stays), and every row count, which is kept only as whether
+ * there are any, because none and some decide a refusal and 41 and 42 decide nothing.
+ *
+ * THE RECORD'S OWN WRITES MOVED THE PLAN UNDER A PERSON. A minute-old BrainDog files arrivals, headlines and rules
+ * after somebody tells it something, and each moved `record_version`, so the first add-on installed after the first
+ * thing told was refused `PLAN_STALE` one time in five, with a plan that would have done exactly what was read (first
+ * hour audit, E2). A list the add-on never names moving, or an update to a pack it does not touch, says the same plan;
+ * a change to anything the sheet shows does not.
+ */
+export function saysOf(d: Omit<Diff, 'planHash'>): Json {
+  const some = (n: number): boolean => n > 0;
+  const { base: _base, requires, dependents, retires, orphans, removals, stays, retypes, newly_required, renames, ...rest } = d;
+  return {
+    ...rest,
+    requires: { format: requires.format, primitives: requires.primitives, packs: requires.packs.map((p) => ({ id: p.id, range: p.range, ok: p.ok })) },
+    dependents: dependents.map((p) => ({ id: p.id, range: p.range, ok: p.ok, was: p.was })),
+    retires: retires.map((r) => ({ ...r, rows: some(r.rows) })),
+    orphans: some(orphans),
+    ...(removals === undefined ? {} : { removals: removals.map((r) => ({ retire: r.retire, name: r.name })) }),
+    stays: stays.map((s) => ({ id: s.id, values: s.values, rows: some(s.rows), ...(s.body === undefined ? {} : { body: s.body }) })),
+    retypes: retypes.map((r) => ({ ...r, rows: some(r.rows) })),
+    newly_required: newly_required.map((r) => ({ ...r, rows: some(r.rows) })),
+    renames: renames.map((r) => ({ ...r, rows: some(r.rows) })),
+  } as unknown as Json;
+}
+
+/**
+ * WHETHER TWO PLAN HASHES ARE ONE PLAN, read at two moments: the halves after the record's version are equal. The
+ * record installs the plan it makes at the press when this holds (`installPack`), so a BrainDog that only wrote rows
+ * the add-on never names, since the plan was read, installs what was read without asking again.
+ */
+export function samePlan(approved: string, now: string): boolean {
+  const said = (h: string): string => h.slice(h.indexOf('.') + 1);
+  return approved.includes('.') && now.includes('.') && said(approved) !== '' && said(approved) === said(now);
 }
 
 /**
@@ -3890,7 +3930,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   if (planHash !== diff.planHash)
     return no<Applied>(
       'PLAN_STALE',
-      'This BrainDog has moved, or the pack has, since the plan you approved. Read the plan again.',
+      'What this would install changed after the plan was read, so nothing was installed. Read the plan again.',
       { at: 'planHash' },
     );
 
