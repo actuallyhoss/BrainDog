@@ -251,8 +251,37 @@ const routeRuntimePlugin: Plugin = {
   }),
 };
 
+/**
+ * THE CLIENT'S ROUTE TABLE, IN THE BROWSER, IS THE NAMES AND THE TWO MARKS IT READS.
+ *
+ * `@braindog/client` takes `ROUTES` from `@braindog/host/table` for three sets: the method names, which of them write,
+ * and which are reads sent as a POST (`NAMES`, `WRITES`, `POST_READS` in `packages/client/src/index.ts`). The table
+ * carries every route's line of help and its arguments besides, sixty files of it, and the client is on every screen's
+ * first load: about 12 KB brotli of a cold Today was help text the browser never reads (speed-c FL1).
+ *
+ * SO A BUILD HANDS THE CLIENT THE TABLE ALREADY READ: the real table, imported here at build time, written out as its
+ * names with `writes` and `postRead` and nothing else, in the table's order. The table stays the one list; a route added
+ * there is in the next build. Only for the client's own import, and only in a build: `vite dev` serves the table whole,
+ * so a route added while it runs is known at once. Reading any other field of `ROUTES` in the client needs it here too.
+ */
+const HOST_TABLE = new URL('../../packages/host/src/table.ts', import.meta.url).href;
+const CLIENT_INDEX = /[\\/]packages[\\/]client[\\/]src[\\/]index\.ts$/u;
+const ROUTE_MARKS = '\0braindog:route-marks';
+const routeMarksPlugin: Plugin = {
+  name: 'braindog:route-marks',
+  apply: 'build',
+  enforce: 'pre',
+  resolveId: (id, importer) => (id === '@braindog/host/table' && importer !== undefined && CLIENT_INDEX.test(importer) ? ROUTE_MARKS : null),
+  async load(id) {
+    if (id !== ROUTE_MARKS) return null;
+    const { ROUTES } = (await import(HOST_TABLE)) as { ROUTES: readonly { name: string; writes: boolean; postRead?: true }[] };
+    const rows = ROUTES.map((r) => [r.name, (r.writes ? 1 : 0) | (r.postRead === true ? 2 : 0)]);
+    return `export const ROUTES = ${JSON.stringify(rows)}.map(([name, m]) => ({ name, writes: (m & 1) === 1, ...(m & 2 ? { postRead: true } : {}) }));`;
+  },
+};
+
 export default defineConfig({
-  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin],
+  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin, routeMarksPlugin],
   /* `__BRAINDOG_BUILD__` IS THE DEPLOY'S BUILD TUPLE, the one the Worker answers `/api/version` with as `app`, so a tab can
      tell it is running an older build than the one live (`newerBuild` in `lib/data/live.ts`). Empty in a build without one,
      which compares nothing. */

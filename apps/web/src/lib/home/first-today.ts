@@ -16,7 +16,8 @@ import type { Boot } from '@braindog/client';
 
 import type { Pref } from '../pref.ts';
 import { playedBy } from '../start/parts.ts';
-import { PAID_STATES, type TellList } from '../tell/read.ts';
+import { PAID_STATES } from '../tell/paid.ts';
+import type { TellList } from '../tell/read.ts';
 
 /** What these read of `boot`: the lists, each with how many entries it holds. */
 export type Holds = Pick<Boot, 'registers'>;

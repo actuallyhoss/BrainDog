@@ -30,6 +30,7 @@ import { homeCurrency } from '../record/api.ts';
 import { symbolText } from '../record/money.ts';
 import type { FieldDecl, MoneyValue } from '../record/schema.ts';
 import { GREETINGS, PEOPLE, hear } from '../who.ts';
+import { PAID_STATES } from './paid.ts';
 import { addDays, daySaid, nextMonday, weekdayOf } from '../work/board.ts';
 
 /** One list the record holds: its id, what a person calls it and one of it, the field that titles an entry, its fields. */
@@ -392,8 +393,6 @@ const FOR_SOMEBODY = new RegExp(`(?:^|[\\s:])((?:\\d{1,4}|${SAID_COUNT})\\s+[^,.
 const METHOD = new RegExp(`\\b(?:on|by|via|through|with|over|using)\\s+(${NAME}|cash|card|bank transfer|transfer|wallet)\\b`, 'u');
 /* The act a payment opens on, taken off before what is left says what it was for. */
 const ACT = /^(?:(?:i|we)\s+)?(?:paid|pays|spent|sent|transferred|received|got)\b\s*/iu;
-/** The states that say money has moved, in the words lists use for it; `first-today.ts` says "a payment" by them too. */
-export const PAID_STATES: readonly string[] = ['paid', 'cleared', 'settled', 'received', 'done'];
 
 /* A greeting or a thanks on its own, as a pasted message opens and closes. */
 const PLEASANTRY = /^(?:hi|hello|hey|thanks|thank you|thx|please|ok|okay|cheers)(?:\s+\p{L}+)?$/iu;
