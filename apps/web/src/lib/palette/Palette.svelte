@@ -590,6 +590,8 @@
   const RECENT = 'Recent';
   /* THE EMPTY PALETTE'S THREE ASKS, over everything else. */
   const ASK_TODAY = 'Ask';
+  /* AND WITH NO MODEL, THE SAME THREE AS PLACES, under a heading that promises no asking (AG5). */
+  const FOR_TODAY = 'For today';
   /* THE PLACES WITH NOTHING TYPED, under the destinations' own heading, so one heading never means two groups. */
   const GO_TO = copy.destinations;
   const BEST = 'Best match';
@@ -732,6 +734,7 @@
 
   /** A space after a tag takes it out of the field as a chip; the words left are the field. */
   function oninput() {
+    moved = false;
     const read = plainRead;
     if (!read || !/\s$/u.test(q)) return;
     const out = read.chips.filter((c) => c.kind !== 'day');
@@ -739,6 +742,14 @@
     held = [...held, ...out];
     q = `${lineTokens(parsed.text, { decl: REGISTERS[plainLine!.register]!, now: Date.now() }, [...given, ...read.chips.filter((c) => c.kind === 'day').map((c) => c.words)]).text} `;
   }
+
+  /**
+   * A SENTENCE TYPED WITH NO MODEL BEHIND THE ASK (audit 31 Oct g, AG5): three words or a question mark, no prefix. It is
+   * told that asking needs a model, with the way to connect one, and Enter does not take the first loose hit for it.
+   */
+  const askless = $derived(!slashHere && parsed.prefix === null && asksFirst(parsed.text));
+  /** Whether the arrows picked a row since the last keystroke, so Enter runs what was chosen rather than what came first. */
+  let moved = $state(false);
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
   const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
@@ -884,7 +895,7 @@
       out.push({ id: 'resume', title: threadWords.resume(opening), href: null, group: ASK_TODAY, icon: 'ask', resume: true });
     if (blank)
       for (const [i, asked] of questionsOf(slashHere).entries())
-        out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: ASK_TODAY, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
+        out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: slashHere ? ASK_TODAY : FOR_TODAY, icon: slashHere ? 'search' : 'arrow', ...(asked.ask === null ? {} : { ask: asked.ask }) });
     /* OPENED ON THIS DEVICE, SO TOLD BY THIS DEVICE'S CLOCK: the record's could be behind it, and said "in 8w". */
     if (blank)
       for (const place of openedList)
@@ -1552,9 +1563,11 @@
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      moved = true;
       cursor = Math.min(cursor + 1, flat.length - 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      moved = true;
       cursor = Math.max(cursor - 1, 0);
     } else if (e.key === 'Backspace' && held.length > 0 && input?.selectionStart === 0 && input.selectionEnd === 0) {
       /* BACKSPACE AT THE START OF THE FIELD GIVES THE LAST CHIP BACK AS WORDS, which then stay words. */
@@ -1565,7 +1578,11 @@
       q = untoken(q, last);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      run(flat[cursor]);
+      /* A SENTENCE WITH NO MODEL BEHIND IT NEVER JUMPS TO A LOOSE HIT (AG5): "add a task to call Ada on Friday" opened Ada
+         Vine's page and added nothing. A row picked with the arrows, a command, or the line that adds what was typed still runs. */
+      const top = flat[cursor];
+      if (askless && !moved && top !== undefined && top.plain !== true && top.group !== copy.commands) return;
+      run(top);
     } else if (e.key === 'Tab' && !e.shiftKey) {
       /**
        * `⇥` COMPLETES THE QUERY, AND IT USED TO SWALLOW `⇧⇥` AS WELL.
@@ -1659,7 +1676,7 @@
         aria-controls="palette-list"
         aria-activedescendant={activeId}
         aria-label={copy.paletteLabel}
-        placeholder={copy.palettePlaceholder}
+        placeholder={slashHere ? copy.palettePlaceholder : copy.paletteFind}
         spellcheck="false"
         autocomplete="off"
       />
@@ -1718,6 +1735,7 @@
   <div class="p-body">
     <!-- LOOKING, AT ONCE: the same frame as the keystroke, where the first answer will land, and gone when it does. -->
     {#if pending}<p class="p-looking" role="status">{copy.looking}</p>{/if}
+    {#if askless && flat.length > 0}<p class="p-needs">{copy.askNeedsModel} <a class="tap" href={at('/settings/agents')} onclick={() => (open = false)}>{copy.askConnect}</a>.</p>{/if}
     <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending}>
       {#if askRow && askLeads}{@render result(askRow)}{/if}
       {#each groups as [group, items]}
@@ -1737,7 +1755,11 @@
            not disabled (23 §8). This record has no model, so this is what you get.
 
            OUTSIDE THE LISTBOX, because it is a sentence about the list rather than a row in it. -->
-      <p class="p-none">{hits?.fix ?? `${copy.noMatches} “${q}”`}</p>
+      {#if askless && !hits?.fix}
+        <p class="p-none">{copy.askNeedsModel} <a class="tap" href={at('/settings/agents')} onclick={() => (open = false)}>{copy.askConnect}</a>.</p>
+      {:else}
+        <p class="p-none">{hits?.fix ?? `${copy.noMatches} “${q}”`}</p>
+      {/if}
     {/if}
   </div>
   {/if}
@@ -2149,6 +2171,13 @@
   .p-none {
     margin: 0;
     padding: var(--sp-5) var(--sp-3);
+    color: var(--ink-3);
+  }
+
+  /* ASKING NEEDS A MODEL, over the hits a sentence also matched: one quiet line, its link the way on. */
+  .p-needs {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-3) 0;
     color: var(--ink-3);
   }
 

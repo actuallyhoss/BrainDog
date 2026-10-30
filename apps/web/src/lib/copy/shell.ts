@@ -62,6 +62,12 @@ export const shell = {
   /* THE ONE ASK, WORD FOR WORD (19 October): the top bar's field, the rail's, the sidebar's and the palette's
      own field say the same five words. Here and not in palette.ts because the frame draws it before the palette loads. */
   palettePlaceholder: 'Ask or change anything',
+  /* WITH NO MODEL CONNECTED THE BAR PROMISES ONLY WHAT IT DOES (audit 31 Oct g, AG5, his call taken 31 Oct): it finds and
+     goes, and asking appears once a model is connected. */
+  paletteFind: 'Search or go to…',
+  /* A SENTENCE TYPED WITH NO MODEL BEHIND THE ASK, said in place of "Nothing matches", with the way to connect one. */
+  askNeedsModel: 'Asking needs a model.',
+  askConnect: 'Connect one in Settings › Agents',
   /* the product */
   product: 'BrainDog',
 
