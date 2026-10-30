@@ -19,6 +19,8 @@
 import { readable, since } from 'braindog-render';
 import type { About } from '@braindog/client';
 
+import { moneyInText } from '../record/money.ts';
+
 /** The fewest characters asked about. Two letters are the start of a word, and the search already answers those. */
 export const ABOUT_MIN = 3;
 /** The most, as the record holds a name (`ASKED` in its `about`): past it the box holds a page, not a name. */
@@ -84,10 +86,13 @@ function calledBy(name: string, also: readonly string[], typed: string): string 
   return also.find((a) => key(a).includes(t)) ?? null;
 }
 
-/** A place as a person reads it: the list's name, then the row's title cased as a person writes it, never bank capitals. */
+/**
+ * A place as a person reads it: the list's name, then the row's title cased as a person writes it, never bank capitals,
+ * and money as Needs you says it: a question asked "for GBP 14.00" reads "for £14" here too.
+ */
 function placed(where: string): string {
   const at = where.indexOf(': ');
-  return at === -1 ? readable(where) : `${where.slice(0, at + 2)}${readable(where.slice(at + 2))}`;
+  return moneyInText(at === -1 ? readable(where) : `${where.slice(0, at + 2)}${readable(where.slice(at + 2))}`);
 }
 
 function line(kind: Kind, called: string | null, place: string | null): string {

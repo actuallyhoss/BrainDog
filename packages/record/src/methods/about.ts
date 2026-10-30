@@ -37,6 +37,7 @@ import { aboutOfRow, candidatesFor, entityLists, ftsQuery, nameWords, type About
 
 import type { CallContext } from '../index.ts';
 import { scrubbed } from '../scrub.ts';
+import { clipped } from '../same-tree.ts';
 import type { RecordDeps } from './index.ts';
 import { readSight } from '../sight.ts';
 
@@ -117,7 +118,7 @@ export function methods(deps: RecordDeps) {
         const list = kernel.register(hit.register)?.name ?? null;
         const title = kernel.titleOfRow(hit.id);
         if (list === null) continue;
-        const where = (title === null || title.trim() === '' || ROW_ID.test(title) ? list : `${list}: ${title.trim()}`).slice(0, PHRASE);
+        const where = clipped(title === null || title.trim() === '' || ROW_ID.test(title) ? list : `${list}: ${title.trim()}`, PHRASE);
         if (!out.has(where)) out.set(where, { at: hit.updated_at, where });
       }
     }
@@ -143,7 +144,7 @@ export function methods(deps: RecordDeps) {
       const words = wordsOf({ said });
       /* THE WHOLE NAME, as `namedIn` holds it, and its own: "Renew Copperleaf's domain" names Copperleaf. */
       if (said === '' || !keys.some((k) => words.includes(` ${k} `) || words.includes(` ${k}'s `))) continue;
-      const where = `${ASKED_OF}${said}`.slice(0, PHRASE);
+      const where = clipped(`${ASKED_OF}${said}`, PHRASE);
       if (ROW_ID.test(where)) continue;
       out.push({ at: String(q.opened_at ?? ''), where });
     }

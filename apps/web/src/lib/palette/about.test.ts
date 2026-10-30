@@ -135,3 +135,13 @@ test('the panel asks through the rule, after the typing settles, and draws throu
   /* THE CLIENT IS LOADED ON THE ASK, never with the panel. */
   assert.doesNotMatch(code, /import \{[^}]*\} from '@braindog\/client'/u);
 });
+
+test('a question seen as a place says its money as Needs you does, never the stored code and pence', () => {
+  const asked: About = {
+    is: { ...northbank.is!, seen: [{ at: TWO_DAYS, where: 'Waiting on you: kiln.example renews in 12 days for GBP 14.00. Keep it?' }] },
+    candidates: [],
+  };
+  const [row] = aboutRows(asked, 'Northbank', NOW);
+  assert.doesNotMatch(row!.detail, /GBP 14\.00/u);
+  assert.match(row!.detail, /14\. Keep it\?, 2d ago$/u);
+});
