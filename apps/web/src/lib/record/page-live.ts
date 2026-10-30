@@ -997,8 +997,10 @@ export const WAITING_TO_CLEAR = 'Waiting to clear';
 
 /**
  * Each ledger line of a timeline still waiting to clear, marked in the line under its name: its account cell (the
- * second of the two the line under reads, `TIMELINE_UNDER` in braindog-render) ends with the words, in place. Only a
- * list of money moved (one with an account and an amount) whose state field holds `pending`.
+ * second of the two the line under reads, `TIMELINE_UNDER` in braindog-render) says the words in place of the account,
+ * so they fit a phone's line ("2 Sep · Production · Waiting to clear"); the first is the category, which picks the
+ * line's chip, so it stays. Only a list of money moved (one with an account and an amount) whose state field holds
+ * `pending`.
  */
 export function pendingSaid(register: string, columns: readonly { field?: unknown }[], entries: readonly Entry[], rows: { cells: (string | null)[] }[]): void {
   const state = REGISTERS[register]?.state;
@@ -1007,8 +1009,7 @@ export function pendingSaid(register: string, columns: readonly { field?: unknow
   entries.forEach((e, n) => {
     const row = rows[n];
     if (!row || e.fields[state] !== 'pending') return;
-    const account = row.cells[at];
-    row.cells[at] = typeof account === 'string' && account.trim() !== '' ? `${account} · ${WAITING_TO_CLEAR}` : WAITING_TO_CLEAR;
+    row.cells[at] = WAITING_TO_CLEAR;
   });
 }
 
