@@ -1,10 +1,10 @@
 {
   "pack": "subscriptions",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "refresh",
   "title": "Subscriptions",
   "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
-  "changes": "Its page says one subscription as one, and says what you hardly use as a sentence.",
+  "changes": "A month, by category says the ones with no category as No category, so its parts add up to the whole.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -668,7 +668,7 @@
           "span": 12,
           "source": "metric.subs-month-by-category",
           "limit": 8,
-          "unset": "Uncategorised",
+          "unset": "No category",
           "when": {
             "metric": "subs-count",
             "gt": 0

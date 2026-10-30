@@ -263,8 +263,39 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "version": "2.0.1",
+          "checksum": "5fcc39597ce467c1c2a658e83485ced5921be0d588e1be273689956b8fed14e0",
+          "bytes": 26306,
+          "published_at": "2026-10-30T18:27:24.651Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Events"
+            ],
+            "pages": [
+              "Events"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "calendar.google.com",
+                "line": "CALLS OUT calendar.google.com, outlook.office365.com and outlook.live.com · every 1h · key \"Calendar link\" to the host its keychain entry opens",
+                "key": "Calendar link"
+              }
+            ],
+            "widgets": [
+              "Next meetings",
+              "Today's events"
+            ]
+          },
+          "notes": "Says to put the link in your keys from a terminal, with braindog keys put \"Calendar link\", which reads it from standard input."
+        },
         {
           "version": "2.0.0",
           "checksum": "da84357cb163697993290465cb0c64e3dc014f53a6d38db8ddadec74b77433c1",
@@ -6517,8 +6548,35 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "18c4ae3029eb9a3e5622038c688abfeb5848babae8c4708917bb86df95b4bda1",
+          "bytes": 21248,
+          "published_at": "2026-10-30T18:27:24.651Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Subscriptions"
+            ],
+            "rules": [
+              "Keep a subscription's old price when its amount changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Subscriptions"
+            ]
+          },
+          "notes": "A month, by category says the ones with no category as No category, so its parts add up to the whole.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "4f9b9a96d356a2b8286cc7dcf59f1e606810e4a649e2d91a0610de18d4dd3bcf",

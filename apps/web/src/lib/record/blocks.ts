@@ -410,7 +410,8 @@ function progressRows(block: BlockResult): string[] {
 const joined = (where: unknown, clause: string): string => (typeof where === 'string' && where.trim() ? `${where}, ${clause}` : clause);
 
 /** The row for what no part holds: its label, linked to those rows, and its figure. */
-const unsetRow = (label: string, href: string, shown: string): string => `[${escapeCell(label)}](${href}) | ${escapeCell(shown)} | `;
+/** The block's `unset:` row, a link to the rows it counts where the list is known, else its words alone. */
+const unsetRow = (label: string, href: string | null, shown: string): string => `${href === null ? escapeCell(label) : `[${escapeCell(label)}](${href})`} | ${escapeCell(shown)} | `;
 
 /** The intent a block names for one value, one of the four, or nothing. */
 const toneWord = (tones: Readonly<Record<string, string>> | undefined, key: string): string => {
@@ -466,8 +467,11 @@ function partsRows(block: BlockResult): string[] {
        own colour and a part not named stays neutral. Only the four intents: anything else is left off. */
     .map((g) => `${escapeCell(partSaid(register, field, g))} | ${escapeCell(said(g.value))} | ${toneOf(block.tones, g.key)}`);
   const rest = parts.value === null || parts.more > 0 ? 0 : parts.value - parts.groups.reduce((n, g) => n + (g.value ?? 0), 0);
-  if (!block.unset || !register || Math.round(rest) < 1) return rows;
-  return [...rows, unsetRow(block.unset, registerHref(register, joined(decl?.where, `${field} is empty`)), said(rest))];
+  /* AN ADD-ON'S FIGURE IS NOT ONE THIS BUILD DECLARES, and its unset row was left out for want of the list to link to:
+     Subscriptions "A month, by category" drew £81 as the whole of £93. The row is said either way, a link where the
+     list and its field are known. */
+  if (!block.unset || Math.round(rest) < 1) return rows;
+  return [...rows, unsetRow(block.unset, register && field ? registerHref(register, joined(decl?.where, `${field} is empty`)) : null, said(rest))];
 }
 
 /**
