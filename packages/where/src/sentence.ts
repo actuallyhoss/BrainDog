@@ -742,6 +742,9 @@ function boundOf(sentence: string, field: string, decl: FieldSpec, said: string,
         : { value: day };
     }
     case 'money': {
+      /* NOUGHT IS NOUGHT IN EVERY CURRENCY, so `cost more than 0` asks the sign and needs none (`signOnly` in
+         `index.ts`): a rule about a service that costs anything, in whatever money it is kept. */
+      if (NUMBER.test(said) && Number(said) === 0) return { value: { amount: 0 } };
       if (NUMBER.test(said))
         return {
           code: 'MONEY_LITERAL_NEEDS_CURRENCY',

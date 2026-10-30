@@ -893,13 +893,16 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   only, so a patch step.
  * - money-core 3.33.0, before it shipped (numbers-agree): Forecast opens on 12 weeks like Money and Today, Reports'
  *   All line says the day money first moved (`metric.moved-since`).
+ * - estate 2.6.1 (finish loop, 30 Oct, audit 2 B14): `rule.renew-soon` asks only about a service that costs more than
+ *   nothing, and the two rules that act on its answer are named for what they do, since a question's answers read
+ *   them as their reasons. Words and a condition, nothing added or taken away, so a patch step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.1',
   portfolio: '1.30.1',
   people: '4.2.2',
   'money-core': '3.33.0',
-  estate: '2.6.0',
+  estate: '2.6.1',
   work: '1.20.1',
 };
 

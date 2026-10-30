@@ -3,7 +3,7 @@
   "version": "2.7.0",
   "title": "Services",
   "summary": "Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.",
-  "changes": "The Services page is called Services, as the menu calls it, and its Lapsing table says the day each service lapses and why, from its own note. Nothing you keep is moved or changed.",
+  "changes": "The Services page is called Services, as the menu calls it, and its Lapsing table says the day each service lapses and why, from its own note. A service that costs nothing is no longer asked about before it renews. Nothing you keep is moved or changed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -393,7 +393,7 @@
       "name": "Ask whether to keep a service before it renews",
       "pack": "estate",
       "register": "services",
-      "when": "state is live, cost is set, renews after yesterday, renews before +15d",
+      "when": "state is live, cost more than 0, renews after yesterday, renews before +15d",
       "then": [
         {
           "suggest": {
@@ -406,14 +406,14 @@
     },
     {
       "rule": "renewal-kept",
-      "name": "Keep a service somebody chose to keep",
+      "name": "Keep a service live, and leave its next renewal day to you",
       "pack": "estate",
       "on": { "decided": { "about": "rule.renew-soon", "option": "Keep it" } },
       "steps": [ { "move": "live" }, { "note": "You chose to keep this in Decide. Set the day it renews next once it has." } ]
     },
     {
       "rule": "renewal-cancelled",
-      "name": "Cancel a service somebody chose to cancel",
+      "name": "Mark a service cancelled, and leave telling the provider to you",
       "pack": "estate",
       "on": { "decided": { "about": "rule.renew-soon", "option": "Cancel it" } },
       "steps": [ { "move": "cancelled" }, { "note": "You chose to cancel this in Decide. Cancel it with the provider too." } ]

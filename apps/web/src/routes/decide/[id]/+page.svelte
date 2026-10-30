@@ -70,7 +70,7 @@
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { proposer, queueMergeOf, queueWords, type FileAt } from '$lib/page/queue-answer.ts';
   import '$lib/decide/form.css';
-  import { askedDay, cardWords, putsOff, queueOf, spoken } from '$lib/decide/card.ts';
+  import { cardWords, putsOff, queueOf, spoken } from '$lib/decide/card.ts';
   import OptionVisual from '$lib/decide/OptionVisual.svelte';
   import { visualOf as drawingOf } from '$lib/decide/option-visual.ts';
   import { homeCurrency } from '$lib/record/api.ts';
@@ -1139,7 +1139,7 @@
           <span class="dc-sr">{cardWords.askedBy}</span>
           {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{askerSaid}</span>{/if}
           <!-- WHEN, AS ITS CARD SAYS IT: a money row's card says the day ("3 Sep"), every other card how long ago. -->
-          <span class="gate-when">{moneyRow ? askedDay(question.opened) || since(question.opened, now) : since(question.opened, now)}</span>
+          <span class="gate-when">{since(question.opened, now)}</span>
         </p>
         <!-- WHAT IT IS ASKED WITH TO LOOK AT, above the answers: a still or a quiet card, opened full width on a press. -->
         <VisualStrip on={question.id} />

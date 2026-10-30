@@ -339,15 +339,17 @@ export const ESTATE_AUTOMATIONS: Record<string, unknown>[] = [
     name: 'Ask whether to keep a service before it renews',
     pack: 'estate',
     register: 'services',
-    /* `cost is set`, BECAUSE THE QUESTION SAYS WHAT IT COSTS: a service whose price nobody has looked up is asked about
-       when somebody has, rather than asked about a price the question would print as a dash. */
-    when: 'state is live, cost is set, renews after yesterday, renews before +15d',
+    /* `cost more than 0`, BECAUSE THE QUESTION SAYS WHAT IT COSTS: a service whose price nobody has looked up is asked
+       about when somebody has, rather than asked about a price the question would print as a dash; and one that costs
+       nothing is not asked about at all, since "renews for £0. Keep it?" asks nothing (audit 2, B14). Nought is a sign,
+       the same in every currency, so the clause names none. */
+    when: 'state is live, cost more than 0, renews after yesterday, renews before +15d',
     then: [{ suggest: { question: '{{name}} renews {{until:renews}} for {{money:cost}}. Keep it?', options: ['Keep it', 'Cancel it'] } }],
     once_per: ['entry', 'renews'],
   },
   {
     rule: 'renewal-kept',
-    name: 'Keep a service somebody chose to keep',
+    name: 'Keep a service live, and leave its next renewal day to you',
     pack: 'estate',
     on: { decided: { about: 'rule.renew-soon', option: 'Keep it' } },
     /* LIVE, WHICH IT USUALLY STILL IS, and which puts it back when its day passed before the answer and `renewal-passed`
@@ -356,7 +358,7 @@ export const ESTATE_AUTOMATIONS: Record<string, unknown>[] = [
   },
   {
     rule: 'renewal-cancelled',
-    name: 'Cancel a service somebody chose to cancel',
+    name: 'Mark a service cancelled, and leave telling the provider to you',
     pack: 'estate',
     on: { decided: { about: 'rule.renew-soon', option: 'Cancel it' } },
     /* CANCELLED, THE STATE EVERY READER OF SERVICES ALREADY LEAVES OUT: the month, the year, the next ninety days and

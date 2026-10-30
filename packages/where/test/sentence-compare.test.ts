@@ -190,6 +190,9 @@ test('A MONEY NUMBER CARRIES ITS CURRENCY, and is read in the currency\'s own un
   assert.equal(refused('amount is at least 100').code, 'MONEY_LITERAL_NEEDS_CURRENCY');
   assert.equal(refused('amount between GBP 10 and 20').code, 'MONEY_LITERAL_NEEDS_CURRENCY');
   assert.equal(refused('amount between GBP 10 and USD 20').code, 'MIXED_CURRENCY');
+  /* NOUGHT IS THE ONE BARE NUMBER MONEY TAKES, as a sign: more than 0 is anything it costs, in any currency. */
+  assert.deepEqual(good('amount more than 0'), { field: 'amount', gt: { amount: 0 } });
+  assert.deepEqual(good('amount less than 0.00'), { field: 'amount', lt: { amount: 0 } });
   assert.equal(refused('amount at least XYZ 10').code, 'CURRENCY_UNKNOWN');
   /* PRECISION PAST THE CURRENCY IS NOT A NUMBER IT HOLDS: a yen has no pence. */
   assert.equal(refused('amount at least JPY 12.5').code, 'VALUE_MALFORMED');

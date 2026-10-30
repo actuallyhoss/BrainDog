@@ -77,7 +77,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, answerRowOf, askedDay, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
+  import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, leave, pointerOff, settle } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
@@ -306,14 +306,15 @@
    */
   const row = $derived(card.merge === null ? moneyRowOf(card.question, card.ways.map((w) => w.label)) : null);
 
-  /** "Asked by your rule Chase late payments, 16 Jul": who asked, at the row's foot and never leading it. */
+  /**
+   * "Asked by your rule Chase late payments · 12h ago": who asked, at the row's foot and never leading it, and how long
+   * it has waited in the words every other card says it (audit 2, B14: this row alone said "3 Sep" beside "12h ago").
+   */
   const askedLine = $derived.by(() => {
     if (!row) return '';
-    /* THREE LETTERS FOR THE MONTH, as every other date reads ("3 Sep"); `en-GB`'s own short month says "Sept". */
-    const day = askedDay(question.at);
     const rule = card.by.kind === 'rule' ? card.by.name.replace(/^A rule: /u, '') : null;
     const who = rule !== null ? cardWords.byRule(rule.charAt(0).toUpperCase() + rule.slice(1)) : card.by.kind === 'you' ? cardWords.byYou : cardWords.by(card.by.name);
-    return day ? `${who}, ${day}` : who;
+    return card.when ? `${who} · ${card.when}` : who;
   });
 
   /**

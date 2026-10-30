@@ -959,6 +959,20 @@ const DECLARED: Record<string, Version> = {
       "Estate 2.6.0 (Q50 of 29 October): `page.estate` is titled Services as the bar says it, and its Lapsing table says the day each lapses and why, from the row's note; no id added or taken away -> 34d56a965d9c4cdf",
     ],
   },
+  'estate@2.6.1': {
+    holds: `
+      metric.domains-held metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d metric.renews-90d metric.services-held
+      page.estate page.service
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
+    `,
+    declares: '33693ab8adbbf728',
+    history: [
+      'Estate 2.6.1 of 30 October (audit 2, B14): `rule.renew-soon` asks only about a service that costs more than nothing, and `rule.renewal-kept` and `rule.renewal-cancelled` are named for what they do, since the answers read them as their reasons; no id added or taken away -> 33693ab8adbbf728',
+    ],
+  },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
   'work@1.11.0': {
     holds: `

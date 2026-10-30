@@ -19,8 +19,10 @@ test('the day a question was asked reads as its card says it', () => {
   assert.equal(askedDay('not a day'), '');
 });
 
-test('the question\'s page asks the card\'s rule for its Later and says a money row\'s day as the card does', () => {
+test('the question\'s page asks the card\'s rule for its Later and says how long a money row waited as every card does', () => {
   const page = readFileSync(new URL('../../routes/decide/[id]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /\.some\(\(o\) => putsOff\(o\.title\)\)/u);
-  assert.match(page, /moneyRow \? askedDay\(question\.opened\)/u);
+  assert.doesNotMatch(page, /askedDay\(/u, 'a money row said "3 Sep" where every other question said "12h ago"');
+  const card = readFileSync(new URL('./DecisionCard.svelte', import.meta.url), 'utf8');
+  assert.doesNotMatch(card, /askedDay\(/u, 'the card\'s money row said "3 Sep" beside cards saying "12h ago"');
 });
