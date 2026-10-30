@@ -238,7 +238,8 @@ test('A COPY THAT DOES NOT CHECK, OR IS SIGNED BY ANOTHER KEY THAN THE ONE NAMED
     /* AND A COPY THIS HOST ALREADY SERVES IS NOT RESTORED A SECOND TIME UNDER ANOTHER NAME: two names reaching two files
        that both say they are one record is the tenant map lying. */
     assert.equal(run(data, 'init', 'drill', '--from', file).code, 0);
-    const twice = run(data, 'init', 'drill-2', '--from', file);
+    /* `--alongside`, so the one-record refusal in `main.ts` steps aside and this check is the one that answers. */
+    const twice = run(data, 'init', 'drill-2', '--from', file, '--alongside');
     assert.equal(twice.code, 1, twice.said);
     assert.match(twice.said, new RegExp(`${REC} is already served here as drill`));
     assert.ok(!existsSync(join(data, 'drill-2')));

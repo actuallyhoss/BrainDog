@@ -145,7 +145,7 @@ function lockRefusal(file: string): string | null {
     if (held === undefined || held.checksum === row.checksum) continue;
     return (
       `This BrainDog ran migration ${row.version} (${held.slug}) as text this build does not hold, so this build would refuse every request to it and has not started. ` +
-      'Start the build that last served the record, or restore the copy taken before the upgrade with braindog init <slug> --from <copy>. ' +
+      `Start the build that last served the record, or restore the copy taken before the upgrade: a backup folder goes into an empty data folder with ${commandFor('restore <backup folder>')}. ` +
       'A migration a record has run is never edited, so the build is at fault: report it with the migration number.'
     );
   }
@@ -197,6 +197,34 @@ const recordIn = (dir: string): string | null => {
 };
 
 /**
+ * The names of the records a data folder holds, in the order they were made: each name the Directory gives out that has
+ * a record file behind it. None when there is no Directory yet.
+ *
+ * A NAME WITH NO FILE BEHIND IT IS SKIPPED, not counted. `49 §5.1` step 6: "a `record_dir` row with no directory … is
+ * logged as `slug` and skipped." Counting it made a host with exactly one servable record refuse to start, saying it held
+ * two, and nothing on the machine would then start it.
+ */
+function recordsIn(data: string): string[] {
+  const dirFile = join(data, 'directory.sqlite');
+  if (!existsSync(dirFile)) return [];
+  const dirSql = openSqlite(dirFile);
+  try {
+    return dirSql
+      .all<{ slug: string }>('SELECT slug FROM dir_slug WHERE released_at IS NULL ORDER BY claimed_at')
+      .map((row: { slug: string }) => row.slug)
+      .filter((slug: string) => recordIn(join(data, slug)) !== null);
+  } finally {
+    dirSql.close();
+  }
+}
+
+/** What to do about a data folder with no record in it, said for where the person is. */
+const noRecord = (data: string): string =>
+  inImage()
+    ? `There is no record in ${data}. Set BRAINDOG_OWNER in .env to your email and start it again (docker compose up -d), and the first start makes one; to bring a backup in instead, see Backups in apps/selfhost/README.md.`
+    : `There is no record in ${data}. Make one with ${commandFor('init <name> --owner <your email>')}, or set BRAINDOG_OWNER and start again; if your record is in another folder, set BRAINDOG_DATA to it.`;
+
+/**
  * `init <slug> [--owner <email>]`, and `BRAINDOG_OWNER` when the flag is absent. `init <slug> --from <file.brainl>
  * [--key <public key>] [--owner <email>]` restores a copy instead, and is `./restore.ts`'s from its first step.
  *
@@ -206,7 +234,23 @@ const recordIn = (dir: string): string | null => {
  */
 async function init(args: readonly string[]): Promise<void> {
   const slug = args[0];
-  if (!slug) return refuse('braindog init needs a name for the record: init <slug> --owner <email>, or init <slug> --from <file.brainl>');
+  if (!slug || slug.startsWith('--'))
+    return refuse(`init needs a name for the record first: ${commandFor('init <name> --owner <your email>')}, or ${commandFor('init <name> --from <file.brainl>')}.`);
+  const data = dataDir();
+
+  /* ONE RECORD A DATA FOLDER, BECAUSE `serve` SERVES ONE. A second `init` here, of a new record or of a copy, exited 0 and
+     the next start refused "holds 2 records", which under Docker is a container restarting for ever. `--alongside` keeps
+     a second record beside the first for a developer who serves one by its file; nobody else is told about it. */
+  if (!args.includes('--alongside')) {
+    const others = recordsIn(data).filter((held) => held !== slug);
+    if (others.length > 0)
+      return refuse(
+        `${data} already holds the record ${others.join(', ')}, and this host serves one record, so ${slug} was not made. ` +
+          (inImage()
+            ? 'Make it in an empty volume instead: take a backup, then docker compose down -v removes this one (apps/selfhost/README.md, Backups).'
+            : `Make it in an empty data folder instead: set BRAINDOG_DATA to a new folder and run ${commandFor(`init ${args.join(' ')}`)} again.`),
+      );
+  }
 
   const flag = args.indexOf('--owner');
 
@@ -216,11 +260,10 @@ async function init(args: readonly string[]): Promise<void> {
   const from = args.indexOf('--from');
   if (from >= 0) {
     const path = args[from + 1];
-    if (!path || path.startsWith('--')) return refuse('braindog init --from needs the file to restore: init <slug> --from <file.brainl>');
+    if (!path || path.startsWith('--')) return refuse(`init --from needs the .brainl file to bring in: ${commandFor('init <name> --from <file.brainl>')}.`);
     const keyAt = args.indexOf('--key');
     const key = keyAt >= 0 ? args[keyAt + 1] : undefined;
     if (keyAt >= 0 && (!key || key.startsWith('--'))) return refuse('--key needs the public key the copy must be signed by, 43 characters of base64url.');
-    const data = dataDir();
     const out = await initFrom({
       data,
       slug,
@@ -245,10 +288,9 @@ async function init(args: readonly string[]): Promise<void> {
      no owner cannot be written there at all, and a record nobody owns is a record nobody can invite
      anybody to. */
   if (!email)
-    return refuse('braindog init needs an owner: --owner <email>, or BRAINDOG_OWNER. A record nobody owns cannot be shared.');
+    return refuse(`init needs an owner: ${commandFor(`init ${slug} --owner <your email>`)}, or set BRAINDOG_OWNER. A record nobody owns cannot be shared.`);
   if (!email.includes('@')) return refuse(`${email} is not an address.`);
 
-  const data = dataDir();
   const dir = join(data, slug);
   const file = join(dir, RECORD_FILE);
 
@@ -294,7 +336,8 @@ async function init(args: readonly string[]): Promise<void> {
   if (wrong) return refuse(wrong);
 
   const held = directory.claimed(slug);
-  if (held === 'taken') return refuse(`${slug} is already somebody's record here.`);
+  if (held === 'taken')
+    return refuse(`${slug} is already somebody's record here, and init makes a record once. Serve it with ${commandFor('serve')}, or make a new one in an empty data folder.`);
   if (held === 'released')
     return refuse(`${slug} was the name of another record and cannot be given out again. Every link that still says it would read the wrong record.`);
 
@@ -590,7 +633,9 @@ async function serve(): Promise<void> {
      served on the port, with every anonymous request its owner. The multi-record refusal below
      tells people to use this branch, which made it the likeliest way in. */
   if (explicit && !existsSync(explicit))
-    return refuse(`${explicit} is not a record. Create one with: braindog init <slug> --owner <email>`);
+    return refuse(
+      `${explicit} is not a record file, so nothing was served. serve takes the path of a ${RECORD_FILE}, or nothing to serve the record in ${data}; ${commandFor('--help')} says more.`,
+    );
   let file = explicit;
 
   if (!file) {
@@ -601,25 +646,14 @@ async function serve(): Promise<void> {
       await init([env.BRAINDOG_RECORD?.trim() || 'home']);
       say(`braindog · first run: made the record in ${data} for ${env.BRAINDOG_OWNER!.trim()}`);
     }
-    if (!existsSync(dirFile))
-      return refuse(`There is no record in ${data}. Create one with: braindog init <slug> --owner <email>`);
-    const dirSql = openSqlite(dirFile);
-    /* A NAME WITH NO FILE BEHIND IT IS SKIPPED, not counted. `49 §5.1` step 6: "a `record_dir` row
-       with no directory … is logged as `slug` and skipped." Counting it made a host with exactly one
-       servable record refuse to start, saying it held two, and nothing on the machine would then
-       start it. */
-    const slugs = dirSql
-      .all<{ slug: string }>('SELECT slug FROM dir_slug WHERE released_at IS NULL ORDER BY claimed_at')
-      .filter((row: { slug: string }) => recordIn(join(data, row.slug)) !== null);
-    dirSql.close();
-    if (slugs.length === 0)
-      return refuse(`There is no record in ${data}. Create one with: braindog init <slug> --owner <email>`);
+    const slugs = recordsIn(data);
+    if (slugs.length === 0) return refuse(noRecord(data));
     if (slugs.length > 1)
       return refuse(
-        `${data} holds ${slugs.length} records (${slugs.map((row: { slug: string }) => row.slug).join(', ')}) and this host serves one. Name it: braindog serve <data>/<slug>/${RECORD_FILE}`,
+        `${data} holds ${slugs.length} records (${slugs.join(', ')}) and this host serves one. Serve one by its file, ${commandFor(`serve ${join(data, '<name>', RECORD_FILE)}`)}, or move the others out of ${data}.`,
       );
-    /* The filter above kept only the slugs that have one, so this is never null. */
-    file = recordIn(join(data, slugs[0]!.slug))!;
+    /* `recordsIn` kept only the names that have one, so this is never null. */
+    file = recordIn(join(data, slugs[0]!))!;
   }
 
   /* THE RECORD'S MIGRATIONS AGAINST THIS BUILD'S LOCK, before a key is opened or a port bound (`lockRefusal`). */
@@ -803,6 +837,20 @@ async function serve(): Promise<void> {
     });
 }
 
+/** What each command takes, on stderr like every other sentence here, and exit 0. Named as the person runs it. */
+function help(): void {
+  const rows: [string, string][] = [
+    ['', `serve the record in BRAINDOG_DATA (${dataDir()} now). The default.`],
+    ['init <name> --owner <email>', 'make a record, in an empty data folder.'],
+    ['init <name> --from <file.brainl> [--key <public key>]', 'bring an export in as the record, in an empty data folder.'],
+    ['backup <folder>', 'copy every record, the directory and the key file into a new folder under <folder>.'],
+    ['restore <backup folder>', 'put a backup into an empty data folder.'],
+  ];
+  say('The self-host. Each command, as you run it here:');
+  for (const [words, does] of rows) say(`  ${commandFor(words).trimEnd()}\n      ${does}`);
+  say('Every setting it reads is in selfhost.env.example, and apps/selfhost/README.md has the steps.');
+}
+
 /**
  * AND NOTHING REACHES THE OPERATOR AS A STACK TRACE.
  *
@@ -819,20 +867,21 @@ try {
     const found = bakedSecrets(APP_ROOT, [dataDir(), env.BRAINDOG_KEK_FILE ?? join(dataDir(), 'kek')]);
     if (found.length > 0) refuse(bakedSaid(found));
   }
-  if (command === 'init') await init(rest);
+  if (command === 'help' || command === '--help' || command === '-h') help();
+  else if (command === 'init') await init(rest);
   else if (command === 'serve') await serve();
   else if (command === 'backup') {
     const dest = rest[0];
-    if (!dest) refuse('braindog backup needs a folder to write into: backup <folder>');
+    if (!dest || dest.startsWith('--')) refuse(`backup needs a folder to write into: ${commandFor('backup <folder>')}.`);
     const kekFile = env.BRAINDOG_KEK_FILE ?? join(dataDir(), 'kek');
     const { out, said } = backupData({ data: dataDir(), kekFile, dest, now: Date.now() });
-    say(`backup written to ${out} (${said.join(', ')}). It holds the key file, so keep it as private as the key.`);
+    say(`backup written to ${out} (${said.join(', ')}). It holds the key file and each record's inbound mail token, so keep it as private as the key, and outside the repository folder.`);
   } else if (command === 'restore') {
     const from = rest[0];
-    if (!from) refuse('braindog restore needs the backup folder: restore <folder>');
+    if (!from || from.startsWith('--')) refuse(`restore needs the backup folder: ${commandFor('restore <backup folder>')}.`);
     restoreData({ data: dataDir(), from });
     say(`restored into ${dataDir()}. Start the server as usual.`);
-  } else refuse(`braindog has no ${command}. It has serve, init, backup and restore.`);
+  } else refuse(`There is no ${command} here. It has serve, init, backup and restore; ${commandFor('--help')} says what each takes.`);
 } catch (e) {
   refuse(e instanceof Error ? e.message : String(e));
 }

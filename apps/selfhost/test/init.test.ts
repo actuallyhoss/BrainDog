@@ -151,7 +151,7 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
     assert.ok(!out.said.includes(token), 'the success line printed the token itself');
 
     /* AND IT IS RANDOM, not a constant of the right length. A second record's is a different one. */
-    assert.equal(run(data, 'init', 'kiln', '--owner', 'bo@example.com').code, 0);
+    assert.equal(run(data, 'init', 'kiln', '--owner', 'bo@example.com', '--alongside').code, 0);
     assert.notEqual(readFileSync(join(data, 'kiln', 'inbound.token'), 'utf8'), token);
     if (process.platform !== 'win32')
       assert.equal(statSync(join(data, 'the-studio', 'inbound.token')).mode & 0o777, 0o600);
@@ -234,7 +234,12 @@ test('AND A COMMAND THIS HOST DOES NOT HAVE IS ONE SENTENCE, not a stack', async
     assert.equal(out.code, 1);
     /* THE LAST LINE, because Node prints its own experimental-SQLite warning first and that is the
        runtime's sentence rather than this command's. */
-    assert.equal(out.said.trim().split(String.fromCharCode(10)).at(-1), 'braindog has no nonsense. It has serve, init, backup and restore.');
+    assert.match(out.said.trim().split(String.fromCharCode(10)).at(-1) ?? '', /^There is no nonsense here\. It has serve, init, backup and restore; node \S+main\.ts --help says what each takes\.$/);
+
+    /* AND --help IS AN ANSWER, not a refusal: each command as it is run here, and exit 0. */
+    const help = run(data, '--help');
+    assert.equal(help.code, 0, help.said);
+    for (const word of ['init <name> --owner <email>', 'backup <folder>', 'restore <backup folder>']) assert.ok(help.said.includes(word), word);
 
     /* AND `serve` WITH NOTHING TO SERVE SAYS WHAT TO DO ABOUT IT, rather than starting a server for
        a record nobody created, which is what an empty file quietly becomes. */
@@ -475,6 +480,27 @@ test('AND A RELEASED NAME IS NEVER REISSUED, which is the whole tenant boundary'
   }
 });
 
+test('A SECOND RECORD IN A LIVE DATA FOLDER IS REFUSED, because the next start would refuse and a container would restart for ever', async () => {
+  /* MEASURED: `init second` on a folder already holding `home` exited 0, and `serve` then refused "holds 2 records",
+     which under Docker's bare `serve` is a restart loop. The refusal comes before anything is written. */
+  const data = scratch();
+  try {
+    assert.equal(run(data, 'init', 'home', '--owner', 'ada@example.com').code, 0);
+    const second = run(data, 'init', 'second', '--owner', 'ada@example.com');
+    assert.equal(second.code, 1, second.said);
+    assert.match(second.said, /already holds the record home, and this host serves one record, so second was not made/);
+    assert.match(second.said, /empty data folder/);
+    assert.ok(!existsSync(join(data, 'second')), 'the refused record left a folder behind');
+
+    /* AND A COPY IS REFUSED THE SAME WAY, before the file is even read. */
+    const copy = run(data, 'init', 'drill', '--from', join(data, 'nowhere.brainl'));
+    assert.equal(copy.code, 1, copy.said);
+    assert.match(copy.said, /already holds the record home/);
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
 test('AND `serve` SERVES THE ONE RECORD IT HAS, even beside a name whose file is gone', async () => {
   /* 49 §5.1 step 6: "a `record_dir` row with no directory … is logged as `slug` and skipped."
      Counting it made a host with exactly one servable record refuse to start, saying it held two,
@@ -482,7 +508,7 @@ test('AND `serve` SERVES THE ONE RECORD IT HAS, even beside a name whose file is
   const data = scratch();
   try {
     assert.equal(run(data, 'init', 'one', '--owner', 'ada@example.com').code, 0);
-    assert.equal(run(data, 'init', 'two', '--owner', 'ada@example.com').code, 0);
+    assert.equal(run(data, 'init', 'two', '--owner', 'ada@example.com', '--alongside').code, 0);
 
     const both = run(data, 'serve');
     assert.equal(both.code, 1, 'a host with two records served one of them');

@@ -93,6 +93,7 @@ import { outboundHeld, scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
 import { selfhostFacts, selfhostProbeWire, slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, slashModelJobs, type SlashConfig } from './slash.ts';
 import { unwrap, type KeyStore } from './keys.ts';
+import { commandFor } from './how.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, keychainDoor } from './keychain.ts';
@@ -1955,7 +1956,7 @@ export async function start(options: {
     /* A DELETED RECORD ANSWERS NOTHING BUT THAT, and never reads a file that is no longer there. */
     if (gone) {
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This BrainDog was deleted. Make another with braindog init.' } }));
+      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: `This BrainDog was deleted. Stop the server and make another with ${commandFor('init <name> --owner <your email>')}.` } }));
       return;
     }
     /* `/.well-known/braindog-key` (`03 §4`): the key this record's exports are signed with, `{ key_id, public_key }`, to
