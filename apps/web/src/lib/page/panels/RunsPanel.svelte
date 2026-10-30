@@ -36,13 +36,14 @@
 
   const words = {
     more: (n: number) => `Show ${n.toLocaleString('en')} more`,
-    /* THE DOOR OPENS THE AGENT RUNS ONLY, so its count says so: the list above also holds rules and scripts. */
-    all: (n: number | null) => (n === null ? 'All agent runs' : `All ${n.toLocaleString('en')} agent runs`),
+    /* THE DOOR OPENS THE AGENT RUNS ONLY, so it says so: the list above also holds rules and scripts. NO COUNT ON IT
+       (the recheck of 30 October, 26): "All 5 agent runs" stood under the sidebar's "Agent runs 3", which counts the
+       ones still open, so the one number beside the list is the sidebar's. */
+    all: 'All agent runs',
     times: (n: number) => `${n.toLocaleString('en')}×`,
   } as const;
 
   let lines = $state.raw<RunLine[]>([]);
-  let total = $state<number | null>(null);
   let short = $state(false);
   let drew = $state<boolean | null>(null);
   let all = $state(false);
@@ -57,7 +58,6 @@
     }
     /* A RUN AT WORK IS SAID UNDER At work, so it is not a second time here. */
     lines = out.lines.filter((l) => l.live !== true);
-    total = out.agentRuns;
     short = out.short;
     drew = lines.length > 0;
     const keys = lines.map((l) => l.project).filter((p): p is string => typeof p === 'string');
@@ -114,7 +114,7 @@
     </ul>
     <p class="runs-foot">
       {#if folded.length > SHOWN && !all}<button type="button" class="runs-more" onclick={() => (all = true)}>{words.more(folded.length - SHOWN)}</button>{/if}
-      <a class="runs-door" href={at('/r/session')}>{words.all(total)}<Icon name="arrow" size="s" /></a>
+      <a class="runs-door" href={at('/r/session')}>{words.all}<Icon name="arrow" size="s" /></a>
       <a class="runs-door" href={at('/jobs?start')}>{runsWords.runAJob}</a>
     </p>
   </div>

@@ -507,12 +507,15 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          no page can count working its own way again. It was seven twelfths beside Left for the next run, which wrapped
          each step to six lines and left a hole under the runs.
 
-         HEADED OPEN NOW SINCE 1.20.0: it holds the runs at work and, under Quiet, the ones
+         HEADED OPEN NOW FROM 1.20.0: it holds the runs at work and, under Quiet, the ones
          open and quiet, so "Nobody working right now." sat over a tile called At work with three runs in it. The panel
-         draws the two parts apart, each with its count. */
+         draws the two parts apart, each with its count.
+
+         HEADED WORKING NOW SINCE 1.27.0, AS TODAY'S TILE OF THE SAME RUNS IS (the recheck of 30 October, 26): Today said
+         Working now and Agents said Open now over the one panel, the working runs first and the quiet ones under Quiet. */
       {
         kind: 'section',
-        heading: 'Open now',
+        heading: 'Working now',
         icon: 'session',
         span: 12,
         panel: 'presence',
@@ -850,8 +853,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.24.0 ADDS TWO SECTIONS, SO IT IS MINOR: Accepted unchanged on the agents home (`panel: kept`), and Over time on
      How the brain changed (`panel: evolution`), the timeline of learnings and skills. No list, field or figure goes.
      1.25.0 IS WORDS, SO IT IS MINOR (round 1030): the first line counts the runs Open now draws, working and open and
-     quiet, where "Nobody working right now" stood over runs heard just now. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.26.0', requires: ['register.things'] },
+     quiet, where "Nobody working right now" stood over runs heard just now. No list, field or figure goes.
+     1.27.0 IS WORDS, SO IT IS MINOR (the recheck of 30 October, 26): the runs open now are headed Working now, as Today
+     heads the same runs, where they were headed Open now. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.27.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

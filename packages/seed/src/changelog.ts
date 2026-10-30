@@ -430,6 +430,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.27.0',
+      notes: 'The runs on Agents are headed Working now, as Today heads them, with the quiet ones under Quiet, where they were headed Open now.',
+    },
+    {
       version: '1.26.0',
       notes: 'Keys past their day are said in a plain sentence, and How the brain changed says how many learnings are in use beside how many arrived.',
     },
