@@ -7,12 +7,16 @@
  * signed amounts or two of money out and money in, a running balance, and the account every line belongs to.
  *
  * A LINE ALREADY IN THE LEDGER IS SKIPPED, held to the key a bank's own feed is held to (`near` dedupe in the bank
- * add-ons, `isDuplicate` in packages/extract): the same account, the same amount in the same currency going the same
- * way, a day within one, and the first twelve letters of the description, case and accents aside. One line kept in the
- * Ledger stands for one line of the file, so two coffees of the same price on the same day stay two.
+ * add-ons, `nearMatch` in packages/extract): the same account, the same amount in the same currency going the same
+ * way, and the same payee once what the bank wraps it in is taken off. An alert is dated the day the money moved and a
+ * statement the day the bank posted it, so the two may be three days apart. Where both say the balance after, it must
+ * agree. One line kept in the Ledger stands for one line of the file, the nearest pairs first, so two coffees of the
+ * same price on the same day stay two. The line the Ledger holds is the one kept, with whatever a person set on it.
  *
  * PURE, so `node --test` reads it. The screen (`routes/add/statement/+page.svelte`) draws it and writes what `fieldsOf` says.
  */
+
+import { bankKey } from '@braindog/kernel';
 
 import { dayReader, inCurrency, numberOf, readExport, SAID_AS, squeeze, type Export } from '../start/export.ts';
 import { decimalsOf } from '../start/lists.ts';
@@ -29,8 +33,12 @@ export type Sign = 'minus-out' | 'plus-out';
 /** One line of the statement, read: its place in the file, its day, what it says, and the amount in minor units. */
 export type Line = { at: number; day: string; what: string; amount: number; currency: string; way: 'in' | 'out'; balance: number | null };
 
-/** A line the Ledger already holds for the account, as the dedupe reads it. */
-export type Held = { day: string; what: string; amount: number; currency: string; way: 'in' | 'out' };
+/**
+ * A line as the dedupe reads it: a line of the file, or one the Ledger already holds for the account. `also` is the
+ * Ledger's other words for the payee (as the bank wrote it, and as a person named it), and `balance` what it says the
+ * account held after, in minor units, when it says.
+ */
+export type Held = { day: string; what: string; amount: number; currency: string; way: 'in' | 'out'; also?: string[]; balance?: number | null };
 
 /** The file read as lines, and what was left out: lines in another currency, and lines with no day, amount or words. */
 export type Read = { lines: Line[]; other: number; unread: number };
@@ -213,57 +221,105 @@ export function dayPlus(day: string, n: number): string {
 
 /** How many letters of the description two lines must share, as a bank's feed is held to. */
 const PREFIX = 12;
+/** How many days apart an alert's day and the statement's posting day may be (`NEAR_ACROSS_DAYS` in packages/extract). */
+const ACROSS = 3;
 
 /** Words for comparing and nothing else: accents, case and runs of space off. */
 const fold = (s: string): string =>
   s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/gu, '')
+    .replace(/[\u0300-\u036f]/gu, '')
     .toLowerCase()
     .replace(/\s+/gu, ' ')
     .trim();
 
+/** The words a bank puts before a payee on a statement line, longest first. */
+const LEADS = ['ipn outward transfer to', 'ipn inward transfer from', 'ipn purchase to', 'ipn transfer to', 'ipn transfer from', 'card purchase', 'pos purchase', 'purchase at', 'payment to', 'purchase'];
+
+/**
+ * A description with what a bank wraps a payee in taken off, as `bankless` in packages/extract does: the day stamp a
+ * statement line starts with (`05OCT26`), the words before the payee, a processor before its star (`PAYMOB*`), the word
+ * `Purchase` at the end, and every mark. Never empty.
+ */
+export function bankless(text: string): string {
+  const folded = fold(text);
+  let words = folded.replace(/[^\p{L}\p{N}*]+/gu, ' ').trim().split(' ').filter(Boolean);
+  if (words.length > 1 && /^\d{1,2}[a-z]{3}(?:\d{2}|\d{4})$/u.test(words[0]!)) words = words.slice(1);
+  for (const lead of LEADS) {
+    const said = lead.split(' ');
+    if (words.length > said.length && said.every((w, i) => words[i] === w)) {
+      words = words.slice(said.length);
+      break;
+    }
+  }
+  let said = words.join(' ');
+  const star = said.indexOf('*');
+  if (star > 0 && star <= 14 && said.slice(0, star).trim().split(' ').length <= 2 && said.slice(star + 1).trim() !== '') said = said.slice(star + 1);
+  words = said.replace(/\*/gu, ' ').split(' ').filter(Boolean);
+  if (words.length > 1 && words.at(-1) === 'purchase') words = words.slice(0, -1);
+  return words.join(' ') || folded;
+}
+
 const DAY_MS = 86_400_000;
 const utc = (day: string): number => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)));
+
+/** Whether two words for a payee name one: the first letters as written, or with the bank taken off, or the payee key. */
+function samePayee(a: string, b: string): boolean {
+  if (fold(a).slice(0, PREFIX) === fold(b).slice(0, PREFIX)) return true;
+  const [x, y] = [bankless(a), bankless(b)];
+  if (x.slice(0, PREFIX) === y.slice(0, PREFIX)) return true;
+  const key = bankKey(x);
+  return key !== null && key === bankKey(y);
+}
 
 /** Whether a line of the file and a line of the Ledger are one movement seen twice. */
 export function sameLine(a: Held, b: Held): boolean {
   if (a.amount !== b.amount || a.currency !== b.currency || a.way !== b.way) return false;
-  if (Math.abs(utc(a.day) - utc(b.day)) > DAY_MS) return false;
-  return fold(a.what).slice(0, PREFIX) === fold(b.what).slice(0, PREFIX);
+  if (Math.abs(utc(a.day) - utc(b.day)) > ACROSS * DAY_MS) return false;
+  /* WHAT BOTH SAY THE ACCOUNT HELD AFTER MUST AGREE: two payments of one size a day apart leave two balances. */
+  if (typeof a.balance === 'number' && typeof b.balance === 'number' && a.balance !== b.balance) return false;
+  const names = (h: Held): string[] => [h.what, ...(h.also ?? [])].filter((t) => t.trim() !== '');
+  return names(a).some((x) => names(b).some((y) => samePayee(x, y)));
 }
 
 /**
  * THE LINES TO ADD, AND THE ONES THE LEDGER ALREADY HOLDS. Each line kept stands for one line of the file and no more,
- * the nearest day first, so a file with two of the same coffee against a Ledger holding one adds the second.
+ * and the nearest pairs are made first, whatever order the file is in: a statement listed newest first does not let a
+ * coffee on the 5th take the Ledger's coffee of the 3rd from the file's own coffee of the 3rd.
  */
 export function freshOf<L extends Held>(lines: readonly L[], held: readonly Held[]): { fresh: L[]; already: L[] } {
-  const used = new Set<number>();
-  const fresh: L[] = [];
-  const already: L[] = [];
-  for (const l of lines) {
-    let best = -1;
-    let gap = Infinity;
-    for (const [i, h] of held.entries()) {
-      if (used.has(i) || !sameLine(l, h)) continue;
-      const d = Math.abs(utc(l.day) - utc(h.day));
-      if (d < gap) (best = i), (gap = d);
-    }
-    if (best >= 0) {
-      used.add(best);
-      already.push(l);
-    } else fresh.push(l);
+  const pairs: { l: number; h: number; gap: number }[] = [];
+  for (const [li, l] of lines.entries())
+    for (const [hi, h] of held.entries()) if (sameLine(l, h)) pairs.push({ l: li, h: hi, gap: Math.abs(utc(l.day) - utc(h.day)) });
+  pairs.sort((x, y) => x.gap - y.gap || x.l - y.l || x.h - y.h);
+  const usedLine = new Set<number>();
+  const usedHeld = new Set<number>();
+  for (const p of pairs) {
+    if (usedLine.has(p.l) || usedHeld.has(p.h)) continue;
+    usedLine.add(p.l);
+    usedHeld.add(p.h);
   }
-  return { fresh, already };
+  return { fresh: lines.filter((_, i) => !usedLine.has(i)), already: lines.filter((_, i) => usedLine.has(i)) };
 }
 
-/** A row of the Ledger as the dedupe reads it, or `null` when it is not one it can compare. */
-export function heldOf(fields: Readonly<Record<string, unknown>>, l: Pick<Ledger, 'title' | 'amount' | 'day' | 'way'>): Held | null {
+/** The Ledger's other words for a payee: as the bank wrote it, and as a person named it (money-core's field ids). */
+const ALSO = ['counterparty_text', 'payee'];
+
+/**
+ * A row of the Ledger as the dedupe reads it, or `null` when it is not one it can compare. `balance` is the field the
+ * import writes a running balance to (`balanceFieldOf`), read in the row's own currency only.
+ */
+export function heldOf(fields: Readonly<Record<string, unknown>>, l: Pick<Ledger, 'title' | 'amount' | 'day' | 'way'>, balance: string | null = null): Held | null {
   const money = fields[l.amount] as { amount?: unknown; currency?: unknown } | null | undefined;
   const day = fields[l.day];
   const way = fields[l.way.field] === l.way.out ? 'out' : fields[l.way.field] === l.way.in ? 'in' : null;
   if (typeof money?.amount !== 'number' || typeof money.currency !== 'string' || typeof day !== 'string' || way === null) return null;
-  return { day: day.slice(0, 10), what: typeof fields[l.title] === 'string' ? (fields[l.title] as string) : '', amount: Math.abs(money.amount), currency: money.currency, way };
+  const out: Held = { day: day.slice(0, 10), what: typeof fields[l.title] === 'string' ? (fields[l.title] as string) : '', amount: Math.abs(money.amount), currency: money.currency, way };
+  const also = ALSO.map((f) => fields[f]).filter((t): t is string => typeof t === 'string' && t.trim() !== '');
+  if (also.length > 0) out.also = also;
+  const after = balance === null ? null : (fields[balance] as { amount?: unknown; currency?: unknown } | null | undefined);
+  if (typeof after?.amount === 'number' && after.currency === money.currency) out.balance = after.amount;
+  return out;
 }
 
 /* ── the write ─────────────────────────────────────────────────────────── */

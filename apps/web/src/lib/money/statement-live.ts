@@ -60,20 +60,23 @@ export async function loadStatement(base: string, lists: readonly Listed[]): Pro
   return { ok: true, value: { ledger, balance: balanceFieldOf(REGISTERS[ledger.list]?.fields ?? [], ledger.amount), accounts } };
 }
 
-/** The account's Ledger lines over the days the file covers, a day either side, as the dedupe reads them. */
-export async function heldFor(base: string, ledger: Ledger, account: string, lines: readonly Line[]): Promise<Held[] | null> {
+/**
+ * The account's Ledger lines over the days the file covers, three days either side, as the dedupe reads them: an alert
+ * is dated the day the money moved, and the statement the day the bank posted it.
+ */
+export async function heldFor(base: string, ledger: Ledger, account: string, lines: readonly Line[], balance: string | null = null): Promise<Held[] | null> {
   const span = spanOf(lines);
   if (span === null) return [];
   const where = {
     all: [
       { field: ledger.account.field, is: account },
-      { field: ledger.day, gte: dayPlus(span.from, -1) },
-      { field: ledger.day, lte: dayPlus(span.to, 1) },
+      { field: ledger.day, gte: dayPlus(span.from, -3) },
+      { field: ledger.day, lte: dayPlus(span.to, 3) },
     ],
   };
   const rows = await every(createClient({ base }), ledger.list, where, HELD_MOST);
   if (rows === null) return null;
-  return rows.map((r) => heldOf(r.fields, ledger)).filter((h): h is Held => h !== null);
+  return rows.map((r) => heldOf(r.fields, ledger, balance)).filter((h): h is Held => h !== null);
 }
 
 /** What the write came to: how many went in, how many the record refused, and its first sentence why. */

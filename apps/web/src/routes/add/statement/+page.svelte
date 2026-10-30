@@ -106,7 +106,7 @@
     heldKey = key;
     held = null;
     heldFailed = false;
-    void heldFor(base, l, a.id, lines).then((got) => {
+    void heldFor(base, l, a.id, lines, loader.value?.balance ?? null).then((got) => {
       if (heldKey !== key) return;
       held = got ?? [];
       heldFailed = got === null;

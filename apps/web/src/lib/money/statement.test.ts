@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { balanceFieldOf, dayPlus, fieldsOf, freshOf, guessRoles, heldOf, linesOf, readStatement, rolesMissing, sameLine, spanOf, type Held, type Roles } from './statement.ts';
+import { balanceFieldOf, bankless, dayPlus, fieldsOf, freshOf, guessRoles, heldOf, linesOf, readStatement, rolesMissing, sameLine, spanOf, type Held, type Roles } from './statement.ts';
 import type { Export } from '../start/export.ts';
 
 const read = (text: string, name = 'statement.csv'): Export => {
@@ -87,14 +87,39 @@ test('a spreadsheet file is refused in a sentence, never read as text', () => {
 
 const line = (day: string, what: string, amount: number, way: 'in' | 'out' = 'out'): Held => ({ day, what, amount, currency: 'GBP', way });
 
-test('one movement seen twice: the same amount and way, a day apart at most, the same first twelve letters', () => {
+test('one movement seen twice: the same amount and way, three days apart at most, the same payee', () => {
   assert.ok(sameLine(line('2026-10-03', 'CORNER BAKERY LONDON GB', 450), line('2026-10-04', 'Corner Bakery London', 450)));
   assert.ok(sameLine(line('2026-10-03', 'Café Lumière', 300), line('2026-10-03', 'CAFE LUMIERE', 300)));
-  assert.ok(!sameLine(line('2026-10-03', 'Corner bakery', 450), line('2026-10-05', 'Corner bakery', 450)), 'two days apart');
+  assert.ok(sameLine(line('2026-10-03', 'Corner bakery', 450), line('2026-10-06', 'Corner bakery', 450)), 'an alert and the day the bank posted it');
+  assert.ok(!sameLine(line('2026-10-03', 'Corner bakery', 450), line('2026-10-07', 'Corner bakery', 450)), 'four days apart');
   assert.ok(!sameLine(line('2026-10-03', 'Corner bakery', 450), line('2026-10-03', 'Corner bakery', 451)), 'another amount');
   assert.ok(!sameLine(line('2026-10-03', 'Corner bakery', 450), line('2026-10-03', 'Corner bakery', 450, 'in')), 'the other way');
   assert.ok(!sameLine(line('2026-10-03', 'Corner bakery', 450), { ...line('2026-10-03', 'Corner bakery', 450), currency: 'EUR' }), 'another currency');
   assert.ok(!sameLine(line('2026-10-03', 'Corner bakery', 450), line('2026-10-03', 'Fruit stall', 450)), 'other words');
+});
+
+test('a statement line and the alert the Ledger holds are one, past what the bank wraps the payee in', () => {
+  /* Live check of 30 October, 11: the alert wrote the payee, the statement the bank's line around it. */
+  assert.ok(sameLine(line('2026-10-21', 'IPN outward transfer to AHMED EMAD SAIED ABDELAZIZ', 150150), line('2026-10-19', 'AHMED EMAD SAIED ABDELAZIZ', 150150)));
+  assert.ok(sameLine(line('2026-10-07', '05OCT26 PAYMOB*UNITRADE Purchase', 27747), line('2026-10-05', 'UNITRADE', 27747)));
+  assert.ok(sameLine(line('2026-10-29', '28OCT26 TALABAT CAIRO EG Purchase', 101587), line('2026-10-28', 'Talabat', 101587)));
+  assert.ok(!sameLine(line('2026-10-29', '28OCT26 BREADFAST CAIRO EG Purchase', 101587), line('2026-10-28', 'Talabat', 101587)), 'another shop');
+  assert.equal(bankless('IPN inward transfer from LAYLA AHMED'), 'layla ahmed');
+});
+
+test('the Ledger is matched by its other words for the payee too, and a balance both say must agree', () => {
+  const held = { ...line('2026-10-17', 'Account ending 8307', 235235), also: ['8307'] };
+  assert.ok(sameLine(line('2026-10-19', 'IPN outward transfer to 8307', 235235), held));
+  assert.ok(sameLine({ ...line('2026-10-17', 'Rent', 80000), balance: 5000 }, { ...line('2026-10-17', 'Rent', 80000), balance: 5000 }));
+  assert.ok(!sameLine({ ...line('2026-10-17', 'Rent', 80000), balance: 5000 }, { ...line('2026-10-18', 'Rent', 80000), balance: -75000 }), 'two balances, two payments');
+});
+
+test('the nearest pairs are made first, whatever order the file lists its lines in', () => {
+  /* Newest first, as a bank prints it: the coffee of the 5th must not take the Ledger's coffee of the 3rd. */
+  const file = [line('2026-10-05', 'Coffee', 300), line('2026-10-03', 'Coffee', 300)];
+  const { fresh, already } = freshOf(file, [line('2026-10-03', 'Coffee', 300)]);
+  assert.deepEqual(already.map((l) => l.day), ['2026-10-03']);
+  assert.deepEqual(fresh.map((l) => l.day), ['2026-10-05']);
 });
 
 test('lines already in the Ledger are skipped, each kept line standing for one line of the file', () => {
@@ -115,6 +140,8 @@ test('a Ledger row is read for the dedupe by its own fields, and one it cannot c
   const l = { title: 'what', amount: 'amount', day: 'on', way: { field: 'direction', in: 'in', out: 'out' } };
   assert.deepEqual(heldOf({ what: 'Rent', amount: { amount: 80000, currency: 'GBP' }, on: '2026-10-05', direction: 'out' }, l), line('2026-10-05', 'Rent', 80000));
   assert.equal(heldOf({ what: 'Rent', on: '2026-10-05', direction: 'out' }, l), null);
+  const full = { what: 'WOPLEK', counterparty_text: 'WOPLEK OFFICE FURNITURE', payee: 'Woplek Office Furniture', amount: { amount: 3462000, currency: 'GBP' }, on: '2026-10-17', direction: 'out', after: { amount: 100, currency: 'GBP' } };
+  assert.deepEqual(heldOf(full, l, 'after'), { ...line('2026-10-17', 'WOPLEK', 3462000), also: ['WOPLEK OFFICE FURNITURE', 'Woplek Office Furniture'], balance: 100 });
 });
 
 test('the span the Ledger is read over, a day either side', () => {
