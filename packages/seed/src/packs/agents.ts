@@ -149,13 +149,14 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
          is refused. */
       { id: 'account', label: 'Account', type: 'text', max: 280, search: true },
       /* The kinds the vault seals (`packages/kernel/src/vault.ts`). SAID AS THE KEYCHAIN SAYS THEM SINCE 1.28.0: a key's
-         page read "Kind: Api token" and "Ssh key", the stored value with its first letter raised. */
+         page read "Kind: Api token" and "Ssh key". Not by declared labels: a label map holds a key named `api_token`, and
+         a pack carrying one is refused as a secret in a file people share. The app says an unlabelled value in words
+         and keeps API and SSH in capitals (`enumWords` in apps/web/src/lib/record/api.ts). */
       {
         id: 'kind',
         label: 'Kind',
         type: 'enum',
         values: ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'],
-        labels: { api_token: 'API token', password: 'Password', ssh_key: 'SSH key', recovery_codes: 'Recovery codes', note: 'Note' },
         required: true,
         index: true,
       },

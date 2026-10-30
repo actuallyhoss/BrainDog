@@ -72,20 +72,21 @@ test('THE NEWEST CHANGE NOTE IS 1.28.0, the manifest\'s, and says how a tool run
 });
 
 /* A TOOL AND A KEY ARE SAID IN WORDS SINCE 1.28.0: their pages read "Transport: Stdio" and "Kind: Api token", the stored
-   values with a capital. The values stay; every one has a label. */
-test('EVERY TOOL TRANSPORT AND KIND AND EVERY KEY KIND HAS A LABEL, and none is the stored value', () => {
+   values with a capital. The values stay; a tool's every one has a label, and a key's kinds are said by the app, since a
+   label map naming `api_token` is refused as a secret in a pack. */
+test('EVERY TOOL TRANSPORT AND KIND HAS A LABEL, none is the stored value, and a key\'s kinds carry no label map', () => {
   const fieldOf = (register: string, id: string) =>
     (AGENTS_PACK.registers[register]!.fields as readonly { id: string; label: string; values?: readonly string[]; labels?: Readonly<Record<string, string>> }[]).find((f) => f.id === id)!;
-  for (const [register, id] of [['tools', 'transport'], ['tools', 'kind'], ['credentials', 'kind']] as const) {
+  for (const [register, id] of [['tools', 'transport'], ['tools', 'kind']] as const) {
     const f = fieldOf(register, id);
     for (const v of f.values ?? []) {
       assert.ok(f.labels?.[v], `${register}.${id} says ${v} raw`);
-      assert.notEqual(f.labels![v]!.toLowerCase(), v.replace(/_/g, ' '), `${register}.${id} says ${v} as it is stored`);
+      assert.notEqual(f.labels![v], v, `${register}.${id} says ${v} as it is stored`);
     }
   }
   assert.equal(fieldOf('tools', 'transport').label, 'How it runs');
   assert.deepEqual(fieldOf('tools', 'transport').labels, { stdio: 'Runs on your machine', http: 'Reached over the web' });
-  assert.equal(fieldOf('credentials', 'kind').labels?.api_token, 'API token');
+  assert.equal(fieldOf('credentials', 'kind').labels, undefined);
 });
 
 test('THE 1.27.0 NOTE says the runs are headed Working now', () => {
@@ -889,8 +890,12 @@ const WORDS_21: [string, string][] = [
 ];
 /** Agents 1.22.0's lists: this build's with no `account` field on Keys. */
 const registers22 = (): typeof AGENTS_REGISTERS => {
-  const credentials = AGENTS_REGISTERS.credentials!;
-  return { ...AGENTS_REGISTERS, credentials: { ...credentials, fields: credentials.fields.filter((f) => f.id !== 'account') } };
+  /* WITHOUT 1.28.0'S LABELS, which came after: a tool's kinds and how it runs said in words, and Transport's own name. */
+  let text = JSON.stringify(AGENTS_REGISTERS);
+  for (const labels of LABELS_28) text = text.split(labels).join('');
+  const regs = JSON.parse(text.replace('"label":"How it runs"', '"label":"Transport"')) as typeof AGENTS_REGISTERS;
+  const credentials = regs.credentials!;
+  return { ...regs, credentials: { ...credentials, fields: credentials.fields.filter((f) => f.id !== 'account') } };
 };
 /** 1.24.0'S TWO SECTIONS, by their keys and the page each stands on: Accepted unchanged on Agents, Over time on How the brain changed. */
 const ADDED_24: [string, string][] = [
@@ -926,9 +931,9 @@ const LINES_24 = [
   { kind: 'note', lead: true, span: 12, when: { metric: 'runs-working', gt: 0 }, body: '{{runs-working}} at work, {{handoffs-open}} step(s) up next' },
   { kind: 'note', lead: true, span: 12, when: { metric: 'runs-working', is: 0 }, body: 'Nobody working right now. {{handoffs-open}} step(s) up next' },
 ];
-/** 1.28.0'S LABELS, each as it sits in a field: a key's kinds, a tool's kinds and how a tool runs, said in words. */
+/** 1.28.0'S LABELS, each as it sits in a field: a tool's kinds and how a tool runs, said in words. A key's kinds are said by
+    the app (`enumWords`): a label map naming `api_token` is refused as a secret in a pack. */
 const LABELS_28 = [
-  ',"labels":{"api_token":"API token","password":"Password","ssh_key":"SSH key","recovery_codes":"Recovery codes","note":"Note"}',
   ',"labels":{"mcp":"MCP server","cli":"Command line","integration":"Integration"}',
   ',"labels":{"stdio":"Runs on your machine","http":"Reached over the web"}',
 ];
@@ -1402,8 +1407,8 @@ test('AGENTS 1.27.0 HEADS THE RUNS WORKING NOW, as Today does, and changed that 
 /* WHAT 1.28.0 DECLARES, AS ONE MARK: 1.27.0 with a tool's transport said as How it runs, Runs on your machine or Reached
    over the web, a tool's kind as MCP server or Command line, and a key's kind as the Keychain says it (`doc27` takes the
    labels off). Words only: no value, list, field or figure goes. */
-const MARK_28 = '22a419e4ca0d5ff8';
-test('AGENTS 1.28.0 SAYS HOW A TOOL RUNS AND A KEY\'S KIND IN WORDS, and changed Keys and Tools only', () => {
+const MARK_28 = '07b1f98a44d50d80';
+test('AGENTS 1.28.0 SAYS HOW A TOOL RUNS AND ITS KIND IN WORDS, and changed Tools only (a key\'s kind is said by the app)', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.28.0', 'a new version takes a mark of its own beside this one');
   assert.equal(mark(doc.declarations), MARK_28, 'the Agents add-on changed what it declares with no new version');
@@ -1411,8 +1416,8 @@ test('AGENTS 1.28.0 SAYS HOW A TOOL RUNS AND A KEY\'S KIND IN WORDS, and changed
   assert.equal(was.length, doc.declarations.length, '1.28.0 put in or took out a declaration');
   assert.deepEqual(
     doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page ?? d.metric ?? d.register),
-    ['credentials', 'tools'],
-    '1.28.0 changed more than Keys and Tools',
+    ['tools'],
+    '1.28.0 changed more than Tools',
   );
 });
 

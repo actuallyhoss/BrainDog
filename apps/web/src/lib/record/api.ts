@@ -462,8 +462,10 @@ export function display(
     case 'bool':
       return value ? 'yes' : 'no';
     case 'enum':
-      /* THE DECLARED LABEL, where the value has one: `owed_to_me` reads Money in. */
-      return f.labels?.[String(value)] ?? String(value).replace(/_/g, ' ');
+      /* THE DECLARED LABEL, where the value has one: `owed_to_me` reads Money in. A value with none reads as words, with
+         the short names people write in capitals kept so: a key's `api_token` reads API token, never Api token. A list
+         that holds keys cannot declare labels named like a secret (a pack is a file people share), so this is its way. */
+      return f.labels?.[String(value)] ?? enumWords(String(value));
     case 'ref': {
       /**
        * A LIVE ROW IS NEVER NAMED FROM THE SAMPLE.
@@ -2191,3 +2193,13 @@ export type SearchResult = {
   /** Every list that matched, with its own count and the address that holds the rest. */
   groups: { kind: string; total: number; hits: SearchHit[]; href: string | null }[];
 };
+
+/** The short names a value spells in lower case and people write in capitals. */
+const CAPITALS = new Set(['api', 'ssh', 'mcp', 'cli', 'url', 'dns', 'sms', 'vat', 'pdf', 'csv', 'gpu', 'cpu']);
+
+/** An enum value with no declared label, as words: `api_token` reads API token, `recovery_codes` Recovery codes. */
+export function enumWords(value: string): string {
+  const words = value.split('_').filter((w) => w !== '').map((w) => (CAPITALS.has(w.toLowerCase()) ? w.toUpperCase() : w));
+  const said = words.join(' ');
+  return said === '' ? value : said.charAt(0).toUpperCase() + said.slice(1);
+}
