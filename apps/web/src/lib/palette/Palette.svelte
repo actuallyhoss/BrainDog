@@ -157,6 +157,8 @@
     plain?: true | undefined;
     /** How many rows of one title this line stands for, past the first. */
     folded?: number | undefined;
+    /** The group a row was found in before it was drawn as the best match, so its count still says what it counts. */
+    from?: string | undefined;
     /** The group a "Show all" row opens. */
     more?: string | undefined;
     /** Set on a "what it is" row wearing its project's own mark, which a page's glyph never covers. */
@@ -1217,6 +1219,19 @@
     opened = new Set();
   });
 
+  /** A row that is a person or an organisation, by the list its address opens. */
+  const isWho = (r: Row): boolean => r.href !== null && /^\/r\/(?:people|organisations)\/\d+(?:$|[?#])/u.test(r.href);
+
+  /**
+   * WHAT A FOLDED COUNT COUNTS, by the list the rows came from: "2 tools", never "2 times" (AG32). A heading that is no
+   * list's says the rows share a name.
+   */
+  const foldedSaid = (r: Row): string | undefined => {
+    if (!r.folded || r.folded < 2) return undefined;
+    const g = r.from ?? r.group;
+    return REGISTER_NAMES.has(g) ? `${r.folded.toLocaleString('en-GB')} ${g.toLowerCase()}` : `${r.folded.toLocaleString('en-GB')} with this name`;
+  };
+
   /** Rows that are a thing a person would name (a page, a list, a row, a person), never a command or a reading. */
   const named = (r: Row): boolean =>
     r.href !== null && r.group !== GO_TO && r.group !== RECENT && r.group !== FIGURES && r.group !== copy.commands && r.group !== copy.destinations && r.group !== '';
@@ -1226,12 +1241,19 @@
     /* THE THING MEANT FIRST (motion F13): a page, a list, a project or a person whose name is exactly what was typed
        comes before every row that only mentions it. "kiln" drew three ledger lines before the project. */
     const needle = parsed.text.trim().toLowerCase();
-    const best = needle === '' ? new Set<string>() : new Set(rows.filter((r) => named(r) && r.title.trim().toLowerCase() === needle).slice(0, 3).map((r) => r.id));
-    for (const r of rows) {
+    /* AND A PERSON OR AN ORGANISATION WHOSE NAME STARTS WITH THE WORDS LEADS IT (audit 31 Oct g, AG32): "fenwick" put a
+       tool called Fenwick over the organisation Fenwick Cloud. Who leads, then what is named exactly, three at most. */
+    const titled = (r: Row): string => r.title.trim().toLowerCase();
+    const leads = (r: Row): boolean => isWho(r) && (titled(r) === needle || titled(r).startsWith(`${needle} `));
+    const best =
+      needle === ''
+        ? new Set<string>()
+        : new Set([...rows.filter((r) => named(r) && leads(r)), ...rows.filter((r) => named(r) && !leads(r) && titled(r) === needle)].slice(0, 3).map((r) => r.id));
+    for (const r of [...rows].sort((a, b) => Number(best.has(b.id) && leads(b)) - Number(best.has(a.id) && leads(a)))) {
       if (r.id === 'all' || r.id === 'slash') continue;
       const group = best.has(r.id) ? BEST : r.group;
       if (!out.has(group)) out.set(group, []);
-      out.get(group)!.push(group === r.group ? r : { ...r, group });
+      out.get(group)!.push(group === r.group ? r : { ...r, group, from: r.group });
     }
     /* IDENTICAL TITLES IN ONE GROUP ARE ONE LINE WITH A COUNT, which opens the search for that title: three
        "KILN STOREFRONT PAYOUT" lines said nothing the one does not. Then each group shows six, and a row to show all. */
@@ -1814,7 +1836,7 @@
     onmouseenter={() => (cursor = index)}
     onclick={() => run(row)}
   >
-    <Result icon={row.more !== undefined ? undefined : row.icon} title={row.more !== undefined ? row.title : readable(row.title)} line={lineOf(row)} value={figureOf(row.value)} tone={row.tone} status={row.tone === 'bad' || row.tone === 'warn' ? row.detail : undefined} folded={row.folded} more={row.more !== undefined} />
+    <Result icon={row.more !== undefined ? undefined : row.icon} title={row.more !== undefined ? row.title : readable(row.title)} line={lineOf(row)} value={figureOf(row.value)} tone={row.tone} status={row.tone === 'bad' || row.tone === 'warn' ? row.detail : undefined} folded={row.folded} foldedSaid={foldedSaid(row)} more={row.more !== undefined} />
     <!-- THE KEY CAP HINT, ON THE CURSOR ROW ONLY (the design system: "the cursor row is wash plus a key cap hint"): the row's own
          binding when it has one, so the slow path teaches the fast one, and `↵`, which is what runs it now. Drawn only at
          desktop width with a fine pointer (the style block says when), and `aria-hidden` so no key is read out as part of

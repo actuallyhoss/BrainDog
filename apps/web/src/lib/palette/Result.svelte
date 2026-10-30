@@ -30,6 +30,7 @@
     tone,
     status,
     folded,
+    foldedSaid,
     more = false,
   }: {
     icon?: IconName | undefined;
@@ -47,6 +48,8 @@
     status?: string | undefined;
     /** How many rows of this one title the line stands for. */
     folded?: number | undefined;
+    /** The count in words, "2 tools", when the caller knows what the rows are; else "2 times". */
+    foldedSaid?: string | undefined;
     /** The row that opens the rest of its group. */
     more?: boolean | undefined;
   } = $props();
@@ -57,7 +60,7 @@
   <span class="result-words">
     <span class="result-head">
       <!-- THE TITLE AND ITS COUNT ARE ONE LINE at every width (VERIFY P9): on a phone the count dropped to a line of its own. -->
-      <span class="result-name"><span class="result-title">{title}</span>{#if folded && folded > 1}<span class="result-folded num">{folded.toLocaleString('en-GB')} times</span>{/if}</span>
+      <span class="result-name"><span class="result-title">{title}</span>{#if folded && folded > 1}<span class="result-folded num">{foldedSaid ?? `${folded.toLocaleString('en-GB')} times`}</span>{/if}</span>
       {#if line}<span class="result-line">{line}</span>{/if}
     </span>
     {#if status}<span class="result-status" data-tone={tone}>{status.charAt(0).toUpperCase()}{status.slice(1)}</span>{/if}
