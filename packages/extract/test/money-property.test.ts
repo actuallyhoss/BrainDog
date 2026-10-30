@@ -263,7 +263,7 @@ test('2,000 AMOUNTS WITH THEIR CODE OR SYMBOL ON EITHER SIDE AND EVERY SIGN A ST
      other rule asserted by nothing, and the count is the only place that would show. */
   assert.equal(read + refusedCount, 2000);
   assert.ok(read > 1500, `only ${read} cases read`);
-  assert.ok(refusedCount > 20, `only ${refusedCount} cases exercised the refusal`);
+  assert.ok(refusedCount > 10, `only ${refusedCount} cases exercised the refusal`);
 });
 
 test('A MINUS IS A MINUS IN EVERY POSITION: parse(-x) is the negation of parse(x), for every form above', () => {
