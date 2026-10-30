@@ -46,6 +46,10 @@ test('WHAT IT RUNS ON IS SAID IN WORDS: a handle is spaced and capitalised, a na
   assert.equal(thingName('google_sa_roomy'), 'Google sa roomy');
   assert.equal(thingName('Fenwick deploy key'), 'Fenwick deploy key');
   assert.equal(thingName('supabase SUPABASE_ACCESS_TOKEN'), 'supabase SUPABASE_ACCESS_TOKEN');
+  assert.equal(thingName('fenwick'), 'Fenwick');
+  assert.equal(thingName('nordhaven-dns'), 'Nordhaven DNS');
+  assert.equal(thingName('kiln.example'), 'kiln.example', 'a domain is a name, said as written');
+  assert.equal(thingName('larkspur-site.env'), 'Larkspur site env', 'a key filed after its file');
   assert.deepEqual(rowsOf('runs-on', [{ block: 'runs-on', rows: [{ key: '9', cells: ['pinwheel-metrics'] }] }]).map((r) => r.title), ['Pinwheel metrics']);
 });
 

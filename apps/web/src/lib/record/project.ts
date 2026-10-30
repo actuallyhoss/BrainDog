@@ -9,7 +9,7 @@
 import { handleName } from 'braindog-render';
 
 import { briefFromNote } from './brief.ts';
-import { actor, humanize } from './names.ts';
+import { actor } from './names.ts';
 
 /** What of a list's declaration decides its part; the record says all of it, so no list is named here. */
 export type Decl = {
@@ -121,12 +121,25 @@ const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 /* A HANDLE, NOT A NAME: lowercase, one word or words joined by hyphens, underscores or dots, as a key or a tool is filed. */
 const HANDLE = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
 
+/** The endings of the files a key or a tool is filed after, which no domain ends in. */
+const FILE_ENDINGS: ReadonlySet<string> = new Set(['env', 'json', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'txt', 'pem', 'key', 'p8', 'p12', 'pfx', 'crt', 'cer', 'csr', 'pub', 'gpg', 'asc', 'plist', 'keychain', 'js', 'mjs', 'ts', 'py', 'csv', 'log']);
+
 /**
  * THE NAME A THING IT RUNS ON IS SAID BY: its own words, and where they are a handle ("pinwheel-metrics") the same words
  * spaced and capitalised ("Pinwheel metrics"), so no key or tool is drawn in the record's own spelling (five raw key handles on one project page). Words a person wrote with a capital or a space stay as written.
  */
-/* AS EVERY SCREEN SAYS A TOOL'S OR A SKILL'S HANDLE (`handleName`): "Fenwick", "Nordhaven DNS", "Review PR". */
-export const thingName = (title: string): string => (HANDLE.test(title) ? (title.includes('.') ? humanize(title) : handleName(title)) : title);
+/* AS EVERY SCREEN SAYS A TOOL'S OR A SKILL'S HANDLE (`handleName`): "Fenwick", "Nordhaven DNS", "Review PR".
+
+   A DOMAIN IS A NAME, AND IS SAID AS WRITTEN: "kiln.example" read "Kiln example", which is no name anybody has for it,
+   and the shared page already kept it ("a domain is a name", `routes/s/reading.ts`). A key filed after the file it came
+   from ("larkspur-site.env") is a handle with a file's ending, said in its words with the ending left on: "Larkspur site
+   env". So no thing it runs on is drawn in the record's own spelling, and no name is taken apart. */
+export const thingName = (title: string): string => {
+  if (!HANDLE.test(title)) return title;
+  if (!title.includes('.')) return handleName(title);
+  const end = title.slice(title.lastIndexOf('.') + 1);
+  return FILE_ENDINGS.has(end) ? handleName(title.replace(/\./gu, '-')) : title;
+};
 
 /** The rows of the lists a block draws, as names. The title is the first cell; a detail is the second only. */
 export function rowsOf(block: Pointed, groups: readonly Pointing[]): DataRow[] {

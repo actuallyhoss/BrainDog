@@ -11,9 +11,10 @@
  * from the moment the owner's record was read in the record's zone.
  */
 
-import { AMOUNT_SPACE, agentNamed, dateSaid, handleName, money, since } from 'braindog-render';
+import { AMOUNT_SPACE, agentNamed, dateSaid, money, since } from 'braindog-render';
 
 import { drawn, type Drawn } from '../../lib/record/money.ts';
+import { thingName } from '../../lib/record/project.ts';
 import { fieldSaid, words, type SharedBlock, type SharedCell, type SharedColumn, type SharedRead, type SharedReading, type SharedRow } from '../../lib/record/share-write.ts';
 
 /**
@@ -157,9 +158,6 @@ function listSaid(cell: SharedCell, where: Where): Said {
   return { text: said.filter((s) => s !== '').join(', ') };
 }
 
-/** A name as an agent types it: lower case, its words joined by hyphens or underscores, with no dot (a domain is a name). */
-const HANDLE = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/u;
-
 /**
  * One column of one row: its typed cell when the record sent one, else the plain value a record without cells sent.
  * A money column with a `sign` turns its amount when the row's sign field says it went out.
@@ -169,7 +167,8 @@ export function cellSaid(row: SharedRow, column: Pick<SharedColumn, 'field' | 's
   /* A NAME FILED AS A HANDLE IS SAID AS THE APP SAYS IT (`thingName` on a project's page): a shared Kiln read its tools
      "fenwick" and "outline-check" where the owner reads "Fenwick" and "Outline check" (audit of 31 October, A19). */
   const named = column.field === 'name' ? (cell?.type === 'text' || cell === undefined ? (cell?.value ?? row.fields.name) : null) : null;
-  if (typeof named === 'string' && HANDLE.test(named)) return { text: handleName(named) };
+  /* ONE RULE WITH THE PROJECT'S PAGE, so a domain stays as written on both and a key filed after its file reads alike. */
+  if (typeof named === 'string' && thingName(named) !== named) return { text: thingName(named) };
   if (cell === undefined) {
     const plain = row.fields[column.field];
     return column.field === 'agent' && typeof plain === 'string' && /^[a-z][a-z0-9-]*$/u.test(plain) ? { text: agentSaid(plain) } : { text: plainSaid(plain, where) };
