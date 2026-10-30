@@ -663,7 +663,9 @@ function packText(e: EventLine): string | null {
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
   if (usecase) return copy.useCaseEvent(verb, useCaseName(usecase));
   const names = (listsOfModule(id) ?? []).map((r) => REGISTERS[r]?.name ?? r);
-  if (names.length === 0) return `${verb} the ${id} add-on`;
+  /* AN ADD-ON FROM THE STORE BRINGS NO LIST THIS BUILD KNOWS: by its id in words, "Added the Reading list add-on",
+     never "the reading-list add-on" (audit 6g, AG6). */
+  if (names.length === 0) return `${verb} the ${nameOfPack(id) === id ? sentence(id.replace(/[-_]+/gu, ' ')) : nameOfPack(id)} add-on`;
   if (names.length === 1) return `${verb} the ${names[0]} list`;
   return `${verb} ${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 }
@@ -916,14 +918,73 @@ export function makingOf(events: readonly EventLine[]): { founding: EventLine; f
   return { founding, folded };
 }
 
+/** A reason the record wrote for a one-press answer, which is no reason anybody gave. */
+const pressed = (reason: string | null): boolean => reason !== null && /^Answered in one press\b/u.test(reason);
+
+/** "Invoice 2026-041: brand system was due 38 days ago, £4,800. Chase it?" is about "Invoice 2026-041: brand system". */
+const dueOn = (question: string): string | null => /^(.+?) was due \d+ days? ago\b/u.exec(question.trim())?.[1]?.trim() ?? null;
+
+/**
+ * A DECISION BY THE ANSWER CHOSEN, where the line carries it (`answer_label`): "You chose Chase it on Invoice 2026-041",
+ * and the reason only when a person wrote one. A line with no label is said as before.
+ */
+function choseText(e: EventLine, by: string, reason: string | null): string | null {
+  const label = typeof e.answer_label === 'string' ? e.answer_label.trim() : '';
+  if (e.kind !== 'decide' || !e.title || label === '') return null;
+  const who = by === 'you' ? 'You' : by.startsWith('rule.') || by === 'system' ? null : by;
+  return copy.feedChose(who, label, dueOn(e.title), e.title, pressed(reason) ? null : reason);
+}
+
+/** A script's writes, which its run's own line already counts ("“…” ran and wrote 4 lines"). */
+const scriptWrite = (e: EventLine): boolean => /^script:[^@\s]+@v\d+$/u.test(e.actor) && /^Written by script:/u.test(e.note ?? '');
+
+/** A script run's line, as the record writes it, read into its name and the lines it wrote, or `null` for any other. */
+function scriptRun(e: EventLine): { named: string; wrote: number } | null {
+  const m = /^(.+) ran and wrote (nothing|one line|(\d+) lines)\.$/u.exec((e.note ?? '').trim());
+  if (!m) return null;
+  return { named: m[1]!, wrote: m[2] === 'nothing' ? 0 : m[2] === 'one line' ? 1 : Number(m[3]) };
+}
+
+/**
+ * BRAINDOG'S OWN SCRIPTS, ONE LINE A SCRIPT A DAY (audit 6g, AG6, as Activity folds them under AF11). The bell opened on
+ * four lines of a setup script, two runs and "Written by script:plans_from_names@v1: made 4 changes in Instalments",
+ * above anything the person did. A script's writes are said on its run's line, and its plain runs on one day are its
+ * newest line: "“Give each plan a page…” ran 2 times and wrote 5 lines". A run that asked or stopped keeps its line.
+ */
+function scriptRuns(events: readonly EventLine[]): { folded: Set<EventLine>; said: Map<EventLine, string> } {
+  const folded = new Set<EventLine>(events.filter(scriptWrite));
+  const said = new Map<EventLine, string>();
+  const newest = new Map<string, { line: EventLine; runs: number; wrote: number; named: string }>();
+  for (const e of events) {
+    const run = scriptRun(e);
+    if (run === null) continue;
+    const key = `${run.named}\u0001${e.ts.slice(0, 10)}`;
+    const had = newest.get(key);
+    if (had === undefined) {
+      newest.set(key, { line: e, runs: 1, wrote: run.wrote, named: run.named });
+      continue;
+    }
+    had.runs += 1;
+    had.wrote += run.wrote;
+    folded.add(e);
+  }
+  for (const n of newest.values()) {
+    if (n.runs < 2) continue;
+    const lines = n.wrote === 0 ? 'nothing' : n.wrote === 1 ? 'one line' : `${n.wrote} lines`;
+    said.set(n.line, `${n.named} ran ${n.runs} times and wrote ${lines}`);
+  }
+  return { folded, said };
+}
+
 /** The record's lines as the feed's items, newest first as they came. */
 export function newsOf(events: readonly EventLine[], me: string | null, names: ReadonlyMap<string, string> = new Map()): NewsItem[] {
   const voice = voiceTexts(events);
   const reasons = reasonsOf(events);
   const folded = finishedDays(events);
   const making = makingOf(events);
+  const scripts = scriptRuns(events);
   const said = events.flatMap((e, i): { e: EventLine; last: boolean; item: NewsItem }[] => {
-    if (folded.has(e) || making?.folded.has(e)) return [];
+    if (folded.has(e) || making?.folded.has(e) || scripts.folded.has(e)) return [];
     if (e === making?.founding) return [{ e, last: false, item: { at: e.ts, by: feedActor(e.actor, me, names), text: copy.feedMade, href: '/audit' } }];
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
@@ -937,11 +998,14 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
     if (e.register === 'session' && e.kind === 'edit' && e.field !== 'state') return [];
     if (reasons.folded.has(e)) return [];
     const reason = reasons.byDecision.get(e);
-    const text = voice.has(i) ? voice.get(i) : reason !== undefined && e.title ? copy.feedDecided(e.title, reason) : textOf(e);
+    const by = feedActor(e.actor, me, names);
+    const text = voice.has(i)
+      ? voice.get(i)
+      : (scripts.said.get(e) ?? choseText(e, by, reason ?? null) ?? (reason !== undefined && e.title ? copy.feedDecided(e.title, pressed(reason) ? null : reason) : textOf(e)));
     const last = i === events.length - 1 && events.length >= WHATS_NEW_CAP;
     /* A QUESTION ASKED IS MARKED, so the bell can leave it to Needs you (`happened` in `shell/alerts.ts`). */
     const asked = e.kind === 'suggest' ? { asked: true as const } : {};
-    return text == null ? [] : [{ e, last, item: { at: e.ts, by: feedActor(e.actor, me, names), text, href: hrefOf(e), ...asked } }];
+    return text == null ? [] : [{ e, last, item: { at: e.ts, by, text, href: hrefOf(e), ...asked } }];
   });
 
   const out: NewsItem[] = [];

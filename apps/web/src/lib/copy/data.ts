@@ -26,6 +26,16 @@ export const data = {
   feedMade: 'Your BrainDog was made',
   /** A decision in the feed, with the reason it was given when there is one. */
   feedDecided: (title: string, reason: string | null) => (reason ? `Decided: ${title}${/[.?!]$/u.test(title) ? '' : '.'} ${reason}` : `Decided: ${title}`),
+  /**
+   * A decision by the answer chosen (audit 6g, AG6): "You chose Chase it on Invoice 2026-041: brand system", where the
+   * line said "Decided: … Chase it? Answered in one press, for the option's own reason: Mark an invoice as chased". `on`
+   * is the thing the question is about when it names one, else the question; the reason only when somebody wrote one.
+   */
+  feedChose: (who: string | null, label: string, on: string | null, question: string, reason: string | null) => {
+    const lead = who === null ? `Chose ${label}` : `${who} chose ${label}`;
+    const said = on !== null ? `${lead} on ${on}` : `${lead}: ${question}`;
+    return reason ? `${said}${/[.?!]$/u.test(said) ? '' : '.'} “${reason}”` : said;
+  },
   /** Many writes by one writer in a few seconds, such as an import, as one line of the feed: "Added 52 items and asked 8 questions". */
   feedBulk: (n: { added: number; changed: number; asked: number; removed: number }, more: boolean, why: string | null = null, list: string | null = null) => {
     const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
