@@ -98,7 +98,7 @@ export function methods(deps: RecordDeps) {
       const a = (args ?? {}) as Record<string, unknown>;
       const stray = Object.keys(a).find((k) => k !== 'retired');
       if (stray !== undefined) return no('FIELD_UNKNOWN', `${stray} is not something agentProfiles takes. It takes retired.`, { at: stray, allowed: ['retired'] });
-      if (a.retired !== undefined && typeof a.retired !== 'boolean') return no('VALUE_MALFORMED', 'retired is true, to list the rows he retired too.', { at: 'retired' });
+      if (a.retired !== undefined && typeof a.retired !== 'boolean') return no('VALUE_MALFORMED', 'retired is true, to list the retired ones too.', { at: 'retired' });
       const rows = kernel.agentProfiles(a.retired === true);
       /* DEFAULTS IS ALWAYS A ROW, the one the record holds or the one it would hold, so the sheet has it to open. */
       const all = rows.some((p) => p.id === 'default') ? rows : [kernel.profileFor({}), ...rows];

@@ -83,9 +83,9 @@ export function lineOf(i: Instr, by: string): string {
   const answer = i.taken_by === null ? `Take it with instructions take ${i.id}.` : `Reply with instructions reply ${i.id} when it is done.`;
   /* THE QUESTIONS IT NAMES, by name, with the call that answers one: the run gives his answer, never its own. */
   const open = (i.answers ?? []).filter((a) => !(i.answered ?? []).includes(a.question)).map((a) => a.question);
-  const named = open.length === 0 ? '' : ` It lets you answer ${open.join(', ')} as he said, with instructions answer ${open[0]!}${i.taken_by === null ? ' once you take it' : ''}.`;
+  const named = open.length === 0 ? '' : ` It lets you answer ${open.join(', ')} as ${by} said, with instructions answer ${open[0]!}${i.taken_by === null ? ' once you take it' : ''}.`;
   /* WHAT HE SENT WITH IT AND WHETHER IT MAY CHANGE FILES, said in the same line, so every path hands both on. */
-  const rows = (i.attach ?? []).length === 0 ? '' : ` He sent ${i.attach.join(', ')} with it: read each with get.`;
+  const rows = (i.attach ?? []).length === 0 ? '' : ` ${by} sent ${i.attach.join(', ')} with it: read each with get.`;
   const leave = i.may_change === true ? ' You may change files for it.' : i.may_change === false ? ' Change no file for it; propose what should change instead.' : '';
   return `${by} said in BrainDog (${i.id}): "${said}".${rows}${leave} ${answer}${named}`;
 }
@@ -461,7 +461,7 @@ export function methods(deps: RecordDeps) {
     const held = instructionsTakenBy(sql, run).filter((i) => i.state === 'working' && i.answers.some((x) => x.question === id));
     const i = held.at(-1);
     if (i === undefined)
-      return no('LEVEL_REQUIRED', `No order you hold names ${given}. Only he answers it, in BrainDog, unless he told you to: then send option and said, his words.`, { at: 'answer' });
+      return no('LEVEL_REQUIRED', `No order you hold names ${given}. Only the person answers it, in BrainDog, unless they told you to: then send option, and said in their words.`, { at: 'answer' });
     const named = i.answers.find((x) => x.question === id)!;
     if (i.answered.includes(id)) return no('TRANSITION_ILLEGAL', `You already answered ${given} on ${i.id}.`, { at: 'answer' });
     /* HIS ORDER, UNDER HIS OWN KEY: a run on somebody else's key never answers as him, whatever it took. */
@@ -472,7 +472,7 @@ export function methods(deps: RecordDeps) {
     const row = kernel.governanceRow('suggestion', id);
     if (row === null || row.status !== 'open') return no('TRANSITION_ILLEGAL', `${given} is already answered.`, { at: 'answer' });
     if ((await questionVersion(row)) !== named.version)
-      return no('VERSION_STALE', `${given} changed since he sent ${i.id}, so his answer is not given. Reply needs_you and he answers it in BrainDog.`, { at: 'answer' });
+      return no('VERSION_STALE', `${given} changed since the person sent ${i.id}, so their answer is not given. Reply needs_you and they answer it in BrainDog.`, { at: 'answer' });
     if (deps.decideAs === undefined) return no('NOT_IN_THIS_BUILD', 'Answering on an order is not in this build.', { at: 'answer' });
     const byName = personNamed(sql, by);
     const as: CallContext = { principal: { kind: 'person', id: by, level: 'owner' }, registers: '*', credentialed: true, ordered: i.id };
@@ -730,7 +730,7 @@ export function methods(deps: RecordDeps) {
       const stop = guard(ctx, 'propose', OWN_RUN);
       if (stop) return { ok: false, refusal: stop };
       if (ctx.principal.kind !== 'token')
-        return no('FORBIDDEN', 'instructionsMine is how an agent reads what it was told, and a person is never a run. His threads are instructionList.', { at: 'principal' });
+        return no('FORBIDDEN', 'instructions reads what an agent was told, and you are signed in as a person, not as an agent. Connect this agent with its own token: braindog token create --scope write.', { at: 'principal' });
       const a = (args ?? {}) as Record<string, unknown>;
       const stray = strayOf('instructions', a, MINE_TAKES);
       if (stray) return stray;
