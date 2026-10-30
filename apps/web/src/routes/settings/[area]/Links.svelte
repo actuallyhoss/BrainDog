@@ -16,7 +16,8 @@
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
-  import { since, day } from 'braindog-render';
+  import { since, dateSaid } from 'braindog-render';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { untrack } from 'svelte';
   import { closeLink, linkState, readLinks, words, type ShareRow } from '$lib/record/share-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -39,6 +40,7 @@
   async function load() {
     const at = opened();
     const out = await readLinks(apiBase());
+    now = recordNow();
     unrouted = !out.ok && out.code === 'ROUTE_UNKNOWN';
     closed(out.ok || unrouted, at);
     if (out.ok) {
@@ -51,7 +53,10 @@
     untrack(() => void load());
   });
 
-  const now = $derived(Date.now());
+  /* THE RECORD'S CLOCK, as the share sheet's: a link made a minute ago on a record whose today is 3 Sep reads "Open until
+     3 Oct · opened just now", not ran out by this browser's date (one clock, audit A12). Days in the reader's year say no
+     year, as every other day on screen. */
+  let now = $state(recordNow());
   /* OPEN LINKS FIRST, newest first within each, which is the order `shares` answers in: what can still be closed is
      what somebody came here to do. */
   const sorted = $derived(links === null ? [] : [...links].sort((a, b) => Number(linkState(a, now) !== 'open') - Number(linkState(b, now) !== 'open')));
@@ -62,9 +67,9 @@
 
   function stateSaid(l: ShareRow): string {
     const s = linkState(l, now);
-    if (s === 'closed') return words.linksClosedOn(day((l.closed_at ?? '').slice(0, 10)));
-    if (s === 'ran-out') return words.linksRanOut(day(l.expires_at.slice(0, 10)));
-    return words.linksOpenUntil(day(l.expires_at.slice(0, 10)));
+    if (s === 'closed') return words.linksClosedOn(dateSaid((l.closed_at ?? '').slice(0, 10), now));
+    if (s === 'ran-out') return words.linksRanOut(dateSaid(l.expires_at.slice(0, 10), now));
+    return words.linksOpenUntil(dateSaid(l.expires_at.slice(0, 10), now));
   }
 
   async function close(l: ShareRow) {
