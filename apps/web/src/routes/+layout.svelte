@@ -466,7 +466,7 @@
   /* THE ONE LIT ROW, and the crumb the bar says it in. */
   const spot = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
   const lit = $derived(litOf(spot, model));
-  const crumb = $derived(crumbOf(spot, model, lit, frame.title || null, frame.heading || null));
+  const crumb = $derived(crumbOf(spot, model, lit, frame.title || null, frame.heading || null, frame.up));
   $effect.pre(() => {
     frame.here = crumb.at(-1)?.label ?? '';
   });

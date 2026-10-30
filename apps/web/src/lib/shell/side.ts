@@ -420,7 +420,10 @@ export type Crumb = { label: string; href?: string | undefined };
  * in place of the row's word (Today says "Good afternoon, Mara"). A page whose name is its content (a question, a row)
  * gives no title, and the crumb ends at the place it sits in, still a link back there.
  */
-export function crumbOf(path: string, m: SideModel, lit: string | null, title: string | null, heading: string | null = null): Crumb[] {
+export function crumbOf(path: string, m: SideModel, lit: string | null, title: string | null, heading: string | null = null, up: Crumb | null = null): Crumb[] {
+  /* A ROW OF A LIST NO SIDEBAR ROW LEADS TO still says where it sits (Q38 of the 29 Oct audit): its page names itself, so
+     with nothing lit the bar was empty and the desk had no way back. Its list, as its head names it, is the trail. */
+  if (lit === null && (title?.trim() ?? '') === '' && up && up.label.trim() !== '' && path !== up.href) return [{ label: up.label, href: up.href }];
   const steps = placed(path, m, lit, title);
   const h = heading?.trim() ?? '';
   const last = steps[steps.length - 1];
