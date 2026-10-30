@@ -232,7 +232,9 @@
     };
   });
 
-  const me = $derived(open.find((r) => r.run === run && r.state !== 'ended' && r.state !== 'gone') ?? null);
+  /* A RUN GONE QUIET IS STILL OPEN, so it keeps its live row, with how long it has been quiet and Tell and Stop beside it
+     (audit 6g, AG10); only an ended run has none. */
+  const me = $derived(open.find((r) => r.run === run && r.state !== 'ended') ?? null);
   const meRow = $derived(me ? { ...presenceOf(me, open, places, toldIt ?? []), href: null, busy: holding } : null);
   const tellView = $derived.by(() => {
     const c = composerOf({ to: `run:${run}`, on: '', when: null }, open, places);

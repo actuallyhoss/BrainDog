@@ -39,6 +39,9 @@ export function partsOf(decl: Decl, all: readonly Decl[]): { list: string; link:
 export async function finishFor(base: string, register: string, seq: number, lists: readonly { id: string; kernel?: true }[] = []): Promise<{ said: string } | null> {
   const client = createClient({ base });
   if (REGISTERS[register] === undefined) await learn(client.schema, register, asked).catch(() => undefined);
+  /* NO FINISH ON AN AGENT'S RUN (audit 6g, AG10): a run working now led with a red "Mark done" beside its own Tell, Pause
+     and Stop. A run ends itself, or is stopped from its live row. */
+  if (register === 'session') return null;
   const decl = REGISTERS[register];
   if (!decl?.state) return null;
   const got = await client.get(register, seq).catch(() => null);
