@@ -162,6 +162,12 @@ const fromOf = (values: readonly unknown[]): string[] =>
 const convertedNote = (from: readonly string[]): string =>
   from.length === 0 ? '' : copy.convertedFrom(from.length === 1 ? from[0]! : `${from.slice(0, -1).join(', ')} and ${from.at(-1)!}`);
 
+/** A BANK'S DAY AT THE HEAD OF ITS LINE ("19OCT26 "), which is no part of a name. */
+const BANK_DAY = /^\d{1,2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}(?:\d{2})?\s+(?=\S)/iu;
+
+/** A name as two lines are matched on: no bank day before it, one space between words, any case. The kernel's twin. */
+const nameKey = (v: string): string => v.replace(BANK_DAY, '').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
+
 /** A bar over a register groups its rows and sums them — the one place a page does arithmetic. */
 function barRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? 'party';
@@ -193,6 +199,20 @@ function barRows(block: BlockResult): string[] {
   /* A LINE SPLIT INTO PARTS ADDS UP AS ITS PARTS when the bar adds up the money they add up to, each part under its own
      label, as the record's own sums read it (`row-parts.ts`). */
   const split = link ? null : splitAtOf(REGISTERS[block.register ?? '']);
+  /* A LINE THAT HOLDS NO LABEL IS ADDED TO THE ONE ITS SECOND FIELD NAMES (`or:`), only where those words are a label
+     another line holds (live check of 30 October, 10), as the record adds up its whole (`orOf` in the kernel's pages). */
+  const or = block.kind === 'bar' || block.kind === 'split' ? block.columns[0]?.or : undefined;
+  const known = new Map<string, unknown>();
+  if (or !== undefined && or !== by)
+    for (const e of block.matched) {
+      const v = e.fields[by];
+      if (typeof v === 'string' && v.trim() !== '' && !known.has(nameKey(v))) known.set(nameKey(v), v);
+    }
+  const labelOfRow = (e: { fields: Record<string, unknown> }): unknown => {
+    const v = e.fields[by];
+    if ((v === undefined || v === null || v === '') && or !== undefined && typeof e.fields[or] === 'string') return known.get(nameKey(e.fields[or] as string)) ?? v;
+    return v;
+  };
   for (const e of split && split.of === of ? rowsBySplit(block.matched, split.field) : block.matched) {
     if (isRest(e)) {
       past.push(...valuesOf(e.fields[of]));
@@ -204,7 +224,7 @@ function barRows(block: BlockResult): string[] {
        holds such rows is left out, so a bar with nothing sized says its empty line. */
     const bare = e.fields[of];
     if (!link && (bare === undefined || bare === null || bare === '')) continue;
-    const said = display(block.register ?? '', by, e.fields[by], clockOf(block), block.names);
+    const said = display(block.register ?? '', by, labelOfRow(e), clockOf(block), block.names);
     /* WHAT NO PART HOLDS IS ITS OWN ROW, LAST, where the block names it, and it opens those rows. */
     if (said === null && block.unset) {
       unset.push(...valuesOf(e.fields[of]));

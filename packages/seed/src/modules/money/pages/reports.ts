@@ -135,14 +135,16 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       empty: 'Nothing went out.',
     },
     {
-      /* WHO WAS PAID MOST, IN THE MONTHS PICKED. Each bar opens that payee's entries. */
+      /* WHO WAS PAID MOST, IN THE MONTHS PICKED. Each bar opens that payee's entries. EVERY LINE TO THEM (live check of
+         30 October, 10): a line no payee was put on counts under the payee its bank line names (`or: what`), so Ahmed
+         Emad is the sum of his lines, not the one line that named him. */
       kind: 'bar',
       heading: 'Paid most',
       icon: 'store',
       span: 12,
       source: 'register.transactions',
       where: `${MOVED}, direction is out, ${BACK}`,
-      columns: [{ field: 'payee' }, { field: 'amount' }],
+      columns: [{ field: 'payee', or: 'what' }, { field: 'amount' }],
       unset: 'Not named yet',
       limit: 10,
       when: { metric: 'out-by-month', gt: 0 },
@@ -156,7 +158,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       span: 12,
       source: 'register.transactions',
       where: `${MOVED}, direction is in, ${BACK}`,
-      columns: [{ field: 'payee' }, { field: 'amount' }],
+      columns: [{ field: 'payee', or: 'what' }, { field: 'amount' }],
       unset: 'Not named yet',
       limit: 8,
       when: { metric: 'in-by-month', gt: 0 },

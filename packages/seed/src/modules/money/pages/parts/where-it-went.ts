@@ -66,7 +66,7 @@ export const WHERE_IT_WENT: Record<string, unknown>[] = [
     span: 12,
     source: 'register.transactions',
     where: UNFILED_OUT,
-    columns: [{ field: 'payee' }, { field: 'amount' }],
+    columns: [{ field: 'payee', or: 'what' }, { field: 'amount' }],
     unset: 'Not named yet',
     limit: PAYEE_BARS,
     when: { metric: 'txn-uncategorised', gt: 0 },

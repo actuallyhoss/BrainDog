@@ -4186,6 +4186,19 @@ function wholeShape(deps: PageDeps, block: PageBlock, register: string, schema: 
   return { by: label, value: summed ?? null, done: null };
 }
 
+/** A bar's or a split's second field for its label (`or:`), a text field of the list, or `null`. */
+function orOf(block: PageBlock, schema: Schema, by: WholeAsk['by']): string | null {
+  if ((block.kind !== 'bar' && block.kind !== 'split') || by.length !== 1) return null;
+  const or = block.columns?.[0]?.or;
+  return typeof or === 'string' && or !== by[0]!.field && schema.fields[or]?.type === 'text' ? or : null;
+}
+
+/** A BANK'S DAY AT THE HEAD OF ITS LINE ("19OCT26 "), which is no part of a name. */
+const BANK_STAMP = /^\d{1,2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}(?:\d{2})?\s+(?=\S)/iu;
+
+/** A name as two lines are matched on: no bank day before it, one space between words, any case. */
+const nameKey = (v: string): string => v.replace(BANK_STAMP, '').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
+
 /**
  * A kind that adds up, over every row its scope and `where` admit: the parts by label and the total, or
  * `null` when its columns name nothing to add up. `whole` is a heat's `of:` as a predicate, `null` when it has none.
@@ -4204,8 +4217,14 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   const held = money ? deps.ctx.fx?.() : undefined;
   const home = held?.home ?? null;
   const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
+  /* A BAR'S LABEL HAS A SECOND FIELD TO READ WHERE IT HOLDS NOTHING (`or:` on its first column), read only where its
+     words name a label the first field already holds (live check of 30 October, 10): Reports' "Paid most" counted only
+     the lines a payee was put on, so Ahmed Emad read 1,501.50 beside two lines of his own of 15,015 and 23,020 that
+     named him in the bank's words alone. A line whose words name nobody known stays with the rows that hold none. */
+  const or = orOf(block, schema, shape.by);
+  const by = or === null ? shape.by : [...shape.by, { field: or }];
   const ask = (w: Predicate | undefined) =>
-    wholeParts(deps, { register, where: w, by: shape.by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null }, splitOf(schema)?.of === shape.value ? splitOf(schema)!.field : null);
+    wholeParts(deps, { register, where: w, by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null }, splitOf(schema)?.of === shape.value ? splitOf(schema)!.field : null);
   type Figure = Pick<WholeRow, 'value' | 'unit' | 'parts'> & { converted?: { asOf: string; stale: boolean } };
   const figure = (g: Gathered): Figure => {
     if (shape.value === null) return { value: shape.done ? g.done : g.rows };
@@ -4221,6 +4240,8 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
 
   const read = ask(where);
   if (!read.ok) return read;
+  const known = new Map<string, Json>();
+  if (or !== null) for (const part of read.value) if (typeof part.by[0] === 'string' && part.by[0].trim() !== '' && !known.has(nameKey(part.by[0]))) known.set(nameKey(part.by[0]), part.by[0]);
   const heat = block.kind === 'heat';
   const from = heat ? heatFrom(today) : '';
   const drawn = (label: Json): label is string => typeof label === 'string' && label >= from && label <= today;
@@ -4235,7 +4256,8 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
     const done = shape.done ? shape.done(part.by[1] ?? null) : false;
     gather(total, part, done);
     if (shape.by.length === 0) continue;
-    const label = part.by[0] ?? null;
+    const own = part.by[0] ?? null;
+    const label = (own === null || own === '') && or !== null && typeof part.by[1] === 'string' ? (known.get(nameKey(part.by[1])) ?? null) : own;
     if (heat && !drawn(label)) {
       outside += part.rows;
       if (typeof label === 'string') outsideDays.add(label);
