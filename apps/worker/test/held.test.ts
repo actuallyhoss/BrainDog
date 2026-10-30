@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import type { IngestDoor, IngestArrival } from '@braindog/host';
 import type { Result } from '@braindog/ports';
 
-import { HELD_GAVE_UP, HELD_OLDEST_MS, HELD_STEPS_S, HELD_WAIT, open, redeliver, serveHeld, sweepHeld, timeSigned, type HeldBucket, type HeldDeps, type HeldMessage } from '../src/held.ts';
+import { HELD_GAVE_UP, HELD_OLDEST_MS, HELD_PER_PLACE, HELD_PER_RECORD, HELD_STEPS_S, HELD_WAIT, open, redeliver, serveHeld, sweepHeld, timeSigned, type HeldBucket, type HeldDeps, type HeldMessage } from '../src/held.ts';
 
 const REC = 'rec_01J8ZC0000000000000000000A';
 const TOKEN = 'tok-123';
@@ -77,9 +77,10 @@ function door(answers: ('ok' | 'throw' | 'gone')[], seen: IngestArrival[]): () =
   });
 }
 
-function deps(answers: ('ok' | 'throw' | 'gone')[], seen: IngestArrival[], b = bucket(), sent: { body: HeldMessage; delay: number | undefined }[] = []) {
+function deps(answers: ('ok' | 'throw' | 'gone')[], seen: IngestArrival[], b = bucket(), sent: { body: HeldMessage; delay: number | undefined }[] = [], knows: HeldDeps['knows'] = async (rec) => rec === REC) {
   const told: string[] = [];
   const d: HeldDeps = {
+    knows,
     bucket: b,
     secret: SECRET,
     queue: { send: async (body, options) => void sent.push({ body, delay: options?.delaySeconds }) },
@@ -285,4 +286,59 @@ test('A RING REFUSED OVER AN OBJECT KEPT AGAIN SINCE LEAVES THE NEW ONE AS IT IS
   assert.equal(await redeliver({ held, tries: 3 }, deps(['throw'], [], b, again).d), 'waiting');
   assert.equal(again.length, 1);
   assert.equal(b.objects.size, 1);
+});
+
+/* ── SEC7 (security review of 30 Oct): strangers could fill the held store during an outage ─────────────────── */
+
+const OTHER = 'rec_01J8ZC0000000000000000000B';
+const junk = (rec: string, n: number, ip: string, url?: string): Request =>
+  new Request(url ?? `https://brain.dog/in/webhook/${rec}/anything-${n}/anything-${n}`, { method: 'POST', headers: { 'cf-connecting-ip': ip }, body: `junk ${n}` });
+
+test('SEC7: A RECORD THE DIRECTORY DOES NOT HOLD, OR CANNOT SAY IT HOLDS, IS NEVER KEPT', async () => {
+  const b = bucket();
+  const res = await serveHeld(junk(OTHER, 1, '198.51.100.1'), deps(['throw'], [], b).d);
+  assert.equal(res.status, 503);
+  const faulty = deps(['throw'], [], b, [], async () => {
+    throw new Error('the Directory is down');
+  });
+  assert.equal((await serveHeld(junk(REC, 2, '198.51.100.1'), faulty.d)).status, 503);
+  assert.equal(b.objects.size, 0, 'a made-up record, or one nobody could vouch for, was kept');
+});
+
+test('SEC7: ONE PLACE KEEPS AT MOST HELD_PER_PLACE, and his own text from his phone still finds room', async () => {
+  const b = bucket();
+  for (let i = 0; i < HELD_PER_PLACE + 5; i++) await serveHeld(junk(REC, i, '2001:db8:aa:bb::' + (i + 1).toString(16)), deps(['throw'], [], b).d);
+  assert.equal(b.objects.size, HELD_PER_PLACE, 'one /64 filled more than its share');
+  assert.ok(HELD_PER_PLACE < HELD_PER_RECORD);
+  const mine = await serveHeld(new Request(URL_, { method: 'POST', headers: { 'cf-connecting-ip': '203.0.113.50' }, body: TEXT }), deps(['throw'], [], b).d);
+  assert.equal(mine.status, 202, "his own text was turned away by a stranger's junk");
+});
+
+test('SEC7: A FOUR-SEGMENT POST WITH NO SIGNATURE IS JUNK AND IS NOT KEPT; ONE SIGNED IN A HEADER IS', async () => {
+  const b = bucket();
+  const bare = new Request(`https://brain.dog/in/webhook/${REC}/bank`, { method: 'POST', body: 'no signature' });
+  assert.equal((await serveHeld(bare, deps(['throw'], [], b).d)).status, 503);
+  assert.equal(b.objects.size, 0);
+  const signed = new Request(`https://brain.dog/in/webhook/${REC}/bank`, { method: 'POST', headers: { 'x-hub-signature-256': 'sha256=abc' }, body: 'signed' });
+  assert.equal((await serveHeld(signed, deps(['throw'], [], b).d)).status, 202);
+});
+
+test('SEC7: A BODY WITH NO LENGTH IS READ ONLY UP TO THE CEILING, and past it is 413 before the record is asked', async () => {
+  const seen: IngestArrival[] = [];
+  let asked = 0;
+  const { d } = deps(['ok'], seen);
+  const counted: HeldDeps = { ...d, door: () => ({ ...d.door(), verify: async (ask) => (asked++, d.door().verify(ask)) }) };
+  const chunk = new Uint8Array(256 * 1024);
+  let sent = 0;
+  const endless = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      sent += chunk.byteLength;
+      if (sent > 64 * 1024 * 1024) controller.close();
+      else controller.enqueue(chunk);
+    },
+  });
+  const res = await serveHeld(new Request(URL_, { method: 'POST', body: endless, duplex: 'half' } as RequestInit), counted);
+  assert.equal(res.status, 413);
+  assert.equal(asked, 0, 'the record was asked about a body that was never going to fit');
+  assert.ok(sent < 4 * 1024 * 1024, `read ${sent} bytes of a body past the ceiling`);
 });

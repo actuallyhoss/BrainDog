@@ -33,6 +33,9 @@
 
 import { serveIngest, servesIngest, type IngestDoor } from '@braindog/host';
 
+import { ipBucket } from '@braindog/record/directory';
+
+import { bodyUpTo } from './files.ts';
 import { op } from './oplog.ts';
 import { isRecordId } from './route.ts';
 
@@ -43,6 +46,12 @@ export const HELD_GAVE_UP = 'held/gave-up/';
 /** The most kept arrivals waiting for one record, and for the deployment. */
 export const HELD_PER_RECORD = 50;
 export const HELD_MOST = 500;
+/**
+ * The most kept arrivals waiting from one place (an IPv4 address, an IPv6 /64), across every record (SEC7). His phone
+ * and his bank's gateway each post from a handful of places; a stranger filling his fifty slots during an outage needs
+ * five places at least, and every one of them a place that cannot fill anybody else's too.
+ */
+export const HELD_PER_PLACE = 10;
 
 /** The door's own ceiling for a webhook (`WEBHOOK_LIMIT` in `@braindog/host`'s `ingest.ts`): a bigger body is its 413. */
 const HOLD_LIMIT = 1_048_576;
@@ -87,9 +96,15 @@ export type HeldBucket = {
  * still ringing from one the queue lost without opening the seal: `next` is when the next ring is due (ms), `tries`
  * how many have failed, `kept` when it was first kept (ms).
  */
-type Ringing = { next: number; tries: number; kept: number };
+type Ringing = { next: number; tries: number; kept: number; from?: string | undefined };
 
-const ringing = (r: Ringing): Record<string, string> => ({ next: String(r.next), tries: String(r.tries), kept: String(r.kept) });
+/** `from` is the place it came from, as a digest (`placeOf`), so the bucket counts by place and never holds an address. */
+const ringing = (r: Ringing): Record<string, string> => ({
+  next: String(r.next),
+  tries: String(r.tries),
+  kept: String(r.kept),
+  ...(r.from === undefined ? {} : { from: r.from }),
+});
 
 function ringingOf(meta: Record<string, string> | undefined): Ringing | null {
   if (meta === undefined) return null;
@@ -100,6 +115,12 @@ function ringingOf(meta: Record<string, string> | undefined): Ringing | null {
 }
 
 export type HeldDeps = {
+  /**
+   * Whether the Directory holds this record now (`knows`), asked before anything is kept (SEC7). A 503 is kept whatever
+   * the URL says, because the record that would check it is the one that cannot answer, so this is the one check a
+   * stranger's post meets first: an id nobody holds is never kept, and a Directory that cannot say keeps nothing.
+   */
+  knows: (rec: string) => Promise<boolean>;
   bucket: HeldBucket | undefined;
   /** `SESSION_SECRET`; the seal's key is derived from it and never stored. */
   secret: string | undefined;
@@ -123,9 +144,12 @@ export async function serveHeld(request: Request, deps: HeldDeps): Promise<Respo
   if (rec === undefined || !isRecordId(rec) || deps.bucket === undefined || !deps.secret) return serveIngest(request, deps.door());
   const said = Number(request.headers.get('content-length') ?? '');
   if (Number.isFinite(said) && said > HOLD_LIMIT) return serveIngest(request, deps.door());
-  const bytes = new Uint8Array(await request.arrayBuffer());
+  /* READ AS IT COMES AND STOPPED PAST THE DOOR'S OWN CEILING (SEC7). A chunked body says no length, and it was read
+     whole, up to the runtime's hundred megabytes, before the budget, the token or the 404 the door asks first. */
+  const bytes = await bodyUpTo(request.body, HOLD_LIMIT);
+  if (bytes === null) return tooLarge();
   const first = await serveIngest(again(request.url, [...request.headers], bytes), deps.door());
-  if (first.status !== 503 || bytes.byteLength > HOLD_LIMIT) return first;
+  if (first.status !== 503) return first;
   /* THE SECOND ASK SPENDS NO SECOND BUDGET: it is the same arrival, already counted at the door. */
   await (deps.pause ?? sleep)(SECOND_ASK_MS);
   const second = await serveIngest(again(request.url, [...request.headers], bytes), unlimited(deps.door()));
@@ -138,7 +162,26 @@ export async function serveHeld(request: Request, deps: HeldDeps): Promise<Respo
     op({ op: 'door', held: false, rec, why: 'time-signed' }, 'error');
     return second;
   }
-  const kept = await hold(deps, rec, request.url, [...request.headers], bytes);
+  /* ONLY WHAT A DOOR COULD TAKE IS KEPT (SEC7): a URL with its token in it, or one signed in a header, as a signed
+     door's sender signs it. A post to `/in/webhook/<rec>/<anything>` with neither is junk the record would refuse, and
+     kept it filled his room while he was down. */
+  if ((path?.channel === 'webhook' ? path.token : undefined) === undefined && !headerSigned(request.headers)) {
+    op({ op: 'door', held: false, rec, why: 'unsigned' }, 'error');
+    return second;
+  }
+  /* AND ONLY FOR A RECORD THE DIRECTORY HOLDS, asked now: during a Directory fault ten made-up ids filled the whole
+     deployment's room. One that cannot answer keeps nothing, and the sender hears 503 and tries again. */
+  let known = false;
+  try {
+    known = await deps.knows(rec);
+  } catch {
+    known = false;
+  }
+  if (!known) {
+    op({ op: 'door', held: false, rec, why: 'unknown' }, 'error');
+    return second;
+  }
+  const kept = await hold(deps, rec, request.url, [...request.headers], bytes, await placeOf(request.headers.get('cf-connecting-ip') ?? ''));
   return kept ? new Response(null, { status: 202, headers: { 'cache-control': 'no-store' } }) : second;
 }
 
@@ -162,14 +205,32 @@ export function timeSigned(headers: Iterable<[string, string]>): boolean {
   return false;
 }
 
+/** The door's own 413 for a body past the ceiling, in its words (`tooBig` in `@braindog/host`'s `ingest.ts`). */
+const tooLarge = (): Response =>
+  new Response(JSON.stringify({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: `An arrival on this channel is at most ${HOLD_LIMIT} bytes.`, at: 'body' } }), {
+    status: 413,
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  });
+
+/** Whether a request carries a signature in a header, under any of the names signed doors use. */
+const headerSigned = (headers: Headers): boolean => {
+  for (const [name, value] of headers) if (/signature|hmac/i.test(name) && value.trim() !== '') return true;
+  return false;
+};
+
+/** The place an address stands for (`ipBucket`: an IPv6 address as its /64), as a short digest, so no address is kept. */
+async function placeOf(ip: string): Promise<string> {
+  return (await digest(utf8(`held-place:${ipBucket(ip)}`))).slice(0, 24);
+}
+
 /** Keep one arrival and ring for it: `true` once it is in the bucket, whether or not the ring went. */
-async function hold(deps: HeldDeps, rec: string, url: string, headers: [string, string][], bytes: Uint8Array): Promise<boolean> {
+async function hold(deps: HeldDeps, rec: string, url: string, headers: [string, string][], bytes: Uint8Array, from: string): Promise<boolean> {
   const bucket = deps.bucket;
   if (bucket === undefined || !deps.secret) return false;
   const now = (deps.now ?? Date.now)();
   try {
     /* A LISTING SHORTER THAN ITS LIMIT IS THE WHOLE OF IT, so the record's own count is read off the same page. */
-    const waiting = await bucket.list({ prefix: HELD_WAIT, limit: HELD_MOST });
+    const waiting = await bucket.list({ prefix: HELD_WAIT, limit: HELD_MOST, include: ['customMetadata'] });
     if (waiting.objects.length >= HELD_MOST) {
       op({ op: 'door', held: false, rec, why: 'full' }, 'error');
       return false;
@@ -179,11 +240,15 @@ async function hold(deps: HeldDeps, rec: string, url: string, headers: [string, 
       op({ op: 'door', held: false, rec, why: 'record-full' }, 'error');
       return false;
     }
-    const envelope: Envelope = { url, headers: headers.filter(([k]) => !UNKEPT.has(k.toLowerCase())), body: base64(bytes), at: new Date(now).toISOString() };
+    if (waiting.objects.filter((o) => o.customMetadata?.['from'] === from).length >= HELD_PER_PLACE) {
+      op({ op: 'door', held: false, rec, why: 'place-full' }, 'error');
+      return false;
+    }
+    const envelope: Envelope = { url, headers: headers.filter(([k]) => !UNKEPT.has(k.toLowerCase())), body: base64(bytes), at: new Date(now).toISOString(), from };
     /* THE SAME REQUEST KEPT TWICE IS ONE KEY: his two devices post every text, and the second one is the same arrival. */
     const key = `${HELD_WAIT}${rec}/${await digest(concat(utf8(url), bytes))}.held`;
     await bucket.put(key, await seal(deps.secret, utf8(JSON.stringify(envelope))), {
-      customMetadata: ringing({ next: now + stepOf(0) * 1000, tries: 0, kept: now }),
+      customMetadata: ringing({ next: now + stepOf(0) * 1000, tries: 0, kept: now, from }),
     });
     op({ op: 'door', held: true, rec, bytes: bytes.byteLength }, 'error');
     try {
@@ -252,7 +317,7 @@ export async function redeliver(message: HeldMessage, deps: HeldDeps): Promise<R
        to ring for a week and end as a mail about nothing. The put holds only while the object is the one read (R2's
        `etagMatches`, which fails on an object deleted since); one gone or kept again since is left as it is, and the
        ring just queued finds it gone or rings the new one. A bucket that says no etag is read again first. */
-    const meta = ringing({ next: now + delay * 1000, tries, kept: Number.isFinite(kept) ? kept : now });
+    const meta = ringing({ next: now + delay * 1000, tries, kept: Number.isFinite(kept) ? kept : now, from: envelope.from });
     let marked: unknown;
     try {
       marked =
@@ -312,7 +377,7 @@ export async function sweepHeld(deps: HeldDeps): Promise<number> {
 
 /* ── the pieces ───────────────────────────────────────────────────────────── */
 
-type Envelope = { url: string; headers: [string, string][]; body: string; at: string };
+type Envelope = { url: string; headers: [string, string][]; body: string; at: string; from?: string };
 
 /** Headers the runtime sets for itself, which a rebuilt request must not carry over. */
 const UNKEPT = new Set(['host', 'content-length', 'connection', 'transfer-encoding']);

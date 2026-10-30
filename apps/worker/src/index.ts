@@ -3424,6 +3424,7 @@ export default {
  */
 function heldDeps(env: Env): HeldDeps {
   return {
+    knows: (rec) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).knows(rec),
     bucket: env.BLOBS,
     secret: env.SESSION_SECRET,
     queue: env.INGRESS,
