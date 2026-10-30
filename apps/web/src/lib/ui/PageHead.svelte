@@ -399,6 +399,26 @@
    * `scroll-padding-block` is set from, so keyboard focus never lands underneath it (WCAG 2.4.11). The full width of
    * the work, as every tile under it is.
    */
+  /**
+   * TWO TITLES IN ONE PLACE HAND OVER, THEY NEVER CROSS (audit 31 Oct, B10). The name and the compact title, and on a
+   * phone where you are and the page's name, used to cross-fade over the same `--d-swap`, so for most of it both were
+   * half there and read as one word drawn over another ("Needs you" through "Wildcard certificate…"), which a picture
+   * taken just after a scroll caught every time. Now the one going fades out first, over half the swap, and the one
+   * coming starts only once it has gone: at any moment at most one of them is showing. Under reduced motion every fade
+   * is forced to the whole `--d-swap` (`skin/a11y.css`), so the wait is the whole of it there.
+   */
+  .head-bar,
+  .page-head {
+    --swap-out: calc(var(--d-swap) / 2);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .head-bar,
+    .page-head {
+      --swap-out: var(--d-swap);
+    }
+  }
+
   .page-head {
     position: sticky;
     inset-block-start: 0;
@@ -474,7 +494,8 @@
     line-height: calc(34 / 28);
     letter-spacing: -0.02em;
     text-wrap: balance;
-    transition: opacity var(--d-swap) var(--ease-out);
+    /* Coming back, it waits for the compact title to go. */
+    transition: opacity var(--swap-out) var(--ease-out) var(--swap-out);
   }
 
   /* FOCUSED BY THE LAYOUT AFTER A MOVE, for a keyboard and a screen reader; a pointer never sees a ring here. */
@@ -516,7 +537,7 @@
     font-size: var(--fs-head);
     font-weight: var(--fw-medium);
     font-variant-numeric: tabular-nums;
-    transition: opacity var(--d-swap) var(--ease-out);
+    transition: opacity var(--swap-out) var(--ease-out) var(--swap-out);
   }
 
   /* THE SPACE IS A CHARACTER, AND IT HAS TO BE: a margin reads `10of 38` to a screen reader and a copy-paste. */
@@ -542,7 +563,7 @@
     opacity: 0;
     pointer-events: none;
     translate: 0 -50%;
-    transition: opacity var(--d-swap) var(--ease-out);
+    transition: opacity var(--swap-out) var(--ease-out);
   }
 
   .head-title-count {
@@ -556,10 +577,13 @@
     .page-head[data-under] .page-name,
     .page-head[data-under] .count {
       opacity: 0;
+      transition-delay: 0s;
     }
 
+    /* Arriving, it waits for the name to go. */
     .page-head[data-under] .head-title {
       opacity: 1;
+      transition-delay: var(--swap-out);
     }
   }
 
@@ -798,11 +822,13 @@
       font-weight: var(--fw-semi);
       text-overflow: ellipsis;
       white-space: nowrap;
-      transition: opacity var(--d-swap) var(--ease-out);
+      /* Showing waits for the other to go; going does not wait. */
+      transition: opacity var(--swap-out) var(--ease-out) var(--swap-out);
     }
 
     .bar-title {
       opacity: 0;
+      transition-delay: 0s;
     }
 
     /* THE PAGE'S COUNT AFTER ITS NAME, quiet. */
@@ -816,10 +842,12 @@
 
     .head-bar[data-past] .bar-where {
       opacity: 0;
+      transition-delay: 0s;
     }
 
     .head-bar[data-past] .bar-title {
       opacity: 1;
+      transition-delay: var(--swap-out);
     }
 
     /* ASK, THE BELL AND THE FACE AT THE END, 44 square each and touching: three targets in the room of three. */
