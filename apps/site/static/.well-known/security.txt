@@ -2,4 +2,4 @@ Contact: mailto:support@brain.dog
 Expires: 2027-10-11T00:00:00.000Z
 Preferred-Languages: en
 Canonical: https://brain.dog/.well-known/security.txt
-Policy: https://github.com/actuallyhoss/BrainDog/blob/master/SECURITY.md
+Policy: https://brain.dog/security
