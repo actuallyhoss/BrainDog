@@ -1104,6 +1104,13 @@
     /* NOTHING ANSWERED: the record may be empty, so opening it as it is lands on its /start, which asks the question
        there, not on the end of a first run that never wrote anything. */
     madeAt = at(out === null ? '/start' : '/start#made', `${BASE}/${name}/`);
+    /* THE PLACES MADE, BY NAME, for the end to say first ("Your BrainDog is made, with Orders, People and Money"): this
+       tab opens it next, so they wait in the tab (`MADE_PLACES` in `start/+page.svelte`). */
+    try {
+      globalThis.sessionStorage?.setItem('braindog.made.places', JSON.stringify(asked.proposal.places.filter((x) => x.kind !== 'today').map((x) => x.name)));
+    } catch {
+      /* Storage off: the end says only that it is made. */
+    }
     if (allWritten(out)) {
       again = null;
       forget();

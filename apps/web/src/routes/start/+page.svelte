@@ -144,6 +144,14 @@
     if (location.hash !== '#made') return;
     history.replaceState(history.state, '', location.pathname + location.search);
     if (page.data.live) made = true;
+    /* AND THE PLACES SIGN-UP MADE, which it left in this tab, read once and let go. */
+    try {
+      const kept: unknown = JSON.parse(globalThis.sessionStorage?.getItem('braindog.made.places') ?? 'null');
+      globalThis.sessionStorage?.removeItem('braindog.made.places');
+      if (Array.isArray(kept) && kept.every((x) => typeof x === 'string')) madePlaces = kept;
+    } catch {
+      /* Nothing kept: the end says only that it is made. */
+    }
   });
 
   /* WHERE AND HOW THE SENTENCE WAS TYPED, for a date such as "on the 1st", for the currency names and for the currency
