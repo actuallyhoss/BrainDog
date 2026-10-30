@@ -35,9 +35,10 @@ const ACTOR = 'p_scratch';
 /** The one module of BrainDog's that is not in `FIRST_PARTY`, named by its pack id. */
 const AGENTS = 'agents';
 
-/** The `Sql` port over an in-memory `node:sqlite`, the adapter the kernel's own tests use, with the same one-level transaction. */
+/** The `Sql` port over an in-memory `node:sqlite`, the adapter the kernel's own tests use, with the same transactions. */
 function memorySql(): Sql & { close(): void } {
-  const db = new DatabaseSync(':memory:');
+  /* Foreign keys off, as on both hosts: `node:sqlite` turns them on unless told. */
+  const db = new DatabaseSync(':memory:', { enableForeignKeyConstraints: false });
   let depth = 0;
   return {
     close: () => db.close(),
@@ -51,17 +52,23 @@ function memorySql(): Sql & { close(): void } {
     one<T = Row>(text: string, ...params: Param[]): T | undefined {
       return db.prepare(text).get(...(params as never[])) as T | undefined;
     },
-    /* `33-CONTRACTS` §1 says the driver never nests, so a re-entrant write shares its trigger's transaction here too. */
+    /* A NESTED CALL IS A SAVEPOINT, as on both hosts (`apps/selfhost` `openSqlite`), so a pack checked here keeps or
+       loses an inner throw's writes as the record would. */
     transactionSync<T>(fn: () => T): T {
-      if (depth > 0) return fn();
-      db.exec('BEGIN');
+      const savepoint = depth > 0 ? `dog_tx_${depth}` : null;
+      db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
       depth++;
       try {
         const value = fn();
-        db.exec('COMMIT');
+        db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT');
         return value;
       } catch (e) {
-        db.exec('ROLLBACK');
+        if (db.isTransaction) {
+          if (savepoint) {
+            db.exec(`ROLLBACK TO ${savepoint}`);
+            db.exec(`RELEASE ${savepoint}`);
+          } else db.exec('ROLLBACK');
+        }
         throw e;
       } finally {
         depth--;
