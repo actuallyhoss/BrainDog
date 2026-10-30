@@ -1138,6 +1138,9 @@
   .block-name {
     min-inline-size: 0;
     margin: 0;
+    /* A NAME THAT WRAPS TAKES ITS COUNT WITH ITS LAST WORDS (audit 6f AF21): "Your work this week" in a quarter of the
+       board put its "2" on a line of its own. */
+    text-wrap: balance;
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--fs-body);

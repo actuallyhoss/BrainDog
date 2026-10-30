@@ -1818,6 +1818,9 @@
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot]) {
     margin-block-start: auto;
     padding-block-start: var(--sp-1);
+    /* THE TILE ALREADY HOLDS ITS INSET (audit 6f AF21): the foot's own put "BrainDog handled 1 today" and its rule 20px in
+       from the questions' rules above it. */
+    padding-inline: 0;
   }
 
   /* NEEDS YOU HOLDS TWO QUESTIONS ON A LAPTOP'S LARGE (Q17): each question without its well, so its buttons sit on its
