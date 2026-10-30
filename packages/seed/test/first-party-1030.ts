@@ -5084,7 +5084,7 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
  },
  "people": {
   "version": "4.0.0",
-  "now": "4.2.1",
+  "now": "4.2.2",
   "added": [
    "metric.organisations-known#0"
   ],

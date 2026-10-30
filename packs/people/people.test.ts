@@ -221,8 +221,9 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
      SINCE 24 October: Scripts is a page. 3.8.0 SINCE 25 October: an organisation can be retired. 3.9.0
      SINCE 27 October: one line a person, and shops from card texts apart. 4.0.0 SINCE 27 October: Health, Scripts,
      Calendar and Activity leave for core. 4.1.0 SINCE 29 October: organisations are one place and one count. 4.2.0
-     SINCE 29 October: organisations you work with apart from shops. 4.2.1 SINCE 29 October: one organisations count. */
-  assert.equal(doc.version, '4.2.1');
+     SINCE 29 October: organisations you work with apart from shops. 4.2.1 SINCE 29 October: one organisations count.
+     4.2.2 SINCE 30 October: who may be listed twice, in plainer words. */
+  assert.equal(doc.version, '4.2.2');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');

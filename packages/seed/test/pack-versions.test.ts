@@ -2512,13 +2512,14 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'e00c98eb1a5acc2f',
+    declares: '149781440f62b820',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
       'Before 3.33.0 shipped, `page.money-forecast` opens on 12 weeks and `metric.moved-since` is added for Reports; one id added, none taken away -> 72b8a0107776271c',
       'Before 3.33.0 shipped, `page.money-payees` and `page.money-budgets` link to their unnamed and unfiled lines with field:is:empty; no id added or taken away -> 3a73960b7bea2133',
       'Before 3.33.0 shipped, `page.money-payees` draws one bar a payee, `page.money-rules` draws its rules as cards, and `metric.filing-rule-filed` and `metric.filing-rules` are added; two ids added, none taken away -> e00c98eb1a5acc2f',
+      'Before 3.33.0 shipped, `script.post_due` says what this BrainDog cannot step on in plain words; no id added or taken away -> 149781440f62b820',
     ],
   },
   'work@1.17.0': {
@@ -2688,7 +2689,20 @@ const DECLARED: Record<string, Version> = {
     history: [
       "People 4.2.1 (round 1030): `metric.organisations-count` counts every organisation not folded into another and not retired, `metric.organisations-known` is added for the ones you work with, the people figures leave you and merged rows out (`metric.people-in-touch-30d`, `metric.people-quiet`), and `page.people` says one organisations line in place of the Organisations table; one id added, none taken away -> e1e0f171a698aca0",
     ],
+  },  'people@4.2.2': {
+    holds: `
+      metric.organisations-count metric.organisations-from-card-texts metric.organisations-known metric.people-count
+      metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: 'd1e4904c80834e27',
+    history: [
+      'People 4.2.2 of 30 October: `page.people` says who may be listed twice in plainer words; no id added or taken away -> d1e4904c80834e27',
+    ],
   },
+
   /* SCRIPTS' COLUMN OF WHERE EACH STANDS IS CALLED STATUS. core 1.0.0 is on master, so a version of its own. */
   'core@1.1.0': {
     holds: `
@@ -2712,9 +2726,10 @@ const DECLARED: Record<string, Version> = {
     holds: `
       page.activity page.calendar page.health page.scripts
     `,
-    declares: 'f519178d239ec8dc',
+    declares: '76619a71f70182cd',
     history: [
       'Core 1.2.1 of 30 October: `page.health` shows every card not checked yet; no id added or taken away -> f519178d239ec8dc',
+      'Before 1.2.1 shipped, `page.scripts` says "Every script you have"; no id added or taken away -> 76619a71f70182cd',
     ],
   },
 

@@ -887,14 +887,17 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   them has, and "Later" by due day, then newest first. An order, nothing added or taken away, so a patch step.
  *   Also before it shipped: Work's band reads "Your work this week" and Timeline's lane "Tasks by due day", keys kept.
  * - core 1.2.1 (finish loop, 30 Oct): Health's "Not checked yet" group shows every card, so the cards add up to the
- *   count above them. A limit, nothing added or taken away, so a patch step.
+ *   count above them. A limit, nothing added or taken away, so a patch step. Also before it shipped, the Scripts page's
+ *   note says "Every script you have" (`page.scripts`).
+ * - people 4.2.2 (finish loop, 30 Oct): People's held-twice note says "may be listed twice" (`page.people`). Words
+ *   only, so a patch step.
  * - money-core 3.33.0, before it shipped (numbers-agree): Forecast opens on 12 weeks like Money and Today, Reports'
  *   All line says the day money first moved (`metric.moved-since`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.1',
   portfolio: '1.30.1',
-  people: '4.2.1',
+  people: '4.2.2',
   'money-core': '3.33.0',
   estate: '2.6.0',
   work: '1.20.1',
