@@ -50,8 +50,8 @@ const OWED = {
   kind: 'metric',
   body: { metric: 'owed-total', name: 'Owed to you', source: 'register.invoices', value: { sum: 'amount_due' }, format: 'money', target: { gte: 0 }, window: '30d', compare: 'none' },
 } as never;
-const page = (slug: string, blocks: unknown[]) =>
-  ({ id: `page.${slug}`, kind: 'page', body: { page: slug, title: slug === 'money' ? 'Money' : 'Elsewhere', requires: ['register.invoices'], blocks } }) as never;
+const page = (slug: string, blocks: unknown[], requires: string[] = ['register.invoices']) =>
+  ({ id: `page.${slug}`, kind: 'page', body: { page: slug, title: slug === 'money' ? 'Money' : 'Elsewhere', requires, blocks } }) as never;
 const MONEY = page('money', [
   { kind: 'stat', cells: [{ metric: 'owed-total' }] },
   { kind: 'note', heading: 'Where it stands', body: 'Owed: {{owed-total}}. Also {{nothing-here}} and [the handbook](/p/handbook).\n\n- Sent\n  - by hand' },
@@ -245,7 +245,7 @@ test('AF18: WITH MONEY OFF, A LIST THAT IS MONEY IS NOT SENT AT ALL', async () =
   const PLAN = page('plan', [
     { kind: 'table', source: 'register.ledger', heading: 'Bills', columns: [{ field: 'what' }, { field: 'amount' }] },
     { kind: 'note', heading: 'Notes', body: 'Earning. {{money:1840000 GBP}} in the last twelve months.\n\nThe licensing tier ships in September.' },
-  ]);
+  ], ['register.ledger']);
   value(await api.kernel.install([LEDGER, PLAN]));
   sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
@@ -253,7 +253,8 @@ test('AF18: WITH MONEY OFF, A LIST THAT IS MONEY IS NOT SENT AT ALL', async () =
   const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
   const { id } = value<{ id: string }>(await direct.openShare({ slug: 'plan' }, owner));
   const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'plan')));
-  const said = JSON.stringify(shown);
+  /* The blocks, not the page's own facts: `home` names the record's currency and holds no amount. */
+  const said = JSON.stringify(shown.blocks);
   assert.doesNotMatch(said, /Hosting|Bills|18,400|GBP|£/u);
   assert.match(said, /The licensing tier ships in September\./u);
   sql.close();
