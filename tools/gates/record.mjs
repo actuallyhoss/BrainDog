@@ -38,7 +38,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { argv } from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { start } from '../../apps/selfhost/src/server.ts';
 import { startCloud } from '../../apps/worker/test/cloud-serve.ts';
@@ -50,6 +50,13 @@ import { budget } from './lib.mjs';
    draws it here as a variant; until then it is handed on from this door, so a gate and the look reach both records
    through one module, and the runner reads `lived.mjs` as the library it is rather than a gate nobody registered. */
 export { buildLived, openLived } from './lived.mjs';
+
+/**
+ * The app's own catalogue folder, the one the build ships beside the shell: every add-on as it was last published, read
+ * from the disk. `catalogue: true` hands it to the record (`startRecord`), so an add-on published since the last deploy
+ * is listed in the store and installs, with the public Kennel still off.
+ */
+export const CATALOGUE = fileURLToPath(new URL('../../apps/web/static/catalogue', import.meta.url));
 
 /** Each running record's server key, by its base. Here and nowhere else. */
 const KEYS = new Map();
@@ -278,7 +285,7 @@ async function startCloudRecord() {
  * call and not from a second one in the gate: `test/handles.test.mjs` holds every gate to closing what it opened in the
  * `finally` of the `try` it opened it in, and four records under one handle are one close.
  */
-export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false } = {}) {
+export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false, catalogue = false } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
   /* THE CLOUD IS ANOTHER HOST, NOT THIS ONE WITH SOMETHING ADDED, so none of what follows is asked of it. */
   if (variant === 'cloud') return startCloudRecord();
@@ -297,6 +304,11 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
        timeout before it could name a single seed, which `self-test` read as four negatives passed. A gate measures
        this record and nothing on the network. */
     kennel: { kennel: 'off', fetch: () => Promise.reject(new Error('the gates read no Kennel')), now: () => NOW },
+    /* THE APP'S OWN CATALOGUE, ASKED FOR BY THE LOOK AND THE COMMAND LINE. With the Kennel off and no folder, the store
+       listed nothing, so an add-on published since the last deploy could not be opened anywhere before that deploy. The
+       folder is on this disk, so nothing waits on the network. No gate asks for it: their sweeps measure the seed as it
+       ships, and a gate's `/packs/browse` stays the empty store it has always measured. */
+    ...(catalogue ? { catalogue: CATALOGUE } : {}),
     ...(key === undefined ? {} : { token: key }),
     ...(origin === undefined ? {} : { origin }),
   });
@@ -596,7 +608,7 @@ export async function answers(origin) {
    `Origin` the proxy passes on, and an open self-host answers only its own names. */
 if (argv[1] && import.meta.url === pathToFileURL(argv[1]).href) {
   const { port } = budget('record');
-  const { base, server } = await startRecord(port, { open: true, origin: 'http://localhost:5183' });
+  const { base, server } = await startRecord(port, { open: true, origin: 'http://localhost:5183', catalogue: true });
   server.ref();
   console.log(`  record: ${base}, the seed at ${new Date(NOW).toISOString().slice(0, 10)}. Stop it with Ctrl+C.`);
 }
