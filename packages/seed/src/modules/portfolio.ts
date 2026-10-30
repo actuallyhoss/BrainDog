@@ -82,7 +82,7 @@ Object storage | {{money:4100 GBP}} a month | the binaries
 \`\`\`note | Watch this | warn
 \`kilnfonts.example\` is the redirect every old licence PDF points at. Letting it lapse breaks
 links in files that have already been delivered, which is not a thing an apology fixes. The task
-to turn auto-renew back on is {{ref:tasks#3}}.
+for it: {{ref:tasks#3}}.
 \`\`\`
 
 ## What is not verified
