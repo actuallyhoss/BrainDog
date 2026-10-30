@@ -501,7 +501,9 @@ function headlineOf(fs: Facts[], renewals: readonly BoardRenewal[], input: Board
   const live = fs.filter((f) => inPlayOf(f.p.lane, input.lanes));
   const late = ordered(live.filter((f) => f.late.length > 0));
   const quiet = live.filter((f) => f.quiet);
-  const due = live.filter((f) => f.late.length === 0 && f.due.length > 0).sort((a, b) => a.due[0]!.day.localeCompare(b.due[0]!.day));
+  /* EVERY PROJECT WITH WORK DUE THIS WEEK, A LATE ONE TOO (finish F4): the headline left the late ones out and said "two
+     projects have work due this week" over the This week tile's "across 3 projects". One count, the tile's. */
+  const due = live.filter((f) => f.due.length > 0).sort((a, b) => a.due[0]!.day.localeCompare(b.due[0]!.day));
   const asks = live.filter((f) => f.asks.length > 0);
   const soon = renewals.filter((r) => daysBetween(input.today, r.day) <= RENEW_DAYS).sort((a, b) => a.day.localeCompare(b.day));
   const clauses: string[] = [];
