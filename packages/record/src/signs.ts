@@ -647,6 +647,8 @@ export async function fileRecordSigns(
 export const SIGNS_KEPT = 'briefing.signs';
 /** How long a kept reading stands before a briefing reads the signs itself again. */
 export const SIGNS_KEPT_MS = 15 * MIN;
+/** How long the alarm leaves a kept reading as it is while nothing a sign reads moved: inside `SIGNS_KEPT_MS`, so a briefing still reads the pref. */
+export const SIGNS_REKEEP_MS = 10 * MIN;
 
 /** One red sign as a briefing names it: its name, its sentence, and its sentence to a reader without the inbox. */
 export type KeptSign = { name: string; said: string; quiet: string };

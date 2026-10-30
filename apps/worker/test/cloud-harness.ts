@@ -122,7 +122,8 @@ export async function cloud(extra: Record<string, unknown> = {}) {
   const storages = new Map<string, RecordStorage>();
   const objects = new Map<string, Obj>();
   const log: string[] = [];
-  /* WHAT A RECORD HANDED `ctx.waitUntil` (the daily look beside a request), kept so a test can let it finish (`settle`). */
+  /* WHAT A RECORD HANDED `ctx.waitUntil` (the ask whether the look is due, beside a request), kept so a test can let it
+     finish (`settle`); the look itself is the alarm's (`wake`). */
   const waits: Promise<unknown>[] = [];
   const open = (id: string): Obj => {
     const storage = storages.get(id) ?? recordStorage();
@@ -209,5 +210,21 @@ export async function cloud(extra: Record<string, unknown> = {}) {
     while (waits.length > 0) await Promise.all(waits.splice(0));
   };
 
-  return { bundle, env, blobs, directory, dirStorage, storages, objects, log, open, provision, signIn, ask, events, settle, record: (id: string) => (env['RECORD'] as { get: (id: string) => Obj }).get(id) };
+  /**
+   * The record's alarm, fired while it is due, as the platform fires one set for now: what a request hands the alarm
+   * (the look, `slashDue`) is done here, a slice an alarm, until no alarm is due or `most` alarms ran. Answers how many.
+   */
+  const wake = async (id: string, most = 50): Promise<number> => {
+    await settle();
+    let ran = 0;
+    for (; ran < most; ran++) {
+      const at = await storages.get(id)?.getAlarm();
+      if (at === null || at === undefined || at > Date.now()) break;
+      await ((env['RECORD'] as { get: (id: string) => Obj }).get(id) as unknown as { alarm(): Promise<void> }).alarm();
+      await settle();
+    }
+    return ran;
+  };
+
+  return { bundle, env, blobs, directory, dirStorage, storages, objects, log, open, provision, signIn, ask, events, settle, wake, record: (id: string) => (env['RECORD'] as { get: (id: string) => Obj }).get(id) };
 }

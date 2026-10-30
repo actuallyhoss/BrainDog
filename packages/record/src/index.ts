@@ -17,8 +17,9 @@
 
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
-import { keptRound, lintRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, unworded } from './page-lint.ts';
-import { SIGNS_KEPT, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
+import { keptRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, roundBegun, roundEnded, roundOf, roundPartOf, roundStep, ROUND_MS, unworded, type RoundPart } from './page-lint.ts';
+import { TICK_PAGES, UNBOUNDED, type TickBudget } from './tick-budget.ts';
+import { SIGNS_KEPT, SIGNS_REKEEP_MS, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
 import { appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
 import {
@@ -176,6 +177,7 @@ import {
   HEADLINE_ASKS_DAY,
   HEADLINE_ITEMS_MOST,
   HEADLINE_LOOK_MS,
+  LOOK_REWALK_MS,
   HEADLINE_ANSWER_TOKENS,
   HEADLINE_PAGES_MOST,
   HEADLINES_ASKED,
@@ -238,14 +240,14 @@ import { staleCount, staleFor as staleLines } from './methods/stale.ts';
 import { learnedOrder, learnedSorted, replacedIn, replacesField } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
 import { doorFacts, doorIsOff, turnedAway as doorTurnedAway, type DoorFacts } from './methods/door-switch.ts';
-import { briefTick } from './brief-write.ts';
+import { briefSlot, briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import type { SealedStore } from './methods/sealed.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
 import { drewCostWhy } from './design-agent.ts';
 import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
-import { methods as censusMethods } from './methods/pages-census.ts';
+import { censusSlices, methods as censusMethods, type CensusPart } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
 import { todayOf, type TodayAnswer, type TodayAsks } from './today.ts';
 import { shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
@@ -303,12 +305,14 @@ export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps 
 export { PASS_KIND, installedTwice, passSentence, type ByWho, type PassSaid, type UpdatePass } from './update-pass.ts';
 export { CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, card, type Card, type CardAt } from './card.ts';
 export { ALSO_HERE_MOST, STEP_DAYS, TREE_WARNING, alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
-export { keptRoundIn, lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_HOLDER, ROUND_MS, ROUND_PAGES, TEMPLATE_ALL, type AnswerRule, type KeptFinding, type KeptRound, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
+export { keptRoundIn, lintAnswer, lintRound, pagesCleanReading, pagesToLint, roundBegun, roundEnded, roundOf, roundPartOf, roundStep, ROUND_HOLDER, ROUND_MS, ROUND_PAGES, TEMPLATE_ALL, type AnswerRule, type KeptFinding, type KeptRound, type PageFinding, type PageLintRound, type PagesCleanReading, type RoundPart } from './page-lint.ts';
+export { TICK_MS, TICK_PAGES, tickBudget, UNBOUNDED, type TickBudget } from './tick-budget.ts';
 export {
   HEADLINE_ANSWER_TOKENS,
   HEADLINE_ASKS_DAY,
   HEADLINE_MOST,
   HEADLINE_OWED_MS,
+  LOOK_REWALK_MS,
   HEADLINE_PAGES_MOST,
   HEADLINE_RAW_MOST,
   HEADLINES_OWED,
@@ -4284,6 +4288,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const FIRST_PARTY_HOLDER = 'braindog:updates';
   const FIRST_PARTY_LAST = 'first-party';
+  /** How long a pass that began and never ended waits before it is begun again. */
+  const FIRST_PARTY_RETRY_MS = 60 * 60_000;
   /** Where each update question is kept with the pack and version it asked about, until it is answered. */
   const FIRST_PARTY_ASKED = 'braindog:updates:asked';
   /** The version of each module the owner said no to, by pack. */
@@ -4418,15 +4424,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ORDER BY d.id`,
       )
       .map((r) => r.id);
-  const firstPartyPass = async (today: string): Promise<string[]> => {
-    const { shippedVersion, updateFirstParty } = await import('@braindog/seed/packs/quiet');
-    const { firstPartyManifest } = await import('@braindog/seed/packs');
-    const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
-    const { useCase } = await import('@braindog/seed/usecases');
-    const { moduleName } = await import('@braindog/seed/usecases/names');
-    /* WHAT THIS BUILD SHIPS OF EVERYTHING THE RECORD HOLDS THAT THE NIGHT KEEPS CURRENT, the agents pack and a use case
-       among them, in the order of their ids: a build that moves only one of those is a new deploy to this record too. */
-    const shipped = JSON.stringify(
+  /* WHAT THIS BUILD SHIPS OF EVERYTHING THE RECORD HOLDS THAT THE NIGHT KEEPS CURRENT, the agents pack and a use case
+     among them, in the order of their ids: a build that moves only one of those is a new deploy to this record too. */
+  const shippedNow = async (): Promise<string> => {
+    const { shippedVersion } = await import('@braindog/seed/packs/quiet');
+    return JSON.stringify(
       kernel
         .packStates()
         .flatMap((p): [string, string][] => {
@@ -4435,8 +4437,36 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         })
         .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     );
+  };
+  /**
+   * WHETHER THE PASS IS DUE: this build's versions or the day are not the ones it last kept, and no pass for them began
+   * within `FIRST_PARTY_RETRY_MS` (`tried`, kept on the same pref until the pass ends).
+   *
+   * THE PASS KEEPS WHAT IT DID ONLY WHEN IT ENDS, so a pass the platform cut, or one that never reached its end, was begun
+   * again by the next tick, and the Worker ticked after every request: from 00:00 UTC on 30 October every `/api/pulse` on
+   * his record spent 15 s of CPU, all day, and that is the work it kept starting. So when a pass begins is kept before it
+   * runs, as the look keeps its day, and a pass that did not end is tried again an hour later, not on the next request.
+   */
+  const firstPartyDue = async (today: string): Promise<boolean> => !firstPartyRunning && firstPartyOwed(today, await shippedNow());
+  const firstPartyOwed = (today: string, shipped: string): boolean => {
+    const prefs = kernel.prefsOf(FIRST_PARTY_HOLDER);
+    const last = prefs[FIRST_PARTY_LAST] as { versions?: unknown; day?: unknown } | undefined;
+    if (last?.versions === shipped && last.day === today) return false;
+    const tried = (last as { tried?: { versions?: unknown; day?: unknown; at?: unknown } } | undefined)?.tried;
+    return !(tried?.versions === shipped && tried.day === today && typeof tried.at === 'number' && clock.now() - tried.at < FIRST_PARTY_RETRY_MS);
+  };
+  const firstPartyPass = async (today: string): Promise<string[]> => {
+    const { shippedVersion, updateFirstParty } = await import('@braindog/seed/packs/quiet');
+    const { firstPartyManifest } = await import('@braindog/seed/packs');
+    const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
+    const { useCase } = await import('@braindog/seed/usecases');
+    const { moduleName } = await import('@braindog/seed/usecases/names');
+    const shipped = await shippedNow();
+    if (!firstPartyOwed(today, shipped)) return [];
     const last = kernel.prefsOf(FIRST_PARTY_HOLDER)[FIRST_PARTY_LAST] as { versions?: unknown; day?: unknown } | undefined;
-    if (last?.versions === shipped && last.day === today) return [];
+    /* WHEN THIS PASS BEGAN, KEPT BEFORE IT RUNS (`firstPartyDue`), beside what the last pass kept, which this one's end
+       writes over whole. */
+    kernel.setPref(FIRST_PARTY_HOLDER, FIRST_PARTY_LAST, { ...(last ?? {}), tried: { versions: shipped, day: today, at: clock.now() } });
     /* WHERE THIS PASS STARTS IN THE LOG, so what it writes is read back as one line with its steps (`update-pass.ts`). */
     const from = kernel.newestEvent();
     const actor = 'system';
@@ -5091,6 +5121,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const slashDay = (): string => localDays(readableZone(kernel.identity()?.tz))(clock.now());
 
+  /**
+   * THE RECORD AS A TICK READ IT, IN ONE INDEXED READ: the newest line of its log and that line's id (a write rolled back
+   * and another in its place has a new id at the same place), the newest row, the newest declaration, the add-ons on
+   * and their versions, and the rows kept private. Every write the kernel makes leaves a line, so two equal stamps are
+   * a record nobody wrote to in between. What moves with no line (a run's heartbeat, the clock) is the reason the
+   * ticks that skip on an equal stamp still look again every `LOOK_REWALK_MS`, and every new day.
+   */
+  const changeStamp = (): string =>
+    JSON.stringify(
+      Object.values(
+        sql.one<Record<string, unknown>>(
+          `SELECT (SELECT rowid FROM event ORDER BY rowid DESC LIMIT 1) AS r, (SELECT id FROM event ORDER BY rowid DESC LIMIT 1) AS i,
+                  (SELECT max(rowid) FROM entry) AS e, (SELECT max(rowid) FROM declaration) AS d,
+                  (SELECT group_concat(id || ':' || coalesce(version, '') || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p,
+                  (SELECT max(rowid) FROM entry_private) AS v, (SELECT count(*) FROM entry_private) AS n`,
+        ) ?? {},
+      ),
+    );
+
   /** The lists a page's blocks read, by their `source: register.<id>`. */
   const listsRead = (blocks: readonly unknown[]): Set<string> =>
     new Set(
@@ -5258,37 +5307,76 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** Whether a page's kept line is of an answer whose look was refused (`lookRehearsed` marks it), so it is not said. */
   const lineRefused = (kept: unknown): boolean => typeof kept === 'object' && kept !== null && (kept as { refused?: unknown }).refused === true;
 
-  const slashHeadlines = async (today: string, again = false): Promise<{ said: string[]; dropped: string[] }> => {
+  /** One page the headline ask is owed, as the walk found it. */
+  type HeadlineDue = { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[]; row?: true };
+  /**
+   * THE WALK OF THE PAGES UNDER WAY, kept in this object between ticks (`TickBudget`): the pages in the rail's order as
+   * the walk began, the next one, and what was found owed so far. A tick with a budget draws a few pages and keeps the
+   * rest for the next; the ask goes once, when the walk has read them all, so one walk is one ask as it always was. Kept
+   * in memory and not as a pref: an object that restarts walks again from the first page, which costs reads and never an
+   * ask (`HEADLINES_ASKED` counts an ask before it is made). `stamp` is the record as the walk began (`changeStamp`).
+   */
+  let headlineWalk: { day: string; again: boolean; order: string[]; at: number; due: HeadlineDue[]; stamp: string } | null = null;
+  /**
+   * THE LAST WALK THAT LEFT NOTHING OWED: the day, the record as it read it, and when. While the record has not moved since
+   * (`changeStamp`), the day holds and `LOOK_REWALK_MS` has not passed, a later tick of the day has nothing to find, so it
+   * draws no page (`slashHeadlinesAgain`). A walk that left a page out (`HEADLINE_PAGES_MOST`, or an answer too long for
+   * the ask) or owes one a wait (`HEADLINES_OWED`) settles nothing, so the next tick walks again as it did.
+   */
+  let headlinesSettled: { day: string; stamp: string; at: number } | null = null;
+
+  const slashHeadlines = async (today: string, again = false, budget: TickBudget = UNBOUNDED): Promise<{ said: string[]; dropped: string[]; cut?: true }> => {
     const model = deps.slashModel;
     if (!model?.headline) return { said: [], dropped: [] };
     const headline = model.headline.bind(model);
     const prefs = kernel.prefsOf(SLASH);
     const asked = askedOn(prefs[HEADLINES_ASKED], today);
-    if (asked.asks >= HEADLINE_ASKS_DAY) return { said: [], dropped: [] };
+    if (asked.asks >= HEADLINE_ASKS_DAY) {
+      headlineWalk = null;
+      return { said: [], dropped: [] };
+    }
     const pressing = pressingRead(today);
-    let due: { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[]; row?: true }[] = [];
     /* A PAGE IS DUE when what it would be written from is not what its line was, and it was not asked at that today. */
     const owed = (slug: string, basis: string, facts: string | undefined): boolean => {
       const stored = storedHeadline(prefs[headlineKey(slug)]);
       if (stored !== null && stored.basis === basis && stored.facts === facts) return false;
       return asked.bases[slug] !== askedAt(basis, facts);
     };
-    const home = homeReading(pressing);
-    if (home !== null) {
-      const basis = homeBasis(home, today);
-      if (owed(HOME_PAGE, basis, undefined)) due.push({ page: home, basis });
-    }
-    /* AND THE PAGES PER ROW, A PROJECT'S AMONG THEM (the thinking scope of 24 October): a project's hero said its
-       rules' line alone. Pages somebody wrote first, then a page per row, the row touched last first, all under the same
-       `HEADLINE_PAGES_MOST`: a page left out is still owed, and a later ask of the day takes it. */
+    /* A WALK A TICK BEFORE THIS ONE CUT GOES ON FROM WHERE IT STOPPED, the same day and the same kind of look; any other is
+       begun again from Home and the first page. */
     const listed = kernel.pages();
-    const touched = (p: (typeof listed)[number]): string => String(p.about?.updated_at ?? '');
-    const ordered = [...listed.filter((p) => p.about === null), ...listed.filter((p) => p.about !== null).sort((a, b) => touched(b).localeCompare(touched(a)))];
-    for (const p of ordered) {
-      if (due.length >= HEADLINE_PAGES_MOST) break;
+    let walk = headlineWalk !== null && headlineWalk.day === today && headlineWalk.again === again ? headlineWalk : null;
+    if (walk === null) {
+      const first: HeadlineDue[] = [];
+      const home = homeReading(pressing);
+      if (home !== null) {
+        const basis = homeBasis(home, today);
+        if (owed(HOME_PAGE, basis, undefined)) first.push({ page: home, basis });
+      }
+      /* AND THE PAGES PER ROW, A PROJECT'S AMONG THEM (the thinking scope of 24 October): a project's hero said its
+         rules' line alone. Pages somebody wrote first, then a page per row, the row touched last first, all under the same
+         `HEADLINE_PAGES_MOST`: a page left out is still owed, and a later ask of the day takes it. */
+      const touched = (p: (typeof listed)[number]): string => String(p.about?.updated_at ?? '');
+      const ordered = [...listed.filter((p) => p.about === null), ...listed.filter((p) => p.about !== null).sort((a, b) => touched(b).localeCompare(touched(a)))];
+      walk = { day: today, again, order: ordered.map((p) => p.slug), at: 0, due: first, stamp: changeStamp() };
+    }
+    headlineWalk = walk;
+    const bySlug = new Map(listed.map((p) => [p.slug, p] as const));
+    const due0 = walk.due;
+    let drawn = 0;
+    while (walk.at < walk.order.length) {
+      if (due0.length >= HEADLINE_PAGES_MOST) break;
+      /* A TICK'S SHARE OF THE WALK IS SPENT: the rest waits for the next tick, and nothing is asked until it is read. */
+      if (drawn > 0 && budget.spent()) return { said: [], dropped: [], cut: true };
+      const p = bySlug.get(walk.order[walk.at]!);
+      walk.at++;
+      /* A PAGE GONE SINCE THE WALK BEGAN is passed over, as a page that does not draw is. */
+      if (p === undefined) continue;
       /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
       if (p.nav === null || p.slug === HOME_PAGE) continue;
       const row = p.about !== null;
+      drawn++;
+      budget.spend();
       const read = kernel.page(p.slug, undefined, { viewer: NOBODY });
       if (!read.ok) continue;
       const plain = leadBlockOf(read.value.blocks);
@@ -5327,7 +5415,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          model may answer an order and one next step beside the line, at no ask beyond it. */
       /* NOT ON A PAGE PER ROW, whose order is its template's: one row's page is not arranged apart from the rest. */
       const look = row ? { blocks: [], rows: [] } : lookInputOf(read.value.blocks, (list) => kernel.register(list)?.title ?? null, groupListsOf(kernel));
-      due.push({
+      due0.push({
         page: {
           page: p.slug,
           title: p.title,
@@ -5345,6 +5433,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(row ? { row: true as const } : {}),
       });
     }
+    /* THE WALK HAS READ WHAT IT WILL: a page it left unread is one `HEADLINE_PAGES_MOST` left out, still owed. */
+    const leftOut = walk.at < walk.order.length;
+    const walked = walk.stamp;
+    headlineWalk = null;
+    let due = due0;
     /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`): each page whose basis moved
        is kept with when it was first seen owed (`HEADLINES_OWED`), and none is asked about until `HEADLINE_OWED_MS` after
        the first, so the writes of one sitting are answered in one ask. The night asks every page it owes at once. */
@@ -5366,6 +5459,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       fits.push(d);
       room -= most;
     }
+    /* A WALK THAT LEFT NO PAGE OUT AND OWES NONE A WAIT SETTLES THE RECORD AS IT READ IT (`headlinesSettled`); what it
+       asks below is counted in `HEADLINES_ASKED` before it is asked, so it is never asked again at the same basis. */
+    headlinesSettled = !leftOut && fits.length === due.length && Object.keys(waiting).length === 0 ? { day: today, stamp: walked, at: clock.now() } : null;
     due = fits;
     if (due.length === 0) return { said: [], dropped: [] };
     const input: HeadlineInput = { today, pages: due.map((d) => d.page) };
@@ -5422,11 +5518,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * notes when (`HEADLINES_OWED`) and asks nothing; the ask goes on the first look `HEADLINE_OWED_MS` after that.
    */
   let headlinesLooked = Number.NEGATIVE_INFINITY;
-  const slashHeadlinesAgain = async (today: string): Promise<void> => {
-    if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return;
+  /**
+   * AND NOT AT ALL WHILE NOTHING MOVED (`headlinesQuiet`). This walk drew every page on every quarter hour's tick, and
+   * a page's figures are held for an hour at most (`holdAcross`), so on his record each tick that came after an hour
+   * spent 15 s of CPU finding what the last walk found. A walk is drawn when the record moved since the last walk that
+   * left nothing owed, when a page waits out `HEADLINE_OWED_MS`, or every `LOOK_REWALK_MS` for what moves with the clock.
+   *
+   * A WALK THE LAST TICK CUT GOES ON first, whatever the quarter hour says: it was due when it began. Answers whether the
+   * walk was cut again, so the host comes back for the rest.
+   */
+  const slashHeadlinesAgain = async (today: string, budget: TickBudget = UNBOUNDED): Promise<boolean> => {
+    if (headlineWalk !== null && headlineWalk.day === today && headlineWalk.again) return (await slashHeadlines(today, true, budget)).cut === true;
+    if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return false;
     headlinesLooked = clock.now();
-    if (askedOn(kernel.prefsOf(SLASH)[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return;
-    await slashHeadlines(today, true);
+    const prefs = kernel.prefsOf(SLASH);
+    if (askedOn(prefs[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return false;
+    if (Object.keys(owedOn(prefs[HEADLINES_OWED])).length === 0 && headlinesQuiet(today)) return false;
+    return (await slashHeadlines(today, true, budget)).cut === true;
+  };
+  /** Whether the last walk that left nothing owed read the record as it is now, today, and lately (`headlinesSettled`). */
+  const headlinesQuiet = (today: string): boolean =>
+    headlinesSettled !== null && headlinesSettled.day === today && clock.now() - headlinesSettled.at < LOOK_REWALK_MS && headlinesSettled.stamp === changeStamp();
+  /** Whether `slashHeadlinesAgain` would draw a page now: what a request asks before it wakes the alarm for it (`slashTick`'s `defer`). */
+  const headlinesAgainDue = (today: string): boolean => {
+    if (!deps.slashModel?.headline) return false;
+    if (headlineWalk !== null && headlineWalk.day === today && headlineWalk.again) return true;
+    if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return false;
+    const prefs = kernel.prefsOf(SLASH);
+    if (askedOn(prefs[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return false;
+    return Object.keys(owedOn(prefs[HEADLINES_OWED])).length > 0 || !headlinesQuiet(today);
   };
 
   /**
@@ -5443,6 +5563,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * costs a read and never an ask: the ask is bounded by `BRIEF_ASKS_DAY`.
    */
   let briefLooked = Number.NEGATIVE_INFINITY;
+  /**
+   * WHAT THE LAST GATHERING READ: the record (`changeStamp`), the part of the day it was in (`briefSlot`), and when. A
+   * later tick of the day gathers nothing while all three hold within `LOOK_REWALK_MS`: `briefTick` asks once a part of
+   * the day and when the facts move, and facts gathered from a record that has not moved, in the same part of the same
+   * day, are the facts it already had.
+   */
+  let briefSeen: { stamp: string; day: string; slot: number; at: number } | null = null;
+  const briefQuiet = (nowMs: number): boolean => {
+    if (briefSeen === null || nowMs - briefSeen.at >= LOOK_REWALK_MS) return false;
+    const { day, slot } = briefSlot(nowMs, kernel.identity()?.tz ?? 'UTC');
+    return briefSeen.day === day && briefSeen.slot === slot && briefSeen.stamp === changeStamp();
+  };
+  /** Whether `slashBrief(now, true)` would gather now: what a request asks before it wakes the alarm for it. */
+  const briefAgainDue = (nowMs: number): boolean => {
+    const model = deps.slashModel;
+    if (typeof model?.written === 'function' || typeof model?.brief !== 'function') return false;
+    return nowMs - briefLooked >= HEADLINE_LOOK_MS && !briefQuiet(nowMs);
+  };
   const slashBrief = async (nowMs: number, again = false): Promise<string[]> => {
     const model = deps.slashModel;
     /* A MODEL THAT WRITES THE BRIEF IS NOT ASKED FOR IT: Today greets only and the agents' briefing passes
@@ -5450,17 +5588,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (typeof model?.written === 'function') return [];
     if (typeof model?.brief !== 'function') return [];
     if (again && nowMs - briefLooked < HEADLINE_LOOK_MS) return [];
+    if (again && briefQuiet(nowMs)) return [];
     briefLooked = nowMs;
     const brief = model.brief.bind(model);
+    const zone = kernel.identity()?.tz ?? 'UTC';
+    const seen = { stamp: changeStamp(), ...briefSlot(nowMs, zone), at: nowMs };
     const facts = briefFactsFor(methodDeps(), { principal: { kind: 'system', id: SLASH }, outbound: true }, nowMs);
     const out = await briefTick({
       facts,
       now: nowMs,
-      zone: kernel.identity()?.tz ?? 'UTC',
+      zone,
       read: (key) => kernel.prefsOf(SLASH)[key],
       write: (key, value) => kernel.setPref(SLASH, key, value as never),
       ask: (input) => slashAsked('headline', input, (i) => brief(i)),
     });
+    briefSeen = seen;
     return out.dropped === null ? [] : [out.dropped];
   };
 
@@ -5716,11 +5858,40 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const SLASH_DAILY = 'slash.daily';
   const SLASH_LAST = 'slash.last';
+  /** The step the day's look is on, kept before each step runs (`slashTick`): `{ day, next, by, large }`. */
+  const SLASH_STEP = 'slash.step';
+  /**
+   * What one step of the look but the walk counts against a tick's budget, in pages (`TickBudget`): most read the record
+   * about as much as a few pages drawn, so a budget of ten runs two or three of them an alarm; `understanding` reads as
+   * much as the whole walk (1.6 s of 3 s on the bench his size), so it spends a whole alarm's share and the steps after
+   * it wait for the next.
+   */
+  const LOOK_STEP_UNITS: Readonly<Record<string, number>> = { understanding: TICK_PAGES };
+  const LOOK_STEP_UNITS_EACH = 4;
+  /** The day's look, step by step, in the order it always ran. */
+  const LOOK_STEPS = ['file', 'skills', 'projects', 'drew', 'understanding', 'headlines', 'brief'] as const;
+  /** The step today's look goes on from, or `null` when no look of today is under way (done, or never begun in steps). */
+  const lookStepOf = (today: string): { next: number; by: string; large: boolean } | null => {
+    const kept = kernel.prefsOf(SLASH)[SLASH_STEP] as { day?: unknown; next?: unknown; by?: unknown; large?: unknown } | undefined;
+    if (kept?.day !== today || typeof kept.next !== 'number' || kept.next >= LOOK_STEPS.length) return null;
+    return { next: Math.max(0, kept.next), by: typeof kept.by === 'string' ? kept.by : 'rules', large: kept.large === true };
+  };
   /** The day `lintTick` last ran a round, kept as the record's own pref beside its updates. */
   const LINT_HOLDER = 'braindog:signs';
   const LINT_LAST = 'pages-clean.last';
   /** The day the record's words were last walked for `textFaults`, kept apart from the lint's so a deploy day still gets one. */
   const WORDS_LAST = 'text-faults.last';
+  /** Today's lint under way in slices (`lintTick` with a budget): its day, the step it is on, its round so far. */
+  const LINT_RUN = 'pages-clean.run';
+  type LintRun = { day: string; step: 'round' | 'census' | 'signs'; round: RoundPart; census?: CensusPart; said?: { state: 'green' | 'red' | 'none'; findings: number; pages: number } };
+  /** Today's lint under way, or `null` for none (done, never begun in slices, another day's, or a shape an older build kept). */
+  const lintRunOf = (today: string): LintRun | null => {
+    const raw = kernel.prefsOf(LINT_HOLDER)[LINT_RUN] as Partial<LintRun> | undefined;
+    if (raw === undefined || raw === null || raw.day !== today || (raw.step !== 'round' && raw.step !== 'census' && raw.step !== 'signs')) return null;
+    const round = roundPartOf(raw.round);
+    const census = raw.census !== undefined && raw.census !== null && typeof raw.census === 'object' && Array.isArray(raw.census.order) && Array.isArray(raw.census.pages) ? raw.census : undefined;
+    return round === null ? null : { day: today, step: raw.step, round, ...(census === undefined ? {} : { census }), ...(raw.said === undefined ? {} : { said: raw.said }) };
+  };
   const slashDailyState = () => {
     const prefs = kernel.prefsOf(SLASH);
     return { on: prefs[SLASH_DAILY] !== false, last: typeof prefs[SLASH_LAST] === 'string' ? (prefs[SLASH_LAST] as string) : null };
@@ -10290,6 +10461,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * THE ALARM'S `keepSigns`, ONLY WHEN SOMETHING A SIGN READS MOVED: the record (`changeStamp`) or a sign's own reading
+   * (`sign_reading`), or `SIGNS_REKEEP_MS` passed, which is well inside the quarter hour a kept reading is trusted for
+   * (`keptNow`), so the briefing still reads a pref. Every tick read every sign again, and ticks in slices come seconds apart.
+   */
+  /** How many pages say the model's line now (`HEADLINES_HELD`), kept for the model sign. A count that throws keeps yesterday's. */
+  const keepHeld = (today: string): void => {
+    try {
+      kernel.setPref(SLASH, HEADLINES_HELD, { day: today, ...headlinesHeld() });
+    } catch {
+      /* The model sign says nothing of the pages until a count is kept. */
+    }
+  };
+  let signsKeptAt: { stamp: string; at: number } | null = null;
+  const keepSignsMoved = (): void => {
+    const now = clock.now();
+    const stamp = changeStamp() + String(sql.one<{ r: string | null }>('SELECT max(read_at) AS r FROM sign_reading')?.r ?? '');
+    if (signsKeptAt !== null && signsKeptAt.stamp === stamp && now - signsKeptAt.at < SIGNS_REKEEP_MS && now >= signsKeptAt.at) return;
+    keepSigns();
+    signsKeptAt = { stamp, at: now };
+  };
+
+  /**
    * The night's walk of the record's own words, kept for `textFaults` (`methods/text-faults.ts`): on the first alarm of a
    * UTC day that finds it undone, and a record with none kept gets it on the first alarm after a deploy. The day is kept
    * before the walk, as the lint's is, so a walk that throws is not tried again until tomorrow; the last answer stands.
@@ -11607,50 +11800,118 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * SLASH'S DAILY RUN, for a host's tick and never routed: once a UTC day at most, unless the owner turned it off. The day
      * is kept before the work, so a run that throws or a model that hangs is not retried until tomorrow. Everything after is
      * the press's own path, so the cap of three and a dismissal holding are the same here.
+     *
+     * IN SLICES, WHEN THE HOST HANDS A BUDGET (`TickBudget`). The day's look is seven steps (`LOOK_STEPS`), and the step it
+     * is on is kept before each one runs (`SLASH_STEP`), as the day is, so a step the platform cut is never run twice and
+     * the next tick goes on from the step after it. The page walk inside the headlines step is the one step that spans
+     * ticks: it is a read until its one ask. A tick whose budget is spent stops after the step it is in and answers
+     * `more`, and the host comes back for the rest. With no budget, one tick does the whole look, as it always did.
+     *
+     * `defer` IS A REQUEST'S ASK, NEVER THE WORK. The Worker asked this after every request, and the work landed in that
+     * request's `waitUntil`: on his record each `/api/pulse` spent 15 s of CPU, every 25 s, all day (30 October). Deferred,
+     * it answers `later` when there is work due (the update pass, the look or its next slice, a page walk or a briefing
+     * due again) and does none of it, so the host wakes its alarm, which does it in slices.
      */
-    async slashTick(): Promise<{ ran: false; why: 'off' | 'today' | 'unopened' } | { ran: true; by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] }> {
+    async slashTick(opts: { budget?: TickBudget; defer?: boolean } = {}): Promise<
+      | { ran: false; why: 'off' | 'today' | 'unopened' | 'later'; more?: true }
+      | { ran: true; by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[]; large: boolean; more?: true }
+    > {
       if (kernel.refused()) return { ran: false, why: 'unopened' };
       const today = slashDay();
+      const budget = opts.budget ?? UNBOUNDED;
+      if (opts.defer === true) {
+        const state = slashDailyState();
+        const due =
+          (await firstPartyDue(today)) ||
+          (state.on && (state.last !== today || lookStepOf(today) !== null || headlinesAgainDue(today) || briefAgainDue(clock.now())));
+        return { ran: false, why: due ? 'later' : state.on ? 'today' : 'off' };
+      }
       /* BRAINDOG'S OWN MODULES FIRST, ONCE A DEPLOY AND ONCE A DAY, whether Slash is on or not (`firstPartyTick`). A check
          that breaks outside its own try (a module of this build that will not load) never costs the day its look. */
       const updates = await firstPartyTick(today).catch(() => ["The check for BrainDog's own updates could not run, and runs again on the next tick."]);
       const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
-      if (state.last === today) {
+      /* THE DAY'S LOOK BEGUN ON AN EARLIER TICK GOES ON FROM THE STEP IT KEPT. */
+      const going = state.last === today ? lookStepOf(today) : null;
+      if (state.last === today && going === null) {
         /* THE DAY'S LOOK IS DONE, BUT A PAGE WHOSE FIGURES MOVED SINCE MAY BE ASKED ABOUT ONCE MORE (`slashHeadlinesAgain`). */
-        await slashHeadlinesAgain(today).catch(() => {});
-        /* AND THE BRIEFING, when a new part of his day began or what it was written from moved (`slashBrief`). */
+        const cut = await slashHeadlinesAgain(today, budget).catch(() => false);
+        /* AND THE BRIEFING, when a new part of his day began or what it was written from moved (`slashBrief`). A walk cut
+           short leaves the briefing to the tick that finishes it. */
+        if (cut) return { ran: false, why: 'today', more: true };
         await slashBrief(clock.now(), true).catch(() => {});
         return { ran: false, why: 'today' };
       }
-      kernel.setPref(SLASH, SLASH_LAST, today);
-      const out = await slashFile(undefined, true);
-      out.dropped.push(...updates);
-      /* THE SKILL STEP COMES AFTER, so a skill's next version takes a slot on Decide the look's own drafts left, and what
-         it passed over or found unchanged is said in the same log (`dropped`). */
-      const skills = await slashSkills();
-      out.filed.push(...skills.filed);
-      out.dropped.push(...skills.dropped);
-      /* THEN THE REPOSITORIES AGENTS WORK IN THAT NO PROJECT HOLDS, one "Start a project?" each (`slashProjects`). */
-      const projects = await slashProjects();
-      out.filed.push(...projects.filed);
-      out.dropped.push(...projects.dropped);
-      /* THEN THE ONE THING BRAINDOG DREW TODAY, if anything has data for a picture and none (`slashDrew`). */
-      const drewAs = drewOwner();
-      const drew = await slashDrew(drewAs === null ? null : previewerOf(this, drewAs));
-      out.filed.push(...drew.filed);
-      out.dropped.push(...drew.dropped);
-      /* THEN WHAT THE RECORD ALREADY HOLDS, READ AGAIN A SLICE A NIGHT, and what it would not settle asked once each. */
-      const understood = await slashUnderstanding();
-      out.filed.push(...understood.filed);
-      out.dropped.push(...understood.dropped);
-      /* AND THE HEADLINES LAST, which file nothing on Decide and only write Slash's own prefs. */
-      out.dropped.push(...(await slashHeadlines(today)).dropped);
-      /* THEN THE BRIEFING, after everything the look filed, so it is written from the questions that now wait. A briefing
-         that fails never costs the day its look: the rules' cards stand. */
-      out.dropped.push(...(await slashBrief(clock.now()).catch(() => [] as string[])));
+      const out: { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[]; large: boolean } =
+        going === null ? { by: 'rules', filed: [], skipped: [], dropped: [], large: false } : { by: going.by, filed: [], skipped: [], dropped: [...updates], large: going.large };
+      if (going === null) kernel.setPref(SLASH, SLASH_LAST, today);
+      let step = going === null ? 0 : going.next;
+      const keep = (next: number): void => kernel.setPref(SLASH, SLASH_STEP, { day: today, next, by: out.by, large: out.large });
+      const took = (got: { filed: { id: string; question: string; by: string }[]; dropped: string[] }): void => {
+        out.filed.push(...got.filed);
+        out.dropped.push(...got.dropped);
+      };
+      let cut = false;
+      try {
+        while (step < LOOK_STEPS.length) {
+          const name = LOOK_STEPS[step]!;
+          /* KEPT BEFORE THE STEP RUNS, so a step the platform cut is not run again: the next tick starts at the one after.
+             The headlines' walk is kept as it is and moved past only once it has read every page it will. */
+          if (name !== 'headlines') keep(step + 1);
+          if (name === 'file') {
+            const filed = await slashFile(undefined, true);
+            out.by = filed.by;
+            out.large = filed.large;
+            out.filed.push(...filed.filed);
+            out.skipped.push(...filed.skipped);
+            out.dropped.push(...filed.dropped);
+            out.dropped.push(...updates);
+            keep(step + 1);
+          } else if (name === 'skills') {
+            /* THE SKILL STEP COMES AFTER, so a skill's next version takes a slot on Decide the look's own drafts left, and
+               what it passed over or found unchanged is said in the same log (`dropped`). */
+            took(await slashSkills());
+          } else if (name === 'projects') {
+            /* THEN THE REPOSITORIES AGENTS WORK IN THAT NO PROJECT HOLDS, one "Start a project?" each (`slashProjects`). */
+            took(await slashProjects());
+          } else if (name === 'drew') {
+            /* THEN THE ONE THING BRAINDOG DREW TODAY, if anything has data for a picture and none (`slashDrew`). */
+            const drewAs = drewOwner();
+            took(await slashDrew(drewAs === null ? null : previewerOf(this, drewAs)));
+          } else if (name === 'understanding') {
+            /* THEN WHAT THE RECORD ALREADY HOLDS, READ AGAIN A SLICE A NIGHT, and what it would not settle asked once each. */
+            took(await slashUnderstanding());
+          } else if (name === 'headlines') {
+            /* AND THE HEADLINES LAST, which file nothing on Decide and only write Slash's own prefs. */
+            const said = await slashHeadlines(today, false, budget);
+            out.dropped.push(...said.dropped);
+            if (said.cut === true) {
+              cut = true;
+              break;
+            }
+            keep(step + 1);
+          } else {
+            /* THEN THE BRIEFING, after everything the look filed, so it is written from the questions that now wait. A
+               briefing that fails never costs the day its look: the rules' cards stand. */
+            out.dropped.push(...(await slashBrief(clock.now()).catch(() => [] as string[])));
+          }
+          /* A STEP THAT DRAWS NO PAGE STILL COUNTS (`LOOK_STEP_UNITS`): on a Worker the clock stands still while it reads,
+             so without this every step but the walk would run in the one alarm. */
+          if (name !== 'headlines') budget.spend(LOOK_STEP_UNITS[name] ?? LOOK_STEP_UNITS_EACH);
+          step++;
+          if (step < LOOK_STEPS.length && budget.spent()) {
+            cut = true;
+            break;
+          }
+        }
+      } catch (e) {
+        /* A STEP THAT THROWS ENDS THE DAY'S LOOK, as it always did: the steps after it wait for tomorrow. */
+        keep(LOOK_STEPS.length);
+        throw e;
+      }
+      if (!cut) keep(LOOK_STEPS.length);
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
-      return { ran: true, ...out };
+      return { ran: true, ...out, ...(cut ? { more: true as const } : {}) };
     },
 
     /**
@@ -11664,13 +11925,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * AND ONCE A DAY, LAST, THE RECORD'S WORDS ARE WALKED AND KEPT (`keepWords`), so `textFaults` reads them back and
      * walks nothing when a screen opens.
+     *
+     * IN SLICES, WHEN THE HOST HANDS A BUDGET (`TickBudget`): the round a few pages a tick, then the census and the sign,
+     * then the record's two signs, each on a tick of its own once the budget is spent, with where it stopped kept as a
+     * pref (`LINT_RUN`) so an object that restarts goes on from there. The step it is on is kept before it runs, so a step
+     * the platform cut is not run again. A round in slices is bounded by `ROUND_PAGES` alone, which on a Worker (whose
+     * clock stands still while a page draws) is the bound it always had. With no budget, one tick does it all, as before.
+     *
+     * AND THE SIGNS ARE KEPT ONLY WHEN SOMETHING MOVED (`keepSignsMoved`): every tick read every sign again, and ticks
+     * in slices come seconds apart.
      */
-    async lintTick(): Promise<{ ran: false; why: 'today' | 'unopened' } | { ran: true; state: 'green' | 'red' | 'none'; findings: number; pages: number }> {
+    async lintTick(opts: { budget?: TickBudget } = {}): Promise<
+      | { ran: false; why: 'today' | 'unopened' | 'later'; more?: true }
+      | { ran: true; state: 'green' | 'red' | 'none'; findings: number; pages: number }
+    > {
       if (kernel.refused()) return { ran: false, why: 'unopened' };
       const today = new Date(clock.now()).toISOString().slice(0, 10);
+      const sliced = opts.budget !== undefined;
+      const budget = opts.budget ?? UNBOUNDED;
       const kept = <T>(out: T): T => {
         try {
-          keepSigns();
+          keepSignsMoved();
         } catch {
           /* The briefing reads the signs itself until one is kept. */
         }
@@ -11678,11 +11953,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         keepWords(today);
         return out;
       };
-      if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today) return kept({ ran: false, why: 'today' } as const);
-      kernel.setPref(LINT_HOLDER, LINT_LAST, today);
-      const round = lintRound({
+      const lintDeps = {
         pages: () => kernel.pages(),
-        page: (slug) => kernel.page(slug),
+        page: (slug: string) => kernel.page(slug),
         questionsOpen: () => {
           const decl = kernel.metricDecl('questions-open');
           const read = decl ? kernel.metric(decl) : null;
@@ -11695,35 +11968,96 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            (`vm`) prints as its key, so only those are a key where a name goes. */
         keysOf: lintKeysOf,
         now: () => Date.now(),
-      });
-      /* THE WHOLE ROUND IS KEPT BESIDE THE SIGN: its reading carries six facts, and Settings › Health lists every
-         finding from this, each with its page's address by its title. */
-      const slugs = new Map(kernel.pages().map((p) => [p.title, p.slug] as const));
-      kernel.setPref(ROUND_HOLDER, ROUND_KEPT, keptRound(round, clock.now(), (title) => slugs.get(title) ?? null));
-      /* THE PAGES CENSUS BESIDE THE LINT: every page, read as the system, and the suggested pages waiting
-         in the holding pen, so the sign also says which pages show a refused block or print a path that named nothing. */
-      const census = await censusMethods(methodDeps()).pagesCensus(undefined, { principal: { kind: 'system', id: 'signs' } });
-      const suggested = penFor({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(), use: { sql, nowMs: clock.now() } }).filter((i) => i.kind === 'page').length;
-      const reading = pagesCleanReading(round, census.ok ? census.value : undefined, suggested);
-      /* AND HOW MANY PAGES SAY THE MODEL'S LINE NOW, for the model sign's facts (`HEADLINES_HELD`). A count that throws
-         keeps yesterday's and costs the round nothing. */
-      try {
-        kernel.setPref(SLASH, HEADLINES_HELD, { day: today, ...headlinesHeld() });
-      } catch {
-        /* The model sign says nothing of the pages until a count is kept. */
+      };
+      let run = lintRunOf(today);
+      if (run === null) {
+        if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today) return kept({ ran: false, why: 'today' } as const);
+        kernel.setPref(LINT_HOLDER, LINT_LAST, today);
+        run = { day: today, step: 'round', round: roundBegun(lintDeps) };
       }
-      /* A READING THE KERNEL REFUSES IS SAID, never dropped: the host logs the throw, and the sign keeps yesterday's. */
-      const filed = kernel.signRead('pages-clean', reading);
-      if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
-      /* AND THE RECORD'S TWO SIGNS (`signs.ts`): whether a new session's briefing is true, and whether agents were given
-         the tool list. A system principal reads the whole briefing, as a session in that repository would be handed it. */
-      const signs = await fileRecordSigns(
-        kernel,
-        { sql, briefing: (repo) => briefingNow({ principal: { kind: 'system', id: 'signs' }, session: { repo } }), build, offers: deps.catalogueOffers },
-        clock.now(),
-      );
-      if (signs.refused.length > 0) throw new Error(`signs were not filed: ${signs.refused.join('; ')}`);
-      return kept({ ran: true as const, state: reading.state, findings: round.findings.length, pages: round.pages });
+      const keep = (next: LintRun | null): void => kernel.setPref(LINT_HOLDER, LINT_RUN, next);
+      const later = (next: LintRun) => {
+        keep(next);
+        return { ran: false as const, why: 'later' as const, more: true as const };
+      };
+      try {
+        if (run.step === 'round') {
+          const start = Date.now();
+          let counted = 0;
+          const round = roundStep(
+            lintDeps,
+            run.round,
+            sliced
+              ? (drawn) => {
+                  budget.spend(drawn - counted);
+                  counted = drawn;
+                  return budget.spent();
+                }
+              : () => Date.now() - start > ROUND_MS,
+          );
+          /* ONE ROUND IN ONE TICK ENDS AT `ROUND_MS` AS IT ALWAYS DID; one in slices goes on until `ROUND_PAGES`. */
+          const ended = !sliced || roundEnded(round);
+          if (!ended) return later({ ...run, round });
+          run = { day: today, step: 'census', round };
+          if (sliced && budget.spent()) return later(run);
+        }
+        if (run.step === 'census') {
+          const round = roundOf(run.round);
+          const slices = censusSlices(methodDeps());
+          const asSystem: CallContext = { principal: { kind: 'system', id: 'signs' } };
+          if (run.census === undefined) {
+            /* THE WHOLE ROUND IS KEPT BESIDE THE SIGN: its reading carries six facts, and Settings › Health lists every
+               finding from this, each with its page's address by its title. */
+            const slugs = new Map(kernel.pages().map((p) => [p.title, p.slug] as const));
+            kernel.setPref(ROUND_HOLDER, ROUND_KEPT, keptRound(round, clock.now(), (title) => slugs.get(title) ?? null));
+          }
+          /* THE PAGES CENSUS BESIDE THE LINT: every page, read as the system, and the suggested pages waiting
+             in the holding pen, so the sign also says which pages show a refused block or print a path that named nothing.
+             In slices it is counted a few pages a tick, as the round is; in one tick it is `pagesCensus` exactly. */
+          let census: Awaited<ReturnType<ReturnType<typeof censusMethods>['pagesCensus']>>;
+          if (sliced) {
+            let counted = 0;
+            const part = slices.step(asSystem, run.census ?? slices.begun(asSystem), (drawn) => {
+              budget.spend(drawn - counted);
+              counted = drawn;
+              return budget.spent();
+            });
+            if (!slices.ended(part)) return later({ ...run, census: part });
+            census = { ok: true, value: slices.answer(part) };
+          } else census = await censusMethods(methodDeps()).pagesCensus(undefined, asSystem);
+          const suggested = penFor({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(), use: { sql, nowMs: clock.now() } }).filter((i) => i.kind === 'page').length;
+          const reading = pagesCleanReading(round, census.ok ? census.value : undefined, suggested);
+          /* AND HOW MANY PAGES SAY THE MODEL'S LINE NOW, for the model sign's facts (`HEADLINES_HELD`), in one tick here as
+             it always was; in slices it is the next tick's, before the record's signs, since it reads every page again. */
+          if (!sliced) keepHeld(today);
+          /* A READING THE KERNEL REFUSES IS SAID, never dropped: the host logs the throw, and the sign keeps yesterday's. */
+          const filed = kernel.signRead('pages-clean', reading);
+          if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
+          const { census: _counted, ...rest } = run;
+          run = { ...rest, step: 'signs', said: { state: reading.state, findings: round.findings.length, pages: round.pages } };
+          /* THE RECORD'S SIGNS READ THE WHOLE BRIEFING: a tick of their own. */
+          if (sliced) return later(run);
+        }
+        if (sliced) {
+          /* KEPT BEFORE THE STEP RUNS: the record's signs the platform cut are not read again today. */
+          keep(null);
+          keepHeld(today);
+        }
+        /* AND THE RECORD'S TWO SIGNS (`signs.ts`): whether a new session's briefing is true, and whether agents were given
+           the tool list. A system principal reads the whole briefing, as a session in that repository would be handed it. */
+        const signs = await fileRecordSigns(
+          kernel,
+          { sql, briefing: (repo) => briefingNow({ principal: { kind: 'system', id: 'signs' }, session: { repo } }), build, offers: deps.catalogueOffers },
+          clock.now(),
+        );
+        if (signs.refused.length > 0) throw new Error(`signs were not filed: ${signs.refused.join('; ')}`);
+        const said = run.said ?? { state: 'none' as const, findings: 0, pages: 0 };
+        return kept({ ran: true as const, state: said.state, findings: said.findings, pages: said.pages });
+      } catch (e) {
+        /* A STEP THAT THROWS ENDS TODAY'S ROUND, as it always did: what is after it waits for tomorrow. */
+        if (sliced) keep(null);
+        throw e;
+      }
     },
 
     /**

@@ -156,6 +156,8 @@ test('AT A CEILING OF 0 NOTHING REACHES THE BINDING: five presses, the daily loo
   const doors: Out[] = [];
   for (const door of ['read', 'propose'])
     doors.push((await (await c.ask(`/api/slash/${door}`, { method: 'POST', cookie, body: JSON.stringify({ question: 'What is still open?' }) })).json()) as Out);
+  /* AND THE DAILY LOOK THE REQUESTS WOKE, which is the alarm's (`slashDue`, `wake`). */
+  await c.wake(REC);
 
   /* THE COUNT FIRST, so a red run says how many calls got through before it says which door let them. */
   assert.equal(ai.worst.length, 0, `the operator turned every ask away and the Worker made ${ai.worst.length} Workers AI calls`);
@@ -170,6 +172,8 @@ test('A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 li
   const { ai, c, post } = await recordOver(t, '900000', 300);
   const out = await post('slashPropose', {});
   assert.ok(out.ok, JSON.stringify(out));
+  /* AND THE DAILY LOOK THE PRESS WOKE, which is the alarm's (`slashDue`, `wake`). */
+  await c.wake(REC);
   assert.equal((out.value as { by: string }).by, 'rules');
   for (const w of ai.worst) assert.ok(w <= 232, `a press may spend ${w} neurons and the ceiling counts every call at 232`);
   assert.equal(ai.worst.length, 0, 'the press and the daily look on 300 lists are both past 232, so neither is sent');
@@ -189,9 +193,11 @@ test('A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 li
 
 test("UNDER THE CEILING THE DAILY LOOK ASKS THE BINDING ONCE, and its row spends the background's month and none of his", async (t) => {
   const { ai, c, post } = await recordOver(t, '900000', 1);
-  /* ANY REQUEST PAST THE FORTNIGHT WAKES THE LOOK (`slashLook` beside every request), and this one is no press. */
+  /* ANY REQUEST PAST THE FORTNIGHT WAKES THE LOOK, and this one is no press: it asks whether the look is due
+     (`slashDue`) and sets the alarm for now, and the alarm does the look (`wake`). */
   const made = await post('create', { register: 'list_0', fields: { what: 'a second one' } });
   assert.ok(made.ok, JSON.stringify(made));
+  assert.ok((await c.wake(REC)) >= 1, 'the request did not wake the alarm for the look');
 
   const rows = await ledger(c, (now) => now.some((r) => r.question === "Slash's daily look"));
   const looks = rows.filter((r) => r.question === "Slash's daily look");

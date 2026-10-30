@@ -80,6 +80,13 @@ export const HEADLINES_OWED = 'headlines.owed';
 /** How often a tick after the day's look reads the pages again for a basis that moved: a read, never an ask. */
 export const HEADLINE_LOOK_MS = 15 * 60_000;
 
+/**
+ * HOW LONG A LATER LOOK OF THE DAY TRUSTS A RECORD THAT HAS NOT MOVED. Every write leaves a line in the log, so a walk
+ * of the pages over a record with no new line finds what the last one found; what moves with no line (the clock, a run's
+ * heartbeat) is looked at again after this, and on every new day.
+ */
+export const LOOK_REWALK_MS = 3 * 60 * 60_000;
+
 /** Slash's pref counting the day's headline asks, and the basis each page was last asked at that day. Not `headline.`, so no page's slug can be it. */
 export const HEADLINES_ASKED = 'headlines.asked';
 
