@@ -763,9 +763,11 @@ export const sinceWords = (iso: string, now: number = Date.now(), zone?: string)
 
 /**
  * `date:` links to the calendar and `day:` does not — a future date raises "what else is then". A SENTENCE'S FORM, so
- * how far off it is is said in words ("4 Sep · in 3 days"), as the typed `until:` and `ago:` say theirs.
+ * how far off it is is said in words ("4 Sep, in 3 days"), as the typed `until:` and `ago:` say theirs. The year only
+ * when it is another year, and a comma and not a dot, since it sits inside a sentence: the shared page read "not
+ * deferrable past 20 Sep 2026 · in 2 weeks" (audit 2, B20).
  */
-export const dateLong = (iso: string, now?: number, zone?: string): string => `${day(iso)} · ${relativeWords(iso, now, zone)}`;
+export const dateLong = (iso: string, now: number = Date.now(), zone?: string): string => `${dateSaid(iso, now)}, ${relativeWords(iso, now, zone)}`;
 
 /**
  * A size, in the unit that tells one file from another.

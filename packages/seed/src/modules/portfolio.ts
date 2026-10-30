@@ -42,10 +42,10 @@ earning since March 2024.
 ## 1 · Where the money comes from
 
 \`\`\`bar | Revenue by channel, twelve months
-Direct licences | 11200 | 61%
-Studio deals | 5300 | 29%
-Specimen prints | 1900 | 10%
-Unattributed | 3400 | | hole
+Direct licences | {{money:1120000 GBP}} | 61%
+Studio deals | {{money:530000 GBP}} | 29%
+Specimen prints | {{money:190000 GBP}} | 10%
+Unattributed | {{money:340000 GBP}} | | hole
 \`\`\`
 
 Direct licensing carries it, and that is the thing to protect. The unattributed row is not a
@@ -88,7 +88,7 @@ as {{ref:tasks#3}}.
 ## What is not verified
 
 - The 61% direct share {estimate}; it excludes the unattributed rows above.
-- Whether studio deals renew at all {unknown}
+- Whether studio deals renew at all is {unknown}.
 
 ## Log
 

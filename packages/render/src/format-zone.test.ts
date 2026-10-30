@@ -47,7 +47,7 @@ test('AFRICA/CAIRO: a deadline read at 01:00 names the Cairo day, not the UTC on
   assert.equal(relative('2026-10-08', one, 'Africa/Cairo'), '1d ago');
   assert.equal(relative('2026-10-09', one, 'UTC'), 'in 1d');
   assert.equal(formatTyped('until', '2026-10-09', one, 'Africa/Cairo'), 'today', 'a typed value counts in the zone it is handed');
-  assert.equal(formatTyped('date', '2026-10-10', one, 'Africa/Cairo'), '10 Oct 2026 · in 1 day', 'and in words, since a typed value is only written into a sentence');
+  assert.equal(formatTyped('date', '2026-10-10', one, 'Africa/Cairo'), '10 Oct, in 1 day', 'and in words, since a typed value is only written into a sentence');
   /* Past a day `since()` bands calendar days, and they are the reader's: 23:00 on the 8th to 01:30 on the 10th is two
      Cairo days, and one UTC day (the 8th to the 9th). */
   const evening = '2026-10-08T20:00:00Z';
