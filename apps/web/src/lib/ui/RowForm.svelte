@@ -8,8 +8,8 @@
   can do it after this file shipped.
 
   So the field TYPE picks the control, once, in one table. `enum` is a segmented control up to four
-  values and a select beyond, because four buttons is a glance and nine is a wall. `ref` is a select
-  over the target register's rows, titled by the target's own `title` field, because a person picks
+  values and a select beyond, because four buttons is a glance and nine is a wall. `ref` is `RefPick`, the
+  target register's rows searched by their own `title` field, because a person picks
   "Halden Type Co" and never `people#1`. `money` puts the currency outside the input, since the
   currency is one somebody chose and not something you type. `secret` is refused outright: a
   credential never goes in a row, and the Keychain is a different surface with different rules.
@@ -32,6 +32,7 @@
   import Field from './Field.svelte';
   import { errorFor, loose, type Refused } from './field.ts';
   import FileField from './FileField.svelte';
+  import RefPick from './RefPick.svelte';
   import Icon from './Icon.svelte';
   import Segmented from './Segmented.svelte';
   import { fileOf, isFile } from '../record/field-draft.ts';
@@ -146,13 +147,6 @@
    * its question names, and the due date it pre-fills.
    */
   const fields = $derived(first ? firstAsks(readableFields(register), decl?.title, given) : readableFields(register));
-
-  /**
-   * The rows a `ref` can point at, titled the way a person says them: the record's rows, as this tab last walked them.
-   *
-   * THEY WERE THE SAMPLE'S, on every record. `held.ts` says what was offered and what the number then pointed at.
-   */
-  const options = (f: FieldDecl): { value: number; label: string }[] => (f.to ? refOptions(f.to, typed[f.id] === '' || typed[f.id] === undefined ? null : Number(typed[f.id])) : []);
 
   const id = (f: FieldDecl) => `new-${register}-${f.id}`;
   /* The label needs an id of its own now that the segmented control points at it rather than at an
@@ -488,11 +482,8 @@
             <option value={move.value}>{valueSaid(f, move.value)}{word(move) ? `, ${word(move)}` : ''}</option>
           {/each}
         </select>
-      {:else if f.type === 'ref'}
-        <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined}>
-          <option value="">{copy.noneChosen}</option>
-          {#each options(f) as o}<option value={String(o.value)}>{o.label}</option>{/each}
-        </select>
+      {:else if f.type === 'ref' && f.to}
+        <RefPick to={f.to} label={labelOf(f)} id={id(f)} required={f.required} {describedBy} {invalid} bind:value={typed[f.id]} />
       {:else if f.type === 'money'}
         <!-- The currency is printed rather than typed, and it is THE ONE THE AMOUNT WILL BE WRITTEN
              IN: the code of the account its link names, else the field's declared currency, else its rows', else the
