@@ -3,9 +3,8 @@
  * understanding is the engine's first job), read from the record's `understandPlan`. How much of each kind it read,
  * how many of each it would link, the first of those links, and what it would ask on Decide, all in names.
  *
- * ONLY THE DRY RUN. The walk itself links rows on every list it reads and files questions for the whole record, so it is
- * the record's own each night and an owner's in the app on ask; this command never starts it. Without `--dry-run` it says
- * so and sends nothing.
+ * ONLY THE DRY RUN, WITH OR WITHOUT `--dry-run`. The walk itself links rows on every list it reads and files questions for
+ * the whole record, so it is the record's own each night and an owner's in the app on ask; this command never starts it.
  *
  * `understandPlan` IS A READ, the walk's dry half as a GET a token may send, so a login from this machine reads it. Who
  * may is the record's to say (the owner, reading the whole record), and its refusal is shown as it gives it. A record
@@ -26,7 +25,7 @@ import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse } from './json.ts';
 import { isObject, type AgentIo } from './skills.ts';
 
-const USAGE = 'braindog understand takes --dry-run and [--host <host>], as in braindog understand --dry-run.';
+const USAGE = 'braindog understand takes [--dry-run] and [--host <host>], as in braindog understand.';
 
 /** The most planned links a dry run names; the rest are counted. */
 export const PLANNED_SHOWN = 10;
@@ -154,7 +153,7 @@ function refusalLine(r: Result<unknown>, to: Target): string {
   return printable(fixOf(r));
 }
 
-/** `braindog understand --dry-run [--host <host>]`, and the exit code: 0 read, 1 refused or not a dry run, 3 unreachable. */
+/** `braindog understand [--dry-run] [--host <host>]`, and the exit code: 0 read, 1 refused, 3 unreachable. */
 export async function understandCommand(args: string[], io: AgentIo): Promise<number> {
   let values: { 'dry-run'?: boolean | undefined; host?: string | undefined };
   try {
@@ -163,10 +162,8 @@ export async function understandCommand(args: string[], io: AgentIo): Promise<nu
     io.say(USAGE);
     return 1;
   }
-  if (values['dry-run'] !== true) {
-    io.say('braindog understand only reads, with --dry-run. Your BrainDog links what it holds on its own each night, and asks you on Decide about the rest.');
-    return 1;
-  }
+  /* EVERY RUN IS THE DRY RUN, so the flag is not asked for (D25): a command that only reads insisted on being told so.
+     `--dry-run` is still taken, as scripts and the help wrote it. */
   let to: Target;
   try {
     to = target(values.host, io.env, hostsPath(io.env));
