@@ -259,7 +259,7 @@
     >
       {@render children()}
       <!-- A CELL HELD WHILE TODAY LOADS for a widget being read again: a quiet empty tile, so the board keeps its shape. -->
-      {#each model.reserved as r (r.key)}<div class="reserve" style="grid-area:{r.area}" aria-hidden="true"></div>{/each}
+      {#each model.reserved as r (r.key)}<div class="reserve" data-size={r.size} style="grid-area:{r.area}" aria-hidden="true"></div>{/each}
       {#if model.editing && !model.asList}
         <!-- A CELL NOTHING FILLS, while editing: drawn, so a gap a smaller size left is seen as room, not as a fault. -->
         {#each model.holes as h (h)}<div class="hole" style="grid-area:{h}" aria-hidden="true"></div>{/each}
@@ -383,6 +383,59 @@
     overflow: hidden;
     contain: layout paint;
     will-change: auto;
+  }
+
+  /* ON A PHONE AT REST A TILE ENDS WHERE WHAT IT SHOWS ENDS (audit 31 Oct, A16): the phone's tiles are one column of
+     full-width frames, and a frame of fixed rows left Late and handed back one line and 200px of nothing over its
+     "5 more", and Your work this week its two tasks over 350px of it. So the rows are as tall as what is drawn in them,
+     and each frame is held to its cells as most (`--most`): what runs past that is cut by `fit.ts` as before, and the
+     frame then closes up under what it kept. Two smalls side by side share their row, as tall as the taller.
+     EDITING, THE CELLS ARE FIXED, so a drag or a resize is measured in whole cells and every frame shows its size. */
+  .board-root:not([data-editing]) .board[data-cols='2'] {
+    grid-auto-rows: auto;
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-board-key]) {
+    --most: var(--row);
+    max-block-size: var(--most);
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key]:is([data-size='tall'], [data-size='large'])) {
+    --most: calc(2 * var(--row) + var(--gap));
+  }
+
+  /* A DRAFT TAKES A ROW MORE (`grow` in `board.svelte.ts`), so its Keep bar sits under the widget it asks about. */
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key]:has(> [data-draft-mark])) {
+    max-block-size: calc(var(--most) + var(--row) + var(--gap));
+  }
+
+  /* AND THE "N MORE" A FRAME WITH NONE OF ITS OWN IS GIVEN (`fit.ts`) TAKES ITS OWN LINE under what it kept, as the
+     frame no longer ends below the rows with room for it laid over: in the flow, after the block. A part of Today's own
+     (Working now) is a card inside a bare frame, so its count stays laid over the card's foot, and the card makes room. */
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more]::after) {
+    position: static;
+    order: 1;
+    flex: none;
+    padding-block-start: var(--sp-2);
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more]:has(> .desk-part)::after) {
+    position: absolute;
+    inset-inline-start: var(--sp-4);
+    padding-block-start: 0;
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more] > .desk-part > .tile) {
+    padding-block-end: calc(var(--sp-4) + 24px);
+  }
+
+  /* A CELL HELD WHILE TODAY LOADS KEEPS ITS SIZE'S HEIGHT, having nothing in it to be as tall as. */
+  .board-root:not([data-editing]) .board[data-cols='2'] .reserve {
+    min-block-size: var(--row);
+  }
+
+  .board-root:not([data-editing]) .board[data-cols='2'] .reserve:is([data-size='tall'], [data-size='large']) {
+    min-block-size: calc(2 * var(--row) + var(--gap));
   }
 
   .board :global([data-board-key] > :is(.block-slice, .block-more)) {

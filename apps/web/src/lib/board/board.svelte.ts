@@ -209,10 +209,10 @@ export class BoardModel {
   }
 
   /** Cells held for a widget that is not drawn this moment, as grid areas: drawn as a quiet empty tile. */
-  get reserved(): { key: string; area: string }[] {
+  get reserved(): { key: string; area: string; size: WidgetSize }[] {
     if (!this.settling || this.editing) return [];
     const shown = this.shown;
-    return [...this.places.values()].filter((p) => !shown.has(p.key) && this.hadCell.has(p.key)).map((p) => ({ key: p.key, area: p.area }));
+    return [...this.places.values()].filter((p) => !shown.has(p.key) && this.hadCell.has(p.key)).map((p) => ({ key: p.key, area: p.area, size: p.size }));
   }
 
   /** The board packed: only what is drawn takes a cell, and an added widget always does. */
