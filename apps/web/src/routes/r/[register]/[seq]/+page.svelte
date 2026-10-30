@@ -202,6 +202,8 @@
      here, as a group's "All N" does. */
   let moneyAll = $state<string | null>(null);
   let workAll = $state<string | null>(null);
+  /* THE LIST THE OPEN WORK IS COUNTED IN, so its tile is not drawn over that list's own tile saying the same. */
+  let workList = $state<string | null>(null);
   let figures: FigureReader | null = null;
   /* A PROJECT'S THREE MONEY FIGURES, said by name of the project (`project.ts`); each is nothing until the record answers. */
   let pjMoney = $state<{ in: Figure | null; out: Figure | null; owed: Figure | null }>({ in: null, out: null, owed: null });
@@ -226,6 +228,7 @@
     openWork = null;
     moneyAll = null;
     workAll = null;
+    workList = null;
     pjMoney = { in: null, out: null, owed: null };
     archived = false;
     fromCopy = false;
@@ -315,6 +318,7 @@
     if (askedFor !== key) return;
     moneyIn = m;
     openWork = w;
+    workList = w && work ? work : null;
     moneyAll = m && about ? `/r/${about.list}?f=${about.field}:is:${n}` : null;
     workAll = w && work && via ? `/r/${work}?f=${via.field}:is:${n}` : null;
   }
@@ -959,6 +963,7 @@
   const rankOf = (g: Backlink): number =>
     meetsOf(REGISTERS[g.register]) ? 0 : isProjects(g.register) ? 1 : REGISTERS[g.register]?.fields.some((f) => f.type === 'money') ? 2 : 3;
   const related = $derived((orgRole ? [...incoming].sort((a, b) => rankOf(a) - rankOf(b)) : incoming).filter((g) => !projectPage || blockOf(REGISTERS[g.register]) === null));
+  const workListed = $derived(openWork !== null && openWork.parts.length === 1 && openWork.late === 0 && workList !== null && related.some((g) => g.register === workList && g.rows.length > 0));
 
   /**
    * A RUN'S PAGE LEADS WITH ITS HANDOFF: what it is doing, where, the next step, what it already tried and its
@@ -1543,7 +1548,7 @@
         {/if}
 
         <!-- THE TILES, ONLY WHERE THERE IS A FIGURE: each a figure, its chart, and one line saying what it means. -->
-        {#if !projectPage && (moneyIn || openWork)}
+        {#if !projectPage && (moneyIn || (openWork && !workListed))}
           <div class="tiles">
             {#if moneyIn}
               <Tile icon="money" title={rowWords.moneyIn} href={moneyAll ?? undefined} hrefLabel={moneyAll ? rowWords.all : undefined}>
@@ -1556,7 +1561,9 @@
                 <p class="reading">{moneyInSaid(moneyIn, clock, moneySaid)}</p>
               </Tile>
             {/if}
-            {#if openWork}
+            <!-- ONE KIND OF OPEN WORK IS THE LIST BELOW ALREADY (31 October, AG23): "Open work 1 open" stood over "Tasks 1"
+                 listing that one task. The tile stays where it splits the work by kind or says what is late. -->
+            {#if openWork && !workListed}
               <Tile icon="task" title={rowWords.openWork} href={workAll ?? undefined} hrefLabel={workAll ? rowWords.all : undefined}>
                 <!-- ONE KIND OF WORK IS SAID ONCE (recheck, low notes): its number and its word, with no bar of one colour
                      across the tile and no sentence saying the number a third time. -->
@@ -1645,6 +1652,7 @@
             href={rel.total > rel.rows.length ? rel.href : undefined}
             hrefLabel={rel.total > rel.rows.length ? `${rowWords.all} ${rel.total}` : undefined}
           >
+            <!-- WHERE A LINE STANDS IS SAID ONCE (31 October, AG23): a task read "Open" under its name and "Open" beside it. -->
             <!-- AMOUNTS AS THE REST OF THE APP SAYS THEM, "+£3,030" in and "−£3,030" out, pence only where they are not
                  round; and THE DOT HAS A WORD, "Paid", "38 days late", "Due in 5 days", so the state is never a colour
                  alone (`linked.ts`). -->
@@ -1652,8 +1660,8 @@
             <ul class="items" aria-label="{rel.name} · {rel.label}">
               {#each rel.rows as r, i (r.key)}
                 {@const fields = rel.raw?.[i]}
-                {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency()))}
-                {@const stood = fields ? linkedState(relDecl, fields, clock, r.tone) : { text: null, tone: r.tone }}
+                {@const stood = fields ? linkedState(relDecl, fields, clock, r.tone, moneySaid) : { text: null, tone: r.tone }}
+                {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency())).filter((c) => !stood.text || c.trim().toLowerCase() !== stood.text.trim().toLowerCase())}
                 {@const stands = stood.text}
                 {@const tone = stood.tone}
                 <li>

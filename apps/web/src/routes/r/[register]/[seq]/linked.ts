@@ -42,7 +42,36 @@ export type Stands = { text: string | null; tone: 'good' | 'warn' | 'bad' | 'inf
  * - An open row past its deadline says how late, and one inside a fortnight how close, the window `toneOf` colours.
  * - Any other state that is not the list's first says itself ("Part paid"), and ahead of the lateness when both hold.
  */
-export function linkedState(decl: RegisterDecl | undefined, fields: Readonly<Record<string, unknown>>, now: number, tone?: Stands['tone']): Stands {
+/** A money value as the record keeps it, `{ amount, currency }` in minor units, or `null`. */
+const moneyOf = (v: unknown): { amount: number; currency: string } | null => {
+  const m = v as { amount?: unknown; currency?: unknown } | null | undefined;
+  return m && typeof m === 'object' && typeof m.amount === 'number' && Number.isFinite(m.amount) && typeof m.currency === 'string' ? { amount: m.amount, currency: m.currency } : null;
+};
+
+/**
+ * HOW MUCH OF IT IS PAID, "£2,000 of £5,470 paid" (31 October, AG23), where the list keeps what was paid beside the
+ * amount (a money field named `paid…`, as money's `settle` writes) and some of it, not all, is paid: "Part paid" alone
+ * said nothing of how much. `null` where it cannot be said, and the state's own word stands.
+ */
+export function paidSaid(decl: RegisterDecl, fields: Readonly<Record<string, unknown>>, say: (minor: number, currency: string) => string): string | null {
+  const figure = amountField(decl);
+  const paidField = decl.fields.find((f) => f.type === 'money' && !f.retired && f.id !== figure?.id && /^paid/iu.test(f.id));
+  if (!figure || !paidField) return null;
+  const whole = moneyOf(fields[figure.id]);
+  const paid = moneyOf(fields[paidField.id]);
+  if (!whole || !paid || paid.currency !== whole.currency) return null;
+  const total = Math.abs(whole.amount);
+  if (paid.amount <= 0 || paid.amount >= total) return null;
+  return `${say(paid.amount, paid.currency)} of ${say(total, whole.currency)} paid`;
+}
+
+export function linkedState(
+  decl: RegisterDecl | undefined,
+  fields: Readonly<Record<string, unknown>>,
+  now: number,
+  tone?: Stands['tone'],
+  say?: (minor: number, currency: string) => string,
+): Stands {
   if (!decl) return { text: null, tone };
   const stateId = decl.state;
   const state = stateId ? fields[stateId] : undefined;
@@ -52,7 +81,7 @@ export function linkedState(decl: RegisterDecl | undefined, fields: Readonly<Rec
     return { text: typeof born === 'string' && decl.done.includes(born) ? null : labelled(decl, stateId!, state), tone };
   }
   const first = stateField?.values?.[0];
-  const own = stateId && typeof state === 'string' && state !== '' && state !== first ? labelled(decl, stateId, state) : null;
+  const own = stateId && typeof state === 'string' && state !== '' && state !== first ? ((say ? paidSaid(decl, fields, say) : null) ?? labelled(decl, stateId, state)) : null;
   const deadline = decl.fields.find((f) => f.type === 'day' && f.deadline);
   const due = deadline ? fields[deadline.id] : undefined;
   let when: string | null = null;

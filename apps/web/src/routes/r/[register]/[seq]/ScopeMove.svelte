@@ -21,6 +21,8 @@
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import { labelOf } from '$lib/record/api.ts';
+  import { meetsOf, orgRoleOf } from '$lib/record/folk.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry } from '$lib/record/schema.ts';
   import {
@@ -85,6 +87,7 @@
   const now = $derived(target ? afterMove(target, scopeOf(register, target.fields, names), landed[target.seq]) : undefined);
   const scope = $derived(now?.scope);
   const canMove = $derived(movesIn(register, live));
+  const folk = $derived(meetsOf(REGISTERS[register]) !== null || orgRoleOf(REGISTERS[register]) !== null);
 
   let open = $state(false);
   /* `undefined` while the projects are being read, `null` when the record would not list them. */
@@ -180,7 +183,10 @@
   </li>
 {/snippet}
 
-{#if !compact && scope !== undefined}
+<!-- A PERSON OR AN ORGANISATION TIED TO NO PROJECT WEARS NO CHIP UNDER ITS NAME unless the chip moves it (31 October,
+     AG23): Ada Vine's page read "Everywhere" in front of "Accountant at Pell & Vine", which nobody could press or
+     explain. A key's "Everywhere" stays: there it says which machines may open it. -->
+{#if !compact && scope !== undefined && (scope !== null || canMove || !folk)}
   <ScopeChip {scope} {size} onmove={canMove ? openMove : undefined} />
 {/if}
 
