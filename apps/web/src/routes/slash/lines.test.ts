@@ -181,9 +181,9 @@ test('EACH SUGGESTION ON DECIDE SAYS HOW LONG IT WAITS, from the day the record 
   assert.equal(of('Turn off Notes?')?.waits, null, 'one answered waits no more');
   /* NONE HANDED, NONE SAID: the reading as it is today draws exactly what it drew. */
   for (const s of suggestedOf(READING, [], NOON)) assert.deepEqual([s.waits, s.taken], [null, null], s.question);
-  assert.equal(waitsOf('2026-10-14', NOON), 'Waits until today');
-  assert.equal(waitsOf('2026-10-02', NOON), 'Waits until today', 'a day gone by is never drawn');
-  assert.equal(waitsOf('2027-01-04', NOON), 'Waits until 4 Jan 2027');
+  assert.equal(waitsOf('2026-10-14', NOON), 'Offered until tonight');
+  assert.equal(waitsOf('2026-10-02', NOON), 'Offered until tonight', 'a day gone by is never drawn');
+  assert.equal(waitsOf('2027-01-04', NOON), 'Offered until 4 Jan 2027');
   for (const bad of ['2026-02-30', '28 Oct', '', null, 20261028]) assert.equal(waitsOf(bad, NOON), null, String(bad));
 });
 
