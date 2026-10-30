@@ -52,7 +52,7 @@ export default async function run(ctx) {
   const today = typeof ctx.today === 'function' ? await ctx.today() : String(ctx.now()).slice(0, 10);
   const lines = await ctx.record.list('recurring', { all: [{ field: 'state', is: 'live' }, { field: 'post', is: true }, { field: 'next_due', lte: today }] });
   if (lines.length === 0) return (ctx.log('No repeating line marked to post is due.'), null);
-  if (typeof ctx.cycle !== 'function') return (ctx.log('This record cannot step a repeating line on, so nothing was posted.'), null);
+  if (typeof ctx.cycle !== 'function') return (ctx.log('This BrainDog cannot step a repeating line on yet, so nothing was posted.'), null);
   const accounts = new Map();
   let posted = 0;
   for (const line of lines) {

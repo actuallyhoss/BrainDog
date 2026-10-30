@@ -14,7 +14,7 @@ export const hand = {
   handPeople: 'People on this BrainDog',
   handAgents: 'Agents',
   /* SAID WHEN THE SHEET HAS NOBODY BUT YOU TO OFFER, so an empty list is not read as a list that failed. */
-  handNobody: 'Nobody else is on this record yet, and no agent has run here.',
+  handNobody: 'Nobody else is here yet, and no agent has run here.',
   handHolding: 'Holds it now',
   /* THE EVENT A HAND LEAVES ON THE ROW, signed by whoever pressed, so the history reads "Sami handed this to Mona". */
   handedNote: (name: string): string => `Handed this to ${name}`,
@@ -23,7 +23,7 @@ export const hand = {
   /* AN AGENT HOLDS A ROW UNTIL ITS NEXT RUN TAKES IT, or while a job it was started as runs. */
   handWaiting: (agent: string): string => `Waiting for ${agent}'s next run`,
   handRunning: (agent: string): string => `${agent} is on it`,
-  handReadFailed: 'BrainDog could not reach this record.',
+  handReadFailed: 'BrainDog could not be reached.',
   /* "WITH A NOTE" (agents and MCP plan §7.2): what he types goes to the agent as an instruction on the row. */
   handNote: 'With a note for the agent',
   handNoteHint: 'What it should know first, if anything',

@@ -250,7 +250,7 @@ function scripted(plans: Record<string, (nth: number) => Result<Diff>>): QuietPo
 }
 
 const ok = (over: Partial<Diff> = {}): Result<Diff> => ({ ok: true, value: clean(over) });
-const WAITS = { pack: 'money-core', from: '0.0.1', to: FIRST_PARTY_VERSIONS['money-core'], did: 'refused', lose: ['take Budgets set from Personal'], why: 'It cannot go in over what this record holds now.' };
+const WAITS = { pack: 'money-core', from: '0.0.1', to: FIRST_PARTY_VERSIONS['money-core'], did: 'refused', lose: ['take Budgets set from Personal'], why: 'It cannot go in over what is here now.' };
 
 test('PLANNED AGAIN IN ITS OWN PLACE: the module whose holder went in is planned twice, and its one step is the later one', async () => {
   const port = scripted({ 'money-core': (nth) => (nth === 1 ? ok(COUNT_HELD) : ok()), 'usecase-personal': () => ok() });
@@ -273,7 +273,7 @@ test('REFUSED FOR ANOTHER REASON IS PLANNED ONCE: a rename, and a document that 
   assert.equal(steps.find((s) => s.pack === 'usecase-personal')?.did, 'updated', JSON.stringify(steps));
   assert.deepEqual(steps.find((s) => s.pack === 'portfolio'), { pack: 'portfolio', from: '0.0.1', to: FIRST_PARTY_VERSIONS.portfolio, did: 'refused', why: 'This document cannot be read.' });
   assert.equal(steps.find((s) => s.pack === 'money-core')?.did, 'refused', JSON.stringify(steps));
-  assert.equal(steps.find((s) => s.pack === 'money-core')?.why, 'It cannot go in over what this record holds now.');
+  assert.equal(steps.find((s) => s.pack === 'money-core')?.why, 'It cannot go in over what is here now.');
   assert.equal(port.planned.portfolio, 1, 'a document that could not be planned was planned again');
   assert.equal(port.planned['money-core'], 1, 'a rename no other pack holds was planned again');
 });

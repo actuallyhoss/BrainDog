@@ -19,14 +19,14 @@ export type LookWay = 'darken' | 'lighten';
 export const theme = {
   lookTitle: 'How your BrainDog looks',
   lookHint:
-    'Every colour this record is drawn in, in light and in dark, for everybody who opens it.',
-  lookOwn: 'This record has a look of its own.',
-  lookHouseNow: 'This record is in the usual look.',
+    'Every colour your BrainDog is drawn in, in light and in dark, for everybody who opens it.',
+  lookOwn: 'Your BrainDog has a look of its own.',
+  lookHouseNow: 'Your BrainDog is in the usual look.',
   lookEdit: 'Edit the look',
   lookClose: 'Close the editor',
   lookHouse: 'Use the usual look',
   lookHouseBack: 'The record is back in the usual look.',
-  lookMember: 'Your look goes to the owner in Needs you, and the record takes it when they accept.',
+  lookMember: 'Your look goes to the owner in Needs you, and everyone sees it once they accept.',
   /** The title the editor wears when a theme refused at install opened it with its fixes staged. */
   lookFixAndInstall: 'Fix and install',
   lookStaged: 'The colours that could not be read are selected, and a fix is ready for each. Check them, then install.',
@@ -113,7 +113,7 @@ export const theme = {
     CONTRAST_FLOOR: 'Some text or an edge would be too faint to see.',
     INTENT_INSEPARABLE: 'Two of the colours that carry a meaning would look the same to a reader who sees colour differently.',
     THEME_LADDER_ORDER: 'The grounds no longer step from darkest to lightest, so a panel would blur into the page.',
-    THEME_VALUE_INVALID: 'One of the colours is not one the record can draw.',
+    THEME_VALUE_INVALID: 'One of the colours is not one BrainDog can draw.',
   } as Record<string, string>,
   lookWhyElse: 'The record cannot draw this look as it stands.',
   lookBlocked: 'Fix every pair marked Fails, then save.',
@@ -126,7 +126,7 @@ export const theme = {
   lookSaved: 'The record is in its new look.',
   lookProposed: 'Your look is in Needs you, waiting for the owner.',
   /** The question a member's look is filed under, which the owner reads on Decide. */
-  lookProposeQuestion: 'Change how this record looks?',
+  lookProposeQuestion: 'Change how your BrainDog looks?',
 
   /* The specimen's own sample content: a small page drawn in the edited look. */
   lookSampleHead: 'This week',

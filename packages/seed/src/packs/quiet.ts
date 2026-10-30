@@ -160,13 +160,13 @@ function unready(diff: Diff): string | null {
   const need = diff.requires.packs.find((p) => !p.ok);
   if (need) return `It needs ${moduleName(need.id)} ${need.range} first.`;
   const list = diff.unresolved[0];
-  if (list) return `It reads ${spelled(`register.${list.register}`)}, which this record does not hold.`;
+  if (list) return `It reads ${spelled(`register.${list.register}`)}, which you do not have.`;
   if (!diff.requires.format.ok || !diff.requires.primitives.ok) return 'It needs a newer BrainDog.';
   const refused =
     diff.conflicts.length + diff.renames.length + diff.retypes.length + diff.newly_required.length + diff.misreads.length > 0 ||
     diff.orphans > 0 ||
     diff.dependents.some((p) => p.was && !p.ok);
-  if (refused) return 'It cannot go in over what this record holds now.';
+  if (refused) return 'It cannot go in over what is here now.';
   return null;
 }
 

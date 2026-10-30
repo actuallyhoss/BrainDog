@@ -149,7 +149,7 @@ export const kpis = {
   kpiReadingValue: 'Value',
   kpiReadingPlaceholder: '1,200',
   kpiReadingEmpty: 'Type the value.',
-  kpiReadingNoList: 'This record has nowhere to keep readings.',
+  kpiReadingNoList: 'There is nowhere to keep readings yet.',
   kpiReadingAdded: (name: string): string => `Added a reading to ${name}.`,
 
   /* ITS PAST VALUES, under the sheet (`lib/kpis/past.ts`): newest first, who set each, the newest taken back with Undo and

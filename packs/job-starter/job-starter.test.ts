@@ -75,7 +75,7 @@ test('THE FILE READS AS A RECORD READS IT, and holds the six kinds and nothing e
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'job-starter');
-  assert.equal(file.value.pack.manifest.version, '1.2.0');
+  assert.equal(file.value.pack.manifest.version, '1.2.1');
   assert.equal(PACK.title, 'Jobs on your machine');
   assert.deepEqual(KINDS.map((k) => k.job), IDS);
   assert.ok(KINDS.every((k) => Object.keys(k).includes('job')), 'a declaration here is not a job');

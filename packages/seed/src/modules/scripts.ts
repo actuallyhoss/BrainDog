@@ -34,7 +34,7 @@ export const SCRIPTS_PAGES: Record<string, SeedPage> = {
     blocks: [
       /* THE PAGE'S LINE, as every page opens on one (`calm-pages.test.ts`). `/scripts` says its own over it, from the rows:
          how many, how much they ran this month, and what has stopped (`routes/scripts/reading.ts`). */
-      { kind: 'note', lead: true, span: 12, body: 'Every script on this record, and where it stands.' },
+      { kind: 'note', lead: true, span: 12, body: 'Every script you have, and where it stands.' },
       {
         kind: 'table',
         key: 'scripts',

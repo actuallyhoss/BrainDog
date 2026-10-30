@@ -254,7 +254,7 @@ export const lists = {
      the data drift apart. `dead-copy` excused it as the chip that mark would render. */
   stale: 'Stale',
   /** Over a search this device answered from the list it keeps, until the record's own answer lands. */
-  foundHere: 'Found on this device. Checking the record.',
+  foundHere: 'Found on this device. Checking BrainDog.',
   /* A ROW IS NAMED BY ITS NUMBER, and "no obligation CALLED #9999" is not English. `19 §642`: a row
      "has a number you can say" — so the sentence says it the way somebody would. */
   noSuchNumber: (one: string, seq: number | string) => `There is no ${one} numbered ${seq}`,

@@ -279,7 +279,7 @@ const FIXES: Readonly<Record<string, string>> = {
   ENUM_VALUE_UNKNOWN: 'the value being saved is not one this field allows. Either widen the field or fix what writes it',
   REQUIRED_MISSING: 'something keeps arriving without it. Either it is not really required, or whatever sends these rows never had it',
   TYPE_MISMATCH: 'what arrives is not the shape this field allows',
-  REF_NOT_FOUND: 'the row it points at is not in this record yet',
+  REF_NOT_FOUND: 'what it points at is not here yet',
   OUT_OF_BOUNDS: 'the value is outside the range this field allows',
   IMMUTABLE: 'this field is settled once written, and something keeps trying to change it',
 };

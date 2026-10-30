@@ -48,12 +48,12 @@ export const palette = {
      is behind Slash on this host, because the row is the only way into the mode and without a model the row does not exist.
      The fold's last line is `23 §6`'s, with a colon for the dash. */
   askSlash: (text: string) => `Ask Slash: ${text}`,
-  slashAsking: 'Slash is reading the record.',
+  slashAsking: 'Slash is reading your BrainDog.',
   /* WHILE A BUSY RECORD IS ASKED AGAIN (the client's 503 retry): calm, and never the crash sentence to quote. */
   slashBusy: 'BrainDog is busy. Trying again.',
   slashWhere: 'Slash looked for',
   slashSearched: (q: string) => `Slash searched the record for “${q}”`,
-  slashNothing: 'Nothing in the record answers that.',
+  slashNothing: 'Nothing in your BrainDog answers that.',
   slashFold: 'What Slash read',
   slashFoldLine: (register: string, rows: number, predicate: string) => `${register}: ${rows === 1 ? '1 item' : `${rows.toLocaleString('en')} items`}, ${predicate}`,
   slashAll: 'all',
@@ -141,7 +141,7 @@ export const palette = {
   customise: {
     group: 'Customise',
     shot: 'Screenshot mode',
-    shotDetail: 'Hides what your record holds on this screen.',
+    shotDetail: 'Hides what your BrainDog holds on this screen.',
     dark: 'Dark mode',
     light: 'Light mode',
     system: 'Match the system',
@@ -154,12 +154,12 @@ export const palette = {
     /* WHERE A LOOK CHANGE IS KEPT, under its title (`pref.whereKept`): the record keeps each person's look, per record,
        so it is on every device they open it on; a device with no record, or a record that cannot keep it, holds it alone;
        and a change the record has not heard of yet waits here until it can be sent. */
-    inRecord: 'Yours in this record, on every device',
+    inRecord: 'Yours in this BrainDog, on every device',
     thisDeviceNow: 'On this device for now',
     thisDevice: 'On this device',
     /* THE TOAST AFTER A LOOK CHANGES, which has nothing to add but where it was kept, as the record answered. */
-    lookKept: (name: string) => `${name}, in this record on every device you open it on.`,
-    lookPending: (name: string) => `${name}, on this device for now. It reaches this record the next time it can.`,
+    lookKept: (name: string) => `${name}, in this BrainDog on every device you open it on.`,
+    lookPending: (name: string) => `${name}, on this device for now. It reaches your BrainDog the next time it can.`,
     lookSet: (name: string) => `${name}, on this device.`,
     openOn: (name: string) => `Open on ${name}`,
     openOnDetail: 'The page BrainDog opens first',

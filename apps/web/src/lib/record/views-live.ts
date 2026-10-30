@@ -106,7 +106,7 @@ export const liveWords = {
   /* THE RECORD ANSWERED THE VIEW AND WOULD NOT DESCRIBE THE LIST IT FILTERS, and said nothing about
      why. Used only where `schema` came back `ok` with no fields on it; a refusal carries the
      record's own sentence and that is preferred over this one. */
-  noList: (register: string): string => `${register} is not a list this record describes, so the view over it cannot be drawn.`,
+  noList: (register: string): string => `${register} is not a list here, so the view over it cannot be drawn.`,
 } as const;
 
 /** `<register>.<id>`, split at the last dot, or nothing when the key names no register. */

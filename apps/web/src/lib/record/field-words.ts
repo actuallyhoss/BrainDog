@@ -58,10 +58,10 @@ export const fieldWords = {
   linkTo: 'Links to',
   pickLink: 'Pick what this links to.',
   linkGone: 'That is not here any more. Pick another to link to.',
-  inRecordCurrency: (code: string) => `In this record's own currency, ${code}.`,
+  inRecordCurrency: (code: string) => `In your home currency, ${code}.`,
   pickCurrency: 'Pick the currency.',
-  noHome: 'This record has no currency of its own yet. Set it in Settings first.',
-  otherCurrency: (code: string) => `A new field keeps money in this record's own currency, ${code}, for now.`,
+  noHome: 'There is no home currency yet. Set it in Settings first.',
+  otherCurrency: (code: string) => `A new field keeps money in your home currency, ${code}, for now.`,
   currencyUnknown: (typed: string) => `${typed} is not a currency.`,
 } as const;
 

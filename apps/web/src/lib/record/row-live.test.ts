@@ -394,3 +394,8 @@ test("A RUN'S PROJECT, HELD AS things#1, IS A LIST THE ROW'S WALK NAMES, so its 
   assert.deepEqual(spokenTargets({ project: 'things#1' }, ['things']), [], 'a list already walked is not walked twice');
   assert.deepEqual(spokenTargets({ note: 'see things#1 later', n: 3 }, []), [], 'only a whole value of that shape');
 });
+
+test("A KEY A TOOL NEEDS, HELD AS header:Authorization=credentials#1, IS A LIST THE ROW'S WALK NAMES", () => {
+  assert.deepEqual(spokenTargets({ name: 'fenwick', needs: ['header:Authorization=credentials#1', 'BRAINDOG_TOKEN'] }, []), ['credentials']);
+  assert.deepEqual(spokenTargets({ needs: ['BRAINDOG_TOKEN', 'header:Authorization'] }, []), [], 'a key named only by its variable names no row');
+});

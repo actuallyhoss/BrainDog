@@ -30,7 +30,7 @@ test('a person keeps a monogram, even after `actor` has said their name', () => 
 test('anything else is a person, including a person whose name happens to end in "rule"', () => {
   assert.equal(faceKindOf('Ada Lovelace'), 'person');
   assert.equal(faceKindOf('Hal Rule'), 'person');
-  assert.equal(faceKindOf('Someone on this record'), 'person');
+  assert.equal(faceKindOf('Someone you share with'), 'person');
 });
 
 test('a person keeps one hue, one of twelve thirty degrees apart', () => {

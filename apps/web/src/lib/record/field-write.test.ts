@@ -196,10 +196,10 @@ test('EACH MISSING PIECE IS REFUSED IN ITS OWN SENTENCE, and a link to a list th
   assert.equal(fix('enum', { values: Array.from({ length: 41 }, (_, i) => `Step ${i + 1}`).join('\n') }), 'Forty choices at most. Take some out.');
   assert.equal(fix('enum', { values: `Lead\n${'w'.repeat(41)}` }), `${'w'.repeat(41)} is longer than 40 letters. Shorten it.`);
   assert.equal(fix('money', {}), 'Pick the currency.');
-  assert.equal(fix('money', { currency: 'record' }, null), 'This record has no currency of its own yet. Set it in Settings first.');
+  assert.equal(fix('money', { currency: 'record' }, null), 'There is no home currency yet. Set it in Settings first.');
   assert.equal(fix('money', { currency: 'XQZ' }), 'XQZ is not a currency.');
   /* ANOTHER CODE WAITS ON THE KERNEL'S `currency` KEY: sent as a default, it put nought in that code on every new row. */
-  assert.equal(fix('money', { currency: 'JPY' }), "A new field keeps money in this record's own currency, EUR, for now.");
+  assert.equal(fix('money', { currency: 'JPY' }), "A new field keeps money in your home currency, EUR, for now.");
   assert.equal(fix('text', {}), null);
   assert.equal(fieldOf('things', 'Title', 'text').ok, false, 'a name the record keeps for itself went out to be refused there');
 });
@@ -219,8 +219,8 @@ test('THE FIELDS SHEET KEEPS THE SAME RULES, and its money takes a currency when
   /* NOTHING PICKED IS MONEY AS THE SHEET HAS ALWAYS SENT IT, since the sheet does not ask yet. */
   assert.deepEqual(draft({ kind: 'money' }), { ok: true, field: { id: 'extra', label: 'Extra', type: 'money' } });
   assert.deepEqual(draft({ kind: 'money', currency: 'eur' }), { ok: true, field: { id: 'extra', label: 'Extra', type: 'money' } });
-  assert.deepEqual(draft({ kind: 'money', currency: 'usd' }), { ok: false, fix: "A new field keeps money in this record's own currency, EUR, for now." });
-  assert.deepEqual(draft({ kind: 'money', currency: 'record' }, null), { ok: false, fix: 'This record has no currency of its own yet. Set it in Settings first.' });
+  assert.deepEqual(draft({ kind: 'money', currency: 'usd' }), { ok: false, fix: "A new field keeps money in your home currency, EUR, for now." });
+  assert.deepEqual(draft({ kind: 'money', currency: 'record' }, null), { ok: false, fix: 'There is no home currency yet. Set it in Settings first.' });
 });
 
 test('A LINK, A CHOICE AND MONEY IN THE RECORD\'S OWN CURRENCY LAND ON THE RECORD AS SENT, and a row holds each', async () => {

@@ -44,7 +44,7 @@ test('NO ID AND NO RAW TIMESTAMP in anything a line says', () => {
     assert.doesNotMatch(read, /\d{4}-\d{2}-\d{2}|T\d{2}:\d{2}|@/u, read);
     assert.doesNotMatch(read, /—/u, read);
   }
-  assert.equal(lines[0]?.said, 'Someone on this record, 1h ago');
+  assert.equal(lines[0]?.said, 'Someone you share with, 1h ago');
 });
 
 test('THE PAGE AS IT IS NOW says so and has no Put back; every earlier one has both', () => {
@@ -78,7 +78,7 @@ test('A NAME THE CALLER HOLDS IS SAID, and nobody is Someone on this record', ()
     names,
   );
   assert.equal(lines[0]?.said, 'Mara, 30 min ago');
-  assert.equal(lines[1]?.said, 'Someone on this record, 1h ago');
+  assert.equal(lines[1]?.said, 'Someone you share with, 1h ago');
 });
 
 test('A TIME THAT DOES NOT READ is left out, never printed as it came', () => {

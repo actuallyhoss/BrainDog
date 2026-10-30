@@ -35,7 +35,7 @@ export type Answer<T> = { ok: true; value: T } | { ok: false; fix: string };
 const PAGES_MOST = 5;
 const PAGE = 200;
 
-const UNREACHED = 'BrainDog could not reach this record.';
+const UNREACHED = 'BrainDog could not be reached.';
 
 const fixOf = (out: { ok: false } & ({ refusal: { fix: string } } | { conflict: unknown })): string =>
   'refusal' in out ? out.refusal.fix : 'The record changed while this was being saved. Try again.';

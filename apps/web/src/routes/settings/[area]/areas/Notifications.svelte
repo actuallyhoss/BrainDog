@@ -28,7 +28,7 @@
 
   /* This area's own words. Urgent is one line: what interrupts, by name, and not how the Keychain and the limits work. */
   const words = {
-    notHereYet: 'Not on this record yet',
+    notHereYet: 'Not here yet',
     urgentAre: 'Keys about to expire, runs held back, and anything a rule marks urgent.',
     tellers: 'Rules that tell you',
     tellersWhere: 'Mute each one on its own page',

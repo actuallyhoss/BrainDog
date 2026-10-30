@@ -160,7 +160,7 @@ export const askWords = {
   tooFew: 'A choice is between at least two options.',
   tooMany: 'Six options is the most a question offers.',
   noFigure: (n: number) => `Write what option ${n} shows, or pick another way to show it.`,
-  noFile: (n: number) => `Option ${n}'s file is not one this record holds. Name the row that holds it, a slash, then its field.`,
+  noFile: (n: number) => `Option ${n}'s file is not one BrainDog holds. Name the row that holds it, a slash, then its field.`,
 } as const;
 
 /** The most options a person offers here; the kernel takes more from an agent, and a sheet on a phone does not. */

@@ -57,7 +57,7 @@ export const words = {
   close: 'Close',
   loading: 'Reading your accounts…',
   noAccounts: (one: string) => `There is no open account to add a ${one} to yet.`,
-  noLedger: 'This record keeps no ledger to add to.',
+  noLedger: 'There is no ledger to add to yet.',
   needAmount: 'Type an amount first.',
   needAccount: 'Choose the account it moved through.',
   needTwo: 'Choose two different accounts.',

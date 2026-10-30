@@ -156,7 +156,7 @@ test('no record here is refused in its own words, and the next page asks again',
 
   const nothing = await pageReader(BASE, host(null).io).read('desk');
   assert.equal(nothing.from, 'refused');
-  if (nothing.from === 'refused') assert.match(nothing.fix, /^BrainDog could not reach this record\.$/u);
+  if (nothing.from === 'refused') assert.match(nothing.fix, /^BrainDog could not be reached\.$/u);
 });
 
 test('the page draws only a live answer, and reads nothing of the sample', () => {
@@ -766,7 +766,7 @@ test('a live feed names its reader as You, anybody else without an id, a pack or
     rows.map((r) => [r.cells[1], r.cells[3]]),
     [
       ['You', 'deleted Tidy the backlog labels'],
-      ['Someone on this record', 'suggested a question'],
+      ['Someone you share with', 'suggested a question'],
       /* A RULE'S LINE THAT SAYS WHAT HAPPENED IN A SENTENCE OF ITS OWN CARRIES NO NAME IN FRONT OF IT: the group says a
          rule did it, and "Chase late payments suggested Raise the Kiln retainer" read as a log. */
       ['', 'Asked: Raise the Kiln retainer'],

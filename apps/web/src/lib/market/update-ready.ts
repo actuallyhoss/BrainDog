@@ -17,7 +17,7 @@ type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
 export const readyWords = {
   heading: 'An update is ready',
-  from: (from: string, to: string): string => `Version ${to} is out. This record has ${from}.`,
+  from: (from: string, to: string): string => `Version ${to} is out. You have ${from}.`,
   author: 'From its author',
   changes: 'What changes',
   nothing: 'Its author listed nothing else that changes.',

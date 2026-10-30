@@ -49,7 +49,7 @@ export type TodayAnswer = { page: PageAnswer; handled: unknown; shared: unknown;
 export const TODAY_HELD_MS = 300_000;
 
 /** What a host without `today` answers a kept Today: the caller reads the page by `page` instead. */
-const UNKEPT = { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Today is not answered by this record yet.' } } as const;
+const UNKEPT = { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot draw Today yet.' } } as const;
 
 /** Refusals that say the host has no `today` at all. */
 const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);

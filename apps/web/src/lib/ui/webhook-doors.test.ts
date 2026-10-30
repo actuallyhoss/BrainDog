@@ -173,7 +173,7 @@ test('NO SIGN-IN IS signin AND NO HOST IS A REFUSAL, with no slug in the address
   /* Through the real client: a fetch that throws is its `UNREACHABLE`, and the sentence it writes is the one shown. */
   const thrown = await mintDoor(callerAt(BASE, host(null).io), BASE, 'stripe-events');
   assert.equal(thrown.kind, 'refused');
-  assert.match(thrown.kind === 'refused' ? thrown.fix : '', /could not reach this record/u);
+  assert.match(thrown.kind === 'refused' ? thrown.fix : '', /could not be reached/u);
 });
 
 test('THE SCREEN SAYS NOTHING ABOUT A DEMO, because there is none', () => {

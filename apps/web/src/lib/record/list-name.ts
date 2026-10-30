@@ -23,7 +23,7 @@ export function listNameOf(lists: readonly { id: string; name: string }[], id: s
   const was = lists.find((l) => l.id === id);
   if (was && was.name === name) return { ok: false, fix: `${name} is its name already.` };
   const other = lists.find((l) => l.id !== id && fold(l.name) === fold(name));
-  if (other) return { ok: false, fix: `This record already has a list called ${other.name}.` };
+  if (other) return { ok: false, fix: `There is already a list called ${other.name}.` };
   return { ok: true, name };
 }
 

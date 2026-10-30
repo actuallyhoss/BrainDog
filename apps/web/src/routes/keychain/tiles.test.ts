@@ -153,7 +153,7 @@ test('EVERY KEY IS COUNTED, however many: 405 handed is 405 said, not the first 
 });
 
 test('MORE KEYS THAN WERE READ IS SAID, and a read that got them all says nothing', () => {
-  assert.equal(words.moreKeys(405), 'The first 405 keys are listed. This record holds more.');
+  assert.equal(words.moreKeys(405), 'The first 405 keys are listed. There are more.');
   assert.ok(!words.moreKeys(1).includes('—'));
 });
 

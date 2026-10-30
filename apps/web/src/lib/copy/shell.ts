@@ -170,7 +170,7 @@ export const shell = {
   pollFaultUrl: 'Write the whole https:// address the numbers are at.',
   pollFaultMost: (n: number) => `One address fills ${n} numbers at most.`,
   pollFaultPath: (path: string) => `${path} is not a path. Write it as data.mrr or plans[0].count.`,
-  feedSomeone: 'Someone on this record',
+  feedSomeone: 'Someone you share with',
   openUnfiltered: (list: string) => `Open ${list}`,
   noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
   clearFilters: 'Clear filters',
@@ -364,8 +364,8 @@ export const shell = {
       shown.set(address, title === undefined || folded(title) === folded(address) ? address : `${address} (${title})`);
     }
     return shown.size === 0
-      ? `This record has no ${kind.toLowerCase()} yet.`
-      : `${kind} on this record: ${[...shown.values()].join(' · ')}.`;
+      ? `There are no ${kind.toLowerCase()} yet.`
+      : `Your ${kind.toLowerCase()}: ${[...shown.values()].join(' · ')}.`;
   },
   signInAgain: 'Sign in again',
   revokeKey: 'Revoke',

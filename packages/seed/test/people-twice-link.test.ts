@@ -12,7 +12,7 @@
  * says "Too many" now, and the last test reads the figure and the people the link shows from one real record.
  *
  * AND THE PEOPLE SHOWN ARE SAID FIRST (batch 82): the kernel counts them as `held-twice-shown`, so the note reads
- * "2 people may be on this record twice, 1 too many", and the last test holds the first number to the list the link
+ * "2 people may be listed twice, 1 too many", and the last test holds the first number to the list the link
  * opens and the second to the figure.
  */
 
@@ -110,7 +110,7 @@ test('THE NOTE STILL READS AS PLAIN WORDS: the people, then how many too many, n
   const k = await seeded();
   holdTwice(k);
   const said = text(drawn(String(noteOn(k)!.body), 1));
-  assert.match(said, /^2 people may be on this record twice, 1 too many\./u);
+  assert.match(said, /^2 people may be listed twice, 1 too many\./u);
   assert.doesNotMatch(said, /people#|#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b|—|\/r\/|Decide/u);
   /* NOTHING LEFT UNREAD: no token the drawer could not resolve, so no dotted text on the page. */
   assert.ok(drawn(String(noteOn(k)!.body), 1).every((n) => n.type !== 'unresolved'));
@@ -134,7 +134,7 @@ test('THE LINK NARROWS BY THE ONE WORD `twice`, and the note no longer sets the 
   assert.deepEqual([...at.searchParams.keys()], ['twice']);
   /* THE LIST SHOWS THEM, so the words that sent the reader down everyone's names are gone. */
   const said = text(drawn(String(note!.body), 2));
-  assert.equal(said, '3 people may be on this record twice, 2 too many. See them.');
+  assert.equal(said, '3 people may be listed twice, 2 too many. See them.');
   assert.doesNotMatch(said, /same person|by name|look for/iu);
 });
 
@@ -158,13 +158,13 @@ test('THE PEOPLE SAID ARE THE PEOPLE THE LIST SHOWS, AND THE TOO-MANY IS THE FIG
   holdTwice(k);
   const pair = read();
   assert.deepEqual([pair.said, pair.people, pair.shown], [1, 2, 2]);
-  assert.equal(pair.words, '2 people may be on this record twice, 1 too many. See them.');
+  assert.equal(pair.words, '2 people may be listed twice, 1 too many. See them.');
 
   /* AND THREE OF ANOTHER NAME: five on the list, three too many. */
   holdTwice(k, 'Ansel Brandt', 3);
   const more = read();
   assert.deepEqual([more.said, more.people, more.shown], [3, 5, 5]);
-  assert.equal(more.words, '5 people may be on this record twice, 3 too many. See them.');
+  assert.equal(more.words, '5 people may be listed twice, 3 too many. See them.');
 
   /* THE LIST IS ALWAYS LONGER THAN THE TOO-MANY, and the number beside "people" is the list's and never the figure's. */
   assert.ok(more.shown > more.said);

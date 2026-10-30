@@ -38,6 +38,7 @@ import { compile, declaredValue } from './where.ts';
 import type { MetricDecl } from './metrics.ts';
 import type { Entry, Fields, Filter, FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 import { listLine } from './tags.ts';
+import { hostsSaid, needsSaid, originSaid } from './tool-facts.ts';
 import { shownName } from '../shell/side.ts';
 import { largestPart, partsOf, splitAtOf, splitSaid } from './split.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
@@ -382,6 +383,13 @@ export function display(
   typed?: string,
 ): string | null {
   if (value === null || value === undefined || value === '') return null;
+  /* A TOOL'S MACHINES AND KEYS BY THEIR NAMES, and how a key reaches it in words: its page read "kiln-mbp" and
+     "header:Authorization=credentials#1" (`tool-facts.ts`). Where a tool or a key came from names its machine too. */
+  if (register === 'tools' && Array.isArray(value)) {
+    if (field === 'needs') return needsSaid(value, names);
+    if (field === 'hosts') return hostsSaid(value);
+  }
+  if ((register === 'tools' || register === 'credentials') && field === 'origin' && typeof value === 'string') return originSaid(value);
   /* A LIST READS AS ITS ELEMENTS, and never with the tags the record keeps for itself (`tags.ts`). A LIST OF LINKS reads
      as the names of the rows it points at, as one link does, never as their numbers: a person's "Met in" read "3, 5". */
   if (Array.isArray(value)) {
@@ -964,11 +972,11 @@ export const isRows = (f: Filter): boolean => f.field === NUMBER && f.op === 'in
 
 /** What the list says while the word is on: what is shown, the way back to everyone, and that nobody is held twice. */
 export const twiceWords = {
-  showing: 'Showing the people who may be on this record twice',
+  showing: 'Showing the people who may be listed twice',
   clear: 'Show everyone',
-  none: 'Nobody is on this record twice.',
+  none: 'Nobody is listed twice.',
   /** Why nothing is saved while the word narrows the list: a view has no place for it. It names `clear`. */
-  unsaved: 'A view cannot keep the people who may be on this record twice. Choose Show everyone first.',
+  unsaved: 'A view cannot keep the people who may be listed twice. Choose Show everyone first.',
 } as const;
 
 /**

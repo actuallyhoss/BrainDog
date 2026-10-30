@@ -1,10 +1,10 @@
 {
   "pack": "job-starter",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "list-todo",
-  "changes": "Claude on your machine can take a request you send from any row: one kind that reads and proposes, and one that may change files in the folder you pick. Each is approved here once, and once on the machine.",
+  "changes": "Its description says a page of your BrainDog, where it said a page of this record.",
   "title": "Jobs on your machine",
-  "summary": "Six kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, composing a page of this record, and Claude taking a request you send from a row, reading only or changing files in the folder you pick. You approve each kind once before it can run.",
+  "summary": "Six kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, composing a page of your BrainDog, and Claude taking a request you send from one of your lists, reading only or changing files in the folder you pick. You approve each kind once before it can run.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

@@ -87,7 +87,7 @@ export const hubWords = {
   scheduledNone: 'No scheduled actions yet',
   scheduledWhy: 'Fetches or watches a web address on a clock.',
   scheduledPrompt: 'read my record, then propose a scheduled action that fetches a figure from api.example.com every hour and files it in my record',
-  scheduledAbsent: 'This record does not list its scheduled actions yet',
+  scheduledAbsent: 'This BrainDog does not list its scheduled actions yet',
   scheduledAbsentHow: 'Updating the host brings them. You can still make one here and send it to Needs you.',
   scriptsPrompt: 'read my record, then write a script that runs every morning, reads my open tasks and writes a one-line summary to my notes, and propose it',
   scriptsMore: 'Logs and versions are on',

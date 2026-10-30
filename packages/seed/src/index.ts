@@ -157,7 +157,7 @@ export const CREDENTIALS: Fields[] = [
 
 /* `needs` names keys by their row, never by their value. Kiln's `fenwick` hides the global one. */
 export const TOOLS: Fields[] = [
-  { name: 'braindog', kind: 'mcp', transport: 'stdio', command: 'braindog', args: ['mcp'], needs: ['BRAINDOG_TOKEN'], trigger: 'To read and write this record from an agent.', project: null, hosts: ['kiln-mbp', 'studio-desktop'], seen: hours(0.05), origin: '~/.claude.json on kiln-mbp', state: 'active' },
+  { name: 'braindog', kind: 'mcp', transport: 'stdio', command: 'braindog', args: ['mcp'], needs: ['BRAINDOG_TOKEN'], trigger: 'To read and write your BrainDog from an agent.', project: null, hosts: ['kiln-mbp', 'studio-desktop'], seen: hours(0.05), origin: '~/.claude.json on kiln-mbp', state: 'active' },
   { name: 'fenwick', kind: 'mcp', transport: 'http', endpoint: 'https://mcp.fenwick.example/v1', trigger: 'To read Fenwick Cloud usage and invoices.', project: null, hosts: ['studio-desktop'], seen: hours(2), state: 'active' },
   { name: 'fenwick', kind: 'mcp', transport: 'http', endpoint: 'https://mcp.fenwick.example/v1', needs: ['header:Authorization=credentials#1'], trigger: 'To deploy kiln.example and read its Workers logs.', project: 1, hosts: ['kiln-mbp'], seen: hours(0.2), origin: '.mcp.json in kiln-site', state: 'active' },
   { name: 'ledger-post', kind: 'mcp', transport: 'stdio', command: 'npx', args: ['-y', 'ledger-post-mcp'], needs: ['LEDGER_POST_KEY=credentials#3'], trigger: 'To check newsletter delivery and bounces for Portage.', project: 3, hosts: ['studio-desktop'], seen: hours(2), origin: '.mcp.json in portage', state: 'active' },

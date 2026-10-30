@@ -94,7 +94,7 @@ export const runWords = {
   /* THE SHARED "nothing was saved" IS ABOUT A WRITE, and a press saves nothing a person typed. */
   unreached: 'The record could not be reached, so it did not run. Try again in a moment.',
   signIn: 'Sign in again to run it now.',
-  older: 'This record cannot run an action early yet. It runs on its own clock.',
+  older: 'This BrainDog cannot run an action early yet. It runs on its own clock.',
   /* THE RECORD SENT A REFUSAL WITH NO SENTENCE IN IT. Said plainly rather than left blank under the button. */
   refusedQuietly: 'The record did not run it, and did not say why.',
   aria: (name: string) => `Run ${name} now`,

@@ -22,7 +22,7 @@ export const OWN_SCOPES: readonly OwnScope[] = ['read', 'propose', 'write'];
 
 export const words = {
   title: 'Your own agent',
-  why: 'A key lets an agent you run use this record as you, and never more than you can. When your access changes, the key changes with it.',
+  why: 'A key lets an agent you run use your BrainDog as you, and never more than you can. When your access changes, the key changes with it.',
   nameLabel: 'Name it after the agent',
   nameHelp: 'Claude on my laptop, for example. Only you and the owner see it.',
   scopeLabel: 'What it may do',

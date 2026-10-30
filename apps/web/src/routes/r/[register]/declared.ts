@@ -82,7 +82,7 @@ export const words = {
   /** Said before the link, so the line reads as a sentence. */
   trying: 'This is the new page for this list.',
   /** A record that cannot draw a page before it is kept (an older host, or none behind the tab). */
-  none: 'This record cannot draw the new page yet. The list as it was still works.',
+  none: 'This BrainDog cannot draw the new page yet. The list as it was still works.',
   /** While the record draws it. */
   drawing: 'Drawing the page',
 } as const;

@@ -22,7 +22,7 @@ export const automations = {
   /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
      token back, and a blank where a value would go reads as "you have none". */
   doorsUnknown: 'Shown only when made. Lost it? Make a new one; the old one stops.',
-  doorsReading: 'Reading the web addresses this record takes things in at.',
+  doorsReading: 'Reading the web addresses BrainDog takes things in at.',
   /* THE EMPTY STATE SAYS WHAT FILLS IT AND WHO ADDS ONE, because nothing on this screen can: a door arrives as a
      change somebody approves. It said "an ingest with channel webhook and verify kind path", which is the file's
      spelling and not the person's; those words stay in the prompt, which is handed to an agent. */
@@ -55,7 +55,7 @@ export const automations = {
   doorsMade: 'Made. Making another replaces this one, which is also how a leaked address is dealt with.',
   doorsNoToken: 'BrainDog answered without a token in it, so nothing was shown. Try again, and if it happens twice nothing has been changed.',
   doorsNoRead: 'This BrainDog does not list its web addresses yet, so none can be shown here. Updating it brings them.',
-  doorsFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write into this record.',
+  doorsFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write into your BrainDog.',
 
   /* ── the automation editor's footer (`routes/automations/[id]`) ── */
   /* SAID IN THE LIVE LINE AFTER AN UNDO, by the button or by Mod+Z, since the card that moved back says nothing. */

@@ -60,7 +60,7 @@ test('AND A SUCCESS THAT CARRIES NO VALUE IS NOT A SUCCESS', async () => {
 
 test('and the answers that were already refused are refused in the same words', async () => {
   const html = await answering(502, '<html>bad gateway</html>', 'text/html').boot();
-  assert.equal(refusalOf(html)?.fix, 'BrainDog could not reach this record.');
+  assert.equal(refusalOf(html)?.fix, 'BrainDog could not be reached.');
   assert.equal(refusalOf(html)?.detail, '502 with a body that is not JSON');
 
   const bare = await answering(422, '{"ok":false}').boot();

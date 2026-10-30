@@ -16,7 +16,7 @@ import { billingLine, hostedHere, words } from './billing.ts';
 
 test('a live record that has not said it is a self-host is told nothing is charged, and nothing else', () => {
   for (const mintsMail of [true, null]) assert.equal(billingLine({ mintsMail }), words.notChargedYet, `mail door ${mintsMail}`);
-  assert.equal(words.notChargedYet, 'BrainDog does not charge for this record yet.');
+  assert.equal(words.notChargedYet, 'BrainDog does not charge for this yet.');
   /* `billingCloud` CLAIMS A PAYMENT THAT DOES NOT EXIST: nothing on the Cloud takes one yet. */
   assert.doesNotMatch(words.notChargedYet, /payment|up to date|lapse|your own machine/iu);
 });

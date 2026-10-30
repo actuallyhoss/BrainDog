@@ -42,7 +42,7 @@ test('A RECORD WITH NO SUCH METHOD GIVES THE ONE LINE, holds no grammar, and is 
   };
   const out = await loadGrammar(call);
   assert.deepEqual(out, { state: 'older', say: OLDER });
-  assert.equal(OLDER, 'This record is older than the app, so its automations open read only.');
+  assert.equal(OLDER, 'This BrainDog is older than the app, so its automations open read only.');
   assert.equal(held(), null);
   await loadGrammar(call);
   assert.equal(asked, 1, 'the build cannot change under an open tab');
@@ -68,7 +68,7 @@ test('A READ THAT FAILED IS ITS OWN LINE, and is asked again on the next open', 
   let asked = 0;
   const down = async () => {
     asked += 1;
-    return { ok: false, refusal: { code: 'UNREACHABLE', fix: 'BrainDog could not reach this record.' } };
+    return { ok: false, refusal: { code: 'UNREACHABLE', fix: 'BrainDog could not be reached.' } };
   };
   assert.deepEqual(await loadGrammar(down), { state: 'unread', say: UNREAD });
   assert.equal((await loadGrammar(async () => ({ ok: true, value: GRAMMAR }))).state, 'ready');

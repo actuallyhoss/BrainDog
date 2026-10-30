@@ -175,7 +175,7 @@
   }
 
   /* THE SENTENCE FOR AN ADDRESS THAT NAMES NO RUN, kept here and not in `words.noSuch`, which puts the id in it. */
-  const gone = 'This run is not on this record';
+  const gone = 'This run is not here';
 
   const title = $derived(row ? runName(row) : words.run1);
   const args = $derived(row ? Object.entries(row.args).filter(([, v]) => v !== '') : []);

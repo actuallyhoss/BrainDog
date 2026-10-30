@@ -35,7 +35,7 @@ export const home = {
      from "nothing matched", which `19 §6` calls the failure by name. */
   /* THE RECORD ITSELF IS EMPTY, which is a different sentence from every list being empty and from
      nothing needing you. It is the state of the first hour and nothing could say it. */
-  recordEmpty: 'Nothing in the record yet',
+  recordEmpty: 'Nothing here yet',
   startHere: 'Start here',
   /**
    * HOME FOR A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD, in place of the two nothings above.
@@ -47,7 +47,7 @@ export const home = {
    */
   yourList: (name: string) => `Nothing needs you. Your list here is ${name}`,
   yourLists: (names: string) => `Nothing needs you. Your lists here are ${names}`,
-  yourListBody: 'The rest of this record belongs to its owner, who can see everything you add.',
+  yourListBody: 'The rest of this BrainDog belongs to its owner, who can see everything you add.',
   /* AND `/start` FOR THE SAME COLLEAGUE, which offered them the tiles that set up a record and which the
      record refused, tile by tile. Setting a record up is its owner's to do. */
   startNotYours: 'This BrainDog is already made, and setting it up is for its owner.',

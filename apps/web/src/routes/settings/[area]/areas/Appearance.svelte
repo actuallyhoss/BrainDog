@@ -62,7 +62,7 @@
   const words = {
     looks: 'How it looks',
     /* PER RECORD, by the record's name: the look is kept in each record a person opens, not once for the whole account. */
-    hint: (record: string) => (record ? `Kept in ${record}, on all your devices.` : 'Kept in this record, on all your devices.'),
+    hint: (record: string) => (record ? `Kept in ${record}, on all your devices.` : 'Kept in this BrainDog, on all your devices.'),
     hintPending: 'On this device until the record hears of it.',
     hintDevice: 'Kept on this device.',
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */

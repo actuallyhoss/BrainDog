@@ -191,8 +191,8 @@ test('PEOPLE LISTED TWICE ARE COUNTED FROM THE KERNEL\'S OWN ROWS, each entry on
 });
 
 test('PEOPLE ARE SAID IN THE PEOPLE LIST\'S OWN WORDS, and the way to them is that list narrowed to them', () => {
-  assert.equal(peopleTwiceSaid(4), '4 people may be on this record twice');
-  assert.equal(peopleTwiceSaid(1), 'One person may be on this record twice');
+  assert.equal(peopleTwiceSaid(4), '4 people may be listed twice');
+  assert.equal(peopleTwiceSaid(1), 'One person may be listed twice');
   assert.equal(peopleTwiceSaid(0), '');
   assert.equal(PEOPLE_TWICE_HREF, '/r/people?twice=1');
 });

@@ -68,7 +68,7 @@
     bareTitle: (said: string): string => `“${said}” could be in any of your lists`,
     bareBody: 'A number on its own does not say which list it is in. Search for the thing by what it says instead.',
     spokenTitle: (said: string): string => `Nothing answers to “${said}”`,
-    spokenBody: 'Nothing on this record goes by that name. Search for it by what it says instead.',
+    spokenBody: 'Nothing here goes by that name. Search for it by what it says instead.',
     opening: (said: string): string => `Opening ${said}`,
   } as const;
 

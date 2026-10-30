@@ -33,7 +33,7 @@ export const listWords = {
   saving: 'Making',
   noName: 'Give the list a name.',
   badName: 'A name starts with a letter, like Suppliers or Reading list.',
-  taken: (name: string) => `This record already has a list called ${name}.`,
+  taken: (name: string) => `There is already a list called ${name}.`,
   noHolds: 'Say in one line what the list holds, so everybody reading it knows.',
   ownerNote: 'The list is made at once.',
   /** WHY A MEMBER'S LIST WAITS, said before the press as well as after it. */
@@ -47,7 +47,7 @@ export const listWords = {
   missingTitle: (said: string) => `No list called ${said}`,
   missing: 'Make it here, or open the list you meant.',
   nearLists: 'The closest lists here:',
-  missingNone: (said: string) => `This record has no list called ${said}, and no lists yet. Make this one to start.`,
+  missingNone: (said: string) => `There is no list called ${said}, and no lists yet. Make this one to start.`,
   makeBody: 'Give it a name, one line of what it holds, and the fields each row should have.',
 } as const;
 

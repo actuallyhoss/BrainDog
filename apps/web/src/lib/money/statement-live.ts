@@ -46,7 +46,7 @@ async function every(client: Client, register: string, where: unknown, most: num
 /** The ledger, where a running balance goes, and the open accounts, by name. */
 export async function loadStatement(base: string, lists: readonly Listed[]): Promise<{ ok: true; value: Loaded } | { ok: false; fix: string }> {
   const ledger = await findLedger(base, lists);
-  if (ledger === null) return { ok: false, fix: 'This record keeps no ledger to import into.' };
+  if (ledger === null) return { ok: false, fix: 'There is no ledger to import into yet.' };
   const a = ledger.account;
   const rows = await every(createClient({ base }), a.list, null, 1000);
   if (rows === null) return { ok: false, fix: 'The accounts could not be read.' };

@@ -363,7 +363,7 @@ export async function putBack(base: string, slug: string, io?: Fetch): Promise<P
   if (got.ok) return { ok: true, restored: got.value?.restored === 'rules' ? 'rules' : 'previous' };
   const out = await said(Promise.resolve(got));
   if (out.ok) return { ok: true, restored: 'previous' };
-  return unrouted(out) ? { ok: false, fix: 'This record cannot put a page back yet.', code: 'ROUTE_UNKNOWN' } : out;
+  return unrouted(out) ? { ok: false, fix: 'This BrainDog cannot put a page back yet.', code: 'ROUTE_UNKNOWN' } : out;
 }
 
 /* ── the six seconds ────────────────────────────────────────────────────── */

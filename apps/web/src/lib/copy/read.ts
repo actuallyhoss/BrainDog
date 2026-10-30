@@ -17,7 +17,7 @@ export const read = {
   /** A refusal that came without the record's own sentence; the record's is drawn whenever it gave one. */
   readRefused: 'BrainDog could not open this',
   /** The offline sentence, word for word and with its full stop, because it is a sentence and not a title. */
-  readOffline: 'BrainDog could not reach this record.',
+  readOffline: 'BrainDog could not be reached.',
   /**
    * A read that answered and a screen that then could not be drawn from it: the fault is BrainDog's code, not the
    * record's, so it never says the record could not be reached. `readOffline` stays for a read that failed.
