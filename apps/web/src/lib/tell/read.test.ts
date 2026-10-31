@@ -480,7 +480,7 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
 test('A NEW NAME BEFORE A BARE "PAID" IS ASKED WHICH WAY, never made a person who paid you (MC1)', () => {
   const on = { ...shop, today: '2026-10-31' };
   for (const s of ['Plumber paid 300', 'Mark paid 50'])
-    assert.deepEqual(tellRead(s, on), { rows: [], left: [], why: `Did ${s.split(' ')[0]} pay you, or did you pay ${s.split(' ')[0]}?` });
+    assert.deepEqual(tellRead(s, on), { rows: [], left: [s], why: `Did ${s.split(' ')[0]} pay you, or did you pay ${s.split(' ')[0]}?` });
   /* Somebody on the record, or a line that says "paid me", is money in from them. */
   const known = tellRead('Mark paid 50', { ...on, people: [{ seq: 7, name: 'Mark Adel' }] }).rows;
   assert.deepEqual(known.map((r) => [r.register, r.fields.direction]), [['transactions', 'in']]);
@@ -490,4 +490,35 @@ test('A NEW NAME BEFORE A BARE "PAID" IS ASKED WHICH WAY, never made a person wh
   /* "Paid Omar 300" is money out, and nobody new. */
   const omar = tellRead('Paid Omar 300', on).rows;
   assert.deepEqual(omar.map((r) => [r.register, r.fields.direction]), [['transactions', 'out']]);
+});
+
+test('A PAYOUT, A CARD SPEND AND A DINAR ARE READ THE WAY THEY WERE SAID (review 31 Oct h, RH1, RH5, RH6, RH11-RH13)', () => {
+  const on = { ...shop, today: '2026-10-31' };
+  const way = (s: string, c: Partial<typeof on> = {}) => tellRead(s, { ...on, ...c }).rows.find((r) => r.register === 'transactions');
+  /* RH1: "paid out" after a platform is its payout, never "Did Stripe pay you". */
+  const stripe = tellRead('Stripe paid out 1,950 USD today', on);
+  assert.equal(stripe.why, undefined);
+  assert.deepEqual(stripe.rows.map((r) => r.register), ['transactions']);
+  assert.equal(stripe.rows[0]!.fields.direction, 'in');
+  assert.deepEqual(stripe.rows[0]!.fields.amount, { amount: 195000, currency: 'USD' });
+  /* RH11: and so is "Paid out ... from Stripe". */
+  const from = way('Paid out 1,950 USD from Stripe today');
+  assert.equal(from?.fields.direction, 'in');
+  assert.deepEqual(from?.fields.amount, { amount: 195000, currency: 'USD' });
+  /* RH5: a typed "1,250" in dinars is twelve hundred and fifty of them; a point still says the fils. */
+  assert.deepEqual(way('I paid 1,250 KWD for rent')?.fields.amount, { amount: 1250000, currency: 'KWD' });
+  assert.deepEqual(way('I paid 1,250 for rent', { currency: 'JOD' })?.fields.amount, { amount: 1250000, currency: 'JOD' });
+  assert.deepEqual(way('I paid 1.250 KWD for coffee')?.fields.amount, { amount: 1250, currency: 'KWD' });
+  /* RH6: a charge or a purchase is out, and a cashback offer after it is no money back. */
+  assert.equal(way('EGP 500 charged to your account ending 12 at Netflix')?.fields.direction, 'out');
+  assert.equal(way('Purchase of EGP 1,250.00 at CARREFOUR on your card ending 1234. Earn 2% cashback')?.fields.direction, 'out');
+  assert.equal(way('EGP 500 refunded to your card ending 1234 for your purchase at Amazon')?.fields.direction, 'in');
+  /* RH12: a limit's own figure is dropped, and the charge after it kept. */
+  const limit = way('Your credit limit EGP 50,000 card ending 1234 was charged EGP 500 at Noon');
+  assert.deepEqual(limit?.fields.amount, { amount: 50000, currency: 'EGP' });
+  assert.equal(limit?.fields.direction, 'out');
+  /* RH13: the payment asked about is said back as left beside the order it came with. */
+  const mugs = tellRead('14 mugs for Lina, Mark paid 50', on);
+  assert.ok(mugs.why);
+  assert.deepEqual(mugs.left, ['Mark paid 50']);
 });

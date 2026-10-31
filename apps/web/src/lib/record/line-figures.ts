@@ -164,8 +164,8 @@ function figuresIn(line: string, known: string | null, home: string | null, labe
 /**
  * THE AMOUNT A LINE NAMES, and only one it plainly names (RG1). A figure is money when a currency is said with it
  * ("$40", "850 EGP", "300 pounds"), when it follows the field's own name ("total 1350"), or, for a list whose one
- * required field is its amount (Bills), when it is the last bare figure that counts nothing: "Rent for 2 rooms 850"
- * is 850, and "Launch 3 apps" on Projects is no money at all. With several said with a currency, the first.
+ * required field is its amount (Bills), when it is the first bare figure that counts nothing: "Rent for 2 rooms 850"
+ * and "Rent 850 for flat 4" are 850, and "Launch 3 apps" on Projects is no money at all. With several said with a currency, the first.
  *
  * `bare` IS A FIGURE THAT IS MONEY AND HAS NO CURRENCY ANYBODY SAID, for the line to ask about, and only where the
  * amount is required (RG10). Anywhere else the figure stays in the words.
@@ -182,7 +182,8 @@ function amountIn(
   const pick =
     all.find((f) => f.code !== undefined) ??
     all.find((f) => f.labelled) ??
-    (money.required ? all.filter((f) => !f.count).at(-1) : undefined);
+    /* THE FIRST BARE FIGURE THAT COUNTS NOTHING (RH4): "Rent 850 for flat 4" is 850, never the 4 that ends it. */
+    (money.required ? all.find((f) => !f.count) : undefined);
   if (!pick) return null;
   const currency = pick.code === undefined ? known : pick.code;
   if (currency === null) return money.required ? { bare: line.slice(pick.at, pick.end).trim() } : null;
