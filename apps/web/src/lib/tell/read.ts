@@ -1638,7 +1638,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const count = q ? (/^\d+$/.test(q[1]!) ? Number(q[1]) : COUNTS[q[1]!.toLowerCase()]) : undefined;
     const thing = trimWords(q ? rest.slice(q[0].length) : rest);
     if (!thing) return false;
-    const fields: Record<string, TellValue> = { [textField(l)!.id]: thing };
+    /* AN ORDER'S NAME STARTS WITH A CAPITAL, as every row typed by hand does (audit 31 Oct n, AN5): Tell's
+       "Salma ordered 20 lavender candles" was an order called "lavender candles" among "Vanilla jars". */
+    const fields: Record<string, TellValue> = { [textField(l)!.id]: thing.charAt(0).toUpperCase() + thing.slice(1) };
     const ref = who ? personOf(who) : null;
     const whoField = pick(l, 'ref', /who|client|customer|person|from/, (f) => f.to === PEOPLE);
     if (ref !== null && whoField) {
