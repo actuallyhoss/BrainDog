@@ -773,3 +773,40 @@ test("TEAM'S TELL: A SPRINT IS A SPRINT, A PROSPECT KEEPS THEIR COMPANY, AND A T
   assert.deepEqual(task.fields.owner, { $row: ticket.findIndex((r) => r.register === 'people') });
   assert.equal(ticket.find((r) => r.register === 'people')!.fields.name, 'Karim');
 });
+
+/* ── review 31 Oct m: a company the record keeps, a service, a month ─────────────────────────────────────────────── */
+
+test('A NAME THE RECORD KEEPS AS NOBODY, A SERVICE HE PAYS OR A MONTH IS NEVER A NEW PERSON OR A PAYER (RM5)', () => {
+  const nobody = (s: string, o: Partial<Parameters<typeof tellRead>[1]> = {}) => !tellRead(s, { ...founder, ...o }).rows.some((r) => r.register === 'people');
+  /* Halden kept as an organisation, a bill, money that comes round or a past payment is who was paid, never somebody new. */
+  for (const titled of [
+    { organisations: [{ seq: 2, name: 'Halden' }] },
+    { obligations: [{ seq: 5, name: 'Halden' }] },
+    { obligations: [{ seq: 6, name: 'Paid to Halden' }] },
+    { transactions: [{ seq: 7, name: 'Groceries at Halden' }] },
+  ]) {
+    assert.ok(nobody('Paid Halden 1,200', { titled }), JSON.stringify(titled));
+    assert.equal(tellRead('Paid Halden 1,200', { ...founder, titled }).rows[0]!.said, 'EGP 1,200 to Halden', JSON.stringify(titled));
+  }
+  assert.ok(nobody('Paid Halden 1,200', { orgs: [{ seq: 2, name: 'Halden' }] }));
+  /* A company kept by its whole name is that company said short as well. */
+  assert.ok(nobody('Sent Kiln 900', { orgs: [{ seq: 3, name: 'Kiln Studio' }] }));
+  /* With nothing kept, somebody who reads as a person is still the payee, and somebody in People always is (AL2). */
+  assert.deepEqual(tellRead('Paid Nadia 300 for the logo', founder).rows.map((r) => r.register), ['people', 'obligations']);
+  assert.equal(tellRead('Paid Halden 300', { ...founder, people: [{ seq: 9, name: 'Halden' }], titled: { organisations: [{ seq: 2, name: 'Halden' }] } }).rows[0]!.fields.party, 'people#9');
+  /* A service he pays, on a record that holds none of them yet. */
+  for (const s of ['Paid Netflix 200', 'Paid Spotify 60', 'Paid Uber 200', 'Paid Yango 150']) assert.ok(nobody(s), s);
+  for (const s of ['Netflix 200 due Friday', 'Uber 200 due Friday', 'Spotify 60 due Friday', 'Yango 150 due Friday']) {
+    const told = tellRead(s, founder);
+    assert.equal(told.why, undefined, s);
+    assert.deepEqual(told.rows.map((r) => [r.register, r.fields.direction]), [['obligations', 'owed_by_me']], s);
+  }
+  /* A month is never who paid, and never the first digits of the figure after it. */
+  const march = tellRead('Bonus for March 5,000', founder);
+  assert.deepEqual(march.rows, []);
+  assert.equal(march.why, 'Is that money you get, or money you pay? Say which with it, like got 5,000 or paid 5,000.');
+  const rent = tellRead('Rent for March 5,000', founder).rows;
+  assert.deepEqual(rent.map((r) => [r.register, r.fields.what, r.fields.amount]), [['obligations', 'Rent for March', { amount: 500000, currency: 'EGP' }]]);
+  const omar = tellRead('Paid Omar March 300', founder).rows;
+  assert.equal(omar[0]!.fields.name, 'Omar');
+});

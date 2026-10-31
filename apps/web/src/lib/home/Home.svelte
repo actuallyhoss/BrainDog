@@ -374,6 +374,7 @@
       accounts: into.flatMap((to) => knownIn(to)),
       /* THE ORGANISATIONS KEPT, so the company somebody met is from is linked, never made twice (AM12). */
       orgs: knownIn(lists.find((l) => l.id === PEOPLE)?.fields.find((f) => f.type === 'ref' && f.id === 'org')?.to),
+      titled: Object.fromEntries(lists.map((l) => [l.id, knownIn(l.id)])),
     };
   });
 
