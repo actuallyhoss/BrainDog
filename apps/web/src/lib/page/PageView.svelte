@@ -538,6 +538,19 @@
   /* THE HEAD IS KNOWN BEFORE THE RECORD ANSWERS: the rail already holds this page's name and glyph, so while
      its blocks read the head is drawn from that entry and bars stand only where the blocks go. A page the rail does not
      hold (one past its budget, or opened by its address alone) waits with the head's bar as before. */
+  /**
+   * A HELD PAGE BY ITS NAME, NEVER ITS ADDRESS (AJ9): "The closest pages here: People, Filing rules, reconcile-invoice"
+   * of a page titled Reconcile invoice, which the record listed with no title. The rail's name for it, else its address
+   * read as words.
+   */
+  const heldTitle = (h: { address: string; title?: string }): string => {
+    const own = h.title?.trim();
+    if (own) return own;
+    const named = (shell?.nav ?? []).find((n) => n.id === h.address)?.title?.trim();
+    if (named) return named;
+    const words = h.address.replace(/[-_]+/gu, ' ').trim();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  };
   const railed = $derived(mode === 'page' && got === null ? ((shell?.nav ?? []).find((n) => n.id === slug) ?? null) : null);
   /* THE TAB SAYS WHAT THE SCREEN SAYS (audit f, AF19): a page the record does not have is "No page called nope", as a
      mistyped address is, and one that did not load keeps its rail name, or says it did not load. Both said "BrainDog". */
@@ -914,7 +927,7 @@
     </Empty>
   </div>
 {:else if !live}
-  {@const pages = (got.from === 'missing' ? got.held : []).map((h) => ({ title: h.title ?? h.address, href: `/p/${h.address}`, address: h.address }))}
+  {@const pages = (got.from === 'missing' ? got.held : []).map((h) => ({ title: heldTitle(h), href: `/p/${h.address}`, address: h.address }))}
   <div class="said">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has the sentence for it.
          Nothing failed, so there is no request id to quote (`50 §13 D11`), and no filter ran, so "nothing matched" is
