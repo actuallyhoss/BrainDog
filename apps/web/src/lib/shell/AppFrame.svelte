@@ -574,16 +574,18 @@
    * screen with no rail and a record that refused are no draw at all, so the rail that follows them is a first one.
    * Three places in one draw are one sentence.
    */
-  const arrivedIn = (was: { keys: ReadonlySet<string>; hidden: readonly string[] } | null, now: readonly { key: string; label: string; near: readonly string[] }[]): string[] =>
+  /* AND A PLACE ALREADY DRAWN BY ITS NAME HAS NOT COME (AH13): a team's Tickets turns into the Work screen's row with its
+     first ticket, a new key under the same name, and was said as arriving. */
+  const arrivedIn = (was: { keys: ReadonlySet<string>; hidden: readonly string[]; labels?: ReadonlySet<string> } | null, now: readonly { key: string; label: string; near: readonly string[] }[]): string[] =>
     now
-      .filter((i) => was !== null && !['today', 'decide', 'activity'].includes(i.key) && !was.keys.has(i.key) && !i.near.some((h) => was.hidden.includes(h)))
+      .filter((i) => was !== null && !['today', 'decide', 'activity'].includes(i.key) && !was.keys.has(i.key) && !(was.labels?.has(i.label) ?? false) && !i.near.some((h) => was.hidden.includes(h)))
       .map((i) => i.label);
-  let drawn: { keys: ReadonlySet<string>; hidden: readonly string[] } | null = null;
+  let drawn: { keys: ReadonlySet<string>; hidden: readonly string[]; labels?: ReadonlySet<string> } | null = null;
   $effect(() => {
     if (bare || data.refused) return void (drawn = null);
     const now = [...rail.places, ...rail.rest];
     const names = arrivedIn(drawn, now);
-    drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
+    drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden], labels: new Set(now.map((i) => i.label)) };
     if (names.length > 0) toasts.push(copy.placeArrived(names, untrack(() => (!narrow ? 'sidebar' : names.every((n) => phoneTabs.some((t) => t.label === n)) ? 'bar' : 'menu'))));
   });
   /* THE PERSON READING, by the name the record told them, for the face: a guest's own name comes with `me`, since
