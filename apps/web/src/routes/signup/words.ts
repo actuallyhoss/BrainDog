@@ -37,6 +37,22 @@ export const words = {
   closest: 'What is it closest to?',
   closestWhy: 'Pick the closest, or say a little more.',
 
+  /** While the model's reading is still out after the press went on with the rules' (1 Nov): what it finds lands on the build. */
+  stillReading: 'Reading it once more. Anything else it finds shows up here.',
+  /** Once a late reading landed and changed the build. */
+  readAgain: 'Read again, and this is what it found.',
+
+  /** The one tap that says the guessed time zone and currency are right, or changes them (1 Nov). */
+  setTitle: 'Set from this device',
+  setLine: (zone: string, money: string | null) => (money === null ? `Times in ${zone} time.` : `Times in ${zone} time, money in ${money}.`),
+  setChange: 'Change',
+  setZone: 'Time zone',
+  setMoney: 'Money',
+  setDone: 'Done',
+  /** A place named in the words gives a zone the device does not keep: offered, never taken without the tap. */
+  setPlaced: (place: string) => `You said ${place}.`,
+  setUse: (zone: string) => `Use ${zone} time`,
+
   /** The one question (`lib/start/question.ts`), on its own step, with the way back to the words. */
   questionTitle: 'One thing I could not guess',
   questionNext: 'Continue',
