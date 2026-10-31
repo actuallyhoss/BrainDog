@@ -31,10 +31,15 @@ import { renderEntry } from '../src/tools.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-setup-'));
 
-/** Whether setup said a step's line, numbered or under its step's number: `stepsOnce` numbers a step's first line only. */
+/**
+ * Whether setup said a step's line, numbered or under its step's number: `stepsOnce` numbers a step's first line only.
+ * A line ending in a colon may carry what it introduces on the same line, as Claude Code's server entry does.
+ */
 const saidStep = (out: readonly string[], line: string): boolean => {
   const m = /^(\d+[a-z]?\. )(.*)$/su.exec(line);
-  return m !== null && out.some((l) => l === line || l === `${' '.repeat(m[1]!.length)}${m[2]!}`);
+  if (m === null) return false;
+  const forms = [line, `${' '.repeat(m[1]!.length)}${m[2]!}`];
+  return out.some((l) => forms.some((f) => l === f || (f.endsWith(':') && l.startsWith(`${f} `))));
 };
 after(() => rmSync(scratch, { recursive: true, force: true }));
 const HOST = 'http://127.0.0.1:9';
@@ -348,14 +353,16 @@ test('apply registers the server in both profiles and the other app, keeps a .pr
 
   /* A SECOND RUN, WITH NO --profile: the work profile is reached from profiles.json, and nothing is written. */
   const again = home2(false);
+  /* THE SAME MACHINE: its home and its config folder, where the hosts file the first run made the default lives. */
   again.io.home = m.home;
+  again.io.env = m.io.env;
   again.io.cwd = m.io.cwd;
   again.io.claude = m.io.claude;
   const settled = snapshot(m.home);
   const calls = m.calls.length;
   assert.equal(await setup([host, '--yes'], again.io), 0, again.out.join('\n'));
   assert.ok(saidStep(again.out, '3. MCP server, Claude Code in ~/.claude-work: braindog is already registered, running this command.'), again.out.join('\n'));
-  assert.equal(again.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
+  assert.equal(again.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`, again.out.join('\n'));
   assert.equal(m.calls.length, calls, 'the second run ran claude');
   assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
 });
