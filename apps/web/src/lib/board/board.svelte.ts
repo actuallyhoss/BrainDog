@@ -253,13 +253,22 @@ export class BoardModel {
     return pack(drafts.size === 0 ? items : items.map((w) => (drafts.has(w.key) ? { ...w, grow: 1 } : w)), cols);
   });
 
+  /** The widgets laid shorter at rest than their size (`rest`), which the filling never draws down a hole. */
+  get short(): ReadonlySet<string> {
+    if (this.onPhone || this.editing) return new Set();
+    const rest = this.src.rest?.() ?? null;
+    return new Set(rest === null ? [] : [...rest.keys()]);
+  }
+
   /** Each widget's place, by key. */
   /* AT REST NO HOLE IS DRAWN (`filled`): a widget beside one is drawn across it. EDITING, THE SAME, so entering the mode
      moves nothing (audit 31 Oct, A17: People halved beside a hole the moment Edit was pressed). ONLY WHILE A WIDGET IS
      HELD, by the pointer or the keys, is the board drawn as packed, holes and all, so a drag or a resize lands in whole
      cells and the room a smaller size leaves is seen. */
   places: ReadonlyMap<string, Place> = $derived(
-    new Map((this.editing && this.held !== null ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4)).map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }])),
+    new Map(
+      (this.editing && this.held !== null ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4, this.short)).map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }]),
+    ),
   );
 
   /** A widget's place, or `null` where it takes none. */

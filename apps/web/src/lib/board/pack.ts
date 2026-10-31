@@ -81,7 +81,7 @@ export function pack(items: readonly Item[], cols: number): Packed {
  * down into empty cells as wide as it is, then left. Its size is unchanged (what it shows, what is kept); only its frame
  * is drawn larger. The editor shows the packed board, holes and all, so he sees where they would be.
  */
-export function filled(packed: Packed, cols: number): Laid[] {
+export function filled(packed: Packed, cols: number, short: ReadonlySet<string> = new Set()): Laid[] {
   const rows = packed.rows;
   const grid: (string | null)[][] = Array.from({ length: rows }, () => Array<string | null>(cols).fill(null));
   const out = packed.laid.map((l) => ({ ...l }));
@@ -97,7 +97,10 @@ export function filled(packed: Packed, cols: number): Laid[] {
   for (const l of out) {
     while (empty(l.x + l.w, l.y, 1, l.h)) claim(l, l.x + l.w, l.y, 1, l.h), (l.w += 1);
   }
+  /* NEVER DOWN FOR A TILE LAID SHORT AT REST (`short`, first hour audit AH19): Needs you, made one row tall because it
+     holds one line, was drawn down the hole beside a tall Arrivals, its heading in the middle of 380px. */
   for (const l of out) {
+    if (short.has(l.key)) continue;
     while (empty(l.x, l.y + l.h, l.w, 1)) claim(l, l.x, l.y + l.h, l.w, 1), (l.h += 1);
   }
   for (const l of out) {
