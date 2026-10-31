@@ -2721,10 +2721,11 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: 'f06ef80069526206',
+    declares: '907bf4230f776598',
     history: [
       'People 4.2.2 of 30 October: `page.people` says who may be listed twice in plainer words; no id added or taken away -> d1e4904c80834e27',
       'Before 4.2.2 shipped, `page.people` offers "Add a person" in its head; no id added or taken away -> f06ef80069526206',
+      'Before 4.2.2 shipped, `page.people` counts contacts besides you; no id added or taken away -> 907bf4230f776598',
     ],
   },
 

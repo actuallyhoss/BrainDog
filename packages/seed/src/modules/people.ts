@@ -537,7 +537,8 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
 
            HOW MANY STANDS IN A CLAUSE OF ITS OWN, so the line never says "0 of your 12 contacts were in touch" about a
            record that simply has no Last in touch days yet (people `meet` adds, until it stamps the day): it says
-           "12 contacts" and stops. */
+           "12 contacts" and stops. BESIDES YOU (31 Oct, audit m AM17): the list shows the owner too, so "1 contact" sat
+           over two names. */
         kind: 'note',
         lead: true,
         span: 12,
@@ -547,7 +548,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM: "Add Priya to People?"
            names no row of its own, and the line said no question was open while it waited in Needs you. The kernel
            counts a rowset on People here now (`openOnList`), and Waiting on you lists it. */
-        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)',
+        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s) besides you',
       },
       {
         /* WHO HAS GONE QUIET, BY NAME, SINCE People 2.7.0 (the visual review of October 2nd), where the line said "1 quiet
