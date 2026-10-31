@@ -98,7 +98,7 @@ import { outboundHeld, scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
 import { selfhostFacts, selfhostProbeWire, slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, slashModelJobs, type SlashConfig } from './slash.ts';
 import { unwrap, type KeyStore } from './keys.ts';
-import { commandFor } from './how.ts';
+import { commandFor, inImage } from './how.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, keychainDoor } from './keychain.ts';
@@ -1856,7 +1856,7 @@ export async function start(options: {
        from a checkout has none, and the record then says `app: null` rather than inventing one.
        `slash` is whether a model is behind Slash here: an endpoint, and a key to call it with or none needed.
        `host` is for `boot`, so Billing reads that this is a self-host rather than inferring it from the mail door's 404. */
-    build: { app: buildApp, slash: slashModel !== undefined, host: 'self-host', min_cli: MIN_CLI },
+    build: { app: buildApp, slash: slashModel !== undefined, host: 'self-host', min_cli: MIN_CLI, ...(inImage() ? { image: true as const } : {}) },
   });
   /* AN ERASURE REACHES SLASH'S LEDGER TOO, in `slash.sqlite` beside the record's file (`slashErasing`),
      which the kernel's erase cascade never reaches. */

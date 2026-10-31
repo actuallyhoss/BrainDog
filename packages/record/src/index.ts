@@ -1556,6 +1556,8 @@ export type Boot = {
    * reader then falls back to whatever it inferred before, rather than being handed a value nobody gave.
    */
   host?: 'cloud' | 'self-host';
+  /** A self-host in its Docker image, copied from `Build.image` (PK5): absent on every other host. */
+  image?: true;
   /**
    * The record's installed look, drawn: each scheme's custom properties by name without the `--`, or `null` when no
    * `theme` declaration is installed and the house theme is what everybody sees (`28 §5`).
@@ -2169,6 +2171,11 @@ export type Build = {
    * Optional, so a build that does not name its host is a record whose `boot` carries no `host` key at all.
    */
   host?: 'cloud' | 'self-host';
+  /**
+   * A self-host running in its Docker image (`BRAINDOG_IMAGE=1`), for `boot` (PK5): a screen that prints a command to
+   * run on the machine prints the `docker compose` one only there. Absent everywhere else.
+   */
+  image?: true;
   /** The oldest command this host's door still works with, `MIN_CLI` from packages/mcp/src/build.ts. */
   min_cli?: string;
 };
@@ -11666,6 +11673,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* ONLY WHEN THE BUILD NAMES ONE: a key set to `undefined` still reads as `'host' in boot`, which is a host
              that said something. */
           ...(build?.host === undefined ? {} : { host: build.host }),
+          ...(build?.image === true ? { image: true as const } : {}),
           ...(admin(ctx) === null ? { copies: kernel.copyFacts() } : {}),
         };
         return [answered, themeInstalled(ctx), looksOf(kernel.declarations().filter((d) => d.kind === 'theme'))] as const;

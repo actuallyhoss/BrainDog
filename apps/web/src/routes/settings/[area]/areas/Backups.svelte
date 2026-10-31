@@ -501,9 +501,12 @@
     <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
          both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
     <p class="hint">{shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere}</p>
-    {#if shell.host !== 'cloud'}
+    <!-- THE DOCKER WAY OFF THE VOLUME ONLY IN THE IMAGE (PK5), and from a host older than the flag, which did not say. -->
+    {#if shell.host !== 'cloud' && (shell.image || shell.host !== 'self-host')}
       <p class="hint">{copy.downloadNeedsKey} {copy.theKeyDocker}</p>
       <CodeLine text={copy.theKeyDockerCommand} />
+    {:else if shell.host !== 'cloud'}
+      <p class="hint">{copy.downloadNeedsKey}</p>
     {/if}
   </div>
 </Tile>

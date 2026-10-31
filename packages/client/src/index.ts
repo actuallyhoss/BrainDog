@@ -129,6 +129,8 @@ export type Boot = {
    * older than the field, and not a guess at either: a reader keeps whatever it inferred before the field existed.
    */
   host?: 'cloud' | 'self-host';
+  /** A self-host in its Docker image (PK5), so a screen prints the `docker compose` command only there. */
+  image?: true;
   /**
    * The pages of rows that come and go (a run's), by their address alone, by list: each row's number and its page's
    * slug, so a link to the row opens its page. `pages` lists them no more. Absent from an older host, which lists them
@@ -273,6 +275,8 @@ export type EventLine = {
   run_by?: { run: string; agent: string; client: string | null; parent: string | null } | null;
   /** On a `decide` line, the question it settled (`SG4`): the `resolve` beside it targets `suggestion:<settles>`. */
   settles?: string;
+  /** On a line the making of this BrainDog wrote (PK1): a starter's own rows, never "you added". Absent everywhere else. */
+  made?: true;
   /** On the one line a pass of BrainDog's own update is said as (kind `update`): its sentence and counts. */
   pass?: { said: string; updated: number; asked: number; steps: number; at: string };
   /** Every line that pass wrote, newest first. */
