@@ -827,3 +827,48 @@ test('MONEY TOLD WHERE NONE IS KEPT OFFERS TO TURN MONEY ON (AM4)', () => {
   assert.equal(told.needsMoney, true);
   assert.deepEqual(told.rows, []);
 });
+
+/* ── review 31 Oct n: a salary he pays, a trailing project, a place somebody is from ────────────────────────────────── */
+
+test('A SALARY OR A PENSION THAT NAMES WHO GETS IT IS ASKED, NEVER MONEY IN (RN1)', () => {
+  const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
+  for (const s of ['Salary for the team 45,000 every month', 'Salary Karim 8,000 a month', 'Pension for mum 2,000 a month', 'Salary 45,000 for the team every month']) {
+    for (const o of [founder, withRepeating]) {
+      const told = tellRead(s, o);
+      assert.deepEqual(told.rows, [], s);
+      assert.ok(told.why, s);
+    }
+  }
+  /* A salary said with nothing but its figure and its cadence, "my", or where it came from is still his. */
+  assert.deepEqual(tellRead('Salary 30,000 a month', withRepeating).rows.map((r) => [r.register, r.fields.direction]), [['recurring', 'in']]);
+  assert.equal(tellRead('Salary 30,000 a month', founder).rows[0]!.fields.direction, 'owed_to_me');
+  assert.equal(tellRead('My salary 30,000', founder).rows[0]!.fields.direction, 'owed_to_me');
+  assert.equal(tellRead('Salary 30,000 from Acme', founder).rows.find((r) => r.register === 'obligations')!.fields.direction, 'owed_to_me');
+});
+
+test('A TRAILING NAME THE RECORD KEEPS AS A PROJECT OR A COMPANY IS NOBODY NEW (RN2)', () => {
+  const roomy = { ...founder, titled: { things: [{ seq: 4, name: 'Nook' }] } };
+  const fix = tellRead('Fix the login bug, Roomy', roomy).rows;
+  assert.ok(!fix.some((r) => r.register === 'people'));
+  assert.deepEqual(fix.map((r) => [r.register, r.fields.what, r.fields.thing, r.fields.owner]), [['tasks', 'Fix the login bug', 'things#4', undefined]]);
+  /* An organisation tasks do not link to stays in the title. */
+  const reply = tellRead('Reply to Priya, Lumen', { ...founder, orgs: [{ seq: 2, name: 'Lumen' }] }).rows;
+  assert.ok(!reply.some((r) => r.register === 'people' && r.fields.name === 'Lumen'));
+  assert.equal(reply.find((r) => r.register === 'tasks')!.fields.owner, undefined);
+  /* A word of how it stands is nobody. */
+  const urgent = tellRead('Ship the post, Urgent', founder).rows;
+  assert.ok(!urgent.some((r) => r.register === 'people'));
+  /* Somebody in People, or a name that reads as a person, is still who it is for. */
+  const karim = tellRead('Fix the login bug, Karim', { ...founder, people: [{ seq: 7, name: 'Karim' }] }).rows;
+  assert.deepEqual(karim.map((r) => [r.register, r.fields.owner]), [['tasks', 'people#7']]);
+});
+
+test('A PLACE SOMEBODY IS FROM IS NO ORGANISATION, AND A KEPT ONE IS FOUND BY ITS SHORT NAME (RN6)', () => {
+  const team = { lists: [PEOPLE, ORGS, TASKS], today: TODAY, currency: null };
+  const lina = tellRead('Met Lina from Dubai', team).rows;
+  assert.deepEqual(lina.map((r) => r.register), ['people']);
+  assert.equal(lina[0]!.fields.org, undefined);
+  assert.match(String(lina[0]!.fields.note ?? ''), /From Dubai/u);
+  const hana = tellRead('Met Hana from Brightside', { ...team, orgs: [{ seq: 3, name: 'Brightside Ltd' }] }).rows;
+  assert.deepEqual(hana.map((r) => [r.register, r.fields.org]), [['people', 'organisations#3']]);
+});

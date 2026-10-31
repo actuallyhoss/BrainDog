@@ -28,6 +28,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { run } from '$lib/data/optimistic.svelte.ts';
   import { reread } from '$lib/data/live.svelte.ts';
+  import type { MoneyAsk } from '$lib/tell/money-on.ts';
   import type { TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -88,6 +89,8 @@
     moneyOn: 'Turn on Money and add it',
     moneyTurning: 'Turning on Money…',
     moneyTurned: 'Turned on Money',
+    /* WHAT MONEY'S PLAN ASKS BEYOND ITS LISTS, said before the press approves it (RN3). */
+    moneyAlso: 'Money will also:',
   };
 
   let typed = $state('');
@@ -162,6 +165,8 @@
      what is taken back. A line that still cannot be placed once Money is on (which currency) says so on the card. */
   let moneyWait = $state(false);
   let moneyFix = $state<string | null>(null);
+  /** What Money's plan would also approve, said on the card; the next press approves these lines and no others (RN3). */
+  let moneyAsk = $state<MoneyAsk | null>(null);
   async function moneyOn() {
     if (sending || moneyWait || reader === null) return;
     moneyFix = null;
@@ -169,7 +174,12 @@
     const words = typed;
     try {
       const { moneyThenRead } = await import('$lib/tell/money-on.ts');
-      const out = await moneyThenRead(apiBase(), words, options, reader);
+      const out = await moneyThenRead(apiBase(), words, options, reader, moneyAsk?.approve ?? []);
+      if ('ask' in out) {
+        moneyAsk = out.ask;
+        return;
+      }
+      moneyAsk = null;
       if ('fix' in out) moneyFix = out.fix;
       else {
         const go = readyRows(out.told.rows);
@@ -188,7 +198,7 @@
     e.preventDefault();
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
     else if (rows.length === 0 && offers.length === 1) addOffer(offers[0]!);
-    else if (told?.needsMoney) void moneyOn();
+    /* AND NEVER TURNS MONEY ON (RN3): ⌘↵ adds a line where a home for it exists; a module goes on by its own button. */
   }
 
   const title = $derived(bank ? say.bankTitle : slim ? say.slimTitle : say.title);
@@ -237,6 +247,14 @@
       <div class="tell-one-becomes" aria-live="polite">
         <p class="tell-one-why">{told.why}</p>
         {#if told.needsMoney}
+          {#if moneyAsk}
+            <div class="tell-one-also">
+              <p class="tell-one-quiet">{say.moneyAlso}</p>
+              <ul class="tell-one-also-lines">
+                {#each moneyAsk.lines as line, i (i)}<li>{line}</li>{/each}
+              </ul>
+            </div>
+          {/if}
           <div class="tell-one-offers">
             <Button weight="primary" disabled={sending || moneyWait} onclick={() => void moneyOn()}>{moneyWait ? say.moneyTurning : say.moneyOn}</Button>
           </div>
@@ -329,6 +347,22 @@
     margin: 0;
     font-size: var(--fs-body);
     color: var(--ink);
+  }
+
+  /* WHAT MONEY WOULD ALSO DO, one call a line in ink under the quiet lead, before the press that approves them. */
+  .tell-one-also {
+    display: grid;
+    gap: var(--sp-1);
+  }
+
+  .tell-one-also-lines {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding-inline-start: var(--sp-4);
+    font-size: var(--fs-body);
+    color: var(--ink);
+    white-space: pre-line;
   }
 
   .tell-one-offers {

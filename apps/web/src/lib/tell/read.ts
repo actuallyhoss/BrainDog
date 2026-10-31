@@ -688,6 +688,12 @@ const INCOME_MINE = /^(?:my|our)\s/iu;
    round. Wages may be his staff's and a bonus or an allowance somebody else's, so those are still asked; and "for Omar",
    "to Omar" or "due" still asks, by `INCOME_NOT`. */
 const INCOME_OWN = /^(?:salary|pay ?cheque|paycheck|pension)\b/iu;
+/* AND ONLY WHEN NOTHING STANDS BETWEEN THE WORD AND THE FIGURE (RN1): "Salary for the team 45,000 every month" and
+   "Salary Karim 8,000 a month" are money he pays, and were told as money in. What comes before the figure, a day taken
+   off; after it, only a cadence, "from <payer>" or "into my account" may follow. */
+const INCOME_OWN_LEAD = /^(?:salary|pay ?cheque|paycheck|pension)(?:\s+of)?[\s:,–-]*$/iu;
+/* "for the team", "to staff", "for mum": a lower-case somebody it is for, as well as a capitalised name (RN1). */
+const INCOME_FOR = /\b(?:for|to)\s+(?:(?:the|my|our|his|her|their|all|each|every)\s+)?(?:team|staff|employees?|workers?|crew|people|kids|children|family|mum|mom|mother|dad|father|parents|wife|husband|son|daughter|brother|sister|driver|nanny|maid|cleaner|helper|intern|interns|freelancers?|contractors?)\b/iu;
 const INCOME_NOT = new RegExp(`\\b(?:[Ff]or|[Tt]o)\\s+(${NAME})(?![\\p{L}\\p{M}'’-])|\\bdue\\b`, 'u');
 const CAME_IN_WORDS = /\b(?:came in|come in|comes in|has come in|arrived|landed|went in|hit (?:my|our|the) account|got paid|into (?:my|our) (?:account|bank))\b/giu;
 /* A FIGURE SAID AS A TIME is no amount: "Call the bank at 3 tomorrow". */
@@ -698,7 +704,7 @@ const ASSIGN = new RegExp(`(?:^|[\\s,;])(?:[Aa]ssign(?:ed)?|[Gg]ive it)\\s+(?:it
 /* A NAME SAID ON ITS OWN BETWEEN COMMAS, or last: "Fix the login bug on Android, Karim, by Tuesday" (AM12). */
 const TRAILING_NAME = new RegExp(`,\\s*(${NAME})\\s*(?=[,;]|$)`, 'u');
 /* What a ticket is about, said with a capital, that is never anybody: a platform or a device. */
-const NOT_SOMEBODY = /^(?:android|ios|iphone|ipad|web|mac|macos|windows|linux|chrome|safari|firefox|desktop|mobile|staging|production|prod|api|ui|ux)$/iu;
+const NOT_SOMEBODY = /^(?:android|ios|iphone|ipad|web|mac|macos|windows|linux|chrome|safari|firefox|desktop|mobile|staging|production|prod|api|ui|ux|urgent|asap|important|priority|high|medium|low|blocked|later|soon|someday|quick|small|big|optional|maybe|p[0-4]|backend|frontend|design|marketing|sales|ops|admin|bug|feature|today|tonight|tomorrow)$/iu;
 /* A BANK'S OWN TEXT, as a card alert or an account alert prints it: one of these words, and a currency it names. */
 const BANKISH = /\b(?:debited|credited|charged|purchase|withdrawn|withdrawal|deposited|avl\.? ?bal|available balance|card ending|card no|a\/c|acct)\b/iu;
 /* The words only a bank prints. With none of them, a sentence that says "purchase" is read as a sentence. */
@@ -1092,15 +1098,24 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        name that reads as a person, never a place, a company or a day. */
     const ownerField = withPeople ? pick(l, 'ref', /owner|assign|who|person/, (f) => f.to === PEOPLE) : undefined;
     const assignedSaid = ASSIGN.exec(rest);
-    const trailing = ownerField && !(assignedSaid && aName(assignedSaid[1]!)) ? TRAILING_NAME.exec(rest) : null;
+    const trailing = !(assignedSaid && aName(assignedSaid[1]!)) ? TRAILING_NAME.exec(rest) : null;
+    /* A TRAILING NAME THE RECORD KEEPS AS SOMETHING ELSE IS THAT, NEVER A PERSON (RN2): "Fix the login bug, Roomy" on a
+       record with a project Roomy made a person Roomy and gave her the task. Somebody in People comes first; then a
+       project, an organisation or any entry a list keeps, linked where this list links to that one, and otherwise
+       left in the title. */
+    const inPeople = trailing ? knownAs(trailing[1]!, opts.people ?? []) !== null : false;
+    const kept = trailing && !inPeople ? keptAs(trailing[1]!) : null;
+    const keptTo = kept?.list?.id;
+    const keptLink = keptTo ? l.fields.find((f) => f.type === 'ref' && f.to === keptTo && !f.retired) : undefined;
     const assigned =
       assignedSaid && aName(assignedSaid[1]!)
         ? assignedSaid
-        : trailing && (knownAs(trailing[1]!, opts.people ?? []) !== null || (somebody(trailing[1]!) && !NOT_SOMEBODY.test(trailing[1]!))) && !ownAccount(trailing[1]!)
+        : ownerField && trailing && !kept && (inPeople || (somebody(trailing[1]!) && !NOT_SOMEBODY.test(trailing[1]!))) && !ownAccount(trailing[1]!)
           ? trailing
           : null;
-    const owner = assigned ? ownerField : undefined;
+    const owner = assigned && ownerField ? ownerField : undefined;
     if (owner && assigned) rest = oneLine(`${rest.slice(0, assigned.index)}${assigned === trailing ? '' : ' '}${rest.slice(assigned.index + assigned[0].length)}`);
+    else if (kept && keptLink && trailing) rest = oneLine(`${rest.slice(0, trailing.index)}${rest.slice(trailing.index + trailing[0].length)}`);
     const { day, rest: undated } = takeDay(rest, opts.today);
     const due = day ? pick(l, 'day', /due|^by$|deadline|aim|target/, (f) => f.deadline === true || said(f, /due|^by$/)) : undefined;
     let title = trimWords((due ? undated : rest).replace(/\s*[,;]\s*(?=[,;]|$)/gu, '')).replace(/\s+(?:due|by|on)$/iu, '');
@@ -1109,6 +1124,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (due && day) fields[due.id] = day;
     startIn(l, fields);
     for (const f of l.fields) if (f.required && !f.retired && f.default === undefined && fields[f.id] === undefined && counted(f)) fields[f.id] = 0;
+    if (kept && keptLink) fields[keptLink.id] = `${keptTo}#${kept.seq}`;
     let who: string | null = null;
     if (owner && assigned) {
       const ref = personOf(assigned[1]!);
@@ -1117,8 +1133,36 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
         who = assigned[1]!;
       }
     }
-    const bits = [`new in ${l.name}`, ...(due && day ? [`due ${dayWord(day, opts.today)}`] : []), ...(who ? [`for ${who}`] : [])];
+    const bits = [`new in ${l.name}`, ...(due && day ? [`due ${dayWord(day, opts.today)}`] : []), ...(who ? [`for ${who}`] : []), ...(kept && keptLink ? [`in ${kept.name}`] : [])];
     return { register: l.id, fields, said: String(fields[what.id]), detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) };
+  }
+
+  /** The entry a list other than People keeps by this name, Projects first, then organisations, then any other list:
+      by its whole name, or by its name without the word a company's ends on ("Brightside" for "Brightside Ltd"). */
+  function keptAs(name: string): { list: TellList | null; seq: number; name: string } | null {
+    const said = words(oneLine(name));
+    const same = (n: string): boolean => {
+      const w = words(oneLine(n)).replace(/[.,;:]+$/u, '');
+      return w === said || w.replace(COMPANY_END, '') === said || said.replace(COMPANY_END, '') === w;
+    };
+    const titled = opts.titled ?? {};
+    const project = projectList(opts.lists);
+    const orgList = orgsList();
+    const order = [...(project ? [project] : []), ...(orgList && orgList !== project ? [orgList] : []), ...opts.lists.filter((x) => x !== project && x !== orgList && x.id !== PEOPLE)];
+    for (const list of order) {
+      const pool = [...(titled[list.id] ?? []), ...(list === orgList ? (opts.orgs ?? []) : [])];
+      const hit = pool.find((k) => same(k.name));
+      if (hit) return { list, seq: hit.seq, name: hit.name };
+    }
+    /* An organisation kept where no list of them is read is still nobody, though nothing links to it. */
+    const org = !orgList ? (opts.orgs ?? []).find((k) => same(k.name)) : undefined;
+    return org ? { list: null, seq: org.seq, name: org.name } : null;
+  }
+
+  /** The list People links a person's company to, where it keeps organisations. */
+  function orgsList(): TellList | undefined {
+    const f = people?.fields.find((x) => x.type === 'ref' && x.to !== undefined && x.to !== PEOPLE && /org|company|organi[sz]ation/iu.test(`${x.id} ${x.label ?? ''}`));
+    return f ? opts.lists.find((x) => x.id === f.to && textField(x) !== undefined) : opts.lists.find((x) => callsItself(x, /^organi[sz]ations?$|^companies$/i) && textField(x) !== undefined);
   }
 
   /** An address said in the sentence, on the person it names: their name in its first half, or the one person met. */
@@ -1167,11 +1211,16 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        Brightside" dropped Brightside. One already kept is linked by its whole name; a new one comes before her, so her
        link points back at it. Where no organisations are kept, it is said in her note. */
     const company = met?.[3] ?? null;
-    const orgField = company ? people.fields.find((f) => f.type === 'ref' && f.to !== undefined && f.to !== PEOPLE && /org|company|organi[sz]ation/iu.test(`${f.id} ${f.label ?? ''}`)) : undefined;
+    /* A PLACE IS WHERE THEY ARE FROM, NEVER AN ORGANISATION (RN6): "Met Lina from Dubai" made one called Dubai. It is
+       said in her note. */
+    const place = company !== null && PLACES.test(company.trim());
+    const orgField = company && !place ? people.fields.find((f) => f.type === 'ref' && f.to !== undefined && f.to !== PEOPLE && /org|company|organi[sz]ation/iu.test(`${f.id} ${f.label ?? ''}`)) : undefined;
     const orgs = orgField ? opts.lists.find((l) => l.id === orgField.to && textField(l) !== undefined) : undefined;
     let orgRef: TellValue | null = null;
     if (company && orgs && knownAs(name, opts.people ?? []) === null && !made.has(words(name)) && room(2)) {
-      const kept = (opts.orgs ?? []).find((o) => words(o.name) === words(company));
+      /* Found by its whole name or its bare one (RN6): "Brightside Ltd" kept is "Brightside" said, and the other way. */
+      const bare = (n: string): string => words(oneLine(n)).replace(/[.,;:]+$/u, '').replace(COMPANY_END, '');
+      const kept = [...(opts.orgs ?? []), ...(opts.titled?.[orgs.id] ?? [])].find((o) => words(o.name) === words(company) || bare(o.name) === bare(company));
       if (kept) orgRef = `${orgs.id}#${kept.seq}`;
       else {
         const fields: Record<string, TellValue> = { [textField(orgs)!.id]: company };
@@ -1313,7 +1362,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* NO WORD OF ARRIVING, NO "FROM", NO "MY": the way is asked, never taken from the word (RL5). */
     if (!CAME_IN.test(c)) {
       const not = INCOME_NOT.exec(c);
-      if (not || !(/\bfrom\s/iu.test(c) || INCOME_MINE.test(c) || INCOME_OWN.test(c))) return askWay(c, a, not?.[1] && aName(not[1]) ? undated(not[1]).name : nameBefore(dated.rest.slice(0, a.at)));
+      /* His own salary only with nothing but the figure, a cadence, "from <payer>" or his own account said (RN1). */
+      const after = oneLine(dated.rest.slice(a.at + a.text.length).replace(EVERY, ' ').replace(INTO_MINE, ' ').replace(/\bfrom\s+.*$/iu, ' ')).replace(/^[\s,.;:–-]+|[\s,.;:–-]+$/gu, '');
+      const own = INCOME_OWN.test(c) && INCOME_OWN_LEAD.test(dated.rest.slice(0, a.at)) && after === '';
+      if (not || INCOME_FOR.test(c) || !(/\bfrom\s/iu.test(c) || INCOME_MINE.test(c) || own)) return askWay(c, a, not?.[1] && aName(not[1]) ? undated(not[1]).name : nameBefore(dated.rest.slice(0, a.at)));
     }
     if (!moneyList(opts.lists) && !dueList(opts.lists)) {
       noMoney = true;

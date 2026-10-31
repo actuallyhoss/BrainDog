@@ -42,7 +42,8 @@ export type SetupRead = {
   kinds: Kind[];
   index: CatalogueIndex | null;
   states: PackState[];
-  /** The currency the money already told is in, the most used one, or `null` where none is told (AM22). */
+  /** The currency the money already told is in, the most used one, or `null` where none is told (AM22). Offered beside
+      the home currency, never ahead of it (RN8). */
   told: string | null;
 };
 
@@ -63,8 +64,16 @@ const isMoney = (v: unknown): v is { amount: number; currency: string } =>
   v !== null && typeof v === 'object' && typeof (v as { currency?: unknown }).currency === 'string' && typeof (v as { amount?: unknown }).amount === 'number';
 
 /**
- * THE CURRENCY HIS MONEY IS ALREADY IN: every amount on the newest lines of the lists money is told into before an
- * account, the most used currency first. `null` when none holds money, or the record would not say.
+ * A LINE'S MAIN AMOUNT, ONCE (RN8): its `amount` where that is money, else its first money field. Every money field was
+ * counted, so a payout with an amount and a paid figure counted twice, and two USD payouts outvoted three EGP bills.
+ */
+const mainAmount = (fields: Record<string, unknown>): { amount: number; currency: string } | null =>
+  isMoney(fields.amount) ? fields.amount : (Object.values(fields).find(isMoney) ?? null);
+
+/**
+ * THE CURRENCY HIS MONEY IS ALREADY IN: the main amount of each of the newest lines of the lists money is told into
+ * before an account, the most used currency first. `null` when none holds money, or the record would not say. It is a
+ * second choice beside the home currency, and leads only where the record has no home currency (`MoneySetup`).
  */
 export async function toldCurrency(client: ReturnType<typeof createClient>, ledger: Ledger): Promise<string | null> {
   const lists = [...new Set<string>([...TOLD_LISTS, ledger.list])];
@@ -73,7 +82,8 @@ export async function toldCurrency(client: ReturnType<typeof createClient>, ledg
   for (const out of read) {
     if (!out?.ok) continue;
     for (const row of out.value.rows as { fields?: Record<string, unknown> }[]) {
-      for (const v of Object.values(row.fields ?? {})) if (isMoney(v)) counts.set(v.currency, (counts.get(v.currency) ?? 0) + 1);
+      const main = mainAmount(row.fields ?? {});
+      if (main) counts.set(main.currency, (counts.get(main.currency) ?? 0) + 1);
     }
   }
   let best: string | null = null;

@@ -66,13 +66,15 @@
   });
 
   let read = $state.raw<SetupRead | null>(null);
-  /* THE ACCOUNT'S CURRENCY IS THE ONE HE HAS USED (audit 31 Oct m, AM22): a founder whose every line was in dollars was
-     asked "Balance today (EGP)". The money already told leads, the home beside it, one press apart. */
+  /* THE ACCOUNT'S CURRENCY IS THE HOME ONE, AND THE ONE HE HAS USED IS BESIDE IT (AM22, RN8): a founder whose every line
+     was in dollars was asked "Balance today (EGP)" with no other way, so the told one is one press away. It does not
+     lead: two USD payouts on an EGP record made a balance typed as 85,000 USD 85,000, fifty times what was there, and
+     Cash ahead and runway read from it. Only a record with no home currency starts on the told one (`onMount`). */
   let acct = $state<string | null>(null);
   const home = $derived(code ?? held);
   const told = $derived(read?.told ?? null);
   const twoWays = $derived(told !== null && home !== null && told !== home);
-  const money = $derived(acct ?? (twoWays ? told : null) ?? home ?? told ?? '');
+  const money = $derived(acct ?? home ?? told ?? '');
   onMount(() => {
     void import('./setup-live.ts').then(async (m) => {
       const got = await m.readSetup(base, ledger);
@@ -190,7 +192,7 @@
         {#if twoWays && told !== null && home !== null}
           <span class="ms-label" id="ms-in">{words.accountIn}</span>
           <Segmented role="group" aria-labelledby="ms-in">
-            {#each [told, home] as c (c)}
+            {#each [home, told] as c (c)}
               <button type="button" class="segment" data-on={money === c ? '' : undefined} aria-pressed={money === c} onclick={() => (acct = c)}>{c}</button>
             {/each}
           </Segmented>
