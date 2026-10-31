@@ -916,10 +916,20 @@ function localInstants(where: Predicate | undefined, schema: Schema, tz: string 
   return walk(where);
 }
 
+/** A read's own memo: `make` worked out once under `key`, and what it read noted again each time it is handed out. */
+export type ReadMemo = { once<T>(key: string, make: () => T): T };
+
 export type EvalContext = {
   nowMs: number;
-  /** Walks ahead already worked out in this one read (`readWalk`), kept by the host only for a read that writes nothing. */
-  walks?: Map<string, unknown> | undefined;
+  /**
+   * Walks ahead already worked out in this one read (`readWalk`), kept by the host only for a read that writes nothing.
+   *
+   * `once` AND NOT A MAP, so what a kept walk read is read again by whoever is handed it. A figure held across reads is
+   * held on the lists its reads named (`holdAcross`), and the second figure over the same walk asked nothing of the
+   * rows: `leaving-30d` after `arriving-30d` was held on no list, and a bill written after it stayed out of Today's
+   * Out, 30 days for up to an hour.
+   */
+  walks?: ReadMemo | undefined;
   /** Who is reading, when rows somebody else kept private must be left out of a raw-SQL figure (`unprivate`); unset reads the whole record. */
   viewer?: string | undefined;
   /**

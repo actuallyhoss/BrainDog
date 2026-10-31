@@ -188,7 +188,7 @@ import { recheck } from './cause.ts';
 import { HELD_SHORT_MS, HeldReadings, notice, traceOf, within, type ReadTrace } from './held-readings.ts';
 import { HeldSigns, heldOn, noticeSign, signTraceOf, tablesWritten, wroteNothing, type SignHeldOn, type SignTrace } from './held-signs.ts';
 import { localDays, readableZone } from './measures.ts';
-import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type ReadMemo, type Reading } from './metrics.ts';
 import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, claimRank, fill, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
@@ -7361,6 +7361,35 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return value;
     });
   };
+  /**
+   * A READ'S OWN MEMO (`EvalContext.walks`) THAT HANDS ON WHAT IT READ. A walk worked out for one figure was handed to
+   * the next figure over the same legs with no read of the rows, so the second was held across reads on no list at all
+   * (`holdAcross`): on a new record, Today's Out, 30 days kept the nought it read before the first bill while In, 30
+   * days beside it, read first, moved. Each value is kept with what making it read, and every reading being read when it
+   * is handed out notes that too (`within`), as a held reading's lists are noted by the reading around it.
+   */
+  const readMemo = (): ReadMemo => {
+    const kept = new Map<string, { value: unknown; read: ReadTrace }>();
+    return {
+      once: <T>(key: string, make: () => T): T => {
+        const was = kept.get(key);
+        if (was !== undefined) {
+          for (const t of traces) within(t, was.read);
+          return was.value as T;
+        }
+        const read = traceOf();
+        traces.push(read);
+        let value: T;
+        try {
+          value = make();
+        } finally {
+          traces.pop();
+        }
+        kept.set(key, { value, read });
+        return value;
+      },
+    };
+  };
   const readingHeld = (decl: MetricDecl, ctx: EvalContext, how: string, read: (sql: Sql, ctx: EvalContext) => Result<Reading>, once: Stamps = { rows: new Map() }): Result<Reading> => {
     if (ctx.asOfMs !== undefined || ctx.point === true || ctx.reads !== undefined) return read(sql, ctx);
     const tz = readableZone(ctx.tz);
@@ -7942,7 +7971,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        row at a time, and a page of figures read the same walk some thirty times. These deps last one read, so the rows
        cannot change under it. */
     const walked = new Map<string, ReturnType<NonNullable<PageDeps['runway']>>>();
-    const walks = new Map<string, unknown>();
+    const walks = readMemo();
     const readings = new Map<string, ReturnType<typeof evaluateMetric>>();
     /* AND THE LISTS' VERSIONS ASKED ONCE FOR THE READ (`listsStamp`), which writes nothing. */
     const once: Stamps = { rows: new Map() };
