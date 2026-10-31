@@ -36,14 +36,27 @@ export const RAIL_MOST = 7;
 /** Where Projects ranks on a starter's record (AL3): after every place that declares or is given a number. */
 export const LATE = 999;
 
-/** A phone bar's worth of places: a record holding this many projects or more has Projects as a place of its own. */
+/** A phone bar's worth of places: the fewest projects that ever make Projects a place of its own on a starter's record. */
 export const BAR_WORTH = 5;
 
+/** How many projects Projects holds: the rows of its list (`holds`), else its project pages, since a project need not have one. */
+const projectsOf = (item: FlatItem): number => item.holds ?? item.rows ?? 0;
+
+/** How many things one place holds: the rows of the list it is named for, else its pages about one thing, else its pages. */
+const itemsOf = (item: FlatItem): number => item.holds ?? item.rows ?? item.near.length;
+
+/** How many things the starter's own places hold, the most of them: what Projects must outgrow to take a slot before them. */
+export const starterItems = (own: readonly FlatItem[]): number => Math.max(0, ...own.map(itemsOf));
+
 /**
- * WHETHER PROJECTS WAITS ITS TURN (AL3, RL6): on a starter's record, only while it is new, holding fewer projects than
- * one bar's worth. A Founder record with twenty projects (his own) keeps Projects where the five put it, on the bar.
+ * WHETHER PROJECTS WAITS ITS TURN (AL3, RL6, RM10): on a starter's record, until the record holds a bar's worth of
+ * projects and more projects than the starter's own place holds things, counted by the Projects list's rows and not its
+ * pages. A fresh starter's first projects move nothing on its bar, and a Founder record with twenty projects (his own)
+ * keeps Projects where the five put it. His own pick of the bar (`chosen`) is never ranked at all. `starter` is
+ * `starterItems` of the starter's own places, `null` on a record with none.
  */
-export const projectsLate = (item: FlatItem, name: string, starter: boolean): boolean => starter && name === 'projects' && (item.rows ?? 0) < BAR_WORTH;
+export const projectsLate = (item: FlatItem, name: string, starter: number | null): boolean =>
+  starter !== null && name === 'projects' && (projectsOf(item) < BAR_WORTH || projectsOf(item) <= starter);
 
 /** The rail, as it is drawn. */
 export type Rail<T> = {
@@ -68,18 +81,23 @@ const PLACE_AT: Readonly<Record<string, number>> = { work: 10, orders: 20, shop:
  * or 25, so it sits after Work as the record orders it (`packages/record/src/places.ts`), and the phone's bar, which
  * takes its places in the same numbers (`tabsOf`), draws it too (FB4).
  */
-function rankOf(item: FlatItem, starter: boolean): number {
+function rankOf(item: FlatItem, starter: number | null): number {
   const name = plainOf(item.key === 'work' ? 'work' : item.key.replace(/^section:/u, ''));
   /* ON A STARTER'S RECORD A NEW PROJECTS COMES AFTER THE PLACES THAT RANK (AL3), as on the phone's bar (`atOf` in
      `nav.ts`): it is no place until the first project, and stepping in at 30 then moved Money and pushed the starter's
-     own place past the seventh. A record already holding a bar's worth of projects keeps it at 30 (RL6). */
+     own place past the seventh. A record whose projects outgrow the starter's own place keeps it at 30 (RL6, RM10). */
   if (projectsLate(item, name, starter)) return LATE;
   return item.place ?? PLACE_AT[name] ?? 1000;
 }
 
-/** Whether the record holds a starter's own place: a section that declares where it sits and is none of `PLACES`. */
-const starterOf = (items: readonly FlatItem[]): boolean =>
-  items.some((i) => i.key.startsWith('section:') && typeof i.place === 'number' && !PLACES.includes(plainOf(i.key.replace(/^section:/u, ''))));
+/**
+ * How many things the record's starter's own places hold (`starterItems`), or `null` for a record with none: a section
+ * that declares where it sits and is none of `PLACES`.
+ */
+const starterOf = (items: readonly FlatItem[]): number | null => {
+  const own = items.filter((i) => i.key.startsWith('section:') && typeof i.place === 'number' && !PLACES.includes(plainOf(i.key.replace(/^section:/u, ''))));
+  return own.length > 0 ? starterItems(own) : null;
+};
 
 /**
  * The rail, from the flat nav (`flatNav`): its rows and the rows it put under More are one list again, ordered by
