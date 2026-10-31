@@ -172,9 +172,12 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 const MONTH = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
 /* A weekday said bare only in full: "she sat down" is no Saturday. Its short form needs a word before it ("by fri"). */
 /* AND NEVER THE FIRST DIGITS OF A FIGURE (RM5): "Bonus for March 5,000" is 5,000, never 5 March and an amount of 000. */
+/* A PART OF THE DAY SAID WITH IT IS THE DAY'S (finish 31 Oct): "Run 10k on Saturday morning" kept "morning" in its name.
+   "Saturday morning", "tomorrow evening", "Friday night", "this afternoon" are each taken whole as the day. */
+const PART = '(?:\\s+(?:in the\\s+)?(?:morning|afternoon|evening|night))?';
 const DAY = new RegExp(
-  `\\b(?:(?:for|by|on|due|before|until)\\s+)?(today|tonight|tomorrow|tmrw|yesterday|this weekend|this week|next week|next (?:${WEEKDAY})|in (?:\\d{1,3}|${IN_COUNT}) (?:days?|weeks?)|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?|\\d{1,2}(?:st|nd|rd|th)?(?: of)? ${MONTH}|${MONTH} \\d{1,2}(?:st|nd|rd|th)?|the \\d{1,2}(?:st|nd|rd|th)|${FULL_DAY})\\b(?![.,]\\d)\\.?` +
-    `|\\b(?:for|by|on|due|before|until)\\s+(${WEEKDAY})\\b\\.?`,
+  `\\b(?:(?:for|by|on|due|before|until)\\s+)?(today|tonight|tomorrow|tmrw|yesterday|this (?:morning|afternoon|evening)|this weekend|this week|next week|next (?:${WEEKDAY})|in (?:\\d{1,3}|${IN_COUNT}) (?:days?|weeks?)|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?|\\d{1,2}(?:st|nd|rd|th)?(?: of)? ${MONTH}|${MONTH} \\d{1,2}(?:st|nd|rd|th)?|the \\d{1,2}(?:st|nd|rd|th)|${FULL_DAY})\\b(?![.,]\\d)${PART}\\.?` +
+    `|\\b(?:for|by|on|due|before|until)\\s+(${WEEKDAY})\\b${PART}\\.?`,
   'iu',
 );
 
@@ -221,7 +224,7 @@ function dayOfMonth(day: number, today: string): string | null {
 /** The day a phrase names, or `null`. */
 function dayNamed(phrase: string, today: string): string | null {
   const p = words(phrase).replace(/\.$/, '');
-  if (p === 'today' || p === 'tonight') return today;
+  if (p === 'today' || p === 'tonight' || /^this (?:morning|afternoon|evening)$/.test(p)) return today;
   if (p === 'tomorrow' || p === 'tmrw') return addDays(today, 1);
   if (p === 'yesterday') return addDays(today, -1);
   if (p === 'next week') return nextMonday(today);
@@ -275,17 +278,42 @@ function dayOfMonthGone(day: number, today: string): string | null {
  * The first day in a stretch of words, the words without it, and `gone`: the same words read for something already
  * done, so "paid on Monday" is the Monday gone and "on the 12th" the last 12th, never one to come.
  */
-function takeDay(text: string, today: string): { day: string | null; rest: string; gone: string | null } {
+function takeDay(text: string, today: string): { day: string | null; rest: string; gone: string | null; part: string | null } {
   const m = DAY.exec(text);
   const phrase = words(m?.[1] ?? m?.[2] ?? '').replace(/\.$/, '');
   const day = m ? dayNamed(phrase, today) : null;
-  if (!m || day === null) return { day: null, rest: text, gone: null };
+  if (!m || day === null) return { day: null, rest: text, gone: null, part: null };
+  /* The part of the day said with it, "morning" in "Saturday morning" or "this morning", for a list that keeps one. */
+  const part = /\b(morning|afternoon|evening|night)\.?$/iu.exec(m[0])?.[1]?.toLowerCase() ?? null;
   const nth = /^the (\d{1,2})/.exec(phrase);
   /* A month's day to come is last year's when it is read for something done: "charged on 14 Nov" in October is gone. */
   /* AND SO IS A SLASHED DAY WITH NO YEAR (RG9): "on 30/10" read on 31 Oct is yesterday, never next October. */
   const named = (/[a-z]{3}/.test(phrase) && /\d/.test(phrase) && !phrase.startsWith('in ')) || /^\d{1,2}\/\d{1,2}$/.test(phrase);
   const gone = day <= today ? day : WEEKDAYS[phrase] !== undefined ? addDays(day, -7) : nth ? dayOfMonthGone(Number(nth[1]), today) : named ? `${Number(day.slice(0, 4)) - 1}${day.slice(4)}` : day;
-  return { day, rest: oneLine(`${text.slice(0, m.index)} ${text.slice(m.index + m[0].length)}`), gone };
+  return { day, rest: oneLine(`${text.slice(0, m.index)} ${text.slice(m.index + m[0].length)}`), gone, part };
+}
+
+/** A day as the preview says it with the part of it kept: "Saturday morning", "this afternoon", "tonight". */
+function partTold(day: string, part: string | null): string {
+  if (part === null) return day;
+  if (day === 'today') return part === 'night' ? 'tonight' : `this ${part}`;
+  return `${day} ${part}`;
+}
+
+/** The field a list keeps the part of a day in, a time of day: a text field called that, or a choice that offers it. */
+function timeField(l: TellList, part: string): FieldDecl | undefined {
+  return l.fields.find(
+    (f) =>
+      !f.retired &&
+      /^(?:time|time of day|part of day|when)$/iu.test(labelOf(f)) &&
+      (f.type === 'text' || (f.type === 'enum' && (f.values ?? []).includes(part))),
+  );
+}
+
+/** Whether the day a line names is a weekday said bare, "on Monday" or "Saturday morning", read as the one gone of a spend. */
+function weekdaySaid(text: string): boolean {
+  const m = DAY.exec(text);
+  return WEEKDAYS[words(m?.[1] ?? m?.[2] ?? '').replace(/\.$/, '')] !== undefined;
 }
 
 /* THE DAY WORDS THAT POINT AHEAD (RO5): "due Friday", "by the 5th", "tomorrow", "next Monday", "in 3 days". Any other day
@@ -1226,9 +1254,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
 
   return finish(unsure);
 
-  /** A day as the preview says it, said as a date when the sentence said one as a date (AO18). */
-  function dayTold(day: string): string {
-    return dayWord(day, opts.today, DATE_SAID.test(sentence));
+  /** A day as the preview says it, said as a date when the clause it came from said one as a date (AO18). One date
+      said in a line never turns another clause's "due Friday" into "due 9 Oct" (RQ12). */
+  function dayTold(day: string, clause: string = sentence): string {
+    return dayWord(day, opts.today, DATE_SAID.test(clause));
   }
 
   /** The person's address and notes put on, and with nothing placed, one task, or the plain word and the way on. */
@@ -1325,12 +1354,15 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const owner = assigned && ownerField ? ownerField : undefined;
     if (owner && assigned) rest = oneLine(`${rest.slice(0, assigned.index)}${assigned === trailing ? '' : ' '}${rest.slice(assigned.index + assigned[0].length)}`);
     else if (kept && keptLink && trailing) rest = oneLine(`${rest.slice(0, trailing.index)}${rest.slice(trailing.index + trailing[0].length)}`);
-    const { day, rest: undated } = takeDay(rest, opts.today);
+    const { day, rest: undated, part } = takeDay(rest, opts.today);
     const due = day ? pick(l, 'day', /due|^by$|deadline|aim|target/, (f) => f.deadline === true || said(f, /due|^by$/)) : undefined;
+    /* THE TIME OF DAY IS KEPT WHERE THE LIST HAS A FIELD FOR IT, and otherwise goes with the day: never in the name. */
+    const at = due && day && part ? timeField(l, part) : undefined;
     let title = trimWords((due ? undated : rest).replace(/\s*[,;]\s*(?=[,;]|$)/gu, '')).replace(/\s+(?:due|by|on)$/iu, '');
     if (title.length > 80) title = trimWords(title.split(CLAUSE)[0] ?? title);
     const fields: Record<string, TellValue> = { [what.id]: capital(title || text) };
     if (due && day) fields[due.id] = day;
+    if (at && part) fields[at.id] = part;
     startIn(l, fields);
     for (const f of l.fields) if (f.required && !f.retired && f.default === undefined && fields[f.id] === undefined && counted(f)) fields[f.id] = 0;
     if (kept && keptLink) fields[keptLink.id] = `${keptTo}#${kept.seq}`;
@@ -1342,7 +1374,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
         who = assigned[1]!;
       }
     }
-    const bits = [`new in ${l.name}`, ...(due && day ? [`due ${dayTold(day)}`] : []), ...(who ? [`for ${who}`] : []), ...(kept && keptLink ? [`in ${kept.name}`] : [])];
+    const bits = [`new in ${l.name}`, ...(due && day ? [`due ${partTold(dayTold(day), at && part ? part : null)}`] : []), ...(who ? [`for ${who}`] : []), ...(kept && keptLink ? [`in ${kept.name}`] : [])];
     return { register: l.id, fields, said: String(fields[what.id]), detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) };
   }
 
@@ -1529,7 +1561,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const kind = l.fields.find((f) => f.type === 'enum' && f.values?.includes('event') && f !== round);
     if (kind) fields[kind.id] = 'event';
     startIn(l, fields);
-    rows.push({ register: l.id, fields, said: title, detail: [`${dayTold(day)}, every year`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    rows.push({ register: l.id, fields, said: title, detail: [`${dayTold(day, when)}, every year`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
   }
@@ -1562,8 +1594,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const m = MEASURE.exec(c);
     const hit = m ? null : HIT.exec(c);
     if (!m && !hit) return false;
-    /* A DAY OR A TIME SAID WITH IT IS NEVER ITS UNIT (RO7). */
-    const phrase = takeDay((m ? m[2]! : hit![3]!).replace(SPAN, ' ').replace(WHEN_SAID, ' '), opts.today).rest;
+    /* A DAY OR A TIME SAID WITH IT IS NEVER ITS UNIT (RO7), AND THE DAY IS KEPT AS ITS WHEN (RQ10): "Sales were 40
+       yesterday" is yesterday's, read before the words of when go, so "yesterday" is the day and never dropped. */
+    const dated = takeDay((m ? m[2]! : hit![3]!).replace(SPAN, ' '), opts.today);
+    const phrase = dated.rest.replace(WHEN_SAID, ' ');
     const [a, ...more] = amountsIn(phrase, opts.currency, held);
     if (!a || more.length > 0) return false;
     /* WHAT IT COUNTS IS KEPT WITH IT (AN9): "Runway is 9 months" was "Runway, 9". */
@@ -1605,8 +1639,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     }
     const source = l.fields.find((f) => f.type === 'enum' && f.values?.includes('typed'));
     if (source) fields[source.id] = 'typed';
+    /* A day gone is kept at its midday, so it reads as that day in any zone; today is the figure as it is now. */
+    const whenField = dated.gone !== null && dated.gone !== opts.today ? (l.fields.find((f) => f.type === 'instant' && !f.retired && said(f, /^at$|when|date/)) ?? l.fields.find((f) => f.type === 'day' && !f.retired)) : undefined;
+    if (whenField && dated.gone) fields[whenField.id] = whenField.type === 'instant' ? `${dated.gone}T12:00:00.000Z` : dated.gone;
+    const whenSaid = whenField && dated.gone ? [dated.gone === addDays(opts.today, -1) ? 'yesterday' : dayTold(dated.gone, c)] : [];
     const name = m ? String(fields[titleField.id]).replace(/\s\([^)]*\)$/u, '') : `${project} ${unit}`;
-    rows.push({ register: l.id, fields, said: `${name}, ${shown}`, detail: [`new in ${l.name}`, ...(thing && kept ? [`for ${kept.name}`] : [])].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    rows.push({ register: l.id, fields, said: `${name}, ${shown}`, detail: [`new in ${l.name}`, ...whenSaid, ...(thing && kept ? [`for ${kept.name}`] : [])].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
   }
@@ -1625,7 +1663,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const name = capital(oneLine(m[1]!).toLowerCase());
     const fields: Record<string, TellValue> = { [textField(l)!.id]: name, [field.id]: day };
     startIn(l, fields);
-    rows.push({ register: l.id, fields, said: name, detail: [`${ends ? 'ends' : 'starts'} ${dayTold(day)}`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    rows.push({ register: l.id, fields, said: name, detail: [`${ends ? 'ends' : 'starts'} ${dayTold(day, c)}`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
   }
@@ -1634,7 +1672,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
    * Money that comes round, in Repeating: what, which way, how much, how often, and the next day it falls on when one
    * was said. No day said is named in `missing`, never guessed.
    */
-  function repeating(l: TellList, k: { value: MoneyValue; into: boolean; what: string; day: string | null; every: string; payer: TellValue | null }): boolean {
+  function repeating(l: TellList, k: { value: MoneyValue; into: boolean; what: string; day: string | null; every: string; payer: TellValue | null; clause?: string }): boolean {
     const often = cadenceOf(l);
     const cadence = REPEATS[k.every];
     if (!often || !cadence || !often.values?.includes(cadence) || !room(1)) return false;
@@ -1657,7 +1695,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     startIn(l, fields);
     /* THE NEXT DAY SAID AS A PERSON SAYS IT (AM23): "due tomorrow" for money out, "next on 1 Nov" for money in, never
        "next tomorrow". */
-    const when = (d: string): string => (dayTold(d) === 'today' || dayTold(d) === 'tomorrow' ? dayTold(d) : `on ${dayTold(d)}`);
+    const when = (d: string): string => (dayTold(d, k.clause) === 'today' || dayTold(d, k.clause) === 'tomorrow' ? dayTold(d, k.clause) : `on ${dayTold(d, k.clause)}`);
     const bits = [`${spelled(k.value.amount, k.value.currency)} ${k.into ? 'in' : 'out'} every ${EVERY_SAID[cadence] ?? k.every}`, ...(k.day ? [`${k.into ? 'next' : 'due'} ${when(k.day)}`] : open ? ['next day not set'] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: k.what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
@@ -1704,7 +1742,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* "My salary 30,000 a month" comes round: Repeating, money in, where the record keeps it. */
     const every = EVERY.exec(c);
     const r = every ? repeatList(opts.lists) : undefined;
-    if (every && r) return repeating(r, { value: { amount, currency }, into: true, what, day: dated.day !== null && dated.day > opts.today ? dated.day : null, every: words(every[1] ?? every[2] ?? ''), payer });
+    if (every && r) return repeating(r, { value: { amount, currency }, into: true, what, day: dated.day !== null && dated.day > opts.today ? dated.day : null, every: words(every[1] ?? every[2] ?? ''), payer, clause: c });
     /* AND WHERE THE RECORD KEEPS NO REPEATING, money in that comes round is an invoice to come in that repeats, as a bill
        that repeats is one to pay, never one payment made today. */
     const owed = every ? dueList(opts.lists) : undefined;
@@ -1727,7 +1765,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (repeat && repeats) fields[repeat.id] = repeats;
       const party = pick(owed, 'ref', /party|who|client|from/, (f) => f.to === PEOPLE);
       if (party && payer !== null) fields[party.id] = payer;
-      const bits = [`${spelled(amount, currency)} in`, ...(day ? [`due ${dayTold(day)}`] : []), ...(repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${owed.name}`];
+      const bits = [`${spelled(amount, currency)} in`, ...(day ? [`due ${dayTold(day, c)}`] : []), ...(repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${owed.name}`];
       rows.push({ register: owed.id, fields, said: what, detail: bits.join(', '), icon: iconOf(owed), missing: missingOf(owed, fields) });
       placed = true;
       return true;
@@ -1834,7 +1872,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const dated = takeDay(c, opts.today);
     /* A DAY GONE IS WHEN IT WAS SPENT (RO5): "Uber 85 on Monday" is last Monday, "Coffee 45 on 28 Oct" the 28th gone. Only
        words that point ahead ("tomorrow", "next", "due", "in 3 days") are no spend: a bill, read after. */
-    if (dated.day !== null && (aheadSaid(c) || (dated.gone ?? dated.day) > opts.today)) return false;
+    /* AND A DATE STILL TO COME IS NO SPEND EITHER (RQ2): "Netflix 180 on the 5th" read on 31 Oct is a bill due 5 Nov, never
+       paid on 5 Oct, and "Hotel 3,000 on 20 Nov" is never paid a year back. Only a bare weekday is read as the one gone. */
+    if (dated.day !== null && (aheadSaid(c) || (dated.day > opts.today && !weekdaySaid(c)))) return false;
     const [a, ...more] = amountsIn(dated.rest, opts.currency, held);
     if (!a || more.length > 0) return false;
     const lead = trimWords(dated.rest.slice(0, a.at));
@@ -1915,7 +1955,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        the one home of repeating money, never a bill whose repeat nothing walks. */
     if (every && !invoice) {
       const r = repeatList(opts.lists);
-      if (r) return repeating(r, { value: { amount, currency }, into: toMe, what, day, every: words(every[1] ?? every[2] ?? ''), payer: null });
+      if (r) return repeating(r, { value: { amount, currency }, into: toMe, what, day, every: words(every[1] ?? every[2] ?? ''), payer: null, clause: c });
     }
     const fields: Record<string, TellValue> = {};
     const title = textField(l);
@@ -1938,7 +1978,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (party && ref !== null) fields[party.id] = ref;
       client(ref, who);
     }
-    const bits = [`${spelled(amount, currency)} ${toMe ? (who ? `owed to you by ${who}` : 'owed to you') : 'to pay'}`, ...(day ? [`due ${dayTold(day)}`] : []), ...(repeat && repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${l.name}`];
+    const bits = [`${spelled(amount, currency)} ${toMe ? (who ? `owed to you by ${who}` : 'owed to you') : 'to pay'}`, ...(day ? [`due ${dayTold(day, c)}`] : []), ...(repeat && repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
@@ -2034,7 +2074,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const party = pick(l, 'ref', /party|who|client|from/, (f) => f.to === PEOPLE);
     const ref = personOf(who);
     if (party && ref !== null) fields[party.id] = ref;
-    const bits = [toMe ? `${who} owes you ${spelled(amount, currency)}` : `You owe ${who} ${spelled(amount, currency)}`, ...(back ? [`due back ${dayTold(back)}`] : []), `in ${l.name}`];
+    const bits = [toMe ? `${who} owes you ${spelled(amount, currency)}` : `You owe ${who} ${spelled(amount, currency)}`, ...(back ? [`due back ${dayTold(back, c)}`] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     loaned = true;
@@ -2141,7 +2181,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const due = day ? pick(l, 'day', /due|^by$|for|deliver|when/, (f) => f.deadline === true || said(f, /due|^by$|for|deliver|when/)) ?? pick(l, 'day', /./) : undefined;
     if (due && day) fields[due.id] = day;
     const one = l.one ?? 'entry';
-    const detail = [`${count !== undefined && many ? `${count} ` : ''}${thing}`, ...(due && day ? [`due ${dayTold(day)}`] : [])];
+    const detail = [`${count !== undefined && many ? `${count} ` : ''}${thing}`, ...(due && day ? [`due ${dayTold(day, `${phrase} ${around}`)}`] : [])];
     lastOrder = { register: l.id, fields, said: who ? `${anA(one)} from ${who}` : anA(one), detail: detail.join(', '), icon: iconOf(l), missing: missingOf(l, fields) };
     lastOrderBy = ref;
     rows.push(lastOrder);
