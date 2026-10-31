@@ -131,6 +131,18 @@ export function methods(deps: RecordDeps) {
     };
   };
 
+  /**
+   * Whether the row a page is made for is one she is shown: its list read, AND THE ROW ITSELF ADMITTED, as `aboutSeen` in
+   * `index.ts` asks it. Asked of the list alone, a person another member kept private was listed to the owner's agent by
+   * name (`braindog:page/<the row's slug>`) though reading it was refused: the title is the row's, so the name was the leak.
+   */
+  const aboutSeen = (ctx: CallContext, about: { register: string; seq?: number | null }): boolean => {
+    if (readable(ctx, about.register) !== null) return false;
+    if (typeof about.seq !== 'number' || kernel.scope(ctx, about.register) === undefined) return true;
+    const row = kernel.get({ register: about.register, seq: about.seq });
+    return row !== null && deps.sight.admits(ctx, row);
+  };
+
   /** The pages she may open, as `pages` in `index.ts` lists them. */
   const pagesFor = (ctx: CallContext): OfferedPage[] => {
     /* HELD FROM NO BLOCK, as `pages` asks it: every list read, and a level that reads. Her pages are not drawn to ask. */
@@ -141,7 +153,7 @@ export function methods(deps: RecordDeps) {
       /* `seesPage`: any list the page draws from is one she reads, or it draws from none, and never a page about a row
          in a list she cannot read, whose title is that row's. */
       if (p.registers.length > 0 && p.registers.every((id) => readable(ctx, id) !== null)) continue;
-      if (p.about !== null && readable(ctx, p.about.register) !== null) continue;
+      if (p.about !== null && !aboutSeen(ctx, p.about)) continue;
       if (!everyList && (deps.withheld === undefined || deps.withheld(ctx, p.slug))) continue;
       out.push({ slug: p.slug, title: p.title });
     }

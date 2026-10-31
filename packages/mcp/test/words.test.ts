@@ -132,7 +132,12 @@ test('A DURATION IS SAID IN ITS FIELD\'S UNIT, from the whole seconds the record
 
 test('A PAGE\'S NOTE IS SAID AS PROSE: no fenced block, money as money, no heading marks', () => {
   const note = '```chips\n● | 3 | cuts\n```\n\n# Kiln\n\nEarning. {{money:1840000 GBP}} in a year, {{pct:61}} direct.\n\n```bar | Revenue\nDirect | 1\n```\n\nIt carries it.';
-  assert.equal(prose(note), 'Kiln Earning. GBP 18,400.00 in a year, 61% direct. It carries it.');
+  assert.equal(prose(note), 'Kiln. Earning. GBP 18,400.00 in a year, 61% direct. It carries it.');
+});
+
+test('A NOTE SAYS NONE OF ITS OWN MARKUP: a link is its words, a mark in braces is in brackets, a heading has no number', () => {
+  const note = '## 2 · The licensing question\n\nIt waits on you in [Needs you](/decide).\n\n- The share {estimate}; renewal is {unknown}.';
+  assert.equal(prose(note), 'The licensing question. It waits on you in Needs you. - The share (estimate); renewal is (unknown).');
 });
 
 test('THE WHOLE ANSWER DROPS EVERY NULL KEY, and the empty lists that say nothing, and keeps a page that is empty', () => {

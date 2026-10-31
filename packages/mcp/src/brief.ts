@@ -97,6 +97,9 @@ function refSaid(value: unknown, look: Look): string | null {
  *
  * `room` is how long a text may run before it is cut, at a word.
  */
+/** The longest one-word text, an address, said whole however little room a line gives it. */
+const ADDRESS_MOST = 200;
+
 export function said(f: Field | undefined, value: unknown, look: Look, room = 60): string | null {
   if (value === null || value === undefined || value === '') return null;
   if (Array.isArray(value)) {
@@ -132,6 +135,9 @@ export function said(f: Field | undefined, value: unknown, look: Look, room = 60
     /* A TEXT THAT OPENS ON A DAY SAYS THE DAY AS ONE READS IT (door audit D32): a person's "Met" line is "2026-08-28 · mail
        from halden.example", and was said that way, digits first. */
     const dated = /^(\d{4}-\d{2}-\d{2})(?![\d:T])(.*)$/su.exec(value);
+    /* AN ADDRESS IS NEVER CUT (audit 10k AK19): a repository, a link, a path or a mailbox is one word with no space,
+       and `https://git.kiln.example/type/kiln-ty...` is an address that leads nowhere. Up to `ADDRESS_MOST`, it is said whole. */
+    if (dated === null && value.length <= ADDRESS_MOST && !/\s/u.test(value)) return value;
     return clip(dated === null ? value : `${day(dated[1]!, look.now)}${dated[2]!}`, room);
   }
   if (typeof value === 'number') return grouped(value);
@@ -356,6 +362,12 @@ function runLine(row: Shaped, head: string, look: Look): string {
 
 /** The most a text field says on a `get`, where a list line says 48: a whole read is asked for, not glanced at. */
 const WHOLE_TEXT = 1_000;
+/**
+ * The characters of a document a `get` says before it is cut, as `list` cuts a row's long text (audit 10k AK19). A
+ * project's note said whole at a thousand was most of the answer, and an agent opening a project wants what it is and
+ * where it stands; `format full` has all of it, which the cut line says.
+ */
+const DOCUMENT_ROOM = 280;
 
 /**
  * One row, field by field: its words, handle, state and version on the first line, then `Label: value` for each field
@@ -390,8 +402,9 @@ export function rowWhole(row: Shaped, register: string, look: Look): string[] {
       typeof value !== 'string' ? null : f?.type === 'document' ? prose(value) : f === undefined || f.type === 'text' ? oneLine(value) : null;
     /* A DOCUMENT IS SAID AS PROSE AT ANY LENGTH, and any text past the room is cut and says how long it is. */
     if (text !== null && (f?.type === 'document' || text.length > WHOLE_TEXT)) {
-      const whole = text.length > WHOLE_TEXT ? ` (${grouped(text.length)} characters; format full has all of it)` : '';
-      if (text !== '') lines.push(`${labelOf(f, id)}: ${clip(text, WHOLE_TEXT)}${whole}`);
+      const room = f?.type === 'document' ? DOCUMENT_ROOM : WHOLE_TEXT;
+      const whole = text.length > room ? ` (${grouped(text.length)} characters; format full has all of it)` : '';
+      if (text !== '') lines.push(`${labelOf(f, id)}: ${clip(text, room)}${whole}`);
       continue;
     }
     const words = said(f, value, look, WHOLE_TEXT);
@@ -410,11 +423,16 @@ export function prose(doc: string): string {
     if (form === 'money' && m) return money(Number(m[1]), m[2]!);
     return form === 'pct' ? `${arg.trim()}%` : arg.trim();
   };
+  /* AND NONE OF ITS OWN MARKUP (audit 10k AK19): a link is its words (`[Needs you](/decide)` is "Needs you"), a mark in
+     single braces is said in brackets (`{estimate}` is "(estimate)"), and a heading loses its number and ends its
+     sentence ("1 · Where the money comes from" ran into the paragraph under it). */
   return oneLine(
     doc
       .replace(/^(```|~~~)[^\n]*\n[\s\S]*?(^\1[^\n]*$|(?![\s\S]))/gmu, ' ')
       .replace(/\{\{([a-z]+):([^}]*)\}\}/gu, (_, form: string, arg: string) => typed(form, arg))
-      .replace(/^#{1,6}\s+/gmu, ''),
+      .replace(/\[([^\]\n]+)\]\([^)\s]*\)/gu, '$1')
+      .replace(/\{([a-z][^{}\n]*)\}/gu, '($1)')
+      .replace(/^#{1,6}\s+(?:\d+\s*[·.]\s+)?(.*?)[\s.:]*$/gmu, (_, heading: string) => (heading === '' ? '' : `${heading}.`)),
   );
 }
 

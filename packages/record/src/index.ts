@@ -11097,9 +11097,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * `meet` HELD TO THE ROW: a meeting the kernel matched onto somebody already there whom this caller
-   * may not write (outside her rule, private to another, on a list she only adds to) is unwound, so she is never handed
+   * may not write (outside her rule, on a list she only adds to) is unwound, so she is never handed
    * their name. Meeting them as if they were not there would add a second row under their key, so it is refused in the
    * words a unique collision gets, which no more proves a row exists than that one does.
+   *
+   * A ROW KEPT PRIVATE FROM HER NEVER GETS HERE (audit 10k AK5): the kernel is handed who is meeting (`viewer`) and
+   * meets as if that row were not there, so an address only it holds is added as a new one's would be, and the answer
+   * says nothing a private row could have caused.
    */
   const heldMet = (ctx: CallContext, out: Result<unknown>): Result<unknown> => {
     const m = (out.ok ? out.value : null) as { row?: { id?: unknown } | null; created?: unknown } | null;
@@ -11111,7 +11115,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** One meeting, written and held to the row in one transaction: a match the caller may not write leaves nothing. */
   const meetHeld = (ctx: CallContext, sent: never, by: WriteContext): Result<unknown> =>
-    unwound(() => kernel.transaction(() => heldMet(ctx, kernel.meet(sent, by) as Result<unknown>)));
+    unwound(() => kernel.transaction(() => heldMet(ctx, kernel.meet(sent, by, { viewer: viewerOf(ctx) }) as Result<unknown>)));
 
   /**
    * AN AGENT'S `meet`, AT ITS RUNG. What `meet` does on its own stays automatic,
@@ -11132,7 +11136,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     try {
       first = kernel.transaction(() => {
         const mark = sql.one<{ n: number | null }>('SELECT max(rowid) AS n FROM event')?.n ?? 0;
-        const met = heldMet(ctx, kernel.meet(sent, by) as Result<unknown>);
+        const met = heldMet(ctx, kernel.meet(sent, by, { viewer: viewerOf(ctx) }) as Result<unknown>);
         const held = met.ok ? assertedOn(ctx, met.value, mark) : null;
         if (held !== null) throw new Asserting(held);
         return met;
