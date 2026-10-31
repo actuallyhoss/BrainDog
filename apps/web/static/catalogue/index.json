@@ -5294,8 +5294,38 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.3",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "5930956e60d70c55b558a8684fd888ebfb0c8950b12cb086e61f255597ba1c30",
+          "bytes": 11996,
+          "published_at": "2026-10-31T00:51:40.419Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Retainers",
+              "Timesheets"
+            ],
+            "pages": [
+              "Clients",
+              "Timesheets",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "waits": [
+              "things"
+            ]
+          },
+          "notes": "Timesheets is a place of its own in the sidebar, where it sat under Clients and the sidebar's Clients opened Timesheets. Nothing you hold changes.",
+          "preview": true
+        },
         {
           "version": "1.0.3",
           "checksum": "2d49b945b6bd5b105bc4416aa49b89b46b17c4847e730a6449645ed7b3ac887b",
@@ -7840,8 +7870,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "3.8.2",
+      "latest": "3.9.0",
       "versions": [
+        {
+          "version": "3.9.0",
+          "checksum": "becda201265f3819fe30a7938edc4b4467e78da1563aab7b4b22d4fc36987776",
+          "bytes": 46064,
+          "published_at": "2026-10-31T00:51:40.419Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Founder overview",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "3.8.2",
           "checksum": "b7d210f98c6950e1546a040e941c0edbdbfc1ab5f507aacfc13308563dc20f2e",
@@ -8567,8 +8626,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.8.0",
+      "latest": "2.9.0",
       "versions": [
+        {
+          "version": "2.9.0",
+          "checksum": "7319de91cfa49de942b2449b5ccb8faf9a7c46cbc5f8722078e7114fc68d70e2",
+          "bytes": 32557,
+          "published_at": "2026-10-31T00:51:40.419Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Log",
+              "Put by",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.8.0",
           "checksum": "4a956f16d69c877cfbff5ef0d03b7131ef885a26b66dbe2fc11909ad6ef4960f",
@@ -8931,8 +9022,32 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.4.1",
+      "latest": "1.5.0",
       "versions": [
+        {
+          "version": "1.5.0",
+          "checksum": "bc88f09347b70b35aed8010706f99a38f01b0d6f865731e96bd373f87653d65d",
+          "bytes": 14297,
+          "published_at": "2026-10-31T00:51:40.419Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Orders",
+              "Products"
+            ],
+            "pages": [
+              "Orders",
+              "Products"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.4.1",
           "checksum": "b05f1b833586f7991e0bf6c32b6f476372b174019324e0203be524090d82a0f8",
@@ -9061,8 +9176,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.6.2",
+      "latest": "1.7.0",
       "versions": [
+        {
+          "version": "1.7.0",
+          "checksum": "74a6b579914a7906bedcb6fe99f62d1f45e4573e332ce98971887e17d120cfdc",
+          "bytes": 17065,
+          "published_at": "2026-10-31T00:51:40.419Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Study sessions",
+              "Reading list"
+            ],
+            "pages": [
+              "Today",
+              "Studies"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "study-planner"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.6.2",
           "checksum": "db29c064dd8ee98e2c224e22aaaa95632e7cb0d66cde4ee2df93123bc7fd0b81",
@@ -9288,8 +9429,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.29.2",
+      "latest": "2.30.0",
       "versions": [
+        {
+          "version": "2.30.0",
+          "checksum": "bfd8c7f2932ee60dfe79e7cc3f01201baa25bf0c86029f41f52f84d760961988",
+          "bytes": 37691,
+          "published_at": "2026-10-31T01:06:28.275Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Cycles",
+              "Cycle plan",
+              "Cycle days"
+            ],
+            "pages": [
+              "Team",
+              "Cycles",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.29.2",
           "checksum": "b0239dcb2e2ea008eb12b88603dde7e6aa1c492bcb24f8d691efe0c5b630b3bf",

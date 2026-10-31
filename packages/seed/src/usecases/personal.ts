@@ -158,8 +158,12 @@ export const PERSONAL = {
      widget draws. Nothing goes, so a minor step.
      2.8.0 (audit 6g, AG12): that figure goes again. A count of days running is a streak, and BrainDog keeps no game
      score (his rule: no gamification); what was logged this week, by goal, stays, and Habits this week reads it. No
-     widget, page, list or field reads `log-streak`, so nothing a person keeps or sees goes with it: a minor step. */
-  version: '2.8.0',
+     widget, page, list or field reads `log-streak`, so nothing a person keeps or sees goes with it: a minor step.
+     2.9.0 (audit 31 Oct h, AH4): Goals is on the rail from the first minute (its place, after Work), and opens on a box to
+     add a goal or a habit, and one to name something you are saving for until one is named, where a new person found it
+     inside More lists saying "Nothing here yet". Blocks added and nothing taken away, so a minor step; 2.8.0 is
+     published. */
+  version: '2.9.0',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -585,7 +589,8 @@ export const PERSONAL = {
       {
         page: 'goals',
         title: 'Goals',
-        nav: { section: 'Goals', order: 10 },
+        /* ITS PLACE ON THE RAIL, SINCE 2.9.0 (AH4): a starter's own page is a place from the first minute. */
+        nav: { section: 'Goals', order: 10, place: 20 },
         icon: 'star',
         requires: ['register.savings_goals', 'register.goals', 'register.goal_log', 'register.put_by'],
         blocks: [
@@ -595,6 +600,16 @@ export const PERSONAL = {
             lead: true,
             span: 12,
             body: '{{saved-toward-goals}} put by so far, {{goals-active}} goal(s) and {{habits-active}} habit(s) on the go',
+          },
+          /* A BOX TO ADD A GOAL OR A HABIT, SINCE 2.9.0 (AH4), and one to name a saving until one is named, as Home has. */
+          { kind: 'capture', heading: 'Add a goal or a habit', icon: 'plus', span: 12, register: 'goals' },
+          {
+            kind: 'capture',
+            heading: 'Name something you are saving for',
+            icon: 'piggy-bank',
+            span: 12,
+            register: 'savings_goals',
+            when: { metric: 'savings-held', lt: 1 },
           },
           savingsProgress(12),
           /* EACH THE WHOLE WIDTH SINCE 2.2.0, so a record keeping habits and no goals leaves no half row. */

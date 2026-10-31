@@ -76,7 +76,9 @@ export function placesOf({
   most?: number;
 }): Places {
   const frame = new Set(FRAME_PLACES.map((p) => p.page));
-  const open = pages.filter((p) => p.lists !== null && (p.about === undefined || p.about === null) && !frame.has(p.slug));
+  /* A PAGE THAT NAMES ITS PLACE NEVER WAITS (audit 31 Oct h, AH4), as the web's rail has it: a starter's own page is a
+     place from the first minute, even over lists that hold only what the starter planted. */
+  const open = pages.filter((p) => (p.lists !== null || typeof p.nav?.place === 'number') && (p.about === undefined || p.about === null) && !frame.has(p.slug));
   /* THE ADD-ON THAT PUT EACH PAGE THERE, the first to install it. A page no add-on declares is a person's or the
      engine's, and its section follows every add-on's. */
   const installedAt = new Map<string, number>();

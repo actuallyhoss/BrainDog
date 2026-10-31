@@ -63,7 +63,7 @@
   <!-- THE BAR IS THE TOTAL'S: a month too old to be added (`left`) is said in the list and has no part of the bar. -->
   {@const earnTotal = b.earning.lines.filter((l) => !l.left).reduce((s, l) => s + l.minor, 0)}
   <div class="projects-board">
-    <div class="b-top">
+    <div class="b-top" data-solo={b.earning.total || b.earning.count > 0 ? undefined : ''}>
       <section class="b-lead" aria-label="Where the projects are">
         <p class="b-date">{b.date}</p>
         <h2 class="b-head" dir="auto">{b.headline}</h2>
@@ -76,6 +76,9 @@
           </div>
         {/if}
       </section>
+      <!-- NO EARNING TILE WHILE NOTHING EARNS AND NO PROJECT IS MARKED EARNING (AH17): "No project is earning yet" beside
+           a shop's one new project was a founder's tile with nothing in it. -->
+      {#if b.earning.total || b.earning.count > 0}
       <section class="b-earn" aria-label="Earning, a month">
         <header class="t-head"><IconWell name="coins" size="m" /><h2 class="t-title">Earning, a month</h2>{#if b.earning.count > 0}<span class="t-meta">{b.earning.count} {b.earning.count === 1 ? 'project' : 'projects'}</span>{/if}</header>
         {#if b.earning.total}
@@ -97,14 +100,19 @@
           <p class="e-empty">{b.earning.empty}</p>
         {/if}
       </section>
+      {/if}
     </div>
 
-    <div class="b-week" role="list" aria-label="This week">
-      {@render week('Late', 'clock', 'late', b.week.late)}
-      {@render week('This week', 'calendar', 'plain', b.week.due)}
-      {@render week('Quiet numbers', 'activity', 'warn', b.week.quiet)}
-      {@render week('Renewals', 'globe', 'plain', b.week.renewals)}
-    </div>
+    <!-- A WEEK TILE WITH NOTHING IN IT IS LEFT OUT, and the row with them when all four are (AH17): a shop with one project
+         read Late 0, This week 0, Quiet numbers 0 and Renewals 0, a wall of noughts. -->
+    {#if b.week.late.count + b.week.due.count + b.week.quiet.count + b.week.renewals.count > 0}
+      <div class="b-week" role="list" aria-label="This week" style:--wk-n={[b.week.late, b.week.due, b.week.quiet, b.week.renewals].filter((t) => t.count > 0).length}>
+        {#if b.week.late.count > 0}{@render week('Late', 'clock', 'late', b.week.late)}{/if}
+        {#if b.week.due.count > 0}{@render week('This week', 'calendar', 'plain', b.week.due)}{/if}
+        {#if b.week.quiet.count > 0}{@render week('Quiet numbers', 'activity', 'warn', b.week.quiet)}{/if}
+        {#if b.week.renewals.count > 0}{@render week('Renewals', 'globe', 'plain', b.week.renewals)}{/if}
+      </div>
+    {/if}
 
     {#if b.groups.length > 0}
       <section class="b-list" aria-label="Projects in play">
@@ -207,6 +215,10 @@
   @media (width >= 1000px) {
     .b-top {
       grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+
+    .b-top[data-solo] {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .b-lead,
@@ -403,7 +415,7 @@
 
   @media (width >= 1000px) {
     .b-week {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(var(--wk-n, 4), minmax(0, 1fr));
     }
   }
 

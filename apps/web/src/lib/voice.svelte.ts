@@ -23,6 +23,8 @@ export const said = (key: VoiceKey): string => lineOf(state.voice, key);
  * and Home is the house one.
  */
 export const homePage = (): string | null => (state.pack === null ? null : homePageOf(state.pack));
+/** The use-case pack this record speaks in now (`usecase-shop`), or `null` for the house voice. */
+export const speakingPackNow = (): string | null => state.pack;
 
 /** The words the record gives its lists now, as the rail draws them. Reactive where it is read, so a screen drawn before the voice was heard catches up. */
 export const heard = (): Labels => state.labels;

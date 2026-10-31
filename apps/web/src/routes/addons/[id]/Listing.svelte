@@ -124,6 +124,30 @@
   let file = $state.raw<{ doc: Record<string, unknown> | null; text: string | null } | null>(null);
   /** What it can reach, computed from the file for a built-in and by the catalogue for a Kennel entry. */
   let reach = $state.raw<Reach | null>(null);
+  /**
+   * WHAT IT NEEDS FIRST THAT THIS RECORD DOES NOT HOLD (audit 31 Oct h, AH6): BrainDog's own parts its reach names, not
+   * installed or switched off here. Debts on a shop with no Money offered Install, and the press answered a line of list
+   * and pack ids; now the button adds Money first, and Install follows once it is in.
+   */
+  const ownParts = firstPartyModules();
+  /* AND WHAT THOSE PARTS LEAN ON IN TURN (`leans`): Money stands on Projects, so a shop with neither adds both, in the
+     order they go in. */
+  const needsFirst = $derived.by((): string[] => {
+    const held = states;
+    if (action?.kind !== 'install' || held === null || listing?.kind === 'module') return [];
+    const here = (id: string): boolean => held.some((s) => s.id === id && s.disabled_at === null);
+    const wanted = new Set<string>();
+    const visit = (id: string): void => {
+      const part = ownParts.find((m) => m.id === id);
+      if (!part || here(id) || wanted.has(id)) return;
+      wanted.add(id);
+      for (const l of part.leans) visit(l);
+    };
+    for (const m of (reach ?? latest?.reach)?.modules ?? []) visit(m);
+    return ownParts.filter((m) => wanted.has(m.id)).map((m) => m.id);
+  });
+  /** The part being added first, while its plan is on the sheet, so the sheet's yes says that part's name. */
+  let addingFirst = $state<string | null>(null);
   /** A Kennel version that did not verify, or a plan or install the record refused. */
   let refused = $state<{ fix: string; code: string | null } | null>(null);
   let trust = $state.raw<Trust | null>(null);
@@ -172,12 +196,14 @@
       const shown = once.slice(0, NAMED_MOST).join(sep);
       rows.push({ key, glyph, label, n: named.length, names: once.length > NAMED_MOST ? `${shown} ${words.andMore(once.length - NAMED_MOST)}` : shown });
     };
-    const read = adds && adds.lists.length + adds.pages.length + adds.figures.length + adds.rules.length > 0 ? adds : null;
+    const read = adds && adds.lists.length + adds.pages.length + adds.figures.length + adds.rules.length + adds.reads.length > 0 ? adds : null;
     if (read) {
       push('lists', 'rows', words.addsLists, read.lists.map((l) => l.name));
       push('pages', 'doc', words.addsPages, read.pages.map(pageTitle));
       push('figures', 'activity', words.addsFigures, read.figures.map((f) => f.name), '; ');
       push('rules', 'skill', words.addsRules, read.rules, '; ');
+      /* WHAT IT READS, ONCE (AH11): Card alerts said "Nothing of its own" over four patterns that file card texts and mail. */
+      if (read.reads.length > 0) rows.push({ key: 'reads', glyph: 'mail', label: words.addsReads, n: 1, names: words.readsBy(read.reads) });
     } else if (reach) {
       push('lists', 'rows', words.addsLists, reach.lists);
       push('pages', 'doc', words.addsPages, reach.pages);
@@ -381,12 +407,22 @@
         return;
       }
       if (action.kind !== 'install' && action.kind !== 'update') return;
+      /* WHAT IT NEEDS FIRST GOES IN FIRST, on its own sheet: the part's plan, and Install for this one after it. */
+      const first = needsFirst[0];
+      if (first !== undefined) {
+        const out = await planFor(client, { kind: 'module', id: first, source: 'bundled', title: moduleTitle(first) }, { doc: null, text: null }, states, copy.writeRaced);
+        if (out.ok) {
+          planned = out.planned;
+          addingFirst = first;
+        } else refused = unresolvedSaid(out);
+        return;
+      }
       /* WHAT ELSE WAITS IS READ ONLY FOR A PLAN THAT HAS SOMETHING TO WAIT FOR (`offer.ts` `afterOthers`): an update
          another one hands something to goes in after it, on the one sheet, instead of a stop nobody can clear here. */
       const held = states;
       const out = await planFor(client, listing, file, held, copy.writeRaced, () => waitingOf(fetch, kennel, held));
       if (out.ok) planned = out.planned;
-      else refused = out;
+      else refused = unresolvedSaid(out);
     } finally {
       busy = false;
     }
@@ -457,10 +493,15 @@
         if (out.nav) pref.write({ nav: out.nav });
         if (entry && trust) await keepFirstKey(keys, `${entry.kind}:${entry.id}`, trust);
         /* A run that took other updates in first names them (`offer.ts` `installInTurn`), so nobody finds one moved unsaid. */
-        toasts.push(out.first ? turnWords.installedAfter(listing.title, out.first) : copy.shareInstalled(listing.title), { intent: 'good' });
+        const title = addingFirst !== null ? moduleTitle(addingFirst) : listing.title;
+        toasts.push(out.first ? turnWords.installedAfter(title, out.first) : copy.shareInstalled(title), { intent: 'good' });
         planned = null;
+        const wasFirst = addingFirst !== null;
+        addingFirst = null;
         await reread();
         await railAgain();
+        /* THE NEXT PART IT NEEDS, OR THE ADD-ON ITSELF, IS THE NEXT SHEET: one press for each, in order. */
+        if (wasFirst) setTimeout(() => void press(), 0);
         return;
       } else if (entry && notOwner(out.code)) {
         wentIn(out);
@@ -483,7 +524,7 @@
       } else {
         wentIn(out);
         planned = null;
-        refused = out;
+        refused = unresolvedSaid(out);
       }
       await reread();
     } finally {
@@ -491,10 +532,24 @@
     }
   }
 
+  /**
+   * A PLAN REFUSED FOR A LIST NOTHING HERE HOLDS, IN WORDS (AH6): "debts points at the accounts list
+   * (register.debts.fields.account.to)... Install money-core first" named ids a person never sees. The part that declares
+   * the list is named by its title when the record named one; else it says only that something must come first.
+   */
+  function unresolvedSaid<T extends { fix: string; code: string | null }>(out: T): T {
+    if (out.code !== 'REGISTER_UNRESOLVED' || !listing) return out;
+    const named = /Install (.+?) first:/u.exec(out.fix)?.[1];
+    const parts = named ? named.split(/, | and /u).map((id) => moduleTitle(id.trim())) : [];
+    return { ...out, fix: parts.length > 0 ? words.needsFirstRefused(listing.title, parts.join(' and ')) : words.needsSomethingFirst(listing.title) };
+  }
+
   const label = $derived(
     busy && planned === null
       ? words.planning
-      : action?.kind === 'update'
+      : needsFirst.length > 0
+        ? words.addFirst(needsFirst.map(moduleTitle).join(' and '))
+        : action?.kind === 'update'
         ? words.update(action.to)
         : action?.kind === 'turn-on'
           ? words.turnOn(listing?.title ?? '')
@@ -718,7 +773,10 @@
         hosted={hostedHere(page.data as unknown as Shell)}
         {busy}
         onapprove={() => void approve()}
-        oncancel={() => (planned = null)}
+        oncancel={() => {
+          planned = null;
+          addingFirst = null;
+        }}
         onrecheck={again}
         onkey={putKey}
         extra={waits.length > 0 || moved ? told : undefined}

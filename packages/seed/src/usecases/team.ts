@@ -255,8 +255,11 @@ export const TEAM = {
      2.29.0: Team task list is part of Team board now. A cycle carries a retro, a document for how it went. One field
      added and nothing taken away, so a minor step.
      2.29.1: the card's summary is one short line. Words only, so a patch step.
-     2.29.2: the project page's And from everywhere cards say "What it is", not "Kind". Words only, so a patch step. */
-  version: '2.29.2',
+     2.29.2: the project page's And from everywhere cards say "What it is", not "Kind". Words only, so a patch step.
+     2.30.0 (audit 31 Oct h, AH4): Cycles is on the rail from the first minute (its place, after Work), and opens on a box
+     to add a cycle, where a new team found it inside More lists. A block added and nothing taken away, so a minor
+     step; 2.29.2 is published. */
+  version: '2.30.0',
   title: 'Team board',
   summary: 'Tickets, cycles and the agents on them.',
   author: 'BrainDog',
@@ -558,7 +561,9 @@ export const TEAM = {
            called Board on one rail said nothing about which was which. */
         page: 'cycles',
         title: 'Cycles',
-        nav: { section: 'Team', order: 10 },
+        /* ITS PLACE ON THE RAIL, SINCE 2.30.0 (AH4): a starter's own page is a place from the first minute, even while
+           its lists hold only what the starter planted. */
+        nav: { section: 'Team', order: 10, place: 20 },
         icon: 'rows',
         requires: ['register.tasks', 'register.cycles', 'register.cycle_plan'],
         blocks: [
@@ -569,6 +574,8 @@ export const TEAM = {
             span: 12,
             body: '{{tickets-planned}} ticket(s) planned into cycles, {{tickets-blocked}} blocked',
           },
+          /* A BOX TO ADD A CYCLE, SINCE 2.30.0 (AH4). */
+          { kind: 'capture', heading: 'Add a cycle', icon: 'plus', span: 12, register: 'cycles' },
           {
             kind: 'table',
             heading: 'Cycles',

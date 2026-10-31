@@ -47,6 +47,8 @@ export type BoardProject = {
   year: { minor: number; currency: string } | null;
   /** The names its code and folders go by (`repos`, `folders`), which a run's repository or folder is matched to. */
   repos: readonly string[];
+  /** When the row was written, an instant, where the answer says; a project younger than a week is never quiet. */
+  made?: string | null;
 };
 
 /** An open task, with the project it points at. */
@@ -438,6 +440,9 @@ function workOf(f: Facts, now: number): WorkCell {
 
 /** Whether a project building is moving or due: late, due within the week, a run or a task change this week, or asked. */
 const moving = (f: Facts, now: number): boolean =>
+  /* A PROJECT LESS THAN A WEEK OLD IS NOT QUIET (audit 31 Oct h, AH17): one made a second ago read "Building, quiet ·
+     nothing in 7 days". */
+  (typeof f.p.made === 'string' && Date.parse(f.p.made) >= now - WEEK_DAYS * DAY) ||
   f.late.length > 0 || f.due.length > 0 || f.asks.length > 0 || (f.lastRun !== null && Date.parse(f.lastRun.at) >= now - WEEK_DAYS * DAY) || (f.lastMove !== null && Date.parse(f.lastMove) >= now - WEEK_DAYS * DAY);
 
 /** Late first, then due soonest, then worked on last, then by name. */
@@ -655,7 +660,8 @@ export function boardOf(input: BoardInput): Board {
   const asksAll = live.flatMap((f) => f.asks);
 
   return {
-    date: `${dateLine(input.today)} · ${live.length} in play · ${parked.length} parked · ${finished.length} closed`,
+    /* A COUNT OF NOUGHT IS LEFT OUT (AH17): "1 in play · 0 parked · 0 closed" said two things that are not there. */
+    date: [dateLine(input.today), `${live.length} in play`, ...(parked.length > 0 ? [`${parked.length} parked`] : []), ...(finished.length > 0 ? [`${finished.length} closed`] : [])].join(' · '),
     headline,
     lede,
     acts: {

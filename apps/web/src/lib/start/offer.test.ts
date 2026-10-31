@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import { BUNDLED, shape } from '../shape.ts';
 import { setupOffer } from './propose.ts';
-import { catalogueOfferOf, heardOf, offerOf, readCatalogueOffer, type CatalogueOffer } from './offer.ts';
+import { catalogueOfferOf, heardOf, namedAddons, offerOf, readCatalogueOffer, type CatalogueOffer } from './offer.ts';
 
 const SAID = 'I rent out six flats and need to keep track of rent and repairs';
 const LETTING = { kind: 'usecase', id: 'letting-desk', title: 'Letting desk', summary: 'Flats, tenancies and repairs.', signals: ['flats', 'tenancy'], modules: ['money', 'letting-desk-lists'] };
@@ -38,30 +38,28 @@ test('WITH NO CATALOGUE THE OFFER IS THE COMPILED LISTS, the very ones the first
   assert.deepEqual(heardOf(null), []);
 });
 
-test('A CATALOGUE USE CASE HEARD AS "FLATS" IS OFFERED, and with that word taken off it is not', async () => {
+test('A CATALOGUE USE CASE IS READ BUT NEVER OFFERED TO A SENTENCE (audit 31 Oct h, AH8): "flats" installs no add-on', async () => {
   const { sent, send } = serving(200, INDEX);
   const catalogue = await readCatalogueOffer(send);
   assert.equal(sent[0]?.url, '/catalogue/index.json');
   assert.equal(sent[0]?.init.credentials, 'omit', 'read with no session');
   assert.deepEqual(catalogue?.usecases.map((u) => u.id), ['letting-desk'], 'an add-on is not a use case');
 
-  assert.ok(ids(offerOf(catalogue)).includes('letting-desk'));
-  assert.deepEqual(heardOf(catalogue), [{ id: 'letting-desk', signals: ['flats', 'tenancy'], modules: ['money', 'letting-desk-lists'] }]);
-  assert.ok(heardIn(catalogue).includes('letting-desk'), 'the rules hear "flats" in the sentence');
-
-  const quiet = catalogueOfferOf({ ...INDEX, entries: [{ ...LETTING, signals: ['tenancy'] }] });
-  assert.ok(!heardIn(quiet).includes('letting-desk'), 'with "flats" taken off the sentence points at nothing of it');
+  assert.deepEqual(offerOf(catalogue), setupOffer());
+  assert.deepEqual(heardOf(catalogue), []);
+  assert.ok(!heardIn(catalogue).includes('letting-desk'), 'the rules installed an add-on for "flats"');
+  assert.deepEqual(namedAddons(catalogue).map((u) => u.id), ['letting-desk'], 'what the sentence could name is still known');
 
   const wordless = catalogueOfferOf({ ...INDEX, entries: [{ ...LETTING, signals: [] }] });
   assert.deepEqual(wordless?.usecases, [], 'an entry with no words is passed over');
   assert.deepEqual(offerOf(wordless), setupOffer());
 });
 
-test('A USE CASE THIS BUILD SHIPS IS NOT OFFERED TWICE, since the compiled words already listen for it', () => {
+test('A USE CASE THIS BUILD SHIPS IS NOT OFFERED TWICE, and a front is not offered at all', () => {
   const shipped = setupOffer().usecases[0]!;
   const twice = catalogueOfferOf({ format: 1, entries: [{ ...LETTING, id: shipped.id, title: 'Again' }, LETTING, LETTING] });
   assert.equal(ids(offerOf(twice)).filter((id) => id === shipped.id).length, 1);
-  assert.equal(ids(offerOf(twice)).filter((id) => id === 'letting-desk').length, 1);
+  assert.equal(ids(offerOf(twice)).filter((id) => id === 'letting-desk').length, 0);
 });
 
 test('A BROKEN INDEX, A FAILED FETCH AND A MISSING ONE EACH LEAVE THE COMPILED LISTS', async () => {

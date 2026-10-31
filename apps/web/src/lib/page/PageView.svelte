@@ -188,8 +188,20 @@
     if (a.verb === 'row.create') {
       const line = document.querySelector<HTMLInputElement>('main .capture-input');
       if (line) return void line.focus();
-      const register = all.find((b) => typeof b.register === 'string' && b.register !== '' && writes.capturable(b))?.register ?? all.find((b) => typeof b.register === 'string' && REGISTERS[b.register])?.register;
+      /* AND ON AN EMPTY PAGE, FROM WHAT THE PAGE REQUIRES (audit 31 Oct h, AH3): a fresh People draws no block, so the
+         press found no list and the record refused it as naming no row. The action's own list, then a drawn block's,
+         then the first list the page says it needs. */
+      const args = a.args && !Array.isArray(a.args) ? (a.args as Readonly<Record<string, unknown>>) : null;
+      const named = typeof args?.register === 'string' && args.register !== '' ? args.register : undefined;
+      const required = (live?.page.page.requires ?? []).flatMap((r) => (typeof r === 'string' && r.startsWith('register.') ? [r.slice('register.'.length)] : []));
+      const register =
+        named ??
+        all.find((b) => typeof b.register === 'string' && b.register !== '' && writes.capturable(b))?.register ??
+        all.find((b) => typeof b.register === 'string' && REGISTERS[b.register])?.register ??
+        required[0];
       if (register) return void goto(at(`/r/${register}?add=1`));
+      /* A HEAD'S ADD NEVER ASKS FOR A ROW: with no list to add to, the press does nothing rather than refuse. */
+      return;
     }
     void writes.act(a);
   }

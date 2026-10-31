@@ -20,8 +20,16 @@ export type Adds = {
   pages: { id: string; title: string }[];
   figures: { id: string; name: string; target: string | null; window: string | null }[];
   rules: string[];
+  /** HOW WHAT IT READS ARRIVES, each way once ("texts", "mail"), from its `ingest` patterns (audit 31 Oct h, AH11). */
+  reads: string[];
   examples: number;
 };
+
+/**
+ * THE WAY AN `ingest` PATTERN'S MESSAGES ARRIVE, in a person's word: by mail, or posted in from a phone, which is a
+ * text. Card alerts' plan read "Ingest.bank card out, ingest" four times while its page said it added nothing.
+ */
+export const channelWord = (channel: unknown): string => (channel === 'email' ? 'mail' : channel === 'webhook' || channel === 'sms' ? 'texts' : 'messages');
 
 const isMap = (v: unknown): v is Body => typeof v === 'object' && v !== null && !Array.isArray(v);
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -74,6 +82,7 @@ export function namesOf(doc: unknown): Map<string, string> {
       names.set(id, name).set(`register.${id}`, name);
     } else if (typeof d.page === 'string') names.set(d.page, str(d.title) || d.page).set(`page.${d.page}`, str(d.title) || d.page);
     else if (typeof d.metric === 'string') names.set(d.metric, str(d.name) || d.metric).set(`metric.${d.metric}`, str(d.name) || d.metric);
+    else if (typeof d.ingest === 'string') names.set(`ingest.${d.ingest}`, channelWord(d.channel));
   }
   for (const d of declarations) {
     if (typeof d.rule === 'string') names.set(`rule.${d.rule}`, ruleOf(d, names));
@@ -117,9 +126,13 @@ function ruleOf(d: Body, names: ReadonlyMap<string, string>): string {
 export function addsOf(doc: unknown): Adds {
   const { declarations, seeds } = declarationsOf(doc);
   const names = namesOf(doc);
-  const out: Adds = { lists: [], pages: [], figures: [], rules: [], examples: seeds };
+  const out: Adds = { lists: [], pages: [], figures: [], rules: [], reads: [], examples: seeds };
   for (const d of declarations) {
     if (typeof d.rule === 'string') out.rules.push(ruleOf(d, names));
+    else if (typeof d.ingest === 'string') {
+      const way = channelWord(d.channel);
+      if (!out.reads.includes(way)) out.reads.push(way);
+    }
     else if (isList(d)) {
       const id = str(d.register);
       const fields = Array.isArray(d.fields) ? d.fields.filter(isMap).map((f) => str(f.label) || str(f.id)).filter((f) => f !== '') : [];

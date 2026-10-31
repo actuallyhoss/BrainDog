@@ -45,6 +45,9 @@ const LOW_POINT = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.'
 const PART_LATE = { metric: 'installments-late', gt: 0 };
 const BILL_LATE = { metric: 'overdue', gt: 0 };
 const GOES_UNDER = { all: [{ metric: 'cash-now', gt: 0 }, { metric: 'runway-days', lte: 84 }] };
+/** Something is due or repeats, so the walk has something to last the year against (`due.ts` `bills-open`). */
+const SOME_DUE = { any: [{ metric: 'bills-open', gt: 0 }, { metric: 'repeating-held', gt: 0 }] };
+const NOTHING_DUE = [{ metric: 'bills-open', lt: 1 }, { metric: 'repeating-held', lt: 1 }];
 
 /** The line's sentences, worst first, each with `between` (what the line says of the accounts or the year) before the card. */
 const says = (between: string): Record<string, unknown>[] => [
@@ -98,8 +101,18 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
     kind: 'note',
     lead: true,
     span: 12,
-    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
+    /* ONLY WHILE SOMETHING IS DUE OR REPEATS (audit 31 Oct h, AH15): with nothing at all, "lasts the year on what is
+       due" was said of nothing, and the next block asks for the first bill instead. */
+    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }, SOME_DUE] },
     says: says(' Lasts the year on what is due.'),
+  },
+  {
+    /* NOTHING DUE AND NOTHING REPEATING: the hero says the balance under it, and the line asks for a bill. */
+    kind: 'note',
+    lead: true,
+    span: 12,
+    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }, ...NOTHING_DUE] },
+    says: says(' Add a bill to see how long it lasts.'),
   },
   HEADLINE[1]!,
 ];

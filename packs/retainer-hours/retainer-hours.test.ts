@@ -144,7 +144,7 @@ test('BEFORE THE ADD-ON: a record with People keeps no retainer and no timesheet
 
 test('THE FILE IS retainer-hours 1.0.1 ON PEOPLE, data only: two lists, three pages, nine figures, no script and no example rows', () => {
   const doc = file() as Body & { requires: { packs: unknown }; declarations: Body[] };
-  assert.deepEqual([doc.pack, doc.version, doc.author, doc.license], ['retainer-hours', '1.0.3', 'BrainDog', 'MIT']);
+  assert.deepEqual([doc.pack, doc.version, doc.author, doc.license], ['retainer-hours', '1.1.0', 'BrainDog', 'MIT']);
   assert.deepEqual(doc.requires.packs, { people: '>=3.3.0 <5.0.0' });
   assert.equal(doc.seeds, undefined, 'no example rows');
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
