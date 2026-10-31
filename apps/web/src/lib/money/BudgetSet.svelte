@@ -73,12 +73,7 @@
     }
     /* A CURRENCY SOMEBODY CHOSE: the budget's own, else the record's home one, never one the screen picks. */
     const home = homeCurrency();
-    /* NO CATEGORY AT ALL: the everyday ones, each a line not yet written, made the moment a budget is set on it. */
-    if (out.value.rows.length === 0) {
-      lines = words.starterNames.map((name, i) => ({ seq: -(i + 1), version: 0, name, minor: null, currency: home, period: 'month' as Period, typed: '' }));
-      return;
-    }
-    lines = (out.value.rows as { seq?: unknown; version?: unknown; fields?: Record<string, unknown> }[]).flatMap((r) => {
+    const held = (out.value.rows as { seq?: unknown; version?: unknown; fields?: Record<string, unknown> }[]).flatMap((r) => {
       const f = r.fields ?? {};
       const name = f[category.title];
       if (typeof r.seq !== 'number' || typeof name !== 'string') return [];
@@ -96,6 +91,13 @@
         },
       ];
     });
+    /* NO CATEGORY BUT THE EVERYDAY ONES THIS TILE MADE: the rest of them stay offered, each a line not yet written, made
+       the moment a budget is set on it. A book with a category of its own is offered nothing it did not make. */
+    const offered = words.starterNames as readonly string[];
+    const ours = held.every((l) => offered.includes(l.name));
+    lines = ours
+      ? offered.map((name, i) => held.find((l) => l.name === name) ?? { seq: -(i + 1), version: 0, name, minor: null, currency: home, period: 'month' as Period, typed: '' })
+      : held;
   }
 
   $effect(() => {
