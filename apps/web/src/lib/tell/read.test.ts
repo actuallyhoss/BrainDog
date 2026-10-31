@@ -528,3 +528,26 @@ test('A PAYOUT, A CARD SPEND AND A DINAR ARE READ THE WAY THEY WERE SAID (review
   assert.ok(mugs.why);
   assert.deepEqual(mugs.left, ['Mark paid 50']);
 });
+
+test('A REFUND AFTER THE AMOUNT, A FEE LINE, A BALANCE FIRST AND "PAID OUT" ARE READ THE WAY THEY WERE SAID (review 31 Oct j, RJ4, RJ5, RJ8)', () => {
+  const on = { ...shop, today: '2026-10-31' };
+  const way = (s: string, c: Partial<typeof on> = {}) => tellRead(s, { ...on, ...c }).rows.find((r) => r.register === 'transactions');
+  /* RJ4: "refund" and "reversal" as nouns after the amount are money back, and "No fees charged" is no charge of it. */
+  assert.equal(way('EGP 500 refund credited to your card ending 1234 for your purchase at Amazon')?.fields.direction, 'in');
+  assert.equal(way('EGP 1,250.00 reversal for purchase at Carrefour on your card ending 1234')?.fields.direction, 'in');
+  assert.equal(way('EGP 500 received in your a/c XX12 from Ahmed. No fees charged.')?.fields.direction, 'in');
+  assert.equal(way('EGP 500 charged to your account ending 12 at Netflix')?.fields.direction, 'out');
+  /* RJ8: a balance said first, in the order banks print it, is not the spend. */
+  const spend = way('Balance available: EGP 45,500. Purchase EGP 500 at Noon on your card ending 1234');
+  assert.deepEqual(spend?.fields.amount, { amount: 50000, currency: 'EGP' });
+  assert.equal(spend?.fields.direction, 'out');
+  /* RJ5: somebody who is no payment provider "paid out" is asked which way. */
+  assert.equal(tellRead('Ahmed paid out 300 for the delivery', on).why, 'Did Ahmed pay you, or did you pay Ahmed?');
+  /* His own account paying out is money out, through that account or not. */
+  assert.equal(way('Paid out 500 from Revolut for the plumber')?.fields.direction, 'out');
+  assert.equal(way('Paid out 500 from Revolut for the plumber', { accounts: [{ seq: 2, name: 'Revolut' }] })?.fields.direction, 'out');
+  /* And a provider's payout to his bank is in. */
+  const stripe = way('Paid out 1,950 USD from Stripe to my bank');
+  assert.equal(stripe?.fields.direction, 'in');
+  assert.deepEqual(stripe?.fields.amount, { amount: 195000, currency: 'USD' });
+});
