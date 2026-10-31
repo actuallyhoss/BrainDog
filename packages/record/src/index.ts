@@ -2979,7 +2979,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return {
       profile: p === null ? null : { id: p.id, name: p.name, applies: p.id === 'default' ? 'default' : p.match.token !== undefined ? 'token' : 'name' },
       may,
-      says: saysOf({ ceiling: may, lists_write: p?.lists_write ?? null, projects: p?.projects ?? null }, listName),
+      /* WHAT HIS WORD LIFTS IS SAID WHERE IT CAN BE GIVEN: his own key, while his switch is on (`wordOf`). */
+      says: saysOf({ ceiling: may, lists_write: p?.lists_write ?? null, projects: p?.projects ?? null }, listName, may === 'write' && kernel.access(principal.person)?.level === 'owner' && kernel.prefsOf(principal.person)[ON_WORD_PREF] !== false),
       projects: p?.projects ?? null,
       lists: p?.lists_write ?? null,
       tools_off: p === null ? [] : Object.entries(p.tools).flatMap(([tool, on]) => (on === false ? [tool] : [])),
@@ -7801,13 +7802,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * and nothing said it asked because the run had read a bank text. One its run asked for having read outside text is
    * marked `outside`, so BrainDog never settles it for him (`handledFault`).
    */
+  /** A filed write's cause: the list, the row (or `new`) and a hash of what it would write, as `askInstead` files it. */
+  const writeCause = (register: string, row: Record<string, unknown>): string => {
+    const target = typeof row.at === 'string' ? row.at : 'new';
+    const patch = row.patch ?? row;
+    return `write#${register}#${target}#${sha256(new TextEncoder().encode(canonValue(patch))).slice(0, 24)}`;
+  };
+
+  /**
+   * THE SAME CHANGE LANDED ON HIS WORD TAKES BACK THE QUESTION THAT ASKED IT (audit 10k, AK16). A run's write the ladder
+   * filed as a question, then sent again with `said`, landed and left "Mark Ship doing?" waiting in Needs you for a
+   * change already made. Its cause is the same write's (`writeCause`), so that one open question is withdrawn, signed as
+   * the run, when the run's own key asked it; one another key asked is the kernel's to refuse, and is left.
+   */
+  const askedLanded = (ctx: CallContext, register: string, row: Record<string, unknown>): void => {
+    const open = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE status = 'open' AND cause = ?", writeCause(register, row));
+    if (open !== undefined) kernel.withdraw(writerOf(ctx), { id: open.id });
+  };
+
   const askInstead = (ctx: CallContext, register: string, row: Record<string, unknown>, self: Entry | null, why: string, outside = false): Result<Asked> => {
     const question = askedOf(register, row, self);
     /* THE SAME WRITE TRIED AGAIN JOINS THE OPEN QUESTION: its cause is the list, the row (or `new`) and a hash
        of what it would write, so another patch to the same row is another question. */
-    const target = typeof row.at === 'string' ? row.at : 'new';
-    const patch = row.patch ?? row;
-    const cause = `write#${register}#${target}#${sha256(new TextEncoder().encode(canonValue(patch))).slice(0, 24)}`;
+    const cause = writeCause(register, row);
     const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register, rows: [row], context: why, ...(outside ? { outside: true } : {}) }, ...(CAUSE.test(cause) ? { cause } : {}) }, writerOf(ctx)));
     if (!filed.ok) return filed;
     return ok({ asked: { id: filed.value.id, question, why, ...(filed.value.joined === true ? { joined: true as const } : {}) } });
@@ -12006,28 +12023,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (refused) return refused;
         return tail(askInstead(ctx, args.register, { ...(args.fields as Record<string, unknown>) }, null, rung.gate.why, rung.gate.outside === true));
       }
-      return tail(
-        keptOnLadder(
-          word === null ? rung : null,
-          ownRowsAsked(
+      const made = keptOnLadder(
+        word === null ? rung : null,
+        ownRowsAsked(
+          args.register,
+          args.fields,
+          offRegister(
             args.register,
-            args.fields,
-            offRegister(
-              args.register,
-              kernel.create(args.register, args.fields, {
-                ...writerOf(ctx),
-                reads: refsSeen(ctx),
-                within,
-                ...(note === undefined ? {} : { note }),
-                ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-                /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
-                   without its own id the record has no way to know the second is the first. */
-                ...(args.op_id === undefined ? {} : { opId: args.op_id }),
-              }),
-            ),
+            kernel.create(args.register, args.fields, {
+              ...writerOf(ctx),
+              reads: refsSeen(ctx),
+              within,
+              ...(note === undefined ? {} : { note }),
+              ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+              /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
+                 without its own id the record has no way to know the second is the first. */
+              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+            }),
           ),
         ),
       );
+      if (word !== null && made.ok) askedLanded(ctx, args.register, { ...(args.fields as Record<string, unknown>) });
+      return tail(made);
     },
 
     /**
@@ -12178,6 +12195,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ),
         ),
       );
+      if (word !== null && self !== null && written.ok && 'fields' in written.value) askedLanded(ctx, args.register, { at: `${args.register}#${args.seq}`, patch: args.patch });
       return tail(written.ok && 'fields' in written.value ? ok(sight.maskRow(ctx, written.value as Entry) as Entry | Asked) : written);
     },
 

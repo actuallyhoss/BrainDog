@@ -972,6 +972,8 @@ const LIST_PAGE = 20;
 const LIST_WHOLE = 60;
 /** The characters of one text a `list` row carries before it is cut, unless the call names its field in `fields`. */
 const CLIP = 280;
+/** The longest note `log` takes, the ledger's own ceiling (`log` in the record). */
+const NOTE_MOST = 280;
 
 /**
  * A compact row as `list` answers it: what an agent reads to choose a row, and not the whole of each one.
@@ -1676,6 +1678,14 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * ("get and meet follow merged_into to the kept row"). `MERGE_HOPS` bounds a chain, and a row
    * that points at itself or cannot be read stops it where it is.
    */
+  /** The batch, when undoing it would put something back (the record's own dry plan says so), else `undefined`. */
+  const undoable = async (batch: string | undefined, ctx: C): Promise<string | undefined> => {
+    if (batch === undefined || !surface.undoOwn) return batch;
+    const plan = await surface.undoOwn({ batch, dry: true }, ctx);
+    const v = plan.ok && isObject(plan.value) ? plan.value : null;
+    return v !== null && Array.isArray(v.steps) && v.steps.length > 0 ? batch : undefined;
+  };
+
   const keptOf = async (entry: Entry, ctx: C): Promise<{ entry: Entry; from: Entry | null }> => {
     let at = entry;
     for (let hop = 0; hop < MERGE_HOPS; hop++) {
@@ -3102,6 +3112,10 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (args.page !== undefined && args.page !== null) return pageOn(args, ctx, turn);
       const note = String(args.note ?? '').trim();
       if (!note) return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'A note is one sentence, and this one is empty.', at: 'note' } } };
+      /* THE LEDGER'S CEILING, AS THE RECORD'S OWN `log` HOLDS IT (audit 10k, AK9). This door goes through `update` and
+         `handoff`, which took a note of any length, so the 280 the docs promise held over HTTP and not here. */
+      if (note.length > NOTE_MOST)
+        return { result: { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `A note is at most ${String(NOTE_MOST)} characters, and this one is ${String(note.length)}.`, at: 'note' } } };
       /**
        * NO ROW IS THE CALLER'S OWN SESSION, AND IT IS THE RECORD'S `handoff` WITH THE NOTE ALONE. That is the one method
        * that finds a token's run, or opens it on its first write, inside the same transaction as the write, so a note is
@@ -3143,7 +3157,10 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     },
 
     /* The arguments go through whole: which fields a session may set, and how `tried` appends, are
-       the record's rules, and it names the field when one is wrong. */
+       the record's rules, and it names the field when one is wrong.
+       ITS RECEIPT OFFERS AN UNDO ONLY WHEN ONE WOULD PUT SOMETHING BACK (audit 10k, AK10): a run's own step, doing and
+       notes are bookkeeping undo never touches, so a handoff that wrote only those offered a batch that answered "That
+       change left nothing that can be put back". A task it started or closed still has its undo. */
     handoff: async (args, ctx, turn) => {
       if (!surface.handoff) return { result: unbuilt('handoff', 'Log the next step on the task you are working on instead.') };
       const out = await surface.handoff(args, ctx);
@@ -3152,7 +3169,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!out.ok && 'refusal' in out && out.refusal.at === 'left' && (args.take !== undefined || args.drop !== undefined))
         return { result: await failed({ ...out, refusal: { ...out.refusal, at: args.take !== undefined ? 'take' : 'drop' } }, ctx, turn) };
       if (!out.ok) return { result: await failed(out, ctx, turn) };
-      turn.batch = batchIn(out.value);
+      turn.batch = await undoable(batchIn(out.value), ctx);
       /* A STEP TAKEN OR DROPPED answers the run that left it and its words, not a run's row: said as what now
          happens to it. The second of two sessions racing for one step was refused above, in the record's sentence. */
       if (isObject(out.value) && typeof out.value.left === 'string' && typeof out.value.next === 'string' && !isEntry(out.value)) {
@@ -4212,6 +4229,8 @@ function receiptOf(name: string, said: string, turn: Turn, value: unknown, inTex
   const did = first === '' ? `Done with ${name}` : first.length > 110 ? `${first.slice(0, 109)}…` : first;
   const head = inText && first !== '' ? 'Receipt:' : `Receipt: ${did}.`;
   if (turn.batch !== undefined) return `${head} To undo, call undo with batch "${turn.batch}".`;
+  /* A HANDOFF THAT MOVED ONLY THE RUN'S OWN STEP has nothing undo puts back: the next handoff is how it changes. */
+  if (name === 'handoff') return `${head} To change it, call handoff again.`;
   if (turn.asks !== undefined) return `${head} To take it back, call propose with withdraw "${turn.asks}".`;
   /* A PROPOSAL THE LADDER LET THROUGH WAS WRITTEN (`landed`, or the `rung` it went through on), so it is not said to have written nothing. */
   const ruled = ruledOf(value);

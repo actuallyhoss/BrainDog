@@ -101,8 +101,12 @@ test('A CHANGE THE LADDER WOULD HAVE ASKED LANDS WITH HIS WORDS, and without the
   assert.notEqual(asked.isError, true, asked.content[0]!.text);
   assert.equal(api.kernel.get(spoken)?.fields.what, 'Ship the Kiln invoice', 'without his word it asked');
 
+  const open = () => sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE status = 'open'")?.n ?? 0;
+  const waiting = open();
   const landed = await call(api, agent(), 'update', { spoken, patch: { what: 'Ship the Kiln invoice today' }, said: 'Rename it to say today.' });
   assert.notEqual(landed.isError, true, landed.content[0]!.text);
   assert.equal(api.kernel.get(spoken)?.fields.what, 'Ship the Kiln invoice today');
+  /* AND THE QUESTION THAT ASKED IT IS TAKEN BACK (audit 10k, AK16): the change it asked for is made. */
+  assert.equal(open(), waiting - 1);
   sql.close();
 });

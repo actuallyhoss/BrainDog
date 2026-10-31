@@ -676,7 +676,8 @@ test("ON HIS WORD AN AGENT ACCEPTS AN ADD-ON (the owner's decision of 27 October
   const { api, sql } = await record();
   sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_owner', 'owner@vance-studio.example', 'Teodor')");
   sql.exec("INSERT OR REPLACE INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
-  const writer: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_owner', level: 'owner' }, session: { client_id: 'c1', agent: 'claude' } };
+  /* ANOTHER OF HIS KEYS: the key that asked is never the one that answers (`wordAnswer`, audit 10k AK2). */
+  const writer: CallContext = { principal: { kind: 'token', id: 't_2', scope: 'write', person: 'p_owner', level: 'owner' }, session: { client_id: 'c1', agent: 'claude' } };
   const asked = value<{ id: string }>(await api.propose({ question: 'Add Work?', body_kind: 'pack', body: { install: 'work' } } as never, agent));
   refusal(await api.decide(accept(asked.id), writer));
   value(await api.instructionsMine({ answer: asked.id, option: 'accept', said: 'Yes, add Work.' } as never, writer));

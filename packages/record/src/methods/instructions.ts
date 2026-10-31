@@ -40,6 +40,7 @@ import {
   agentOf as kindOf,
   instructionsTakenBy,
   placesHeard,
+  tokenOfRun,
   type Instr,
   type InstrAnswer,
   type InstructInput,
@@ -146,15 +147,20 @@ export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string, c
   /* A RUN SHE IS NOT SHOWN HAS NO RECEIPT FOR HER, and its writes are named only where she is shown the row. */
   if (run !== null && !sight.admits(ctx, run)) return null;
   const until = i.replied_at ?? nowIso;
+  /* FROM THE TAKE ITSELF, NOT ITS MILLISECOND (audit 10k, AK11): writes in the same instant as the take, before it in the
+     log, are what the run did before it held this, and a reply called them "while you held it". The take is the run's
+     first line on the instruction's row at or after `taken_at`, so only what the log holds after it counts. */
+  const took = sql.one<{ r: number | null }>('SELECT min(rowid) AS r FROM event WHERE target = ? AND actor = ? AND ts >= ?', `entry:${i.row}`, i.taken_by, i.taken_at)?.r ?? 0;
   const rows = sql.all<{ batch: string | null; id: string; ts: string; target: string | null }>(
     `SELECT batch, id, ts, target FROM event
-      WHERE actor = ? AND ts >= ? AND ts <= ?
+      WHERE actor = ? AND ts >= ? AND ts <= ? AND rowid > ?
         AND (target IS NULL OR (target <> ? AND target NOT IN (SELECT 'entry:' || id FROM entry WHERE register = ?)))
         AND kind NOT IN ('note', 'read', 'grant.read')
       ORDER BY ts DESC, rowid DESC LIMIT 2000`,
     i.taken_by,
     i.taken_at,
     until,
+    took,
     run === null ? '' : `entry:${run.id}`,
     INSTRUCTIONS,
   );
@@ -519,6 +525,18 @@ export function methods(deps: RecordDeps) {
     /* A QUESTION HE IS NOT SHOWN IS ONE THAT IS NOT THERE, as `decide` answers it. */
     if (row === null || sightOf(ctx, `suggestion:${id}`) === null) return no('OUT_OF_BOUNDS', `There is no question called ${given}.`, { at: 'answer' });
     if (row.status !== 'open') return no('TRANSITION_ILLEGAL', `${given} is already answered.`, { at: 'answer' });
+    /* A QUESTION THIS AGENT ASKED IS NEVER ITS OWN TO ANSWER (audit 10k, AK2). Its key asked the person, so an answer from
+       the same key is the agent deciding for them, whatever words it carries: they answer it in BrainDog. A change they
+       told it to make goes in with said on create or update, which takes the question back (AK16); a choice it asked is
+       taken back with withdraw once they have said. */
+    const askedBy = String(row.opened_by ?? '');
+    const key = ctx.principal.kind === 'token' ? ctx.principal.id : null;
+    if (askedBy === run || (key !== null && (askedBy === key || tokenOfRun(sql, askedBy) === key)))
+      return no(
+        'FORBIDDEN',
+        `You asked ${given} yourself, so the person answers it in BrainDog. If they told you what to do, make that change with said on create or update, or take the question back.`,
+        { at: 'answer', try: `propose ${JSON.stringify({ withdraw: given })}` },
+      );
     const kind = String(row.body_kind ?? '');
     const takes = PRESSABLE.has(kind) ? answersTaken(row) : ['accept', 'reject'];
     const asked = typeof option === 'string' ? option.trim() : '';

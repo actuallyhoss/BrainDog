@@ -35,13 +35,20 @@ export type ProfileView = Profile & { effective: Effective; heard_at: string | n
 /** The floors no setting lifts, said the same way on every row and in `whoami` (§5.1). */
 export const FLOORS = 'money, keys and deletes are asked';
 
-/** The one sentence a row's ceiling, lists and projects come to: "Writes Tasks and Learnings; money, keys and deletes are asked." */
-export function saysOf(p: Pick<Profile, 'ceiling' | 'lists_write' | 'projects'>, nameOf: (list: string) => string = (l) => l): string {
+/** What the person's word lifts of the floors, said after them to a key that may act on it (`wordOf` in `index.ts`). */
+export const ON_WORD = 'On their word, passed as said, only money and keys still are.';
+
+/**
+ * The one sentence a row's ceiling, lists and projects come to: "Writes Tasks and Learnings; money, keys and deletes are
+ * asked." With `onWord`, for a key that may act on the person's word, it adds what that word lifts (`ON_WORD`): a delete
+ * lands on it, money and keys never do (audit 10k, AK6).
+ */
+export function saysOf(p: Pick<Profile, 'ceiling' | 'lists_write' | 'projects'>, nameOf: (list: string) => string = (l) => l, onWord = false): string {
   if (p.ceiling === 'read') return 'Reads only; every change is refused.';
   if (p.ceiling === 'propose') return 'Suggests; every change is asked first.';
   const lists = p.lists_write === null ? '' : ` ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(p.lists_write.map(nameOf))}`;
   const where = p.projects === null ? '' : ` on ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(p.projects)}`;
-  return `Writes${lists}${where}; ${FLOORS}${p.lists_write !== null || p.projects !== null ? ', and so is anything outside that' : ''}.`;
+  return `Writes${lists}${where}; ${FLOORS}${p.lists_write !== null || p.projects !== null ? ', and so is anything outside that' : ''}.${onWord ? ` ${ON_WORD}` : ''}`;
 }
 
 /** How a row's match reaches. */
