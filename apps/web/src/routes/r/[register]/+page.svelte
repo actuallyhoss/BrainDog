@@ -3268,7 +3268,7 @@
         <!-- NOBODY IS HELD TWICE, said as that and not as a search that found nothing. -->
         <p class="held-none" data-held-twice-none>{thingSaid?.none ?? twiceWords.none}</p>
       {:else if rows.length === 0}
-        <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
+        <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} {adds} />
       {/if}
 
       {#if tiled && rows.length > 0}

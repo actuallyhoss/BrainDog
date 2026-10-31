@@ -584,7 +584,7 @@
     const now = [...rail.places, ...rail.rest];
     const names = arrivedIn(drawn, now);
     drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
-    if (names.length > 0) toasts.push(copy.placeArrived(names));
+    if (names.length > 0) toasts.push(copy.placeArrived(names, untrack(() => (!narrow ? 'sidebar' : names.every((n) => phoneTabs.some((t) => t.label === n)) ? 'bar' : 'menu'))));
   });
   /* THE PERSON READING, by the name the record told them, for the face: a guest's own name comes with `me`, since
      `names` names nobody to her, so her face is her own letter and never the "Y" of "You". */

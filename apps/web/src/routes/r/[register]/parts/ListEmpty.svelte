@@ -37,6 +37,7 @@
     q,
     filters,
     searched,
+    adds = false,
   }: {
     kind: 'no-data-yet' | 'no-results' | 'cleared';
     register: string;
@@ -51,7 +52,12 @@
     filters: Filter[];
     /** The labels of the fields the search box matches. */
     searched: string[];
+    /** Whether the reader may add to this list: an empty one then leads with its own Add (AH28). */
+    adds?: boolean | undefined;
   } = $props();
+
+  /* "Add a bill or invoice": the list's own word for one entry. */
+  const addOne = $derived(`Add ${/^[aeiou]/iu.test(decl.one ?? '') ? 'an' : 'a'} ${(decl.one ?? 'entry').toLowerCase()}`);
 </script>
 
 <Empty
@@ -71,6 +77,9 @@
          so the example offer went too. -->
     {#if kind === 'no-results'}
       <Button href="/r/{register}">{copy.clearFilters}</Button>
+    {:else if kind === 'no-data-yet' && adds}
+      <!-- AN EMPTY LIST LEADS WITH ITS OWN ADD (AH28), never "Connect your agent": it opens the list's add line. -->
+      <Button href="/r/{register}?add=1">{addOne}</Button>
     {:else if kind === 'no-data-yet'}
       <NextStep />
     {/if}

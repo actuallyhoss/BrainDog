@@ -455,7 +455,9 @@ export const shell = {
   arrangeMovesTo: (name: string, pack: string) => `${name} moves to ${pack}, which is not installed; it keeps working until you remove it.`,
   /* A PLACE THE RAIL DID NOT HOLD AT ITS LAST DRAW, named once in a toast (`lib/shell/AppFrame.svelte`): a page stays off the
      rail until one of its lists holds something, so the first thing typed can bring a place nobody saw arrive. */
-  placeArrived: (names: readonly string[]) => `${list([...names])} ${names.length === 1 ? 'is' : 'are'} in your sidebar now.`,
+  /* AND WHERE IT IS SAID IS WHERE IT IS (AH28): a phone has a bar and a Menu, not a sidebar. */
+  placeArrived: (names: readonly string[], where: 'sidebar' | 'bar' | 'menu' = 'sidebar') =>
+    `${list([...names])} ${names.length === 1 ? 'is' : 'are'} ${where === 'bar' ? 'on your bar' : where === 'menu' ? 'in your Menu' : 'in your sidebar'} now.`,
 
   /* ── WORDS THE FRAME DRAWS FROM OTHER AREAS, kept here so the frame's copy (`frame.ts`) is this file and not theirs ── */
 
