@@ -1,6 +1,6 @@
 # Data Processing Addendum
 
-Last updated: 2026-10-22
+Last updated: 2026-10-31
 
 ## The short version
 
@@ -112,7 +112,7 @@ This addendum lasts as long as we process personal data for you, and ends when y
 ## Annex 2: Security measures
 
 - **Isolation.** Every record is its own database. No table holds two customers' records, and no request can address two records.
-- **Sign-in.** Passkeys first, with a one-time emailed link as the fallback. No passwords. Opening saved keys, restoring a copy, deleting a record and letting a new app in all need a sign-in within the last 15 minutes. Repeated failed attempts are locked out.
+- **Sign-in.** A one-time emailed link, Google (which only proves the address and never makes an account) or a passkey. No passwords. Opening saved keys, restoring a copy, deleting a record and letting a new app in all need a sign-in within the last 15 minutes. Repeated failed attempts are locked out.
 - **Access for agents.** Keys can read, propose or write, and nothing more. No key can open saved keys, erase data, restore or delete. Keys from approved apps expire after 90 days, and we can end every key at once if we must.
 - **Saved keys.** Sealed before they are stored, under a key belonging to the record, which is itself sealed under a root key held only by our servers. An optional keychain password takes that root key out of the path for the keys people open; it is used only while a key is being opened and never stored. Keys a scheduled connection uses stay under the root key, so they can run with nobody there. An export leaves the secret values out.
 - **Encryption.** Data travels over HTTPS. Data at rest is encrypted by Cloudflare. Nightly backups are sealed to a key kept outside Cloudflare, so a stored copy alone opens nothing.

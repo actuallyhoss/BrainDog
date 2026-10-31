@@ -38,7 +38,7 @@ If you chose Cloud or Cloud Plus, you pay on Stripe's page after opening the lin
 
 Once your email is confirmed, BrainDog offers a passkey on the device you are using, such as **Use this Mac**. A passkey is how you get back in with one touch, so keep more than one, on more than one device. You can say **Not now** and add one later in Settings, under Recovery.
 
-Without a passkey, a sign-in link can be mailed to your address. It lasts fifteen minutes and works once. There are no recovery codes. Ten failed attempts lock sign-in for fifteen minutes, and waiting is the only way through.
+To sign in again, the sign-in page leads with your email: press **Email me a sign-in link**, and a link is mailed to your address. It lasts fifteen minutes and works once. **Continue with Google** signs you in with a Google address that already has a BrainDog account (a Gmail address, or a work address Google runs the mail for), and **Use a passkey** is the one-touch way. There is no password. There are no recovery codes. Ten failed attempts lock sign-in for fifteen minutes, and waiting is the only way through.
 
 ## It is made
 

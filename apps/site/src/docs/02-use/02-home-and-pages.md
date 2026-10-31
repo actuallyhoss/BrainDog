@@ -1,6 +1,6 @@
 # Today and pages
 
-Today is the page your BrainDog opens on. It answers four questions without a filter: what needs you, who is working, what is coming, and what happened while you were not looking. Every other page is built the same way, out of blocks, and you can arrange any of them.
+Today is the page your BrainDog opens on. It answers four questions without a filter: what needs you, who is working, what is coming, and what happened while you were not looking. It is a board of widgets you arrange. Every other page is built out of blocks, and you can arrange those too.
 
 ## What Today shows
 
@@ -14,6 +14,22 @@ Today keeps itself up to date. When an agent, a rule or another tab changes some
 
 A colleague who holds some of your lists and not all of BrainDog sees a Today that names their lists and opens them in one press.
 
+## Arrange Today
+
+Press **Edit Today** at the foot of Today, or press and hold a widget. A bar stands over the board while you arrange it.
+
+```steps
+Add a widget | Press Add widget, search or browse the groups, pick one and its size, then Add to Today | In the bar
+Move a widget | Drag it to its new place. From the keyboard, Enter picks it up, the arrows move it and Enter drops it | On the board
+Change its size | Small, Wide, Tall, Large or Full, from its handle or Shift and the arrows. Not every widget takes every size | On the board
+Hide a widget | Remove it, or drag it to Hidden under the board. It keeps its setup, and a press on it in Hidden puts it back | On the board
+Keep it | Press Done. Undo and Redo step through what you changed, and Cancel or Esc leaves without keeping anything | In the bar
+```
+
+On a laptop the bar has **Laptop** and **Phone**, so you can arrange the phone's board as well, which keeps its own order. **Arrange as a list** shows every widget as a row with Move up, Move down and its size, for anybody who would rather not drag. What needs you and what is late always stay on Today.
+
+**Make your own**, at the end of Add widget, draws a widget from a line such as "my food spending by week". It goes on Today as a draft for you to keep or throw away, and so does a widget an agent adds.
+
 ## Handled today
 
 When BrainDog settles something reversible by itself, such as filing a bill it was sure about, it says so on Today, under **Handled today**. Each line says what was done and why, and has an **Undo** that puts it back. The newest five show, with a count of the rest. Nothing irreversible is ever settled this way.
@@ -26,7 +42,7 @@ Pages sit in the sidebar in sections. Some pages are drawn once for each row, su
 
 ## Arrange a page
 
-Press **Edit layout** at the top of a page.
+Today is arranged with Edit Today, above. Every other page is arranged with **Edit layout**, in the page's ⋯ menu.
 
 ```steps
 Move a block | Drag it, or use Move up and Move down. On a wide page, move it between the main column and the side rail | In Edit layout
@@ -79,7 +95,7 @@ Every page is written in a small text format: Markdown, with fenced blocks for t
 
 ## Share one page
 
-**Share** on a page makes a read-only link. Anybody with it can read that page as it is now, and nothing else: they cannot change anything or open any other page. You choose how long it works, and you can close it early in Settings, under Links. The link is shown once, so copy it when it appears.
+**Share** on a page makes a read-only link. Anybody with it can read that page as it is now, and nothing else: they cannot change anything or open any other page. You choose how long it works, and whether money goes on it with **Include money**, which starts off on a project's page. Close a link early in Settings, under People & sharing. The link is shown once, so copy it when it appears. See [Sharing](/docs/use/sharing).
 
 ## Moving around
 

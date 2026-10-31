@@ -23,7 +23,7 @@ Most commands take `--host` for your BrainDog's address. Without it, the host co
 Command | What it does
 braindog setup <host> | Sign in, add the hooks and the BrainDog skill, register the MCP server, write your tools, sync your skills, and make a token for each agent it wired, in that order, one line each. --dry-run writes nothing
 braindog login <host> | Sign this machine in: six digits to approve in the app, and the token kept in the hosts file
-braindog login <host> --keychain <project> | Ask for keychain access that opens the keys of one project, or, given a star, the keys that belong to no project
+braindog login <host> --keychain things#3 | Ask for keychain access that opens the keys of one project, named by its list and number, or, given a star, the keys that belong to no project.
 braindog logout [<host>] | Remove this machine's sign-in, runner sign-in and keychain access for one host. Nothing is sent
 braindog install | Show the hooks it would add to Claude Code's settings. --apply writes them and places the BrainDog skill. --replace takes out an older tool's hooks, servers and skills
 braindog hook start | What Claude Code runs when a session starts: the briefing
@@ -40,6 +40,9 @@ braindog keys put <label> | Put a key in the Keychain. At a terminal it asks for
 braindog keys exec <label> -- <command> | Run the command with the key in one environment variable, named from the label unless --as names it. Never printed
 braindog run <label> -- <command> | The same as keys exec, under a shorter name
 braindog keys headers <label> --as <Header> | Print the key as one header for a program that reads it. Refuses a terminal
+braindog keys helper <label> | Print the key alone, for Claude Code's apiKeyHelper. Refuses a terminal
+braindog keys list | The keys your BrainDog holds, one line each, never a value
+braindog keys scan [<folder>] | Name every key lying in a folder's files and the command that seals them. Sends nothing unless --deposit
 braindog token create | Make a token for an agent and print it once. It reads unless --scope names propose or write. --days sets its life, --inbox gives it the inbox reach, and --name labels it. You approve the one mint in the app
 ```
 
@@ -53,7 +56,7 @@ braindog session next <text> | Leave the one next step
 braindog session tried <text> | Add a dead end
 braindog session note <text> | Add a line of reasoning
 braindog session end | End it. --state says idle, handoff or done, and --next leaves a last step
-braindog skills sync | Keep this machine's skills in step with a BrainDog you own: it says what it would copy and asks once, then writes your skills where Claude Code reads them, proposes a local edit and adds a skill kept by hand
+braindog skills sync | Keep this machine's skills in step with a BrainDog you own: it says what it would copy and asks once (--yes where there is no terminal), then writes your skills where Claude Code reads them, proposes a local edit and adds a skill kept by hand
 braindog skills off | Take that yes back: no session copies your skills or records your MCP servers
 braindog tools scan | Record the MCP servers in .mcp.json and ~/.claude.json. A key found there is put in the Keychain, and only its name is recorded
 braindog tools write | Show the Claude Code entries your tools become. --scope user or --scope project writes that one

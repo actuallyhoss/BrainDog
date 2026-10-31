@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 2026-10-22
+Last updated: 2026-10-31
 
 ## The short version
 
@@ -34,7 +34,8 @@ BrainDog is only offered as a hosted service at brain.dog. These terms cover tha
 
 ## Your account
 
-- You sign in with a passkey, and an emailed link is the fallback. There are no passwords.
+- You sign in with a link we email you, with Google, or with a passkey. There are no passwords.
+- Signing in with Google uses your Google account only to show us the email address is yours. It works only for an address that already has a BrainDog account, and Google's own terms cover your Google account.
 - Keep your email account and your devices secure. Anyone who gets into your email can ask for a sign-in link.
 - Some things need you to have signed in within the last 15 minutes, such as opening your saved keys, restoring a copy, deleting a record or letting a new app in.
 - You're responsible for what happens in your account. If you think someone else has used it, tell us at support@brain.dog. You can sign out every other device in Settings.

@@ -72,8 +72,8 @@
           </div>
           <div class="signin" role="img" aria-label={d.signinLabel}>
             {#each d.signin as way, i (way)}
-              <span class="way" class:not={i === 2} aria-hidden="true">
-                <span class="glyph" class:ink={i === 0}><Icon name={i === 0 ? 'key' : i === 1 ? 'mail' : 'x'} /></span>{way}
+              <span class="way" class:not={i === 3} aria-hidden="true">
+                <span class="glyph" class:ink={i === 0}><Icon name={i === 0 ? 'mail' : i === 1 ? 'globe' : i === 2 ? 'key' : 'x'} /></span>{way}
               </span>
             {/each}
           </div>
