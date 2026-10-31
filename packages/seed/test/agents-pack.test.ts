@@ -51,22 +51,23 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.28.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.29.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.28.0');
+  assert.equal(pack.manifest.version, '1.29.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
 /* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
    the add-on's page never draws a version with no notes, and its notes name what the page gained and no word a person
    should not read. */
-test('THE NEWEST CHANGE NOTE IS 1.28.0, the manifest\'s, and says how a tool runs and a key\'s kind in plain words', () => {
+test('THE NEWEST CHANGE NOTE IS 1.29.0, the manifest\'s, and says Keys opens the Keychain', () => {
   const newest = MODULE_CHANGES.agents[0]!;
-  assert.equal(newest.version, '1.28.0');
+  assert.equal(newest.version, '1.29.0');
   assert.equal(newest.version, AGENTS_PACK.manifest.version);
-  assert.match(newest.notes, /Runs on your machine/);
-  assert.match(newest.notes, /API token/);
+  assert.match(newest.notes, /Keychain/);
+  assert.match(MODULE_CHANGES.agents[1]!.notes, /Runs on your machine/);
+  assert.match(MODULE_CHANGES.agents[1]!.notes, /API token/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
   assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
 });
@@ -195,7 +196,7 @@ test('THE 1.14.0 NOTE names what the page opens on and the tiles it gained', () 
    1.13.0's as they were written too. */
 test('THE 1.10.0 TO 1.13.0 NOTES ARE AS THEY WERE WRITTEN, with 1.14.0 beside them and not in their place', () => {
   const versions = MODULE_CHANGES.agents.map((c) => c.version);
-  assert.deepEqual(versions.slice(0, 20), ['1.28.0', '1.27.0', '1.26.0', '1.25.0', '1.24.0', '1.23.0', '1.22.0', '1.21.0', '1.20.0', '1.19.0', '1.18.0', '1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
+  assert.deepEqual(versions.slice(0, 21), ['1.29.0', '1.28.0', '1.27.0', '1.26.0', '1.25.0', '1.24.0', '1.23.0', '1.22.0', '1.21.0', '1.20.0', '1.19.0', '1.18.0', '1.17.0', '1.16.0', '1.15.0', '1.14.0', '1.13.0', '1.12.0', '1.11.0', '1.10.0', '1.9.0']);
   assert.equal(new Set(versions).size, versions.length, 'a version is noted twice');
   assert.equal(
     MODULE_CHANGES.agents[15]!.notes,
@@ -254,7 +255,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.28.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.29.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -1161,7 +1162,7 @@ test('NOTHING IS FOLDED SINCE 1.17.0, and the foot is one line of doors, How the
   assert.deepEqual([foot.kind, foot.key, foot.when], ['note', 'brain-link', undefined]);
   assert.deepEqual(
     [...String(foot.body).matchAll(/\]\(([^)]+)\)/gu)].map((m) => m[1]),
-    ['/p/brain', '/r/learnings', '/r/skills', '/r/tools', '/r/credentials'],
+    ['/p/brain', '/r/learnings', '/r/skills', '/r/tools', '/keychain'],
   );
   /* AFTER IT ONLY THE KEY AND TOOL LINES, each drawn only while its figure is above nought. */
   for (const b of blocks.slice(runs + 3)) assert.deepEqual([b.kind, typeof b.when], ['note', 'object'], 'something but a warning line follows the foot');
