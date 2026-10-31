@@ -108,10 +108,11 @@ export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Lab
  * the list that plays `meets`. Both builders load only when asked, so a screen that never arranges Today loads neither.
  */
 export async function weekHeld(shell: Pick<Shell, 'lists'>): Promise<Week | undefined> {
-  const [{ weekOf }, { playedBy }] = await Promise.all([import('../home/default-home.ts'), import('../start/parts.ts')]);
+  const [{ weekOf, STARTER_PACK }, { playedBy }] = await Promise.all([import('../home/default-home.ts'), import('../start/parts.ts')]);
   return weekOf(
     shell.lists.flatMap((l) => (REGISTERS[l.id] ? [REGISTERS[l.id]!] : [])),
     playedBy('meets'),
+    new Set(shell.lists.flatMap((l) => (l.pack?.startsWith(STARTER_PACK) ? [l.id] : []))),
   );
 }
 

@@ -214,10 +214,11 @@ const PORTFOLIO_ID = 'portfolio';
  * tomorrow" then had nowhere to go but Organisations. A record no use case speaks for is given Work's tasks, as a starter
  * is given its own lists, so a line with a day becomes a task due that day. It costs nothing on the rail: Work is a place
  * only once it holds a task (`workOf` in `lib/nav.ts`), and the first-run's places leave it out until then
- * (`railPlaces`). A use case brings its own lists for the day's things and is left as it is.
+ * (`railPlaces`). A use case brings its own lists for the day's things and is left as it is, and words that turned
+ * nothing on at all stay nothing, so the first run still asks what they are closest to.
  */
 function withFirstList(modules: readonly PackId[], u: UseCase | null): PackId[] {
-  return u !== null || modules.includes(TO_DO) ? [...modules] : [...modules, TO_DO];
+  return u !== null || modules.length === 0 || modules.includes(TO_DO) ? [...modules] : [...modules, TO_DO];
 }
 
 /**

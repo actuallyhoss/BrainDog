@@ -48,7 +48,7 @@ test('A SENTENCE THESE RULES CANNOT READ IS KEPT, NEVER REFUSED: nothing heard, 
     assert.equal(p.currency, null, sentence);
   }
   /* A NAME IS STILL HEARD, and People with it, so the words have somewhere to be kept. */
-  assert.deepEqual(said('Élodie, je suis étudiante').modules, ['people']);
+  assert.deepEqual(said('Élodie, je suis étudiante').modules, ['people', 'work'], 'and Work, so its first thing to do has a list (AM2)');
 });
 
 test('THE CURRENCY IS ONE THAT WAS TYPED, or none', () => {

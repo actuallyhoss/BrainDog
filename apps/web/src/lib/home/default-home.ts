@@ -227,7 +227,7 @@ export type Week = {
 
 const live = (f: FieldDecl): boolean => f.retired !== true;
 /** How a starter's own pack is named (`usecase-student`), whose lists are the person's from the first minute. */
-const STARTER_PACK = 'usecase-';
+export const STARTER_PACK = 'usecase-';
 /** A field whose id or label says `re`. */
 const saysOf = (f: FieldDecl, re: RegExp): boolean => re.test(f.id) || re.test(f.label ?? '');
 
@@ -237,7 +237,7 @@ const saysOf = (f: FieldDecl, re: RegExp): boolean => re.test(f.id) || re.test(f
  * on a day (a `deadline` day), and are done once they are (`done`), and that does not owe a required amount (a bill
  * owes one, and Late already says a bill). The tasks are Today's own blocks and are never it.
  */
-export function weekOf(decls: readonly WeekDecl[], people: string | null): Week | undefined {
+export function weekOf(decls: readonly WeekDecl[], people: string | null, starter: ReadonlySet<string> = new Set()): Week | undefined {
   /* A LIST THAT FALLS DUE AND IS DONE ONCE IT IS, owing no amount (a bill owes one, and Late already says a bill), and
      never the tasks, which are Today's own blocks. */
   const falls = (d: WeekDecl): boolean =>
@@ -250,7 +250,8 @@ export function weekOf(decls: readonly WeekDecl[], people: string | null): Week 
   /* SOMEBODY'S FIRST (a shop's orders); ELSE THE READER'S OWN, ONE A STARTER GAVE (audit 31 Oct m, AM5): a student's
      essay due Thursday was on Studies and nowhere on Today, since an assignment is nobody else's. Only a starter's own
      list: Work's threads and a service that renews fall due too, and neither is the week a person opens Today on. */
-  const starters = (d: WeekDecl): boolean => d.pack?.startsWith(STARTER_PACK) === true;
+  /* BY THE PACK THE DECLARATION NAMES, or the one `boot` names for the list (`starter`), which a learnt one may not carry. */
+  const starters = (d: WeekDecl): boolean => d.pack?.startsWith(STARTER_PACK) === true || starter.has(d.id);
   const due = decls.find((d) => falls(d) && theirs(d)) ?? decls.find((d) => falls(d) && starters(d));
   if (!due) return undefined;
   const day = due.fields.find((f) => live(f) && f.type === 'day' && f.deadline)!;
