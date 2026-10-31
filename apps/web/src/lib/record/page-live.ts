@@ -1564,6 +1564,14 @@ function wordsFor(columns: readonly { field: string }[], cells: (string | null)[
   return said === null ? cells : cells.map((c, i) => (columns[i]?.field === field ? said : c));
 }
 
+/**
+ * THE WAY A FIGURE'S MONEY GOES, BY THE FIGURE, for a cell that carries no `sign` of its own (RN7). A Today arranged
+ * before the cells were signed is kept on the record's `home` page with cells that never had one, and Money's own
+ * pages from before its widgets did, so Coming in and Going out read as two figures of the same kind there. These two
+ * are what they are wherever they are drawn; a cell that says its own way keeps it.
+ */
+const WAY_OF: Readonly<Record<string, 'in' | 'out'>> = { 'arriving-30d': 'in', 'leaving-30d': 'out' };
+
 /** The names a note's refs were sent with, by the row's handle (`tasks#3`), or `null` for none or for a shape that is not one. */
 export function refNamesOf(v: unknown): ReadonlyMap<string, string> | null {
   if (!isObject(v)) return null;
@@ -1850,7 +1858,7 @@ export function blockOf(
           const kept = (m.trend ?? []).filter((v) => v !== null).length;
           /* THE WAY ITS MONEY GOES, BY ITS OWN FIGURE AND NEVER ITS PLACE (audit 31 Oct m, AM1): Today's Cash ahead signed
              its second tile "+", and with no account Cash now drew nothing, so the rent going out read "+EGP 12,000". */
-          const way = b.cells?.find((c) => c.metric === cell.metric)?.sign;
+          const way = b.cells?.find((c) => c.metric === cell.metric)?.sign ?? WAY_OF[cell.metric];
           const signed: typeof m = way === 'in' || way === 'out' ? { ...m, sign: way } : m;
           return asked && kept < 3 && m.value !== MISSING ? { ...signed, waits: true as const } : signed;
         }),
