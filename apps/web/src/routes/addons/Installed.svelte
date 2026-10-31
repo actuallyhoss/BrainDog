@@ -45,6 +45,7 @@
   import { handsOf, holderFirst, inOrder, marked, orderWords } from '$lib/market/update-order.ts';
   import { words as market } from '$lib/market/words.ts';
   import { CORE_PACK, isCore, speakingPack } from '@braindog/declare';
+  import { speakingPackNow } from '$lib/voice.svelte.ts';
   import { baseTurnedOn } from '$lib/market/shelves.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -584,7 +585,12 @@
     return named !== undefined && isGlyph(named) ? named : null;
   };
   /* THE STARTER THIS RECORD RUNS ON is one tile, never an add-on row, and BrainDog's own parts are one folded line. */
-  const starterId = $derived(speakingPack(installed));
+  /* THE ONE THE RECORD SPEAKS IN, as the shell heard it with each pack's `speaks` setting (audit 31 Oct h, AH16): read by
+     id alone, a shop with Small business beside it was told its starter was Small business, which sorts first. */
+  const starterId = $derived.by(() => {
+    const now = speakingPackNow();
+    return now !== null && installed.some((s) => s.id === now && s.disabled_at === null) ? now : speakingPack(installed);
+  });
   const starter = $derived(starterId === null ? null : (listed.find((l) => l.installedId === starterId) ?? null));
   const coreHeld = $derived(installed.filter((s) => isCore(s.id)));
   /* THE PAGES BRAINDOG KEEPS FOR EVERY RECORD (`core`) ARE NO ADD-ON'S: not a row, and not named in the folded line. */
