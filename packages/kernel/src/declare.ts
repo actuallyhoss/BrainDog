@@ -934,8 +934,11 @@ function figureListsFault(id: string, body: { source?: unknown; value?: unknown;
  * A NEW KIND IS NOT WRITTEN INTO THE ARRAY: it is a module in the kernel's kind registry (`kinds/index.ts`), and every
  * name that registry holds is admitted here as it loads. The array is the kinds `pages.ts` reads itself, and it stays
  * as it is so nothing that already installs moves. A name in both is one kind.
+ *
+ * EXPORTED FOR THE RECORD'S SHARED-LINK TEST, which walks every kind a link may draw and asks that none sends an amount
+ * on a link with money off (`packages/record/test/shared-page.test.ts`), so a kind added later is asked too.
  */
-const BLOCK_KINDS: readonly string[] = [
+export const BLOCK_KINDS: readonly string[] = [
   ...new Set([
     'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
     'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',

@@ -575,7 +575,7 @@ export type { Tried, TriedStep, TryOptions, TrySample } from './flow-try.ts';
    and the runner read (`capabilities.ts`). */
 export { CAPABILITIES, capability, notInThisBuild, serves, type Capability, type Hosts } from './capabilities.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
-export { digest, indexesFor, indexName, registerOfIndex, validate as validateDeclaration, KINDS, REMOVED_WINDOW_DAYS } from './declare.ts';
+export { digest, indexesFor, indexName, registerOfIndex, validate as validateDeclaration, BLOCK_KINDS, KINDS, REMOVED_WINDOW_DAYS } from './declare.ts';
 export { jcs } from './jcs.ts';
 export { ftsQuery, projectedText } from './fts.ts';
 export { TRAVELS, decode, encode, projection, tables } from './brainl.ts';
@@ -13671,5 +13671,5 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 export { kpisSource, type KpiAnswer, type KpiEvery, type KpiPoint } from './sources/kpis.ts';
 export { KPIS_FOR, kpisFault, type KpisFor } from './block-keys.ts';
 export { KPI_BIG_CHANGE, KPI_CHART_POINTS, KPI_KINDS, KPI_LATE_PERIODS, KPI_SOURCES, KPI_STALE_DAYS, KPI_TODAY_MOST, KPI_TODAY_PHONE, KPI_TREND_POINTS } from './kpi-rank.ts';
-export { kpiChart, kpiFix, kpiHeadline, kpiIsMoney, kpiKind, kpiLive, kpiRanked, kpiScore, kpiStale, kpiVerdict, kpisForToday } from './kpi-rank.ts';
+export { isMoneyUnit, kpiChart, kpiFix, kpiHeadline, kpiIsMoney, kpiKind, kpiLive, kpiRanked, kpiScore, kpiStale, kpiVerdict, kpisForToday } from './kpi-rank.ts';
 export type { KpiCandidate, KpiChart, KpiChartKind, KpiFix, KpiGood, KpiKind, KpiMoney, KpiNow, KpiPick, KpiRow, KpiSource, KpiStale, KpiState, KpiTargetMark, KpiToday, KpiVerdict, KpiWhy } from './kpi-rank.ts';

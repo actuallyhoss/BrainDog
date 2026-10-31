@@ -35,7 +35,7 @@
  * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
 
-import { NOBODY, instant, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
+import { NOBODY, instant, isMoneyFormat, isMoneyUnit, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { TYPED, dateSaid, formatTyped, kindSpec, splitRow, writeAmount, type TypedForm } from 'braindog-render';
 import { ok } from '@braindog/ports';
@@ -574,6 +574,8 @@ type Showing = {
   reads: (b: BlockResult) => readonly string[];
   /** Whether the link shows money: false keeps every amount, money figure and money list off it (`moneyFree`). */
   money: boolean;
+  /** Whether a figure, by its id and any parameter after its first colon, is money (`figureIsMoney`). */
+  moneyFigure: (metric: string) => boolean;
 };
 
 /**
@@ -583,24 +585,94 @@ type Showing = {
  */
 const moneyList = (decl: RegisterDecl | undefined): boolean => decl !== undefined && decl.fields.some((f) => f.type === 'money' && f.required === true && f.retired !== true);
 
-/** Whether anything in a value is an amount: money as minor units and a currency, at any depth. */
+/** Whether a unit is a currency's code, which a reading, a measure or a chart in money is said in. */
+const currencyUnit = (unit: unknown): boolean => typeof unit === 'string' && (/^[A-Z]{3}$/u.test(unit) || isMoneyUnit(unit));
+
+/**
+ * Whether anything in a value is an amount, at any depth: money as minor units and a currency, or numbers said in a
+ * currency's unit (RF1). A chart by month (`bars`), a measure and a reading each hold their money as bare numbers with
+ * the code beside them in `unit`, and went out whole when only the first shape was asked about.
+ */
 const holdsMoney = (x: unknown, depth = 0): boolean => {
   if (depth > 6 || x === null || typeof x !== 'object') return false;
   if (moneyShown(x) !== undefined) return true;
+  if (!Array.isArray(x) && currencyUnit((x as { unit?: unknown }).unit)) return true;
   return (Array.isArray(x) ? x : Object.values(x)).some((v) => holdsMoney(v, depth + 1));
 };
 
 /** A figure read in a currency, or one whose parts are amounts. */
 const moneyReading = (reading: unknown): boolean =>
-  isRecord(reading) && ((typeof reading.unit === 'string' && /^[A-Z]{3}$/u.test(reading.unit)) || holdsMoney(reading.parts) || holdsMoney(reading.groups) || holdsMoney(reading.noRate));
+  isRecord(reading) && (currencyUnit(reading.unit) || holdsMoney(reading.parts) || holdsMoney(reading.groups) || holdsMoney(reading.noRate));
+
+/** Every word a figure's `value:` names, at any depth: the fields it adds up and the figures it adds. */
+const wordsOf = (x: unknown, depth = 0): string[] =>
+  depth > 6 ? [] : typeof x === 'string' ? [x] : Array.isArray(x) ? x.flatMap((v) => wordsOf(v, depth + 1)) : isRecord(x) ? Object.values(x).flatMap((v) => wordsOf(v, depth + 1)) : [];
+
+/**
+ * WHETHER A FIGURE IS MONEY, which a link with money off keeps off whatever unit it is read in (RF5). The tick says
+ * "Amounts, bills and money figures", and a money figure is: one written as money (`format: money`), one over the cash
+ * walk ahead (how many days the money lasts, the day it runs out, the bill it runs out on), one over a list that is money
+ * (`moneyList`: how many bills are late), one that adds up an amount of a list it reads (`sum: amount`), and one that adds
+ * figures one of which is money (`sum_of`). How many tasks are open, or the hours worked, is not.
+ *
+ * BY ITS ID: a figure's parameter, after its first colon, is cut off, as everywhere a figure is named.
+ */
+const figureIsMoney = (kernel: RecordDeps['kernel'], lists: ReadonlyMap<string, RegisterDecl>): ((metric: string) => boolean) => {
+  const known = new Map<string, boolean>();
+  const money = (said: string, depth: number): boolean => {
+    const at = said.indexOf(':');
+    const id = (at < 0 ? said : said.slice(0, at)).trim();
+    const held = known.get(id);
+    if (held !== undefined) return held;
+    /* A FIGURE THAT ADDS ITSELF is asked once: the answer while it is being asked is no. */
+    known.set(id, false);
+    const decl = id === '' ? null : kernel.metricDecl(id);
+    let is = false;
+    if (decl) {
+      const read = kernel.figureLists(decl);
+      const named = new Set(wordsOf(decl.value));
+      const value: unknown = decl.value;
+      const added = isRecord(value) && Array.isArray(value.sum_of) ? (value.sum_of as unknown[]).map((p) => (isRecord(p) ? p.metric : undefined)) : [];
+      is =
+        isMoneyFormat(decl.format) ||
+        decl.source === 'forecast.runway' ||
+        read.some((l) => moneyList(lists.get(l)) || lists.get(l)?.fields.some((f) => f.type === 'money' && named.has(f.id)) === true) ||
+        (depth < 4 && added.some((p) => typeof p === 'string' && money(p, depth + 1)));
+    }
+    known.set(id, is);
+    return is;
+  };
+  return (metric) => money(metric, 0);
+};
+
+/**
+ * Whether one `{{…}}` reads a money figure on a link that keeps money off (RF5): a path, or a typed form naming one,
+ * any word of which is a money figure (`{{runway-days}}`, `{{runway-days.on}}`, `{{money.owed}}`), or whose first word
+ * is a list that is money (`{{bills.late}}`). What it holds is said as nothing, whatever it is: a number of days, a day,
+ * a bill's name.
+ */
+const moneyPath = (showing: Showing) => (key: string): boolean => {
+  const colon = key.indexOf(':');
+  const form = colon > 0 ? key.slice(0, colon).trim() : '';
+  const path = (TYPED as readonly string[]).includes(form) ? key.slice(colon + 1).trim() : key.trim();
+  if (!/^[A-Za-z]/u.test(path)) return false;
+  const at = path.indexOf(':');
+  const words = (at < 0 ? path : path.slice(0, at)).split('.');
+  return words.some((w) => w !== '' && showing.moneyFigure(w)) || moneyList(showing.lists.get(words[0]!));
+};
 
 /**
  * A block with money kept off it, or `null` for a block that is money through and through: a cash walk, a block whose
- * rows are a list that is money (`moneyList`), or the runway. Otherwise a column of an amount goes (and its cells with it, since a
- * row keeps only what its columns draw), a figure read in a currency goes, and a computed key that holds an amount goes.
+ * rows are a list that is money (`moneyList`), the runway, or a bar of a money figure's parts. Otherwise a column of an
+ * amount goes (and its cells with it, since a row keeps only what its columns draw), a money figure goes (`figureIsMoney`),
+ * a measure in a currency goes, a chart in money goes, a computed key that holds an amount goes, and with any of them
+ * the block's own target. Each is checked by its unit as well as its shape, since a chart and a measure hold money
+ * as bare numbers with the code beside them (RF1).
  */
 const moneyFree = (b: BlockResult, showing: Showing): BlockResult | null => {
   if (b.walk !== undefined || b.walks !== undefined || b.source === 'forecast.runway') return null;
+  /* A BAR OR A SPLIT OF A MONEY FIGURE'S PARTS is that figure and nothing else. */
+  if (typeof b.source === 'string' && b.source.startsWith('metric.') && showing.moneyFigure(b.source.slice('metric.'.length))) return null;
   const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
   /* THE LISTS ITS ROWS COME FROM, not every list its figures count: "Open 7" over the work stays beside "Still to come
      in", which goes as a figure in a currency. */
@@ -609,13 +681,79 @@ const moneyFree = (b: BlockResult, showing: Showing): BlockResult | null => {
   const typeOf = (field: string): FieldType | undefined => (list === undefined ? undefined : showing.lists.get(list)?.fields.find((f) => f.id === field)?.type);
   const block = b as unknown as Record<string, unknown>;
   const kept: Record<string, unknown> = { ...block };
-  if (b.columns !== undefined) kept.columns = b.columns.filter((c) => c.sign === undefined && typeOf(c.field) !== 'money');
-  if (b.readings !== undefined) kept.readings = b.readings.filter((r) => !moneyReading(r.reading));
-  for (const key of FIGURES) if (holdsMoney(block[key])) delete kept[key];
+  /* WHETHER ANYTHING WENT FOR BEING MONEY, which says the block's own `target:` is a sum of money too (RF1): a gauge or a
+     progress block over an amount carried its target as a bare number. */
+  let held = false;
+  const figured = (id: unknown): boolean => typeof id === 'string' && showing.moneyFigure(id);
+  /* A COLUMN OF AN AMOUNT, and a card's trend over a money figure, whose numbers by week went out as `trends`. */
+  const unitOf = (field: string): unknown => (list === undefined ? undefined : (showing.lists.get(list)?.fields.find((f) => f.id === field) as { unit?: unknown } | undefined)?.unit);
+  const moneyColumn = (c: NonNullable<BlockResult['columns']>[number]): boolean =>
+    c.sign !== undefined || typeOf(c.field) === 'money' || currencyUnit(unitOf(c.field)) || figured(c.metric);
+  if (b.columns !== undefined) {
+    kept.columns = b.columns.filter((c) => !moneyColumn(c));
+    if (b.columns.some((c) => c.metric !== undefined && figured(c.metric))) {
+      delete kept.trends;
+      held = true;
+    }
+    held ||= (kept.columns as unknown[]).length < b.columns.length;
+  }
+  if (b.readings !== undefined) {
+    kept.readings = b.readings.filter((r) => !moneyReading(r.reading) && !figured(r.metric));
+    held ||= (kept.readings as unknown[]).length < b.readings.length;
+  }
+  /* A MEASURE IN A CURRENCY, one of a project's readings: what it reported it earned, by day. AND EVERY MEASURE OF A
+     BLOCK WHOSE VALUE IS AN AMOUNT: a stat over a list with a day and a money field reads each row as a reading (its
+     second column is the value, as `measures.ts` reads them), and its numbers went out as minor units with no unit. */
+  const valued = typeOf(b.columns?.[1]?.field ?? '') === 'money';
+  for (const key of ['measures', 'latest'] as const) {
+    const each = block[key];
+    if (!Array.isArray(each)) continue;
+    kept[key] = valued ? [] : each.filter((m) => !(isRecord(m) && currencyUnit(m.unit)));
+    held ||= (kept[key] as unknown[]).length < each.length;
+  }
+  /* A CHART BY MONTH IN MONEY, by its unit or by the figures its lines are. */
+  const lines = Array.isArray(block.series) ? (block.series as unknown[]) : [];
+  if (block.bars !== undefined && (holdsMoney(block.bars) || lines.some((l) => isRecord(l) && (figured(l.metric) || figured(l.then))))) {
+    delete kept.bars;
+    held = true;
+  }
+  /* A PROGRESS BLOCK SET AGAINST A MONEY FIGURE is money whatever its rows are. */
+  if (figured(block.spent) || figured(block.toward)) held = true;
+  for (const key of FIGURES)
+    if (holdsMoney(kept[key])) {
+      delete kept[key];
+      held = true;
+    }
+  /* A WALK'S OWN FIGURES, which only a cash walk answers and every one of which is about money: what it held the
+     ninety days before, what may be sold, how late money comes in, and that figure's name. */
+  for (const key of ['past', 'sells', 'lateness', 'late_name'] as const) delete kept[key];
+  if (held) delete kept.target;
   /* AND HOW ITS MONEY WAS CONVERTED, which is about amounts and nothing else. */
   delete kept.fx;
   delete kept.walkFx;
   return kept as unknown as BlockResult;
+};
+
+/** The field types a number is held in, which a row's currency code beside it makes an amount. */
+const NUMBERS: ReadonlySet<string> = new Set(['int', 'number', 'decimal']);
+
+/** Whether a cell's value is a currency's code, written as one: three capitals a currency has. */
+const codeCell = (c: SharedCell): boolean => (c.type === 'text' || c.type === 'enum') && typeof c.value === 'string' && /^[A-Z]{3}$/u.test(c.value) && isMoneyUnit(c.value);
+
+/**
+ * A ROW WITH MONEY KEPT OFF IT WHERE A NUMBER IS SAID IN A CURRENCY BESIDE IT (RF1): a project's reading written as
+ * `value 54321.97, unit GBP` is an amount though neither field is money, as the record reads it into a measure in pounds.
+ * Its numbers go, and the code with them, which says nothing without them. A row with no currency code keeps every cell.
+ */
+const unitless = (row: ReturnType<typeof rowShown>): ReturnType<typeof rowShown> => {
+  const cells = Object.entries(row.cells);
+  if (!cells.some(([, c]) => codeCell(c))) return row;
+  const gone = new Set(cells.filter(([, c]) => codeCell(c) || NUMBERS.has(c.type)).map(([id]) => id));
+  return {
+    ...row,
+    fields: Object.fromEntries(Object.entries(row.fields).filter(([id]) => !gone.has(id))),
+    cells: Object.fromEntries(cells.filter(([id]) => !gone.has(id))),
+  };
 };
 
 /** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
@@ -660,12 +798,19 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
   const block = b as unknown as Record<string, unknown>;
   const kept: Record<string, unknown> = {};
   for (const key of LOOKS) if (block[key] !== undefined) kept[key] = block[key];
-  const values: Record<string, Json> = isRecord(block.values) ? (block.values as Record<string, Json>) : {};
+  const written: Record<string, Json> = isRecord(block.values) ? (block.values as Record<string, Json>) : {};
+  /* A MONEY FIGURE'S `{{path}}` IS FILLED WITH NOTHING on a link that keeps money off (RF5), so the sentence that said
+     how many days the money lasts goes whole, as the one that said an amount does. */
+  const inMoney = showing.money ? undefined : moneyPath(showing);
+  const values = inMoney === undefined ? written : Object.fromEntries(Object.entries(written).filter(([key]) => !inMoney(key)));
   const fill = tokenSaid(values, said, typed);
-  const amount = showing.money ? undefined : amountKey(values);
+  const amount = inMoney === undefined ? undefined : (key: string): boolean => amountKey(written)(key) || inMoney(key);
   for (const key of WORDS) if (typeof kept[key] === 'string') kept[key] = key === 'body' ? noteShown(kept[key], fill, tokenSaid(values, said, cell), amount) : filledIn(wordsShown(kept[key]), fill);
   if (kept.body === '') delete kept.body;
 
+  /* `figures`, WHAT EACH FIGURE THE BLOCK NAMES IS AS DECLARED (`pages.ts` `figuresOf`), IS NEVER SENT: its `where` and
+     `source` name lists and fields, and its `target` is a number in the figure's own money. A shared block says each
+     figure's name on its reading, below, and nothing else of its declaration. */
   for (const key of FIGURES) if (block[key] !== undefined) kept[key] = block[key];
   /* A ROW'S PROJECT AND A CARD'S NEXT STEP ARE TITLES OF ROWS OF OTHER LISTS, sent only where a column draws them (SEC2).
      `scopes` is computed for a block that inherits by its project as well as for one that draws it, and fell back to a
@@ -685,7 +830,9 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
 
   const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
   const declared = list === undefined ? undefined : lists.get(list);
-  const columns = (b.columns ?? []).map((c) => {
+  /* A COLUMN THAT DRAWS A FIGURE AND NO FIELD (a card's `{ metric, as: trend }`) SAYS NOTHING ON A ROW a link sends, and
+     naming it by its field threw on the field it does not have, so a page whose cards drew a trend could not be shared. */
+  const columns = (b.columns ?? []).filter((c) => typeof c.field === 'string' && c.field !== '').map((c) => {
     const owned = typeof c.label === 'string' && c.label.trim() !== '' ? c.label : undefined;
     const shown: ColumnShown = { field: c.field, label: owned ?? declared?.fields.find((f) => f.id === c.field)?.label ?? idSaid(c.field) };
     if (c.as !== undefined) shown.as = c.as;
@@ -695,7 +842,10 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
   if (columns.length > 0) kept.columns = columns;
   const drawn = (register: string): string[] =>
     columns.length > 0 ? columns.flatMap((c) => (c.sign === undefined ? [c.field] : [c.field, c.sign.field])) : [lists.get(register)?.title ?? ''];
-  kept.rows = b.rows.map((row) => rowShown(row, drawn(row.register), lists));
+  kept.rows = b.rows.map((row) => {
+    const shown = rowShown(row, drawn(row.register), lists);
+    return showing.money ? shown : unitless(shown);
+  });
 
   /* EVERY FIGURE SAYS ITS NAME: the cell's label, else the figure's own, so a stranger never reads a metric's id. */
   if (b.readings !== undefined)
@@ -752,7 +902,16 @@ const moneyKept = (money: boolean, said: Showing['said']): Showing['said'] =>
 const typedKept = (money: boolean, typed: Showing['typed']): Showing['typed'] => (money ? typed : (form, arg) => (form === 'money' ? undefined : typed(form, arg)));
 
 /** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
-type ReadIn = { language: unknown; zone: unknown; home: string | null; now: number; figure: Showing['figure']; reads: Showing['reads']; money: boolean };
+type ReadIn = {
+  language: unknown;
+  zone: unknown;
+  home: string | null;
+  now: number;
+  figure: Showing['figure'];
+  reads: Showing['reads'];
+  money: boolean;
+  moneyFigure: Showing['moneyFigure'];
+};
 
 /**
  * The page as a link shows it: its title, when it was read, its layout, when the link closes, the language and zone it
@@ -767,6 +926,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
     figure: where.figure,
     reads: where.reads,
     money: where.money,
+    moneyFigure: where.moneyFigure,
     said: moneyKept(where.money, saidIn(language, where.home)),
     typed: typedKept(where.money, typedIn(where.now, zone, where.home)),
     cell: typedKept(where.money, typedIn(where.now, zone, where.home, true)),
@@ -1089,7 +1249,9 @@ export function methods(deps: RecordDeps) {
       const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
       const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
       const reads = (b: BlockResult): readonly string[] => kernel.blockRegisters(b as unknown as Parameters<typeof kernel.blockRegisters>[0]);
-      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money: moneyOf(opened.bound) }));
+      const lists = kernel.registers();
+      const moneyFigure = figureIsMoney(kernel, lists);
+      return ok(shownPage(out.value, opened.expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money: moneyOf(opened.bound), moneyFigure }));
     },
   };
 }
