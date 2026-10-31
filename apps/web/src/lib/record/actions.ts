@@ -528,13 +528,18 @@ const isGlobal = (scope: string | null): boolean => scope === null || scope === 
  * NO BAR FOR A WEEK THAT HAS NOT STARTED. `through` is today; a week after it drew as zero runs, which
  * reads as nothing having run rather than nothing having happened yet.
  */
-export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[], month: string, through?: string): UsageView['weeks'] {
+export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[], month: string, through?: string, made?: string | null): UsageView['weeks'] {
   const [y, m] = month.split('-').map(Number);
   const end = new Date(Date.UTC(y ?? 1970, m ?? 1, 0)).getUTCDate();
   const last = through?.slice(0, 7) === month ? Math.min(end, Number(through.slice(8, 10))) : end;
+  /* NO WEEK BEFORE THE BRAINDOG WAS MADE (AH30): one made on the 31st charted "1 Oct to 7 Oct" and three more empty weeks.
+     The first bar starts on the day it was made. */
+  const born = made?.slice(0, 7) === month ? Number(made.slice(8, 10)) : 1;
   const out: UsageView['weeks'] = [];
-  for (let start = 1; start <= last; start += 7) {
-    const stop = Math.min(start + 6, end);
+  for (let first = 1; first <= last; first += 7) {
+    const stop = Math.min(first + 6, end);
+    if (stop < born) continue;
+    const start = Math.max(first, born);
     const runs = days
       .filter((d) => d.day.slice(0, 7) === month && Number(d.day.slice(8, 10)) >= start && Number(d.day.slice(8, 10)) <= stop)
       .reduce((n, d) => n + d.runs, 0);
@@ -862,7 +867,7 @@ export function usageFromLedger(said: AccountUsage, month: string, through?: str
     projects: sortNamed([...projects.values()]),
     actions: sortNamed(actions),
     groups: groupsOf(scoped),
-    weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
+    weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through, madeDay(said.records)),
     days: daysOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records,
     since: sinceOf(said.records),
@@ -872,6 +877,13 @@ export function usageFromLedger(said: AccountUsage, month: string, through?: str
 /** The month the earliest of these records was made, or `null` where none says. */
 function sinceOf(records: AccountUsage['records']): string | null {
   const made = records.map((r) => (typeof r.since === 'string' && /^\d{4}-\d{2}/u.test(r.since) ? r.since.slice(0, 7) : null));
+  if (made.length === 0 || made.some((m) => m === null)) return null;
+  return (made as string[]).reduce((a, b) => (b < a ? b : a));
+}
+
+/** The day the earliest of these records was made, `YYYY-MM-DD`, or `null` where none says it whole. */
+function madeDay(records: AccountUsage['records']): string | null {
+  const made = records.map((r) => (typeof r.since === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(r.since) ? r.since.slice(0, 10) : null));
   if (made.length === 0 || made.some((m) => m === null)) return null;
   return (made as string[]).reduce((a, b) => (b < a ? b : a));
 }
