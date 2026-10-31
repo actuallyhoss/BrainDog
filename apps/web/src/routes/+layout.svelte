@@ -10,6 +10,8 @@
 -->
 <script lang="ts">
   import { applyInset } from '$lib/shell.ts';
+  /* The page's name on a real move only; Kit's own announcer also spoke after a write's invalidate (AI1). */
+  import RouteSay from '$lib/shell/RouteSay.svelte';
   /* Title-bar room for the Mac app: sets --shell-inset once, 0 in a browser. Here, so sign-in in the Mac app has it too. */
   applyInset();
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
@@ -38,3 +40,4 @@
 {:else if data.light}
   <data.light {children} />
 {/if}
+<RouteSay />
