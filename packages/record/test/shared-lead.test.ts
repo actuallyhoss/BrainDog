@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import type { RegisterDecl } from '@braindog/kernel';
 
-import { addressOnly, leadShown, pluralsSettled, voiced } from '../src/methods/shares.ts';
+import { addressOnly, badSaid, leadShown, pluralsSettled, voiced } from '../src/methods/shares.ts';
 
 const said = (values: Record<string, string>) => (key: string): string | undefined => values[key];
 
@@ -56,4 +56,11 @@ test('a linked row named by an address or a phone number is not named on a link 
   assert.equal(addressOnly('Mia Lund'), false);
   assert.equal(addressOnly('2026-10-31'), false);
   assert.equal(addressOnly('Run 100 km'), false);
+});
+
+test('a word in the danger colour is said as its words on a link (AN3)', () => {
+  assert.equal(leadShown(badSaid('Bills {{bad:late}}: {{overdue}} to pay.'), said({ overdue: '£10,540' })), 'Bills late: £10,540 to pay.');
+  assert.equal(badSaid('{{bad:{{tasks.late}} late}} and more'), '{{tasks.late}} late and more');
+  assert.equal(badSaid('{{ bad : late {estimate}}}'), 'late {estimate}');
+  assert.equal(badSaid('{{bad:overdue'), '{{bad:overdue');
 });

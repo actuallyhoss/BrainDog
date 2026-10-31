@@ -44,6 +44,9 @@ const count = (n: number): string => n.toLocaleString('en');
  * `nameWords` is: each is a piece of a sentence this file or its page builds, and none is read anywhere else.
  */
 export const historyWords = {
+  /* AFTER THE PAGE A LINK SHARES, and in its place when the line names none (AN21). */
+  withLink: ' with a link',
+  aLink: ' a link',
   /* THE ONE LIST TODAY'S COUNT OPENED THE LOG ON (`?list=`), said in the toolbar so the narrowing is never silent. */
   onlyList: (name: string) => `Only ${name}`,
   everyList: (name: string) => `Show everything, not only ${name}`,

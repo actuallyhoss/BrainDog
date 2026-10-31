@@ -128,6 +128,8 @@ export type LogRead =
 /** Where a line points, in the sample's spelling: `obligations#3`, `suggestion:SG1`, or what the record wrote. */
 function targetOf(e: EventLine): string | undefined {
   if (e.register !== null && e.seq !== null) return `${e.register}#${e.seq}`;
+  /* A LINK IS SAID BY THE PAGE IT SHARES (AN21), held on the line as its field: "Shared Money with a link". */
+  if ((e.kind === 'share.open' || e.kind === 'share.close') && typeof e.field === 'string' && /^[a-z0-9_-]+$/u.test(e.field)) return `page.${e.field}`;
   if (e.target === null) return undefined;
   return e.target_kind === 'suggestion' && !e.target.includes(':') ? `suggestion:${e.target}` : e.target;
 }

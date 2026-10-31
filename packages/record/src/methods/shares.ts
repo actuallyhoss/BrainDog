@@ -102,7 +102,7 @@ export type SharedCell = { type: FieldType; of?: FieldType; value: Json; label?:
 
 /** The host's answer to whether it can make a read-only link, and why not (`sharesOf` at the Worker's door). */
 /** Whether a link can be made, the host's sentence when not, and, asked of a page, whether its link would show nothing. */
-export type SharesAnswer = { can: boolean; why?: string; empty?: true };
+export type SharesAnswer = { can: boolean; why?: string; empty?: true; page?: SharedPage };
 
 /** What `shareable` says on a host that never answered, or said no without a sentence. */
 export const SHARES_OFF = 'Read-only links are switched off on this BrainDog.';
@@ -193,6 +193,53 @@ const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
  */
 const inside = (x: unknown): boolean => typeof x === 'string' && (/^\s*[/#]/u.test(x) || ULID.test(x.trim()));
 
+/** `{{bad:`, with the space the renderer allows (`{{ bad : late }}`). */
+const BAD_OPEN = /\{\{\s*bad\s*:\s*/uy;
+
+/**
+ * THE OWNER'S WORDS WITH EACH `{{bad:…}}` SAID AS ITS WORDS, without its colour (audit 31 Oct n, AN3): Money's
+ * "Bills {{bad:late}}: … to pay" read "Bills : £10,540 to pay" on a link, since the form was asked for as a path, found
+ * nothing, and printed nothing, and the line lost the one word it leads with. What the form holds is the owner's words
+ * and any `{{…}}` inside, which are filled after as every other one is. It closes as the renderer's `pairs` closes it:
+ * counting the `{{` inside, and an odd run of `}` giving its first one away. One never closed is left as written.
+ */
+export const badSaid = (text: string): string => {
+  if (!/\{\{\s*bad\s*:/u.test(text)) return text;
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    BAD_OPEN.lastIndex = i;
+    const open = BAD_OPEN.exec(text);
+    if (open === null) {
+      out += text[i];
+      i += 1;
+      continue;
+    }
+    const from = i + open[0].length;
+    let depth = 1;
+    let at = from;
+    let close = -1;
+    while (at < text.length && close < 0) {
+      if (text.startsWith('{{', at)) {
+        depth += 1;
+        at += 2;
+      } else if (text[at] === '}') {
+        let end = at;
+        while (text[end] === '}') end += 1;
+        const first = at + ((end - at) % 2);
+        const closes = (end - first) / 2;
+        if (closes >= depth) close = first + 2 * (depth - 1);
+        else depth -= closes;
+        at = end;
+      } else at += 1;
+    }
+    if (close < 0) return out + text.slice(i);
+    out += badSaid(text.slice(from, close)).trimEnd();
+    i = close + 2;
+  }
+  return out;
+};
+
 /**
  * The owner's words with every link into this BrainDog left as its words: `[the handbook](/p/handbook)` is shown as
  * `the handbook`. A link that leaves is kept, because it opens nothing of the record's.
@@ -204,7 +251,7 @@ const inside = (x: unknown): boolean => typeof x === 'string' && (/^\s*[/#]/u.te
  * the thing named (review i, RI3).
  */
 const wordsShown = (text: string): string =>
-  text
+  badSaid(text)
     .replace(/([.!?…])[ \t]+\[[^\]]*\]\(\s*[/#][^)]*\)[.!]?[ \t]*$/gmu, '$1')
     .replace(/\[([^\]]*)\]\(\s*[/#][^)]*\)/gu, '$1');
 
@@ -1468,7 +1515,11 @@ export function methods(deps: RecordDeps) {
       if (!can.can || typeof slug !== 'string' || slug === '' || kernel.refused() || !kernel.pages().some((p) => p.slug === slug) || personalPage(slug)) return ok(can);
       const money = isRecord(args) && args.money === true;
       const shown = linkPage(slug, money, instant(clock.now() + SHARE_DAYS * DAY_MS));
-      return ok(shown !== null && shown.blocks.length === 0 ? { ...can, empty: true } : can);
+      /* AND THE PAGE A LINK WOULD OPEN, so the sheet judges it as the link's page draws it (AN14): the reader leaves out a
+         block with nothing a stranger can read (a heading over no rows, the owner's own "empty" line), and an empty Money
+         kept blocks here and drew none there, so the sheet never warned. The owner reads all of it already. */
+      if (shown === null) return ok(can);
+      return ok(shown.blocks.length === 0 ? { ...can, empty: true } : { ...can, page: shown });
     },
 
     /**

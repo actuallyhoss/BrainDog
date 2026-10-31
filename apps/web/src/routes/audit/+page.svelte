@@ -179,8 +179,10 @@
     /* Access */
     'access.grant': { word: 'Gave access', icon: 'people' },
     'access.revoke': { word: 'Took access away', icon: 'people' },
-    'share.open': { word: 'Opened a link', icon: 'link' },
-    'share.close': { word: 'Closed a link', icon: 'link' },
+    /* MADE, NOT OPENED (AN21): "Opened a link" read as somebody having read it. The line names the page ("Shared Money
+       with a link", `targetOf` in `news-live.ts`). */
+    'share.open': { word: 'Shared', icon: 'link' },
+    'share.close': { word: 'Stopped sharing', icon: 'link' },
     /* Lifecycle */
     /* `Exported` AND IT WAS `Backed up`: these lines are his own exports, and Settings › Backups lists them as that. */
     export: { word: 'Exported', icon: 'archive' },
@@ -746,7 +748,7 @@
         {:else}<span class="line-title"
             >{#if said.verb}<span class="verb">{said.verb}</span>{/if}{#if thing}{said.verb ? ' ' : ''}{#if thing.href}<a class="target tap" href={at(thing.href)}
                   >{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}</a
-                >{:else}{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}{/if}{/if}</span
+                >{:else}{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}{/if}{/if}{#if e.kind === 'share.open'}{thing ? historyWords.withLink : historyWords.aLink}{:else if e.kind === 'share.close' && !thing}{historyWords.aLink}{/if}</span
           >{/if}
         <span class="line-detail">
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
