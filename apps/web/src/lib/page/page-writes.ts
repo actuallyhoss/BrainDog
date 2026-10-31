@@ -455,14 +455,15 @@ export function pageWrites(deps: WritesDeps) {
    *
    * THE GRID'S OWN WRITE. `captureRow` is `capturedFields` over the block's fills, so the row is the one `/r/tasks`
    * writes for the same line under the same filter, required fields and all, and `rowWriter` is the client that list
-   * writes through. What was filled on the reader's behalf is said once, as the grid says it. A refusal is the
+   * writes through. What was filled on the reader's behalf is on the row, not in the receipt (AL13). A refusal is the
    * record's sentence; a landed row reads the page again, so a list of tasks below the field draws it.
    */
   async function captureLine(register: string, text: string, inherited: Record<string, string>) {
     const now = deps.now();
     if (now === null) return;
     /* THE ADD BOX KEEPS THE FOCUS (first-hour audit AH20): read again, it is drawn anew, and the focus fell to the page. */
-    const back = holdFocus();
+    /* AND WHERE THE BOX GOES WITH THE EMPTY STATE IT STOOD IN (AL9), the focus lands on what was just added. */
+    const back = holdFocus(justAdded);
     const typed = text.trim();
     /* A QUESTION IS ASKED, NOT FILED: "what is due this week" goes to the palette, where search and Slash answer it,
        as Today's ask bar sends it. Only where the host can open one; elsewhere the line is a row as it always was. */
@@ -499,7 +500,7 @@ export function pageWrites(deps: WritesDeps) {
       apply: () => {},
       revert: () => typedLine(register, drawn, false),
       send: () => writer.create(register, row.fields).then((w) => (w.ok ? { ok: true as const, value: w.entry } : { ok: false as const, fix: w.fix })),
-      said: words.added(read.text, listWord(register, REGISTERS[register]?.name), read.said, row.filled),
+      said: words.added(read.text, listWord(register, REGISTERS[register]?.name), read.said),
       undo: (landed) => () => void writer.archive(register, landed.seq, landed.version).then(() => deps.reread()),
     });
     if (!out.ok) return back();
@@ -507,6 +508,12 @@ export function pageWrites(deps: WritesDeps) {
     await deps.reread();
     typedLine(register, drawn, false);
     back();
+  }
+
+  /** The line Just changed draws for the latest write, or the card itself when the line opens nothing. */
+  function justAdded(): HTMLElement | null {
+    if (typeof document === 'undefined') return null;
+    return document.querySelector<HTMLElement>('main button.just-what') ?? document.querySelector<HTMLElement>('main [data-just]');
   }
 
   /** A captured line drawn on the lists over `register`, or taken off them. */
