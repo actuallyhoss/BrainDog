@@ -53,7 +53,7 @@ export const SAID: Readonly<Record<FaultFamily, string>> = Object.freeze({
   export: 'BrainDog could not save its nightly copy. It tries again tonight.',
   script: 'BrainDog could not run one of your scripts. It tries again the next time it is due.',
   schedule: 'BrainDog could not do something it had planned. It tries again the next time it is due.',
-  mail: 'BrainDog could not send a mail, so a sign-in link or a notice may not have arrived. Check the mail server it sends through; the next mail tries again.',
+  mail: 'BrainDog could not send a mail, so a sign-in link or a notice may not have arrived. It tries again with the next one; check the mail server it sends through.',
   other: 'BrainDog could not finish some work of its own. It tries again later.',
 });
 
