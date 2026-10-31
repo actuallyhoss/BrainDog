@@ -74,7 +74,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import ClearExamples from '$lib/ui/ClearExamples.svelte';
+  import type ClearExamplesOf from '$lib/ui/ClearExamples.svelte';
   import type PageViewOf from '$lib/page/PageView.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
@@ -1099,6 +1099,11 @@
   });
   /* THE BOARD'S EDIT HANDLES AND A DRAFT WIDGET'S MARK, LOADED WHEN ONE IS DRAWN: a Today kept as it is never edits its
      board and seldom holds a draft, so their code is not on the cold open's path. */
+  /* AND THE OFFER TO CLEAR THE EXAMPLES, which reads the record before it draws anything, so its code comes with that read. */
+  let ClearExamples = $state.raw<typeof ClearExamplesOf | null>(null);
+  $effect(() => {
+    if (ClearExamples === null && data.live) void import('$lib/ui/ClearExamples.svelte').then((m) => (ClearExamples = m.default), () => undefined);
+  });
   let EditCover = $state.raw<typeof EditCoverOf | null>(null);
   let DraftMark = $state.raw<typeof DraftMarkOf | null>(null);
   $effect(() => {
@@ -1589,7 +1594,7 @@
     </Empty>
   {:else}
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
-    {#if data.live}<ClearExamples />{/if}
+    {#if data.live && ClearExamples}<ClearExamples />{/if}
 
     <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
     {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{:else if slim}<TellOne
