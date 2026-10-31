@@ -102,6 +102,8 @@
     moneyNotAdded: "Money is on, but this wasn't added yet. Press Add to try again.",
     /* AN OPEN BILL, INVOICE OR ORDER SAID PAID BY ITS NUMBER, marked paid as its own page does. */
     markIt: 'Mark it paid',
+    /* THE PRESS'S OWN PIECES DID NOT LOAD (RQ6): offline, or an old tab after a deploy. Said, and the press works again. */
+    markNotLoaded: "Couldn't mark it. Try again.",
     /* THE RECORD'S CURRENCY, ASKED ONCE IN WORDS AND KEPT (AO2): the answer is every later amount's too. */
     whichHome: 'Which currency is your money in?',
     homeOnce: 'It is kept for every amount after this one, so you are asked once.',
@@ -139,7 +141,13 @@
   let asking = '';
   $effect(() => {
     const n = numberSaid;
-    if (n === '' || n === asking) return;
+    /* THE LINE CHANGED, SO WHAT WAS READ FOR IT GOES (RQ5): the same words typed again later are asked of the record again. */
+    if (n === '') {
+      asking = '';
+      if (numbered !== null) numbered = null;
+      return;
+    }
+    if (n === asking) return;
     asking = n;
     const lists = options.lists;
     void import('$lib/tell/numbered.ts')
@@ -313,7 +321,7 @@
           onadded?.([{ said: `${c.name}, ${c.done.split(' ').pop()}`, list: listName(c.register), href: `/r/${c.register}/${c.seq}` }]);
         },
       });
-    else toasts.push(say.notLoaded, { intent: 'warn' });
+    else toasts.push(say.markNotLoaded, { intent: 'warn' });
     sending = false;
     const was = field;
     focusOnceDrawn(() => (was?.isConnected ? was : [...document.querySelectorAll<HTMLElement>('[data-tell-one] .tell-one-field')].find((f) => f !== was)), { from: pressed });

@@ -134,13 +134,36 @@ export type Told = {
    and `mark` says the press sets `field` (its state) to `line` (the paid state), as the entry's own Mark paid does. */
 /* A SECOND BIRTHDAY IN THE SAME LINE (RP2) is `also`, kept in the one press, with `ask` and `done` naming them all;
    `already` is what is said when every note already holds its day, and nothing is written. */
-export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string; mark?: true; also?: readonly TellChange[]; already?: string };
+/* AND THE PRESS RE-READS THE ENTRY FIRST (RQ5): `shut` is its list's finished states, and what is said, with nothing
+   written, when the entry is in one already: paid (`paid`) or closed some other way, written off (`other`). */
+export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string; mark?: true; also?: readonly TellChange[]; already?: string; shut?: { states: readonly string[]; paid: string; other: string } };
 
-/** The state a list keeps an entry paid in, as it declares it: a finished state that says paid, on a list keeping money. */
+/** The state a list keeps an entry paid in, as it declares it: "paid" itself, finished, on a list keeping money. Never
+    "cleared" or "done" (RQ3): a Ledger line cleared is no bill paid. */
 export function paidStateOf(l: Pick<TellList, 'state' | 'done' | 'fields'>): string | null {
   const state = l.fields.find((f) => f.id === l.state && f.type === 'enum' && f.retired !== true);
   if (!state || !l.fields.some((f) => f.type === 'money' && f.retired !== true)) return null;
-  return PAID_STATES.find((s) => (l.done ?? []).includes(s) && (state.values ?? []).includes(s)) ?? null;
+  return (l.done ?? []).includes('paid') && (state.values ?? []).includes('paid') ? 'paid' : null;
+}
+
+/**
+ * WHAT A LIST KEEPS THAT A LINE CAN MARK PAID BY ITS NUMBER (RQ3): orders, on a list that calls an entry an order; bills
+ * and invoices, on Bills and invoices or a list like it (owed to him or by him, with a day it is due). Never the Ledger,
+ * Instalments or Plans, though each has a finished state.
+ */
+export function markKind(l: Pick<TellList, 'id' | 'name' | 'one' | 'state' | 'done' | 'fields'>): 'order' | 'bill' | null {
+  if (paidStateOf(l) === null) return null;
+  if (/\border/iu.test(`${l.id} ${l.name} ${l.one ?? ''}`)) return 'order';
+  const owed = l.fields.some((f) => f.type === 'enum' && f.retired !== true && f.values?.includes('owed_to_me') === true && f.values.includes('owed_by_me'));
+  const due = l.fields.some((f) => f.type === 'day' && f.deadline === true && f.retired !== true);
+  return l.id === 'obligations' || (owed && due) ? 'bill' : null;
+}
+
+/** Whether an entry's name says it is the one by that number, starting with its list's word: "Invoice 1042",
+    "INV-1042", "Order #3". Never a count inside it ("3 vanilla jars") or a number after other words ("Rent for flat 12"). */
+export function namedAs(name: string, kind: 'order' | 'bill', digits: string): boolean {
+  const nouns = kind === 'order' ? 'orders?' : 'invoices?|inv|bills?';
+  return new RegExp(`^\\s*(?:${nouns})\\.?[\\s#:-]*(?:no\\.?|number)?\\s*#?\\s*0*${digits}(?!\\p{Nd})`, 'iu').test(name);
 }
 
 /** The most one sentence becomes. More is a paste of a whole day, and the rest is said back as left. */
@@ -679,6 +702,10 @@ const PAID_LAST = /^(.*?\d.*?)\s+(?:(?:is|was|has been|have been|already|now|all
 /* Words before that "paid" that say it is not yet: "to be paid", "not paid". */
 /* AND A CONTRACTION, NEVER OR THE FUTURE (RO1): "isn't paid", "never paid", "will get paid" are not paid yet. */
 const NOT_YET = /\b(?:not|to be|will be|needs? to be|must be|should be|be|to)$|\b(?:not|never|unpaid|owed?|owes|due|will|gets?|getting|yet)\b|n['’]t\b/iu;
+/* WORDS BEFORE "PAID" THAT CHANGE NOTHING (RQ7): "Rent 12,000 just paid" was paid, as "Rent 12,000 paid" was. */
+const PAID_ASIDE = /\b(?:just|finally|already|today|now|all|fully|in full|been|has|have|is|was)\b/giu;
+/* AND HOW IT WAS PAID, kept for the reader's `METHOD`: "in cash", "by card", "via InstaPay". */
+const PAID_HOW = /\b(?:in|by|via|through|with|using|over)\s+(cash|card|bank transfer|transfer|wallet|\p{Lu}[\p{L}\p{M}'’-]*)/u;
 /* PART OF IT PAID IS NOT ALL OF IT (RO1): "Rent 12,000 half paid" was all 12,000 paid. How much is asked. */
 const PART_PAID = /^(?:half|partly|partially|part|some|mostly|almost|nearly)(?:\s+of\s+it)?$/iu;
 /* THE TIME IT WAS FOR, SAID BETWEEN THE FIGURE AND "PAID", IS NO "NOT YET" (RO1): "Rent 12,000 for May paid", "for this
@@ -731,7 +758,8 @@ const COSTS = 'hosting|web hosting|domains?|servers?|vps|cdn|coworking|co-workin
 const THING_PAID = new RegExp(`^(?:${BILL_WORD.source.slice(2, -2)}|${COSTS}|electricity|electric|water|gas|internet|wifi|broadband|phone|mobile|groceries|petrol|fuel|parking|school|gym|netflix|spotify)\\b`, 'iu');
 /* A WORD FOR WORK DONE, said alone, is a thing and nobody (AN6): "Hosting", "Cleaning", "Tutoring", "Marketing". */
 /* ONLY THE WORDS FOR WORK, NEVER ANY WORD ENDING IN "ING" (RO8): Meiling, Xiaoling, Sterling and Fleming are people. */
-const GERUND = /^(?:cleaning|tutoring|hosting|web hosting|consulting|coaching|catering|printing|marketing|accounting|bookkeeping|training|shipping|parking|housekeeping|gardening|plumbing|babysitting|landscaping|painting|editing|advertising|packaging|copywriting|translating|proofreading|filming|recording|engineering|programming|coding|designing|tailoring|ironing|washing|baking|cooking|boarding|grooming|dog walking|moving|banking|billing|invoicing|licensing|branding|recruiting|staffing|outsourcing|freelancing|modelling|modeling|lodging|clothing|flooring|roofing|tiling|wiring|heating|servicing|decorating|plastering|welding|towing|dry cleaning|ticketing|streaming|messaging)$/iu;
+/* AND THE WORDS FOR THINGS AND EVENTS THAT ARE NEVER A NAME (RQ8): "Got 3,000 from Funding", "Wedding 50,000 due Friday". */
+const GERUND = /^(?:cleaning|tutoring|hosting|web hosting|consulting|coaching|catering|printing|marketing|accounting|bookkeeping|training|shipping|parking|housekeeping|gardening|plumbing|babysitting|landscaping|painting|editing|advertising|packaging|copywriting|translating|proofreading|filming|recording|engineering|programming|coding|designing|tailoring|ironing|washing|baking|cooking|boarding|grooming|dog walking|moving|banking|billing|invoicing|licensing|branding|recruiting|staffing|outsourcing|freelancing|modelling|modeling|lodging|clothing|flooring|roofing|tiling|wiring|heating|servicing|decorating|plastering|welding|towing|dry cleaning|ticketing|streaming|messaging|wedding|shopping|funding|fundraising|housing|building|morning|evening|something|everything|nothing|bedding|camping|swimming|gaming|hiring|renting|leasing|lending|dining|travelling|traveling|wrapping|packing|posting|mailing|meeting|briefing)$/iu;
 const EVERY = /\b(?:a|per|each|every)\s+(month|year|quarter|week)\b|\b(monthly|yearly|annually|quarterly|weekly)\b/iu;
 const EVERY_SAID: Record<string, string> = { monthly: 'month', yearly: 'year', quarterly: 'quarter', weekly: 'week' };
 const REPEATS: Record<string, string> = { month: 'monthly', monthly: 'monthly', year: 'yearly', yearly: 'yearly', annually: 'yearly', quarter: 'quarterly', quarterly: 'quarterly', week: 'weekly', weekly: 'weekly' };
@@ -792,7 +820,8 @@ function heldThings(opts: TellOptions): ReadonlySet<string> {
   return out;
 }
 /* HIS OWN LISTS OF WHAT HE SELLS (RO4), by id or name: Orders, Products, Services, a menu or a catalogue. */
-const SELLS = /\b(?:orders?|products?|services?|menus?|catalog(?:ue)?s?|listings?|offerings?|stock)\b/iu;
+/* NEVER ORDERS (RQ11): an order's name often holds the client's ("Cake for Salma"), and Salma is nothing he sells. */
+const SELLS = /\b(?:products?|services?|menus?|catalog(?:ue)?s?|listings?|offerings?|stock)\b/iu;
 /** A name as its words are matched: lower case, one space, and each word without a plural's "s". */
 const bare = (name: string): string =>
   oneLine(words(name))
@@ -801,14 +830,23 @@ const bare = (name: string): string =>
     .filter(Boolean)
     .map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
     .join(' ');
-/** What the record's Orders, Products and Services name, as `bare` says each (RO4). */
+/** What the record's Products and Services name, as `bare` says each (RO4): the whole name, and the thing it ends on
+    before any "for" or "with" ("Lavender candles" is candles, "Cake for Salma" a cake), never any word inside it, so
+    "Coffee 45" is no "Coffee mug" (RQ11). A last word that reads as somebody is left out. */
 function soldBy(opts: TellOptions): ReadonlySet<string> {
   const out = new Set<string>();
   for (const l of opts.lists) {
     if (l.id === PEOPLE || !SELLS.test(`${l.id} ${l.name}`)) continue;
     for (const { name } of opts.titled?.[l.id] ?? []) {
       const b = bare(name);
-      if (b) out.add(b);
+      if (!b) continue;
+      out.add(b);
+      const thing = oneLine(name).split(/\s+(?:for|to|from|by|with)\s+/iu)[0] ?? '';
+      const last = thing.split(/\s+/u).pop() ?? '';
+      const noun = bare(last);
+      /* Somebody he keeps, or a capital the rest of the name does not have ("Gift box Salma"), is somebody, never a thing. */
+      const named = knownAs(last, opts.people ?? []) !== null || (/^\p{Lu}/u.test(last) && /^\p{Ll}/u.test(thing.split(/\s+/u)[1] ?? '') && readsAsSomebody(last));
+      if (noun && noun !== b && !named) out.add(noun);
     }
   }
   return out;
@@ -992,7 +1030,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     .replace(/([,;])(?:\s*[,;])+/gu, '$1')
     .replace(/^[\s,;]+|[\s,;]+$/gu, '')
     /* "Dr. Hana" is never a clause that ends at "Dr". */
-    .replace(/\b(Dr|Mr|Mrs|Ms|Prof|St)\./gu, '$1');
+    .replace(/\b(Dr|Mr|Mrs|Ms|Prof|St)\./gu, '$1')
+    /* "Invoice no. 1042 paid" is one clause, never "Invoice no" and "1042 paid" (RQ9). */
+    .replace(/\b(no)\.(?=\s*#?\p{Nd})/giu, '$1');
   /* "1,000 Kuwaiti dinars" is KWD 1,000, never the record's own currency beside a word (AL8). */
   text = namedCodes(text);
 
@@ -1023,12 +1063,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
      accounts, bills, subscriptions or past payees. Somebody in People is found before this is asked. */
   const things = heldThings(opts);
   const somebody = (name: string): boolean => readsAsSomebody(name) && !things.has(words(name.trim()));
-  /* WHAT HE SELLS, BY HIS OWN LISTS (RO4): the names his Orders, Products or Services hold, each word without its plural, so
-     "Candles 300" where he sells lavender candles is never money he spent. */
+  /* WHAT HE SELLS, BY HIS OWN LISTS (RO4): the names his Products or Services hold, or the thing each ends on, without its
+     plural, so "Candles 300" where he sells lavender candles is never money he spent. */
   const sold = soldBy(opts);
   const sells = (name: string): boolean => {
     const said = bare(name);
-    return said !== '' && [...sold].some((t) => t === said || ` ${t} `.includes(` ${said} `));
+    return said !== '' && sold.has(said);
   };
 
   /* Who each name is: an entry already kept, or a new one made the first time they are named. */
@@ -1803,18 +1843,21 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     }
     const [a, ...more] = figures;
     if (!a || more.length > 0 || TIME_BEFORE.test(lead.slice(0, a.at))) return false;
-    /* NOTHING BUT "PAID" AFTER THE FIGURE, or the words "is", "was", "already" the shape takes (RO1): "Rent 12,000 isn't
-       paid" was paid in full, and so was "half paid". Part of it paid is asked; any other word is no payment made. */
+    /* PART OF IT PAID IS ASKED (RO1): "Rent 12,000 half paid". A "not" or a "will" anywhere was no payment (`NOT_YET`). */
     const between = trimWords(lead.slice(a.at + a.text.length));
-    if (between !== '') {
-      if (!PART_PAID.test(between)) return false;
+    if (PART_PAID.test(between)) {
       const n = numberOf(a.digits, a.thousand);
       if (!moneyList(opts.lists) && !dueList(opts.lists)) noMoney = true;
       else partPaid ??= { figure: a.digits, half: n === null ? null : (n / 2).toLocaleString('en-GB'), what: saidAsTyped(trimWords(lead.slice(0, a.at))) };
       left.push(c);
       return true;
     }
-    const what = trimWords(oneLine(`${lead.slice(0, a.at)} ${lead.slice(a.at + a.text.length)}`));
+    /* ANY OTHER WORD BEFORE "PAID" STILL SAYS IT WAS PAID (RQ7): "Rent 12,000 just paid", "today", "in cash", "via InstaPay".
+       The words that change nothing go, how it was paid is kept for the reader, and anything else stays in its name. */
+    const how = PAID_HOW.exec(between);
+    const by = how ? (/^cash$/iu.test(how[1]!) ? 'by cash' : how[0]) : '';
+    const aside = trimWords(oneLine((how ? between.replace(how[0], ' ') : between).replace(PAID_ASIDE, ' ')));
+    const what = trimWords(oneLine(`${lead.slice(0, a.at)} ${aside}`));
     /* A salary or a wage "paid" may be his or his staff's: the income reader asks. */
     if (what === '' || INCOME_WORD.test(what)) return false;
     /* Seats, ads, a platform that pays him, or something he sells, "paid", may have paid him (RO2, RO6). */
@@ -1822,7 +1865,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const who = nameBefore(what);
     if (who !== null) return askWay(c, a, who);
     const from = rows.length;
-    if (readMoney(oneLine(`paid ${a.text} for ${what} ${dayText(c)}`), null, false)) {
+    if (readMoney(oneLine(`paid ${a.text} for ${what} ${by} ${dayText(c)}`), null, false)) {
       placed = true;
       /* The time it was for goes back on its name, after what it was for: "Rent for May". */
       if (forWhen !== '')
@@ -1843,27 +1886,26 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const ref = REF_SAID.exec(trimWords(lead));
     if (!ref || ref[2] !== a.digits || change !== null) return false;
     const noun = /^inv$/iu.test(ref[1]!) ? 'invoice' : ref[1]!.toLowerCase();
-    /* AN ORDER IS ON A LIST OF ORDERS, a bill or an invoice on any other that keeps one paid. */
-    const order = noun === 'order';
-    const listOf = (e: Open): TellList | undefined => opts.lists.find((l) => l.id === e.register && paidStateOf(l) !== null);
-    const fits = (opts.open ?? []).filter((e) => {
-      const l = listOf(e);
-      return l !== undefined && /\border/iu.test(`${l.id} ${l.name} ${l.one ?? ''}`) === order;
-    });
-    /* KNOWN BY THE NUMBER IN ITS NAME ("Invoice 1042"), or else by the number it is kept under. One, or none is offered. */
-    const inName = new RegExp(`(?:^|\\D)${a.digits}(?:\\D|$)`, 'u');
-    const byName = fits.filter((e) => inName.test(e.name));
+    /* AN ORDER IS ON A LIST OF ORDERS, a bill or an invoice on Bills and invoices or one like it, never the Ledger (RQ3). */
+    const kind = noun === 'order' ? 'order' : 'bill';
+    const listOf = (e: Open): TellList | undefined => opts.lists.find((l) => l.id === e.register && markKind(l) === kind);
+    const fits = (opts.open ?? []).filter((e) => listOf(e) !== undefined);
+    /* KNOWN BY THE NUMBER IT IS KEPT UNDER FIRST (RQ1), and else by a name that starts with it ("Invoice 1042"), never by a
+       count in its name ("3 vanilla jars" is no order 3). One, or none is offered. */
     const bySeq = fits.filter((e) => String(e.seq) === a.digits);
-    const it = byName.length === 1 ? byName[0]! : byName.length === 0 && bySeq.length === 1 ? bySeq[0]! : null;
+    const byName = fits.filter((e) => namedAs(e.name, kind, a.digits));
+    const it = bySeq.length === 1 ? bySeq[0]! : bySeq.length === 0 && byName.length === 1 ? byName[0]! : null;
     const l = it ? listOf(it) : undefined;
     const to = l ? paidStateOf(l) : null;
     if (!it || !l || to === null) return false;
     const state = l.fields.find((f) => f.id === l.state);
     const word = (state?.labels?.[to] ?? to).toLowerCase();
     const called = `${noun} ${a.digits}`;
-    /* What it is said with, when its name does not say the number: "Mark order 57, 3 vanilla jars, paid?" */
-    const also = byName.length === 1 || it.name.trim() === '' ? '' : `, ${it.name},`;
-    change = { register: l.id, seq: it.seq, name: it.name.trim() || capital(called), field: state!.id, line: to, ask: `Mark ${called}${also} ${word}?`, done: `Marked ${called} ${word}`, mark: true };
+    /* THE ASK ALWAYS SAYS WHICH ENTRY IT MARKS, unless its name is the words he said: "Mark order 57, 3 vanilla jars, paid?" */
+    const name = oneLine(it.name);
+    const also = name === '' || words(name) === words(called) ? '' : `, ${name},`;
+    const shut = { states: [...(l.done ?? [])], paid: `${capital(called)} is already ${word}.`, other: `${capital(called)} isn't open any more.` };
+    change = { register: l.id, seq: it.seq, name: name || capital(called), field: state!.id, line: to, ask: `Mark ${called}${also} ${word}?`, done: `Marked ${called} ${word}`, mark: true, shut };
     return true;
   }
 
@@ -2197,7 +2239,16 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* "Paid 900 for order 57" is 900, for order 57, never 900 and a second figure of 57 said back (RO3). */
     const all = amountsIn(dated.rest, opts.currency, held);
     const figures = all.filter((x) => !refAt(dated.rest, x, 'any'));
-    const [a, ...more] = figures.length > 0 ? figures : all;
+    /* ONLY A BARE "BILL" FALLS BACK (RQ4): "Paid electricity bill 850" keeps 850, and "Paid for order 57" or "Got paid for
+       invoice 1042" names no amount at all. How much is asked, as "Order 57 paid" is, and the line is said back by the
+       reader that asked, with nothing made, not even who paid it. */
+    const strict = figures.length > 0 ? figures : all.filter((x) => !refAt(dated.rest, x, 'never'));
+    if (strict.length === 0 && all.length > 0) {
+      if (!moneyList(opts.lists) && !dueList(opts.lists)) noMoney = true;
+      else howMuch ??= capital(trimWords(dated.rest.replace(ACT, '').replace(/^for\s+/iu, '')));
+      return false;
+    }
+    const [a, ...more] = strict;
     if (!a) return false;
     /* WHERE NO MONEY IS KEPT, that is what is said, before any question of which currency: unless an order just placed
        keeps what was paid for it, as a shop with no Money keeps it on the order. */
