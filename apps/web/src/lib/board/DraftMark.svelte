@@ -7,7 +7,10 @@
   The sheet lane's draft actions (W4) may stand in for this; it takes the same two presses.
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
+  import { fade } from 'svelte/transition';
   import Button from '$lib/ui/Button.svelte';
+  import { letGo, ms, settleHere, still } from '$lib/motion/index.ts';
   import Icon from '$lib/ui/Icon.svelte';
 
   let {
@@ -38,6 +41,7 @@
   const who = $derived(typeof draft.by === 'string' && draft.by.trim() !== '' && draft.by.trim() !== 'other' ? words.by(draft.by.trim()) : words.someone);
   const why = $derived(typeof draft.why === 'string' && draft.why.trim() !== '' ? draft.why.trim() : null);
   let busy = $state(false);
+  let mark = $state<HTMLElement | null>(null);
 
   async function press(f: () => unknown) {
     if (busy) return;
@@ -48,17 +52,32 @@
       busy = false;
     }
   }
+
+  /* THE PRESS IS FELT AT ONCE, AND THE WRITE FOLLOWS (the record forming, `$lib/motion`). Kept, the widget settles where it
+     stands as its dashes go; thrown away, it lets go on the press and the widgets beside it close over its place when
+     the board reads again. A throw that did not take puts it back. */
+  const tile = () => mark?.closest<HTMLElement>('[data-board-key]') ?? null;
+  const keep = () => {
+    settleHere(tile());
+    return press(onkeep);
+  };
+  const discard = async () => {
+    const back = letGo(tile());
+    await press(ondiscard);
+    await tick();
+    if (mark?.isConnected) back();
+  };
 </script>
 
-<div class="draft-mark" data-draft-mark>
+<div class="draft-mark" data-draft-mark bind:this={mark} out:fade={{ duration: still() ? 0 : ms('--form-out', 180) }}>
   <div class="say">
     <p class="who"><Icon name="zap" size="s" /><span>{who}</span></p>
     {#if why}<p class="why">{why}</p>{/if}
   </div>
   <div class="acts">
-    <Button weight="primary" size="sm" disabled={busy} aria-label="{words.keep}: {name}" onclick={() => press(onkeep)}>{words.keep}</Button>
+    <Button weight="primary" size="sm" disabled={busy} aria-label="{words.keep}: {name}" onclick={keep}>{words.keep}</Button>
     {#if onagain}<Button weight="quiet" size="sm" disabled={busy} aria-label="{words.again}: {name}" onclick={() => press(onagain)}>{words.again}</Button>{/if}
-    <Button weight="bare" size="sm" disabled={busy} aria-label="{words.throwAway}: {name}" onclick={() => press(ondiscard)}>{words.throwAway}</Button>
+    <Button weight="bare" size="sm" disabled={busy} aria-label="{words.throwAway}: {name}" onclick={discard}>{words.throwAway}</Button>
   </div>
 </div>
 

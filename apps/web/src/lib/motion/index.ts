@@ -167,13 +167,19 @@ export function play(el: HTMLElement, frames: Keyframe[] | PropertyIndexedKeyfra
 /**
  * A THING LETTING GO WHERE IT IS before the record takes it away: thrown away, it sinks and fades at once on the press,
  * and is marked leaving (`data-leaving`) so the page's recomposition (`page/recompose.ts`) does not draw a copy of it
- * fading again when the record's answer comes. The press is never held for it.
+ * fading again when the record's answer comes. The press is never held for it. What it returns puts the element back.
  */
-export function letGo(node: Element | null | undefined): void {
-  if (!node || typeof (node as HTMLElement).animate !== 'function') return;
+export function letGo(node: Element | null | undefined): () => void {
+  if (!node || typeof (node as HTMLElement).animate !== 'function') return () => {};
   const el = node as HTMLElement;
   el.setAttribute('data-leaving', '');
-  el.animate(still() ? { opacity: [1, 0] } : { opacity: [1, 0], transform: ['none', 'scale(0.96)'] }, { duration: still() ? FADE : ms('--form-out', 180), easing: 'cubic-bezier(0.4, 0, 1, 0.5)', fill: 'forwards' });
+  const a = el.animate(still() ? { opacity: [1, 0] } : { opacity: [1, 0], transform: ['none', 'scale(0.96)'] }, { duration: still() ? FADE : ms('--form-out', 180), easing: 'cubic-bezier(0.4, 0, 1, 0.5)', fill: 'forwards' });
+  /* PUT BACK, for a throw the record did not take. */
+  return () => {
+    a.cancel();
+    el.removeAttribute('data-leaving');
+    settleHere(el);
+  };
 }
 
 /**
