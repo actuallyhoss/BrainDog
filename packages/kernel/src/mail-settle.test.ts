@@ -151,3 +151,59 @@ test('A REMINDER ABOUT A BILL HE OWES OFFERS NOTHING TO MARK PAID (RL3)', async 
   assert.equal(k.count('dues'), 1);
   sql.close();
 });
+
+test('A REMITTANCE FROM ANOTHER ADDRESS AT A FREE MAIL HOST OFFERS NOTHING (RM3)', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const folk = reg('folk', 'Folk', {
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'email', type: 'email' },
+      { id: 'met', type: 'list', of: 'text' },
+    ],
+    meets: { name: 'name', email: 'email', met: 'met' },
+  });
+  const dues = DECLS[0]!;
+  const body = dues.body as unknown as { fields: object[] };
+  const withParty: Declaration = { ...dues, body: { ...body, fields: [...body.fields, { id: 'party', type: 'ref', to: 'folk' }] } as never };
+  assert.ok((await k.install([folk, withParty, DECLS[1]!])).ok);
+  const omar = value(k.create('folk', { name: 'Omar', email: 'omar@gmail.com' }, PERSON)) as { id: string };
+  value(k.create('dues', { what: 'Omar INV-7', direction: 'owed_to_me', amount: { amount: 50000, currency: 'GBP' }, due: '2026-10-15', party: omar.id }, PERSON));
+  const got = mail(k, 'Sam <sam@gmail.com>', 'Paid', 'We have paid your invoice INV-7.\n');
+  if (got.suggestion) {
+    const said = sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'suggest' ORDER BY rowid LIMIT 1", `suggestion:${got.suggestion}`);
+    assert.notEqual(said?.note, 'Mark invoice INV-7 paid?');
+  }
+  const own = mail(k, 'Omar <omar@gmail.com>', 'Paid', 'We have paid your invoice INV-7.\n');
+  assert.ok(own.suggestion);
+  const asks = sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'suggest' ORDER BY rowid LIMIT 1", `suggestion:${own.suggestion}`);
+  assert.equal(asks?.note, 'Mark invoice INV-7 paid?');
+  sql.close();
+});
+
+test('FILING ONE MAIL OUT OF A QUESTION WHOSE ROWS AND MAILS DO NOT LINE UP ASKS ABOUT THE REST ON THEIR OWN (RM4)', async () => {
+  const { k, sql } = await record();
+  const bill = (ref: string, amount: string) => mail(k, 'Loomhouse <billing@loomhouse.example>', 'Your invoice', `Invoice ${ref}\nAmount due: GBP ${amount}\nPayment due by 14 November 2026\n`);
+  const [a, b, c] = [bill('INV-9', '48.00'), bill('INV-10', '52.00'), bill('INV-11', '60.00')];
+  const q = a.suggestion!;
+  /* ONE QUESTION HOLDING ALL THREE MAILS AND ONE ROW, the shape `settleAsked` cannot line up. */
+  for (const other of [b.suggestion, c.suggestion]) if (other && other !== q) sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ?", other);
+  const body = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', q)!.body) as Record<string, unknown>;
+  sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, raws: [a.raw, b.raw, c.raw] }), q);
+
+  value(k.fileArrival(b.raw, 'notes', null, PERSON));
+  assert.deepEqual(statusOf(sql, q), { status: 'resolved', resolved_as: 'moot' });
+  const held = (raw: string) =>
+    sql.one<{ id: string }>(
+      "SELECT id FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' AND EXISTS (SELECT 1 FROM json_each(suggestion.body, '$.raws') WHERE value = ?)",
+      raw,
+    )?.id;
+  for (const raw of [a.raw, c.raw]) {
+    assert.ok(held(raw), 'a mail left in the inbox has nothing asking about it');
+    assert.notEqual(held(raw), q);
+    assert.equal(stateOf(sql, raw), 'review');
+  }
+  assert.equal(held(b.raw), undefined, 'the filed mail is asked about again');
+  sql.close();
+});

@@ -547,6 +547,9 @@ export type Filed = { id: string; joined?: true; widened?: number; answered?: Re
 /** How a question another one covered is closed: this, then the question whose accept settled it. */
 export const COVERED = 'Settled by';
 
+/** How a question is closed when its mail is asked about again one mail at a time (RM4): never reopened whole. */
+export const ONE_AT_A_TIME = 'Each mail in it is asked about on its own, after';
+
 /**
  * A mail put back in the inbox, given back to the questions its settling let go of it from (`settleAsked` in
  * `index.ts`, RL10): each `suggest` line on `raws` in the settling's batch holds the row it let go of. The question takes

@@ -53,7 +53,7 @@ import { BACKFILL_ACTOR } from './backfill.ts';
 import { agentOf, kindOfEvent, shapeIn } from './change-kind.ts';
 import type { Json } from './coerce.ts';
 import { jcs, type Declaration } from './declare.ts';
-import { COVERED, askAgainLetGo } from './govern.ts';
+import { COVERED, ONE_AT_A_TIME, askAgainLetGo } from './govern.ts';
 import type { Patch } from './index.ts';
 import { keyedLists, mergeFieldOf } from './entities.ts';
 import type { RoleList } from './roles.ts';
@@ -142,6 +142,8 @@ export type UndoApplied = {
 export type UndoParts = Pick<KernelParts, 'sql' | 'clock' | 'mint' | 'transaction' | 'write'> & {
   /** The write path through the door an accepted decision's writes use, for a move undoing that decision puts back. */
   decidedWrite?: KernelParts['write'];
+  /** The mail door asking about one mail again (RM4), for a filing undone out of a question that was asked one at a time. */
+  askMail?: (raw: string) => void;
 };
 
 /** Narrows what a person's plan may show: a list she cannot read is left out without a word. */
@@ -1367,6 +1369,9 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       );
       /* AND THE QUESTION ITS FILING LET GO OF IT FROM HOLDS IT AGAIN (RL10). */
       askAgainLetGo(sql, () => parts.mint(), at, every.filter((e) => e.batch === l.batch), id, actor, batch);
+      /* AND A QUESTION ITS FILING CLOSED SO ITS MAIL WAS ASKED ONE AT A TIME (RM4) asks this mail on its own again. */
+      if (every.some((e) => e.batch === l.batch && e.kind === 'resolve' && e.to_v === 'moot' && typeof e.note === 'string' && e.note.startsWith(ONE_AT_A_TIME)))
+        parts.askMail?.(id);
     }
 
     /* ── the declarations, each question's together: the earlier bodies as new versions, and a history line each ── */

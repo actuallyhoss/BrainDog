@@ -165,6 +165,7 @@ import {
   settleWaiting,
   HANDLED_RULE,
   COVERED,
+  ONE_AT_A_TIME,
   askAgainLetGo,
   reopen,
   withdraw as withdrawSuggestion,
@@ -10189,18 +10190,58 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         continue;
       }
       /* ITS ROWS AND ITS MAIL DO NOT LINE UP, so which row was this mail's cannot be said: the question closes, rather
-         than stay open with the settled mail in it, where a yes would file it a second time (RL10). The mail left in it
-         is still in the inbox. */
+         than stay open with the settled mail in it, where a yes would file it a second time (RL10). AND EACH MAIL LEFT IN
+         IT IS ASKED AGAIN ON ITS OWN (RM4), as the mail door asks a mail that arrives, so none of it sits in the inbox
+         with nothing asking about it. Closed with `ONE_AT_A_TIME`'s line and not `COVERED`'s, so neither an undo nor a
+         put back opens the old question again beside the new ones: a put back asks this mail again on its own too. */
+      const left = raws.filter((r): r is string => typeof r === 'string' && r !== id);
       sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", q.id);
       sql.exec(
         "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note, batch) VALUES (?, ?, 'system', 'resolve', ?, 'suggestion', 'moot', ?, ?)",
         mint(),
         instant(clock.now()),
         `suggestion:${q.id}`,
-        `${COVERED} ${said}`.slice(0, 280),
+        `${left.length > 0 ? ONE_AT_A_TIME : COVERED} ${said}`.slice(0, 280),
         batch,
       );
+      for (const raw of left) askMailAgain(raw);
     }
+  };
+
+  /**
+   * One mail still in the inbox asked about again, through the path the mail door takes when it arrives (RM4), when no
+   * open question holds it. It never files itself from here: what it would have filed waits as a question, since the
+   * person is in the middle of settling another mail.
+   */
+  const askMailAgain = (raw: string): void => {
+    const held = sql.one<{ channel: string; headers: string | null; body: string | null; state: string }>('SELECT channel, headers, body, state FROM inbox_raw WHERE id = ?', raw);
+    if (!held || held.channel !== 'email' || (held.state !== 'review' && held.state !== 'untriaged')) return;
+    const asked = sql.one(
+      `SELECT 1 AS x FROM suggestion WHERE status = 'open' AND body_kind = 'rowset'
+         AND EXISTS (SELECT 1 FROM json_each(suggestion.body, '$.raws') WHERE value = ?) LIMIT 1`,
+      raw,
+    );
+    if (asked !== undefined) return;
+    let headers: Record<string, string> = {};
+    try {
+      const parsed = JSON.parse(held.headers ?? '{}') as unknown;
+      if (parsed !== null && typeof parsed === 'object')
+        headers = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).flatMap(([k, v]) => (typeof v === 'string' ? [[k.toLowerCase(), v]] : [])));
+    } catch {
+      /* no headers read: the door reads the body alone */
+    }
+    const lists = [...registers.values()];
+    const people = [meetsRole(lists)?.register, orgRole(lists)?.register].filter((r): r is string => r !== undefined);
+    const meet = (a: MeetArgs) => meetPerson(peopleDeps({ actor: 'ingest:mail' }, () => null, (p) => openSuggestion(governDeps(), 'ingest:mail', p)), a);
+    const { settle: _files, ...ing } = ingestDeps();
+    let seen: MailOutcome = { handled: false };
+    try {
+      seen = readMailArrival({ ing, lists, people, meet }, { raw, headers, body: held.body ?? '' });
+    } catch {
+      /* left where it is, and the inbox shows it */
+    }
+    /* A MAIL THE DOOR CAN PLACE NOTHING IN IS UNTRIAGED, where the inbox asks about it, never a review with no question. */
+    if (!seen.handled && held.state === 'review') sql.exec("UPDATE inbox_raw SET state = 'untriaged', reason = NULL WHERE id = ?", raw);
   };
 
   /**
@@ -10238,6 +10279,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         batch,
       );
     }
+    /* A QUESTION WHOSE MAIL WAS ASKED AGAIN ONE AT A TIME (RM4) stays closed, and this mail is asked on its own too. */
+    const apart = sql.one(
+      "SELECT 1 AS x FROM event WHERE batch = ? AND kind = 'resolve' AND to_v = 'moot' AND target LIKE 'suggestion:%' AND note LIKE ? || '%' LIMIT 1",
+      settled,
+      ONE_AT_A_TIME,
+    );
+    if (apart !== undefined) askMailAgain(raw);
   };
 
   /**
@@ -13681,7 +13729,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const barred = schemaRefusal(state);
       if (barred) return barred;
       /* A MOVE ONLY A DECISION MAKES, put back by undoing that decision, goes through a decision's door. */
-      return applyUndo({ ...parts, decidedWrite: (register, ref, patch, w) => write(register, ref, patch, w, { decided: true }) }, scope, hash, actor, opts, declared);
+      return applyUndo({ ...parts, decidedWrite: (register, ref, patch, w) => write(register, ref, patch, w, { decided: true }), askMail: askMailAgain }, scope, hash, actor, opts, declared);
     },
 
     /**

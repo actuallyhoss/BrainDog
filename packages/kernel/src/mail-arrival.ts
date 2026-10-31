@@ -15,7 +15,7 @@ import type { Result } from '@braindog/ports';
 import { openRowset, unfile, type IngestDeps } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { places, readMail, type MailRead } from './mail-read.ts';
-import { domainOrgName } from './identity-keys.ts';
+import { domainOrgName, isPublicMail } from './identity-keys.ts';
 import type { MeetArgs, Met } from './index.ts';
 
 type MailField = { id: string; type: string; to?: string; values?: readonly string[]; retired?: boolean; deadline?: boolean };
@@ -237,6 +237,15 @@ function billPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | null {
 }
 
 /**
+ * Whether a person's fields, as one lowered JSON string, hold an address or a domain (`@acme.com`) as a whole one: not
+ * "xomar@acme.com" for "omar@acme.com", and not "@acme.com.eg" for "@acme.com".
+ */
+const heldAs = (kept: string, said: string, domainOnly = false): boolean => {
+  const esc = said.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  return new RegExp(`${domainOnly ? '' : '(?<![a-z0-9._%+-])'}${esc}(?![a-z0-9-]|\\.[a-z0-9])`, 'u').test(kept);
+};
+
+/**
  * Somebody telling us they paid one of our invoices (audit 10k, AK12): it offers to mark that invoice paid, found by the
  * reference the mail prints in a bill's title. It was offered as a new bill owed by us, "amount unread". With no one
  * open bill of that reference it offers nothing and the mail waits in the inbox as it came. Never filed alone: marking
@@ -254,7 +263,12 @@ function remittancePlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | 
     if (typeof party !== 'string' || party === '' || !bills.party) return true;
     const who = rowsOf(deps, bills.party.to).find((p) => p.id === party);
     const kept = who ? JSON.stringify(who.fields).toLowerCase() : '';
-    return read.domain !== '' && (kept.includes(`@${read.domain.toLowerCase()}`) || (read.from !== null && kept.includes(read.from.email.toLowerCase())));
+    /* THEIR WHOLE ADDRESS FIRST, AND THEIR DOMAIN ONLY WHEN IT IS THEIR OWN (RM3): a mail from sam@gmail.com is not Omar's
+       because Omar's address is at gmail.com too, since a free mail host is anybody's. */
+    const address = read.from?.email.toLowerCase() ?? '';
+    if (address !== '' && heldAs(kept, address)) return true;
+    const domain = read.domain.toLowerCase();
+    return domain !== '' && !isPublicMail(domain) && heldAs(kept, `@${domain}`, true);
   };
   const hits = rowsOf(deps, bills.id).filter(
     (r) => r.fields[bills.direction] === 'owed_to_me' && fromThem(r) && whole(String(r.fields[bills.title] ?? '').toLowerCase(), ref),
