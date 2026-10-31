@@ -72,7 +72,7 @@ type Prefs = NonNullable<Answer<'boot'>['me']['prefs']>;
 export type Boot = {
   /** Each list the caller reads; `icon` is the glyph its declaration names, `null` for none, absent from an older host. */
   /** `kernel` marks a list the kernel declares itself (the runs, what he told them), never one he filed into. */
-  registers: { id: string; name: string; count: number; open?: number; icon?: string | null; kernel?: true }[];
+  registers: { id: string; name: string; count: number; open?: number; icon?: string | null; kernel?: true; pack?: string }[];
   /** ISO 8601, UTC. What day the record thinks it is, which is not always what day the reader does. */
   now: string;
   /* OPTIONAL, because a host older than the session register answers without them. */

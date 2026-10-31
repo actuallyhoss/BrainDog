@@ -1397,7 +1397,7 @@ export type Boot = {
    * The lists the caller reads, each with its row count and the glyph its declaration names (`icon`), so the rail draws
    * the list's own mark rather than one the web guesses from its id. `null` for a list that names none.
    */
-  registers: { id: string; name: string; count: number; open?: number; icon: string | null; kernel?: true }[];
+  registers: { id: string; name: string; count: number; open?: number; icon: string | null; kernel?: true; pack?: string }[];
   /** ISO 8601, UTC. The instant the record answered as of. */
   now: string;
   /** The runs that are live now, as `sessionsLive` answers. Empty for a caller who may not read them. */
@@ -3572,7 +3572,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { firstPartyManifest } = await import('@braindog/seed/packs');
       const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
       const { useCase } = await import('@braindog/seed/usecases');
-      const host = packHost(ctx);
+      /* THE RE-PUT IS THE RECORD'S OWN, signed `system` whoever's press set it off, so a same-version one that changed
+         nothing stays out of the feed while a person's own reinstall is signed by them (review i, RI1). */
+      const host: Host = { ...packHost(ctx), remember: (row) => kernel.rememberPack({ ...row, by: 'system' }) };
       const speaking = speakingNow(kernel);
       const u = speaking === null ? undefined : useCase(speaking.replace(/^usecase-/u, ''));
       const planned = async (doc: Record<string, unknown>) => {
@@ -11662,6 +11664,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const out: Boot['registers'] = [];
         /* THE KERNEL'S OWN LISTS SAY SO (`kernel: true`), by their declaration, so no screen leaves them out by a name. */
         const own = new Set(kernel.kernelLists());
+        /* AND THE ADD-ON THAT DECLARED EACH ONE (`pack`), so a screen tells Money's Plans from a list somebody made and
+           called Plans (review i, RI4). A list changed in the app has `pack_id` empty on its live row and is still the
+           pack's: the pack's last row says whose, unless a retire came between (`detached`). */
+        const packOf = new Map(
+          sql
+            .all<{ id: string; pack: string | null }>(
+              `SELECT d.id AS id, COALESCE(d.pack_id, (SELECT p.pack_id FROM declaration p WHERE p.id = d.id AND p.version < d.version AND p.pack_id IS NOT NULL
+                   AND NOT EXISTS (SELECT 1 FROM declaration r WHERE r.id = d.id AND r.retired = 1 AND r.version >= p.version AND r.version < d.version)
+                 ORDER BY p.version DESC LIMIT 1)) AS pack
+                 FROM declaration d WHERE d.kind = 'register' AND d.superseded_at IS NULL AND d.retired = 0`,
+            )
+            .flatMap((r) => (r.pack ? [[r.id.slice('register.'.length), r.pack] as const] : [])),
+        );
         for (const [id, decl] of kernel.registers()) {
           /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
              on is inside their ceiling by construction, so its name and its row count went out to the
@@ -11686,7 +11701,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               open = undefined;
             }
           }
-          out.push({ id, name: decl.name, count: countNow(ctx, id), ...(open === undefined ? {} : { open }), icon: typeof icon === 'string' && icon !== '' ? icon : null, ...(own.has(id) ? { kernel: true as const } : {}) });
+          out.push({ id, name: decl.name, count: countNow(ctx, id), ...(open === undefined ? {} : { open }), icon: typeof icon === 'string' && icon !== '' ? icon : null, ...(own.has(id) ? { kernel: true as const } : {}), ...(packOf.has(id) ? { pack: packOf.get(id)! } : {}) });
         }
         const shell = shellFor(ctx);
         const waits = waitsFor(ctx);

@@ -135,7 +135,10 @@ export function tellLists(boot: Holds, declared: Readonly<Record<string, TellLis
   const out: TellList[] = [];
   for (const r of boot.registers) {
     const d = declared[r.id];
-    if (d) out.push(Number.isFinite(r.count) ? { ...d, count: r.count } : d);
+    if (!d) continue;
+    /* AND WHOSE IT IS, as `boot` says (RI4): the declaration says nothing of the add-on that made it. */
+    const owned: TellList = typeof r.pack === 'string' ? { ...d, pack: r.pack } : d;
+    out.push(Number.isFinite(r.count) ? { ...owned, count: r.count } : owned);
   }
   return out;
 }

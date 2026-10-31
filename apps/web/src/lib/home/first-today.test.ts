@@ -157,7 +157,7 @@ type Declared = { register?: string; name: string; one?: string; title: string; 
 function seeded(pack: string, id: string): TellList {
   const d = ((firstPartyDocument(pack as never)?.declarations ?? []) as Declared[]).find((x) => x.register === id);
   assert.ok(d, `${pack} declares ${id}`);
-  return { id, name: d.name, title: d.title, fields: d.fields, ...(d.one ? { one: d.one } : {}), ...(d.state ? { state: d.state } : {}), ...(d.done ? { done: d.done } : {}) };
+  return { id, name: d.name, title: d.title, fields: d.fields, pack, ...(d.one ? { one: d.one } : {}), ...(d.state ? { state: d.state } : {}), ...(d.done ? { done: d.done } : {}) };
 }
 
 const ORDERS: TellList = {

@@ -43,7 +43,7 @@ type Declared = { register?: string; name: string; title: string; fields: FieldD
 function seeded(pack: string, id: string): TellList {
   const d = ((firstPartyDocument(pack as never)?.declarations ?? []) as Declared[]).find((x) => x.register === id);
   assert.ok(d, `${pack} declares ${id}`);
-  return { id, name: d.name, title: d.title, fields: d.fields, ...(d.one ? { one: d.one } : {}), ...(d.state ? { state: d.state } : {}) };
+  return { id, name: d.name, title: d.title, fields: d.fields, pack, ...(d.one ? { one: d.one } : {}), ...(d.state ? { state: d.state } : {}) };
 }
 
 const LISTS = [seeded('people', 'people'), seeded('money-core', 'transactions'), seeded('money-core', 'obligations')];

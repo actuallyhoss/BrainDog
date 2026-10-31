@@ -18,7 +18,7 @@ type Declared = { register?: string; name: string; one?: string; title: string; 
 function seeded(pack: string, id: string): TellList {
   const d = ((firstPartyDocument(pack as never)?.declarations ?? []) as Declared[]).find((x) => x.register === id);
   assert.ok(d, `${pack} declares ${id}`);
-  return { id, name: d.name, title: d.title, fields: d.fields, ...(d.one ? { one: d.one } : {}), ...(d.state ? { state: d.state } : {}), ...(d.icon ? { icon: d.icon } : {}) };
+  return { id, name: d.name, title: d.title, fields: d.fields, pack, ...(d.one ? { one: d.one } : {}), ...(d.state ? { state: d.state } : {}), ...(d.icon ? { icon: d.icon } : {}) };
 }
 
 const PEOPLE = seeded('people', 'people');
@@ -449,9 +449,12 @@ test('NOTHING PLACED IS SAID, WITH THE WAY ON, never a card over nothing to pres
   assert.deepEqual(told.offers?.map((r) => r.register), ['things']);
   /* AJ8: never the record's own lists or Money's parts, whatever their shape. */
   const runs = { ...THINGS, id: 'session', name: 'Agent runs' };
-  const plans = { ...THINGS, id: 'plans', name: 'Plans' };
+  const plans = { ...THINGS, id: 'plans', name: 'Plans', pack: 'money-core' };
   const own = tellRead('Call the printer about the new labels tomorrow', { ...shopNoTasks, lists: [PEOPLE, ORDERS, runs, plans, THINGS] });
   assert.deepEqual(own.offers?.map((r) => r.register), ['things']);
+  /* RI4: a list he made and called Plans, with no Money, is his own and is offered. */
+  const his = tellRead('Call the printer about the new labels tomorrow', { ...shopNoTasks, lists: [PEOPLE, ORDERS, runs, { ...THINGS, id: 'plans', name: 'Plans' }, THINGS] });
+  assert.ok(his.offers?.some((r) => r.register === 'plans'), 'a list of his own called Plans was never offered');
 });
 
 test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oct g, RG4-RG9, RG16)', () => {

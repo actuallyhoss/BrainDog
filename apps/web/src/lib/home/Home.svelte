@@ -222,6 +222,7 @@
       id: l.id,
       name: l.name,
       count: counted ? (counted.get(l.id) ?? 0) : (data.index.registers.find((r) => r.id === l.id)?.count ?? 0),
+      ...(l.pack === undefined ? {} : { pack: l.pack }),
     })),
   });
   /** The device's own preferences: whether the next steps are hidden, and how her work arrives. Read again on Hide. */

@@ -47,6 +47,8 @@ export type TellList = {
   icon?: string;
   /** How many entries it holds, as the record counted them (`tellLists`), when known. */
   count?: number;
+  /** The add-on that declared it, as `boot` says (`tellLists`); absent for a list somebody made. */
+  pack?: string;
 };
 
 /** An entry already on the record, by the number you can say out loud and its name. */
@@ -358,11 +360,18 @@ function startIn(l: TellList, fields: Record<string, TellValue>): void {
  * a plan is a payment plan, an instalment one part of it, a book a set of accounts, and the rest are kept by the record
  * (AJ8: "train for the Cairo half marathon" was offered to Plans and Agent runs on a Personal that has Goals).
  */
-const NEVER_PLAIN: ReadonlySet<string> = new Set(['session', 'plans', 'installments', 'books', 'snapshots', 'balances', 'fx', 'filing_rules', 'categories', 'accounts']);
+const MONEY_PARTS: ReadonlySet<string> = new Set(['plans', 'installments', 'books', 'snapshots', 'balances', 'fx', 'filing_rules', 'categories', 'accounts']);
+
+/**
+ * BY WHOSE THE LIST IS AS WELL AS ITS ID (review i, RI4): on a record without Money, a list he made and called Plans,
+ * Books, Categories or Accounts has that id, and "Read Dune next week" was never offered to it. The kernel's own Agent
+ * runs go by id, which nobody else can declare.
+ */
+const neverPlain = (l: TellList): boolean => l.id === 'session' || (l.pack === 'money-core' && MONEY_PARTS.has(l.id));
 
 /** Lists a plain line is never put in: People, orders, money and the record's own. */
 const plainable = (l: TellList): boolean =>
-  l.id !== PEOPLE && !NEVER_PLAIN.has(l.id) && !callsItself(l, /\border/i) && !l.fields.some((f) => f.type === 'money' && f.required) && fillable(l);
+  l.id !== PEOPLE && !neverPlain(l) && !callsItself(l, /\border/i) && !l.fields.some((f) => f.type === 'money' && f.required) && fillable(l);
 
 /**
  * HOW MUCH A LIST LOOKS LIKE THINGS TO DO, BY ITS SHAPE and never its name, since a team calls its tasks Tickets and a

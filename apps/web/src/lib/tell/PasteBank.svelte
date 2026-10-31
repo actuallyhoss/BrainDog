@@ -37,7 +37,7 @@
 
   const options = $derived.by((): TellOptions => {
     void learnt;
-    const kept = { registers: shell.lists.map((l) => ({ id: l.id, name: l.name, count: shell.index.registers.find((r) => r.id === l.id)?.count ?? 0 })) };
+    const kept = { registers: shell.lists.map((l) => ({ id: l.id, name: l.name, count: shell.index.registers.find((r) => r.id === l.id)?.count ?? 0, ...(l.pack === undefined ? {} : { pack: l.pack }) })) };
     const lists = tellLists(kept, REGISTERS);
     const into = lists.flatMap((l) => l.fields.filter((f) => f.type === 'ref' && f.required && /account/i.test(`${f.id} ${f.label ?? ''}`)).map((f) => f.to));
     return { lists, today: recordToday(shell.now), currency: shell.index.currency ?? null, people: knownIn(playedBy('meets')), accounts: into.flatMap((to) => knownIn(to)) };
