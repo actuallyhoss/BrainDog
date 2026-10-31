@@ -50,10 +50,9 @@ export const RECURRING_REGISTER: MoneyRegister = {
       index: true,
       required: true,
     },
-    /* "NEXT" MAY BE LEFT OPEN (AO5): few people know the day a subscription takes its money, and "Netflix 180 a month" is
-       kept without one, never with a day made up. It still counts in every month's figure; the walk, Due soon and
-       the missed-day question pass it by until somebody says the day. */
-    { id: 'next_due', label: 'Next', type: 'day', index: true, deadline: true, remind: ['-3d', '0d'] },
+    /* "NEXT" STAYS REQUIRED FOR LAUNCH (31 Oct, at the merge of AO5): leaving it open changes the list his live record
+       holds. Tell asks "When is it next due?" for a line said with no day, and never makes one up. */
+    { id: 'next_due', label: 'Next', type: 'day', index: true, deadline: true, required: true, remind: ['-3d', '0d'] },
     /* THE LAST PAYMENT, ITS DAY AND WHAT IT CAME TO, and no link: a line is a pattern and is paid every cycle,
        so it names no one Ledger entry. Money's `settle` script writes both when a payment is matched to the line and
        moves "Next" one cycle on in the same change, by the walk's own steps (`cycleAfter`). The amount is the payment's,

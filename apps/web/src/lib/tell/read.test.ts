@@ -592,8 +592,8 @@ test('PLAIN MONEY LINES ARE MONEY, never tasks (AL4)', () => {
   /* A cost that comes round is Repeating, where the record keeps it, and a bill that repeats where it does not. */
   const netflix = tellRead('Netflix 180 a month', { ...founder, lists: [...founder.lists, RECURRING] }).rows;
   assert.deepEqual(netflix.map((r) => [r.register, r.fields.direction, r.fields.every]), [['recurring', 'out', 'monthly']]);
-  /* Repeating keeps a line with its next day open (AO5), so nothing is missing. */
-  assert.deepEqual(netflix[0]!.missing, []);
+  /* Repeating needs its next day, so Tell asks for it and never makes one up. */
+  assert.deepEqual(netflix[0]!.missing, ['next_due']);
   assert.equal(tellRead('Netflix 180 a month', founder).rows[0]!.fields.repeats, 'monthly');
   /* Where nothing is a task list, they are still money, never "Not sure". */
   const personal = { lists: [PEOPLE, LEDGER, DUE], today: TODAY, currency: 'EGP' };
@@ -1111,18 +1111,12 @@ test('"INVOICE 1042 PAID" WITH INVOICE 1042 OPEN IS OFFERED AS MARKING IT PAID',
 
 /* ── audit 31 Oct o: a line with no day can be added, one place before and after, a date said as a date ──────────── */
 
-test('"NETFLIX 180 A MONTH" CAN BE ADDED WITH ITS NEXT DAY OPEN, never a day made up (AO5)', () => {
+test('"NETFLIX 180 A MONTH" ASKS FOR ITS NEXT DAY, never a day made up (AO5, kept required at the merge)', () => {
   const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
-  for (const said of ['Netflix 180 a month', 'Hosting 45 USD a month', 'Gym membership 900 a month']) {
-    const told = tellRead(said, withRepeating);
-    assert.equal(told.why, undefined, said);
-    assert.equal(told.rows.length, 1, said);
-    assert.equal(told.rows[0]!.register, 'recurring', said);
-    assert.equal(told.rows[0]!.fields.next_due, undefined, said);
-    assert.deepEqual(told.rows[0]!.missing, [], said);
-    assert.match(told.rows[0]!.detail, /next day not set/u, said);
-  }
-  /* A day said is still kept, and "not set" never said beside it. */
+  const told = tellRead('Netflix 180 a month', withRepeating);
+  assert.equal(told.rows[0]!.fields.next_due, undefined);
+  assert.deepEqual(told.rows[0]!.missing, ['next_due']);
+  /* A day said is kept, and nothing is missing. */
   const fifth = tellRead('Netflix 180 a month on the 5th', withRepeating).rows[0]!;
   assert.equal(fifth.fields.next_due, '2026-11-05');
   assert.doesNotMatch(fifth.detail, /not set/u);
