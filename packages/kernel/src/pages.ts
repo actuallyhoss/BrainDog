@@ -1006,6 +1006,11 @@ export type PageDeps = {
    * unasked (`walkReach`). A forecast walks it only when its own `horizons:` offers it. Absent, nothing was asked.
    */
   walk?: number | 'last';
+  /**
+   * `false` READS A CARD'S TREND FROM ITS OWN FIGURE AND NEVER FROM THE PROJECT'S KEY NUMBER (`kpiLeadsOf`): a read for a
+   * shared link (SL2), since the key numbers are read across the whole record and a link reads only the page.
+   */
+  keyNumbers?: false;
   ctx: EvalContext;
   /*
    * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
@@ -3774,7 +3779,7 @@ const KPIS_KIND = 'kpis';
 function kpiLeadsOf(deps: PageDeps): ReadonlyMap<string, KpiAnswer> {
   const source = sourceModule(KPIS_KIND);
   const reads = deps.ctx.reads;
-  if (!source || (reads !== undefined && !reads(WHOLE_RECORD))) return new Map();
+  if (!source || deps.keyNumbers === false || (reads !== undefined && !reads(WHOLE_RECORD))) return new Map();
   const block: PageBlock = { kind: KPIS_KIND, source: KPIS_KIND, for: 'cards', limit: KPI_LEADS_MOST };
   const read = source.read(deps, block, { ...block, rows: [], matched: 0, refusals: [] }, (...more) => [...more], sourceKit(deps));
   const out = new Map<string, KpiAnswer>();

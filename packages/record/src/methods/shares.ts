@@ -792,17 +792,19 @@ const FIGURE_COLUMN_OUT: Readonly<Record<string, string>> = { trend: 'trends', w
  * page said "This page has nothing a link can show". The column goes and the cards stay, drawn from the projects' own
  * rows; whatever else the block reads is still asked of `NEVER_READ` after.
  *
- * A LINE THAT LEADS WITH THE PROJECT'S KEY NUMBER (`kpi: headline`) GOES TOO: the record draws it from the `kpis` source,
- * which reads across the whole record (any list a key number counts, money among them), and `blockRegisters` names only
- * the column's own figure, since a member is drawn that figure instead (`kpiLeadsOf`). A link reads as the owner and
- * would be handed the key numbers, so the line is off it whichever rows it was drawn from.
+ * A LINE THAT LEADS WITH THE PROJECT'S KEY NUMBER (`kpi: headline`) IS READ FROM ITS OWN FIGURE ON A LINK (SL2). The key
+ * numbers come from the `kpis` source, which reads across the whole record (any list a key number counts, money among
+ * them), so `sharedPage` reads the page with them off (`keyNumbers: false`), as a member who does not read the whole
+ * record is drawn: each card's line is then the column's own figure filled from the card's row (tasks of that project
+ * done by week), and the column is asked of `NEVER_READ` by the lists that figure reads, like any other. The money rules
+ * still hold after this (`moneyFree` drops a trend over a money figure).
  */
 const neverReadCut = (b: BlockResult, showing: Showing): BlockResult => {
   if (!Array.isArray(b.columns) || !b.columns.some((c) => typeof c.metric === 'string')) return b;
   const cut = new Set<string>();
   const columns = b.columns.filter((c) => {
     if (typeof c.metric !== 'string') return true;
-    const reads = c.kpi !== undefined ? ['*'] : showing.reads({ kind: b.kind, columns: [c], rows: [], refusals: [] } as unknown as BlockResult);
+    const reads = showing.reads({ kind: b.kind, columns: [c], rows: [], refusals: [] } as unknown as BlockResult);
     if (!reads.some((list) => NEVER_READ.has(list))) return true;
     if (typeof c.as === 'string' && FIGURE_COLUMN_OUT[c.as] !== undefined) cut.add(FIGURE_COLUMN_OUT[c.as]!);
     return false;
@@ -880,6 +882,15 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
     return shown;
   });
   if (columns.length > 0) kept.columns = columns;
+  /* A CARD'S TREND IS NAMED AS ITS FIGURE IS (SL2): the column's own label, else the figure's name, as every reading on
+     a link is named. The column itself names no field, so it is not one of `columns`; the name is all a reader needs to
+     draw the line `trends` holds. */
+  const trendColumn = Array.isArray(kept.trends) ? (b.columns ?? []).find((c) => c.as === 'trend' && typeof c.metric === 'string') : undefined;
+  if (trendColumn !== undefined) {
+    const id = trendColumn.metric!.split(':')[0]!;
+    const owned = typeof trendColumn.label === 'string' && trendColumn.label.trim() !== '' ? trendColumn.label : undefined;
+    kept.trend_label = owned ?? figure(id) ?? idSaid(id);
+  }
   const drawn = (register: string): string[] =>
     columns.length > 0 ? columns.flatMap((c) => (c.sign === undefined ? [c.field] : [c.field, c.sign.field])) : [lists.get(register)?.title ?? ''];
   kept.rows = b.rows.map((row) => {
@@ -1280,7 +1291,8 @@ export function methods(deps: RecordDeps) {
       /* AND A PAGE THAT CAME TO SHOW A PERSONAL LIST AFTER ITS LINK WAS OPENED NO LONGER OPENS. */
       if (personalPage(slug)) return { ok: false, refusal: SHUT };
       /* A LINK IS NOBODY, so a row its maker kept private is not on the shared page. */
-      const out = kernel.page(slug, undefined, { viewer: NOBODY });
+      /* AND WITH NO KEY NUMBER LEADING A CARD (SL2): those read across the record, so each card's line is its own figure. */
+      const out = kernel.page(slug, undefined, { viewer: NOBODY, keyNumbers: false });
       if (!out.ok) return { ok: false, refusal: SHUT };
       const identity = kernel.identity();
       const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;

@@ -10392,11 +10392,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         sees?: PageSees | undefined;
         /** The row the host last saw at this address, when it is a page of a row that comes and goes (`rowPageAt`). */
         about?: { register: string; seq: number } | undefined;
+        /** `false` draws every card's trend from its own figure, never a key number (`PageDeps.keyNumbers`): a link's read. */
+        keyNumbers?: false;
       } = {},
     ): Result<PageResult> =>
       readPage(
         {
           ...pageDeps(opts.viewer, opts.sees),
+          ...(opts.keyNumbers === false ? { keyNumbers: false as const } : {}),
           /* WHAT THE RECORD READS THAT THE KERNEL CANNOT (`lists`, `pages`), and the names it holds for the people in the log. */
           ...(opts.hostSources ? { hostSources: opts.hostSources } : {}),
           ...(opts.actorName ? { actorName: opts.actorName } : {}),
