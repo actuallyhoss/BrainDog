@@ -180,5 +180,7 @@ test('WHAT A PLAN ADDS IS SAID ONCE EACH: the script its rule runs, and the page
   );
   const adds = sheet?.parts[0]?.sections.find((s) => s.key === 'adds');
   assert.deepEqual(adds?.rows.map((r) => r.text), ['Events', "Keep a subscription's old price when its amount changes", 'Subscriptions', 'and 1 number']);
-  assert.equal(adds?.n, 4);
+  /* THE PAGE FOLDED INTO ITS LIST'S LINE IS STILL SAID AND COUNTED (AL10), as the store's listing counts it. */
+  assert.equal(adds?.rows[0]?.detail, 'With its own page');
+  assert.equal(adds?.n, 5);
 });
