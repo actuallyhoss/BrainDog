@@ -18,9 +18,31 @@ const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
 /** The command line that runs `main.ts <words>` from where the person is: through Compose in the image, with node elsewhere. */
 export function commandFor(words: string): string {
-  if (inImage()) return `docker compose run --rm braindog node apps/selfhost/src/main.ts ${words}`;
+  if (inImage()) return imageCommand(words);
   const near = relative(cwd(), MAIN);
   return `node ${near === '' || near.startsWith('..') || isAbsolute(near) ? MAIN : near} ${words}`;
+}
+
+/**
+ * IN THE IMAGE, EACH COMMAND AS THE README GIVES IT (AI25). `docker compose run` for all of them printed a backup that
+ * wrote into a throwaway container, a restore and an import that could not see a folder on the machine, and a serve
+ * with no published port. A backup runs in the server that is up; a restore or an import mounts the folder read-only and
+ * runs as root, then hands `/data` back to the server's user; serving is Compose's own.
+ */
+function imageCommand(words: string): string {
+  const node = 'node apps/selfhost/src/main.ts';
+  const [verb = '', ...rest] = words.trim().split(/\s+/u);
+  if (verb === '' || (verb === 'serve' && rest.length === 0)) return 'docker compose up -d';
+  if (verb === '--help' || verb === 'backup') return `docker compose exec braindog ${node} ${words.trim()}`;
+  if (verb === 'restore')
+    return `docker compose run --rm --user root -v "$HOME/braindog-backups/braindog-<time>:/restore:ro" braindog sh -c '${node} restore /restore && chown -R node:node /data'`;
+  const from = rest.indexOf('--from');
+  if (verb === 'init' && from !== -1) {
+    const named = rest.slice(0, from).join(' ') || '<record name>';
+    const after = rest.slice(from + 2).join(' ');
+    return `docker compose run --rm --user root -v "$HOME/Downloads:/import:ro" braindog sh -c '${node} init ${named} --from /import/<file>.brainl${after ? ` ${after}` : ''} && chown -R node:node /data'`;
+  }
+  return `docker compose run --rm braindog ${node} ${words.trim()}`;
 }
 
 /**
@@ -59,10 +81,17 @@ export function listenOf(e: Record<string, string | undefined>): string | undefi
  * is said at start rather than refused: a container behind its own proxy, or a machine alone on a trusted network, is
  * a real setup. An `https:` origin with no certificate here is a proxy in front, which is not this line's to judge.
  */
-export function plainLine(o: { key: boolean; tls: boolean; listen: string | undefined; origin: string }): string | null {
+export function plainLine(o: { key: boolean; tls: boolean; listen: string | undefined; origin: string; image?: boolean; publish?: string | undefined }): string | null {
   if (!o.key || o.tls || !/^http:/iu.test(o.origin)) return null;
-  const bound = (o.listen ?? '::').replace(/^\[|\]$/gu, '').toLowerCase();
-  if (bound === '127.0.0.1' || bound === '::1' || bound === 'localhost') return null;
+  const loop = (at: string): boolean => ['127.0.0.1', '::1', 'localhost'].includes(at.replace(/^\[|\]$/gu, '').toLowerCase());
+  /* IN THE IMAGE THE BIND IS NOT THE OPERATOR'S TO NARROW (AI19): loopback inside a container is reachable from nowhere,
+     and how far the port reaches is where Compose publishes it, `BRAINDOG_PUBLISH`, this machine alone unless set. */
+  if (o.image === true) {
+    const published = o.publish?.trim() ?? '';
+    if (published === '' || loop(published)) return null;
+    return `  plain http on your network (BRAINDOG_PUBLISH=${published}): the server key and the sign-in cookie cross it unencrypted to anybody on it. Set BRAINDOG_TLS_CERT and BRAINDOG_TLS_KEY, or put https in front and remove BRAINDOG_PUBLISH to keep the port on this machine.`;
+  }
+  if (loop(o.listen ?? '::')) return null;
   return '  plain http on every interface: the server key and the sign-in cookie cross the network unencrypted to anybody on it. Set BRAINDOG_TLS_CERT and BRAINDOG_TLS_KEY, serve it behind https on this machine, or set BRAINDOG_LISTEN=127.0.0.1.';
 }
 

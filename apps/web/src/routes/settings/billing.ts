@@ -404,7 +404,8 @@ export const tileWords = {
   copiesTitle: 'Nightly copies',
   copiesMeta: (kept: number) => `every night · last ${kept} kept`,
   /** The strip's right-hand end, under it. */
-  stripTo: 'last night',
+  /* THE RIGHT-HAND SQUARE IS TODAY, and a copy taken this morning is today's (AI22). */
+  stripTo: 'today',
   everyNight: (n: number) => `Every one of the last ${n} nights was copied.`,
   sinceFirst: (n: number, first: string) =>
     n === 1 ? `The first copy was taken on ${first}.` : `A copy on each of the last ${n} nights, since the first on ${first}.`,

@@ -178,7 +178,7 @@
          mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
          person who runs the host as the last resort either way, because there is no recovery code to offer. -->
     {#if livePasskeys}
-      <StateRow icon="key" title={copy.passkeyLost} line={copy.passkeyLostHow(livePasskeys.magic !== false)} />
+      <StateRow icon="key" title={copy.passkeyLost} line={shell.host === 'self-host' && s.anOwner ? copy.passkeyLostSelfHost : copy.passkeyLostHow(livePasskeys.magic !== false)} />
     {/if}
     <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
          `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery

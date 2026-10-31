@@ -50,6 +50,26 @@ export const addressCommand = (origin: string, slug: string): string =>
   `echo "${mailUrl(origin, `$(cat \${BRAINDOG_DATA:-/data}/${slug}/${words.tokenFile})`)}"`;
 
 /**
+ * THE SAME COMMAND ON DOCKER (AI21): the file is inside the container's volume, so `cat` on the machine found no `/data`.
+ * It runs in the container, where the data folder is.
+ */
+export const dockerAddressCommand = (origin: string, slug: string): string =>
+  `docker compose exec braindog sh -c 'echo "${mailUrl(origin, `$(cat \${BRAINDOG_DATA:-/data}/${slug}/${words.tokenFile})`)}"'`;
+
+/**
+ * WHETHER A MAIL PROVIDER COULD POST TO THIS ORIGIN AT ALL (AI21): a forwarder on the internet reaches neither
+ * `localhost` nor a private name over plain http, so the address printed would never take a message.
+ */
+export const reachableForMail = (origin: string): boolean => {
+  try {
+    const u = new URL(origin);
+    return u.protocol === 'https:' && !/^(localhost|127\.|\[?::1\]?$)/u.test(u.hostname) && !u.hostname.endsWith('.localhost');
+  } catch {
+    return false;
+  }
+};
+
+/**
  * What the screen shows after a press, and every arm is a sentence rather than a failure.
  *
  * `signin` IS ITS OWN KIND, for the reason `device.ts` gives it one: the door wants an owner whose last sign-in is
@@ -169,5 +189,10 @@ export const words = {
   /* THE FILE'S NAME ON A LINE OF ITS OWN: in the middle of the sentence it read as a name from the code (the printed
      gate's `dev-name`), and set apart it is the thing a person types. */
   unrouted: 'On a self-host the address is a file beside your BrainDog:',
+  onDocker: 'On Docker:',
+  noDocker: 'Without Docker:',
+  /* SAID OVER THE COMMAND, NOT INSTEAD OF IT: the address is still the one to use once the name is public. */
+  notReachable: (origin: string) =>
+    `${origin} is not a public https address, so no mail provider can deliver to it. Serve BrainDog at one and set BRAINDOG_ORIGIN to it first.`,
   tokenFile: 'inbound.token',
 } as const;

@@ -22,6 +22,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Waffle from '$lib/viz/Waffle.svelte';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
   import { nightParts, nightsLine, nightsOf, nightsSaid, nightWords, tileWords } from '../../billing.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import { aboutCopies, nightFailed, type Fault } from '../health.ts';
@@ -97,6 +98,11 @@
    * nights it has had, not three weeks of failures from before it existed.
    */
   const nights = $derived(copyLines.length > 0 ? nightsOf(copyLines, Date.now(), KEPT_NIGHTS) : null);
+  /* THE STRIP STARTS AT THE FIRST COPY (AI22): a BrainDog made minutes ago drew thirty filled squares from a month before
+     it existed. The nights before it are not drawn; the line under the strip still says since when. */
+  const strip = $derived(nights ? nights.slice(Math.max(0, nights.findIndex((x) => x.state !== 'before'))) : null);
+  /* AND ITS RIGHT END IS THE NEWEST COPY'S REAL AGE, not "last night" under a copy taken a minute ago. */
+  const newestAt = $derived(copyLines.find((c) => c.failed === null)?.at ?? null);
 
   /** The copies by the month they were taken in, newest first: one group on the ground each. */
   const MONTH_NAME = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -117,8 +123,29 @@
   const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const copyDay = (id: string): string => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(id);
-    return m ? `${Number(m[3])} ${SHORT_MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]}` : id;
+    return m ? `${Number(m[3])} ${SHORT_MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]}` : copyName(id);
   };
+  /* A SELF-HOST'S COPY IS NAMED BY ITS TIME AND WHO TOOK IT, IN LOCAL WORDS (AI23): `2026-10-31T00-38-42Z-now` is
+     "Today 02:38, taken by you". The stamp in the name is UTC, so it is read as an instant and said where the person is. */
+  const STAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})Z-([a-z][a-z-]*?)(?:-\d+)?$/u;
+  const dayOf = (d: Date): string => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  function copyName(id: string): string {
+    const m = STAMP.exec(id);
+    if (!m) return id;
+    const when = new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`);
+    if (Number.isNaN(when.getTime())) return id;
+    const now = new Date();
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const time = `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`;
+    const day =
+      dayOf(when) === dayOf(now)
+        ? copy.copyToday
+        : dayOf(when) === dayOf(yesterday)
+          ? copy.copyYesterday
+          : `${when.getDate()} ${SHORT_MONTHS[when.getMonth()]}${when.getFullYear() === now.getFullYear() ? '' : ` ${when.getFullYear()}`}`;
+    const by = copy.copyBy[m[5] ?? ''];
+    return by ? `${day} ${time}, ${by}` : `${day} ${time}`;
+  }
 
   /* READ ON ARRIVING AT THE AREA. `untrack` for the reason the Ingest area gives: `opened()` reads
      and writes the same state, so an effect that called it tracked would loop. */
@@ -230,7 +257,7 @@
     closed(true, at);
     backingUp = false;
     if (out.ok) {
-      toasts.push(copy.backedUp(out.value.id), { intent: 'good' });
+      toasts.push(copy.backedUp, { intent: 'good' });
       await readCopies();
       /* A COPY TAKEN BY HAND IS A COPY, so the line over the list reads it, from the record's own `boot`. */
       void rereadBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : facts));
@@ -264,7 +291,7 @@
     restoreBusy = false;
     if (out.ok) {
       restoring = null;
-      toasts.push(copy.restoredTo(out.value.bookmark, out.value.kept ?? ''), { intent: 'good' });
+      toasts.push(copy.restoredTo(copyDay(out.value.bookmark), out.value.kept ? copyDay(out.value.kept) : ''), { intent: 'good' });
       await readCopies();
     } else toasts.push(out.fix, { intent: 'warn' });
   }
@@ -338,14 +365,14 @@
   host's own: `53 §4` has the Cloud keep "the 30 newest dated keys plus `latest`" and run at `17 3 * * *` UTC, and
   `49 §5.13` a self-host keep 30 files and run at 02:00 UTC plus `hash(slug) mod 60` minutes, so no one time is printed.
 -->
-{#if nights && nights.length > 0}
+{#if nights && strip && strip.length > 0}
   <Tile icon="archive" title={tileWords.copiesTitle} meta={tileWords.copiesMeta(KEPT_NIGHTS)}>
     <div class="strip">
-      <Waffle parts={nightParts(nights)} columns={KEPT_NIGHTS} summary={nightsSaid(nights)} />
+      <Waffle parts={nightParts(strip)} columns={KEPT_NIGHTS} summary={nightsSaid(strip)} />
       <!-- THE STRIP'S TWO ENDS, so the squares read as dates. Secondary labels, dropped on a phone. -->
       <div class="strip-ends" aria-hidden="true">
-        <span>{nightWords(nights[0]?.day ?? '')}</span>
-        <span class="strip-now">{tileWords.stripTo}</span>
+        <span>{nightWords(strip[0]?.day ?? '')}</span>
+        <span class="strip-now">{strip[strip.length - 1]?.state === 'copied' && newestAt ? relative(newestAt, Date.now()) : tileWords.stripTo}</span>
       </div>
     </div>
     <p class="reading">{nightsLine(nights)}</p>
@@ -474,6 +501,10 @@
     <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
          both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
     <p class="hint">{shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere}</p>
+    {#if shell.host !== 'cloud'}
+      <p class="hint">{copy.downloadNeedsKey} {copy.theKeyDocker}</p>
+      <CodeLine text={copy.theKeyDockerCommand} />
+    {/if}
   </div>
 </Tile>
 
@@ -513,7 +544,7 @@
       <!-- THE CONFIRM IS WORDS AND TWO VERBS ON THE GROUND: a destructive verb is its words in ink asking to
            be pressed again, never a red box. What it replaces is said in the sentence, which is the part to read. -->
       <div class="confirm" role="group" aria-label={copy.restoreThis}>
-        <p class="confirm-said">{copy.restoreConfirm(restoring)}</p>
+        <p class="confirm-said">{copy.restoreConfirm(copyDay(restoring))}</p>
         <div class="row-actions">
           <Button tone="bad" disabled={restoreBusy} aria-busy={restoreBusy} onclick={restoreCopy}>{copy.restoreThis}</Button>
           <Button weight="bare" disabled={restoreBusy} onclick={() => (restoring = null)}>{copy.keepAsIs}</Button>

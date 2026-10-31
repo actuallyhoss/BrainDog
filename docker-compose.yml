@@ -1,6 +1,8 @@
 # One command: `cp selfhost.env.example .env`, fill in the two values it asks for, then `docker compose up -d`.
 # The record lives in the named volume, so `docker compose down` keeps it; `down -v` deletes it.
 # BRAINDOG_PORT in .env moves the port on your machine, and the address the server names follows it.
+# The port is published on this machine only (127.0.0.1). To reach it from other machines on your network, set
+# BRAINDOG_PUBLISH=0.0.0.0 in .env, and serve https (selfhost.env.example says how).
 # The build context is this folder: keep backups out of it (apps/selfhost/README.md, Backups).
 services:
   braindog:
@@ -11,7 +13,7 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "${BRAINDOG_PORT:-8080}:8080"
+      - "${BRAINDOG_PUBLISH:-127.0.0.1}:${BRAINDOG_PORT:-8080}:8080"
     volumes:
       - braindog:/data
     healthcheck:
