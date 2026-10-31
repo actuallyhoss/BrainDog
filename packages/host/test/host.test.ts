@@ -247,6 +247,10 @@ test('PH2: A PAGE THAT IS NOT THERE IS A 404 WITH THE SAME BODY, alone and insid
   assert.equal(routeStatus('openShare', no('PAGE_UNKNOWN', 'There is no such page to share.')), 422);
   assert.equal(routeStatus('page', no('REGISTER_UNKNOWN', 'x')), 422);
   assert.equal(routeStatus('page', no('PAGE_UNKNOWN', 'x')), 404);
+  /* PL2: A FIGURE THAT IS NOT THERE IS A 404 TOO; one that walks from a missing one is a declaration to fix. */
+  const figure = await call('metric?metric=nothing-counted');
+  assert.deepEqual([figure.status, figure.body.refusal?.code], [404, 'METRIC_UNKNOWN']);
+  assert.equal(routeStatus('metric', no('METRIC_UNKNOWN', 'x', { at: 'opening' })), 422);
   sql.close();
 });
 
