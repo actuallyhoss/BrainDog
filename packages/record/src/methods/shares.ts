@@ -243,6 +243,15 @@ const valueShown = (field: RegisterDecl['fields'][number], value: Json | undefin
   return oneShown(field.type, value);
 };
 
+/**
+ * A NAME THAT IS AN ADDRESS OR A NUMBER (RM2): a person met by mail before anybody knew their name is titled by their
+ * address, and one met by phone by their number. Said on a link, that hands their address to whoever holds it, so the
+ * cell is left out, as it was before a link said a linked row's name at all.
+ */
+export const addressOnly = (title: string): boolean =>
+  /[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+/u.test(title) ||
+  (/^\s*\+?[\d\s().-]+\s*$/u.test(title) && (title.match(/\d/gu)?.length ?? 0) >= 7 && !/^\s*\d{4}-\d{2}-\d{2}\s*$/u.test(title));
+
 /** A plain value, or a list of them: what the older reader of `fields` draws, which never held an amount. */
 const plain = (v: Json): boolean => isScalar(v) || (Array.isArray(v) && v.every(isScalar));
 
@@ -266,7 +275,7 @@ const rowShown = (row: Entry, drawn: readonly string[], lists: ReadonlyMap<strin
     if (field.type === 'ref') {
       const value = row.fields[id];
       const title = typeof value === 'string' && refSaid !== undefined ? refSaid(value) : undefined;
-      if (title !== undefined && title !== '' && !inside(title)) {
+      if (title !== undefined && title !== '' && !inside(title) && !addressOnly(title)) {
         fields[id] = title;
         cells[id] = { type: 'text', value: title };
       }
@@ -570,9 +579,12 @@ const clauseStands = (clause: string, fill: (key: string) => string | undefined)
 export const leadShown = (template: string, fill: (key: string) => string | undefined): string => {
   const out: string[] = [];
   let before = true;
+  /* A SENTENCE THAT SAYS AN ID IS LEFT OUT WHOLE, as `noteShown` leaves it (RM6): "Ship D41 before Friday." names a
+     decision a link does not open, and cannot be said without it. */
+  const spoken = (text: string): boolean => new RegExp(SPOKEN_ID.source, 'u').test(text);
   for (const sentence of template.split(/(?<=[.!?])\s+(?=\S)/u)) {
     if (keysIn(sentence).length === 0) {
-      if (before && sentence.trim() !== '') out.push(sentence.trim());
+      if (before && sentence.trim() !== '' && !spoken(sentence)) out.push(sentence.trim());
       continue;
     }
     let lean = true;
@@ -581,8 +593,9 @@ export const leadShown = (template: string, fill: (key: string) => string | unde
       .replace(/^and\s+/u, '')
       .replace(/\s{2,}/gu, ' ')
       .trim();
-    before = said !== '';
-    if (said !== '') out.push(STOPPED.test(said) ? said : `${said}.`);
+    const stands = said !== '' && !spoken(said);
+    before = stands;
+    if (stands) out.push(STOPPED.test(said) ? said : `${said}.`);
   }
   /* AND IT ENDS AS A SENTENCE DOES, whatever it held (`stopped` in the app): a project's line is its own words, filled. */
   const line = out.join(' ').trim();
