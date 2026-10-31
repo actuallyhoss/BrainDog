@@ -779,6 +779,40 @@ const walkShown = (walk: unknown) => {
 /** The keys of `LOOKS` that hold the owner's words, which a `{{path}}` is filled in. */
 const WORDS = ['heading', 'lead', 'empty', 'body'] as const;
 
+/** A card's columns that only say how the card is drawn, never words a link shows. */
+const DRAWING_ROLES: ReadonlySet<string> = new Set(['mark', 'hue', 'picture']);
+
+/** What a card's figure column computed, one per row, by the column's role: a `trend` its `trends`, a `when` its `whens`. */
+const FIGURE_COLUMN_OUT: Readonly<Record<string, string>> = { trend: 'trends', when: 'whens' };
+
+/**
+ * A block without the figure columns that read a list a link never reads (`NEVER_READ`), and without what each computed
+ * (SC1). Projects' cards say "Worked on" through `project-worked`, which reads the agents' runs and every list that hands
+ * work out, so it names the whole record (`*`), and the whole cards block was kept off every link: a shared Projects
+ * page said "This page has nothing a link can show". The column goes and the cards stay, drawn from the projects' own
+ * rows; whatever else the block reads is still asked of `NEVER_READ` after.
+ *
+ * A LINE THAT LEADS WITH THE PROJECT'S KEY NUMBER (`kpi: headline`) GOES TOO: the record draws it from the `kpis` source,
+ * which reads across the whole record (any list a key number counts, money among them), and `blockRegisters` names only
+ * the column's own figure, since a member is drawn that figure instead (`kpiLeadsOf`). A link reads as the owner and
+ * would be handed the key numbers, so the line is off it whichever rows it was drawn from.
+ */
+const neverReadCut = (b: BlockResult, showing: Showing): BlockResult => {
+  if (!Array.isArray(b.columns) || !b.columns.some((c) => typeof c.metric === 'string')) return b;
+  const cut = new Set<string>();
+  const columns = b.columns.filter((c) => {
+    if (typeof c.metric !== 'string') return true;
+    const reads = c.kpi !== undefined ? ['*'] : showing.reads({ kind: b.kind, columns: [c], rows: [], refusals: [] } as unknown as BlockResult);
+    if (!reads.some((list) => NEVER_READ.has(list))) return true;
+    if (typeof c.as === 'string' && FIGURE_COLUMN_OUT[c.as] !== undefined) cut.add(FIGURE_COLUMN_OUT[c.as]!);
+    return false;
+  });
+  if (columns.length === b.columns.length) return b;
+  const kept = { ...b, columns } as unknown as Record<string, unknown>;
+  for (const key of cut) delete kept[key];
+  return kept as unknown as BlockResult;
+};
+
 /**
  * One block as a shared page shows it, built from nothing (this file's header says why), or `null` for a block the link
  * hides, which is not sent at all: a kind that writes, links or reads across the record, and a block the record could
@@ -788,9 +822,10 @@ const WORDS = ['heading', 'lead', 'empty', 'body'] as const;
  * columns, which is what a card or a list without columns draws. A `sign` names a second field a money column reads.
  * Every column says the label the owner reads over it: hers, else the field's, else the field's id as words.
  */
-const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknown> | null => {
+const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknown> | null => {
   const { lists, figure, said, typed, cell } = showing;
-  if (typeof whole.kind !== 'string' || !shareKind(whole.kind) || !shareDraws(whole.source)) return null;
+  if (typeof given.kind !== 'string' || !shareKind(given.kind) || !shareDraws(given.source)) return null;
+  const whole = neverReadCut(given, showing);
   if (showing.reads(whole).some((list) => NEVER_READ.has(list))) return null;
   if (whole.refusals.length > 0) return null;
   /* WHAT THE OWNER'S PAGE DOES NOT DRAW IS NOT ON THE LINK (AH7, `markDrawn`): a note whose `when` failed said "No project
@@ -835,7 +870,9 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
   const declared = list === undefined ? undefined : lists.get(list);
   /* A COLUMN THAT DRAWS A FIGURE AND NO FIELD (a card's `{ metric, as: trend }`) SAYS NOTHING ON A ROW a link sends, and
      naming it by its field threw on the field it does not have, so a page whose cards drew a trend could not be shared. */
-  const columns = (b.columns ?? []).filter((c) => typeof c.field === 'string' && c.field !== '').map((c) => {
+  /* NOR A CARD'S MARK, HUE OR PICTURE (SC1): each is how the owner's card is drawn, an icon's name, a colour's degrees, a
+     stored file, and a link draws a card's row as words, where Projects said "tag" and "265" beside every name. */
+  const columns = (b.columns ?? []).filter((c) => typeof c.field === 'string' && c.field !== '' && !(typeof c.as === 'string' && DRAWING_ROLES.has(c.as))).map((c) => {
     const owned = typeof c.label === 'string' && c.label.trim() !== '' ? c.label : undefined;
     const shown: ColumnShown = { field: c.field, label: owned ?? declared?.fields.find((f) => f.id === c.field)?.label ?? idSaid(c.field) };
     if (c.as !== undefined) shown.as = c.as;
