@@ -6075,7 +6075,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AN ADD-ON PUT IN AGAIN AT THE VERSION IT HELD, BY THE RECORD AND SAYING NOTHING (audit j, AJ6): Money re-put for
        the lists Certificates brought into Cash ahead. Nothing a person chose changed; the log keeps the line. A part that
        waited and arrived carries its `because` as the note, and a reinstall somebody approved carries the lines, so both
-       stay in the feed. */
+       stay in the feed. A person's own reinstall is signed by them, and a re-put whose body changed has no `from_v`
+       (`rememberPack`), so both stay too (review i, RI1). */
     if (e.kind === 'install' && e.target?.startsWith('pack:') && e.actor === 'system' && typeof e.from === 'string' && e.from === e.to && (e.note ?? null) === null) return true;
     /* A SCRIPT'S QUIET RUN (`script-run.ts` stamps `quiet`): it wrote nothing, asked nothing and stopped nothing, so a
        script that runs every night adds no line to a feed on a quiet one. Its history keeps it. */
@@ -13003,8 +13004,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const waiting = row.waiting !== undefined && row.waiting.length > 0 ? jcs(row.waiting.map((w) => ({ at: w.at, holds: [...w.holds] })) as unknown as Json) : null;
         /* THE VERSION IT HELD BEFORE, as the line's `from_v`, so a reinstall at the same version is told from a first
            install: Money put in again for Certificates' legs read "Installed the Money add-on" and every list it holds
-           as added (audit j, AJ6). `bookkeeping` leaves such a line out of the feed and Activity; the log keeps it. */
-        const was = sql.one<{ version: string }>('SELECT version FROM pack WHERE id = ?', row.id)?.version ?? null;
+           as added (audit j, AJ6). `bookkeeping` leaves such a line out of the feed and Activity; the log keeps it.
+           ONLY WHEN THE BODY IS THE SAME TOO (review i, RI1): a re-put at the same version whose checksum moved (a fold
+           landing after that version is live) changed what the record holds, so its line keeps `from_v` empty and is
+           said as an install. */
+        const held = sql.one<{ version: string; checksum: string | null }>('SELECT version, checksum FROM pack WHERE id = ?', row.id);
+        const was = held === undefined ? null : held.version !== row.version || held.checksum === row.checksum ? held.version : null;
         sql.exec(
           `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum, waiting)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -13021,11 +13026,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           waiting,
         );
         const approved = row.approved !== undefined && row.approved.length > 0;
+        /* SIGNED BY WHOEVER IT WAS MADE FOR (review i, RI1): a person's own reinstall, with nothing to approve and no
+           `because`, was signed `system` and left out of the feed as the record's own. `system` only when no one is
+           named, or the record put it in by itself (`legsFollow` names `system`). */
         sql.exec(
           "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v, note) VALUES (?, ?, ?, 'install', ?, 'pack', ?, ?, ?)",
           mint(),
           instant(clock.now()),
-          (approved || row.because !== undefined) && row.by ? row.by : 'system',
+          row.by || 'system',
           `pack:${row.id}`,
           was,
           row.version,
