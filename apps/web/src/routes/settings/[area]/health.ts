@@ -45,7 +45,18 @@ export type Engine = {
 };
 
 /** One vital sign as `signs()` answers it, the part this sentence reads: its state, and its own sentence when red. */
-export type Sign = { sign: string; state: 'green' | 'red' | 'none'; said?: string };
+export type Sign = {
+  sign: string;
+  state: 'green' | 'red' | 'none';
+  said?: string;
+  /**
+   * The heading the sign is said under, and where it is mended (AG7). A record's own failure is headed by its own words
+   * ("The backup on 3 Sep did not run") and carries `to`, its question; its `said` is then the follow-on ("It waits on you
+   * in Needs you"), which on this one line lost what it was about (AJ3). With `to`, the line leads with the name.
+   */
+  name?: string;
+  to?: string;
+};
 
 /** The word of the link at the line's end, to where the signs are shown. */
 export const LOOK = 'Look';
@@ -197,7 +208,8 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
   if (fault) return [{ text: firstSentence(fault.said), needs: true }];
   if ((redSigns(more.signs) ?? 0) > 0) {
     const lead = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '');
-    const raw = lead?.said;
+    const headed = typeof lead?.to === 'string' && lead.to.startsWith('/') && typeof lead.name === 'string' && lead.name.trim() !== '';
+    const raw = headed ? lead!.name : lead?.said;
     const named = raw === undefined ? 'One check needs a look' : upper(plainSign(raw).replace(/[.!?]$/u, ''));
     const link =
       /* AN OLD RATE LINKS TO WHAT CURES IT: a feed that is paused to where scheduled actions start again, anything else to
@@ -209,7 +221,9 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
         ? { text: KEEP_RATES, href: KEEP_RATES_AT }
         : lead?.sign === ARRIVALS && more.inboxAt
         ? { text: OPEN_THEM, href: more.inboxAt }
-        : aboutCopies(named) && more.backupsAt
+        : headed
+          ? { text: LOOK, href: lead!.to! }
+          : aboutCopies(named) && more.backupsAt
           ? { text: BACKUPS, href: more.backupsAt }
           : more.signsAt
             ? { text: LOOK, href: more.signsAt }
