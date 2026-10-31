@@ -99,11 +99,13 @@ It may also say:
 
 Caddy, nginx or cloudflared in front: set `BRAINDOG_ORIGIN` to the https address it answers at, and
 `BRAINDOG_TRUST_PROXY`, so the sign-in lockout and the rate limits count the real caller. Best is the proxy's own
-address (`BRAINDOG_TRUST_PROXY=127.0.0.1`, or `172.16.0.0/12` for a proxy in Docker): then each caller is counted on
-its own, and nobody can lock you out by guessing. `1` is the quick setting: it believes `X-Forwarded-For` from anything
-on this machine or a private network, so the whole LAN counts as a proxy, and anybody on it who reaches the port can
-claim a new address per guess. With `1` the wrong keys through each proxy are counted too: over 200 in fifteen minutes,
-keys through it wait two seconds before they are checked (the right key still works), and the log says so once. The
+address (`BRAINDOG_TRUST_PROXY=127.0.0.1`, or the proxy container's own address in Docker): then each caller is counted
+on its own, and nobody can lock you out by guessing. `1` is the quick setting: it believes `X-Forwarded-For` from
+anything on this machine or a private network, so the whole LAN counts as a proxy, and anybody on it who reaches the
+port can claim a new address per guess; a range such as `172.16.0.0/12` is the same for every machine in it. With `1` or
+a range the wrong keys through each proxy are counted too: over 200 in fifteen minutes, keys through it are rate limited
+to one every two seconds, one more waits its turn and the rest are told to try again (the right key still works when its
+turn comes), and the log says so once. The
 server's port must then be reachable only through the proxy: keep the default publish on `127.0.0.1`.
 
 ### Mail in

@@ -38,38 +38,56 @@ export const KEY_TRIES = { most: 10, window: 15 * 60_000 } as const;
 const PLACES_MOST = 50_000;
 
 /**
- * THE PROXY ITSELF IS COUNTED TOO, AND SLOWED, NEVER LOCKED (AI16, RG3). With `BRAINDOG_TRUST_PROXY=1` a peer on this
- * machine or a private network is believed, and one that reached the port past the proxy (the Docker gateway, anybody
- * on the LAN) can write a fresh place into the header with each guess (RG14). So the wrong keys through one peer are
- * counted too. LOCKING THAT PEER WAS THE OLD FAULT AGAIN: every caller behind Caddy or cloudflared has the proxy as its
- * peer, so a hundred wrong keys from anywhere on the internet locked the owner out with everybody else. Over the
- * ceiling the peer's key-shaped bearers wait `wait` before they are compared: the owner's right key still works, a
- * second or two late, and a guess costs that long. With a list of exact proxy addresses nobody can pass as one, and
- * nothing is counted against the peer at all (`peerSlowFor`).
+ * THE PROXY ITSELF IS COUNTED TOO, AND HELD TO A RATE, NEVER LOCKED (AI16, RG3, RH7, RH10). When a peer this host
+ * trusts may be more than one machine (`1`, which believes the whole LAN, or a list holding a range such as
+ * `172.16.0.0/12`, every Docker network), anybody who reaches the port past the proxy can write a fresh place into the
+ * header with each guess (RG14), and the place lock never trips. So the wrong keys through one peer are counted too.
+ * LOCKING THAT PEER WAS THE OLD FAULT AGAIN: every caller behind Caddy or cloudflared has the proxy as its peer, so a
+ * hundred wrong keys from anywhere on the internet locked the owner out with everybody else.
+ *
+ * WHAT IT IS NOW: A RATE LIMIT. Over the ceiling, ONE key-shaped bearer through that peer is compared per `wait`, in
+ * turn. One more may wait for the next turn (at most `wait`); any beyond that is answered 429 at once with the seconds
+ * to the next free turn, so nothing piles up sockets and timers. Before RH7 each request just slept `wait` and was then
+ * compared, so a thousand sent at once were five hundred guesses a second. Now it is one every `wait`, whatever is sent.
+ * The owner's right key takes a turn like any other: during a flood he may see a 429 and get in on a retry, which is the
+ * price of not locking him out. With a list of exact proxy addresses nobody can pass as one, and nothing is counted
+ * against the peer at all (`peerSlowFor`).
  */
 export const PEER_CEILING = { most: 200, window: 15 * 60_000, wait: 2_000 } as const;
 
+/** What `turn` hands back: wait this long and then compare, or refuse with `retryAfter` seconds. */
+export type PeerTurn = { wait: number } | { full: true; retryAfter: number };
+
 export type PeerSlow = {
-  /** Milliseconds a key-shaped bearer through `peer` waits before it is compared; 0 while under the ceiling. */
-  wait(peer: string): number;
+  /**
+   * The turn of one key-shaped bearer through `peer`: `{ wait: 0 }` under the ceiling; over it, the milliseconds until
+   * its turn (and the turn is taken), or `full` when one already waits for the next turn.
+   */
+  turn(peer: string): PeerTurn;
   /** One wrong key through `peer`; `true` the once its count reaches the ceiling in a window, to say so. */
   strike(peer: string): boolean;
 };
 
 export function peerSlow(now: () => number, rule: { most: number; window: number; wait: number } = PEER_CEILING): PeerSlow {
-  const peers = new Map<string, { n: number; first: number }>();
+  /* `next` is when the next turn is free, once the peer is over the ceiling. */
+  const peers = new Map<string, { n: number; first: number; next: number }>();
   const live = (peer: string, t: number) => {
     const at = peers.get(peer);
     return at !== undefined && at.first > t - rule.window ? at : undefined;
   };
   return {
-    wait(peer) {
-      const at = live(peer, now());
-      return at !== undefined && at.n >= rule.most ? rule.wait : 0;
+    turn(peer) {
+      const t = now();
+      const at = live(peer, t);
+      if (at === undefined || at.n < rule.most) return { wait: 0 };
+      const slot = Math.max(t, at.next);
+      if (slot - t > rule.wait) return { full: true, retryAfter: Math.max(1, Math.ceil((slot - t) / 1000)) };
+      at.next = slot + rule.wait;
+      return { wait: slot - t };
     },
     strike(peer) {
       const t = now();
-      const at = live(peer, t) ?? { n: 0, first: t };
+      const at = live(peer, t) ?? { n: 0, first: t, next: 0 };
       at.n += 1;
       peers.delete(peer);
       peers.set(peer, at);
@@ -82,14 +100,20 @@ export function peerSlow(now: () => number, rule: { most: number; window: number
   };
 }
 
-/** The peer count a trust setting needs: only `1`'s loose one (`nearPeer`), where a peer can forge a place. */
+/* THE ADDRESS LISTS THAT HOLD A RANGE WIDER THAN ONE ADDRESS (RH10), marked by `proxyTrustOf` as it builds them. */
+const wideLists = new WeakSet<ProxyTrust>();
+
+/**
+ * The peer count a trust setting needs: wherever a trusted peer may be more than one machine, so that a machine which is
+ * not the proxy may forge a place: `1`'s loose `nearPeer`, or a list holding a range (RH10). Exact addresses need none.
+ */
 export function peerSlowFor(trusts: ProxyTrust | null, now: () => number): PeerSlow | null {
-  return trusts === nearPeer ? peerSlow(now) : null;
+  return trusts !== null && (trusts === nearPeer || wideLists.has(trusts)) ? peerSlow(now) : null;
 }
 
 /** What the operator is told the first time one peer passes the ceiling (RG3). */
 export function slowedLine(peer: string): string {
-  return `${String(PEER_CEILING.most)} wrong server keys came through ${peer} in fifteen minutes, so keys through it now wait ${String(PEER_CEILING.wait / 1000)} seconds before they are checked (the right key still works). If ${peer} is your proxy, set BRAINDOG_TRUST_PROXY to its exact address instead of 1, so each caller is counted on its own.`;
+  return `${String(PEER_CEILING.most)} wrong server keys came through ${peer} in fifteen minutes, so keys through it are now checked one at a time, one every ${String(PEER_CEILING.wait / 1000)} seconds, and the rest are told to try again later (the right key still works when its turn comes). If ${peer} is your proxy, set BRAINDOG_TRUST_PROXY to its exact address instead of 1 or a range, so each caller is counted on its own.`;
 }
 
 export function keyLockout(now: () => number, rule: { most: number; window: number } = KEY_TRIES): KeyLockout {
@@ -148,8 +172,8 @@ export type ProxyTrust = (peer: string) => boolean;
 /**
  * `BRAINDOG_TRUST_PROXY`: unset or `0` reads no header; `1` trusts a peer on this machine or a private network
  * (`nearPeer`), which is where Caddy, nginx, cloudflared or the Docker gateway stand, AND SO THE WHOLE LAN IS A PROXY
- * (RG14): anybody on it who reaches the port can name a place, which is why `1` alone also slows by peer
- * (`peerSlowFor`), and why the exact addresses are the setting to give; anything else is the proxies'
+ * (RG14): anybody on it who reaches the port can name a place, which is why `1`, and a list holding a range, also
+ * count by peer (`peerSlowFor`), and why the exact addresses are the setting to give; anything else is the proxies'
  * own addresses or ranges, comma or space separated (`127.0.0.1, 172.16.0.0/12, fd00::/8`). A value that reads as
  * neither stops the server with `wrong`, rather than a guess at which header to believe.
  */
@@ -158,6 +182,7 @@ export function proxyTrustOf(setting: string | undefined): ProxyTrust | null | {
   if (said === '' || /^(0|false|off|no)$/iu.test(said)) return null;
   if (/^(1|true|on|yes)$/iu.test(said)) return nearPeer;
   const list = new BlockList();
+  let wide = false;
   for (const part of said.split(/[\s,]+/u).filter(Boolean)) {
     const [address = '', bits] = part.split('/');
     const plain = address.replace(/^\[|\]$/gu, '').toLowerCase().replace(/^::ffff:(?=\d+\.)/u, '');
@@ -166,12 +191,15 @@ export function proxyTrustOf(setting: string | undefined): ProxyTrust | null | {
     if (family === 0 || !Number.isInteger(width) || width < 0 || width > (family === 6 ? 128 : 32))
       return { wrong: `BRAINDOG_TRUST_PROXY takes 1, or the addresses of the proxies in front (such as 127.0.0.1 or 172.16.0.0/12), and "${part}" is neither.` };
     list.addSubnet(plain, width, family === 6 ? 'ipv6' : 'ipv4');
+    if (width < (family === 6 ? 128 : 32)) wide = true;
   }
-  return (peer) => {
+  const trusts: ProxyTrust = (peer) => {
     const a = peer.toLowerCase().replace(/^::ffff:(?=\d+\.)/u, '');
     const family = isIP(a);
     return family !== 0 && list.check(a, family === 6 ? 'ipv6' : 'ipv4');
   };
+  if (wide) wideLists.add(trusts);
+  return trusts;
 }
 
 /** Where a request came from: `ip`, the place the lockouts and limits count, and `peer`, the socket that sent it. */

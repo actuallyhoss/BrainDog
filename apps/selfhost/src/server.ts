@@ -390,8 +390,9 @@ type Site = {
   /** The server key's lockout at `/api` and `/mcp` (`./key-lockout.ts`), built once so its count lasts the whole process. */
   keyLock: KeyLockout;
   /**
-   * The wrong keys counted by the socket's own peer when a proxy's header named the place, slowing that peer over a
-   * ceiling and never locking it (AI16, RG3): only under `BRAINDOG_TRUST_PROXY=1`, and `null` otherwise.
+   * The wrong keys counted by the socket's own peer when a proxy's header named the place, holding that peer to one
+   * compare per turn over a ceiling and never locking it (AI16, RG3, RH7): under `BRAINDOG_TRUST_PROXY=1` or a list
+   * holding a range (RH10), and `null` for exact addresses.
    */
   peerSlow: PeerSlow | null;
 };
@@ -500,12 +501,14 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: P
      key could be guessed in a loop. The lock, the compare and the strike run with no await between them. */
   const keyShaped = token !== undefined && !sent.includes('.');
   /* AND THE PEER AS WELL, WHEN A LOOSELY TRUSTED PROXY'S HEADER NAMED THE PLACE (AI16): a header is words, and the
-     socket is not. Over its ceiling the peer is SLOWED BEFORE THE LOCK IS READ, never locked (RG3): every caller behind
-     the proxy shares it, the owner too, so a lock there was a stranger's way to shut him out. The wait comes first so
-     the lock, the compare and the strike below still run with nothing in between. */
+     socket is not. Over its ceiling the peer is HELD TO ONE COMPARE PER TURN BEFORE THE LOCK IS READ, never locked (RG3,
+     RH7): every caller behind the proxy shares it, the owner too, so a lock there was a stranger's way to shut him out.
+     One waits for the next turn and the rest are a 429 at once. The wait comes first so the lock, the compare and the
+     strike below still run with nothing in between. */
   const peerCount = keyShaped && at.peer !== '' && at.ip !== at.peer ? site.peerSlow : null;
-  const slowed = peerCount?.wait(at.peer) ?? 0;
-  if (slowed > 0) await new Promise((done) => setTimeout(done, slowed));
+  const turn = peerCount?.turn(at.peer) ?? { wait: 0 };
+  if ('full' in turn) return { bare: 429, retryAfter: turn.retryAfter };
+  if (turn.wait > 0) await new Promise((done) => setTimeout(done, turn.wait));
   if (keyShaped) {
     const wait = site.keyLock.locked(at.ip);
     if (wait !== null) return { bare: 429, retryAfter: wait };

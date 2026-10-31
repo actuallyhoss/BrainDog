@@ -98,21 +98,28 @@ test('AI16: THE HEADER IS READ ONLY FROM A PEER THAT IS A TRUSTED PROXY, and fro
   assert.ok(bad !== null && 'wrong' in bad);
 });
 
-test('RG3: A PEER OVER THE CEILING IS SLOWED, NEVER LOCKED, AND ONLY UNDER THE LOOSE 1', () => {
+test('RG3, RH7: A PEER OVER THE CEILING IS HELD TO ONE COMPARE PER TURN, NEVER LOCKED', () => {
   let at = 0;
   const slow = peerSlow(() => at);
   for (let i = 0; i < PEER_CEILING.most - 1; i++) assert.equal(slow.strike('172.18.0.1'), false);
-  assert.equal(slow.wait('172.18.0.1'), 0, 'slowed under the ceiling');
+  assert.deepEqual(slow.turn('172.18.0.1'), { wait: 0 }, 'held under the ceiling');
   assert.equal(slow.strike('172.18.0.1'), true, 'the ceiling was not said once');
   assert.equal(slow.strike('172.18.0.1'), false, 'the ceiling was said twice');
-  assert.equal(slow.wait('172.18.0.1'), PEER_CEILING.wait);
-  assert.equal(slow.wait('172.18.0.2'), 0, 'another peer was slowed');
+  assert.deepEqual(slow.turn('172.18.0.1'), { wait: 0 }, 'the first turn over the ceiling is now');
+  assert.deepEqual(slow.turn('172.18.0.1'), { wait: PEER_CEILING.wait }, 'the next waits one turn');
+  const full = slow.turn('172.18.0.1');
+  assert.ok('full' in full && full.retryAfter >= 1, 'a third at once was let wait as well');
+  assert.deepEqual(slow.turn('172.18.0.2'), { wait: 0 }, 'another peer was held');
+  at += PEER_CEILING.wait;
+  assert.deepEqual(slow.turn('172.18.0.1'), { wait: PEER_CEILING.wait }, 'a turn freed was not handed on');
   at += PEER_CEILING.window + 1;
-  assert.equal(slow.wait('172.18.0.1'), 0, 'the slowing never ended');
+  assert.deepEqual(slow.turn('172.18.0.1'), { wait: 0 }, 'the rate never ended');
   const loose = proxyTrustOf('1');
-  const exact = proxyTrustOf('127.0.0.1');
-  assert.ok(loose !== null && !('wrong' in loose) && exact !== null && !('wrong' in exact));
+  const exact = proxyTrustOf('127.0.0.1, ::1');
+  const range = proxyTrustOf('127.0.0.1, 172.16.0.0/12');
+  assert.ok(loose !== null && !('wrong' in loose) && exact !== null && !('wrong' in exact) && range !== null && !('wrong' in range));
   assert.notEqual(peerSlowFor(loose, () => 0), null);
+  assert.notEqual(peerSlowFor(range, () => 0), null, 'a list with a range did not count the peer (RH10)');
   assert.equal(peerSlowFor(exact, () => 0), null, 'an exact proxy list counted the peer');
   assert.equal(peerSlowFor(null, () => 0), null);
 });
