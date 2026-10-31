@@ -83,8 +83,10 @@
   const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)]));
   /* THE LISTS THIS BRAINDOG KEEPS, which the example on Today's line names (`firstWords.sub`). */
   /* AND BY THE PLACES JUST MADE, since the shell this screen opened on may be the one from before the build. */
+  /* AND BY THE PARTS JUST INSTALLED, since a part that waits for its first entry (Work) is no place yet. */
   const lists = $derived([
     ...(page.data.live === true ? (page.data.index?.registers ?? []).map((r: { id: string }) => r.id) : []),
+    ...(made.modules ?? []),
     ...(made.places ?? []).map((p) => p.trim().toLowerCase().replace(/\s+/gu, '_')),
   ]);
 

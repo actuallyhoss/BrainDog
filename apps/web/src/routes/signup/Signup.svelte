@@ -111,7 +111,7 @@
     type ReadCause,
   } from '$lib/signup.ts';
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, type CatalogueOffer } from '$lib/start/offer.ts';
-  import { filledBy, placesOf, proposeFirst, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
+  import { becameShown, filledBy, placesOf, proposeFirst, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
   import { readAsks } from '$lib/start/ask.ts';
   import { answer, oneQuestion, words as asked, type Question } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
@@ -1325,7 +1325,8 @@
                 <!-- `heard-line`, NEVER `line`: the ledger's global `.line` is a grid, and it took this row over. -->
                 <button type="button" class="heard-line" aria-expanded={opened === lineOf(h)} onclick={() => openLine(h)}>
                   <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : saidAll(h)}</span>
-                  <span class="line-became">{h.you === true ? words.you : h.became}<Icon name="chevron" size="s" /></span>
+                  <!-- SAID AS THE PLACES IT MAKES (`becameShown`); `h.became` itself is what a change to the line is read back by. -->
+                  <span class="line-became">{h.you === true ? words.you : becameShown(h, read)}<Icon name="chevron" size="s" /></span>
                 </button>
                 {#if opened === lineOf(h)}
                   <div class="line-edit">

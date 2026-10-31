@@ -17,7 +17,7 @@ import { offerOf } from './offer.ts';
 import { currencyWord, placeCurrency } from './place-currency.ts';
 import { answer, oneQuestion } from './question.ts';
 
-import { caseBecame, currencyFor, draftBrief, filledBy, fold, fromModel, heardWords, outsideCatalogue, partName, propose, proposeFirst, railPlaces, setupOffer } from './propose.ts';
+import { becameShown, caseBecame, currencyFor, draftBrief, filledBy, fold, fromModel, heardWords, outsideCatalogue, partName, propose, proposeFirst, railPlaces, setupOffer } from './propose.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
 
@@ -1426,4 +1426,14 @@ test('SIGN-UP NAMES THE PLACES THE RAIL WILL SHOW (AM10)', () => {
   assert.ok(!sam.heard.some((h) => h.became === 'Bills'), 'a word for money is Money');
   const ali = propose("I'm Ali.", CAIRO);
   assert.deepEqual(railPlaces(ali.places, filledBy(ali.rows)).map((x) => x.name), ['Today', 'People'], 'Work waits for its first task');
+});
+
+test('WHAT I HEARD SAYS A STARTER’S PLACES, and the line keeps its lists underneath for a change to it (left-f)', () => {
+  const sam = propose("I'm Sam. I want my life admin under control: my bills, my budget, rent and payday, and training for a marathon.", CAIRO);
+  const life = sam.heard.find((h) => h.phrase.includes('life admin'));
+  assert.ok(life, 'the phrase is heard');
+  assert.equal(life.became, 'Savings goals, Goals and Project steps', 'the line itself still names the lists `amend` reads back');
+  assert.equal(becameShown(life, sam), 'Goals');
+  const money = sam.heard.find((h) => /Money/u.test(h.became));
+  if (money) assert.equal(becameShown(money, sam), money.became, 'a part is said as it is');
 });

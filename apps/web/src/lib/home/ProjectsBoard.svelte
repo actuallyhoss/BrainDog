@@ -150,10 +150,10 @@
     {/if}
 
     {#if b.parked.length > 0 || b.finished.count > 0}
-      <section class="b-parked" aria-label="Parked and closed">
+      <section class="b-parked" aria-label={`${b.said.parked} and ${b.said.finished.toLowerCase()}`}>
         <header class="t-head">
-          <IconWell name="archive" size="m" /><h2 class="t-title">Parked <span class="t-count num">{b.parked.length}</span></h2>
-          {#if b.finished.count > 0}<span class="t-meta" title={b.finished.names.join(', ')}>Closed {b.finished.count} · {b.finished.names.slice(0, 3).join(', ')}{b.finished.count > 3 ? ` and ${b.finished.count - 3} more` : ''}</span>{/if}
+          <IconWell name="archive" size="m" /><h2 class="t-title">{b.said.parked} <span class="t-count num">{b.parked.length}</span></h2>
+          {#if b.finished.count > 0}<span class="t-meta" title={b.finished.names.join(', ')}>{b.said.finished} {b.finished.count} · {b.finished.names.slice(0, 3).join(', ')}{b.finished.count > 3 ? ` and ${b.finished.count - 3} more` : ''}</span>{/if}
         </header>
         {#if b.parked.length > 0}
           <ul class="chips">

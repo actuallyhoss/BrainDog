@@ -183,7 +183,8 @@ export async function readBoard(base: string, list: string, entries: readonly Ro
      as its page does. A read a project, each small, since one read of every project's newest would leave out the quiet
      ones, whose readings are the oldest. */
   const feedList = listWith(list, ['at', 'value', 'name'], Object.keys(REGISTERS).filter((id) => handFor(REGISTERS[id]) !== null));
-  const lanes = lanesOf(REGISTERS[list], (REGISTERS[list]?.fields.find((f) => f.id === (REGISTERS[list]?.state ?? 'lane')) as { values?: string[] } | undefined)?.values ?? ['parked', 'retired']);
+  const stateField = REGISTERS[list]?.fields.find((f) => f.id === (REGISTERS[list]?.state ?? 'lane')) as { values?: string[]; labels?: Record<string, string> } | undefined;
+  const lanes = lanesOf(REGISTERS[list], stateField?.values ?? ['parked', 'retired']);
   const feedOf = async (p: BoardProject): Promise<BoardReading[]> => {
     if (!feedList) return [];
     const got = await client
@@ -267,6 +268,7 @@ export async function readBoard(base: string, list: string, entries: readonly Ro
       : [],
     readings: feeds.flat(),
     lanes,
+    ...(stateField?.labels ? { laneLabels: stateField.labels } : {}),
     now,
     today,
     format,

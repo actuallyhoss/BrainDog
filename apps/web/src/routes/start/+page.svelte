@@ -61,7 +61,7 @@
   import { landing } from '$lib/record/landing.ts';
   import { INSTALL_ORDER, LEANS_ON } from '$lib/shape.ts';
   import { byRules, draftChange, type Drafted, type SlashClient } from '$lib/record/slash.ts';
-  import { draftBrief, filledBy, outsideCatalogue, propose, proposeFirst, railPlaces, type Proposal } from '$lib/start/propose.ts';
+  import { becameShown, draftBrief, filledBy, outsideCatalogue, propose, proposeFirst, railPlaces, type Proposal } from '$lib/start/propose.ts';
   import { slashAsks } from '$lib/start/ask.ts';
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, tradesKept, type CatalogueOffer, type TradeOffer } from '$lib/start/offer.ts';
   import { BYTES_MOST, drawnWith, entriesOf, EXPORTS_MOST, leftSaid, mapExport, newListDeclarations, ownList, readExports, type Export, type Mapping } from '$lib/start/export.ts';
@@ -942,7 +942,7 @@
                                 <IconWell name={iconOfBecame(h.became, proposal.names)} size="l" />
                                 <span class="heard-main">
                                   <q class="phrase">{h.phrase}</q>
-                                  <span class="became"><span class="sr">: </span>{h.became}</span>
+                                  <span class="became"><span class="sr">: </span>{becameShown(h, proposal)}</span>
                                 </span>
                               </li>
                             {/each}
@@ -1077,7 +1077,7 @@
                     <IconWell name={iconOfBecame(h.became, live?.names)} />
                     <span class="heard-main">
                       <q class="phrase">{h.phrase}</q>
-                      <span class="became"><span class="sr">: </span>{h.became}</span>
+                      <span class="became"><span class="sr">: </span>{becameShown(h, live)}</span>
                     </span>
                   </li>
                 {/each}

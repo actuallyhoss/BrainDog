@@ -19,7 +19,12 @@ export const firstWords = {
      bakery, while the site says nobody needs to be technical. Today's card is the first act; an agent is the second. */
   title: 'Start with one real thing',
   /* THE EXAMPLE NAMES WHAT THIS BRAINDOG KEEPS (first hour audit, AH25): a student was told "like an order". */
-  sub: (lists: readonly string[] = []) => `On Today, type something that happened, like ${exampleOf(lists)}. BrainDog puts it where it belongs, and one Undo takes it back.`,
+  /* A BLANK BRAINDOG IS OFFERED A TO-DO (`blankOf`): it keeps People and Work's tasks, and "like somebody you met" sent
+     its first line to People when the one place made for a day's things is Work. */
+  sub: (lists: readonly string[] = []) =>
+    blankOf(lists)
+      ? `On Today, type something you need to do, like “${TO_DO_SAID}”. BrainDog puts it where it belongs, and one Undo takes it back.`
+      : `On Today, type something that happened, like ${exampleOf(lists)}. BrainDog puts it where it belongs, and one Undo takes it back.`,
   /* WHAT WAS JUST MADE, first, by its places: the screen opened on a terminal command and never said. */
   /* THE PLACES THE RAIL SHOWS, AND MORE AS THEY FILL (AM10): Projects and Work come with their first entry. */
   made: (places: readonly string[]) => (places.length === 0 ? 'Your BrainDog is made.' : `Your BrainDog is made, with ${firstRun.and(places)}, and more as you fill them.`),
@@ -62,9 +67,27 @@ const EXAMPLES: readonly (readonly [readonly string[], string])[] = [
   [['things', 'projects'], 'a project'],
 ];
 
-export function exampleOf(lists: readonly string[]): string {
+/** The to-do a blank BrainDog is offered: a day in it, so Work keeps it as a task due that day. */
+export const TO_DO_SAID = 'Call the plumber tomorrow';
+
+/** The examples these lists name, all of them, in `EXAMPLES`' order. */
+const examplesIn = (lists: readonly string[]): string[] => {
   const kept = new Set(lists);
-  const said = EXAMPLES.filter(([ids]) => ids.some((id) => kept.has(id))).map(([, words]) => words).slice(0, 3);
+  return EXAMPLES.filter(([ids]) => ids.some((id) => kept.has(id))).map(([, words]) => words);
+};
+
+/**
+ * WHETHER THIS IS A BRAINDOG NO STARTER SPEAKS FOR: the lists it keeps name nothing but People and Work's tasks (Work
+ * is no place on the rail until its first task, so the places just made may say People alone). One that keeps nothing
+ * known is not blank: nothing is known of it, and it is given the three that read for anybody.
+ */
+export function blankOf(lists: readonly string[]): boolean {
+  const said = examplesIn(lists);
+  return said.length > 0 && said.every((w) => w === 'somebody you met' || w === 'something to do');
+}
+
+export function exampleOf(lists: readonly string[]): string {
+  const said = examplesIn(lists).slice(0, 3);
   const out = said.length > 0 ? said : ['something to do', 'a bill', 'somebody you met'];
   return out.length === 1 ? out[0]! : `${out.slice(0, -1).join(', ')} or ${out.at(-1)}`;
 }

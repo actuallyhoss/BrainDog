@@ -110,6 +110,8 @@ export type BoardInput = {
   readings?: readonly BoardReading[];
   /** Which lanes are parked and which finished, as the projects list declares them (`side.ts` `lanesOf`). */
   lanes?: Lanes;
+  /** What the record calls each lane, by its value, as its state field labels it (Personal's `building` is "Active"). */
+  laneLabels?: Readonly<Record<string, string>>;
   /** The record's clock, and its day as YYYY-MM-DD. */
   now: number;
   today: string;
@@ -158,6 +160,8 @@ export type Board = {
   groups: BoardGroup[];
   parked: Parked[];
   finished: { count: number; names: string[] };
+  /** The parked strip's title and the finished count's word, in the record's own lane words. */
+  said: { parked: string; finished: string };
 };
 
 /* ── words ─────────────────────────────────────────────────────────────── */
@@ -620,11 +624,19 @@ export function boardOf(input: BoardInput): Board {
     .filter((f) => !moving(f, input.now))
     .sort((a, b) => Number(chipOf(b, input.today) !== null) - Number(chipOf(a, input.today) !== null) || a.p.name.localeCompare(b.p.name));
   const earning = earningOf(input, fs);
+  /* THE GROUPS IN THE RECORD'S OWN LANE WORDS (as `ProjectCard` says a card's lane): Personal's projects list calls
+     `building` "Active" and `earning` "Ongoing", and the board said Building and Earning over them. */
+  const laneSaid = (lane: string, fallback: string): string => {
+    const said = input.laneLabels?.[lane];
+    return typeof said === 'string' && said.trim() !== '' ? said.trim() : fallback;
+  };
+  const buildingSaid = laneSaid('building', 'Building');
   const groups: BoardGroup[] = [
-    { id: 'earning' as const, name: 'Earning', said: `${earningFs.length}`, rows: earningFs.map(rowOf) },
-    { id: 'moving' as const, name: 'Building', said: `${movingFs.length}`, rows: movingFs.map(rowOf) },
-    { id: 'quiet' as const, name: 'Building, quiet', said: `${quietFs.length} · nothing in ${WEEK_DAYS} days`, rows: quietFs.map(rowOf) },
+    { id: 'earning' as const, name: laneSaid(EARNING_LANE, 'Earning'), said: `${earningFs.length}`, rows: earningFs.map(rowOf) },
+    { id: 'moving' as const, name: buildingSaid, said: `${movingFs.length}`, rows: movingFs.map(rowOf) },
+    { id: 'quiet' as const, name: `${buildingSaid}, quiet`, said: `${quietFs.length} · nothing in ${WEEK_DAYS} days`, rows: quietFs.map(rowOf) },
   ].filter((g) => g.rows.length > 0);
+  const finishedLane = [...lanes.finished][0];
 
   /* ── this week ── */
   const lateLines = ordered(live.filter((f) => f.late.length > 0)).flatMap((f) => f.late.map((t) => ({ day: dayShortest(t.by!.slice(0, 10)), project: f.p.name, text: t.title, href: t.href })));
@@ -691,6 +703,7 @@ export function boardOf(input: BoardInput): Board {
       })
       .sort((a, b) => Number(b.due !== null) - Number(a.due !== null) || a.name.localeCompare(b.name)),
     finished: { count: finished.length, names: finished.map((f) => f.p.name).sort() },
+    said: { parked: laneSaid('parked', 'Parked'), finished: finishedLane === undefined ? 'Closed' : laneSaid(finishedLane, 'Closed') },
   };
 }
 

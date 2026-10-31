@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { connectLines } from '../record/device.ts';
-import { appLines, exampleOf, firstWords, signOf } from './first-connect.ts';
+import { appLines, blankOf, exampleOf, firstWords, signOf } from './first-connect.ts';
 
 test('five apps, Claude first at every width, each with a line for this record and no key', () => {
   const apps = appLines(connectLines('https://brain.dog', 'acme'));
@@ -23,6 +23,15 @@ test('THE EXAMPLE NAMES WHAT THE BRAINDOG KEEPS (AH25)', () => {
   assert.equal(exampleOf(['courses', 'assignments', 'study_sessions']), 'an essay that is due');
   assert.equal(exampleOf([]), 'something to do, a bill or somebody you met');
   assert.doesNotMatch(firstWords.sub(['assignments']), /order/u);
+});
+
+test('A BLANK BRAINDOG IS OFFERED A TO-DO, never somebody you met (People and Work only)', () => {
+  assert.equal(blankOf(['people']), true, 'the places just made say People alone, Work waits for its first task');
+  assert.equal(blankOf(['people', 'organisations', 'work', 'tasks', 'tracks', 'updates']), true);
+  assert.equal(blankOf(['orders', 'people']), false);
+  assert.equal(blankOf([]), false);
+  assert.match(firstWords.sub(['people', 'work']), /like “Call the plumber tomorrow”/u);
+  assert.doesNotMatch(firstWords.sub(['people', 'work']), /somebody you met/u);
 });
 
 test('THE SCREEN FIRST SAYS WHAT WAS MADE, by the places on it', () => {

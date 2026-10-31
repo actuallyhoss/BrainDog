@@ -937,6 +937,50 @@ export function railPlaces(places: readonly Place[], filled: (p: Place) => boole
   return out;
 }
 
+/** The rail place a use case's list is kept in: the section of the first of its pages that needs it, else `null`. */
+function sectionOfList(u: UseCase, list: string): string | null {
+  for (const d of (u.pack?.declarations ?? []) as { page?: unknown; requires?: unknown; nav?: { section?: unknown } }[]) {
+    if (typeof d.page !== 'string' || !Array.isArray(d.requires) || !d.requires.includes(`register.${list}`)) continue;
+    if (typeof d.nav?.section === 'string' && d.nav.section.trim() !== '') return d.nav.section;
+  }
+  return null;
+}
+
+/**
+ * WHAT A LINE HEARD BECAME, AS THE SCREEN SAYS IT (left-f, AM10's line): a starter's lists said as the places they are
+ * kept in on the rail, as `railPlaces` says them on the right. Sam's "life admin under control" read "Savings goals,
+ * Goals and Project steps", three lists, two of them inside a page; it now reads Goals, the place they make. Projects
+ * is said only where nothing else is, since it is no place until it holds a project. ONLY THE WORDS SHOWN CHANGE:
+ * `became` itself stays the lists' names, because `placesOf`, `amend`, `sayCurrency` and `fold` read the line back by
+ * them, and a line taken out or turned into another part must still take its own lists with it.
+ */
+export function becameShown(h: Pick<HeardLine, 'became' | 'you' | 'loose'>, p: Pick<Proposal, 'usecase' | 'also' | 'names'>): string {
+  if (h.you === true || h.loose === true) return h.became;
+  const cases = [p.usecase, ...p.also].flatMap((id) => (id === null ? [] : (useCase(id) ?? [])));
+  if (cases.length === 0) return h.became;
+  const projects = partName(PORTFOLIO_ID);
+  /* THE CURRENCY SAID ON THE LINE (`sayCurrency`, ", in Egyptian pounds") stays its tail, never a place. */
+  const all = partsOfBecame(h.became);
+  const tail = all.filter((w) => /^in\s/u.test(w));
+  const parts = all.filter((w) => !tail.includes(w));
+  let changed = false;
+  const shown = parts.map((w) => {
+    for (const u of cases) {
+      const l = caseLists(u).find((x) => (p.names?.[x.id] ?? u.labels[x.id] ?? x.name) === w);
+      const section = l ? sectionOfList(u, l.id) : null;
+      if (section !== null) {
+        if (section !== w) changed = true;
+        return section;
+      }
+    }
+    return w;
+  });
+  if (!changed) return h.became;
+  const kept = shown.filter((w, i) => shown.indexOf(w) === i);
+  const placed = kept.length > 1 ? kept.filter((w) => w !== projects) : kept;
+  return `${firstRun.and(placed)}${tail.map((t) => `, ${t}`).join('')}`;
+}
+
 /** Whether a proposal's entries fill a part, so that part is a place from the first minute (`railPlaces`). */
 export const filledBy =
   (rows: readonly { register: string }[]) =>

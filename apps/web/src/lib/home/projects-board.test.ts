@@ -228,3 +228,14 @@ test('the headline counts every project with work due this week, a late one too,
   assert.equal(b.week.due.said, 'across 3 projects');
   assert.match(b.headline, /three projects have work due this week/u);
 });
+
+test('THE GROUPS SAY THE RECORD’S OWN LANE WORDS: Personal’s Active, never Building over them', () => {
+  const said = boardOf(base({ laneLabels: { building: 'Active', earning: 'Ongoing', parked: 'On hold', retired: 'Finished' } }));
+  assert.ok(said.groups.every((g) => !/^(?:Building|Earning)/u.test(g.name)));
+  assert.equal(said.groups.find((g) => g.id === 'moving')?.name, 'Active');
+  assert.equal(said.groups.find((g) => g.id === 'quiet')?.name, 'Active, quiet');
+  assert.deepEqual(said.said, { parked: 'On hold', finished: 'Finished' });
+  const plain = boardOf(base());
+  assert.equal(plain.groups.find((g) => g.id === 'moving')?.name, 'Building');
+  assert.deepEqual(plain.said, { parked: 'Parked', finished: 'Closed' });
+});
