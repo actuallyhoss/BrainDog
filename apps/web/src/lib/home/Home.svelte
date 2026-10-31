@@ -226,7 +226,7 @@
   /** The device's own preferences: whether the next steps are hidden, and how her work arrives. Read again on Hide. */
   let prefs = $state(readPref());
   /* WHAT THE MAKING WROTE, which is not added by hand (AH19, `made-counts.ts`). */
-  const madeWith = madeOf(data.index.slug);
+  const madeWith = $derived(madeOf(data.index.slug));
   const added = $derived(addedByHand(kept, madeWith));
   /** The card was pressed here: it goes at once and the next steps take its place, before `boot` counts what it added. */
   let pressed = $state(false);
