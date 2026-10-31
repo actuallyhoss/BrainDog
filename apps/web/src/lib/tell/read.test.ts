@@ -592,7 +592,8 @@ test('PLAIN MONEY LINES ARE MONEY, never tasks (AL4)', () => {
   /* A cost that comes round is Repeating, where the record keeps it, and a bill that repeats where it does not. */
   const netflix = tellRead('Netflix 180 a month', { ...founder, lists: [...founder.lists, RECURRING] }).rows;
   assert.deepEqual(netflix.map((r) => [r.register, r.fields.direction, r.fields.every]), [['recurring', 'out', 'monthly']]);
-  assert.deepEqual(netflix[0]!.missing, ['the day it is due']);
+  /* Repeating keeps a line with its next day open (AO5), so nothing is missing. */
+  assert.deepEqual(netflix[0]!.missing, []);
   assert.equal(tellRead('Netflix 180 a month', founder).rows[0]!.fields.repeats, 'monthly');
   /* Where nothing is a task list, they are still money, never "Not sure". */
   const personal = { lists: [PEOPLE, LEDGER, DUE], today: TODAY, currency: 'EGP' };
@@ -640,8 +641,9 @@ test('A FOREIGN AMOUNT IS SAID BY ITS OWN SIGN, AND "DINARS" IS ASKED IN WORDS (
 
 test('MONEY THAT COMES ROUND WITH NO DAY ASKS WHEN IT IS NEXT DUE, and takes the answer (never a day made up)', () => {
   const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
-  /* Asked as Tell asks which way a payment went, with the entry waiting for its day. */
-  const asked = tellRead('Netflix 180 a month', withRepeating);
+  /* Asked as Tell asks which way a payment went, with the entry waiting for its day, where the list needs one. */
+  const needsDay: TellList = { ...RECURRING, fields: RECURRING.fields.map((f) => (f.id === 'next_due' ? { ...f, required: true } : f)) };
+  const asked = tellRead('Netflix 180 a month', { ...founder, lists: [...founder.lists, needsDay] });
   assert.equal(asked.why, 'When is it next due? Say the day with it, like on the 5th or next Friday.');
   assert.equal(asked.rows[0]!.fields.next_due, undefined);
   assert.deepEqual(asked.rows[0]!.missing, ['the day it is due']);
@@ -1105,4 +1107,44 @@ test('"INVOICE 1042 PAID" WITH INVOICE 1042 OPEN IS OFFERED AS MARKING IT PAID',
   assert.equal(none.change, undefined);
   assert.match(none.why ?? '', /^How much was paid for Invoice 2001/u);
   assert.equal(tellRead('Order 57 paid', founder).change, undefined);
+});
+
+/* ── audit 31 Oct o: a line with no day can be added, one place before and after, a date said as a date ──────────── */
+
+test('"NETFLIX 180 A MONTH" CAN BE ADDED WITH ITS NEXT DAY OPEN, never a day made up (AO5)', () => {
+  const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
+  for (const said of ['Netflix 180 a month', 'Hosting 45 USD a month', 'Gym membership 900 a month']) {
+    const told = tellRead(said, withRepeating);
+    assert.equal(told.why, undefined, said);
+    assert.equal(told.rows.length, 1, said);
+    assert.equal(told.rows[0]!.register, 'recurring', said);
+    assert.equal(told.rows[0]!.fields.next_due, undefined, said);
+    assert.deepEqual(told.rows[0]!.missing, [], said);
+    assert.match(told.rows[0]!.detail, /next day not set/u, said);
+  }
+  /* A day said is still kept, and "not set" never said beside it. */
+  const fifth = tellRead('Netflix 180 a month on the 5th', withRepeating).rows[0]!;
+  assert.equal(fifth.fields.next_due, '2026-11-05');
+  assert.doesNotMatch(fifth.detail, /not set/u);
+});
+
+test('MONEY IN KEPT AS A PAID ITEM IS IN MONEY BEFORE THE ADD AND AFTER IT (AO10)', () => {
+  const personal = { lists: [PEOPLE, DUE], today: TODAY, currency: 'EGP' };
+  const salary = tellRead('Got paid 45,000 salary today', personal).rows[0]!;
+  assert.equal(salary.detail, 'kept in Money');
+  assert.deepEqual(salary.where, { name: 'Money', href: '/p/money' });
+  /* A client's payment is the invoice it settles, and its place is its list's own. */
+  assert.equal(tellRead(NADIA, fresh).rows[2]!.where, undefined);
+});
+
+test('A DAY OF THE MONTH IS SAID BACK AS A DATE, never as a weekday (AO18)', () => {
+  /* 7 Oct is a Wednesday: the 10th is a Saturday three days on. */
+  const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
+  const tenth = tellRead('Netflix 180 a month on the 10th', withRepeating).rows[0]!;
+  assert.equal(tenth.fields.next_due, '2026-10-10');
+  assert.match(tenth.detail, /due on 10 Oct/u);
+  assert.doesNotMatch(tenth.detail, /Saturday/u);
+  assert.match(tellRead('Electricity 850 due 10 Oct', founder).rows[0]!.detail, /due 10 Oct/u);
+  /* A weekday said is still said as one. */
+  assert.match(tellRead('Electricity 850 due Saturday', founder).rows[0]!.detail, /due Saturday/u);
 });

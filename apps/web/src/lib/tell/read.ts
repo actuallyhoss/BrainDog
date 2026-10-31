@@ -97,6 +97,9 @@ export type TellRow = {
   icon: string;
   /** Required fields the sentence did not give, as a person reads them. The record refuses the entry until they are. */
   missing: string[];
+  /** WHERE THE PERSON FINDS IT, when that is not its list's own page (AO10): money in kept as a paid item is said
+      "kept in Money" before the add, and "in Money", linked to Money, after it. */
+  where?: { name: string; href: string };
 };
 
 /**
@@ -237,13 +240,18 @@ function dayNamed(phrase: string, today: string): string | null {
   return w === undefined ? null : addDays(today, (w - weekdayOf(today) + 7) % 7);
 }
 
-/** A day as the preview says it: today, tomorrow, the weekday within the week, or the date. */
-export function dayWord(day: string, today: string): string {
+/** A day as the preview says it: today, tomorrow, the weekday within the week, or the date. A day said as a date
+    (`dated`) is said back as one, never as a weekday he has to work back (AO18): "on the 5th" is "5 Nov". */
+export function dayWord(day: string, today: string, dated = false): string {
   if (day === today) return 'today';
   if (day === addDays(today, 1)) return 'tomorrow';
+  if (dated) return daySaid(day).replace(/^\S+\s+/u, '');
   for (let n = 2; n < 7; n++) if (day === addDays(today, n)) return FULL_DAYS[weekdayOf(day)]!;
   return daySaid(day);
 }
+
+/* A DAY SAID AS A DATE, never as a weekday or a count: "the 5th", "5 Nov", "Nov 5", "5/11", "2026-11-05" (AO18). */
+const DATE_SAID = new RegExp(`\\b(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}|\\d{1,2}(?:st|nd|rd|th)?(?: of)? ${MONTH}|${MONTH} \\d{1,2}|the \\d{1,2}(?:st|nd|rd|th))\\b`, 'iu');
 
 /** The last date falling on that day of the month, today included. */
 function dayOfMonthGone(day: number, today: string): string | null {
@@ -1198,6 +1206,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
 
   return finish(unsure);
 
+  /** A day as the preview says it, said as a date when the sentence said one as a date (AO18). */
+  function dayTold(day: string): string {
+    return dayWord(day, opts.today, DATE_SAID.test(sentence));
+  }
+
   /** The person's address and notes put on, and with nothing placed, one task, or the plain word and the way on. */
   function finish(unsureOf = false): Told {
     for (const email of emails) addressOf(email);
@@ -1300,7 +1313,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
         who = assigned[1]!;
       }
     }
-    const bits = [`new in ${l.name}`, ...(due && day ? [`due ${dayWord(day, opts.today)}`] : []), ...(who ? [`for ${who}`] : []), ...(kept && keptLink ? [`in ${kept.name}`] : [])];
+    const bits = [`new in ${l.name}`, ...(due && day ? [`due ${dayTold(day)}`] : []), ...(who ? [`for ${who}`] : []), ...(kept && keptLink ? [`in ${kept.name}`] : [])];
     return { register: l.id, fields, said: String(fields[what.id]), detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) };
   }
 
@@ -1452,7 +1465,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const kind = l.fields.find((f) => f.type === 'enum' && f.values?.includes('event') && f !== round);
     if (kind) fields[kind.id] = 'event';
     startIn(l, fields);
-    rows.push({ register: l.id, fields, said: title, detail: [`${dayWord(day, opts.today)}, every year`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    rows.push({ register: l.id, fields, said: title, detail: [`${dayTold(day)}, every year`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
   }
@@ -1548,7 +1561,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const name = capital(oneLine(m[1]!).toLowerCase());
     const fields: Record<string, TellValue> = { [textField(l)!.id]: name, [field.id]: day };
     startIn(l, fields);
-    rows.push({ register: l.id, fields, said: name, detail: [`${ends ? 'ends' : 'starts'} ${dayWord(day, opts.today)}`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    rows.push({ register: l.id, fields, said: name, detail: [`${ends ? 'ends' : 'starts'} ${dayTold(day)}`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
   }
@@ -1569,16 +1582,19 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const sum = pick(l, 'money', /^amount$/, (f) => f.required === true);
     if (sum) fields[sum.id] = k.value;
     fields[often.id] = cadence;
-    const next = pick(l, 'day', /next|due/, (f) => f.required === true);
+    const next = pick(l, 'day', /next|due/, (f) => f.required === true) ?? l.fields.find((f) => f.type === 'day' && said(f, /next|due/));
     if (next && k.day) fields[next.id] = k.day;
-    if (next && !k.day && next.default === undefined) whenNext = true;
+    /* NO DAY SAID IS ASKED ONLY WHERE THE LIST CANNOT KEEP IT WITHOUT ONE (AO5): where Repeating keeps a line with its
+       next day open, it is added so, and the preview says the day is not set. Never a day made up. */
+    if (next && !k.day && next.required === true && next.default === undefined) whenNext = true;
+    const open = next !== undefined && !k.day && next.required !== true && next.default === undefined;
     const party = pick(l, 'ref', /party|who/, (f) => f.to === PEOPLE);
     if (party && k.payer !== null) fields[party.id] = k.payer;
     startIn(l, fields);
     /* THE NEXT DAY SAID AS A PERSON SAYS IT (AM23): "due tomorrow" for money out, "next on 1 Nov" for money in, never
        "next tomorrow". */
-    const when = (d: string): string => (dayWord(d, opts.today) === 'today' || dayWord(d, opts.today) === 'tomorrow' ? dayWord(d, opts.today) : `on ${dayWord(d, opts.today)}`);
-    const bits = [`${spelled(k.value.amount, k.value.currency)} ${k.into ? 'in' : 'out'} every ${EVERY_SAID[cadence] ?? k.every}`, ...(k.day ? [`${k.into ? 'next' : 'due'} ${when(k.day)}`] : []), `in ${l.name}`];
+    const when = (d: string): string => (dayTold(d) === 'today' || dayTold(d) === 'tomorrow' ? dayTold(d) : `on ${dayTold(d)}`);
+    const bits = [`${spelled(k.value.amount, k.value.currency)} ${k.into ? 'in' : 'out'} every ${EVERY_SAID[cadence] ?? k.every}`, ...(k.day ? [`${k.into ? 'next' : 'due'} ${when(k.day)}`] : open ? ['next day not set'] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: k.what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
@@ -1647,7 +1663,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (repeat && repeats) fields[repeat.id] = repeats;
       const party = pick(owed, 'ref', /party|who|client|from/, (f) => f.to === PEOPLE);
       if (party && payer !== null) fields[party.id] = payer;
-      const bits = [`${spelled(amount, currency)} in`, ...(day ? [`due ${dayWord(day, opts.today)}`] : []), ...(repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${owed.name}`];
+      const bits = [`${spelled(amount, currency)} in`, ...(day ? [`due ${dayTold(day)}`] : []), ...(repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${owed.name}`];
       rows.push({ register: owed.id, fields, said: what, detail: bits.join(', '), icon: iconOf(owed), missing: missingOf(owed, fields) });
       placed = true;
       return true;
@@ -1858,7 +1874,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (party && ref !== null) fields[party.id] = ref;
       client(ref, who);
     }
-    const bits = [`${spelled(amount, currency)} ${toMe ? (who ? `owed to you by ${who}` : 'owed to you') : 'to pay'}`, ...(day ? [`due ${dayWord(day, opts.today)}`] : []), ...(repeat && repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${l.name}`];
+    const bits = [`${spelled(amount, currency)} ${toMe ? (who ? `owed to you by ${who}` : 'owed to you') : 'to pay'}`, ...(day ? [`due ${dayTold(day)}`] : []), ...(repeat && repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
@@ -1954,7 +1970,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const party = pick(l, 'ref', /party|who|client|from/, (f) => f.to === PEOPLE);
     const ref = personOf(who);
     if (party && ref !== null) fields[party.id] = ref;
-    const bits = [toMe ? `${who} owes you ${spelled(amount, currency)}` : `You owe ${who} ${spelled(amount, currency)}`, ...(back ? [`due back ${dayWord(back, opts.today)}`] : []), `in ${l.name}`];
+    const bits = [toMe ? `${who} owes you ${spelled(amount, currency)}` : `You owe ${who} ${spelled(amount, currency)}`, ...(back ? [`due back ${dayTold(back)}`] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     loaned = true;
@@ -2059,7 +2075,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const due = day ? pick(l, 'day', /due|^by$|for|deliver|when/, (f) => f.deadline === true || said(f, /due|^by$|for|deliver|when/)) ?? pick(l, 'day', /./) : undefined;
     if (due && day) fields[due.id] = day;
     const one = l.one ?? 'entry';
-    const detail = [`${count !== undefined && many ? `${count} ` : ''}${thing}`, ...(due && day ? [`due ${dayWord(day, opts.today)}`] : [])];
+    const detail = [`${count !== undefined && many ? `${count} ` : ''}${thing}`, ...(due && day ? [`due ${dayTold(day)}`] : [])];
     lastOrder = { register: l.id, fields, said: who ? `${anA(one)} from ${who}` : anA(one), detail: detail.join(', '), icon: iconOf(l), missing: missingOf(l, fields) };
     lastOrderBy = ref;
     rows.push(lastOrder);
@@ -2212,7 +2228,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* MONEY IN THAT NOBODY OWED HIM IS NO BILL (AN10): a salary, a payout or a refund kept as a paid item is said where
        it shows, in Money, never "paid, kept in Bills". A client's payment is still the invoice it settles. */
     const plainIn = k.into && l !== ledger && k.payer === null;
-    rows.push({ register: l.id, fields, said: k.said, detail: plainIn ? 'kept in Money' : `${settled ? 'paid, ' : ''}kept in ${l.name}`, icon: iconOf(l), missing: missingOf(l, fields) });
+    /* AND SAID IN MONEY AFTER THE ADD AS WELL (AO10): "Just added: ..., in Money", where it said "in Bills and invoices". */
+    rows.push({ register: l.id, fields, said: k.said, detail: plainIn ? 'kept in Money' : `${settled ? 'paid, ' : ''}kept in ${l.name}`, icon: iconOf(l), missing: missingOf(l, fields), ...(plainIn ? { where: { name: 'Money', href: '/p/money' } } : {}) });
     placed = true;
     return true;
   }

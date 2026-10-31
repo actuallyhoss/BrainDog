@@ -152,7 +152,12 @@
     if (sending || sent.length === 0) return;
     sending = true;
     const pressed = typeof document === 'undefined' ? null : document.activeElement;
-    const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: nameOf(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
+    /* SAID WHERE THE PREVIEW SAID IT GOES (AO10): money in kept as a paid item is "in Money", linked to Money, after the
+       add as before it, never "in Bills and invoices". */
+    const lines: ToldLine[] = at.flatMap((i) => {
+      const row = shown[i];
+      return row ? [{ said: row.said, list: row.where?.name ?? nameOf(row.register), href: row.where?.href ?? `/r/${row.register}` }] : [];
+    });
     const client = createClient({ base: apiBase() });
     const run = await runOf();
     if (run === null) return void (sending = false);
