@@ -519,6 +519,10 @@ test('A PAYOUT, A CARD SPEND AND A DINAR ARE READ THE WAY THEY WERE SAID (review
   /* MB1: a credit word names the way, whatever purchase it was for. */
   assert.equal(way('EGP 500 credited to your account for purchase return')?.fields.direction, 'in');
   assert.equal(way('EGP 500 refund for your purchase at Amazon')?.fields.direction, 'in');
+  /* RK6: a credit word elsewhere, or of a reward or a shop's returns, does not turn a purchase into money in. */
+  assert.equal(way('EGP 500 charged on your card ending 1234 at Noon. 5% cashback will be credited to your account')?.fields.direction, 'out');
+  assert.equal(way('Purchase of EGP 750 at Carrefour. Points credited: 75')?.fields.direction, 'out');
+  assert.equal(way('EGP 900 spent at H&M on your card ending 1234. Free returns within 14 days')?.fields.direction, 'out');
   /* RH12: a limit's own figure is dropped, and the charge after it kept. */
   const limit = way('Your credit limit EGP 50,000 card ending 1234 was charged EGP 500 at Noon');
   assert.deepEqual(limit?.fields.amount, { amount: 50000, currency: 'EGP' });

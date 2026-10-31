@@ -6061,8 +6061,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AN ADD-ON PUT IN AGAIN AT THE VERSION IT HELD, BY THE RECORD AND SAYING NOTHING (audit j, AJ6): Money re-put for
        the lists Certificates brought into Cash ahead. Nothing a person chose changed; the log keeps the line. A part that
        waited and arrived carries its `because` as the note, and a reinstall somebody approved carries the lines, so both
-       stay in the feed. A person's own reinstall is signed by them, and a re-put whose body changed has no `from_v`
-       (`rememberPack`), so both stay too (review i, RI1). */
+       stay in the feed. A person's own reinstall is signed by them, and a person's re-put whose body changed has no
+       `from_v` (`rememberPack`), so both stay too (review i, RI1). The record's own re-put with new legs keeps its
+       `from_v` and is left out like any other (review k, RK2). */
     if (e.kind === 'install' && e.target?.startsWith('pack:') && e.actor === 'system' && typeof e.from === 'string' && e.from === e.to && (e.note ?? null) === null) return true;
     /* A SCRIPT'S QUIET RUN (`script-run.ts` stamps `quiet`): it wrote nothing, asked nothing and stopped nothing, so a
        script that runs every night adds no line to a feed on a quiet one. Its history keeps it. */
@@ -13071,9 +13072,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            as added (audit j, AJ6). `bookkeeping` leaves such a line out of the feed and Activity; the log keeps it.
            ONLY WHEN THE BODY IS THE SAME TOO (review i, RI1): a re-put at the same version whose checksum moved (a fold
            landing after that version is live) changed what the record holds, so its line keeps `from_v` empty and is
-           said as an install. */
+           said as an install. BUT NEVER FOR THE RECORD'S OWN RE-PUT (review k, RK2): `legsFollow` puts Money in again at
+           the version it holds with the legs another add-on's install brought, which moves the checksum and nothing a
+           person chose, so a line signed `system` keeps the version it held and stays out of the feed. Only a person's
+           re-put, or a fold they pressed in, can land a new body at a live version. */
         const held = sql.one<{ version: string; checksum: string | null }>('SELECT version, checksum FROM pack WHERE id = ?', row.id);
-        const was = held === undefined ? null : held.version !== row.version || held.checksum === row.checksum ? held.version : null;
+        const own = (row.by || 'system') === 'system';
+        const was = held === undefined ? null : held.version !== row.version || held.checksum === row.checksum || own ? held.version : null;
         sql.exec(
           `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum, waiting)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)

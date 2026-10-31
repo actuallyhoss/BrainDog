@@ -621,13 +621,22 @@ const sentenceOf = (text: string, at: number, end: number): string => {
   }
   return text.slice(from, to);
 };
+/* A CREDIT OF SOMETHING THAT IS NOT THE AMOUNT (review k, RK6): "5% cashback will be credited", "Points credited: 75",
+   and a shop's "Free returns within 14 days", none of which is the purchase coming back. */
+const CREDIT_OF_OTHER = /\b(?:cash ?back|points?|rewards?|miles|bonus)\b|\bfree returns?\b|\breturns?\s+(?:within|policy|accepted|allowed)\b/iu;
+/** Whether a credit word in `sentence` names the way the amount went: in a clause of its own sentence, and not of a
+    reward or a shop's returns. */
+const creditSaid = (sentence: string): boolean => sentence.split(/[,:;]/u).some((clause) => BANK_CREDIT.test(clause) && !CREDIT_OF_OTHER.test(clause));
 /** Whether a bank's text put the money kept (the figure at `at`, `end` past it) into the account. A charge, a purchase or
     a spend is read only in the sentence that holds the amount (RJ4), so "EGP 500 received from Ahmed. No fees charged" is
-    in. */
-const bankInto = (text: string, at: number, end: number): boolean =>
-  BANK_BACK.test(text.slice(0, at)) ||
-  BANK_BACK_AFTER.test(text.slice(end)) ||
-  (!BANK_TAKEN.test(text) && (BANK_CREDIT.test(text) || (!BANK_SPENT.test(sentenceOf(text, at, end)) && BANK_IN.test(text))));
+    in; and so is a credit word that turns one into money back (RK6), so "EGP 500 charged at Noon. 5% cashback will be
+    credited to your account" stays out. */
+const bankInto = (text: string, at: number, end: number): boolean => {
+  if (BANK_BACK.test(text.slice(0, at)) || BANK_BACK_AFTER.test(text.slice(end))) return true;
+  if (BANK_TAKEN.test(text)) return false;
+  const own = sentenceOf(text, at, end);
+  return creditSaid(own) || (!BANK_SPENT.test(own) && BANK_IN.test(text));
+};
 /* A BALANCE OR A LIMIT IS NO AMOUNT THAT MOVED (RG5): a figure right after its word, joining words and all ("available
    balance is EGP 12,000.00", "Avl Bal after txn: EGP 3,200"), is not the one kept. A figure further on still is (RH12):
    "Your credit limit EGP 50,000 card ending 1234 was charged EGP 500 at X" is the 500. */

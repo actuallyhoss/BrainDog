@@ -1,6 +1,7 @@
 /**
- * An add-on put in again at the version it held (audit j, AJ6; review i, RI1). The record's own re-put that changed
- * nothing stays out of the feed; a person's own reinstall, and a re-put whose body changed, stay in it.
+ * An add-on put in again at the version it held (audit j, AJ6; review i, RI1; review k, RK2). The record's own re-put
+ * stays out of the feed, whether it changed nothing or brought new legs (`legsFollow`); a person's own reinstall, and a
+ * person's re-put whose body changed, stay in it.
  */
 
 import { test } from 'node:test';
@@ -48,12 +49,24 @@ test('A PERSON’S OWN REINSTALL IS SIGNED BY THEM AND STAYS IN THE FEED', async
   sql.close();
 });
 
-test('A RE-PUT AT THE SAME VERSION WHOSE BODY CHANGED STAYS IN THE FEED', async () => {
+test('A PERSON’S RE-PUT AT THE SAME VERSION WHOSE BODY CHANGED STAYS IN THE FEED', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   put(k, 'sum-a', 'p_1');
-  put(k, 'sum-b', 'system');
+  put(k, 'sum-b', 'p_1');
   assert.equal(last(sql).from_v, null, 'a changed body kept the version it held as from');
   assert.equal(quiet(k, last(sql)), false, 'a fold landing at a live version said nothing');
+  sql.close();
+});
+
+test('THE RECORD PUTTING AN ADD-ON BACK WITH NEW LEGS IS NO CHANGE EITHER', async () => {
+  /* Certificates goes in, and `legsFollow` re-puts Money at the version it holds with Cash ahead counting it: the
+     checksum moves, and nobody chose anything about Money. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  put(k, 'sum-a', 'p_1');
+  put(k, 'sum-legs', 'system');
+  assert.equal(last(sql).from_v, '3.33.0', 'the record\'s own re-put lost the version it held');
+  assert.equal(quiet(k, last(sql)), true, 'Money put back for Certificates\' legs said "Installed the Money add-on" again');
   sql.close();
 });

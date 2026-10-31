@@ -11725,11 +11725,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const own = new Set(kernel.kernelLists());
         /* AND THE ADD-ON THAT DECLARED EACH ONE (`pack`), so a screen tells Money's Plans from a list somebody made and
            called Plans (review i, RI4). A list changed in the app has `pack_id` empty on its live row and is still the
-           pack's: the pack's last row says whose, unless a retire came between (`detached`). */
+           pack's: the pack's last row says whose, unless a retire came between (`detached`). THE BODY'S `pack:` TOO, as
+           `OWNER` reads it (`declare.ts`; review k, RK7): the seed puts the first-party lists in as plain declarations with
+           `pack_id` empty, so Money's Plans on a seeded record had no `pack`, and "Read Dune next week" was offered to it. */
         const packOf = new Map(
           sql
             .all<{ id: string; pack: string | null }>(
-              `SELECT d.id AS id, COALESCE(d.pack_id, (SELECT p.pack_id FROM declaration p WHERE p.id = d.id AND p.version < d.version AND p.pack_id IS NOT NULL
+              `SELECT d.id AS id, COALESCE(d.pack_id, json_extract(d.body, '$.pack'), (SELECT COALESCE(p.pack_id, json_extract(p.body, '$.pack')) FROM declaration p
+                 WHERE p.id = d.id AND p.version < d.version AND COALESCE(p.pack_id, json_extract(p.body, '$.pack')) IS NOT NULL
                    AND NOT EXISTS (SELECT 1 FROM declaration r WHERE r.id = d.id AND r.retired = 1 AND r.version >= p.version AND r.version < d.version)
                  ORDER BY p.version DESC LIMIT 1)) AS pack
                  FROM declaration d WHERE d.kind = 'register' AND d.superseded_at IS NULL AND d.retired = 0`,

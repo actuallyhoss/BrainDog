@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import type { OutboxRow } from '@braindog/kernel';
 
-import { addressRefused, authMail, mailedNotices, withoutAddresses, type MailFault } from '../src/smtp.ts';
+import { addressRefused, authMail, mailboxRefused, mailedNotices, withoutAddresses, type MailFault } from '../src/smtp.ts';
 
 const job = (payload: unknown): OutboxRow => ({ id: 1, kind: 'notify.email', payload: JSON.stringify(payload) }) as unknown as OutboxRow;
 
@@ -38,16 +38,30 @@ test('RH14: A SUMMARY THAT FAILS RAISES THE MAIL FAULT, WITHOUT THE ADDRESS, AND
 test('RJ7: ONE MEMBER WHOSE ADDRESS BOUNCES NEITHER RAISES NOR CLEARS THE MAIL FAULT', async () => {
   const { said, fault } = watched();
   const notices = mailedNotices(async ({ to }) => {
-    if (to.includes('gone@example.com')) throw new Error('the mail server answered 550 at RCPT TO, so the mail was not sent');
+    if (to.includes('gone@example.com')) throw new Error('the mail server has no such mailbox (550 5.1.1 at RCPT TO), so the mail was not sent');
   }, fault);
   await assert.rejects(notices(job({ to: 'gone@example.com', subject: 'Your week' })));
   assert.deepEqual(said, [], 'a mailbox that bounces was put on Health as the server');
   await notices(job({ to: 'owner@example.com', subject: 'Your week' }));
   assert.deepEqual(said, ['sent']);
-  assert.equal(addressRefused('the mail server answered 550 at RCPT TO, so the mail was not sent'), true);
+  assert.equal(addressRefused('the mail server has no such mailbox (550 5.1.1 at RCPT TO), so the mail was not sent'), true);
   assert.equal(addressRefused('the mail server answered 451 at RCPT TO, so the mail was not sent'), false, 'a server busy is the server');
+  assert.equal(addressRefused('the mail server answered 554 5.7.1 at RCPT TO, so the mail was not sent'), false, 'relay denied is the server');
+  assert.equal(addressRefused('the mail server answered 550 at RCPT TO, so the mail was not sent'), false, 'a 550 the server did not say was a mailbox');
+  assert.equal(addressRefused('the mail server refused every address at RCPT TO (550 5.1.1), so the mail was not sent'), false, 'every address refused is the server');
   assert.equal(addressRefused('the mail server answered 554 at DATA, so the mail was not sent'), false);
   assert.equal(addressRefused('the mail server stopped answering'), false);
+});
+
+test('RK5: ONLY A MAILBOX THE SERVER DOES NOT HAVE IS ONE BAD ADDRESS', () => {
+  assert.equal(mailboxRefused({ code: 550, lines: ['5.1.1 <gone@example.com>: Recipient address rejected: User unknown'] }), true);
+  assert.equal(mailboxRefused({ code: 553, lines: ['5.1.3 Bad recipient address syntax'] }), true);
+  assert.equal(mailboxRefused({ code: 550, lines: ['No such user here'] }), true);
+  assert.equal(mailboxRefused({ code: 554, lines: ['5.7.1 Relay access denied'] }), false);
+  assert.equal(mailboxRefused({ code: 550, lines: ['5.7.1 Sender not authorised'] }), false);
+  assert.equal(mailboxRefused({ code: 550, lines: ['5.1.8 Sender address rejected: Domain not found'] }), false);
+  assert.equal(mailboxRefused({ code: 550, lines: ['Relaying denied'] }), false);
+  assert.equal(mailboxRefused({ code: 451, lines: ['4.3.0 Try again later'] }), false);
 });
 
 test('RH14: A PAYLOAD THIS HOST CANNOT READ IS NOT A MAIL SERVER FAULT', async () => {

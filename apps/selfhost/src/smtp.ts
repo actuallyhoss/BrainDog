@@ -184,13 +184,30 @@ export function smtpSender(config: SmtpConfig, tls: ConnectionOptions = {}): Sen
     try {
       wire.write(`MAIL FROM:<${config.from}>`);
       await expect(wire, 'MAIL FROM', is2);
+      /* ONE MAILBOX THE SERVER DOES NOT HAVE IS SKIPPED, AND THE REST STILL GET THE MAIL (review k, RK5): a summary to
+         the owner and a member stopped at the member's 550, so the owner's copy never went either. Only a refusal of
+         the mailbox itself is skipped (`mailboxRefused`); a relay denied or a sender not allowed is the server refusing
+         every mail, and ends the send as any other answer does. */
+      const taken: string[] = [];
+      let refusal = '';
       for (const address of to) {
         wire.write(`RCPT TO:<${address}>`);
-        await expect(wire, 'RCPT TO', is2);
+        const got = await wire.reply();
+        if (is2(got.code)) taken.push(address);
+        else if (mailboxRefused(got)) refusal = codeOf(got);
+        else throw new Error(`the mail server answered ${codeOf(got)} at RCPT TO, so the mail was not sent`);
       }
+      /* NOBODY TAKEN: one address refused is that mailbox (`addressRefused`), and every one of several refused is the
+         server's to explain, so Health hears it. */
+      if (taken.length === 0)
+        throw new Error(
+          to.length === 1
+            ? `the mail server has no such mailbox (${refusal} at RCPT TO), so the mail was not sent`
+            : `the mail server refused every address at RCPT TO (${refusal}), so the mail was not sent`,
+        );
       wire.write('DATA');
       await expect(wire, 'DATA', (c) => c === 354);
-      wire.write(messageOf(config.from, to, letter.subject, letter.text, new Date()));
+      wire.write(messageOf(config.from, taken, letter.subject, letter.text, new Date()));
       await expect(wire, 'the end of the message', is2);
       wire.write('QUIT');
     } finally {
@@ -367,12 +384,33 @@ function tellRecord(f: () => void): void {
 }
 
 /**
- * Whether a send failed because the server refused one address (a 5xx at `RCPT TO`, such as 550 no such user) rather
- * than because the server itself is down, refusing the login or out of room (RJ7). Health's mail fault is about the
- * server, so a mailbox that bounces is the job's dead letter and never raises or clears it.
+ * Whether a send failed because the server refused its one address (550, 551 or 553 at `RCPT TO`, a mailbox it does not
+ * have: `mailboxRefused`) rather than because the server itself is down, refusing the login, refusing to relay or out of
+ * room (RJ7; review k, RK5). Health's mail fault is about the server, so a mailbox that bounces is the job's dead letter
+ * and never raises or clears it.
  */
 export function addressRefused(error: string): boolean {
-  return /\banswered 5\d\d at RCPT TO\b/u.test(error);
+  return /\bhas no such mailbox \(55[013]\b[^)]* at RCPT TO\)/u.test(error);
+}
+
+/** A reply's enhanced status code (RFC 3463), such as `5.1.1`, when the server gave one. */
+const enhancedOf = (got: { lines: string[] }): string | null => /^([245]\.\d{1,3}\.\d{1,3})\b/u.exec(got.lines[0] ?? '')?.[1] ?? null;
+
+/** A reply's code with its enhanced code, `550 5.7.1`, and nothing else the server said. */
+const codeOf = (got: { code: number; lines: string[] }): string => `${String(got.code)}${enhancedOf(got) === null ? '' : ` ${enhancedOf(got)!}`}`;
+
+/**
+ * Whether a refusal at RCPT TO is of that one mailbox (review k, RK5): 550, 551 or 553, with the enhanced code 5.1.x of
+ * a bad destination address, never 5.7.x (relay access denied, sender not authorised) nor 5.1.7/5.1.8 (the sender's
+ * own address), which say the server takes no mail from this host at all. A server that gives no enhanced code is
+ * read by its words: a user or mailbox it does not know, and nothing of relaying, policy or the sender.
+ */
+export function mailboxRefused(got: { code: number; lines: string[] }): boolean {
+  if (got.code !== 550 && got.code !== 551 && got.code !== 553) return false;
+  const enhanced = enhancedOf(got);
+  if (enhanced !== null) return /^5\.1\.\d+$/u.test(enhanced) && enhanced !== '5.1.7' && enhanced !== '5.1.8';
+  const said = got.lines.join(' ');
+  return /\b(?:no such|unknown|user|mailbox|recipient)\b/iu.test(said) && !/relay|denied|authori[sz]|permitted|sender|policy|spam|block/iu.test(said);
 }
 
 /**
