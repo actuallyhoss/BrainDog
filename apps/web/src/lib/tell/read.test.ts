@@ -63,7 +63,7 @@ test('the Nadia sentence on a fresh shop record is a client, an order from her a
   assert.equal(person!.said, 'Nadia, a client');
   assert.equal(person!.detail, 'new in People');
 
-  assert.deepEqual(order!.fields, { what: 'vanilla jars', who: { $row: 0 }, how_many: 3, due: '2026-10-09', paid: { amount: 90000, currency: 'EGP' } });
+  assert.deepEqual(order!.fields, { what: 'Vanilla jars', who: { $row: 0 }, how_many: 3, due: '2026-10-09', paid: { amount: 90000, currency: 'EGP' } });
   assert.equal(order!.said, 'An order from Nadia');
   assert.equal(order!.detail, '3 vanilla jars, due Friday, paid');
   assert.equal(order!.icon, 'box');
@@ -177,13 +177,13 @@ test('money the reader paid goes out, for what they said', () => {
 test('a pasted message is from the person who sent it', () => {
   const { rows } = tellRead('[09/10, 14:02] Salma: can I get two lavender candles by tomorrow?', shop);
   assert.deepEqual(rows.map((r) => r.register), ['people', 'orders']);
-  assert.deepEqual(rows[1]!.fields, { what: 'lavender candles', who: { $row: 0 }, how_many: 2, due: '2026-10-08' });
+  assert.deepEqual(rows[1]!.fields, { what: 'Lavender candles', who: { $row: 0 }, how_many: 2, due: '2026-10-08' });
   assert.equal(rows[1]!.detail, '2 lavender candles, due tomorrow');
 });
 
 test('a self-introduction is the reader, not a new person', () => {
   const { rows } = tellRead("I'm Mariam, Nadia wants 3 vanilla jars for Friday", shop);
-  assert.deepEqual(rows.map((r) => r.fields.name ?? r.fields.what), ['Nadia', 'vanilla jars']);
+  assert.deepEqual(rows.map((r) => r.fields.name ?? r.fields.what), ['Nadia', 'Vanilla jars']);
 });
 
 test('with no list that fits, one task with the words as its title', () => {
@@ -285,7 +285,7 @@ test('"14 MUGS FOR LINA, SHE PAID 1200" IS ONE ORDER FROM LINA, paid, on the day
   assert.deepEqual(rows.map((r) => r.register), ['people', 'orders', 'obligations']);
   assert.deepEqual(rows[0]!.fields, { name: 'Lina', role: 'client' });
   const order = rows[1]!;
-  assert.deepEqual(order.fields, { what: 'mugs', who: { $row: 0 }, how_many: 14, due: '2026-10-08', paid: { amount: 120000, currency: 'EGP' } });
+  assert.deepEqual(order.fields, { what: 'Mugs', who: { $row: 0 }, how_many: 14, due: '2026-10-08', paid: { amount: 120000, currency: 'EGP' } });
   assert.equal(order.said, 'An order from Lina');
   assert.equal(order.detail, '14 mugs, due tomorrow, paid');
   const paid = rows[2]!;

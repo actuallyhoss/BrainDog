@@ -30,11 +30,11 @@ const TODAY = '2026-10-07';
 
 test('the box and Tell make the same order: what, how many, who and the day', () => {
   const box = orderLine('20 candles for Salma by Friday', ORDERS, PEOPLE, [], TODAY)!;
-  assert.deepEqual(box.fields, { what: 'candles', how_many: 20, due: '2026-10-09' });
+  assert.deepEqual(box.fields, { what: 'Candles', how_many: 20, due: '2026-10-09' });
   assert.deepEqual(box.person?.fields, { name: 'Salma', role: 'client' });
   assert.equal(box.whoField, 'who');
   const told = orderLine('Salma ordered 20 lavender candles for Friday', ORDERS, PEOPLE, [{ seq: 4, name: 'Salma' }], TODAY)!;
-  assert.deepEqual(told.fields, { what: 'lavender candles', how_many: 20, due: '2026-10-09', who: 'people#4' });
+  assert.deepEqual(told.fields, { what: 'Lavender candles', how_many: 20, due: '2026-10-09', who: 'people#4' });
   assert.equal(told.person, null);
 });
 

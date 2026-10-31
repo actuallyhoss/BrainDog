@@ -45,6 +45,8 @@ export const words = {
   shareShow: 'Show the link',
   /* A PAGE WHOSE LINK WOULD SHOW NOTHING, said before it is made (AM21). */
   shareEmpty: 'Nothing on this page yet, so the link would show nothing.',
+  /* A PAGE OF MONEY WITH THE TICK OFF (AN14): it has things on it, and the link would show none of them. */
+  shareEmptyMoney: 'With money left off, the link would show nothing.',
   shareCopy: 'Copy the link',
   shareCopied: 'Link copied',
   shareUntil: (day: string) => `It works until ${day}, or until you close it in Settings, under People & sharing.`,
@@ -65,7 +67,8 @@ export const words = {
   linksOpenUntil: (day: string) => `Open until ${day}`,
   linksRanOut: (day: string) => `Ran out ${day}`,
   linksClosedOn: (day: string) => `Closed ${day}`,
-  linksOpened: (when: string) => `opened ${when}`,
+  /* MADE, NOT OPENED (AN21): "opened just now" read as somebody having read it. */
+  linksOpened: (when: string) => `made ${when}`,
   sharedChip: 'Shared, read only',
   sharedUntil: (day: string) => `This link works until ${day}.`,
   sharedDead: 'This page is not shared.',
@@ -155,7 +158,16 @@ export async function readShareable(client: Caller): Promise<Shareable> {
  */
 export async function linkEmpty(client: Caller, slug: string, money: boolean): Promise<boolean> {
   const out = await client.call<unknown>('shareable', { slug, money }).catch(() => null);
-  return out !== null && out.ok && isObject(out.value) && out.value.empty === true;
+  if (out === null || !out.ok || !isObject(out.value)) return false;
+  if (out.value.empty === true) return true;
+  /* THE RECORD KEEPS BLOCKS THE LINK'S PAGE DRAWS NOTHING OF (AN14), so the page it would open is judged as `/s` judges
+     it (`shownBlocks`): with nothing to draw, the link reads "This page has nothing a link can show". */
+  const page = isObject(out.value.page) ? pageOf(out.value.page) : null;
+  if (page === null) return false;
+  if (page.empty !== null) return true;
+  const { shownBlocks } = await import('../../routes/s/reading.ts');
+  const t = page.read_at === null ? Number.NaN : Date.parse(page.read_at);
+  return shownBlocks(page.blocks, { language: page.language, zone: page.zone, now: Number.isFinite(t) ? t : Date.now(), home: page.home }).blocks.length === 0;
 }
 
 /** The links this record opened, newest first. Never a link itself, which nobody keeps. */
@@ -500,21 +512,23 @@ export async function readShared(origin: string, token: string, io?: Fetch): Pro
     const detail = (out.refusal as { detail?: unknown }).detail;
     return { from: 'unreached', why: typeof detail === 'string' ? detail : out.refusal.fix };
   }
-  const v = isObject(out.value) ? out.value : {};
-  if (typeof v.title !== 'string' || typeof v.expires_at !== 'string') return { from: 'shut' };
+  const page = pageOf(isObject(out.value) ? out.value : {});
+  return page === null ? { from: 'shut' } : { from: 'live', page };
+}
+
+/** A page as the record sends it, each part kept only in its shape, or `null` for an answer that is not one. */
+function pageOf(v: Record<string, unknown>): SharedPage | null {
+  if (typeof v.title !== 'string' || typeof v.expires_at !== 'string') return null;
   return {
-    from: 'live',
-    page: {
-      title: v.title,
-      expires_at: v.expires_at,
-      read_at: typeof v.read_at === 'string' ? v.read_at : null,
-      language: languageOf(v.language),
-      zone: zoneOf(v.zone),
-      home: typeof v.home === 'string' && /^[A-Z]{3}$/u.test(v.home) ? v.home : null,
-      empty: text(v.empty),
-      layout: layoutOf(v),
-      blocks: (Array.isArray(v.blocks) ? v.blocks : []).map(blockShared),
-    },
+    title: v.title,
+    expires_at: v.expires_at,
+    read_at: typeof v.read_at === 'string' ? v.read_at : null,
+    language: languageOf(v.language),
+    zone: zoneOf(v.zone),
+    home: typeof v.home === 'string' && /^[A-Z]{3}$/u.test(v.home) ? v.home : null,
+    empty: text(v.empty),
+    layout: layoutOf(v),
+    blocks: (Array.isArray(v.blocks) ? v.blocks : []).map(blockShared),
   };
 }
 

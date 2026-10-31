@@ -42,7 +42,7 @@
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { REGISTERS, TITLES } from '$lib/record/held.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { handFor, readHolders } from '$lib/record/hand.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import KeyViews from '../../keychain/KeyViews.svelte';
@@ -60,9 +60,8 @@
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { lineFigures, lineValues, whichCurrency } from '$lib/record/line-figures.ts';
-  import { orderLine } from '$lib/tell/order-line.ts';
+  import { orderFields, orderFor } from '$lib/tell/order-box.ts';
   import { sameAsked, samePerson, type Twin } from '$lib/record/same-person.ts';
-  import { PEOPLE } from '$lib/who.ts';
   import { recordToday } from '$lib/record/zone.ts';
   import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
@@ -1855,17 +1854,16 @@
        was a bill called the whole line, refused for its amount. The words left are the title. */
     /* AN ORDER IS READ AS TELL READS ONE (AM11): "20 candles for Salma by Friday" is candles, 20 of them, for Salma, by
        Friday, where the box made one called the whole line with only a day. Somebody new it is for is made first. */
-    const order = decl ? orderLine(said, { ...decl, id }, REGISTERS[PEOPLE] ? { ...REGISTERS[PEOPLE], id: PEOPLE } : undefined, [...(TITLES.get(PEOPLE) ?? [])].map(([seq, name]) => ({ seq, name })), recordToday(now)) : null;
+    const order = decl ? orderFor(said, id, recordToday(now)) : null;
     const figures = order && decl?.title && typeof order.fields[decl.title] === 'string' ? { text: String(order.fields[decl.title]), fields: order.fields as Fields } : lineFigures(id, said, now);
     const captured = capturedFields(id, figures.text, either ? [] : filters, now, result.entries);
     const fields: Fields = { ...captured.fields, ...figures.fields };
-    let madePerson: { register: string; seq: number; version: number } | null = null;
-    if (order?.person && order.whoField) {
-      const person = await writes().create(order.person.register, order.person.fields as Fields);
-      if (person.ok) {
-        fields[order.whoField] = `${order.person.register}#${person.entry.seq}`;
-        madePerson = { register: order.person.register, seq: person.entry.seq, version: person.entry.version };
-      }
+    /* SOMEBODY NEW THE ORDER IS FOR IS MADE FIRST, and their name is on this screen before the row is drawn (AN18): the
+       new row's Who said "Unnamed person" until the page was opened again. */
+    const madePerson = order ? (await orderFields(order, (register, f) => writes().create(register, f as Fields))).made : null;
+    if (madePerson && order?.whoField) {
+      fields[order.whoField] = `${madePerson.register}#${madePerson.seq}`;
+      if (madePerson.name !== '') named = joinNames(named, new Map([[`${madePerson.register}#${madePerson.seq}`, madePerson.name]]));
     }
     /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
     const seq = -++typedSeq;
@@ -1890,12 +1888,14 @@
     }
     if (madePerson) madeFor.set(out.entry.seq, { register: madePerson.register, seq: madePerson.seq });
     if (asked !== was) return null;
-    addLanded(out.entry, mark);
+    /* THE PERSON IT IS FOR IS HELD BY NUMBER on the landed row, as on the typed one, so its Who is their name. */
+    const entry = madePerson && order?.whoField ? { ...out.entry, fields: { ...out.entry.fields, [order.whoField]: madePerson.seq } } : out.entry;
+    addLanded(entry, mark);
     /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME (motion F12, F20, VERIFY H23): "Added “Motion test bill” to Bills and
        invoices." The fields it filled in are each in their own cell on the row, so they are not read out here. The
        row's chip carries Put back, so the toast offers no second Undo; ⌘Z still takes it back. */
-    if (decl) toasts.push(copy.captureAdded(titleSaid(out.entry), listWord(id, decl.name)), { undo: takeBack(out.entry), offer: false });
-    return out.entry;
+    if (decl) toasts.push(copy.captureAdded(titleSaid(entry), listWord(id, decl.name)), { undo: takeBack(entry), offer: false });
+    return entry;
   }
 
   /**

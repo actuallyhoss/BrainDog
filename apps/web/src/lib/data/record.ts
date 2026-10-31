@@ -229,12 +229,16 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     let kept = maps.get(register);
     if (!kept) {
       maps.set(register, (kept = walk(register)));
-      void kept.then((out) => {
-        if (!out.ok) maps.delete(register);
-      });
+      /* ONLY WHILE IT IS OUT (audit 31 Oct n, AN18): the tab's walk keeps itself and asks again after a write this tab
+         sent, and a map kept here past it named a person the Orders box had just made "Unnamed person" on every read
+         of the list until the page was opened again. A map is made once per walk (`mapsOf`). */
+      void kept.finally(() => maps.delete(register));
     }
     return kept;
   }
+
+  /** Each walk's map, by the walk's own rows: a walk the tab kept answers the map made of it. */
+  const mapsOf = new WeakMap<readonly RecordRow[], RefMap>();
 
   async function walk(register: string): Promise<Said<RefMap>> {
     /* A LIST THIS BUILD DOES NOT SHIP IS DECLARED FIRST, or `refMapOf` finds no title to name its rows by and every ref
@@ -242,7 +246,10 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     await learn(schemaOf, register, asked);
     /* THE TAB'S WALK (`ref-rows.ts`), which every other reader shares, and the record's refusal where it would not. */
     const out = await rowsSaid(client, apiBase(), register);
-    return out.ok ? { ok: true, value: refMapOf(register, out.rows) } : out;
+    if (!out.ok) return out;
+    let map = mapsOf.get(out.rows);
+    if (map === undefined) mapsOf.set(out.rows, (map = refMapOf(register, out.rows)));
+    return { ok: true, value: map };
   }
 
   async function refsFor(register: string): Promise<Said<Map<string, RefMap>>> {

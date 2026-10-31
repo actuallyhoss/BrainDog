@@ -32,6 +32,7 @@ import { optimist, UNDO_MS } from '../data/optimistic.ts';
 import { isQuestion } from '../work/capture.ts';
 import { words } from './words.ts';
 import type { ActAction, OpenSheet } from './act-sheet.ts';
+import type { Fields } from '../record/schema.ts';
 
 /* TODAY'S LIGHT SYNTAX, handed on so the palette's reader reaches `lib/work` through this one held file. */
 export { captureOf, contextOf, isQuestion, projectNamed } from '../work/capture.ts';
@@ -472,13 +473,31 @@ export function pageWrites(deps: WritesDeps) {
        once the page has read the row back, or at once if the record refuses it (`lib/data/optimistic.ts`). */
     let line: Row = { cells: [typed], done: false };
     typedLine(register, line, true);
-    const [{ captureRow, readLine }, { rowWriter }, { lineFigures }] = await Promise.all([import('./capture.ts'), import('../record/rows-write.ts'), import('../record/line-figures.ts')]);
-    /* THE LIGHT SYNTAX, READ: "Chase Halden tomorrow #kiln" is drawn and written as "Chase Halden", due tomorrow. */
-    const light = readLine(register, typed, now);
-    /* AND THE AMOUNT AND DAY A LINE ON A LIST OF MONEY CARRIES (AH5): "Electricity bill 850 due 5 Nov" is a bill of 850
-       due on 5 Nov called "Electricity bill". What the light syntax read wins over it. */
-    const figures = lineFigures(register, light.text, now);
-    const read = { text: figures.text, parsed: { ...figures.fields, ...light.parsed }, said: [...light.said, ...figures.said] };
+    const [{ captureRow, readLine }, { rowWriter }, { lineFigures }, { orderFor, orderFields, orderRead }, { recordToday }] = await Promise.all([
+      import('./capture.ts'),
+      import('../record/rows-write.ts'),
+      import('../record/line-figures.ts'),
+      import('../tell/order-box.ts'),
+      import('../record/zone.ts'),
+    ]);
+    const writer = rowWriter(deps.base());
+    /* AN ORDER IS READ AS THE ORDERS LIST'S OWN BOX AND TELL READ ONE (audit 31 Oct n, AN5): "20 candles for Salma by
+       Friday" on the Orders page was an order called the whole line, for nobody. It is Candles, 20 of them, for Salma,
+       by Friday, and somebody new it is for is made in People first. */
+    const order = orderFor(typed, register, recordToday(now));
+    const title = REGISTERS[register]?.title;
+    const ordered = order && title && typeof order.fields[title] === 'string' ? order : null;
+    const took = ordered ? await orderFields(ordered, (r, f) => writer.create(r, f as Fields)) : null;
+    const made = took?.made ?? null;
+    const read = took && title ? (orderRead(took.fields, title, made) as { text: string; parsed: Fields; said: string[] }) : lightRead();
+    function lightRead() {
+      /* THE LIGHT SYNTAX, READ: "Chase Halden tomorrow #kiln" is drawn and written as "Chase Halden", due tomorrow. */
+      const light = readLine(register, typed, now!);
+      /* AND THE AMOUNT AND DAY A LINE ON A LIST OF MONEY CARRIES (AH5): "Electricity bill 850 due 5 Nov" is a bill of 850
+         due on 5 Nov called "Electricity bill". What the light syntax read wins over it. */
+      const figures = lineFigures(register, light.text, now!);
+      return { text: figures.text, parsed: { ...figures.fields, ...light.parsed } as Fields, said: [...light.said, ...figures.said] };
+    }
     if (read.text !== typed) {
       typedLine(register, line, false);
       line = { cells: [read.text], done: false };
@@ -487,12 +506,14 @@ export function pageWrites(deps: WritesDeps) {
     const row = captureRow(register, read.text, inherited, now, read.parsed);
     /* NO ROW IS A LIST WHOSE TITLE LEFT BETWEEN THE READ AND THE PRESS, because the page hands a capture a write only
        when the list declares one. It is the race it is, read again. */
+    /* A refused order leaves nobody behind (RN5): the person made for it goes too, so the next try makes one, not two. */
+    const unmade = () => void (made && writer.archive(made.register, made.seq, made.version));
     if (!row) {
+      unmade();
       typedLine(register, line, false);
       toasts.push(copy.writeRaced, { intent: 'warn' });
       return void (await deps.reread());
     }
-    const writer = rowWriter(deps.base());
     const drawn = line;
     /* THROUGH THE ONE OPTIMISTIC RUNNER, so the receipt names the row and offers it back for six seconds, as a tick's
        does: Undo archives the row it wrote, at the version it landed with, and reads the page again. */
@@ -501,9 +522,17 @@ export function pageWrites(deps: WritesDeps) {
       revert: () => typedLine(register, drawn, false),
       send: () => writer.create(register, row.fields).then((w) => (w.ok ? { ok: true as const, value: w.entry } : { ok: false as const, fix: w.fix })),
       said: words.added(read.text, listWord(register, REGISTERS[register]?.name), read.said),
-      undo: (landed) => () => void writer.archive(register, landed.seq, landed.version).then(() => deps.reread()),
+      /* AND THE PERSON AN ORDER MADE GOES BACK WITH IT, as on the list (RN5). */
+      undo: (landed) => () =>
+        void writer
+          .archive(register, landed.seq, landed.version)
+          .then(() => (made ? writer.archive(made.register, made.seq) : undefined))
+          .then(() => deps.reread()),
     });
-    if (!out.ok) return back();
+    if (!out.ok) {
+      unmade();
+      return back();
+    }
     deps.touched?.({ register, seq: out.value.seq }, words.markAdded, read.text);
     await deps.reread();
     typedLine(register, drawn, false);

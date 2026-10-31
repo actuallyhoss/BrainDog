@@ -73,7 +73,9 @@
    * WHETHER A LINK TO THIS PAGE WOULD SHOW NOTHING (AM21), asked of the record while the sheet is open, for the page and
    * the money tick as they stand. An answer for an older ask is dropped; no answer is not empty.
    */
-  let empty = $state(false);
+  /* AND WHERE ONLY MONEY IS ON IT, that is what is said (AN14): Money with the tick off would show nothing, which is not a
+     page with nothing on it. */
+  let empty = $state<false | 'empty' | 'money'>(false);
   let emptyAsks = 0;
   $effect(() => {
     if (!open || can.state !== 'yes') {
@@ -82,9 +84,12 @@
     }
     const n = (emptyAsks += 1);
     const [which, withMoney] = [slug, money];
-    void linkEmpty(createClient({ base: apiBase() }), which, withMoney).then((said) => {
-      if (n === emptyAsks) empty = said;
-    });
+    const client = createClient({ base: apiBase() });
+    void linkEmpty(client, which, withMoney)
+      .then(async (none) => (!none ? false : withMoney || (await linkEmpty(client, which, true)) ? 'empty' : 'money'))
+      .then((said) => {
+        if (n === emptyAsks) empty = said;
+      });
   });
 
   /** Which of the sheet's two jobs it is doing: the read-only link, or the page as a template. */
@@ -309,7 +314,7 @@
       </label>
       <!-- A PAGE WHOSE LINK WOULD SHOW NOTHING SAYS SO BEFORE THE LINK IS MADE (AM21), as the record reads it for this
            tick of money (`shareable` with the page): an empty Money made a 30-day link to "nothing a link can show". -->
-      {#if empty}<p class="share-empty" role="status"><Icon name="info" size="s" />{words.shareEmpty}</p>{/if}
+      {#if empty}<p class="share-empty" role="status"><Icon name="info" size="s" />{empty === 'money' ? words.shareEmptyMoney : words.shareEmpty}</p>{/if}
       {#if refused}<p class="refused" role="alert">{refused}</p>{/if}
       <div class="share-actions">
         <Button weight="primary" disabled={busy} aria-busy={busy ? 'true' : undefined} onclick={() => void make()}>
