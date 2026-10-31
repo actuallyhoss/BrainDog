@@ -679,18 +679,18 @@ test('PAID AND CAME IN OF ONE AMOUNT ARE TWO MONEYS, said side by side, and are 
     ({ ...weekMoney(), drawn: true, rows: [], entries: [], matched: [], columns: [], refusals: [], shown: 0, total: 0, stale_at: '', metrics: Object.entries(values).map(([id, v]) => ({ id, label: id, note: '', ...(typeof v === 'string' ? { value: v } : v) })) }) as unknown as LiveBlock;
   const line = (values: Record<string, Cell>) => homeDrawn([tile(values)], NOW, undefined, undefined, null, WEEK).sentence?.text;
   /* AN ORDER MARKED PAID AND AN UNRELATED EGP 900 IN THE BANK'S TEXT ARE 1,800: equal amounts say nothing of one payment. */
-  assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00' }), 'EGP 900 was paid, and EGP 900 came in this week.');
+  assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00' }), 'EGP 900 came in, and EGP 900 reached your accounts this week.');
   assert.equal(line({ 'settled-in-7d': 'EGP 900.00 · USD 40.00', 'received-7d': 'EGP 900.00 · USD 40.00' }), 'EGP 900 and USD 40 were paid, and EGP 900 and USD 40 came in this week.');
   /* ONE ENTRY BEHIND BOTH FIGURES, as the figures themselves say: the amount is said once, and the tile still names both. */
   const one = { 'settled-in-7d': { value: 'EGP 900.00', backs: ['obligations#4'] }, 'received-7d': { value: 'EGP 900.00', backs: ['obligations#4'] } };
   assert.equal(line(one), 'EGP 900 came in this week.');
   assert.equal(homeDrawn([tile(one)], NOW, undefined, undefined, null, WEEK).blocks[0]!.metrics?.length, 2);
   /* TWO ENTRIES, OR ONE FIGURE THAT NAMES NONE, OR TWO BEHIND ONE FIGURE: still two moneys. */
-  const two = 'EGP 900 was paid, and EGP 900 came in this week.';
+  const two = 'EGP 900 came in, and EGP 900 reached your accounts this week.';
   assert.equal(line({ 'settled-in-7d': { value: 'EGP 900.00', backs: ['obligations#4'] }, 'received-7d': { value: 'EGP 900.00', backs: ['transactions#9'] } }), two);
   assert.equal(line({ 'settled-in-7d': { value: 'EGP 900.00', backs: ['obligations#4'] }, 'received-7d': 'EGP 900.00' }), two);
   assert.equal(line({ 'settled-in-7d': { value: 'EGP 900.00', backs: ['obligations#4', 'obligations#5'] }, 'received-7d': { value: 'EGP 900.00', backs: ['obligations#4', 'obligations#5'] } }), two);
-  assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }), 'EGP 900 was paid, and EGP 150 came in this week.');
+  assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }), 'EGP 900 came in, and EGP 150 reached your accounts this week.');
 });
 
 /* ── working means working ─────────────────────────────────────────────── */
@@ -740,7 +740,7 @@ test('A RUN QUIET FOR 20 MINUTES IS NOT WORKING NOW, though it is active and was
 });
 
 test('THE MONEY TILE SAYS WHAT IS STILL TO COME IN, beside what was paid and what came in', () => {
-  assert.deepEqual(weekMoney().cells?.map((c) => c.label), ['Paid', 'Came in', 'Still to come in']);
+  assert.deepEqual(weekMoney().cells?.map((c) => c.label), ['Came in', 'Into your accounts', 'Still to come in']);
 });
 
 /* ── the line Today says while a vital sign reads red ── */

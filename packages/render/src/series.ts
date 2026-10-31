@@ -14,7 +14,7 @@
 
 import { MISSING, axisFigure, exponentOf } from './format.ts';
 import { signedOf } from './bridge.ts';
-import { figureLike } from './figure.ts';
+import { figureLike, wholeMinor, wholeShape } from './figure.ts';
 import { type AmountSetting, currencyOfFigure, writeAmount } from './money.ts';
 
 /** Two decimals at most, and no trailing zeros, so an attribute stays short and exact. */
@@ -295,6 +295,8 @@ export function amountLike(template: string, value: number, home: string | null 
   if (!currency) return copied();
   const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(currency));
   if (!Number.isSafeInteger(minor)) return copied();
+  /* WHOLE WHERE THE CELL WAS WHOLE (AO11), as `figureLike` keeps it: "£2,400" is never written again as "£2,400.00". */
+  if (wholeShape(template) && setting !== 'axis') return writeAmount({ minor: wholeMinor(minor, currency), currency }, home ?? null, setting === 'exact' ? 'read' : setting)?.text ?? copied();
   return writeAmount({ minor, currency }, home ?? null, setting)?.text ?? copied();
 }
 

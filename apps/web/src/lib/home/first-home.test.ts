@@ -189,7 +189,7 @@ test('AFTER A CAPTURE OF THREE ENTRIES the line and the first two blocks read th
   );
   /* THE TILE READS "Paid EGP 900" and nothing else: a nought is no figure. */
   const money = drawn.blocks.find((b) => b.heading === MONEY_WEEK)!;
-  assert.deepEqual(money.metrics?.map((m) => [m.label, m.value]), [['Paid', 'EGP 900.00']]);
+  assert.deepEqual(money.metrics?.map((m) => [m.label, m.value]), [['Came in', 'EGP 900.00']]);
   /* WITHOUT THE WEEK, as on a page the record declares, the house line stands. */
   assert.notEqual(homeDrawn(live, NOW, undefined, undefined, null).sentence?.text, drawn.sentence?.text);
 });
@@ -207,7 +207,7 @@ test('ON A SHOP THAT KEEPS ITS BOOKS the line reads the tile: one payment by who
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00' }), 'EGP 900 came in this week.');
   /* TWO CURRENCIES, AND THE TWO FIGURES, are said side by side and never added, each figure by the tile's name for it. */
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00 · USD 40.00' }), 'EGP 900 and USD 40 came in this week.');
-  assert.equal(lineOf({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }, [order]), '1 order is due Friday. EGP 900 was paid, and EGP 150 came in this week.');
+  assert.equal(lineOf({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }, [order]), '1 order is due Friday. EGP 900 came in, and EGP 150 reached your accounts this week.');
   /* NOTHING IN: the house line stands, with no "0 came in". */
   assert.doesNotMatch(lineOf({ 'settled-in-7d': 'EGP 0.00', 'received-7d': '0' }) ?? '', /came in|paid/u);
   assert.equal(amountSpoken(90_000, 'EGP'), 'EGP 900');

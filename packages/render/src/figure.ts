@@ -34,6 +34,10 @@ export function figureLike(template: string, value: number, home?: Home, setting
     /* Half a minor unit rounds away from nought, on either side of it, as the path below always did. */
     const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(currency));
     if (home === undefined) return money(minor, currency);
+    /* WHOLE WHERE THE PAGE WROTE IT WHOLE (audit 31 Oct o, AO11): read by its sign alone, "£2,400" was written again as
+       "£2,400.00", and a category's total "£18,604.78" stood under the page's "£18,605 out". A template with no pence
+       is the page's rule for its whole amounts, so the value is rounded to the whole unit and written without them. */
+    if (wholeShape(template)) return writeAmount({ minor: wholeMinor(minor, currency), currency }, home, setting === 'exact' ? 'read' : setting)?.text ?? MISSING;
     return writeAmount({ minor, currency }, home, setting)?.text ?? MISSING;
   }
   const m = NUMBER.exec(template);
@@ -48,4 +52,16 @@ export function figureLike(template: string, value: number, home?: Home, setting
   /* A CODE KEEPS ITS PLACE AND THE SIGN FOLLOWS IT, as `money` writes `GBP −1,299.00`; a symbol takes
      the sign in front of it, as `symbolFigure` writes `−£1,299.00`. */
   return /^[A-Z]{3} $/u.test(prefix) ? `${prefix}${minus}${body}${suffix}` : `${minus}${prefix}${body}${suffix}`;
+}
+
+/** Whether a figure was written with no fraction ("£2,400", "EGP 1,299"), the shape a page uses for its whole amounts. */
+export function wholeShape(template: string): boolean {
+  const m = NUMBER.exec(template);
+  return m !== null && m[1] === undefined;
+}
+
+/** Minor units rounded to the whole unit of `currency`, half away from nought. */
+export function wholeMinor(minor: number, currency: string): number {
+  const unit = 10 ** exponentOf(currency);
+  return Math.sign(minor) * Math.round(Math.abs(minor) / unit) * unit;
 }

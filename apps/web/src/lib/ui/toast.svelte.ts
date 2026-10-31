@@ -85,6 +85,11 @@ class Toasts {
   push(text: string, opts: { undo?: () => void; intent?: Toast['intent']; life?: number; offer?: boolean } = {}): number {
     return untrack(() => {
       const id = this.#next++;
+      /* ONE ACTION, ONE TOAST (audit 31 Oct o, AO13): two adds in a row stacked "Added a payment and a person, Undo" over
+         "Added a repeating item, Undo", covering the tile below at 390, and which Undo took back what was not clear. A
+         toast that offers an Undo takes the place of the one before that offered one: the newest is what ⌘Z undoes. */
+      const offers = (t: Pick<Toast, 'undo' | 'offer'>): boolean => t.undo !== undefined && t.offer !== false;
+      if (offers({ undo: opts.undo, offer: opts.offer })) for (const was of this.items.filter(offers)) this.dismiss(was.id);
       const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent, life: opts.life, offer: opts.offer }];
 
       /* THE OLDEST GOES THROUGH `dismiss` RATHER THAN JUST OFF THE END OF THE ARRAY, so that its

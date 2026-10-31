@@ -76,6 +76,9 @@ export type TellOptions = {
   /** Every currency the record's money is in (`moneyCurrencies()` when not said): "dinars" on a record that holds
       only Kuwaiti dinars is those. */
   held?: readonly string[];
+  /** The name of whoever is telling it, the record's owner on their own BrainDog: never the one their money was paid to
+      (AO12). */
+  me?: string | null;
 };
 
 /** A field's value: as the record takes it, or `{ $row: n }` for the entry at index `n` of the same call. */
@@ -891,6 +894,9 @@ const WHY = {
       : `Which ${plural} are they? Say whose with the figure, like ${figure} ${like} ${plural}.`;
   },
   whichWay: (name: string) => `Did ${name} pay you, or did you pay ${name}?`,
+  /* THE OWNER IS NEVER THE PAYEE (AO12): "Paid Nadia 300" on Nadia's own BrainDog paid herself, with no question. */
+  selfPaid: (name: string, figure: string) =>
+    `You are ${name} here. Was it paid to you, or to somebody else called ${name}? Say it like got ${figure}, or paid ${name} and their surname ${figure}.`,
   /* A PLAIN LINE THAT SAYS NO WAY, AND NAMES NOBODY (RL5): "Wages 12,000 due Friday". */
   inOrOut: (figure: string) => `Is that money you get, or money you pay? Say which with it, like got ${figure} or paid ${figure}.`,
   /* A NUMBER A THING IS KNOWN BY, AND NO AMOUNT (RO3): "Order 57 paid". */
@@ -998,6 +1004,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let whichWay: string | null = null;
   /* A plain money line that names nobody and says no way (RL5): which way is asked, with the figure it said. */
   let inOrOut: string | null = null;
+  /* The reader named as the one paid (AO12): asked, never kept as paying themself. */
+  let selfPaid: { name: string; figure: string } | null = null;
   /* Money that comes round was read with no day it next falls on: the day is asked, and the entry waits for it. */
   let whenNext = false;
   /* "Order 57 paid": the line named what was paid by its number and said no amount (RO3). How much is asked. */
@@ -1187,6 +1195,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (row && note && said.length > 0) row.fields[note.id] = said.join('. ');
     }
     if (bankBare) return { rows, left, why: WHY.bankNoCurrency };
+    if (selfPaid !== null) return { rows, left, why: WHY.selfPaid(selfPaid.name, selfPaid.figure) };
     if (whichWay !== null) return { rows, left, why: WHY.whichWay(whichWay) };
     if (inOrOut !== null) return { rows, left, why: WHY.inOrOut(inOrOut) };
     if (howMuch !== null) return { rows, left, why: WHY.howMuch(howMuch) };
@@ -2051,6 +2060,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       const cutTo = (m: RegExpExecArray): string => oneLine(`${m[0].startsWith('to') ? rest.slice(0, m.index) : 'paid'} ${dropped.join(' ')} ${rest.slice(m.index + m[0].length)}`);
       /* ONLY SOMEBODY IS A PAYEE (RL7): one already in People, or a name that reads as a person, never a place, a
          company, a provider, a bill or one of his accounts. "Paid Vodafone 450" keeps Vodafone as what it was for. */
+      if (to && name && isReader(name)) {
+        selfPaid ??= { name: titled(name), figure: a.digits };
+        left.push(oneLine(phrase));
+        return true;
+      }
       if (to && name && (knownAs(name, opts.people ?? []) !== null || made.has(words(name)) || somebody(name)) && !THING_PAID.test(name) && !ownAccount(name)) {
         payee = name;
         rest = cutTo(to);
@@ -2156,6 +2170,14 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   }
 
   /** Whether `name` is one of his own accounts, as `accountFor` matches one by name. */
+  /** Whether a name is the reader's own (AO12): their whole name, or their first name alone when it is all that was said. */
+  function isReader(name: string): boolean {
+    const me = words(opts.me ?? '').trim().replace(/\s+/gu, ' ');
+    if (me === '') return false;
+    const said = words(name).trim().replace(/\s+/gu, ' ');
+    return said === me || said === me.split(' ')[0];
+  }
+
   function ownAccount(name: string): boolean {
     const said = words(name.trim());
     return said !== '' && (opts.accounts ?? []).some((a) => words(a.name) === said || words(a.name).includes(said) || said.includes(words(a.name)));

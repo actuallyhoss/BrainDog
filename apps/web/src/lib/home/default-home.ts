@@ -355,7 +355,9 @@ export const MONEY_WEEK = 'Money this week';
  * two (`WEEK_IN`); two names say that the two cells are two different things, where "In EGP 900, In EGP 900" read as
  * the same money twice.
  */
-export const WEEK_IN_SAID: Record<(typeof WEEK_IN)[number], string> = { 'settled-in-7d': 'Paid', 'received-7d': 'Came in' };
+/* "CAME IN", NEVER "PAID" (audit 31 Oct o, AO3): read alone beside "Paid out", "Paid EGP 3,000" was money he spent, when
+   it was Upwork paying him. What reached his accounts is said as that, so the two cells keep two names. */
+export const WEEK_IN_SAID: Record<(typeof WEEK_IN)[number], string> = { 'settled-in-7d': 'Came in', 'received-7d': 'Into your accounts' };
 /** What is still owed to you, said as money still on its way and never as a debt held over somebody. */
 export const OWED_TO_YOU = 'Still to come in';
 
@@ -384,7 +386,7 @@ export const ACCOUNTS_OPEN = 'accounts-open';
 /**
  * WHAT HE PAID OUT THIS WEEK, money-core's own (`settled-out-7d`): a bill or a payment he owed and told as paid, kept
  * paid on Bills and invoices while there is no account ("Paid Nadia 300 for the logo"). It is its own cell, signed as
- * money going out, and never added to "Paid", which is money paid to him: the two go opposite ways.
+ * money going out, and never added to "Came in", which is money paid to him: the two go opposite ways.
  */
 export const PAID_OUT = 'settled-out-7d';
 /** Its cell's words on the tile. */
@@ -1055,6 +1057,11 @@ export function homeDrawn(
       shaped.push(weekMoneyDrawn(b));
       continue;
     }
+    /* CASH AHEAD LEADS WITH WHAT THERE IS, with no account open yet (AO4). */
+    if (isCashAhead(b)) {
+      shaped.push(linesKept(cashDrawn(b)));
+      continue;
+    }
     shaped.push(linesKept(newOnly(b)));
   }
   const kept = shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b));
@@ -1118,10 +1125,10 @@ const isMoney = (v: unknown): v is { amount: number; currency: string } =>
 const andOf = (items: readonly string[]): string => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
 
 /**
- * A FIGURE THE TILE DREW AS NOUGHT: `EGP 0.00`, or a bare `0` where no currency was said. The record answers a sum over
+ * A FIGURE THE TILE DREW AS NOUGHT: `EGP 0.00`, `£0`, or a bare `0` where no currency was said. The record answers a sum over
  * nothing as 0 (uc6-money-47), and the cell is the only place left that says so.
  */
-const nought = (value: string): boolean => /^(?:[A-Z]{3} )?[−-]?0(?:[.,]0+)?$/u.test(value.trim());
+const nought = (value: string): boolean => /^(?:[A-Z]{3}[\s\u00a0])?[−-]?[^\d\s]{0,3}0(?:[.,]0+)?(?:[\s\u00a0][A-Z]{3})?$/u.test(value.trim());
 
 /** An amount as the tile wrote it ("EGP 900.00 · USD 40.00", the dot between spaces of either kind), as a sentence says it: "EGP 900 and USD 40". */
 const spokenOf = (value: string): string => andOf(value.split(/\s*·\s*/u).map((v) => v.trim().replace(/\.0+$/u, '')));
@@ -1131,13 +1138,42 @@ const spokenOf = (value: string): string => andOf(value.split(/\s*·\s*/u).map((
  * "Paid 0" and nothing owed is not a figure, and a tile left with none is not drawn. Every other figure is as it came.
  */
 function weekMoneyDrawn(b: LiveBlock): LiveBlock {
-  const metrics = (b.metrics ?? []).filter(
+  const week = [...WEEK_IN, OWED, PAID_OUT] as string[];
+  const kept = (b.metrics ?? []).filter(
     (m) =>
-      !(([...WEEK_IN, OWED, PAID_OUT] as string[]).includes(m.id) && nought(m.value)) &&
+      !(week.includes(m.id) && nought(m.value)) &&
       /* A MONEY THAT DOES NOT KEEP WHAT WAS PAID OUT YET draws no cell for it, never a dash. */
       !(m.id === PAID_OUT && m.value === MISSING),
   );
-  if (metrics.length === b.metrics?.length) return b;
+  /* EACH CURRENCY SIDE BY SIDE AND NEVER ADDED, SO NO RATE IS ASKED FOR (audit 31 Oct o, AO6): "EGP 3,000 · $1,950" said
+     "At least EGP 3,000 here; no rate from USD to EGP for the rest." under it, a rate the tile never needs. */
+  const metrics = kept.map((m) => (week.includes(m.id) && m.note && RATE_WORDS.test(m.note) ? { ...m, note: '' } : m));
+  if (metrics.length === b.metrics?.length && metrics.every((m, i) => m === b.metrics![i])) return b;
+  return metrics.length === 0 ? { ...b, metrics, drawn: false } : { ...b, metrics };
+}
+
+/** A note about rates or currencies a figure was not added up across (`fxNote`). */
+const RATE_WORDS = /\brates?\b|\bmore than one currency\b/iu;
+
+/** Today's Cash ahead, by its key and its figures, as `todayHome` writes it. */
+const isCashAhead = (b: LiveBlock): boolean => b.kind === 'stat' && b.key === 'cash' && (b.metrics ?? []).some((m) => m.id === CASH_NOW);
+
+/** The figure of what the accounts hold now, which Cash ahead leads with once an account is open. */
+const CASH_NOW = 'cash-now';
+
+/**
+ * CASH AHEAD AS HOME DRAWS IT BEFORE AN ACCOUNT IS OPEN (audit 31 Oct o, AO4). Cash now reads nothing with no account, so
+ * the next figure took its place and its size: right after "Rent 12,000 due on the 1st every month" the tile's headline
+ * was "In, 30 days EGP 0", with the rent going out small beside it or not at all. With no cash now, a figure that reads
+ * nought is left out, so the tile leads with the money that does move (the rent going out), and a tile with nothing
+ * left to say is not drawn. Once an account is open the tile is as it came: a nought beside a balance is a fact.
+ */
+function cashDrawn(b: LiveBlock): LiveBlock {
+  const all = b.metrics ?? [];
+  const now = all.find((m) => m.id === CASH_NOW);
+  if (now !== undefined && now.value !== MISSING) return b;
+  const metrics = all.filter((m) => m.id !== CASH_NOW && m.value !== MISSING && !nought(m.value));
+  if (metrics.length === all.length) return b;
   return metrics.length === 0 ? { ...b, metrics, drawn: false } : { ...b, metrics };
 }
 
@@ -1172,7 +1208,7 @@ function weekInSaid(blocks: readonly LiveBlock[], due: LiveBlock | undefined, w:
   if (came.length === 0) return null;
   if (came.length === 2) {
     const [settled, received] = WEEK_IN.map((id) => came.find((m) => m.id === id)!.value);
-    return `${spokenOf(settled!)} ${settled!.includes('·') ? 'were' : 'was'} paid, and ${spokenOf(received!)} came in this week.`;
+    return `${spokenOf(settled!)} came in, and ${spokenOf(received!)} reached your accounts this week.`;
   }
   const said = spokenOf(came[0]!.value);
   const paid = w.due.paid;
