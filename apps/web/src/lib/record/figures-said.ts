@@ -4,7 +4,8 @@
  * because only the page readers (`page-live.ts`, `page-drawn.ts`) learn from an answer.
  */
 
-import { FIGURES_KNOWN, SAID } from './figures-known.ts';
+import { apiBase } from '../at.ts';
+import { FIGURES_KNOWN, SAID, figuresOf } from './figures-known.ts';
 import type { MetricDecl } from './metrics.ts';
 
 /* A FIGURE'S ID AS A DECLARATION WRITES ONE, so no key the answer sends can reach the object's prototype. */
@@ -12,6 +13,8 @@ const FIGURE_ID = /^[a-z][a-z0-9_-]{0,79}$/u;
 
 /** What a record's answer said of each figure it named (`figures` on a block), kept as the figure's declaration. */
 export function learnFigures(said: unknown): void {
+  /* WHAT ANOTHER BRAINDOG IN THIS TAB SAID IS NOT THIS ONE'S (RG19). */
+  if (globalThis.location !== undefined) figuresOf(apiBase());
   if (said === null || typeof said !== 'object' || Array.isArray(said)) return;
   for (const [id, facts] of Object.entries(said as Record<string, unknown>)) {
     if (!FIGURE_ID.test(id) || facts === null || typeof facts !== 'object' || Array.isArray(facts)) continue;

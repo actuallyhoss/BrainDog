@@ -54,6 +54,8 @@ export const SIGNED_OUT_PREFIXES = [
   'bd_board_draft:',
   /* Slash's threads, one list a person a BrainDog (`slash-chat.ts` `threadsKey`) */
   'bd_slash_threads:',
+  /* Today's Tell line and what it last added, one a person a BrainDog (`tell-line.ts`) */
+  'bd.tell:',
 ] as const;
 
 /** A drawn widget's picture in the shape kept before it was kept per person (`<code>.<size>.<mode>`, no `whose.`). */

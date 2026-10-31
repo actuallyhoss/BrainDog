@@ -23,6 +23,11 @@ test('what was last added is said for two days, then not', () => {
 });
 
 test('a browser that keeps nothing reads as a first visit, and a keep still answers the change', () => {
-  assert.deepEqual(readTell('/nadia'), {});
-  assert.deepEqual(keepTell('/nadia', { hidden: true }).hidden, true);
+  assert.deepEqual(readTell('/nadia', 'p1'), {});
+  assert.deepEqual(keepTell('/nadia', 'p1', { hidden: true }).hidden, true);
+});
+
+test('RG11: with no person, nothing is read and the change is only answered', () => {
+  assert.deepEqual(readTell('/nadia', null), {});
+  assert.deepEqual(keepTell('/nadia', null, { hidden: true }, { from: 1 }), { from: 1, hidden: true });
 });
