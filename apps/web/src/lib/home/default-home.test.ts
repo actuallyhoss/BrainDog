@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, weekOf, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -876,4 +876,26 @@ test('A LATE BILL IS A ROW OF A LIST THAT OWES ITS AMOUNT ONCE: a repeating char
   } finally {
     for (const id of ['bills', 'repeats', 'renewals']) delete REGISTERS[id];
   }
+});
+
+test("A STARTER'S OWN LIST THAT FALLS DUE IS TODAY'S WEEK (AM5), and a list nobody started from is not", () => {
+  const assignments: WeekDecl = {
+    id: 'assignments',
+    name: 'Assignments',
+    one: 'assignment',
+    title: 'what',
+    state: 'state',
+    done: ['handed_in', 'marked'],
+    pack: 'usecase-student',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'state', type: 'enum', values: ['todo', 'handed_in', 'marked'] },
+      { id: 'due', type: 'day', deadline: true },
+    ],
+  } as WeekDecl;
+  const week = weekOf([assignments], 'people');
+  assert.equal(week?.due.register, 'assignments');
+  assert.equal(week?.due.who, null, "an assignment is nobody else's");
+  assert.equal(weekOf([{ ...assignments, pack: 'estate' }], 'people'), undefined, "a service that renews is not the week");
+  assert.equal(weekOf([(({ pack: _, ...rest }) => rest)(assignments)], 'people', new Set(['assignments']))?.due.register, 'assignments', 'boot names the pack');
 });

@@ -26,7 +26,7 @@ test('THE EXAMPLE NAMES WHAT THE BRAINDOG KEEPS (AH25)', () => {
 });
 
 test('THE SCREEN FIRST SAYS WHAT WAS MADE, by the places on it', () => {
-  assert.equal(firstWords.made(['Orders', 'Products', 'People', 'Money']), 'Your BrainDog is made, with Orders, Products, People and Money.');
+  assert.equal(firstWords.made(['Orders', 'Products', 'People', 'Money']), 'Your BrainDog is made, with Orders, Products, People and Money, and more as you fill them.');
   assert.equal(firstWords.made([]), 'Your BrainDog is made.');
 });
 

@@ -458,11 +458,19 @@ const taskList = (lists: readonly TellList[], capture: string | undefined): Tell
   lists.find((l) => callsItself(l, /^tasks?$|\bto-?dos?\b/i) && textField(l) !== undefined) ??
   [...lists].filter((l) => todoScore(l) >= 2 && l.fields.some((f) => f.type === 'day' && f.deadline === true)).sort((a, b) => todoScore(b) - todoScore(a))[0];
 
+/**
+ * WHERE SOMEBODY IS KEPT, never offered a line that names nobody (audit 31 Oct m, AM2): "Call the plumber tomorrow" on a
+ * blank BrainDog offered Organisations alone. People's own lists, and any list People links a person to (the firm they
+ * are with), take a person or a company; Tell names those itself (`MET`, `JOINED`).
+ */
+const keepsSomebody = (l: TellList, lists: readonly TellList[]): boolean =>
+  l.id === PEOPLE || l.pack === PEOPLE || (lists.find((x) => x.id === PEOPLE)?.fields.some((f) => f.type === 'ref' && f.to === l.id) ?? false);
+
 /** The lists a line that fits nowhere is offered to, at most two: those with a day or a state, the starter's own first
     (AL5), then most like things to do. */
 const offerLists = (lists: readonly TellList[]): TellList[] =>
   lists
-    .filter((l) => plainable(l, true) && (l.fields.some((f) => f.type === 'day') || l.fields.some((f) => f.id === (l.state ?? 'state') && f.type === 'enum')))
+    .filter((l) => plainable(l, true) && !keepsSomebody(l, lists) && (l.fields.some((f) => f.type === 'day') || l.fields.some((f) => f.id === (l.state ?? 'state') && f.type === 'enum')))
     .sort((a, b) => starters(b) - starters(a) || todoScore(b) - todoScore(a))
     .slice(0, 2);
 

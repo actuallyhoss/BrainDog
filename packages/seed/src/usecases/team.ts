@@ -265,8 +265,11 @@ export const TEAM = {
      2.30.2 (UP2): the rail's section says what it holds: Sprints, not Team, and Agent work sits under Agents beside the
      agents it is about. Names on the rail only, so a patch step; 2.30.1 is in the catalogue.
      2.30.3 (audit 31 Oct l, AL11): Open each morning is called Sprint days, a noun beside Sprints and Sprint plan where
-     an instruction read as half a sentence. The list's id stays. Words only, so a patch step; 2.30.2 is published. */
-  version: '2.30.3',
+     an instruction read as half a sentence. The list's id stays. Words only, so a patch step; 2.30.2 is published.
+     2.30.4 (audit 31 Oct m, AM17): People is called People, as the rail, Today and the People page say it, where the
+     list was Teammates and sat apart under More lists; a team keeps clients and people it met there too. The setting
+     stays. Words only, so a patch step; 2.30.3 is published. */
+  version: '2.30.4',
   title: 'Team board',
   summary: 'Tickets, sprints and the agents on them.',
   author: 'BrainDog',
@@ -312,8 +315,9 @@ export const TEAM = {
     'tasks.state.review': 'In review',
     cycles: 'Sprints',
     cycle_plan: 'Sprint plan',
-    people: 'Teammates',
-    'people:holds': 'everyone on the team, the part each one plays and how to reach them',
+    /* PEOPLE, ONE WORD ON EVERY SCREEN (AM17): Teammates was a fourth name for the one list. */
+    people: 'People',
+    'people:holds': 'everyone on the team and everyone it works with, the part each one plays and how to reach them',
     'people.role.collaborator': 'Teammate',
     cycle_days: 'Sprint days',
   },

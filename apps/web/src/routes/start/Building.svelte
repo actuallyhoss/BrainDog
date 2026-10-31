@@ -25,7 +25,7 @@
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { firstRun } from '$lib/first-run.ts';
-  import type { Place, Proposal } from '$lib/start/propose.ts';
+  import { railPlaces, type Place, type Proposal } from '$lib/start/propose.ts';
   import { placeIcon, placesFrom, words, type Part as PartOf } from './building.ts';
 
   let {
@@ -64,8 +64,10 @@
         : firstRun.readByRulesAny,
   );
 
-  const shown = $derived(placesFrom(places, parts));
   const entriesOf = (place: Place) => (place.kind === 'module' ? (parts.find((p) => p.on && p.id === place.id)?.entries ?? []) : []);
+  /* THE PLACES AS THE RAIL WILL HOLD THEM (`railPlaces`, AM10): a part that waits for its first entry is drawn once the
+     words fill it. */
+  const shown = $derived(railPlaces(placesFrom(places, parts), (p) => entriesOf(p).length > 0));
 
   /** "1 Oct", in the person's own order of day and month. */
   function day(iso: string): string {

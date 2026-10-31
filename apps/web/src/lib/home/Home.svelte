@@ -92,6 +92,7 @@
     slashLineOf,
     todayHome,
     quietHeld,
+    STARTER_PACK,
     weekOf,
     type Holds,
     type HomeVoice,
@@ -343,7 +344,9 @@
   });
 
   /** The record's week, on Today's own body only: a page the record declares draws what it declares. */
-  const week = $derived(declares === null ? weekOf(decls, playedBy('meets')) : undefined);
+  const week = $derived(
+    declares === null ? weekOf(decls, playedBy('meets'), new Set(data.lists.flatMap((l) => (l.pack?.startsWith(STARTER_PACK) ? [l.id] : [])))) : undefined,
+  );
   /** The people the desk names a few of, on Today's own body only, the same way. */
   const people = $derived(declares === null ? peopleOf(decls, playedBy('meets')) : undefined);
 

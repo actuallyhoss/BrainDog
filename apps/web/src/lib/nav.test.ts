@@ -201,6 +201,18 @@ test("A FOUNDER RECORD WITH TWENTY PROJECTS KEEPS PROJECTS ON ITS BAR (RL6), and
   assert.deepEqual(tabsOf(rail(1).places, 5).map((i) => i.label), ['Today', 'Needs you', 'Money', 'Agents', 'Dashboard']);
 });
 
+test("A TEAM'S TICKETS ARE ON ITS PHONE BAR (AM6): Work in a starter's own word is its place, and an empty Agents goes to Menu", () => {
+  const placed = (title: string, href: string, place: number) => ({ ...page(title, href), place });
+  const team = [
+    ['Tickets', [page('Work', '/p/work')]],
+    ['Sprints', [placed('Sprints', '/p/cycles', 20)]],
+    ['People', [placed('People', '/p/people', 50)]],
+    ['Agents', [page('Agent work', '/p/agent-work')]],
+  ] as const;
+  const bar = tabsOf(railOf(flatNav(team, 1, WORDS, { work: WORK }), 'Needs you').places, 4).map((i) => i.label);
+  assert.deepEqual(bar, ['Today', 'Needs you', 'Tickets', 'Sprints']);
+});
+
 test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a gone page is skipped', () => {
   const main = flatNav(FOUNDER, 2, WORDS).main;
   const money = main.find((i) => i.label === 'Money')!;

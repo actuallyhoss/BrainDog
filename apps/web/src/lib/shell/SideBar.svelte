@@ -292,7 +292,9 @@
   let placeMore = $state<Record<string, boolean | null>>({});
   let folds = $state<{ parked: boolean | null; finished: boolean | null; more: boolean | null }>({ parked: null, finished: null, more: null });
   const foldOpen = (key: 'parked' | 'finished', list: readonly SideProject[]): boolean => folds[key] ?? list.some((p) => isLit(p.href));
-  const moreOpen = $derived(folds.more ?? model.more.some((l) => isLit(l.href)));
+  /* OPEN ON THE PHONE'S MENU (audit 31 Oct m, AM13): the Menu is a page with room, and an add-on just installed (Pad,
+     Reading) sat shut inside More lists, so Menu read as though it had no way in. A press still shuts it. */
+  const moreOpen = $derived(folds.more ?? (phone || model.more.some((l) => isLit(l.href))));
   /* A PLACE'S OWN ROWS SHOW WHILE YOU ARE THERE; on a phone each opens by its own button. */
   let opens = $state<Record<string, boolean>>({});
   const placeOpen = (p: SidePlace): boolean => (phone ? (opens[p.key] ?? false) : isLit(p.href) || p.kids.some((k) => isLit(k.href)));

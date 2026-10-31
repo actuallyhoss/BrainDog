@@ -317,8 +317,18 @@ const placeName = (i: FlatItem): string => plainOf(i.key.replace(/^section:/u, '
  */
 export function atOf(item: FlatItem, starter: boolean): number {
   if (projectsLate(item, placeName(item), starter)) return LATE;
-  return item.place ?? FIVE_AT[placeName(item)] ?? 100;
+  return item.place ?? FIVE_AT[placeName(item)] ?? (renamedWork(item) ? WORK_AT : 100);
 }
+
+/** Where Work sits among the places, as the rail ranks it (`PLACE_AT` in `nav/rail.ts`). */
+const WORK_AT = 10;
+
+/**
+ * WORK IN A STARTER'S OWN WORD IS THAT STARTER'S PLACE (audit 31 Oct m, AM6): a team's Tickets, the board it asked for,
+ * stood second on the rail and only in Menu on the phone, while an empty Agents had the slot. Work itself stays off the
+ * bar, where his call of 20 October put it.
+ */
+const renamedWork = (i: FlatItem): boolean => i.key === 'work' && plainOf(i.label) !== plainOf(WORK_WORD);
 
 /**
  * The five places, on the phone's tab bar and in the top bar: Today, Needs you, Projects, Money and Agents. A record
@@ -338,7 +348,7 @@ export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly str
      team's Sprints and a founder's Dashboard declare where they sit (`nav.place`, before Projects), and ranked after the
      five they fell into Menu while the rail drew them. Each of the five and each such place goes by that number, a
      place that says none by where the five put it. */
-  const own = tail.filter((i) => !PLACES.includes(placeName(i)) && typeof i.place === 'number');
+  const own = tail.filter((i) => (!PLACES.includes(placeName(i)) && typeof i.place === 'number') || renamedWork(i));
   const named = [...FIVE.flatMap((name) => tail.filter((i) => placeName(i) === name)), ...own]
     .map((item, i) => ({ item, at: atOf(item, own.length > 0), i }))
     .sort((a, b) => a.at - b.at || a.i - b.i)

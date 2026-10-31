@@ -17,7 +17,7 @@ import { offerOf } from './offer.ts';
 import { currencyWord, placeCurrency } from './place-currency.ts';
 import { answer, oneQuestion } from './question.ts';
 
-import { caseBecame, currencyFor, draftBrief, fold, fromModel, heardWords, outsideCatalogue, partName, propose, proposeFirst, setupOffer } from './propose.ts';
+import { caseBecame, currencyFor, draftBrief, filledBy, fold, fromModel, heardWords, outsideCatalogue, partName, propose, proposeFirst, railPlaces, setupOffer } from './propose.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
 
@@ -1411,4 +1411,19 @@ test("a shop's own name is its BrainDog's, not a project in it (PK3)", () => {
   assert.ok(!p.rows.some((r) => r.register === 'things'), 'no project named after the shop');
   assert.ok(!p.modules.includes('portfolio'), 'Projects is not turned on for it');
   assert.equal(p.heard.find((h) => h.phrase === "Nadia's Candles")?.became, "Your BrainDog's name");
+});
+
+test('A BLANK BRAINDOG TAKES ITS FIRST THING (AM2): a name alone brings People and Work, and nothing heard stays nothing', () => {
+  assert.deepEqual(propose("I'm Ali.", CAIRO).modules, ['people', 'work']);
+  assert.deepEqual(propose('Hello', CAIRO).modules, [], 'the first run still asks what it is closest to');
+  assert.ok(!propose("I'm Lina, a second year student at uni.", CAIRO).modules.includes('work'), 'a use case brings its own lists');
+});
+
+test('SIGN-UP NAMES THE PLACES THE RAIL WILL SHOW (AM10)', () => {
+  const sam = propose("I'm Sam. I want my life admin under control: my bills, my budget, rent and payday, and training for a marathon.", CAIRO);
+  assert.deepEqual(railPlaces(sam.places, filledBy(sam.rows)).map((x) => x.name), ['Today', 'Goals', 'People', 'Money']);
+  assert.ok(sam.heard.some((h) => h.phrase === 'training for a marathon'), 'one phrase, as typed');
+  assert.ok(!sam.heard.some((h) => h.became === 'Bills'), 'a word for money is Money');
+  const ali = propose("I'm Ali.", CAIRO);
+  assert.deepEqual(railPlaces(ali.places, filledBy(ali.rows)).map((x) => x.name), ['Today', 'People'], 'Work waits for its first task');
 });

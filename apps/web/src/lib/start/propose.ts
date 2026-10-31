@@ -24,7 +24,7 @@
 import { CORE_PACK, MODULE_WORDS } from '@braindog/declare';
 import { AGENTS_PACK } from '@braindog/seed/packs';
 import { moduleOfList } from '@braindog/seed/packs/modules';
-import { alongside, listsOf as caseLists, modulesFor, payDayRow, useCase, USE_CASES, type UseCase } from '@braindog/seed/usecases';
+import { alongside, listsOf as caseLists, modulesFor, pagesOf, payDayRow, useCase, USE_CASES, type UseCase } from '@braindog/seed/usecases';
 import { claimedBy } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
 
@@ -201,7 +201,24 @@ function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean,
   const money = read.packs.find((p) => p.why.length > 0 && keepsMoney(p.id) && !chosen.includes(p.id));
   const keeps = chosen.some((id) => keepsMoney(id));
   /* A CATALOGUE PACK THE SENTENCE ASKED FOR IS KEPT beside the use case's modules, since `modulesFor` keeps any pack. */
-  return closeOver(money !== undefined && !keeps ? [...chosen, money.id] : chosen, offers);
+  return closeOver(withFirstList(money !== undefined && !keeps ? [...chosen, money.id] : chosen, u), offers);
+}
+
+/** The module whose list takes a thing to do, the one a record with no use case is given (`withFirstList`). */
+const TO_DO = 'work';
+/** Projects' part, which is no place on the rail until it holds a project (`railPlaces`). */
+const PORTFOLIO_ID = 'portfolio';
+
+/**
+ * A BLANK BRAINDOG TAKES ITS FIRST THING (audit 31 Oct m, AM2): "I'm Ali." made Today and People, and "Call the plumber
+ * tomorrow" then had nowhere to go but Organisations. A record no use case speaks for is given Work's tasks, as a starter
+ * is given its own lists, so a line with a day becomes a task due that day. It costs nothing on the rail: Work is a place
+ * only once it holds a task (`workOf` in `lib/nav.ts`), and the first-run's places leave it out until then
+ * (`railPlaces`). A use case brings its own lists for the day's things and is left as it is, and words that turned
+ * nothing on at all stay nothing, so the first run still asks what they are closest to.
+ */
+function withFirstList(modules: readonly PackId[], u: UseCase | null): PackId[] {
+  return u !== null || modules.length === 0 || modules.includes(TO_DO) ? [...modules] : [...modules, TO_DO];
 }
 
 /**
@@ -754,9 +771,11 @@ export function caseBecame(u: UseCase, phrase: string): string {
   const word = phrase.trim().toLocaleLowerCase();
   const named = lists.find((n) => [word, plural(word)].includes(n.toLocaleLowerCase()));
   if (named) return named;
+  /* A WORD FOR MONEY IS MONEY BEFORE IT IS A LIST MONEY KEEPS (audit 31 Oct m, AM10): Personal calls Money's bills
+     "Bills", and "my bills" read "bills → Bills", a list inside Money that is no place on the rail. */
+  if (MONEY_SAID.test(word) && [...u.modules, ...(u.needs ?? [])].includes('money-core')) return partName('money-core');
   const renamed = Object.entries(u.labels).find(([k, v]) => !/[:.]/u.test(k) && [word, plural(word)].includes(v.toLocaleLowerCase()));
   if (renamed) return renamed[1];
-  if (MONEY_SAID.test(word) && [...u.modules, ...(u.needs ?? [])].includes('money-core')) return partName('money-core');
   if (GOAL_SAID.test(word)) {
     const goals = lists.find((n) => /\b(?:goals?|habits?)\b/iu.test(n) && !/\bsavings?\b/iu.test(n));
     if (goals) return goals;
@@ -803,7 +822,8 @@ export function currencyFor(typed: string | null, modules: readonly string[], ct
 }
 
 /* What may sit between two phrases said in one breath: "who owes me, and taxes", "orders and my invoices". */
-const BETWEEN = /^[\s,;]*(?:(?:and|or|plus|also)\s+)?(?:(?:my|our|the)\s+)?$/iu;
+/* AND "A" OR "AN" (audit 31 Oct m, AM10): "training for a marathon" was two lines, said "training for and marathon". */
+const BETWEEN = /^[\s,;]*(?:(?:and|or|plus|also)\s+)?(?:(?:my|our|the|a|an)\s+)?$/iu;
 
 /**
  * ONE LINE FOR ONE THING: a later phrase that became exactly what an earlier one did is folded into it, so "who owes me"
@@ -877,6 +897,51 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
   const order = (a: Place, b: Place): number => (a.at?.[0] ?? Number.MAX_SAFE_INTEGER) - (b.at?.[0] ?? Number.MAX_SAFE_INTEGER);
   return [place('today', 'today', 'Today', null), ...lists, ...shown.sort(order)];
 }
+
+/** The parts that are no place on the rail until they hold something: Projects until a project, Work until a task. */
+const WAITS_FOR_FIRST: ReadonlySet<string> = new Set([PORTFOLIO_ID, TO_DO]);
+
+/** A use case's own places on the rail, by the sections its pages are filed under, Projects left to its part. */
+function caseSections(u: UseCase): { page: string; section: string }[] {
+  const out: { page: string; section: string }[] = [];
+  for (const p of pagesOf(u)) if (p.section !== null && p.section !== partName(PORTFOLIO_ID) && !out.some((x) => x.section === p.section)) out.push({ page: p.page, section: p.section });
+  return out;
+}
+
+/**
+ * WHERE THINGS WILL BE KEPT, AS THE RAIL WILL SHOW THEM (audit 31 Oct m, AM10). Sam's sign-up built "Savings goals,
+ * Goals, Progress, Money saved, Project steps, People, Projects and Money" and said the BrainDog was made with all eight;
+ * his rail then held Goals, Money and People. So a use case's lists are said as the places its pages are filed under
+ * (Goals; a student's Studies; a shop's Orders and Products), each list keeping its phrase for the first of them, and a
+ * part that is no place until it holds something (Projects, Work) is said only where the words fill it (`filled`). A use
+ * case with no page of its own still says its lists. Nothing is counted, and the order is `placesOf`'s.
+ */
+export function railPlaces(places: readonly Place[], filled: (p: Place) => boolean = () => false): Place[] {
+  const out: Place[] = [];
+  const said = (name: string): boolean => out.some((x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+  for (const p of places) {
+    if (p.kind === 'module' && WAITS_FOR_FIRST.has(p.id) && !filled(p)) continue;
+    const u = p.kind === 'list' ? USE_CASES.find((c) => caseLists(c).some((l) => l.id === p.id)) : undefined;
+    const sections = u ? caseSections(u) : [];
+    if (u === undefined || sections.length === 0) {
+      if (!said(p.name)) out.push(p);
+      continue;
+    }
+    /* THE PHRASE OF THE FIRST OF ITS LISTS THE WORDS NAMED, said on its first place. */
+    const own = new Set(caseLists(u).map((l) => l.id));
+    const by = places.find((x) => x.kind === 'list' && own.has(x.id) && x.phrase !== null) ?? null;
+    sections.forEach((x, i) => {
+      if (!said(x.section)) out.push({ kind: 'list', id: x.page, name: x.section, phrase: i === 0 ? (by?.phrase ?? null) : null, at: i === 0 ? (by?.at ?? null) : null });
+    });
+  }
+  return out;
+}
+
+/** Whether a proposal's entries fill a part, so that part is a place from the first minute (`railPlaces`). */
+export const filledBy =
+  (rows: readonly { register: string }[]) =>
+  (p: Place): boolean =>
+    p.kind === 'module' && rows.some((r) => moduleOfList(r.register)?.id === p.id);
 
 /*
  * A BARE WORD FOR MONEY IS MONEY, NEVER A USE CASE BESIDE: "who owes me money", said by a ceramics studio,
@@ -1094,7 +1159,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
      the words are the brief Slash drafts from (`outsideCatalogue`), as before there was a model. */
   if (u === null && asked.length === 0 && (reply.draft ?? '').trim() === '') return { ...rules, fell: 'PROPOSAL_EMPTY' };
   const named = name !== null && !asked.includes(PEOPLE) ? [...asked, PEOPLE] : asked;
-  const modules = closeOver(u ? [...modulesFor(u, named).filter((id) => id !== CORE_PACK), ...beside.flatMap((b) => b.modules)] : named, offers);
+  const modules = closeOver(u ? [...modulesFor(u, named).filter((id) => id !== CORE_PACK), ...beside.flatMap((b) => b.modules)] : withFirstList(named, null), offers);
 
   /* THE RULES' CURRENCY WAS TYPED where it is not the device's; the device's is weighed again over the model's modules. */
   const ruled = rules.currencyBy === 'device' ? null : rules.currency;

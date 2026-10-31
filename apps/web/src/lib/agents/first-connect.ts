@@ -21,7 +21,8 @@ export const firstWords = {
   /* THE EXAMPLE NAMES WHAT THIS BRAINDOG KEEPS (first hour audit, AH25): a student was told "like an order". */
   sub: (lists: readonly string[] = []) => `On Today, type something that happened, like ${exampleOf(lists)}. BrainDog puts it where it belongs, and one Undo takes it back.`,
   /* WHAT WAS JUST MADE, first, by its places: the screen opened on a terminal command and never said. */
-  made: (places: readonly string[]) => (places.length === 0 ? 'Your BrainDog is made.' : `Your BrainDog is made, with ${firstRun.and(places)}.`),
+  /* THE PLACES THE RAIL SHOWS, AND MORE AS THEY FILL (AM10): Projects and Work come with their first entry. */
+  made: (places: readonly string[]) => (places.length === 0 ? 'Your BrainDog is made.' : `Your BrainDog is made, with ${firstRun.and(places)}, and more as you fill them.`),
   agentTitle: 'Connect an AI app, if you use one',
   agentSub: 'Claude, ChatGPT and coding apps can read and update your BrainDog once connected. You can also do this later in Settings, under Agents.',
   waiting: 'Waiting for your agent…',

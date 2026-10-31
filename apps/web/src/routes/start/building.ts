@@ -323,7 +323,10 @@ export function placeIcon(place: Pick<Place, 'kind' | 'id'>): IconName {
   if (place.kind === 'module') return partIcon(place.id);
   for (const u of USE_CASES) {
     const raw = u.pack?.declarations;
-    const decl = (Array.isArray(raw) ? raw : []).find((d): d is Record<string, unknown> => typeof d === 'object' && d !== null && (d as { register?: unknown }).register === place.id);
+    /* A LIST, OR THE PAGE A USE CASE'S PLACE OPENS ON (`railPlaces`): a student's Studies wears its page's glyph. */
+    const decl = (Array.isArray(raw) ? raw : []).find(
+      (d): d is Record<string, unknown> => typeof d === 'object' && d !== null && ((d as { register?: unknown }).register === place.id || (d as { page?: unknown }).page === place.id),
+    );
     if (decl && typeof decl.icon === 'string' && isGlyph(decl.icon)) return decl.icon;
   }
   return 'doc';

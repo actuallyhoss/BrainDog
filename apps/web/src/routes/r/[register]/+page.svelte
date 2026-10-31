@@ -1306,6 +1306,11 @@
     if (!m) return 0;
     return result.entries.filter((e) => (m.self && e.fields[m.self] === true) || mergedAway(e.fields, decl)).length;
   });
+  /** You are a row of this list, drawn and not counted, so its line says "besides you" (AM17). */
+  const youListed = $derived.by(() => {
+    const m = meetsOf(decl);
+    return m?.self !== undefined && result.entries.some((e) => e.seq > 0 && e.fields[m.self!] === true);
+  });
   const denominator = $derived(Math.max(0, (narrowed || q ? result.matched : result.total) - notCounted));
 
   /**
@@ -1435,7 +1440,7 @@
    * (`readingOf`). It counts the rows in hand, so it says nothing while the list is still being paged.
    */
   const reading = $derived(
-    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted) }),
+    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted), besides: youListed }),
   );
 
   /** A row's title as the list says it, for the summary tile's largest rows. */

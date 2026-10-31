@@ -111,7 +111,7 @@
     type ReadCause,
   } from '$lib/signup.ts';
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, type CatalogueOffer } from '$lib/start/offer.ts';
-  import { placesOf, proposeFirst, type HeardLine, type Proposal } from '$lib/start/propose.ts';
+  import { filledBy, placesOf, proposeFirst, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
   import { readAsks } from '$lib/start/ask.ts';
   import { answer, oneQuestion, words as asked, type Question } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
@@ -1127,7 +1127,7 @@
     /* THE PLACES MADE, BY NAME, for the end to say first ("Your BrainDog is made, with Orders, People and Money"): this
        tab opens it next, so they wait in the tab (`MADE_PLACES` in `start/+page.svelte`). */
     try {
-      globalThis.sessionStorage?.setItem('braindog.made.places', JSON.stringify(asked.proposal.places.filter((x) => x.kind !== 'today').map((x) => x.name)));
+      globalThis.sessionStorage?.setItem('braindog.made.places', JSON.stringify(railPlaces(asked.proposal.places, filledBy(asked.proposal.rows)).filter((x) => x.kind !== 'today').map((x) => x.name)));
       /* AND THE ADD-ONS A TRADE SAID NAMES (AH8, FB5): offered by name at the end, never installed by the sentence. */
       globalThis.sessionStorage?.setItem(MADE_ADDONS, JSON.stringify(tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }))));
     } catch {
