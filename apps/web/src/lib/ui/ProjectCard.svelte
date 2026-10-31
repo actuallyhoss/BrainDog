@@ -92,6 +92,9 @@
   /* A CARD WITH NOTHING ELSE TO SAY SAYS THAT, in one honest line: no next step, figure, progress or sign of life. */
   const empty = $derived(!card.next && figure === null && !leadsWithProgress && card.progress === null && life === null);
   const worked = $derived(life?.kind === 'working' && card.worked ? workedSaid(card.worked) : '');
+  /* ONLY ITS NAME AND HOW IT STANDS ("Tallow · Building"): a grid that shares its row out draws it small, never as a
+     whole-width card of white under one line (audit 31 Oct n, AN20). */
+  const thin = $derived(figure === null && !leadsWithProgress && card.progress === null && !card.next && life === null);
   const named = $derived(
     [
       title,
@@ -129,7 +132,7 @@
   });
 </script>
 
-<a class="pcard" href={at(card.href)} style={slotStyle(card.hue)} aria-label={named}>
+<a class="pcard" href={at(card.href)} style={slotStyle(card.hue)} aria-label={named} data-thin={thin ? '' : undefined}>
   <span class="pc-a">
     <ProjectWell mark={card.mark} name={title} hue={card.hue} />
     <span class="pc-id">

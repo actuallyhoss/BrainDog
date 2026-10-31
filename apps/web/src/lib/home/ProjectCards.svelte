@@ -294,6 +294,14 @@
     }
   }
 
+  /* BUT CARDS THAT SAY ONLY A NAME AND HOW IT STANDS KEEP A CARD'S SIZE (AN20): the Founder's one "Tallow · Building"
+     ran the whole width over a band of white. With every card that thin, the row keeps its four places and ends short. */
+  @media (width >= 640px) {
+    .cards:not(:has(> li:not(:has(> :global([data-thin]))))) {
+      grid-template-columns: repeat(auto-fill, minmax(max(280px, calc((100% - 3 * 12px) / 4)), 1fr));
+    }
+  }
+
   /* A LONE TILE ON A LAST ROW OF FOUR is held back (17 projects leave one under sixteen); All projects has it. */
   @media (width >= 1280px) {
     .cards > li:last-child:nth-child(4n + 1):not(:first-child) {
