@@ -108,7 +108,9 @@ a revoke button. A credential you cannot see being used is a credential you cann
   `BRAINDOG_SERVER_KEY` widens the bind to `::`, and nothing turns TLS on, so the key, bearers and the session cookie
   cross the network unencrypted, and `bd_s` at `localhost` is shared with every port on the machine. The start says so
   in one line (`plainLine` in `apps/selfhost/src/how.ts`); set `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY`, serve it
-  behind https on the same machine, or set `BRAINDOG_LISTEN=127.0.0.1`.
+  behind https on the same machine, or set `BRAINDOG_LISTEN=127.0.0.1`. In the Docker image the default compose file
+  publishes the port on `127.0.0.1` only; `BRAINDOG_PUBLISH=0.0.0.0` is the explicit opt-in for the network, and the
+  line then names it.
 - **The token cut-off** is `TOKENS_VALID_FROM` (`BRAINDOG_TOKENS_VALID_FROM` on a self-host): every token, device grant
   and operation grant created before the instant is refused, and the owner's list shows them "ended by the operator".
 - **Closing an account** is the person's own act (`POST /account/close`, the address typed, a sign-in within 15
@@ -850,7 +852,7 @@ Carried from the predecessor, where each was earned:
 |---|---|
 | A `401` says only `UNAUTHORIZED`; a `500` is bare | recon gets nothing |
 | **No CORS, anywhere**; every JSON answer is `no-store` | — |
-| The login lockout **reserves the attempt before comparing**, compares ten attempts and refuses the eleventh with a bare `429` and `Retry-After` for fifteen minutes, sticky, on a capped counter that forgets a first strike fifteen minutes old and that a success clears for its address; the address is the socket's, or behind a proxy named with `BRAINDOG_TRUST_PROXY=1` the last `X-Forwarded-For` entry; it is keyed four ways — `ip:` `email:` `mint:` `device:` — and **fails closed** — a reservation that returns no row is a `503`, not a pass. Device codes and share tokens are locked out on the record's own `auth_fail`, logins on the Directory's ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.5) | the magic-link fallback code is short-lived and guessable in principle; the lockout is what makes any code field acceptable |
+| The login lockout **reserves the attempt before comparing**, compares ten attempts and refuses the eleventh with a bare `429` and `Retry-After` for fifteen minutes, sticky, on a capped counter that forgets a first strike fifteen minutes old and that a success clears for its address; the address is the socket's, or, when the socket is a proxy `BRAINDOG_TRUST_PROXY` trusts (`1`: loopback or private; or a list), the caller it wrote into `X-Forwarded-For`, with the server key's strikes also counted against that peer; it is keyed four ways — `ip:` `email:` `mint:` `device:` — and **fails closed** — a reservation that returns no row is a `503`, not a pass. Device codes and share tokens are locked out on the record's own `auth_fail`, logins on the Directory's ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.5) | the magic-link fallback code is short-lived and guessable in principle; the lockout is what makes any code field acceptable |
 | **Agent tokens bypass the lockout, deliberately** | *"an agent tripping the ten-strike IP block would lock the owner out of his own record"* |
 | Every sign-in failure is **one body**, `401 UNAUTHORIZED` "That did not sign you in.", whatever failed: a passkey, a link, the server key or a session. The reason is logged, not returned | the caller who deserves the reason is the owner, who reads the log |
 | Passkey registration requires an authenticated session **in place of attestation** | *"behind the gate… is the security model in one line"* |

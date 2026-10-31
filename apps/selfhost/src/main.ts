@@ -57,7 +57,7 @@ import { openSqlite, signedWebhooks, start } from './server.ts';
 import { rewrapAtStart } from './rewrap.ts';
 import { webhookPost } from './actions.ts';
 import { outboundOf } from './script.ts';
-import { authMail, mailedNotices, smtpLine, smtpOf, smtpSender } from './smtp.ts';
+import { authMail, mailedNotices, smtpCheck, smtpLine, smtpOf, smtpSender } from './smtp.ts';
 
 /**
  * One sentence on stderr, and nothing on stdout, ever.
@@ -837,6 +837,13 @@ async function serve(): Promise<void> {
   }
   /* AND WHERE MAIL GOES, by host and port and never with what password. */
   if (smtp) say(`  ${smtpLine(smtp)}`);
+  /* AND WHETHER IT CAN (AI20): signed in to and left with nothing sent, said when it answers, without holding the start. */
+  if (smtp)
+    void smtpCheck(smtp).then(
+      () => say(`  mail: signed in to ${smtp.host}:${String(smtp.port)}. The domain of ${smtp.from} needs SPF and DKIM set up at your mail provider, or links land in spam.`),
+      (e: unknown) =>
+        say(`  mail: could not reach or sign in to ${smtp.host}:${String(smtp.port)} (${e instanceof Error ? e.message : 'no answer'}). Sign-in links and notices will not go out until it can.`),
+    );
   for (const line of degradeLines(env, smtp !== null)) say(line);
   /* AND HOW AN AGENT GETS IN, with OAuth said either way: a default host listens on every interface at a plain-http
      origin, where OAuth is off, and nothing at start said so. */

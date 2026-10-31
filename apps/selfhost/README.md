@@ -27,7 +27,11 @@ last line prints that link: open it and add a passkey. It works once, for 24 hou
 a new one until a passkey exists. The link is never written to the log, because anybody who reads it could sign in as
 you.
 
-Health: `curl localhost:8080/healthz`. Every command the server has: `docker compose exec braindog node apps/selfhost/src/main.ts --help`.
+Health: `curl localhost:${BRAINDOG_PORT:-8080}/healthz`. Every command the server has: `docker compose exec braindog node apps/selfhost/src/main.ts --help`.
+
+The port is published on this machine only (`127.0.0.1`), so your own browser and a proxy on the same machine reach
+it and nothing else does. To open it to your network, set `BRAINDOG_PUBLISH=0.0.0.0` in `.env` and serve https (see
+What is off), since the server key and the sign-in cookie would otherwise cross it in the clear.
 
 An older `.env` that says `BRAINDOG_TOKEN` and `BRAINDOG_HOST` still works. The new names are there because the
 `braindog` command line reads those two as its own.
@@ -70,10 +74,49 @@ The address of your record is the server's address and the record's name, such a
 The server says each of these in one line when it starts. None is an error.
 
 - Mail: off until `BRAINDOG_SMTP_URL` and `BRAINDOG_MAIL_FROM` are set. Passkeys and the server key work without it.
+  When they are set, the start signs in to the mail server without sending anything and says `mail: signed in` or
+  `mail: could not reach or sign in`. The domain of `BRAINDOG_MAIL_FROM` needs SPF and DKIM set up at your mail
+  provider, or sign-in links land in spam.
 - Model: off until someone adds their own key in the app (Settings, Keys). Nothing else needs it.
 - Billing: always off. Nothing is charged or counted.
 - Turnstile: off. Self-host has no public sign-up.
 - OAuth: off at a plain http address. See Connect your agents.
+- Add-ons: they send no requests to other servers until `BRAINDOG_OUTBOUND=on`. The public add-on registry is read
+  either way; `BRAINDOG_KENNEL=off` stops that.
+
+It may also say:
+
+- `plain http on every interface` (or, on Docker, `plain http on your network`): the server key goes over the network
+  unencrypted. Set `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY`, put https in front, or keep it on this machine
+  (`BRAINDOG_LISTEN=127.0.0.1` without Docker; leave `BRAINDOG_PUBLISH` unset with it).
+- `This looks like it is behind a proxy`: requests arrive at an https address this process does not serve itself, and
+  `BRAINDOG_TRUST_PROXY` is not set, so ten wrong keys from anywhere lock the server key for everyone. Set it (below).
+- `the name changed from … to …`: `BRAINDOG_ORIGIN` or the certificate moved, and passkeys made at the old name stop
+  working there; each device adds one again.
+- `first time: a one-time sign-in link …`: until a passkey exists. The file is removed once the first passkey is added.
+
+### Behind a proxy
+
+Caddy, nginx or cloudflared in front: set `BRAINDOG_ORIGIN` to the https address it answers at, and
+`BRAINDOG_TRUST_PROXY=1`, so the sign-in lockout and the rate limits count the real caller. With `1` the
+`X-Forwarded-For` header is read only from a proxy on this machine or a private network (the Docker gateway counts);
+give the proxy's own addresses instead (`BRAINDOG_TRUST_PROXY=127.0.0.1` or `172.16.0.0/12`) to narrow that. The
+server's port must then be reachable only through the proxy: keep the default publish on `127.0.0.1`.
+
+### Mail in
+
+Forwarded mail (Settings, What comes in) is posted to `<your address>/in/email/<token>` as the raw message (RFC 5322)
+in the request body, from something on the internet, so `BRAINDOG_ORIGIN` must be a public https address. Mail
+providers do not post mail anywhere themselves: use a Cloudflare Email Worker that forwards `message.raw` with
+`fetch`, or a procmail or Postfix pipe that runs `curl --data-binary @- <address>`. BrainDog checks each message's DKIM
+signature against DNS itself, so a forwarder that rewrites the message breaks it, and that mail waits in the Inbox,
+unfiled. The token is in the data folder; print the whole address with:
+
+```sh
+docker compose exec braindog sh -c 'echo "$BRAINDOG_ORIGIN/in/email/$(cat /data/home/inbound.token)"'
+```
+
+(`home` is the record's name.)
 
 Every setting is in `selfhost.env.example`. For a public address, put https in front (or set `BRAINDOG_TLS_CERT` and
 `BRAINDOG_TLS_KEY`) and set `BRAINDOG_ORIGIN` to it. Passkeys are tied to that address, so choose it first. If you
@@ -94,7 +137,9 @@ docker compose cp braindog:/data/backups/. ~/braindog-backups/
 A backup folder holds the key file, the record and its inbound mail token (the secret forwarded mail is sent in with),
 so keep it as private as the key. Never put one in this repository folder: everything in it is sent to `docker build`.
 `.dockerignore` keeps backups, key files and `.env` out, and the image will not build or start if one gets in anyway.
-Without the key file the copy cannot be opened.
+Without the key file your saved keys stay sealed; everything else in it is readable, so keep the copy as private as
+the key. The same holds for a copy downloaded from Settings, Backups: it is the record without the key file, so keep
+the key file (`docker compose cp braindog:/data/kek ~/braindog-backups/`) to put it back.
 
 To restore, start the volume empty (a new machine, or `docker compose down -v`, which deletes the record in it), then:
 

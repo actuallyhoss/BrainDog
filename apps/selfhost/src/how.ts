@@ -33,7 +33,9 @@ function imageCommand(words: string): string {
   const node = 'node apps/selfhost/src/main.ts';
   const [verb = '', ...rest] = words.trim().split(/\s+/u);
   if (verb === '' || (verb === 'serve' && rest.length === 0)) return 'docker compose up -d';
-  if (verb === '--help' || verb === 'backup') return `docker compose exec braindog ${node} ${words.trim()}`;
+  if (verb === '--help') return `docker compose exec braindog ${node} --help`;
+  /* A BACKUP INSIDE THE VOLUME, where the README takes it from with `docker compose cp`. */
+  if (verb === 'backup') return `docker compose exec braindog ${node} backup ${rest[0] === '<folder>' || rest.length === 0 ? '/data/backups' : rest.join(' ')}`;
   if (verb === 'restore')
     return `docker compose run --rm --user root -v "$HOME/braindog-backups/braindog-<time>:/restore:ro" braindog sh -c '${node} restore /restore && chown -R node:node /data'`;
   const from = rest.indexOf('--from');
