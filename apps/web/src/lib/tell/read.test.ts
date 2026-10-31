@@ -490,9 +490,9 @@ test('A NEW NAME BEFORE A BARE "PAID" IS ASKED WHICH WAY, never made a person wh
   const sara = tellRead('Sara paid me 200', on).rows;
   assert.deepEqual(sara.map((r) => r.register), ['people', 'transactions']);
   assert.equal(sara[1]!.fields.direction, 'in');
-  /* "Paid Omar 300" is money out, and nobody new. */
+  /* "Paid Omar 300" is money out, to Omar, who is new in People (AL2). */
   const omar = tellRead('Paid Omar 300', on).rows;
-  assert.deepEqual(omar.map((r) => [r.register, r.fields.direction]), [['transactions', 'out']]);
+  assert.deepEqual(omar.map((r) => [r.register, r.fields.direction]), [['people', undefined], ['transactions', 'out']]);
 });
 
 test('A PAYOUT, A CARD SPEND AND A DINAR ARE READ THE WAY THEY WERE SAID (review 31 Oct h, RH1, RH5, RH6, RH11-RH13)', () => {
@@ -550,4 +550,86 @@ test('A REFUND AFTER THE AMOUNT, A FEE LINE, A BALANCE FIRST AND "PAID OUT" ARE 
   const stripe = way('Paid out 1,950 USD from Stripe to my bank');
   assert.equal(stripe?.fields.direction, 'in');
   assert.deepEqual(stripe?.fields.amount, { amount: 195000, currency: 'USD' });
+});
+
+/* ── audit 31 Oct l: who was paid, plain money lines, the offers, and currencies said by name ────────────────────── */
+
+const RECURRING = seeded('money-core', 'recurring');
+
+test('"PAID NADIA 300 FOR THE LOGO" KEEPS NADIA AND THE LOGO (AL2)', () => {
+  const { rows, left } = tellRead('Paid Nadia 300 for the logo', founder);
+  assert.deepEqual(left, []);
+  assert.deepEqual(rows.map((r) => r.register), ['people', 'obligations']);
+  assert.equal(rows[0]!.fields.name, 'Nadia');
+  const paid = rows[1]!;
+  assert.equal(paid.fields.what, 'Logo');
+  assert.equal(paid.fields.direction, 'owed_by_me');
+  assert.deepEqual(paid.fields.party, { $row: 0 });
+  assert.equal(paid.said, 'EGP\u00a0300 to Nadia, for the logo');
+  /* "to Nadia" after the figure is the same, and somebody on the record is linked, never made again. */
+  const to = tellRead('I paid 300 to Nadia Samir', { ...founder, people: [{ seq: 4, name: 'Nadia Samir' }] }).rows;
+  assert.deepEqual(to.map((r) => r.register), ['obligations']);
+  assert.equal(to[0]!.fields.party, 'people#4');
+  /* A thing paid for is nobody. */
+  assert.ok(!tellRead('Paid Netflix 180', founder).rows.some((r) => r.register === 'people'));
+});
+
+test('PLAIN MONEY LINES ARE MONEY, never tasks (AL4)', () => {
+  const power = tellRead('Electricity 850 due Thursday', founder).rows;
+  assert.deepEqual(power.map((r) => r.register), ['obligations']);
+  assert.equal(power[0]!.fields.what, 'Electricity');
+  assert.equal(power[0]!.fields.direction, 'owed_by_me');
+  assert.equal(power[0]!.fields.due, '2026-10-08');
+  const salary = tellRead('Salary 30,000 came in today', founder).rows;
+  assert.deepEqual(salary.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_to_me', 'Salary']]);
+  assert.deepEqual(salary[0]!.fields.amount, { amount: 3000000, currency: 'EGP' });
+  const refund = tellRead('Refund from Amazon 450', founder).rows;
+  assert.deepEqual(refund.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_to_me', 'Refund from Amazon']]);
+  /* A cost that comes round is Repeating, where the record keeps it, and a bill that repeats where it does not. */
+  const netflix = tellRead('Netflix 180 a month', { ...founder, lists: [...founder.lists, RECURRING] }).rows;
+  assert.deepEqual(netflix.map((r) => [r.register, r.fields.direction, r.fields.every]), [['recurring', 'out', 'monthly']]);
+  assert.deepEqual(netflix[0]!.missing, ['the day it is due']);
+  assert.equal(tellRead('Netflix 180 a month', founder).rows[0]!.fields.repeats, 'monthly');
+  /* Where nothing is a task list, they are still money, never "Not sure". */
+  const personal = { lists: [PEOPLE, LEDGER, DUE], today: TODAY, currency: 'EGP' };
+  assert.equal(tellRead('Electricity 850 due Thursday', personal).why, undefined);
+  /* A count, a time and a small figure due are not money. */
+  for (const s of ['Glaze 14 mugs due Friday', 'Call the bank at 3 tomorrow', 'Chapter 3 due Friday', '3 boxes arrived'])
+    assert.ok(!tellRead(s, founder).rows.some((r) => r.register === 'obligations'), s);
+});
+
+test("PERSONAL'S TELL OFFERS GOALS, never the agents' Instructions (AL5)", () => {
+  const goals: TellList = {
+    id: 'goals',
+    name: 'Goals',
+    one: 'goal',
+    title: 'what',
+    state: 'state',
+    pack: 'usecase-personal',
+    fields: [
+      { id: 'what', label: 'Goal', type: 'text', required: true },
+      { id: 'kind', type: 'enum', values: ['habit', 'goal'], default: 'goal' },
+      { id: 'target', label: 'Aim', type: 'decimal', required: true },
+      { id: 'by', label: 'By', type: 'day' },
+      { id: 'state', type: 'enum', values: ['active', 'paused', 'done'], default: 'active', required: true },
+    ],
+  };
+  const instructions: TellList = { ...THINGS, id: 'instructions', name: 'Instructions', pack: 'kernel' };
+  const told = tellRead('Running: train for the Cairo half marathon', { lists: [PEOPLE, instructions, THINGS, goals, DUE], today: TODAY, currency: 'EGP' });
+  assert.deepEqual(told.offers?.map((r) => r.register), ['goals', 'things']);
+  assert.equal(told.offers?.[0]!.fields.target, 0);
+});
+
+test('A FOREIGN AMOUNT IS SAID BY ITS OWN SIGN, AND "DINARS" IS ASKED IN WORDS (AL8)', () => {
+  const mrr = tellRead('MRR is 4,200 USD this month', { ...founder, home: 'EGP' }).rows[0]!;
+  assert.equal(mrr.said, 'MRR, $4,200');
+  /* "dinars" on an Egyptian record is asked which, by name; said by name, it is read. */
+  const asked = tellRead('Sent mum 1,000 dinars', { ...founder, home: 'EGP', held: ['EGP'] });
+  assert.deepEqual(asked.rows, []);
+  assert.match(asked.why ?? '', /^Which dinars are they: .*Kuwaiti.*\? Say it with the figure, like 1,000 /u);
+  const kwd = tellRead('Sent mum 1,000 Kuwaiti dinars', { ...founder, home: 'EGP', held: ['EGP'] }).rows;
+  assert.deepEqual(kwd[0]!.fields.amount, { amount: 1000000, currency: 'KWD' });
+  /* The record's own dinars need no asking. */
+  const held = tellRead('Sent mum 1,000 dinars', { ...founder, home: 'EGP', held: ['EGP', 'JOD'] }).rows;
+  assert.deepEqual(held[0]!.fields.amount, { amount: 1000000, currency: 'JOD' });
 });
