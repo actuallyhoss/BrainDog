@@ -2447,7 +2447,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     ctx: C,
     turn: Turn,
     within?: string,
-  ): Promise<{ one: { register: string; seq: number } } | { many: { handles: string[]; each: string[]; count: number } } | null> => {
+  ): Promise<{ one: { register: string; seq: number }; exact: boolean } | { many: { handles: string[]; each: string[]; count: number } } | null> => {
     if (said === '' || said.length > 200) return null;
     const found = await surface.search({ q: said, limit: 20 }, ctx);
     if (!found.ok) return null;
@@ -2459,7 +2459,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const exact = all.filter((h) => norm(h.title) === norm(said));
     const picked = exact.length > 0 ? exact : all.length === 1 ? all : [];
     if (picked.length === 0) return null;
-    if (picked.length === 1) return { one: { register: picked[0]!.register, seq: picked[0]!.seq } };
+    if (picked.length === 1) return { one: { register: picked[0]!.register, seq: picked[0]!.seq }, exact: exact.length === 1 };
     const handles = await Promise.all(picked.slice(0, 5).map((h) => addressOf(h.register, h.seq, ctx)));
     const boot = await bootOf(ctx, turn);
     const lists = new Map(
@@ -3483,26 +3483,51 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * that are listed by handle with the first as `try`; none, and the refusal stays as it came. A name and not a guess:
    * nothing is written until the agent sends the call again.
    */
-  async function refFor(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Refusal> {
-    if (refusal.code !== 'VALUE_MALFORMED' || typeof refusal.at !== 'string' || (refusal as { try?: unknown }).try !== undefined) return refusal;
+  /** Where a ref refusal's name sits in a write's fields: the list the field points at, and the name as sent. */
+  function refAt(name: string, args: Args, refusal: Refusal): { to: string; key: string; fields: Record<string, unknown>; field: string; index: number | null; held: unknown; value: string } | null {
+    if (refusal.code !== 'VALUE_MALFORMED' || typeof refusal.at !== 'string' || (refusal as { try?: unknown }).try !== undefined) return null;
     const to = /takes a row id or a spoken id like ([a-z][a-z0-9_]*)#41/u.exec(refusal.fix)?.[1];
     const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
     const fields = key === null ? null : args[key];
-    const place = /^([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+)\])?$/u.exec(refusal.at);
-    if (to === undefined || key === null || !isObject(fields) || place === null) return refusal;
+    const place = /^(?:(?:fields|patch)\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+)\])?$/u.exec(refusal.at);
+    if (to === undefined || key === null || !isObject(fields) || place === null) return null;
     const field = place[1]!;
     const index = place[2] === undefined ? null : Number(place[2]);
     const held = fields[field];
     const value = index === null ? held : Array.isArray(held) ? held[index] : undefined;
-    if (typeof value !== 'string' || value.trim() === '') return refusal;
-    const found = await named(value.trim(), ctx, turn, to);
+    if (typeof value !== 'string' || value.trim() === '') return null;
+    return { to, key, fields, field, index, held, value: value.trim() };
+  }
+
+  /**
+   * A WRITE THAT NAMED A REF BY ITS NAME, SENT AGAIN WITH ITS HANDLE when exactly one row the caller reads is called that,
+   * as a `where` takes the name (audit 10k AK13). `list tasks where thing is Kiln` worked and `create` with `"thing":"Kiln"`
+   * was refused, knowing the row, so an agent had to carry ids. Only a name that is one row's title, case and spacing
+   * aside, in the list the field points at: a name several rows are called, or one a search alone found, is still refused
+   * with its handles (`refFor`). The refused call wrote nothing, so sending it again writes once. `null` is no such name.
+   */
+  async function refByName(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Args | null> {
+    const at = refAt(name, args, refusal);
+    if (at === null) return null;
+    const found = await named(at.value, ctx, turn, at.to);
+    if (found === null || !('one' in found) || !found.exact) return null;
+    const handle = `${found.one.register}#${String(found.one.seq)}`;
+    const put = at.index === null ? handle : (at.held as unknown[]).map((v, i) => (i === at.index ? handle : v));
+    return { ...args, [at.key]: { ...at.fields, [at.field]: put } };
+  }
+
+  async function refFor(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Refusal> {
+    const at = refAt(name, args, refusal);
+    if (at === null) return refusal;
+    const { key, fields, field, index, held, value } = at;
+    const found = await named(value, ctx, turn, at.to);
     if (found === null) return refusal;
     const handle = 'one' in found ? `${found.one.register}#${String(found.one.seq)}` : found.many.handles[0]!;
     const put = index === null ? handle : (held as unknown[]).map((v, i) => (i === index ? handle : v));
     const tried = callOf(name, { ...args, [key]: { ...fields, [field]: put } });
-    if ('one' in found) return taught({ ...refusal, fix: `${refusal.fix} ${clip(value.trim(), 60)} is ${handle}.` } as Refusal, tried);
+    if ('one' in found) return taught({ ...refusal, fix: `${refusal.fix} ${clip(value, 60)} is ${handle}.` } as Refusal, tried);
     const more = found.many.count > 5 ? ` and ${String(found.many.count - 5)} more` : '';
-    return taught({ ...refusal, fix: `${refusal.fix} ${String(found.many.count)} are called ${clip(value.trim(), 60)}: ${found.many.each.join(', ')}${more}.`, allowed: found.many.handles } as Refusal, tried);
+    return taught({ ...refusal, fix: `${refusal.fix} ${String(found.many.count)} are called ${clip(value, 60)}: ${found.many.each.join(', ')}${more}.`, allowed: found.many.handles } as Refusal, tried);
   }
 
   /**
@@ -3574,7 +3599,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return said({ ok: false, refusal }, refusalBrief(refusal as Record<string, unknown>));
     }
     const full = args.format === 'full' || args.format === 'json';
-    const sent: Args = Object.fromEntries(Object.entries(args).filter(([k]) => k !== 'format'));
+    let sent: Args = Object.fromEntries(Object.entries(args).filter(([k]) => k !== 'format'));
     /* NOT SAID IN WORDS WHEN THE CALL ASKS full, whose text is the JSON: the reads only a line needs are not made. */
     const turn: Turn = { text: text && !full, titles: new Map() };
     const stray = strayIn(name, sent);
@@ -3585,7 +3610,14 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /* ADMITTED, SO IT BEATS: a name and keys this door took go on to the record, and a call refused above never got
        there. With the caller's own context, never `asked`'s hint, and never waited on. */
     beatOn(surface, ctx);
-    const done = await tool(sent, asked, turn);
+    let done = await tool(sent, asked, turn);
+    /* A REF NAMED BY THE ONE ROW CALLED THAT IS TAKEN AS THAT ROW (`refByName`), a field at a time, at most three. */
+    for (let hop = 0; hop < 3 && refused(done.result) && (name === 'create' || name === 'update' || name === 'triage'); hop++) {
+      const again = await refByName(name, sent, done.result.refusal, ctx, turn);
+      if (again === null) break;
+      sent = again;
+      done = await tool(sent, asked, turn);
+    }
     let result = done.result;
     /* THE FIREWALL BEFORE A WORD IS WRITTEN: a field hidden from the caller still on a row of
        the answer is taken off here and raised as fault `lens.firewall`, and then BOTH HALVES ARE DRAWN FROM WHAT IS LEFT.

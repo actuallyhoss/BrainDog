@@ -11861,7 +11861,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * a run included.
      * The caller's `version` and `opId` are not carried, because they describe no row meet writes.
      */
-    meet: (args: MeetArgs, w: WriteContext): Result<Met> => {
+    meet: (args: MeetArgs, w: WriteContext, o: { viewer?: string | undefined } = {}): Result<Met> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
       const as: WriteContext = {
@@ -11885,6 +11885,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
               (p) => openSuggestion(governDeps(), () => signedBy(as), p),
             ),
             typed: as.principal?.kind === 'person' && as.principal.token === undefined,
+            /* A ROW KEPT PRIVATE FROM WHOEVER IS MEETING IS NOT THERE FOR THE MEETING (`PeopleDeps.hidden`): the viewer
+               the record names (`o.viewer`), else the person the write is by, a run read as the person whose key opened
+               it. A rule, an import or the system is nobody and meets every row, as before. */
+            hidden: ((viewer) => (viewer === null ? undefined : (id: string) => hiddenFrom(id, viewer)))(o.viewer ?? personOf(sql, as.actor)),
             /* AN AGENT'S WORD IS CAPPED AT A COMMIT'S, whatever its source says (`people.ts` `trustOf`). */
             token: as.principal?.kind === 'token' || as.principal?.token !== undefined,
             remote: () => as.session?.remote ?? null,

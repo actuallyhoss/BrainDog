@@ -71,8 +71,16 @@ function shared(deps: RecordDeps) {
   const { kernel, readable } = deps;
 
   /** Whether the caller may open a page `kernel.pages()` lists: the rule of `seesPage` in `index.ts`, asked of `readable`. */
-  const opens = (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }): boolean =>
-    (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || readable(ctx, p.about.register) === null);
+  const opens = (ctx: CallContext, p: { registers: string[]; about: { register: string; seq?: number | null } | null }): boolean =>
+    (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || aboutSeen(ctx, p.about));
+
+  /** Whether the row a page is made for is one she is shown, as `aboutSeen` in `index.ts` asks: its list read, and the row admitted. */
+  const aboutSeen = (ctx: CallContext, about: { register: string; seq?: number | null }): boolean => {
+    if (readable(ctx, about.register) !== null) return false;
+    if (typeof about.seq !== 'number' || kernel.scope(ctx, about.register) === undefined) return true;
+    const row = kernel.get({ register: about.register, seq: about.seq });
+    return row !== null && deps.sight.admits(ctx, row);
+  };
 
   /** Whether the caller reads the record whole, as `whole` in `signs.ts` asks it, with no grant narrowed to some rows. */
   const whole = (ctx: CallContext): boolean => {

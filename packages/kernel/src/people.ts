@@ -183,6 +183,13 @@ export type PeopleDeps = {
   propose: (p: Proposal) => Result<{ id: string }>;
   /** Whether a member other than the owner made this row, so nobody merges it but by asking them. */
   othersRow?: (id: string) => boolean;
+  /**
+   * Whether this row is kept private from whoever is meeting (migration 40): another member made it and kept it to
+   * themselves. Such a row is NOT THERE for the meeting, so nothing private reaches the caller, not even that it exists:
+   * no match onto it, no fold into it, no question naming it, and a key only it holds is no match either. Left out, every
+   * row is there, as for a rule, an import or the system.
+   */
+  hidden?: ((id: string) => boolean) | undefined;
   /** Whether a live row holding money points at this one. */
   moneyAt?: (id: string) => boolean;
   /** Run writes so a refusal takes back every one of them (`tx.ts`'s `attempt`). */
@@ -541,8 +548,16 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   }
 
   /* A PAYEE STORED UNDER ITS OLD KEY (`legacyKeysOf`) IS STILL THE ONE MET; it gains the new key when the meeting is trusted. */
-  const found = holders(deps.sql, list.register, [...keys, ...legacyKeysOf({ email: s.email, handle: s.handle, keys: s.keys })]);
-  const hit = found[0] ? rowById(deps.sql, found[0].id) : null;
+  const held = holders(deps.sql, list.register, [...keys, ...legacyKeysOf({ email: s.email, handle: s.handle, keys: s.keys })]);
+  /* A ROW KEPT PRIVATE FROM THE CALLER IS NOT THERE FOR THIS MEETING (`hidden`, audit 10k AK5). Matched onto it, the
+     record refused the meeting, while an address nobody held was added: the refusal said that somebody kept private
+     holds that address. Now the meeting goes as it would if that row were not there: the person is added, or found
+     among the rows the caller does see, and a key only the hidden row holds stays with it, unclaimed and unwritten,
+     so the address on a unique field does not collide with it either. */
+  const found = held.filter((h) => deps.hidden?.(h.id) !== true);
+  const veiled = new Set(held.filter((h) => deps.hidden?.(h.id) === true).flatMap((h) => h.keys));
+  const own = veiled.size === 0 ? keys : keys.filter((k) => !veiled.has(k));
+  const hit = found[0] ? rowById(deps.sql, found[0].id) : veiled.size > 0 ? sameNamed(deps, list, s.name ?? nameFromKeys(keys)) : null;
   /* NOBODY NEW FROM A RULE THAT SAID `only: 'known'`: a sender the record has no reason to know is a sighting, not a
      person, and nothing about them is written onto anybody. */
   if (!hit && s.only === 'known' && !knownAddress(deps, list, keys)) {
@@ -586,7 +601,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     written = deps.write(list.register, hit.id, patch, { version: hit.version });
   } else {
     linked = project !== null;
-    const placed = placeKeys(list, keys, s);
+    const placed = placeKeys(list, own, s);
     written = deps.write(list.register, null, {
       [at.name]: s.name ?? nameFromKeys(keys),
       ...placed,
@@ -598,7 +613,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   }
   if (!written.ok) return written as Result<Met>;
   const person = written.value;
-  sourceKeys(deps.sql, person.id, keys, s.source);
+  sourceKeys(deps.sql, person.id, own, s.source);
 
   /* THE MEETING BRIDGED TWO PEOPLE THE RECORD HELD APART: one key was one row's and another key another's. Never
      joined on its own, since one wrong key would fold two people; asked. */
@@ -634,6 +649,25 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     linked,
     merge: question,
   });
+}
+
+/**
+ * The one row the caller sees that goes by this name and holds none of its keys, or `null`: who a meeting is when the
+ * only row holding its keys is kept private from the caller (`hidden`). The person an earlier such meeting added is
+ * found again by their name, since the key they were met by is the hidden row's, so a second meeting adds no second row.
+ */
+function sameNamed(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, list: DeclaredList<MeetsFields>, name: string): Row | null {
+  const said = nameKey(name);
+  if (said === '') return null;
+  const named = deps.sql
+    .all<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND json_extract(fields, ?) IS NOT NULL ORDER BY seq`,
+      ...live(list.register, list.fields.merged_into),
+      path(list.fields.name),
+    )
+    .map(hydrate)
+    .filter((r) => deps.hidden?.(r.id) !== true && typeof r.fields[list.fields.name] === 'string' && nameKey(String(r.fields[list.fields.name])) === said);
+  return named.length === 1 ? named[0]! : null;
 }
 
 /**
@@ -1468,7 +1502,7 @@ const folded = (text: string): string => text.toLowerCase().replace(/[\s._-]/g, 
  * The live people who may be this one, oldest first: a narrow read in SQL for the words, run-together names and handles
  * that `similar` could match on, then `similar` itself.
  */
-function candidates(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, person: Row): Row[] {
+function candidates(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, list: DeclaredList<MeetsFields>, person: Row): Row[] {
   const probes = new Set<string>();
   for (const name of namesOf(list, person)) {
     const words = name.split(' ').map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter((w) => w.length >= 3);
@@ -1493,7 +1527,8 @@ function candidates(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsField
       ...like,
     )
     .map(hydrate)
-    .filter((r) => similar(list, person, r));
+    /* NEVER A ROW KEPT PRIVATE FROM THE CALLER (`hidden`): a fold into it or a question beside it would say its name. */
+    .filter((r) => deps.hidden?.(r.id) !== true && similar(list, person, r));
 }
 
 /**
