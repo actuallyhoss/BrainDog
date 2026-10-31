@@ -15,6 +15,7 @@
 import { createClient } from '@braindog/client';
 
 import type { Fetch } from './boot-live.ts';
+import { layoutOf, type Layout } from '../page/layout.ts';
 import { wrote, type Wrote } from './settings-write.ts';
 
 /**
@@ -195,7 +196,15 @@ export type SharedRow = {
  * value a day oldest first, a day with no point `null` (`trendOf` in `@braindog/kernel`'s `pages.ts`). Absent where the
  * owner's cell drew no trend, or the record sent none.
  */
-export type SharedReading = { metric: string; label?: string; value: number | null; unit: string | null; trend?: (number | null)[] };
+export type SharedReading = {
+  metric: string;
+  label?: string;
+  value: number | null;
+  unit: string | null;
+  trend?: (number | null)[];
+  /** How the figure is declared to be written (`day`, `days`, `pct`, `int`, `money.GBP`...): a day is held as days since 1970. */
+  format?: string;
+};
 
 /**
  * One block as the reader draws it, narrowed from what the record sent.
@@ -217,6 +226,10 @@ export type SharedBlock = {
   matched: number;
   readings: SharedReading[];
   authored: unknown[][];
+  /** Which area of a page with a rail the block sits in (`layout` on the page); `main` on a page with none. */
+  area: 'main' | 'rail';
+  /** The states the block's lists count as finished (their declared `done:`), or `null` from a record that sends none. */
+  done: string[] | null;
   /** What a card's trend is, its figure's name ("Done, by week"), sent beside the cards' runs (`SharedRow.trend`). */
   trendLabel?: string | null;
 };
@@ -235,6 +248,8 @@ export type SharedPage = {
   /** The record's home currency, whose amounts are written by their sign alone, or `null` (an older record sends none). */
   home: string | null;
   empty: string | null;
+  /** The page's two columns, as the owner's page lays them: the rail's width in twelfths, or `null` for one column. */
+  layout: Layout | null;
   blocks: SharedBlock[];
 };
 
@@ -275,6 +290,7 @@ const readingOf = (x: unknown): SharedReading | null => {
     value,
     unit,
     ...(trend !== null && trend.some((v) => v !== null) ? { trend } : {}),
+    ...(typeof x.format === 'string' && /^[a-z][a-z.A-Z]{0,15}$/u.test(x.format) ? { format: x.format } : {}),
   };
 };
 
@@ -305,7 +321,8 @@ const columnOf = (c: unknown): SharedColumn[] => {
   return [
     {
       field: c.field,
-      ...(typeof c.label === 'string' && c.label !== '' ? { label: c.label } : {}),
+      /* AN EMPTY LABEL IS KEPT EMPTY (SB4): the owner's pack left the fact unnamed, as the app draws it. */
+      ...(typeof c.label === 'string' ? { label: c.label.trim() === '' ? '' : c.label } : {}),
       ...(typeof c.as === 'string' ? { as: c.as } : {}),
       ...(sign === null ? {} : { sign }),
     },
@@ -348,6 +365,8 @@ export function blockShared(x: unknown): SharedBlock {
     matched: typeof b.matched === 'number' && Number.isFinite(b.matched) ? b.matched : rows.length,
     readings: (Array.isArray(b.readings) ? b.readings : []).map(readingOf).filter((r) => r !== null),
     authored,
+    area: b.area === 'rail' ? 'rail' : 'main',
+    done: Array.isArray(b.done) ? b.done.filter((d): d is string => typeof d === 'string') : null,
     trendLabel: rows.some((r) => r.trend !== undefined) ? text(b.trend_label) : null,
   };
 }
@@ -401,6 +420,7 @@ export async function readShared(origin: string, token: string, io?: Fetch): Pro
       zone: zoneOf(v.zone),
       home: typeof v.home === 'string' && /^[A-Z]{3}$/u.test(v.home) ? v.home : null,
       empty: text(v.empty),
+      layout: layoutOf(v),
       blocks: (Array.isArray(v.blocks) ? v.blocks : []).map(blockShared),
     },
   };

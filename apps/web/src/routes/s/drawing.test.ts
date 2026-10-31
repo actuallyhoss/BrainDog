@@ -25,6 +25,8 @@ const block = (over: Partial<SharedBlock>): SharedBlock => ({
   matched: 0,
   readings: [],
   authored: [],
+  area: 'main',
+  done: null,
   ...over,
 });
 
@@ -65,4 +67,30 @@ test('figures are a stat, a todo ticks its finished rows, and a plain list is th
   assert.equal(table.segments.length, 0);
   assert.equal(table.table?.columns[1]?.align, 'end');
   assert.equal(table.table?.rows[0]?.cells[1], '£8,530');
+});
+
+test('a todo ticks by its list\'s own done states, and a card fact the pack left unnamed has no name', () => {
+  const rows = [row({ what: { type: 'text', value: 'Ship it' } }, 'released'), row({ what: { type: 'text', value: 'Write it' } }, 'done')];
+  const todo = drawingOf(shown(block({ kind: 'todo', columns: [{ field: 'what', label: 'What' }], rows, done: ['released'] })), where).segments[0];
+  assert.ok(todo && todo.type === 'block' && todo.kind === 'todo');
+  assert.deepEqual(
+    todo.rows.map((r) => r.done === true),
+    [true, false],
+  );
+
+  const cards = drawingOf(
+    shown(block({ kind: 'cards', columns: [{ field: 'name', label: 'Name', as: 'title' }, { field: 'health', label: '', as: 'fact' }], rows: [row({ name: { type: 'text', value: 'Kiln' }, health: { type: 'enum', value: 'on_track', label: 'On track' } })] })),
+    where,
+  ).segments.find((s) => s.type === 'block');
+  assert.ok(cards && cards.type === 'block');
+  assert.equal(cards.rows[0]?.cells[1], 'fact:');
+});
+
+test('a card\'s cost of nothing is Free, as the app says it', () => {
+  const cards = drawingOf(
+    shown(block({ kind: 'cards', columns: [{ field: 'name', label: 'Name', as: 'title' }, { field: 'cost', label: 'Cost', as: 'figure' }], rows: [row({ name: { type: 'text', value: 'Wildcard certificate' }, cost: { type: 'money', value: { amount: 0, currency: 'GBP' } } })] })),
+    where,
+  ).segments.find((s) => s.type === 'block');
+  assert.ok(cards && cards.type === 'block');
+  assert.equal(cards.rows[1]?.cells[1], 'Free');
 });

@@ -316,12 +316,15 @@ const languageOf = (tag: unknown): string => {
  * an amount with its currency, a figure in several currencies as each amount in turn and never their sum, a number,
  * and words. An address or an id is no value here.
  */
-const saidIn = (language: string, home: string | null) => {
+const saidIn = (language: string, home: string | null, now: number) => {
   /* AN AMOUNT IS WRITTEN ONE WAY, as every screen writes it (`braindog-render`'s `writeAmount`), against the record's
-     home currency; the language no longer changes how money reads. */
+     home currency; the language no longer changes how money reads. IN A SENTENCE, NOUGHT PENCE GO (AJ2): Money's line
+     read "£1,240.00 to pay on the card" where the app reads "£1,240". */
   const amount = (m: { amount: number; currency: string }): string =>
-    writeAmount({ minor: m.amount, currency: m.currency }, home, 'exact')?.text ?? `${m.currency} ${m.amount}`;
+    writeAmount({ minor: m.amount, currency: m.currency }, home, 'read')?.text ?? `${m.currency} ${m.amount}`;
   return (v: Json | undefined): string | undefined => {
+    /* A DAY IS SAID AS THE APP SAYS ONE (AJ2): "as of 1 Sep", where a link read "as of 2026-09-01". */
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v)) return dateSaid(v, now);
     if (typeof v === 'string') return inside(v) ? undefined : wordsShown(v);
     if (typeof v === 'number') return Number.isFinite(v) ? new Intl.NumberFormat(language).format(v) : undefined;
     const one = moneyShown(v);
@@ -756,6 +759,9 @@ const unitless = (row: ReturnType<typeof rowShown>): ReturnType<typeof rowShown>
   };
 };
 
+/** The formats a figure is declared in that a link says (`format:` on a figure): a day, a count of days, a share, a number, money. */
+const FIGURE_FORMATS = /^(?:int|decimal|pct|days|day|money(?:\.[A-Z]{3})?)$/u;
+
 /** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
 type ColumnShown = { field: string; label: string; as?: string; sign?: { field: string; minus: string } };
 
@@ -875,8 +881,11 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
   /* NOR A CARD'S MARK, HUE OR PICTURE (SC1): each is how the owner's card is drawn, an icon's name, a colour's degrees, a
      stored file, and a link draws a card's row as words, where Projects said "tag" and "265" beside every name. */
   const columns = (b.columns ?? []).filter((c) => typeof c.field === 'string' && c.field !== '' && !(typeof c.as === 'string' && DRAWING_ROLES.has(c.as))).map((c) => {
+    /* A LABEL THE PACK LEFT EMPTY ON PURPOSE (`label: ''`, Projects' Health on a card) IS SENT EMPTY (SB4): the app draws
+       that fact with no name over it, and a link said the field's own label, "Health", beside every project. */
+    const blank = typeof c.label === 'string' && c.label.trim() === '';
     const owned = typeof c.label === 'string' && c.label.trim() !== '' ? c.label : undefined;
-    const shown: ColumnShown = { field: c.field, label: owned ?? declared?.fields.find((f) => f.id === c.field)?.label ?? idSaid(c.field) };
+    const shown: ColumnShown = { field: c.field, label: blank ? '' : (owned ?? declared?.fields.find((f) => f.id === c.field)?.label ?? idSaid(c.field)) };
     if (c.as !== undefined) shown.as = c.as;
     if (c.sign !== undefined) shown.sign = { field: c.sign.field, minus: c.sign.minus };
     return shown;
@@ -897,12 +906,21 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
     const shown = rowShown(row, drawn(row.register), lists);
     return showing.money ? shown : unitless(shown);
   });
+  /* THE STATES ITS LISTS COUNT AS FINISHED (SB2), each list's own declared `done:`, so a shared `todo` ticks the rows the
+     owner's ticks and not the ones a word guessed at. The list's declaration, never a row: the same words for every row. */
+  if (b.rows.length > 0) {
+    const finished = new Set<string>();
+    for (const register of new Set([...(list === undefined ? [] : [list]), ...b.rows.map((r) => r.register)])) for (const d of lists.get(register)?.done ?? []) finished.add(d);
+    kept.done = [...finished];
+  }
 
   /* EVERY FIGURE SAYS ITS NAME: the cell's label, else the figure's own, so a stranger never reads a metric's id. */
   if (b.readings !== undefined)
     kept.readings = b.readings.map((r) => ({
       metric: r.metric,
       label: r.label ?? figure(r.metric) ?? idSaid(r.metric),
+      /* AND HOW IT IS WRITTEN (SB1): a day the money runs out is held as days since 1970, and said "20,756" without it. */
+      ...(typeof r.format === 'string' && FIGURE_FORMATS.test(r.format) ? { format: r.format } : {}),
       reading: readingShown(r.reading),
       ...(r.trend === undefined ? {} : { trend: r.trend }),
       ...(r.target === undefined ? {} : { target: r.target }),
@@ -978,7 +996,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
     reads: where.reads,
     money: where.money,
     moneyFigure: where.moneyFigure,
-    said: moneyKept(where.money, saidIn(language, where.home)),
+    said: moneyKept(where.money, saidIn(language, where.home, where.now)),
     typed: typedKept(where.money, typedIn(where.now, zone, where.home)),
     cell: typedKept(where.money, typedIn(where.now, zone, where.home, true)),
   };

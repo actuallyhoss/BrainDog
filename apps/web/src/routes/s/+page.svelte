@@ -42,7 +42,9 @@
     openOutside('https://brain.dog');
   };
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
-  import { headOf, noteOpts, plainSaid, shownBlocks, takeShared, type Shown, type Where } from './reading.ts';
+  import { areasOf, headOf, noteOpts, plainSaid, shownBlocks, takeShared, type Shown, type Where } from './reading.ts';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { boardRail, leadChartAt } from '$lib/page/layout.ts';
   import { drawingOf } from './drawing.ts';
   import { isGlyph, pathOf, glyphSet, glyphSetNow } from '$lib/ui/icons.ts';
   import { agentKindOf } from '$lib/ui/face.ts';
@@ -86,6 +88,9 @@
   });
 
   const head = $derived(got === null ? null : headOf(got));
+
+  /* TWO COLUMNS FROM 900 UP, as the owner's page (`PageBody.svelte`'s `wide`). */
+  const wide = new MediaQuery('(width >= 900px)', true);
 
   /* WHAT THE PAGE DRAWS: its opening line under its name, and each block that has something to show (`shownBlocks`). */
   const shown = $derived(got?.from === 'live' ? shownBlocks(got.page.blocks, where) : { lead: null, blocks: [] as Shown[] });
@@ -154,6 +159,21 @@
   {#if s.rows.length > 0 && s.matched > s.rows.length}<p class="part-note">{words.sharedMore(s.matched - s.rows.length)}</p>{/if}
 {/snippet}
 
+{#snippet tiles(list: Shown[], at: string)}
+  {#each list as s, i (i)}
+    {#if s.block.kind === 'section'}
+      <!-- A SECTION IS THE NAME OF WHAT FOLLOWS IT, as on the owner's page: a heading on the board, not a tile. -->
+      <h2 class="section-head">{s.block.heading}</h2>
+    {:else}
+      {@const b = s.block}
+      <section class="part tile" style:--span={b.span ?? 12} aria-labelledby={b.heading ? `shared-${at}${i}` : undefined} aria-label={b.heading ? undefined : copy.kindNames[b.kind]}>
+        {#if b.heading}<h2 class="part-head" id="shared-{at}{i}">{b.heading}</h2>{/if}
+        {@render blockBody(s)}
+      </section>
+    {/if}
+  {/each}
+{/snippet}
+
 <div class="shared">
   <!-- FLAT, ON THE BOARD: the mark, the name, and what this link is in words. -->
   <header class="bar">
@@ -191,20 +211,26 @@
       {#if p.empty || shown.blocks.length === 0}
         <section class="part tile"><p class="part-body">{p.empty ?? words.sharedNothing}</p></section>
       {:else}
-        <div class="blocks">
-          {#each shown.blocks as s, i (i)}
-            {#if s.block.kind === 'section'}
-              <!-- A SECTION IS THE NAME OF WHAT FOLLOWS IT, as on the owner's page: a heading on the board, not a tile. -->
-              <h2 class="section-head">{s.block.heading}</h2>
+        {@const areas = areasOf(shown.blocks, p.layout)}
+        {#if areas.rail === null || p.layout === null}
+          <div class="blocks">{@render tiles(areas.main, 'm')}</div>
+        {:else}
+          <!-- THE OWNER'S SIDE RAIL, KEPT (SB3): two columns from 900 up, the board's own two thirds and a third
+               (`boardRail`), and one under it with the rail first, as the owner's page reads on a phone, the chart the
+               main column opens on before it (`leadChartAt`). In the markup, so Tab meets them as the eye does. -->
+          {@const spans = boardRail(p.layout)}
+          {@const lead = wide.current ? -1 : leadChartAt(areas.main.map((s) => ({ kind: s.block.kind, drawn: true, lead: s.block.lead })))}
+          <div class="areas" style:--main={spans.main} style:--rail={spans.rail}>
+            {#if wide.current}
+              <div class="blocks area-main">{@render tiles(areas.main, 'm')}</div>
+              <div class="blocks area-rail">{@render tiles(areas.rail, 'r')}</div>
             {:else}
-              {@const b = s.block}
-              <section class="part tile" style:--span={b.span ?? 12} aria-labelledby={b.heading ? `shared-b${i}` : undefined} aria-label={b.heading ? undefined : copy.kindNames[b.kind]}>
-                {#if b.heading}<h2 class="part-head" id="shared-b{i}">{b.heading}</h2>{/if}
-                {@render blockBody(s)}
-              </section>
+              {#if lead >= 0}<div class="blocks">{@render tiles(areas.main.slice(lead, lead + 1), 'l')}</div>{/if}
+              <div class="blocks area-rail">{@render tiles(areas.rail, 'r')}</div>
+              <div class="blocks area-main">{@render tiles(lead >= 0 ? areas.main.filter((_, n) => n !== lead) : areas.main, 'm')}</div>
             {/if}
-          {/each}
-        </div>
+          </div>
+        {/if}
       {/if}
     </article>
   {/if}
@@ -473,6 +499,14 @@
     }
   }
 
+  /* THE TWO COLUMNS: one under the other on a phone, the rail first. */
+  .areas {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tile-gap);
+    align-items: start;
+  }
+
   @media (width >= 900px) {
     .blocks {
       grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -480,6 +514,24 @@
 
     .part {
       grid-column: span var(--span);
+    }
+
+    .areas {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .area-main {
+      grid-column: span var(--main);
+    }
+
+    /* THE RAIL IS ONE STACK, and a block's span means nothing in it, as on the owner's page. */
+    .area-rail {
+      grid-column: span var(--rail);
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .area-rail > .part {
+      grid-column: 1 / -1;
     }
   }
 

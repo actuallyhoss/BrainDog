@@ -28,10 +28,23 @@ const textOf = (s: Said): string => ('money' in s ? s.money.text : s.text);
 export const escapeCell = (c: string): string => c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
 
 /**
- * THE STATES A ROW IS FINISHED IN, which a shared `todo` ticks. The link sends a row's state and not its list's `done:`,
- * so the words the seed's and the packs' lists finish in are read here; any other state is an open box.
+ * THE STATES A ROW IS FINISHED IN, which a shared `todo` ticks: the block's lists' own `done:`, as the record sends it
+ * (SB2), the same list the app ticks by. Only a record that sends none is read by these words, the ones the seed's and
+ * the packs' lists finish in; any other state is an open box.
  */
+const finishedIn = (b: Shown['block']): ReadonlySet<string> => (b.done === null ? DONE : new Set(b.done));
 const DONE = new Set(['done', 'paid', 'closed', 'cancelled', 'canceled', 'complete', 'completed', 'shipped', 'resolved', 'won', 'lost', 'retired', 'finished', 'archived']);
+
+/**
+ * A CARD'S COST OF NOTHING IS "Free", as the app says it (`freeSaid` in `page-live.ts`, AG22; AJ13): only a figure whose
+ * field is named for what something costs and holds an amount of nought. A link read "£0" over "Cost".
+ */
+const freeOf = (row: SharedRow, c: SharedColumn, role: string): string | null => {
+  if (role !== 'figure' || !/^(cost|price|fee)$/u.test(c.field)) return null;
+  const cell = row.cells[c.field];
+  const v = cell?.type === 'money' ? (cell.value as { amount?: unknown } | null) : null;
+  return v !== null && typeof v === 'object' && v.amount === 0 ? 'Free' : null;
+};
 
 /** The kinds whose cells are a list's fields in the declared order, each a place (`projectRows` in `blocks.ts`). */
 const PLACED: ReadonlySet<string> = new Set(['todo', 'steps', 'timeline', 'board', 'roadmap', 'lanes', 'calendar', 'spec', 'params']);
@@ -90,7 +103,7 @@ function cardRows(s: Shown, where: Where): string[] | null {
   const trended = named !== null && !kept.includes('trend') && s.rows.some((r) => (r.trend?.filter((v) => v !== null).length ?? 0) >= 3);
   const head = [...at.map(({ c, role }) => escapeCell(`${role}: ${c.label}`)), ...(trended ? [escapeCell(`trend: ${named}`)] : [])].join(' | ');
   const rows = s.rows.map((row) => {
-    const cells = at.map(({ c }) => escapeCell(textOf(cellSaid(row, c, where))));
+    const cells = at.map(({ c, role }) => escapeCell(freeOf(row, c, role) ?? textOf(cellSaid(row, c, where))));
     if (trended) {
       const run = row.trend ?? [];
       cells.push(run.filter((v) => v !== null).length >= 3 ? run.map((v) => (v === null ? '-' : String(v))).join(' ') : '');
@@ -124,12 +137,13 @@ function datedCell(row: SharedRow, c: SharedColumn, where: Where): string {
 function placedRows(s: Shown, cells: number, checkbox: boolean, where: Where): string[] {
   const columns = allColumns(s).slice(0, cells);
   const dated = DATED.has(s.block.kind);
+  const finished = finishedIn(s.block);
   return s.rows.map((row) => {
     const out = Array.from({ length: cells }, (_, n) => {
       const c = columns[n];
       return c === undefined ? '' : escapeCell(dated ? datedCell(row, c, where) : textOf(cellSaid(row, c, where)));
     });
-    if (checkbox) out[0] = `[${row.state !== null && DONE.has(row.state) ? 'x' : ' '}] ${out[0] ?? ''}`;
+    if (checkbox) out[0] = `[${row.state !== null && finished.has(row.state) ? 'x' : ' '}] ${out[0] ?? ''}`;
     return out.join(' | ');
   });
 }
