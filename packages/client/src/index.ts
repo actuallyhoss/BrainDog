@@ -2156,7 +2156,10 @@ export function createClient(options: ClientOptions) {
   function send<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean, args?: Record<string, unknown>): Promise<Result<T>> {
     const read = !WRITES.has(name) || POST_READS.has(name);
     const host = `${base} ${options.token ?? ''}`;
-    if (READ_BATCHING && read && args !== undefined && !outlives && !ALONE.has(name) && !NO_READS.has(host) && !LEAVING) return inReadWave<T>(host, { name, url, writes, sent, args, ahead });
+    /* A CLIENT ASKED AHEAD FILLS A WAVE OF ITS OWN (speed-g SG1): joined to a screen's own reads, its answer waited for
+       theirs and the whole request was the screen's, which is what asking ahead was for. */
+    if (READ_BATCHING && read && args !== undefined && !outlives && !ALONE.has(name) && !NO_READS.has(host) && !LEAVING)
+      return inReadWave<T>(ahead ? `${host} ahead` : host, { name, url, writes, sent, args, ahead });
     return sendNow<T>(name, url, writes, sent, outlives);
   }
 
