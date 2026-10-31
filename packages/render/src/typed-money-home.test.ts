@@ -53,7 +53,7 @@ const drawer = (opts: RenderOptions): string[] => typed(render(Block, { props: {
 
 test('told the home, a typed amount is said as the writer says it among words, in both drawers', () => {
   const home = { home: 'GBP' };
-  assert.deepEqual(mirror(home), ['£41', '$1,299.50 USD']);
+  assert.deepEqual(mirror(home), ['£41', '$1,299.50']);
   assert.deepEqual(drawer(home), mirror(home));
 });
 

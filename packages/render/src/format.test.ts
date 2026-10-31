@@ -15,7 +15,7 @@ test('A HEADLINE SAYS A WHOLE AMOUNT WITHOUT ITS ZEROS, and keeps a fraction tha
   assert.equal(headlineFigure(money(3_385_050, 'GBP')), '£33,850.50');
   assert.equal(headlineFigure(money(-129_900, 'GBP')), '−£1,299');
   assert.equal(headlineFigure(money(-129_900, 'EGP')), 'EGP −1,299');
-  assert.equal(headlineFigure(money(1_299, 'JPY')), 'JP¥1,299', 'a currency with no minor unit has nothing to drop');
+  assert.equal(headlineFigure(money(1_299, 'JPY')), '¥1,299', 'a currency with no minor unit has nothing to drop');
   assert.equal(headlineFigure(money(1_500, 'KWD')), 'KWD 1.500', 'three places that are not all zeros stay');
   assert.equal(headlineFigure(money(1_000_000, 'CLF')), 'CLF 100');
   assert.equal(headlineMoney(3_385_000, 'GBP'), '£33,850');
@@ -107,20 +107,20 @@ test('TOLD THE HOME CURRENCY, EACH OLD FUNCTION WRITES WHAT THE ONE WRITER WRITE
   }
 });
 
-test('THE RULE AS A PERSON READS IT, through the old names: at home by its sign, another currency with its code after, a true minus in front', () => {
+test('THE RULE AS A PERSON READS IT, through the old names: at home by its sign, another currency by its own sign, a true minus in front', () => {
   /* The dollar and sterling, whose signs nobody disputes. How the Egyptian pound is written is the writer's one
      table and the person's to rule, so it is held above only to what the writer says, never to a spelling here. */
   assert.equal(symbolFigure(money(108_621_341, 'GBP'), 'GBP'), '£1,086,213.41');
-  assert.equal(symbolFigure(money(294_795, 'USD'), 'EGP'), `$2,947.95${AMOUNT_SPACE}USD`);
+  assert.equal(symbolFigure(money(294_795, 'USD'), 'EGP'), '$2,947.95');
   assert.equal(symbolFigure(money(294_795, 'USD'), 'USD'), '$2,947.95');
   assert.equal(symbolFigure(money(-7_361_527, 'USD'), 'USD'), '−$73,615.27');
   assert.equal(symbolFigure(money(-120_000, 'CHF'), 'EGP'), `−CHF${AMOUNT_SPACE}1,200.00`, 'a currency with no sign keeps its code, and the minus stands in front of it');
   assert.equal(headlineFigure(money(5_818_500, 'USD'), 'USD'), '$58,185');
   assert.equal(headlineFigure(money(5_818_550, 'USD'), 'USD'), '$58,185.50', 'a fraction that is part of the amount stays');
-  assert.equal(barFigure(money(480_000, 'USD'), 'EGP'), `$4,800${AMOUNT_SPACE}USD`);
+  assert.equal(barFigure(money(480_000, 'USD'), 'EGP'), '$4,800');
   assert.equal(axisFigure(money(3_124_055, 'GBP'), 'GBP'), '£31k');
   assert.equal(axisFigure(money(800_000_000, 'USD'), 'USD'), '$8m');
-  assert.equal(headlineFigure('GBP 43,700.00 · USD 24,800.50', 'GBP'), `£43,700 · $24,800.50${AMOUNT_SPACE}USD`, 'several amounts are each written once');
+  assert.equal(headlineFigure('GBP 43,700.00 · USD 24,800.50', 'GBP'), '£43,700 · $24,800.50', 'several amounts are each written once');
   for (const home of HOMES) {
     assert.equal(figureChars(money(108_621_341, 'EGP'), home), written(108_621_341, 'EGP', home, 'exact').length, 'a tile measures the figure as it is drawn');
   }
@@ -132,7 +132,7 @@ test('A SENTENCE TOLD THE HOME CURRENCY has every stored amount in it written by
     assert.equal(symbolText(said, false, home), amountsIn(said, home, 'exact'));
     assert.equal(symbolText(said, true, home), amountsIn(said, home, 'read'));
   }
-  assert.equal(symbolText('Rent of USD 12,000.00 is due, and GBP 39.50 to the host', true, 'USD'), `Rent of $12,000 is due, and £39.50${AMOUNT_SPACE}GBP to the host`);
+  assert.equal(symbolText('Rent of USD 12,000.00 is due, and GBP 39.50 to the host', true, 'USD'), 'Rent of $12,000 is due, and £39.50 to the host');
 });
 
 test('WHAT IS NOT A STORED AMOUNT IS NOT READ AS ONE: told the home currency, a drawing and a bare number keep the path they had', () => {

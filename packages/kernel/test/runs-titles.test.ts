@@ -179,7 +179,8 @@ test('THE OLD NAMES ARE THE RECORD’S TOO: "Claude run, 2 Oct", "Kiln, 2 Oct" i
   /* AND THE NAMES A RUN IS GIVEN NOW, from its hello and its machine: "Claude Code on MacBook", an app nobody listed by its own name. */
   assert.deepEqual(recordNamed(run('Claude Code on MacBook')), { name: 'Claude Code' });
   assert.deepEqual(recordNamed(run('An agent')), { name: null });
-  assert.deepEqual(recordNamed(run('Zed on MacBook', { client: 'zed' })), { name: 'Zed' });
+  /* The app's own name is not carried on (RM8): `learned` says it again through `selfNamed`. */
+  assert.deepEqual(recordNamed(run('Zed on MacBook', { client: 'zed' })), { name: null });
   assert.equal(recordNamed(run('Zed on MacBook')), null, 'an app the run never named was read as its own');
   assert.deepEqual(recordNamed(run('Lanternly, 1 Oct'), 'Lanternly'), { name: null });
   assert.deepEqual(recordNamed(run('braindog on master', { repo: 'braindog' })), { name: null });

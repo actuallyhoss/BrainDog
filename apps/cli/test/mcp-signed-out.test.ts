@@ -118,7 +118,7 @@ test('with a login past its expiry, every call names the host, the day it lapsed
   for (const [i, [name]] of FIRST.entries()) {
     const said = refusal(by.get(10 + i));
     assert.equal(said.code, 'UNAUTHORIZED', name);
-    assert.ok(said.fix?.includes('2020-01-01'), `${name}: ${said.fix}`);
+    assert.ok(said.fix?.includes('1 Jan 2020'), `${name}: ${said.fix}`);
     assert.ok(said.fix?.includes(`${SIGN_IN} https://a.example`), `${name}: ${said.fix}`);
     assert.ok(said.text.includes(`${SIGN_IN} https://a.example`), `${name}: the text says ${said.text}`);
   }

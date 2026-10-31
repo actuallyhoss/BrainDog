@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AMOUNT_SPACE, parse, toHTML } from 'braindog-render';
+import { parse, toHTML } from 'braindog-render';
 import { HOME, inSymbols, leadOf, said } from '../src/lib/app/page.ts';
 import { EXAMPLES } from '../src/lib/examples/index.ts';
 
@@ -106,10 +106,12 @@ test('the drawn app spells a dollar as its copy does, $ and never US$, and anoth
     for (const m of drawn.matchAll(/.{0,24}US\$.{0,12}/gu)) wrong.push(`${at}: "${m[0]}"`);
   }
   assert.deepEqual(wrong, []);
-  /* THE PLANTED FAULT: the same page drawn with no home told is the old spelling, so the check above can fail. */
+  /* THE PLANTED FAULT: no path writes `US$` since AM15 (audit 31 Oct m), told the home or not, so the matcher above is
+     held to find one where it is written, and the page drawn with no home told says the dollar by its own sign too. */
+  assert.equal([...'Paid US$40 on the 3rd'.matchAll(/.{0,24}US\$.{0,12}/gu)].length, 1, 'the matcher finds the old spelling');
   const home = EXAMPLES.find((e) => e.id === 'personal')?.pages[0];
   assert.ok(home);
-  assert.match(toHTML(parse(home.src, { page: true })), /US\$/u, 'with no home told the renderer no longer writes US$, so this test proves nothing');
-  /* A pound in an example stays a pound, with its code after, as on a record whose home is dollars. */
-  assert.equal(said('Rent of GBP 1,200.00 is due.'), `Rent of £1,200${AMOUNT_SPACE}GBP is due.`);
+  assert.doesNotMatch(toHTML(parse(home.src, { page: true })), /US\$/u, 'with no home told the renderer still says the dollar by its own sign');
+  /* A pound in an example stays a pound, by its own sign, as on a record whose home is dollars. */
+  assert.equal(said('Rent of GBP 1,200.00 is due.'), 'Rent of £1,200 is due.');
 });

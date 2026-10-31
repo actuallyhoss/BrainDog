@@ -62,7 +62,7 @@ test('a money cell is drawn whole in its own currency, and turned when its row s
   assert.equal(said(cellSaid(row, { field: 'total', sign: { field: 'way', minus: 'out' } }, where)), '−EGP 1,234.50');
   assert.equal(said(cellSaid(row, { field: 'way' }, where)), 'Paid out');
   const gbp = moneySaid(999, 'GBP');
-  assert.ok(gbp && gbp.text.includes('9.99') && gbp.text.includes('GBP'), gbp?.text);
+  assert.equal(gbp?.text, '£9.99', 'no home: sterling by its own sign');
 });
 
 test('a money figure says its currency, and a figure with none says so', () => {
@@ -94,10 +94,11 @@ test('a trend is drawn from three points, a gap left out, and each point said as
   assert.equal(pointSaid(cash, 7_500_00, where), 'EGP 7,500');
 });
 
-test('an amount in the home currency is its sign alone, any other keeps its code, and noughts of pence go', () => {
+test('an amount in the home currency is its sign alone, any other its own sign, and noughts of pence go', () => {
   const home: Where = { ...where, home: 'GBP' };
   assert.equal(said(figureSaid({ metric: 'owed', value: 405_000, unit: 'GBP' }, home)), '£4,050');
-  assert.equal(said(figureSaid({ metric: 'owed', value: 405_000, unit: 'USD' }, home)), '$4,050 USD');
+  assert.equal(said(figureSaid({ metric: 'owed', value: 405_000, unit: 'USD' }, home)), '$4,050');
+  assert.equal(said(figureSaid({ metric: 'owed', value: 405_000, unit: 'USD' }, { ...where, home: 'CAD' })), '$4,050 USD', 'where the sign is the home one, the code says which');
   const row = { cells: { cost: { type: 'money', value: { amount: 0, currency: 'GBP' } }, bill: { type: 'money', value: { amount: 853_000, currency: 'GBP' } }, part: { type: 'money', value: { amount: 1_240, currency: 'GBP' } } }, fields: {}, state: null };
   assert.equal(said(cellSaid(row, { field: 'cost' }, home)), '£0');
   assert.equal(said(cellSaid(row, { field: 'bill' }, home)), '£8,530');

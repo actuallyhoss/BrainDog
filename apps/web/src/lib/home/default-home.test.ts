@@ -43,7 +43,7 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   const kinds = (b: { blocks: { kind: string; source?: string }[] }) => b.blocks.map((x) => x.source ?? x.kind);
   /* WHO IS WORKING IS NOT A BLOCK OF TODAY'S OWN BODY (today F1): Home draws it from `boot`, once. THE WORK DUE THIS
      WEEK is its own tile beside what comes up with money on it (audit Q10). */
-  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'stat', 'kpis', 'deadlines', 'register.tasks', 'activity']);
+  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'stat', 'kpis', 'stat', 'deadlines', 'register.tasks', 'activity']);
   assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'kpis', 'deadlines', 'activity']);
   assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'kpis', 'deadlines', 'register.tasks', 'activity']);
   /* WHAT IS LATE AND WHAT COMES UP ARE TWO READS, so the late ones never use up the next few's rows. */
@@ -62,7 +62,7 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   /* EVERY WIDGET OF THE BOARD IS KEYED (the widgets plan of 29 October, §4.1), and the late band's four reads with it. */
   assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [
     ['needs-you', 5], ['late', undefined], ['overdue-money', undefined], ['to-check', undefined], ['urgent', undefined],
-    ['cash', 3], ['numbers', 12], ['coming-up', 3], ['work-due', undefined], ['arrivals', undefined],
+    ['cash', 3], ['numbers', 12], ['week-money', 3], ['coming-up', 3], ['work-due', undefined], ['arrivals', undefined],
   ]);
 });
 
@@ -898,4 +898,15 @@ test("A STARTER'S OWN LIST THAT FALLS DUE IS TODAY'S WEEK (AM5), and a list nobo
   assert.equal(week?.due.who, null, "an assignment is nobody else's");
   assert.equal(weekOf([{ ...assignments, pack: 'estate' }], 'people'), undefined, "a service that renews is not the week");
   assert.equal(weekOf([(({ pack: _, ...rest }) => rest)(assignments)], 'people', new Set(['assignments']))?.due.register, 'assignments', 'boot names the pack');
+});
+
+test('MONEY TOLD BEFORE AN ACCOUNT IS ON TODAY (audit 31 Oct m, AM3): the week\'s money while none is open, and one tile where a week says it', () => {
+  const keyed = (holds: Holds) => todayHome(holds).blocks.filter((b) => (b as unknown as { key?: string }).key === 'week-money') as unknown as { when?: unknown; cells?: { metric: string }[] }[];
+  const told = keyed({ tasks: true, adds: true, money: true });
+  assert.equal(told.length, 1);
+  assert.deepEqual(told[0]!.cells?.map((c) => c.metric), weekMoney().cells?.map((c) => c.metric));
+  /* ONLY UNTIL THE FIRST ACCOUNT IS OPEN, when Cash ahead says the money, and only on a Money with the week's figures. */
+  assert.deepEqual(told[0]!.when, { all: [{ metric: 'settled-in-7d', gte: -Number.MAX_SAFE_INTEGER }, { metric: 'accounts-open', is: 0 }] });
+  assert.deepEqual(keyed({ tasks: true, adds: true, money: false }), [], 'no Money, no money tile');
+  assert.equal(keyed({ tasks: false, adds: false, money: true, week: WEEK }).length, 1, 'a week says its money once');
 });

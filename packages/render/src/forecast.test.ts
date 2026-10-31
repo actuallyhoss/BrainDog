@@ -461,14 +461,14 @@ test('THE WASH IS ONE CLOSED SHAPE from the zero rule, under the remembered line
   assert.match(plan.area, new RegExp(`L1000 ${plan.zero}Z$`, 'u'), 'and closes on zero under the horizon');
 });
 
-test('A FIGURE A HOST DREW WITH ITS CODE AFTER IT IS SAID SHORT on the axis, keeps its code on the readout and the switches, and is exact in the table', () => {
+test('A FIGURE A HOST DREW WITH ITS CODE AFTER IT IS SAID SHORT on the axis, by its own sign on the readout and the switches, and is exact in the table', () => {
   const rows = ROWS.map((r) => (/£/u.test(r[3] ?? '') ? [r[0]!, r[1]!, r[2]!, `${r[3]}\u00a0GBP`] : r));
   const m = forecastModel(rows)!;
   const s = scenario(m, baseKnobs(m));
   const plan = forecastPlan(m, s, null);
   assert.deepEqual(plan.axis.map((a) => a.label), ['£1.5k', '£1k', '£500', '£0', '−£500', '−£1k'], 'not £1,500.00 GBP');
-  assert.equal(readoutAt(m, s, plan, 1).balance, '−£900\u00a0GBP', 'the writer keeps the code of a currency the record did not name as its own');
-  assert.deepEqual(countsOf(m).out[0], { label: 'Tax', amount: '−£2,400\u00a0GBP' });
+  assert.equal(readoutAt(m, s, plan, 1).balance, '−£900', 'a currency the record did not name as its own is said by its own sign (AM15)');
+  assert.deepEqual(countsOf(m).out[0], { label: 'Tax', amount: '−£2,400' });
   const src = ['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n');
   assert.match(toHTML(parse(src, { page: true })), /<td class="num">−£1,200\.00\u00a0GBP<\/td>/u, 'the table keeps every penny and the code');
 });

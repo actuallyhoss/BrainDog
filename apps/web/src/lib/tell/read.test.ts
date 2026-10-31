@@ -154,7 +154,7 @@ test('an amount with a currency word keeps it, and one with none takes the recor
   assert.deepEqual(euros!.fields.amount, { amount: 5000, currency: 'EUR' });
   const code = tellRead('Omar paid me USD 1,200.50 by card', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(code!.fields.amount, { amount: 120050, currency: 'USD' });
-  assert.equal(code!.said, '$1,200.50\u00a0USD from Omar, by card');
+  assert.equal(code!.said, '$1,200.50 from Omar, by card');
   const pounds = tellRead('Omar paid me 300 pounds', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(pounds!.fields.amount, { amount: 30000, currency: 'EGP' });
 });
