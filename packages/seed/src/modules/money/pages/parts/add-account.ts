@@ -1,5 +1,7 @@
 /** Add an account, on a record that holds none yet. */
 
+import { NOTHING_TOLD } from './told.ts';
+
 export const ADD_ACCOUNT: Record<string, unknown>[] = [
   {
     /* THE FIRST BALANCE IS ADDED HERE, IN THE WALK'S PLACE, while there is none: the first thing a fresh record does,
@@ -10,6 +12,7 @@ export const ADD_ACCOUNT: Record<string, unknown>[] = [
     icon: 'plus',
     span: 12,
     register: 'accounts',
-    when: { metric: 'cash-accounts', lt: 1 },
+    /* NOT OVER WHAT WAS TOLD (AM3): there, the line above the lists says to add an account, and links to it. */
+    when: { all: [{ metric: 'cash-accounts', lt: 1 }, ...NOTHING_TOLD] },
   },
 ];

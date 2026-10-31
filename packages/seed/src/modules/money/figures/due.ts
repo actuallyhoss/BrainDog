@@ -119,6 +119,22 @@ export const DUE_FIGURES: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /**
+   * EVERY BILL AND INVOICE KEPT, OPEN OR PAID, but one written off (audit 31 Oct m, AM3): a payout told before there is
+   * an account is kept here as paid, and Money said "Nothing here yet" over it. Money's home lists them while there is
+   * no account (`parts/told.ts`).
+   */
+  'bills-held': {
+    metric: 'bills-held',
+    name: 'Bills and invoices kept',
+    source: 'register.obligations',
+    where: 'state is open or part or paid',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   'repeating-held': {
     metric: 'repeating-held',
     name: 'Repeating payments',

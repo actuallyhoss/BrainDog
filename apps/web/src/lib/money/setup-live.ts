@@ -42,6 +42,8 @@ export type SetupRead = {
   kinds: Kind[];
   index: CatalogueIndex | null;
   states: PackState[];
+  /** The currency the money already told is in, the most used one, or `null` where none is told (AM22). */
+  told: string | null;
 };
 
 const cap = (v: string): string => v.charAt(0).toUpperCase() + v.slice(1).replaceAll('_', ' ');
@@ -53,10 +55,36 @@ export function kindsOf(ledger: Ledger): Kind[] {
   return (field?.values ?? []).map((v) => ({ value: v, label: field?.labels?.[v] ?? cap(v) }));
 }
 
+/** The money lines a person tells before there is an account: bills and invoices, what repeats, and the Ledger. */
+const TOLD_LISTS = ['obligations', 'recurring'] as const;
+
+/** A money value as the record holds one. */
+const isMoney = (v: unknown): v is { amount: number; currency: string } =>
+  v !== null && typeof v === 'object' && typeof (v as { currency?: unknown }).currency === 'string' && typeof (v as { amount?: unknown }).amount === 'number';
+
+/**
+ * THE CURRENCY HIS MONEY IS ALREADY IN: every amount on the newest lines of the lists money is told into before an
+ * account, the most used currency first. `null` when none holds money, or the record would not say.
+ */
+export async function toldCurrency(client: ReturnType<typeof createClient>, ledger: Ledger): Promise<string | null> {
+  const lists = [...new Set<string>([...TOLD_LISTS, ledger.list])];
+  const read = await Promise.all(lists.map((register) => client.list({ register, limit: 25 }).catch(() => null)));
+  const counts = new Map<string, number>();
+  for (const out of read) {
+    if (!out?.ok) continue;
+    for (const row of out.value.rows as { fields?: Record<string, unknown> }[]) {
+      for (const v of Object.values(row.fields ?? {})) if (isMoney(v)) counts.set(v.currency, (counts.get(v.currency) ?? 0) + 1);
+    }
+  }
+  let best: string | null = null;
+  for (const [c, n] of counts) if (best === null || n > (counts.get(best) ?? 0)) best = c;
+  return best;
+}
+
 /** Everything the setup draws from, at once. */
 export async function readSetup(base: string, ledger: Ledger): Promise<SetupRead> {
   const client = createClient({ base });
-  const [store, packs] = await Promise.all([readHostCatalogue(fetch), choose(client).catch(() => null)]);
+  const [store, packs, told] = await Promise.all([readHostCatalogue(fetch), choose(client).catch(() => null), toldCurrency(client, ledger).catch(() => null)]);
   const states = packs?.first.ok ? packs.first.value : [];
   const index = store.ok ? store.index : null;
   const on = states.filter((s) => s.disabled_at === null).map((s) => s.id);
@@ -68,6 +96,7 @@ export async function readSetup(base: string, ledger: Ledger): Promise<SetupRead
     kinds: kindsOf(ledger),
     index,
     states,
+    told,
   };
 }
 

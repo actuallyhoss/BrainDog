@@ -64,14 +64,22 @@
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
     return currencyChoices('', browserCurrencyEnv(locale, [...(navigator.languages ?? [])], zone));
   });
-  const money = $derived(code ?? held ?? '');
 
   let read = $state.raw<SetupRead | null>(null);
+  /* THE ACCOUNT'S CURRENCY IS THE ONE HE HAS USED (audit 31 Oct m, AM22): a founder whose every line was in dollars was
+     asked "Balance today (EGP)". The money already told leads, the home beside it, one press apart. */
+  let acct = $state<string | null>(null);
+  const home = $derived(code ?? held);
+  const told = $derived(read?.told ?? null);
+  const twoWays = $derived(told !== null && home !== null && told !== home);
+  const money = $derived(acct ?? (twoWays ? told : null) ?? home ?? told ?? '');
   onMount(() => {
     void import('./setup-live.ts').then(async (m) => {
       const got = await m.readSetup(base, ledger);
       read = got;
       if (kind === null) kind = got.kinds[0]?.value ?? null;
+      /* WITH NO HOME CURRENCY YET, the one he has used is the one offered first. */
+      if (code === null && held === null && got.told !== null) code = got.told;
     });
   });
 
@@ -176,6 +184,14 @@
           <Segmented role="group" aria-labelledby="ms-kind">
             {#each read?.kinds ?? [] as k (k.value)}
               <button type="button" class="segment" data-on={kind === k.value ? '' : undefined} aria-pressed={kind === k.value} onclick={() => (kind = k.value)}>{k.label}</button>
+            {/each}
+          </Segmented>
+        {/if}
+        {#if twoWays && told !== null && home !== null}
+          <span class="ms-label" id="ms-in">{words.accountIn}</span>
+          <Segmented role="group" aria-labelledby="ms-in">
+            {#each [told, home] as c (c)}
+              <button type="button" class="segment" data-on={money === c ? '' : undefined} aria-pressed={money === c} onclick={() => (acct = c)}>{c}</button>
             {/each}
           </Segmented>
         {/if}

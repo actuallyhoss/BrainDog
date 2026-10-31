@@ -1103,7 +1103,9 @@
          blocks follow. THE SHAPE'S CODE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a
          project's shape, so its first load does not carry one. While it is on its way the project waits in its own shape
          (`waiting`), and the page's other blocks wait on the shape's reads (`shapeWaits`). -->
-    <SetupGate facts={setupFacts}>
+    <!-- WHAT WAS TOLD BEFORE AN ACCOUNT STAYS ABOVE THE SETUP (audit 31 Oct m, AM3): bills and what repeats, kept and
+         drawn, never "Nothing here yet" over them. Only while there is no account, when the page draws nothing else. -->
+    <SetupGate facts={setupFacts} keep={blank === null && setupFacts?.accounts === 0}>
     {#snippet setup(close)}
       {#if ledgerHere}
         {#await import('$lib/money/MoneySetup.svelte') then { default: MoneySetup }}

@@ -23,11 +23,12 @@
 -->
 <script lang="ts">
   import { createClient } from '@braindog/client';
+  import { invalidateAll } from '$app/navigation';
 
   import { apiBase, at } from '$lib/at.ts';
   import { run } from '$lib/data/optimistic.svelte.ts';
   import { reread } from '$lib/data/live.svelte.ts';
-  import type { TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
+  import type { TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -83,6 +84,10 @@
     hideLabel: 'Hide the line to tell it something',
     justAdded: 'Just added',
     inList: (list: string) => `in ${list}`,
+    /* MONEY TOLD WHERE NONE IS KEPT (AM4): one press turns Money on and adds the line. */
+    moneyOn: 'Turn on Money and add it',
+    moneyTurning: 'Turning on Money…',
+    moneyTurned: 'Turned on Money',
   };
 
   let typed = $state('');
@@ -105,11 +110,12 @@
   const listName = (register: string): string => options.lists.find((l) => l.id === register)?.name ?? register;
 
   /** Adds these entries of the preview (`shown`), all under one batch, and keeps the lines they were said in. */
-  async function send(sent: { register: string; fields: Record<string, unknown> }[], shown: readonly TellRow[], at: readonly number[]) {
+  async function send(sent: { register: string; fields: Record<string, unknown> }[], shown: readonly TellRow[], at: readonly number[], first: string | null = null, lists: readonly TellList[] = options.lists) {
+    const nameOf = (register: string): string => lists.find((l) => l.id === register)?.name ?? register;
     if (sending || sent.length === 0) return;
     sending = true;
     const pressed = typeof document === 'undefined' ? null : document.activeElement;
-    const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: listName(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
+    const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: nameOf(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
     const client = createClient({ base: apiBase() });
     /* THE UNDO IS THE RECORD'S, by the batch the capture answers: `run` offers `undoChange(base, batch)` on the receipt. */
     await run({
@@ -122,7 +128,7 @@
       },
       /* EACH ENTRY BY WHAT IT IS, read from the fields it was sent with: the capture answers in the order it was sent. */
       said: (value) =>
-        [addedSaid(value.made.map((m, i) => ({ register: m.register, fields: sent[i]?.fields })), options.lists), heldSaid(shown)]
+        [first ?? '', addedSaid(value.made.map((m, i) => ({ register: m.register, fields: sent[i]?.fields })), lists), heldSaid(shown)]
           .filter((line) => line !== '')
           .join('. '),
       settle: () => {
@@ -149,12 +155,40 @@
     void send([{ register: row.register, fields: row.fields as Record<string, unknown> }], [row], [0]);
   }
 
+  /* ── turning Money on for a money line (AM4) ──
+     THE PRESS TURNS MONEY ON, THEN THE SAME WORDS ARE READ AGAIN AGAINST THE LISTS IT BROUGHT and what they become is
+     added, all in one press, under one batch with the one Undo every add has: the lists Money holds are learnt here
+     (`learn`), the sentence read against them, and the rail read again after. Money stays on after an Undo; the line is
+     what is taken back. A line that still cannot be placed once Money is on (which currency) says so on the card. */
+  let moneyWait = $state(false);
+  let moneyFix = $state<string | null>(null);
+  async function moneyOn() {
+    if (sending || moneyWait || reader === null) return;
+    moneyFix = null;
+    moneyWait = true;
+    const words = typed;
+    try {
+      const { moneyThenRead } = await import('$lib/tell/money-on.ts');
+      const out = await moneyThenRead(apiBase(), words, options, reader);
+      if ('fix' in out) moneyFix = out.fix;
+      else {
+        const go = readyRows(out.told.rows);
+        if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists);
+        else moneyFix = out.told.why ?? null;
+      }
+      await invalidateAll();
+    } finally {
+      moneyWait = false;
+    }
+  }
+
   /* CMD OR CTRL AND ENTER ADDS (AH20): Enter alone is a new line, for a pasted message. */
   function keyed(e: KeyboardEvent) {
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
     e.preventDefault();
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
     else if (rows.length === 0 && offers.length === 1) addOffer(offers[0]!);
+    else if (told?.needsMoney) void moneyOn();
   }
 
   const title = $derived(bank ? say.bankTitle : slim ? say.slimTitle : say.title);
@@ -202,6 +236,12 @@
       <!-- NOTHING PLACED IS SAID IN WORDS, with the way on: never a card over nothing to press (AH1). -->
       <div class="tell-one-becomes" aria-live="polite">
         <p class="tell-one-why">{told.why}</p>
+        {#if told.needsMoney}
+          <div class="tell-one-offers">
+            <Button weight="primary" disabled={sending || moneyWait} onclick={() => void moneyOn()}>{moneyWait ? say.moneyTurning : say.moneyOn}</Button>
+          </div>
+          {#if moneyFix}<p class="tell-one-needs" role="alert">{moneyFix}</p>{/if}
+        {/if}
         {#if offers.length > 0}
           <div class="tell-one-offers">
             {#each offers as offer (offer.register)}
@@ -212,7 +252,7 @@
       </div>
     {/if}
   </form>
-  {#if !slim || rows.length > 0 || offers.length > 0}
+  {#if !slim || rows.length > 0 || offers.length > 0 || told?.needsMoney}
     <p class="tell-one-quiet">{say.notYet} {ready.length > 1 ? say.undoAll(ready.length) : ready.length === 1 ? say.undoOne : say.undoAny}</p>
   {/if}
   {#if last.length > 0 && typed.trim() === ''}

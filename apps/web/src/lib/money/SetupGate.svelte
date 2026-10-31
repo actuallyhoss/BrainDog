@@ -12,11 +12,14 @@
 
   let {
     facts,
+    keep = false,
     setup,
     children,
   }: {
     /** What the screen knows; `null` where it is not a page this gate can be about. */
     facts: SetupFacts | null;
+    /** The page holds what was told before there is an account (AM3): it stays drawn, above the setup. */
+    keep?: boolean;
     /** The setup, handed the press that lets it go. */
     setup: Snippet<[() => void]>;
     /** The page as it is. */
@@ -34,7 +37,16 @@
 </script>
 
 {#if showing}
+  {#if keep}<div class="kept">{@render children()}</div>{/if}
   {@render setup(() => (closed = true))}
 {:else}
   {@render children()}
 {/if}
+
+<style>
+  /* THE PAGE KEPT ABOVE THE SETUP ENDS WHERE ITS LAST TILE DOES: the room a page leaves at its foot stood as a gap
+     between what was told and the setup under it. */
+  .kept :global(.page) {
+    padding-block-end: 0;
+  }
+</style>

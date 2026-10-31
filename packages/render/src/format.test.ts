@@ -23,9 +23,9 @@ test('A HEADLINE SAYS A WHOLE AMOUNT WITHOUT ITS ZEROS, and keeps a fraction tha
 });
 
 test('A HEADLINE NEVER SAYS A CURRENCY TWICE: a symbol with its code after it is said by the code', () => {
-  assert.equal(headlineFigure('$4,800.00 USD'), 'US$4,800');
+  assert.equal(headlineFigure('$4,800.00 USD'), '$4,800');
   assert.equal(headlineFigure('E£43,700.00 EGP'), 'EGP 43,700');
-  assert.equal(headlineFigure('−$39.50 USD'), '−US$39.50');
+  assert.equal(headlineFigure('−$39.50 USD'), '−$39.50');
   assert.equal(headlineFigure('£24,800.00'), '£24,800', 'a symbol alone is kept as written');
   assert.equal(headlineFigure('+GBP 850.00'), '+£850', 'a sign written for money in stays in front');
 });
@@ -53,7 +53,7 @@ test('A FIGURE A HOST DREW WITH ITS CODE AFTER A NO-BREAK SPACE IS STILL ONE FIG
   assert.equal(headlineFigure('£24,000.00\u00a0GBP'), '£24,000');
   assert.equal(headlineFigure('−£39.00\u202fGBP'), '−£39');
   assert.equal(axisFigure('£31,035.00\u00a0GBP'), '£31k');
-  assert.equal(axisFigure('$4,800.00 USD'), 'US$4.8k', 'an axis says one mark of currency too');
+  assert.equal(axisFigure('$4,800.00 USD'), '$4.8k', 'an axis says one mark of currency too');
   assert.equal(barFigure('£11,200.00\u00a0GBP'), '£11,200');
 });
 

@@ -238,7 +238,7 @@ type Answered = {
   fold?: unknown;
   icon?: string;
   columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string }; metric?: unknown; or?: unknown }[];
-  cells?: { metric: string; label?: unknown; trend?: unknown; ahead?: unknown; note?: unknown }[];
+  cells?: { metric: string; label?: unknown; trend?: unknown; ahead?: unknown; note?: unknown; sign?: unknown }[];
   /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
      seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
      `heading`, `empty`, `body`, `target`, `authored`, and every `label` a column, cell or reading
@@ -1848,7 +1848,11 @@ export function blockOf(
              number over an empty chart until the nights had kept a line. It says when the line starts instead. */
           const asked = typeof b.cells?.[i]?.trend === 'string' && b.cells[i]!.ahead === undefined;
           const kept = (m.trend ?? []).filter((v) => v !== null).length;
-          return asked && kept < 3 && m.value !== MISSING ? { ...m, waits: true as const } : m;
+          /* THE WAY ITS MONEY GOES, BY ITS OWN FIGURE AND NEVER ITS PLACE (audit 31 Oct m, AM1): Today's Cash ahead signed
+             its second tile "+", and with no account Cash now drew nothing, so the rent going out read "+EGP 12,000". */
+          const way = b.cells?.find((c) => c.metric === cell.metric)?.sign;
+          const signed: typeof m = way === 'in' || way === 'out' ? { ...m, sign: way } : m;
+          return asked && kept < 3 && m.value !== MISSING ? { ...signed, waits: true as const } : signed;
         }),
       ),
     };

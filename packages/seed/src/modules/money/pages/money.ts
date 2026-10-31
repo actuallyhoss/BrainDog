@@ -14,6 +14,7 @@ import { OVER_TIME } from './parts/over-time.ts';
 import { A_MONTH } from '../figures/budgets2.ts';
 import { BUDGET } from './parts/budget.ts';
 import { SPENDING } from './parts/spending.ts';
+import { TOLD } from './parts/told.ts';
 
 /** The budgets tile of Budgets' own page, with no width of its own so it pairs, and its six first. */
 const { span: _span, ...BUDGET_TILE } = BUDGET[0]!;
@@ -69,6 +70,8 @@ export const MONEY_PAGE: SeedPage = {
   pack: 'money-core',
   /* NO SIDE COLUMN, SINCE money-core 3.29.0: the hero takes the whole row, and the tiles under it pair as one board. */
   blocks: [
+    /* What was told before there is an account, under the line that says what one adds (AM3). Not drawn once there is one. */
+    ...TOLD,
     /* The line, split so a record whose money lasts reads that it lasts the year. */
     ...HEADLINE_LASTS,
     /* The box to add a first account, in the hero's place while there is none. */

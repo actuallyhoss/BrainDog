@@ -810,3 +810,20 @@ test('A NAME THE RECORD KEEPS AS NOBODY, A SERVICE HE PAYS OR A MONTH IS NEVER A
   const omar = tellRead('Paid Omar March 300', founder).rows;
   assert.equal(omar[0]!.fields.name, 'Omar');
 });
+
+/* ── audit 31 Oct m: the rent's name and its next day, and money told where none is kept ───────────────────────────── */
+
+test('"RENT 12,000 DUE ON THE 1ST EVERY MONTH" IS "RENT", DUE ON ITS DAY (AM23)', () => {
+  const rows = tellRead('Rent 12,000 due on the 1st every month', { ...founder, lists: [...founder.lists, RECURRING] }).rows;
+  assert.deepEqual(rows.map((r) => r.register), ['recurring']);
+  assert.equal(rows[0]!.said, 'Rent');
+  assert.equal(rows[0]!.fields.what, 'Rent');
+  assert.ok(!/next tomorrow/u.test(rows[0]!.detail), rows[0]!.detail);
+  assert.match(rows[0]!.detail, /\bdue (?:tomorrow|today|on \S+)/u, rows[0]!.detail);
+});
+
+test('MONEY TOLD WHERE NONE IS KEPT OFFERS TO TURN MONEY ON (AM4)', () => {
+  const told = tellRead('Paid 1,200 USD for the Figma team plan', { lists: [PEOPLE, TASKS], today: TODAY, currency: null });
+  assert.equal(told.needsMoney, true);
+  assert.deepEqual(told.rows, []);
+});

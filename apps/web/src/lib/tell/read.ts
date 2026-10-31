@@ -98,7 +98,14 @@ export type TellRow = {
  * words and the `offers`, each the same words as one entry of a list it could go into, for the person to pick. A card
  * never draws over nothing: an empty answer still says so and offers the way on (first-hour audit AH1).
  */
-export type Told = { rows: TellRow[]; left: string[]; why?: string; offers?: TellRow[] };
+export type Told = {
+  rows: TellRow[];
+  left: string[];
+  why?: string;
+  offers?: TellRow[];
+  /** Money was said on a record that keeps none: the card offers to turn Money on and add it in the same press (AM4). */
+  needsMoney?: true;
+};
 
 /** The most one sentence becomes. More is a paste of a whole day, and the rest is said back as left. */
 export const MOST = 8;
@@ -766,7 +773,7 @@ const orOf = (items: readonly string[]): string => (items.length < 2 ? (items[0]
 const WHY = {
   notSure: 'Not sure where this goes.',
   reads: (kinds: readonly string[]) => (kinds.length === 0 ? '' : ` It reads ${orOf(kinds)}.`),
-  noMoney: 'This BrainDog keeps no money yet, so the amount has nowhere to go.',
+  noMoney: 'This BrainDog keeps no money yet.',
   /* SAID IN WORDS, never "write its code" (AL8): "Which dinars are they: Algerian, Bahraini, ... or Tunisian?" */
   whichCurrency: (word: string | null, figure: string) => {
     const codes = familyOf(word);
@@ -1047,7 +1054,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (whichWay !== null) return { rows, left, why: WHY.whichWay(whichWay) };
     if (inOrOut !== null) return { rows, left, why: WHY.inOrOut(inOrOut) };
     if (whenNext) return { rows, left, why: WHY.whenNext };
-    if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney };
+    if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney, needsMoney: true };
     if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency(unsureWord?.word ?? null, unsureWord?.figure ?? '300') };
     if (known !== null && !placed && rows.length === 0) return { rows, left: [], why: WHY.known(known, people?.name ?? 'People') };
     if (placed || unsureOf || noMoney) return { rows, left };
@@ -1284,7 +1291,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const party = pick(l, 'ref', /party|who/, (f) => f.to === PEOPLE);
     if (party && k.payer !== null) fields[party.id] = k.payer;
     startIn(l, fields);
-    const bits = [`${spelled(k.value.amount, k.value.currency)} ${k.into ? 'in' : 'out'} every ${EVERY_SAID[cadence] ?? k.every}`, ...(k.day ? [`next ${dayWord(k.day, opts.today)}`] : []), `in ${l.name}`];
+    /* THE NEXT DAY SAID AS A PERSON SAYS IT (AM23): "due tomorrow" for money out, "next on 1 Nov" for money in, never
+       "next tomorrow". */
+    const when = (d: string): string => (dayWord(d, opts.today) === 'today' || dayWord(d, opts.today) === 'tomorrow' ? dayWord(d, opts.today) : `on ${dayWord(d, opts.today)}`);
+    const bits = [`${spelled(k.value.amount, k.value.currency)} ${k.into ? 'in' : 'out'} every ${EVERY_SAID[cadence] ?? k.every}`, ...(k.day ? [`${k.into ? 'next' : 'due'} ${when(k.day)}`] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: k.what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
@@ -1409,7 +1419,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     else if (pay) rest = rest.replace(PAY, '');
     if (every) rest = rest.replace(every[0], ' ');
     if (every) rest = oneLine(rest).replace(NEXT_SAID, '');
-    const plain = trimWords(rest.replace(/^(?:for|to)\s+(?:the\s+)?/iu, '').replace(/\s+(?:due|on|by|is)$/iu, ''));
+    /* EVERY WORD OF WHEN IS DROPPED FROM ITS NAME (audit 31 Oct m, AM23): "Rent 12,000 due on the 1st every month" was
+       named "Rent due", the "on" before the day taken and the "due" before it kept. */
+    const plain = trimWords(trimWords(rest).replace(/^(?:for|to)\s+(?:the\s+)?/iu, '').replace(/(?:\s+(?:due|on|by|is|starting))+$/iu, ''));
     const who = invoice?.[1] ?? null;
     const what = capital(plain) || (who ? `Invoice to ${who}` : 'A bill');
     /* MONEY THAT COMES ROUND IS REPEATING, where the record keeps it (AL4): "Netflix 180 a month" is a cost every month,
