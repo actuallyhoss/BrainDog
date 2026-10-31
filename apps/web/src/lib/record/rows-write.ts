@@ -94,6 +94,23 @@ function typedNumber(text: string): number | null {
   return DIGITS.test(said) ? Number(said.replace(/,/gu, '').replace('−', '-')) : null;
 }
 
+/**
+ * A FIELD THE RECORD SAYS IS MISSING, IN THE LIST'S OWN WORDS (audit 31 Oct h, AH5): the record says "obligations needs
+ * amount.", its ids, and a person reads "A bill or invoice needs an amount." `null` for any other refusal, or a field
+ * this tab holds no declaration for, and the record's sentence stands.
+ */
+export function missingSaid(register: string, refusal: { code: string; at?: string | undefined }): string | null {
+  if (refusal.code !== 'REQUIRED_MISSING' || !refusal.at) return null;
+  const decl = REGISTERS[register];
+  const f = decl?.fields.find((x) => x.id === refusal.at);
+  if (!decl || !f) return null;
+  const one = decl.one?.trim() || singularOf(register.replace(/_/g, ' '));
+  const label = labelOf(f);
+  const a = (w: string): string => (/^[aeiou]/iu.test(w) ? 'an' : 'a');
+  const which = f.type === 'money' ? `${a(label)} ${label.toLowerCase()}` : f.type === 'day' ? 'a day' : `${label} filled in`;
+  return `${a(one) === 'an' ? 'An' : 'A'} ${one} needs ${which}.`;
+}
+
 /** The words this file says itself. The record's own sentences come back through `failed`. */
 const words = {
   /* A WHOLE-NUMBER FIELD IS NOT OFFERED `3.5` AS ITS EXAMPLE, because the record would refuse that next. */
@@ -450,7 +467,7 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
     }
     if ('conflict' in out) return { ok: false, why: 'refused', fix: copy.writeConflict(rowSaid(register, seq, out.conflict.current)) };
     if (out.refusal.code === 'UNREACHABLE') return { ok: false, why: 'unreachable', fix: copy.writeNotReached };
-    return { ok: false, why: 'refused', fix: out.refusal.fix, ...(out.refusal.at ? { at: out.refusal.at } : {}) };
+    return { ok: false, why: 'refused', fix: missingSaid(register, out.refusal) ?? out.refusal.fix, ...(out.refusal.at ? { at: out.refusal.at } : {}) };
   }
 
   /**

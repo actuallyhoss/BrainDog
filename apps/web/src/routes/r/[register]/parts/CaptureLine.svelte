@@ -36,6 +36,7 @@
     open = $bindable(false),
     captureRow,
     allFields,
+    fault = null,
   }: {
     one: string;
     /** A name from the list itself, shown in the field as what a name here looks like. */
@@ -48,6 +49,8 @@
     captureRow: () => void;
     /** The whole form, for a row that needs more than its name. Absent, the sheet offers only Add. */
     allFields?: (() => void) | undefined;
+    /** Why the last line was refused, in the list's words, said under the field (audit 31 Oct h, AH5). */
+    fault?: string | null;
   } = $props();
 
   /* This part's own words. */
@@ -101,8 +104,10 @@
             e.stopPropagation();
             closeLine();
           }}
+          aria-describedby={fault ? 'capture-fault' : undefined}
         />
       </div>
+      {#if fault}<p class="capture-fault" id="capture-fault" role="alert">{fault}</p>{/if}
       <Button weight="primary" type="submit" data-capture-go>{copy.captureAdd}</Button>
       {#if allFields}<Button weight="quiet" onclick={() => allFields?.()}>{words.allFields}</Button>{/if}
       <button type="button" class="capture-close tap" aria-label={words.close} onclick={closeLine}><Icon name="close" size="s" /></button>
@@ -123,8 +128,10 @@
         enterkeyhint="done"
         bind:value
         placeholder={words.ask(example)}
+        aria-describedby={fault ? 'capture-fault' : undefined}
       />
     </div>
+    {#if fault}<p class="capture-fault" id="capture-fault" role="alert">{fault}</p>{/if}
   </form>
   {#snippet footer()}
     {#if allFields}
@@ -142,6 +149,14 @@
 {/if}
 
 <style>
+  /* WHY THE LINE WAS REFUSED, under the field, in the warning ink, inside the sheet where the press was made. */
+  .capture-fault {
+    flex-basis: 100%;
+    margin: 4px 0 0;
+    color: var(--red);
+    font-size: var(--fs-cap);
+  }
+
   /* ONE FIELD, AND IT LOOKS LIKE ONE. The label is for a screen reader: the field's own placeholder says what to type,
      and a visible label above a single-field form turns one line into three. */
   .capture {

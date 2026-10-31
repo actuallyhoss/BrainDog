@@ -467,9 +467,13 @@ export function pageWrites(deps: WritesDeps) {
        once the page has read the row back, or at once if the record refuses it (`lib/data/optimistic.ts`). */
     let line: Row = { cells: [typed], done: false };
     typedLine(register, line, true);
-    const [{ captureRow, readLine }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('../record/rows-write.ts')]);
+    const [{ captureRow, readLine }, { rowWriter }, { lineFigures }] = await Promise.all([import('./capture.ts'), import('../record/rows-write.ts'), import('../record/line-figures.ts')]);
     /* THE LIGHT SYNTAX, READ: "Chase Halden tomorrow #kiln" is drawn and written as "Chase Halden", due tomorrow. */
-    const read = readLine(register, typed, now);
+    const light = readLine(register, typed, now);
+    /* AND THE AMOUNT AND DAY A LINE ON A LIST OF MONEY CARRIES (AH5): "Electricity bill 850 due 5 Nov" is a bill of 850
+       due on 5 Nov called "Electricity bill". What the light syntax read wins over it. */
+    const figures = lineFigures(register, light.text, now);
+    const read = { text: figures.text, parsed: { ...figures.fields, ...light.parsed }, said: [...light.said, ...figures.said] };
     if (read.text !== typed) {
       typedLine(register, line, false);
       line = { cells: [read.text], done: false };

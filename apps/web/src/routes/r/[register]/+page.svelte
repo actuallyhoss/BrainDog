@@ -58,6 +58,7 @@
   import Kbd from '$lib/ui/Kbd.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
+  import { lineFigures, lineValues } from '$lib/record/line-figures.ts';
   import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
   import { foldAsk, sameOf, thingWords, twiceLine } from './twice-fold.ts';
@@ -258,6 +259,7 @@
   const closeCreate = () => {
     createOpen = false;
     addRefused = null;
+    createValues = {};
     if (page.url.searchParams.has('new')) setParam((p) => p.delete('new'));
   };
 
@@ -392,6 +394,10 @@
   let problems = $state<string[]>([]);
   /** What the sheet's form holds, so the submit can put the row somewhere rather than describing it. */
   let taken = $state<Fields>({});
+  /** What the new-row form opens holding: the add line's words when "Fill in the rest" opened it, else nothing. */
+  let createValues = $state.raw<Record<string, string>>({});
+  /** Why the add line's last row was refused, said under the field inside its sheet, until the next press. */
+  let captureFault = $state<string | null>(null);
   let displayOpen = $state(false);
   let bindOpen = $state(false);
 
@@ -1757,10 +1763,13 @@
     if (!decl?.title) return;
     /* THE LINE EMPTIES AT ONCE, and what was typed goes back into it if the record says no. */
     capture = '';
-    void createRow(said, (back) => {
+    captureFault = null;
+    void createRow(said, (back, fix) => {
       /* WHAT WAS TYPED GOES BACK IN THE BOX, and only if nothing else has been typed since. Overwriting a
          second line somebody has already started would lose the newer one to report the older. */
       if (capture === '') capture = back;
+      /* AND WHY IS SAID IN THE SHEET, under the field (AH5): at 390 the toast sat behind the sheet, and Add looked dead. */
+      captureFault = fix;
     });
   }
 
@@ -1776,10 +1785,14 @@
    * something. `onBack` is the caller's, because the capture line and the example button put it in different
    * places.
    */
-  async function createRow(said: string, onBack: (back: string) => void, mark?: string): Promise<Entry | null> {
+  async function createRow(said: string, onBack: (back: string, fix: string) => void, mark?: string): Promise<Entry | null> {
     const was = asked;
     /* UNDER "or" NO CHIP IS SOMETHING EVERY ENTRY HERE HOLDS, so none of them is written onto a new one. */
-    const { fields } = capturedFields(id, said, either ? [] : filters, now, result.entries);
+    /* THE AMOUNT AND DAY THE LINE CARRIES ARE READ OFF IT FIRST (audit 31 Oct h, AH5): "Electricity bill 850 due 5 Nov"
+       was a bill called the whole line, refused for its amount. The words left are the title. */
+    const figures = lineFigures(id, said, now);
+    const captured = capturedFields(id, figures.text, either ? [] : filters, now, result.entries);
+    const fields = { ...captured.fields, ...figures.fields };
     /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
     const seq = -++typedSeq;
     const line = typedRows.add({ seq, fields, version: 0, created: new Date(now).toISOString(), by: '' });
@@ -1794,7 +1807,7 @@
     unline();
     if (!out.ok) {
       missed(was, out);
-      onBack(said);
+      onBack(said, out.fix);
       return null;
     }
     if (asked !== was) return null;
@@ -3261,7 +3274,10 @@
       {#if !adds && !madeByAgents}
         <p class="reach">{reachWords.readOnly(decl.name)}</p>
       {:else if !arriving}
-        <CaptureLine one={decl.one} example={captureExample} named={captureNamed} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
+        <CaptureLine one={decl.one} example={captureExample} named={captureNamed} bind:value={capture} bind:open={captureOpen} fault={captureFault} {captureRow} allFields={() => {
+          createValues = lineValues(id, capture, now);
+          createOpen = true;
+        }} />
       {/if}
 
       {#if rows.length === 0 && twice && filters.length === 0 && q === '' && result.total > 0}
@@ -3476,6 +3492,7 @@
       refused={addRefused}
       {addTypedRow}
       {closeCreate}
+      values={createValues}
     />
   {/if}
 

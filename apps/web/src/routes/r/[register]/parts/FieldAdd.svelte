@@ -27,6 +27,7 @@
     refused = null,
     addTypedRow,
     closeCreate,
+    values = {},
   }: {
     open?: boolean;
     register: string;
@@ -40,6 +41,8 @@
     refused?: { fix: string; at?: string | undefined } | null;
     addTypedRow: () => void;
     closeCreate: () => void;
+    /** What the form opens holding: the add line's words, its amount and its day, for "Fill in the rest" (AH5). */
+    values?: Readonly<Record<string, string>>;
   } = $props();
 
   let unnamed = $state<string | null>(null);
@@ -62,7 +65,7 @@
       addTypedRow();
     }}
   >
-    <RowForm {register} {refused} bind:unnamed bind:problems bind:taken />
+    {#key values}<RowForm {register} {refused} {values} bind:unnamed bind:problems bind:taken />{/key}
   </form>
   {#snippet footer()}
     <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED, which is `/decide`'s answer to the same

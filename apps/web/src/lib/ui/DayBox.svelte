@@ -15,6 +15,7 @@
 -->
 <script lang="ts">
   import { dayFrom, dayLine } from '$lib/record/field-draft.ts';
+  import { recordToday } from '$lib/record/zone.ts';
 
   let {
     value = $bindable(),
@@ -51,7 +52,8 @@
   } = $props();
 
   /* A DAY THE BOX SHOWS WHILE IT IS EMPTY, as an example of the form it reads and not as its label. */
-  const words = { example: '3 Sep 2026' } as const;
+  /* TODAY, IN THE RECORD'S OWN WORDS (audit 31 Oct h, AH5): a fixed "3 Sep 2026" read as a day two months gone. */
+  const words = { example: dayLine(recordToday()) } as const;
 
   /* READ ONCE, AS THE BOX OPENS, and Svelte is right that only the first value is captured: that is the requirement.
      Rewriting the text from the value on every key would turn `3 september 2026` into `3 Sep 2026` under the caret the
