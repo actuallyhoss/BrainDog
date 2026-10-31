@@ -98,6 +98,7 @@
     type WeekDecl,
   } from '$lib/home/default-home.ts';
   import { addedByHand, showTell, tellLists } from '$lib/home/first-today.ts';
+  import { SLIM_MOST, keepTell, lastLines, readTell, slimShown, type TellKept, type ToldLine } from '$lib/home/tell-line.ts';
   import TellOne from '$lib/home/TellOne.svelte';
   import NeedsFoot from '$lib/home/NeedsFoot.svelte';
   import { sharedFrom, type SharedOut } from '$lib/home/shared-line.ts';
@@ -257,6 +258,22 @@
   /* THE CARD, ON A RECORD WHERE NOTHING IS ADDED BY HAND YET, until it is pressed, and again once an Undo empties it. */
   const tell = $derived(first && !told && showTell(kept, prefs));
 
+  /*
+   * AND ONCE SOMETHING IS IN, THE SLIM LINE (first-hour audit AH9, the call in QUEUE.md "Audit 31 Oct h"): the same
+   * rules-only reader, so adding never spends an ask, for a week from when it was first offered here or until hidden,
+   * with what was last added said under it (AH23). Not on a record kept for long: one that holds more than a first
+   * week's worth by hand is not offered it, whatever this browser remembers.
+   */
+  let tellKept = $state<TellKept>(readTell(apiBase()));
+  $effect(() => {
+    if ((tell || first) && tellKept.from === undefined && added <= SLIM_MOST) tellKept = keepTell(apiBase(), { from: Date.now() });
+  });
+  const slim = $derived(first && !tell && added <= SLIM_MOST && slimShown(tellKept, Date.now()));
+  const lastTold = $derived(lastLines(tellKept, Date.now()));
+  function keepTold(lines: ToldLine[]) {
+    if (lines.length > 0) tellKept = keepTell(apiBase(), { last: { at: Date.now(), lines } });
+  }
+
   /* THE NEXT STEPS' OWN CODE, LOADED ON A FIRST TODAY ONLY (`want-more.ts`): it reads every use case this build ships, and
      a Today kept for months never draws a step. Asked once a first Today is known, so it lands a moment after the page.
      NOT WHERE NO STEP CAN DRAW (hidden, or more added than a first Today holds, as `steps` reads it): `first` holds on
@@ -291,7 +308,7 @@
      there). A later open learns as before, the copy first: by then the record may have moved past that read. */
   const every = everyAsked(apiBase()) && !firstDrawn();
   $effect(() => {
-    if (data.refused || (declares !== null && !tell) || !(looked || every)) return;
+    if (data.refused || (declares !== null && !tell && !slim) || !(looked || every)) return;
     const missing = data.lists.map((l) => l.id).filter((id) => REGISTERS[id] === undefined);
     /* ALL OF THEM LEARNT ALREADY: said once, so a later read of the shell does not draw Today's body again for nothing.
        AND WITH THE COPY'S PUT BACK, Today is read on them at once, and the few the copy never holds (a list of keys) are
@@ -814,7 +831,8 @@
   listen(reread, () => reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
   /** After the card's press: it goes, the next steps come, and Today's body is read again, so what it added is drawn at once. */
-  function toldOne() {
+  function toldOne(lines: ToldLine[] = []) {
+    keepTold(lines);
     pressed = true;
     void reread();
   }
@@ -1547,7 +1565,16 @@
     {#if data.live}<ClearExamples />{/if}
 
     <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
-    {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{/if}
+    {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{:else if slim}<TellOne
+        slim
+        options={tellOptions}
+        last={lastTold}
+        onadded={(lines) => {
+          keepTold(lines);
+          void reread();
+        }}
+        onhide={() => (tellKept = keepTell(apiBase(), { hidden: true }))}
+      />{/if}
 
     {#if calm && lands}
       <!--

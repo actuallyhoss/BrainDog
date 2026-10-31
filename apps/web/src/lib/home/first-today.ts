@@ -157,6 +157,9 @@ function readyOf(rows: readonly Read[]): boolean[] {
   return ok;
 }
 
+/** Where each entry one press adds sits in the preview, in the order `readyRows` sends them. */
+export const readyAt = (rows: readonly Read[]): number[] => readyOf(rows).flatMap((ok, i) => (ok ? [i] : []));
+
 /**
  * THE ENTRIES ONE PRESS CAN ADD NOW (capture-read-45's line): each with nothing missing, and none pointing (`$row`) at an
  * entry that is not ready, since the record writes a capture all or none. Each pointer is counted again over the entries
