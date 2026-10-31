@@ -44,6 +44,24 @@ export const DUE_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
+   * WHAT YOU PAID OUT IN THE LAST SEVEN DAYS, `settled-in-7d` with the direction turned round (left-h): "Paid Nadia 300
+   * for the logo" told before there is an account is kept as a bill owed by you, paid today, and Today's "Money this
+   * week" left it out, so the one payment he told was on no tile. Today draws it as its own cell, going out, and never
+   * adds it to what was paid to you. One amount per currency, as its other half.
+   */
+  'settled-out-7d': {
+    metric: 'settled-out-7d',
+    name: 'Paid by you, 7 days',
+    source: 'register.obligations',
+    where: 'state is paid, direction is owed by me, settled is set, settled after -7d, settled before +1d',
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '7d',
+    compare: 'none',
+  },
+
+  /**
    * THE WHOLE BOOK YOU OWE, AND IT WAS THE ONE FIGURE OF THE FOUR A SNAPSHOT HOLDS THAT NOTHING COMPUTED.
    *
    * `snapshots` stores `cash`, `owed_to_me`, `owed_by_me` and `net` on one row, and three of the four

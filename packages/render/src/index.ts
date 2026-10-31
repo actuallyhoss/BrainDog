@@ -293,7 +293,7 @@ export {
   type Home,
 } from './format.ts';
 /* The one writer of an amount for a screen: the stored form read, and written for exact, read and axis. */
-export { AMOUNT_SPACE, amountsIn, moneySet, moneyWhole, readAmount, readFigure, writeAmount, writeFigure, type Amount, type AmountSetting, type Figure, type WrittenAmount } from './money.ts';
+export { AMOUNT_SPACE, amountsIn, currencyOfFigure, currencyOfSign, moneySet, moneyWhole, readAmount, readFigure, writeAmount, writeFigure, type Amount, type AmountSetting, type Figure, type WrittenAmount } from './money.ts';
 /* The page lint: what a drawn page prints that a person should never read. The host draws its pages and runs it. */
 export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, type LintPage, type LintPart, type LintRule } from './lint.ts';
 /* The look sheets: fixed specimens of every chart form, the plan and the parts, drawn on one fixed day. */

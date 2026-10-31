@@ -663,3 +663,12 @@ test('A GROUP OFFERS EVERY WALK’S PAIRS AND HOLDINGS, and selling the first wa
   /* A day held by the group's shared knobs from before is not read by a walk of a group: its own key's day is. */
   assert.equal(walkKnobs(second, { knobs: { ...group.knobs, sell: '2026-10-05' }, sold: {} }, 'EGP').sell, null);
 });
+
+test('A WALK DRAWN BY ITS SIGN ALONE, OR ITS CODE AFTER, STILL KNOWS ITS CURRENCY with no home row', () => {
+  const dollars = forecastModel([['opening', '2026-09-17', 'Cash now', '$1,950'], ['sell', '', 'Bonds', 'USD 900.00'], ['sell', '', 'Gold', '£500.00'], ['spent', '3', '', '$400']])!;
+  assert.equal(dollars.currency, 'USD');
+  assert.deepEqual(dollars.sells, [{ label: 'Bonds', value: 900 }], 'one money written two ways is one money; pounds stay out');
+  assert.equal(dollars.spent, 400);
+  assert.equal(forecastModel([['opening', '2026-09-17', 'Cash now', '£1,000.00 GBP']])!.currency, 'GBP');
+  assert.equal(forecastModel([['opening', '2026-09-17', 'Cash now', '$1,950'], ['home', 'CAD', '', '']])!.currency, 'CAD');
+});

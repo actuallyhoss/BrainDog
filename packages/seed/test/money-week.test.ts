@@ -192,3 +192,13 @@ test('A RECORD WITH AN ACCOUNT READS ITS LEDGER MONEY ONCE: an invoice paid and 
   assert.equal(ledgerHalf.value, 15_000, `the Ledger half read ${ledgerHalf.value}: a reconciled payment was counted beside its invoice`);
   assert.equal((week.value ?? 0) + (ledgerHalf.value ?? 0), 105_000, 'EGP 1,050 came in this week, not 1,950');
 });
+
+test('WHAT HE PAID OUT IS ITS OWN HALF: a bill owed by him and told as paid reads in `settled-out-7d`, never in what was paid to him', async () => {
+  const k = await fresh();
+  const nadia = client(k, 'Nadia');
+  value(k.create('obligations', { what: 'Logo', party: nadia.id, direction: 'owed_by_me', amount: { amount: 30_000, currency: 'EGP' }, due: day(0), state: 'paid', settled: day(0) }, OWNER));
+  const out = read(k, 'settled-out-7d');
+  assert.equal(out.value, 30_000);
+  assert.equal(out.unit, 'EGP');
+  assert.equal(read(k, 'settled-in-7d').rows, 0, 'money he paid out was read as money paid to him');
+});

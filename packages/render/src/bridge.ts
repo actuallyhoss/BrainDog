@@ -8,7 +8,7 @@
  */
 
 import { MISSING, exponentOf, magnitudeOf, quantity } from './format.ts';
-import { readFigure, writeFigure } from './money.ts';
+import { currencyOfFigure, readFigure, writeFigure } from './money.ts';
 
 /** Two decimals at most, and no trailing zeros, so an attribute stays short and exact. */
 const at = (n: number): string => String(Math.round(n * 100) / 100);
@@ -127,7 +127,13 @@ export function bridgePlanOf(cells: readonly string[], home?: string | null): Br
   const currencies = new Set<string>();
   const values = cells.map((c) => {
     const figure = readFigure(c.trim());
-    if (!figure) return signedOf(c);
+    if (!figure) {
+      /* A SIGN ALONE STILL SAYS ITS CURRENCY (`$1,950`, as the writer draws another one), so pounds and dollars are
+         never added because neither carried a code after it. */
+      const said = currencyOfFigure(c, home);
+      if (said) currencies.add(said);
+      return signedOf(c);
+    }
     currencies.add(figure.currency);
     return Number(figure.minor) / 10 ** exponentOf(figure.currency);
   });

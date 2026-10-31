@@ -121,6 +121,38 @@ function ownSignOf(currency: string): string {
   return sign;
 }
 
+let owners: Map<string, string | null> | undefined;
+
+/**
+ * THE CURRENCY A SIGN ALONE SAYS, the inverse of the table above, or `null` when it says none for certain. Since
+ * other currencies are written by their own sign (`OTHERS_BY_SIGN`), "$1,950" on a page is the US dollar and "£1,000.00"
+ * sterling, and a reader that wanted a code after the figure lost the currency of both. On a record whose home is
+ * written by a sign, that sign is the home's first: "$" on a Canadian record is the Canadian dollar, as the writer
+ * draws it. A sign two currencies claim, or none (`E£`, `kr`), says nothing.
+ */
+export function currencyOfSign(sign: string, home: string | null): string | null {
+  const h = typeof home === 'string' && home !== '' ? home.toUpperCase() : null;
+  if (h !== null && HOME_BY_SIGN && signOf(h) !== '' && signOf(h) === sign) return h;
+  if (!OTHERS_BY_SIGN) return null;
+  if (!owners) {
+    owners = new Map();
+    let codes: string[] = [];
+    try {
+      codes = Intl.supportedValuesOf('currency');
+    } catch {
+      /* A runtime that cannot list its currencies reads no sign. */
+    }
+    for (const c of codes) {
+      /* As `writeAmount` writes another currency: by its own sign, only when it has a sign at all. */
+      const s = signOf(c) === '' ? '' : ownSignOf(c);
+      if (s !== '') owners.set(s, owners.has(s) ? null : c);
+    }
+  }
+  const owner = owners.get(sign) ?? null;
+  /* A sign that is the home's own is never another currency's alone: the writer adds that one's code after it. */
+  return owner !== null && h !== null && owner !== h && signOf(h) === sign ? null : owner;
+}
+
 /** Digits in groups of three, counted off in one pass. */
 function grouped(digits: string): string {
   const head = digits.length % 3 || 3;
@@ -195,6 +227,24 @@ export function readFigure(text: string): Figure | null {
   const minor = BigInt(`${whole.replace(/,/gu, '')}${fraction}`);
   const sign = outer || inner;
   return { minor: sign && sign !== '+' ? -minor : minor, currency, plus: sign === '+' };
+}
+
+/** A whole figure written by a sign alone, a plus or a minus on either side of it: `$1,950`, `−CA$900.00`. */
+const SIGN_ONLY = new RegExp(String.raw`^[+−-]?([A-Z]{0,2}\p{Sc})[−-]?${DIGITS}$`, 'u');
+
+/**
+ * THE CURRENCY ONE WHOLE FIGURE IS IN, or `null` when it does not say. A code says it (`readFigure`), and so does a sign
+ * alone, by the writer's own table (`currencyOfSign`): `$1,950` is the US dollar on a record with no home, the home's
+ * dollar on a Canadian one. Only the currency is read, never the amount, which `readFigure` alone reads, since a sign
+ * without its code was once any of four dollars. A reader that needs to know whether two figures are in one money asks
+ * this, not the code after the figure, which the writer no longer puts there for another currency (`OTHERS_BY_SIGN`).
+ */
+export function currencyOfFigure(text: string, home: string | null): string | null {
+  const t = text.trim();
+  const read = readFigure(t);
+  if (read) return read.currency;
+  const sign = SIGN_ONLY.exec(t)?.[1];
+  return sign ? currencyOfSign(sign, home) : null;
 }
 
 /* ---- Writing ------------------------------------------------------------------------------------------------- */

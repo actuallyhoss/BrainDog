@@ -904,7 +904,9 @@ test('MONEY TOLD BEFORE AN ACCOUNT IS ON TODAY (audit 31 Oct m, AM3): the week\'
   const keyed = (holds: Holds) => todayHome(holds).blocks.filter((b) => (b as unknown as { key?: string }).key === 'week-money') as unknown as { when?: unknown; cells?: { metric: string }[] }[];
   const told = keyed({ tasks: true, adds: true, money: true });
   assert.equal(told.length, 1);
-  assert.deepEqual(told[0]!.cells?.map((c) => c.metric), weekMoney().cells?.map((c) => c.metric));
+  /* AND WHAT HE TOLD AS PAID OUT, its own cell going out, never added to Paid. */
+  assert.deepEqual(told[0]!.cells?.map((c) => c.metric), [...(weekMoney().cells ?? []).map((c) => c.metric), 'settled-out-7d']);
+  assert.deepEqual(told[0]!.cells?.at(-1), { metric: 'settled-out-7d', label: 'Paid out', sign: 'out' });
   /* ONLY UNTIL THE FIRST ACCOUNT IS OPEN, when Cash ahead says the money, and only on a Money with the week's figures. */
   assert.deepEqual(told[0]!.when, { all: [{ metric: 'settled-in-7d', gte: -Number.MAX_SAFE_INTEGER }, { metric: 'accounts-open', is: 0 }] });
   assert.deepEqual(keyed({ tasks: true, adds: true, money: false }), [], 'no Money, no money tile');
