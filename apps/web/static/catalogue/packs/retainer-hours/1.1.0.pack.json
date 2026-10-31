@@ -1,0 +1,330 @@
+{
+  "pack": "retainer-hours",
+  "version": "1.1.0",
+  "icon": "clock",
+  "title": "Agency",
+  "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
+  "changes": "Timesheets is a place of its own in the sidebar, where it sat under Clients and the sidebar's Clients opened Timesheets. Nothing you hold changes.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <5.0.0" } },
+  "words": { "client_retainers": { "name": "Retainers", "one": "retainer" }, "timesheets": { "name": "Timesheets", "one": "timesheet" } },
+  "declarations": [
+    {
+      "register": "client_retainers",
+      "name": "Retainers",
+      "icon": "handshake",
+      "one": "retainer",
+      "holds": "what each client pays a month, the hours that buys, and the day it renews",
+      "title": "name",
+      "mobile": [ "name", "fee", "hours_bought" ],
+      "state": "state",
+      "done": [ "ended" ],
+      "pack": "retainer-hours",
+      "fields": [
+        { "id": "name", "label": "Retainer", "type": "text", "required": true, "search": true },
+        { "id": "org", "label": "Client", "type": "ref", "to": "organisations", "required": true, "index": true },
+        { "id": "fee", "label": "Fee a month", "type": "money", "required": true },
+        { "id": "hours_bought", "label": "Hours bought a month", "type": "decimal", "min": 0, "required": true },
+        { "id": "renew", "label": "Renews", "type": "day", "index": true, "deadline": true, "remind": [ "-30d", "-7d", "0d" ] },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [ "live", "paused", "ended" ],
+          "labels": { "live": "Live", "paused": "Paused", "ended": "Ended" },
+          "index": true,
+          "required": true
+        },
+        { "id": "note", "label": "Notes", "type": "text" }
+      ]
+    },
+    {
+      "register": "timesheets",
+      "name": "Timesheets",
+      "icon": "clock",
+      "one": "timesheet",
+      "holds": "who worked on which retainer, on what day, for how many hours, and whether the hours are billed",
+      "title": "what",
+      "mobile": [ "what", "who", "hours" ],
+      "pack": "retainer-hours",
+      "fields": [
+        { "id": "what", "label": "What was done", "type": "text", "required": true, "search": true },
+        { "id": "who", "label": "Person", "type": "ref", "to": "people", "required": true, "index": true },
+        { "id": "deal", "label": "Retainer", "type": "ref", "to": "client_retainers", "required": true, "index": true },
+        { "id": "day", "label": "Day", "type": "day", "required": true, "index": true },
+        { "id": "hours", "label": "Hours", "type": "decimal", "min": 0, "required": true },
+        {
+          "id": "kind",
+          "label": "Billable or not",
+          "type": "enum",
+          "values": [ "billable", "not_billable" ],
+          "labels": { "billable": "Billable", "not_billable": "Not billable" },
+          "default": "billable",
+          "index": true,
+          "required": true
+        },
+        {
+          "id": "thing",
+          "label": "Project",
+          "type": "ref",
+          "to": "things",
+          "index": true,
+          "when": { "holds": [ "things" ] }
+        }
+      ]
+    },
+    {
+      "page": "clients",
+      "title": "Clients",
+      "nav": { "section": "Clients", "order": 10 },
+      "icon": "handshake",
+      "requires": [ "register.client_retainers" ],
+      "pack": "retainer-hours",
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{retainer-income}} a month from live retainers, and {{billed-share-month}} of this month's hours billed."
+        },
+        {
+          "kind": "note",
+          "heading": "No retainer yet",
+          "icon": "handshake",
+          "span": 12,
+          "body": "Add a client's retainer, with its fee and the hours it buys a month, and how much of them this month has used shows here.",
+          "when": { "metric": "retainers-live", "lt": 1 }
+        },
+        {
+          "kind": "progress",
+          "heading": "Hours used this month",
+          "icon": "gauge",
+          "span": 12,
+          "source": "register.client_retainers",
+          "where": "state is live",
+          "columns": [ { "field": "name" }, { "field": "hours_bought" } ],
+          "toward": "hours-by-retainer-month",
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 12,
+          "when": { "metric": "retainers-live", "gt": 0 },
+          "empty": "No live retainer."
+        },
+        {
+          "kind": "table",
+          "heading": "Every retainer",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.client_retainers",
+          "columns": [
+            { "field": "name", "label": "Retainer", "width": "minmax(16ch,1fr)" },
+            { "field": "org", "label": "Client", "width": "minmax(12ch,18ch)" },
+            { "field": "fee", "label": "Fee a month", "width": "13ch", "align": "end" },
+            { "field": "hours_bought", "label": "Hours", "width": "8ch", "align": "end" },
+            { "field": "renew", "label": "Renews", "width": "15ch", "align": "end" }
+          ],
+          "order": [ { "field": "renew", "dir": "asc" } ],
+          "limit": 50,
+          "when": { "metric": "retainers-live", "gt": 0 },
+          "empty": "No retainers yet."
+        }
+      ]
+    },
+    {
+      "page": "timesheets-week",
+      "title": "Timesheets",
+      "nav": { "section": "Timesheets", "order": 10 },
+      "icon": "clock",
+      "requires": [ "register.timesheets" ],
+      "pack": "retainer-hours",
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{hours-week}} hours worked in the last seven days, by {{people-logging-week}} people."
+        },
+        {
+          "kind": "table",
+          "heading": "The last seven days",
+          "icon": "calendar",
+          "span": 12,
+          "source": "register.timesheets",
+          "where": "day after -8d",
+          "columns": [
+            { "field": "day", "label": "Day", "width": "13ch" },
+            { "field": "who", "label": "Person", "width": "minmax(12ch,16ch)" },
+            { "field": "deal", "label": "Retainer", "width": "minmax(12ch,18ch)" },
+            { "field": "what", "label": "What was done", "width": "minmax(16ch,1fr)" },
+            { "field": "hours", "label": "Hours", "width": "8ch", "align": "end" },
+            { "field": "kind", "label": "Billable or not", "width": "14ch" }
+          ],
+          "order": [ { "field": "day", "dir": "desc" } ],
+          "limit": 100,
+          "empty": "No hours logged in the last seven days."
+        },
+        {
+          "kind": "split",
+          "heading": "Hours billed this month, by person",
+          "icon": "people",
+          "span": 12,
+          "source": "metric.billed-hours-by-person-month",
+          "limit": 6,
+          "empty": "Nothing billed this month yet."
+        }
+      ]
+    },
+    {
+      "page": "retainer",
+      "title": "{{name}}",
+      "for": { "register": "client_retainers" },
+      "icon": "handshake",
+      "requires": [ "register.client_retainers", "register.timesheets" ],
+      "pack": "retainer-hours",
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{hours_bought}} hours bought a month."
+        },
+        {
+          "kind": "stat",
+          "heading": "This month",
+          "icon": "gauge",
+          "span": 12,
+          "cells": [ { "metric": "retainer-hours-month:{{name}}", "label": "Hours used" } ]
+        },
+        {
+          "kind": "table",
+          "heading": "This month's hours",
+          "icon": "clock",
+          "span": 12,
+          "source": "register.timesheets",
+          "where": "deal is {{name}}, day at least bom",
+          "columns": [
+            { "field": "day", "label": "Day", "width": "13ch" },
+            { "field": "who", "label": "Person", "width": "minmax(12ch,16ch)" },
+            { "field": "what", "label": "What was done", "width": "minmax(16ch,1fr)" },
+            { "field": "hours", "label": "Hours", "width": "8ch", "align": "end" },
+            { "field": "kind", "label": "Billable or not", "width": "14ch" }
+          ],
+          "order": [ { "field": "day", "dir": "desc" } ],
+          "limit": 50,
+          "empty": "No hours logged on {{name}} this month."
+        }
+      ]
+    },
+    {
+      "metric": "hours-by-retainer-month",
+      "name": "Hours used this month, by retainer",
+      "source": "register.timesheets",
+      "where": "day at least bom",
+      "value": { "sum": "hours" },
+      "group_by": "deal",
+      "format": "decimal",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "retainer-hours-month",
+      "name": "Hours used this month",
+      "source": "register.timesheets",
+      "where": "deal is {{it}}, day at least bom",
+      "value": { "sum": "hours" },
+      "format": "decimal",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "billed-share-month",
+      "name": "Hours billed of hours worked this month",
+      "source": "register.timesheets",
+      "where": "day at least bom",
+      "value": {
+        "ratio": {
+          "of": { "sum": { "product": [ "hours", { "lookup": "billed", "by": "kind" } ] } },
+          "per": { "sum": { "product": [ "hours", { "lookup": "worked", "by": "kind" } ] } }
+        }
+      },
+      "lookups": { "billed": { "billable": 100, "not_billable": 0 }, "worked": { "billable": 100, "not_billable": 100 } },
+      "format": "pct",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "home": 2
+    },
+    {
+      "metric": "hours-by-person-month",
+      "name": "Hours worked this month, by person",
+      "source": "register.timesheets",
+      "where": "day at least bom",
+      "value": { "sum": "hours" },
+      "group_by": "who",
+      "format": "decimal",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "billed-hours-by-person-month",
+      "name": "Hours billed this month, by person",
+      "source": "register.timesheets",
+      "where": "day at least bom, kind is billable",
+      "value": { "sum": "hours" },
+      "group_by": "who",
+      "format": "decimal",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "retainer-income",
+      "name": "Retainer income a month",
+      "source": "register.client_retainers",
+      "where": "state is live",
+      "value": { "sum": "fee" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "home": 1
+    },
+    {
+      "metric": "retainers-live",
+      "name": "Live retainers",
+      "source": "register.client_retainers",
+      "where": "state is live",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "hours-week",
+      "name": "Hours worked in the last seven days",
+      "source": "register.timesheets",
+      "where": "day after -8d",
+      "value": { "sum": "hours" },
+      "format": "decimal",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "people-logging-week",
+      "name": "People who logged hours in the last seven days",
+      "source": "register.timesheets",
+      "where": "day after -8d",
+      "value": { "distinct": "who" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    }
+  ]
+}
