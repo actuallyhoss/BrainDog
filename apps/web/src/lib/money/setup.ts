@@ -76,6 +76,34 @@ export function moneyAddons(index: CatalogueIndex | null): Addon[] {
 }
 
 /**
+ * THE THREE A STARTER IS LIKELIEST TO WANT, by its use case (audit 31 Oct h, AH32): fifteen add-ons in long paragraphs,
+ * Zakat and Savings circle among them, were a wall for a shop. These lead, each in one line, and the rest wait under
+ * More. One the store does not list is passed over.
+ */
+const LIKELY: Readonly<Record<string, readonly string[]>> = {
+  shop: ['card-alerts', 'receipts', 'count-cash'],
+  business: ['subscriptions', 'receipts', 'tax-set-aside'],
+  founder: ['subscriptions', 'tax-set-aside', 'receipts'],
+  personal: ['card-alerts', 'subscriptions', 'goals'],
+  student: ['card-alerts', 'splits', 'subscriptions'],
+  team: ['subscriptions', 'receipts', 'splits'],
+};
+const LIKELY_ANY: readonly string[] = ['card-alerts', 'subscriptions', 'receipts'];
+
+/** The add-ons split into the three a starter likeliest wants, in that order, and the rest in the store's order. */
+export function likelyFirst(addons: readonly Addon[], usecase: string | null): { first: Addon[]; more: Addon[] } {
+  const want = (usecase !== null ? LIKELY[usecase] : undefined) ?? LIKELY_ANY;
+  const first = want.flatMap((id) => addons.filter((a) => a.id === id)).slice(0, 3);
+  return { first, more: addons.filter((a) => !first.includes(a)) };
+}
+
+/** An add-on's summary as one line: its first sentence. */
+export const oneLine = (summary: string): string => {
+  const m = /^(.+?[.!?])(?:\s|$)/u.exec(summary.trim());
+  return (m?.[1] ?? summary).trim();
+};
+
+/**
  * The chosen add-ons in the order they go in: each after the ones it needs, and an add-on chosen without one it needs
  * brings that one with it, since the record would refuse it alone.
  */
@@ -126,6 +154,7 @@ export const words = {
   balance: (code: string) => `Balance today (${code})`,
   addons: 'Add-ons',
   addonsLine: 'Switch on what you keep. Each one adds its own page to Money.',
+  moreAddons: (n: number) => `More add-ons (${String(n)})`,
   installed: 'On',
   rates: 'Keep rates current',
   ratesLine: 'Fetches exchange rates once a day. You say where from next.',

@@ -20,7 +20,8 @@
   import Currency from '../../routes/start/Currency.svelte';
   import { browserCurrencyEnv, currencyChoices } from '../../routes/start/building.ts';
   import type { Ledger } from './ledger.ts';
-  import { balanceOf, SETUP_KEY, words } from './setup.ts';
+  import { balanceOf, likelyFirst, oneLine, SETUP_KEY, words, type Addon } from './setup.ts';
+  import { speakingPackNow } from '$lib/voice.svelte.ts';
   import type { Finished, SetupRead } from './setup-live.ts';
 
   let {
@@ -124,6 +125,15 @@
   }
 </script>
 
+{#snippet addonRow(a: Addon, on: boolean)}
+  <li>
+    <label class="ms-addon">
+      <input type="checkbox" checked={on || picked.includes(a.id)} disabled={on} onchange={(e) => toggle(a.id, e.currentTarget.checked)} />
+      <span class="ms-addon-text"><span class="ms-addon-name">{a.title}{#if on}<span class="ms-quiet"> · {words.installed}</span>{/if}</span><span class="ms-quiet ms-one" title={a.summary}>{oneLine(a.summary)}</span></span>
+    </label>
+  </li>
+{/snippet}
+
 <section class="ms" aria-labelledby="ms-title">
   {#if finished}
     <h2 class="ms-title" id="ms-title">{finished.left.length > 0 || finished.failed.length > 0 ? words.doneSome : words.done}</h2>
@@ -171,16 +181,9 @@
         <h3 class="ms-sub">{words.addons}</h3>
         <p class="ms-line">{words.addonsLine}</p>
         {#if read && read.addons.length > 0}
+          {@const split = likelyFirst(read.addons, speakingPackNow()?.replace(/^usecase-/u, '') ?? null)}
           <ul class="ms-addons">
-            {#each read.addons as a (a.id)}
-              {@const on = read.on.includes(a.id)}
-              <li>
-                <label class="ms-addon">
-                  <input type="checkbox" checked={on || picked.includes(a.id)} disabled={on} onchange={(e) => toggle(a.id, e.currentTarget.checked)} />
-                  <span class="ms-addon-text"><span class="ms-addon-name">{a.title}{#if on}<span class="ms-quiet"> · {words.installed}</span>{/if}</span><span class="ms-quiet">{a.summary}</span></span>
-                </label>
-              </li>
-            {/each}
+            {#each split.first as a (a.id)}{@render addonRow(a, read.on.includes(a.id))}{/each}
             <li>
               <label class="ms-addon">
                 <input type="checkbox" checked={read.rates || rates} disabled={read.rates} onchange={(e) => (rates = e.currentTarget.checked)} />
@@ -188,6 +191,14 @@
               </label>
             </li>
           </ul>
+          {#if split.more.length > 0}
+            <details class="ms-more">
+              <summary class="tap">{words.moreAddons(split.more.length)}</summary>
+              <ul class="ms-addons">
+                {#each split.more as a (a.id)}{@render addonRow(a, read.on.includes(a.id))}{/each}
+              </ul>
+            </details>
+          {/if}
         {:else if read}
           <p class="ms-line">{read.storeFix ?? words.noStore}</p>
           <div class="ms-actions"><Button href={at('/addons')}>{words.openAddons}</Button></div>
@@ -322,6 +333,20 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 400;
+  }
+
+  /* ONE LINE EACH (AH32), the whole summary on hover. */
+  .ms-one {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ms-more > summary {
+    cursor: pointer;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    padding-block: 8px;
   }
 
   .ms-left li {
