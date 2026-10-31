@@ -46,7 +46,7 @@ test('THE SOURCE IS THE ONE WHOSE FINDS LAND HERE: a bank where money is kept, m
   assert.equal(madeOffers(of('portfolio')).source.kind, 'file');
   /* MAIL IS SET UP IN SETTINGS, WHAT COMES IN; a file is brought in from /start, which answering again adds to. */
   assert.equal(madeOffers(of('money-core')).source.href, '/settings/ingest');
-  assert.equal(madeOffers([]).source.href, '/start');
+  assert.equal(madeOffers([]).source.href, '/start?more=1');
 });
 
 test('A LIST IS KNOWN BY THE PART IT PLAYS, read off its declaration and not its module', () => {
