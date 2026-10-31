@@ -333,6 +333,29 @@ export type SetupAnswer = { done: Record<string, string[]>; failed: SetupPart[];
 const SETUP_HOLDER = 'braindog:setup';
 const SETUP_KEYS = 'rows';
 const SETUP_KEYS_KEPT = 200;
+/** Where a setup keeps the stretch of the log each press wrote, as `{ from, to, actor }` (PK1). */
+const SETUP_MADE = 'made';
+const SETUP_MADE_KEPT = 20;
+
+/** One stretch of the log a setup wrote: the rowids from and to, and who it was signed by. */
+export type MadeSpan = { from: number; to: number; actor: string };
+
+/**
+ * WHAT THE MAKING WROTE, by the stretches of the log each setup press took (PK1). Arrivals said "You added 6 to
+ * Milestones" for a Guide's own plan, which the starter wrote from the sentence: a line inside one of these, by the one
+ * who pressed, is the making's and not an arrival. Held in the record, so every device and every reader agrees.
+ */
+export function madeSpans(kernel: Pick<Kernel, 'prefsOf'>): MadeSpan[] {
+  const kept = kernel.prefsOf(SETUP_HOLDER)[SETUP_MADE];
+  if (!Array.isArray(kept)) return [];
+  return kept.filter(
+    (x): x is MadeSpan => isMap(x) && Number.isSafeInteger(x.from) && Number.isSafeInteger(x.to) && typeof x.actor === 'string' && (x.from as number) <= (x.to as number),
+  );
+}
+
+/** Whether a line of the log is one the making wrote: inside a setup's stretch, by the one who pressed. */
+export const madeLine = (spans: readonly MadeSpan[], line: { rowid: number; actor: string }): boolean =>
+  spans.some((s) => line.rowid >= s.from && line.rowid <= s.to && line.actor === s.actor);
 
 /** A use case's pack starts with this, by `declare`'s own convention. */
 const USE_CASE = packIdOf('');
@@ -2112,6 +2135,8 @@ export function arranger(d: ArrangeDeps) {
     const prepared = await prepare('arrange', asked, { own: true });
     if (!prepared.ok) return prepared;
     const p = prepared.value;
+    /* THE STRETCH OF THE LOG THIS PRESS WRITES, kept when it is done, so what it made is never "you added" (PK1). */
+    const began = kernel.version();
     const packs = (isMap(p.packs) ? p.packs : {}) as { install?: string[]; enable?: string[]; disable?: string[] };
     const order = packs.install ?? [];
     const maps = (x: unknown): Body[] => (Array.isArray(x) ? x.filter(isMap) : []);
@@ -2154,6 +2179,8 @@ export function arranger(d: ArrangeDeps) {
     }
     if (isMap(p.me)) await piece('me', 'You', { me: p.me });
     await setupRows(maps(p.rows), { again: again === true, key: typeof key === 'string' ? key : null, named, labels, piece, failed, skipped });
+    const ended = kernel.version();
+    if (ended > began) kernel.setPref(SETUP_HOLDER, SETUP_MADE, [...madeSpans(kernel), { from: began + 1, to: ended, actor }].slice(-SETUP_MADE_KEPT));
     return ok({ done, failed, ...(skipped.length === 0 ? {} : { skipped }) });
   }
 

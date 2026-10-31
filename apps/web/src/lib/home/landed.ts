@@ -23,6 +23,8 @@ export type Line = {
   title: string | null;
   note: string | null;
   run_by?: { run?: string | null; agent: string; client: string | null; parent: string | null } | null | undefined;
+  /** The record says the making of this BrainDog wrote it (PK1): a starter's own rows, not an arrival. */
+  made?: true | undefined;
 };
 
 export type Landed = {
@@ -85,6 +87,8 @@ export function landedOf(
     /* A SCRIPT'S WORK IS SETUP, NOT AN ARRIVAL (audit 6f AF11): Arrivals led with "Give each plan a page and count what is
        left after each part added 2 to Plans", rows a script made out of what was already here. Activity says it. */
     if (/^script:/u.test(l.actor)) continue;
+    /* NOR IS WHAT THE MAKING WROTE (PK1): "You added 6 to Milestones" was a Guide's own plan, written from the sentence. */
+    if (l.made === true) continue;
     const name = displayName(l.title ?? '');
     if (name === '' || ULID.test(name)) continue;
     if (mine !== '' && l.actor === me && name === mine) continue;

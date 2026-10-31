@@ -163,7 +163,7 @@ import {
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
-import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
+import { arranger, carryUpdate, forgetHeld, installHeld, madeLine, madeSpans, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
 import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, waitingOn, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, nightKeeps, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
@@ -1658,6 +1658,11 @@ export type EventLine = Omit<LogLine, 'rowid'> & {
   /** The row's register and number, when the event is about a row. */
   register: string | null;
   seq: number | null;
+  /**
+   * On a line the making of this BrainDog wrote (a setup press, by the one who pressed it), so Today's Arrivals does not
+   * say a starter's own plan as "You added 6 to Milestones" (PK1). Left out on every other line.
+   */
+  made?: true;
   /** What the thing is called: a row's title, or a question. */
   title: string | null;
   /**
@@ -9500,9 +9505,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const skip = everything ? undefined : (e: LogLine): boolean => kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted));
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip, true);
     const events = lines.slice(0, NEWS);
+    /* WHAT THE MAKING WROTE IS SAID SO (PK1), read once for the page. */
+    const spans = madeSpans(kernel);
+    const marked = (line: Walked): Walked => (spans.length > 0 && madeLine(spans, line) ? { ...line, made: true } : line);
     return {
       /* AND WHO SUGGESTED, DRAFTED AND SETTLED, read once for the page (`settling.ts`). */
-      events: withSettling(sql, events).map((line) => shown(ctx, line)),
+      events: withSettling(sql, events).map((line) => shown(ctx, marked(line))),
       upTo: events[0] ? pointAt(ctx, events[0]) : null,
       sinceCapped: next !== null || lines.length > NEWS,
       byWho: byWhoOf(events, reader),

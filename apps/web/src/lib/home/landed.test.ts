@@ -111,3 +111,8 @@ test('rows a script made are its setup and not an arrival (audit 6f AF11)', () =
   const rows = landedOf([line('s', { actor: 'script:plans_from_names@v1', title: 'Halden licence' }), line('a')], lists, null, NOW);
   assert.deepEqual(rows.map((r) => r.name), ['Talabat']);
 });
+
+test("rows the making wrote are not said as added by hand (PK1)", () => {
+  const rows = landedOf([line('m', { made: true, title: 'Halden licence' }), line('a')], lists, null, NOW);
+  assert.deepEqual(rows.map((r) => r.name), ['Talabat']);
+});
