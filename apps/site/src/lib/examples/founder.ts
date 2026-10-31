@@ -30,12 +30,12 @@ Runway | 14 months | at September's costs
 
 ~~~series net | Money in and out
 Month | in: Money in | out: Money out | state
-April | USD 5,200.00 | USD 2,840.00
+Apr | USD 5,200.00 | USD 2,840.00
 May | USD 6,100.00 | USD 2,910.00
-June | USD 6,900.00 | USD 3,020.00
-July | USD 7,650.00 | USD 3,060.00
-August | USD 7,900.00 | USD 3,090.00
-September | USD 8,420.00 | USD 3,115.00 | partial
+Jun | USD 6,900.00 | USD 3,020.00
+Jul | USD 7,650.00 | USD 3,060.00
+Aug | USD 7,900.00 | USD 3,090.00
+Sep | USD 8,420.00 | USD 3,115.00 | partial
 ~~~
 
 ~~~ring | Paying customers, the goal for this quarter

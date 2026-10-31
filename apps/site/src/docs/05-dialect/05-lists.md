@@ -43,7 +43,7 @@ Where | beside the record | in its snapshots folder
 A table with real columns. The first row is the header and fixes how many columns every row has. Use it for choices side by side.
 
 ```comparison | Cloud and Cloud Plus
- | Cloud | Cloud Plus
+Meter | Cloud | Cloud Plus
 Runs a month | 15,000 | 75,000
 Requests a month | 150,000 | 750,000
 Data fetched a month | 1 GB | 5 GB
@@ -51,7 +51,7 @@ Data fetched a month | 1 GB | 5 GB
 
 ~~~code | As written
 ```comparison | Cloud and Cloud Plus
- | Cloud | Cloud Plus
+Meter | Cloud | Cloud Plus
 Runs a month | 15,000 | 75,000
 Requests a month | 150,000 | 750,000
 Data fetched a month | 1 GB | 5 GB

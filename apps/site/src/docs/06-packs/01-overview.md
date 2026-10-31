@@ -1,6 +1,6 @@
-# Packs
+# Add-ons
 
-A pack is an add-on for a record, written as one file of data: the lists it adds, the pages over them, and the figures, rules, digests and scripts that go with them. Anybody can write one, and a record installs it through the same door whether BrainDog wrote it or you did.
+An add-on (a pack, in its file and the command line) is one file of data for a record, written as one file of data: the lists it adds, the pages over them, and the figures, rules, digests and scripts that go with them. Anybody can write one, and a record installs it through the same door whether BrainDog wrote it or you did.
 
 ## BrainDog is the shell
 
@@ -8,9 +8,9 @@ The core of BrainDog knows how to keep lists, draw pages, count figures, run rul
 
 So a pack is the way to give a record a shape of its own: a set of lists and pages for one kind of work, shared as a file.
 
-## What a pack can declare
+## What an add-on can declare
 
-A pack's `declarations` are each one of a closed set of kinds, kept in `KINDS` in `packages/kernel/src/declare.ts`. The ones a pack reaches for most:
+A pack's `declarations` are each one of a closed set of kinds, listed in [The kinds](/docs/packs/kinds). The ones a pack reaches for most:
 
 ```spec | Declarations
 register | a list | its fields, their types, and which one is the title
@@ -42,7 +42,7 @@ Nothing is installed without a plan first. The record works out everything the p
 
 A pack may place its own pages in the rail. It never moves yours.
 
-## What a pack cannot do
+## What an add-on cannot do
 
 - Read a list it did not declare or require.
 - Write any row except its own example rows, which are counted on their own line in the plan.

@@ -22,7 +22,7 @@ braindog addon new bills-kit --from-page bills.dog
 braindog addon check bills-kit
 ```
 
-`pack new` writes the same folder it always does, with the add-on file made from your page in place of the blank one. The test file and the README are the ones a blank add-on starts with, so change the test to rows of your own list before you run `braindog addon test`.
+`addon new` writes the same folder it always does, with the add-on file made from your page in place of the blank one. The test file and the README are the ones a blank add-on starts with, so change the test to rows of your own list before you run `braindog addon test`.
 
 A page file holds the page and not what it reads. So the command line makes each list the page reads from what the page shows of it: the columns, the order and the filters. Read those fields before you publish, because a page does not name every field a list holds.
 

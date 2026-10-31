@@ -22,7 +22,7 @@ When a rule's steps cannot say it, a pack carries a script: a function in JavaSc
 - **`egress`** is every address it may call, each a bare `https://` origin: no path, no placeholder and nothing computed.
 - **`keys`** are the Keychain keys it may send, by label. The script never holds a key: it names the label, and the host opens the key outside the sandbox.
 - **`reads`** and **`writes`** are the lists it may read and write.
-- **`limits`** asks for time, calls and writes. The defaults and the most a declaration may ask for are `DEFAULT_LIMITS` and `CEILINGS` in `packages/script/src/index.ts`, and a declaration over a ceiling is refused rather than cut down.
+- **`limits`** asks for time, calls and writes (`cpu_ms`, `wall_ms`, `fetches`, `writes`). Without them a script gets 200 ms of CPU, 15 seconds in all, 5 calls out and 200 writes. The most a declaration may ask for is 1,000 ms of CPU, 30 seconds, 20 calls and 1,000 writes, and a declaration over that is refused rather than cut down.
 
 The code lives twice in a pack's folder: as `<name>.js`, the file you edit, and as the `source` of the declaration, which is what a record runs. Open it with a comment that says what it does, in words a person deciding whether to install it can follow.
 

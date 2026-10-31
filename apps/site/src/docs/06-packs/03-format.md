@@ -1,8 +1,8 @@
-# The pack file
+# The add-on file
 
 A pack is one file, `<id>.pack.json` or `<id>.pack.yaml`: a manifest saying what the pack is and what it needs, then its declarations and example rows. A record reads both forms through one parser, so choose whichever you would rather write.
 
-## A whole pack
+## A whole add-on
 
 This is the smallest useful pack, a list of things to do and a page of what is still open. It is the shape `braindog addon new` starts every pack in, shortened here by its `author` and `license` lines.
 
@@ -58,7 +58,7 @@ This is the smallest useful pack, a list of things to do and a page of what is s
 
 ## The manifest
 
-The top of the file says what the pack is. Its keys are the ones `MANIFEST_KEYS` names in `packages/declare/src/catalogue.ts`; a record passes over any other key, and the Kennel refuses it.
+The top of the file says what the pack is. Its keys are the ones listed below; a record passes over any other key, and the Kennel refuses it.
 
 - `pack` and `version`: the id a record holds the pack under, and its version as three numbers.
 - `title` and `summary`: what a person sees when browsing, and in the plan before installing.
