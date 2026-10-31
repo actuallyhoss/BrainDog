@@ -772,7 +772,8 @@ async function serve(): Promise<void> {
     delivers: notices ? ['notify.webhook', 'notify.email', 'erase.r2'] : ['notify.webhook', 'erase.r2'],
     deliver: (job, keys) => (job.kind === 'notify.email' && notices ? notices(job) : webhooks(job, keys)),
     /* SIGN-IN LINKS, AN INVITATION'S PROOF AND THE PASSKEY NOTICES go out the same way, and `start` turns links on with it. */
-    ...(send ? { mail: authMail(send, say) } : {}),
+    /* AND ONE THAT FAILS IS A FAULT ON HEALTH (PK4), told to the record once it is open. */
+    ...(send ? { mail: authMail(send, say, { failed: (error) => running.api.kernel.mailFailed(error), sent: () => running.api.kernel.mailSent() }) } : {}),
     /* AND MAIL THIS HOST CANNOT SEND IS SAID ONCE rather than left to wait unseen. The jobs stay queued, where dropping
        them would lose the digest somebody was promised; `start` says nothing when `notify.email` is delivered. */
     unsentMail: (waiting) =>

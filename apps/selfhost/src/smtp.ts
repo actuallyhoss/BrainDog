@@ -340,15 +340,32 @@ export function letterOf(kind: SignInMailKind | undefined, link: string): { subj
   };
 }
 
+/** Where a mail that went out or failed is told to the record, so Health says it (PK4). */
+export type MailFault = { failed: (error: string) => void; sent: () => void };
+
 /**
  * What the auth door calls to mail a person: called and not awaited, so a known and an unknown address answer in the same
- * time, and it never throws. A send that fails is said in one line that names the kind and never the address or the link.
+ * time, and it never throws. A send that fails is said in one line that names the kind and never the address or the link,
+ * AND RAISED ON HEALTH (`fault`, PK4): it was the server log alone, where neither the person waiting for the link nor the
+ * owner looked. The next mail that goes out clears it.
  */
-export function authMail(send: SendLetter, say: (line: string) => void): (to: string, link: string, kind?: SignInMailKind) => void {
+export function authMail(send: SendLetter, say: (line: string) => void, fault?: MailFault): (to: string, link: string, kind?: SignInMailKind) => void {
+  const told = (f: () => void): void => {
+    try {
+      f();
+    } catch {
+      /* The record is not open yet or refused: the log line still says it. */
+    }
+  };
   return (to, link, kind) => {
     const letter = letterOf(kind, link);
-    void send({ to, ...letter }).catch((e: unknown) =>
-      say(`braindog · a ${kind ?? 'sign-in'} mail was not sent: ${e instanceof Error ? e.message : 'the mail server did not take it'}`),
+    void send({ to, ...letter }).then(
+      () => fault && told(fault.sent),
+      (e: unknown) => {
+        const why = e instanceof Error ? e.message : 'the mail server did not take it';
+        say(`braindog · a ${kind ?? 'sign-in'} mail was not sent: ${why}`);
+        if (fault) told(() => fault.failed(`a ${kind ?? 'sign-in'} mail was not sent: ${why}`));
+      },
     );
   };
 }
