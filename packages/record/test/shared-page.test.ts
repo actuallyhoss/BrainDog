@@ -534,3 +534,63 @@ test('RF5: WITH MONEY OFF, A MONEY FIGURE THAT IS NOT IN A CURRENCY GOES TOO: ho
   const stat = off.blocks.find((b) => b.kind === 'stat') as { readings?: unknown[] } | undefined;
   assert.equal(stat?.readings?.length ?? 0, 0);
 });
+
+test('SC1: A PROJECTS PAGE\'S CARDS REACH A LINK without the column that reads the runs, and without the card\'s mark or hue', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  sql.exec(
+    "INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, 'rec_1', 'studio', 'Studio', 'en-GB', 'Europe/London', 1, '2026-10-01T00:00:00.000Z')",
+  );
+  const THINGS = {
+    id: 'register.things',
+    kind: 'register',
+    body: {
+      id: 'things',
+      name: 'Projects',
+      title: 'name',
+      fields: [
+        { id: 'name', type: 'text', required: true },
+        { id: 'mark', type: 'text' },
+        { id: 'hue', type: 'int' },
+        { id: 'health', type: 'enum', values: ['on_track', 'at_risk'], labels: { on_track: 'On track', at_risk: 'At risk' } },
+        { id: 'revenue', label: 'Earned in a year', type: 'money' },
+      ],
+    },
+  } as never;
+  /* THE CARDS AS PROJECTS DRAWS THEM: "Worked on" is `project-worked`, which reads the runs and names the whole record. */
+  const PROJECTS = page('portfolio', [
+    {
+      kind: 'cards',
+      heading: 'In play',
+      source: 'register.things',
+      columns: [
+        { field: 'name', as: 'title' },
+        { field: 'mark', as: 'mark' },
+        { field: 'hue', as: 'hue' },
+        { field: 'health', label: '', as: 'fact' },
+        { field: 'revenue', as: 'fact' },
+        { metric: 'project-worked:{{name}}', as: 'when', label: 'Worked on' },
+      ],
+    },
+  ], ['register.things']);
+  value(await api.kernel.install([THINGS, PROJECTS]));
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  value(api.kernel.create('things', { name: 'Kiln', mark: 'tag', hue: 265, health: 'at_risk', revenue: { amount: 1_840_000, currency: 'GBP' } }, { actor: 'p_owner' }));
+  const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
+  for (const money of [false, true]) {
+    const { id } = value<{ id: string }>(await direct.openShare({ slug: 'portfolio', money }, owner));
+    const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'portfolio')));
+    assert.equal(shown.empty, null, `the cards never reached a link made with money ${String(money)}`);
+    const cards = shown.blocks.find((b) => b.kind === 'cards') as { columns: { field: string }[]; rows: Row[]; whens?: unknown; trends?: unknown } | undefined;
+    assert.ok(cards);
+    assert.deepEqual(cards.columns.map((c) => c.field), money ? ['name', 'health', 'revenue'] : ['name', 'health']);
+    assert.equal(cards.rows[0]?.cells.name?.value, 'Kiln');
+    assert.equal(cards.whens, undefined);
+    const said = JSON.stringify(shown.blocks);
+    assert.doesNotMatch(said, /"tag"|265|Worked on/u);
+    if (money) assert.match(said, /"currency":"GBP"/u);
+    else assert.doesNotMatch(said, /GBP|18,400|1840000/u);
+  }
+  sql.close();
+});
