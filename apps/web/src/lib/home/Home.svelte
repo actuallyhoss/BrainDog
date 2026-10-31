@@ -57,6 +57,7 @@
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase, at as inApp } from '$lib/at.ts';
+  import { madeOf } from '$lib/home/made-counts.ts';
   import { stillShown, type WidgetSize } from 'braindog-render';
   import { recordToday, recordZone } from '$lib/record/zone.ts';
   import { partsOf } from '$lib/shell/headline.ts';
@@ -224,7 +225,9 @@
   });
   /** The device's own preferences: whether the next steps are hidden, and how her work arrives. Read again on Hide. */
   let prefs = $state(readPref());
-  const added = $derived(addedByHand(kept, prefs.madeWith));
+  /* WHAT THE MAKING WROTE, which is not added by hand (AH19, `made-counts.ts`). */
+  const madeWith = madeOf(apiBase());
+  const added = $derived(addedByHand(kept, madeWith));
   /** The card was pressed here: it goes at once and the next steps take its place, before `boot` counts what it added. */
   let pressed = $state(false);
   /**
@@ -252,7 +255,7 @@
   const first = $derived(!data.refused && data.lists.length > 0 && landing(data) === null && may(data, 'append'));
 
   /* THE CARD, ON A RECORD WHERE NOTHING IS ADDED BY HAND YET, until it is pressed, and again once an Undo empties it. */
-  const tell = $derived(first && !told && showTell(kept, prefs));
+  const tell = $derived(first && !told && showTell(kept, { ...prefs, madeWith }));
 
   /* THE NEXT STEPS' OWN CODE, LOADED ON A FIRST TODAY ONLY (`want-more.ts`): it reads every use case this build ships, and
      a Today kept for months never draws a step. Asked once a first Today is known, so it lands a moment after the page.
@@ -269,7 +272,7 @@
   const steps = $derived.by(() => {
     if (!first || prefs.nextStepsHidden === true || added > FIRST_TODAY_MOST) return [];
     if (nextSteps === null) return [];
-    return told ? nextSteps.madeSteps(kept.registers, prefs.arrivesBy) : nextSteps.wantMore(kept, prefs);
+    return told ? nextSteps.madeSteps(kept.registers, prefs.arrivesBy) : nextSteps.wantMore(kept, { ...prefs, madeWith });
   });
 
   /**

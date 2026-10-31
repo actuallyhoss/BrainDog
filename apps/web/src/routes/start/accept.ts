@@ -28,6 +28,8 @@ import { moduleName } from '@braindog/seed/usecases/names';
 
 import { firstRun } from '../../lib/first-run.ts';
 import { write as writePref } from '../../lib/pref.ts';
+import { apiBase } from '../../lib/at.ts';
+import { keepMade } from '../../lib/home/made-counts.ts';
 import { packDocument, relabelDocument, type PackState } from '../../lib/record/packs.ts';
 import { fileDrafted, type Drafted, type SlashClient } from '../../lib/record/slash.ts';
 import { withOrder } from '../../lib/nav.ts';
@@ -437,7 +439,7 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   /* WHAT THE MAKING WROTE, COUNTED ONCE IT IS IN (AH19): a Guide's plan is the starter's, not something the person added,
      so Today still offers to tell it one real thing. Before the file, which the person brought. */
   const made = await madeCounts(client);
-  if (made !== null) writePref({ madeWith: made });
+  if (made !== null) keepMade(apiBase(), made);
 
   /* THE FILE THEY POINTED AT, LAST, once the list it maps into is there. In the currency the preview drew it in: the one
      chosen for Money, or the one typed where Money is not kept. */

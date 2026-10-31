@@ -119,12 +119,6 @@ export type Pref = {
    */
   arrivesBy?: 'messages' | 'app' | 'in-person' | undefined;
   /**
-   * How many entries each list held the moment the first run made the BrainDog, by list id, kept by its accept (AH19):
-   * a Guide's plan, written by the starter from the sentence, is not something the person added, so Today still opens on
-   * telling it one real thing. `undefined` counts every entry, as before.
-   */
-  madeWith?: Record<string, number> | undefined;
-  /**
    * The instant you last marked the activity feed read.
    *
    * "SINCE YOU WERE AWAY" NEVER ADVANCED. Home's feed reads a module constant and nothing anywhere
@@ -232,7 +226,6 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   suggestPages: (v) => typeof v === 'boolean',
   nextStepsHidden: (v) => typeof v === 'boolean',
   arrivesBy: (v) => v === 'messages' || v === 'app' || v === 'in-person',
-  madeWith: (v) => typeof v === 'object' && v !== null && !Array.isArray(v) && Object.values(v).every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0),
   seen: (v) => typeof v === 'string',
   nav: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   defined: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),

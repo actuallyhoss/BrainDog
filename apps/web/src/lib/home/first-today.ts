@@ -23,7 +23,10 @@ import type { TellList } from '../tell/read.ts';
 export type Holds = Pick<Boot, 'registers'>;
 
 /** What these read of the device's preferences: whether the next steps are hidden, and how work arrives. */
-export type Said = Pick<Pref, 'nextStepsHidden' | 'arrivesBy' | 'madeWith'>;
+export type Said = Pick<Pref, 'nextStepsHidden' | 'arrivesBy'> & {
+  /** What the making wrote, by list id (`made-counts.ts`): not added by hand. */
+  madeWith?: Readonly<Record<string, number>> | undefined;
+};
 
 /**
  * How many entries a person has put in, across every list.

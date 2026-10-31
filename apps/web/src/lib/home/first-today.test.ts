@@ -209,3 +209,11 @@ test('THE LISTS CARRY THEIR COUNT, so an account held is known before its name i
   const b = { registers: [{ id: 'accounts', name: 'Accounts', count: 2 }, { id: 'people', name: 'People', count: 0 }] };
   assert.deepEqual(tellLists(b, { accounts: decl('accounts'), people: decl('people') }).map((l) => [l.id, l.count]), [['accounts', 2], ['people', 0]]);
 });
+
+test('WHAT THE MAKING WROTE IS NOT ADDED BY HAND, so a Guide still offers Tell (AH19)', () => {
+  const boot = { registers: [{ id: 'milestones', name: 'Milestones', count: 6 }, { id: 'steps', name: 'Steps', count: 5 }] } as Parameters<typeof addedByHand>[0];
+  assert.equal(addedByHand(boot), 11);
+  assert.equal(addedByHand(boot, { milestones: 6, steps: 5 }), 0);
+  assert.equal(showTell(boot, { madeWith: { milestones: 6, steps: 5 } }), true);
+  assert.equal(addedByHand({ registers: [{ id: 'steps', name: 'Steps', count: 6 }] } as Parameters<typeof addedByHand>[0], { steps: 5 }), 1);
+});
