@@ -602,6 +602,16 @@
   }
 
   @media (width >= 900px) {
+    /* A HEAD WITH NO NAME OF ITS OWN SCROLLS WITH THE PAGE (AG22). Its name is the bar's, so stuck it was a band of
+       board colour holding Share and More over the tiles passing under it, which read as grey covering the page. */
+    .page-head:is([data-headless], [data-titled]) {
+      position: relative;
+    }
+
+    .page-head:is([data-headless], [data-titled])::before {
+      display: none;
+    }
+
     .page-head[data-under] .page-name,
     .page-head[data-under] .count {
       opacity: 0;
