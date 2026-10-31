@@ -231,17 +231,18 @@
     {:else if made}
       <p class="once" id="{ids}once">{words.shareOnce}</p>
       <label class="share-label" for="{ids}link">{words.shareLinkLabel}</label>
-      <!-- A TEXTAREA AND NOT AN INPUT, so a link longer than the sheet wraps and can be read whole at 390px. Read only,
-           and selected on focus, so a long press or a click takes all of it. -->
-      <textarea
+      <!-- ONE LINE THAT SCROLLS (AH29): three wrapped lines of token cut the link mid-line at 390. Read only, and
+           selected on focus, so a long press or a click takes all of it; Copy the link is the press it is here for. -->
+      <input
         class="share-link"
         id="{ids}link"
+        type="text"
         readonly
-        rows="3"
         spellcheck="false"
+        autocomplete="off"
         aria-describedby="{ids}once"
         value={made.link}
-        onfocus={(e) => e.currentTarget.select()}></textarea>
+        onfocus={(e) => e.currentTarget.select()} />
       <div class="share-actions">
         <Button weight="primary" onclick={() => made && void put(made.link, words.shareLinkLabel, words.shareCopied)}>
           <Icon name="copy" size="s" />
@@ -381,12 +382,13 @@
     font-weight: 500;
   }
 
-  /* The link wraps anywhere: a token has no spaces to break at, and a sideways scroll inside a sheet on a phone hides
-     the half that matters. */
-  /* A FIELD: the `--tile-2` fill with no border, radius 8, as `controls.css` draws `.field`. */
+  /* A FIELD ON ONE LINE: the `--tile-2` fill with no border, radius 8, as `controls.css` draws `.field`; the link scrolls
+     inside it, and Copy the link takes it whole. */
   .share-link {
+    box-sizing: border-box;
     inline-size: 100%;
-    min-block-size: 40px;
+    min-inline-size: 0;
+    min-block-size: var(--tap);
     padding: var(--sp-2) var(--sp-3);
     background: var(--tile-2);
     border: 0;
@@ -394,9 +396,7 @@
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
-    overflow-wrap: anywhere;
-    word-break: break-all;
-    resize: none;
+    text-overflow: ellipsis;
   }
 
   .share-actions {

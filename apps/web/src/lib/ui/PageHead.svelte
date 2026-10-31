@@ -943,7 +943,9 @@
     /* A BUTTON WITH A GLYPH IS THE GLYPH ALONE, in a 44px square, and the page's primary is red with a white glyph: its
        words stay in it at no size, so they are still its name to a screen reader. A page's "+" and "⋯" take the same
        square, one size with the search button and the face in the bar above (motion F17). */
-    .head-actions :global(.btn:has(.icon)) {
+    /* NEVER INSIDE A SHEET THE HEAD HOLDS (AH29): Share's sheet is a child of this row, and its Copy the link was a
+       red bar with the glyph alone. */
+    .head-actions :global(.btn:has(.icon):not(dialog *)) {
       inline-size: var(--tap);
       min-inline-size: var(--tap);
       min-block-size: var(--tap);
@@ -959,13 +961,13 @@
     /* THE PAGE'S "+" IS A STEP SMALLER THAN THE BAR'S SQUARES: 36 with its 16px glyph, its
        hit box still the 44 of `.tap`. A red 44 square beside the title was the loudest thing on the phone's first
        screen, louder than the sentence that says what the page holds. */
-    .head-actions :global(.btn[data-weight='primary']:has(.icon)) {
+    .head-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *)) {
       inline-size: 36px;
       min-inline-size: 36px;
       min-block-size: 36px;
     }
 
-    .head-actions :global(.btn[data-weight='primary']:has(.icon) .icon[data-size]) {
+    .head-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *) .icon[data-size]) {
       inline-size: var(--icon-m);
       block-size: var(--icon-m);
     }
@@ -977,7 +979,7 @@
 
     /* A QUIET GLYPH AND THE PAGE'S "⋯" ARE ONE PAIR, drawn as the bar's search button is: a bare 44 square, a 20px
        glyph in the ink, no fill. Share was a white tile with a 16px glyph beside a bare 32px "⋯" (Kiln at 390). */
-    .head-actions :global(.btn:has(.icon):is([data-weight='quiet'], [data-weight='glass'])),
+    .head-actions :global(.btn:has(.icon):is([data-weight='quiet'], [data-weight='glass']):not(dialog *)),
     .head-actions :global(.head-more) {
       background: none;
       color: var(--ink);
