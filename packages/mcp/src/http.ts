@@ -19,7 +19,8 @@
  *   6. Not JSON: 400, -32700.
  *   7. The headers that mirror the body, against the body: 400, -32022 or -32020.
  *   8. `handle`, with the context carrying `params._meta.session` and the client's own name and version, which the
- *      2026-07-28 revision sends on every request. A notification is 202 with no body.
+ *      2026-07-28 revision sends on every request. A notification is 202 with no body. A method it does not have is
+ *      its -32601 on a 200, never a 404, which a client reads as the endpoint gone (D38).
  *
  * `no-store` ON EVERY ANSWER: the URL does not name the record, so a cache keyed on it would hand one
  * caller's answer to another.
@@ -210,15 +211,18 @@ function saidOf(meta: Record<string, unknown>): unknown {
 }
 
 /**
- * The HTTP status a reply travels under. A result is 200. A message the transport could not accept is 400;
- * a method this server does not have is 404, as the 2026-07-28 binding asks; a throw is 500. A refusal of
- * the call itself is 200, because it is a result the model reads.
+ * The HTTP status a reply travels under. A result is 200. A message the transport could not accept is 400; a throw is
+ * 500. A refusal of the call itself is 200, because it is a result the model reads.
+ *
+ * A METHOD THIS SERVER DOES NOT HAVE IS 200 WITH ITS -32601 (D38). It was 404, as the 2026-07-28 binding asked, but in
+ * Streamable HTTP a 404 on the endpoint reads as "the session or the endpoint is gone", and some clients start over or
+ * give up on the whole server over one method they probed for. The JSON-RPC error says what it is; an HTTP method the
+ * endpoint does not take is still 405 with `Allow: POST` (`gate`).
  */
 function statusOf(reply: Reply): number {
   if (!('error' in reply)) return 200;
   const n = reply.error.code;
   if (n === RPC.parse || n === RPC.invalid) return 400;
-  if (n === RPC.method) return 404;
   return n === RPC.internal ? 500 : 200;
 }
 

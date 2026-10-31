@@ -2035,6 +2035,25 @@
     text-wrap: pretty;
   }
 
+  /* AT THE BOARD'S SHORTEST ROW (a laptop window about 1280 wide, his call of 23 Oct): the row is 164 tall and the frame
+     under the tile's name 80, where "Cash now" over its figure over two lines of how long it lasts took 104 and the last
+     line was cut. Here the label stands on its figure's line, so the note keeps both its lines whole and no row grows;
+     a figure too wide to stand beside it wraps back under it, never cut. Today's own short labels hold the side
+     figures to one line each (`words.ts` `comingIn`, `goingOut`). Four columns only: a phone's row is its own. */
+  @container board (max-width: 1150px) {
+    .body[data-board] :global(.board:not([data-cols='2']) .block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child) {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      column-gap: var(--sp-2);
+      row-gap: var(--sp-1);
+    }
+
+    .body[data-board] :global(.board:not([data-cols='2']) .block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child .cell-note) {
+      flex-basis: 100%;
+    }
+  }
+
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
     margin-block-start: var(--sp-1);
   }

@@ -658,8 +658,9 @@ bearer first, as it does for `/api`, and passes the context it built, or `null` 
 step that fails answers and stops. Every step before the bearer reads only the request line and the headers, so a
 stranger's body is never parsed.
 
-1. **Method.** Not `POST`: `405`, `Allow: POST`. There is no `GET` stream and no `DELETE`, because the server keeps no
-   session (10 §1).
+1. **Method.** Not `POST`: `405`, `Allow: POST`, and one sentence (`ROUTE_UNKNOWN`, the code every other door answers a
+   method with). There is no `GET` stream and no `DELETE`, because the server keeps no session (10 §1). Never `404`,
+   which a Streamable HTTP client reads as the session or the endpoint gone (D38).
 2. **Origin.** Any `Origin` header: `403`. Only a browser page sends one, no page is served this endpoint, and there
    is no CORS.
 3. **Content type.** Not `application/json`, parameters ignored: `415`.
@@ -679,7 +680,9 @@ stranger's body is never parsed.
    puts what passes on the context. A hint that fails is dropped, and the call goes through.
 9. **`handle`** (§4.1). A notification is `202` with an empty body.
 10. **Status.** A result is `200`, and so is a refusal of the call, because it is a result the model reads. `-32700`
-    and `-32600` are `400`; `-32601` is `404`, as the 2026-07-28 binding asks; `-32603` is `500`.
+    and `-32600` are `400`; `-32603` is `500`. `-32601`, a method this server does not have, is `200` with its JSON-RPC
+    error (D38): the 2026-07-28 binding asked for `404`, but a client that probes for an optional method and gets a
+    `404` on the endpoint reads it as the endpoint gone, and starts over or gives up.
 
 `Cache-Control: no-store` and `X-Content-Type-Options: nosniff` are on every answer, because the URL does not name the
 record, and a cache keyed on it would hand one caller's answer to another. No session id is minted or echoed, and
@@ -878,7 +881,7 @@ code is relayed from the record unchanged.
 |---|---|---|---|
 | `-32700` | 400 | the body is not JSON | none |
 | `-32600` | 400 | not an object; an array; `jsonrpc` other than `'2.0'`; an `id` of the wrong type (§4.1) | none |
-| `-32601` | 404 | a `method` outside the nine of `METHODS` | `{ allowed }` |
+| `-32601` | 200 | a `method` outside the nine of `METHODS`; never `404`, which reads as the endpoint gone (D38) | `{ allowed }` |
 | `-32602` | 200 | `params` that is not an object; `tools/call` with no `name`, or with `arguments` that is not an object; `resources/read` with no `uri`; `initialize` naming a version older than every one in `VERSIONS` | `{ allowed }` for a missing tool name; `{ supported, requested }` for the version |
 | `-32002` | 200 | a resource that is not there, or that the record refused | `{ refusal }` for a refusal |
 | `-32020` | 400 | a mirrored header that disagrees with the body, or one a 2026-07-28 request left out (§5.1 step 7) | none |
@@ -886,7 +889,8 @@ code is relayed from the record unchanged.
 | `-32001` | 401 | the host knows no caller | none; `message: 'UNAUTHORIZED'` and nothing else (12 §8) |
 | `-32603` | 500 | anything thrown below the dispatch | `{ ref }`, a UUID the log line carries; `message: 'internal'` |
 
-Plus the HTTP answers with an empty body: `405` (not `POST`), `403` (an `Origin`), `413` (over `maxBodyBytes`) and
+Plus the HTTP answers outside JSON-RPC: `405` (not `POST`), with `Allow: POST` and a one-sentence `ROUTE_UNKNOWN`
+refusal for whoever opened the address; and, with an empty body, `403` (an `Origin`), `413` (over `maxBodyBytes`) and
 `415` (not JSON), and `202` for a notification. An unknown tool is not a protocol error. It is an error result
 carrying `ROUTE_UNKNOWN`, with the sixteen in `allowed` (§4.4), because a result is what the model reads to correct
 the call.
@@ -1036,7 +1040,7 @@ and each case is named for what it holds.
 | `packages/mcp/test/automations.test.ts` | `braindog:automation/<id>` answers the definition and its runs; a rule change's `propose` answers with its dry run and writes nothing; the dry run's path for every trigger, and what it says of a step that waits; a body nested past any ceiling is refused; `braindog:automations` lists every rule; `automationRun` and `cancelRun` are an owner's; `braindog:grammar/automations` is listed for any reader, its numbers are the kernel's, and every example in it installs and dry-runs; no tool was added |
 | `packages/mcp/test/script.test.ts` | `braindog:grammar/script` is listed, read and asked before it is offered; its numbers are the sandbox's and the kernel's; its header is the kernel's and both examples install; a script filed through `propose` carries the record's calls-out line |
 | `packages/mcp/test/script-try.test.ts` | a trial writes nothing and is counted as one run; a held one starts nothing; a caller given no keys has none opened and one given keys has them opened by label and scrubbed; `pin` before any socket; the reads are the caller's; `scriptTry` routed as READ+ and a POST; a sandbox that throws is the host's; a script change without `try` is filed and never run, and with it is tried and filed nowhere; `try` refused on anything else; end to end on a real record, no row written and nothing waiting in Decide |
-| `packages/mcp/test/http.test.ts` | `serveMcp` in §5.1's order: 405 with `Allow: POST`; 403 for any `Origin`; 415; 401 before a byte of the body; 413 on the claim and on the bytes; 400 with `-32700` for bytes that are not JSON or not UTF-8, and `-32600` for a batch; 202 for a notification; no session minted, and one a client sends ignored; 404 for a method this server does not have; the mirrored headers held to the body, required of a 2026-07-28 request and not of an older one; `-32022` for an unsupported version, `initialize` exempt; 500 for a throw; `no-store` on every answer, and no CORS or session header |
+| `packages/mcp/test/http.test.ts` | `serveMcp` in §5.1's order: 405 with `Allow: POST`; 403 for any `Origin`; 415; 401 before a byte of the body; 413 on the claim and on the bytes; 400 with `-32700` for bytes that are not JSON or not UTF-8, and `-32600` for a batch; 202 for a notification; no session minted, and one a client sends ignored; -32601 on a 200 for a method this server does not have (D38); the mirrored headers held to the body, required of a 2026-07-28 request and not of an older one; `-32022` for an unsupported version, `initialize` exempt; 500 for a throw; `no-store` on every answer, and no CORS or session header |
 | `packages/mcp/test/budget.test.ts` | §5.8's estimator on its worked examples, the ceilings of §7, plain ASCII in everything a client shows a model, and money shifted by its currency's decimals (§5.9) |
 | `apps/cli/test/stdio.test.ts` | `braindog mcp` spawned against a stub `/api`. `initialize` and `tools/list` answer without touching the host. A list call carries the bearer and the session headers, and `get` of a figure's id goes to `/api/metric`. The token comes from the hosts file when the environment has none. A line that is not JSON is a parse error, and the server keeps serving. A host that does not answer, or has nothing listening, gets the unreachable sentence. Calls in flight are answered when stdin ends. A startup failure is one line on stderr. The token is never printed |
 | `apps/cli/test/http.test.ts` | the hosts file, its path and its whole-file write; where the host and the token come from; the budget from `BRAINDOG_TIMEOUT_MS`; the bearer and the session headers on a request; no redirect followed; a header outside its grammar dropped |
@@ -1159,7 +1163,7 @@ the documents that still cite the earlier decision.
 | D9 | **Types.** `McpSurface<C>` is structural, `Result` and `refused` come from `@braindog/ports`, and `src/` imports nothing of the record, so the same tools run in process and over `@braindog/client` | `index.ts` |
 | D10 | **Resources** are `braindog:<path>`, split and never resolved: the fixed addresses of `RESOURCES` and the templates of `TEMPLATES`, each fixed address and each figure read before it is listed, with the ttl of §4.7. `decisions` is `governance({ register: 'suggestion' })`; the script and automation grammars are this package's text behind `version()` | `index.ts` |
 | D11 | **No refusal list.** A KEYCHAIN, JOBS or ADMIN method name is `ROUTE_UNKNOWN` like any other name that is not a tool, and the record refuses every token at those groups (§6.2) | `index.ts`, `call` |
-| D12 | **Transport shape.** stdio and `POST /mcp` around one `handle`. Over HTTP: `POST` only, no `Origin`, JSON only, a bearer before the body, 1 MB, and the mirrored headers held to the body; a notification is 202 and `-32601` is 404; `no-store` and `nosniff` on every answer; no session id, and nothing streamed (§5.1) | `http.ts`, `apps/cli/src/stdio.ts` |
+| D12 | **Transport shape.** stdio and `POST /mcp` around one `handle`. Over HTTP: `POST` only, no `Origin`, JSON only, a bearer before the body, 1 MB, and the mirrored headers held to the body; a notification is 202, an HTTP method other than `POST` is 405 with `Allow: POST`, and `-32601` is 200 with its error, never 404 (D38); `no-store` and `nosniff` on every answer; no session id, and nothing streamed (§5.1) | `http.ts`, `apps/cli/src/stdio.ts` |
 | D13 | **There is no handler factory.** An earlier revision specified `createMcpHandler(api, opts)`. The code has `handle(message, surface, ctx)`, which both transports share, and `serveMcp(request, surface, ctx, options)`, to which a host passes the record's API after the bearer check `/api` uses, or `null` for a caller it does not know | `rpc.ts`, `http.ts`, both hosts |
 | D14 | **`cacheScope` is `private` for anything a record answers, and `public` only for `server/discover`**, the two values the MCP specification allows. `tools/list`, both resource lists, `resources/read` and `prompts/list` carry `private` | `rpc.ts` |
 | D15 | **Versions.** `initialize` answers the version asked for, or the newest this server speaks below it, or the newest of all when none is named, and refuses a date older than all three with `-32602` and the list (§4.1). Over HTTP, a request other than `initialize` that names a version this server does not speak is `-32022` | `rpc.ts`, `negotiate`; `http.ts` |

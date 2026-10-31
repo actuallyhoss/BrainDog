@@ -40,6 +40,9 @@ export const words = {
   picture: 'Its picture is drawn from its own pages when BrainDog approves it, from made-up examples. Nothing of yours is in it.',
   publish: 'Publish to the store',
   publishing: 'Publishing',
+  /* SAID ONCE, beside the press: an explicit sign-out takes the signing key off this browser (`author-key-forget.ts`). */
+  keyAfterSignOut:
+    'What you publish is signed with a key this browser keeps for you. Signing out removes it, and your next publish here makes a new one. The store takes an update only with the key that signed the add-on before, so send updates before you sign out.',
   keeps: 'Rows, keys and anything you keep in it never go. A person who installs it is asked first, and sees what it will add.',
   /* SKILLS: the text of a skill goes with the add-on when ticked, is read by whoever reviews it, and is shown by name to
      whoever installs it, who is asked first. */
