@@ -730,15 +730,40 @@ function unrefusedCases<A extends ReturnType<typeof arrangeTurns>>(a: A, no: (sp
  */
 export const caseWords = (u: UseCase, names?: Readonly<Record<string, string>>): string[] => [u.title, ...caseLists(u).map((l) => names?.[l.id] ?? u.labels[l.id] ?? l.name)];
 
+/* THE WORDS FOR MONEY AND FOR GOALS A USE CASE LISTENS FOR, each said as the place it makes (first-hour audit AH21: Sam's
+   "bills", "budget" and "marathon" were all "Savings goals, Goals, Log, Put by and Project steps"). */
+const MONEY_SAID = /^(?:my money|money|personal finance|finances|budgets?|budgeting|spending|bills?|rent|pay ?day|debts?|groceries|household)$/iu;
+const GOAL_SAID = /^(?:habits?|goals?|my goals|running|gym|fitness|marathon|training for|diet|reading more)$/iu;
+
+/** A list's id and what it points at, read off the use case's own declaration. */
+const pointsAt = (u: UseCase, id: string): string[] => {
+  const d = ((u.pack?.declarations ?? []) as { register?: unknown; fields?: unknown }[]).find((x) => x.register === id);
+  return Array.isArray(d?.fields) ? (d.fields as { type?: unknown; to?: unknown }[]).flatMap((f) => (f.type === 'ref' && typeof f.to === 'string' ? [f.to] : [])) : [];
+};
+
 /**
- * WHAT A PHRASE A USE CASE HEARD READS AS: the one of its lists the phrase names ("orders" is Orders), else every list
- * it brings ("a small candle shop" is Orders and Products), and the use case's own title only where it brings none.
+ * WHAT A PHRASE A USE CASE HEARD READS AS: the one of its lists the phrase names ("orders" is Orders), or the list it
+ * renamed ("tickets" is Team's Tickets); a word for money is Money, a word for a goal its Goals; else the lists it brings
+ * that stand on their own ("a small candle shop" is Orders and Products), never one kept inside another (a goal's Log,
+ * a saving's Put by, a cycle's days), and the use case's own title only where it brings none.
  */
 export function caseBecame(u: UseCase, phrase: string): string {
+  const own = caseLists(u);
   const lists = caseWords(u).slice(1);
   if (lists.length === 0) return u.title;
   const word = phrase.trim().toLocaleLowerCase();
-  return lists.find((n) => [word, plural(word)].includes(n.toLocaleLowerCase())) ?? firstRun.and(lists);
+  const named = lists.find((n) => [word, plural(word)].includes(n.toLocaleLowerCase()));
+  if (named) return named;
+  const renamed = Object.entries(u.labels).find(([k, v]) => !/[:.]/u.test(k) && [word, plural(word)].includes(v.toLocaleLowerCase()));
+  if (renamed) return renamed[1];
+  if (MONEY_SAID.test(word) && [...u.modules, ...(u.needs ?? [])].includes('money-core')) return partName('money-core');
+  if (GOAL_SAID.test(word)) {
+    const goals = lists.find((n) => /\b(?:goals?|habits?)\b/iu.test(n) && !/\bsavings?\b/iu.test(n));
+    if (goals) return goals;
+  }
+  const ids = new Set(own.map((l) => l.id));
+  const alone = own.flatMap((l, i) => (pointsAt(u, l.id).some((to) => ids.has(to) && to !== l.id) ? [] : [lists[i]!]));
+  return firstRun.and(alone.length > 0 ? alone : lists);
 }
 
 /**
