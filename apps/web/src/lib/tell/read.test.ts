@@ -1061,3 +1061,48 @@ test('A NAME ENDING IN "ING" CAN BE SOMEBODY; A WORD FOR WORK STAYS NOBODY (RO8)
   assert.deepEqual(tellRead('Paid Xiaoling 300', founder).rows.map((r) => r.register), ['people', 'obligations']);
   assert.ok(!tellRead('Paid Cleaning 300', founder).rows.some((r) => r.register === 'people'));
 });
+
+/* ── finish loop, lane k: the time a payment was for, and an open bill marked paid by its number ── */
+
+test('"RENT 12,000 FOR MAY PAID" IS PAID, AS "RENT 12,000 PAID" IS, the time kept in its name (RO1)', () => {
+  for (const [s, what] of [['Rent 12,000 for May paid', 'Rent for May'], ['Rent 12,000 this month paid', 'Rent this month'], ['Rent 12,000 for October paid', 'Rent for October'], ['Rent 12,000 for Q3 paid', 'Rent for Q3'], ['Rent 12,000 May paid', 'Rent for May'], ['Rent 12,000 for May is paid', 'Rent for May']] as const) {
+    const told = tellRead(s, founder);
+    assert.equal(told.why, undefined, s);
+    assert.deepEqual(told.rows.map((r) => [r.register, r.fields.direction, r.fields.state, r.fields.what]), [['obligations', 'owed_by_me', 'paid', what]], s);
+    assert.deepEqual(told.rows[0]!.fields.amount, { amount: 1200000, currency: 'EGP' }, s);
+    assert.deepEqual(told.left, [], s);
+  }
+  assert.match(tellRead('Rent 12,000 for May paid', founder).rows[0]!.said, /12,000 out, for rent for May$/u);
+  /* RO1's cases stay as they were. */
+  for (const s of ["Rent 12,000 isn't paid", 'Rent 12,000 will get paid', 'Rent 12,000 half paid']) assert.ok(!tellRead(s, founder).rows.some((r) => r.fields.state === 'paid'), s);
+  assert.equal(tellRead('Rent 12,000 half paid', founder).why, 'How much of the 12,000 was paid? Say it with the figure, like paid 6,000 for rent.');
+});
+
+test('"INVOICE 1042 PAID" WITH INVOICE 1042 OPEN IS OFFERED AS MARKING IT PAID', () => {
+  const BILLS = { ...DUE, done: ['paid', 'written_off'] };
+  const SOLD = { ...ORDERS, done: ['paid'] };
+  const lists = [PEOPLE, TASKS, LEDGER, BILLS, SOLD];
+  const open = [
+    { register: 'obligations', seq: 7, name: 'Invoice 1042' },
+    { register: 'obligations', seq: 12, name: 'Electricity' },
+    { register: 'orders', seq: 57, name: '3 vanilla jars' },
+  ];
+  const record = { lists, today: TODAY, currency: 'EGP', open };
+  /* Known by the number in its name. */
+  const invoice = tellRead('Invoice 1042 paid', record);
+  assert.deepEqual(invoice.rows, []);
+  assert.equal(invoice.why, undefined);
+  assert.deepEqual(invoice.change, { register: 'obligations', seq: 7, name: 'Invoice 1042', field: 'state', line: 'paid', ask: 'Mark invoice 1042 paid?', done: 'Marked invoice 1042 paid', mark: true });
+  /* Or by the number it is kept under, said with its name. */
+  const order = tellRead('Order 57 paid', record).change;
+  assert.deepEqual([order?.register, order?.seq, order?.ask], ['orders', 57, 'Mark order 57, 3 vanilla jars, paid?']);
+  const bill = tellRead('Bill #12 paid', record).change;
+  assert.deepEqual([bill?.register, bill?.seq, bill?.ask], ['obligations', 12, 'Mark bill 12, Electricity, paid?']);
+  /* An order is never a bill: "Invoice 57" is no order 57. */
+  assert.equal(tellRead('Invoice 57 paid', record).change, undefined);
+  /* With no open entry by that number, how much is still asked. */
+  const none = tellRead('Invoice 2001 paid', record);
+  assert.equal(none.change, undefined);
+  assert.match(none.why ?? '', /^How much was paid for Invoice 2001/u);
+  assert.equal(tellRead('Order 57 paid', founder).change, undefined);
+});

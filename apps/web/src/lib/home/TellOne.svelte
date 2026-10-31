@@ -28,7 +28,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
   import type { MoneyAsk } from '$lib/tell/money-on.ts';
-  import type { TellChange, TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
+  import type { Open, TellChange, TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -95,6 +95,8 @@
     moneyAlso: 'Money will also:',
     /* A BIRTHDAY FOR SOMEBODY KEPT, kept on them (their note) where no list of dates is. */
     keepOn: (name: string) => `Add it to ${name}`,
+    /* AN OPEN BILL, INVOICE OR ORDER SAID PAID BY ITS NUMBER, marked paid as its own page does. */
+    markIt: 'Mark it paid',
   };
 
   let typed = $state('');
@@ -115,7 +117,27 @@
   let reader = $state<typeof tellRead | null>(null);
   void import('$lib/tell/read.ts').then((m) => (reader = m.tellRead));
 
-  const told = $derived(typed.trim() === '' || reader === null ? null : reader(typed, options));
+  /* "INVOICE 1042 PAID": THE OPEN BILL, INVOICE OR ORDER KNOWN BY THAT NUMBER is asked of the record once a line names one
+     and says paid, never with Today, and the line is read again with it (`tell/numbered.ts`). */
+  const NUMBERED = /^\s*(?:order|invoice|inv|bill)\s*(?:#|no\.?|number)?\s*(\d{1,9})\b.*\bpaid\b/iu;
+  const numberSaid = $derived(NUMBERED.exec(typed)?.[1] ?? '');
+  let numbered = $state.raw<{ n: string; open: readonly Open[] } | null>(null);
+  let asking = '';
+  $effect(() => {
+    const n = numberSaid;
+    if (n === '' || n === asking) return;
+    asking = n;
+    const lists = options.lists;
+    void import('$lib/tell/numbered.ts')
+      .then((m) => m.openNumbered(apiBase(), lists, Number(n)))
+      .then(
+        (open) => void (asking === n && (numbered = { n, open })),
+        () => void (asking === n && (asking = '')),
+      );
+  });
+  const heard = $derived(numbered !== null && numbered.n === numberSaid ? { ...options, open: numbered.open } : options);
+
+  const told = $derived(typed.trim() === '' || reader === null ? null : reader(typed, heard));
   const rows = $derived(told?.rows ?? []);
   /* WHAT CAN BE ADDED NOW: an entry that still needs something stays in the preview, saying what, and the rest go. */
   const ready = $derived(readyRows(rows));
@@ -223,6 +245,34 @@
     focusOnceDrawn(() => (was?.isConnected ? was : [...document.querySelectorAll<HTMLElement>('[data-tell-one] .tell-one-field')].find((f) => f !== was)), { from: pressed });
   }
 
+  /* ── an open bill, invoice or order, marked paid ──
+     "Invoice 1042 paid" with invoice 1042 open: one press sets its state to paid at the version just read, as its own Mark
+     paid does, and the receipt's Undo puts it back (`markPress`). */
+  async function markOn(c: TellChange) {
+    if (sending) return;
+    sending = true;
+    const pressed = typeof document === 'undefined' ? null : document.activeElement;
+    const [run, press] = await Promise.all([runOf(), import('$lib/tell/numbered.ts').then((m) => m.markPress(apiBase(), c, say.raced, () => void reread())).catch(() => null)]);
+    if (run !== null && press !== null)
+      await run({
+        apply: () => {},
+        revert: () => {},
+        ...press,
+        said: c.done,
+        settle: () => {
+          typed = '';
+          numbered = null;
+          asking = '';
+          void reread();
+          onadded?.([{ said: `${c.name}, ${c.done.split(' ').pop()}`, list: listName(c.register), href: `/r/${c.register}/${c.seq}` }]);
+        },
+      });
+    sending = false;
+    const was = field;
+    focusOnceDrawn(() => (was?.isConnected ? was : [...document.querySelectorAll<HTMLElement>('[data-tell-one] .tell-one-field')].find((f) => f !== was)), { from: pressed });
+  }
+  const changeOn = (c: TellChange): Promise<void> => (c.mark ? markOn(c) : keepOn(c));
+
   /* ── turning Money on for a money line (AM4) ──
      THE PRESS TURNS MONEY ON, THEN THE SAME WORDS ARE READ AGAIN AGAINST THE LISTS IT BROUGHT and what they become is
      added, all in one press, under one batch with the one Undo every add has: the lists Money holds are learnt here
@@ -267,7 +317,7 @@
     e.preventDefault();
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
     else if (rows.length === 0 && offers.length === 1 && !told?.about) addOffer(offers[0]!);
-    else if (rows.length === 0 && told?.change) void keepOn(told.change);
+    else if (rows.length === 0 && told?.change) void changeOn(told.change);
     /* AND NEVER TURNS MONEY ON (RN3): ⌘↵ adds a line where a home for it exists; a module goes on by its own button. */
   }
 
@@ -319,7 +369,7 @@
       <div class="tell-one-becomes" aria-live="polite">
         <p class="tell-one-why">{change.ask}</p>
         <div class="tell-one-offers">
-          <Button weight={rows.length === 0 ? 'primary' : 'quiet'} disabled={sending} onclick={() => void keepOn(change)}>{say.keepOn(change.name)}</Button>
+          <Button weight={rows.length === 0 ? 'primary' : 'quiet'} disabled={sending} onclick={() => void changeOn(change)}>{change.mark ? say.markIt : say.keepOn(change.name)}</Button>
         </div>
       </div>
     {/if}

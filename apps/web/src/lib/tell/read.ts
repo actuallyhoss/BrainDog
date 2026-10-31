@@ -76,7 +76,13 @@ export type TellOptions = {
   /** Every currency the record's money is in (`moneyCurrencies()` when not said): "dinars" on a record that holds
       only Kuwaiti dinars is those. */
   held?: readonly string[];
+  /** The open entries of the lists that keep a bill, an invoice or an order paid, known by the number a line says
+      ("Invoice 1042 paid"): asked of the record only once a line names one (`numbered.ts`), never with Today. */
+  open?: readonly Open[];
 };
+
+/** An entry still open, on the list it is kept in: one a line can mark paid by its number. */
+export type Open = Known & { register: string };
 
 /** A field's value: as the record takes it, or `{ $row: n }` for the entry at index `n` of the same call. */
 export type TellValue = string | number | boolean | MoneyValue | { $row: number };
@@ -116,7 +122,16 @@ export type Told = {
  * dates is kept. Tell only adds, so it said "Mum is already in People" and dropped the day. It is offered as `ask`
  * ("Add 14 Nov as Mum's birthday?"), and the press adds `line` to their `field` (their note), after what it holds.
  */
-export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string };
+/* AND AN OPEN BILL, INVOICE OR ORDER SAID PAID BY ITS NUMBER: "Invoice 1042 paid" is offered as "Mark invoice 1042 paid?",
+   and `mark` says the press sets `field` (its state) to `line` (the paid state), as the entry's own Mark paid does. */
+export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string; mark?: true };
+
+/** The state a list keeps an entry paid in, as it declares it: a finished state that says paid, on a list keeping money. */
+export function paidStateOf(l: Pick<TellList, 'state' | 'done' | 'fields'>): string | null {
+  const state = l.fields.find((f) => f.id === l.state && f.type === 'enum' && f.retired !== true);
+  if (!state || !l.fields.some((f) => f.type === 'money' && f.retired !== true)) return null;
+  return PAID_STATES.find((s) => (l.done ?? []).includes(s) && (state.values ?? []).includes(s)) ?? null;
+}
 
 /** The most one sentence becomes. More is a paste of a whole day, and the rest is said back as left. */
 export const MOST = 8;
@@ -619,6 +634,11 @@ const PAID_LAST = /^(.*?\d.*?)\s+(?:(?:is|was|has been|have been|already|now|all
 const NOT_YET = /\b(?:not|to be|will be|needs? to be|must be|should be|be|to)$|\b(?:not|never|unpaid|owed?|owes|due|will|gets?|getting|yet)\b|n['’]t\b/iu;
 /* PART OF IT PAID IS NOT ALL OF IT (RO1): "Rent 12,000 half paid" was all 12,000 paid. How much is asked. */
 const PART_PAID = /^(?:half|partly|partially|part|some|mostly|almost|nearly)(?:\s+of\s+it)?$/iu;
+/* THE TIME IT WAS FOR, SAID BETWEEN THE FIGURE AND "PAID", IS NO "NOT YET" (RO1): "Rent 12,000 for May paid", "for this
+   month", "for Q3" were all paid. Taken off before the words are read, and kept in what it was for. */
+const PAID_FOR = new RegExp(`\\s+((?:for\\s+)?(?:(?:the\\s+)?month\\s+of\\s+)?(?:${MONTH}|(?:this|last|next)\\s+(?:month|quarter|year)|q[1-4]|h[12]))$`, 'iu');
+/* "INVOICE 1042", "ORDER #57", "BILL NO. 12": a bill, an invoice or an order by its number and nothing else. */
+const REF_SAID = /^(order|invoice|inv|bill)\s*(?:#|no\.?|number)?\s*(\p{Nd}+)$/iu;
 /* THE WORDS A BILL STILL TO PAY IS SAID WITH, off its name: "Rent 12,000 isn't paid" is "Rent", to pay. */
 const NOT_PAID_TAIL = /(?:\s+(?:is|isn['’]t|was|wasn['’]t|has|hasn['’]t|have|haven['’]t|not|never|still|yet|been|be|to|will|won['’]t|get|gets|getting))+\s+paid(?:\s+(?:yet|off|in full))?$|\s+(?:unpaid|not paid)(?:\s+yet)?$/iu;
 /* A NUMBER A THING IS KNOWN BY IS NEVER ITS AMOUNT (RO3): "Order 57 paid", "Invoice 1042 paid", "Room 12", "#57", "No. 57".
@@ -1647,11 +1667,17 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const dated = takeDay(c, opts.today);
     const m = PAID_LAST.exec(dated.rest);
     if (!m || NOT_YET.test(m[1]!.trim())) return false;
-    const lead = m[1]!;
+    /* "RENT 12,000 FOR MAY PAID" WAS PAID (RO1): the time it was for, after the figure, is taken off and kept in its name. */
+    const time = PAID_FOR.exec(m[1]!);
+    const timed = time !== null && /\d/u.test(m[1]!.slice(0, time.index)) ? time : null;
+    const lead = timed ? m[1]!.slice(0, timed.index) : m[1]!;
+    const forWhen = timed ? (/^(?:for|this|last|next)\b/iu.test(timed[1]!) ? timed[1]! : `for ${timed[1]!}`) : '';
     const found = amountsIn(lead, opts.currency, held);
     const figures = found.filter((x) => !refAt(lead, x, 'opening'));
-    /* "ORDER 57 PAID" SAYS NO AMOUNT (RO3): 57 is the order, never EGP 57 out. How much, and which way, is asked. */
+    /* "ORDER 57 PAID" SAYS NO AMOUNT (RO3): 57 is the order, never EGP 57 out. How much, and which way, is asked, unless the
+       record holds that order open: then marking it paid is offered. */
     if (figures.length === 0 && found.length > 0) {
+      if (found.length === 1 && !timed && markPaid(lead, found[0]!)) return true;
       if (!moneyList(opts.lists) && !dueList(opts.lists)) noMoney = true;
       else howMuch ??= capital(trimWords(lead));
       left.push(c);
@@ -1677,8 +1703,49 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (EITHER_WAY.test(what) || paysHim(what) || sells(what)) return askWay(c, a, null);
     const who = nameBefore(what);
     if (who !== null) return askWay(c, a, who);
-    if (readMoney(oneLine(`paid ${a.text} for ${what} ${dayText(c)}`), null, false)) placed = true;
-    else left.push(c);
+    const from = rows.length;
+    if (readMoney(oneLine(`paid ${a.text} for ${what} ${dayText(c)}`), null, false)) {
+      placed = true;
+      /* The time it was for goes back on its name, after what it was for: "Rent for May". */
+      if (forWhen !== '')
+        for (const r of rows.slice(from)) {
+          const l = opts.lists.find((x) => x.id === r.register);
+          const t = l ? textField(l) : undefined;
+          const named = t ? r.fields[t.id] : undefined;
+          if (!t || typeof named !== 'string' || words(named) !== words(what)) continue;
+          r.fields[t.id] = `${named} ${forWhen}`;
+          r.said = `${r.said} ${forWhen}`;
+        }
+    } else left.push(c);
+    return true;
+  }
+
+  /** "Invoice 1042 paid" where the record holds invoice 1042 open: offered as marking it paid, as its own Mark paid does. */
+  function markPaid(lead: string, a: Amount): boolean {
+    const ref = REF_SAID.exec(trimWords(lead));
+    if (!ref || ref[2] !== a.digits || change !== null) return false;
+    const noun = /^inv$/iu.test(ref[1]!) ? 'invoice' : ref[1]!.toLowerCase();
+    /* AN ORDER IS ON A LIST OF ORDERS, a bill or an invoice on any other that keeps one paid. */
+    const order = noun === 'order';
+    const listOf = (e: Open): TellList | undefined => opts.lists.find((l) => l.id === e.register && paidStateOf(l) !== null);
+    const fits = (opts.open ?? []).filter((e) => {
+      const l = listOf(e);
+      return l !== undefined && /\border/iu.test(`${l.id} ${l.name} ${l.one ?? ''}`) === order;
+    });
+    /* KNOWN BY THE NUMBER IN ITS NAME ("Invoice 1042"), or else by the number it is kept under. One, or none is offered. */
+    const inName = new RegExp(`(?:^|\\D)${a.digits}(?:\\D|$)`, 'u');
+    const byName = fits.filter((e) => inName.test(e.name));
+    const bySeq = fits.filter((e) => String(e.seq) === a.digits);
+    const it = byName.length === 1 ? byName[0]! : byName.length === 0 && bySeq.length === 1 ? bySeq[0]! : null;
+    const l = it ? listOf(it) : undefined;
+    const to = l ? paidStateOf(l) : null;
+    if (!it || !l || to === null) return false;
+    const state = l.fields.find((f) => f.id === l.state);
+    const word = (state?.labels?.[to] ?? to).toLowerCase();
+    const called = `${noun} ${a.digits}`;
+    /* What it is said with, when its name does not say the number: "Mark order 57, 3 vanilla jars, paid?" */
+    const also = byName.length === 1 || it.name.trim() === '' ? '' : `, ${it.name},`;
+    change = { register: l.id, seq: it.seq, name: it.name.trim() || capital(called), field: state!.id, line: to, ask: `Mark ${called}${also} ${word}?`, done: `Marked ${called} ${word}`, mark: true };
     return true;
   }
 
