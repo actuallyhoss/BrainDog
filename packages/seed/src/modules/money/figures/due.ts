@@ -103,6 +103,33 @@ export const DUE_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /**
+   * HOW MANY BILLS AND INVOICES ARE OPEN, AND HOW MANY THINGS REPEAT, whatever their day (audit 31 Oct h, AH15): Money's
+   * first line said "Lasts the year on what is due." on a record with nothing due at all. While both are nought the line
+   * asks for a bill instead (`parts/headline.ts`).
+   */
+  'bills-open': {
+    metric: 'bills-open',
+    name: 'Bills and invoices open',
+    source: 'register.obligations',
+    where: OPEN,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'repeating-held': {
+    metric: 'repeating-held',
+    name: 'Repeating payments',
+    source: 'register.recurring',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* ONE DIRECTION, like the two tiles it sits beside. This once added receivables to payables and
      painted the sum in the alarm colour: GBP 17,740.00 was GBP 7,200 you are owed plus GBP 10,540
      you owe. Those are not the same problem, and the sum is not a quantity. */

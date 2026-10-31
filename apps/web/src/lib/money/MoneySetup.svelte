@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
+  import { invalidateAll } from '$app/navigation';
   import { at } from '$lib/at.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -104,6 +105,10 @@
         rates,
       });
       await navPrefs.dismiss(SETUP_KEY);
+      /* THE RAIL READS THE RECORD AGAIN (audit 31 Oct h, AH15): the first account brings Accounts, Coming up, Forecast and
+         Reports onto it, and they showed only after a reload. */
+      (await import('$lib/record/boot-live.ts')).forget();
+      await invalidateAll();
       if (out.failed.length === 0 && out.left.length === 0) {
         toasts.push(words.done, { intent: 'good' });
         onclose();
