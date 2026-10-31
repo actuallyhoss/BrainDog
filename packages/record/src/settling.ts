@@ -22,6 +22,7 @@
  */
 
 import type { Sql } from '@braindog/ports';
+import { ASKED_KEY } from '@braindog/kernel';
 
 /** The keys one line carries. `answer_label` only on a `decide`; `settled_by` and `undone` only on a row's event. */
 export type Settled = {
@@ -136,7 +137,7 @@ export function settlingOf(sql: Sql, lines: readonly { id: string }[]): Map<stri
   for (const [id, a] of asks) {
     const s = asked.get(a.suggestion);
     if (!s || typeof s.opened_by !== 'string') continue;
-    const said: Settled = { suggested_by: s.opened_by, drafted_by: typeof s.drafted_by === 'string' && s.drafted_by !== '' ? s.drafted_by : null };
+    const said: Settled = { suggested_by: s.opened_by, drafted_by: typeof s.drafted_by === 'string' && s.drafted_by !== '' && !s.drafted_by.startsWith(ASKED_KEY) ? s.drafted_by : null };
     if (a.decision !== undefined) {
       const answer = answers.get(a.decision);
       said.answer_label = answer === undefined ? null : labelOf(s.body, answer);

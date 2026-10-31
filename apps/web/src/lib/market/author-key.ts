@@ -19,8 +19,9 @@
  * goes to the first person who asks for a key on this browser: it is the key their add-ons are pinned to, and a fresh
  * one would have the store refuse every update to them.
  *
- * AN EXPLICIT SIGN-OUT DROPS THE PERSON'S KEY (`author-key-forget.ts`, his call of 23 Oct), so nothing of theirs that
- * signs is left on a shared device; their next publish here makes a new one. A session that only lapsed keeps it.
+ * A SIGN-OUT KEEPS THE KEY (`author-key-forget.ts` says why): the store takes an update only with the key that signed the
+ * add-on, so a key dropped at sign-out would strand every add-on the person published. It is kept under their id, and
+ * nobody else signed in on this browser reaches it.
  *
  * LOADED ONLY WHEN SOMEBODY PUBLISHES: `publish.ts` imports this file with `import()` at the press, so no page pays for
  * the declare package or IndexedDB until then. The store is injectable for tests, and IndexedDB is opened only when called.
@@ -50,7 +51,7 @@ export type AuthorKeyHandle = {
 };
 
 const ALG = { name: 'Ed25519' } as const;
-/* WHERE THE KEY IS KEPT is named once, in the small file an explicit sign-out loads to drop it (`author-key-forget.ts`). */
+/* WHERE THE KEY IS KEPT is named once, in a small file of its own (`author-key-forget.ts`). */
 const DB = KEY_DB;
 const SHELF = KEY_SHELF;
 /** The one slot every key was kept in before keys were kept per person, read once to hand its key on (`indexedStore`). */
@@ -93,8 +94,9 @@ const asked = <T>(req: IDBRequest<T>): Promise<T> =>
  * One person's key in the browser's IndexedDB, opened at the first read or keep and not before. `null` when the browser
  * has none.
  *
- * THE KEY KEPT BEFORE KEYS WERE PER PERSON is handed to the first person whose slot is empty when it is read, in the same
- * transaction that takes it out of the old slot, so it goes to one person and never two.
+ * THE KEY KEPT BEFORE KEYS WERE PER PERSON is moved off the shared shelf by the first person signed in whose key is read,
+ * in the same transaction that takes it out of the old slot, so it goes to one person and never two: into their slot when
+ * theirs is empty, and beside their own key, unread, when they have one, so nobody later on this browser is handed it.
  */
 export function indexedStore(person: string): KeyStore | null {
   const idb = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
@@ -118,17 +120,18 @@ export function indexedStore(person: string): KeyStore | null {
       const tx = (await open()).transaction(SHELF, 'readwrite');
       const shelf = tx.objectStore(SHELF);
       const got = await asked(shelf.get(slot));
-      if (isKept(got)) return got;
       const old = await asked(shelf.get(LEGACY_SLOT));
-      if (!isKept(old)) return null;
+      if (!isKept(old)) return isKept(got) ? got : null;
       const landed = new Promise<void>((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onabort = () => reject(new Error('indexeddb'));
       });
-      shelf.put(old, slot);
+      /* AND OUT OF THE SHARED SLOT EITHER WAY (RM7): a person who has a key of their own still takes the old one off the
+         shelf, kept beside theirs and never read, so the next person signed in here is never handed it. */
+      shelf.put(old, isKept(got) ? `${slot}:before` : slot);
       shelf.delete(LEGACY_SLOT);
       await landed;
-      return old;
+      return isKept(got) ? got : old;
     },
     keep: async (key) => {
       const tx = (await open()).transaction(SHELF, 'readwrite');

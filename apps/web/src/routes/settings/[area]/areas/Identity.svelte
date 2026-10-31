@@ -315,7 +315,7 @@
     closeRefusal = '';
     closeStale = false;
     const mark = opened();
-    /* Who is leaving, read before the close ends the session, so their own pictures and publisher key go with it. */
+    /* Who is leaving, read before the close ends the session, so their own pictures go with it. */
     const leaving = s.hostAuth?.me?.person ?? null;
     let answer: { ok?: unknown; refusal?: { code?: unknown; fix?: unknown } } | undefined;
     try {
