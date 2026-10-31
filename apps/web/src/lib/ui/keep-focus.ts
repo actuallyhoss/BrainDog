@@ -32,27 +32,46 @@ export const WATCH_MS = 2000;
 /**
  * Puts the focus in the element `find` answers, now and each time the screen is drawn again for `WATCH_MS`, while the
  * focus is nowhere: on the page, on an element that is gone, or still on `from`, the control the press started from.
- * Once the person puts it somewhere else it stays there, and the watch ends.
+ *
+ * ONCE IT IS IN THE FIELD, ONLY A REDRAW BRINGS IT BACK (review i, RI2): the field it was put in gone and the focus fallen
+ * to the page with it. Any other way it leaves is the person moving it, a tap on blank space to close the keyboard or a
+ * Shift+Tab back to the button, and the watch ends there, whatever it left to. `from` counts as nowhere only until then.
  */
 export function focusOnceDrawn(find: () => HTMLElement | null | undefined, opts: { from?: Element | null; within?: number } = {}): void {
   if (typeof document === 'undefined') return;
   const from = opts.from ?? null;
   let done = false;
-  const free = (): boolean => {
+  /* THE FIELD THE FOCUS WAS LAST PUT IN, or found in. */
+  let placed: HTMLElement | null = null;
+  const fallen = (): boolean => {
     const now = document.activeElement;
-    return !now || now === document.body || !now.isConnected || now === from;
+    return !now || now === document.body || !now.isConnected;
+  };
+  const free = (): boolean => (placed === null ? fallen() || document.activeElement === from : !placed.isConnected && fallen());
+  /* A FIELD STILL ON THE PAGE THAT LOSES THE FOCUS lost it to the person; one drawn away loses it with no say. */
+  const left = (e: FocusEvent): void => {
+    if (e.target instanceof Node && e.target.isConnected) stop();
+  };
+  const place = (el: HTMLElement): void => {
+    if (placed === el) return;
+    placed?.removeEventListener('focusout', left);
+    placed = el;
+    el.addEventListener('focusout', left);
   };
   const put = (): void => {
     if (done) return;
     const el = find();
-    if (el && el.isConnected && document.activeElement === el) return;
+    if (el && el.isConnected && document.activeElement === el) return place(el);
     if (!free()) return stop();
-    if (el && el.isConnected) el.focus();
+    if (!el || !el.isConnected) return;
+    el.focus();
+    if (document.activeElement === el) place(el);
   };
   const watch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => queueMicrotask(put));
   const stop = (): void => {
     done = true;
     watch?.disconnect();
+    placed?.removeEventListener('focusout', left);
   };
   watch?.observe(document.body, { childList: true, subtree: true });
   setTimeout(put, 0);
