@@ -15,19 +15,48 @@ export function holdFocus(): () => void {
   const tag = was.tagName.toLowerCase();
   const label = was.getAttribute('aria-label');
   const name = was.getAttribute('name');
-  const put = (): void => {
+  const css = (s: string): string => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/"/g, '\\"'));
+  const at = label ? `${tag}[aria-label="${css(label)}"]` : name ? `${tag}[name="${css(name)}"]` : null;
+  const find = (): HTMLElement | null => (was.isConnected ? was : at ? document.querySelector<HTMLElement>(at) : null);
+  return () => focusOnceDrawn(find, { from: was });
+}
+
+/**
+ * HOW LONG A FIELD IS WATCHED FOR, after the press that may draw it anew. A first add from an empty place draws the page
+ * twice over: once when the row lands, and again when the counts read after it turn the empty place into a list and the
+ * line moves under the page's sentence (AJ7). Two tries at 0 and 120ms were over before the second, so the focus fell
+ * to the page on the first add and held on every one after.
+ */
+export const WATCH_MS = 2000;
+
+/**
+ * Puts the focus in the element `find` answers, now and each time the screen is drawn again for `WATCH_MS`, while the
+ * focus is nowhere: on the page, on an element that is gone, or still on `from`, the control the press started from.
+ * Once the person puts it somewhere else it stays there, and the watch ends.
+ */
+export function focusOnceDrawn(find: () => HTMLElement | null | undefined, opts: { from?: Element | null; within?: number } = {}): void {
+  if (typeof document === 'undefined') return;
+  const from = opts.from ?? null;
+  let done = false;
+  const free = (): boolean => {
     const now = document.activeElement;
-    if (now && now !== document.body && now !== was) return;
-    if (was.isConnected) {
-      if (now !== was) was.focus();
-      return;
-    }
-    const css = (s: string): string => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/"/g, '\\"'));
-    const at = label ? `${tag}[aria-label="${css(label)}"]` : name ? `${tag}[name="${css(name)}"]` : null;
-    (at ? document.querySelector<HTMLElement>(at) : null)?.focus();
+    return !now || now === document.body || !now.isConnected || now === from;
   };
-  /* After the screen has drawn: a frame, then once more, since a page read again draws over two. */
-  return () => void setTimeout(() => (put(), setTimeout(put, 120)), 0);
+  const put = (): void => {
+    if (done) return;
+    const el = find();
+    if (el && el.isConnected && document.activeElement === el) return;
+    if (!free()) return stop();
+    if (el && el.isConnected) el.focus();
+  };
+  const watch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => queueMicrotask(put));
+  const stop = (): void => {
+    done = true;
+    watch?.disconnect();
+  };
+  watch?.observe(document.body, { childList: true, subtree: true });
+  setTimeout(put, 0);
+  setTimeout(stop, opts.within ?? WATCH_MS);
 }
 
 /**

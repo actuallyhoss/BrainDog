@@ -274,10 +274,25 @@
     }
     /* THE LISTS IT NAMES, LEARNT BEFORE ITS STEPS ARE DRAWN, so a field is said by its name ("As the bank wrote it")
        and never its id (`fieldName` in `flow.ts`). A list the record will not describe keeps its id in words. */
-    await Promise.all(listsIn(one.value.body).map((list) => learn(described.schema, list, listsAsked))).catch(() => undefined);
+    await Promise.all((await listsNamed(out.source, one.value.body)).map((list) => learn(described.schema, list, listsAsked))).catch(() => undefined);
     take({ ...one.value, acted: rows.find((r) => r.id === one.value.id)?.acted });
     from = 'ready';
     return true;
+  }
+
+  /**
+   * THE LISTS A BODY NAMES, AND THE LIST OF THE RULE WHOSE QUESTION STARTS IT (AJ5). "Mark an invoice as chased" starts
+   * when `rule.invoice-late`'s question is answered and names no list itself, so its steps were said with Bills and
+   * invoices' ids ("set chased", "State is part") wherever no other screen had learnt that list first: on a phone, every
+   * time. The asking rule says which list its rows are in, so it is read too.
+   */
+  async function listsNamed(src: typeof source, body: unknown): Promise<string[]> {
+    const own = listsIn(body);
+    const on = (body as { on?: { decided?: { about?: unknown } } } | null)?.on;
+    const about = typeof on?.decided?.about === 'string' ? on.decided.about : '';
+    if (!about.startsWith('rule.') || src === null) return own;
+    const asker = await src.automation(about.slice('rule.'.length)).catch(() => null);
+    return [...new Set([...own, ...(asker?.ok ? listsIn(asker.value.body) : [])])];
   }
 
   /* THE SCRIPTS' TITLES BEFORE THE STEPS ARE DRAWN, so a script step names the script as it declares itself

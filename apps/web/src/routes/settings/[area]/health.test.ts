@@ -130,6 +130,11 @@ test('A RED CHECK IS NAMED BY ITS OWN SENTENCE, with no count of the rest, and o
   assert.deepEqual(links(said), ['/settings/backups']);
   assert.deepEqual(links(healthSaid('missing', null, { backupsAt: '/settings/backups' })), ['/settings/backups']);
   assert.deepEqual(links(healthSaid('in', null, { signs: signs('red'), signsAt: '/p/health', backupsAt: '/settings/backups' })), ['/p/health']);
+  /* AJ3: a failure headed by its own words says them, not the follow-on, and opens its question. */
+  const headed: Sign = { sign: 'questions', state: 'red', name: 'The backup on 3 Sep did not run', said: 'It waits on you in Needs you, with “Run it now” suggested.', to: '/decide/q1' };
+  const lead = healthSaid(null, null, { signs: [headed], signsAt: '/p/health', backupsAt: '/settings/backups' });
+  assert.equal(text(lead), 'The backup on 3 Sep did not run. Look');
+  assert.deepEqual(links(lead), ['/decide/q1']);
   assert.equal(plainSign('Something went wrong, not a choice for you: The mail did not send.'), 'The mail did not send.');
   assert.ok(aboutCopies('The backup on 3 Sep did not run') && !aboutCopies('The mail did not send'));
   for (const one of [said, healthSaid(null, null, { faults: [PAIRS] })]) assert.doesNotMatch(text(one), /vital sign|and \d+ more|model/u);
