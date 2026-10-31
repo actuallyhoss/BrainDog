@@ -8,7 +8,7 @@
  */
 
 import { MISSING, exponentOf, money, quantity, type Home } from './format.ts';
-import { readAmount, readFigure, writeAmount, type AmountSetting } from './money.ts';
+import { currencyOfFigure, readAmount, writeAmount, type AmountSetting } from './money.ts';
 
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
@@ -28,12 +28,13 @@ export function figureLike(template: string, value: number, home?: Home, setting
   /* TOLD THE HOME, A TEMPLATE THE HOST DREW FIRST (`$3.63 USD`) STILL NAMES ITS CURRENCY (`readFigure`), so the value is
      the writer's too. Not told, only the stored form is read, as it always was: a drawing keeps the path below, which
      copies its shape, since nobody draws this figure again. */
-  const stored = home === undefined ? readAmount(template.trim()) : readFigure(template.trim());
-  if (stored) {
+  /* AND A SIGN ALONE NAMES IT (`currencyOfFigure`): "$1,950", as the writer draws another currency, copied as a shape. */
+  const currency = home === undefined ? readAmount(template.trim())?.currency : currencyOfFigure(template, home);
+  if (currency) {
     /* Half a minor unit rounds away from nought, on either side of it, as the path below always did. */
-    const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(stored.currency));
-    if (home === undefined) return money(minor, stored.currency);
-    return writeAmount({ minor, currency: stored.currency }, home, setting)?.text ?? MISSING;
+    const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(currency));
+    if (home === undefined) return money(minor, currency);
+    return writeAmount({ minor, currency }, home, setting)?.text ?? MISSING;
   }
   const m = NUMBER.exec(template);
   if (!m) return quantity(Math.round(value * 100) / 100, '');

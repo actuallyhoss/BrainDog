@@ -15,7 +15,7 @@
 import { MISSING, axisFigure, exponentOf } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
-import { type AmountSetting, readFigure, writeAmount } from './money.ts';
+import { type AmountSetting, currencyOfFigure, writeAmount } from './money.ts';
 
 /** Two decimals at most, and no trailing zeros, so an attribute stays short and exact. */
 const at = (n: number): string => String(Math.round(n * 100) / 100);
@@ -289,11 +289,13 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
  */
 export function amountLike(template: string, value: number, home: string | null | undefined, setting: AmountSetting): string {
   const copied = (): string => (setting === 'axis' ? axisFigure(figureLike(template, value)) : figureLike(template, value));
-  const like = home === undefined || !Number.isFinite(value) ? null : readFigure(template.trim());
-  if (!like) return copied();
-  const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(like.currency));
+  /* A CELL DRAWN BY ITS SIGN ALONE SAYS ITS CURRENCY TOO (`currencyOfFigure`): "$1,950", as the writer now draws another
+     currency, was copied as a shape and its net and axis never written by the one writer. */
+  const currency = home === undefined || !Number.isFinite(value) ? null : currencyOfFigure(template, home);
+  if (!currency) return copied();
+  const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(currency));
   if (!Number.isSafeInteger(minor)) return copied();
-  return writeAmount({ minor, currency: like.currency }, home ?? null, setting)?.text ?? copied();
+  return writeAmount({ minor, currency }, home ?? null, setting)?.text ?? copied();
 }
 
 /** What a cell says around its figure, its sign aside: `£#` of `−£1,200.00`, `GBP #`, `#h`. */

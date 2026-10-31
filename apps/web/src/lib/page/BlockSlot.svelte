@@ -23,7 +23,7 @@
   import { whoseOf } from './drawn-pictures.ts';
   import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
-  import { EMPTY_KEEP, KINDS, KPIS_KIND, inline, moneyWhole, readFigure, text } from 'braindog-render';
+  import { EMPTY_KEEP, KINDS, KPIS_KIND, currencyOfFigure, exponentOf, inline, moneyWhole, readFigure, signedOf, text } from 'braindog-render';
   import { approxOf } from '$lib/money/rates.ts';
   import { held as heldRates } from '$lib/money/rates.svelte.ts';
   import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
@@ -285,8 +285,12 @@
        the amount is at home or no rate reaches it. The rates are asked of the record the first time one is wanted. */
     approx: (figure: string): string | null => {
       const home = homeCurrency();
-      const f = home ? readFigure(figure) : null;
-      if (!home || !f) return null;
+      /* THE CURRENCY BY ITS CODE OR BY ITS SIGN ALONE (`currencyOfFigure`): another currency is drawn by its own sign now,
+         "$1,950" with no "USD" after it, and a reader that wanted the code said no "≈" under any payout in dollars. */
+      const currency = home ? currencyOfFigure(figure, home) : null;
+      if (!home || !currency) return null;
+      const read = readFigure(figure.trim());
+      const f = { minor: read ? Number(read.minor) : Math.round(signedOf(figure) * 10 ** exponentOf(currency)), currency };
       heldRates.ask();
       /* A LEAD FIGURE IN THE HOME CURRENCY (Money's Cash now) IS SAID ONCE MORE IN EACH OTHER CURRENCY THE RECORD HOLDS A
          RATE FOR, under it ("≈ $13,187"), as a finance app restates its headline: the rest of a tile's figures are not. */
