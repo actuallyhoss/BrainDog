@@ -393,6 +393,25 @@
        still by 450ms (five gaps and a page's 200). */
     --d-stagger: 40ms;
 
+    /* THE RECORD FORMING (1 Nov, "satisfying animations to the way your braindog forms and evolves"; `$lib/motion`).
+       A second scale beside the one above, for the moments the record itself changes rather than the screen answering
+       a press: a card, a widget, a person, a line or a place arriving; a draft kept or thrown away; a figure counting
+       and a bar growing to a new value. Longer than the answering scale because each of these is something to see,
+       and still under half a second. Transform and opacity only, and only on a real change, never on a first draw.
+         --form-in      a thing arriving: rises a few pixels and grows from 97% on the spring
+         --form-out     a thing answered or thrown away, leaving (quicker than it came)
+         --form-settle  what stays, sliding into the gap, or a draft settling as it is kept
+         --form-count   a figure counting to its new value, a bar growing to it
+         --form-gap     one after another, in a group arriving together
+       `a11y.css` rewrites all five under reduced motion: a fade where something arrives or leaves, else at once. */
+    --form-in: 320ms;
+    --form-out: 180ms;
+    --form-settle: 380ms;
+    --form-count: 420ms;
+    --form-gap: 40ms;
+    /* A RESTRAINED SPRING: most of the way in the first third, 2.8% past, and back by the end. Never a bounce. */
+    --ease-spring: linear(0, 0.05 4%, 0.168 8%, 0.316 12%, 0.467 16%, 0.606 20%, 0.752 25%, 0.862 30%, 0.949 36%, 0.999 42%, 1.022 48%, 1.028 55%, 1.024 62%, 1.016 70%, 1.007 80%, 1.002 90%, 1);
+
     /* The two named curves, then the three kept for one job each. Platform conventions, not anyone's identity. */
     --ease-standard: cubic-bezier(0.2, 0, 0, 1);
     --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);

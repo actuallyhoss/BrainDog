@@ -81,6 +81,12 @@
       --d-recompose: 120ms;
       --d-panel: 120ms;
       --d-stagger: 0ms;
+      /* THE RECORD FORMING: a fade where a thing arrives or leaves, and at once where it settles, counts or grows. */
+      --form-in: 120ms;
+      --form-out: 90ms;
+      --form-settle: 0ms;
+      --form-count: 0ms;
+      --form-gap: 0ms;
     }
 
     *,

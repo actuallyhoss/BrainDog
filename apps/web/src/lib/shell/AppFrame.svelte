@@ -89,6 +89,7 @@
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
   import { noteOpened } from '$lib/palette/opened.ts';
   import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
+  import { hush } from '$lib/motion/index.ts';
   import { PRODUCT } from '$lib/title.ts';
   import { navigating, page } from '$app/state';
   /* The Mac app's Go menu, a notification's click and braindog://goto: only an address of the app moves the window
@@ -810,6 +811,16 @@
   /* WHERE HE WENT, KEPT ON THIS DEVICE for the empty palette's Recent. The first screen counts too. */
   afterNavigate((nav) => {
     if (nav.to) noteOpened(`${nav.to.url.pathname}${nav.to.url.search}`, PRODUCT);
+    /* THE RECORD FORMING (`$lib/motion`): a screen's first second draws still, so what was already there never flies in. */
+    hush();
+  });
+  /* AND FIGURES COUNT AND BARS GROW when the record changes them, from one watcher on the window, fetched after the
+     first draw so Today's first load does not wait for it. */
+  $effect(() => {
+    let stop: (() => void) | null = null;
+    let gone = false;
+    void import('$lib/motion/watch.ts').then((m) => !gone && (stop = m.watchChanges()), () => undefined);
+    return () => ((gone = true), stop?.());
   });
 
   /* THE PAGE ASKED BEFORE THE APP ARRIVED (`app.html`) IS FOR THE ADDRESS THE TAB OPENED ON, so a move inside the app lets
