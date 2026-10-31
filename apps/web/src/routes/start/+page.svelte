@@ -108,6 +108,7 @@
   import NoRecord from './NoRecord.svelte';
   import Frame from './Frame.svelte';
   import Made from './Made.svelte';
+  import { MADE_SAID, saidMade, saidMadeOf, type SaidMade } from '$lib/start/made.ts';
   import Making from './Making.svelte';
 
   /**
@@ -143,6 +144,8 @@
   let madePlaces = $state.raw<string[] | null>(null);
   /* THE ADD-ONS A TRADE SAID NAMES, offered by name at the end and never installed (AH8, FB5). */
   let madeAddons = $state.raw<TradeOffer[]>([]);
+  /* THE WORDS AND WHAT THEY BUILT (1 Nov), which the end has the model read once more for drafts on Today. */
+  let madeSaid = $state.raw<SaidMade | null>(null);
   onMount(() => {
     /* A SET-UP BRAINDOG GOES TO TODAY (first hour audit, AH31): its address back at /start drew sign-up again over
        "This BrainDog is set up". Only the end of the run (`#made`), an agent's set-up (`?agent=1`) and "Or bring in a
@@ -167,6 +170,12 @@
       globalThis.sessionStorage?.removeItem(MADE_ADDONS);
     } catch {
       /* Storage off: no add-on is offered. */
+    }
+    try {
+      madeSaid = saidMadeOf(globalThis.sessionStorage?.getItem(MADE_SAID) ?? null);
+      globalThis.sessionStorage?.removeItem(MADE_SAID);
+    } catch {
+      /* Storage off: the end reads nothing more. */
     }
   });
 
@@ -725,6 +734,7 @@
         madeModules = asked.modules;
         madePlaces = railPlaces(asked.proposal.places, filledBy(asked.proposal.rows)).filter((x) => x.kind !== 'today').map((x) => x.name);
         madeAddons = tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }));
+        madeSaid = sentence.trim() === '' ? null : saidMade(sentence, asked.proposal.rows);
         made = true;
         globalThis.scrollTo?.({ top: 0 });
         return;
@@ -838,7 +848,7 @@
         </div>
       </section>
     {:else if made}
-      <Made modules={madeModules} places={madePlaces} addons={madeAddons} />
+      <Made modules={madeModules} places={madePlaces} addons={madeAddons} said={madeSaid} />
     {:else if watched}
       <!-- AFTER THE PRESS: the record being made, tile by tile. Today opens when the call answers; where the record
            refused a part, its tile says why and the way back is one button. -->

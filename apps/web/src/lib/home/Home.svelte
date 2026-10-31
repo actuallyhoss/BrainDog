@@ -75,6 +75,8 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import type ClearExamplesOf from '$lib/ui/ClearExamples.svelte';
+  import type FirstDraftsOf from '$lib/start/FirstDrafts.svelte';
+  import { draftsFor, draftsWaiting } from '$lib/start/first-drafts.svelte.ts';
   import type PageViewOf from '$lib/page/PageView.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
@@ -1121,6 +1123,16 @@
   $effect(() => {
     if (ClearExamples === null && data.live) void import('$lib/ui/ClearExamples.svelte').then((m) => (ClearExamples = m.default), () => undefined);
   });
+  /* THE DRAFTS FROM WHAT THE PERSON WROTE AT SIGN-UP (1 Nov), read by the model once more after the build: drawn at the
+     top of Today while it reads and until each is kept or let go. Its code comes only when there are drafts. */
+  let FirstDrafts = $state.raw<typeof FirstDraftsOf | null>(null);
+  $effect(() => {
+    if (data.live) draftsFor(apiBase());
+  });
+  const drafting = $derived(Boolean(data.live) && draftsWaiting(apiBase()));
+  $effect(() => {
+    if (FirstDrafts === null && drafting) void import('$lib/start/FirstDrafts.svelte').then((m) => (FirstDrafts = m.default), () => undefined);
+  });
   let EditCover = $state.raw<typeof EditCoverOf | null>(null);
   let DraftMark = $state.raw<typeof DraftMarkOf | null>(null);
   $effect(() => {
@@ -1608,6 +1620,9 @@
   {:else}
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
     {#if data.live && ClearExamples}<ClearExamples />{/if}
+
+    <!-- WHAT THE MODEL FOUND IN THE SIGN-UP WORDS BEYOND THE BUILD, each a draft kept with one press (1 Nov). -->
+    {#if drafting && FirstDrafts}<FirstDrafts />{/if}
 
     <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
     {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{:else if slim}<TellOne

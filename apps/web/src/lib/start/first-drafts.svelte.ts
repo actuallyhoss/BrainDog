@@ -1,0 +1,163 @@
+/**
+ * THE DRAFTS FROM A STRANGER'S FIRST WORDS, held for the tab while the model reads and until each is kept or let go
+ * (`first-drafts.ts` says what a draft is and why nothing here writes).
+ *
+ * BEGUN ON THE MADE SCREEN, SHOWN ON TODAY. The made screen starts the read the moment it opens and says, in one line,
+ * that it is reading and then what it found; Today draws the drafts at its top, where the first things are told. The
+ * read outlives the move between the two (this module's state), and a reload (the tab's `sessionStorage`, by the
+ * BrainDog's own address), so the model is asked once for one sentence.
+ *
+ * LIGHT ON PURPOSE: Today imports this on every open, so the lists and the model's door are loaded only when a read
+ * begins (`import()` below), never on Today's cold path.
+ *
+ * NEVER BLOCKS AND NEVER HANGS: the read has its door's twenty seconds and no more, a host with no model or a month spent
+ * is no drafts and no word, and what the rules built stands either way.
+ */
+
+import type { FirstDraft } from './first-drafts.ts';
+
+export type DraftsState = 'reading' | 'ready' | 'none';
+
+/** What a read is begun with, kept so a reload mid-read can ask again. */
+export type Begin = {
+  /** The BrainDog's own address (`apiBase()`), which keys what is kept. */
+  base: string;
+  said: string;
+  /** What the build already wrote from the same words, never offered again. */
+  built: { register: string; fields: Record<string, unknown> }[];
+  /** The lists this BrainDog holds, by id. */
+  registers: string[];
+  currency: string | null;
+  me: string | null;
+  today: string;
+};
+
+export type Kept = {
+  base: string;
+  state: DraftsState;
+  /** When the read began, so a reload long after an interrupted read does not ask again. */
+  at: number;
+  summary: string | null;
+  drafts: FirstDraft[];
+  /** How many the model found, kept or not, so the made screen can say it. */
+  found: number;
+  begin: Begin;
+};
+
+const KEY = 'braindog.first.drafts';
+/** An interrupted read older than this is let go on reload rather than asked again. */
+const STALE_MS = 60_000;
+
+class Drafts {
+  now = $state.raw<Kept | null>(null);
+}
+
+/** The one holder, read by the made screen and by Today. */
+export const firstDrafts = new Drafts();
+
+function tab(): Storage | null {
+  try {
+    return globalThis.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function save(k: Kept | null): void {
+  try {
+    if (k === null) tab()?.removeItem(KEY);
+    else tab()?.setItem(KEY, JSON.stringify(k));
+  } catch {
+    /* Storage off: the drafts live as long as this page does. */
+  }
+}
+
+function load(base: string): Kept | null {
+  try {
+    const v = JSON.parse(tab()?.getItem(KEY) ?? 'null') as Kept | null;
+    return v !== null && typeof v === 'object' && v.base === base && Array.isArray(v.drafts) && typeof v.begin?.said === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function set(k: Kept | null): void {
+  firstDrafts.now = k;
+  save(k);
+}
+
+/**
+ * The drafts for this BrainDog, from this page or this tab; a read cut off by a reload is asked again if it is recent.
+ * IT WRITES STATE, so it is called from a mount, an effect or a press, never from a `$derived` or the markup.
+ */
+export function draftsFor(base: string): Kept | null {
+  const held = firstDrafts.now?.base === base ? firstDrafts.now : load(base);
+  if (held === null) return null;
+  if (firstDrafts.now !== held) {
+    firstDrafts.now = held;
+    if (held.state === 'reading' && !inFlight.has(base)) {
+      if (Date.now() - held.at < STALE_MS) void read(held.begin);
+      else set({ ...held, state: 'none' });
+    }
+  }
+  return firstDrafts.now;
+}
+
+/** Whether there are drafts to draw for this BrainDog: reading, or found and not all handled. Reads only; `draftsFor` first. */
+export const draftsWaiting = (base: string): boolean => {
+  const k = firstDrafts.now;
+  return k !== null && k.base === base && (k.state === 'reading' || (k.state === 'ready' && k.drafts.length > 0));
+};
+
+const inFlight = new Set<string>();
+
+/** Start the read once for these words; a second call for the same words, or for words already read, changes nothing. */
+export function beginDrafts(b: Begin): void {
+  if (typeof window === 'undefined' || b.said.trim() === '') return;
+  const held = draftsFor(b.base);
+  if (held !== null && held.begin.said === b.said) return;
+  void read(b);
+}
+
+async function read(b: Begin): Promise<void> {
+  if (inFlight.has(b.base)) return;
+  inFlight.add(b.base);
+  set({ base: b.base, state: 'reading', at: Date.now(), summary: null, drafts: [], found: 0, begin: b });
+  try {
+    const [{ draftOffer, draftsOf, modulesHeld, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
+    const modules = modulesHeld(b.registers);
+    if (modules.length === 0) return void set({ ...firstDrafts.now!, state: 'none' });
+    const out = await slashAsks(b.base).setup({ said: b.said, offer: draftOffer(modules), today: b.today });
+    /* MOVED ON TO ANOTHER BRAINDOG MEANWHILE: what came back is not this one's to show. */
+    if (firstDrafts.now?.base !== b.base) return;
+    if (!out.ok) return void set({ ...firstDrafts.now, state: 'none' });
+    const drafts = draftsOf(out.value, { modules, currency: b.currency, built: b.built, me: b.me });
+    set({ ...firstDrafts.now, state: drafts.length > 0 ? 'ready' : 'none', summary: summaryOf(out.value), drafts, found: drafts.length });
+  } catch {
+    if (firstDrafts.now?.base === b.base) set({ ...firstDrafts.now, state: 'none' });
+  } finally {
+    inFlight.delete(b.base);
+  }
+}
+
+/** Drafts handled (kept or let go), by key: off the card, and the card goes with the last. */
+export function settleDrafts(base: string, keys: readonly string[]): void {
+  const k = draftsFor(base);
+  if (k === null) return;
+  set({ ...k, drafts: k.drafts.filter((d) => !keys.includes(d.key)) });
+}
+
+/** A draft changed by hand, in place. */
+export function replaceDraft(base: string, d: FirstDraft): void {
+  const k = draftsFor(base);
+  if (k === null) return;
+  set({ ...k, drafts: k.drafts.map((x) => (x.key === d.key ? d : x)) });
+}
+
+/** A draft put back after an Undo, where it was. */
+export function restoreDrafts(base: string, back: readonly FirstDraft[]): void {
+  const k = draftsFor(base);
+  if (k === null) return;
+  const keys = new Set(k.drafts.map((d) => d.key));
+  set({ ...k, state: 'ready', drafts: [...k.drafts, ...back.filter((d) => !keys.has(d.key))] });
+}
