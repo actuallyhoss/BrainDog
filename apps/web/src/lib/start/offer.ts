@@ -32,8 +32,18 @@ export const CATALOGUE_INDEX_AT = '/catalogue/index.json';
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const SHIPPED: ReadonlySet<string> = new Set([...USE_CASES.map((u) => u.usecase), ...MODULE_ORDER]);
 
-/** The catalogue's use cases this build does not already ship, each heard in at least one word. */
-const added = (catalogue: CatalogueOffer | null | undefined): CatalogueUsecase[] => {
+/**
+ * The catalogue's use cases a sentence may be read into: NONE BEYOND WHAT THIS BUILD SHIPS (audit 31 Oct h, AH8, his
+ * call). Every use case the catalogue serves beside the built-in starters is an add-on's front (Photographer, Retainer
+ * hours, Landlord), and "I freelance as a designer and track my clients" installed two of them, a Shoots page and a
+ * Timesheets page called Clients, because "clients" is one of their words. A sentence installs a starter and the
+ * first-party modules; an add-on is found by name in the store. The catalogue is still read, so a later call can say
+ * which add-ons a sentence named without installing them.
+ */
+const added = (_catalogue: CatalogueOffer | null | undefined): CatalogueUsecase[] => [];
+
+/** The catalogue's use cases this build does not ship, each heard in at least one word: what a sentence named, by id. */
+export const namedAddons = (catalogue: CatalogueOffer | null | undefined): CatalogueUsecase[] => {
   const seen = new Set<string>();
   const out: CatalogueUsecase[] = [];
   for (const u of catalogue?.usecases ?? []) {

@@ -163,9 +163,14 @@ let bare: Promise<SetupOffer> | null = null;
 export function catalogueOffer(assets: Assets | undefined, log: (line: string) => void = (line) => console.warn(line)): Promise<SetupOffer> {
   const held = assets === undefined ? bare : readOnce.get(assets);
   if (held !== null && held !== undefined) return held;
-  const reading = firstReadCasesRead(assets === undefined ? null : entriesIn(assets), builtInCases()).then(({ cases, said }) => {
+  const built = builtInCases();
+  const ids = new Set(built.map((c) => c.id));
+  const reading = firstReadCasesRead(assets === undefined ? null : entriesIn(assets), built).then(({ cases, said }) => {
     if (said !== null) log(said);
-    return { usecases: cases.map(firstReadTold), modules: modulesOffer() };
+    /* ONLY THE STARTERS THIS BUILD SHIPS (audit 31 Oct h, AH8, his call): the catalogue's other use cases are add-ons'
+       fronts, and a stranger's sentence installs a starter and first-party modules, never Photographer for "clients".
+       The catalogue's newer words for a built-in still stand. */
+    return { usecases: cases.filter((c) => ids.has(c.id)).map(firstReadTold), modules: modulesOffer() };
   });
   if (assets === undefined) bare = reading;
   else readOnce.set(assets, reading);

@@ -193,21 +193,16 @@ const askSaying = (said: string, ip = '203.0.113.9'): Request =>
     body: JSON.stringify({ said, today: '2026-10-14', zone: 'Europe/London', locale: 'en-GB', turnstile: 'good' }),
   });
 
-test('THE CATALOGUE IS ON OFFER: the landlord front reaches the model with its signals, and the sentence is read as Landlord', async () => {
+test('A FRONT IN THE CATALOGUE IS NOT ON OFFER (audit 31 Oct h, AH8): a sentence is read into the starters built in, never an add-on such as Landlord', async () => {
   const { assets, asked } = landlordAssets();
   const seen: SetupOffer[] = [];
   const lines: string[] = [];
   const d = firstReadDoorOf({ ...allOn(), ASSETS: assets }, { origin: ORIGIN, readSetup: hearingRead(seen), store: memoryStore(), send: verify, log: (l) => lines.push(l) });
   const res = await serveFirstRead(askSaying(LANDLORD_SAID), d, NOW);
   assert.equal(res.status, 200);
-  assert.equal(((await res.json()) as { value: { usecase: string | null } }).value.usecase, 'landlord');
-  const landlord = seen[0]!.usecases.find((u) => u.id === 'landlord') as SetupOffer['usecases'][number] & { signals: readonly string[]; modules: readonly string[] };
-  assert.equal(landlord.title, 'Landlord');
-  assert.deepEqual(landlord.signals, LANDLORD_SIGNALS);
-  assert.deepEqual(landlord.modules, ['people', 'landlord']);
-  assert.match(landlord.summary, /Heard in: landlord, flats/u, 'the words did not reach what the model is told');
+  assert.notEqual(((await res.json()) as { value: { usecase: string | null } }).value.usecase, 'landlord');
   const ids = seen[0]!.usecases.map((u) => u.id);
-  assert.equal(ids[0], 'landlord', 'the catalogue comes first');
+  assert.ok(!ids.includes('landlord'), 'an add-on front was offered to a sentence');
   for (const built of firstReadOffer().usecases) assert.ok(ids.includes(built.id), `${built.id}, compiled in, was dropped`);
   assert.ok(!ids.includes('hidden-front') && !ids.includes('landlord-tools'), 'an unlisted front or an add-on was offered');
   assert.deepEqual(seen[0]!.modules, firstReadOffer().modules);
