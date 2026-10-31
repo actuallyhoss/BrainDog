@@ -165,6 +165,7 @@ import {
   settleWaiting,
   HANDLED_RULE,
   COVERED,
+  askAgainLetGo,
   reopen,
   withdraw as withdrawSuggestion,
   keepApplied,
@@ -10174,9 +10175,22 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const at = raws.indexOf(id);
         const left = rows.filter((_, n) => n !== at);
         sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, rows: left, raws: raws.filter((_, n) => n !== at), count: left.length }), q.id);
+        /* THE ROW IT LET GO OF IS KEPT ON THE LINE, in this batch, so a put back gives it back (RL10). */
+        sql.exec(
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch) VALUES (?, ?, 'system', 'suggest', ?, 'suggestion', 'raws', ?, ?, ?, ?)",
+          mint(),
+          instant(clock.now()),
+          `suggestion:${q.id}`,
+          JSON.stringify({ raw: id, row: rows[at] ?? null }),
+          String(left.length),
+          `One mail in this question was settled, by ${said}`.slice(0, 280),
+          batch,
+        );
         continue;
       }
-      if (raws.length > 1) continue;
+      /* ITS ROWS AND ITS MAIL DO NOT LINE UP, so which row was this mail's cannot be said: the question closes, rather
+         than stay open with the settled mail in it, where a yes would file it a second time (RL10). The mail left in it
+         is still in the inbox. */
       sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", q.id);
       sql.exec(
         "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note, batch) VALUES (?, ?, 'system', 'resolve', ?, 'suggestion', 'moot', ?, ?)",
@@ -10189,9 +10203,18 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     }
   };
 
-  /** The door's questions a settlement closed (`settleAsked`), asked again when the arrival is put back in the inbox. */
-  const reaskArrival = (settled: string | null, actor: string, batch: string): void => {
+  /**
+   * The door's questions a settlement closed or let go of the arrival from (`settleAsked`), asked again when the arrival
+   * is put back in the inbox: a question that held other mail too takes this one's row back (RL10), and holds only the
+   * mail still in the inbox, so a yes never files a mail that was filed meanwhile.
+   */
+  const reaskArrival = (settled: string | null, raw: string, actor: string, batch: string): void => {
     if (settled === null) return;
+    const lines = sql.all<{ kind: string; target: string | null; field: string | null; from_v: string | null }>(
+      "SELECT kind, target, field, from_v FROM event WHERE batch = ? AND kind = 'suggest' AND field = 'raws' ORDER BY rowid",
+      settled,
+    );
+    askAgainLetGo(sql, mint, instant(clock.now()), lines, raw, actor, batch);
     const shut = sql.all<{ q: string }>(
       `SELECT substr(e.target, 12) AS q FROM event e JOIN suggestion s ON s.id = substr(e.target, 12)
         WHERE e.batch = ? AND e.kind = 'resolve' AND e.to_v = 'moot' AND e.target LIKE 'suggestion:%' AND e.note LIKE ? || '%'
@@ -11487,7 +11510,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           entry = out.value;
         }
         settleArrival(id, raw.state, back, w.actor, raw.state === 'matched' ? 'Filing taken back; in the inbox again.' : 'Archive taken back; in the inbox again.', batch);
-        reaskArrival(settled.batch, w.actor, batch);
+        reaskArrival(settled.batch, id, w.actor, batch);
         return ok<ArrivalSettled>({ id, state: back, entry, already: false });
       }),
 

@@ -152,6 +152,30 @@ test('A QUESTION A MEMBER\'S AGENT ASKED IS ANSWERED IN BRAINDOG, though its run
   sql.close();
 });
 
+test('A RUN A MEMBER MADE IN THE APP IS HIS, though no key opened it: his agent\'s question through it is answered in BrainDog (audit 31l, RL1)', async () => {
+  const { api, sql } = await record();
+  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_2', 'bob@vance-studio.example', 'Bob')");
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_2', '*', 'write')");
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_bob', 'p_2', 'hb', 'write', 'Bob Claude', '2026-10-01T00:00:00.000Z')");
+  const bob: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'write' }, credentialed: true } as never;
+  const made = value<{ id: string; seq: number }>(await api.create({ register: 'session', fields: { doing: 'Tidy the Q3 drafts' } }, bob));
+  const spoken = `S${made.seq}`;
+  assert.equal(sql.one<{ t: unknown }>("SELECT json_extract(fields, '$.token_id') AS t FROM entry WHERE id = ?", made.id)?.t ?? null, null, 'no key opened the run');
+  const bobsAgent = { principal: { kind: 'token', id: 't_bob', scope: 'write', person: 'p_2', level: 'write' }, session: { spoken, client: 'claude-code', host: 'mac', agent: 'claude' } } as never as CallContext;
+  const asked = value<{ id: string }>(
+    await api.propose(
+      { question: 'Delete the Q3 draft or keep it?', body_kind: 'options', body: { options: [{ id: 'drop', label: 'Delete it', because: 'Old.' }, { id: 'keep', label: 'Keep it', because: 'Safer.' }] } } as never,
+      bobsAgent,
+    ),
+  ).id;
+  assert.equal(String(api.kernel.governanceRow('suggestion', asked)?.opened_by), spoken, 'the question is signed by the run Bob made');
+  const out = refusal(await api.instructionsMine({ answer: asked, option: 'drop', said: "Yes, do what Bob's agent asked." } as never, agent()));
+  assert.equal(out.code, 'FORBIDDEN');
+  assert.match(out.fix, /was asked by somebody else/u);
+  assert.equal(statusOf(api, asked), 'open');
+  sql.close();
+});
+
 test('ON HIS WORD A RUN ANSWERS A QUESTION AS HIS, his words and the run kept on the decision, and Undo takes it back', async () => {
   const { api, sql } = await record();
   const a = rowsAsked(api, 'Write the bounce report');

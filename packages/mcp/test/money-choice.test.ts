@@ -70,3 +70,17 @@ test('ANY OTHER CHOICE LEFT OUT STILL HANDS THE CALL WITH ITS FIRST VALUE', asyn
   assert.doesNotMatch(r.fix, /Ask the person which/u);
   assert.match(String(r.try), /"room":"kitchen"/u);
 });
+
+test('A WRONG VALUE FOR A MONEY CHOICE IS NEVER GUESSED AS THE FIRST: the values are named and no try is handed (RL4)', async () => {
+  const mcp = await agent();
+  const r = refusal(await mcp.call('create', { register: 'bills', fields: { what: 'Halden deposit', direction: 'incoming' } }, owner));
+  assert.equal(r.code, 'ENUM_VALUE_UNKNOWN');
+  assert.equal(r.try, undefined);
+});
+
+test('A WRONG VALUE NO WORD POINTS TO GETS NO TRY, on any list (RL4)', async () => {
+  const mcp = await agent();
+  const r = refusal(await mcp.call('create', { register: 'chores', fields: { what: 'Mop', room: 'garage' } }, owner));
+  assert.equal(r.code, 'ENUM_VALUE_UNKNOWN');
+  assert.equal(r.try, undefined);
+});

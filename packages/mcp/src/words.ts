@@ -126,7 +126,12 @@ export function moneyInText(text: string): string {
   return text.replace(/\b([A-Z]{3}) ([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,3}))?(?![\d.,]*\d)/gu, (whole, code: string, minus: string, units: string, minor: string | undefined) => {
     const sign = SIGN[code];
     if (sign === undefined) return whole;
-    return `${minus === '' ? '' : '-'}${sign}${units}${minor !== undefined && /[1-9]/u.test(minor) ? `.${minor}` : ''}`;
+    /* THE MINOR PART TO THE CURRENCY'S OWN PLACES, as `money` writes it (RL11): "EUR 1.5" is "€1.50", never "€1.5". A
+       figure with more places than its currency has is left as written. */
+    const exp = EXPONENT[code] ?? 2;
+    if (minor !== undefined && minor.length > exp) return whole;
+    const part = minor !== undefined && /[1-9]/u.test(minor) ? `.${minor.padEnd(exp, '0')}` : '';
+    return `${minus === '' ? '' : '-'}${sign}${units}${part}`;
   });
 }
 
@@ -155,11 +160,15 @@ export function day(said: string, now: number): string {
  * A day said in words, as YYYY-MM-DD beside `now`, or `null` for words this does not read: today, tomorrow, yesterday,
  * a weekday ("friday", "next friday", the coming one), "in 3 days", "next week", "29 Oct", "October 29 2026",
  * "29/10/2026", and an instant's own day. What a refusal's `try` hands an agent that sent `by: "next friday"` (AK14).
+ *
+ * TODAY IS THE RECORD'S, in its own zone (RL8): at 00:30 in Cairo "tomorrow" is Cairo's tomorrow, not Greenwich's.
+ * "friday" said on a Friday is today, and "next friday" a week out. "03/04/2026" is read by the record's locale, day
+ * first unless it writes month first, and left unread where the locale names no country to say which.
  */
-export function dayInWords(said: string, now: number): string | null {
+export function dayInWords(said: string, now: number, place: { zone?: string; locale?: string } = {}): string | null {
   const w = said.trim().toLowerCase().replace(/[.,]/gu, ' ').replace(/\s+/gu, ' ').trim();
-  const base = new Date(now);
-  const today = Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate());
+  const base = new Date(zonedDay(now, place.zone));
+  const today = base.getTime();
   const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
   const DAY_MS = 86_400_000;
   const instant = /^(\d{4}-\d{2}-\d{2})t/u.exec(w);
@@ -175,7 +184,7 @@ export function dayInWords(said: string, now: number): string | null {
   if (weekday) {
     const at = WEEK.findIndex((d) => d === weekday[2] || (weekday[2]!.length >= 3 && d.startsWith(weekday[2]!)));
     if (at >= 0) {
-      const gap = (at - new Date(today).getUTCDay() + 7) % 7 || 7;
+      const gap = (at - new Date(today).getUTCDay() + 7) % 7 || (weekday[1] === 'next' ? 7 : 0);
       return iso(today + gap * DAY_MS);
     }
   }
@@ -195,10 +204,49 @@ export function dayInWords(said: string, now: number): string | null {
     return day;
   }
   const slashed = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/u.exec(w);
-  if (slashed) return real(Number(slashed[3]), Number(slashed[2]) - 1, Number(slashed[1]));
+  if (slashed) {
+    const [a, b, y] = [Number(slashed[1]), Number(slashed[2]), Number(slashed[3])];
+    const first = a <= 12 && b <= 12 && a !== b ? monthFirst(place.locale) : a > 12 ? false : b > 12 ? true : false;
+    if (first === null) return null;
+    return first ? real(y, a - 1, b) : real(y, b - 1, a);
+  }
   const ymd = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/u.exec(w);
   if (ymd) return real(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
   return null;
+}
+
+/** Midnight UTC of the day `now` falls on in `zone`, or in UTC where the zone is missing or one the runtime cannot read. */
+function zonedDay(now: number, zone: string | undefined): number {
+  const utc = new Date(now);
+  const plain = Date.UTC(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
+  if (zone === undefined || zone === '' || zone === 'UTC') return plain;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(utc);
+    const of = (t: string): number => Number(parts.find((p) => p.type === t)?.value);
+    const ms = Date.UTC(of('year'), of('month') - 1, of('day'));
+    return Number.isFinite(ms) ? ms : plain;
+  } catch {
+    return plain;
+  }
+}
+
+/** The countries that write a day month first, 03/04 for 4 March. */
+const MONTH_FIRST = new Set(['US', 'PH', 'FM', 'MH', 'PW', 'GU', 'AS', 'MP', 'PR', 'VI', 'UM', 'BZ']);
+
+/**
+ * Whether a locale writes a day month first: `true` for `en-US`, `false` for `en-GB` or `ar-EG`, and `null` for a
+ * locale that names no country (`en`), where 03/04 could be either.
+ */
+function monthFirst(locale: string | undefined): boolean | null {
+  if (locale === undefined || locale.trim() === '') return null;
+  let region: string | undefined;
+  try {
+    region = new Intl.Locale(locale.trim().replace(/_/gu, '-')).region;
+  } catch {
+    return null;
+  }
+  if (region === undefined) return null;
+  return MONTH_FIRST.has(region.toUpperCase());
 }
 
 /** How long ago `seconds` was, the short way: `just now`, `12m ago`, `5h ago`, `3d ago`. */

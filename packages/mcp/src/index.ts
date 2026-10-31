@@ -2169,7 +2169,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * and "the owner" otherwise. `boot.names` is the record's to give: the owner and a reader of People are told names,
    * and anybody else is told none, so a line says "Someone on this record" for them as the app does.
    */
-  const peopleOf = async (ctx: C, turn: Turn): Promise<{ names: Map<string, string>; decider: string; now: number; run?: string; app?: string }> => {
+  const peopleOf = async (ctx: C, turn: Turn): Promise<{ names: Map<string, string>; decider: string; now: number; zone?: string; locale?: string; run?: string; app?: string }> => {
     const boot = await bootOf(ctx, turn);
     const value = boot.ok && isObject(boot.value) ? boot.value : {};
     const names = new Map<string, string>();
@@ -2181,6 +2181,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       names,
       decider: me.level === 'owner' && mine ? mine : 'the owner',
       now: Number.isFinite(now) ? now : Date.now(),
+      ...(typeof value.zone === 'string' && value.zone !== '' ? { zone: value.zone } : {}),
+      ...(isObject(value.record) && typeof value.record.locale === 'string' ? { locale: value.record.locale } : {}),
       ...(typeof me.run === 'string' && RUN_HANDLE.test(me.run) ? { run: me.run } : {}),
       ...(typeof me.app === 'string' && me.app.trim() !== '' ? { app: me.app.trim() } : {}),
     };
@@ -3544,18 +3546,23 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         return callOf(name, { ...args, [key!]: { ...rest, [best]: was } });
       }
       const value = fields[refusal.at];
+      /* A MONEY CHOICE GETS NO TRY HERE EITHER (RL4): "incoming" read as a bill's first way is a guess at his money. */
+      const at = name === 'update' ? await locate(args.spoken, ctx) : null;
+      const register = at === null ? args.register : at.ok ? at.value.register : undefined;
+      if (typeof register === 'string' && !decls.has(register)) await learnPrefix(register, ctx);
+      if (moneyChoice(register, refusal.at)) return undefined;
       /* THE VALUE IT MOST LIKELY MEANT, BY SPELLING OR BY MEANING: "started" is no typo of doing, and got no try (AK14). */
       const best = typeof value === 'string' ? enumMeant(value, allowed) : null;
       return best === null ? undefined : callOf(name, { ...args, [key!]: { ...fields, [refusal.at]: best } });
     }
     /* A DAY SAID IN WORDS, "next friday", where a field takes one as YYYY-MM-DD: the day those words are, by the record's
-       own clock (AK14). Words it cannot read are left to the sentence. */
+       own clock, zone and locale (AK14, RL8). Words it cannot read, or could read two ways, are left to the sentence. */
     if (refusal.code === 'VALUE_MALFORMED' && typeof refusal.at === 'string' && refusal.fix.includes('takes a day, as YYYY-MM-DD')) {
       const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
       const fields = key === null ? null : args[key];
       if (!isObject(fields) || typeof fields[refusal.at] !== 'string') return undefined;
-      const { now } = await peopleOf(ctx, turn);
-      const read = dayInWords(fields[refusal.at] as string, now);
+      const { now, zone, locale } = await peopleOf(ctx, turn);
+      const read = dayInWords(fields[refusal.at] as string, now, { ...(zone === undefined ? {} : { zone }), ...(locale === undefined ? {} : { locale }) });
       return read === null ? undefined : callOf(name, { ...args, [key!]: { ...fields, [refusal.at]: read } });
     }
     /* A FIELD THE LIST NEEDS AND THE CALL LEFT OUT, when it is a choice: the call with its first value, the values named in
@@ -4443,7 +4450,7 @@ function strayIn(name: string, sent: Args): { ok: false; refusal: Refusal } | nu
 
 /**
  * The value of `allowed` a word most likely meant: by spelling (`closest`), then by meaning, "started" for doing and
- * "finished" for done, and else the first, so a refusal that lists the values always hands a call (audit 10k, AK14).
+ * "finished" for done, and else `null`: a value no word points to is never guessed as the first (audit 10k, AK14; RL4).
  */
 const MEANINGS: Readonly<Record<string, readonly string[]>> = {
   doing: ['started', 'start', 'in progress', 'in_progress', 'inprogress', 'active', 'working', 'wip', 'ongoing', 'underway', 'progress'],
@@ -4460,8 +4467,13 @@ export function enumMeant(said: string, allowed: readonly string[]): string | nu
   const spelt = closest(said, among);
   if (spelt !== null) return spelt;
   const word = said.trim().toLowerCase();
-  for (const [meant, words] of Object.entries(MEANINGS)) if (words.includes(word)) return closest(meant, among) ?? allowed[0]!;
-  return allowed[0]!;
+  for (const [meant, words] of Object.entries(MEANINGS)) {
+    if (!words.includes(word)) continue;
+    const found = closest(meant, among);
+    if (found !== null) return found;
+  }
+  /* NEITHER SPELLING NOR MEANING FINDS ONE: no guess. The refusal lists the values (RL4). */
+  return null;
 }
 
 /**

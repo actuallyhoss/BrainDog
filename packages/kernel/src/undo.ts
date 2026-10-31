@@ -53,7 +53,7 @@ import { BACKFILL_ACTOR } from './backfill.ts';
 import { agentOf, kindOfEvent, shapeIn } from './change-kind.ts';
 import type { Json } from './coerce.ts';
 import { jcs, type Declaration } from './declare.ts';
-import { COVERED } from './govern.ts';
+import { COVERED, askAgainLetGo } from './govern.ts';
 import type { Patch } from './index.ts';
 import { keyedLists, mergeFieldOf } from './entities.ts';
 import type { RoleList } from './roles.ts';
@@ -1365,6 +1365,8 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
         'Filing undone; in the inbox again.',
         batch,
       );
+      /* AND THE QUESTION ITS FILING LET GO OF IT FROM HOLDS IT AGAIN (RL10). */
+      askAgainLetGo(sql, () => parts.mint(), at, every.filter((e) => e.batch === l.batch), id, actor, batch);
     }
 
     /* ── the declarations, each question's together: the earlier bodies as new versions, and a history line each ── */

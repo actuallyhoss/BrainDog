@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { EXPONENT as DRAWN, exponentOf, money as drawn } from '../../render/src/format.ts';
-import { actorWords, bare, clip, closest, cursorIn, cursorOut, deviceOf, EXPONENT, gist, money, PERSON_ID, runnerOf, ULID } from '../src/words.ts';
+import { actorWords, bare, clip, closest, cursorIn, cursorOut, dayInWords, deviceOf, EXPONENT, gist, money, moneyInText, PERSON_ID, runnerOf, ULID } from '../src/words.ts';
 import { durationSaid, prose, rowLine, type Decl, type Look } from '../src/brief.ts';
 
 const ROW = '01M345FTM0D4F495AW6K6NDAHH';
@@ -174,4 +174,27 @@ test('TWO AMOUNTS ON ONE LINE SAY WHICH IS WHICH, and one amount alone is the ro
   assert.equal(rowLine(both, 'things', look), 'Kiln (things#1) · earned in a year £18,400 · earned the year before £14,120');
   const one = { spoken: 'things#2', fields: { name: 'Marlow', revenue: { amount: 420_000, currency: 'GBP' } } };
   assert.equal(rowLine(one, 'things', look), 'Marlow (things#2) · £4,200');
+});
+
+test('A DAY IN WORDS IS THE RECORD\'S DAY: its zone, "friday" on a Friday is today, and 03/04 by its locale (RL8)', () => {
+  /* 00:30 on Saturday 31 October in Cairo is 22:30 on Friday 30 October in Greenwich. */
+  const late = Date.UTC(2026, 9, 30, 22, 30);
+  assert.equal(dayInWords('today', late, { zone: 'Africa/Cairo' }), '2026-10-31');
+  assert.equal(dayInWords('tomorrow', late, { zone: 'Africa/Cairo' }), '2026-11-01');
+  assert.equal(dayInWords('today', late), '2026-10-30');
+  const friday = Date.UTC(2026, 9, 30, 9);
+  assert.equal(dayInWords('friday', friday), '2026-10-30');
+  assert.equal(dayInWords('next friday', friday), '2026-11-06');
+  assert.equal(dayInWords('03/04/2026', friday, { locale: 'en-US' }), '2026-03-04');
+  assert.equal(dayInWords('03/04/2026', friday, { locale: 'en-GB' }), '2026-04-03');
+  assert.equal(dayInWords('03/04/2026', friday, { locale: 'en' }), null);
+  assert.equal(dayInWords('29/10/2026', friday, { locale: 'en' }), '2026-10-29');
+  assert.equal(dayInWords('10/29/2026', friday, { locale: 'en' }), '2026-10-29');
+});
+
+test('MONEY IN A SENTENCE IS WRITTEN TO ITS CURRENCY\'S PLACES, as every answer writes it (RL11)', () => {
+  assert.equal(moneyInText('Refund EUR 1.5 to Lina'), 'Refund €1.50 to Lina');
+  assert.equal(moneyInText('Pay GBP 12.3 today'), 'Pay £12.30 today');
+  assert.equal(moneyInText('Pay GBP 39.00?'), 'Pay £39?');
+  assert.equal(moneyInText('JPY 100.5 is odd'), 'JPY 100.5 is odd');
 });

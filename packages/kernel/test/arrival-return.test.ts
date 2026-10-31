@@ -230,3 +230,62 @@ test('A RETURNED UNVERIFIED ARRIVAL THE INGEST THEN RESCUES IS THE INGEST FILING
   assert.match(fixOf(refile), /left the inbox/);
   sql.close();
 });
+
+/* ── a question that holds several mails (audit 31l, RL10) ── */
+
+const askAbout = (k: Kernel, sql: NodeSql, raws: string[], rows: number): string => {
+  const id = value(
+    k.propose(
+      { question: 'Add these?', body_kind: 'rowset', body: { register: 'out', rows: Array.from({ length: rows }, (_, n) => ({ merchant: `Shop ${String(n + 1)}` })) } } as never,
+      'slash',
+      'rules',
+    ),
+  ).id;
+  const body = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)!.body) as Record<string, unknown>;
+  sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, raws, count: rows }), id);
+  return id;
+};
+const bodyOf = (sql: NodeSql, id: string): { rows: { merchant: string }[]; raws: string[] } =>
+  JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)!.body) as { rows: { merchant: string }[]; raws: string[] };
+const statusOf = (sql: NodeSql, id: string): string | undefined => sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', id)?.status;
+
+test('ONE MAIL FILED OUT OF A QUESTION ABOUT SEVERAL IS GIVEN BACK TO IT WHEN IT IS PUT BACK', async () => {
+  const { k, sql } = await record();
+  const [a, b, c] = [email(k, 'One'), email(k, 'Two'), email(k, 'Three')];
+  const q = askAbout(k, sql, [a, b, c], 3);
+  const filed = value(k.fileArrival(b, 'notes', null, PERSON));
+  assert.deepEqual(bodyOf(sql, q).raws, [a, c]);
+  assert.equal(statusOf(sql, q), 'open');
+
+  value(k.returnArrival(b, filed.entry!.version, PERSON));
+  const back = bodyOf(sql, q);
+  assert.deepEqual(back.raws, [a, c, b]);
+  assert.deepEqual(back.rows.map((r) => r.merchant), ['Shop 1', 'Shop 3', 'Shop 2']);
+  assert.equal(statusOf(sql, q), 'open');
+  sql.close();
+});
+
+test('A MAIL PUT BACK AFTER THE REST WERE FILED REOPENS THE QUESTION WITH ITSELF ALONE, so no mail is filed twice', async () => {
+  const { k, sql } = await record();
+  const [a, b] = [email(k, 'One'), email(k, 'Two')];
+  const q = askAbout(k, sql, [a, b], 2);
+  const first = value(k.fileArrival(a, 'notes', null, PERSON));
+  value(k.fileArrival(b, 'notes', null, PERSON));
+  assert.equal(statusOf(sql, q), 'resolved');
+
+  value(k.returnArrival(a, first.entry!.version, PERSON));
+  assert.equal(statusOf(sql, q), 'open');
+  assert.deepEqual(bodyOf(sql, q).raws, [a]);
+  assert.deepEqual(bodyOf(sql, q).rows.map((r) => r.merchant), ['Shop 1']);
+  sql.close();
+});
+
+test('A QUESTION WHOSE ROWS AND MAILS DO NOT LINE UP CLOSES WHEN ONE IS FILED, rather than keep the filed mail in it', async () => {
+  const { k, sql } = await record();
+  const [a, b, c] = [email(k, 'One'), email(k, 'Two'), email(k, 'Three')];
+  const q = askAbout(k, sql, [a, b, c], 2);
+  value(k.fileArrival(b, 'notes', null, PERSON));
+  assert.equal(statusOf(sql, q), 'resolved');
+  assert.equal(sql.one<{ r: string }>('SELECT resolved_as AS r FROM suggestion WHERE id = ?', q)?.r, 'moot');
+  sql.close();
+});
