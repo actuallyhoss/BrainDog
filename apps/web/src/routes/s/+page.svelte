@@ -402,6 +402,55 @@
     margin-block: 0;
   }
 
+  /* A TILE OF ONE FIGURE AND ITS LINE ("Over time") IS A CHART, as the app draws it on Money (`money/look.css`, AL6): the
+     label and the figure over a line the tile's width, its first day and Today under the line. The link drew the line
+     about 120px wide at the tile's far end with its days beside the label. */
+  .part > :global(.block[data-kind='stat']:not([data-form='lead']) > .grid:has(> .cell:only-child > .cell-trend) > .cell) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'trend trend'
+      'axis axis'
+      'note note';
+    align-items: start;
+    inline-size: 100%;
+  }
+
+  .part > :global(.block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-label) {
+    grid-area: label;
+  }
+
+  .part > :global(.block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-figure) {
+    grid-area: figure;
+    justify-self: start;
+  }
+
+  .part > :global(.block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-trend) {
+    grid-area: trend;
+    inline-size: 100%;
+    block-size: 140px;
+    margin-block-start: var(--sp-3);
+  }
+
+  .part > :global(.block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-trend-days) {
+    grid-area: axis;
+    display: flex;
+    justify-content: space-between;
+    margin-block-start: var(--sp-1);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .part > :global(.block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-note) {
+    grid-area: note;
+  }
+
+  .part > :global(.block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .glyph) {
+    grid-area: glyph;
+  }
+
   .part-head {
     margin: 0;
     color: var(--ink);
