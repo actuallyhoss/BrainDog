@@ -7,8 +7,13 @@
  * person moved to), it stays there. A field drawn anew is found by what it is called, its `aria-label` or `name`.
  */
 
-/** Call before the press's work; call what it answers after, and the focus is back in the field it left. */
-export function holdFocus(): () => void {
+/**
+ * Call before the press's work; call what it answers after, and the focus is back in the field it left.
+ *
+ * `orElse` IS WHERE IT GOES WHEN THE FIELD IS GONE FOR GOOD (AL9): the Dashboard's "Name your first project" is drawn only
+ * while no project is, so its first add takes the box away with the empty state, and the focus fell to the page.
+ */
+export function holdFocus(orElse?: () => HTMLElement | null | undefined): () => void {
   if (typeof document === 'undefined') return () => {};
   const was = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
   if (!was) return () => {};
@@ -17,7 +22,7 @@ export function holdFocus(): () => void {
   const name = was.getAttribute('name');
   const css = (s: string): string => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/"/g, '\\"'));
   const at = label ? `${tag}[aria-label="${css(label)}"]` : name ? `${tag}[name="${css(name)}"]` : null;
-  const find = (): HTMLElement | null => (was.isConnected ? was : at ? document.querySelector<HTMLElement>(at) : null);
+  const find = (): HTMLElement | null => (was.isConnected ? was : ((at ? document.querySelector<HTMLElement>(at) : null) ?? orElse?.() ?? null));
   return () => focusOnceDrawn(find, { from: was });
 }
 

@@ -58,6 +58,7 @@ export const words = {
   keyAgain: 'Then open this again.',
   adds: 'Adds',
   /* THE NUMBERS A PLAN ADDS, AS ONE ROW: seventeen of them named one under another buried its lists. */
+  withPage: (detail: string | null) => (detail ? `${detail}, and its own page` : 'With its own page'),
   addsNumbers: (n: number) => (n === 1 ? 'and 1 number' : `and ${n.toLocaleString('en-GB')} numbers`),
   handed: 'already here, under another add-on',
   /** What an add-on's patterns read, by how each arrives (AH11). */
@@ -240,9 +241,9 @@ const addDetail = (id: string, summary: string): string | null => (/^(?:page|rul
 const section = (key: SectionKey, title: string, rows: Row[]): Section[] => (rows.length === 0 ? [] : [{ key, title, rows }]);
 
 /** What a plan adds: each list, page and rule by name, then its numbers as one row, and the count of every one. */
-function addsSection(named: Row[], figures: number): Section[] {
+function addsSection(named: Row[], figures: number, folded = 0): Section[] {
   const rows = figures === 0 ? named : [...named, row(words.addsNumbers(figures))];
-  return rows.length === 0 ? [] : [{ key: 'adds', title: words.adds, rows, n: named.length + figures }];
+  return rows.length === 0 ? [] : [{ key: 'adds', title: words.adds, rows, n: named.length + figures + folded }];
 }
 const row = (t: string, detail: string | null = null): Row => ({ text: t, detail });
 
@@ -270,6 +271,16 @@ function onceEach(adds: readonly Body[], name: (id: string) => string): Body[] {
     if (id.startsWith('script.') && ids.has(`rule.${id.slice('script.'.length)}`)) return false;
     return !(id.startsWith('page.') && lists.has(name(id).trim().toLowerCase()));
   });
+}
+
+/**
+ * The pages folded into the list of their name by `onceEach`, by that name. THEY ARE STILL COUNTED AND SAID (AL10): the
+ * store's listing counted Certificates' page among the 11 things it adds and the sheet said "Adds 10", so the list's line
+ * says it comes with its page, and the count keeps it.
+ */
+function foldedPages(adds: readonly Body[], name: (id: string) => string): Set<string> {
+  const lists = new Set(adds.map((a) => text(a.id)).filter((id) => id.startsWith('register.')).map((id) => name(id).trim().toLowerCase()));
+  return new Set(adds.map((a) => text(a.id)).filter((id) => id.startsWith('page.') && lists.has(name(id).trim().toLowerCase())).map((id) => name(id).trim().toLowerCase()));
 }
 
 /* THE PREDICATE NAMES ITS OWN SHAPE, AND NOT PLAIN `Body`: two guards that both narrow to the same wide type leave the
@@ -337,6 +348,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     ...removals.map((r) => row(name(`register.${text(r.retire)}`), text(r.line))),
   ];
 
+  const folded = foldedPages(list(d.adds), name);
   const part: Part = {
     key: id,
     title,
@@ -344,12 +356,17 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     sections: [
       ...addsSection(
         [
-          ...onceEach(list(d.adds).filter((a) => !text(a.id).startsWith('metric.') && !text(a.id).startsWith('ingest.')), name).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : addDetail(text(a.id), text(a.summary)))),
+          ...onceEach(list(d.adds).filter((a) => !text(a.id).startsWith('metric.') && !text(a.id).startsWith('ingest.')), name).map((a) => {
+            const detail = a.handed === true ? words.handed : addDetail(text(a.id), text(a.summary));
+            const paged = text(a.id).startsWith('register.') && folded.has(name(text(a.id)).trim().toLowerCase());
+            return row(name(text(a.id)), paged ? words.withPage(detail) : detail);
+          }),
           /* WHAT IT READS, ONE LINE FOR EVERY PATTERN (audit 31 Oct h, AH11): Card alerts' four were "Ingest.bank card out,
              ingest" each. A pattern the namer knows by how it arrives ("mail", "texts") says that way. */
           ...readsRow(list(d.adds).filter((a) => text(a.id).startsWith('ingest.')).map((a) => name(text(a.id)))),
         ],
         list(d.adds).filter((a) => text(a.id).startsWith('metric.')).length,
+        folded.size,
       ),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),
       ...section('retires', words.retires, retires.filter((r) => typeof r.to !== 'string').map((r) => row(name(text(r.id)), words.keepsRows(count(r.rows))))),

@@ -27,7 +27,8 @@
 </script>
 
 {#if lines.length > 0}
-  <div class="just">
+  <!-- FOCUSABLE BY SCRIPT, so a first add whose box went with the empty state lands here (AL9). -->
+  <div class="just" data-just tabindex="-1">
     <Tile icon="history" title={words.just} aria-live="polite">
       <ul class="just-lines">
         {#each lines as l (l.key)}
@@ -53,6 +54,12 @@
   .just {
     grid-column: 1 / -1;
     min-inline-size: 0;
+    border-radius: var(--r-tile);
+  }
+
+  .just:focus:not(:focus-visible) {
+    /* focus-ok: taken by script after a first add; the ring stays for a keyboard. */
+    outline: none;
   }
 
   .just-lines {

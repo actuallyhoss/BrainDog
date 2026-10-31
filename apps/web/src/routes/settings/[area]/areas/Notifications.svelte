@@ -51,9 +51,46 @@
 
   /* ── the time zone (MC2) ─────────────────────────────────────────────── */
 
-  /** "Africa/Cairo" as a person reads it: "Cairo", in the group "Africa"; "America/Argentina/Buenos_Aires" is "Buenos Aires". */
-  const placeOf = (tz: string): string => (tz === 'UTC' ? 'UTC' : (tz.split('/').pop() ?? tz).replace(/_/g, ' '));
-  const areaOf = (tz: string): string => (tz.includes('/') ? tz.slice(0, tz.indexOf('/')).replace(/_/g, ' ') : '');
+  /**
+   * TODAY'S NAMES FOR THE PLACES THE RUNTIME STILL FILES UNDER OLD ONES (AL7). `Intl` lists Calcutta, Kiev and Saigon,
+   * and hands them back for the new names too, so the value kept stays the runtime's and only the words change.
+   */
+  const NOW_CALLED: Readonly<Record<string, string>> = {
+    'Asia/Calcutta': 'Kolkata',
+    'Europe/Kiev': 'Kyiv',
+    'Asia/Saigon': 'Ho Chi Minh City',
+    'Asia/Rangoon': 'Yangon',
+    'Asia/Katmandu': 'Kathmandu',
+    'Africa/Asmera': 'Asmara',
+    'Atlantic/Faeroe': 'Faroe Islands',
+    'Pacific/Enderbury': 'Kanton',
+    'Pacific/Ponape': 'Pohnpei',
+    'Pacific/Truk': 'Chuuk',
+    'America/Godthab': 'Nuuk',
+    'America/Coral_Harbour': 'Atikokan',
+    'America/Scoresbysund': 'Ittoqqortoormiit',
+    'America/Indianapolis': 'Indianapolis, Indiana',
+    'America/Louisville': 'Louisville, Kentucky',
+  };
+  /* A GROUP IS A CONTINENT OR AN OCEAN, said as one: "Indian" alone is no place, and Svalbard is filed in Europe. */
+  const AREA_CALLED: Readonly<Record<string, string>> = { Indian: 'Indian Ocean', Atlantic: 'Atlantic Ocean', Pacific: 'Pacific Ocean', Arctic: 'Europe' };
+
+  /**
+   * "Africa/Cairo" as a person reads it: "Cairo", in the group "Africa". A zone inside a state or country says it, so
+   * "America/North_Dakota/Center" is "Center, North Dakota" and never a bare "Center".
+   */
+  const placeOf = (tz: string): string => {
+    if (tz === 'UTC') return 'UTC';
+    const called = NOW_CALLED[tz];
+    if (called) return called;
+    const parts = tz.split('/').map((p) => p.replace(/_/g, ' '));
+    return parts.length > 2 ? `${parts[parts.length - 1]}, ${parts[parts.length - 2]}` : (parts[parts.length - 1] ?? tz);
+  };
+  const areaOf = (tz: string): string => {
+    if (!tz.includes('/')) return '';
+    const area = tz.slice(0, tz.indexOf('/')).replace(/_/g, ' ');
+    return AREA_CALLED[area] ?? area;
+  };
   const zoneSaid = (tz: string): string => (areaOf(tz) ? `${placeOf(tz)} (${areaOf(tz)})` : placeOf(tz));
 
   /**
@@ -77,7 +114,7 @@
       const area = areaOf(z);
       groups.set(area, [...(groups.get(area) ?? []), z]);
     }
-    return [...groups].map(([area, zones]) => ({ area, zones: zones.sort((a, b) => placeOf(a).localeCompare(placeOf(b))) }));
+    return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([area, zones]) => ({ area, zones: zones.sort((a, b) => placeOf(a).localeCompare(placeOf(b))) }));
   });
   let zoneBusy = $state(false);
   let zoneRefusal = $state('');
@@ -279,8 +316,8 @@
 <Tile icon="globe" title={words.zone}>
   {#if owner}
     <div class="zone">
-      <label class="quiet-word" for="zone-pick">{words.zone}</label>
-      <select class="zone-pick" id="zone-pick" value={zoneHeld} disabled={zoneBusy} onchange={(e) => void putZone(e.currentTarget.value, false, e.currentTarget)}>
+      <!-- THE TILE'S TITLE SAYS "Time zone", so the picker is named for a screen reader and not said a second time. -->
+      <select class="zone-pick" id="zone-pick" aria-label={words.zone} value={zoneHeld} disabled={zoneBusy} onchange={(e) => void putZone(e.currentTarget.value, false, e.currentTarget)}>
         {#if device && device !== zoneHeld}<option value={device}>{words.zoneDevice(zoneSaid(device))}</option>{/if}
         <option value="UTC">UTC</option>
         {#each zoneGroups as g (g.area)}

@@ -11,7 +11,7 @@
  * mistake `+layout.ts` already has a paragraph about.
  */
 
-import { PLACES } from './nav/rail.ts';
+import { LATE, PLACES } from './nav/rail.ts';
 import { TASKS } from './work/list.ts';
 import { WORK_PAGE } from './work/page.ts';
 
@@ -297,6 +297,17 @@ const FIVE_AT: Readonly<Record<string, number>> = { orders: 20, shop: 20, projec
 const placeName = (i: FlatItem): string => plainOf(i.key.replace(/^section:/u, ''));
 
 /**
+ * Where a place sits on the bar. ON A STARTER'S RECORD PROJECTS COMES LAST (audit 31 Oct l, AL3): Projects is no place
+ * until the first project is kept, and ranked by its 30 it then stepped in ahead of Money, so a Founder's Money moved a
+ * slot and his Dashboard fell into Menu. After the starter's own place and the rest, it takes the next free slot or
+ * waits in Menu, and nothing he already had moves. A record with no starter place (his own) keeps the five's order.
+ */
+export function atOf(item: FlatItem, starter: boolean): number {
+  if (starter && placeName(item) === 'projects') return LATE;
+  return item.place ?? FIVE_AT[placeName(item)] ?? 100;
+}
+
+/**
  * The five places, on the phone's tab bar and in the top bar: Today, Needs you, Projects, Money and Agents. A record
  * without one of the three fills its slot with its next place in the rail's order, so the bar is never short while
  * the record has places to show. The rest are behind More with everything else.
@@ -316,7 +327,7 @@ export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly str
      place that says none by where the five put it. */
   const own = tail.filter((i) => !PLACES.includes(placeName(i)) && typeof i.place === 'number');
   const named = [...FIVE.flatMap((name) => tail.filter((i) => placeName(i) === name)), ...own]
-    .map((item, i) => ({ item, at: item.place ?? FIVE_AT[placeName(item)] ?? 100, i }))
+    .map((item, i) => ({ item, at: atOf(item, own.length > 0), i }))
     .sort((a, b) => a.at - b.at || a.i - b.i)
     .map((x) => x.item);
   const others = tail.filter((i) => !named.includes(i));

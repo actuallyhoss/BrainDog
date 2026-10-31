@@ -21,11 +21,11 @@ export const words = {
   bindWhy: 'This page shows no list yet. Choose the list it should show.',
   bindNone: 'There is no list yet, so anything added here would have nothing to show.',
   /**
-   * A captured line's receipt: the row by its words, the list it went to, what the line said beside its words ("Due Thu
-   * 1 Oct", "Kiln"), and what was filled on the reader's behalf.
+   * A captured line's receipt: the row by its words, the list it went to, and what the line said beside its words ("Due
+   * Thu 1 Oct", "Kiln"). NOT WHAT WAS FILLED ON THE READER'S BEHALF (AL13): "with aim 0 and status Active filled in" read
+   * as a form, and a list's own add line has said only "Added" since VERIFY H23. What was filled is on the row.
    */
-  added: (what: string, list: string, read: readonly string[], filled: readonly string[]) =>
-    `Added “${what}” to ${list}${read.length > 0 ? ` · ${read.join(' · ')}` : ''}${filled.length > 0 ? `, with ${and(filled)} filled in` : ''}.`,
+  added: (what: string, list: string, read: readonly string[]) => `Added “${what}” to ${list}${read.length > 0 ? ` · ${read.join(' · ')}` : ''}.`,
   /* A PAGE ABOUT ONE ROW SPEAKS FIRST (things, not rows), and the row's own fields are one press under it. */
   showData: 'Show the data',
   /** A block with no heading and a kind with no name, said to a screen reader only: the region's name. */
@@ -63,8 +63,3 @@ export const words = {
   /** The next action under the headline, for a screen reader: the line itself says what it is. */
   next: 'Next step',
 } as const;
-
-/** "a", "a and b", "a, b and c". */
-function and(parts: readonly string[]): string {
-  return parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
-}

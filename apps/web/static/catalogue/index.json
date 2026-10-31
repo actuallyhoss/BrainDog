@@ -8655,8 +8655,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.9.1",
+      "latest": "2.10.0",
       "versions": [
+        {
+          "version": "2.10.0",
+          "checksum": "55a8dd88b4b6a1283b5ebee1fc838f323cd9f0f5f9a30aae7be842e3aa94f900",
+          "bytes": 33665,
+          "published_at": "2026-10-31T02:39:07.291Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Progress",
+              "Money saved",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.9.1",
           "checksum": "02627fde25860ad8f961dad8eeb71023d354be4f7b3ee87f025cc649617a8cfc",
@@ -9490,8 +9522,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.30.2",
+      "latest": "2.30.3",
       "versions": [
+        {
+          "version": "2.30.3",
+          "checksum": "db8da3d89775919e9f90ae26a589aa9f46dacac36512b36d50ff388415afb79f",
+          "bytes": 37732,
+          "published_at": "2026-10-31T02:37:23.823Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Sprints",
+              "Sprint plan",
+              "Sprint days"
+            ],
+            "pages": [
+              "Team",
+              "Sprints",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.30.2",
           "checksum": "306856a854616def5473d3b134957ede218666f2738429dd2c413f292b05b331",
