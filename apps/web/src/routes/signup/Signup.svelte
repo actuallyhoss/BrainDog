@@ -492,6 +492,17 @@
       only: asked.only,
     };
   });
+  /**
+   * EVERY WORD LIT ON A LINE IS SAID ON IT (first-hour audit AH21): a later phrase folded into a line (`more`) was lit in
+   * the field and said nowhere under it, so "bills", "rent" and "payday" lit up and only "budget" was read back.
+   */
+  const saidAll = (h: HeardLine): string => {
+    const one = (t: string): string => t.replace(/\s+/gu, ' ').trim();
+    const more = (h.more ?? []).map(([a, b]) => one(sentence.slice(a, b))).filter((t) => t !== '' && t.toLowerCase() !== h.phrase.toLowerCase());
+    const all = [h.phrase, ...more];
+    return all.length < 2 ? h.phrase : `${all.slice(0, -1).join(', ')} and ${all[all.length - 1]}`;
+  };
+
   /** The sentence cut at the very words heard, for the marks under the field. */
   const lit = $derived(litIn(sentence, read?.heard ?? []));
 
@@ -1309,7 +1320,7 @@
               <li>
                 <!-- `heard-line`, NEVER `line`: the ledger's global `.line` is a grid, and it took this row over. -->
                 <button type="button" class="heard-line" aria-expanded={opened === lineOf(h)} onclick={() => openLine(h)}>
-                  <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : h.phrase}</span>
+                  <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : saidAll(h)}</span>
                   <span class="line-became">{h.you === true ? words.you : h.became}<Icon name="chevron" size="s" /></span>
                 </button>
                 {#if opened === lineOf(h)}

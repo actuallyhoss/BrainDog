@@ -300,3 +300,133 @@ test('a thing "for" a day or for somebody unnamed is no order from anybody', () 
   assert.ok(!tellRead('14 mugs for Friday', fresh).rows.some((r) => r.register === 'people'));
   assert.ok(!tellRead('Glaze 14 mugs for the market', fresh).rows.some((r) => r.register === 'people'));
 });
+
+/* ── a stranger's first sentence, on every starter (first-hour audit AH1, AH2, AH24) ──────────────────────────────── */
+
+const STEPS: TellList = {
+  id: 'assignments',
+  name: 'Assignments',
+  one: 'assignment',
+  title: 'what',
+  state: 'state',
+  fields: [
+    { id: 'what', label: 'Assignment', type: 'text', required: true },
+    { id: 'state', label: 'Status', type: 'enum', values: ['to_do', 'doing', 'handed_in', 'marked'], default: 'to_do', required: true },
+    { id: 'due', label: 'Due', type: 'day', deadline: true },
+  ],
+};
+const THINGS = seeded('portfolio', 'things');
+const NUMBERS = seeded('portfolio', 'datapoints');
+/* A Wednesday on 7 Oct: a student with People and Assignments and no Money. */
+const student = { lists: [PEOPLE, STEPS], today: TODAY, currency: null };
+/* A founder before any account: People, Tasks, Projects, Numbers and Money. */
+const founder = { lists: [PEOPLE, TASKS, THINGS, NUMBERS, LEDGER, DUE], today: TODAY, currency: 'EGP' };
+
+test('A TASK ON A LIST CALLED ANYTHING: a list with a day it is due by takes a plain line (Assignments, Tickets)', () => {
+  const { rows } = tellRead('Essay on Keynes due Friday for Economics', student);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.register, 'assignments');
+  assert.deepEqual(rows[0]!.fields, { what: 'Essay on Keynes for Economics', due: '2026-10-09' });
+  const exam = tellRead('Exam for Statistics on 20 Nov', student).rows[0]!;
+  assert.equal(exam.fields.due, '2026-11-20');
+});
+
+test('A TASK ASSIGNED TO SOMEBODY IS THEIRS, and its title is short', () => {
+  const { rows } = tellRead('Fix the login timeout bug, assign to Omar, due Tuesday', founder);
+  const task = rows.find((r) => r.register === 'tasks')!;
+  assert.equal(task.fields.what, 'Fix the login timeout bug');
+  assert.equal(task.fields.by, '2026-10-13');
+  assert.deepEqual(task.fields.owner, { $row: rows.findIndex((r) => r.register === 'people') });
+});
+
+test('SOMEBODY MET IS A PERSON, with their address whole and what was said of them (AH24)', () => {
+  const { rows, left } = tellRead('Met Lina from Acme, lina@acme.example, interested in a pilot', founder);
+  assert.deepEqual(left, []);
+  assert.deepEqual(rows.map((r) => r.register), ['people']);
+  assert.equal(rows[0]!.fields.name, 'Lina');
+  assert.equal(rows[0]!.fields.email, 'lina@acme.example');
+  assert.equal(rows[0]!.fields.note, 'From Acme. Interested in a pilot');
+  assert.equal(rows[0]!.fields.role, undefined, 'somebody met is not a client until they order');
+});
+
+test('"MET SALMA, HER ADDRESS, SHE WANTS 20 CANDLES" IS SALMA, WITH HER ADDRESS, AND AN ORDER FROM HER', () => {
+  const { rows, left } = tellRead('Met Salma Fahmy today, salma@example.com, she wants 20 candles by Friday', fresh);
+  assert.deepEqual(left, []);
+  assert.deepEqual(rows.map((r) => r.register), ['people', 'orders']);
+  assert.equal(rows[0]!.fields.email, 'salma@example.com');
+  assert.equal(rows[0]!.said, 'Salma Fahmy, a client');
+  assert.deepEqual(rows[1]!.fields.who, { $row: 0 });
+  assert.equal(rows[1]!.fields.how_many, 20);
+});
+
+test('A TUTOR MET AND A TEAMMATE JOINED ARE PEOPLE', () => {
+  const tutor = tellRead('Met my tutor Dr Hana Saleh, hana@uni.example', student).rows[0]!;
+  assert.equal(tutor.fields.name, 'Hana Saleh');
+  assert.equal(tutor.fields.email, 'hana@uni.example');
+  const joined = tellRead('Priya joined the team, priya@team.example', founder).rows;
+  assert.deepEqual(joined.map((r) => r.fields.name), ['Priya']);
+});
+
+test('A CODE TYPED AFTER THE FIGURE IS ITS CURRENCY, and a payout makes nobody a client (AH2)', () => {
+  const { rows } = tellRead('Stripe paid out 1,950 USD today', founder);
+  assert.deepEqual(rows.map((r) => r.register), ['obligations']);
+  assert.deepEqual(rows[0]!.fields.amount, { amount: 195000, currency: 'USD' });
+  assert.equal(rows[0]!.fields.what, 'Payout from Stripe');
+  assert.equal(rows[0]!.fields.direction, 'owed_to_me');
+});
+
+test('A FIGURE KEPT AN EYE ON IS A NUMBER, and a new project is a project', () => {
+  const mrr = tellRead('MRR is 4,200 USD this month', founder).rows;
+  assert.deepEqual(mrr.map((r) => r.register), ['datapoints']);
+  assert.deepEqual(mrr[0]!.fields.amount, { amount: 420000, currency: 'USD' });
+  const p = tellRead('New project: Tallow, a habit tracker app', founder).rows;
+  assert.deepEqual(p.map((r) => r.register), ['things']);
+  assert.equal(p[0]!.fields.name, 'Tallow');
+  assert.equal(p[0]!.fields.about, 'A habit tracker app');
+  assert.equal(p[0]!.fields.lane, 'building');
+});
+
+test('A BILL TO PAY AND AN INVOICE TO SEND ARE BILLS AND INVOICES, due on the day said', () => {
+  const rent = tellRead('Pay rent 12000 on the 1st', founder).rows[0]!;
+  assert.equal(rent.register, 'obligations');
+  assert.deepEqual(rent.fields, { what: 'Rent', amount: { amount: 1200000, currency: 'EGP' }, direction: 'owed_by_me', due: '2026-11-01', state: 'open' });
+  const power = tellRead('Electricity bill 850 due 5 Nov', founder).rows[0]!;
+  assert.equal(power.fields.what, 'Electricity bill');
+  assert.equal(power.fields.due, '2026-11-05');
+  const { rows, left } = tellRead('Invoice Acme 1,200 USD for the logo work, due in 14 days', founder);
+  assert.deepEqual(left, []);
+  const invoice = rows.find((r) => r.register === 'obligations')!;
+  assert.equal(invoice.fields.direction, 'owed_to_me');
+  assert.equal(invoice.fields.what, 'Logo work');
+  assert.equal(invoice.fields.due, '2026-10-21');
+  assert.deepEqual(invoice.fields.amount, { amount: 120000, currency: 'USD' });
+  /* With no day, the bill says what it needs, and is never given one. */
+  assert.deepEqual(tellRead('Gym membership 900 a month', founder).rows[0]!.missing, ['the day it is due']);
+});
+
+test("A BANK'S TEXT IS MONEY IN THE CURRENCY IT NAMES, never the record's, where and when it was spent", () => {
+  const cib = 'CIB: Your card ending 4421 was charged EGP 1,250.00 at CARREFOUR MAADI on 31/10/2026. Avl bal EGP 18,340.55';
+  const { rows } = tellRead(cib, { ...founder, currency: 'USD', today: '2026-10-31' });
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0]!.fields.amount, { amount: 125000, currency: 'EGP' });
+  assert.equal(rows[0]!.fields.what, 'Carrefour Maadi');
+  assert.equal(rows[0]!.fields.direction, 'owed_by_me');
+  assert.equal(rows[0]!.fields.due, '2026-10-31');
+  /* A text that names no currency keeps nothing, and says so. */
+  const bare = tellRead('Your card ending 4421 was debited 300 at UBER', founder);
+  assert.deepEqual(bare.rows, []);
+  assert.ok(bare.why);
+});
+
+test('NOTHING PLACED IS SAID, WITH THE WAY ON, never a card over nothing to press (AH1)', () => {
+  /* Money said where no money is kept. */
+  const paid = tellRead('Paid 300 for textbooks', student);
+  assert.deepEqual(paid.rows, []);
+  assert.match(paid.why ?? '', /no money/u);
+  /* A line no list takes as a task is offered to the lists it could go into. */
+  const shopNoTasks = { lists: [PEOPLE, ORDERS, THINGS], today: TODAY, currency: 'EGP' };
+  const told = tellRead('Call the printer about the new labels tomorrow', shopNoTasks);
+  assert.deepEqual(told.rows, []);
+  assert.ok(told.why);
+  assert.deepEqual(told.offers?.map((r) => r.register), ['things']);
+});

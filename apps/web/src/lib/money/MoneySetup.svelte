@@ -10,6 +10,7 @@
   Keep rates current links to where it asks for the address. Finish or Skip, it is kept as done, and never opens again.
 -->
 <script lang="ts">
+  import { focusWhenDrawn } from '$lib/ui/keep-focus.ts';
   import { onMount, untrack } from 'svelte';
   import { at } from '$lib/at.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
@@ -80,6 +81,8 @@
       if (balanceOf(typed, money) === null) return void (said = words.needBalance);
     }
     place = Math.min(place + 1, steps.length - 1);
+    /* THE NEXT STEP TAKES THE FOCUS (first-hour audit AH20): its heading, or its first field, never the top of the page. */
+    focusWhenDrawn(() => document.querySelector<HTMLElement>('.ms .ms-body h3, .ms .ms-body input, .ms .ms-body button'), document.activeElement);
   }
 
   function toggle(id: string, on: boolean): void {
@@ -107,7 +110,12 @@
       if (out.failed.length === 0 && out.left.length === 0) {
         toasts.push(words.done, { intent: 'good' });
         onclose();
-      } else finished = out;
+        /* AND MONEY'S OWN HEADING once the board is drawn in its place, where the focus would have fallen to the page. */
+        focusWhenDrawn(() => document.querySelector<HTMLElement>('main h1'));
+      } else {
+        finished = out;
+        focusWhenDrawn(() => document.getElementById('ms-title'));
+      }
     } finally {
       busy = false;
     }
