@@ -138,6 +138,10 @@ export const words = {
   previewRefused: 'This drawing could not be read.',
   yanked: (reason: string): string => `Taken back: ${reason}`,
   install: (title: string): string => `Install ${title}`,
+  /** The press when what an add-on needs is not here yet (AH6): it adds that part, and Install follows. */
+  addFirst: (parts: string): string => `Add ${parts} first`,
+  needsFirstRefused: (title: string, parts: string): string => `${title} needs ${parts} first. Add ${parts}, then ${title}.`,
+  needsSomethingFirst: (title: string): string => `${title} needs another add-on first, one that keeps a list it points at.`,
   update: (to: string): string => `Update to ${to}`,
   turnOn: (title: string): string => `Turn on ${title}`,
   installed: 'Installed',

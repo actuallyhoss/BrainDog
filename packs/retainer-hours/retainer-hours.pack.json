@@ -1,10 +1,10 @@
 {
   "pack": "retainer-hours",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "icon": "clock",
   "title": "Agency",
   "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
-  "changes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
+  "changes": "Timesheets is a place of its own in the sidebar, where it sat under Clients and the sidebar's Clients opened Timesheets. Nothing you hold changes.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
@@ -134,7 +134,7 @@
     {
       "page": "timesheets-week",
       "title": "Timesheets",
-      "nav": { "section": "Clients", "order": 20 },
+      "nav": { "section": "Timesheets", "order": 10 },
       "icon": "clock",
       "requires": [ "register.timesheets" ],
       "pack": "retainer-hours",

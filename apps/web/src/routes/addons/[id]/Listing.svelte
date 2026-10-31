@@ -97,6 +97,19 @@
   const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);
   const latest = $derived(listing ? latestOf(listing) : null);
   const action = $derived(listing && states ? actionOf(listing, states) : null);
+  /**
+   * WHAT IT NEEDS FIRST THAT THIS RECORD DOES NOT HOLD (audit 31 Oct h, AH6): BrainDog's own parts its reach names, not
+   * installed or switched off here. Debts on a shop with no Money offered Install, and the press answered a line of list
+   * and pack ids; now the button adds Money first, and Install follows once it is in.
+   */
+  const ownParts = new Set(firstPartyModules().map((m) => m.id));
+  const needsFirst = $derived(
+    action?.kind === 'install' && states && listing?.kind !== 'module'
+      ? ((reach ?? latest?.reach)?.modules ?? []).filter((m) => ownParts.has(m) && !states.some((s) => s.id === m && s.disabled_at === null))
+      : [],
+  );
+  /** The part being added first, while its plan is on the sheet, so the sheet's yes says that part's name. */
+  let addingFirst = $state<string | null>(null);
 
   /**
    * ITS OWN GLYPH (agents F25): a built-in wears the place it brings (`glyph.ts`), a built-in use case its Home's or its
@@ -380,12 +393,22 @@
         return;
       }
       if (action.kind !== 'install' && action.kind !== 'update') return;
+      /* WHAT IT NEEDS FIRST GOES IN FIRST, on its own sheet: the part's plan, and Install for this one after it. */
+      const first = needsFirst[0];
+      if (first !== undefined) {
+        const out = await planFor(client, { kind: 'module', id: first, source: 'bundled', title: moduleTitle(first) }, { doc: null, text: null }, states, copy.writeRaced);
+        if (out.ok) {
+          planned = out.planned;
+          addingFirst = first;
+        } else refused = { fix: words.needsFirstRefused(listing.title, moduleTitle(first)), code: out.code };
+        return;
+      }
       /* WHAT ELSE WAITS IS READ ONLY FOR A PLAN THAT HAS SOMETHING TO WAIT FOR (`offer.ts` `afterOthers`): an update
          another one hands something to goes in after it, on the one sheet, instead of a stop nobody can clear here. */
       const held = states;
       const out = await planFor(client, listing, file, held, copy.writeRaced, () => waitingOf(fetch, kennel, held));
       if (out.ok) planned = out.planned;
-      else refused = out;
+      else refused = unresolvedSaid(out);
     } finally {
       busy = false;
     }
@@ -452,8 +475,10 @@
         if (out.nav) pref.write({ nav: out.nav });
         if (entry && trust) await keepFirstKey(keys, `${entry.kind}:${entry.id}`, trust);
         /* A run that took other updates in first names them (`offer.ts` `installInTurn`), so nobody finds one moved unsaid. */
-        toasts.push(out.first ? turnWords.installedAfter(listing.title, out.first) : copy.shareInstalled(listing.title), { intent: 'good' });
+        const title = addingFirst !== null ? moduleTitle(addingFirst) : listing.title;
+        toasts.push(out.first ? turnWords.installedAfter(title, out.first) : copy.shareInstalled(title), { intent: 'good' });
         planned = null;
+        addingFirst = null;
         await reread();
         await railAgain();
         return;
@@ -478,7 +503,7 @@
       } else {
         wentIn(out);
         planned = null;
-        refused = out;
+        refused = unresolvedSaid(out);
       }
       await reread();
     } finally {
@@ -486,10 +511,24 @@
     }
   }
 
+  /**
+   * A PLAN REFUSED FOR A LIST NOTHING HERE HOLDS, IN WORDS (AH6): "debts points at the accounts list
+   * (register.debts.fields.account.to)... Install money-core first" named ids a person never sees. The part that declares
+   * the list is named by its title when the record named one; else it says only that something must come first.
+   */
+  function unresolvedSaid<T extends { fix: string; code: string | null }>(out: T): T {
+    if (out.code !== 'REGISTER_UNRESOLVED' || !listing) return out;
+    const named = /Install (.+?) first:/u.exec(out.fix)?.[1];
+    const parts = named ? named.split(/, | and /u).map((id) => moduleTitle(id.trim())) : [];
+    return { ...out, fix: parts.length > 0 ? words.needsFirstRefused(listing.title, parts.join(' and ')) : words.needsSomethingFirst(listing.title) };
+  }
+
   const label = $derived(
     busy && planned === null
       ? words.planning
-      : action?.kind === 'update'
+      : needsFirst.length > 0
+        ? words.addFirst(needsFirst.map(moduleTitle).join(' and '))
+        : action?.kind === 'update'
         ? words.update(action.to)
         : action?.kind === 'turn-on'
           ? words.turnOn(listing?.title ?? '')
@@ -713,7 +752,10 @@
         hosted={hostedHere(page.data as unknown as Shell)}
         {busy}
         onapprove={() => void approve()}
-        oncancel={() => (planned = null)}
+        oncancel={() => {
+          planned = null;
+          addingFirst = null;
+        }}
         onrecheck={again}
         onkey={putKey}
         extra={waits.length > 0 || moved ? told : undefined}
