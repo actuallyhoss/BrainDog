@@ -500,16 +500,22 @@ const BANK_ONLY = /\b(?:debited|credited|avl\.? ?bal|available balance|card endi
    of EGP 500 credited to your card for your purchase at Amazon"), but only when it is said of the amount kept: before it,
    or as its own verb ("EGP 500 refunded"). "Purchase of EGP 1,250.00 at CARREFOUR. Earn 2% cashback" is the purchase,
    out (RH6). Then money taken from the account is out, even when it is credited to somebody else ("debited from a/c
-   XX12 and credited to Ahmed") or charged to your account ("EGP 500 charged to your account ending 12 at Netflix").
-   Then money put in is in ("EGP 500 transferred to your a/c from Ahmed"). A text that says neither is a card payment,
-   out. */
+   XX12 and credited to Ahmed"). A charge, a purchase or a spend is out ("EGP 500 charged to your account ending 12 at
+   Netflix"), unless a credit word names the way it went (MB1): "EGP 500 credited to your account for purchase return"
+   and "EGP 500 refund for your purchase" are money back. Then money put in is in ("EGP 500 transferred to your a/c
+   from Ahmed"). A text that says neither is a card payment, out. */
 const BANK_BACK = /\b(?:refund(?:ed)?|reversal|reversed|cashback)\b/iu;
 const BANK_BACK_AFTER = /^\s*(?:(?:has|have)\s+been\s+|was\s+|were\s+|is\s+)?(?:refunded|reversed|cashback)\b/iu;
-const BANK_TAKEN = /\b(?:debited|withdrawn|withdrawal|charged|purchase|spent)\b/iu;
+const BANK_TAKEN = /\b(?:debited|withdrawn|withdrawal)\b/iu;
+const BANK_SPENT = /\b(?:charged|purchase|spent)\b/iu;
+/* "credited" to the reader, never "credited to Ahmed"; a refund, a reversal or a return, wherever it is said. */
+const BANK_CREDIT = /\bcredited\b(?!\s+to\s+(?!(?:your|you|a\/c|acct|account|card)\b))|\b(?:refund(?:ed|s)?|reversal|reversed|returns?|returned)\b/iu;
 const BANK_IN = /\b(?:credited|deposited|received|incoming)\b|\btransferred to your\b|\bto your (?:a\/c|acct|account)\b/iu;
 /** Whether a bank's text put the money kept (the figure at `at`, `end` past it) into the account. */
 const bankInto = (text: string, at: number, end: number): boolean =>
-  BANK_BACK.test(text.slice(0, at)) || BANK_BACK_AFTER.test(text.slice(end)) || (!BANK_TAKEN.test(text) && BANK_IN.test(text));
+  BANK_BACK.test(text.slice(0, at)) ||
+  BANK_BACK_AFTER.test(text.slice(end)) ||
+  (!BANK_TAKEN.test(text) && (BANK_CREDIT.test(text) || (!BANK_SPENT.test(text) && BANK_IN.test(text))));
 /* A BALANCE OR A LIMIT IS NO AMOUNT THAT MOVED (RG5): a figure right after its word, joining words and all ("available
    balance is EGP 12,000.00", "Avl Bal after txn: EGP 3,200"), is not the one kept. A figure further on still is (RH12):
    "Your credit limit EGP 50,000 card ending 1234 was charged EGP 500 at X" is the 500. */

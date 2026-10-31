@@ -335,8 +335,9 @@ test('the summary says paid in, left and what is late, and the track the next pa
   );
   await counted(k);
   const blocks = pageOf(k, 'Flat');
-  const stat = headed(blocks, 'Where it stands');
-  assert.deepEqual(stat.readings!.map((c) => c.label), ['Paid in', 'Left', 'Late']);
+  const stat = headed(drawn(blocks), 'Where it stands');
+  assert.deepEqual(stat.readings!.map((c) => c.label), ['Paid', 'Left', 'Late']);
+  assert.equal(drawn(blocks).filter((b) => b.heading === 'Where it stands').length, 1, 'one summary is drawn');
   assert.equal(read(blocks, 'plan-paid').value, PART);
   assert.equal(read(blocks, 'plan-left').value, PART * (2 + 3 + 4 + 5 + 6));
   /* THE NEXT IS THE EARLIEST STILL OPEN, the second, late already: its day, and its amount as what is left less what is
@@ -409,7 +410,8 @@ test('a plan with parts is led by one sentence, and a plan all paid says no next
   assert.equal(dayOf(said(flat, 'plan-last-due')), daysOf('2027-06-01'));
   /* AND THE SENTENCE'S FIGURES ARE SAID ONCE: the summary under it holds the amounts and the next day. */
   const cells = drawn(flat).flatMap((b) => b.readings ?? []).map((c) => c.metric.split(':')[0]);
-  assert.deepEqual(cells, ['plan-paid', 'plan-left', 'plan-late', ...['parts-paid', 'parts', 'next-due', 'left', 'after-next'].map((f) => `plan-${f}-by-plan`)]);
+  /* NOTHING IS LATE, SO NO LATE IS DRAWN (MB3): a cell with nothing to say is left out, never "Late £0" with a tick. */
+  assert.deepEqual(cells, ['plan-paid', 'plan-left', ...['parts-paid', 'parts', 'next-due', 'left', 'after-next'].map((f) => `plan-${f}-by-plan`)]);
   assert.equal(trackOf(flat, 'Flat').next, daysOf(due(3)));
 
   const desk = pageOf(k, 'Desk');
@@ -419,6 +421,8 @@ test('a plan with parts is led by one sentence, and a plan all paid says no next
   assert.equal(leadOf(desk).body, paidUpOf('Desk'));
   assert.deepEqual(Object.keys(leadOf(desk).values ?? {}).sort(), ['plan-last-due:Desk', 'plan-parts-paid:Desk', 'plan-parts:Desk']);
   assert.deepEqual([said(desk, 'plan-parts-paid'), said(desk, 'plan-parts'), read(desk, 'plan-paid').value], [2, 2, 2 * PART]);
+  /* AND ITS SUMMARY SAYS PAID ALONE: nothing is left and nothing is late. */
+  assert.deepEqual(headed(drawn(desk), 'Where it stands').readings!.map((c) => c.label), ['Paid']);
   assert.equal(dayOf(said(desk, 'plan-last-due')), daysOf(due(2)));
 });
 

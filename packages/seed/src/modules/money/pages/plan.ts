@@ -50,6 +50,26 @@ const lead = (when: unknown, body: string): Record<string, unknown> => ({
   says: [{ when: A_PROPERTY, body: `${body} ${TO_PROPERTY}` }, { body }],
 });
 
+/** The summary's three cells: paid, left, and what is late. */
+const PAID = { metric: 'plan-paid:{{name}}', label: 'Paid' };
+const LEFT = { metric: 'plan-left:{{name}}', label: 'Left' };
+const LATE = { metric: 'plan-late:{{name}}', label: 'Late' };
+
+/** A part still open and one of them late, and a part still open with none late. One join each, never one inside another. */
+const LATE_OPEN = { all: [HAS_PARTS, { metric: OPEN_PARTS, gte: 1 }, { metric: 'plan-late:{{name}}', gt: 0 }] };
+const NONE_LATE = { all: [HAS_PARTS, { metric: OPEN_PARTS, gte: 1 }, { metric: 'plan-late:{{name}}', lte: 0 }] };
+
+/** The summary drawn with the cells that have something to say while `when` holds. */
+const summary = (when: unknown, cells: Record<string, unknown>[]): Record<string, unknown> => ({
+  kind: 'stat',
+  heading: 'Where it stands',
+  icon: 'wallet',
+  tone: 'bad',
+  span: 12,
+  when,
+  cells,
+});
+
 /**
  * ONE PAGE A PLAN, UNDER MONEY, SINCE REC-B12 (jobs 3 and 4): an instalment plan has its own page. A TEMPLATE, as
  * a book's page is (`book.ts`): one declaration, one page for each plan, every `{{name}}` filled from it. A record
@@ -65,7 +85,7 @@ const lead = (when: unknown, body: string): Record<string, unknown> => ({
  * which says nothing is left in words and never "0 left". Each waits on counts of parts, one number whatever currencies
  * the parts are in. The amounts are the summary's: paid in, left and what is late in the late red, and the track says
  * the next part, its amount and its day, under the parts paid. A cell whose figure has nothing to say is not drawn, so
- * a plan all paid shows what was paid in alone.
+ * a plan with nothing late says no Late, and a plan all paid shows what was paid alone.
  *
  * EVERY FIGURE IS COUNTED FROM THE PARTS (`figures/plans.ts`), so the page cannot disagree with Instalments, and a
  * cancelled part is in neither side; it is listed under the fold, under its own word.
@@ -91,22 +111,14 @@ export const MONEY_PLAN_PAGE: SeedPage = {
     /* HOW MANY ARE PAID AND WHEN IT ENDS. The amounts are the summary's, under it, and said once. */
     lead(HAS_OPEN, '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, the last due on {{plan-last-due:{{name}}}}.'),
     lead(ALL_PAID, '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, and nothing is left. The last was due on {{plan-last-due:{{name}}}}.'),
-    {
-      /* THE SUMMARY: paid, left, and what is late, which is red while it is not nought: the block's tone is bad, so a
-         figure off its line is drawn red and not amber. A cell with nothing to say is left out, so a plan all paid reads
-         paid in alone. */
-      kind: 'stat',
-      heading: 'Where it stands',
-      icon: 'wallet',
-      tone: 'bad',
-      span: 12,
-      when: HAS_PARTS,
-      cells: [
-        { metric: 'plan-paid:{{name}}', label: 'Paid' },
-        { metric: 'plan-left:{{name}}', label: 'Left' },
-        { metric: 'plan-late:{{name}}', label: 'Late' },
-      ],
-    },
+    /* THE SUMMARY: paid, left, and what is late, which is red while it is not nought: the block's tone is bad, so a
+       figure off its line is drawn red and not amber. A CELL WITH NOTHING TO SAY IS NOT DRAWN (MB3): a stat's `when:`
+       is the block's, so the summary is one tile for each case, each drawn only while it holds, as Heads up draws each
+       line only while it is true. Late is there only while a part is late, and a plan all paid reads paid alone, never
+       "Late £0" with a tick or "Left £0". */
+    summary(LATE_OPEN, [PAID, LEFT, LATE]),
+    summary(NONE_LATE, [PAID, LEFT]),
+    summary(ALL_PAID, [PAID]),
     {
       /* ONE TRACK, THE PARTS PAID AGAINST EVERY PART THAT STANDS, AND THE NEXT PART UNDER IT, as Money's Instalments tile
          draws each plan from the same five figures cut to one plan: "10 of 36", then "Next EGP 120,000 on 28 Nov", or the
