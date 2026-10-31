@@ -176,6 +176,7 @@ import {
   factsBasis,
   figureText,
   filledHeadline,
+  linkedLine,
   nought,
   hashOf,
   HEADLINE_ASKS_DAY,
@@ -325,6 +326,7 @@ export {
   handedHoles,
   headlineFault,
   holedRules,
+  linkedLine,
   HOME_PAGE,
   owedOn,
   owedPages,
@@ -5922,7 +5924,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AN ANSWER WHOSE LOOK WAS REFUSED IS REFUSED WHOLE (`lookRehearsed`): its line came from the same answer, so the page
        keeps the line its rules wrote until the page is answered for again. */
     if (lineRefused(keptLine)) return { line: null, next: look.next };
-    return { line: { at: lead.at, text: stored.text }, next: look.next };
+    /* WITH THE TEMPLATE'S LINKS LAID BACK (`linkedLine`, PJ2): Money's late figure is the way to the late bills whoever
+       wrote the line, and a line kept before this was written gets its link on the next read. */
+    return { line: { at: lead.at, text: linkedLine(stored.text, lead, slashDay()) }, next: look.next };
   };
 
   /**
