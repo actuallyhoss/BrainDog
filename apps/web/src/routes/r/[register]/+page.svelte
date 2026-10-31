@@ -58,7 +58,7 @@
   import Kbd from '$lib/ui/Kbd.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
-  import { lineFigures, lineValues } from '$lib/record/line-figures.ts';
+  import { lineFigures, lineValues, whichCurrency } from '$lib/record/line-figures.ts';
   import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
   import { foldAsk, sameOf, thingWords, twiceLine } from './twice-fold.ts';
@@ -1762,6 +1762,12 @@
     if (!said) return;
     if (!decl?.title) return;
     /* THE LINE EMPTIES AT ONCE, and what was typed goes back into it if the record says no. */
+    /* A FIGURE AND NO CURRENCY ANYBODY CHOSE: asked in the sheet, and nothing is sent (AH5). */
+    const bare = lineFigures(id, said, now).bare;
+    if (bare !== undefined) {
+      captureFault = whichCurrency(bare);
+      return;
+    }
     capture = '';
     captureFault = null;
     void createRow(said, (back, fix) => {

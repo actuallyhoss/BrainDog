@@ -24,7 +24,7 @@ import { recordToday } from './zone.ts';
 import { addDays, daySaid, weekdayOf } from '../work/board.ts';
 
 /** A line, read: the words left for the title, the fields read off it, and what was read, said short. */
-export type LineFigures = { text: string; fields: Fields; said: string[] };
+export type LineFigures = { text: string; fields: Fields; said: string[]; bare?: string };
 
 const MONTHS: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
@@ -169,7 +169,13 @@ export function lineFigures(register: string, typed: string, now: number): LineF
     }
   }
   if (money) {
-    const a = amountIn(left, currencyFor(register, money.id) ?? homeCurrency());
+    const known = currencyFor(register, money.id) ?? homeCurrency();
+    const a = amountIn(left, known);
+    /* A FIGURE WITH NO CURRENCY ANYBODY SAID is named back, so the line can ask which one rather than drop it. */
+    if (!a && known === null) {
+      const figure = amountIn(left, 'XXX');
+      if (figure) return { text: left, fields, said, bare: left.slice(figure.at, figure.end).trim() };
+    }
     if (a) {
       const rest = cut(left, a.at, a.end);
       if (rest !== '') {
@@ -201,3 +207,7 @@ export function lineValues(register: string, typed: string, now: number): Record
   }
   return out;
 }
+
+/** What the add line says when a figure was typed and nobody has chosen a currency yet. */
+export const whichCurrency = (figure: string): string =>
+  `Which currency is ${figure} in? Type it with the figure, like ${figure} EGP, or set your home currency in Money.`;
