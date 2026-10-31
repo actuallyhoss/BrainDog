@@ -2,6 +2,7 @@
  * The words every page shares: the product's name, each page's search result, the header, the footer (which
  * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
+import { APPS_OR } from '../agents.ts';
 import { LAUNCH } from '../launch.ts';
 
 export const shell = {
@@ -29,7 +30,7 @@ export const shell = {
     agents: {
       title: 'Connect Claude, ChatGPT and Cursor · BrainDog',
       description:
-        'Connect Claude, ChatGPT, Codex, Cursor or VS Code to BrainDog in one line. Each starts from your ' +
+        `Connect ${APPS_OR} to BrainDog in one line. Each starts from your ` +
         "brief and leaves a note when it's done.",
     },
     notFound: {

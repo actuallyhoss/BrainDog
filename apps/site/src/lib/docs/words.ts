@@ -5,6 +5,7 @@
  * one belongs to `lib/docs/`). The pages themselves are dialect text in `src/docs/`, so
  * nothing here describes the product beyond what a section of the docs is about.
  */
+import { APPS_AND, APPS_OR } from '../agents.ts';
 import type { IconName } from '../icons.ts';
 import type { Section } from './pages.ts';
 
@@ -84,7 +85,7 @@ export const docsWords = {
       'Projects, Work (with a timeline), People and Agents are built in. Money is a whole section: net worth, accounts, ledger, budgets by the week, month or year with what is left, forecast, coming up, payees, reports and quick add.',
       'Add-ons extend Money and the rest: subscriptions, splitting costs with friends, investments and gold (with a daily gold price), certificates, property, insurance, zakat, trips, debts and goals.',
       'Slash: press ⌘J anywhere to ask in plain words or ask for a change, with an undo.',
-      'Claude, ChatGPT, Codex, Cursor and VS Code connect over MCP at https://app.brain.dog/mcp, approved once with OAuth. The command line sets up a machine with `braindog setup`.',
+      `${APPS_AND} connect over MCP at https://app.brain.dog/mcp, approved once with OAuth. The command line sets up a machine with \`braindog setup\`.`,
       'Early access is invite only and free, with every feature, 3 AI tools and 20 questions to Slash a month. Paid plans are not priced yet.',
       'The app is at https://app.brain.dog. BrainDog is made by Quartz Apps LLC. Support: support@brain.dog.',
     ],
@@ -96,6 +97,6 @@ export const docsWords = {
     connect: 'Connecting',
     /* `MCP` in `lib/links.ts`, `servesMcp` in `apps/worker/src/route.ts`. The address is code; the words around it are not. */
     address: 'The address agents connect to',
-    mcp: 'Where Claude, ChatGPT, Codex, Cursor or VS Code connects to a BrainDog. You approve it once in the app, and no key is copied anywhere.',
+    mcp: `Where ${APPS_OR} connects to a BrainDog. You approve it once in the app, and no key is copied anywhere.`,
   },
 };

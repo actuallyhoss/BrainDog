@@ -16,6 +16,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 import { bodyOf, docOf, launched, type Doc } from '../src/lib/docs/pages.ts';
 import { LAUNCH } from '../src/lib/launch.ts';
+import { CODEX_LISTED } from '../src/lib/agents.ts';
 import { parse } from '../../../packages/render/src/parse.ts';
 import { BUILD, missing, when } from './built.ts';
 
@@ -39,7 +40,7 @@ const read = (): { docs: Doc[]; broken: string[] } => {
   const broken: string[] = [];
   for (const [key, src] of files) {
     try {
-      docs.push(docOf(key, src, LAUNCH));
+      docs.push(docOf(key, src, { ...LAUNCH, codex: CODEX_LISTED }));
     } catch (error) {
       broken.push(error instanceof Error ? error.message : `${key}: ${String(error)}`);
     }
@@ -152,6 +153,9 @@ test('a launch part shows only when its flag is on', () => {
   assert.equal(launched('k', src, { repo: true }), '# T\n\nBefore.\n\n## Plugin\n\nAdd it.\n\nAfter.\n');
   assert.equal(launched('k', src, { repo: false }), '# T\n\nBefore.\n\nAfter.\n');
   assert.throws(() => launched('k', src, { cli: true }), /not a launch flag/);
+  const either = 'A.\n\n<!-- launch: codex -->\nWith Codex.\n<!-- /launch -->\n<!-- launch: !codex -->\nWithout it.\n<!-- /launch -->\n\nB.\n';
+  assert.equal(launched('k', either, { codex: true }), 'A.\n\nWith Codex.\n\nB.\n');
+  assert.equal(launched('k', either, { codex: false }), 'A.\n\nWithout it.\n\nB.\n');
   assert.throws(() => launched('k', '<!-- launch: repo -->\nx\n', { repo: true }), /open/);
   assert.throws(() => launched('k', 'x\n<!-- /launch -->\n', { repo: true }), /never opened/);
 });
@@ -159,6 +163,11 @@ test('a launch part shows only when its flag is on', () => {
 test('no docs page names the repository or the plugin while LAUNCH.repo is off', { skip: LAUNCH.repo }, () => {
   const { docs } = read();
   for (const d of docs) assert.doesNotMatch(d.src, /actuallyhoss\/BrainDog|\/plugin (?:marketplace|install)/u, `${d.file} names the private repository`);
+});
+
+test('no docs page names Codex while CODEX_LISTED is off', { skip: CODEX_LISTED }, () => {
+  const { docs } = read();
+  for (const d of docs) assert.doesNotMatch(d.src, /codex/iu, `${d.file} names Codex`);
 });
 
 /** "EDIT ON GITHUB" ONLY ONCE THE REPOSITORY IS PUBLIC: until then the address answers 404 to everyone but the owner. */

@@ -1,6 +1,11 @@
 # Connect an agent
 
+<!-- launch: codex -->
 Claude Code, Codex, Cursor and any other agent that speaks MCP can work in your BrainDog. It signs in with your yes, everything it writes carries its name, and it asks you before it changes anything it may not change itself.
+<!-- /launch -->
+<!-- launch: !codex -->
+Claude Code, Cursor and any other agent that speaks MCP can work in your BrainDog. It signs in with your yes, everything it writes carries its name, and it asks you before it changes anything it may not change itself.
+<!-- /launch -->
 
 ## Set up a machine
 
@@ -13,10 +18,20 @@ braindog setup https://app.brain.dog/<slug>
 
 On Windows, in PowerShell, the first line is `irm https://brain.dog/cli/install.ps1 | iex` and the second is the same. The command line needs Node.js 24.13 or later, and nothing needs an administrator.
 
+<!-- launch: codex -->
 `setup` sets up every app it finds on the machine (Claude Code, Codex, Cursor, Claude Desktop and VS Code) in six steps, and prints one line for each:
+<!-- /launch -->
+<!-- launch: !codex -->
+`setup` sets up every app it finds on the machine (Claude Code, Cursor, Claude Desktop and VS Code) in six steps, and prints one line for each:
+<!-- /launch -->
 
 - it signs the machine in, printing six digits for you to approve in the app;
+<!-- launch: codex -->
 - it adds BrainDog's hooks and skill to Claude Code's settings, and in Codex a turn-end hook and BrainDog's part of `AGENTS.md`;
+<!-- /launch -->
+<!-- launch: !codex -->
+- it adds BrainDog's hooks and skill to Claude Code's settings;
+<!-- /launch -->
 - it registers the `braindog` MCP server with each app;
 - it writes the tools your BrainDog applies everywhere;
 - it syncs your skills;
@@ -60,10 +75,15 @@ Inside Claude Code, `/plugin marketplace add actuallyhoss/BrainDog` then `/plugi
 A client that starts its servers as commands runs the command line instead, which uses the machine's sign-in:
 
 ```code | sh
-braindog mcp --agent codex
+braindog mcp --agent cursor
 ```
 
+<!-- launch: codex -->
 `--agent` is `claude`, `codex`, `cursor` or `other`, and tells BrainDog which agent is calling. Put the command where your client lists its MCP servers. No token goes in that file.
+<!-- /launch -->
+<!-- launch: !codex -->
+`--agent` is `claude`, `cursor` or `other`, and tells BrainDog which agent is calling. Put the command where your client lists its MCP servers. No token goes in that file.
+<!-- /launch -->
 
 ## With a token
 

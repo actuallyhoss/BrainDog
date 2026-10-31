@@ -11,6 +11,7 @@
  * THE COMPANY is Quartz Apps LLC, the name the Terms and the Privacy Policy give (`legal/`). The offer is the one the
  * pricing page says today: free while in early access, so `price` is 0 and no paid plan is named until billing is live.
  */
+import { APPS_AND } from '../agents.ts';
 import { SUPPORT_EMAIL } from '../links.ts';
 import { TABLE } from '../plans.ts';
 import { LAUNCH } from '../launch.ts';
@@ -76,7 +77,7 @@ export const application = {
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   description:
-    'One place that remembers your projects, money and people, shows what needs you on a Today board of widgets you arrange, keeps your personal money (budgets, subscriptions, splits, net worth and gold), and shares that memory with Claude, ChatGPT, Codex, Cursor and VS Code.',
+    `One place that remembers your projects, money and people, shows what needs you on a Today board of widgets you arrange, keeps your personal money (budgets, subscriptions, splits, net worth and gold), and shares that memory with ${APPS_AND}.`,
   publisher: { '@id': ORG_ID },
   offers: LAUNCH.billing
     ? [TABLE.free, TABLE.hosted, TABLE.plus].map((row) => ({

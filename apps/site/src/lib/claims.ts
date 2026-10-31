@@ -22,6 +22,7 @@
  * anybody can read the code is `not-yet`, and `claims.test.ts` asks for it to be marked again once `LAUNCH.repo` is on.
  */
 import type { LaunchFlag } from './launch.ts';
+import { APPS_AND } from './agents.ts';
 
 export type ClaimState = 'true' | 'flag' | 'not-yet';
 
@@ -63,7 +64,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'agent-asks-first', said: 'Move money, share or delete without your yes.', where: 'agents.cannot.lines.1', state: 'true' },
   { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.2', state: 'true' },
   { id: 'agent-write-undo', said: 'A receipt and an undo for everything it writes.', where: 'agents.gets.lines.2', state: 'true' },
-  { id: 'five-apps-connect', said: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your BrainDog, suggest changes and leave notes.', where: 'agents.lead', state: 'true' },
+  { id: 'five-apps-connect', said: `${APPS_AND} can read your BrainDog, suggest changes and leave notes.`, where: 'agents.lead', state: 'true' },
 
   /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
   { id: 'early-free', said: 'Everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },

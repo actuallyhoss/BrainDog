@@ -8,6 +8,7 @@
  * this page say the same lines. The made-up names are the demo record's (`lib/demo/maya.ts`).
  */
 import { PEOPLE, PROJECTS } from '../demo/maya.ts';
+import { APPS_AND } from '../agents.ts';
 import { DOCS, MCP } from '../links.ts';
 
 const DANA = PEOPLE.dana.name.split(' ')[0] ?? PEOPLE.dana.name;
@@ -16,7 +17,7 @@ const TIDEPOOL = PROJECTS.tidepool.name;
 export const agents = {
   agents: {
     title: 'Connect your AI tools in one line.',
-    lead: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your BrainDog, suggest changes and leave notes. You approve each one once, and no key is copied anywhere.',
+    lead: `${APPS_AND} can read your BrainDog, suggest changes and leave notes. You approve each one once, and no key is copied anywhere.`,
     gets: {
       title: 'What your AI tool gets',
       lines: [

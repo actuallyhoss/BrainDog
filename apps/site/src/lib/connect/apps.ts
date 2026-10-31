@@ -21,9 +21,10 @@
  * A hint is one line. Words in backticks are code, drawn as code, so a command's own spelling stays as typed.
  */
 import type { AppMark, MarkedAgent } from '@braindog/skin/agent-marks.ts';
+import { listed } from '../agents.ts';
 import { CLI_INSTALL, MCP } from '../links.ts';
 
-/** The five apps the site names, each with its maker's mark. */
+/** The apps the site may name, each with its maker's mark. */
 export type ConnectId = Extract<MarkedAgent, 'claude' | 'codex' | 'cursor'> | AppMark;
 
 /** One way in: where it goes, what to paste or run, and the one line that says what happens next. */
@@ -38,7 +39,8 @@ export type Way = {
 
 export type ConnectApp = { id: ConnectId; name: string; ways: readonly [Way, ...Way[]] };
 
-export const CONNECT: readonly ConnectApp[] = [
+/** Every app the box knows; `CONNECT` is the ones the site names (`CODEX_LISTED` in `lib/agents.ts`). */
+const EVERY_APP: readonly ConnectApp[] = [
   {
     id: 'claude',
     name: 'Claude',
@@ -94,6 +96,8 @@ export const CONNECT: readonly ConnectApp[] = [
     ],
   },
 ];
+
+export const CONNECT: readonly ConnectApp[] = EVERY_APP.filter((app) => listed(app.id));
 
 /** The box's own words. */
 export const CONNECT_WORDS = {

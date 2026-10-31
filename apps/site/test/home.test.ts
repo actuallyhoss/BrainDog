@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { home } from '../src/lib/copy/home.ts';
+import { APP_NAMES, CODEX_LISTED } from '../src/lib/agents.ts';
 import { BUILD, missing, when } from './built.ts';
 
 const NO_BUILD = missing(['index.html'], 'the home page checks read the built page');
@@ -39,7 +40,7 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
   assert.equal(home.hero.works, 'Works with');
   assert.deepEqual(
     home.hero.makers.map((m) => m.name),
-    ['Claude', 'ChatGPT', 'Codex', 'Cursor', 'VS Code'],
+    APP_NAMES,
   );
   assert.equal(home.who.title, "Who it's for");
   assert.deepEqual(
@@ -129,7 +130,8 @@ test('the seven bands, in order, and no close after them', when(NO_BUILD), () =>
 test('the makers are named, and the page draws no picture', when(NO_BUILD), () => {
   const html = page();
   const said = text(html);
-  for (const name of ['Claude', 'ChatGPT', 'Codex', 'Cursor', 'VS Code']) assert.ok(said.includes(name), name);
+  for (const name of APP_NAMES) assert.ok(said.includes(name), name);
+  if (!CODEX_LISTED) assert.doesNotMatch(said, /codex/i, 'the page names Codex while CODEX_LISTED is off');
   assert.doesNotMatch(html, /<img\b/i);
 });
 

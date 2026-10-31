@@ -45,7 +45,12 @@ In Settings, under Agents, the owner can give Slash a key from a model provider 
 
 ```comparison | Slash, and your agents
 Question | Slash | Your agents
+<!-- launch: codex -->
 Where it lives | In BrainDog. Press Ctrl+J (⌘J) | Claude, Codex, Cursor and any MCP client you connect
+<!-- /launch -->
+<!-- launch: !codex -->
+Where it lives | In BrainDog. Press Ctrl+J (⌘J) | Claude, Cursor and any MCP client you connect
+<!-- /launch -->
 What it reads | Your BrainDog | What the key or sign-in you gave it allows
 What it writes | What you ask for, with an undo; money, keys, sharing and deletes wait for your yes | Proposals for you to decide, or rows directly, as you allowed
 Who pays for it | Your plan's asks, or your own key | Your agent's own provider

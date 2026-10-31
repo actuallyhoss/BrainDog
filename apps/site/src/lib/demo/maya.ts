@@ -10,6 +10,7 @@
  *
  * MONEY IS INTEGER CENTS, in `CENTS`, and `usd()` says each figure the way the prototype says it.
  */
+import { CODEX_LISTED, listed } from '../agents.ts';
 import type { IconName } from '../icons.ts';
 
 /** A dollar figure in cents as the page says it: `$8,420`, `$64.20`, or with `pence` always, `$3,200.00`. */
@@ -221,11 +222,11 @@ export const TODAY: {
 
 /** The AI tools Maya has connected, as the desk's Agents place lists them. */
 export const CONNECTED: { agent: AgentId; name: string; seen: string; live: boolean }[] = [
-  { agent: 'claude', name: 'Claude', seen: 'working now', live: true },
-  { agent: 'cursor', name: 'Cursor', seen: 'working now', live: true },
-  { agent: 'chatgpt', name: 'ChatGPT', seen: 'last seen Tuesday', live: false },
-  { agent: 'codex', name: 'Codex', seen: 'last seen Monday', live: false },
-];
+  { agent: 'claude' as const, name: 'Claude', seen: 'working now', live: true },
+  { agent: 'cursor' as const, name: 'Cursor', seen: 'working now', live: true },
+  { agent: 'chatgpt' as const, name: 'ChatGPT', seen: 'last seen Tuesday', live: false },
+  { agent: 'codex' as const, name: 'Codex', seen: 'last seen Monday', live: false },
+].filter((c) => listed(c.agent));
 
 /** The Money place: what goes out in the next days, and what she is owed. */
 export const MONEY: {
@@ -379,11 +380,11 @@ export const HANDLED: { text: string; why: string }[] = [
 
 /** The notes agents leave on the record, newest first. */
 export const NOTES: { agent: AgentId; text: string; meta: string }[] = [
-  { agent: 'claude', text: 'Shipped webhook retries. 18 tests pass.', meta: 'Claude · today 11:02' },
-  { agent: 'cursor', text: "Onboarding copy waits on Dana's icons.", meta: 'Cursor · yesterday' },
-  { agent: 'chatgpt', text: 'Call with Sam: Northbound wants the April sprint a week later.', meta: 'ChatGPT · Tuesday' },
-  { agent: 'codex', text: 'Upgraded the Stripe library. Nothing else changed.', meta: 'Codex · Monday' },
-];
+  { agent: 'claude' as const, text: 'Shipped webhook retries. 18 tests pass.', meta: 'Claude · today 11:02' },
+  { agent: 'cursor' as const, text: "Onboarding copy waits on Dana's icons.", meta: 'Cursor · yesterday' },
+  { agent: 'chatgpt' as const, text: 'Call with Sam: Northbound wants the April sprint a week later.', meta: 'ChatGPT · Tuesday' },
+  { agent: 'codex' as const, text: 'Upgraded the Stripe library. Nothing else changed.', meta: 'Codex · Monday' },
+].filter((n) => listed(n.agent));
 
 /** The agent tab's terminal, line by line. An empty line is a gap; `tone` picks the line's colour. */
 export const TERM: { tone: 'dim' | 'bold' | 'good' | 'white' | ''; text: string }[] = [
@@ -490,12 +491,13 @@ export const FINDS: Find[] = [
   },
   {
     q: 'stripe',
-    count: 4,
+    /* Codex's note is a hit only while Codex is named (`CODEX_LISTED` in `lib/agents.ts`). */
+    count: CODEX_LISTED ? 4 : 3,
     aside: FOUND,
     hits: [
       { icon: 'key', title: 'Stripe live key', sub: 'In the Keychain · used by Tidepool', kind: 'Key' },
       { icon: 'download', title: 'Stripe payouts', sub: '38 payouts · Tidepool', kind: 'List' },
-      { icon: 'message', title: 'Upgraded the Stripe library', sub: 'Note by Codex · Monday', kind: 'Note' },
+      ...(CODEX_LISTED ? [{ icon: 'message' as const, title: 'Upgraded the Stripe library', sub: 'Note by Codex · Monday', kind: 'Note' }] : []),
       { icon: 'server', title: 'Stripe', sub: 'Tidepool runs on it · working', kind: 'Service' },
     ],
   },

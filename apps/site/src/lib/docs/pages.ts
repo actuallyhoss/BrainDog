@@ -89,8 +89,9 @@ export function slugOf(text: string): string {
 export type LaunchFlags = Readonly<Record<string, boolean>>;
 
 /* A PART HELD UNTIL LAUNCH: a line `<!-- launch: repo -->`, the part, and a line `<!-- /launch -->`. Each marker is a
-   line of its own, so a fence's text never opens or closes one. */
-const HELD_OPEN = /^<!-- launch: ([a-z]+) -->$/;
+   line of its own, so a fence's text never opens or closes one. `<!-- launch: !codex -->` is the other way round: the
+   part shows while the flag is off, so a sentence can have its words for before and after. */
+const HELD_OPEN = /^<!-- launch: (!?)([a-z]+) -->$/;
 const HELD_CLOSE = /^<!-- \/launch -->$/;
 
 /**
@@ -104,6 +105,7 @@ const HELD_CLOSE = /^<!-- \/launch -->$/;
 export function launched(key: string, src: string, launch: LaunchFlags): string {
   const out: string[] = [];
   let open: string | null = null;
+  let shown = false;
   /* A PART TAKEN OUT LEAVES A BLANK LINE ON EACH SIDE; the one after it goes too, so one paragraph break stays. */
   let dropped = false;
   for (const line of src.split('\n')) {
@@ -113,19 +115,20 @@ export function launched(key: string, src: string, launch: LaunchFlags): string 
     }
     const start = HELD_OPEN.exec(line.trim());
     if (start) {
-      const flag = start[1] ?? '';
+      const flag = start[2] ?? '';
       if (open !== null) throw new Error(`${key} opens a launch part inside another. Close the first with <!-- /launch --> before the next.`);
       if (!(flag in launch)) throw new Error(`${key} holds a part on "${flag}", which is not a launch flag. The flags are ${Object.keys(launch).join(', ')}.`);
       open = flag;
+      shown = (launch[flag] === true) !== (start[1] === '!');
       continue;
     }
     if (HELD_CLOSE.test(line.trim())) {
       if (open === null) throw new Error(`${key} closes a launch part it never opened.`);
-      dropped = launch[open] !== true;
+      dropped = !shown;
       open = null;
       continue;
     }
-    if (open === null || launch[open] === true) out.push(line);
+    if (open === null || shown) out.push(line);
   }
   if (open !== null) throw new Error(`${key} leaves the launch part on "${open}" open. Close it with <!-- /launch -->.`);
   return out.join('\n');
