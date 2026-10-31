@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { KEY_TRIES, keyLockout, nearPeer, placeOf, proxied, proxyTrustOf } from '../src/key-lockout.ts';
+import { KEY_TRIES, keyLockout, nearPeer, PEER_CEILING, peerSlow, peerSlowFor, placeOf, proxied, proxyTrustOf } from '../src/key-lockout.ts';
 import { start } from '../src/server.ts';
 
 test('SEC5: TEN MISSES ARE COMPARED, THE ELEVENTH IS NOT, AND THE LOCK OUTLASTS A RIGHT KEY UNTIL IT ENDS', () => {
@@ -96,4 +96,23 @@ test('AI16: THE HEADER IS READ ONLY FROM A PEER THAT IS A TRUSTED PROXY, and fro
   assert.equal(proxyTrustOf('0'), null);
   const bad = proxyTrustOf('caddy');
   assert.ok(bad !== null && 'wrong' in bad);
+});
+
+test('RG3: A PEER OVER THE CEILING IS SLOWED, NEVER LOCKED, AND ONLY UNDER THE LOOSE 1', () => {
+  let at = 0;
+  const slow = peerSlow(() => at);
+  for (let i = 0; i < PEER_CEILING.most - 1; i++) assert.equal(slow.strike('172.18.0.1'), false);
+  assert.equal(slow.wait('172.18.0.1'), 0, 'slowed under the ceiling');
+  assert.equal(slow.strike('172.18.0.1'), true, 'the ceiling was not said once');
+  assert.equal(slow.strike('172.18.0.1'), false, 'the ceiling was said twice');
+  assert.equal(slow.wait('172.18.0.1'), PEER_CEILING.wait);
+  assert.equal(slow.wait('172.18.0.2'), 0, 'another peer was slowed');
+  at += PEER_CEILING.window + 1;
+  assert.equal(slow.wait('172.18.0.1'), 0, 'the slowing never ended');
+  const loose = proxyTrustOf('1');
+  const exact = proxyTrustOf('127.0.0.1');
+  assert.ok(loose !== null && !('wrong' in loose) && exact !== null && !('wrong' in exact));
+  assert.notEqual(peerSlowFor(loose, () => 0), null);
+  assert.equal(peerSlowFor(exact, () => 0), null, 'an exact proxy list counted the peer');
+  assert.equal(peerSlowFor(null, () => 0), null);
 });

@@ -34,18 +34,63 @@ export type KeyLockout = {
 /** Ten wrong keys in fifteen minutes; the lock lasts fifteen minutes. */
 export const KEY_TRIES = { most: 10, window: 15 * 60_000 } as const;
 
-/**
- * THE PROXY ITSELF IS COUNTED TOO (AI16), against a hundred in the same fifteen minutes. With `BRAINDOG_TRUST_PROXY` on,
- * the place counted is the one the proxy wrote; a caller that reached the port past the proxy, from an address that
- * looks like one (the Docker gateway, anybody on the LAN), wrote its own and reset its count with each guess. Every key
- * that came through one peer is now also that peer's, so a forged header buys a hundred guesses and not unlimited ones,
- * and ten strangers behind a real proxy do not lock the key for everybody, which is what one shared count of ten did
- * (RD7).
- */
-export const PEER_TRIES = { most: 100, window: 15 * 60_000 } as const;
-
 /** The most places remembered at once; the one struck longest ago goes first, so a flood of places costs bounded memory. */
 const PLACES_MOST = 50_000;
+
+/**
+ * THE PROXY ITSELF IS COUNTED TOO, AND SLOWED, NEVER LOCKED (AI16, RG3). With `BRAINDOG_TRUST_PROXY=1` a peer on this
+ * machine or a private network is believed, and one that reached the port past the proxy (the Docker gateway, anybody
+ * on the LAN) can write a fresh place into the header with each guess (RG14). So the wrong keys through one peer are
+ * counted too. LOCKING THAT PEER WAS THE OLD FAULT AGAIN: every caller behind Caddy or cloudflared has the proxy as its
+ * peer, so a hundred wrong keys from anywhere on the internet locked the owner out with everybody else. Over the
+ * ceiling the peer's key-shaped bearers wait `wait` before they are compared: the owner's right key still works, a
+ * second or two late, and a guess costs that long. With a list of exact proxy addresses nobody can pass as one, and
+ * nothing is counted against the peer at all (`peerSlowFor`).
+ */
+export const PEER_CEILING = { most: 200, window: 15 * 60_000, wait: 2_000 } as const;
+
+export type PeerSlow = {
+  /** Milliseconds a key-shaped bearer through `peer` waits before it is compared; 0 while under the ceiling. */
+  wait(peer: string): number;
+  /** One wrong key through `peer`; `true` the once its count reaches the ceiling in a window, to say so. */
+  strike(peer: string): boolean;
+};
+
+export function peerSlow(now: () => number, rule: { most: number; window: number; wait: number } = PEER_CEILING): PeerSlow {
+  const peers = new Map<string, { n: number; first: number }>();
+  const live = (peer: string, t: number) => {
+    const at = peers.get(peer);
+    return at !== undefined && at.first > t - rule.window ? at : undefined;
+  };
+  return {
+    wait(peer) {
+      const at = live(peer, now());
+      return at !== undefined && at.n >= rule.most ? rule.wait : 0;
+    },
+    strike(peer) {
+      const t = now();
+      const at = live(peer, t) ?? { n: 0, first: t };
+      at.n += 1;
+      peers.delete(peer);
+      peers.set(peer, at);
+      if (peers.size > PLACES_MOST) {
+        const oldest = peers.keys().next().value;
+        if (oldest !== undefined) peers.delete(oldest);
+      }
+      return at.n === rule.most;
+    },
+  };
+}
+
+/** The peer count a trust setting needs: only `1`'s loose one (`nearPeer`), where a peer can forge a place. */
+export function peerSlowFor(trusts: ProxyTrust | null, now: () => number): PeerSlow | null {
+  return trusts === nearPeer ? peerSlow(now) : null;
+}
+
+/** What the operator is told the first time one peer passes the ceiling (RG3). */
+export function slowedLine(peer: string): string {
+  return `${String(PEER_CEILING.most)} wrong server keys came through ${peer} in fifteen minutes, so keys through it now wait ${String(PEER_CEILING.wait / 1000)} seconds before they are checked (the right key still works). If ${peer} is your proxy, set BRAINDOG_TRUST_PROXY to its exact address instead of 1, so each caller is counted on its own.`;
+}
 
 export function keyLockout(now: () => number, rule: { most: number; window: number } = KEY_TRIES): KeyLockout {
   const places = new Map<string, { n: number; first: number; until: number | null }>();
@@ -82,7 +127,7 @@ export function keyLockout(now: () => number, rule: { most: number; window: numb
  * locked the server key for everyone, again every fifteen minutes, and nothing said why.
  */
 export const ONE_PLACE =
-  'This looks like it is behind a proxy, and BRAINDOG_TRUST_PROXY is not set, so the sign-in lockout counts every visitor as the proxy: ten wrong keys from anywhere lock the server key for everyone for fifteen minutes. Set BRAINDOG_TRUST_PROXY=1 (or the proxy\'s address) if a proxy you run is the only way in.';
+  'This looks like it is behind a proxy, and BRAINDOG_TRUST_PROXY is not set, so the sign-in lockout counts every visitor as the proxy: ten wrong keys from anywhere lock the server key for everyone for fifteen minutes. Set BRAINDOG_TRUST_PROXY to the proxy\'s address (or 1) if a proxy you run is the only way in.';
 
 /** An address on this machine or a private network: where a proxy in front of this process stands. */
 export function nearPeer(address: string): boolean {
@@ -102,7 +147,9 @@ export type ProxyTrust = (peer: string) => boolean;
 
 /**
  * `BRAINDOG_TRUST_PROXY`: unset or `0` reads no header; `1` trusts a peer on this machine or a private network
- * (`nearPeer`), which is where Caddy, nginx, cloudflared or the Docker gateway stand; anything else is the proxies'
+ * (`nearPeer`), which is where Caddy, nginx, cloudflared or the Docker gateway stand, AND SO THE WHOLE LAN IS A PROXY
+ * (RG14): anybody on it who reaches the port can name a place, which is why `1` alone also slows by peer
+ * (`peerSlowFor`), and why the exact addresses are the setting to give; anything else is the proxies'
  * own addresses or ranges, comma or space separated (`127.0.0.1, 172.16.0.0/12, fd00::/8`). A value that reads as
  * neither stops the server with `wrong`, rather than a guess at which header to believe.
  */

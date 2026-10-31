@@ -98,9 +98,12 @@ It may also say:
 ### Behind a proxy
 
 Caddy, nginx or cloudflared in front: set `BRAINDOG_ORIGIN` to the https address it answers at, and
-`BRAINDOG_TRUST_PROXY=1`, so the sign-in lockout and the rate limits count the real caller. With `1` the
-`X-Forwarded-For` header is read only from a proxy on this machine or a private network (the Docker gateway counts);
-give the proxy's own addresses instead (`BRAINDOG_TRUST_PROXY=127.0.0.1` or `172.16.0.0/12`) to narrow that. The
+`BRAINDOG_TRUST_PROXY`, so the sign-in lockout and the rate limits count the real caller. Best is the proxy's own
+address (`BRAINDOG_TRUST_PROXY=127.0.0.1`, or `172.16.0.0/12` for a proxy in Docker): then each caller is counted on
+its own, and nobody can lock you out by guessing. `1` is the quick setting: it believes `X-Forwarded-For` from anything
+on this machine or a private network, so the whole LAN counts as a proxy, and anybody on it who reaches the port can
+claim a new address per guess. With `1` the wrong keys through each proxy are counted too: over 200 in fifteen minutes,
+keys through it wait two seconds before they are checked (the right key still works), and the log says so once. The
 server's port must then be reachable only through the proxy: keep the default publish on `127.0.0.1`.
 
 ### Mail in
