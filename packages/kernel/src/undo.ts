@@ -1335,6 +1335,35 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       }
     }
 
+    /* ── a filing taken back puts its mail back in the inbox (audit 10k, AK12) ──
+       `triage` files an arrival as a row and marks it `matched` in the same batch (the kernel's `fileArrival`). Undoing
+       that batch took the row away and left the mail marked filed, so the inbox said "1 filed" of a row that was gone and
+       the arrival could not be filed again. Once the row is put back, the arrival goes back to where it was filed from,
+       with a `state` line of its own, as `returnArrival` writes one; an arrival moved on since is left as it is. */
+    const putKeys = new Set(put.map(keyOf));
+    for (const l of every) {
+      if (l.kind !== 'state' || l.target === null || !l.target.startsWith('inbox_raw:') || !putKeys.has(keyOf(l))) continue;
+      const to = parse(l.to_v);
+      const from = parse(l.from_v);
+      if (to !== 'matched' || (from !== 'untriaged' && from !== 'review')) continue;
+      const id = l.target.slice('inbox_raw:'.length);
+      const now = sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', id)?.state;
+      if (now !== 'matched') continue;
+      slashMayWrite(actor, 'state');
+      sql.exec('UPDATE inbox_raw SET state = ? WHERE id = ?', from, id);
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch) VALUES (?, ?, ?, 'state', ?, 'inbox_raw', 'state', ?, ?, ?, ?)",
+        parts.mint(),
+        at,
+        actor,
+        l.target,
+        jcs('matched'),
+        jcs(from),
+        'Filing undone; in the inbox again.',
+        batch,
+      );
+    }
+
     /* ── the declarations, each question's together: the earlier bodies as new versions, and a history line each ── */
     const declaredBack = new Set<string>();
     for (const [suggestion, group] of byQuestion(declares)) {

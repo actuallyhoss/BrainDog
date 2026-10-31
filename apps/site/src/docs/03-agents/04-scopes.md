@@ -1,6 +1,6 @@
 # Scopes: what an agent may do
 
-Every agent works under a token, and every token has one of three scopes: read, propose or write. Each opens what the one before it does and a little more. None of them lets an agent decide for you.
+Every agent works under a token, and every token has one of three scopes: read, propose or write. Each opens what the one before it does and a little more. None of them lets an agent decide for you: a write token acts on its own only where you tell it to, passing your words.
 
 ## The three scopes
 
@@ -23,13 +23,15 @@ A list the token cannot read stays out of its answers: a search does not reach i
 
 There is no admin scope, and there never will be one. These need somebody signed in to the app:
 
-- answering a question in Needs you, which no token reaches;
+- answering a question in Needs you, which no token reaches on its own. When you tell an agent the answer, it may pass it on with your words as `said`, while "Agents may answer when you tell them" is on in Settings › Agents. It never answers a question it asked itself, one somebody else asked, or one about a key or an amount of money;
 - inviting or removing people;
 - making, listing and revoking tokens, report keys and door addresses;
 - installing, removing and turning off packs;
 - running an automation now, and starting a paused one again;
 - exporting your BrainDog, putting it back, and deleting it;
 - listing and revoking what each key opens.
+
+A write token asks before money, keys and deletes. When you tell it to make one of those changes, it passes your words as `said` and a delete goes through; money and keys still wait for you in BrainDog.
 
 An agent that wants one of these asks with `propose`, and you decide. Some fields are marked the same way: a skill's text, for one, only changes when you accept a proposal.
 

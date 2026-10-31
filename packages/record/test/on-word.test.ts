@@ -64,8 +64,8 @@ const value = <T>(r: unknown): T => {
   return x.value;
 };
 
-const refusal = (r: unknown): { code: string; fix: string; at?: string } => {
-  const x = r as { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+const refusal = (r: unknown): { code: string; fix: string; at?: string; try?: string } => {
+  const x = r as { ok: boolean; refusal?: { code: string; fix: string; at?: string; try?: string } };
   assert.equal(x.ok, false, 'the call went through');
   return x.refusal!;
 };
@@ -91,8 +91,18 @@ const openCount = (sql: NodeSql) => sql.one<{ n: number }>("SELECT count(*) AS n
 const rowsAsked = (api: Api, name: string): string =>
   value<{ id: string }>(api.kernel.propose({ question: `Add ${name}?`, body_kind: 'rowset', body: { register: 'tasks', rows: [{ name }] } }, 'slash', 'rules')).id;
 
-/** A choice of two, filed by the agent. */
+/** A choice of two, filed by Slash's rules: a question the agent asked itself is never its own to answer (`own` below). */
 const choice = async (api: Api): Promise<string> =>
+  value<{ id: string }>(
+    api.kernel.propose(
+      { question: 'Ship Friday or wait?', body_kind: 'options', body: { options: [{ id: 'ship', label: 'Ship Friday', because: 'Ready.' }, { id: 'wait', label: 'Wait', because: 'Safer.' }] } } as never,
+      'slash',
+      'rules',
+    ),
+  ).id;
+
+/** A choice of two, filed by the agent's own key. */
+const ownChoice = async (api: Api): Promise<string> =>
   value<{ id: string }>(
     await api.propose(
       { question: 'Ship Friday or wait?', body_kind: 'options', body: { options: [{ id: 'ship', label: 'Ship Friday', because: 'Ready.' }, { id: 'wait', label: 'Wait', because: 'Safer.' }] } } as never,
@@ -101,6 +111,18 @@ const choice = async (api: Api): Promise<string> =>
   ).id;
 
 /* ── a question answered on his word ───────────────────────────────────── */
+
+test('A QUESTION THE AGENT ASKED IS NOT ANSWERED BY IT, on any word: the person answers it, or the agent takes it back', async () => {
+  const { api, sql } = await record();
+  const own = await ownChoice(api);
+  const out = refusal(await api.instructionsMine({ answer: own, option: 'ship', said: 'Ship it Friday.' } as never, agent()));
+  assert.equal(out.code, 'FORBIDDEN');
+  assert.equal(out.at, 'answer');
+  assert.match(out.fix, /^You asked SG\d+ yourself, so the person answers it in BrainDog\./u);
+  assert.equal(out.try, `propose {"withdraw":"${own}"}`);
+  assert.equal(statusOf(api, own), 'open');
+  sql.close();
+});
 
 test('ON HIS WORD A RUN ANSWERS A QUESTION AS HIS, his words and the run kept on the decision, and Undo takes it back', async () => {
   const { api, sql } = await record();
