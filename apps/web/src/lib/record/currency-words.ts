@@ -98,6 +98,8 @@ const DIGIT = '[0-9\\u0660-\\u0669\\u06F0-\\u06F9]';
  * Which convention it is in is `minorOf`'s to say, by the currency.
  */
 export const FIGURE = `${DIGIT}+(?:[,.\\u066B\\u066C]${DIGIT}+)*`;
+/* One comma and three digits after it, and nothing else: "1,250". */
+const ONE_GROUP = new RegExp(`^${DIGIT}{1,3},${DIGIT}{3}$`, 'u');
 
 /**
  * A typed figure as minor units of `currency`, times a thousand for "k", or `null` when it is no amount there: more
@@ -105,8 +107,12 @@ export const FIGURE = `${DIGIT}+(?:[,.\\u066B\\u066C]${DIGIT}+)*`;
  */
 export function minorOf(figure: string, currency: string, thousand = false): number | null {
   const e = exponentOf(currency);
+  /* A TYPED "1,250" IN DINARS IS ONE THOUSAND TWO HUNDRED AND FIFTY (review 31 Oct h, RH5). The shared reader takes a
+     lone comma before three digits as the point at three places, which is right for a provider's text; a person who
+     types "Paid rent 1,250 KWD" means 1,250 dinars, and writes the fils with a point ("1.250") when they mean them. */
+  const typed = e === 3 && !thousand && ONE_GROUP.test(figure) ? figure.replace(',', '') : figure;
   /* "1.5k" is the figure at three more places: 1.5 thousand is 1500, read without a float. */
-  const out = readAmount(figure, thousand ? e + 3 : e, currency);
+  const out = readAmount(typed, thousand ? e + 3 : e, currency);
   return out !== null && Number.isSafeInteger(out) && out > 0 ? out : null;
 }
 
