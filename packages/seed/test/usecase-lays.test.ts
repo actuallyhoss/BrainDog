@@ -353,6 +353,11 @@ const LAID: Record<string, Laid> = {
     declares: '5719e519311f68f0',
     history: ['2.9.0 lays what 2.8.0 laid, word for word: only `page.goals` moved, its place on the rail and its add boxes -> 5719e519311f68f0'],
   },
+  'personal@2.9.1': {
+    lays: ['hands metric.budgets-set to money-core'],
+    declares: '5719e519311f68f0',
+    history: ['2.9.1 lays what 2.9.0 laid, word for word: only the names of the Log and Put by changed (AH21) -> 5719e519311f68f0'],
+  },
 };
 
 /** What is wrong with one use case's document against `LAID`, as sentences. Empty when nothing is. */

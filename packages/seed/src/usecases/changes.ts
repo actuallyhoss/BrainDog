@@ -23,6 +23,7 @@ const SUMMARY = 'Its card says what it is for in one short line. Nothing in your
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.9.1', notes: 'The Log is called Progress and Put by is called Money saved. Nothing you hold changes.' },
     { version: '2.9.0', notes: 'Goals is in your sidebar from the start, and opens on a box to add a goal or a habit. Nothing you hold changes.' },
     { version: '2.8.0', notes: 'Personal no longer counts how many days running you logged something. What you logged this week still shows against each habit. Nothing you hold changes.' },
     { version: '2.7.0', notes: 'Personal counts your streak: how many days running you logged something. Nothing you hold changes.' },
@@ -88,6 +89,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.30.1', notes: 'Cycles are called Sprints, the Cycle plan is the Sprint plan, and Cycle days is called Open each morning. Nothing you hold changes.' },
     { version: '2.30.0', notes: 'Cycles is in your sidebar from the start, and opens on a box to add a cycle. Nothing you hold changes.' },
     { version: '2.29.2', notes: 'A project\'s And from everywhere cards say what each thing is, not its kind.' },
     { version: '2.29.1', notes: SUMMARY },

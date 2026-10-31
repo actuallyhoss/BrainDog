@@ -533,6 +533,22 @@ const EVERY_SAID: Record<string, string> = { monthly: 'month', yearly: 'year', q
 const REPEATS: Record<string, string> = { month: 'monthly', monthly: 'monthly', year: 'yearly', yearly: 'yearly', annually: 'yearly', quarter: 'quarterly', quarterly: 'quarterly', week: 'weekly', weekly: 'weekly' };
 /* A payout is money in from a platform, never a person or a client: "Stripe paid out 1,950 USD". */
 const PAYOUT = /^(?:paid out|pays out|paying out|payout(?:\s+of)?)\b\s*/iu;
+/* MONEY LENT OR BORROWED BETWEEN TWO PEOPLE IS OWED, never a payment and never "Not sure" (first-hour audit, FB3):
+   "Lent Omar 500 yesterday", "Omar owes me 500", "Borrowed 300 from Sara", "Sara lent me 300", "I owe Sara 300". Case
+   kept on the name, as everywhere: it is told by its capital. Each is [who, the rest] and whose the money is. */
+const LOANS: readonly { re: RegExp; toMe: boolean; who: number; rest: number }[] = [
+  { re: new RegExp(`^(?:(?:I|i|We|we)\\s+)?(?:[Ll]ent|[Ll]oaned|[Gg]ave)\\s+(${NAME})\\s+(.*?\\d.*?)(?:\\s+(?:as a loan|on loan))?$`, 'u'), toMe: true, who: 1, rest: 2 },
+  { re: new RegExp(`^(${NAME})\\s+(?:owes|still owes)\\s+(?:me|us)\\s+(.+)$`, 'u'), toMe: true, who: 1, rest: 2 },
+  { re: new RegExp(`^(${NAME})\\s+(?:borrowed)\\s+(.+)$`, 'u'), toMe: true, who: 1, rest: 2 },
+  { re: new RegExp(`^(?:(?:I|i|We|we)\\s+)?(?:[Bb]orrowed)\\s+(.+?)\\s+from\\s+(${NAME})(?![\\p{L}\\p{M}'’-])(.*)$`, 'u'), toMe: false, who: 2, rest: 1 },
+  { re: new RegExp(`^(${NAME})\\s+(?:lent|loaned)\\s+(?:me|us)\\s+(.+)$`, 'u'), toMe: false, who: 1, rest: 2 },
+  { re: new RegExp(`^(?:I|i|We|we)\\s+owe\\s+(${NAME})\\s+(.+)$`, 'u'), toMe: false, who: 1, rest: 2 },
+];
+/* A clause that says only when a loan comes back, once its day is taken off: "pay back by", "she'll pay me back on". */
+const BACK_SAID = /^(?:(?:(?:she|he|they)(?:['’]ll| will)\s+)?(?:pay(?:s|ing)?|give(?:s)?|get)\s+(?:(?:me|us|it|you|her|him|them)\s+)?)?back(?:\s+(?:due|by|on|before))?$|^due back(?:\s+(?:by|on))?$/iu;
+/* The words around a loan's amount that say nothing more of it. */
+const LOAN_WORDS = /\b(?:back|as a loan|on loan|to pay back|to be paid back|pay(?:s|ing)? (?:me |us |it )?back)\b/giu;
+
 /* "assign to Omar", "assigned to Omar". */
 const ASSIGN = new RegExp(`(?:^|[\\s,;])(?:[Aa]ssign(?:ed)?|[Gg]ive it)\\s+(?:it\\s+)?to\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
 /* A BANK'S OWN TEXT, as a card alert or an account alert prints it: one of these words, and a currency it names. */
@@ -608,6 +624,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let lastOrderBy: TellValue | null = null;
   /* An amount heard with no currency to put to it: said back as left, never turned into a task. */
   let unsure = false;
+  /* A loan was read, so a clause after it that says only when it comes back is its. */
+  let loaned = false;
   /* The person the sentence met, whose note what is said after them goes into. */
   let metRow: number | null = null;
 
@@ -675,9 +693,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       left.push(whole);
       continue;
     }
-    if (!self && !acts(c) && (measure(c) || bill(c))) continue;
+    if (!self && !acts(c) && (measure(c) || loan(c) || bill(c))) continue;
     /* A DAY SAID ON ITS OWN after what it is the day of was read with it: "Invoice Acme 1,200 USD, due in 14 days". */
     if (placed && takeDay(c, opts.today).day !== null && trimWords(takeDay(c, opts.today).rest.replace(/^(?:due|by|on)$/iu, '')) === '') continue;
+    /* AND THE DAY A LOAN COMES BACK, said after it: "Borrowed 300 from Sara, pay back by Friday". */
+    if (loaned && takeDay(c, opts.today).day !== null && BACK_SAID.test(trimWords(takeDay(c, opts.today).rest))) continue;
     const forSomebody = !self && !acts(c) ? FOR_SOMEBODY.exec(c) : null;
     if (forSomebody && aName(forSomebody[2]!)) {
       const before = rows.length;
@@ -743,7 +763,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const kinds = [
       ...(order ? [anA(order.one ?? 'order').toLowerCase()] : []),
       ...(people ? ['somebody you met'] : []),
-      ...(dueList(opts.lists) ? ['a bill with its amount and day'] : []),
+      ...(dueList(opts.lists) ? ['a bill with its amount and day', 'money lent or borrowed'] : []),
       ...(moneyList(opts.lists) || dueList(opts.lists) ? ['money paid or got', "a bank's text"] : []),
       ...(projectList(opts.lists) ? ['a new project'] : []),
     ];
@@ -943,6 +963,71 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const bits = [`${spelled(amount, currency)} ${toMe ? (who ? `owed to you by ${who}` : 'owed to you') : 'to pay'}`, ...(day ? [`due ${dayWord(day, opts.today)}`] : []), ...(repeat && repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${l.name}`];
     rows.push({ register: l.id, fields, said: what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
+    return true;
+  }
+
+  /**
+   * "Lent Omar 500 yesterday": money owed between the reader and a person, kept in Bills and invoices, owed to the reader
+   * or by them, linked to who. A day gone is when it was lent, kept in its note; a day to come is when it is due back.
+   */
+  function loan(c: string): boolean {
+    const shape = LOANS.map((l) => ({ l, m: l.re.exec(c) })).find((x) => x.m !== null && aName(x.m[x.l.who]!));
+    if (!shape || !shape.m) return false;
+    /* "Lent Omar EGP 500": a currency's code after the name is the amount's, never the name's. */
+    const named = shape.m[shape.l.who]!.split(' ');
+    const code = named.length > 1 && CODES.has(named[named.length - 1]!) ? named.pop()! : '';
+    const who = named.join(' ');
+    const phrase = `${code} ${shape.m[shape.l.rest] ?? ''} ${shape.l.rest === 1 ? (shape.m[3] ?? '') : ''}`;
+    const own = takeDay(phrase, opts.today);
+    const [a] = amountsIn(own.rest, opts.currency);
+    if (!a) return false;
+    const l = dueList(opts.lists);
+    if (!l) {
+      noMoney = true;
+      return true;
+    }
+    const currency = a.currency ?? (a.word ? null : opts.currency);
+    const amount = currency ? minor(a, currency) : null;
+    if (currency === null || amount === null) {
+      unsure = true;
+      noCurrency ||= currency === null;
+      left.push(c);
+      return true;
+    }
+    if (!room(2)) return false;
+    const toMe = shape.l.toMe;
+    /* A day to come is when it comes back, in its own clause or the next ("…, pay back by Friday"); one gone, or today,
+       is when it was lent. */
+    const at = text.indexOf(c);
+    const next = at === -1 ? '' : oneLine(text.slice(at + c.length).split(CLAUSE).find((p) => oneLine(p ?? '') !== '') ?? '');
+    const later = takeDay(next, opts.today);
+    const nextBack = later.day !== null && later.day > opts.today && BACK_SAID.test(trimWords(later.rest)) ? later.day : null;
+    const back = own.day !== null && own.day > opts.today ? own.day : nextBack;
+    const lentOn = own.day !== null && back === null ? own.gone : null;
+    const fields: Record<string, TellValue> = {};
+    const owes = /\bowes?\b/u.test(c);
+    const what = owes ? (toMe ? `${who} owes you` : `You owe ${who}`) : toMe ? `Lent to ${who}` : `Borrowed from ${who}`;
+    const title = textField(l);
+    if (title) fields[title.id] = what;
+    const sum = pick(l, 'money', /^amount$/, (f) => f.required === true);
+    if (sum) fields[sum.id] = { amount, currency };
+    const way = l.fields.find((f) => f.type === 'enum' && f.values?.includes('owed_to_me') && f.values.includes('owed_by_me'));
+    if (way) fields[way.id] = toMe ? 'owed_to_me' : 'owed_by_me';
+    const due = pick(l, 'day', /due/, (f) => f.deadline === true || said(f, /due/));
+    if (due && back) fields[due.id] = back;
+    const stateField = l.fields.find((f) => f.id === (l.state ?? 'state') && f.type === 'enum');
+    if (stateField && stateField.default === undefined && stateField.values?.includes('open')) fields[stateField.id] = 'open';
+    const note = pick(l, 'text', /note/, (f) => f.id !== title?.id);
+    const extra = trimWords(own.rest.slice(0, a.at) + ' ' + own.rest.slice(a.at + a.text.length)).replace(LOAN_WORDS, ' ').trim();
+    const noteSaid = [lentOn ? `${toMe ? 'Lent' : 'Borrowed'} on ${daySaid(lentOn)}` : '', extra ? capital(extra) : ''].filter(Boolean).join('. ');
+    if (note && noteSaid) fields[note.id] = noteSaid;
+    const party = pick(l, 'ref', /party|who|client|from/, (f) => f.to === PEOPLE);
+    const ref = personOf(who);
+    if (party && ref !== null) fields[party.id] = ref;
+    const bits = [toMe ? `${who} owes you ${spelled(amount, currency)}` : `You owe ${who} ${spelled(amount, currency)}`, ...(back ? [`due back ${dayWord(back, opts.today)}`] : []), `in ${l.name}`];
+    rows.push({ register: l.id, fields, said: what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    placed = true;
+    loaned = true;
     return true;
   }
 

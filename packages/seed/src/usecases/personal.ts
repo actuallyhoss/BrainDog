@@ -162,8 +162,10 @@ export const PERSONAL = {
      2.9.0 (audit 31 Oct h, AH4): Goals is on the rail from the first minute (its place, after Work), and opens on a box to
      add a goal or a habit, and one to name something you are saving for until one is named, where a new person found it
      inside More lists saying "Nothing here yet". Blocks added and nothing taken away, so a minor step; 2.8.0 is
-     published. */
-  version: '2.9.0',
+     published.
+     2.9.1 (audit 31 Oct h, AH21): the Log is called Progress and Put by is called Money saved, so a new person reads
+     what each holds. Words only, so a patch step; 2.9.0 is published. */
+  version: '2.9.1',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -254,8 +256,8 @@ export const PERSONAL = {
     'people.role.collaborator': 'Project partner',
     savings_goals: 'Savings goals',
     goals: 'Goals',
-    goal_log: 'Log',
-    put_by: 'Put by',
+    goal_log: 'Progress',
+    put_by: 'Money saved',
     project_steps: 'Project steps',
   },
   /* NO SPENDING SORTER SINCE 2.0.0: a purchase is a row of Money's ledger, and Money files it by its categories' own
@@ -281,7 +283,7 @@ export const PERSONAL = {
         name: 'Savings goals',
         one: 'savings goal',
         icon: 'star',
-        holds: 'what you are saving for, how much it takes and how much is put by',
+        holds: 'what you are saving for, how much it takes and how much is saved',
         title: 'name',
         mobile: ['name', 'target', 'by'],
         state: 'state',
@@ -350,8 +352,8 @@ export const PERSONAL = {
       {
         /* A RUN, A BOOK FINISHED, A NIGHT COOKED IN: one row each, pointing at the habit or goal it counts toward. */
         register: 'goal_log',
-        name: 'Log',
-        one: 'log entry',
+        name: 'Progress',
+        one: 'progress entry',
         icon: 'check',
         holds: 'each run, book or night in that counts toward a habit or a goal, and how much',
         title: 'what',
@@ -368,10 +370,10 @@ export const PERSONAL = {
       {
         /* MONEY PUT BY TOWARD A SAVINGS GOAL, one row a transfer. */
         register: 'put_by',
-        name: 'Put by',
+        name: 'Money saved',
         one: 'saving',
         icon: 'money',
-        holds: 'each amount put by toward a savings goal, and when',
+        holds: 'each amount set aside toward a savings goal, and when',
         title: 'what',
         mobile: ['what', 'amount', 'on'],
         fields: [
@@ -428,7 +430,7 @@ export const PERSONAL = {
       },
       {
         metric: 'put-by-by-goal',
-        name: 'Put by, by savings goal',
+        name: 'Saved, by savings goal',
         source: 'register.put_by',
         value: { sum: 'amount' },
         group_by: 'saving',
@@ -459,7 +461,7 @@ export const PERSONAL = {
       counted('savings-held', 'Savings goals kept', 'register.savings_goals'),
       counted('goals-held', 'Goals and habits', 'register.goals'),
       counted('goal-log-held', 'Logged', 'register.goal_log'),
-      counted('put-by-held', 'Put by', 'register.put_by'),
+      counted('put-by-held', 'Money saved', 'register.put_by'),
       counted('steps-left', 'Steps left on a project', 'register.project_steps', 'thing is {{it}}, done is false'),
       counted('steps-done', 'Steps done on a project', 'register.project_steps', 'thing is {{it}}, done is true'),
       {
@@ -599,7 +601,7 @@ export const PERSONAL = {
             kind: 'note',
             lead: true,
             span: 12,
-            body: '{{saved-toward-goals}} put by so far, {{goals-active}} goal(s) and {{habits-active}} habit(s) on the go',
+            body: '{{saved-toward-goals}} saved so far, {{goals-active}} goal(s) and {{habits-active}} habit(s) on the go',
           },
           /* A BOX TO ADD A GOAL OR A HABIT, SINCE 2.9.0 (AH4), and one to name a saving until one is named, as Home has. */
           { kind: 'capture', heading: 'Add a goal or a habit', icon: 'plus', span: 12, register: 'goals' },
@@ -642,7 +644,7 @@ export const PERSONAL = {
           },
           {
             kind: 'table',
-            heading: 'Put by lately',
+            heading: 'Saved lately',
             icon: 'piggy-bank',
             span: 12,
             when: { metric: 'put-by-held', gt: 0 },
@@ -655,7 +657,7 @@ export const PERSONAL = {
             ],
             order: [{ field: 'on', dir: 'desc' }],
             limit: 8,
-            empty: 'Nothing put by yet. Add what you set aside and it counts toward its goal.',
+            empty: 'Nothing saved yet. Add what you set aside and it counts toward its goal.',
           },
           {
             kind: 'table',

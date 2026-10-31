@@ -152,7 +152,7 @@ export const TEAM_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'cycle_day', as: 'counting' } }],
   },
   teamScript('plan_follows_ticket', 'Tick a planned ticket when its ticket is done', ['tasks', 'cycle_plan'], ['cycle_plan'], PLAN_FOLLOWS_TICKET),
-  teamScript('cycle_day', "Write the morning's cycle day", ['cycles', 'cycle_plan', 'cycle_days', 'tasks'], ['cycle_plan', 'cycle_days'], CYCLE_DAY),
+  teamScript('cycle_day', "Count the sprint's open tickets each morning", ['cycles', 'cycle_plan', 'cycle_days', 'tasks'], ['cycle_plan', 'cycle_days'], CYCLE_DAY),
 ];
 
 export const TEAM = {
@@ -258,10 +258,13 @@ export const TEAM = {
      2.29.2: the project page's And from everywhere cards say "What it is", not "Kind". Words only, so a patch step.
      2.30.0 (audit 31 Oct h, AH4): Cycles is on the rail from the first minute (its place, after Work), and opens on a box
      to add a cycle, where a new team found it inside More lists. A block added and nothing taken away, so a minor
-     step; 2.29.2 is published. */
-  version: '2.30.0',
+     step; 2.29.2 is published.
+     2.30.1 (audit 31 Oct h, AH21): cycles are said as sprints, as a team says them (Sprints, Sprint plan), and Cycle
+     days is called Open each morning. The lists' ids and the page's address stay. Words only, so a patch step; 2.30.0
+     is published. */
+  version: '2.30.1',
   title: 'Team board',
-  summary: 'Tickets, cycles and the agents on them.',
+  summary: 'Tickets, sprints and the agents on them.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'team',
@@ -303,12 +306,12 @@ export const TEAM = {
     'tasks.state.open': 'To do',
     'tasks.state.doing': 'In progress',
     'tasks.state.review': 'In review',
-    cycles: 'Cycles',
-    cycle_plan: 'Cycle plan',
+    cycles: 'Sprints',
+    cycle_plan: 'Sprint plan',
     people: 'Teammates',
     'people:holds': 'everyone on the team, the part each one plays and how to reach them',
     'people.role.collaborator': 'Teammate',
-    cycle_days: 'Cycle days',
+    cycle_days: 'Open each morning',
   },
   skills: [
     { name: 'task-triage', trigger: 'when a ticket is opened, to set its priority, suggest an owner and say whether an agent can take it' },
@@ -324,16 +327,16 @@ export const TEAM = {
     declarations: [
       {
         register: 'cycles',
-        name: 'Cycles',
-        one: 'cycle',
+        name: 'Sprints',
+        one: 'sprint',
         icon: 'rows',
-        holds: 'the sprints or cycles the team works in, with the dates each runs and what it is for',
+        holds: 'the sprints the team works in, with the dates each runs and what it is for',
         title: 'name',
         mobile: ['name', 'state', 'ends'],
         state: 'state',
         done: ['done'],
         fields: [
-          { id: 'name', label: 'Cycle', type: 'text', required: true, search: true },
+          { id: 'name', label: 'Sprint', type: 'text', required: true, search: true },
           {
             id: 'state',
             label: 'Status',
@@ -355,10 +358,10 @@ export const TEAM = {
         /* WHAT WORK'S TASKS DO NOT HOLD: the cycle a ticket is planned in and its points, one line per ticket per cycle, so a
            ticket carried into the next cycle keeps what it was worth in the last one. */
         register: 'cycle_plan',
-        name: 'Cycle plan',
+        name: 'Sprint plan',
         one: 'planned ticket',
         icon: 'rows',
-        holds: 'which tickets each cycle takes on, and how many points each one is worth',
+        holds: 'which tickets each sprint takes on, and how many points each one is worth',
         title: 'what',
         /* A PLANNED TICKET IS A STEP OF ITS CYCLE (2.6.0), so a cycle knows how much of what it took on is done: Home's
            progress counts the lines ticked against the lines planned, and a cycle's card fills the same way. A line
@@ -368,7 +371,7 @@ export const TEAM = {
         fields: [
           { id: 'what', label: 'Planned', type: 'text', required: true, search: true },
           { id: 'task', label: 'Ticket', type: 'ref', to: 'tasks', index: true },
-          { id: 'cycle', label: 'Cycle', type: 'ref', to: 'cycles', index: true },
+          { id: 'cycle', label: 'Sprint', type: 'ref', to: 'cycles', index: true },
           { id: 'points', label: 'Points', type: 'int', min: 0 },
           { id: 'done', label: 'Done', type: 'bool', default: false, index: true },
           { id: 'tags', type: 'list', of: 'text' },
@@ -380,16 +383,16 @@ export const TEAM = {
            itself each morning: the planned lines of the active cycle not ticked (`cycle_day` in `TEAM_AUTOMATIONS`).
            A person can still write a day, and the record then writes none for it. */
         register: 'cycle_days',
-        name: 'Cycle days',
-        one: 'cycle day',
+        name: 'Open each morning',
+        one: 'morning count',
         icon: 'rows',
-        holds: 'how many tickets were still open on each day of a cycle, one row a morning',
+        holds: 'how many tickets were still open on each day of a sprint, one row a morning',
         title: 'day',
         mobile: ['day', 'open', 'cycle'],
         fields: [
           { id: 'day', label: 'Day', type: 'day', required: true, index: true },
           { id: 'open', label: 'Open tickets', type: 'int', min: 0, required: true },
-          { id: 'cycle', label: 'Cycle', type: 'ref', to: 'cycles', index: true },
+          { id: 'cycle', label: 'Sprint', type: 'ref', to: 'cycles', index: true },
           { id: 'tags', type: 'list', of: 'text' },
         ],
       },
@@ -397,7 +400,7 @@ export const TEAM = {
       counted('tickets-in-flight', 'In flight', 'register.tasks', IN_FLIGHT),
       counted('tickets-blocked', 'Blocked', 'register.tasks', 'state is blocked'),
       counted('tickets-due-else', 'Else due this week', 'register.tasks', `${LIVE}, state is not doing or review or blocked, by before +8d`),
-      counted('tickets-planned', 'Planned into a cycle', 'register.cycle_plan'),
+      counted('tickets-planned', 'Planned into a sprint', 'register.cycle_plan'),
       counted('tickets-taken', 'Taken by agents', 'register.tasks', 'agent is set, state is not done or dropped'),
       counted('tickets-done-by-agents', 'Finished by agents', 'register.tasks', 'agent is set, state is done'),
       /* THE RULES THAT KEEP THE CYCLE'S PROGRESS AND ITS MORNING COUNT, AND THEIR SCRIPTS, SINCE 2.21.0. */
@@ -522,7 +525,7 @@ export const TEAM = {
           {
             /* HOW THE CYCLE IS GOING, FOLDED SHUT, SINCE 2.10.0: above it Home is what needs the team this week. */
             kind: 'section',
-            heading: 'How the cycle is going',
+            heading: 'How the sprint is going',
             icon: 'gauge',
             span: 12,
             fold: true,
@@ -531,14 +534,14 @@ export const TEAM = {
             /* HOW FAR THE CYCLE HAS COME: the planned tickets ticked done against every ticket planned, one track a
                cycle. The newest cycle first, since the one a team is in is the one it asks about. */
             kind: 'progress',
-            heading: 'This cycle',
+            heading: 'This sprint',
             icon: 'goal',
             span: 6,
             source: 'register.cycle_plan',
             columns: [{ field: 'cycle' }, { field: 'done' }],
             order: [{ field: 'cycle', dir: 'desc' }],
             limit: 3,
-            empty: 'Plan tickets into a cycle and how far it has come shows here.',
+            empty: 'Plan tickets into a sprint and how far it has come shows here.',
           },
           {
             /* BESIDE IT, THE BURNDOWN: how many tickets were open each morning of the last two weeks, against the two
@@ -551,7 +554,7 @@ export const TEAM = {
             columns: [{ field: 'day' }, { field: 'open' }],
             back: 14,
             bucket: 'day',
-            empty: 'No cycle day is written yet. Once a cycle is active the record writes one each morning.',
+            empty: 'Nothing counted yet. Once a sprint is active, the open tickets are counted each morning.',
           },
         ],
       },
@@ -560,7 +563,7 @@ export const TEAM = {
            what each one takes on, and what is stuck. It was called Board when tickets were this pack's own, and two pages
            called Board on one rail said nothing about which was which. */
         page: 'cycles',
-        title: 'Cycles',
+        title: 'Sprints',
         /* ITS PLACE ON THE RAIL, SINCE 2.30.0 (AH4): a starter's own page is a place from the first minute, even while
            its lists hold only what the starter planted. */
         nav: { section: 'Team', order: 10, place: 20 },
@@ -572,39 +575,39 @@ export const TEAM = {
             kind: 'note',
             lead: true,
             span: 12,
-            body: '{{tickets-planned}} ticket(s) planned into cycles, {{tickets-blocked}} blocked',
+            body: '{{tickets-planned}} ticket(s) planned into sprints, {{tickets-blocked}} blocked',
           },
           /* A BOX TO ADD A CYCLE, SINCE 2.30.0 (AH4). */
-          { kind: 'capture', heading: 'Add a cycle', icon: 'plus', span: 12, register: 'cycles' },
+          { kind: 'capture', heading: 'Add a sprint', icon: 'plus', span: 12, register: 'cycles' },
           {
             kind: 'table',
-            heading: 'Cycles',
+            heading: 'Sprints',
             icon: 'repeat',
             span: 12,
             source: 'register.cycles',
             columns: [
-              { field: 'name', label: 'Cycle', width: 'minmax(16ch,1fr)' },
+              { field: 'name', label: 'Sprint', width: 'minmax(16ch,1fr)' },
               { field: 'state', label: 'Status', width: '12ch' },
               { field: 'starts', label: 'Starts', width: '15ch' },
               { field: 'ends', label: 'Ends', width: '15ch', align: 'end' },
             ],
             order: [{ field: 'starts', dir: 'desc' }],
-            empty: 'No cycles yet.',
+            empty: 'No sprints yet.',
           },
           {
             kind: 'table',
-            heading: 'Cycle plan',
+            heading: 'Sprint plan',
             icon: 'list-checks',
             span: 12,
             when: { metric: 'tickets-planned', gt: 0 },
             source: 'register.cycle_plan',
             columns: [
               { field: 'task', label: 'Ticket', width: 'minmax(20ch,1fr)' },
-              { field: 'cycle', label: 'Cycle', width: 'minmax(10ch,16ch)' },
+              { field: 'cycle', label: 'Sprint', width: 'minmax(10ch,16ch)' },
               { field: 'points', label: 'Points', width: '8ch', align: 'end' },
             ],
             limit: 30,
-            empty: 'No ticket is planned into a cycle yet.',
+            empty: 'No ticket is planned into a sprint yet.',
           },
           {
             kind: 'table',
@@ -705,9 +708,9 @@ export const TEAM = {
       },
     ],
     seeds: [
-      { register: 'cycles', fields: { name: 'Cycle 1', state: 'active', goal: 'Ship the first version of the board' } },
+      { register: 'cycles', fields: { name: 'Sprint 1', state: 'active', goal: 'Ship the first version of the board' } },
       { register: 'cycle_plan', fields: { what: 'Write the release notes', points: 2, done: false } },
-      { register: 'cycle_plan', fields: { what: 'Agree what goes in the next cycle', points: 1, done: false } },
+      { register: 'cycle_plan', fields: { what: 'Agree what goes in the next sprint', points: 1, done: false } },
       { register: 'cycle_plan', fields: { what: 'Fix the sign-in link that expires too soon', points: 3, done: false } },
       { register: 'cycle_plan', fields: { what: 'Wait on the design for the settings screen', points: 5, done: false } },
       { register: 'cycle_plan', fields: { what: 'Tidy the backlog labels', points: 1, done: true } },
@@ -726,9 +729,9 @@ export const TEAM = {
 const TEAM_PROJECT = 'The customer app';
 
 export const TEAM_EXAMPLES: readonly Body[] = [
-  { register: 'things', fields: { name: TEAM_PROJECT, lane: 'building', health: 'on_track', next: 'Agree what goes in the next cycle', since: '-60d' } },
+  { register: 'things', fields: { name: TEAM_PROJECT, lane: 'building', health: 'on_track', next: 'Agree what goes in the next sprint', since: '-60d' } },
   { register: 'tasks', fields: { what: 'Write the release notes', state: 'doing', priority: 'normal', agent: 'claude' } },
-  { register: 'tasks', fields: { what: 'Agree what goes in the next cycle', state: 'open', priority: 'high', by: '+3d' } },
+  { register: 'tasks', fields: { what: 'Agree what goes in the next sprint', state: 'open', priority: 'high', by: '+3d' } },
   { register: 'tasks', fields: { what: 'Fix the sign-in link that expires too soon', state: 'review', priority: 'urgent', agent: 'claude' } },
   { register: 'tasks', fields: { what: 'Wait on the design for the settings screen', state: 'blocked', priority: 'normal', by: '+5d' } },
   { register: 'tasks', fields: { what: 'Tidy the backlog labels', state: 'done', priority: 'low', agent: 'claude' } },
@@ -741,7 +744,7 @@ export const TEAM_PLAN_LINKS = [
     .filter((s) => s.register === 'cycle_plan')
     .flatMap((s) => [
       { register: 'cycle_plan', title: String(s.fields.what), field: 'task', to: 'tasks', target: String(s.fields.what) },
-      { register: 'cycle_plan', title: String(s.fields.what), field: 'cycle', to: 'cycles', target: 'Cycle 1' },
+      { register: 'cycle_plan', title: String(s.fields.what), field: 'cycle', to: 'cycles', target: 'Sprint 1' },
     ]),
   ...TEAM_EXAMPLES.filter((s) => s.register === 'tasks').map((s) => ({
     register: 'tasks',

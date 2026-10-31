@@ -1254,6 +1254,34 @@ const DECLARED: Record<string, Version> = {
     declares: 'f1ae90143338bc3b',
     history: ['`page.goals` takes its place on the rail and opens on boxes to add a goal or a habit and a saving (audit 31 Oct h, AH4); no id added or taken away -> f1ae90143338bc3b'],
   },
+  'personal@2.9.1': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      hands.metric.budgets-set.money-core metric.goal-log-held metric.goals-active metric.goals-held
+      metric.habits-active metric.logged-by-goal metric.logged-this-week-by-goal metric.put-by-by-goal
+      metric.put-by-held metric.saved-toward-goals metric.savings-active metric.savings-held metric.steps-done
+      metric.steps-left page.goals page.home-personal page.my-project register.goal_log register.goals
+      register.project_steps register.put_by register.savings_goals setting.holds_obligations setting.holds_people
+      setting.holds_things setting.label_accounts setting.label_books setting.label_categories setting.label_goal_log
+      setting.label_goals setting.label_installments setting.label_obligations setting.label_people
+      setting.label_people__role__accountant setting.label_people__role__client setting.label_people__role__collaborator
+      setting.label_people__role__contractor setting.label_project_steps setting.label_put_by setting.label_recurring
+      setting.label_savings_goals setting.label_things setting.label_things__lane__building
+      setting.label_things__lane__earning setting.label_things__lane__parked setting.label_things__lane__retired
+      setting.label_things__revenue setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f
+      setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a
+      setting.lk_f625eca1 setting.one_accounts setting.one_books setting.one_categories setting.one_goal_log
+      setting.one_goals setting.one_installments setting.one_obligations setting.one_people setting.one_project_steps
+      setting.one_put_by setting.one_recurring setting.one_savings_goals setting.one_things setting.one_transactions
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'f15c575c1b367587',
+    history: ['`register.goal_log` is called Progress and `register.put_by` Money saved, with the words on `page.goals` and `page.home-personal` (audit 31 Oct h, AH21); words only, no id added or taken away -> f15c575c1b367587'],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -2477,6 +2505,26 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '7ee971b7a8020e12',
     history: ['`page.cycles` takes its place on the rail and opens on a box to add a cycle (audit 31 Oct h, AH4); no id added or taken away -> 7ee971b7a8020e12'],
+  },
+  'team@2.30.1': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles rule.cycle_day_each_morning rule.ticket_done_ticks_plan
+      rule.ticket_reopened_unticks_plan script.cycle_day script.plan_follows_ticket setting.holds_people
+      setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: 'aceabf9e31d40769',
+    history: ['`register.cycles` is called Sprints, `register.cycle_plan` Sprint plan and `register.cycle_days` Open each morning, with the words on `page.cycles` and `page.home-team` (audit 31 Oct h, AH21); words only, no id added or taken away -> aceabf9e31d40769'],
   },
 };
 

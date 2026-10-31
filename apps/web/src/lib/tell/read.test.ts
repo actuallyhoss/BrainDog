@@ -404,6 +404,24 @@ test('A BILL TO PAY AND AN INVOICE TO SEND ARE BILLS AND INVOICES, due on the da
   assert.deepEqual(tellRead('Gym membership 900 a month', founder).rows[0]!.missing, ['the day it is due']);
 });
 
+test('MONEY LENT OR BORROWED IS OWED BETWEEN YOU AND THEM, never "Not sure" (FB3)', () => {
+  const { rows, left } = tellRead('Lent Omar 500 yesterday', founder);
+  assert.deepEqual(left, []);
+  const lent = rows.find((r) => r.register === 'obligations')!;
+  assert.equal(lent.fields.what, 'Lent to Omar');
+  assert.equal(lent.fields.direction, 'owed_to_me');
+  assert.deepEqual(lent.fields.amount, { amount: 50000, currency: 'EGP' });
+  assert.equal(lent.fields.due, undefined);
+  assert.ok(rows.some((r) => r.register === 'people' && r.fields.name === 'Omar'));
+  const owe = tellRead('Borrowed 300 from Sara, pay back by Friday', founder).rows.find((r) => r.register === 'obligations')!;
+  assert.equal(owe.fields.direction, 'owed_by_me');
+  assert.equal(owe.fields.what, 'Borrowed from Sara');
+  const owed = tellRead('Omar owes me 200', founder).rows.find((r) => r.register === 'obligations')!;
+  assert.equal(owed.fields.direction, 'owed_to_me');
+  assert.equal(owed.fields.what, 'Omar owes you');
+  assert.equal(tellRead('I owe Sara 150', founder).rows.find((r) => r.register === 'obligations')!.fields.direction, 'owed_by_me');
+});
+
 test("A BANK'S TEXT IS MONEY IN THE CURRENCY IT NAMES, never the record's, where and when it was spent", () => {
   const cib = 'CIB: Your card ending 4421 was charged EGP 1,250.00 at CARREFOUR MAADI on 31/10/2026. Avl bal EGP 18,340.55';
   const { rows } = tellRead(cib, { ...founder, currency: 'USD', today: '2026-10-31' });

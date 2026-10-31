@@ -141,7 +141,7 @@ test('and none under both In flight and Due this week, which the example rows do
   assert.deepEqual(due.rows!.filter((r) => above.has(r.id)).map((r) => String(r.fields.what)), [], 'drawn under In flight and again under Due this week');
 
   /* AND THE REST OF DUE THIS WEEK IS STILL THERE, so that the clause narrows the heading rather than emptying it. */
-  assert.deepEqual(titles(due), ['Agree what goes in the next cycle']);
+  assert.deepEqual(titles(due), ['Agree what goes in the next sprint']);
   sql.close();
 });
 

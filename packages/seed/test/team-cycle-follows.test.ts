@@ -222,7 +222,7 @@ test('a ticket planned after it was finished is ticked by the morning and not co
   const open = value<Entry>(r.k.create('tasks', { what: `Call ${PEOPLE[2]!.name} about the import`, state: 'open' }, LEAD));
   const late = value<Entry>(r.k.create('cycle_plan', { what: 'Ship the export button', task: finished.id, cycle: cycle.id }, LEAD));
   const byHand = value<Entry>(r.k.create('cycle_plan', { what: 'Call about the import', task: open.id, cycle: cycle.id, done: true }, LEAD));
-  const loose = value<Entry>(r.k.create('cycle_plan', { what: 'Agree what goes in the next cycle', cycle: cycle.id }, LEAD));
+  const loose = value<Entry>(r.k.create('cycle_plan', { what: 'Agree what goes in the next sprint', cycle: cycle.id }, LEAD));
   await r.settle();
   assert.equal(r.k.get(late.id)!.fields.done, false, 'a line planned after its ticket was done was ticked before the morning');
   await r.morning();

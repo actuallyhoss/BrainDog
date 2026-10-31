@@ -160,6 +160,17 @@ test('THE PHONE`S TABS ARE THE FIVE OF 19 OCTOBER, Projects and Money first and 
   assert.deepEqual(tabsOf(flatNav(FOUNDER, 2, WORDS).main).map((i) => i.label), ['Today', 'Needs you', 'Projects', 'Money', 'Work']);
 });
 
+test("A STARTER'S OWN PLACE IS ON THE PHONE'S BAR AS ON THE RAIL, by the place its page declares (FB4)", () => {
+  const placed = (title: string, href: string, place: number) => ({ ...page(title, href), place });
+  const personal = [
+    ['Projects', [placed('Projects', '/p/projects', 30)]],
+    ['Money', [placed('Money', '/p/money', 40)]],
+    ['People', [placed('People', '/p/people', 50)]],
+    ['Goals', [placed('Goals', '/p/goals', 20)]],
+  ] as const;
+  assert.deepEqual(tabsOf(flatNav(personal, 1, WORDS).main, 4).map((i) => i.label), ['Today', 'Needs you', 'Goals', 'Projects']);
+});
+
 test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a gone page is skipped', () => {
   const main = flatNav(FOUNDER, 2, WORDS).main;
   const money = main.find((i) => i.label === 'Money')!;

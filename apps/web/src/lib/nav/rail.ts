@@ -47,11 +47,18 @@ export type Rail<T> = {
 
 const plainOf = (s: string): string => s.trim().toLowerCase();
 
-/** The rank a section is drawn at, by its key's name: one of the named places, else after them. */
+/** Where each named place sits, the numbers their own modules declare (`nav.place`), for a section that says none. */
+const PLACE_AT: Readonly<Record<string, number>> = { work: 10, orders: 20, shop: 20, projects: 30, money: 40, people: 50, agents: 60 };
+
+/**
+ * The rank a section is drawn at: the place its pages declare (`nav.place`), else the named place's own number, else
+ * after them all. A STARTER'S OWN PLACE (Goals, Products, Studies, a team's Sprints, a founder's Dashboard) declares 20
+ * or 25, so it sits after Work as the record orders it (`packages/record/src/places.ts`), and the phone's bar, which
+ * takes its places in the same numbers (`tabsOf`), draws it too (FB4).
+ */
 function rankOf(item: FlatItem): number {
   const name = plainOf(item.key === 'work' ? 'work' : item.key.replace(/^section:/u, ''));
-  const at = PLACES.indexOf(name);
-  return at < 0 ? PLACES.length : at;
+  return item.place ?? PLACE_AT[name] ?? 1000;
 }
 
 /**

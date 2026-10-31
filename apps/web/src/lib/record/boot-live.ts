@@ -1209,6 +1209,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
             href: `/p/${p.slug}`,
             section: p.nav.section,
             order: p.nav.order,
+            ...(typeof p.nav.place === 'number' ? { place: p.nav.place } : {}),
             icon: iconFor(p.icon ?? undefined, 'doc'),
             ...((p.nav as { tabs?: unknown }).tabs === true ? { tabs: true as const } : {}),
             ...(kept.has(p) ? {} : { cut: true as const }),

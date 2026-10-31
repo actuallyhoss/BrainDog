@@ -63,7 +63,7 @@
   import { byRules, draftChange, type Drafted, type SlashClient } from '$lib/record/slash.ts';
   import { draftBrief, outsideCatalogue, propose, proposeFirst, type Proposal } from '$lib/start/propose.ts';
   import { slashAsks } from '$lib/start/ask.ts';
-  import { heardOf, offerOf, readCatalogueOffer, type CatalogueOffer } from '$lib/start/offer.ts';
+  import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, tradesKept, type CatalogueOffer, type TradeOffer } from '$lib/start/offer.ts';
   import { BYTES_MOST, drawnWith, entriesOf, EXPORTS_MOST, leftSaid, mapExport, newListDeclarations, ownList, readExports, type Export, type Mapping } from '$lib/start/export.ts';
   import { allLists, listById } from '$lib/start/lists.ts';
   import { titleOf } from '$lib/title.ts';
@@ -141,6 +141,8 @@
   let madeModules = $state.raw<string[] | null>(null);
   /* THE PLACES MADE, by name, which the end says first. */
   let madePlaces = $state.raw<string[] | null>(null);
+  /* THE ADD-ONS A TRADE SAID NAMES, offered by name at the end and never installed (AH8, FB5). */
+  let madeAddons = $state.raw<TradeOffer[]>([]);
   onMount(() => {
     /* A SET-UP BRAINDOG GOES TO TODAY (first hour audit, AH31): its address back at /start drew sign-up again over
        "This BrainDog is set up". Only the end of the run (`#made`), an agent's set-up (`?agent=1`) and "Or bring in a
@@ -159,6 +161,12 @@
       if (Array.isArray(kept) && kept.every((x) => typeof x === 'string')) madePlaces = kept;
     } catch {
       /* Nothing kept: the end says only that it is made. */
+    }
+    try {
+      madeAddons = tradesKept(globalThis.sessionStorage?.getItem(MADE_ADDONS) ?? null);
+      globalThis.sessionStorage?.removeItem(MADE_ADDONS);
+    } catch {
+      /* Storage off: no add-on is offered. */
     }
   });
 
@@ -716,6 +724,7 @@
       if (out.failed.length === 0) {
         madeModules = asked.modules;
         madePlaces = asked.proposal.places.filter((x) => x.kind !== 'today').map((x) => x.name);
+        madeAddons = tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }));
         made = true;
         globalThis.scrollTo?.({ top: 0 });
         return;
@@ -829,7 +838,7 @@
         </div>
       </section>
     {:else if made}
-      <Made modules={madeModules} places={madePlaces} />
+      <Made modules={madeModules} places={madePlaces} addons={madeAddons} />
     {:else if watched}
       <!-- AFTER THE PRESS: the record being made, tile by tile. Today opens when the call answers; where the record
            refused a part, its tile says why and the way back is one button. -->
