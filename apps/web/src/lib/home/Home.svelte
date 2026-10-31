@@ -104,7 +104,7 @@
   import NeedsFoot from '$lib/home/NeedsFoot.svelte';
   import { sharedFrom, type SharedOut } from '$lib/home/shared-line.ts';
   import { desked as deskedOf, type Desked } from '$lib/home/desk-part.ts';
-  import WantMore from '$lib/home/WantMore.svelte';
+  import type WantMoreOf from '$lib/home/WantMore.svelte';
   import { read as readPref } from '$lib/pref.ts';
   import { REGISTERS, TITLES } from '$lib/record/held.ts';
   import { learn } from '$lib/record/remote.ts';
@@ -124,8 +124,8 @@
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import Board from '$lib/board/Board.svelte';
-  import EditCover from '$lib/board/EditCover.svelte';
-  import DraftMark from '$lib/board/DraftMark.svelte';
+  import type EditCoverOf from '$lib/board/EditCover.svelte';
+  import type DraftMarkOf from '$lib/board/DraftMark.svelte';
   import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
   import { restSize, rowsOf } from '$lib/board/rest-size.ts';
   import { leftBlock, phoneAsk, withLeft } from '$lib/home/phone-ask.ts';
@@ -289,9 +289,14 @@
      NOT WHERE NO STEP CAN DRAW (hidden, or more added than a first Today holds, as `steps` reads it): `first` holds on
      any record its keeper may add to, and the use cases were about 50 KB of a cold phone's Today for nothing. */
   let nextSteps = $state.raw<typeof import('$lib/home/want-more.ts') | null>(null);
+  /* AND THE CARD THAT DRAWS THEM, WITH THEM: no step draws before both have landed. */
+  let WantMore = $state.raw<typeof WantMoreOf | null>(null);
   $effect(() => {
     if (first && nextSteps === null && prefs.nextStepsHidden !== true && added <= FIRST_TODAY_MOST)
-      void import('$lib/home/want-more.ts').then((m) => (nextSteps = m), () => undefined);
+      void Promise.all([import('$lib/home/want-more.ts'), import('$lib/home/WantMore.svelte')]).then(
+        ([m, c]) => ((WantMore = c.default), (nextSteps = m)),
+        () => undefined,
+      );
   });
 
   /* THE NEXT STEPS, under Today's blocks, on a first Today only: a record kept for months is not offered them, and its
@@ -1092,6 +1097,18 @@
     const { layout: _rail, ...flat } = got.page.page;
     return { ...got, page: { page: flat, blocks } };
   });
+  /* THE BOARD'S EDIT HANDLES AND A DRAFT WIDGET'S MARK, LOADED WHEN ONE IS DRAWN: a Today kept as it is never edits its
+     board and seldom holds a draft, so their code is not on the cold open's path. */
+  let EditCover = $state.raw<typeof EditCoverOf | null>(null);
+  let DraftMark = $state.raw<typeof DraftMarkOf | null>(null);
+  $effect(() => {
+    if (EditCover === null && boardModel.editing) void import('$lib/board/EditCover.svelte').then((m) => (EditCover = m.default), () => undefined);
+  });
+  $effect(() => {
+    if (DraftMark !== null || !mayArrange || drawn?.from !== 'live') return;
+    if (drawn.page.blocks.some((b) => { const d = (b as { draft?: unknown }).draft; return d !== null && typeof d === 'object'; }))
+      void import('$lib/board/DraftMark.svelte').then((m) => (DraftMark = m.default), () => undefined);
+  });
   const slug = $derived(live?.page.page.page ?? declares ?? 'today');
 
   /* THE READER THE BODY IS DRAWN BY, whose writes the line in the head adds through (`PageView`'s `capture`). */
@@ -1511,7 +1528,7 @@
   {#if cell}
     <div class="board-part" data-board-key={key} data-size={cell.size} style="grid-area:{cell.area}">
       {@render body()}
-      {#if boardModel.editing}<EditCover model={boardModel} {key} />{/if}
+      {#if boardModel.editing && EditCover}<EditCover model={boardModel} {key} />{/if}
     </div>
   {/if}
 {/snippet}
@@ -1525,11 +1542,11 @@
     {@render needsFoot()}
   {/if}
   {@const draft = (b as { draft?: unknown } | undefined)?.draft}
-  {#if mayArrange && key && !boardModel.editing && draft !== null && typeof draft === 'object'}
+  {#if DraftMark && mayArrange && key && !boardModel.editing && draft !== null && typeof draft === 'object'}
     {@const own = declaredOf(key)}
     <DraftMark draft={draft as { by?: unknown; why?: unknown }} name={boardModel.nameOf(key)} onkeep={() => boardStep([{ keep: key }], draftSaid.kept)} ondiscard={() => boardStep([{ remove: key }], draftSaid.gone)} onagain={own ? () => draftAgain(key, own) : undefined} />
   {/if}
-  {#if boardModel.editing && key && boardModel.placeOf(key)}<EditCover model={boardModel} {key} />{/if}
+  {#if boardModel.editing && EditCover && key && boardModel.placeOf(key)}<EditCover model={boardModel} {key} />{/if}
 {/snippet}
 
 <!-- THE READER, the one for a board and for a page laid out by hand. -->
@@ -1654,7 +1671,7 @@
     </div>
 
     <!-- AND UNDER TODAY, THE NEXT STEPS, until they are hidden. -->
-    {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
+    {#if steps.length > 0 && WantMore}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
   {/if}
   {#if !shown && !data.refused}<span class="page-wait" hidden></span>{/if}
 </div>
