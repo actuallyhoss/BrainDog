@@ -103,8 +103,8 @@ test('APPROVED: pending twice, then the token kept in the hosts file, the defaul
 
   assert.equal(out.code, 0, out.stderr);
   assert.equal(out.stdout, '');
-  assert.ok(out.stderr.includes(`Open ${host.base}/settings/agents and enter  123 456   (10 minutes)`), out.stderr);
-  assert.match(out.stderr, new RegExp(`logged in to ${host.base.replaceAll('.', '\\.')} as .+ · token expires 2099-01-01`));
+  assert.ok(out.stderr.includes(`Open ${host.base}/settings/agents and enter 123 456 (10 minutes)`), out.stderr);
+  assert.match(out.stderr, new RegExp(`Logged in to ${host.base.replaceAll('.', '\\.')} as .+ · token expires 2099-01-01`));
   hidden(out);
 
   const hosts = readHosts(out.file);
@@ -201,7 +201,7 @@ test('A LOCAL SELF-HOST THAT CALLS ITSELF localhost is the same machine as 127.0
   const host = await stub(t, () => granted, (base) => `${base.replace('127.0.0.1', 'localhost')}/settings/agents`);
   const out = await run(t, host.base);
   assert.equal(out.code, 0, out.stderr);
-  assert.ok(out.stderr.includes('/settings/agents and enter  123 456'), out.stderr);
+  assert.ok(out.stderr.includes('/settings/agents and enter 123 456'), out.stderr);
   assert.equal(readHosts(out.file).hosts[host.base]?.token?.value, TOKEN);
   hidden(out);
 });

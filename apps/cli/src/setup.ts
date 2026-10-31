@@ -498,7 +498,15 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
      */
     const planned = installProfiles(profiles, [], { apply: false, scripts: io.scripts, home: io.home }).lines;
     const pending = planned.some((line) => line.startsWith('  + hooks.') || line.startsWith('  ~ hooks.') || line.startsWith(PLACES_SKILL));
-    const rest = (lines: string[]) => lines.filter((line) => !line.startsWith('Nothing was changed.') && !line.includes(HOOKS_HELD));
+    /* SETUP'S OWN WORDS FOR WHAT IT DOES (audit 31 Oct k, AK26): `install`'s plan says "braindog install would change", which
+       read wrong under setup, and wrong again once written; and "There was no file before, so there is nothing to keep
+       a copy of." was said once a file, a line nobody needs when the step already said a copy is kept where there is one. */
+    const NO_COPY = 'There was no file before, so there is nothing to keep a copy of.';
+    const said = (line: string): string =>
+      line
+        .replace(/^braindog install (?:--replace )?would change /u, 'Changes to ')
+        .replace(/^braindog install (?:--replace )?would place BrainDog's Agent Skill in /u, "BrainDog's Agent Skill goes in ");
+    const rest = (lines: string[]) => lines.filter((line) => !line.startsWith('Nothing was changed.') && !line.includes(HOOKS_HELD) && line !== NO_COPY).map(said);
     if (!pending) {
       io.out("2. Hooks: Claude Code's settings already run the BrainDog hooks and Agent Skill.");
       detail(rest(planned));
@@ -706,7 +714,10 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
         /* STEP 3'S SET, so a file it made or copied (Codex's config.toml) gets no copy of BrainDog's own text here. */
         copied,
       });
-      const shown = lines.filter((line) => !line.startsWith('Nothing was changed.'));
+      /* BRAINDOG'S OWN SERVER IS STEP 3'S (AK26): the record lists it as a tool too, and "Tool braindog was not written,
+         because its program braindog is neither on this machine's path nor a file here." came right after step 3 had
+         registered it, running this very command. */
+      const shown = lines.filter((line) => !line.startsWith('Nothing was changed.') && !/^Tool braindog was not written\b/u.test(line));
       /* A LINE SAYING A TOOL WENT IN IS A CHANGE; one saying a tool was left out or left as it is, is not. */
       const wrote = !dryRun && shown.some((line) => /^Tool \S+ (?:added|replaced)\b/u.test(line));
       if (wrote) changed = true;

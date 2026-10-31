@@ -54,8 +54,18 @@ async function todayBlocks(client: ReturnType<typeof clientFor>): Promise<Result
   return { ok: true, value: blocks as Block[] };
 }
 
+/** How many of the briefing's lines `braindog today` says before it counts the rest. */
+const BRIEF_SHOWN = 5;
+
+/** The lines Today opens on (the record's `briefing`), in order, or none when it cannot be read. */
+async function briefLines(client: ReturnType<typeof clientFor>): Promise<string[]> {
+  const got: Result<unknown> = await client.call('briefing', {});
+  if (!got.ok || !isObject(got.value) || !Array.isArray(got.value.cards)) return [];
+  return (got.value.cards as unknown[]).flatMap((c) => (isObject(c) && typeof c.line === 'string' && c.line.trim() !== '' ? [c.line.trim()] : []));
+}
+
 /** Said where Today is still drawn from what the record holds, so there is no board to read or add to yet. */
-const NOT_KEPT = 'Today is not kept as a board yet: it is drawn from what your BrainDog holds. Add one widget to it in the app, and then it can be read and added to from here.';
+const NOT_KEPT = 'Today has no widgets of its own yet. Add the first one in the app, and then braindog today can add to it and share one.';
 
 const nameOf = (b: Block): string => (typeof b.heading === 'string' && b.heading.trim() !== '' ? b.heading.trim() : String(b.kind ?? 'A widget'));
 
@@ -75,15 +85,28 @@ export async function todayCommand(args: string[], io: AgentIo): Promise<number>
   const { to, client } = at;
 
   if (verb === undefined) {
-    const blocks = await todayBlocks(client);
-    if (refused(blocks) && blocks.refusal.code === 'PAGE_UNKNOWN') return refuse(io, blocks, NOT_KEPT);
-    if (!blocks.ok) return refuse(io, blocks, line(blocks, to));
-    io.answer?.({ value: blocks.value });
+    /* WHAT TODAY OPENS ON FIRST, WHETHER OR NOT IT IS A BOARD YET (audit 31 Oct k, AK18): the briefing's lines, what is
+       late, due, asked and left, in the words the app shows. A seeded record has no board of its own, and the command
+       answered only that Today is not kept, so an agent had no way to read Today's next step. */
+    const [blocks, brief] = await Promise.all([todayBlocks(client), briefLines(client)]);
+    const kept = !(refused(blocks) && blocks.refusal.code === 'PAGE_UNKNOWN');
+    if (kept && !blocks.ok) return refuse(io, blocks, line(blocks, to));
+    for (const l of brief.slice(0, BRIEF_SHOWN)) io.out(printable(l));
+    if (brief.length > BRIEF_SHOWN) io.out(`And ${String(brief.length - BRIEF_SHOWN)} more on Today in the app.`);
+    if (!kept || !blocks.ok) {
+      io.answer?.({ value: { lines: brief, widgets: [] } });
+      if (brief.length === 0) io.out('Nothing on Today needs you now.');
+      io.out('Today has no widgets of its own yet. Add the first one in the app; after that braindog today add can add more.');
+      return 0;
+    }
+    io.answer?.({ value: brief.length === 0 ? blocks.value : { lines: brief, widgets: blocks.value } });
     const shown = blocks.value.filter((b) => typeof b.key === 'string');
     if (shown.length === 0) {
+      if (brief.length === 0) io.out('Nothing on Today needs you now.');
       io.out('Today holds no widgets of its own yet. Add one with braindog today add "<what it shows>".');
       return 0;
     }
+    if (brief.length > 0) io.out('Widgets:');
     for (const b of shown) {
       const draft = isObject(b.draft) && typeof b.draft.by === 'string' ? ` · a draft from ${b.draft.by}` : '';
       io.out(printable(`${nameOf(b)} · ${typeof b.size === 'string' ? b.size : 'wide'}${draft}`));

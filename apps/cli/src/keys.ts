@@ -206,8 +206,12 @@ const aFile = (path: string): boolean => {
   }
 };
 
-/** Where a request goes and what it carries: keychain access for `scope`, or, for `put` alone, the login (`login`). */
-type Door = { key: string; base: string; bearer: string; scope: string; login: boolean; from?: Target['from'] };
+/**
+ * Where a request goes and what it carries: keychain access for `scope`, or, for `put` alone, the login (`login`).
+ * `expired` is the sentence about a keychain grant past its day that `put` passed over for the login, said in place of
+ * the login's refusal, since the grant is what ran out (AK8).
+ */
+type Door = { key: string; base: string; bearer: string; scope: string; login: boolean; from?: Target['from']; expired?: string };
 type Answer = { status: number; body: Record<string, unknown> | null };
 
 /**
@@ -250,7 +254,9 @@ function doorFor(flags: { host?: string | undefined; vault?: string | undefined 
   } catch (e) {
     return e instanceof Error ? e.message : granted;
   }
-  if (to.token) return { key: to.key, base: to.base, bearer: to.token, scope: '', login: true, ...(to.from ? { from: to.from } : {}) };
+  const expired = / has expired\. /.test(granted) ? { expired: granted } : {};
+  if (to.token) return { key: to.key, base: to.base, bearer: to.token, scope: '', login: true, ...(to.from ? { from: to.from } : {}), ...expired };
+  if (expired.expired !== undefined) return expired.expired;
   /* NEITHER IS KEPT, and the sentence still names keychain access, which is what `tools scan` reads to say why a key it
      found was kept by name only. */
   return `No keychain access or login is kept for ${to.key}. Run braindog login ${to.key}.`;
@@ -310,10 +316,18 @@ function refusedLine(door: Door, answer: Answer): string {
      take. Keychain access is the way in, and once it is kept it is sent before the variable. */
   if (door.login && door.from === 'env' && (answer.status === 401 || refusal?.at === 'vault'))
     return `${door.key} did not take the token in BRAINDOG_TOKEN for a key: only this machine's login, an agent's write token or keychain access adds one, and a self-host's server key is none of those. Run braindog login ${door.key} --keychain <project>, then put the key again.`;
+  /* THE LOGIN IS NEVER THE FIX HERE (AK8): the deposit door takes keychain access, or a login only where the host wired
+     that half, so "run braindog login" sent a person round to the same refusal. One way on, and it works. */
   if (answer.status === 401 || (door.login && refusal?.at === 'vault'))
     return door.login
-      ? `${door.key} did not take the login. Run braindog login ${door.key}, or braindog login ${door.key} --keychain <project>.`
+      ? (door.expired ?? `${door.key} did not take this machine's login for a key. Run braindog login ${door.key} --keychain <project>, then put the key again.`)
       : `${door.key} did not take the keychain access. Run braindog login ${door.key} --keychain ${door.scope}.`;
+  /* STILL ASKED AFTER THE WAIT: nothing was kept, and the same command puts it once he says yes. */
+  if (refusal?.code === 'KEY_ASKED' && refusal.at === 'register')
+    return 'Nothing was put away yet. Say yes to adding Agents in Needs you, then put the key again.';
+  /* A NEW KEY WITH NO `--opens` is answered in the record's words, which name no flag. */
+  if (refusal?.at === 'opens' && refusal.code === 'REQUIRED_MISSING')
+    return 'A new key says what it opens. Add --opens "<what it opens>", such as a host or an account, and put it again.';
   if (typeof refusal?.fix === 'string' && refusal.fix) return refusal.fix.slice(0, 300);
   return `${door.key} answered in a way this command does not recognise.`;
 }
@@ -332,6 +346,31 @@ async function depositOne(door: Door, ask: { label: string; opens?: string; kind
     ...(io.signal ? { signal: io.signal } : {}),
   });
   return answerOf(res);
+}
+
+/**
+ * One deposit, and a wait while the owner is asked (AK3). A BrainDog with no Keychain yet asks him on Decide to add it
+ * and answers `KEY_ASKED`; this says the record's sentence once and sends the same deposit again every three seconds for
+ * up to two minutes, as `getWaiting` does for a key set to ask first, until it is kept or refused for another reason.
+ */
+async function depositWaiting(door: Door, ask: { label: string; opens?: string; kind?: string }, value: Plaintext, headers: Record<string, string>, io: KeysIo): Promise<Answer> {
+  const asked = (a: Answer): string | null => {
+    const r = a.body?.ok === false && isObject(a.body.refusal) ? a.body.refusal : null;
+    return r?.code === 'KEY_ASKED' ? (typeof r.fix === 'string' && r.fix ? r.fix.slice(0, 300) : 'You were asked in BrainDog first.') : null;
+  };
+  let answer = await depositOne(door, ask, value, headers, io);
+  const said = asked(answer);
+  if (said === null) return answer;
+  io.say(`${said} Waiting for that…`);
+  const now = io.now ?? Date.now;
+  const wait = io.wait ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
+  const until = now() + ASK_FOR_MS;
+  while (now() < until && !io.signal?.aborted) {
+    await wait(ASK_EVERY_MS);
+    answer = await depositOne(door, ask, value, headers, io);
+    if (asked(answer) === null) return answer;
+  }
+  return answer;
 }
 
 /** The door `put --from` sends every key of one file or folder through: what `put` would use, read once. */
@@ -628,7 +667,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
     const headers = await io.headers(door.key);
     if (verb === 'put' && value !== null) {
       const ask = { label: label.trim(), ...(values.opens ? { opens: values.opens } : {}), ...(values.kind ? { kind: values.kind } : {}) };
-      const answer = await depositOne(door, ask, value, headers, io);
+      const answer = await depositWaiting(door, ask, value, headers, io);
       const kept = answer.body?.ok === true && isObject(answer.body.value) ? answer.body.value : null;
       if (kept === null || typeof kept.credential !== 'string') {
         io.say(refusedLine(door, answer));

@@ -245,6 +245,7 @@ import { maskMoneyText, sharesFor as heldSharesOf } from '@braindog/kernel';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
 import { learnedOrder, learnedSorted, replacedIn, replacesField } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
+import { rulesBrief } from './briefing.ts';
 import { doorFacts, doorIsOff, turnedAway as doorTurnedAway, type DoorFacts } from './methods/door-switch.ts';
 import { briefSlot, briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
@@ -10194,6 +10195,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(told.stamp ? { stamp: told.stamp } : {}),
         ...(where.task ? { task: taskFact(ctx, where.task) } : {}),
         ...(where.depth === 'card' ? {} : { kpis: kpisKept(ctx, told.project, at.agent) }),
+        /* TODAY'S FIRST LINE, by the briefing's rules, read only when the card has no step to give it (AK18). */
+        today: () => rulesBrief(kernel.transaction(() => briefFactsFor(methodDeps(), ctx, now)))[0]?.line ?? null,
       }),
       { budget: told.budget, depth: where.depth },
     );
@@ -16342,6 +16345,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const agent = ctx !== null && opts?.agentDeposit === true && ctx.principal.kind === 'token' ? ctx : null;
       if (opts?.agentDeposit === true && agent === null)
         return no('FORBIDDEN', 'This door adds a key for a login token, and the bearer sent is not one.', { at: 'principal' });
+      /* A RECORD WITH NO KEYCHAIN YET (audit 31 Oct k, AK3): a fresh `init` holds the kernel's two lists and nothing else,
+         and `keys put` answered "There is no register called credentials." with no way on. The Keychain is the Agents
+         module's, and only the owner adds a module, so an agent's deposit asks him on Decide to add it, once, and answers
+         `KEY_ASKED`: the same `keys put` goes through once he says yes, and the CLI waits for it as it waits on a key set
+         to ask first. A no, or a caller that cannot ask, is told where to add it. */
+      if (!kernel.register(KEYS)) {
+        const absent = 'This BrainDog has no Keychain yet. Add Agents in the app (Add-ons), which holds it, then put the key again.';
+        if (agent === null) return no('REGISTER_UNKNOWN', absent, { at: 'register' });
+        const self = this as unknown as { propose: (a: Proposal, c: CallContext) => Promise<Result<{ id: string; answered?: unknown }>> };
+        const asked = await self
+          .propose({ question: 'Add Agents, which holds the Keychain, so an agent can put a key away?', body_kind: 'pack', body: { install: 'agents' } } as Proposal, agent)
+          .catch(() => null);
+        if (asked === null || !asked.ok || asked.value.answered !== undefined) return no('REGISTER_UNKNOWN', absent, { at: 'register' });
+        const named = /^SG[1-9][0-9]*$/u.test(asked.value.id) ? ` (${asked.value.id})` : '';
+        return no('KEY_ASKED', `This BrainDog has no Keychain yet, so you were asked in Needs you${named} to add Agents, which holds it. The key goes in once you say yes.`, { at: 'register' });
+      }
       if (ctx && agent === null) {
         const stop = keychain(ctx);
         if (stop) return { ok: false as const, refusal: stop };

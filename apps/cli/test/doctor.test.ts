@@ -230,7 +230,7 @@ test('A CCENV PROFILE IS NAMED BY ITS NAME, and its servers are read from its ow
   json(join(studio, 'settings.json'), ours);
   json(join(studio, '.claude.json'), { mcpServers: { braindog: BRAINDOG_SERVER } });
   const out = doctor([], { ...quiet, home, env: {}, crontab: () => null });
-  assert.ok(out.lines.includes("Claude Code, ccenv profile studio: BrainDog's server is registered and runs this command. Both hooks are there."), out.lines.join('\n'));
+  assert.ok(out.lines.includes("Claude Code, ccenv profile studio: BrainDog's server is registered and runs this command. The start and end hooks are there."), out.lines.join('\n'));
   assert.equal(out.code, 0, out.lines.join('\n'));
   /* Under another CCENV_HOME the profile is named by it too. */
   const other = join(home, 'tools', 'ccenv');
@@ -289,7 +289,7 @@ test('EVERY APP AND THE OLD PROCESS IN THREE LINES OF WORDS: Cursor has BrainDog
   assert.ok(out.lines.includes("Codex: BrainDog's server is not registered. A server of Tallybook's is still there."), text);
   assert.ok(out.lines.includes('Started before this command was updated: restart Claude Code.'), text);
   /* The profile by its name, and each file under the home as `~`, never the folder a temporary home sits in. */
-  assert.ok(out.lines.includes("Claude Code, the default profile: BrainDog's server is registered and runs this command. Both hooks are there."), text);
+  assert.ok(out.lines.includes("Claude Code, the default profile: BrainDog's server is registered and runs this command. The start and end hooks are there."), text);
   assert.ok(!text.includes(x.home), `a path a person cannot act on:\n${text}`);
   assert.ok(out.lines.some((l) => l.includes('~/.codex/config.toml') && l.includes('mcp_servers.brain')), text);
   /* The server started after the change, and a process that is no server, are not listed. */
