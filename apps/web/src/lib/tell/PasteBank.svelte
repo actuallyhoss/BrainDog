@@ -17,6 +17,7 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { REGISTERS, TITLES } from '$lib/record/held.ts';
   import { learn } from '$lib/record/remote.ts';
+  import { recordToday } from '$lib/record/zone.ts';
   import type { TellOptions } from './read.ts';
   import type { ToldLine } from '$lib/home/tell-line.ts';
 
@@ -32,10 +33,6 @@
     void Promise.all(missing.map((id) => learn(client.schema, id, asked))).finally(() => (learnt += 1));
   });
 
-  const dayOn = (now: number): string => {
-    const d = new Date(now);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
   const knownIn = (register: string | null | undefined) => [...(register ? (TITLES.get(register) ?? []) : [])].map(([seq, name]) => ({ seq, name }));
 
   const options = $derived.by((): TellOptions => {
@@ -43,7 +40,7 @@
     const kept = { registers: shell.lists.map((l) => ({ id: l.id, name: l.name, count: shell.index.registers.find((r) => r.id === l.id)?.count ?? 0 })) };
     const lists = tellLists(kept, REGISTERS);
     const into = lists.flatMap((l) => l.fields.filter((f) => f.type === 'ref' && f.required && /account/i.test(`${f.id} ${f.label ?? ''}`)).map((f) => f.to));
-    return { lists, today: dayOn(shell.now), currency: shell.index.currency ?? null, people: knownIn(playedBy('meets')), accounts: into.flatMap((to) => knownIn(to)) };
+    return { lists, today: recordToday(shell.now), currency: shell.index.currency ?? null, people: knownIn(playedBy('meets')), accounts: into.flatMap((to) => knownIn(to)) };
   });
 
   /* What was added from here, said under the box until the next. */
