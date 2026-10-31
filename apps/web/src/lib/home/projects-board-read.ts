@@ -36,7 +36,7 @@ import { lanesOf, inPlayOf } from '../shell/side.ts';
 /** What this tab has asked, so a list's declaration is asked for once. */
 const asked = new Map<string, Promise<void>>();
 
-type Row = { seq?: unknown; id?: unknown; fields?: Record<string, unknown>; updated_at?: unknown; created_at?: unknown };
+type Row = { seq?: unknown; id?: unknown; fields?: Record<string, unknown>; updated_at?: unknown; created_at?: unknown; created?: unknown };
 type Where = { toJSON: () => string };
 const where = (s: string): Where => ({ toJSON: () => s });
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -148,7 +148,7 @@ export function projectsFrom(list: string, entries: readonly Row[]): BoardProjec
       year: fieldMoney(f.revenue),
       repos,
       /* WHEN IT WAS WRITTEN, or last changed where the answer says no more, so a project a minute old is not quiet (AH17). */
-      made: typeof e.created_at === 'string' ? e.created_at : typeof e.updated_at === 'string' ? e.updated_at : null,
+      made: typeof e.created === 'string' ? e.created : typeof e.created_at === 'string' ? e.created_at : typeof e.updated_at === 'string' ? e.updated_at : null,
     });
   }
   return out;
