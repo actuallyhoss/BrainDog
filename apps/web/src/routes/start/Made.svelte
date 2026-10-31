@@ -7,7 +7,7 @@
   is optional and nobody needs to be technical. Now the first tile says what was made and the one thing to do on Today,
   with "Go to Today" as the press; the second tile, under it, is the connect step for people who want it.
 
-  ONE APP AT A TIME (first F1), in the second tile. A segmented control of the five apps, Claude Code first and chosen,
+  ONE APP AT A TIME (first F1), in the second tile. A segmented control of the five apps, Claude first and chosen,
   each with its maker's mark; under it that app's steps only, numbered where there are two, each step's command or
   address in its own block with its own Copy (`CodeLine`). Under them the live sign: "Waiting for your agent…" beside a
   grey dot until the record hears its first session, then "Connected: Claude Code on MacBook" beside a green one. It asks
@@ -21,8 +21,8 @@
 
   `modules` (`made.modules`) is what was just made; nothing here reads it, and the prop stays so `/start`'s call is unchanged.
   `places` are the names of the places made, said in one line over the first step, so the screen first says what
-  was built. On a phone (under 640) Claude comes first and chosen, since nobody runs a terminal command there, and a
-  command breaks only at its spaces (`CodeLine` `words`).
+  was built. Claude comes first and chosen at every width (AH25), and a command breaks only at its spaces (`CodeLine`
+  `words`).
 -->
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
@@ -61,11 +61,12 @@
 
   /* THIS RECORD'S LINES: the bare host, and the record's own address where the shell names it. */
   const slug = $derived(page.data.live === true ? (page.data.index?.slug ?? null) : null);
-  /* UNDER 640, A PHONE: the apps with no terminal come first (`appLines`). Read once; a turned phone keeps its choice. */
-  const phone = globalThis.matchMedia?.('(width < 640px)').matches ?? false;
-  const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)], phone));
+  /* CLAUDE FIRST AT EVERY WIDTH (`appLines`, AH25): the apps with no terminal lead, the coding apps follow. */
+  const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)]));
+  /* THE LISTS THIS BRAINDOG KEEPS, which the example on Today's line names (`firstWords.sub`). */
+  const lists = $derived(page.data.live === true ? (page.data.index?.registers ?? []).map((r: { id: string }) => r.id) : []);
 
-  /* CLAUDE CODE FIRST AND CHOSEN, the app a person reading this is likeliest to have. */
+  /* CLAUDE FIRST AND CHOSEN. */
   let chosenId = $state<string | null>(null);
   const chosen = $derived(apps.find((a) => a.id === chosenId) ?? apps[0]);
 
@@ -118,7 +119,7 @@
     <header class="head">
       <p class="made-line">{madeLine}</p>
       <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
-      <p class="entry-lede">{firstWords.sub}</p>
+      <p class="entry-lede">{firstWords.sub(lists)}</p>
     </header>
     <div class="go">
       <Button weight="primary" href="/">{firstWords.go}</Button>

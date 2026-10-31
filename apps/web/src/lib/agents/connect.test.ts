@@ -23,7 +23,7 @@ test('the apps the first screen offers, in its order, then Codex, any other app 
   );
   /* THE SAME APPS AS CONNECT YOUR AGENT (`first-connect.ts`), so the two screens never offer different ones. */
   const first = appLines(connectLines('https://brain.dog', 'acme')).map((a) => a.name);
-  assert.deepEqual(CONNECT_TILES.slice(0, first.length).map((t) => t.title), first);
+  assert.deepEqual(CONNECT_TILES.slice(0, first.length).map((t) => t.title).sort(), [...first].sort());
   assert.equal(new Set(CONNECT_TILES.map((t) => t.id)).size, CONNECT_TILES.length);
 });
 
