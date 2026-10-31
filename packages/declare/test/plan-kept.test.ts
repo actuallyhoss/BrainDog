@@ -200,3 +200,32 @@ test('a kept list the update changes is refused, and one it leaves alone is kept
   assert.deepEqual(same.conflicts, []);
   assert.deepEqual(same.kept, [{ id: 'register.transactions' }]);
 });
+
+/* RH3: AN UPDATE THAT ONLY REWORDS A LIST THE OWNER CHANGED IS NOT A CONFLICT. Team 2.30.1 said Sprints for Cycles,
+   and a record whose owner had renamed one of those lists was refused that update and every later one, each night. */
+test('a words-only update over a list the owner renamed carries its words where the list still says the old ones', async () => {
+  const theirs = (b: Record<string, unknown>) => ({ ...b, name: 'My transactions', fields: (b.fields as { id: string }[]).map((f) => (f.id === 'direction' ? { ...f, label: 'Way' } : f)) });
+  const installed = await recordWith({ 'register.transactions': theirs });
+  const labels: Record<string, string> = { transfer: 'Moved between your accounts', direction: 'In or out' };
+  const doc = DOC('1.1.0', FIELDS().map((f) => (f.id in labels ? { ...f, label: labels[f.id]! } : f)) as ReturnType<typeof FIELDS>);
+  const next = await packOf({ ...doc, declarations: doc.declarations.map((d) => (d.register === 'transactions' ? { ...d, name: 'Money moved' } : d)) });
+  const diff = await plan(next, installed);
+
+  assert.deepEqual(diff.conflicts, []);
+  const kept = diff.kept.find((k) => k.id === 'register.transactions');
+  assert.ok(kept?.rebased !== undefined, 'the list was not carried');
+  const body = JSON.parse(kept.rebased) as { name: string; fields: { id: string; label?: string }[] };
+  assert.equal(body.name, 'My transactions', 'the name the owner gave the list was changed');
+  assert.equal(body.fields.find((f) => f.id === 'direction')?.label, 'Way', 'a label the owner typed was changed');
+  assert.equal(body.fields.find((f) => f.id === 'transfer')?.label, 'Moved between your accounts');
+  assert.deepEqual(kept.words, ['Moved between your accounts']);
+});
+
+test('a words-only update over a list that holds none of the old words keeps it as the owner left it', async () => {
+  const installed = await recordWith({ 'register.transactions': (b) => ({ ...b, name: 'My transactions' }) });
+  const doc = DOC('1.1.0');
+  const next = await packOf({ ...doc, declarations: doc.declarations.map((d) => (d.register === 'transactions' ? { ...d, name: 'Money moved' } : d)) });
+  const diff = await plan(next, installed);
+  assert.deepEqual(diff.conflicts, []);
+  assert.deepEqual(diff.kept.filter((k) => k.id === 'register.transactions'), [{ id: 'register.transactions' }]);
+});

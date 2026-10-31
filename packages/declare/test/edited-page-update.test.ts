@@ -81,29 +81,42 @@ const host = (log: string[]): Host => ({
 
 const names = (id: string): string => (id === 'usecase-founder' ? 'Founder' : id === HOME ? 'your Home page' : id);
 
-test('Founder 2.6.0 over an edited Home keeps the page and names the Late table and the title Founder overview', async () => {
+/* SINCE UP1 AND RH2 (31 Oct) THE TITLE IS CARRIED IN, as a word the owner's page still held as the pack's, and so it is
+   not asked about again: only the Late table is. */
+test('Founder 2.6.0 over an edited Home keeps the page, carries the title Founder overview and names the Late table', async () => {
   const next = await founder();
   assert.equal(next.manifest.version, '2.6.0');
   const diff = await plan(next, await recordWith(next, lapsingFirst));
 
   assert.deepEqual(diff.conflicts, []);
-  assert.deepEqual(diff.kept, [{ id: HOME }]);
-  assert.deepEqual(diff.brings, [{ id: HOME, title: 'Founder overview', blocks: [{ kind: 'table', heading: 'Late' }] }]);
+  assert.deepEqual(diff.kept.map((k) => k.id), [HOME]);
+  const kept = diff.kept[0]!;
+  assert.ok(kept.rebased !== undefined);
+  const page = JSON.parse(kept.rebased) as Body;
+  assert.equal(page.title, 'Founder overview');
+  assert.equal(page.blocks[0]?.heading, 'Lapsing', 'the owner’s arrangement was lost');
+  assert.ok(!page.blocks.some((b) => b.heading === 'Late'), 'a block the update adds was laid on the owner’s page');
+  assert.ok(kept.words?.includes('Founder overview'));
+  assert.deepEqual(diff.brings, [{ id: HOME, blocks: [{ kind: 'table', heading: 'Late' }] }]);
   assert.deepEqual(keptQuestion(diff, names), {
     about: 'Founder 2.6.0 adds to a page you changed',
-    line: "Founder 2.6.0 adds the Late table and the title Founder overview to your Home page, which you changed. Your page is kept as you left it. Take the update's page, or keep yours.",
+    line: "Founder 2.6.0 adds the Late table to your Home page, which you changed. Your page is kept as you left it. Take the update's page, or keep yours.",
     pages: [HOME],
   });
 });
 
-test('the install goes through and leaves the owner’s page out of what it stages', async () => {
+test('the install goes through and the owner’s page stays theirs, staged after the pack’s', async () => {
   const next = await founder();
   const diff = await plan(next, await recordWith(next, lapsingFirst));
   const log: string[] = [];
-  const put = await install(next, diff, host(log), diff.planHash, diff.approve);
+  const staged: { id: string; pack?: string; body: unknown }[] = [];
+  const h = host(log);
+  const put = await install(next, diff, { ...h, stage: async (batch) => (staged.push(...(batch as unknown as typeof staged)), h.stage(batch)) }, diff.planHash, diff.approve);
 
   assert.ok(put.ok, JSON.stringify(put));
-  assert.ok(!log.includes(`stage:${HOME}`), 'the update staged over the page the owner changed');
+  const last = staged.filter((d) => d.id === HOME).at(-1);
+  assert.ok(last !== undefined && last.pack === undefined, 'the update staged over the page the owner changed');
+  assert.equal((last.body as Body).blocks[0]?.heading, 'Lapsing');
   assert.ok(log.includes('pack:usecase-founder@2.6.0'));
 });
 

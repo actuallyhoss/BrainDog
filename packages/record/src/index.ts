@@ -4518,6 +4518,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const title = (body as { title?: unknown } | null)?.title;
     return typeof title === 'string' && title !== '' && !title.includes('{{') ? `your ${title} page` : 'a page of yours';
   };
+  /** A list as its owner knows it, "your Sprints list", from the body the record holds now. */
+  const ownListSaid = (id: string): string => {
+    const held = kernel.declarations().find((d) => d.id === id)?.body as unknown;
+    let body: unknown = held;
+    try {
+      if (typeof held === 'string') body = JSON.parse(held);
+    } catch {
+      body = null;
+    }
+    const name = (body as { name?: unknown } | null)?.name;
+    return typeof name === 'string' && name.trim() !== '' ? `your ${name} list` : 'a list of yours';
+  };
+  /**
+   * WHAT THE NIGHT CARRIED INTO A PAGE OR LIST HE CHANGED, said (RH9): the update's new words, put in only where his page
+   * or list still said the pack's old ones (`reworded`, `relisted` in `@braindog/declare`). Carried silently, his
+   * words looked changed behind his back. One line each, the first few words named.
+   */
+  const rewordSaid = (diff: Awaited<ReturnType<typeof plan>>): string[] =>
+    diff.kept.flatMap((k) => {
+      if (k.rebased === undefined || k.words === undefined) return [];
+      const whose = k.id.startsWith('page.') ? ownPageSaid(k.id) : ownListSaid(k.id);
+      const Whose = whose.charAt(0).toUpperCase() + whose.slice(1);
+      if (k.words.length === 0) return k.id.startsWith('page.') ? [`${Whose} takes the update's place for it on the rail.`] : [];
+      const shown = k.words.slice(0, 3).map((w) => `"${w.length > 60 ? `${w.slice(0, 59).trimEnd()}…` : w}"`);
+      const more = k.words.length - shown.length;
+      const named = more > 0 ? `${shown.join(', ')} and ${more} more` : shown.length === 1 ? shown[0]! : `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)!}`;
+      return [`${Whose} takes the update's new words where it still had the old ones: ${named}. What you wrote yourself stays.`];
+    });
   /** File the one question for an update that is in, and answer its sentence for the night's log, or `null` for none. */
   const keptAsk = (pack: Parameters<typeof plan>[0], diff: Awaited<ReturnType<typeof plan>>, packSaid: (id: string) => string): string | null => {
     const declined = keptDeclined();
@@ -4698,6 +4726,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               if (line !== null) keptSaid.push(line);
             } catch {
               /* The page is kept either way. */
+            }
+          /* AND WHAT IT REWORDED ON A PAGE OR LIST HE CHANGED IS SAID, never done quietly (RH9). */
+          if (put.ok)
+            try {
+              keptSaid.push(...rewordSaid(got.value.diff));
+            } catch {
+              /* The words are in either way. */
             }
           return put;
         },
