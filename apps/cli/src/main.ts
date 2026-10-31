@@ -622,10 +622,10 @@ async function mcp(args: string[]): Promise<void> {
   /* THE SELF-HOST'S SERVER KEY IN BRAINDOG_TOKEN IS THE OWNER, a person and never a run, so an agent sending it could not
      hand off, log to its run or read what it was told (D4). The agent sends a token of its own instead, made from the key
      as `token create` makes one, with no approval, and kept for the next start (`agentTokenFromKey`). A token there is
-     refused the mint, and is sent as it always was. */
+     refused the mint, and is sent as it always was; the refusal is kept for that key, so the next start does not ask. */
   const speaks = agent ?? agentOf(process.env);
   if (to.from === 'env' && speaks !== undefined) {
-    const own = await agentTokenFromKey(to.key, speaks, hostsPath(process.env), { env: process.env, signal: AbortSignal.timeout(5_000) }).catch(() => null);
+    const own = await agentTokenFromKey(to.key, speaks, hostsPath(process.env), { env: process.env, home: homedir(), signal: AbortSignal.timeout(5_000) }).catch(() => null);
     if (own !== null) to = { ...to, token: own, from: 'agent' };
   }
   /* Started now and awaited by the first request, so git runs while the client is still saying hello. */

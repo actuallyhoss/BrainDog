@@ -18,7 +18,9 @@ import { fileURLToPath } from 'node:url';
 
 import { writeDoorCache } from '../src/bridge-cache.ts';
 import { eventOf, HOOK_MS, heldFor, hookBudget, hookStart, notSignedIn, readSession, REMEMBER_MS, sessionPath, staleLine, windowPath, writeSession, type SessionFile } from '../src/hooks.ts';
+import { keyPrint } from '../src/http.ts';
 import { replaceByHand, hookCommand, installInto, serversFileOf } from '../src/install.ts';
+import { mintRefusedPath } from '../src/mint-refused.ts';
 import { sessionHeaders } from '../src/position.ts';
 import { REPLACE, REPLACE_FILE } from './replace.ts';
 import { OWNER } from '../../../fixtures/names.ts';
@@ -65,6 +67,7 @@ const CONTEXT = {
  * refuses as a record without People does when `people` is false. With `hang`, nothing ever answers. With `card`,
  * the context carries the record's own card, as a host that draws one does. `context` answers the same context,
  * `boot` says the sign-in speaks for the owner (`FIRST`), and `list` answers no rows, for the commands and the MCP server.
+ * `createToken` refuses the bearer as a record refuses a token (`NEEDS_BROWSER_SESSION`, 403), or with `mint`'s code.
  */
 async function stubHost(
   t: { after: (fn: () => Promise<void>) => void },
@@ -78,6 +81,7 @@ async function stubHost(
     joined?: string | null;
     endSays?: string;
     head?: string;
+    mint?: string;
   } = {},
 ) {
   /* WITH `head`, the handoff names that commit and the record's card says the commits since it, as `x-braindog-ahead`
@@ -117,6 +121,12 @@ async function stubHost(
       if (method === 'end') return answer({ ok: true, value: { run: 'S7', state: 'done', changed: true } });
       if (method === 'context') return answer({ ok: true, value: carded(req.headers['x-braindog-ahead']) });
       if (method === 'heard') return answer({ ok: true, value: { marked: true } });
+      /* A TOKEN CANNOT MAKE TOKENS (`admin` in the record), which is what a plain token in BRAINDOG_TOKEN is told (D4). */
+      if (method === 'createToken') {
+        const code = o.mint ?? 'NEEDS_BROWSER_SESSION';
+        res.writeHead(code === 'RATE_LIMITED' ? 429 : 403, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, refusal: { code, fix: 'Open this from the app; a token cannot change what this BrainDog is.', at: 'principal' } }));
+      }
       /* With `projects`, a Projects list declaring `scopes:` and a People list declaring `meets:` with its self part. */
       const registers = o.projects === undefined ? [] : [{ id: 'things', name: 'Projects', count: o.projects.length }, { id: 'people', name: 'People', count: 1 }];
       if (method === 'boot') return answer({ ok: true, value: { registers, now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: FIRST, level: 'owner' } } });
@@ -791,6 +801,54 @@ test('THE MCP SERVER SENDS WHAT ITS CLIENT SAID IT IS, from the hello on, with t
       ['claude-code', '2.1.287', 'claude-run-mine', 'claude'],
       asked.method,
     );
+});
+
+test('A KEY THE HOST REFUSED TO MAKE A TOKEN FROM IS NOT ASKED AGAIN: once per key, kept by its print alone, under the home folder', async (t) => {
+  const host = await stubHost(t);
+  const config = folder('config');
+  const env = envFor(config, { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  const kept = mintRefusedPath(join(config, 'home'));
+  const input = `${[
+    JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-code', version: '2.1.287' } } }),
+    JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'list', arguments: { register: 'tasks' } } }),
+  ].join('\n')}\n`;
+  const mints = () => host.seen.filter((s) => s.method === 'createToken').length;
+  const start = async (e: NodeJS.ProcessEnv) => {
+    const out = await run(['mcp', '--agent', 'claude'], e, input, folder('kiln'));
+    assert.equal(out.code, 0, out.stderr);
+    /* REFUSED OR SKIPPED, THE KEY IS SENT AS IT ALWAYS WAS, and the hello and the tool call still reach the host. */
+    const said = host.seen.filter((s) => s.method !== 'createToken');
+    assert.ok(said.length > 0 && said.every((s) => s.headers.authorization === `Bearer ${String(e.BRAINDOG_TOKEN)}`), host.seen.map((s) => s.method).join(' '));
+    host.seen.splice(0, host.seen.length, ...host.seen.filter((s) => s.method === 'createToken'));
+  };
+
+  await start(env);
+  assert.equal(mints(), 1, 'the first start asks');
+  assert.ok(existsSync(kept), 'and keeps the refusal under the home folder');
+  const text = readFileSync(kept, 'utf8');
+  assert.equal(text.includes(TOKEN) || text.includes('stub-bearer'), false, 'never the key itself');
+  assert.equal(text.includes(keyPrint(TOKEN)), true, "the key's print");
+
+  await start(env);
+  await start(env);
+  assert.equal(mints(), 1, 'the same key is not asked again');
+
+  /* ANOTHER KEY IS ASKED, once, and then it too is known. */
+  const other = { ...env, BRAINDOG_TOKEN: `${TOKEN}-another` };
+  await start(other);
+  assert.equal(mints(), 2);
+  await start(other);
+  assert.equal(mints(), 2);
+});
+
+test('A HOST THAT WAS ONLY BUSY IS ASKED AGAIN AT THE NEXT START: nothing is kept for a refusal that is not about the key', async (t) => {
+  const host = await stubHost(t, false, true, undefined, { mint: 'RATE_LIMITED' });
+  const config = folder('config');
+  const env = envFor(config, { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  const hello = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-code', version: '2.1.287' } } })}\n`;
+  for (let i = 0; i < 2; i++) assert.equal((await run(['mcp', '--agent', 'claude'], env, hello, folder('kiln'))).code, 0);
+  assert.equal(host.seen.filter((s) => s.method === 'createToken').length, 2);
+  assert.equal(existsSync(mintRefusedPath(join(config, 'home'))), false);
 });
 
 test('THE MCP SERVER FOLLOWS ITS WINDOW ACROSS A CLEAR: the run its own window’s start hook wrote, and never another window’s', async (t) => {

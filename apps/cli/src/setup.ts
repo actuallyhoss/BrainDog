@@ -50,6 +50,7 @@ import { applyCodexHooks, planCodexHooks } from './clients/codex-hooks.ts';
 import { CLIENTS, type Client } from './clients/index.ts';
 import { hostKey, hostsPath, keyPrint, readHosts, sameHost, saveHosts, target, type Held } from './http.ts';
 import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, keepCopy, PLACES_SKILL, serversFileOf } from './install.ts';
+import { keepMintAnswer, mintRefused } from './mint-refused.ts';
 import { keepPin, pinOf, pinsFile, readPins } from './pins.ts';
 import { placeStatusLine, statusLineEntry, statusLineIn } from './statusline-place.ts';
 import { approveOperation, login, machineName } from './login.ts';
@@ -826,8 +827,17 @@ export const mintAgent: MintAgent = async (key, label, io) => {
  * An agent's token for `braindog mcp` started under `BRAINDOG_TOKEN` (D4): the one kept for this agent and this key when
  * it is live, else one made from the key and kept, or `null` when the key is a token or the host did not answer, and
  * the server then sends the key as it always did. One request at most, and only while no token is kept.
+ *
+ * AND NONE FOR A KEY THIS HOST ALREADY REFUSED (CS1): a plain token there was asked at every start, one round trip
+ * before the hello. The refusal is kept under `io.home` by the key's print alone (`mint-refused.ts`), so the same key
+ * is not asked again and a different one is.
  */
-export async function agentTokenFromKey(key: string, agent: string, file: string, io: { env: Record<string, string | undefined>; signal?: AbortSignal | undefined }): Promise<string | null> {
+export async function agentTokenFromKey(
+  key: string,
+  agent: string,
+  file: string,
+  io: { env: Record<string, string | undefined>; home: string; signal?: AbortSignal | undefined },
+): Promise<string | null> {
   const sent = io.env.BRAINDOG_TOKEN || undefined;
   if (sent === undefined) return null;
   const kind = agentKindOf(agent);
@@ -841,8 +851,11 @@ export async function agentTokenFromKey(key: string, agent: string, file: string
   };
   const kept = keptNow();
   if (kept !== null) return kept;
+  if (mintRefused(io.home, key, sent)) return null;
   const made = await createWith(key, sent, `${await machineName()} · ${AGENT_TITLE[kind] ?? kind}`, io.signal);
-  if (made === null || !('value' in made)) return null;
+  if (made === null) return null;
+  keepMintAnswer(io.home, key, sent, 'value' in made ? { made: true } : { code: made.code });
+  if (!('value' in made)) return null;
   /* ANOTHER SESSION MAY HAVE KEPT ONE MEANWHILE: theirs is kept, and this one is sent this once. */
   if (keptNow() !== null) return made.value;
   try {
