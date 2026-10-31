@@ -35,6 +35,7 @@
   import * as pref from '$lib/pref.ts';
   import { copy } from '$lib/copy/frame.ts';
   import { callsOut, leaving, quiet, rested, settled } from '$lib/ui/screen.svelte.ts';
+  import { copyMark } from '$lib/data/copy-mark.svelte.ts';
   import { onCallsOut } from '@braindog/client';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { inField, notTheShells } from '$lib/a11y/typed.ts';
@@ -125,6 +126,7 @@
      Today's own code and reads on a cold phone, and Today settled that much later (speed-d SD1, 30 Oct). */
   const atRest = rested();
   const later = (load: () => void): void => void atRest.then(load);
+  let frameRested = $state(false);
   let paletteAsked = false;
   const loadPalette = (): void => {
     if (paletteAsked) return;
@@ -146,7 +148,19 @@
   $effect(() => {
     later(loadPalette);
     later(loadKeymap);
-    later(() => void import('$lib/ui/CopyMark.svelte').then((m) => (CopyMark = m.default)));
+    later(() => (frameRested = true));
+  });
+  /* THE COPY'S MARK LOADS ONLY WHEN A SCREEN WAS DRAWN FROM THE LOCAL COPY AND IS STILL ASKING (polish-l, PL3), and no
+     sooner than the frame's other extras. Loaded on every visit at rest, it was Today's last change on a visit that
+     drew nothing from the copy, a hairline that never shows; now such a visit never asks for it at all. */
+  let copyMarkAsked = false;
+  $effect(() => {
+    if (!frameRested || !copyMark.on || copyMarkAsked) return;
+    copyMarkAsked = true;
+    void import('$lib/ui/CopyMark.svelte').then(
+      (m) => (CopyMark = m.default),
+      () => (copyMarkAsked = false),
+    );
   });
   /* OPENED BEFORE IT LANDED: asked now, and drawn open the moment it arrives. */
   $effect(() => {

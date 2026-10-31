@@ -2,8 +2,8 @@
   THE QUIET MARK (`copy-mark.svelte.ts`): something on this screen was drawn from the local copy and the record is being
   asked again. Sticky and no taller than nothing, so it moves no row; it fades out once every answer has landed.
 
-  ITS OWN FILE SO ITS STYLES ARE NOT THE ENTRY'S. The root layout asks for it as the shell mounts, as it does the
-  palette, so the hairline arrives beside the first screen rather than in the stylesheet every visit waits for.
+  ITS OWN FILE SO ITS STYLES ARE NOT THE ENTRY'S. The frame asks for it once the first screen has rested, and only while
+  a screen drawn from the copy is still asking (PL3), so a visit that drew nothing from the copy never loads it.
 -->
 <script lang="ts">
   import { copyMark } from '$lib/data/copy-mark.svelte.ts';
