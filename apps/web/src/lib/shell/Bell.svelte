@@ -94,14 +94,18 @@
       const [{ createClient }, { newsOf }] = await Promise.all([import('@braindog/client'), import('../record/boot-live.ts')]);
       const out = await createClient({ base: apiBase() }).recentHistory({ limit: 40 });
       if (!out.ok) return;
-      before = bellLines(newsOf(out.value.events, null)).slice(0, BEFORE_SHOWN);
+      before = bellLines(others(newsOf(out.value.events, frame.actor === '' ? null : frame.actor))).slice(0, BEFORE_SHOWN);
     } catch {
       /* Not read: only what is new is drawn. */
     }
   }
   const BEFORE_SHOWN = 12;
 
-  const news = $derived(bellLines(frame.news));
+  /* WHAT HE DID HIMSELF IS NOT THE BELL'S (audit 31 Oct o, AO8): a fresh Founder's bell said "4 new", each a thing he had
+     done a moment before ("Added Tallow", "You shared Money with a link"). The bell is for what agents, rules, mail and
+     other people did; Activity keeps his own, as Arrivals on Today leaves them out (AN20). */
+  const others = <N extends { by: string }>(items: readonly N[]): N[] => items.filter((n) => n.by !== 'you');
+  const news = $derived(bellLines(others(frame.news)));
   const unread = $derived(unreadBy(frame.readTo));
   const fresh = $derived(news.filter(unread).length);
   const seenBefore = $derived(before.filter((b) => !news.some((n) => n.text === b.text && n.at === b.at)).map((b) => ({ ...b, old: true as const })));

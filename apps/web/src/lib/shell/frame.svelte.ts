@@ -20,6 +20,8 @@ export const frame = $state({
   refused: undefined as string | undefined,
   /** The person reading, by the name the record told them. */
   person: '',
+  /** The person reading, as the record writes them on what they did: their own doings are not the bell's (AO8). */
+  actor: '',
   /** Set by the face's "Keyboard keys"; the shell opens the sheet and puts it back. */
   keys: false,
   /** Opens another record; the shell's, since it reloads the tab. */

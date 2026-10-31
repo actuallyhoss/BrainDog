@@ -74,6 +74,12 @@ test('the sentence says what is still to settle, what is late in red, and when t
   assert.deepEqual(readingOf(bills, rows, NOW, WHOLE), { before: '3 to settle, ', needs: '1 late', after: ', the next due tomorrow.' });
 });
 
+test('orders are to ship, as the Orders page says them, never to settle (AO16)', () => {
+  const orders = { ...bills, id: 'orders', name: 'Orders', one: 'order' } as typeof bills;
+  const rows = [row({ what: 'Candles', amount: gbp(4_000), due: '2026-10-02', state: 'open' })];
+  assert.equal(readingOf(orders, rows, NOW, WHOLE)?.before, '1 to ship, none late, the next due in 3 days.');
+});
+
 test('nothing late is said calmly, with no phrase in red', () => {
   const rows = [row({ what: 'Power', due: '2026-10-02', state: 'open' }), row({ what: 'Gas', due: '2026-11-20', state: 'open' })];
   assert.deepEqual(readingOf(bills, rows, NOW, WHOLE), { before: '2 to settle, none late, the next due in 3 days.', needs: '', after: '' });

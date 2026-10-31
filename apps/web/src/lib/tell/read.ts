@@ -117,6 +117,8 @@ export type Told = {
   offers?: TellRow[];
   /** Money was said on a record that keeps none: the card offers to turn Money on and add it in the same press (AM4). */
   needsMoney?: true;
+  /** It fits nowhere on a record that keeps no things to do: the card offers to start a to-do list (Work) and add it (AO7). */
+  needsTodo?: true;
   /** Somebody kept on the record whom the line names, when it fits no list: their page is offered (AN9). */
   about?: { name: string; href: string };
   /** What the line says of somebody kept, offered as a change to their entry: one press keeps it on them. */
@@ -944,6 +946,8 @@ const WHY = {
   /* A LINE THAT NAMES SOMEBODY KEPT, AND FITS NO LIST, IS OFFERED THEIR PAGE (AN9): "Coffee with Mona on Sunday". */
   about: (name: string, more: boolean) => `It names ${name}. Keep it on their page${more ? ', or as one of these:' : '.'}`,
   offer: 'Or keep it as one of these:',
+  /* WITH NOTHING TO OFFER BUT A TO-DO LIST (AO7), "one of these" over one button. */
+  offerTodo: 'Or keep it as a to-do:',
 };
 
 /** One sentence, read into the entries it would become. Writes nothing. */
@@ -1269,7 +1273,15 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       ...(moneyList(opts.lists) || dueList(opts.lists) ? ['money paid or got', "a bank's text"] : []),
       ...(projectList(opts.lists) ? ['a new project'] : []),
     ];
-    return { rows, left: [], why: `${WHY.notSure}${WHY.reads(kinds)}${offers.length > 0 ? ` ${WHY.offer}` : ''}`, ...(offers.length > 0 ? { offers } : {}) };
+    /* NO LIST FOR THINGS TO DO AT ALL (AO7): Personal's "Run 10k on Saturday morning" is offered a to-do list too, as a
+       blank BrainDog is given one, and keeps its day once the list is there (`todo-on.ts`). */
+    return {
+      rows,
+      left: [],
+      why: `${WHY.notSure}${WHY.reads(kinds)}${offers.length > 0 ? ` ${WHY.offer}` : opts.lists.some((l) => l.pack === 'work') ? '' : ` ${WHY.offerTodo}`}`,
+      ...(offers.length > 0 ? { offers } : {}),
+      ...(opts.lists.some((l) => l.pack === 'work') ? {} : { needsTodo: true as const }),
+    };
   }
 
   /** Somebody in People the sentence names, by a capitalised name in it, whole or by its first word. */

@@ -1178,3 +1178,16 @@ test('A DAY OF THE MONTH IS SAID BACK AS A DATE, never as a weekday (AO18)', () 
   /* A weekday said is still said as one. */
   assert.match(tellRead('Electricity 850 due Saturday', founder).rows[0]!.detail, /due Saturday/u);
 });
+
+test('A LINE THAT FITS NOWHERE, ON A RECORD WITH NO THINGS TO DO, IS OFFERED A TO-DO LIST, AND THEN KEEPS ITS DAY (AO7)', () => {
+  const personal = { lists: [PEOPLE, THINGS, DUE], today: TODAY, currency: 'EGP' };
+  const before = tellRead('Run 10k on Saturday morning', personal);
+  assert.equal(before.rows.length, 0);
+  assert.equal(before.needsTodo, true);
+  /* Once Work is on, the same words are a task due that Saturday. */
+  const after = tellRead('Run 10k on Saturday morning', { ...personal, lists: [...personal.lists, TASKS] });
+  assert.deepEqual(after.rows.map((r) => r.register), ['tasks']);
+  assert.equal(after.needsTodo, undefined);
+  /* A record that keeps Work is never offered it. */
+  assert.equal(tellRead('Run 10k on Saturday morning', founder).needsTodo, undefined);
+});

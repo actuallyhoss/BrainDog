@@ -91,6 +91,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.30.5', notes: 'Sprints has its own icon, so it no longer looks like Menu on a phone. Nothing you hold changes.' },
     { version: '2.30.4', notes: 'Teammates is called People, as your sidebar and Today say it. Nothing you hold changes.' },
     { version: '2.30.3', notes: 'Open each morning is called Sprint days. Nothing you hold changes.' },
     { version: '2.30.2', notes: 'Sprints has its own place in your sidebar, and Agent work sits under Agents. Nothing you hold changes.' },

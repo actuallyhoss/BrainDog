@@ -107,6 +107,10 @@
     homeOnce: 'It is kept for every amount after this one, so you are asked once.',
     homeOther: 'Another one? Say it with the figure, like 2,400 euros.',
     homeKept: (name: string) => `Your currency is the ${name} now`,
+    /* A LINE THAT FITS NOWHERE, ON A RECORD WITH NO THINGS TO DO (AO7): one press starts Work's list and adds it there. */
+    todoOn: 'Start a to-do list and add it',
+    todoTurning: 'Starting a to-do list…',
+    todoTurned: 'Started a to-do list in Work',
   };
 
   let typed = $state('');
@@ -411,12 +415,39 @@
     await invalidateAll();
   }
 
+  /* ── starting a to-do list for a line that fits nowhere (AO7) ──
+     As Money above: Work is turned on, the same words read again against the lists it brought, and what they become
+     added under one batch with the one Undo. Work stays on after an Undo; the line is what is taken back. */
+  let todoWait = $state(false);
+  let todoFix = $state<string | null>(null);
+  async function todoOn() {
+    if (sending || todoWait || reader === null) return;
+    todoFix = null;
+    todoWait = true;
+    const words = typed;
+    try {
+      const { todoThenRead } = await import('$lib/tell/todo-on.ts');
+      const out = await todoThenRead(apiBase(), words, options, reader);
+      if ('fix' in out) todoFix = out.fix;
+      else {
+        const go = readyRows(out.told.rows);
+        /* ONE PRESS, ONE TOAST, as Money's: "Started a to-do list in Work" names Work, so the rail does not say it came. */
+        if (go.length > 0) for (const href of ['/?work', ...go.map((r) => `/r/${r.register}`)]) toasts.named(href);
+        if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.todoTurned, out.lists);
+        else todoFix = out.told.why ?? null;
+      }
+      await invalidateAll();
+    } finally {
+      todoWait = false;
+    }
+  }
+
   /* CMD OR CTRL AND ENTER ADDS (AH20): Enter alone is a new line, for a pasted message. */
   function keyed(e: KeyboardEvent) {
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
     e.preventDefault();
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
-    else if (rows.length === 0 && offers.length === 1 && !told?.about) addOffer(offers[0]!);
+    else if (rows.length === 0 && offers.length === 1 && !told?.about && !told?.needsTodo) addOffer(offers[0]!);
     else if (rows.length === 0 && told?.change) void changeOn(told.change);
     /* AND NEVER TURNS MONEY ON (RN3): ⌘↵ adds a line where a home for it exists; a module goes on by its own button. */
   }
@@ -503,18 +534,20 @@
           </div>
           {#if moneyFix}<p class="tell-one-needs" role="alert">{moneyFix}</p>{/if}
         {/if}
-        {#if told.about || offers.length > 0}
+        {#if told.about || offers.length > 0 || told.needsTodo}
           <div class="tell-one-offers">
+            {#if told.needsTodo}<Button weight="primary" disabled={sending || todoWait} onclick={() => void todoOn()}>{todoWait ? say.todoTurning : say.todoOn}</Button>{/if}
             {#if told.about}<Button weight="primary" href={at(told.about.href)}>{say.openPage(told.about.name)}</Button>{/if}
             {#each offers as offer (offer.register)}
-              <Button weight={offers.length === 1 && !told.about ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
+              <Button weight={offers.length === 1 && !told.about && !told.needsTodo ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
             {/each}
           </div>
+          {#if todoFix}<p class="tell-one-needs" role="alert">{todoFix}</p>{/if}
         {/if}
       </div>
     {/if}
   </form>
-  {#if !slim || rows.length > 0 || offers.length > 0 || told?.needsMoney || told?.change}
+  {#if !slim || rows.length > 0 || offers.length > 0 || told?.needsMoney || told?.needsTodo || told?.change}
     <p class="tell-one-quiet">{say.notYet} {ready.length > 1 ? say.undoAll(ready.length) : ready.length === 1 ? say.undoOne : say.undoAny}</p>
   {/if}
   {#if last.length > 0 && typed.trim() === ''}

@@ -244,6 +244,8 @@ export type SharedReading = {
   format?: string;
   /** Its parts, for a figure cut by something ("What each account holds", parts paid by plan), as the record named them. */
   groups?: SharedPart[];
+  /** The way its money goes, as the owner's tile signs it: "+" coming in, "−" going out (AO9). */
+  sign?: 'in' | 'out';
 };
 
 /**
@@ -379,6 +381,7 @@ const readingOf = (x: unknown): SharedReading | null => {
     ...(groups === null ? {} : { groups }),
     ...(trend !== null && trend.some((v) => v !== null) ? { trend } : {}),
     ...(typeof x.format === 'string' && /^[a-z][a-z.A-Z]{0,15}$/u.test(x.format) ? { format: x.format } : {}),
+    ...(x.sign === 'in' || x.sign === 'out' ? { sign: x.sign } : {}),
   };
 };
 
