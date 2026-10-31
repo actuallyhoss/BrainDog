@@ -375,6 +375,26 @@ export const weekMoney = (): PageBlock => ({
   when: { metric: WEEK_IN[0], gte: ANY },
 });
 
+/** The figure that counts the accounts open, money-core's own (`accounts-open`): nought until the first is added. */
+export const ACCOUNTS_OPEN = 'accounts-open';
+
+/**
+ * MONEY TOLD BEFORE AN ACCOUNT IS OPEN (audit 31 Oct m, AM3): Cash ahead reads the accounts, so with none it draws
+ * nothing, and the Founder's "Stripe paid out 1,950 USD today", kept as a paid invoice, was on no tile of his Today. Until
+ * the first account is open, the week's money says what was told: what was paid to him, what came in and what is still
+ * to come in, and once one is open Cash ahead says it and this tile goes (`when`). A record that keeps a week has the
+ * week's money already (`weekBlocks`), and one on a Money without either figure draws neither.
+ */
+export const toldMoney = (): PageBlock =>
+  ({
+    ...weekMoney(),
+    ...keyed('week-money'),
+    size: 'wide',
+    span: 3,
+    /* TWO TESTS IN ONE (`all`), which the record reads as one condition; the app's type names only a leaf. */
+    when: { all: [{ metric: WEEK_IN[0], gte: ANY }, { metric: ACCOUNTS_OPEN, is: 0 }] },
+  }) as unknown as PageBlock;
+
 /** The figure that counts the vital signs reading red now, by the name the kernel answers it under (`built-in-figures.ts`). */
 export const SIGNS_RED = 'signs-red';
 /** The page the vital signs are shown on, as the health sentence in Settings links to it (`signsAt`). */
@@ -590,6 +610,8 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
     ...(holds.quiet ? [quietTile()] : []),
     /* THE FEW KEY NUMBERS THAT LEAD: drawn only where the record keeps one. */
     numbersTile(),
+    /* AND THE MONEY TOLD BEFORE AN ACCOUNT, where no week says it already (`toldMoney`). */
+    ...(holds.money && !holds.week ? [toldMoney()] : []),
     /* THE PROJECTS IN PLAY, as their cards, where the record keeps a list of them. */
     ...(holds.projects ? [projectsTile(holds.projects)] : []),
     /* WHAT FALLS DUE WITH MONEY ON IT (audit Q10): Money's own due list (`source: deadlines`, `amount is set`, as Money's

@@ -598,7 +598,8 @@
   $effect(() => {
     if (bare || data.refused) return void (drawn = null);
     const now = [...rail.places, ...rail.rest];
-    const names = arrivedIn(drawn, now);
+    /* A PLACE A TOAST ALREADY NAMED IS NOT SAID AGAIN (AM4): "Turned on Money. Added a payment" is the one toast. */
+    const names = arrivedIn(drawn, now.filter((i) => !i.near.some((h) => toasts.wasNamed(h))));
     drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden], labels: new Set(now.map((i) => i.label)) };
     if (names.length > 0) toasts.push(copy.placeArrived(names, untrack(() => (!narrow ? 'sidebar' : names.every((n) => phoneTabs.some((t) => t.label === n)) ? 'bar' : 'menu'))));
   });

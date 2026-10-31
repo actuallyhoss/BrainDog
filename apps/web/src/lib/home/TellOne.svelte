@@ -32,6 +32,7 @@
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import { focusOnceDrawn } from '$lib/ui/keep-focus.ts';
   import { addedSaid, countWord, heldSaid, readyAt, readyRows } from './first-today.ts';
@@ -160,6 +161,8 @@
      added, all in one press, under one batch with the one Undo every add has: the lists Money holds are learnt here
      (`learn`), the sentence read against them, and the rail read again after. Money stays on after an Undo; the line is
      what is taken back. A line that still cannot be placed once Money is on (which currency) says so on the card. */
+  /** Money's own page, the address its place on the rail answers to. */
+  const MONEY_PLACE = '/p/money';
   let moneyWait = $state(false);
   let moneyFix = $state<string | null>(null);
   async function moneyOn() {
@@ -173,6 +176,8 @@
       if ('fix' in out) moneyFix = out.fix;
       else {
         const go = readyRows(out.told.rows);
+        /* ONE PRESS, ONE TOAST: "Turned on Money. Added …" names Money, so the rail does not say it came as well. */
+        if (go.length > 0) toasts.named(MONEY_PLACE);
         if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists);
         else moneyFix = out.told.why ?? null;
       }
