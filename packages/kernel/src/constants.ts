@@ -11,7 +11,7 @@
  * `@braindog/kernel` still answers every name it did, and there is one value for each.
  */
 
-import { LEGACY } from './roles.ts';
+import { LEGACY } from './legacy-lists.ts';
 
 export { ABANDON_MS, QUIET_MS, STALE_MS, WORKING_MS, isQuiet, isStale, presenceOf, type Presence } from './presence.ts';
 export { GROUP_CAP, isBucket } from './buckets.ts';

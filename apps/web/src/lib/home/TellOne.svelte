@@ -26,7 +26,6 @@
   import { invalidateAll } from '$app/navigation';
 
   import { apiBase, at } from '$lib/at.ts';
-  import { run } from '$lib/data/optimistic.svelte.ts';
   import { reread } from '$lib/data/live.svelte.ts';
   import type { MoneyAsk } from '$lib/tell/money-on.ts';
   import type { TellChange, TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
@@ -100,6 +99,14 @@
 
   let typed = $state('');
   let sending = $state(false);
+
+  /* THE UNDO'S MACHINERY COMES WITH THE FIRST PRESS, not with Today: `run` and the receipt's Undo behind it are only ever
+     asked by an Add, so a cold open no longer waits for them. Warmed when the field takes the focus, which every press
+     here follows, so the press itself does not wait; a failed load is asked again on the next press. */
+  type Run = typeof import('$lib/data/optimistic.svelte.ts').run;
+  let runIs: Promise<Run> | null = null;
+  const runOf = (): Promise<Run | null> =>
+    (runIs ??= import('$lib/data/optimistic.svelte.ts').then((m) => m.run)).catch(() => ((runIs = null), null));
   let field = $state<HTMLTextAreaElement | null>(null);
 
   /* THE READER COMES AFTER THE CARD: asked as the card is made, so the field draws with Today and a cold first load does
@@ -125,6 +132,8 @@
     const pressed = typeof document === 'undefined' ? null : document.activeElement;
     const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: nameOf(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
     const client = createClient({ base: apiBase() });
+    const run = await runOf();
+    if (run === null) return void (sending = false);
     /* THE UNDO IS THE RECORD'S, by the batch the capture answers: `run` offers `undoChange(base, batch)` on the receipt. */
     await run({
       apply: () => {},
@@ -173,6 +182,8 @@
     const client = createClient({ base: apiBase() });
     const href = `/r/${c.register}/${c.seq}`;
     let had = '';
+    const run = await runOf();
+    if (run === null) return void (sending = false);
     await run<{ version: number }>({
       apply: () => {},
       revert: () => {},
@@ -280,6 +291,7 @@
       aria-keyshortcuts="Meta+Enter Control+Enter"
       bind:value={typed}
       bind:this={field}
+      onfocus={() => void runOf()}
       onkeydown={keyed}
     ></textarea>
     {#if rows.length > 0}

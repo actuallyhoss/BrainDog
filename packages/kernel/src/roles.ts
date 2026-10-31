@@ -23,6 +23,8 @@
  * and `index.ts` reads it at run time, and the two must agree about what a part's field may be.
  */
 
+import { LEGACY } from './legacy-lists.ts';
+
 /** A field as a register declares it, as far as a role asks. */
 export type RoleField = { id: string; type: string; of?: string; to?: string; retired?: boolean };
 
@@ -92,7 +94,6 @@ export const PARTS: Readonly<Record<RoleName, readonly Part[]>> = {
   ],
 };
 
-/** The list each role was read from by name before the keys, and still is while no list declares the role. */
 /**
  * The parts a list may play for the record's agents (`role:` on a register), which `packages/record` `agent-lists.ts`
  * reads: its skills, its tools, its learnings, its index of keys by name, the profiles its agents run under and what
@@ -100,7 +101,8 @@ export const PARTS: Readonly<Record<RoleName, readonly Part[]>> = {
  */
 export const AGENT_ROLES = ['skills', 'tools', 'learnings', 'keys-index', 'profiles', 'carry'] as const;
 
-export const LEGACY: Readonly<Record<RoleName, string>> = { rates: 'fx', meets: 'people', org: 'organisations' };
+/** The list each role was read from by name before the keys (`legacy-lists.ts`, which `constants.ts` reads alone). */
+export { LEGACY };
 
 /** What each role's list holds, for a sentence. */
 export const HOLDS: Readonly<Record<RoleName, string>> = { rates: 'the rates', meets: 'the people meet writes', org: 'the organisations meet writes' };
