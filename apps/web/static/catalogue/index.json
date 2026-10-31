@@ -8626,8 +8626,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.9.0",
+      "latest": "2.9.1",
       "versions": [
+        {
+          "version": "2.9.1",
+          "checksum": "02627fde25860ad8f961dad8eeb71023d354be4f7b3ee87f025cc649617a8cfc",
+          "bytes": 32585,
+          "published_at": "2026-10-31T01:23:36.766Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Progress",
+              "Money saved",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.9.0",
           "checksum": "7319de91cfa49de942b2449b5ccb8faf9a7c46cbc5f8722078e7114fc68d70e2",
@@ -9425,12 +9457,48 @@
       "kind": "usecase",
       "id": "team",
       "title": "Team board",
-      "summary": "Tickets, cycles and the agents on them.",
+      "summary": "Tickets, sprints and the agents on them.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.30.0",
+      "latest": "2.30.1",
       "versions": [
+        {
+          "version": "2.30.1",
+          "checksum": "8eef20373e4add6c2db543dc05b708437fd6950ef6270db839e02df820a25b40",
+          "bytes": 37739,
+          "published_at": "2026-10-31T01:23:36.766Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Sprints",
+              "Sprint plan",
+              "Open each morning"
+            ],
+            "pages": [
+              "Team",
+              "Sprints",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.30.0",
           "checksum": "bfd8c7f2932ee60dfe79e7cc3f01201baa25bf0c86029f41f52f84d760961988",
