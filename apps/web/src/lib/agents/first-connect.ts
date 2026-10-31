@@ -44,7 +44,8 @@ export function appLines(lines: ConnectLines, install: string = lines.install): 
 }
 
 /**
- * The few things this BrainDog keeps, said as "an order, a bill or somebody you met", by the lists it has: at most
+ * The few things this BrainDog keeps, said as "an order, a bill or somebody you met", by the lists it has (or the
+ * places just made, by name): at most
  * three, in the order a person is likeliest to say them. A list it does not know says nothing, and a BrainDog with none
  * of these is given the three that read for anybody.
  */
@@ -52,11 +53,11 @@ const EXAMPLES: readonly (readonly [readonly string[], string])[] = [
   [['orders'], 'an order'],
   [['assignments'], 'an essay that is due'],
   [['cycle_plan', 'tickets'], 'a bug to fix'],
-  [['milestones', 'steps'], 'the next step'],
+  [['milestones', 'steps', 'guide'], 'the next step'],
   [['goals', 'savings_goals'], 'a goal'],
-  [['things'], 'a project'],
-  [['obligations'], 'a bill'],
-  [['tasks'], 'something to do'],
+  [['things', 'projects'], 'a project'],
+  [['obligations', 'money', 'bills_and_invoices'], 'a bill'],
+  [['tasks', 'work'], 'something to do'],
   [['people'], 'somebody you met'],
 ];
 

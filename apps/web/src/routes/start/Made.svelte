@@ -64,7 +64,11 @@
   /* CLAUDE FIRST AT EVERY WIDTH (`appLines`, AH25): the apps with no terminal lead, the coding apps follow. */
   const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)]));
   /* THE LISTS THIS BRAINDOG KEEPS, which the example on Today's line names (`firstWords.sub`). */
-  const lists = $derived(page.data.live === true ? (page.data.index?.registers ?? []).map((r: { id: string }) => r.id) : []);
+  /* AND BY THE PLACES JUST MADE, since the shell this screen opened on may be the one from before the build. */
+  const lists = $derived([
+    ...(page.data.live === true ? (page.data.index?.registers ?? []).map((r: { id: string }) => r.id) : []),
+    ...(made.places ?? []).map((p) => p.trim().toLowerCase().replace(/\s+/gu, '_')),
+  ]);
 
   /* CLAUDE FIRST AND CHOSEN. */
   let chosenId = $state<string | null>(null);
