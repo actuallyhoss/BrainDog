@@ -355,7 +355,7 @@ Keys: `ip:<addr>` on `/auth/token`, `/auth/passkey/assert` and `/auth/magic/rede
 `dir_fail`. `<addr>` is `socket.remoteAddress`. Behind a proxy the operator names with `BRAINDOG_TRUST_PROXY=1`, it
 is the last `X-Forwarded-For` entry, the one that proxy wrote; otherwise the header is ignored, because an address
 anybody can write is an address anybody can lock out. Without it, behind a proxy every request is the proxy's address,
-so ten wrong keys from anywhere lock everybody out: the host says so at start when its origin is https and it serves
+so ten wrong keys from anywhere hold everybody's wrong keys (the right key still gets in): the host says so at start when its origin is https and it serves
 plain http with a server key, and once on stderr at the first request that carries a forwarding header from a loopback
 or private peer (`ONE_PLACE` in `apps/selfhost/src/key-lockout.ts`).
 
@@ -1073,7 +1073,7 @@ assertion pair, an RS256 pair, each generated once with `subtle` and stored.
 - `ponytail:` passkey challenges live in memory for five minutes; a restart forgets a ceremony in flight.
 - `ponytail:` no Inference adapter; `infer.*` rows wait in `pending`. A BYO key is the same adapter with a base URL (33 §1) when tier B lands.
 - `ponytail:` `idle_ms` is a constant 1500; the runner backs off itself.
-- `ponytail:` the lockout keys on the socket's address; with `BRAINDOG_TRUST_PROXY` set (`1` for a loopback or private peer, or a list of proxy addresses) it reads `X-Forwarded-For` only from such a peer, right to left past trusted hops, and under `1`, or a list holding a range wider than one address, the server key's strikes also count against that peer, which over 200 in fifteen minutes is rate limited to one compare every two seconds, one more waiting its turn and the rest a 429 with `Retry-After`, and never locked (RG3, RH7, RH10); a list of exact addresses counts no peer.
+- `ponytail:` the lockout keys on the socket's address; with `BRAINDOG_TRUST_PROXY` set (`1` for a loopback or private peer, or a list of proxy addresses) it reads `X-Forwarded-For` only from such a peer, right to left past trusted hops, and under `1`, or a list holding a range wider than one address, the server key's strikes also count against that peer, which over 200 in fifteen minutes is rate limited to one compare every two seconds, one more waiting its turn and the rest a 429 with `Retry-After`, and never locked (RG3, RH7, RH10), counted by the peer's place so an IPv6 /64 is one peer; a list of exact addresses counts no peer. The server key's own lock holds only wrong keys, to one answer every two seconds and the rest a 429: the key is compared first in constant time and the right one always gets in, so a forged address can no longer lock the owner out (RG14).
 - `ponytail:` the nightly copy runs at `BRAINDOG_BACKUP_AT` (03:20 UTC by default), not in the record's `tz`.
 - `ponytail:` attachments are the five image types; PDF when a register asks for it.
 - `ponytail:` inbound email checks DKIM itself against DNS (`server.ts`); a forwarder's own `Authentication-Results` line is never the verdict.

@@ -1,8 +1,8 @@
 /**
  * SEC5 (security review of 30 Oct): THE SERVER KEY COULD BE GUESSED WITHOUT LIMIT OVER `/api` AND `/mcp`. Each miss was a
  * 401 and nothing more, so a loop of `Authorization: Bearer <guess>` at `GET /api/boot` from anywhere that reached the
- * port was a loop with no end, and a hit was the owner. Now ten misses from one place lock it for fifteen minutes, and
- * a place is an IPv4 address or an IPv6 /64.
+ * port was a loop with no end, and a hit was the owner. Now ten misses from one place lock it for fifteen minutes (wrong
+ * keys only: the right key still gets in, RG14), and a place is an IPv4 address or an IPv6 /64.
  */
 
 import { test } from 'node:test';
@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { KEY_TRIES, keyLockout, nearPeer, PEER_CEILING, peerSlow, peerSlowFor, placeOf, proxied, proxyTrustOf } from '../src/key-lockout.ts';
 import { start } from '../src/server.ts';
 
-test('SEC5: TEN MISSES ARE COMPARED, THE ELEVENTH IS NOT, AND THE LOCK OUTLASTS A RIGHT KEY UNTIL IT ENDS', () => {
+test('SEC5: TEN MISSES LOCK THE PLACE UNTIL THE LOCK ENDS', () => {
   let at = 0;
   const lock = keyLockout(() => at);
   for (let i = 0; i < KEY_TRIES.most; i++) {
@@ -43,7 +43,7 @@ test('SEC5: THE RIGHT KEY CLEARS THE PLACE IT CAME FROM, so an owner who mistype
   assert.equal(lock.locked('198.51.100.1'), null);
 });
 
-test('SEC5: OVER HTTP, THE ELEVENTH GUESS AT /api AND /mcp IS 429 AND NEVER COMPARED', async () => {
+test('SEC5, RG14: OVER HTTP, THE ELEVENTH GUESS AT /api AND /mcp IS 429, AND THE RIGHT KEY STILL GETS IN', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-keylock-'));
   const KEY = 'k'.repeat(40);
   const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0, token: KEY, host: '127.0.0.1' });
@@ -52,14 +52,19 @@ test('SEC5: OVER HTTP, THE ELEVENTH GUESS AT /api AND /mcp IS 429 AND NEVER COMP
   try {
     for (let i = 0; i < KEY_TRIES.most; i++) assert.equal((await boot(`guess-${i}`)).status, 401, `guess ${i + 1}`);
     assert.equal((await boot('guess-eleven')).status, 429);
-    /* THE RIGHT KEY DURING THE LOCK IS REFUSED THE SAME WAY, so the lock is no oracle. */
-    assert.equal((await boot(KEY)).status, 429);
+    /* THE RIGHT KEY DURING THE LOCK GETS IN AT ONCE (RG14): the lock holds wrong keys only. */
     const mcp = await fetch(`http://127.0.0.1:${port}/mcp`, {
       method: 'POST',
       headers: { authorization: `Bearer ${KEY}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
     });
-    assert.equal(mcp.status, 429);
+    assert.notEqual(mcp.status, 429, 'the right key was held by the lock at /mcp');
+    assert.notEqual(mcp.status, 401);
+    const right = await boot(KEY);
+    assert.notEqual(right.status, 429, 'the right key was held by the lock at /api');
+    assert.notEqual(right.status, 401);
+    /* AND IT CLEARED THE PLACE, so a mistyped key after it is a plain miss again. */
+    assert.equal((await boot('guess-after')).status, 401);
     /* AN AGENT'S TOKEN IS ITS OWN CHECK AND IS NOT HELD BY THE KEY'S LOCK: a dotted bearer is still answered. */
     assert.equal((await boot('rec_x.not-a-real-token')).status, 401);
   } finally {
@@ -146,4 +151,47 @@ test('RG3, RH7, RJ2: A PEER OVER THE CEILING HOLDS ITS WRONG KEYS TO ONE ANSWER 
   assert.notEqual(peerSlowFor(range, () => 0), null, 'a list with a range did not count the peer (RH10)');
   assert.equal(peerSlowFor(exact, () => 0), null, 'an exact proxy list counted the peer');
   assert.equal(peerSlowFor(null, () => 0), null);
+});
+
+test('RG14: A LOCKED PLACE HOLDS ITS WRONG KEYS TO ONE ANSWER PER TURN; AN UNLOCKED ONE IS NOT HELD', () => {
+  let at = 0;
+  const lock = keyLockout(() => at);
+  assert.deepEqual(lock.turn('203.0.113.9'), { wait: 0 });
+  for (let i = 0; i < KEY_TRIES.most; i++) lock.strike('203.0.113.9');
+  assert.deepEqual(lock.turn('203.0.113.9'), { wait: 0 }, 'the first wrong key in a lock is answered now');
+  assert.deepEqual(lock.turn('203.0.113.9'), { wait: KEY_TRIES.wait }, 'the next waits one turn');
+  const full = lock.turn('203.0.113.9');
+  assert.ok('full' in full && full.retryAfter >= 1, 'a third at once was let wait as well');
+  assert.deepEqual(lock.turn('203.0.113.10'), { wait: 0 }, 'another place was held');
+  at += KEY_TRIES.window + 1;
+  assert.deepEqual(lock.turn('203.0.113.9'), { wait: 0 }, 'the hold outlasted the lock');
+});
+
+test('RG14: A PEER IS COUNTED BY ITS PLACE, so an IPv6 caller on the LAN taking a fresh address is the same peer', () => {
+  const slow = peerSlow(() => 0);
+  for (let i = 0; i < PEER_CEILING.most - 1; i++) slow.strike(`fd00:1:2:3::${(i + 1).toString(16)}`);
+  assert.equal(slow.strike('fd00:1:2:3::ffff'), true, 'a fresh address in the same /64 started a fresh count');
+  assert.deepEqual(slow.turn('fd00:1:2:3::abcd'), { wait: 0 });
+  assert.deepEqual(slow.turn('fd00:1:2:3::abce'), { wait: PEER_CEILING.wait });
+  assert.deepEqual(slow.turn('fd00:1:2:4::1'), { wait: 0 }, 'another /64 was held');
+});
+
+test('RG14: OVER HTTP, TEN WRONG KEYS NAMING THE OWNER\'S ADDRESS DO NOT LOCK THE OWNER OUT', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-forged-'));
+  const KEY = 'k'.repeat(40);
+  const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0, token: KEY, host: '127.0.0.1', trustProxy: true });
+  const port = (running.server.address() as { port: number }).port;
+  const OWNER = '198.51.100.20';
+  const boot = (bearer: string) =>
+    fetch(`http://127.0.0.1:${port}/api/boot`, { headers: { authorization: `Bearer ${bearer}`, 'x-forwarded-for': OWNER } });
+  try {
+    for (let i = 0; i < KEY_TRIES.most; i++) assert.equal((await boot(`guess-${i}`)).status, 401, `guess ${i + 1}`);
+    assert.equal((await boot('guess-eleven')).status, 429, 'the forged place was not locked for wrong keys');
+    const right = await boot(KEY);
+    assert.notEqual(right.status, 429, 'a forged address locked the owner out');
+    assert.notEqual(right.status, 401);
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
