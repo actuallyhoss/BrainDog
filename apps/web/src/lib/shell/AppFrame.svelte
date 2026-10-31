@@ -775,8 +775,8 @@
 
   /* THE PAGE ASKED BEFORE THE APP ARRIVED (`app.html`) IS FOR THE ADDRESS THE TAB OPENED ON, so a move inside the app lets
      it go unread (RF6, `page-live.ts` `earlyPage`), written here rather than imported so the frame loads no page reader. */
-  beforeNavigate((nav) => {
-    if (nav.type !== 'enter') (globalThis as { __bdPage?: unknown }).__bdPage = undefined;
+  beforeNavigate(() => {
+    (globalThis as { __bdPage?: unknown }).__bdPage = undefined;
   });
 
   afterNavigate((nav) => {
