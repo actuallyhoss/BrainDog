@@ -95,7 +95,10 @@ test('a record too large for the included model is said plainly, under the title
 
 test('the daily switch says what on and off mean and when Slash last looked, and sends only the choice', async () => {
   assert.equal(dailySaid({ on: true, last: null }), words.dailyOn);
-  assert.equal(dailySaid({ on: false, last: '2026-09-17' }), `${words.dailyOff} It last looked on 17 September 2026.`);
+  /* AS EVERY OTHER DATE READS (AN22): no year this year, "today" for today, and the year only for another one. */
+  assert.equal(dailySaid({ on: false, last: '2026-09-17' }, '2026-10-31'), `${words.dailyOff} It last looked on 17 Sep.`);
+  assert.equal(dailySaid({ on: true, last: '2026-10-31' }, '2026-10-31'), `${words.dailyOn} It last looked today.`);
+  assert.equal(dailySaid({ on: true, last: '2025-12-30' }, '2026-01-02'), `${words.dailyOn} It last looked on 30 Dec 2025.`);
   for (const line of [words.dailyOn, words.dailyOff, words.dailySwitch, words.dailyTitle]) assert.ok(!line.includes('—'), line);
 
   const sent: unknown[] = [];
