@@ -32,7 +32,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { BODY_KINDS, causeOfFinder, finders, openHandoffs, sessionDeclaration, tokenOfRun } from '@braindog/kernel';
+import { BODY_KINDS, causeOfFinder, dayIn, finders, openHandoffs, sessionDeclaration, tokenOfRun } from '@braindog/kernel';
 import type { BodyKind, Entry, Finder, HandoffPlace, Json, OpenHandoff } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
@@ -219,7 +219,8 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
   /* WHAT FADES AND NOBODY HAS CONFIRMED. A list fades when it has the `confirmed_on` day, whatever the list is called,
      and a thing on it is stale when it is still held true (in no finished state) and was neither confirmed nor made in
      the last sixty days. Read under the caller's own grant, the one that has waited longest said out loud. */
-  const today = new Date(nowMs).toISOString().slice(0, 10);
+  /* THE RECORD'S DAY, IN ITS OWN ZONE (AH22). */
+  const today = dayIn(nowMs, kernel.identity()?.tz);
   const cutMs = nowMs - UNCONFIRMED_DAYS * DAY_MS;
   const cutDay = new Date(cutMs).toISOString().slice(0, 10);
   for (const [id, decl] of kernel.registers()) {

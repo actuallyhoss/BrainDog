@@ -1056,7 +1056,8 @@ export function soonSaid(register: string, columns: readonly { field?: unknown }
     delete row.tone;
     const due = dated === undefined ? undefined : e.fields[dated];
     if (at < 0 || typeof due !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(due)) return;
-    const days = Math.floor(Date.parse(`${due}T00:00:00Z`) / 86_400_000) - Math.floor(now / 86_400_000);
+    /* FROM THE RECORD'S DAY, NOT GREENWICH'S (AH22): at 01:52 in Cairo an order due Friday said "Due in 7 days". */
+    const days = Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${recordToday(now)}T00:00:00Z`)) / 86_400_000);
     row.cells[at] = days <= 0 ? DUE_WORDS.today : days === 1 ? DUE_WORDS.tomorrow : DUE_WORDS.inDays(days);
   });
 }

@@ -1,12 +1,15 @@
 /** What the person said to widget offers, as plain functions a test can load in Node (`widget-held.svelte.ts`). */
 
+import { recordToday } from '../record/zone.ts';
+
 /** What `widgets.held` holds. */
 export type Held = { notNow: string[]; last?: string; forgot?: string };
 
 /** The most Not nows kept, as the record keeps them (`WIDGETS_NOT_NOW_MOST`). */
 const NOT_NOW_MOST = 40;
 
-export const today = (now = Date.now()): string => new Date(now).toISOString().slice(0, 10);
+/** The record's day, in its own zone (AH22), as the record counts a Not now. */
+export const today = (now = Date.now()): string => recordToday(now);
 
 /** `widgets.held` as `boot` said it, held to its shape; anything else is nothing said yet. */
 export function heldOf(v: unknown): Held {

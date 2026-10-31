@@ -13,6 +13,7 @@
  */
 
 import { day, shortDay, sinceWords } from 'braindog-render';
+import { recordToday } from '../../../../lib/record/zone.ts';
 
 /**
  * WHETHER A LIST OF TAGS IS ONLY THE KEYS AN IMPORT LEFT, which say where a row came from to the importer and nothing to
@@ -192,7 +193,8 @@ export function daysTo(iso: string, now: number): number | null {
   if (!DAY.test(iso)) return null;
   const at = Date.parse(`${iso}T00:00:00Z`);
   if (!Number.isFinite(at)) return null;
-  return Math.floor(at / DAY_MS) - Math.floor(now / DAY_MS);
+  /* FROM THE RECORD'S DAY, IN ITS ZONE (AH22), not Greenwich's. */
+  return Math.round((at - Date.parse(`${recordToday(now)}T00:00:00Z`)) / DAY_MS);
 }
 
 /** How far off a deadline is, as a person says it, or `null` for a value that is not a day. */

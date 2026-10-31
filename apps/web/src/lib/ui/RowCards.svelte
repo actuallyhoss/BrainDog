@@ -67,6 +67,7 @@
   import ScopeChip from './ScopeChip.svelte';
   import StateDot from './StateDot.svelte';
   import { rowIn, rowOut, settle } from './motion.ts';
+  import { recordToday } from '../record/zone.ts';
 
   let {
     register,
@@ -188,7 +189,8 @@
 
   /* How far off a close deadline is, in calendar days as the row page counts them. */
   const dueSaid = (iso: string, tone: 'bad' | 'warn'): string => {
-    const days = Math.floor(Date.parse(`${iso}T00:00:00Z`) / DAY_MS) - Math.floor(now / DAY_MS);
+    /* FROM THE RECORD'S DAY (AH22). */
+    const days = Math.round((Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${recordToday(now)}T00:00:00Z`)) / DAY_MS);
     if (tone === 'bad') return days < 0 ? words.late(-days) : words.dueToday;
     return days <= 0 ? words.dueToday : days === 1 ? words.dueTomorrow : words.dueIn(days);
   };
