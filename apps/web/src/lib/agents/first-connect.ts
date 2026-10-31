@@ -55,10 +55,10 @@ const EXAMPLES: readonly (readonly [readonly string[], string])[] = [
   [['cycle_plan', 'tickets'], 'a bug to fix'],
   [['milestones', 'steps', 'guide'], 'the next step'],
   [['goals', 'savings_goals'], 'a goal'],
-  [['things', 'projects'], 'a project'],
   [['obligations', 'money', 'bills_and_invoices'], 'a bill'],
-  [['tasks', 'work'], 'something to do'],
   [['people'], 'somebody you met'],
+  [['tasks', 'work'], 'something to do'],
+  [['things', 'projects'], 'a project'],
 ];
 
 export function exampleOf(lists: readonly string[]): string {
