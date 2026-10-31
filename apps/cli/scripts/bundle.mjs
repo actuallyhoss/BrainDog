@@ -45,11 +45,16 @@
  * `src/inbox-file.ts`, which imports nothing but Node's own modules, is built first on its own and defined into the
  * bundle as `__INBOX_HOOK__`, as the skill is, and the command writes it beside its hook scripts as
  * `braindog-inbox.mjs` (`hookScripts` in `main.ts`). One file is still all a machine downloads.
+ *
+ * AND dist/ IS A PACKAGE OF ITS OWN, so a publish by hand is one line: `npm publish apps/cli/dist`. The build writes
+ * `dist/package.json` under the npm name (`NPM_NAME`, the name `tag.yml` publishes under), with this manifest's
+ * version, licence and links, the bundle as its only file and no dependencies, and copies the README and LICENSE in.
+ * The workspace's own manifest keeps its workspace name and its `workspace:*` tools, which never reach npm.
  */
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -62,6 +67,9 @@ const SUM = `${OUT}.sha256`;
 const STAMP = `${OUT}.build`;
 const SKILL = fileURLToPath(new URL('../../../skills/braindog/SKILL.md', import.meta.url));
 const HASHBANG = '#!/usr/bin/env node\n';
+/* The name npm knows the command by (`tag.yml` publishes `apps/cli` under it too). */
+const NPM_NAME = 'braindog';
+const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
 
 /* The one spelling the sources use for their own entry, rewritten in the bundle for the reason THE COMMAND'S OWN PATH
    gives above. `ENTRY_LEFT` is any quoted `./main.ts` still in the output, whichever quotes esbuild printed. */
@@ -192,5 +200,26 @@ const bytes = readFileSync(OUT);
 const hex = createHash('sha256').update(bytes).digest('hex');
 writeFileSync(SUM, `${hex}  braindog.mjs\n`);
 writeFileSync(STAMP, `${tuple}\n`);
+
+/* THE PUBLISHED MANIFEST (see the top): only what a person installing it needs, read from this workspace's manifest. */
+const own = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const published = {
+  name: NPM_NAME,
+  version: own.version,
+  description: own.description,
+  license: own.license,
+  type: 'module',
+  homepage: own.homepage,
+  repository: own.repository,
+  bugs: own.bugs,
+  keywords: own.keywords,
+  bin: { braindog: 'braindog.mjs' },
+  files: ['braindog.mjs'],
+  engines: own.engines,
+  publishConfig: own.publishConfig,
+};
+writeFileSync(`${DIST}package.json`, `${JSON.stringify(published, null, 2)}\n`);
+copyFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), `${DIST}README.md`);
+copyFileSync(fileURLToPath(new URL('../LICENSE', import.meta.url)), `${DIST}LICENSE`);
 
 process.stdout.write(`dist/braindog.mjs, build ${tuple}, ${bytes.length} bytes, sha256 ${hex}\n`);

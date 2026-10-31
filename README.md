@@ -64,6 +64,13 @@ braindog setup https://app.brain.dog/<your record>
 server and places the [Agent Skill](skills/braindog/SKILL.md). [apps/cli/README.md](apps/cli/README.md) has the
 rest, and [brain.dog/docs/agents/connect](https://brain.dog/docs/agents/connect) covers every client.
 
+**As a Claude Code plugin.** Inside Claude Code, this adds the MCP server, the session hooks and the skill in one step:
+
+```text
+/plugin marketplace add actuallyhoss/BrainDog
+/plugin install braindog@braindog
+```
+
 ## Two ways to run it
 
 **Hosted, at [app.brain.dog](https://app.brain.dog).** Each record is its own database on Cloudflare. Keys are
