@@ -128,11 +128,22 @@
    * installed or switched off here. Debts on a shop with no Money offered Install, and the press answered a line of list
    * and pack ids; now the button adds Money first, and Install follows once it is in.
    */
-  const ownParts = new Set(firstPartyModules().map((m) => m.id));
+  const ownParts = firstPartyModules();
+  /* AND WHAT THOSE PARTS LEAN ON IN TURN (`leans`): Money stands on Projects, so a shop with neither adds both, in the
+     order they go in. */
   const needsFirst = $derived.by((): string[] => {
     const held = states;
     if (action?.kind !== 'install' || held === null || listing?.kind === 'module') return [];
-    return ((reach ?? latest?.reach)?.modules ?? []).filter((m) => ownParts.has(m) && !held.some((s) => s.id === m && s.disabled_at === null));
+    const here = (id: string): boolean => held.some((s) => s.id === id && s.disabled_at === null);
+    const wanted = new Set<string>();
+    const visit = (id: string): void => {
+      const part = ownParts.find((m) => m.id === id);
+      if (!part || here(id) || wanted.has(id)) return;
+      wanted.add(id);
+      for (const l of part.leans) visit(l);
+    };
+    for (const m of (reach ?? latest?.reach)?.modules ?? []) visit(m);
+    return ownParts.filter((m) => wanted.has(m.id)).map((m) => m.id);
   });
   /** The part being added first, while its plan is on the sheet, so the sheet's yes says that part's name. */
   let addingFirst = $state<string | null>(null);
@@ -402,7 +413,7 @@
         if (out.ok) {
           planned = out.planned;
           addingFirst = first;
-        } else refused = { fix: words.needsFirstRefused(listing.title, moduleTitle(first)), code: out.code };
+        } else refused = unresolvedSaid(out);
         return;
       }
       /* WHAT ELSE WAITS IS READ ONLY FOR A PLAN THAT HAS SOMETHING TO WAIT FOR (`offer.ts` `afterOthers`): an update
@@ -480,9 +491,12 @@
         const title = addingFirst !== null ? moduleTitle(addingFirst) : listing.title;
         toasts.push(out.first ? turnWords.installedAfter(title, out.first) : copy.shareInstalled(title), { intent: 'good' });
         planned = null;
+        const wasFirst = addingFirst !== null;
         addingFirst = null;
         await reread();
         await railAgain();
+        /* THE NEXT PART IT NEEDS, OR THE ADD-ON ITSELF, IS THE NEXT SHEET: one press for each, in order. */
+        if (wasFirst) setTimeout(() => void press(), 0);
         return;
       } else if (entry && notOwner(out.code)) {
         wentIn(out);
