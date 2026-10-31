@@ -20,7 +20,7 @@
  * round is read as its inverse, because a rate is quoted whichever way a person or a public address happens to quote it.
  */
 
-import { exponentOf } from './ingest.ts';
+import { exponentOf } from './exponent.ts';
 
 export type Rate = { currency: string; base: string; rate: number; as_of: string };
 

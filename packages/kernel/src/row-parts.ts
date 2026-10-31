@@ -19,7 +19,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Schema } from '@braindog/where';
 
 import { coerce, isAbsent, type FieldDecl, type Json, type Lookups } from './coerce.ts';
-import { moneyText } from './ingest.ts';
+import { moneyText } from './exponent.ts';
 import { splitView } from './split-view.ts';
 
 /** The parts field of a list and the money field its parts add up to, or none. */

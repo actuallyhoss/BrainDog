@@ -15,7 +15,7 @@
  */
 
 import { bucketOf, bucketStart, nextBucket, shiftBucket, type Bucket } from './buckets.ts';
-import { exponentOf } from './ingest.ts';
+import { exponentOf } from './exponent.ts';
 
 /** The buckets a measure may be drawn in. A day for a month or two, a week for a year. */
 export const MEASURE_BUCKETS = ['day', 'week'] as const;
