@@ -49,7 +49,7 @@ const drawn = (rows: unknown[]): Row[] =>
       {
         kind: 'cards',
         source: 'register.services',
-        heading: 'Keeping it alive',
+        heading: 'Services',
         columns: [
           { field: 'name', as: 'title' },
           { field: 'cost', as: 'figure' },

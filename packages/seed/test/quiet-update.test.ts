@@ -1715,6 +1715,8 @@ const projectBefore = (doc: Body, id: string): Body =>
       if (b.kind === 'section' && b.heading === 'Runs on') return [];
       if (b.heading === 'And from everywhere') return [];
       if (b.heading === 'Money by month') return [{ ...b, span: 6 }];
+      /* AND UNTIL founder 3.8.2 (31 October, AG22) what keeps it running was headed Keeping it alive. */
+      if (b.heading === 'Services' && b.source === 'register.services') return [{ ...b, heading: 'Keeping it alive' }];
       if (b.heading === 'Agents' && b.source === 'register.session')
         return [{ ...b, columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }], where: 'project is {{spoken}}' }];
       if (b.heading === 'Tools and servers') return [{ ...runsOn89(b), span: 6, where: 'kind is tool' }];

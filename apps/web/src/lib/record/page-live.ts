@@ -343,6 +343,8 @@ export type LiveBlock = BlockResult & {
   narrowed?: true;
   /** A lead note's: its sentence is the line the model wrote, not the rules' (`said`), so a hero can say who wrote it. */
   modelLine?: true;
+  /** The rows a block names, by handle (`tasks#3`), with the name each is said by: a list's refs, or a note's (`refNamesOf`). */
+  names?: ReadonlyMap<string, string>;
   /** The block's `{{path}}` values as the record answered them. */
   values?: Record<string, unknown>;
   /** An `actions` block's rows, in the shape "Runs on" reads. */
@@ -1561,6 +1563,14 @@ function wordsFor(columns: readonly { field: string }[], cells: (string | null)[
   return said === null ? cells : cells.map((c, i) => (columns[i]?.field === field ? said : c));
 }
 
+/** The names a note's refs were sent with, by the row's handle (`tasks#3`), or `null` for none or for a shape that is not one. */
+export function refNamesOf(v: unknown): ReadonlyMap<string, string> | null {
+  if (!isObject(v)) return null;
+  const out = new Map<string, string>();
+  for (const [handle, name] of Object.entries(v)) if (/^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(handle) && typeof name === 'string' && name.trim() !== '') out.set(handle, name.trim());
+  return out.size > 0 ? out : null;
+}
+
 export function blockOf(
   b: Answered,
   refs: ReadonlyMap<string, RefMap>,
@@ -1637,6 +1647,8 @@ export function blockOf(
     open: openSteps,
     /* THE MODEL'S LINE FOR A LEAD NOTE, taken by name so it never rides through `rest` onto a block that is not one. */
     said: modelSaid,
+    /* THE NAMES OF THE ROWS A NOTE'S REFS POINT AT, taken by name and narrowed into `names` below (`refNamesOf`). */
+    ref_names: refNamed,
     /* WHAT THE BLOCK IS, taken by name and narrowed by `keyOf`, so a page never keys its blocks by something that is not text. */
     key: keyed,
     /* WHAT A CARD BLOCK'S CARDS ARE GROUPED BY, AND EACH CARD'S GROUP BY NAME, taken by name and narrowed below. */
@@ -1700,6 +1712,9 @@ export function blockOf(
     /* A DAY THE RECORD WROTE INTO A NOTE IS SAID AS A PERSON SAYS IT (`datesIn`): a person's Seen in read
        "2026-08-28 · mail from halden.example". Never in a document, whose words are the person's own. */
     ...(body === undefined ? {} : { body: kind === 'note' && rest.document !== true && typeof body === 'string' ? datesIn(pluralsIn(wholeMoneyIn(body), saidFor(namedResolverOf(values, unnamedOf(b)))), now) : body }),
+    /* A NOTE'S `{{ref:tasks#3}}` BY ITS ROW'S NAME (PJ4): the record sends the names of the rows it may show this reader,
+       and the renderer says each by it (`refName` in `BlockSlot.svelte`) where it drew "#3" until the tab read the list. */
+    ...((named) => (named === null ? {} : { names: named }))(kind === 'note' ? refNamesOf(refNamed) : null),
     ...(target === undefined ? {} : { target }),
     ...(authored === undefined ? {} : { authored }),
     ...(cells === undefined ? {} : { cells }),

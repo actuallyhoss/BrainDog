@@ -19,14 +19,14 @@ const PAGE: B[] = [
   { kind: 'note', heading: 'Notes', drawn: true },
   { kind: 'series', heading: 'Money by month', drawn: true },
   { kind: 'table', heading: 'Bills and invoices', register: 'obligations', total: 9, span: 6, drawn: true },
-  { kind: 'cards', heading: 'Keeping it alive', register: 'services', total: 7, span: 6, drawn: true },
+  { kind: 'cards', heading: 'Services', register: 'services', total: 7, span: 6, drawn: true },
   { kind: 'section', heading: 'Runs on', box: true, drawn: true },
 ];
 
 test('A PROJECT SAYS EACH THING ONCE: the sentence, the rail, the series and the runs go, the questions stay (proj F1)', () => {
   const got = onProject(PAGE, 'things');
   const drawn = got.filter((b) => b.drawn !== false).map((b) => b.heading ?? b.kind);
-  assert.deepEqual(drawn, ['Waiting on you', 'More about Kiln', 'Bills and invoices', 'Keeping it alive', 'Notes', 'What changed', PLAN_BY_DATE, 'Runs on']);
+  assert.deepEqual(drawn, ['Waiting on you', 'More about Kiln', 'Bills and invoices', 'Services', 'Notes', 'What changed', PLAN_BY_DATE, 'Runs on']);
 });
 
 test('MORE ABOUT IS FOLDED, AND THE PLAN IS INSIDE IT AS PLAN BY DATE, keyed anew so no look lifts it (proj F1)', () => {
@@ -37,5 +37,5 @@ test('MORE ABOUT IS FOLDED, AND THE PLAN IS INSIDE IT AS PLAN BY DATE, keyed ane
   assert.equal(plan.length, 1, 'the plan is drawn once');
   assert.notEqual(plan[0]!.key, 'plan');
   assert.ok(got.indexOf(plan[0]!) > got.indexOf(more));
-  assert.equal(moreSaid(got), 'Bills and invoices 9 · Keeping it alive 7 · Notes · What changed · Plan by date');
+  assert.equal(moreSaid(got), 'Bills and invoices 9 · Services 7 · Notes · What changed · Plan by date');
 });

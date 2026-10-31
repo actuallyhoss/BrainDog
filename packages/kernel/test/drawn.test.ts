@@ -165,7 +165,7 @@ test('A CARD WITH ANYTHING SAID IS DRAWN, and every card beside it: a name, a no
   assert.equal(unsaid(cards([row({ health: null }), row({ aim: '2026-12-01' })])), false, 'one card said is the block said');
   /* A CARD WITH A NAME IS NEVER LEFT OUT: a service imported with no cost is still what the project runs on. */
   const alive = cards([row({ name: 'pinwheel.example', cost: null, cycle: null, note: '', renews: null })], {
-    heading: 'Keeping it alive',
+    heading: 'Services',
     columns: [{ field: 'name', as: 'title' }, { field: 'cost', as: 'figure' }, { field: 'cycle', as: 'fact' }, { field: 'note', as: 'fact' }, { field: 'renews', as: 'when' }],
   });
   assert.equal(unsaid(alive), false);

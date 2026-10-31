@@ -1399,8 +1399,32 @@ export function sayCondition(cond: unknown, register?: string): string {
   return unmark(conditionWords(cond, register));
 }
 
+/**
+ * A TYPED VALUE IN A WRITTEN CONDITION BY ITS LABEL (polish-j PJ3), as a tree's leaf says one (`valueSaid`): Money's
+ * chase read "Status is open or part" and "Which way is owed to me", the values as the sentence spells them, where the
+ * list shows "Part paid" and "Money in". Only a clause `<field> is [not] <value> [or <value>…]` over a field of the
+ * list that labels its values, and only when every value is one of them; anything else is left as written.
+ */
+const valuesSaid = (text: string, register?: string): string => {
+  const fields = register ? REGISTERS[register]?.fields : undefined;
+  if (!fields?.some((f) => f.labels !== undefined)) return text;
+  return text
+    .split(/(\{\{[^}]*\}\}|,\s*(?:or\s+)?|\s+and\s+)/u)
+    .map((part) => {
+      const m = /^(\s*)([a-z][a-z0-9_]*)(\s+is(?:\s+not)?\s+)(\S.*?)(\s*)$/u.exec(part);
+      if (m === null) return part;
+      const [, lead, id, verb, rest, tail] = m as unknown as [string, string, string, string, string, string];
+      const labels = fields.find((f) => f.id === id)?.labels;
+      if (labels === undefined) return part;
+      const values = rest.split(/\s+or\s+/u).map((w) => w.trim().toLowerCase().replace(/\s+/gu, '_'));
+      if (!values.every((v) => Object.hasOwn(labels, v))) return part;
+      return `${lead}${id}${verb}${values.map((v) => valueSaid(id, v, register)).join(' or ')}${tail}`;
+    })
+    .join('');
+};
+
 function conditionWords(cond: unknown, register?: string): string {
-  if (typeof cond === 'string') return mark(daysSaid(idsSaid(cond.trim(), register)));
+  if (typeof cond === 'string') return mark(daysSaid(idsSaid(valuesSaid(cond.trim(), register), register)));
   const leaf = leafOf(cond);
   if (leaf) return `${fieldNamed(leaf.field, register)} ${COMPARE.find((c) => c.op === leaf.op)!.said} ${leaf.value}`;
   if (!isObject(cond)) return '';

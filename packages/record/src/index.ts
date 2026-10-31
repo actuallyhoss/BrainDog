@@ -176,6 +176,7 @@ import {
   factsBasis,
   figureText,
   filledHeadline,
+  linkedLine,
   nought,
   hashOf,
   HEADLINE_ASKS_DAY,
@@ -325,6 +326,7 @@ export {
   handedHoles,
   headlineFault,
   holedRules,
+  linkedLine,
   HOME_PAGE,
   owedOn,
   owedPages,
@@ -5888,6 +5890,39 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A LINE THAT NAMES THINGS (`facts`) IS SENT ONLY TO SOMEBODY WHO READS ALL OF EVERY LIST THE PAGE DOES, and only while the
    * same things are still late or due: a bill named late is not named once it is paid.
    */
+  /** A note's `{{ref:<list>#<n>}}`, by the row's handle. */
+  const NOTE_REF = /\{\{\s*ref:\s*([a-z][a-z0-9_]*#[1-9][0-9]*)\s*\}\}/gu;
+  /** The most refs one note is sent the names of. */
+  const NOTE_REFS_MOST = 40;
+  /**
+   * A NOTE'S `{{ref:tasks#3}}` IS SENT WITH ITS ROW'S NAME (polish-j PJ4), as `ref_names` on the block: the tab drew
+   * "#3" until it had read the row's list (`refName` in `BlockSlot.svelte`), so Kiln's note said "The task to turn
+   * auto-renew back on is #3" on every first open. ONLY A ROW THIS READER MAY SEE: a list she reads, a row her grant
+   * admits, and a title field not hidden from her; any other ref is left to say its number. A shared link is not read
+   * through here (`methods/shares.ts` reads the kernel's page itself), so it never carries a name. At most
+   * `NOTE_REFS_MOST` a note, the first it names.
+   */
+  const refsNamed = <B,>(ctx: CallContext, b: B): B => {
+    if (b === null || typeof b !== 'object') return b;
+    const block = b as { kind?: unknown; body?: unknown; values?: unknown };
+    if (block.kind !== 'note') return b;
+    const texts = [
+      typeof block.body === 'string' ? block.body : '',
+      ...(block.values !== null && typeof block.values === 'object' ? Object.values(block.values as Record<string, unknown>).filter((v): v is string => typeof v === 'string') : []),
+    ];
+    const spoken = [...new Set(texts.flatMap((t) => (t.includes('{{') ? [...t.matchAll(NOTE_REF)].map((m) => m[1]!) : [])))].slice(0, NOTE_REFS_MOST);
+    const names: Record<string, string> = {};
+    for (const handle of spoken) {
+      const row = kernel.get(handle);
+      if (row === null || readable(ctx, row.register) !== null || !sight.admits(ctx, row)) continue;
+      const title = kernel.register(row.register)?.title;
+      if (typeof title === 'string' && sight.hidden(ctx, row.register).has(title)) continue;
+      const name = kernel.titleOfRow(row.id);
+      if (name !== null) names[handle] = name;
+    }
+    return Object.keys(names).length === 0 ? b : ({ ...b, ref_names: names } as B);
+  };
+
   const headlineFor = (slug: string, blocks: readonly unknown[], ctx: CallContext, row = false): { line: { at: number; text: string } | null; next: LookNext | null } => {
     const none = { line: null, next: null };
     if (slug === HOME_PAGE) return none;
@@ -5922,7 +5957,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AN ANSWER WHOSE LOOK WAS REFUSED IS REFUSED WHOLE (`lookRehearsed`): its line came from the same answer, so the page
        keeps the line its rules wrote until the page is answered for again. */
     if (lineRefused(keptLine)) return { line: null, next: look.next };
-    return { line: { at: lead.at, text: stored.text }, next: look.next };
+    /* WITH THE TEMPLATE'S LINKS LAID BACK (`linkedLine`, PJ2): Money's late figure is the way to the late bills whoever
+       wrote the line, and a line kept before this was written gets its link on the next read. */
+    return { line: { at: lead.at, text: linkedLine(stored.text, lead, slashDay()) }, next: look.next };
   };
 
   /**
@@ -12794,7 +12831,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ...(declared ? { declared_version: declared.version } : {}),
           ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
           ...(look === undefined ? {} : { look: lookAt === undefined ? look : { ...look, at: lookAt } }),
-          blocks: line === null ? blocks : blocks.map((b, i) => (i === line.at ? { ...b, said: line.text } : b)),
+          blocks: blocks.map((b, i) => refsNamed(ctx, line !== null && i === line.at ? { ...b, said: line.text } : b)),
         }),
         ...(shape === null ? {} : { shape }),
       });

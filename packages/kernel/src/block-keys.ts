@@ -157,6 +157,9 @@ const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
  * `says_at` IS WHICH OF A NOTE'S `says:` SENTENCES WAS SAID, whose words the read wrote into `body` (`pages.ts`
  * `saidLine`). A note read back with both is read without the body it was answered, so it chooses again.
  *
+ * `ref_names` IS THE NAME OF EACH ROW A NOTE'S `{{ref:…}}` POINTS AT, put on it by the record after the read for the rows
+ * the reader may see (polish-j PJ4), so a note read back with them is not refused for a key the record wrote.
+ *
  * `figures` IS WHAT EACH FIGURE THE BLOCK NAMES IS, as the record declares it (`pages.ts` `figuresOf`), so a held block
  * keeps no figure's `where` and a block read back is answered its figures again.
  */
@@ -165,7 +168,7 @@ export const ANSWER_KEYS: readonly string[] = [
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'presence', 'facts', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at', 'kpis', 'kpi_list', 'figures',
+  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at', 'kpis', 'kpi_list', 'figures', 'ref_names',
 ];
 
 /**

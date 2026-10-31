@@ -424,6 +424,51 @@ export function filledHeadline(line: string, page: HeadlinePage, now: Today = Da
   return missing ? null : plainLine(filled.trim(), namesOf(page), now);
 }
 
+/** A markdown link as a lead note's template writes one: `[{{overdue}}](/r/obligations?…)`. */
+const LINK = /\[([^\]]*)\]\(([^)\s]*)\)/gu;
+
+/**
+ * THE MODEL'S LINE KEEPS THE TEMPLATE'S LINKS (polish-j PJ2). Money's figure late is the way to the bills in the rules'
+ * line (`[{{overdue}}](/r/obligations?…)`, money-core 3.33.0), and the line written overnight in its place said the same
+ * figure with no way to them: the model is handed the sentence without its addresses (`rulesLine`) and may type no
+ * markup (`headlineFault`). So the record lays each link back where the line says what the link's words are, filled from
+ * the lead's own values: the whole label, or the one figure a one-hole label names. Once each, never inside a link
+ * already laid, and never inside a longer number. A label whose figure has no value, or one the line does not say, lays
+ * nothing, and the line is as it was kept.
+ */
+export function linkedLine(text: string, lead: Pick<LeadBlock, 'body' | 'values'>, now: Today = Date.now()): string {
+  if (!lead.body.includes('](')) return text;
+  let out = text;
+  for (const [, label, href] of lead.body.matchAll(LINK)) {
+    if (href === undefined || href === '' || label === undefined) continue;
+    const holes = holesOf(label);
+    if (holes.length === 0) continue;
+    const said = (path: string): string | null => (Object.hasOwn(lead.values, path) ? figureText(lead.values[path], now) : null);
+    const whole = holes.every((h) => said(h) !== null) ? label.replace(HOLE, (_, path: string) => said(path)!).trim() : null;
+    const one = holes.length === 1 ? said(holes[0]!) : null;
+    for (const words of [whole, one]) {
+      if (words === null || words === '') continue;
+      const laid = laidOnce(out, words, href);
+      if (laid !== null) {
+        out = laid;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** `text` with the first `words` outside a link made a link to `href`, or `null` when the line never says them so. */
+function laidOnce(text: string, words: string, href: string): string | null {
+  const taken = [...text.matchAll(LINK)].map((m) => [m.index, m.index + m[0].length] as const);
+  const esc = words.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  for (const m of text.matchAll(new RegExp(`(?<![\\p{L}\\p{N}.,])${esc}(?![\\p{L}\\p{N}]|[.,]\\p{N})`, 'gu'))) {
+    if (taken.some(([from, to]) => m.index >= from && m.index < to)) continue;
+    return `${text.slice(0, m.index)}[${words}](${href})${text.slice(m.index + words.length)}`;
+  }
+  return null;
+}
+
 /**
  * A page's rules line with each figure it says written as that figure's hole: what "give back the rules line" means now
  * that no number is typed. Each value is found whole, never inside a longer number, and the longest first, so `2` is

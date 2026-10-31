@@ -50,9 +50,29 @@ test('a condition and the fields a trigger waits on are said by name', () => {
      when account is set, book is empty" said "only when" twice and read the fields as words. */
   assert.equal(said, 'When an item in Ledger is added or changed, only when As the bank wrote it or Filed by changes, Filed by is empty and As the bank wrote it is set');
   assert.equal(sayTrigger({ written: { register: 'filing_rules', fields: ['match_by'] } } as never, () => 'Filing rules'), 'When an item in Filing rules is added or changed, only when Match by changes');
-  /* A FIELD A CLAUSE OPENS WITH, by its name, and the value after it left as written. */
+  /* A FIELD A CLAUSE OPENS WITH, by its name, and the value after it as written where the list labels none. */
   const rule = { trigger: { written: { register: 'filing_rules', fields: ['state'] } }, when: 'state is on and match is set' };
   assert.match(sayStart(rule as never, () => 'Filing rules'), /only when Status changes, Status is on and Matches is set$/u);
+});
+
+/* A TYPED VALUE BY ITS LABEL (polish-j PJ3): Money's chase read "Status is open or part" where the list says Part paid. */
+learnt('obligations', {
+  name: 'Bills and invoices',
+  fields: [
+    { id: 'direction', label: 'Which way', type: 'enum', values: ['owed_by_me', 'owed_to_me'], labels: { owed_by_me: 'Money out', owed_to_me: 'Money in' } },
+    { id: 'state', label: 'Status', type: 'enum', values: ['open', 'part', 'paid'], labels: { open: 'Open', part: 'Part paid', paid: 'Paid' } },
+    { id: 'due', label: 'Due', type: 'day' },
+  ] as RegisterDecl['fields'],
+});
+
+test('a written condition says a typed value by the label its list shows, and leaves anything else as written', () => {
+  const chase = { trigger: { written: { register: 'obligations' } }, when: 'direction is owed to me, state is open or part, due before -7d' };
+  assert.equal(sayStart(chase as never, () => 'Bills and invoices'), 'When an item in Bills and invoices is added or changed, only when Which way is money in, Status is open or part paid, Due more than 7 days ago');
+  const not = { ...chase, when: 'state is not paid' };
+  assert.match(sayStart(not as never, () => 'Bills and invoices'), /only when Status is not paid$/u);
+  /* A VALUE THE LIST DOES NOT HOLD, AND EMPTY OR SET, ARE AS WRITTEN. */
+  const odd = { ...chase, when: 'state is open or nonsense, due is set' };
+  assert.match(sayStart(odd as never, () => 'Bills and invoices'), /only when Status is open or nonsense, Due is set$/u);
 });
 
 test('the lists an automation names are found anywhere in its body, for the page to learn before it draws', () => {
