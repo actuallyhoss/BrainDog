@@ -208,7 +208,7 @@ const CALLS: readonly Call[] = [
   { name: 'a page that is not there', want: 404, path: '/api/page?slug=nowhere' },
   { name: 'the figures', want: 200, path: '/api/figures' },
   { name: 'a figure', want: 200, path: '/api/metric?metric=open-tasks' },
-  { name: 'a figure that is not there', want: 422, path: '/api/metric?metric=nothing-counted' },
+  { name: 'a figure that is not there', want: 404, path: '/api/metric?metric=nothing-counted' },
   { name: 'export', want: 403, path: '/api/export', body: {} },
   { name: 'an unknown method', want: 404, path: '/api/teleport' },
   { name: 'a body that is not JSON', want: 400, path: '/api/create', body: '{"register": "tasks", ' },

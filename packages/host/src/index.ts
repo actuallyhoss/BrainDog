@@ -266,12 +266,22 @@ export const httpStatus = (r: Result<unknown>): number =>
  * nobody declared>` asked `page` and got a 422, which every browser logs in red as a broken call; a page that does not
  * exist is not found. Only `page`'s `PAGE_UNKNOWN`: elsewhere that code is a value to fix (a look laid over no page, a
  * link opened onto none) and keeps its 422. The client reads the code, never the status, so both say "missing".
+ *
+ * AND `metric`'s `METRIC_UNKNOWN` FOR THE FIGURE ASKED FOR (polish-l, PL2), the refusal `at: 'metric'`, which is also
+ * what a figure over a list the caller cannot read answers, so the two stay one answer. A figure that is there but walks
+ * from one that is not (`at: 'opening'`, `at: 'value'`) is a declaration to fix, and keeps its 422.
  */
-const NOT_THERE: Readonly<Record<string, string>> = { page: 'PAGE_UNKNOWN' };
+const NOT_THERE: Readonly<Record<string, { code: string; at?: string }>> = {
+  page: { code: 'PAGE_UNKNOWN' },
+  metric: { code: 'METRIC_UNKNOWN', at: 'metric' },
+};
 
 /** `httpStatus`, with a route's own not-found (`NOT_THERE`) at 404. */
-export const routeStatus = (name: string, r: Result<unknown>): number =>
-  !r.ok && refused(r) && Object.hasOwn(NOT_THERE, name) && NOT_THERE[name] === r.refusal.code ? 404 : httpStatus(r);
+export const routeStatus = (name: string, r: Result<unknown>): number => {
+  if (r.ok || !refused(r) || !Object.hasOwn(NOT_THERE, name)) return httpStatus(r);
+  const there = NOT_THERE[name]!;
+  return there.code === r.refusal.code && (there.at === undefined || there.at === r.refusal.at) ? 404 : httpStatus(r);
+};
 
 export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<Result<unknown>>;
 
