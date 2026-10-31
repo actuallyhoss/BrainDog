@@ -23,6 +23,7 @@ const SUMMARY = 'Its card says what it is for in one short line. Nothing in your
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.9.0', notes: 'Goals is in your sidebar from the start, and opens on a box to add a goal or a habit. Nothing you hold changes.' },
     { version: '2.8.0', notes: 'Personal no longer counts how many days running you logged something. What you logged this week still shows against each habit. Nothing you hold changes.' },
     { version: '2.7.0', notes: 'Personal counts your streak: how many days running you logged something. Nothing you hold changes.' },
     { version: '2.6.1', notes: SUMMARY },
@@ -32,12 +33,14 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '2.3.1', notes: NAMED('Ledger') },
   ],
   student: [
+    { version: '1.7.0', notes: 'Studies is in your sidebar from the start, and opens on boxes to add a piece of work and a course. Nothing you hold changes.' },
     { version: '1.6.2', notes: 'Home calls your study by day Study done. It counts no streak. Nothing you hold changes.' },
     { version: '1.6.1', notes: SUMMARY },
     { version: '1.6.0', notes: 'Studies is part of Student now: a piece of work can carry a mark as a number, and a reading list of books and papers sits beside your courses.' },
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.9.0', notes: 'The Dashboard is in your sidebar from the start. Before your first project it asks you to add one; it talks about fixing a numbers feed only once a feed has sent a number. Nothing you hold changes.' },
     { version: '3.8.2', notes: 'A project\'s services are headed Services.' },
     { version: '3.8.1', notes: 'A project\'s And from everywhere cards say what each thing is, not its kind.' },
     { version: '3.8.0', notes: 'The founder page is called Founder overview, not Today. While no numbers came in thirty days, the Dashboard says so in one line, shows what went quiet and links to fixing the feed.' },
@@ -85,6 +88,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.30.0', notes: 'Cycles is in your sidebar from the start, and opens on a box to start a cycle. Nothing you hold changes.' },
     { version: '2.29.2', notes: 'A project\'s And from everywhere cards say what each thing is, not its kind.' },
     { version: '2.29.1', notes: SUMMARY },
     { version: '2.29.0', notes: 'Team task list is part of Team board now: a cycle can carry a write-up of how it went.' },
@@ -127,6 +131,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.6.1', notes: NAMED('Steps') },
   ],
   shop: [
+    { version: '1.5.0', notes: 'Products has a page of its own in your sidebar, beside Orders, with a box to add a product. Nothing you hold changes.' },
     { version: '1.4.1', notes: SUMMARY },
     { version: '1.4.0', notes: 'The Orders page opens on a box to add an order, so a new shop has something to press on its first tab.' },
     { version: '1.3.0', notes: 'Orders sits second in the menu, after Work and before Projects, Money and People.' },

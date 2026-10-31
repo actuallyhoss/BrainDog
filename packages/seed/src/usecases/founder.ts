@@ -507,8 +507,13 @@ export const FOUNDER = {
      3.7.1: the card's summary is one short line. Words only, so a patch step.
      3.8.1: the project page's And from everywhere cards say "What it is", not "Kind". Words only, so a patch step.
      3.8.2: the project page's services are headed Services, not Keeping it alive, beside Runs on (AG22). Words only,
-     so a patch step. */
-  version: '3.8.2',
+     so a patch step.
+     3.9.0 (audit 31 Oct h, AH4 and AH18): the Dashboard is on the rail from the first minute (its place, after Work), and
+     before any project it opens on "Add your first project, and its numbers come here" over a box to add one, where a
+     minute-old founder was told no numbers came in thirty days and to fix a feed nobody had made. Fix the feed is said
+     only once a feed has sent a number; before that, a project's numbers are set up. Blocks added and nothing taken
+     away, so a minor step; 3.8.2 is published. */
+  version: '3.9.0',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
@@ -711,9 +716,11 @@ export const FOUNDER = {
            this page says: thirty days of every number, and where each came from. */
         page: 'dashboard',
         title: 'Dashboard',
-        nav: { section: 'Dashboard', order: 10 },
+        /* ITS PLACE ON THE RAIL, SINCE 3.9.0 (AH4): a starter's own page is a place from the first minute. */
+        nav: { section: 'Dashboard', order: 10, place: 20 },
         icon: 'observe',
-        requires: ['register.datapoints', 'register.organisations'],
+        /* AND PROJECTS, SINCE 3.9.0: the first project is named on this page before any number comes. */
+        requires: ['register.datapoints', 'register.organisations', 'register.things'],
         blocks: [
           /* THE OPENING SENTENCE, SAID FROM THE NUMBERS OF THE LAST THIRTY DAYS (`datapoints-30d`, which leaves the
              example out). Both are held to the one figure, so exactly one of them draws. */
@@ -724,23 +731,58 @@ export const FOUNDER = {
             when: { metric: 'datapoints-30d', gte: 1 },
             body: 'Your projects reported {{datapoints-30d}} number(s) in the last thirty days.',
           },
+          /* BEFORE ANY PROJECT, SINCE 3.9.0 (AH18): what comes here and the box that starts it, never a feed to fix. The
+             project named here is on the go at once (`lane is building`), as Personal's Home box makes one. */
           {
             kind: 'note',
             lead: true,
             span: 12,
-            when: { metric: 'datapoints-30d', lt: 1 },
+            when: { all: [{ metric: 'projects-live', lt: 1 }, { metric: 'datapoints-30d', lt: 1 }] },
+            body: 'Add your first project, and its numbers come here.',
+          },
+          {
+            kind: 'capture',
+            heading: 'Name your first project',
+            icon: 'rocket',
+            span: 12,
+            register: 'things',
+            where: 'lane is building',
+            when: { metric: 'projects-live', lt: 1 },
+          },
+          /* A PROJECT, AND NO NUMBER YET FROM ANY FEED: where they are sent from, said as a first step. */
+          {
+            kind: 'note',
+            lead: true,
+            span: 12,
+            when: { all: [{ metric: 'projects-live', gte: 1 }, { metric: 'datapoints-reported', lt: 1 }] },
+            body: 'No project has sent a number yet.',
+          },
+          {
+            kind: 'link',
+            heading: 'Send your numbers',
+            icon: 'send',
+            span: 12,
+            when: { all: [{ metric: 'projects-live', gte: 1 }, { metric: 'datapoints-reported', lt: 1 }] },
+            authored: [{ cells: ['Set up a numbers feed', SEND_NUMBERS, "Each project sends its numbers to its own address; its page has the key"] }],
+          },
+          /* A FEED THAT SENT ONCE AND WENT QUIET: only then is it "no numbers in thirty days", and a feed to fix. */
+          {
+            kind: 'note',
+            lead: true,
+            span: 12,
+            when: { all: [{ metric: 'datapoints-reported', gte: 1 }, { metric: 'datapoints-30d', lt: 1 }] },
             body: 'No numbers came in the last thirty days.',
           },
           /* WHICH FEEDS STOPPED AND WHERE TO FIX THEM, WHILE NONE CAME (Q51 of 29 October): the page was one headline over
              two folded rows, a dead end in the sidebar. What went quiet is the record's own read, Home's block word for
              word, and the press opens the feed's setup, as "Fix the feed" does on a project's Numbers. */
-          { ...GONE_QUIET, when: { metric: 'datapoints-30d', lt: 1 } },
+          { ...GONE_QUIET, when: { all: [{ metric: 'datapoints-reported', gte: 1 }, { metric: 'datapoints-30d', lt: 1 }] } },
           {
             kind: 'link',
             heading: 'Fix the feed',
             icon: 'send',
             span: 12,
-            when: { metric: 'datapoints-30d', lt: 1 },
+            when: { all: [{ metric: 'datapoints-reported', gte: 1 }, { metric: 'datapoints-30d', lt: 1 }] },
             authored: [{ cells: ['Fix the numbers feed', SEND_NUMBERS, "Each project sends its numbers to its own address; its page has the key"] }],
           },
           /* ON THE FIGURE THE LINE SAYS, so the chart is drawn exactly while the sentence over it counts something. The

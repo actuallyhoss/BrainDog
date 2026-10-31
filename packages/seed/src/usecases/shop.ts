@@ -57,8 +57,11 @@ export const SHOP = {
      1.4.0: the Orders page opens on a box to add an order, where a new shop's first tab said
      "Nothing here yet" over nothing to press. A block added to a page that is already there, so a minor step. 1.3.0 is
      master's.
-     1.4.1: the card's summary is one short line. Words only, so a patch step. */
-  version: '1.4.1',
+     1.4.1: the card's summary is one short line. Words only, so a patch step.
+     1.5.0 (audit 31 Oct h, AH4): Products has a page of its own, on the rail from the first minute beside Orders, opening
+     on a box to add a product. The first screen promised Products, and `/p/products` said there was no such page. A
+     page added and nothing taken away, so a minor step; 1.4.1 is published. */
+  version: '1.5.0',
   title: 'Shop',
   summary: 'Your orders, products and what is paid.',
   author: 'BrainDog',
@@ -146,6 +149,8 @@ export const SHOP = {
       counted('orders-due-7d', 'Orders due this week', 'register.orders', THIS_WEEK),
       counted('orders-late', 'Orders late', 'register.orders', LATE),
       counted('orders-owed', 'Orders not paid in full', 'register.orders', OWED),
+      counted('products-held', 'Products', 'register.products'),
+      counted('products-low', 'Products with three or fewer left', 'register.products', 'left at most 3'),
       /* TREES, because the second ORs three fields and the two must split the owed orders between them. */
       { ...counted('orders-owed-named', 'Orders nothing was paid on, with a name and a day', 'register.orders'), where: OWED_NAMED },
       { ...counted('orders-owed-other', 'Other orders not paid in full', 'register.orders'), where: OWED_OTHER },
@@ -241,6 +246,35 @@ export const SHOP = {
             order: [{ field: 'due', dir: 'asc' }],
             limit: 8,
             empty: 'Every order is paid in full.',
+          },
+        ],
+      },
+      {
+        /* THE THINGS SHE SELLS, SINCE 1.5.0 (audit 31 Oct h, AH4): its own place on the rail, after Orders, from the first
+           minute, and a box to add the first product, where Products was a list on no rail and no page. */
+        page: 'products',
+        title: 'Products',
+        nav: { section: 'Products', order: 10, place: 25 },
+        icon: 'doc',
+        requires: ['register.products'],
+        blocks: [
+          { kind: 'note', lead: true, span: 12, body: '{{products-held}} product(s), {{products-low}} running low' },
+          { kind: 'capture', heading: 'Add a product', icon: 'plus', span: 12, register: 'products' },
+          {
+            kind: 'table',
+            heading: 'Products',
+            icon: 'doc',
+            span: 12,
+            source: 'register.products',
+            when: { metric: 'products-held', gt: 0 },
+            columns: [
+              { field: 'name', label: 'Product', width: 'minmax(18ch,1fr)' },
+              { field: 'price', label: 'Price', width: '14ch', align: 'end' },
+              { field: 'left', label: 'How many left', width: '14ch', align: 'end' },
+            ],
+            order: [{ field: 'name', dir: 'asc' }],
+            limit: 50,
+            empty: 'No products yet.',
           },
         ],
       },

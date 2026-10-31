@@ -29,8 +29,11 @@ export const STUDENT = {
      papers sits beside the courses. A field and a list added and nothing taken away, so a minor step.
      1.6.1: the card's summary is one short line. Words only, so a patch step.
      1.6.2 (audit 6g, AG12): Home's twelve weeks of study by day is headed Study done, where it said Study streak and
-     "your streak starts here": BrainDog keeps no game score (his rule: no gamification). Words only, so a patch step. */
-  version: '1.6.2',
+     "your streak starts here": BrainDog keeps no game score (his rule: no gamification). Words only, so a patch step.
+     1.7.0 (audit 31 Oct h, AH4): Studies is on the rail from the first minute (its place, after Work), and opens on two
+     boxes, one to add a piece of work and one to add a course, where a new student found it inside More lists saying
+     "Nothing here yet". Blocks added and nothing taken away, so a minor step; 1.6.2 is published. */
+  version: '1.7.0',
   title: 'Student',
   summary: 'Your courses, assignments and grades.',
   author: 'BrainDog',
@@ -273,7 +276,9 @@ export const STUDENT = {
       {
         page: 'studies',
         title: 'Studies',
-        nav: { section: 'Studies', order: 10 },
+        /* ITS PLACE ON THE RAIL, SINCE 1.7.0 (AH4): a starter's own page is a place from the first minute, never one that
+           waits for its lists to fill. */
+        nav: { section: 'Studies', order: 10, place: 20 },
         icon: 'board',
         requires: ['register.assignments', 'register.courses', 'register.study_sessions'],
         blocks: [
@@ -284,6 +289,9 @@ export const STUDENT = {
             span: 12,
             body: '{{homework-open}} piece(s) of work to hand in, {{courses-held}} course(s)',
           },
+          /* TWO BOXES, SINCE 1.7.0 (AH4): a piece of work and a course, each added where the page opens. */
+          { kind: 'capture', heading: 'Add a piece of work', icon: 'plus', span: 12, register: 'assignments' },
+          { kind: 'capture', heading: 'Add a course', icon: 'graduation-cap', span: 12, register: 'courses', when: { metric: 'courses-held', lt: 1 } },
           /* NO DUE NEXT TABLE SINCE 1.5.0: it drew the work not handed in a second time above the board, which holds every
              piece in its column with its day. */
           {
