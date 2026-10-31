@@ -78,6 +78,30 @@ test('RD7: A FORWARDING HEADER FROM A PEER ON THIS MACHINE OR ITS NETWORK READS 
   for (const peer of ['198.51.100.7', '172.32.0.1', '2001:db8::1']) assert.equal(proxied(peer, { 'x-forwarded-for': '203.0.113.9' }), false, peer);
 });
 
+test('RJ2: OVER HTTP, A FLOOD OF WRONG KEYS THROUGH ONE PEER NEVER HOLDS THE RIGHT KEY', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-peerslow-'));
+  const KEY = 'k'.repeat(40);
+  const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0, token: KEY, host: '127.0.0.1', trustProxy: true });
+  const port = (running.server.address() as { port: number }).port;
+  const boot = (bearer: string, from: string) =>
+    fetch(`http://127.0.0.1:${port}/api/boot`, { headers: { authorization: `Bearer ${bearer}`, 'x-forwarded-for': from } });
+  try {
+    for (let i = 0; i < PEER_CEILING.most; i++) await boot(`guess-${i}`, `203.0.113.${(i % 250) + 1}`);
+    /* THE PEER IS NOW OVER ITS CEILING: two wrong keys at once take the turn and the one waiter, and a third is a 429. */
+    const held = [boot('guess-a', '198.51.100.1'), boot('guess-b', '198.51.100.2'), boot('guess-c', '198.51.100.3')];
+    const started = Date.now();
+    const right = await boot(KEY, '198.51.100.9');
+    assert.notEqual(right.status, 429, 'the right key was held with the guesses');
+    assert.notEqual(right.status, 401);
+    assert.ok(Date.now() - started < PEER_CEILING.wait, 'the right key waited a turn');
+    const statuses = (await Promise.all(held)).map((r) => r.status).sort();
+    assert.ok(statuses.includes(429), 'the wrong keys over the ceiling were not bounded');
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('AI16: THE HEADER IS READ ONLY FROM A PEER THAT IS A TRUSTED PROXY, and from the right past every trusted hop', () => {
   const near = proxyTrustOf('1');
   assert.ok(near !== null && !('wrong' in near));
@@ -98,7 +122,7 @@ test('AI16: THE HEADER IS READ ONLY FROM A PEER THAT IS A TRUSTED PROXY, and fro
   assert.ok(bad !== null && 'wrong' in bad);
 });
 
-test('RG3, RH7: A PEER OVER THE CEILING IS HELD TO ONE COMPARE PER TURN, NEVER LOCKED', () => {
+test('RG3, RH7, RJ2: A PEER OVER THE CEILING HOLDS ITS WRONG KEYS TO ONE ANSWER PER TURN, NEVER LOCKED', () => {
   let at = 0;
   const slow = peerSlow(() => at);
   for (let i = 0; i < PEER_CEILING.most - 1; i++) assert.equal(slow.strike('172.18.0.1'), false);

@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import type { OutboxRow } from '@braindog/kernel';
 
-import { authMail, mailedNotices, withoutAddresses, type MailFault } from '../src/smtp.ts';
+import { addressRefused, authMail, mailedNotices, withoutAddresses, type MailFault } from '../src/smtp.ts';
 
 const job = (payload: unknown): OutboxRow => ({ id: 1, kind: 'notify.email', payload: JSON.stringify(payload) }) as unknown as OutboxRow;
 
@@ -24,7 +24,7 @@ test('RH14: A SUMMARY THAT FAILS RAISES THE MAIL FAULT, WITHOUT THE ADDRESS, AND
   const { said, fault } = watched();
   let fail = true;
   const notices = mailedNotices(async () => {
-    if (fail) throw new Error('RCPT TO answered 550 <someone@example.com> no such user');
+    if (fail) throw new Error('421 <someone@example.com> service not available, closing the channel');
   }, fault);
   await assert.rejects(notices(job({ to: 'someone@example.com', subject: 'Your week' })), (e: Error) => !e.message.includes('@'));
   assert.equal(said.length, 1);
@@ -33,6 +33,21 @@ test('RH14: A SUMMARY THAT FAILS RAISES THE MAIL FAULT, WITHOUT THE ADDRESS, AND
   fail = false;
   await notices(job({ to: 'someone@example.com', subject: 'Your week' }));
   assert.deepEqual(said.slice(1), ['sent'], 'a summary that went out did not clear the fault');
+});
+
+test('RJ7: ONE MEMBER WHOSE ADDRESS BOUNCES NEITHER RAISES NOR CLEARS THE MAIL FAULT', async () => {
+  const { said, fault } = watched();
+  const notices = mailedNotices(async ({ to }) => {
+    if (to.includes('gone@example.com')) throw new Error('the mail server answered 550 at RCPT TO, so the mail was not sent');
+  }, fault);
+  await assert.rejects(notices(job({ to: 'gone@example.com', subject: 'Your week' })));
+  assert.deepEqual(said, [], 'a mailbox that bounces was put on Health as the server');
+  await notices(job({ to: 'owner@example.com', subject: 'Your week' }));
+  assert.deepEqual(said, ['sent']);
+  assert.equal(addressRefused('the mail server answered 550 at RCPT TO, so the mail was not sent'), true);
+  assert.equal(addressRefused('the mail server answered 451 at RCPT TO, so the mail was not sent'), false, 'a server busy is the server');
+  assert.equal(addressRefused('the mail server answered 554 at DATA, so the mail was not sent'), false);
+  assert.equal(addressRefused('the mail server stopped answering'), false);
 });
 
 test('RH14: A PAYLOAD THIS HOST CANNOT READ IS NOT A MAIL SERVER FAULT', async () => {

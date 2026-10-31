@@ -167,6 +167,15 @@ function figuresIn(line: string, known: string | null, home: string | null, labe
   return out;
 }
 
+/** A figure written as a year, 1900 to 2099, with no currency, no thousands mark and no "k". */
+const yearLike = (f: Figure): boolean => f.code === undefined && !f.thousand && /^(?:19|20)\p{N}{2}$/u.test(f.figure);
+
+/** The first bare figure that counts nothing, passing over a year when another such figure follows it (RJ3). */
+function bareAmount(all: readonly Figure[]): Figure | undefined {
+  const plain = all.filter((f) => !f.count);
+  return plain.find((f, i) => !yearLike(f) || !plain.slice(i + 1).some((g) => !yearLike(g))) ?? plain[0];
+}
+
 /**
  * THE AMOUNT A LINE NAMES, and only one it plainly names (RG1). A figure is money when a currency is said with it
  * ("$40", "850 EGP", "300 pounds"), when it follows the field's own name ("total 1350"), or, for a list whose one
@@ -188,8 +197,11 @@ function amountIn(
   const pick =
     all.find((f) => f.code !== undefined) ??
     all.find((f) => f.labelled) ??
-    /* THE FIRST BARE FIGURE THAT COUNTS NOTHING (RH4): "Rent 850 for flat 4" is 850, never the 4 that ends it. */
-    (money.required ? all.find((f) => !f.count) : undefined);
+    /* THE FIRST BARE FIGURE THAT COUNTS NOTHING (RH4): "Rent 850 for flat 4" is 850, never the 4 that ends it. AND A
+       YEAR IS NEVER THE AMOUNT WHEN ANOTHER FIGURE IS THERE (RJ3): "Car insurance 2027 3000" is 3000 and "Rent Nov 2026
+       850" is 850, where RH4 took the year that came first. A year alone ("Fees 2026") is still read, and asked about
+       by the currency question like any bare figure. */
+    (money.required ? bareAmount(all) : undefined);
   if (!pick) return null;
   const currency = pick.code === undefined ? known : pick.code;
   if (currency === null) return money.required ? { bare: line.slice(pick.at, pick.end).trim() } : null;

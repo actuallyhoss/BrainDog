@@ -295,12 +295,16 @@ export function mailedNotices(send: SendLetter, fault?: MailFault): (job: Outbox
     if (to.length > MOST_RECIPIENTS)
       throw new Error(`a notify.email goes to at most ${String(MOST_RECIPIENTS)} addresses, and this one names ${String(to.length)}`);
     /* ONLY THE SEND ITSELF IS TOLD TO HEALTH (RH14): a payload this host cannot read is the queue's fault, not the mail
-       server's, and its dead letter already says so. A summary that goes out clears a standing fault, as a sign-in mail does. */
+       server's, and its dead letter already says so. A summary that goes out clears a standing fault, as a sign-in mail
+       does. AND AN ADDRESS THE SERVER REFUSED IS NOT THE SERVER'S FAULT (RJ7): one member whose mailbox answers 550 every
+       night raised it and the owner's digest a minute later cleared it, so Health said whichever ran last. That refusal
+       is the job's own dead letter, and the fault is left as it stood. */
     try {
       await send({ to, subject, text: typeof payload.text === 'string' ? payload.text : '' });
     } catch (e) {
-      const why = withoutAddresses(e instanceof Error ? e.message : 'the mail server did not take it');
-      if (fault) tellRecord(() => fault.failed(`a summary mail was not sent: ${why}`));
+      const raw = e instanceof Error ? e.message : 'the mail server did not take it';
+      const why = withoutAddresses(raw);
+      if (fault && !addressRefused(raw)) tellRecord(() => fault.failed(`a summary mail was not sent: ${why}`));
       /* THROWN ON WITHOUT ITS ADDRESSES, so the dead letter the outbox keeps names nobody either. */
       throw new Error(why);
     }
@@ -363,6 +367,15 @@ function tellRecord(f: () => void): void {
 }
 
 /**
+ * Whether a send failed because the server refused one address (a 5xx at `RCPT TO`, such as 550 no such user) rather
+ * than because the server itself is down, refusing the login or out of room (RJ7). Health's mail fault is about the
+ * server, so a mailbox that bounces is the job's dead letter and never raises or clears it.
+ */
+export function addressRefused(error: string): boolean {
+  return /\banswered 5\d\d at RCPT TO\b/u.test(error);
+}
+
+/**
  * A mail server's refusal with every address in it taken out (RH14). The raw text is kept on Health and printed in the
  * log, and a server's `550 <someone@example.com> no such user` names who the mail was for.
  */
@@ -382,9 +395,11 @@ export function authMail(send: SendLetter, say: (line: string) => void, fault?: 
     void send({ to, ...letter }).then(
       () => fault && tellRecord(fault.sent),
       (e: unknown) => {
-        const why = withoutAddresses(e instanceof Error ? e.message : 'the mail server did not take it');
+        const raw = e instanceof Error ? e.message : 'the mail server did not take it';
+        const why = withoutAddresses(raw);
         say(`braindog · a ${kind ?? 'sign-in'} mail was not sent: ${why}`);
-        if (fault) tellRecord(() => fault.failed(`a ${kind ?? 'sign-in'} mail was not sent: ${why}`));
+        /* AN ADDRESS THE SERVER REFUSED IS SAID IN THE LOG AND NOT ON HEALTH (RJ7): the server is working. */
+        if (fault && !addressRefused(raw)) tellRecord(() => fault.failed(`a ${kind ?? 'sign-in'} mail was not sent: ${why}`));
       },
     );
   };

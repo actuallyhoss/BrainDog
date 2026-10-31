@@ -483,6 +483,11 @@ const EVERY_SAID: Record<string, string> = { monthly: 'month', yearly: 'year', q
 const REPEATS: Record<string, string> = { month: 'monthly', monthly: 'monthly', year: 'yearly', yearly: 'yearly', annually: 'yearly', quarter: 'quarterly', quarterly: 'quarterly', week: 'weekly', weekly: 'weekly' };
 /* A payout is money in from a platform, never a person or a client: "Stripe paid out 1,950 USD". */
 const PAYOUT = /^(?:paid out|pays out|paying out|payout(?:\s+of)?)\b\s*/iu;
+/* THE PAYMENT PROVIDERS WHOSE "PAID OUT" IS MONEY IN (RJ5): a platform that holds what he earns and pays it to his bank.
+   Anybody else who "paid out" may have paid him or been paid, and is asked about. */
+const PROVIDERS = /^(?:stripe|paypal|paddle|gumroad|lemon ?squeezy|shopify|etsy|ebay|amazon|apple|app store|google|google play|adsense|upwork|fiverr|payoneer|wise|square|substack|patreon|youtube|twitch|airbnb|uber|deliveroo|talabat|careem|fawry|paymob|kickstarter|teachable|kajabi|ko-fi|buy me a coffee|tiktok|meta|facebook|instagram)$/iu;
+/* "... to my bank", "into our account": the money came to him, whoever paid it out. */
+const INTO_MINE = /\b(?:to|into)\s+(?:my|our)\s+(?:bank|account|a\/c|acct|card|wallet|balance|current account|savings)\b/iu;
 /* MONEY LENT OR BORROWED BETWEEN TWO PEOPLE IS OWED, never a payment and never "Not sure" (first-hour audit, FB3):
    "Lent Omar 500 yesterday", "Omar owes me 500", "Borrowed 300 from Sara", "Sara lent me 300", "I owe Sara 300". Case
    kept on the name, as everywhere: it is told by its capital. Each is [who, the rest] and whose the money is. */
@@ -514,21 +519,42 @@ const BANK_ONLY = /\b(?:debited|credited|avl\.? ?bal|available balance|card endi
    and "EGP 500 refund for your purchase" are money back. Then money put in is in ("EGP 500 transferred to your a/c
    from Ahmed"). A text that says neither is a card payment, out. */
 const BANK_BACK = /\b(?:refund(?:ed)?|reversal|reversed|cashback)\b/iu;
-const BANK_BACK_AFTER = /^\s*(?:(?:has|have)\s+been\s+|was\s+|were\s+|is\s+)?(?:refunded|reversed|cashback)\b/iu;
+/* "EGP 500 refunded", and the nouns too (RJ4): "EGP 500 refund credited to your card", "EGP 1,250.00 reversal for
+   purchase at X". */
+const BANK_BACK_AFTER = /^\s*(?:(?:has|have)\s+been\s+|was\s+|were\s+|is\s+)?(?:refunded|reversed|refund|reversal|cashback)\b/iu;
 const BANK_TAKEN = /\b(?:debited|withdrawn|withdrawal)\b/iu;
 const BANK_SPENT = /\b(?:charged|purchase|spent)\b/iu;
 /* "credited" to the reader, never "credited to Ahmed"; a refund, a reversal or a return, wherever it is said. */
 const BANK_CREDIT = /\bcredited\b(?!\s+to\s+(?!(?:your|you|a\/c|acct|account|card)\b))|\b(?:refund(?:ed|s)?|reversal|reversed|returns?|returned)\b/iu;
 const BANK_IN = /\b(?:credited|deposited|received|incoming)\b|\btransferred to your\b|\bto your (?:a\/c|acct|account)\b/iu;
-/** Whether a bank's text put the money kept (the figure at `at`, `end` past it) into the account. */
+/* Where one sentence of a bank's text ends: a full stop, a semicolon or a line, never the point inside "1,250.00". */
+const SENTENCE_END = /[.;!?\n](?=\s|$)/gu;
+/** The sentence of `text` that holds `at` to `end`: "No fees charged" after an incoming amount is no charge of it (RJ4). */
+const sentenceOf = (text: string, at: number, end: number): string => {
+  let from = 0;
+  let to = text.length;
+  for (const m of text.matchAll(SENTENCE_END)) {
+    const i = m.index ?? 0;
+    if (i < at) from = i + 1;
+    else if (i >= end) {
+      to = i;
+      break;
+    }
+  }
+  return text.slice(from, to);
+};
+/** Whether a bank's text put the money kept (the figure at `at`, `end` past it) into the account. A charge, a purchase or
+    a spend is read only in the sentence that holds the amount (RJ4), so "EGP 500 received from Ahmed. No fees charged" is
+    in. */
 const bankInto = (text: string, at: number, end: number): boolean =>
   BANK_BACK.test(text.slice(0, at)) ||
   BANK_BACK_AFTER.test(text.slice(end)) ||
-  (!BANK_TAKEN.test(text) && (BANK_CREDIT.test(text) || (!BANK_SPENT.test(text) && BANK_IN.test(text))));
+  (!BANK_TAKEN.test(text) && (BANK_CREDIT.test(text) || (!BANK_SPENT.test(sentenceOf(text, at, end)) && BANK_IN.test(text))));
 /* A BALANCE OR A LIMIT IS NO AMOUNT THAT MOVED (RG5): a figure right after its word, joining words and all ("available
    balance is EGP 12,000.00", "Avl Bal after txn: EGP 3,200"), is not the one kept. A figure further on still is (RH12):
    "Your credit limit EGP 50,000 card ending 1234 was charged EGP 500 at X" is the 500. */
-const BALANCE_BEFORE = /\b(?:bal(?:ance)?|limit|lmt)\b(?:[\s:.=-]|\b(?:is|of|now|was|after|txn|transaction)\b)*$/iu;
+/* And the orders banks print it in (RJ8): "Balance available: EGP 45,500", "Bal remaining EGP 3,200". */
+const BALANCE_BEFORE = /\b(?:bal(?:ance)?|limit|lmt)\b(?:[\s:.=-]|\b(?:is|of|now|was|after|txn|transaction|available|avail|avl|remaining|left|current)\b)*$/iu;
 /* Who the money went to or came from, never the reader's own card or account. */
 const PAYEE_END = '(?=\\s+on\\s|\\s+using\\s|\\s+with\\s|\\s+via\\s|\\s+ref\\b|\\s+for\\s|\\s+card\\b|\\.\\s|\\.$|,|;|$)';
 const NOT_THEM = '(?!(?:your|you|a\\/c|acct|account|card)\\b)';
@@ -666,7 +692,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        50 may have gone to Mark. It reads in only for somebody on the record, somebody who ordered in this sentence, or
        a line that says "paid me". */
     const name = opener?.[1] ?? '';
-    if (opened && PAID_ONLY.test(after) && amountsIn(after, opts.currency).length > 0 && !knownAs(name, opts.people ?? []) && !sharedBy(name, opts.people ?? []) && !ordered.has(words(name))) {
+    /* AND SO IS ONE WHO "PAID OUT" WHO IS NO PAYMENT PROVIDER (RJ5): "Ahmed paid out 300 for the delivery" saved 300 in,
+       "Payout from Ahmed". Stripe paying out, or anybody paying out into his account, is still the payout. */
+    const askedOut = PAYOUT.test(after) && !PROVIDERS.test(name.trim()) && !INTO_MINE.test(after);
+    if (opened && (PAID_ONLY.test(after) || askedOut) && amountsIn(after, opts.currency).length > 0 && !knownAs(name, opts.people ?? []) && !sharedBy(name, opts.people ?? []) && !ordered.has(words(name))) {
       whichWay ??= name;
       /* Said back as left too (RH13), so an order placed beside it ("14 mugs for Lina, Mark paid 50") never saves as
          though the 50 were never said. */
@@ -690,14 +719,21 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* "PAID OUT" WITH NOBODY NAMED IS MONEY OUT (RG16): "Paid out 300 to the cleaner" went to the cleaner. A payout is
        one a platform named in the clause paid, or one called a payout. */
     /* "PAID OUT 1,950 USD FROM STRIPE" IS STRIPE'S PAYOUT, in (RH11): a platform named after "from", with nobody it went to. */
-    const platform = PAYOUT.test(c) && !opened && !/\bto\s/iu.test(c) ? FROM.exec(c) : null;
-    if (platform && aName(platform[1]!)) {
+    /* ONLY A PAYMENT PROVIDER, OR ANYBODY INTO HIS OWN ACCOUNT, AND NEVER ONE OF HIS OWN ACCOUNTS (RJ5): "Paid out 500 from
+       Revolut for the plumber" is his account paying the plumber, out; "Paid out 1,950 USD from Stripe to my bank" is
+       Stripe's payout, in, where "to" made it money out. "Paid out" from anybody else is money out of his, as RG16 reads
+       it with nobody named. */
+    const platform = PAYOUT.test(c) && !opened && (!/\bto\s/iu.test(c) || INTO_MINE.test(c)) ? FROM.exec(c) : null;
+    const mine = platform !== null && ownAccount(platform[1]!);
+    if (platform && aName(platform[1]!) && !mine && (PROVIDERS.test(platform[1]!.trim()) || INTO_MINE.test(c))) {
       const rest = oneLine(`${c.slice(0, platform.index)} ${c.slice(platform.index + platform[0].length)}`);
       if (payout(rest.replace(PAYOUT, ''), platform[1]!)) continue;
       left.push(whole);
       continue;
     }
     if (PAYOUT.test(c) && !opened && !/^payout\b/iu.test(c)) {
+      /* FROM ONE OF HIS OWN ACCOUNTS, the account is the way it went out ("via Revolut"), never a name in the words. */
+      if (mine && platform) c = oneLine(`${c.slice(0, platform.index)} via ${platform[1]!} ${c.slice(platform.index + platform[0].length)}`);
       if (readMoney(c.replace(PAYOUT, 'paid ').replace(/^paid\s+(.*?)\s+to\s+/iu, 'paid $1 for '), null, false)) placed = true;
       else left.push(whole);
       continue;
@@ -1257,6 +1293,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   /** Whether the record holds any account of the kind this field links to: one known by name, or one counted. */
   function accountsHeld(account: FieldDecl): boolean {
     return (opts.accounts ?? []).length > 0 || (opts.lists.find((x) => x.id === account.to)?.count ?? 0) > 0;
+  }
+
+  /** Whether `name` is one of his own accounts, as `accountFor` matches one by name. */
+  function ownAccount(name: string): boolean {
+    const said = words(name.trim());
+    return said !== '' && (opts.accounts ?? []).some((a) => words(a.name) === said || words(a.name).includes(said) || said.includes(words(a.name)));
   }
 
   /** The account a payment came through: the one its way names, or the only one there is when it names none. */

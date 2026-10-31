@@ -45,13 +45,14 @@ const PLACES_MOST = 50_000;
  * LOCKING THAT PEER WAS THE OLD FAULT AGAIN: every caller behind Caddy or cloudflared has the proxy as its peer, so a
  * hundred wrong keys from anywhere on the internet locked the owner out with everybody else.
  *
- * WHAT IT IS NOW: A RATE LIMIT. Over the ceiling, ONE key-shaped bearer through that peer is compared per `wait`, in
- * turn. One more may wait for the next turn (at most `wait`); any beyond that is answered 429 at once with the seconds
- * to the next free turn, so nothing piles up sockets and timers. Before RH7 each request just slept `wait` and was then
- * compared, so a thousand sent at once were five hundred guesses a second. Now it is one every `wait`, whatever is sent.
- * The owner's right key takes a turn like any other: during a flood he may see a 429 and get in on a retry, which is the
- * price of not locking him out. With a list of exact proxy addresses nobody can pass as one, and nothing is counted
- * against the peer at all (`peerSlowFor`).
+ * WHAT IT IS NOW: A RATE LIMIT ON WRONG KEYS. Over the ceiling, ONE wrong key through that peer is answered per `wait`,
+ * in turn. One more may wait for the next turn (at most `wait`); any beyond that is answered 429 at once with the
+ * seconds to the next free turn, so nothing piles up sockets and timers. THE RIGHT KEY NEVER TAKES A TURN (RJ2): it is
+ * compared first and let in at once. Under RH7 it queued with the guesses, so a stranger sending a hundred a second
+ * took nearly every turn and the owner's agents were a 429 ninety-nine times in a hundred. The compare is constant time
+ * and a server key is at least 128 bits (`weakKey` in `main.ts`), so letting every compare happen costs no secret; the
+ * turns slow a guesser who waits for answers and keep a flood from holding sockets. With a list of exact proxy
+ * addresses nobody can pass as one, and nothing is counted against the peer at all (`peerSlowFor`).
  */
 export const PEER_CEILING = { most: 200, window: 15 * 60_000, wait: 2_000 } as const;
 
@@ -60,8 +61,8 @@ export type PeerTurn = { wait: number } | { full: true; retryAfter: number };
 
 export type PeerSlow = {
   /**
-   * The turn of one key-shaped bearer through `peer`: `{ wait: 0 }` under the ceiling; over it, the milliseconds until
-   * its turn (and the turn is taken), or `full` when one already waits for the next turn.
+   * The turn of one wrong key through `peer`, taken after its compare: `{ wait: 0 }` under the ceiling; over it, the
+   * milliseconds until its answer (and the turn is taken), or `full` when one already waits for the next turn.
    */
   turn(peer: string): PeerTurn;
   /** One wrong key through `peer`; `true` the once its count reaches the ceiling in a window, to say so. */
@@ -113,7 +114,7 @@ export function peerSlowFor(trusts: ProxyTrust | null, now: () => number): PeerS
 
 /** What the operator is told the first time one peer passes the ceiling (RG3). */
 export function slowedLine(peer: string): string {
-  return `${String(PEER_CEILING.most)} wrong server keys came through ${peer} in fifteen minutes, so keys through it are now checked one at a time, one every ${String(PEER_CEILING.wait / 1000)} seconds, and the rest are told to try again later (the right key still works when its turn comes). If ${peer} is your proxy, set BRAINDOG_TRUST_PROXY to its exact address instead of 1 or a range, so each caller is counted on its own.`;
+  return `${String(PEER_CEILING.most)} wrong server keys came through ${peer} in fifteen minutes, so wrong keys through it are now answered one at a time, one every ${String(PEER_CEILING.wait / 1000)} seconds, and the rest are told to try again later. The right key still gets in at once. If ${peer} is your proxy, set BRAINDOG_TRUST_PROXY to its exact address instead of 1 or a range, so each caller is counted on its own.`;
 }
 
 export function keyLockout(now: () => number, rule: { most: number; window: number } = KEY_TRIES): KeyLockout {
