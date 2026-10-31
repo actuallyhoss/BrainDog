@@ -22,6 +22,7 @@ import type { Row, RowRef, TableRow } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from '../record/held.ts';
+import { listWord } from '../record/names.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { Declared, Kept } from '../record/page-write.ts';
 import type { InputsWriter } from '../record/inputs-write.ts';
@@ -494,7 +495,7 @@ export function pageWrites(deps: WritesDeps) {
       apply: () => {},
       revert: () => typedLine(register, drawn, false),
       send: () => writer.create(register, row.fields).then((w) => (w.ok ? { ok: true as const, value: w.entry } : { ok: false as const, fix: w.fix })),
-      said: words.added(read.text, REGISTERS[register]?.name ?? register, read.said, row.filled),
+      said: words.added(read.text, listWord(register, REGISTERS[register]?.name), read.said, row.filled),
       undo: (landed) => () => void writer.archive(register, landed.seq, landed.version).then(() => deps.reread()),
     });
     if (!out.ok) return back();

@@ -18,6 +18,7 @@ import { handleName } from 'braindog-render';
 
 import { copy } from '../copy/frame.ts';
 import { REGISTERS } from './held.ts';
+import { labels } from '../voice.ts';
 import { mergedFieldOf } from './folk.ts';
 
 /**
@@ -104,6 +105,17 @@ export const rowNameSaid = (register: string, title: string): string => (HANDLED
 export function listName(id: string): string {
   const declared = Object.hasOwn(REGISTERS, id) ? REGISTERS[id]?.name : undefined;
   return declared !== undefined && declared.trim() !== '' ? declared : humanize(id);
+}
+
+/**
+ * A LIST'S OWN WORD IN A RECEIPT (PK2): the record's label for it where its use case gives one, else the name it was
+ * read with, else `listName`. A team's add box said "Added … to Tasks" where the rail says Tickets, because the
+ * declaration it was handed had been read before the labels were laid over it.
+ */
+export function listWord(id: string, declared?: string): string {
+  const label = Object.hasOwn(labels(), id) ? labels()[id] : undefined;
+  if (label !== undefined && label.trim() !== '') return label;
+  return declared !== undefined && declared.trim() !== '' ? declared : listName(id);
 }
 
 /**

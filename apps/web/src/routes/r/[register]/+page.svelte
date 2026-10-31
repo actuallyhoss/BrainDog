@@ -21,6 +21,7 @@
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { said } from '$lib/voice.svelte.ts';
+  import { listWord } from '$lib/record/names.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
   import { covered, overlays, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
@@ -1802,7 +1803,7 @@
     /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME (motion F12, F20, VERIFY H23): "Added “Motion test bill” to Bills and
        invoices." The fields it filled in are each in their own cell on the row, so they are not read out here. The
        row's chip carries Put back, so the toast offers no second Undo; ⌘Z still takes it back. */
-    if (decl) toasts.push(copy.captureAdded(titleSaid(out.entry), decl.name), { undo: takeBack(out.entry), offer: false });
+    if (decl) toasts.push(copy.captureAdded(titleSaid(out.entry), listWord(id, decl.name)), { undo: takeBack(out.entry), offer: false });
     return out.entry;
   }
 
