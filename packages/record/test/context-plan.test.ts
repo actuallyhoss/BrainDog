@@ -380,3 +380,21 @@ test('A TASK’S VALUES ARE SAID AS A PERSON READS THEM, and every more line is 
   const text = planText(planContext(his({ kpis: Array.from({ length: 9 }, (_, i) => ({ name: `N${String(i)}`, every: '1w', last: null, stale: true })) }), { depth: 'full' }));
   assert.doesNotMatch(text, /\b[a-z_]+\(\{/u, text);
 });
+
+test('TODAY IS HIS, NEVER THE AGENT’S NEXT: said as his own line with no step here, left out with a lane, asked once (RK8)', () => {
+  let asked = 0;
+  const today = (): string => {
+    asked += 1;
+    return 'Dentist is 3 days late';
+  };
+  const bare = { told: [], lane: [], owner: 'Mara', who: who({ next: 'Next     Nothing was handed over. Last here: Claude Code, 2h ago.' }), today };
+  const plan = planContext(his(bare));
+  assert.ok(!/Next .*Dentist/u.test(plan.card), plan.card);
+  assert.ok(plan.card.includes("Today    Dentist is 3 days late (Mara's, not a step for you)"), plan.card);
+  assert.ok(asked >= 1);
+  /* WITH A LANE THE AGENT HAS WORK OF ITS OWN, so his late item is not said at all. */
+  asked = 0;
+  const laned = planContext(his({ ...bare, lane: [{ name: 'Fix the importer', spoken: 'tasks#7', mine: false }] }));
+  assert.ok(!laned.card.includes('Dentist'), laned.card);
+  assert.equal(asked, 0, 'Today is not even read');
+});

@@ -243,6 +243,7 @@ export type ContextFacts = {
   /**
    * The first line Today opens on (the record's briefing, by its rules), asked only when the card has no step to give:
    * no instruction in hand, no step left here and nothing in this agent's lane (AK18). `null` when Today says nothing.
+   * Said as the person's own line, never as the agent's Next (RK8). Held by the record for the call (`carded`).
    */
   today?: (() => string | null) | undefined;
   /** Outside any project: the projects this agent worked on last, by name. */
@@ -416,17 +417,21 @@ function planCard(f: ContextFacts, lesson: string | null, builder: boolean, clas
       }`;
   const inHand = f.told.find((t) => t.taken_by && f.run && t.taken_by === f.run && t.kind !== 'stop' && t.kind !== 'pause');
   const top = f.lane.find((t) => t.mine);
-  /* A STEP LEFT HERE, ELSE THE TOP OF THE LANE, ELSE WHAT TODAY OPENS ON (AK18): "Nothing was handed over" gave an agent
-     on a record full of late work no way to it, so the line Today leads with stands in for the step nobody left. */
+  /* A STEP LEFT HERE, ELSE THE TOP OF THE LANE (AK18). WHAT TODAY OPENS ON IS THE PERSON'S, never the agent's step
+     (audit 31k, RK8): "Next: Today: Dentist is 3 days late" sent a Kiln run to his dentist. So it is its own line, said as
+     his, and only to an agent with nothing in hand, no step left and no lane here; a builder is never given it. */
   const handed = who.next !== null && who.next !== undefined && !who.next.includes('Nothing was handed over') ? who.next : null;
-  const today = inHand || handed || top ? null : todayLine(f);
+  const today = inHand || handed || f.lane.length > 0 || builder ? null : todayLine(f);
   const next = inHand
     ? labeled('Next', `${inHand.id}, in hand: do it, then reply with instructions.`)
-    : (handed ?? (top ? labeled('Next', `${words(top.name, 70)} (${top.spoken}, yours)`) : today !== null ? labeled('Next', `Today: ${words(today, 70)}`) : (who.next ?? null)));
+    : (handed ?? (top ? labeled('Next', `${words(top.name, 70)} (${top.spoken}, yours)`) : (who.next ?? null)));
+  const his = today === null ? null : labeled('Today', `${words(today, 60)} (${words(f.owner ?? 'the owner', 24)}'s, not a step for you)`);
   const learned = lesson === null ? null : labeled('Learned', words(lesson, 91));
-  const lines = [first, next, clash, builder ? null : who.waiting, learned, who.update].filter((l): l is string => l !== null);
-  /* FIVE LINES AT MOST: line one, Next, the warning, Waiting and Update are five, so Learned is the one that gives way. */
+  const lines = [first, next, his, clash, builder ? null : who.waiting, learned, who.update].filter((l): l is string => l !== null);
+  /* FIVE LINES AT MOST: line one, Next, the warning, Waiting and Update are five, so Learned is the one that gives way,
+     then Today, which is his and is in BrainDog whatever the card says. */
   if (lines.length > PLAN_CARD_LINES && learned !== null) lines.splice(lines.indexOf(learned), 1);
+  if (lines.length > PLAN_CARD_LINES && his !== null) lines.splice(lines.indexOf(his), 1);
   return cutTo(lines, PLAN_CARD_WORDS).join('\n');
 }
 

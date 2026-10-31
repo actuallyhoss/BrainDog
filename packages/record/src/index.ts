@@ -10237,6 +10237,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        PLAN'S, ONE TEXT BYTE FOR BYTE: the start hook prints `card`, `context` over `/mcp` says `plan_card`, and
        `/api/context` answers `card`, so all three are the plan's card and an agent is never told one card at start and
        another by context. */
+    let todayOnce: { line: string | null } | undefined;
     const plan = planContext(
       factsFromContext(out, {
         ...cardAt,
@@ -10249,8 +10250,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(told.stamp ? { stamp: told.stamp } : {}),
         ...(where.task ? { task: taskFact(ctx, where.task) } : {}),
         ...(where.depth === 'card' ? {} : { kpis: kpisKept(ctx, told.project, at.agent) }),
-        /* TODAY'S FIRST LINE, by the briefing's rules, read only when the card has no step to give it (AK18). */
-        today: () => rulesBrief(kernel.transaction(() => briefFactsFor(methodDeps(), ctx, now)))[0]?.line ?? null,
+        /* TODAY'S FIRST LINE, by the briefing's rules, read only when the card has no step to give it (AK18). ONCE PER
+           CALL AND HELD WITH THE OTHER FACTS (audit 31k, RK8): it walks every list's deadlines, so a budget pass asks the
+           line it already has, and the same caller is answered it again while the record's version stands (`HELD_MS`). */
+        today: () => (todayOnce ??= { line: heldFor(todayHeld, callerKey(ctx), () => rulesBrief(kernel.transaction(() => briefFactsFor(methodDeps(), ctx, now)))[0]?.line ?? null) }).line,
       }),
       { budget: told.budget, depth: where.depth },
     );
@@ -10374,6 +10377,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * she is, neither of which a briefing reads.
    */
   const briefed = new Map<string, Held<Context>>();
+  /** Today's first line for an agent's card (`carded`), held per caller as a briefing is. */
+  const todayHeld = new Map<string, Held<string | null>>();
+  /** Which caller a held fact is for: everything the context says of her but the call's own batch and proof. */
+  const callerKey = (ctx: CallContext): string => {
+    const { batch: _batch, provedAt: _proved, ...caller } = ctx;
+    return JSON.stringify(caller);
+  };
   const briefing = (ctx: CallContext, where: Where = {}): Context => {
     const { batch: _batch, provedAt: _proved, ...caller } = ctx;
     /* ONE SNAPSHOT, so the kernel's per-transaction reads (which lists hold private rows) are asked once, not 200 times. */
@@ -11111,6 +11121,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       for (let hop = 0; hop < 4 && holder && parts.merged_into !== undefined && typeof holder.fields[parts.merged_into] === 'string'; hop += 1)
         holder = kernel.get(String(holder.fields[parts.merged_into]), { includeDeleted: true });
       if (!holder || holder.deleted_at !== null || holder.register !== register || holder.id === self) continue;
+      /* A ROW KEPT PRIVATE FROM THE CALLER HOLDS NOTHING THEY CAN BE TOLD OF (audit 31k, RK3): refused, the write would say
+         it is there. The row written carries the key, and the hidden row keeps holding it. */
+      if (kernel.hiddenFrom(holder.id, viewerOf(ctx)) || (owned.row_id !== holder.id && kernel.hiddenFrom(owned.row_id, viewerOf(ctx)))) continue;
       const title = kernel.register(register)?.title;
       const name = title === undefined ? null : text(holder.fields[title]);
       /* SHOWN ONLY TO SOMEBODY WHO READS ALL OF THE LIST: a grant narrowed to some of its rows
@@ -11139,9 +11152,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * their name. Meeting them as if they were not there would add a second row under their key, so it is refused in the
    * words a unique collision gets, which no more proves a row exists than that one does.
    *
-   * A ROW KEPT PRIVATE FROM HER NEVER GETS HERE (audit 10k AK5): the kernel is handed who is meeting (`viewer`) and
-   * meets as if that row were not there, so an address only it holds is added as a new one's would be, and the answer
-   * says nothing a private row could have caused.
+   * A ROW KEPT PRIVATE FROM HER NEVER GETS HERE (audit 10k AK5), a person or an organisation (audit 31k, RK4): the
+   * kernel is handed who is meeting (`viewer`) and meets as if that row were not there, so an address or a domain only it
+   * holds is added as a new one's would be, carrying the key on its own field, and the answer says nothing a private row
+   * could have caused.
    */
   const heldMet = (ctx: CallContext, out: Result<unknown>): Result<unknown> => {
     const m = (out.ok ? out.value : null) as { row?: { id?: unknown } | null; created?: unknown } | null;
@@ -15487,7 +15501,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          is believed. A meeting that will not land leaves them a member all the same. NOR BY A SHARED INBOX'S ADDRESS
          (`office@`), which no person can hold (`markOwnRow`): `meet` reads it as an organisation's and would write one. */
       if (joined.ok && kernel.meetsList() !== null && !isOrganisationAddress(email))
-        kernel.meet({ ...(name ? { name } : {}), email, where: 'accepted an invitation' }, { actor: id, principal: { kind: 'person' } });
+        kernel.meet({ ...(name ? { name } : {}), email, where: 'accepted an invitation' }, { actor: id, principal: { kind: 'person' } }, { viewer: null });
       return tail(joined);
     },
 

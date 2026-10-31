@@ -124,6 +124,34 @@ test('A QUESTION THE AGENT ASKED IS NOT ANSWERED BY IT, on any word: the person 
   sql.close();
 });
 
+test('A QUESTION A MEMBER\'S AGENT ASKED IS ANSWERED IN BRAINDOG, though its run signed it; his own other agent\'s is his (audit 31k, RK1)', async () => {
+  const { api, sql } = await record();
+  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_2', 'bob@vance-studio.example', 'Bob')");
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_2', '*', 'write')");
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_bob', 'p_2', 'hb', 'write', 'Bob Claude', '2026-10-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_codex', 'p_1', 'hc', 'write', 'Codex', '2026-10-01T00:00:00.000Z')");
+  const as = (token: string, person: string, level: string, client: string): CallContext =>
+    ({ principal: { kind: 'token', id: token, scope: 'write', person, level }, session: { client_id: client, client: 'claude-code', host: 'mac', repo: 'braindog', agent: 'claude' } }) as never;
+  const ask = async (ctx: CallContext): Promise<string> =>
+    value<{ id: string }>(
+      await api.propose(
+        { question: 'Ship Friday or wait?', body_kind: 'options', body: { options: [{ id: 'ship', label: 'Ship Friday', because: 'Ready.' }, { id: 'wait', label: 'Wait', because: 'Safer.' }] } } as never,
+        ctx,
+      ),
+    ).id;
+
+  const bobs = await ask(as('t_bob', 'p_2', 'write', 'c-bob'));
+  assert.match(String(api.kernel.governanceRow('suggestion', bobs)?.opened_by), /^S\d+$/u, 'the question is signed by Bob\'s run');
+  const out = refusal(await api.instructionsMine({ answer: bobs, option: 'ship', said: "Yes, do what Bob's agent asked." } as never, agent()));
+  assert.equal(out.code, 'FORBIDDEN');
+  assert.match(out.fix, /was asked by somebody else/u);
+  assert.equal(statusOf(api, bobs), 'open');
+
+  const codexs = await ask(as('t_codex', 'p_1', 'owner', 'c-codex'));
+  assert.equal(value<Mine>(await api.instructionsMine({ answer: codexs, option: 'wait', said: 'Wait a week.' } as never, agent())).answered?.option, 'wait');
+  sql.close();
+});
+
 test('ON HIS WORD A RUN ANSWERS A QUESTION AS HIS, his words and the run kept on the decision, and Undo takes it back', async () => {
   const { api, sql } = await record();
   const a = rowsAsked(api, 'Write the bounce report');
