@@ -5231,6 +5231,326 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
       ]
      }
     ]
+   },
+   "page.money-plan#0": {
+    "page": "money-plan",
+    "title": "{{name}}",
+    "for": {
+     "register": "plans"
+    },
+    "nav": {
+     "section": "Money",
+     "order": 30
+    },
+    "icon": "calendar",
+    "requires": [
+     "register.plans",
+     "register.installments"
+    ],
+    "pack": "money-core",
+    "blocks": [
+     {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+       "metric": "plan-parts:{{name}}",
+       "lt": 1
+      },
+      "body": "No instalments for {{name}} yet."
+     },
+     {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+       "all": [
+        {
+         "metric": "plan-parts:{{name}}",
+         "gte": 1
+        },
+        {
+         "metric": "plan-parts-open:{{name}}",
+         "gte": 1
+        }
+       ]
+      },
+      "says": [
+       {
+        "when": {
+         "metric": "property-value-of:{{name}}",
+         "empty": false
+        },
+        "body": "{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, the last due on {{plan-last-due:{{name}}}}. [Property](/p/properties) has what it is worth and your equity."
+       },
+       {
+        "body": "{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, the last due on {{plan-last-due:{{name}}}}."
+       }
+      ]
+     },
+     {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+       "all": [
+        {
+         "metric": "plan-parts:{{name}}",
+         "gte": 1
+        },
+        {
+         "metric": "plan-parts-open:{{name}}",
+         "lt": 1
+        }
+       ]
+      },
+      "says": [
+       {
+        "when": {
+         "metric": "property-value-of:{{name}}",
+         "empty": false
+        },
+        "body": "{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, and nothing is left. The last was due on {{plan-last-due:{{name}}}}. [Property](/p/properties) has what it is worth and your equity."
+       },
+       {
+        "body": "{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, and nothing is left. The last was due on {{plan-last-due:{{name}}}}."
+       }
+      ]
+     },
+     {
+      "kind": "stat",
+      "heading": "Where it stands",
+      "icon": "wallet",
+      "tone": "bad",
+      "span": 12,
+      "when": {
+       "metric": "plan-parts:{{name}}",
+       "gte": 1
+      },
+      "cells": [
+       {
+        "metric": "plan-paid:{{name}}",
+        "label": "Paid in"
+       },
+       {
+        "metric": "plan-left:{{name}}",
+        "label": "Left"
+       },
+       {
+        "metric": "plan-late:{{name}}",
+        "label": "Late"
+       }
+      ]
+     },
+     {
+      "kind": "progress",
+      "heading": "Parts paid",
+      "icon": "credit-card",
+      "span": 12,
+      "cells": [
+       {
+        "metric": "plan-parts-paid-by-plan:{{name}}",
+        "label": "Paid"
+       },
+       {
+        "metric": "plan-parts-by-plan:{{name}}",
+        "label": "Parts"
+       },
+       {
+        "metric": "plan-next-due-by-plan:{{name}}",
+        "label": "Next due"
+       },
+       {
+        "metric": "plan-left-by-plan:{{name}}",
+        "label": "Left"
+       },
+       {
+        "metric": "plan-after-next-by-plan:{{name}}",
+        "label": "Left after"
+       }
+      ],
+      "when": {
+       "metric": "plan-parts:{{name}}",
+       "gte": 1
+      },
+      "empty": "No parts of {{name}} yet."
+     },
+     {
+      "kind": "series",
+      "heading": "Paid in all, over time",
+      "icon": "chart-column",
+      "span": 12,
+      "series": [
+       {
+        "metric": "plan-paid-by-quarter:{{name}}",
+        "label": "Paid in all",
+        "running": true
+       }
+      ],
+      "back": 24,
+      "when": {
+       "metric": "plan-parts-paid:{{name}}",
+       "gt": 0
+      },
+      "empty": "Nothing paid on {{name}} yet."
+     },
+     {
+      "kind": "todo",
+      "heading": "Upcoming",
+      "icon": "calendar-clock",
+      "span": 12,
+      "source": "register.installments",
+      "where": "plan is {{name}}, state is open",
+      "columns": [
+       {
+        "field": "what"
+       },
+       {
+        "field": "note"
+       },
+       {
+        "field": "due"
+       },
+       {
+        "field": "amount"
+       }
+      ],
+      "order": [
+       {
+        "field": "due",
+        "dir": "asc"
+       }
+      ],
+      "limit": 6,
+      "empty": "Nothing left to pay on {{name}}."
+     },
+     {
+      "kind": "table",
+      "heading": "Paid",
+      "icon": "receipt",
+      "span": 12,
+      "source": "register.installments",
+      "where": "plan is {{name}}, state is paid",
+      "columns": [
+       {
+        "field": "due",
+        "label": "Due",
+        "width": "13ch"
+       },
+       {
+        "field": "what",
+        "label": "Description",
+        "width": "minmax(14ch,1fr)"
+       },
+       {
+        "field": "amount",
+        "label": "Amount",
+        "width": "15ch",
+        "align": "end"
+       },
+       {
+        "field": "settled",
+        "label": "Paid on",
+        "width": "13ch"
+       },
+       {
+        "field": "paid_by",
+        "label": "Paid by",
+        "width": "minmax(10ch,18ch)"
+       }
+      ],
+      "order": [
+       {
+        "field": "due",
+        "dir": "desc"
+       }
+      ],
+      "limit": 120,
+      "empty": "Nothing paid on {{name}} yet."
+     },
+     {
+      "kind": "section",
+      "heading": "Every part still to come",
+      "icon": "calendar-clock",
+      "span": 12,
+      "fold": true
+     },
+     {
+      "kind": "table",
+      "span": 12,
+      "source": "register.installments",
+      "where": "plan is {{name}}, state is open",
+      "columns": [
+       {
+        "field": "due",
+        "label": "Due",
+        "width": "13ch"
+       },
+       {
+        "field": "what",
+        "label": "Description",
+        "width": "minmax(14ch,1fr)"
+       },
+       {
+        "field": "amount",
+        "label": "Amount",
+        "width": "15ch",
+        "align": "end"
+       },
+       {
+        "field": "left_after",
+        "label": "Left after",
+        "width": "15ch",
+        "align": "end"
+       }
+      ],
+      "order": [
+       {
+        "field": "due",
+        "dir": "asc"
+       }
+      ],
+      "limit": 120,
+      "empty": "Nothing left to pay on {{name}}."
+     },
+     {
+      "kind": "table",
+      "heading": "Cancelled",
+      "icon": "calendar-x",
+      "span": 12,
+      "source": "register.installments",
+      "where": "plan is {{name}}, state is cancelled",
+      "columns": [
+       {
+        "field": "due",
+        "label": "Due",
+        "width": "13ch"
+       },
+       {
+        "field": "what",
+        "label": "Description",
+        "width": "minmax(14ch,1fr)"
+       },
+       {
+        "field": "amount",
+        "label": "Amount",
+        "width": "15ch",
+        "align": "end"
+       }
+      ],
+      "order": [
+       {
+        "field": "due",
+        "dir": "asc"
+       }
+      ],
+      "limit": 120,
+      "when": {
+       "metric": "plan-parts-cancelled:{{name}}",
+       "gte": 1
+      }
+     }
+    ]
    }
   }
  },

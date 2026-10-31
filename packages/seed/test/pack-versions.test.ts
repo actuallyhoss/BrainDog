@@ -2527,7 +2527,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'a04f3a06af13f9d7',
+    declares: '0bc4bf113bd883c0',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
@@ -2541,6 +2541,7 @@ const DECLARED: Record<string, Version> = {
       'Before 3.33.0 shipped, `page.money` links the late figure in its first line and its Heads up drops the repeated Bills late line; no id added or taken away -> 6ed7ba30566e892e',
       'Before 3.33.0 shipped, `rule.invoice-chased` notes say "in Needs you", where they said "in Decide"; no id added or taken away -> 25faa3d6f8712d37',
       'Before 3.33.0 shipped, `metric.bills-open` and `metric.repeating-held` are added and `page.money` asks for a bill when nothing is due; two ids added, none taken away -> a04f3a06af13f9d7',
+      'Before 3.33.0 shipped, `page.money-plan` names its summary cell "Paid", where it said "Paid in"; no id added or taken away -> 0bc4bf113bd883c0',
     ],
   },
   'work@1.17.0': {
