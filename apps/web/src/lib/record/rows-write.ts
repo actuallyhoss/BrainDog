@@ -424,7 +424,8 @@ export type RowWriter = {
   archive(register: string, seq: number, version?: number): Promise<Wrote>;
   /**
    * Archive a row made along with another only while nothing else points at it (RO9): the person an order's box made
-   * goes back with that order, and stays where a later order, a meeting or a note now links to them. `null` when kept.
+   * goes back with that order, and stays where anything now links to them: a later order or any field that holds one
+   * link, and a list of links too (RP4: a meeting's people). A name said in a note is no link. `null` when kept.
    */
   archiveAlone(register: string, seq: number): Promise<Wrote | null>;
   restore(register: string, seq: number, version?: number): Promise<Wrote>;
@@ -528,6 +529,16 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
       const links = await client.backlinks({ register, seq, limit: 1 });
       /* A READ THAT MISSES KEEPS THEM: somebody left in People is one press from gone; somebody taken from an order is not. */
       if (!links.ok || links.value.from.some((g) => g.matched > 0 || g.rows.length > 0)) return null;
+      /* AND A LIST OF LINKS, which `backlinks` leaves out (RP4): each list this tab knows that holds a list of links to
+         `register` is asked whether one of its live rows holds this one, by the row's own id. */
+      const lists = Object.entries(REGISTERS).flatMap(([r, d]) => (d?.fields ?? []).filter((f) => f.type === 'list' && f.of === 'ref' && f.to === register).map((f) => ({ register: r, field: f.id })));
+      if (lists.length > 0) {
+        const got = await client.get(register, seq);
+        const id = got.ok ? (got.value as { id?: unknown } | null)?.id : undefined;
+        if (typeof id !== 'string') return null;
+        const held = await Promise.all(lists.map((l) => client.list({ register: l.register, where: { field: l.field, has: id }, limit: 1, fields: [l.field] })));
+        if (held.some((h) => !h.ok || h.value.rows.length > 0)) return null;
+      }
       return update(register, seq, { deleted_at: new Date().toISOString() });
     },
     async saveView(register, title, address, columns) {

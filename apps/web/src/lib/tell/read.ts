@@ -127,7 +127,9 @@ export type Told = {
  */
 /* AND AN OPEN BILL, INVOICE OR ORDER SAID PAID BY ITS NUMBER: "Invoice 1042 paid" is offered as "Mark invoice 1042 paid?",
    and `mark` says the press sets `field` (its state) to `line` (the paid state), as the entry's own Mark paid does. */
-export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string; mark?: true };
+/* A SECOND BIRTHDAY IN THE SAME LINE (RP2) is `also`, kept in the one press, with `ask` and `done` naming them all;
+   `already` is what is said when every note already holds its day, and nothing is written. */
+export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string; mark?: true; also?: readonly TellChange[]; already?: string };
 
 /** The state a list keeps an entry paid in, as it declares it: a finished state that says paid, on a list keeping money. */
 export function paidStateOf(l: Pick<TellList, 'state' | 'done' | 'fields'>): string | null {
@@ -617,6 +619,10 @@ const MET = new RegExp(
 const JOINED = new RegExp(`^(${NAME})\\s+(?:joined|has joined|is (?:our|my|the) new\\s+(\\p{Ll}+))\\b(.*)$`, 'u');
 /* "Mum's birthday is 14 Nov". */
 const BIRTHDAY = new RegExp(`^(${NAME})['’]s\\s+[Bb]irthday(?:\\s+is|\\s+on|\\s*:)?\\s+(.+)$`, 'u');
+/* "...and Dad's is 3 Mar": a birthday said after one, without the word again (RP2). */
+const BIRTHDAY_TOO = new RegExp(`^(${NAME})['’]s(?:\\s+is|\\s+on|\\s*:)\\s+(.+)$`, 'u');
+/* "Mum's birthday is 14 Nov and Dad's is 3 Mar": two facts about two people in one clause, each read as its own (RP2). */
+const TWO_FACTS = new RegExp(`^(${NAME}['’]s\\s.+?)\\s+(?:and|&)\\s+(${NAME}['’]s\\s.+)$`, 'u');
 /* "New project: Tallow, a habit tracker app", "New client project: Delta rebrand", "Group project: market research". */
 const PROJECT = /^(?:(?:a|my|our)\s+)?(?:new\s+)?(?:(\p{L}+)\s+)?project\s*[:–-]\s*(.+)$/iu;
 /* "MRR is 4,200 USD this month": a figure kept an eye on, said with what it is. */
@@ -999,6 +1005,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let known: string | null = null;
   /* What the line says of somebody kept, offered on their entry (`keptOn`). */
   let change: TellChange | null = null;
+  /* A birthday was read, so "Dad's is 3 Mar" after it is one too (RP2). */
+  let bornSaid = false;
   /* The bank's own text named no currency: never kept in the record's. */
   let bankBare = false;
   /* An amount said with no currency to put to it, on a record with none or a word that is several. */
@@ -1376,17 +1384,33 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   /** "Met Lina from Acme", "Priya joined the team", "Mum's birthday is 14 Nov": a person, by name. */
   function contact(c: string): boolean {
     if (!people) return false;
+    /* TWO BIRTHDAYS IN ONE LINE ARE TWO (RP2): "Mum's birthday is 14 Nov and Dad's is 3 Mar" offered Mum's alone and
+       dropped Dad's. Each is read as its own, and a second that is no fact about anybody is said back as not placed. */
+    const two = /[Bb]irthday/u.test(c) || bornSaid ? TWO_FACTS.exec(c) : null;
+    if (two) {
+      if (!contact(two[1]!)) return false;
+      if (!contact(two[2]!)) left.push(oneLine(two[2]!));
+      return true;
+    }
     const met = MET.exec(c);
     const joined = met ? null : JOINED.exec(c);
-    const born = met || joined ? null : BIRTHDAY.exec(c);
+    /* "Dad's is 3 Mar" after a birthday is one only when it says a day: "Salma's is ready" is nobody's birthday. */
+    const too = met || joined || !bornSaid ? null : BIRTHDAY_TOO.exec(c);
+    const born = met || joined ? null : (BIRTHDAY.exec(c) ?? (too && takeDay(too[2]!, opts.today).day !== null ? too : null));
     const name = met?.[2] ?? joined?.[1] ?? born?.[1];
     if (!name || !aName(name)) return false;
+    if (born) bornSaid = true;
     if (knownAs(name, opts.people ?? [])) {
       subject = name;
       /* A BIRTHDAY OF SOMEBODY KEPT IS STILL KEPT, among the dates, where the record keeps them (AN9), and on them where
          it keeps none: offered as a change to their note. */
       if (born && birthday(name, born[2]!)) return true;
       if (born && keptOn(knownAs(name, opts.people ?? [])!, born[2]!)) return true;
+      /* A FULL PREVIEW NEVER SENDS A DATE TO THE NOTE (RP2): where dates are kept and no room is left, it is said back. */
+      if (born && datesList() && !room(1)) {
+        left.push(oneLine(c));
+        return true;
+      }
       known = name;
       return true;
     }
@@ -1443,17 +1467,36 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   function keptOn(them: Known, when: string): boolean {
     const day = takeDay(when, opts.today).day;
     const note = people ? pick(people, 'text', /note/, (f) => f.id !== people.title) : undefined;
-    if (!people || !note || day === null || change !== null) return false;
+    /* WHERE A LIST OF DATES IS KEPT, A BIRTHDAY GOES THERE OR NOWHERE (RP2): room in the preview never decides it. */
+    if (!people || !note || day === null || datesList()) return false;
+    if (change !== null && (change.mark || change.register !== people.id || [change, ...(change.also ?? [])].some((k) => k.seq === them.seq))) return false;
     const [, m = 1, d = 1] = day.split('-').map(Number);
     const on = `${d} ${capital(MONTHS[m - 1]!)}`;
-    change = { register: people.id, seq: them.seq, name: them.name, field: note.id, line: `Birthday ${on}`, ask: `Add ${on} as ${them.name}'s birthday?`, done: `Added ${on} as ${them.name}'s birthday` };
+    const one: TellChange = { register: people.id, seq: them.seq, name: them.name, field: note.id, line: `Birthday ${on}`, ask: `Add ${on} as ${them.name}'s birthday?`, done: `Added ${on} as ${them.name}'s birthday`, already: `${them.name}'s birthday is already ${on}.` };
+    if (change === null) {
+      change = one;
+      return true;
+    }
+    /* A SECOND BIRTHDAY IN THE LINE IS OFFERED WITH THE FIRST (RP2), one press keeping each on its own person. */
+    const also = [...(change.also ?? []), one];
+    const all = [change, ...also];
+    const dayOf = (k: TellChange): string => k.line.replace(/^Birthday\s+/u, '');
+    const said = all.map((k, i) => `${dayOf(k)} as ${k.name}'s${i === 0 ? ' birthday' : ''}`);
+    const joined = `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]!}`;
+    change = { ...change, also, ask: `Add ${joined}?`, done: `Added ${joined}`, already: all.map((k) => `${k.name}'s birthday is already ${dayOf(k)}.`).join(' ') };
     return true;
+  }
+
+  /** The list of dates a birthday goes into, coming round every year: one with a title, a day it falls on, and a way
+      it comes round that says yearly. Undefined where there is none. */
+  function datesList(): TellList | undefined {
+    return opts.lists.find((x) => x.id !== PEOPLE && !neverPlain(x) && textField(x) !== undefined && !x.fields.some((f) => f.type === 'money' && f.required) && x.fields.some((f) => f.type === 'day' && f.required) && x.fields.some((f) => f.type === 'enum' && f.values?.includes('yearly')));
   }
 
   /** "Mum's birthday is 14 Nov" among the record's dates, coming round every year, where it keeps a list of them: one
       with a title, a day it falls on, and a way it comes round that says yearly. False where there is none. */
   function birthday(name: string, when: string): boolean {
-    const l = opts.lists.find((x) => x.id !== PEOPLE && !neverPlain(x) && textField(x) !== undefined && !x.fields.some((f) => f.type === 'money' && f.required) && x.fields.some((f) => f.type === 'day' && f.required) && x.fields.some((f) => f.type === 'enum' && f.values?.includes('yearly')));
+    const l = datesList();
     const day = takeDay(when, opts.today).day;
     if (!l || day === null || !room(1)) return false;
     const title = `${name}'s birthday`;
@@ -2062,8 +2105,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const thing = trimWords(q ? rest.slice(q[0].length) : rest);
     if (!thing) return false;
     /* AN ORDER'S NAME STARTS WITH A CAPITAL, as every row typed by hand does (audit 31 Oct n, AN5): Tell's
-       "Salma ordered 20 lavender candles" was an order called "lavender candles" among "Vanilla jars". */
-    const fields: Record<string, TellValue> = { [textField(l)!.id]: thing.charAt(0).toUpperCase() + thing.slice(1) };
+       "Salma ordered 20 lavender candles" was an order called "lavender candles" among "Vanilla jars". ONLY A FIRST WORD
+       ALL IN SMALL LETTERS (RP3): one with a capital inside it is a name, kept as said, so "iPhone cases" never becomes
+       "IPhone cases". */
+    const fields: Record<string, TellValue> = { [textField(l)!.id]: /^\p{Ll}+(?=\s|$)/u.test(thing) ? capital(thing) : thing };
     const ref = who ? personOf(who) : null;
     const whoField = pick(l, 'ref', /who|client|customer|person|from/, (f) => f.to === PEOPLE);
     if (ref !== null && whoField) {
