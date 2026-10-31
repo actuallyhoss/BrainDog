@@ -24,7 +24,9 @@
   let { category, onsaved }: { category: NonNullable<Ledger['category']>; onsaved?: (() => void) | undefined } = $props();
 
   type Period = 'week' | 'month' | 'year';
-  type Line = { seq: number; version: number; name: string; minor: number | null; currency: string | null; period: Period; typed: string };
+  /* `key` IS THE LINE'S OWN AND NEVER MOVES: its seq, or a starter's negative one kept after the starter is written, so two
+     categories with one name are two lines (RG18) and a starter just set is not drawn afresh under the cursor. */
+  type Line = { key: number; seq: number; version: number; name: string; minor: number | null; currency: string | null; period: Period; typed: string };
 
   const words = {
     heading: 'Set a budget',
@@ -81,6 +83,7 @@
       const minor = b && typeof b.amount === 'number' ? b.amount : null;
       return [
         {
+          key: r.seq,
           seq: r.seq,
           version: typeof r.version === 'number' ? r.version : 0,
           name,
@@ -96,7 +99,7 @@
     const offered = words.starterNames as readonly string[];
     const ours = held.every((l) => offered.includes(l.name));
     lines = ours
-      ? offered.map((name, i) => held.find((l) => l.name === name) ?? { seq: -(i + 1), version: 0, name, minor: null, currency: home, period: 'month' as Period, typed: '' })
+      ? offered.map((name, i) => held.find((l) => l.name === name) ?? { key: -(i + 1), seq: -(i + 1), version: 0, name, minor: null, currency: home, period: 'month' as Period, typed: '' })
       : held;
   }
 
@@ -181,7 +184,7 @@
     {:else}
       {#if lines.every((l) => l.seq < 0)}<p class="bset-lede">{words.starters}</p>{/if}
       <ul class="bset-lines">
-        {#each lines as l (l.name)}
+        {#each lines as l (l.key)}
           <li class="bset-line">
             <span class="bset-name" dir="auto">{l.name}</span>
             <label class="bset-most">
