@@ -353,9 +353,16 @@ function startIn(l: TellList, fields: Record<string, TellValue>): void {
   for (const f of l.fields) if (f.required && !f.retired && f.default === undefined && f.type === 'enum' && fields[f.id] === undefined && f.values?.[0]) fields[f.id] = f.values[0];
 }
 
+/**
+ * THE RECORD'S OWN LISTS AND MONEY'S PARTS OF A WHOLE, which nobody types a line into: Agent runs are the agents' own,
+ * a plan is a payment plan, an instalment one part of it, a book a set of accounts, and the rest are kept by the record
+ * (AJ8: "train for the Cairo half marathon" was offered to Plans and Agent runs on a Personal that has Goals).
+ */
+const NEVER_PLAIN: ReadonlySet<string> = new Set(['session', 'plans', 'installments', 'books', 'snapshots', 'balances', 'fx', 'filing_rules', 'categories', 'accounts']);
+
 /** Lists a plain line is never put in: People, orders, money and the record's own. */
 const plainable = (l: TellList): boolean =>
-  l.id !== PEOPLE && !callsItself(l, /\border/i) && !l.fields.some((f) => f.type === 'money' && f.required) && fillable(l);
+  l.id !== PEOPLE && !NEVER_PLAIN.has(l.id) && !callsItself(l, /\border/i) && !l.fields.some((f) => f.type === 'money' && f.required) && fillable(l);
 
 /**
  * HOW MUCH A LIST LOOKS LIKE THINGS TO DO, BY ITS SHAPE and never its name, since a team calls its tasks Tickets and a

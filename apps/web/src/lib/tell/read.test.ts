@@ -447,6 +447,11 @@ test('NOTHING PLACED IS SAID, WITH THE WAY ON, never a card over nothing to pres
   assert.deepEqual(told.rows, []);
   assert.ok(told.why);
   assert.deepEqual(told.offers?.map((r) => r.register), ['things']);
+  /* AJ8: never the record's own lists or Money's parts, whatever their shape. */
+  const runs = { ...THINGS, id: 'session', name: 'Agent runs' };
+  const plans = { ...THINGS, id: 'plans', name: 'Plans' };
+  const own = tellRead('Call the printer about the new labels tomorrow', { ...shopNoTasks, lists: [PEOPLE, ORDERS, runs, plans, THINGS] });
+  assert.deepEqual(own.offers?.map((r) => r.register), ['things']);
 });
 
 test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oct g, RG4-RG9, RG16)', () => {
