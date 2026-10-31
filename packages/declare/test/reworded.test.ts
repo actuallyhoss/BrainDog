@@ -79,3 +79,56 @@ test('an update that changes more of a list than its words is not carried, and t
   assert.equal(relisted(LIST, LIST, { ...LIST, title: 'state' }), null);
   assert.deepEqual(relisted(LIST, { ...LIST, name: 'Mine', one: 'mine', fields: [{ ...LIST.fields[0]!, label: 'Mine' }, LIST.fields[1]!] }, SPRINTS), { body: null, words: [] });
 });
+
+/*
+ * RJ1: LOOK-ALIKE PARTS ARE LINED UP BY WHICH PART EACH IS, NEVER BY POSITION, AND A LINK'S TARGET IS NEVER A WORD.
+ * The link block names itself (`key`), so it is the same block whatever its rows; its rows are the look-alikes.
+ */
+const row = (words: string, to: string, says: string) => ({ cells: [words, to, says] });
+const SEND = row('Send numbers from a project', '/automations?new=door', 'A project posts each number here');
+const WATCH = row('Watch a number', '/automations?new=action', 'BrainDog asks an address for one number');
+const LIVE = row('Watch a live number', '/packs/browse?q=polls', 'Add-ons that read a live number for you');
+const CONNECT = row('Connect a bank', '/settings/connections', 'Your bank sends its numbers each day');
+const home = (heading: string, rows: { cells: string[] }[]) => ({
+  page: 'home',
+  title: 'Founder overview',
+  blocks: [note('{{runway}} of runway'), { kind: 'link', key: 'bring-in', heading, icon: 'send', authored: rows }],
+});
+const arranged = (page: ReturnType<typeof home>) => ({ ...page, blocks: [page.blocks[1]!, page.blocks[0]!] });
+const rowsOf = (body: unknown) => ((body as { blocks: { authored?: unknown }[] }).blocks[0] as { authored?: unknown }).authored;
+
+test('an update that drops a row leaves each of his rows its own words and its own link', () => {
+  const start = home('Bring your numbers in', [SEND, WATCH, LIVE]);
+  const out = reworded(start, arranged(start), home('Bring your figures in', [SEND, LIVE]));
+  assert.deepEqual(rowsOf(out?.body), [SEND, WATCH, LIVE]);
+  assert.deepEqual(out?.words, ['Bring your figures in']);
+});
+
+test('an update that puts a row first leaves every row of his as it was', () => {
+  const start = home('Bring your numbers in', [SEND, WATCH, LIVE]);
+  const out = reworded(start, arranged(start), home('Bring your figures in', [CONNECT, SEND, WATCH, LIVE]));
+  assert.deepEqual(rowsOf(out?.body), [SEND, WATCH, LIVE]);
+});
+
+test('look-alike rows with nothing to tell them apart are left alone when the update rewords and drops one', () => {
+  const plain = (a: string) => ({ cells: [a, 'and', 'more'] });
+  const start = home('Bring your numbers in', [plain('One'), plain('Two'), plain('Three')]);
+  assert.equal(reworded(start, arranged(start), home('Bring your numbers in', [plain('Uno'), plain('Three')])), null);
+  const out = reworded(start, arranged(start), home('Bring your figures in', [plain('Two'), plain('Three'), plain('Four')]));
+  assert.deepEqual(rowsOf(out?.body), [plain('One'), plain('Two'), plain('Three')]);
+});
+
+test('a row the update reworded in place takes its words, and a link target is never carried', () => {
+  const start = home('Bring your numbers in', [SEND, WATCH]);
+  const asked = row('Ask for a number', '/automations?new=action', 'BrainDog asks an address for one number');
+  assert.deepEqual(rowsOf(reworded(start, arranged(start), home('Bring your numbers in', [SEND, asked]))?.body), [SEND, asked]);
+  const elsewhere = row('Watch a number', '/automations?new=watch', 'BrainDog asks an address for one number');
+  assert.equal(reworded(start, arranged(start), home('Bring your numbers in', [SEND, elsewhere])), null);
+});
+
+test('a sentence whose condition changed while a twin took its place is not taken for the twin', () => {
+  const says = (items: { when: string; body: string }[]) => ({ page: 'home', title: 'Home', blocks: [note('Hello'), { kind: 'headline', key: 'lasts', says: items }] });
+  const start = says([{ when: 'bills>0', body: 'Lasts the year' }]);
+  const next = says([{ when: 'bills>0&cash>0', body: 'Lasts the year' }, { when: 'bills>0', body: 'Add a bill to see how long it lasts' }]);
+  assert.equal(reworded(start, { ...start, blocks: [start.blocks[1]!, start.blocks[0]!] }, next), null);
+});
