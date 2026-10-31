@@ -606,10 +606,13 @@ test('BRAINDOG MCP --AGENT CODEX does the start work after its hello is answered
   assert.equal(reply.result.protocolVersion, '2025-06-18');
   assert.match(first.stderr, /^BrainDog at the start of this session: skills sync: 1 change\.$/m);
   assert.ok(existsSync(p.skillFile), "the record's skill is on disk");
-  /* The hello first, and the work's own requests after it, with the app's name. */
-  const methods = h.seen.map((s) => s.method);
-  assert.deepEqual(methods.slice(0, 3), ['mcp:initialize', 'context', 'get'], methods.join(' '));
-  assert.equal(h.seen[1]?.headers['x-braindog-agent'], 'codex');
+  /* The hello first, and the work's own requests after it, with the app's name. Before the hello, at most the one
+     `createToken` the server tries for Codex's own token from BRAINDOG_TOKEN (D4), which a token there is refused. */
+  const all = h.seen.map((s) => s.method);
+  assert.ok(all.indexOf('createToken') < all.indexOf('mcp:initialize') && all.filter((m) => m === 'createToken').length <= 1, all.join(' '));
+  const work = h.seen.filter((s) => s.method !== 'createToken');
+  assert.deepEqual(work.slice(0, 3).map((s) => s.method), ['mcp:initialize', 'context', 'get'], all.join(' '));
+  assert.equal(work[1]?.headers['x-braindog-agent'], 'codex');
   assert.ok(existsSync(startedPath(p.home)));
 
   const again = await serve('codex', kiln, env, null);
