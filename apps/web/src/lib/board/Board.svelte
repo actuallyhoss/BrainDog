@@ -817,7 +817,7 @@
     min-block-size: 32px;
     padding: 0 var(--sp-3);
     border: 1px solid var(--rule);
-    border-radius: 999px;
+    border-radius: var(--r-ctl);
     background: var(--tile);
     color: var(--ink);
     font: inherit;

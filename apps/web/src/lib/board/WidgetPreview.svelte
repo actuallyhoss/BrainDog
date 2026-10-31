@@ -210,7 +210,7 @@
     flex: none;
     padding: 1px 6px;
     border: 1px solid var(--rule-strong);
-    border-radius: 999px;
+    border-radius: var(--r-xs);
     color: var(--ink-3);
     font-size: var(--fs-cap);
     font-weight: var(--fw-medium);
