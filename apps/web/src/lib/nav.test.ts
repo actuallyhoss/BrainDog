@@ -184,6 +184,23 @@ test("THE FIRST PROJECT MOVES NOTHING ON A STARTER'S BAR (AL3): Projects takes t
   assert.deepEqual(bar(after), ['Today', 'Needs you', 'Money', 'Dashboard']);
 });
 
+test("A FOUNDER RECORD WITH TWENTY PROJECTS KEEPS PROJECTS ON ITS BAR (RL6), and a fresh starter's first project still waits", () => {
+  const placed = (title: string, href: string, place: number) => ({ ...page(title, href), place });
+  const projects = (n: number) => [placed('Projects', '/p/projects', 30), ...Array.from({ length: n }, (_, i) => page(`Project ${String(i + 1)}`, `/p/project-${String(i + 1)}`, true))];
+  const founder = (n: number) =>
+    [
+      ['Projects', projects(n)],
+      ['Money', [placed('Money', '/p/money', 40)]],
+      ['Agents', [placed('Agents', '/p/agents', 60)]],
+      ['Dashboard', [placed('Dashboard', '/p/dashboard', 70)]],
+    ] as const;
+  const rail = (n: number) => railOf(flatNav(founder(n), 1, WORDS), 'Needs you');
+  assert.deepEqual(tabsOf(rail(20).places, 5).map((i) => i.label), ['Today', 'Needs you', 'Projects', 'Money', 'Agents']);
+  assert.equal(rail(20).places.findIndex((i) => i.label === 'Projects'), 2);
+  /* A fresh Founder record's first project moves nothing it already had (AL3). */
+  assert.deepEqual(tabsOf(rail(1).places, 5).map((i) => i.label), ['Today', 'Needs you', 'Money', 'Agents', 'Dashboard']);
+});
+
 test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a gone page is skipped', () => {
   const main = flatNav(FOUNDER, 2, WORDS).main;
   const money = main.find((i) => i.label === 'Money')!;

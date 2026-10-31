@@ -36,6 +36,15 @@ export const RAIL_MOST = 7;
 /** Where Projects ranks on a starter's record (AL3): after every place that declares or is given a number. */
 export const LATE = 999;
 
+/** A phone bar's worth of places: a record holding this many projects or more has Projects as a place of its own. */
+export const BAR_WORTH = 5;
+
+/**
+ * WHETHER PROJECTS WAITS ITS TURN (AL3, RL6): on a starter's record, only while it is new, holding fewer projects than
+ * one bar's worth. A Founder record with twenty projects (his own) keeps Projects where the five put it, on the bar.
+ */
+export const projectsLate = (item: FlatItem, name: string, starter: boolean): boolean => starter && name === 'projects' && (item.rows ?? 0) < BAR_WORTH;
+
 /** The rail, as it is drawn. */
 export type Rail<T> = {
   /** Today, Decide, then the sections, seven at most. */
@@ -61,10 +70,10 @@ const PLACE_AT: Readonly<Record<string, number>> = { work: 10, orders: 20, shop:
  */
 function rankOf(item: FlatItem, starter: boolean): number {
   const name = plainOf(item.key === 'work' ? 'work' : item.key.replace(/^section:/u, ''));
-  /* ON A STARTER'S RECORD PROJECTS COMES AFTER THE PLACES THAT RANK (AL3), as on the phone's bar (`atOf` in `nav.ts`):
-     it is no place until the first project, and stepping in at 30 then moved Money and pushed the starter's own place
-     past the seventh. */
-  if (starter && name === 'projects') return LATE;
+  /* ON A STARTER'S RECORD A NEW PROJECTS COMES AFTER THE PLACES THAT RANK (AL3), as on the phone's bar (`atOf` in
+     `nav.ts`): it is no place until the first project, and stepping in at 30 then moved Money and pushed the starter's
+     own place past the seventh. A record already holding a bar's worth of projects keeps it at 30 (RL6). */
+  if (projectsLate(item, name, starter)) return LATE;
   return item.place ?? PLACE_AT[name] ?? 1000;
 }
 
