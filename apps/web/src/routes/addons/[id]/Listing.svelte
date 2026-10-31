@@ -184,12 +184,14 @@
       const shown = once.slice(0, NAMED_MOST).join(sep);
       rows.push({ key, glyph, label, n: named.length, names: once.length > NAMED_MOST ? `${shown} ${words.andMore(once.length - NAMED_MOST)}` : shown });
     };
-    const read = adds && adds.lists.length + adds.pages.length + adds.figures.length + adds.rules.length > 0 ? adds : null;
+    const read = adds && adds.lists.length + adds.pages.length + adds.figures.length + adds.rules.length + adds.reads.length > 0 ? adds : null;
     if (read) {
       push('lists', 'rows', words.addsLists, read.lists.map((l) => l.name));
       push('pages', 'doc', words.addsPages, read.pages.map(pageTitle));
       push('figures', 'activity', words.addsFigures, read.figures.map((f) => f.name), '; ');
       push('rules', 'skill', words.addsRules, read.rules, '; ');
+      /* WHAT IT READS, ONCE (AH11): Card alerts said "Nothing of its own" over four patterns that file card texts and mail. */
+      if (read.reads.length > 0) rows.push({ key: 'reads', glyph: 'mail', label: words.addsReads, n: 1, names: words.readsBy(read.reads) });
     } else if (reach) {
       push('lists', 'rows', words.addsLists, reach.lists);
       push('pages', 'doc', words.addsPages, reach.pages);

@@ -58,6 +58,10 @@ export const words = {
   /* THE NUMBERS A PLAN ADDS, AS ONE ROW: seventeen of them named one under another buried its lists. */
   addsNumbers: (n: number) => (n === 1 ? 'and 1 number' : `and ${n.toLocaleString('en-GB')} numbers`),
   handed: 'already here, under another add-on',
+  /** What an add-on's patterns read, by how each arrives (AH11). */
+  readsBy: (ways: readonly string[]): string =>
+    `Reads ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(ways)} you forward, and files each as it comes in`,
+  readsSentIn: 'Reads what you forward, and files each as it comes in',
   changes: 'Changes',
   retires: 'Takes away',
   keepsRows: (n: number) => (n === 0 ? 'holds nothing' : n === 1 ? 'the 1 item in it stays in your BrainDog' : `the ${n.toLocaleString('en-GB')} items in it stay in your BrainDog`),
@@ -240,6 +244,16 @@ function addsSection(named: Row[], figures: number): Section[] {
 }
 const row = (t: string, detail: string | null = null): Row => ({ text: t, detail });
 
+/** The ways a pattern's messages arrive that a person names, the words `adds.ts` `channelWord` gives. */
+const WAYS: ReadonlySet<string> = new Set(['mail', 'texts', 'messages']);
+
+/** Every pattern a plan adds, as one line: the ways they arrive when each is named by one, else "Messages sent in". */
+function readsRow(named: readonly string[]): Row[] {
+  if (named.length === 0) return [];
+  const ways = [...new Set(named.map((n) => n.trim().toLowerCase()))];
+  return [row(ways.every((w) => WAYS.has(w)) ? words.readsBy(ways) : words.readsSentIn)];
+}
+
 /**
  * WHAT A PLAN ADDS, EACH THING ONCE (audit 31 Oct f, AF23): Subscriptions' sheet listed "Keep a subscription's old price
  * when its amount changes" and "Keep a subscription's old price", the rule and the script it runs, and counted 13 where
@@ -327,7 +341,12 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     move: installed && installed !== version ? words.updateAvailable : '',
     sections: [
       ...addsSection(
-        onceEach(list(d.adds).filter((a) => !text(a.id).startsWith('metric.')), name).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : addDetail(text(a.id), text(a.summary)))),
+        [
+          ...onceEach(list(d.adds).filter((a) => !text(a.id).startsWith('metric.') && !text(a.id).startsWith('ingest.')), name).map((a) => row(name(text(a.id)), a.handed === true ? words.handed : addDetail(text(a.id), text(a.summary)))),
+          /* WHAT IT READS, ONE LINE FOR EVERY PATTERN (audit 31 Oct h, AH11): Card alerts' four were "Ingest.bank card out,
+             ingest" each. A pattern the namer knows by how it arrives ("mail", "texts") says that way. */
+          ...readsRow(list(d.adds).filter((a) => text(a.id).startsWith('ingest.')).map((a) => name(text(a.id)))),
+        ],
         list(d.adds).filter((a) => text(a.id).startsWith('metric.')).length,
       ),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),

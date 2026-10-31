@@ -92,6 +92,9 @@ export const words = {
   addsLists: 'Lists',
   addsPages: 'Pages',
   addsRules: 'Rules',
+  addsReads: 'Reads',
+  /** What an add-on's patterns read, by how each arrives: "Card texts and card mail, filed as they come in". */
+  readsBy: (ways: readonly string[]): string => `${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(ways.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)))} you forward, filed as they come in`,
   addsExamples: 'Examples',
   addsModules: 'Needs first',
   addsNothing: 'Nothing of its own',
