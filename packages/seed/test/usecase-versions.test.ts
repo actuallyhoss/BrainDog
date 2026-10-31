@@ -2548,6 +2548,26 @@ const DECLARED: Record<string, Version> = {
     declares: 'aceabf9e31d40769',
     history: ['`register.cycles` is called Sprints, `register.cycle_plan` Sprint plan and `register.cycle_days` Open each morning, with the words on `page.cycles` and `page.home-team` (audit 31 Oct h, AH21); words only, no id added or taken away -> aceabf9e31d40769'],
   },
+  'team@2.30.2': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles rule.cycle_day_each_morning rule.ticket_done_ticks_plan
+      rule.ticket_reopened_unticks_plan script.cycle_day script.plan_follows_ticket setting.holds_people
+      setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '9c816f722db330f0',
+    history: ['`page.cycles` files itself under a section called Sprints and `page.agent-work` under Agents, so the rail names a section by what it holds (UP2); words on the rail only, no id added or taken away -> 9c816f722db330f0'],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

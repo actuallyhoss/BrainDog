@@ -9490,8 +9490,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.30.1",
+      "latest": "2.30.2",
       "versions": [
+        {
+          "version": "2.30.2",
+          "checksum": "306856a854616def5473d3b134957ede218666f2738429dd2c413f292b05b331",
+          "bytes": 37744,
+          "published_at": "2026-10-31T01:36:52.672Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Sprints",
+              "Sprint plan",
+              "Open each morning"
+            ],
+            "pages": [
+              "Team",
+              "Sprints",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.30.1",
           "checksum": "8eef20373e4add6c2db543dc05b708437fd6950ef6270db839e02df820a25b40",

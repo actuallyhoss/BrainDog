@@ -261,8 +261,10 @@ export const TEAM = {
      step; 2.29.2 is published.
      2.30.1 (audit 31 Oct h, AH21): cycles are said as sprints, as a team says them (Sprints, Sprint plan), and Cycle
      days is called Open each morning. The lists' ids and the page's address stay. Words only, so a patch step; 2.30.0
-     is published. */
-  version: '2.30.1',
+     is published.
+     2.30.2 (UP2): the rail's section says what it holds: Sprints, not Team, and Agent work sits under Agents beside the
+     agents it is about. Names on the rail only, so a patch step; 2.30.1 is in the catalogue. */
+  version: '2.30.2',
   title: 'Team board',
   summary: 'Tickets, sprints and the agents on them.',
   author: 'BrainDog',
@@ -566,7 +568,8 @@ export const TEAM = {
         title: 'Sprints',
         /* ITS PLACE ON THE RAIL, SINCE 2.30.0 (AH4): a starter's own page is a place from the first minute, even while
            its lists hold only what the starter planted. */
-        nav: { section: 'Team', order: 10, place: 20 },
+        /* THE SECTION IS CALLED BY WHAT IT HOLDS, SINCE 2.30.2 (UP2): it was "Team", which read as the people on it. */
+        nav: { section: 'Sprints', order: 10, place: 20 },
         icon: 'rows',
         requires: ['register.tasks', 'register.cycles', 'register.cycle_plan'],
         blocks: [
@@ -637,7 +640,8 @@ export const TEAM = {
       {
         page: 'agent-work',
         title: 'Agent work',
-        nav: { section: 'Team', order: 20 },
+        /* UNDER AGENTS SINCE 2.30.2 (UP2): the tickets agents are on, beside the agents themselves. */
+        nav: { section: 'Agents', order: 20 },
         icon: 'session',
         requires: ['register.tasks'],
         blocks: [

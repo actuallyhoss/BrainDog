@@ -4729,6 +4729,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             return doc !== null && typeof doc === 'object' && !Array.isArray(doc) ? [{ id: o.id, title: o.title, from: o.from, to: o.to, doc: doc as Record<string, unknown> }] : [];
           });
         },
+        /* THE LISTS HELD NOW, so a use case's update is cut to them as its first install was (UP1). */
+        holds: () => [...kernel.registers()].map(([list]) => list),
         nameOf: (id) => {
           const body = kernel.declarations().find((d) => d.id === id)?.body as { name?: unknown; title?: unknown } | undefined;
           return typeof body?.name === 'string' ? body.name : typeof body?.title === 'string' ? body.title : null;

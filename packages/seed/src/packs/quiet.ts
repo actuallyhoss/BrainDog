@@ -49,6 +49,7 @@ import { compareVersions } from '@braindog/declare/catalogue';
 import type { Result } from '@braindog/ports';
 
 import { USE_CASES, keptLists, useCaseDocument } from '../usecases/index.ts';
+import { fitted } from '../usecases/install.ts';
 import { moduleName, namesSaid } from '../usecases/names.ts';
 import { AGENTS_PACK, agentsPackDocument } from './agents.ts';
 import { ADDON_LEG_LISTS } from '../modules/held-legs.ts';
@@ -96,6 +97,12 @@ export type QuietPort = {
    * its document. Only first-party ones: a community or private add-on is never lent, so it always asks. Absent, none.
    */
   addons?(): readonly QuietAddon[] | Promise<readonly QuietAddon[]>;
+  /**
+   * The lists the record holds now, asked before each use case is planned. A use case's document is cut to them
+   * (`fitted`), as the catalogue cuts it at the first install, so a part over a module the record does not hold goes in
+   * without that list instead of refusing the whole update. Absent, the document is the whole one.
+   */
+  holds?(): readonly string[] | Promise<readonly string[]>;
 };
 
 /** One of BrainDog's own add-ons the catalogue holds newer: its pack id, its name, the versions, and its document. */
@@ -250,13 +257,19 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     if (isFirstParty(id)) return port.document(id);
     if (id === AGENTS_PACK.manifest.id) return agentsPackDocument();
     const usecase = USE_CASE_PACK.exec(id)![1]!;
+    /* CUT TO THE LISTS THE RECORD HOLDS, AS THE FIRST INSTALL WAS (UP1, 31 Oct). Uncut, a Personal record made without
+       People met Personal 2.9.1's Project partner over People's list and was refused every night, and a founder's made
+       without People, Estate or Work met 3.9.0's figures over them: neither record ever took a word changed after it
+       was made. */
+    const lists = port.holds ? new Set(await port.holds()) : null;
+    const cut = (doc: Body | null): Body | null => (doc === null || lists === null ? doc : fitted(doc, lists));
     const kept = keptLists(usecase);
-    const whole = useCaseDocument(usecase, NO_DAY, kept);
+    const whole = cut(useCaseDocument(usecase, NO_DAY, kept));
     if (!whole || kept.length === 0) return whole;
     const probe = await port.plan(without(whole));
     if (!probe.ok) return whole;
     const lacks = new Set(probe.value.adds.map((a) => a.id));
-    return useCaseDocument(usecase, NO_DAY, kept.filter((list) => !lacks.has(`register.${list}`)));
+    return cut(useCaseDocument(usecase, NO_DAY, kept.filter((list) => !lacks.has(`register.${list}`))));
   };
 
   /**
