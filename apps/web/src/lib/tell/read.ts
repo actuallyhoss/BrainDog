@@ -26,9 +26,9 @@
 
 import { exponentOf, money } from 'braindog-render';
 
-import { homeCurrency } from '../record/api.ts';
+import { homeCurrency, moneyCurrencies } from '../record/api.ts';
 import { CODES, FIGURE, SYMBOLS, bareDollar, codeOf, minorOf, numberOf } from '../record/currency-words.ts';
-import { symbolText } from '../record/money.ts';
+import { symbolOf, symbolText } from '../record/money.ts';
 import type { FieldDecl, MoneyValue } from '../record/schema.ts';
 import { GREETINGS, PEOPLE, hear } from '../who.ts';
 import { PAID_STATES } from './paid.ts';
@@ -68,6 +68,9 @@ export type TellOptions = {
   accounts?: readonly Known[];
   /** The list a plain line goes into, when the record says. Otherwise the list that calls one of its entries a task. */
   capture?: string;
+  /** Every currency the record's money is in (`moneyCurrencies()` when not said): "dinars" on a record that holds
+      only Kuwaiti dinars is those. */
+  held?: readonly string[];
 };
 
 /** A field's value: as the record takes it, or `{ $row: n }` for the entry at index `n` of the same call. */
@@ -245,8 +248,51 @@ const AMOUNT = new RegExp(
 
 type Amount = { at: number; text: string; digits: string; thousand: boolean; currency: string | null; word: string | null };
 
+/* ── currencies said by name (audit 31 Oct l, AL8) ── */
+
+const CURRENCY_NAME = new Intl.DisplayNames('en', { type: 'currency' });
+/* "Kuwaiti dinar", "us dollar", "egyptian pound": every tender code by its English name, as the runtime says it, and the
+   one shortening people say for a name the runtime writes long. */
+const BY_NAME: ReadonlyMap<string, string> = new Map([
+  ...[...CODES].map((c) => [words(CURRENCY_NAME.of(c) ?? c), c] as [string, string]),
+  ['uae dirham', 'AED'],
+]);
+/* A currency's family word, plural or not, and a bare "$", which is a dollar whose country is not said. */
+const FAMILY_WORD = /^(?:(pound|dollar|buck|dirham|riyal|rial|dinar|rupee)s?|(\$))$/iu;
+const FAMILY_ENDS: Record<string, string> = { buck: 'dollar', rial: 'ri(?:y)?al', riyal: 'ri(?:y)?al' };
+
+/** The currencies a family word may be, read off the runtime's names: "dinars" is the eight whose name ends in Dinar. */
+function familyOf(word: string | null): string[] {
+  const m = word ? FAMILY_WORD.exec(word) : null;
+  if (!m) return [];
+  const f = m[2] ? 'dollar' : (FAMILY_ENDS[m[1]!.toLowerCase()] ?? m[1]!.toLowerCase());
+  return [...CODES].filter((c) => new RegExp(`\\b${f}$`, 'iu').test(CURRENCY_NAME.of(c) ?? ''));
+}
+
+/** A currency said by its name ("1,000 Kuwaiti dinars", "300 US dollars") written as its code, so the figure reads it. */
+const NAMED = /((?:[\p{L}.&]+\s+){1,3})(pounds?|dollars?|dirhams?|riyals?|rials?|dinars?|rupees?)(?![\p{L}\p{M}])/giu;
+function namedCodes(text: string): string {
+  return text.replace(NAMED, (whole: string, before: string, family: string) => {
+    const ws = before.trim().split(/\s+/u);
+    const one = words(family).replace(/s$/u, '');
+    for (let k = Math.min(3, ws.length); k >= 1; k--) {
+      const code = BY_NAME.get(words(`${ws.slice(-k).join(' ')} ${one}`));
+      if (code) return `${ws.slice(0, -k).join(' ')}${ws.length > k ? ' ' : ''}${code}`;
+    }
+    return whole;
+  });
+}
+
+/** The code a word beside a figure names, as `codeOf` reads it, or the one currency of its family the record holds. */
+function codeHeld(word: string, record: string | null, held: readonly string[]): string | null | undefined {
+  const code = codeOf(word, record);
+  if (code !== null) return code;
+  const mine = familyOf(word).filter((c) => held.includes(c));
+  return mine.length === 1 ? mine[0]! : null;
+}
+
 /** Every figure in a stretch of words, with the currency typed beside it. A bare count before a word is still read. */
-function amountsIn(text: string, record: string | null): Amount[] {
+function amountsIn(text: string, record: string | null, held: readonly string[] = []): Amount[] {
   const out: Amount[] = [];
   for (const m of text.matchAll(AMOUNT)) {
     const at = m.index ?? 0;
@@ -254,7 +300,7 @@ function amountsIn(text: string, record: string | null): Amount[] {
       /* A CODE WRITTEN BESIDE A BARE "$" SAYS WHICH DOLLAR, or that it is no dollar: "$12 EGP" and "EGP $12" are EGP 12. */
       const written = m[1] === '$' ? (/^\s?([A-Za-z]{3})\b/u.exec(text.slice(at + m[0].length))?.[1] ?? /\b([A-Za-z]{3})\s?$/u.exec(text.slice(0, at))?.[1]) : undefined;
       const code = written !== undefined && CODES.has(written.toUpperCase()) ? written.toUpperCase() : null;
-      out.push({ at, text: m[0], digits: m[2]!, thousand: Boolean(m[3]), currency: code ?? codeOf(m[1], record) ?? null, word: m[1] });
+      out.push({ at, text: m[0], digits: m[2]!, thousand: Boolean(m[3]), currency: code ?? codeHeld(m[1], record, held) ?? null, word: m[1] });
     }
     else if (m[4]) {
       const code = codeOf(m[4], record);
@@ -265,7 +311,7 @@ function amountsIn(text: string, record: string | null): Amount[] {
            the currency (founder audit AH2, where the record's own was written in its place). */
         const digitsAt = m[0].search(/\d/);
         const after = /^\s?(E£|£|€|¥|₹|[A-Za-z]{3}\b|euros?\b|sterling\b|quid\b|(?:pound|dollar|buck|dirham|riyal|rial|dinar|rupee)s?\b)/u.exec(text.slice(at + m[0].length));
-        const code = after ? codeOf(after[1]!, record) : undefined;
+        const code = after ? codeHeld(after[1]!, record, held) : undefined;
         if (after && code !== undefined)
           out.push({ at: at + digitsAt, text: m[0].slice(digitsAt) + after[0], digits: m[5]!, thousand: Boolean(m[6]), currency: code, word: after[1]! });
         else out.push({ at: at + digitsAt, text: m[0].slice(digitsAt), digits: m[5]!, thousand: Boolean(m[6]), currency: null, word: null });
@@ -274,13 +320,17 @@ function amountsIn(text: string, record: string | null): Amount[] {
       const word = m[9] ?? null;
       /* "12$ EGP": the code after the sign says which, as it does before a figure. */
       const after = word === '$' ? /^\s?([A-Za-z]{3})\b/u.exec(text.slice(at + m[0].length))?.[1]?.toUpperCase() : undefined;
-      const code = after !== undefined && CODES.has(after) ? after : word ? codeOf(word, record) : null;
+      const code = after !== undefined && CODES.has(after) ? after : word ? codeHeld(word, record, held) : null;
       const plain = code === undefined ? m[0].slice(0, m[0].length - (word?.length ?? 0)).trimEnd() : m[0];
       out.push({ at, text: plain, digits: m[7]!, thousand: Boolean(m[8]), currency: code ?? null, word: code === undefined ? null : word });
     }
   }
   return out;
 }
+
+/** A currency's sign as the runtime writes it in English, by its own mark ("CA$", "€"), or its code where it has none. */
+const signSaid = (code: string): string =>
+  new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay: 'symbol' }).formatToParts(1).find((p) => p.type === 'currency')?.value ?? code;
 
 /** Minor units, or `null` for more decimal places than the currency has or a grouping it does not print. */
 const minor = (a: Amount, currency: string): number | null => minorOf(a.digits, currency, a.thousand);
@@ -331,9 +381,16 @@ const callsItself = (l: TellList, word: RegExp): boolean => word.test(l.one ?? '
 const orderList = (lists: readonly TellList[]): TellList | undefined =>
   lists.find((l) => callsItself(l, /\border/i) && textField(l) !== undefined);
 
-/** The ledger: a list with a required amount and a way it moved, in or out. */
+/* HOW OFTEN, as a list of money that comes round declares it: weekly and monthly among its values, and required. */
+const cadenceOf = (l: TellList): FieldDecl | undefined => l.fields.find((f) => f.type === 'enum' && f.required === true && f.values?.includes('monthly') === true && f.values.includes('weekly'));
+
+/** The ledger: a list with a required amount and a way it moved, in or out, and no cadence (that is Repeating). */
 const moneyList = (lists: readonly TellList[]): TellList | undefined =>
-  lists.find((l) => l.fields.some((f) => f.type === 'money' && f.required) && l.fields.some((f) => f.type === 'enum' && f.values?.includes('in') && f.values.includes('out')));
+  lists.find((l) => l.fields.some((f) => f.type === 'money' && f.required) && l.fields.some((f) => f.type === 'enum' && f.values?.includes('in') && f.values.includes('out')) && cadenceOf(l) === undefined);
+
+/** Repeating: a list with a required amount, a way in or out, and how often it comes round. */
+const repeatList = (lists: readonly TellList[]): TellList | undefined =>
+  lists.find((l) => l.fields.some((f) => f.type === 'money' && f.required) && l.fields.some((f) => f.type === 'enum' && f.values?.includes('in') && f.values.includes('out')) && cadenceOf(l) !== undefined);
 
 /** Bills and invoices: a list with a required amount owed one way or the other, to the reader or by them. */
 const dueList = (lists: readonly TellList[]): TellList | undefined =>
@@ -345,10 +402,14 @@ const peopleList = (lists: readonly TellList[]): TellList | undefined => lists.f
  * A LIST A PLAIN LINE CAN GO INTO WITH ITS WORDS ALONE: every field it needs but its title has a default, or is a state
  * it starts in (its first, as `startIn` fills it). A list that needs an amount, a day or a number is not one.
  */
-const fillable = (l: TellList): boolean => {
+const fillable = (l: TellList, numbers = false): boolean => {
   const title = textField(l);
-  return title !== undefined && l.fields.every((f) => !f.required || f.retired || f.default !== undefined || f.id === title.id || (f.type === 'enum' && (f.values?.length ?? 0) > 0));
+  return title !== undefined && l.fields.every((f) => !f.required || f.retired || f.default !== undefined || f.id === title.id || (f.type === 'enum' && (f.values?.length ?? 0) > 0) || (numbers && counted(f)));
 };
+
+/* A REQUIRED NUMBER IS ONE AN OFFER FILLS AT NOUGHT, as the list's own add box does (`capturedFields`): a goal offered
+   for "train for the Cairo half marathon" starts with its aim at nought, for the person to set (AL5). */
+const counted = (f: FieldDecl): boolean => f.type === 'int' || f.type === 'decimal';
 
 /** A required state with no default starts in its first, as the list declares them: a new project is Building. */
 function startIn(l: TellList, fields: Record<string, TellValue>): void {
@@ -367,11 +428,15 @@ const MONEY_PARTS: ReadonlySet<string> = new Set(['plans', 'installments', 'book
  * Books, Categories or Accounts has that id, and "Read Dune next week" was never offered to it. The kernel's own Agent
  * runs go by id, which nobody else can declare.
  */
-const neverPlain = (l: TellList): boolean => l.id === 'session' || (l.pack === 'money-core' && MONEY_PARTS.has(l.id));
+/* AND THE AGENTS' INSTRUCTIONS (AL5), the kernel's as Agent runs are, which an agent reads and nobody types a line into. */
+const neverPlain = (l: TellList): boolean => l.id === 'session' || l.id === 'instructions' || l.pack === 'kernel' || (l.pack === 'money-core' && MONEY_PARTS.has(l.id));
 
 /** Lists a plain line is never put in: People, orders, money and the record's own. */
-const plainable = (l: TellList): boolean =>
-  l.id !== PEOPLE && !neverPlain(l) && !callsItself(l, /\border/i) && !l.fields.some((f) => f.type === 'money' && f.required) && fillable(l);
+const plainable = (l: TellList, numbers = false): boolean =>
+  l.id !== PEOPLE && !neverPlain(l) && !callsItself(l, /\border/i) && !l.fields.some((f) => f.type === 'money' && f.required) && fillable(l, numbers);
+
+/* The starter's own lists, the ones a person was given with their BrainDog: Personal's Goals before an add-on's. */
+const starters = (l: TellList): number => (l.pack?.startsWith('usecase-') ? 1 : 0);
 
 /**
  * HOW MUCH A LIST LOOKS LIKE THINGS TO DO, BY ITS SHAPE and never its name, since a team calls its tasks Tickets and a
@@ -393,11 +458,12 @@ const taskList = (lists: readonly TellList[], capture: string | undefined): Tell
   lists.find((l) => callsItself(l, /^tasks?$|\bto-?dos?\b/i) && textField(l) !== undefined) ??
   [...lists].filter((l) => todoScore(l) >= 2 && l.fields.some((f) => f.type === 'day' && f.deadline === true)).sort((a, b) => todoScore(b) - todoScore(a))[0];
 
-/** The lists a line that fits nowhere is offered to, at most two: those with a day or a state, most like things to do first. */
+/** The lists a line that fits nowhere is offered to, at most two: those with a day or a state, the starter's own first
+    (AL5), then most like things to do. */
 const offerLists = (lists: readonly TellList[]): TellList[] =>
   lists
-    .filter((l) => plainable(l) && (l.fields.some((f) => f.type === 'day') || l.fields.some((f) => f.id === (l.state ?? 'state') && f.type === 'enum')))
-    .sort((a, b) => todoScore(b) - todoScore(a))
+    .filter((l) => plainable(l, true) && (l.fields.some((f) => f.type === 'day') || l.fields.some((f) => f.id === (l.state ?? 'state') && f.type === 'enum')))
+    .sort((a, b) => starters(b) - starters(a) || todoScore(b) - todoScore(a))
     .slice(0, 2);
 
 /** The list a new project goes into: one that calls an entry a project. */
@@ -504,6 +570,18 @@ const BACK_SAID = /^(?:(?:(?:she|he|they)(?:['’]ll| will)\s+)?(?:pay(?:s|ing)?
 /* The words around a loan's amount that say nothing more of it. */
 const LOAN_WORDS = /\b(?:back|as a loan|on loan|to pay back|to be paid back|pay(?:s|ing)? (?:me |us |it )?back)\b/giu;
 
+/* WHO THE READER PAID, BY NAME (AL2): "Paid Nadia 300 for the logo", "I sent Mum 1,000", "Paid 300 to Nadia". Case kept
+   on the name, which is told by its capital. */
+const PAID_TO = new RegExp(`^(?:(?:I|i|We|we)\\s+)?(?:[Pp]aid|[Ss]ent|[Tt]ransferred)\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
+const TO_SOMEBODY = new RegExp(`\\bto\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
+/* MONEY THAT CAME IN, SAID WITHOUT A CURRENCY OR A VERB OF PAYING (AL4): "Salary 30,000 came in today", "Refund from
+   Amazon 450". A refund said to somebody ("Refund Nadia 300") is the reader paying back, and is not this. */
+const CAME_IN = /\b(?:came in|come in|comes in|has come in|arrived|landed|went in|hit (?:my|our|the) account|got paid)\b/iu;
+const INCOME_WORD = /^(?:(?:my|our|the)\s+)?(?:salary|wages?|pay ?cheque|paycheck|bonus|refund|dividends?|commission|allowance|pension|rent from)\b/iu;
+const CAME_IN_WORDS = /\b(?:came in|come in|comes in|has come in|arrived|landed|went in|hit (?:my|our|the) account|got paid|into (?:my|our) (?:account|bank))\b/giu;
+/* A FIGURE SAID AS A TIME is no amount: "Call the bank at 3 tomorrow". */
+const TIME_BEFORE = /\b(?:at|around|from|until|till|by)\s*$/iu;
+
 /* "assign to Omar", "assigned to Omar". */
 const ASSIGN = new RegExp(`(?:^|[\\s,;])(?:[Aa]ssign(?:ed)?|[Gg]ive it)\\s+(?:it\\s+)?to\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
 /* A BANK'S OWN TEXT, as a card alert or an account alert prints it: one of these words, and a currency it names. */
@@ -572,7 +650,18 @@ const WHY = {
   notSure: 'Not sure where this goes.',
   reads: (kinds: readonly string[]) => (kinds.length === 0 ? '' : ` It reads ${orOf(kinds)}.`),
   noMoney: 'This BrainDog keeps no money yet, so the amount has nowhere to go.',
-  whichCurrency: 'Which currency is that in? Write its code beside the figure, like 300 USD or 300 EGP.',
+  /* SAID IN WORDS, never "write its code" (AL8): "Which dinars are they: Algerian, Bahraini, ... or Tunisian?" */
+  whichCurrency: (word: string | null, figure: string) => {
+    const codes = familyOf(word);
+    if (codes.length === 0) return `Which currency is that in? Say it with the figure, like ${figure} US dollars or ${figure} euros.`;
+    const typed = word !== null && /^\p{L}+$/u.test(word) && !/^bucks?$/iu.test(word) ? words(word).replace(/s?$/u, 's') : null;
+    const plural = typed ?? `${words(CURRENCY_NAME.of(codes[0]!) ?? '').split(' ').pop() ?? 'dollar'}s`;
+    const whose = codes.map((c) => (CURRENCY_NAME.of(c) ?? c).split(' ').slice(0, -1).join(' ')).sort((a, b) => a.localeCompare(b, 'en'));
+    const like = codes.includes('USD') ? (CURRENCY_NAME.of('USD') ?? '').split(' ').slice(0, -1).join(' ') : whose[0]!;
+    return whose.length <= 8
+      ? `Which ${plural} are they: ${orOf(whose)}? Say it with the figure, like ${figure} ${whose[0]} ${plural}.`
+      : `Which ${plural} are they? Say whose with the figure, like ${figure} ${like} ${plural}.`;
+  },
   whichWay: (name: string) => `Did ${name} pay you, or did you pay ${name}?`,
   bankNoCurrency: 'That text names no currency, so nothing is kept from it. Paste it as the bank sent it.',
   known: (name: string, list: string) => `${name} is already in ${list}.`,
@@ -594,6 +683,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     .replace(/^[\s,;]+|[\s,;]+$/gu, '')
     /* "Dr. Hana" is never a clause that ends at "Dr". */
     .replace(/\b(Dr|Mr|Mrs|Ms|Prof|St)\./gu, '$1');
+  /* "1,000 Kuwaiti dinars" is KWD 1,000, never the record's own currency beside a word (AL8). */
+  text = namedCodes(text);
 
   /* A self-introduction names the reader, who is never a new person: "I'm Mariam, Nadia wants..." reads from Nadia. */
   if (INTRODUCED.test(text)) text = hear(text).bio || text;
@@ -603,7 +694,20 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
      ROUND AMOUNT HAS NO ".00" (audit j, AJ11): the preview said "$4,200.00 USD" and "EGP 12,000.00" over rows Bills
      then drew "EGP 850"; pence that are not round are still said. */
   const home = opts.home === undefined ? homeCurrency() : opts.home;
-  const spelled = (amount: number, currency: string): string => symbolText(money(amount, currency), home, 'sentence');
+  const held = opts.held ?? moneyCurrencies();
+  /* A CURRENCY THAT IS NOT HOME IS SAID BY ITS OWN SIGN, "$4,200", "CA$900", "€50", where every screen writes "$4,200 USD"
+     beside a column of the home's (AL8): a sentence names one amount, and the sign the runtime gives each currency is
+     its alone. Kept as written when that sign is the home's own ("$" on a Canadian record) or is only letters. */
+  const spelled = (amount: number, currency: string): string => {
+    const text = symbolText(money(amount, currency), home, 'sentence');
+    const tail = new RegExp(`[\\s\\u00a0\\u202f]${currency}$`, 'u');
+    const sign = signSaid(currency);
+    const narrow = symbolOf(currency);
+    if (!tail.test(text) || !narrow || /^[A-Za-z]+$/u.test(sign) || (home !== null && (signSaid(home) === sign || symbolOf(home) === sign))) return text;
+    const body = text.replace(tail, '');
+    const i = body.indexOf(narrow);
+    return i === -1 ? text : `${body.slice(0, i)}${sign}${body.slice(i + narrow.length)}`;
+  };
   const room = (n: number): boolean => rows.length + n <= MOST;
 
   /* Who each name is: an entry already kept, or a new one made the first time they are named. */
@@ -620,6 +724,13 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let bankBare = false;
   /* An amount said with no currency to put to it, on a record with none or a word that is several. */
   let noCurrency = false;
+  /* The word that was several ("dinars") and the figure said with it, for the question asked in words (AL8). */
+  let unsureWord: { word: string | null; figure: string } | null = null;
+  const unsureIn = (a: Amount, currency: string | null): boolean => {
+    if (currency !== null) return false;
+    unsureWord ??= { word: a.word, figure: a.digits };
+    return true;
+  };
   /* Who placed an order in this sentence, so only they are clients: a payer alone is a payer (AH2). */
   const ordered = new Set<string>();
   let subject: string | null = null;
@@ -695,7 +806,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* AND SO IS ONE WHO "PAID OUT" WHO IS NO PAYMENT PROVIDER (RJ5): "Ahmed paid out 300 for the delivery" saved 300 in,
        "Payout from Ahmed". Stripe paying out, or anybody paying out into his account, is still the payout. */
     const askedOut = PAYOUT.test(after) && !PROVIDERS.test(name.trim()) && !INTO_MINE.test(after);
-    if (opened && (PAID_ONLY.test(after) || askedOut) && amountsIn(after, opts.currency).length > 0 && !knownAs(name, opts.people ?? []) && !sharedBy(name, opts.people ?? []) && !ordered.has(words(name))) {
+    if (opened && (PAID_ONLY.test(after) || askedOut) && amountsIn(after, opts.currency, held).length > 0 && !knownAs(name, opts.people ?? []) && !sharedBy(name, opts.people ?? []) && !ordered.has(words(name))) {
       whichWay ??= name;
       /* Said back as left too (RH13), so an order placed beside it ("14 mugs for Lina, Mark paid 50") never saves as
          though the 50 were never said. */
@@ -743,7 +854,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       left.push(whole);
       continue;
     }
-    if (!self && !acts(c) && (measure(c) || loan(c) || bill(c))) continue;
+    if (!self && !acts(c) && (measure(c) || loan(c) || income(c) || bill(c))) continue;
     /* A DAY SAID ON ITS OWN after what it is the day of was read with it: "Invoice Acme 1,200 USD, due in 14 days". */
     if (placed && takeDay(c, opts.today).day !== null && trimWords(takeDay(c, opts.today).rest.replace(/^(?:due|by|on)$/iu, '')) === '') continue;
     /* AND THE DAY A LOAN COMES BACK, said after it: "Borrowed 300 from Sara, pay back by Friday". */
@@ -764,7 +875,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     }
     if (!self && !acts(c)) {
       /* WHAT IS SAID OF SOMEBODY JUST MET is theirs: "Met Lina from Acme, interested in a pilot". */
-      if (metRow !== null && amountsIn(c, opts.currency).length === 0) notes.set(metRow, [...(notes.get(metRow) ?? []), capital(trimWords(c))]);
+      if (metRow !== null && amountsIn(c, opts.currency, held).length === 0) notes.set(metRow, [...(notes.get(metRow) ?? []), capital(trimWords(c))]);
       else left.push(whole);
       continue;
     }
@@ -798,7 +909,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (bankBare) return { rows, left, why: WHY.bankNoCurrency };
     if (whichWay !== null) return { rows, left, why: WHY.whichWay(whichWay) };
     if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney };
-    if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency };
+    if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency(unsureWord?.word ?? null, unsureWord?.figure ?? '300') };
     if (known !== null && !placed && rows.length === 0) return { rows, left: [], why: WHY.known(known, people?.name ?? 'People') };
     if (placed || unsureOf || noMoney) return { rows, left };
 
@@ -840,6 +951,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const fields: Record<string, TellValue> = { [what.id]: capital(title || text) };
     if (due && day) fields[due.id] = day;
     startIn(l, fields);
+    for (const f of l.fields) if (f.required && !f.retired && f.default === undefined && fields[f.id] === undefined && counted(f)) fields[f.id] = 0;
     let who: string | null = null;
     if (owner && assigned) {
       const ref = personOf(assigned[1]!);
@@ -935,7 +1047,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const m = MEASURE.exec(c);
     const l = numberList(opts.lists);
     if (!m || !l || !room(1)) return false;
-    const [a, ...more] = amountsIn(m[2]!.replace(SPAN, ' '), opts.currency);
+    const [a, ...more] = amountsIn(m[2]!.replace(SPAN, ' '), opts.currency, held);
     if (!a || more.length > 0) return false;
     const fields: Record<string, TellValue> = { [textField(l)!.id]: /^[a-z]/u.test(m[1]!) ? capital(m[1]!) : m[1]! };
     let shown: string;
@@ -959,14 +1071,88 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     return true;
   }
 
+  /**
+   * Money that comes round, in Repeating: what, which way, how much, how often, and the next day it falls on when one
+   * was said. No day said is named in `missing`, never guessed.
+   */
+  function repeating(l: TellList, k: { value: MoneyValue; into: boolean; what: string; day: string | null; every: string; payer: TellValue | null }): boolean {
+    const often = cadenceOf(l);
+    const cadence = REPEATS[k.every];
+    if (!often || !cadence || !often.values?.includes(cadence) || !room(1)) return false;
+    const fields: Record<string, TellValue> = {};
+    const title = textField(l);
+    if (title) fields[title.id] = k.what;
+    const way = l.fields.find((f) => f.type === 'enum' && f.values?.includes('in') && f.values.includes('out'));
+    if (way) fields[way.id] = k.into ? 'in' : 'out';
+    const sum = pick(l, 'money', /^amount$/, (f) => f.required === true);
+    if (sum) fields[sum.id] = k.value;
+    fields[often.id] = cadence;
+    const next = pick(l, 'day', /next|due/, (f) => f.required === true);
+    if (next && k.day) fields[next.id] = k.day;
+    const party = pick(l, 'ref', /party|who/, (f) => f.to === PEOPLE);
+    if (party && k.payer !== null) fields[party.id] = k.payer;
+    startIn(l, fields);
+    const bits = [`${spelled(k.value.amount, k.value.currency)} ${k.into ? 'in' : 'out'} every ${EVERY_SAID[cadence] ?? k.every}`, ...(k.day ? [`next ${dayWord(k.day, opts.today)}`] : []), `in ${l.name}`];
+    rows.push({ register: l.id, fields, said: k.what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    placed = true;
+    return true;
+  }
+
+  /** "Salary 30,000 came in today", "Refund from Amazon 450": money in, said without a verb of paying (AL4). */
+  function income(c: string): boolean {
+    if (!INCOME_WORD.test(c) && !CAME_IN.test(c)) return false;
+    const worded = INCOME_WORD.test(c);
+    if (/^(?:(?:[Mm]y|[Oo]ur|[Tt]he)\s+)?[Rr]efund\s+\p{Lu}/u.test(c)) return false;
+    const dated = takeDay(c, opts.today);
+    const [a, ...more] = amountsIn(dated.rest, opts.currency, held);
+    if (!a || more.length > 0 || TIME_BEFORE.test(dated.rest.slice(0, a.at))) return false;
+    /* "3 boxes arrived" is no money: with no word like salary, nothing but where it came from is said after the figure. */
+    if (!worded && a.word === null && !/^(?:from\b.*)?$/iu.test(oneLine(dated.rest.slice(a.at + a.text.length).replace(CAME_IN_WORDS, ' ')))) return false;
+    if (!moneyList(opts.lists) && !dueList(opts.lists)) {
+      noMoney = true;
+      return true;
+    }
+    const currency = a.currency ?? (a.word ? null : opts.currency);
+    const amount = currency ? minor(a, currency) : null;
+    if (currency === null || amount === null) {
+      unsure = true;
+      noCurrency ||= unsureIn(a, currency);
+      left.push(c);
+      return true;
+    }
+    const rest = oneLine(`${dated.rest.slice(0, a.at)} ${dated.rest.slice(a.at + a.text.length)}`).replace(CAME_IN_WORDS, ' ');
+    const from = FROM.exec(rest);
+    const party = from && aName(from[1]!) ? from[1]! : null;
+    const named = trimWords(oneLine(rest.replace(EVERY, ' ')).replace(/^(?:my|our)\s+/iu, ''));
+    const what = capital(named) || (party ? `From ${party}` : 'Money in');
+    /* Somebody who paid it is a person; a shop or a platform that refunded it is only named. */
+    const payer = party && !PROVIDERS.test(party) && !THING_PAID.test(party) && !ownAccount(party) ? personOf(party) : null;
+    /* "Salary 30,000 a month" comes round: Repeating, money in, where the record keeps it. */
+    const every = EVERY.exec(c);
+    const r = every ? repeatList(opts.lists) : undefined;
+    if (every && r) return repeating(r, { value: { amount, currency }, into: true, what, day: dated.day !== null && dated.day > opts.today ? dated.day : null, every: words(every[1] ?? every[2] ?? ''), payer });
+    return keepMoney({ value: { amount, currency }, into: true, party, payer, by: null, day: dated.gone, what, said: `${spelled(amount, currency)} in, ${what.charAt(0).toLowerCase()}${what.slice(1)}` });
+  }
+
   /** "Pay rent 12000 on the 1st", "Invoice Acme 1,200 USD for the logo work, due in 14 days": a bill or an invoice. */
   function bill(c: string): boolean {
     const invoice = INVOICE.exec(c);
     const pay = PAY.exec(c);
-    if (!invoice && !pay && !BILL_WORD.test(c)) return false;
+    /* A PLAIN MONEY LINE IS A BILL TOO (AL4): "Electricity 850 due Thursday", "Netflix 180 a month", a thing paid for or
+       a figure due or repeating, so long as the figure is the last thing said of it. "Glaze 14 mugs due Friday" is no
+       bill, nor "Call the bank at 3 tomorrow". */
+    const billSaid = invoice !== null || pay !== null || BILL_WORD.test(c);
+    const loose = !billSaid && (THING_PAID.test(c) || EVERY.test(c) || /\bdue\b/iu.test(c));
+    if (!billSaid && !loose) return false;
     const own = takeDay(c, opts.today);
-    const [a] = amountsIn(own.rest, opts.currency);
+    const [a] = amountsIn(own.rest, opts.currency, held);
     if (!a) return false;
+    if (loose && a.word === null) {
+      const after = oneLine(own.rest.slice(a.at + a.text.length).replace(EVERY, ' ')).replace(/^(?:due|by|on)$/iu, '');
+      const size = numberOf(a.digits, a.thousand) ?? 0;
+      if (after !== '' || TIME_BEFORE.test(own.rest.slice(0, a.at)) || own.rest.slice(0, a.at).trim() === '') return false;
+      if (!THING_PAID.test(c) && !EVERY.test(c) && size < 100) return false;
+    }
     const l = dueList(opts.lists);
     if (!l) {
       noMoney = true;
@@ -976,7 +1162,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const amount = currency ? minor(a, currency) : null;
     if (currency === null || amount === null) {
       unsure = true;
-      noCurrency ||= currency === null;
+      noCurrency ||= unsureIn(a, currency);
       left.push(c);
       return true;
     }
@@ -994,6 +1180,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const plain = trimWords(rest.replace(/^(?:for|to)\s+(?:the\s+)?/iu, '').replace(/\s+(?:due|on|by|is)$/iu, ''));
     const who = invoice?.[1] ?? null;
     const what = capital(plain) || (who ? `Invoice to ${who}` : 'A bill');
+    /* MONEY THAT COMES ROUND IS REPEATING, where the record keeps it (AL4): "Netflix 180 a month" is a cost every month,
+       the one home of repeating money, never a bill whose repeat nothing walks. */
+    if (every && !invoice) {
+      const r = repeatList(opts.lists);
+      if (r) return repeating(r, { value: { amount, currency }, into: toMe, what, day, every: words(every[1] ?? every[2] ?? ''), payer: null });
+    }
     const fields: Record<string, TellValue> = {};
     const title = textField(l);
     if (title) fields[title.id] = what;
@@ -1033,7 +1225,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const who = named.join(' ');
     const phrase = `${code} ${shape.m[shape.l.rest] ?? ''} ${shape.l.rest === 1 ? (shape.m[3] ?? '') : ''}`;
     const own = takeDay(phrase, opts.today);
-    const [a] = amountsIn(own.rest, opts.currency);
+    const [a] = amountsIn(own.rest, opts.currency, held);
     if (!a) return false;
     const l = dueList(opts.lists);
     if (!l) {
@@ -1044,7 +1236,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const amount = currency ? minor(a, currency) : null;
     if (currency === null || amount === null) {
       unsure = true;
-      noCurrency ||= currency === null;
+      noCurrency ||= unsureIn(a, currency);
       left.push(c);
       return true;
     }
@@ -1088,7 +1280,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   /** "Stripe paid out 1,950 USD today": money in from a platform, and nobody new. */
   function payout(phrase: string, from: string | null): boolean {
     const dated = takeDay(phrase, opts.today);
-    const [a] = amountsIn(dated.rest, opts.currency);
+    const [a] = amountsIn(dated.rest, opts.currency, held);
     if (!a) return false;
     if (!moneyList(opts.lists) && !dueList(opts.lists)) {
       noMoney = true;
@@ -1098,7 +1290,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const amount = currency ? minor(a, currency) : null;
     if (currency === null || amount === null) {
       unsure = true;
-      noCurrency ||= currency === null;
+      noCurrency ||= unsureIn(a, currency);
       return false;
     }
     if (!keepMoney({ value: { amount, currency }, into: true, party: from, payer: null, by: null, day: dated.gone, what: from ? `Payout from ${from}` : 'Payout', said: `${spelled(amount, currency)} paid out${from ? ` by ${from}` : ''}` })) return false;
@@ -1107,7 +1299,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
 
   /** A card alert or an account's text, as the bank sent it: the amount in the currency it names, where, and when. */
   function bankText(whole: string): boolean {
-    const found = amountsIn(whole, opts.currency);
+    const found = amountsIn(whole, opts.currency, held);
     if (found.length === 0) return false;
     const named = found.filter((a) => a.word !== null && a.currency !== null && !BALANCE_BEFORE.test(whole.slice(Math.max(0, a.at - 40), a.at)));
     const a = named[0];
@@ -1148,7 +1340,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const total = l ? pick(l, 'money', /total/, (f) => said(f, /total/)) : undefined;
     if (!total || order.fields[total.id] !== undefined) return false;
     const bare = clause.replace(TOTAL_WORDS, ' ').trim();
-    const [a, ...more] = amountsIn(bare, opts.currency);
+    const [a, ...more] = amountsIn(bare, opts.currency, held);
     if (!a || more.length > 0 || oneLine(bare.slice(0, a.at) + bare.slice(a.at + a.text.length)) !== '') return false;
     const currency = a.currency ?? (a.word ? null : opts.currency);
     const amount = currency ? minor(a, currency) : null;
@@ -1194,7 +1386,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* The day first, so "on the 12th" is never twelve of anything. */
     const dated = takeDay(phrase, opts.today);
     const day = dated.gone;
-    const [a, ...more] = amountsIn(dated.rest, opts.currency);
+    const [a, ...more] = amountsIn(dated.rest, opts.currency, held);
     if (!a) return false;
     /* WHERE NO MONEY IS KEPT, that is what is said, before any question of which currency: unless an order just placed
        keeps what was paid for it, as a shop with no Money keeps it on the order. */
@@ -1208,7 +1400,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const amount = currency ? minor(a, currency) : null;
     if (currency === null || amount === null) {
       unsure = true;
-      noCurrency ||= currency === null;
+      noCurrency ||= unsureIn(a, currency);
       return false;
     }
     /* One amount a clause; a second is said back, never dropped and never added in. */
@@ -1219,7 +1411,22 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const by = method && !NOT_A_NAME.has(method[1]!.toLowerCase()) ? method[1]! : null;
     if (method) rest = oneLine(rest.replace(method[0], ' '));
     const into = who !== null || someone || GOT.test(phrase);
-    const payer = into && who ? personOf(who) : null;
+    /* WHO THE READER PAID IS KEPT, and new in People as "Got 2,000 from Dad" makes Dad (AL2): "Paid Nadia 300 for the
+       logo" said only "EGP 300 out". Never a bill, a provider or one of his own accounts. */
+    let payee: string | null = null;
+    let payeeRef: TellValue | null = null;
+    if (!into) {
+      const to = PAID_TO.exec(rest) ?? TO_SOMEBODY.exec(rest);
+      const parts = (to?.[1] ?? '').split(' ');
+      while (parts.length > 1 && CODES.has(parts[parts.length - 1]!)) parts.pop();
+      const name = parts.join(' ');
+      if (to && name && aName(name) && !THING_PAID.test(name) && !PROVIDERS.test(name) && !ownAccount(name)) {
+        payee = name;
+        rest = oneLine(`${to[0].startsWith('to') ? rest.slice(0, to.index) : 'paid'} ${rest.slice(to.index + to[0].length)}`);
+        payeeRef = personOf(name);
+      }
+    }
+    const payer = into && who ? personOf(who) : payeeRef;
     /* A PAYER IS A CLIENT ONLY WHEN THEY ORDERED: "Omar paid 1,200" says what moved, not who Omar is to you. */
     if (payer !== null && who && ordered.has(words(who))) client(payer, who);
 
@@ -1234,11 +1441,13 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     }
 
     const plain = trimWords(rest.replace(ACT, '').replace(/^(?:for|from)\s+/iu, ''));
-    const what = who ? `Payment from ${who}${by ? `, by ${by}` : ''}` : capital(plain) || (into ? 'Money in' : 'Money out');
+    const what = who ? `Payment from ${who}${by ? `, by ${by}` : ''}` : capital(plain) || (payee ? `Paid to ${payee}` : into ? 'Money in' : 'Money out');
+    /* What it was for, in the words said: "EGP 300 to Nadia, for the logo". */
+    const reason = payee ? oneLine(rest.replace(ACT, '')).replace(/[\s,.;:!?]+$/u, '') : '';
     /* ONE LINE, READ AS A PERSON SAYS IT: "EGP 1,200.00 from Lina", then "paid, kept in Bills and
        invoices", where it said "EGP 1,200.00 in" over "into Bills and invoices". */
-    const line = `${spelled(amount, currency)} ${into ? (who ? `from ${who}` : 'in') : 'out'}${by ? `, by ${by}` : ''}`;
-    const kept = keepMoney({ value, into, party: who, payer, by, day, what, said: line });
+    const line = `${spelled(amount, currency)} ${into ? (who ? `from ${who}` : 'in') : payee ? `to ${payee}` : 'out'}${reason ? `, ${reason}` : ''}${by ? `, by ${by}` : ''}`;
+    const kept = keepMoney({ value, into, party: who ?? payee, payer, by, day, what, said: line });
     if (!kept && !moneyList(opts.lists) && !dueList(opts.lists)) noMoney = true;
     return kept || paidField !== undefined;
   }
