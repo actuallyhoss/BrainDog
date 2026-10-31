@@ -13,6 +13,7 @@
   import { homeCurrency } from '$lib/record/api.ts';
   import { symbolOf } from '$lib/record/money.ts';
   import { updateRow } from '$lib/record/page-write.ts';
+  import { rowWriter } from '$lib/record/rows-write.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { Ledger } from './ledger.ts';
@@ -35,6 +36,10 @@
     saved: (name: string) => `${name}'s budget is saved.`,
     cleared: (name: string) => `${name} has no budget now.`,
     empty: 'No category you spend in yet.',
+    /* AN EMPTY BOOK IS OFFERED THE EVERYDAY CATEGORIES (audit 31 Oct h, AH14): Budgets said "No category you spend in
+       yet" over nothing to press, and a first budget could not be set before the first spending. */
+    starters: 'No category yet. Set the most to spend on any of these, and it is kept as a category.',
+    starterNames: ['Home', 'Food', 'Transport', 'Health', 'Fun', 'Subscriptions', 'Other'],
     bad: 'Write the most to spend as an amount, such as 250.',
     noCurrency: 'Set your home currency in Money first, so a budget says which money it is.',
   };
@@ -67,6 +72,11 @@
     }
     /* A CURRENCY SOMEBODY CHOSE: the budget's own, else the record's home one, never one the screen picks. */
     const home = homeCurrency();
+    /* NO CATEGORY AT ALL: the everyday ones, each a line not yet written, made the moment a budget is set on it. */
+    if (out.value.rows.length === 0) {
+      lines = words.starterNames.map((name, i) => ({ seq: -(i + 1), version: 0, name, minor: null, currency: home, period: 'month' as Period, typed: '' }));
+      return;
+    }
     lines = (out.value.rows as { seq?: unknown; version?: unknown; fields?: Record<string, unknown> }[]).flatMap((r) => {
       const f = r.fields ?? {};
       const name = f[category.title];
@@ -93,6 +103,22 @@
 
   async function save(l: Line, patch: Record<string, unknown>, said: string) {
     busy = l.seq;
+    /* A LINE NOT YET A CATEGORY IS WRITTEN AS ONE, spending money, with its budget on it. */
+    if (l.seq < 0) {
+      const made = await rowWriter(apiBase()).create(category.list, { [category.title]: l.name, ...(category.way ? { [category.way.field]: category.way.out } : {}), ...patch });
+      busy = null;
+      if (!made.ok) {
+        toasts.push(made.fix, { intent: 'warn' });
+        l.minor = null;
+        l.typed = '';
+        return;
+      }
+      l.seq = made.entry.seq;
+      l.version = made.entry.version;
+      toasts.push(said);
+      onsaved?.();
+      return;
+    }
     const out = await updateRow(apiBase(), { register: category.list, seq: l.seq, version: l.version }, patch, l.name);
     busy = null;
     if (out.from !== 'written') {
@@ -150,8 +176,9 @@
     {#if lines.length === 0}
       <p class="bset-lede">{words.empty}</p>
     {:else}
+      {#if lines.every((l) => l.seq < 0)}<p class="bset-lede">{words.starters}</p>{/if}
       <ul class="bset-lines">
-        {#each lines as l (l.seq)}
+        {#each lines as l (l.name)}
           <li class="bset-line">
             <span class="bset-name" dir="auto">{l.name}</span>
             <label class="bset-most">
