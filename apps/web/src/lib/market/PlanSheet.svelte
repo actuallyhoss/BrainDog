@@ -57,15 +57,19 @@
     onrecheck?: (() => Promise<void>) | undefined;
     /**
      * PUTS A KEY IN FROM THIS SHEET (audit 31 Oct f, AF3): its label, the value typed, and the Keychain password where it
-     * has one. Answers the record's sentence on a refusal, and `pass` when the Keychain wants its password. Left out, the
-     * sheet offers only the terminal command.
+     * has one. Answers the record's sentence on a refusal, `pass` when the Keychain wants its password, and `signin`, the
+     * sign-in page that comes back here, when the sign-in is too old to open the keychain and no passkey could prove it
+     * in place (RF3). Left out, the sheet offers only the terminal command.
      */
-    onkey?: ((label: string, value: string, passphrase: string) => Promise<{ ok: true } | { ok: false; fix: string; pass?: boolean }>) | undefined;
+    onkey?: ((label: string, value: string, passphrase: string) => Promise<{ ok: true } | { ok: false; fix: string; pass?: boolean; signin?: string }>) | undefined;
   } = $props();
 
-  /* WHAT IS TYPED FOR EACH MISSING KEY, never kept past the sheet: emptied as it is sent, whatever comes back. */
+  /* WHAT IS TYPED FOR EACH MISSING KEY, never kept past the sheet: emptied as it is sent, whatever comes back (RF4), as
+     the Keychain password is. A refusal asks for it again, typed afresh; a stale sign-in proved again in place is sent
+     the same value by `onkey` itself, so nothing here holds it for the retry. */
   let keyValues = $state<Record<string, string>>({});
   let keySaid = $state<Record<string, string>>({});
+  let keySignin = $state<Record<string, string>>({});
   let keyPass = $state('');
   let askPass = $state(false);
   let putting = $state('');
@@ -75,17 +79,19 @@
     if (!onkey || putting !== '' || value.trim() === '') return;
     putting = label;
     keySaid = { ...keySaid, [label]: '' };
+    keySignin = { ...keySignin, [label]: '' };
+    keyValues = { ...keyValues, [label]: '' };
     const pass = keyPass;
     keyPass = '';
     try {
       const out = await onkey(label, value, pass);
       if (out.ok) {
-        keyValues = { ...keyValues, [label]: '' };
         askPass = false;
         await onrecheck?.();
       } else {
         if (out.pass) askPass = true;
         keySaid = { ...keySaid, [label]: out.fix };
+        if (out.signin) keySignin = { ...keySignin, [label]: out.signin };
       }
     } finally {
       putting = '';
@@ -169,6 +175,10 @@
                       <div class="field"><input class="field-input" id="plan-key-pass-{i}" type="password" autocomplete="current-password" bind:value={keyPass} /></div>
                     {/if}
                     {#if keySaid[k.label]}<p class="plan-key-said" role="status">{keySaid[k.label]}</p>{/if}
+                    {#if keySignin[k.label]}
+                      {@const to = keySignin[k.label]!}
+                      <div class="plan-key-signin"><Button weight="quiet" onclick={() => location.assign(to)}>{words.keySignIn}</Button></div>
+                    {/if}
                   </form>
                   <span class="plan-detail">{words.keyTerminal}</span>
                   <CodeLine text={k.command} label={k.label} words />
@@ -367,6 +377,10 @@
     color: var(--red);
     font-size: var(--fs-meta);
     line-height: 18px;
+  }
+
+  .plan-key-signin {
+    display: flex;
   }
 
   .plan-text {

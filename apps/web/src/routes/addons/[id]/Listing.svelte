@@ -50,7 +50,8 @@
   import { glyphOf, ownIcon } from '$lib/market/ListingCard.svelte';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { words as planWords } from '$lib/market/plan.ts';
-  import { wantsPassphrase } from '$lib/record/keychain.ts';
+  import { keyPut, type KeyPut } from '$lib/market/key-put.ts';
+  import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import PreviewPage from '$lib/market/PreviewPage.svelte';
   import { addsOf, fieldsOf, namesOf } from '$lib/market/adds.ts';
   import { readCounts } from '$lib/market/counts.ts';
@@ -408,18 +409,22 @@
    * A KEY THE INSTALL SENDS, PUT IN FROM THE SHEET (audit 31 Oct f, AF3): the same host door the Keychain's Add a key
    * uses (`putKey`), so the value is sealed by the host and the record is handed sealed bytes. The plan is read again
    * after it, so the stop lifts and Install opens. A Keychain behind a password asks for it on the sheet.
+   *
+   * A SIGN-IN OLDER THAN THE KEYCHAIN'S LOCK IS PROVED AGAIN IN PLACE (RF3), as the Keychain page proves it: the record
+   * sends back "Sign in again to open the keychain." once the session's proof is older than `lock_after`, fifteen minutes
+   * until he sets one, which is the usual case for somebody browsing the Store. Where a passkey can prove it here, it does
+   * and the same key is sent once more; anywhere else the sheet offers the sign-in page, which comes back to this listing.
    */
-  async function putKey(label: string, value: string, passphrase: string): Promise<{ ok: true } | { ok: false; fix: string; pass?: boolean }> {
-    const out = await createClient({ base: apiBase() })
-      .putKey({ label, value, ...(passphrase === '' ? {} : { passphrase }) })
-      .catch(() => null);
-    if (out?.ok) {
-      toasts.push(planWords.keyAdded(label), { intent: 'good' });
-      return { ok: true };
-    }
-    if (out && 'refusal' in out) return { ok: false, fix: out.refusal.fix, ...(wantsPassphrase(out) ? { pass: true } : {}) };
-    return { ok: false, fix: copy.writeRaced };
+  async function putKey(label: string, value: string, passphrase: string): Promise<KeyPut> {
+    const send = () =>
+      createClient({ base: apiBase() })
+        .putKey({ label, value, ...(passphrase === '' ? {} : { passphrase }) })
+        .catch(() => null);
+    const out = await keyPut(send, { support, methods, passkeySignIn }, copy.writeRaced);
+    if (out.ok) toasts.push(planWords.keyAdded(label), { intent: 'good' });
+    return out;
   }
+
 
   /**
    * THE OWNER'S PRESS ON A KEY THAT CHANGED: the new key is kept beside the ones seen before, on the record, and the

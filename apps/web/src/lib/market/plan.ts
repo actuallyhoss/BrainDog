@@ -53,6 +53,8 @@ export const words = {
   keyPass: 'Keychain password',
   keyTerminal: 'Or from a terminal:',
   keyAdded: (label: string) => `"${label}" is in your keys.`,
+  /* A SIGN-IN TOO OLD TO OPEN THE KEYCHAIN, where no passkey could prove it on the sheet (RF3): the sign-in page, and back. */
+  keySignIn: 'Sign in again',
   keyAgain: 'Then open this again.',
   adds: 'Adds',
   /* THE NUMBERS A PLAN ADDS, AS ONE ROW: seventeen of them named one under another buried its lists. */
