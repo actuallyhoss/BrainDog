@@ -74,6 +74,11 @@ async function stubHost(t: After) {
       if (method === 'get')
         return answer({ ok: true, value: { id: 'e_1', register: 'skills', seq: 1, state: 'active', version: 1, fields: { kind: 'skill', rev: 1, managed: true, ...SKILL } } });
       if (method === 'heard') return answer({ ok: true, value: { marked: true } });
+      /* A TOKEN CANNOT MAKE TOKENS, as a record tells the plain token in BRAINDOG_TOKEN that `braindog mcp` tries (D4). */
+      if (method === 'createToken') {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this BrainDog is.', at: 'principal' } }));
+      }
       answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } });
     });
   });
@@ -606,10 +611,10 @@ test('BRAINDOG MCP --AGENT CODEX does the start work after its hello is answered
   assert.equal(reply.result.protocolVersion, '2025-06-18');
   assert.match(first.stderr, /^BrainDog at the start of this session: skills sync: 1 change\.$/m);
   assert.ok(existsSync(p.skillFile), "the record's skill is on disk");
-  /* The hello first, and the work's own requests after it, with the app's name. Before the hello, at most the one
+  /* The hello first, and the work's own requests after it, with the app's name. Before the hello, the one
      `createToken` the server tries for Codex's own token from BRAINDOG_TOKEN (D4), which a token there is refused. */
   const all = h.seen.map((s) => s.method);
-  assert.ok(all.indexOf('createToken') < all.indexOf('mcp:initialize') && all.filter((m) => m === 'createToken').length <= 1, all.join(' '));
+  assert.ok(all.indexOf('createToken') < all.indexOf('mcp:initialize') && all.filter((m) => m === 'createToken').length === 1, all.join(' '));
   const work = h.seen.filter((s) => s.method !== 'createToken');
   assert.deepEqual(work.slice(0, 3).map((s) => s.method), ['mcp:initialize', 'context', 'get'], all.join(' '));
   assert.equal(work[1]?.headers['x-braindog-agent'], 'codex');
@@ -623,6 +628,8 @@ test('BRAINDOG MCP --AGENT CODEX does the start work after its hello is answered
   const cursor = await serve('cursor', kiln, env, /BrainDog at the start of this session/);
   assert.equal(cursor.code, 0, cursor.stderr);
   assert.equal(h.seen.filter((s) => s.method === 'context').length, 2, 'another app runs it again');
+  /* THE REFUSAL IS KEPT FOR THE KEY (CS1), so neither later start asks again before its hello, whichever app it is. */
+  assert.equal(h.seen.filter((s) => s.method === 'createToken').length, 1, h.seen.map((s) => s.method).join(' '));
 
   for (const text of [first.stdout, first.stderr, again.stdout, again.stderr, cursor.stdout, cursor.stderr]) assert.equal(text.includes('stub-bearer'), false);
 });
