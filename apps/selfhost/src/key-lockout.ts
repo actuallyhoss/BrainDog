@@ -6,10 +6,18 @@
  * a 401 with no strike, so anybody who reached the port could guess in a loop, and a hit was the owner. The Directory's
  * own `ip:` lockout guarded only `/auth/token`.
  *
- * THE SAME RULE AS THE DIRECTORY'S (`packages/record/src/identity.ts`, `SIGN_IN`): ten are compared and the eleventh is
- * not; a lock is sticky, so a right key during it is refused like any other and cannot be told apart; a count whose
- * first strike is a window old starts again; and the right key clears the place it came from. AN IPv6 ADDRESS IS ITS
- * /64 (`ipBucket`), what one home or one cheap server is handed, so a fresh address per guess is the same place.
+ * THE RULE: ten wrong keys from one place in a window lock it; a count whose first strike is a window old starts
+ * again; and the right key clears the place it came from. AN IPv6 ADDRESS IS ITS /64 (`ipBucket`), what one home or one
+ * cheap server is handed, so a fresh address per guess is the same place.
+ *
+ * THE LOCK HOLDS WRONG KEYS ONLY, AND THE RIGHT KEY ALWAYS GETS IN (RG14). It used to be sticky, as the Directory's
+ * `SIGN_IN` is: a locked place was refused before anything was compared, the right key too. Under
+ * `BRAINDOG_TRUST_PROXY=1` or a trusted range the place is a header, and a header is words, so anybody on the LAN could
+ * name the owner's own address with ten wrong keys and lock the owner out for fifteen minutes, again and again. Now the
+ * key is compared first, in constant time, and a match is the owner wherever it came from. A wrong key from a locked
+ * place is a 429, held to one answer per `wait` (`turn`): one more may wait for the next turn and the rest are refused
+ * at once, so a guesser who waits for answers gets one every two seconds and a flood holds no sockets. That the right
+ * key answers differently during a lock costs no secret: a server key is at least 128 bits (`weakKey` in `main.ts`).
  *
  * IN THIS PROCESS AND NOT THE DIRECTORY, because a self-host with a key may have no Directory, and because the compare
  * is synchronous here (`sameKeyNow` in `server.ts`): the lock is read, the key compared and the strike written with
@@ -25,14 +33,19 @@ import { ipBucket } from '@braindog/record/directory';
 export type KeyLockout = {
   /** Seconds until the place `ip` stands for may try again, or `null` while it may. */
   locked(ip: string): number | null;
+  /**
+   * The turn of one wrong key from `ip`, taken after its compare: `{ wait: 0 }` while the place is not locked; locked,
+   * the milliseconds until its answer (and the turn is taken), or `full` when one already waits for the next turn.
+   */
+  turn(ip: string): PeerTurn;
   /** One wrong key from `ip`. */
   strike(ip: string): void;
   /** The right key from `ip`: its strikes are forgotten. */
   clear(ip: string): void;
 };
 
-/** Ten wrong keys in fifteen minutes; the lock lasts fifteen minutes. */
-export const KEY_TRIES = { most: 10, window: 15 * 60_000 } as const;
+/** Ten wrong keys in fifteen minutes; the lock lasts fifteen minutes, and holds a locked place's wrong keys to one answer per `wait`. */
+export const KEY_TRIES = { most: 10, window: 15 * 60_000, wait: 2_000 } as const;
 
 /** The most places remembered at once; the one struck longest ago goes first, so a flood of places costs bounded memory. */
 const PLACES_MOST = 50_000;
@@ -41,7 +54,9 @@ const PLACES_MOST = 50_000;
  * THE PROXY ITSELF IS COUNTED TOO, AND HELD TO A RATE, NEVER LOCKED (AI16, RG3, RH7, RH10). When a peer this host
  * trusts may be more than one machine (`1`, which believes the whole LAN, or a list holding a range such as
  * `172.16.0.0/12`, every Docker network), anybody who reaches the port past the proxy can write a fresh place into the
- * header with each guess (RG14), and the place lock never trips. So the wrong keys through one peer are counted too.
+ * header with each guess (RG14), and the place lock never trips. So the wrong keys through one peer are counted too,
+ * BY THE PEER'S OWN PLACE (`ipBucket`): an IPv6 caller on the LAN may take any address in its /64 without asking anybody,
+ * so a fresh source address per hundred guesses was a fresh peer.
  * LOCKING THAT PEER WAS THE OLD FAULT AGAIN: every caller behind Caddy or cloudflared has the proxy as its peer, so a
  * hundred wrong keys from anywhere on the internet locked the owner out with everybody else.
  *
@@ -69,29 +84,39 @@ export type PeerSlow = {
   strike(peer: string): boolean;
 };
 
+/**
+ * One turn on a queue whose next free turn is `at.next`: now or the next turn while it is at most `wait` away (and taken),
+ * else `full` with the seconds to it. Shared by the peer's rate and a locked place's.
+ */
+function takeTurn(at: { next: number }, t: number, wait: number): PeerTurn {
+  const slot = Math.max(t, at.next);
+  if (slot - t > wait) return { full: true, retryAfter: Math.max(1, Math.ceil((slot - t) / 1000)) };
+  at.next = slot + wait;
+  return { wait: slot - t };
+}
+
 export function peerSlow(now: () => number, rule: { most: number; window: number; wait: number } = PEER_CEILING): PeerSlow {
   /* `next` is when the next turn is free, once the peer is over the ceiling. */
   const peers = new Map<string, { n: number; first: number; next: number }>();
-  const live = (peer: string, t: number) => {
-    const at = peers.get(peer);
+  const placeOfPeer = (peer: string): string => ipBucket(peer) || peer;
+  const live = (place: string, t: number) => {
+    const at = peers.get(place);
     return at !== undefined && at.first > t - rule.window ? at : undefined;
   };
   return {
     turn(peer) {
       const t = now();
-      const at = live(peer, t);
+      const at = live(placeOfPeer(peer), t);
       if (at === undefined || at.n < rule.most) return { wait: 0 };
-      const slot = Math.max(t, at.next);
-      if (slot - t > rule.wait) return { full: true, retryAfter: Math.max(1, Math.ceil((slot - t) / 1000)) };
-      at.next = slot + rule.wait;
-      return { wait: slot - t };
+      return takeTurn(at, t, rule.wait);
     },
     strike(peer) {
+      const place = placeOfPeer(peer);
       const t = now();
-      const at = live(peer, t) ?? { n: 0, first: t, next: 0 };
+      const at = live(place, t) ?? { n: 0, first: t, next: 0 };
       at.n += 1;
-      peers.delete(peer);
-      peers.set(peer, at);
+      peers.delete(place);
+      peers.set(place, at);
       if (peers.size > PLACES_MOST) {
         const oldest = peers.keys().next().value;
         if (oldest !== undefined) peers.delete(oldest);
@@ -117,20 +142,30 @@ export function slowedLine(peer: string): string {
   return `${String(PEER_CEILING.most)} wrong server keys came through ${peer} in fifteen minutes, so wrong keys through it are now answered one at a time, one every ${String(PEER_CEILING.wait / 1000)} seconds, and the rest are told to try again later. The right key still gets in at once. If ${peer} is your proxy, set BRAINDOG_TRUST_PROXY to its exact address instead of 1 or a range, so each caller is counted on its own.`;
 }
 
-export function keyLockout(now: () => number, rule: { most: number; window: number } = KEY_TRIES): KeyLockout {
-  const places = new Map<string, { n: number; first: number; until: number | null }>();
+export function keyLockout(now: () => number, rule: { most: number; window: number; wait: number } = KEY_TRIES): KeyLockout {
+  /* `next` is when a locked place's next wrong key may be answered. */
+  const places = new Map<string, { n: number; first: number; until: number | null; next: number }>();
   const placeOf = (ip: string): string => ipBucket(ip) || '?';
+  const lockOf = (ip: string, t: number) => {
+    const at = places.get(placeOf(ip));
+    return at?.until != null && at.until > t ? at : undefined;
+  };
   return {
     locked(ip) {
-      const at = places.get(placeOf(ip));
       const t = now();
-      return at?.until != null && at.until > t ? Math.ceil((at.until - t) / 1000) : null;
+      const at = lockOf(ip, t);
+      return at?.until != null ? Math.ceil((at.until - t) / 1000) : null;
+    },
+    turn(ip) {
+      const t = now();
+      const at = lockOf(ip, t);
+      return at === undefined ? { wait: 0 } : takeTurn(at, t, rule.wait);
     },
     strike(ip) {
       const place = placeOf(ip);
       const t = now();
       let at = places.get(place);
-      if (at === undefined || (at.until !== null && at.until <= t) || (at.until === null && at.first <= t - rule.window)) at = { n: 0, first: t, until: null };
+      if (at === undefined || (at.until !== null && at.until <= t) || (at.until === null && at.first <= t - rule.window)) at = { n: 0, first: t, until: null, next: 0 };
       at.n += 1;
       if (at.n >= rule.most && at.until === null) at.until = t + rule.window;
       places.delete(place);
@@ -152,7 +187,7 @@ export function keyLockout(now: () => number, rule: { most: number; window: numb
  * locked the server key for everyone, again every fifteen minutes, and nothing said why.
  */
 export const ONE_PLACE =
-  'This looks like it is behind a proxy, and BRAINDOG_TRUST_PROXY is not set, so the sign-in lockout counts every visitor as the proxy: ten wrong keys from anywhere lock the server key for everyone for fifteen minutes. Set BRAINDOG_TRUST_PROXY to the proxy\'s address (or 1) if a proxy you run is the only way in.';
+  'This looks like it is behind a proxy, and BRAINDOG_TRUST_PROXY is not set, so the sign-in lockout counts every visitor as the proxy: after ten wrong keys from anywhere, every wrong key from anybody is answered slowly for fifteen minutes. The right key still gets in. Set BRAINDOG_TRUST_PROXY to the proxy\'s address (or 1) if a proxy you run is the only way in.';
 
 /** An address on this machine or a private network: where a proxy in front of this process stands. */
 export function nearPeer(address: string): boolean {

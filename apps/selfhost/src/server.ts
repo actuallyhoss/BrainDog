@@ -496,21 +496,18 @@ function validFrom(): string | undefined {
  */
 async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: Place, door?: string, cli?: string, request?: Request): Promise<Known> {
   const { api, token } = site;
-  /* A BEARER SHAPED LIKE THE SERVER KEY IS COUNTED AGAINST THE PLACE IT CAME FROM (SEC5), and a place that missed ten
-     times in fifteen minutes is refused before anything is compared: a miss used to be a 401 and nothing else, so the
-     key could be guessed in a loop. The lock, the compare and the strike run with no await between them. */
+  /* A BEARER SHAPED LIKE THE SERVER KEY IS COUNTED AGAINST THE PLACE IT CAME FROM (SEC5): a miss used to be a 401 and
+     nothing else, so the key could be guessed in a loop. Ten misses in fifteen minutes lock the place, and a locked
+     place's WRONG keys are a 429, one answer per turn. THE RIGHT KEY IS NEVER HELD BY THE LOCK (RG14): it is compared
+     first and let in at once, wherever it came from, because under a loosely trusted proxy the place is a header, and
+     anybody on the LAN could write the owner's own address into it with ten wrong keys and lock him out. The compare,
+     the lock's read and the strike still run with no await between them. */
   const keyShaped = token !== undefined && !sent.includes('.');
   /* AND THE PEER AS WELL, WHEN A LOOSELY TRUSTED PROXY'S HEADER NAMED THE PLACE (AI16): a header is words, and the
      socket is not. Over its ceiling the peer's WRONG KEYS are held to one answer per turn, never locked (RG3, RH7): every
-     caller behind the proxy shares it, the owner too. THE RIGHT KEY IS NEVER HELD (RJ2): it is compared first and let in
-     at once, so a stranger flooding the peer cannot starve the owner's agents of their turns as he did when every key
-     queued for one. Only a miss takes a turn: one waits for the next and the rest are a 429 at once, so sockets and
-     timers stay bounded. The lock, the compare and the strike still run with nothing in between. */
+     caller behind the proxy shares it, the owner too. THE RIGHT KEY IS NEVER HELD (RJ2), here either. Only a miss takes a
+     turn: one waits for the next and the rest are a 429 at once, so sockets and timers stay bounded. */
   const peerCount = keyShaped && at.peer !== '' && at.ip !== at.peer ? site.peerSlow : null;
-  if (keyShaped) {
-    const wait = site.keyLock.locked(at.ip);
-    if (wait !== null) return { bare: 429, retryAfter: wait };
-  }
   /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
      differs, so how long a wrong guess took said how much of it was right. */
   const isKey = token !== undefined && sameKeyNow(sent, token);
@@ -519,11 +516,18 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: P
     return owner(api, true);
   }
   if (keyShaped) {
-    site.keyLock.strike(at.ip);
+    /* A LOCKED PLACE IS NOT STRUCK AGAIN: its lock ends when it ends. A miss through a loose proxy still counts against
+       the peer, so naming one locked place for every guess dodges nothing. */
+    const lockedFor = site.keyLock.locked(at.ip);
+    if (lockedFor === null) site.keyLock.strike(at.ip);
     if (peerCount?.strike(at.peer) === true) console.error(slowedLine(at.peer));
-    const turn = peerCount?.turn(at.peer) ?? { wait: 0 };
-    if ('full' in turn) return { bare: 429, retryAfter: turn.retryAfter };
-    if (turn.wait > 0) await new Promise((done) => setTimeout(done, turn.wait));
+    const placeTurn = lockedFor === null ? { wait: 0 } : site.keyLock.turn(at.ip);
+    if ('full' in placeTurn) return { bare: 429, retryAfter: Math.max(placeTurn.retryAfter, lockedFor ?? 0) };
+    const peerTurn = peerCount?.turn(at.peer) ?? { wait: 0 };
+    if ('full' in peerTurn) return { bare: 429, retryAfter: peerTurn.retryAfter };
+    const wait = Math.max(placeTurn.wait, peerTurn.wait);
+    if (wait > 0) await new Promise((done) => setTimeout(done, wait));
+    if (lockedFor !== null) return { bare: 429, retryAfter: site.keyLock.locked(at.ip) ?? 1 };
   }
 
   /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
