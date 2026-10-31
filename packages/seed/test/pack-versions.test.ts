@@ -2504,11 +2504,12 @@ const DECLARED: Record<string, Version> = {
       metric.received-a-month metric.received-all metric.received-last metric.received-month metric.received-three
       metric.received-three-months-back metric.received-year metric.repeating-held metric.repeating-in-no-book
       metric.repeating-overdue metric.rule-filed metric.rules-filing metric.rules-filing-30d metric.runs-out-on metric.runway-days
-      metric.settled-in-7d metric.spent-30d metric.spent-all metric.spent-by-category-last-month metric.spent-by-category-month
-      metric.spent-by-category-to-date-last-month metric.spent-by-category-week metric.spent-by-category-year
-      metric.spent-in-category-by-week metric.spent-last metric.spent-last-month metric.spent-three metric.spent-vs-last-month
-      metric.spent-year metric.spoken-for-month metric.spoken-for-share metric.statement-oldest-days metric.stripe-below-zero-count
-      metric.txn-uncategorised metric.uncategorised-share-30d metric.unfiled-month metric.unfiled-spent-month metric.unnamed-paid-90d
+      metric.settled-in-7d metric.settled-out-7d metric.spent-30d metric.spent-all metric.spent-by-category-last-month
+      metric.spent-by-category-month metric.spent-by-category-to-date-last-month metric.spent-by-category-week
+      metric.spent-by-category-year metric.spent-in-category-by-week metric.spent-last metric.spent-last-month metric.spent-three
+      metric.spent-vs-last-month metric.spent-year metric.spoken-for-month metric.spoken-for-share metric.statement-oldest-days
+      metric.stripe-below-zero-count metric.txn-uncategorised metric.uncategorised-share-30d metric.unfiled-month
+      metric.unfiled-spent-month metric.unnamed-paid-90d
       page.money page.money-account page.money-accounts page.money-bill page.money-book page.money-budgets page.money-coming
       page.money-forecast page.money-ledger page.money-payees page.money-plan page.money-reports page.money-rules
       register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments
@@ -2528,7 +2529,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '199f1f241a0a0d26',
+    declares: '786ef33ec53daf88',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
@@ -2545,6 +2546,7 @@ const DECLARED: Record<string, Version> = {
       'Before 3.33.0 shipped, `page.money-plan` names its summary cell "Paid", where it said "Paid in"; no id added or taken away -> 0bc4bf113bd883c0',
       'Before 3.33.0 shipped, `page.money-plan` draws its summary as one tile set at a time, so a plan with nothing late has no "Late £0" and a paid plan no "Left £0"; no id added or taken away -> e6eb76a485ee7c05',
       'Before 3.33.0 shipped, `metric.bills-held` is added, `page.money` opens on an account to add when none is kept and signs its hero tiles by their way, `widget.cash-today` signs the same; one id added, none taken away -> 199f1f241a0a0d26',
+      'Before 3.33.0 shipped, `metric.settled-out-7d` is added, money he paid out in the last 7 days; one id added, none taken away -> 786ef33ec53daf88',
     ],
   },
   'work@1.17.0': {

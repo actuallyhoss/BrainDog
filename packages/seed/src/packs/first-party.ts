@@ -913,6 +913,8 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - money-core 3.33.0, before it shipped (audit 31 Oct m, AM1 AM3): `metric.bills-held` is added; with no account Money
  *   opens on one to add with what was told under it (`page.money`), and Cash ahead signs its tiles by their way
  *   (`page.money`, `widget.cash-today`).
+ * - money-core 3.33.0, before it shipped (left-h): `metric.settled-out-7d` is added, what he paid out in the last 7
+ *   days, for Today's no-account tile.
  * - portfolio 1.30.2 (audit 31 Oct g, AG22): a card's key number field reads "Shown first", where it read "Leads the
  *   card". Words only, so a patch step.
  * - work 1.20.1, before it shipped (audit 31 Oct f, AF20): Work's folded groups say how many they hold (`page.work`).
