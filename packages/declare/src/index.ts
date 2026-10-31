@@ -31,6 +31,7 @@ import { credentialKey as credential, credentialValue, looksLikeCredential, NEST
 import { FIRST_PARTY_LISTS, MODULES, readChanges, type ListWords } from './usecase.ts';
 import { cardsFault } from './cards.ts';
 import { addressFault } from './address.ts';
+import { reworded } from './reworded.ts';
 import { columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
@@ -1869,7 +1870,10 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
          the install went through with the metric summing a field the list did not have. The kernel took `sum: 'nosuch'`
          as well. One comparison with the body the edit started from closes it. */
       if (decl.kind !== 'register' || edited.body === decl.canonical) {
-        kept.push({ id: decl.id });
+        /* A PAGE KEPT TAKES THE UPDATE'S WORDS WHERE IT STILL SAYS THE PACK'S OLD ONES (`reworded`, UP1): staged as a
+           rebased list is, the update's page as the pack's and the owner's after it, so the next update starts from this one. */
+        const worded = decl.kind === 'page' ? rewordedPage(edited.body, already.body, decl.canonical) : null;
+        kept.push({ id: decl.id, ...(worded === null ? {} : { rebased: worded }) });
         /* AND WHAT THE OWNER'S PAGE GOES WITHOUT IS NAMED (`Diff.brings`), so Decide asks once instead of keeping
            the page and saying nothing of the table the update was written for. */
         const more = decl.kind === 'page' ? broughtTo(decl.id, edited.body, already.body, decl.body) : null;
@@ -2143,7 +2147,8 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     }
   }
 
-  const misreads = misreadsOf(pack, installed, new Set(kept.filter((k) => k.rebased === undefined).map((k) => k.id)), gone);
+  /* A KEPT PAGE WITH THE UPDATE'S WORDS CARRIED IN IS STILL THE OWNER'S PAGE, read as it was. */
+  const misreads = misreadsOf(pack, installed, new Set(kept.filter((k) => k.rebased === undefined || live.get(k.id)?.kind === 'page').map((k) => k.id)), gone);
   const unresolved = unresolvedOf(pack, installed, retires);
   /* A LIST THE RECORD LACKS HAS NOTHING TO LAY ON, and `unresolved` names it with the module that declares it. */
   const extensions: Diff['extends'] = Object.entries(pack.manifest.extends ?? {}).flatMap(([id, ext]) => {
@@ -2786,6 +2791,19 @@ function movedFields(was: string, now: unknown): { fields: Map<string, Record<st
  * only). A renamed list, a retyped field or a value taken off is an edit the update would undo or be undone by, so it
  * stays the conflict it was. The owner's fields go after the update's, and their values after the update's values.
  */
+/** A kept declaration's kind by its id: a rebased list, or a page with the update's words carried in. */
+const keptKind = (id: string): DeclKind => (id.startsWith('page.') ? 'page' : 'register');
+
+/** The owner's page with the update's words carried in (`reworded`), as stored text, or `null` for no word to carry. */
+function rewordedPage(from: string, mine: string, now: string): string | null {
+  try {
+    const out = reworded(JSON.parse(from) as Json, JSON.parse(mine) as Json, JSON.parse(now) as Json);
+    return out === null ? null : canonicalise(out);
+  } catch {
+    return null;
+  }
+}
+
 function rebased(from: string, mine: string, now: Record<string, Json>): { body: string; adds: string[] } | { clash: string } | null {
   let was: Record<string, unknown>;
   let theirs: Record<string, unknown>;
@@ -3731,7 +3749,7 @@ export function stagedBatch(pack: Pack, diff: Diff): StagedDeclaration[] {
      the record: portfolio one step up went through, and the step after it was refused `{ changed: true, field:
      'launched' }`, because the edit still started from the older body and the first update's own `launched` read as
      the owner's addition. */
-  const over = diff.kept.flatMap((k) => (k.rebased === undefined ? [] : [{ id: k.id, kind: 'register', body: JSON.parse(k.rebased) as Json }]));
+  const over = diff.kept.flatMap((k) => (k.rebased === undefined ? [] : [{ id: k.id, kind: keptKind(k.id), body: JSON.parse(k.rebased) as Json }]));
   /* WHAT THIS VERSION HANDS ON IS STAGED UNDER ITS NEW OWNER IN THE SAME BATCH, so the declaration is never retired: its
      rows stay readable, and a webhook's path token outlives the move, because `heldDigest` keeps a digest while every
      version since the mint is live. Retired and declared again, as money-core 1.8.0 first did, the Shortcut's door
@@ -3785,7 +3803,7 @@ export function plannedState(installed: Installed, pack: Pack, diff: Diff): Inst
   const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
   const staying = new Map(diff.stays.flatMap((s) => (s.body === undefined ? [] : [[s.id, s.body] as const])));
   for (const d of settleWhen(filledWith(pack, diff.config), diff.waiting ?? []).declarations) if (!keep.has(d.id)) put(d.id, d.kind, mine, staying.get(d.id) ?? d.canonical);
-  for (const k of diff.kept) if (k.rebased !== undefined) put(k.id, 'register', null, k.rebased);
+  for (const k of diff.kept) if (k.rebased !== undefined) put(k.id, keptKind(k.id), null, k.rebased);
   for (const r of diff.retires) if (r.to !== undefined && r.body !== undefined) put(r.id, live.get(r.id)?.kind ?? 'register', r.to, r.body);
   for (const e of diff.extends) if (e.body !== undefined) put(e.id, 'register', null, e.body);
   for (const r of diff.retires)
