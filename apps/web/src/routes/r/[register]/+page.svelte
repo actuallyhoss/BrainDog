@@ -60,7 +60,7 @@
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { lineFigures, lineValues, whichCurrency } from '$lib/record/line-figures.ts';
-  import { orderFields, orderFor } from '$lib/tell/order-box.ts';
+  import { newFor, orderFor, orderWrite } from '$lib/tell/order-box.ts';
   import { sameAsked, samePerson, type Twin } from '$lib/record/same-person.ts';
   import { recordToday } from '$lib/record/zone.ts';
   import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
@@ -1703,8 +1703,9 @@
    * one more from here again. Before this, the only way to take back a typed row was to find Archive in its menu.
    */
   const takeBack = (entry: Entry) => () => void archiveOnRecord([entry.seq], `“${nameOf(entry.seq)}”`, madeFor.get(entry.seq));
-  /* THE PERSON AN ORDER MADE GOES AND COMES BACK WITH IT (RN5): "20 candles for Salma by Friday" made Salma in a write
-     of her own, and the order's Put back and ⌘Z left her in People. By the order's number, for this tab's life. */
+  /* THE PERSON AN ORDER MADE GOES AND COMES BACK WITH IT (RN5): "20 candles for Salma by Friday" makes Salma in the
+     same write as the order, and its Undo and Put back take her too, unless something else now links to her (RO9). By
+     the order's number, for this tab's life. */
   const madeFor = new Map<number, { register: string; seq: number }>();
 
   /**
@@ -1858,13 +1859,9 @@
     const figures = order && decl?.title && typeof order.fields[decl.title] === 'string' ? { text: String(order.fields[decl.title]), fields: order.fields as Fields } : lineFigures(id, said, now);
     const captured = capturedFields(id, figures.text, either ? [] : filters, now, result.entries);
     const fields: Fields = { ...captured.fields, ...figures.fields };
-    /* SOMEBODY NEW THE ORDER IS FOR IS MADE FIRST, and their name is on this screen before the row is drawn (AN18): the
-       new row's Who said "Unnamed person" until the page was opened again. */
-    const madePerson = order ? (await orderFields(order, (register, f) => writes().create(register, f as Fields))).made : null;
-    if (madePerson && order?.whoField) {
-      fields[order.whoField] = `${madePerson.register}#${madePerson.seq}`;
-      if (madePerson.name !== '') named = joinNames(named, new Map([[`${madePerson.register}#${madePerson.seq}`, madePerson.name]]));
-    }
+    /* SOMEBODY NEW THE ORDER IS FOR GOES WITH IT, IN ONE WRITE (RN5): the person and the order land together or not at
+       all, under the one batch Tell's box writes a person and a row in. Their name is on this screen once it lands (AN18). */
+    const person = newFor(order);
     /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
     const seq = -++typedSeq;
     /* A LINK SAID AS `people#4` IS DRAWN AS THE ROW IT NAMES, by its number, as every row on the list holds one. */
@@ -1875,21 +1872,21 @@
       typedRows.drop(line);
       if (asked === was) clearReceipt(seq);
     };
-    const out = await writes().create(id, fields);
+    const { out, made: madePerson } = await orderWrite(writes(), id, fields, person);
+    if (madePerson && madePerson.name !== '') named = joinNames(named, new Map([[`${madePerson.register}#${madePerson.seq}`, madePerson.name]]));
     /* THE TYPED LINE AND THE RECORD'S ROW ARE ONE ROW: the swap is drawn where it stands, with neither leaving nor arriving. */
     if (out.ok && asked === was) swapInPlace();
     unline();
     if (!out.ok) {
-      /* A refused order leaves nobody behind: the person made for it goes too, so the next try makes one, not two. */
-      if (madePerson) void writes().archive(madePerson.register, madePerson.seq, madePerson.version);
+      /* A refused order made nobody: the one write took neither. */
       missed(was, out);
       onBack(said, out.fix);
       return null;
     }
     if (madePerson) madeFor.set(out.entry.seq, { register: madePerson.register, seq: madePerson.seq });
     if (asked !== was) return null;
-    /* THE PERSON IT IS FOR IS HELD BY NUMBER on the landed row, as on the typed one, so its Who is their name. */
-    const entry = madePerson && order?.whoField ? { ...out.entry, fields: { ...out.entry.fields, [order.whoField]: madePerson.seq } } : out.entry;
+    /* THE PERSON IT IS FOR IS HELD BY NUMBER on the landed row (`orderWrite`), so its Who is their name. */
+    const entry = out.entry;
     addLanded(entry, mark);
     /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME (motion F12, F20, VERIFY H23): "Added “Motion test bill” to Bills and
        invoices." The fields it filled in are each in their own cell on the row, so they are not read out here. The
@@ -2914,9 +2911,11 @@
       toasts.push(first ?? copy.writeNotReached, { intent: 'warn' });
       return;
     }
-    if (along) {
-      const gone = await writes().archive(along.register, along.seq);
-      if (gone.ok) alongGone = gone.entry;
+    /* ONLY WHILE NOTHING ELSE LINKS TO THEM (RO9): the person stays where a later order, a meeting or a note now points
+       at them, and Put back then has nobody to bring back but the order. */
+    if (along && landed.length === seqs.length) {
+      const gone = await writes().archiveAlone(along.register, along.seq);
+      if (gone?.ok) alongGone = gone.entry;
     }
     const line = landed.length === seqs.length ? copy.writeArchived(named) : copy.writeArchivedSome(landed.length, seqs.length);
     /* THE TOAST SAYS WHAT HAPPENED AND NOTHING MORE (motion F20): each row wears its own "Put back", so the toast draws no

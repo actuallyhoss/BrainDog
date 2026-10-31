@@ -473,7 +473,7 @@ export function pageWrites(deps: WritesDeps) {
        once the page has read the row back, or at once if the record refuses it (`lib/data/optimistic.ts`). */
     let line: Row = { cells: [typed], done: false };
     typedLine(register, line, true);
-    const [{ captureRow, readLine }, { rowWriter }, { lineFigures }, { orderFor, orderFields, orderRead }, { recordToday }] = await Promise.all([
+    const [{ captureRow, readLine }, { rowWriter }, { lineFigures }, { orderFor, newFor, orderRead, orderWrite }, { recordToday }] = await Promise.all([
       import('./capture.ts'),
       import('../record/rows-write.ts'),
       import('../record/line-figures.ts'),
@@ -483,13 +483,13 @@ export function pageWrites(deps: WritesDeps) {
     const writer = rowWriter(deps.base());
     /* AN ORDER IS READ AS THE ORDERS LIST'S OWN BOX AND TELL READ ONE (audit 31 Oct n, AN5): "20 candles for Salma by
        Friday" on the Orders page was an order called the whole line, for nobody. It is Candles, 20 of them, for Salma,
-       by Friday, and somebody new it is for is made in People first. */
+       by Friday, and somebody new it is for is made in People with it, in the same write (RN5). */
     const order = orderFor(typed, register, recordToday(now));
     const title = REGISTERS[register]?.title;
     const ordered = order && title && typeof order.fields[title] === 'string' ? order : null;
-    const took = ordered ? await orderFields(ordered, (r, f) => writer.create(r, f as Fields)) : null;
-    const made = took?.made ?? null;
-    const read = took && title ? (orderRead(took.fields, title, made) as { text: string; parsed: Fields; said: string[] }) : lightRead();
+    const person = newFor(ordered);
+    const read = ordered && title ? (orderRead(ordered.fields, title, person) as { text: string; parsed: Fields; said: string[] }) : lightRead();
+    let made: { register: string; seq: number } | null = null;
     function lightRead() {
       /* THE LIGHT SYNTAX, READ: "Chase Halden tomorrow #kiln" is drawn and written as "Chase Halden", due tomorrow. */
       const light = readLine(register, typed, now!);
@@ -506,10 +506,7 @@ export function pageWrites(deps: WritesDeps) {
     const row = captureRow(register, read.text, inherited, now, read.parsed);
     /* NO ROW IS A LIST WHOSE TITLE LEFT BETWEEN THE READ AND THE PRESS, because the page hands a capture a write only
        when the list declares one. It is the race it is, read again. */
-    /* A refused order leaves nobody behind (RN5): the person made for it goes too, so the next try makes one, not two. */
-    const unmade = () => void (made && writer.archive(made.register, made.seq, made.version));
     if (!row) {
-      unmade();
       typedLine(register, line, false);
       toasts.push(copy.writeRaced, { intent: 'warn' });
       return void (await deps.reread());
@@ -520,19 +517,21 @@ export function pageWrites(deps: WritesDeps) {
     const out = await optimist(toasts).run<{ seq: number; version: number }>({
       apply: () => {},
       revert: () => typedLine(register, drawn, false),
-      send: () => writer.create(register, row.fields).then((w) => (w.ok ? { ok: true as const, value: w.entry } : { ok: false as const, fix: w.fix })),
+      /* ONE WRITE FOR THE ORDER AND SOMEBODY NEW IT IS FOR (RN5): a refused order made nobody. */
+      send: () =>
+        orderWrite(writer, register, row.fields, person).then(({ out: w, made: m }) => {
+          made = m;
+          return w.ok ? { ok: true as const, value: w.entry } : { ok: false as const, fix: w.fix };
+        }),
       said: words.added(read.text, listWord(register, REGISTERS[register]?.name), read.said),
-      /* AND THE PERSON AN ORDER MADE GOES BACK WITH IT, as on the list (RN5). */
+      /* AND THE PERSON AN ORDER MADE GOES BACK WITH IT, as on the list (RN5), unless something else now links to them (RO9). */
       undo: (landed) => () =>
         void writer
           .archive(register, landed.seq, landed.version)
-          .then(() => (made ? writer.archive(made.register, made.seq) : undefined))
+          .then(() => (made ? writer.archiveAlone(made.register, made.seq) : undefined))
           .then(() => deps.reread()),
     });
-    if (!out.ok) {
-      unmade();
-      return back();
-    }
+    if (!out.ok) return back();
     deps.touched?.({ register, seq: out.value.seq }, words.markAdded, read.text);
     await deps.reread();
     typedLine(register, drawn, false);

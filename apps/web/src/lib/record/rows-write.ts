@@ -408,11 +408,25 @@ export function askedOf(register: string, captured: Captured): Asked[] {
   return asked;
 }
 
+/** Somebody new an entry is for, made with it: their list, their fields, and the entry's field that links them. */
+export type MadeWith = { register: string; fields: Fields; link: string };
+
 export type RowWriter = {
   create(register: string, fields: Fields, note?: string): Promise<Wrote>;
+  /**
+   * An entry and somebody new it is for, in ONE write under one batch (RN5, the record's `capture`, as Tell's box writes
+   * a person and a row together): both land or neither does, so a refused order leaves nobody behind. `person` is the
+   * one it made, by number.
+   */
+  createFor(register: string, fields: Fields, person: MadeWith): Promise<(Wrote & { ok: false }) | { ok: true; entry: Entry; person: { register: string; seq: number }; batch: string }>;
   update(register: string, seq: number, patch: Fields, version?: number): Promise<Wrote>;
   /** Archive a row: `deleted_at` set, so every list leaves it out and `restore` brings it back. */
   archive(register: string, seq: number, version?: number): Promise<Wrote>;
+  /**
+   * Archive a row made along with another only while nothing else points at it (RO9): the person an order's box made
+   * goes back with that order, and stays where a later order, a meeting or a note now links to them. `null` when kept.
+   */
+  archiveAlone(register: string, seq: number): Promise<Wrote | null>;
   restore(register: string, seq: number, version?: number): Promise<Wrote>;
   note(register: string, seq: number, note: string): Promise<Noted>;
   saveView(register: string, title: string, address: Address, columns: readonly string[]): Promise<Saved>;
@@ -510,6 +524,12 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
     /* THE RECORD STAMPS ITS OWN INSTANT on a non-null `deleted_at`, so what is sent only has to be not null. */
     archive: (register, seq, version) => update(register, seq, { deleted_at: new Date().toISOString() }, version),
     restore: (register, seq, version) => update(register, seq, { deleted_at: null }, version),
+    async archiveAlone(register, seq) {
+      const links = await client.backlinks({ register, seq, limit: 1 });
+      /* A READ THAT MISSES KEEPS THEM: somebody left in People is one press from gone; somebody taken from an order is not. */
+      if (!links.ok || links.value.from.some((g) => g.matched > 0 || g.rows.length > 0)) return null;
+      return update(register, seq, { deleted_at: new Date().toISOString() });
+    },
     async saveView(register, title, address, columns) {
       const refs = await refsFor(register);
       const slug = `${register.replace(/_/g, '-')}-${Date.now().toString(36)}`;
@@ -529,6 +549,35 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
       /* THE NEW ROW IS NOT IN THIS REGISTER'S KEPT MAP, so the map is dropped and walked again when next asked for. */
       maps.delete(register);
       return { ok: true, entry: entryOf(register, out.value as RecordRow, refs) };
+    },
+    async createFor(register, fields, person) {
+      const wrong = misTyped(person.register, person.fields) ?? misTyped(register, fields);
+      if (wrong !== null) return { ok: false, why: 'refused', fix: wrong };
+      const [refs, theirs] = await Promise.all([refsHolding(register, fields), refsHolding(person.register, person.fields)]);
+      /* THE ENTRY'S LINK POINTS AT THE FIRST ROW OF THE SAME WRITE, which the record turns into the person it just made. */
+      const rows = [
+        { register: person.register, fields: outbound(person.register, person.fields, theirs) },
+        { register, fields: { ...outbound(register, fields, refs), [person.link]: { $row: 0 } } },
+      ];
+      const out = await client.capture({ rows });
+      if (!out.ok) {
+        /* THE REFUSAL NAMES ITS ENTRY AND FIELD (`rows[1].fields.amount`), said here as the list it is on would say it. */
+        const f = out as Failed;
+        const at = 'refusal' in f ? /^rows\[(\d)\]\.fields\.(.+)$/u.exec(f.refusal.at ?? '') : null;
+        const theirsRefused = at?.[1] === '0';
+        const said = 'refusal' in f && at ? ({ ok: false, refusal: { ...f.refusal, at: at[2] } } as Failed) : f;
+        return failed(theirsRefused ? person.register : register, null, said, theirsRefused ? theirs : refs) as Promise<Wrote & { ok: false }>;
+      }
+      maps.delete(register);
+      maps.delete(person.register);
+      const value = out.value as { batch: string; made: { register: string; seq: number | null }[] };
+      const them = value.made[0]?.seq ?? null;
+      const it = value.made[1]?.seq ?? null;
+      if (them === null || it === null) return { ok: false, why: 'refused', fix: copy.writeRaced };
+      /* THE ENTRY AS THE RECORD KEPT IT, read once, since a capture answers numbers; as it was sent, if that read misses. */
+      const got = await client.get(register, it);
+      const entry: Entry = got.ok && isRow(got.value) ? entryOf(register, got.value, refs) : { seq: it, fields: { ...fields, [person.link]: them }, version: 1, created: new Date().toISOString(), by: '' };
+      return { ok: true, entry, person: { register: person.register, seq: them }, batch: value.batch };
     },
     async note(register, seq, note) {
       const out = await client.log({ register, seq, note });
