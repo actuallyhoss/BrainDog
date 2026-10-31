@@ -562,7 +562,7 @@
         class:cell-open={href}
         {href}
         data-intent={row.tone}
-        data-cell={i}
+        data-dir={(w ? w.minus : coded?.sign) === '+' ? 'in' : undefined}
       >
         <span class="cell-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
         <span class="cell-figure num" data-fit={chars === null ? undefined : ''} style={chars === null ? undefined : `--chars:${chars}`}>

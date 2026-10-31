@@ -28,7 +28,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { run } from '$lib/data/optimistic.svelte.ts';
   import { reread } from '$lib/data/live.svelte.ts';
-  import type { TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
+  import type { TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -110,11 +110,12 @@
   const listName = (register: string): string => options.lists.find((l) => l.id === register)?.name ?? register;
 
   /** Adds these entries of the preview (`shown`), all under one batch, and keeps the lines they were said in. */
-  async function send(sent: { register: string; fields: Record<string, unknown> }[], shown: readonly TellRow[], at: readonly number[], first: string | null = null) {
+  async function send(sent: { register: string; fields: Record<string, unknown> }[], shown: readonly TellRow[], at: readonly number[], first: string | null = null, lists: readonly TellList[] = options.lists) {
+    const nameOf = (register: string): string => lists.find((l) => l.id === register)?.name ?? register;
     if (sending || sent.length === 0) return;
     sending = true;
     const pressed = typeof document === 'undefined' ? null : document.activeElement;
-    const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: listName(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
+    const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: nameOf(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
     const client = createClient({ base: apiBase() });
     /* THE UNDO IS THE RECORD'S, by the batch the capture answers: `run` offers `undoChange(base, batch)` on the receipt. */
     await run({
@@ -127,7 +128,7 @@
       },
       /* EACH ENTRY BY WHAT IT IS, read from the fields it was sent with: the capture answers in the order it was sent. */
       said: (value) =>
-        [first ?? '', addedSaid(value.made.map((m, i) => ({ register: m.register, fields: sent[i]?.fields })), options.lists), heldSaid(shown)]
+        [first ?? '', addedSaid(value.made.map((m, i) => ({ register: m.register, fields: sent[i]?.fields })), lists), heldSaid(shown)]
           .filter((line) => line !== '')
           .join('. '),
       settle: () => {
@@ -156,32 +157,30 @@
 
   /* ── turning Money on for a money line (AM4) ──
      THE PRESS TURNS MONEY ON, THEN THE SAME WORDS ARE READ AGAIN AGAINST THE LISTS IT BROUGHT and what they become is
-     added, all in one press: the rail and the lists are read again (`forget`, `invalidateAll`), Today learns the new
-     lists' declarations, and once the line reads as entries they go, under one batch with the one Undo every add has.
-     Money stays on after an Undo; the line is what is taken back. A line that reads as a question once Money is on
-     (which currency) is left on the card to be answered. */
+     added, all in one press, under one batch with the one Undo every add has: the lists Money holds are learnt here
+     (`learn`), the sentence read against them, and the rail read again after. Money stays on after an Undo; the line is
+     what is taken back. A line that still cannot be placed once Money is on (which currency) says so on the card. */
   let moneyWait = $state(false);
   let moneyFix = $state<string | null>(null);
   async function moneyOn() {
-    if (sending || moneyWait) return;
+    if (sending || moneyWait || reader === null) return;
     moneyFix = null;
     moneyWait = true;
-    const { turnOnMoney } = await import('$lib/tell/money-on.ts');
-    const fix = await turnOnMoney(apiBase()).catch(() => 'Money could not be turned on. Try again.');
-    if (fix !== null) {
+    const words = typed;
+    try {
+      const { moneyThenRead } = await import('$lib/tell/money-on.ts');
+      const out = await moneyThenRead(apiBase(), words, options, reader);
+      if ('fix' in out) moneyFix = out.fix;
+      else {
+        const go = readyRows(out.told.rows);
+        if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists);
+        else moneyFix = out.told.why ?? null;
+      }
+      await invalidateAll();
+    } finally {
       moneyWait = false;
-      moneyFix = fix;
-      return;
     }
-    (await import('$lib/record/boot-live.ts')).forget();
-    await invalidateAll();
-    void reread();
   }
-  $effect(() => {
-    if (!moneyWait || !told || told.needsMoney) return;
-    moneyWait = false;
-    if (ready.length > 0) void send(ready, rows, readyAt(rows), say.moneyTurned);
-  });
 
   /* CMD OR CTRL AND ENTER ADDS (AH20): Enter alone is a new line, for a pasted message. */
   function keyed(e: KeyboardEvent) {

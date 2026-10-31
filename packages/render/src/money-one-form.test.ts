@@ -24,18 +24,19 @@ const exact = (text: string, home: string | null): string | null => symbolFigure
 const read = (text: string, home: string | null): string => headlineFigure(text, home);
 const bar = (text: string, home: string | null): string => barFigure(text, home);
 
-test('A DOLLAR ON A RECORD THAT IS NOT IN DOLLARS IS `$3.63 USD`: in a table, on a tile and on a bar, however it came', () => {
+/* BY ITS OWN SIGN ALONE SINCE AM15 (audit 31 Oct m): "$1,950" on Today, "+$1,950 USD" on Bills and "+US$1,950" in its table. */
+test('A DOLLAR ON A RECORD THAT IS NOT IN DOLLARS IS `$3.63`: in a table, on a tile and on a bar, however it came', () => {
   for (const home of ['EGP', 'GBP', null]) {
     for (const text of SMALL) {
-      assert.equal(exact(text, home), `$3.63${S}USD`, `exact, ${text}, home ${home}`);
-      assert.equal(read(text, home), `$3.63${S}USD`, `read, ${text}, home ${home}`);
-      assert.equal(bar(text, home), `$3.63${S}USD`, `bar, ${text}, home ${home}`);
+      assert.equal(exact(text, home), '$3.63', `exact, ${text}, home ${home}`);
+      assert.equal(read(text, home), '$3.63', `read, ${text}, home ${home}`);
+      assert.equal(bar(text, home), '$3.63', `bar, ${text}, home ${home}`);
     }
     for (const text of LARGE) {
-      assert.equal(exact(text, home), `$4,012.46${S}USD`, `exact, ${text}, home ${home}`);
-      assert.equal(read(text, home), `$4,012.46${S}USD`, `read, ${text}, home ${home}`);
-      assert.equal(bar(text, home), `$4,012.46${S}USD`, `bar, ${text}, home ${home}`);
-      assert.equal(axisFigure(text, home), `$4k${S}USD`, `axis, ${text}, home ${home}`);
+      assert.equal(exact(text, home), '$4,012.46', `exact, ${text}, home ${home}`);
+      assert.equal(read(text, home), '$4,012.46', `read, ${text}, home ${home}`);
+      assert.equal(bar(text, home), '$4,012.46', `bar, ${text}, home ${home}`);
+      assert.equal(axisFigure(text, home), '$4k', `axis, ${text}, home ${home}`);
     }
   }
 });
@@ -73,14 +74,16 @@ test('THE HOME CURRENCY OF AN EGP RECORD IS `EGP 700` EVERYWHERE, and never `E£
 test('A CELL, A TILE AND A SENTENCE OF ONE RECORD AGREE, the two currencies side by side', () => {
   const home = 'EGP';
   const cell = leadingCode('USD 2,947.95', home);
-  assert.deepEqual(cell, { currency: 'USD', rest: '$2,947.95', sign: '', place: 'after', text: `$2,947.95${S}USD` });
+  assert.deepEqual(cell, { currency: '', rest: '$2,947.95', sign: '', place: null, text: '$2,947.95' });
   assert.equal(read(`$2,947.95${S}USD`, home), cell.text, 'a tile handed the drawn figure');
   assert.equal(symbolText('Harbour holds USD 2,947.95 today', false, home), `Harbour holds ${cell.text} today`);
-  assert.equal(read(`EGP 702,318.00 · $2,947.95${S}USD`, home), `EGP${S}702,318 · $2,947.95${S}USD`, 'two figures on one tile');
+  assert.equal(read(`EGP 702,318.00 · $2,947.95${S}USD`, home), `EGP${S}702,318 · $2,947.95`, 'two figures on one tile');
 });
 
 test('MONEY COMING IN KEEPS ITS PLUS, in front of everything, and nought has no sign', () => {
-  assert.equal(bar('+USD 850.00', 'EGP'), `+$850${S}USD`);
+  assert.equal(bar('+USD 850.00', 'EGP'), '+$850');
+  /* A DOLLAR ON A CANADIAN RECORD KEEPS ITS CODE: there `$` is the home's own sign. */
+  assert.equal(bar('USD 850.00', 'CAD'), `$850${S}USD`);
   assert.equal(bar('+GBP 850.00', 'GBP'), '+£850');
   assert.equal(exact('+EGP 850.00', 'EGP'), `+EGP${S}850.00`);
   assert.equal(leadingCode('+EGP 850.00', 'EGP')?.sign, '+');
@@ -102,8 +105,8 @@ test('ONLY A WHOLE FIGURE WITH EVERY DIGIT IN IT IS READ: a compact one, a bare 
 });
 
 test('NOT TOLD THE HOME, A DRAWER KEEPS THE PATH IT HAD, which is why every host has to say it', () => {
-  assert.equal(headlineFigure('$4,800.00 USD'), 'US$4,800');
-  assert.equal(symbolFigure('USD 3.63'), 'US$3.63');
+  assert.equal(headlineFigure('$4,800.00 USD'), '$4,800');
+  assert.equal(symbolFigure('USD 3.63'), '$3.63');
   /* The older path reads the writer's own code-first figure too, so a figure drawn once is not mangled by it. */
   assert.equal(barFigure(`EGP${S}700`), `EGP${S}700`);
   assert.equal(headlineFigure(`−EGP${S}73,615.27`), `−EGP${S}73,615.27`);

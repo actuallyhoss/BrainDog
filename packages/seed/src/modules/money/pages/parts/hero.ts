@@ -33,10 +33,11 @@ export const HERO: Record<string, unknown>[] = [
       { metric: 'cash-now', label: 'Cash now', trend: '12w', ahead: 'runway-days', note: CASH_NOW_SAID },
       { ...ON_WHAT_IS_DUE, label: 'Lasts', note: 'In {{runway-days}}' },
       { ...LASTS_SAID, label: 'If nothing comes in' },
-      { metric: 'arriving-30d', label: 'To come in, next 30 days' },
+      /* EACH SAID WITH THE WAY IT GOES, "+" in and "−" out, as Today's Cash ahead says them (AM1). */
+      { metric: 'arriving-30d', label: 'To come in, next 30 days', sign: 'in' },
       /* WHAT THE FIGURE HOLDS IS ITS NAME (live check of 30 October, 9): bills, plans and the usual everyday spending, so it
          never reads as Coming up's repeating bills a month, a far smaller figure under a name alike. */
-      { metric: 'leaving-30d', label: 'Bills and usual spending, next 30 days' },
+      { metric: 'leaving-30d', label: 'Bills and usual spending, next 30 days', sign: 'out' },
     ],
     when: { metric: 'cash-accounts', gt: 0 },
   },

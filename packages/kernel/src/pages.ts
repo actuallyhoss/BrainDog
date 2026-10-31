@@ -135,7 +135,8 @@ export type PageBlock = {
    * `ahead:` may name the figure a walk opens from (`cash-now`) instead, and the fullest walk declared from it is drawn
    * (`walkFrom`), so a page that knows only what is held draws its future without naming whose figure walks it.
    */
-  cells?: { metric: string; label?: string; trend?: string; note?: string; ahead?: string }[];
+  /* `sign`: the way the money in a figure goes, said in front of it, "+£11,490" for `in` and "−£43,047" for `out` (AM1). */
+  cells?: { metric: string; label?: string; trend?: string; note?: string; ahead?: string; sign?: 'in' | 'out' }[];
   /**
    * A `stat`'s: its first figure is the screen's one hero figure. A `cards` block's: its first card is drawn two tracks
    * wide. A `note`'s: its body is the page's opening sentence, said with the plural and nought rules a figure's note has.

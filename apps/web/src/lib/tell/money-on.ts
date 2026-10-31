@@ -10,7 +10,11 @@
 
 import { createClient } from '@braindog/client';
 
+import { forget, readBoot } from '../record/boot-live.ts';
+import { REGISTERS } from '../record/held.ts';
 import { packDocument, type PackState } from '../record/packs.ts';
+import { learn } from '../record/remote.ts';
+import type { Told, TellList, TellOptions, tellRead } from './read.ts';
 
 /** The module that keeps money: accounts, the Ledger, bills and what repeats. */
 export const MONEY_MODULE = 'money-core';
@@ -42,4 +46,33 @@ export async function turnOnMoney(base: string): Promise<string | null> {
   if (typeof hash !== 'string' || hash === '') return fixOf(null);
   const put = (await client.installPack({ doc, source: { kind: 'local' }, planHash: hash, ...(approve.length === 0 ? {} : { approve }) }).catch(() => null)) as Wire | null;
   return put?.ok ? null : fixOf(put);
+}
+
+/**
+ * MONEY ON, THEN THE SAME WORDS READ AGAIN AGAINST THE LISTS IT BROUGHT: the lists Money holds are learnt here (`learn`)
+ * and put in the order the record lists them, as Today reads them (`tellLists`), since the first list a line fits is
+ * the one it goes into: read against Instalments before Bills and invoices, a payment asked which plan it was part of.
+ * The kept `boot` is dropped, so the rail and Today read the record again after.
+ */
+export async function moneyThenRead(
+  base: string,
+  words: string,
+  options: TellOptions,
+  reader: typeof tellRead,
+): Promise<{ fix: string } | { told: Told; lists: TellList[] }> {
+  const fix = await turnOnMoney(base).catch(() => fixOf(null));
+  if (fix !== null) return { fix };
+  const client = createClient({ base });
+  const packs = (await client.packs().catch(() => null)) as (Wire & { value?: PackState[] }) | null;
+  const ids = (packs?.ok ? (packs.value ?? []) : []).find((p) => p.id === MONEY_MODULE)?.registers ?? [];
+  const asked = new Map<string, Promise<void>>();
+  await Promise.all(ids.map((id) => learn(client.schema, id, asked).catch(() => {})));
+  const held = new Set(options.lists.map((l) => l.id));
+  const brought = ids.flatMap((id) => (held.has(id) || !REGISTERS[id] ? [] : [{ ...(REGISTERS[id] as unknown as TellList), pack: MONEY_MODULE, count: 0 }]));
+  forget();
+  const got = await readBoot(base).catch(() => null);
+  const order = got?.from === 'live' ? got.boot.registers.map((r) => r.id) : [];
+  const at = (id: string): number => order.indexOf(id) + 1 || order.length + 1;
+  const lists = [...options.lists, ...brought].sort((a, b) => at(a.id) - at(b.id));
+  return { told: reader(words, { ...options, lists }), lists };
 }

@@ -934,8 +934,10 @@ type Body = Record<string, unknown>;
  * draws on a record with People off.
  */
 /* An organisation's `projects` is a link by the same id as a person's, since People 3.0.0, and the ledger's `party`
-   points at People's organisations since money-core 3.10.0, where a bill's still points at its people. */
-const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], 'money-core': ['party'], work: ['owner', 'thing'] };
+   points at People's organisations since money-core 3.10.0, where a bill's still points at its people. AND WHICH PROJECT
+   A BILL, A PAYMENT OR A REPEATING LINE IS FOR (`thing`, audit 31 Oct m, AM4), as Work's tasks say it: Money turned on
+   from a money line on a Student's Today was refused, "money-core points at the things list ... which is not here". */
+const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], 'money-core': ['party', 'thing'], work: ['owner', 'thing'] };
 
 /**
  * The id a declaration in a document is filed under: its kind's key.

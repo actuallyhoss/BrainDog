@@ -696,6 +696,16 @@ export function bucketLabel(key: string, bucket: string): string {
  * break. Doing it here means an author never has to know the rule.
  */
 /**
+ * A FIGURE WITH THE WAY ITS MONEY GOES IN FRONT, where its tile says so (`sign` on the cell, AM1): "+EGP 45,000" coming
+ * in, "−EGP 12,000" going out, as the stored amount the one writer reads (`readFigure` takes a sign before the code).
+ * Nought has no sign, and a figure that is no amount, or is below nought already, is left as it is.
+ */
+export function signedFigure(m: { value: string; sign?: 'in' | 'out' | undefined }): string {
+  if (!m.sign || m.value.includes('·') || !/^[A-Z]{3} \d/u.test(m.value) || /^[A-Z]{3} 0(?:\.0+)?$/u.test(m.value)) return m.value;
+  return `${m.sign === 'in' ? '+' : '\u2212'}${m.value}`;
+}
+
+/**
  * A figure's trend as the dialect's fourth `stat` cell: whole units, a gap as `-`.
  *
  * WHOLE UNITS FOR MONEY, because the line's accessible name reads these numbers out, and `3385000` is
@@ -1524,7 +1534,7 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
         )
       : block.metrics
     ? block.metrics.map(
-        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value) || m.ahead !== undefined, m.ahead?.from) || (m.waits ? ' | -' : '')}${m.tone ? ` | ${m.tone}` : ''}`,
+        (m) => `${escapeCell(m.label)} | ${escapeCell(signedFigure(m))} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value) || m.ahead !== undefined, m.ahead?.from) || (m.waits ? ' | -' : '')}${m.tone ? ` | ${m.tone}` : ''}`,
       )
     : block.kind === 'stat' && (block.register || block.measures)
       ? tileRows(measuresFor(block))

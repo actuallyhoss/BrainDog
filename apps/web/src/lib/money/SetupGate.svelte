@@ -37,8 +37,16 @@
 </script>
 
 {#if showing}
-  {#if keep}{@render children()}{/if}
+  {#if keep}<div class="kept">{@render children()}</div>{/if}
   {@render setup(() => (closed = true))}
 {:else}
   {@render children()}
 {/if}
+
+<style>
+  /* THE PAGE KEPT ABOVE THE SETUP ENDS WHERE ITS LAST TILE DOES: the room a page leaves at its foot stood as a gap
+     between what was told and the setup under it. */
+  .kept :global(.page) {
+    padding-block-end: 0;
+  }
+</style>

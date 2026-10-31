@@ -2274,20 +2274,12 @@
   }
 
   /* COMING IN AND GOING OUT CARRY THEIR SIGNS (VERIFY H6): "+£11,490" in the good green and "−£43,047" in ink, so the
-     two figures are never read as the same kind of number. BY THE CELL'S OWN PLACE IN THE TILE (`data-cell`, as
-     `default-home.ts` declares them: cash now, coming in, going out), NEVER ITS PLACE ON SCREEN (audit 31 Oct m, AM1):
-     with no account Cash now draws nothing, going out stood second, and the rent read "+EGP 12,000" in green. A figure
-     that leads the tile is said bare. */
-  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell[data-cell='1']:not(:first-child) .cell-figure) {
+     two figures are never read as the same kind of number. THE SIGN IS THE FIGURE'S OWN, written by the tile's cell
+     (`sign` in `default-home.ts`, `signedFigure`), and the green follows it (`data-dir`). It was put on by the cell's
+     place on screen (audit 31 Oct m, AM1): with no account Cash now draws nothing, going out stood second, and the rent
+     read "+EGP 12,000" in green. */
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell[data-dir='in'] .cell-figure) {
     color: var(--good);
-  }
-
-  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell[data-cell='1']:not(:first-child) .cell-figure::before) {
-    content: '+';
-  }
-
-  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell[data-cell='2']:not(:first-child) .cell-figure::before) {
-    content: '\2212';
   }
 
   .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child) {

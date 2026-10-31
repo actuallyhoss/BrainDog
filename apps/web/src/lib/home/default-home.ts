@@ -568,8 +568,8 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
             icon: 'wallet',
             cells: [
               { metric: 'cash-now', label: words.cashNow, trend: '12w', ahead: 'cash-now', note: words.lastsTo },
-              { metric: 'arriving-30d', label: words.comingIn },
-              { metric: 'leaving-30d', label: words.goingOut },
+              { metric: 'arriving-30d', label: words.comingIn, sign: 'in' },
+              { metric: 'leaving-30d', label: words.goingOut, sign: 'out' },
             ],
           } as PageBlock,
         ]

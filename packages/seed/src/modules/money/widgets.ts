@@ -30,8 +30,8 @@ export const MONEY_WIDGETS = {
       icon: 'wallet',
       block: stat('Cash ahead', 'wallet', [
         { metric: 'cash-now', label: 'Cash now', trend: '12w', ahead: 'cash-now', note: 'Lasts to {{runs-out-on}}' },
-        { metric: 'arriving-30d', label: 'Coming in, 30 days' },
-        { metric: 'leaving-30d', label: 'Going out, 30 days' },
+        { metric: 'arriving-30d', label: 'Coming in, 30 days', sign: 'in' },
+        { metric: 'leaving-30d', label: 'Going out, 30 days', sign: 'out' },
       ]),
       sizes: ALL,
       size: 'wide',
