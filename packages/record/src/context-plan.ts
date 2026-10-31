@@ -240,6 +240,11 @@ export type ContextFacts = {
   now: number;
   /** The record's version for this run (`stampFor`), carried on the plan so the door can hand it on. */
   stamp?: string | undefined;
+  /**
+   * The first line Today opens on (the record's briefing, by its rules), asked only when the card has no step to give:
+   * no instruction in hand, no step left here and nothing in this agent's lane (AK18). `null` when Today says nothing.
+   */
+  today?: (() => string | null) | undefined;
   /** Outside any project: the projects this agent worked on last, by name. */
   recent?: readonly string[] | undefined;
   /** This run's first call: the teaching lines are said, once. */
@@ -386,6 +391,16 @@ function clashLine(f: ContextFacts): string | null {
  * THE START HOOK PRINTS THIS CARD AND NOTHING ELSE, so the warning is a line of it: an agent sharing a tree is told at
  * start, not only when it calls `context`.
  */
+/** Today's first line, or `null` when it says nothing or cannot be read. */
+const todayLine = (f: ContextFacts): string | null => {
+  try {
+    const line = f.today?.() ?? null;
+    return line === null || line.trim() === '' ? null : oneLine(line);
+  } catch {
+    return null;
+  }
+};
+
 function planCard(f: ContextFacts, lesson: string | null, builder: boolean, clash: string | null): string {
   const who = f.who!;
   const recent = (f.recent ?? []).map((r) => words(r, 30)).filter(Boolean).slice(0, 3);
@@ -394,9 +409,13 @@ function planCard(f: ContextFacts, lesson: string | null, builder: boolean, clas
     : `${who.who.replace(/, no project yet:.*$/u, '')}. No project here.${recent.length > 0 ? ` Lately: ${and(recent)}; name one to context as project.` : ' Name it to context as project.'}`;
   const inHand = f.told.find((t) => t.taken_by && f.run && t.taken_by === f.run && t.kind !== 'stop' && t.kind !== 'pause');
   const top = f.lane.find((t) => t.mine);
+  /* A STEP LEFT HERE, ELSE THE TOP OF THE LANE, ELSE WHAT TODAY OPENS ON (AK18): "Nothing was handed over" gave an agent
+     on a record full of late work no way to it, so the line Today leads with stands in for the step nobody left. */
+  const handed = who.next !== null && who.next !== undefined && !who.next.includes('Nothing was handed over') ? who.next : null;
+  const today = inHand || handed || top ? null : todayLine(f);
   const next = inHand
     ? labeled('Next', `${inHand.id}, in hand: do it, then reply with instructions.`)
-    : (who.next ?? (top ? labeled('Next', `${words(top.name, 70)} (${top.spoken}, yours)`) : null));
+    : (handed ?? (top ? labeled('Next', `${words(top.name, 70)} (${top.spoken}, yours)`) : today !== null ? labeled('Next', `Today: ${words(today, 70)}`) : (who.next ?? null)));
   const learned = lesson === null ? null : labeled('Learned', words(lesson, 91));
   const lines = [first, next, clash, builder ? null : who.waiting, learned, who.update].filter((l): l is string => l !== null);
   /* FIVE LINES AT MOST: line one, Next, the warning, Waiting and Update are five, so Learned is the one that gives way. */
@@ -596,7 +615,7 @@ export const planCardWords = (p: Plan): number => wordCount(p.card);
 /* ── the facts from today's context ────────────────────────────────────── */
 
 /** What `factsFromContext` is told beside the context: the card's `at`, the instant, and what `Context` does not hold. */
-export type FactsAt = CardAt & { now: number } & Partial<Pick<ContextFacts, 'stop' | 'told' | 'may' | 'reach' | 'brief' | 'first' | 'teach' | 'stamp' | 'recent' | 'extra' | 'task' | 'since' | 'kpis'>>;
+export type FactsAt = CardAt & { now: number } & Partial<Pick<ContextFacts, 'stop' | 'told' | 'may' | 'reach' | 'brief' | 'first' | 'teach' | 'stamp' | 'recent' | 'extra' | 'task' | 'since' | 'kpis' | 'today'>>;
 
 const str = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null);
 
@@ -667,6 +686,7 @@ export function factsFromContext(c: Context, at: FactsAt): ContextFacts {
     ...(at.since ? { since: at.since } : {}),
     ...(at.stamp ? { stamp: at.stamp } : {}),
     ...(at.recent ? { recent: at.recent } : {}),
+    ...(at.today ? { today: at.today } : {}),
     ...(at.first !== undefined ? { first: at.first } : {}),
     ...(at.teach ? { teach: at.teach } : {}),
     ...(at.extra ? { extra: at.extra } : {}),

@@ -149,7 +149,7 @@ test('EXPORT THROUGH THE DEVICE FLOW: reach export, six digits on stderr, the be
   );
   assert.equal(d.seen[1]!.body.reach, 'export');
   assert.match(String(d.seen[1]!.body.label), /export/, 'the approver is not told what they are approving');
-  assert.ok(r.said.some((l) => l.includes('enter  123 456')), r.said.join('\n'));
+  assert.ok(r.said.some((l) => l.includes('enter 123 456')), r.said.join('\n'));
   const sent = d.api()[1]!;
   assert.equal(sent.auth, `Bearer ${GRANT}`);
   assert.deepEqual(sent.body, { redactGrants: false, kek_id: KEK }, 'a backup must carry the sealed bytes and name their key');

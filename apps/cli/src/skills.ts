@@ -153,6 +153,19 @@ export function valueOf<T>(r: Result<T>): T | null {
 export const fixOf = (r: Result<unknown>): string => (refused(r) ? r.refusal.fix : 'BrainDog did not take it.');
 
 /**
+ * Why a create added no row, in words (AK20): the refusal's fix, or, for an answer that filed a question in its place,
+ * that it was asked and where. "BrainDog did not take it." said neither.
+ */
+function notTaken(out: Result<unknown>): string {
+  if (!out.ok) return fixOf(out);
+  const v = isObject(out.value) ? out.value : {};
+  if (typeof v.said === 'string' && v.said.trim() !== '') return v.said.trim();
+  const id = typeof v.id === 'string' ? v.id : typeof v.suggestion === 'string' ? v.suggestion : null;
+  if (id !== null && /^SG[1-9][0-9]*$/u.test(id)) return `it was asked about in Needs you (${id}) rather than added.`;
+  return 'BrainDog answered without adding it and gave no reason. Run braindog skills sync again, and if it says the same, add the skill in the app.';
+}
+
+/**
  * A COPY OF `packages/kernel/src/cause.ts`'s `CAUSE`, because the command line is bundled without the kernel: a letter or
  * digit, then at most 199 of letters, digits and `# @ . _ : / -`. A key outside it is left off, so the record derives one
  * rather than refusing the whole question for its key.
@@ -281,6 +294,9 @@ function triggerOf(text: string, kind: Kind): string {
 }
 
 /** The skill files under a `.claude` folder: `skills/<name>/SKILL.md` and `commands/<name>.md`, by valid name. */
+/** The folder BrainDog's own Agent Skill is placed in under a profile's `skills/` (`install.ts`). */
+const OWN_SKILL = 'braindog';
+
 function filesIn(base: string): { path: string; name: string; kind: Kind }[] {
   const out: { path: string; name: string; kind: Kind }[] = [];
   const list = (dir: string) => {
@@ -291,6 +307,10 @@ function filesIn(base: string): { path: string; name: string; kind: Kind }[] {
     }
   };
   for (const d of list(join(base, 'skills'))) {
+    /* BRAINDOG'S OWN AGENT SKILL IS NOT ONE OF THE PERSON'S (audit 31 Oct k, AK20): `setup` places it in every profile's
+       `skills/braindog/`, and the plan then offered to copy it into the record, where it was not taken. It ships with
+       the command and is never copied up. */
+    if (d.name === OWN_SKILL) continue;
     const path = d.isDirectory() ? skillPath(base, 'skill', d.name) : null;
     if (path !== null && existsSync(path)) out.push({ path, name: d.name, kind: 'skill' });
   }
@@ -839,7 +859,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         const spoken = spokenOf(valueOf(out));
         if (spoken === null) {
           lock[file.path] = { spoken: null, version: 0, sha256: now, proposed_sha: now };
-          lines.push(`Skill ${file.name} in ${where(file.path)} was not registered: ${fixOf(out)}`);
+          lines.push(`Skill ${file.name} in ${where(file.path)} was not registered: ${notTaken(out)}`);
           continue;
         }
         lock[file.path] = { spoken, version: 1, sha256: now };

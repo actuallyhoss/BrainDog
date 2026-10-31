@@ -60,7 +60,7 @@ import {
 } from './declare.ts';
 import { commitAuthors } from './commit-authors.ts';
 import { commitSubjects, cutLine, mayRefreshNext, readNames, type Named, type Open } from './run-reads.ts';
-import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobodysPlace, noPlace, topicName } from './first-project.ts';
+import { DRAFT_FIELD, firstProjectFields, firstProjectName, nobodysPlace, noPlace, topicName } from './first-project.ts';
 import { maskMoneyText } from './mail-read.ts';
 import { containsMatched, maskedMatched, project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, searchWords, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
@@ -5593,11 +5593,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * A PROJECT FORMED AS A DRAFT, QUIETLY: an agent's run from a place no project holds. On a record with no project yet
-   * it is the first project; on one with projects, a new repository forms its draft at first sight and a bare folder on
-   * its second session, unless the place is called exactly what a live project is called (the run goes there) or partly
-   * matches one (the record asks instead). The person keeps a draft with one press or says it is not a project. Its
-   * spoken id, or `null` for none.
+   * THE FIRST PROJECT, FORMED AS A DRAFT: an agent's run from a place no project holds, on a record with no project yet.
+   * On one with projects the place is that project only when it is called exactly what one live project is called, and
+   * otherwise nothing is formed (AK7): the person is asked, never handed a project nobody named. The person keeps a draft
+   * with one press or says it is not a project. Its spoken id, or `null` for none.
    */
   function formFirstProject(w: WriteContext): string | null {
     const hints = w.session ?? {};
@@ -5606,11 +5605,6 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (!list || !list.fields.some((f) => f.id === DRAFT_FIELD && !f.retired)) return null;
     const name = firstProjectName(hints);
     if (name === null || nobodysPlace(hints)) return null;
-    /* A RECORD WITH PROJECTS FORMS A DRAFT QUIETLY FROM A NEW REPOSITORY, at first sight, rather than asking; a folder
-       with no repository on its second session, so a one-off folder spawns nothing; and a topic, which no repository
-       stands behind, never (`topicProject` finds one by its name instead). A place that partly matches a project is the
-       record's question and not a draft (`ambiguous`), and a name the record has ever held (a draft the person turned
-       away included) is not formed again. */
     if (sql.one('SELECT 1 AS n FROM entry WHERE register = ? LIMIT 1', list.id)) {
       /* A PLACE CALLED EXACTLY WHAT ONE LIVE PROJECT IS CALLED IS THAT PROJECT, and the run goes there with no draft
          and no question. */
@@ -5620,20 +5614,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         name,
       );
       if (same.length === 1 && same[0]) return nameOf(same[0].id);
-      if (resolveProject(sql, registers, hints).ambiguous.length > 0) return null;
-      const earlier =
-        sql.one<{ n: number }>(
-          "SELECT COUNT(*) AS n FROM entry WHERE register = ? AND ((? <> '' AND json_extract(fields, '$.remote') = ?) OR (? <> '' AND json_extract(fields, '$.repo') = ?) OR (? <> '' AND json_extract(fields, '$.cwd') = ?))",
-          SESSION,
-          hints.remote ?? '',
-          hints.remote ?? '',
-          hints.repo ?? '',
-          hints.repo ?? '',
-          hints.cwd ?? '',
-          hints.cwd ?? '',
-        )?.n ?? 0;
-      if (!formsOnRepeat(hints, Number(earlier))) return null;
-      if (sql.one("SELECT 1 AS n FROM entry WHERE register = ? AND lower(json_extract(fields, '$.name')) = lower(?) LIMIT 1", list.id, name)) return null;
+      /* AND NOTHING NEW WITHOUT A QUESTION (audit 31 Oct k, AK7): on a record that already has projects, a folder an agent
+         or a command was started in is not made a project unasked. A `braindog mcp` started in a checkout put "Braindog"
+         in the owner's projects with no question; the run stays in none, and `context` tells its agent to name the
+         project or ask. The first project, on a record with none, is still formed as a draft. */
+      return null;
     }
     const has = (field: string) => list.fields.some((f) => f.id === field && !f.retired);
     const made = writing(list.id, null, firstProjectFields(hints, name, has), { actor: 'system', note: 'formed from an agent session', cascade: false });

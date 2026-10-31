@@ -35,7 +35,7 @@ export const INSTRUCTIONS = [
   '3. Write short and plain, for a phone: say names, never ids, and one line where one will do.',
   'Reads answer in short lines; format "full" gives JSON.',
   'Meet everyone you work with or hear of, with an email or handle.',
-  'A credential never goes in a row, note or call. Deposit a key with braindog keys put <label>, which reads standard input.',
+  'A credential never goes in a row, note or call: pipe it to braindog keys put <label> --opens <what>.',
   'After a fix, a surprise or a dead end a later session would repeat, create a learning: topic is the skill it bears on, by name; because says how it went wrong.',
   'A refusal names the field and fix; its try is the corrected call. Never resend one unchanged.',
 ].join('\n');

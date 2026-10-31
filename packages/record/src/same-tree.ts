@@ -67,6 +67,12 @@ const parentIs = (child: TreeRun, run: TreeRun): boolean => {
 const sameRun = (a: TreeRun, b: TreeRun): boolean =>
   (a.id !== undefined && a.id === b.id) || (spokenOf(a) !== null && spokenOf(a) === spokenOf(b));
 
+/** Whether a run says which agent or which app it is: a kind other than `other`, or a client's name. */
+const namesAgent = (run: TreeRun): boolean => {
+  const agent = textOf(run.fields.agent);
+  return (agent !== null && agent !== 'other') || textOf(run.fields.client) !== null;
+};
+
 /**
  * Whether two runs work in one tree: the same machine and the same repository, and neither works for the other nor do
  * both work for one session.
@@ -81,6 +87,12 @@ const sameRun = (a: TreeRun, b: TreeRun): boolean =>
  */
 export function sameTree(a: TreeRun, b: TreeRun): boolean {
   if (sameRun(a, b)) return false;
+  /* A COMMAND SOMEBODY RAN AT A TERMINAL IS NOT A SESSION IN THE TREE (audit 31 Oct k, AK7). `braindog skills sync` or
+     `keys put`, run by hand in a checkout, names its machine and repository and neither an agent nor an app, and a
+     session started there next was told "Two sessions in one working tree overwrite each other. Coordinate or stop."
+     about it. Every agent's session names one or the other: the hooks and `braindog mcp --agent` an agent, an MCP
+     client its app. The caller is not held to it: a person at a terminal is still told who works where they are. */
+  if (!namesAgent(b)) return false;
   const host = textOf(a.fields.host);
   if (host === null || host !== textOf(b.fields.host)) return false;
   const [repoA, repoB] = [textOf(a.fields.repo), textOf(b.fields.repo)];

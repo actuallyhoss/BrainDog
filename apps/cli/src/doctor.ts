@@ -470,7 +470,7 @@ export function printDoctor(report: Report, home?: string, ccenv?: string): stri
   const apps = report.apps.length > 0 ? ` and ${count(report.apps.length, 'other app', 'other apps')}` : '';
   const lines = [`braindog doctor read ${count(report.profiles.length, 'profile', 'profiles')}${apps}, and changed nothing.`];
   for (const p of report.profiles) {
-    const hooks = p.start && p.end ? 'Both hooks are there' : p.start ? 'The end hook is missing' : p.end ? 'The start hook is missing' : 'Both hooks are missing';
+    const hooks = p.start && p.end ? 'The start and end hooks are there' : p.start ? 'The end hook is missing' : p.end ? 'The start hook is missing' : 'Both hooks are missing';
     lines.push(`${profileName(p.dir, home, ccenv)}: ${serverWords(p.server)}. ${hooks}.`);
   }
   for (const a of report.apps) {

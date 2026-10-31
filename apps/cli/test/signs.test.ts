@@ -62,7 +62,7 @@ test('THE SIGNS ARE READ AS THE RECORD GIVES THEM: a list or an object holding o
 
 test('THE SIGNS ARE SAID BY NAME, each state with a word and never a colour alone, a few facts each, and how many of the last days read red', () => {
   const facts = Array.from({ length: FACTS_SHOWN + 2 }, (_, i) => `Fact ${String(i + 1)}`);
-  const lines = signLines(readSigns([{ ...SIGNS[0], facts }, SIGNS[3], SIGNS[4]]));
+  const lines = signLines(readSigns([{ ...SIGNS[0], facts }, SIGNS[3], SIGNS[4]]), true);
   assert.deepEqual(lines, [
     '1 of 3 signs need a look.',
     '',
@@ -80,10 +80,22 @@ test('THE SIGNS ARE SAID BY NAME, each state with a word and never a colour alon
     assert.doesNotMatch(line, /—/u, 'no em dash in what a person reads');
     assert.doesNotMatch(line, /\b[a-z]+-[a-z]+(-[a-z]+)?\b/u, `${line} prints an id`);
   }
-  assert.deepEqual(signLines(readSigns([SIGNS[3]])), ['The one sign is fine.', '', 'Oldest question: Fine', '  The oldest open question is 6 days old.']);
+  assert.deepEqual(signLines(readSigns([SIGNS[3]]), true), ['The one sign is fine.', '', 'Oldest question: Fine', '  The oldest open question is 6 days old.']);
+  /* PHONE-SHORT BY DEFAULT (AK25): what needs a look, then the rest counted in one line. */
+  assert.deepEqual(signLines(readSigns([{ ...SIGNS[0], facts }, SIGNS[3], SIGNS[4]])), [
+    '1 of 3 signs need a look.',
+    '',
+    'Arrivals filed: Needs a look',
+    '  32 arrivals wait to be filed, and the newest Ledger row is from 28 September.',
+    ...facts.slice(0, FACTS_SHOWN).map((f) => `  ${f}.`),
+    '  Red on 14 of the last 14 days.',
+    '',
+    'Of the rest, 1 is fine and 1 has not been read yet. braindog signs --all says each.',
+  ]);
+  assert.deepEqual(signLines(readSigns([SIGNS[3]])), ['The one sign is fine.', 'braindog signs --all says each.']);
   assert.deepEqual(signLines([]), ['Your BrainDog has no signs to read yet.']);
   /* A SIGN THAT WAS NEVER RED SAYS NOTHING OF ITS DAYS (AG34), where every fine sign said "Red on 0 of the last 14 days." */
-  const calm = signLines(readSigns([{ ...SIGNS[3], days: Array.from({ length: 14 }, () => 'green') }]));
+  const calm = signLines(readSigns([{ ...SIGNS[3], days: Array.from({ length: 14 }, () => 'green') }]), true);
   assert.ok(!calm.some((l) => /Red on/u.test(l)), calm.join('\n'));
 });
 

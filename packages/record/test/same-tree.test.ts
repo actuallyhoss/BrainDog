@@ -41,6 +41,8 @@ test('another machine, a parent, a child, a sibling and the run itself are not t
   assert.equal(sameTree(helper, run(5)), false, 'its parent');
   assert.equal(sameTree(helper, run(6, { parent: 'S5' })), false, 'a sibling under one parent');
   assert.equal(sameTree(self, run(900)), false, 'itself');
+  assert.equal(sameTree(self, run(1, { agent: null, client: null })), false, 'a command run by hand at a terminal (AK7)');
+  assert.equal(sameTree(self, run(1, { agent: 'other', client: null })), false, 'a run that names no agent and no app');
 });
 
 test('the repository is the folder and the remote together', () => {

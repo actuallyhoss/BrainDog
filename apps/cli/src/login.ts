@@ -251,7 +251,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   }
   io.say(
     vault === undefined
-      ? `logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
+      ? `Logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
       : `keychain access for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
   );
   io.answer?.({ value: { host: key, label, expires, vault: vault ?? null } });
@@ -346,7 +346,7 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
     }
 
     const life = seconds(code.expires_in, 600, 1_800) || 600;
-    io.say(`Open ${uri} and enter  ${userCode.slice(0, 3)} ${userCode.slice(3)}   (${Math.max(1, Math.round(life / 60))} minutes)`);
+    io.say(`Open ${uri} and enter ${userCode.slice(0, 3)} ${userCode.slice(3)} (${Math.max(1, Math.round(life / 60))} minutes).`);
     /* AND THE ONE REQUEST IT APPROVES, by the print the app shows beside it, when the request was named. */
     if ('binds' in asked && typeof asked.binds === 'string') io.say(`It approves this one request, which the app shows as ${bodyPrint(asked.binds)}.`);
 
