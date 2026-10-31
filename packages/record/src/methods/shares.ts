@@ -101,7 +101,8 @@ export type SharedPage = {
 export type SharedCell = { type: FieldType; of?: FieldType; value: Json; label?: string; unit?: string };
 
 /** The host's answer to whether it can make a read-only link, and why not (`sharesOf` at the Worker's door). */
-export type SharesAnswer = { can: boolean; why?: string };
+/** Whether a link can be made, the host's sentence when not, and, asked of a page, whether its link would show nothing. */
+export type SharesAnswer = { can: boolean; why?: string; empty?: true };
 
 /** What `shareable` says on a host that never answered, or said no without a sentence. */
 export const SHARES_OFF = 'Read-only links are switched off on this BrainDog.';
@@ -1400,17 +1401,61 @@ export function methods(deps: RecordDeps) {
       person,
     ) !== undefined;
 
+  /**
+   * THE PAGE AS A LINK WOULD SHOW IT, or `null` for a page the kernel would not draw: read as nobody, with no key number
+   * leading a card, in the words the owner reads, and money on or off as the link says. `sharedPage` answers it to a
+   * link, and `shareable` asks it before a link is made, so the sheet can say a page shows nothing (AM21).
+   */
+  const linkPage = (slug: string, money: boolean, expires_at: string): SharedPage | null => {
+    /* A LINK IS NOBODY, so a row its maker kept private is not on the shared page. */
+    /* AND WITH NO KEY NUMBER LEADING A CARD (SL2): those read across the record, so each card's line is its own figure. */
+    const out = kernel.page(slug, undefined, { viewer: NOBODY, keyNumbers: false });
+    if (!out.ok) return null;
+    const identity = kernel.identity();
+    const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;
+    /* THE HOME CURRENCY AS THE APP READS IT (`homeOf`): the one the record chose, else the one its money is all in. Two
+       held and none chosen is no home, and every amount keeps its code. */
+    const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
+    const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
+    const reads = (b: BlockResult): readonly string[] => kernel.blockRegisters(b as unknown as Parameters<typeof kernel.blockRegisters>[0]);
+    /* THE LISTS IN THE WORDS THE OWNER READS THEM IN (`voiced`): a team's tasks are Tickets, a ticket To do. */
+    const lists = voiced(kernel.registers(), voiceLabels());
+    const moneyFigure = figureIsMoney(kernel, lists);
+    /* A ROW ANOTHER ROW LINKS TO IS NAMED ONLY WHERE THE LINK MAY NAME IT: a row that is there, kept private by nobody,
+       on a list that is neither personal nor one no link reads, and on a link with money off, not a row of a list that
+       is money. Its name and nothing else: never its id, its list or its address. */
+    const personal = new Set(kernel.personalLists());
+    const refSaid = (id: string): string | undefined => {
+      if (!ULID.test(id)) return undefined;
+      const row = kernel.get(id);
+      if (row === null || row.deleted_at !== null || personal.has(row.register) || NEVER_READ.has(row.register)) return undefined;
+      if (!money && moneyList(lists.get(row.register))) return undefined;
+      if (sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', row.id) !== undefined) return undefined;
+      return kernel.titleOfRow(row.id) ?? undefined;
+    };
+    return shownPage(out.value, expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money, moneyFigure, refSaid });
+  };
+
   return {
     /**
      * Whether a read-only link can be made here, and why not, so the Share sheet draws the press only when it would
      * work. ADMIN, A READ: the owner in a browser asks; a token or a member is refused as every ADMIN method refuses them.
      * An owner who is not signed in is told she must be, as `openShare` would tell her.
+     *
+     * ASKED WITH A PAGE (`slug`, and `money` as the link would carry it), IT ALSO SAYS WHETHER A LINK WOULD SHOW ANYTHING
+     * (`empty: true` when it would show nothing, AM21): Share on an empty Money made a 30-day link that read "This page
+     * has nothing a link can show", and the sheet never said so first. Nothing is written, as nothing is for a link.
      */
-    async shareable(_args: unknown, ctx: CallContext): Promise<Result<SharesAnswer>> {
+    async shareable(args: { slug?: unknown; money?: unknown } | undefined, ctx: CallContext): Promise<Result<SharesAnswer>> {
       const stop = admin(ctx, 'ask whether a link can be made');
       if (stop) return { ok: false, refusal: stop };
       if (ctx.principal.kind !== 'person' || ctx.credentialed === false) return ok({ can: false, why: SHARES_SIGNED_IN });
-      return ok(hostSays());
+      const can = hostSays();
+      const slug = isRecord(args) ? args.slug : undefined;
+      if (!can.can || typeof slug !== 'string' || slug === '' || kernel.refused() || !kernel.pages().some((p) => p.slug === slug) || personalPage(slug)) return ok(can);
+      const money = isRecord(args) && args.money === true;
+      const shown = linkPage(slug, money, instant(clock.now() + SHARE_DAYS * DAY_MS));
+      return ok(shown !== null && shown.blocks.length === 0 ? { ...can, empty: true } : can);
     },
 
     /**
@@ -1556,34 +1601,8 @@ export function methods(deps: RecordDeps) {
       if (slug === null || !kernel.pages().some((p) => p.slug === slug)) return { ok: false, refusal: SHUT };
       /* AND A PAGE THAT CAME TO SHOW A PERSONAL LIST AFTER ITS LINK WAS OPENED NO LONGER OPENS. */
       if (personalPage(slug)) return { ok: false, refusal: SHUT };
-      /* A LINK IS NOBODY, so a row its maker kept private is not on the shared page. */
-      /* AND WITH NO KEY NUMBER LEADING A CARD (SL2): those read across the record, so each card's line is its own figure. */
-      const out = kernel.page(slug, undefined, { viewer: NOBODY, keyNumbers: false });
-      if (!out.ok) return { ok: false, refusal: SHUT };
-      const identity = kernel.identity();
-      const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;
-      /* THE HOME CURRENCY AS THE APP READS IT (`homeOf`): the one the record chose, else the one its money is all in. Two
-         held and none chosen is no home, and every amount keeps its code. */
-      const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
-      const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
-      const reads = (b: BlockResult): readonly string[] => kernel.blockRegisters(b as unknown as Parameters<typeof kernel.blockRegisters>[0]);
-      /* THE LISTS IN THE WORDS THE OWNER READS THEM IN (`voiced`): a team's tasks are Tickets, a ticket To do. */
-      const lists = voiced(kernel.registers(), voiceLabels());
-      const moneyFigure = figureIsMoney(kernel, lists);
-      const money = moneyOf(opened.bound);
-      /* A ROW ANOTHER ROW LINKS TO IS NAMED ONLY WHERE THE LINK MAY NAME IT: a row that is there, kept private by nobody,
-         on a list that is neither personal nor one no link reads, and on a link with money off, not a row of a list that
-         is money. Its name and nothing else: never its id, its list or its address. */
-      const personal = new Set(kernel.personalLists());
-      const refSaid = (id: string): string | undefined => {
-        if (!ULID.test(id)) return undefined;
-        const row = kernel.get(id);
-        if (row === null || row.deleted_at !== null || personal.has(row.register) || NEVER_READ.has(row.register)) return undefined;
-        if (!money && moneyList(lists.get(row.register))) return undefined;
-        if (sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', row.id) !== undefined) return undefined;
-        return kernel.titleOfRow(row.id) ?? undefined;
-      };
-      return ok(shownPage(out.value, opened.expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money, moneyFigure, refSaid }));
+      const shown = linkPage(slug, moneyOf(opened.bound), opened.expires_at);
+      return shown === null ? { ok: false, refusal: SHUT } : ok(shown);
     },
   };
 }

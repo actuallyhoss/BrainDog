@@ -26,7 +26,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -98,6 +98,8 @@
   const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);
   const latest = $derived(listing ? latestOf(listing) : null);
   const action = $derived(listing && states ? actionOf(listing, states) : null);
+  /** Whether this record holds a version of it already, so what a newer one changed is something to read. */
+  const held = $derived(action !== null && action.kind !== 'install');
 
   /**
    * ITS OWN GLYPH (agents F25): a built-in wears the place it brings (`glyph.ts`), a built-in use case its Home's or its
@@ -184,7 +186,7 @@
    * WHAT IT ADDS, AS THE BOARD'S PLAN ROWS: each kind it brings with its count and what each is called, from the file
    * (`adds`), else from the reach the catalogue computed; then the hosts it calls, said as none when it calls none.
    */
-  type PlanRow = { key: string; glyph: IconName; label: string; n: number; names: string };
+  type PlanRow = { key: string; glyph: IconName; label: string; n: number | null; names: string };
   /** At most this many named on a row, and how many more said after them, so Money's 38 figures are one line. */
   const NAMED_MOST = 4;
   const planRows = $derived.by((): PlanRow[] => {
@@ -211,7 +213,8 @@
     }
     if (reach) {
       const hosts = [...new Set(reach.calls_out.map((c) => c.host ?? '').filter((h) => h !== ''))];
-      rows.push({ key: 'hosts', glyph: 'globe', label: words.calledHosts, n: hosts.length, names: hosts.length > 0 ? hosts.join(', ') : words.callsNothing });
+      /* ONE THAT CALLS NOTHING SAYS SO WITHOUT A NOUGHT (AM20): "Hosts it calls 0" read as a count gone wrong. */
+      rows.push(hosts.length > 0 ? { key: 'hosts', glyph: 'globe', label: words.calledHosts, n: hosts.length, names: hosts.join(', ') } : { key: 'hosts', glyph: 'globe', label: words.callsLabel, n: null, names: words.callsNothing });
     }
     return rows;
   });
@@ -235,7 +238,7 @@
   }
 
   /** How many things it adds, for the tile's count; `null` until the file or its reach is read. */
-  const addsTotal = $derived(planRows.length === 0 ? null : planRows.filter((r) => r.key !== 'hosts').reduce((n, r) => n + r.n, 0));
+  const addsTotal = $derived(planRows.length === 0 ? null : planRows.filter((r) => r.key !== 'hosts').reduce((n, r) => n + (r.n ?? 0), 0));
 
   function safeParse(text: string): unknown {
     try {
@@ -503,6 +506,7 @@
         await railAgain();
         /* THE NEXT PART IT NEEDS, OR THE ADD-ON ITSELF, IS THE NEXT SHEET: one press for each, in order. */
         if (wasFirst) setTimeout(() => void press(), 0);
+        else await focusOpen();
         return;
       } else if (entry && notOwner(out.code)) {
         wentIn(out);
@@ -531,6 +535,18 @@
     } finally {
       busy = false;
     }
+  }
+
+  /**
+   * ONCE IT IS IN, FOCUS GOES TO WHAT TO DO NEXT (AM19): "Open Reading", or the paste box's press, wherever it is drawn
+   * (beside the summary, or on the phone's bar); else the page's heading. The sheet closed and left focus on the page.
+   */
+  async function focusOpen() {
+    await tick();
+    const shown = (el: Element | null): el is HTMLElement => el instanceof HTMLElement && el.getClientRects().length > 0;
+    const next = [...document.querySelectorAll('.act a[href], .act button:not(:disabled)')].find(shown);
+    const target = next ?? document.querySelector('h1[tabindex="-1"]');
+    if (shown(target)) target.focus();
   }
 
   /**
@@ -588,7 +604,9 @@
   <li class="log-row" data-yanked={v.yanked ? '' : undefined}>
     <!-- THE VERSION AND ITS TAG ON ONE LINE: "1.13.0  New · Published 2 Sep". -->
     <span class="v-line"><span class="v num">{v.version}</span><span class="quiet">{[v.bump ? words.bump[v.bump] : words.first, v.published_at ? words.published(v.published_at) : ''].filter(Boolean).join(' · ')}</span></span>
-    {#if v.notes}<span class="notes">{v.notes}</span>{/if}
+    <!-- WHAT A VERSION CHANGED IS SAID TO WHOEVER HAD THE ONE BEFORE IT (AM20): to somebody who never had it, "Each book
+         keeps its title in Name, as it has since 2.0.0" answered nothing they asked. A first version's note says what it is. -->
+    {#if v.notes && (held || !v.bump)}<span class="notes">{v.notes}</span>{/if}
     {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
     {#if listing?.source === 'kennel' && signedLine(v.signature, ours)}<span class="quiet">{signedLine(v.signature, ours)}</span>{/if}
   </li>
@@ -691,7 +709,7 @@
                 <li class="plan-row">
                   <Icon name={r.glyph} size="m" />
                   <span class="plan-label">{r.label}</span>
-                  <span class="plan-n num">{r.n}</span>
+                  <span class="plan-n num">{r.n ?? ''}</span>
                   <span class="plan-names">{r.names}</span>
                 </li>
               {/each}
@@ -709,7 +727,10 @@
            its pages. A drawing that could not be read says so. -->
       {#if u || preview.state === 'ready' || preview.state === 'refused'}
         <div class="wide-cell">
-          <Tile icon="projects" title={words.pages}>
+          <!-- AN EXAMPLE, SAID SO (AM9): the drawing holds the add-on's own made-up rows, and "Studio rent £1,650" under
+               Its pages read as his own rent, on a record whose rent is EGP 12,000. -->
+          <Tile icon="projects" title={words.pages} meta={u || preview.state === 'ready' ? words.anExample : undefined}>
+            {#if u || preview.state === 'ready'}<p class="quiet">{words.exampleLine}</p>{/if}
             {#if u}
               <Preview preview={previewOf(u)} large />
             {:else if preview.state === 'ready' && preview.preview.pages.length > 0}

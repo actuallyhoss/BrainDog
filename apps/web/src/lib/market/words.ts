@@ -138,6 +138,9 @@ export const words = {
   licence: 'Licence',
   pages: 'Its pages',
   noPreview: 'No drawing of its pages yet.',
+  /* ITS PAGES ARE DRAWN WITH MADE-UP ROWS, and say so (AM9), so nobody reads them as their own. */
+  anExample: 'An example',
+  exampleLine: 'Made up, to show how it looks. Yours will hold your own.',
   previewRefused: 'This drawing could not be read.',
   yanked: (reason: string): string => `Taken back: ${reason}`,
   install: (title: string): string => `Install ${title}`,
@@ -178,6 +181,8 @@ export const words = {
   ownLists: (names: readonly string[]): string => names.join(', '),
   /* THE DETAIL PAGE'S PLAN: the row that names every host it calls, and the tail of a row that names more than fit. */
   calledHosts: 'Hosts it calls',
+  /** The same row's name for one that calls nothing, beside `callsNothing` and no count. */
+  callsLabel: 'Calls out to',
   andMore: (n: number): string => `and ${n} more`,
   /* A SMALL DRAWING'S LAST LINE, when a Home has more headings than a card draws. */
   moreLines: (n: number): string => `${n} more`,

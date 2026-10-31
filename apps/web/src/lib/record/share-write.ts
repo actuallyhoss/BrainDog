@@ -40,6 +40,11 @@ export const words = {
   shareMaking: 'Making the link',
   shareOnce: 'This is the only time the link is shown. Copy it now.',
   shareLinkLabel: 'Read-only link',
+  /* THE LINK MADE, SAID AS READY AND NEVER SPELT OUT (AM21); its address is under Show the link. */
+  shareReady: 'Link ready',
+  shareShow: 'Show the link',
+  /* A PAGE WHOSE LINK WOULD SHOW NOTHING, said before it is made (AM21). */
+  shareEmpty: 'Nothing on this page yet, so the link would show nothing.',
   shareCopy: 'Copy the link',
   shareCopied: 'Link copied',
   shareUntil: (day: string) => `It works until ${day}, or until you close it in Settings, under People & sharing.`,
@@ -142,6 +147,15 @@ export async function readShareable(client: Caller): Promise<Shareable> {
   const v = isObject(out.value) ? out.value : {};
   if (v.can === true) return { can: true };
   return { can: false, why: typeof v.why === 'string' && v.why.trim() !== '' ? v.why : SHARES_OFF };
+}
+
+/**
+ * WHETHER A LINK TO A PAGE WOULD SHOW NOTHING (AM21), as `shareable` answers when asked with the page and the money tick.
+ * Anything but a plain yes is no, so a record too old to say, or one that refused, never warns.
+ */
+export async function linkEmpty(client: Caller, slug: string, money: boolean): Promise<boolean> {
+  const out = await client.call<unknown>('shareable', { slug, money }).catch(() => null);
+  return out !== null && out.ok && isObject(out.value) && out.value.empty === true;
 }
 
 /** The links this record opened, newest first. Never a link itself, which nobody keeps. */

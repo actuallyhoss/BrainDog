@@ -1504,8 +1504,9 @@
 </Sheet>
 
 <!-- One stack, one live region, on every surface including the two that carry no shell: an action
-     taken from a shared page still has to be able to report itself. -->
-<Toasts />
+     taken from a shared page still has to be able to report itself. ITS START IS CLEAR OF THE SIDEBAR OR ITS RAIL
+     (AM19), whose width it is handed here, since the stack stands outside the shell. -->
+<div class="toasts-at" style:--toast-side={bare || endedSaid !== undefined ? undefined : sideOn ? `${sideWidth}px` : railOn ? `${RAIL_W}px` : undefined}><Toasts /></div>
 
 <!-- Debounced elsewhere; a live region that announces on every keystroke is unusable (13 §7). -->
 <div class="sr-only" role="status" aria-live="polite"></div>
@@ -1959,5 +1960,10 @@
     cursor: default;
     opacity: 0.6;
     transition: opacity 0s 0.3s;
+  }
+
+  /* THE TOASTS' HOLDER DRAWS NOTHING: it only hands the stack where the sidebar ends. */
+  .toasts-at {
+    display: contents;
   }
 </style>

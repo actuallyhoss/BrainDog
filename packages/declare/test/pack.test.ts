@@ -181,7 +181,7 @@ test('THE PLAN SAYS WHAT WOULD HAPPEN, and refuses none of it', async () => {
   assert.equal(diff.direction, 'install');
   assert.equal(diff.installed_version, null);
   assert.deepEqual(diff.adds.map((a) => a.id), ['register.obligations', 'rule.chase']);
-  assert.equal(diff.adds[0]?.summary, '2 fields');
+  assert.equal(diff.adds[0]?.summary, 'What and tags', 'a list says its fields by name, never how many');
   assert.deepEqual(diff.changes, []);
   assert.deepEqual(diff.retires, []);
   assert.equal(diff.seeds.count, 1);
