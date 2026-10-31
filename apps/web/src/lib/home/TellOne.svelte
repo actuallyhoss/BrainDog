@@ -77,6 +77,8 @@
     /* Some wait for what they need: the button names only what goes, never "all" over lines that stay. */
     addReady: (n: number) => (n === 1 ? 'Add the one that is ready' : `Add the ${countWord(n)} that are ready`),
     addTo: (list: string) => `Add it to ${list}`,
+    /* A LINE THAT NAMES SOMEBODY KEPT is offered their page (AN9). */
+    openPage: (name: string) => `Open ${name}`,
     notYet: 'Nothing is added until you press.',
     undoOne: 'One Undo takes it back.',
     undoAll: (n: number) => (n === 2 ? 'One Undo takes both back.' : `One Undo takes all ${countWord(n)} back.`),
@@ -202,7 +204,7 @@
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
     e.preventDefault();
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
-    else if (rows.length === 0 && offers.length === 1) addOffer(offers[0]!);
+    else if (rows.length === 0 && offers.length === 1 && !told?.about) addOffer(offers[0]!);
     /* AND NEVER TURNS MONEY ON (RN3): ⌘↵ adds a line where a home for it exists; a module goes on by its own button. */
   }
 
@@ -265,10 +267,11 @@
           </div>
           {#if moneyFix}<p class="tell-one-needs" role="alert">{moneyFix}</p>{/if}
         {/if}
-        {#if offers.length > 0}
+        {#if told.about || offers.length > 0}
           <div class="tell-one-offers">
+            {#if told.about}<Button weight="primary" href={at(told.about.href)}>{say.openPage(told.about.name)}</Button>{/if}
             {#each offers as offer (offer.register)}
-              <Button weight={offers.length === 1 ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
+              <Button weight={offers.length === 1 && !told.about ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
             {/each}
           </div>
         {/if}
