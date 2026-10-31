@@ -368,10 +368,18 @@
         <details class="command">
           <summary>{words.unrouted}</summary>
           {#if origin && !reachableForMail(origin)}<p class="hint">{mailWords.notReachable(origin)}</p>{/if}
-          <p class="hint">{mailWords.onDocker}</p>
-          <CodeLine text={dockerAddressCommand(origin, shell.index.slug)} />
-          <p class="hint">{mailWords.noDocker}</p>
-          <CodeLine text={addressCommand(origin, shell.index.slug)} />
+          <!-- ONE COMMAND WHERE THE HOST SAYS WHICH (PK5): the Docker one in the image, the plain one outside it, and both
+               only from a host older than the flag. -->
+          {#if shell.image}
+            <CodeLine text={dockerAddressCommand(origin, shell.index.slug)} />
+          {:else if shell.host === 'self-host'}
+            <CodeLine text={addressCommand(origin, shell.index.slug)} />
+          {:else}
+            <p class="hint">{mailWords.onDocker}</p>
+            <CodeLine text={dockerAddressCommand(origin, shell.index.slug)} />
+            <p class="hint">{mailWords.noDocker}</p>
+            <CodeLine text={addressCommand(origin, shell.index.slug)} />
+          {/if}
         </details>
       {/if}
     {:else if mintsHere === true && !anOwner}

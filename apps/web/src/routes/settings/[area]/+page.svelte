@@ -383,6 +383,9 @@
     return Number.isFinite(ms) ? new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : iso;
   };
 
+  /* A MAIL THAT DID NOT GO OUT HAS NO JOB TO QUEUE AGAIN (PK4): the next mail tries, so it is offered no Try again. */
+  const retries = (cause: string): boolean => !cause.startsWith('mail#');
+
   async function retry(cause: string): Promise<void> {
     if (retrying !== null) return;
     retrying = cause;
@@ -413,7 +416,7 @@
 {#snippet faultTools()}
   {#if fault}
     <div class="fault-tools">
-      <Button size="sm" disabled={retrying !== null} aria-busy={retrying === fault.cause} onclick={() => void retry(fault.cause)}>{faultWords.retry}</Button>
+      {#if retries(fault.cause)}<Button size="sm" disabled={retrying !== null} aria-busy={retrying === fault.cause} onclick={() => void retry(fault.cause)}>{faultWords.retry}</Button>{/if}
       {#if owns}
         <Button size="sm" weight="bare" aria-expanded={details} aria-controls="fault-details" onclick={() => (details = !details)}
           >{details ? faultWords.hide : faultWords.details}</Button
@@ -431,7 +434,7 @@
                 {#if f.why}<p class="fault-why">{f.why}</p>{/if}
                 <p class="fault-when">{faultWords.failed(f.count, dayOf(f.since))}</p>
                 {#if f.error}<p class="fault-error">{f.error}</p>{/if}
-                {#if f.cause !== fault.cause}
+                {#if f.cause !== fault.cause && retries(f.cause)}
                   <Button size="sm" disabled={retrying !== null} aria-busy={retrying === f.cause} onclick={() => void retry(f.cause)}>{faultWords.retry}</Button>
                 {/if}
               </li>

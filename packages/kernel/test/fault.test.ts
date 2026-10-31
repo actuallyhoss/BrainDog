@@ -75,6 +75,7 @@ test('THE SENTENCE IS THE FAMILY\'S: no job name, no model id, no count of attem
   assert.equal(familyOf('outbox#notify.push'), 'notify');
   assert.equal(familyOf('outbox#pull.fetch'), 'pull');
   assert.equal(familyOf('outbox#export.r2'), 'export');
+  assert.equal(familyOf('mail#send'), 'mail', 'a mail the host could not send (PK4)');
   assert.equal(familyOf('outbox#erase.r2'), 'export');
   assert.equal(familyOf('outbox#script.run'), 'script');
   assert.equal(familyOf('schedule#digest'), 'schedule');

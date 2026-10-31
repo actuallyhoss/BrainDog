@@ -906,6 +906,40 @@ function datedIn(said: string): Said[] {
   });
 }
 
+/** The use cases whose record is the business itself, so the business's own name is never a project in it. */
+const THE_BUSINESS: ReadonlySet<string> = new Set(['shop']);
+const PORTFOLIO = 'portfolio';
+
+/**
+ * A SHOP IS THE BUSINESS, NOT A PROJECT (PK3). "I'm Nadia and I run Nadia's Candles" made the record Nadia's Candles and
+ * a project of the same name beside its orders, with Projects turned on for it. Where the use case is the business, the
+ * project the record is named after is not written, the words say they name the BrainDog, and Projects stays only where
+ * something else asked for it or leans on it.
+ */
+export function businessNotProject<P extends Pick<Proposal, 'usecase' | 'also' | 'modules' | 'heard' | 'names' | 'rows' | 'title' | 'places'>>(p: P): P {
+  if (p.usecase === null || !THE_BUSINESS.has(p.usecase) || p.title === null) return p;
+  const at = p.rows.findIndex((r) => r.register === PROJECTS && r.fields.name === p.title);
+  if (at < 0) return p;
+  const rows = p.rows.flatMap((r, i) => {
+    if (i === at) return [];
+    const { party, ...rest } = r;
+    if (party === undefined || party === at) return [rest];
+    return [{ ...rest, party: party > at ? party - 1 : party }];
+  });
+  const projects = partName(PORTFOLIO, p.names);
+  const named = (h: HeardLine): boolean => h.phrase === p.title && partsOfBecame(h.became).includes(projects);
+  const heard = p.heard.map((h) => (named(h) ? { ...h, became: firstRun.heardBusiness } : h));
+  /* PROJECTS STAYS WHERE ANOTHER PHRASE ASKED FOR IT, or a part that stays leans on it (Money links to projects). */
+  const asked = heard.some((h) => !named(h) && partsOfBecame(h.became).includes(projects));
+  const cases = [p.usecase, ...p.also].flatMap((id) => useCase(id) ?? []);
+  const own = cases.some((u) => [...u.modules, ...(u.needs ?? [])].includes(PORTFOLIO));
+  const rest = p.modules.filter((id) => id !== PORTFOLIO);
+  const keeps = asked || own || closeOver(rest).includes(PORTFOLIO);
+  const modules = keeps ? p.modules : rest;
+  const out = { ...p, rows, heard, modules };
+  return { ...out, places: placesOf(out) };
+}
+
 /** What one sentence proposes. `ctx.locale` is carried for the catalogue's reading; these rules read English. */
 export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const name = who(sentence);
@@ -1008,7 +1042,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     heard: typed === null ? sayCurrency(lines, modules, currency) : lines,
     ...(Object.keys(names).length === 0 ? {} : { names }),
   };
-  return {
+  return businessNotProject({
     ...out,
     currency,
     ...(typed === null && there === null && currency !== null ? { currencyBy: 'device' as const } : {}),
@@ -1016,7 +1050,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     title: titleOf(said, name.name, rows),
     places: placesOf(out),
     by: 'rules',
-  };
+  });
 }
 
 /* ── the model, first ──────────────────────────────────────────────────── */
@@ -1114,7 +1148,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     /* THE RULES' NAMES COME WITH THE RULES' LINES, so "freelance as a designer" still reads Clients where it stands in. */
     ...(Object.keys(names).length > 0 ? { names } : said.length === 0 && rules.names ? { names: rules.names } : {}),
   };
-  return {
+  return businessNotProject({
     ...out,
     currency,
     ...(!typed && ruled === null && currency !== null ? { currencyBy: 'device' as const } : {}),
@@ -1124,7 +1158,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     by: reply.by === '' || reply.by === 'rules' ? 'model' : reply.by,
     summary: summary === '' ? null : summary,
     draft: u === null && reply.draft !== null && reply.draft.trim() !== '' ? reply.draft.trim() : null,
-  };
+  });
 }
 
 /**

@@ -35,7 +35,7 @@ export type Fault = {
 };
 
 /** The families a fault's sentence is keyed by. A kind outside them reads as `other`. */
-export const FAULT_FAMILIES = ['infer', 'notify', 'pull', 'export', 'script', 'schedule', 'other'] as const;
+export const FAULT_FAMILIES = ['infer', 'notify', 'pull', 'export', 'script', 'schedule', 'mail', 'other'] as const;
 export type FaultFamily = (typeof FAULT_FAMILIES)[number];
 
 /**
@@ -53,6 +53,7 @@ export const SAID: Readonly<Record<FaultFamily, string>> = Object.freeze({
   export: 'BrainDog could not save its nightly copy. It tries again tonight.',
   script: 'BrainDog could not run one of your scripts. It tries again the next time it is due.',
   schedule: 'BrainDog could not do something it had planned. It tries again the next time it is due.',
+  mail: 'BrainDog could not send a mail, so a sign-in link or a notice may not have arrived. It tries again with the next one; check the mail server it sends through.',
   other: 'BrainDog could not finish some work of its own. It tries again later.',
 });
 
@@ -73,10 +74,18 @@ export const saidOf = (cause: string): string => SAID_KIND[kindOf(cause)] ?? SAI
 export function familyOf(cause: string): FaultFamily {
   const [door, kind = ''] = cause.split('#', 2);
   if (door === 'schedule') return 'schedule';
+  if (door === 'mail') return 'mail';
   const head = kind.split('.', 1)[0] ?? '';
   if (head === 'erase') return 'export';
   return (FAULT_FAMILIES as readonly string[]).includes(head) ? (head as FaultFamily) : 'other';
 }
+
+/**
+ * MAIL THE HOST COULD NOT SEND (PK4): a sign-in link, an invitation's proof or a passkey notice the self-host's own mail
+ * server refused. It went to the server log only, so the person waiting for the link and the owner were never told. One
+ * cause for every kind, cleared by the next mail that goes out.
+ */
+export const MAIL_FAULT = 'mail#send';
 
 /** The kind a cause names: `outbox#infer.resolve` is `infer.resolve`. */
 const kindOf = (cause: string): string => cause.split('#', 2)[1] ?? cause;

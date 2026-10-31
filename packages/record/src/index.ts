@@ -163,7 +163,7 @@ import {
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
-import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
+import { arranger, carryUpdate, forgetHeld, installHeld, madeLine, madeSpans, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
 import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, waitingOn, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, nightKeeps, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
@@ -1556,6 +1556,8 @@ export type Boot = {
    * reader then falls back to whatever it inferred before, rather than being handed a value nobody gave.
    */
   host?: 'cloud' | 'self-host';
+  /** A self-host in its Docker image, copied from `Build.image` (PK5): absent on every other host. */
+  image?: true;
   /**
    * The record's installed look, drawn: each scheme's custom properties by name without the `--`, or `null` when no
    * `theme` declaration is installed and the house theme is what everybody sees (`28 §5`).
@@ -1658,6 +1660,11 @@ export type EventLine = Omit<LogLine, 'rowid'> & {
   /** The row's register and number, when the event is about a row. */
   register: string | null;
   seq: number | null;
+  /**
+   * On a line the making of this BrainDog wrote (a setup press, by the one who pressed it), so Today's Arrivals does not
+   * say a starter's own plan as "You added 6 to Milestones" (PK1). Left out on every other line.
+   */
+  made?: true;
   /** What the thing is called: a row's title, or a question. */
   title: string | null;
   /**
@@ -2164,6 +2171,11 @@ export type Build = {
    * Optional, so a build that does not name its host is a record whose `boot` carries no `host` key at all.
    */
   host?: 'cloud' | 'self-host';
+  /**
+   * A self-host running in its Docker image (`BRAINDOG_IMAGE=1`), for `boot` (PK5): a screen that prints a command to
+   * run on the machine prints the `docker compose` one only there. Absent everywhere else.
+   */
+  image?: true;
   /** The oldest command this host's door still works with, `MIN_CLI` from packages/mcp/src/build.ts. */
   min_cli?: string;
 };
@@ -9500,9 +9512,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const skip = everything ? undefined : (e: LogLine): boolean => kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted));
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip, true);
     const events = lines.slice(0, NEWS);
+    /* WHAT THE MAKING WROTE IS SAID SO (PK1), read once for the page. */
+    const spans = madeSpans(kernel);
+    const marked = (line: Walked): Walked => (spans.length > 0 && madeLine(spans, line) ? { ...line, made: true } : line);
     return {
       /* AND WHO SUGGESTED, DRAFTED AND SETTLED, read once for the page (`settling.ts`). */
-      events: withSettling(sql, events).map((line) => shown(ctx, line)),
+      events: withSettling(sql, events).map((line) => shown(ctx, marked(line))),
       upTo: events[0] ? pointAt(ctx, events[0]) : null,
       sinceCapped: next !== null || lines.length > NEWS,
       byWho: byWhoOf(events, reader),
@@ -11658,6 +11673,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* ONLY WHEN THE BUILD NAMES ONE: a key set to `undefined` still reads as `'host' in boot`, which is a host
              that said something. */
           ...(build?.host === undefined ? {} : { host: build.host }),
+          ...(build?.image === true ? { image: true as const } : {}),
           ...(admin(ctx) === null ? { copies: kernel.copyFacts() } : {}),
         };
         return [answered, themeInstalled(ctx), looksOf(kernel.declarations().filter((d) => d.kind === 'theme'))] as const;

@@ -197,6 +197,8 @@ export type Shell = ShellBase & {
    * `self-host` on the Cloud build, so it is not a stand-in for this (`routes/settings/billing.ts`).
    */
   host?: 'cloud' | 'self-host' | undefined;
+  /** A self-host in its Docker image (PK5), so a command to run on the machine is the `docker compose` one only there. */
+  image?: true | undefined;
   /**
    * WHY THE RECORD ITSELF WOULD NOT ANSWER `boot`, when it would not.
    *
@@ -1284,6 +1286,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
     upTo: b.whatsNew?.upTo ?? null,
     /* ONLY THE TWO WORDS THE RECORD SENDS, as `signsIn` reads only `false`: anything else is a host that did not say. */
     ...(b.host === 'cloud' || b.host === 'self-host' ? { host: b.host } : {}),
+    ...(b.host === 'self-host' && b.image === true ? { image: true as const } : {}),
   };
 }
 

@@ -73,7 +73,7 @@ import { markHand } from './hold.ts';
 import { accessNight, countLists, deadPaths } from './night-counts.ts';
 import { actionsBlocking } from './signs-actions.ts';
 import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, sweepDoorMarks, type DoorMark, type DoorSigns } from './door.ts';
-import { openFaults, type Fault } from './fault.ts';
+import { clearFault, MAIL_FAULT, openFaults, raiseFault, type Fault } from './fault.ts';
 import { copyFacts, copyFailed, copyKept, type CopyFacts } from './copies.ts';
 import {
   closePassed as closePassedHandoffs,
@@ -448,7 +448,7 @@ export {
   type OpenHandoff,
   type Taken,
 } from './handoff.ts';
-export { SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts';
+export { MAIL_FAULT, SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts';
 /* THE RECORD'S COPIES AS THREE FACTS, and the night's two writes (`copies.ts`). */
 export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, keptNote, nightWhy, type CopyFacts, type Lifecycle } from './copies.ts';
 /* `canon` IS ALSO MIGRATE'S NAME (a script written one way), so a value written one way is `canonValue` out here. */
@@ -13212,6 +13212,18 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const barred = schemaRefusal(state);
       if (barred) return barred;
       return ok({ faults: openFaults(sql) });
+    },
+    /**
+     * THE HOST'S MAIL, SAID ON HEALTH (PK4): a mail its server refused raises `MAIL_FAULT` with the raw error for the
+     * operator, and the next one that goes out clears it. A record this build refuses keeps nothing.
+     */
+    mailFailed: (error: string): void => {
+      if (schemaRefusal(state)) return;
+      raiseFault(sql, MAIL_FAULT, 'mail', error, clock.now());
+    },
+    mailSent: (): void => {
+      if (schemaRefusal(state)) return;
+      clearFault(sql, MAIL_FAULT, clock.now());
     },
     /**
      * Queue the job a fault is about once more: `outbox#<kind>`'s dead letters go back on the outbox with their attempts
