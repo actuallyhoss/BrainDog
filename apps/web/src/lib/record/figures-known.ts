@@ -23,7 +23,29 @@ export const FIGURES_KNOWN: Record<string, MetricDecl> = {};
 /** The figures a record described (`figures-said.ts`), which the build's copy never overwrites. */
 export const SAID = new Set<string>();
 
+/* THE BUILD'S OWN COPY, KEPT APART, so a record switch can put it back under nothing (`figuresOf`). */
+const BUILT: Record<string, MetricDecl> = {};
+let known: string | null = null;
+
 /** This build's own declarations (`declared.ts`), under every figure a record has described. */
 export function knowFigures(table: Record<string, MetricDecl>): void {
-  for (const [id, decl] of Object.entries(table)) if (!SAID.has(id)) FIGURES_KNOWN[id] = decl;
+  for (const [id, decl] of Object.entries(table)) {
+    BUILT[id] = decl;
+    if (!SAID.has(id)) FIGURES_KNOWN[id] = decl;
+  }
+}
+
+/**
+ * The table is for the record at `base` (RG19). ONE TAB OPENS MORE THAN ONE BRAINDOG, and a figure B names but does not
+ * describe was drawn with A's declaration: A's format, target and `where`. On a switch what the last record said is
+ * forgotten, and the build's copy is all that is left until the new one says its own.
+ */
+export function figuresOf(base: string): void {
+  if (known === base) return;
+  if (known !== null) {
+    SAID.clear();
+    for (const id of Object.keys(FIGURES_KNOWN)) delete FIGURES_KNOWN[id];
+    Object.assign(FIGURES_KNOWN, BUILT);
+  }
+  known = base;
 }

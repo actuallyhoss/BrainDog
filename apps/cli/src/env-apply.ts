@@ -51,7 +51,7 @@ import { codex, codexHome } from './clients/codex.ts';
 import { askTerminal, envFor, heldIn, registerServer, runIn, sameServer, type ProfileRunner } from './setup.ts';
 import { placeStatusLine, statusLineEntry, statusLineIn } from './statusline-place.ts';
 import { connect, Stopped, syncSkills, type AgentIo, type Connected } from './skills.ts';
-import { skillsAllowed } from './skills-consent.ts';
+import { SKILLS_ASK, skillsAllowed } from './skills-consent.ts';
 import { canonical, looksLikeKey, writeTools } from './tools.ts';
 
 /** What `env apply` needs from its process, passed in so a test can hold all of it. */
@@ -497,10 +497,11 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
           failed = true;
           io.out('4. Skills: your BrainDog could not be read, so none was synced.');
         } else if (!at.context.registers.some((r) => r.id === 'skills')) io.out('4. Skills: this BrainDog has no Skills list, so there is nothing to sync.');
+        /* NOTHING IS COPIED EITHER WAY WITHOUT THE YES `braindog skills sync` asks for after its owner check (RG12). */
+        else if (!skillsAllowed(io.home, at.to.key)) io.out(`4. Skills: ${SKILLS_ASK}`);
         else {
           const leave = new Set([...scoped.keys()].filter((spoken) => spoken.startsWith('skills#') && shared(spoken)));
-          /* NOTHING OF THIS MACHINE'S GOES UP WITHOUT THE YES `braindog skills sync` asks for (`skills-consent.ts`). */
-          const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: p.dir, top: null, dryRun: planOnly, until: Infinity, to: at.to, leave, upload: skillsAllowed(io.home, at.to.key) });
+          const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: p.dir, top: null, dryRun: planOnly, until: Infinity, to: at.to, leave, upload: true });
           if (lines.length > 0) {
             changes = true;
             if (!planOnly) wrote = true;

@@ -55,7 +55,7 @@ import { keepPin, pinOf, pinsFile, readPins } from './pins.ts';
 import { placeStatusLine, statusLineEntry, statusLineIn } from './statusline-place.ts';
 import { approveOperation, login, machineName } from './login.ts';
 import { connect, isObject, syncSkills, valueOf, type AgentIo, type Connected } from './skills.ts';
-import { skillsAllowed } from './skills-consent.ts';
+import { SKILLS_ASK, skillsAllowed } from './skills-consent.ts';
 import { writeTools } from './tools.ts';
 
 type Env = Record<string, string | undefined>;
@@ -733,11 +733,15 @@ export async function setup(args: string[], given: SetupIo): Promise<number> {
   }
   if (!skills.context.registers.some((r) => r.id === 'skills')) io.out('5. Skills: this BrainDog has no Skills list, so there is nothing to sync.');
   else if (profiles.length === 0) io.out(`5. Skills: ${noClaude}, so no skill was synced.`);
+  else if (!skillsAllowed(io.home, skills.to.key))
+    /* NOTHING IS COPIED EITHER WAY WITHOUT THE YES `braindog skills sync` asks for after its owner check
+       (`skills-consent.ts`, RG12): a BrainDog you are only a member of would put somebody else's skills, which Claude
+       runs as instructions, into every profile here. */
+    io.out(`5. Skills: ${SKILLS_ASK}`);
   else
     for (const dir of profiles) {
       const where = nameOf(dir, io.home);
-      /* NOTHING OF THIS MACHINE'S GOES UP WITHOUT THE YES `braindog skills sync` asks for (`skills-consent.ts`). */
-      const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun, to: skills.to, upload: skillsAllowed(io.home, skills.to.key) });
+      const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun, to: skills.to, upload: true });
       if (lines.length > 0) changed = true;
       io.out(lines.length === 0 ? `5. Skills, Claude Code in ${where}: it already holds every skill as your BrainDog has it.` : `5. Skills, Claude Code in ${where}: ${dryRun ? 'what would be synced' : 'synced'}:`);
       detail(lines);

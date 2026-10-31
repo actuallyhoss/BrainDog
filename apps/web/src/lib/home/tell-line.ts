@@ -5,8 +5,10 @@
  * (AH23), so the first thing told is seen where it was said.
  *
  * PER VIEWER AND PER BRAINDOG, in this browser only: it is a convenience, never the record's state, so it lives in
- * `localStorage` under the record's own address, and a browser that keeps nothing still draws Today (every read and
- * write is guarded, and a missing copy reads as a first visit).
+ * `localStorage` under the record's own address AND THE PERSON'S (RG11: under the address alone, the next person to sign
+ * in to that BrainDog here was shown the owner's last adds), and sign-out clears it (`signed-out.ts`, `bd.tell:`). With
+ * no person, or while the record is seen as somebody, nothing is read or kept. A browser that keeps nothing still draws
+ * Today (every read and write is guarded, and a missing copy reads as a first visit).
  *
  * A plain `.ts` so `node --test` can hold it; `Home.svelte` and `TellOne.svelte` only call it.
  */
@@ -31,7 +33,8 @@ export const WEEK = 7 * 86_400_000;
 /** How long what was last added is said under it. */
 export const LAST_FOR = 2 * 86_400_000;
 
-const keyOf = (base: string): string => `bd.tell:${base || '/'}`;
+const keyOf = (base: string, person: string | null | undefined): string | null =>
+  typeof person === 'string' && person !== '' ? `bd.tell:${base || '/'}:${person}` : null;
 
 const shaped = (v: unknown): TellKept => {
   if (v === null || typeof v !== 'object') return {};
@@ -48,10 +51,12 @@ const shaped = (v: unknown): TellKept => {
   return out;
 };
 
-/** What this browser keeps of the line for the BrainDog at `base`; nothing when it keeps nothing. */
-export function readTell(base: string): TellKept {
+/** What this browser keeps of the line for `person` on the BrainDog at `base`; nothing when it keeps nothing. */
+export function readTell(base: string, person: string | null | undefined): TellKept {
+  const key = keyOf(base, person);
+  if (key === null) return {};
   try {
-    const raw = globalThis.localStorage?.getItem(keyOf(base));
+    const raw = globalThis.localStorage?.getItem(key);
     return raw ? shaped(JSON.parse(raw)) : {};
   } catch {
     return {};
@@ -59,10 +64,12 @@ export function readTell(base: string): TellKept {
 }
 
 /** Keeps a change, and answers what is kept now (the change alone, where the browser keeps nothing). */
-export function keepTell(base: string, change: TellKept): TellKept {
-  const next = { ...readTell(base), ...change };
+export function keepTell(base: string, person: string | null | undefined, change: TellKept, had: TellKept = {}): TellKept {
+  const key = keyOf(base, person);
+  const next = { ...(key === null ? had : readTell(base, person)), ...change };
+  if (key === null) return next;
   try {
-    globalThis.localStorage?.setItem(keyOf(base), JSON.stringify(next));
+    globalThis.localStorage?.setItem(key, JSON.stringify(next));
   } catch {
     /* A private window keeps nothing: the line is still drawn for this visit. */
   }

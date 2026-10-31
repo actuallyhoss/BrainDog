@@ -56,7 +56,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
-import { keyLockout, nearPeer, ONE_PLACE, PEER_TRIES, placeOf, proxied, type KeyLockout, type Place, type ProxyTrust } from './key-lockout.ts';
+import { keyLockout, nearPeer, ONE_PLACE, peerSlowFor, placeOf, proxied, slowedLine, type KeyLockout, type PeerSlow, type Place, type ProxyTrust } from './key-lockout.ts';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
@@ -389,8 +389,11 @@ type Site = {
   firstRead: FirstReadDoor;
   /** The server key's lockout at `/api` and `/mcp` (`./key-lockout.ts`), built once so its count lasts the whole process. */
   keyLock: KeyLockout;
-  /** The same lockout counted by the socket's own peer when a proxy's header named the place (AI16, `PEER_TRIES`). */
-  peerLock: KeyLockout;
+  /**
+   * The wrong keys counted by the socket's own peer when a proxy's header named the place, slowing that peer over a
+   * ceiling and never locking it (AI16, RG3): only under `BRAINDOG_TRUST_PROXY=1`, and `null` otherwise.
+   */
+  peerSlow: PeerSlow | null;
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -496,10 +499,15 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: P
      times in fifteen minutes is refused before anything is compared: a miss used to be a 401 and nothing else, so the
      key could be guessed in a loop. The lock, the compare and the strike run with no await between them. */
   const keyShaped = token !== undefined && !sent.includes('.');
-  /* AND THE PEER AS WELL, WHEN A PROXY'S HEADER NAMED THE PLACE (AI16): a header is words, and the socket is not. */
-  const viaProxy = at.peer !== '' && at.ip !== at.peer;
+  /* AND THE PEER AS WELL, WHEN A LOOSELY TRUSTED PROXY'S HEADER NAMED THE PLACE (AI16): a header is words, and the
+     socket is not. Over its ceiling the peer is SLOWED BEFORE THE LOCK IS READ, never locked (RG3): every caller behind
+     the proxy shares it, the owner too, so a lock there was a stranger's way to shut him out. The wait comes first so
+     the lock, the compare and the strike below still run with nothing in between. */
+  const peerCount = keyShaped && at.peer !== '' && at.ip !== at.peer ? site.peerSlow : null;
+  const slowed = peerCount?.wait(at.peer) ?? 0;
+  if (slowed > 0) await new Promise((done) => setTimeout(done, slowed));
   if (keyShaped) {
-    const wait = site.keyLock.locked(at.ip) ?? (viaProxy ? site.peerLock.locked(at.peer) : null);
+    const wait = site.keyLock.locked(at.ip);
     if (wait !== null) return { bare: 429, retryAfter: wait };
   }
   /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
@@ -511,7 +519,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: P
   }
   if (keyShaped) {
     site.keyLock.strike(at.ip);
-    if (viaProxy) site.peerLock.strike(at.peer);
+    if (peerCount?.strike(at.peer) === true) console.error(slowedLine(at.peer));
   }
 
   /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
@@ -2232,7 +2240,7 @@ export async function start(options: {
     }),
     /* THE SERVER KEY'S LOCKOUT, built once so a strike outlives the request that earned it (SEC5). */
     keyLock: keyLockout(clock.now),
-    peerLock: keyLockout(clock.now, PEER_TRIES),
+    peerSlow: peerSlowFor(trusts, clock.now),
     /* THE FIRST READ OF A STRANGER'S SENTENCE, built once here where the origin is known, so its count lasts the process. */
     firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup, catalogue: catalogueDir ?? null }),
     snapshots: kept,

@@ -1073,7 +1073,7 @@ assertion pair, an RS256 pair, each generated once with `subtle` and stored.
 - `ponytail:` passkey challenges live in memory for five minutes; a restart forgets a ceremony in flight.
 - `ponytail:` no Inference adapter; `infer.*` rows wait in `pending`. A BYO key is the same adapter with a base URL (33 §1) when tier B lands.
 - `ponytail:` `idle_ms` is a constant 1500; the runner backs off itself.
-- `ponytail:` the lockout keys on the socket's address; with `BRAINDOG_TRUST_PROXY` set (`1` for a loopback or private peer, or a list of proxy addresses) it reads `X-Forwarded-For` only from such a peer, right to left past trusted hops, and the server key's strikes also count against that peer (100 in fifteen minutes).
+- `ponytail:` the lockout keys on the socket's address; with `BRAINDOG_TRUST_PROXY` set (`1` for a loopback or private peer, or a list of proxy addresses) it reads `X-Forwarded-For` only from such a peer, right to left past trusted hops, and under `1` alone the server key's strikes also count against that peer, which over 200 in fifteen minutes is slowed two seconds a key and never locked (RG3); an exact list counts no peer.
 - `ponytail:` the nightly copy runs at `BRAINDOG_BACKUP_AT` (03:20 UTC by default), not in the record's `tz`.
 - `ponytail:` attachments are the five image types; PDF when a register asks for it.
 - `ponytail:` inbound email checks DKIM itself against DNS (`server.ts`); a forwarder's own `Authentication-Results` line is never the verdict.

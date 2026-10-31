@@ -456,13 +456,14 @@ async function init(args: readonly string[]): Promise<void> {
   /* THE RECORD FIRST. 51 §13 D21: a Directory row never points at a record that failed to
      initialise. `createRecord` takes no `CallContext`: it is the one method that cannot be routed,
      because there is nobody to authorise it against until it has run. */
+  const zone = machineZone();
   const made = await api.createRecord({
     id,
     slug,
     name: slug,
     /* THE MACHINE'S ZONE, NOT GREENWICH'S (AH22): the hosted sign-up sends the person's zone, and a self-host made at
        its own command line counts its days where it runs. `TZ` set on the machine wins; none read is UTC. */
-    tz: machineZone(),
+    tz: zone,
     locale: 'en',
     owner: { id: person.value.id, email: person.value.email, name: person.value.name },
     keys,
@@ -501,6 +502,12 @@ async function init(args: readonly string[]): Promise<void> {
   sql.close();
   dirSql.close();
   say(`record ${slug} created · owner ${email} · inbound email token at ${inbound}`);
+  /* AND THE ZONE ITS DAYS ARE COUNTED IN (RG13): in a container that sets no `TZ` it is UTC, and nothing said so. */
+  say(
+    zone === 'UTC'
+      ? `  its days are counted in UTC. To count them at your midnight, set TZ in .env (such as TZ=Europe/London) before the first start.`
+      : `  its days are counted in ${zone}.`,
+  );
 }
 
 /**
@@ -703,12 +710,13 @@ async function serve(): Promise<void> {
     return refuse(`${serverKey.name} is set but empty. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
   /* AND A SHORT ONE IS A KEY SOMEBODY CAN GUESS (SEC5): it is the owner to whoever presents it, on every interface. The
      lockout slows a guess at `/api` and `/mcp`; it cannot make eight characters into a secret. AND ONE OF A FEW
-     CHARACTERS OVER AND OVER IS SHORT TOO (AI26): thirty-two copies of "a" passed. Sixteen distinct characters is far
-     under what any random key of this length has, and far over what a typed pattern does. */
+     CHARACTERS OVER AND OVER IS SHORT TOO (AI26): thirty-two copies of "a" passed. `weakKey` refuses under eight
+     distinct characters, or under 128 bits for the alphabet it is written in (RG2: sixteen distinct refused about a
+     quarter of `openssl rand -hex 32` keys, which hold sixteen digits at most). */
   if (serverKey.value !== undefined && serverKey.value.trim().length < 32)
     return refuse(`${serverKey.name} is shorter than 32 characters, so it could be guessed. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
-  if (serverKey.value !== undefined && new Set(serverKey.value.trim()).size < 16)
-    return refuse(`${serverKey.name} repeats a few characters, so it could be guessed. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
+  if (serverKey.value !== undefined && weakKey(serverKey.value.trim()))
+    return refuse(`${serverKey.name} uses too few different characters, so it could be guessed. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
   const secret = env.BRAINDOG_SESSION_SECRET;
   if (secret !== undefined && secret.length < 32)
     return refuse('BRAINDOG_SESSION_SECRET is shorter than 32 characters. Make it 32 random bytes in base64url, or unset it to derive one from the key file.');
@@ -959,6 +967,16 @@ try {
   } else refuse(`There is no ${command} here. It has serve, init, backup and restore; ${commandFor('--help')} says what each takes.`);
 } catch (e) {
   refuse(e instanceof Error ? e.message : String(e));
+}
+
+/**
+ * Whether a key of 32 characters or more is still guessable: under eight distinct characters ("aaaa…", "abab…"), or
+ * under 128 bits at what its alphabet gives a character (digits 3.3, hex 4, one case of letters 4.7, anything else 6).
+ */
+function weakKey(key: string): boolean {
+  if (new Set(key).size < 8) return true;
+  const bits = /^\d+$/u.test(key) ? Math.log2(10) : /^[0-9a-f]+$/iu.test(key) ? 4 : /^[a-z]+$/u.test(key) || /^[A-Z]+$/u.test(key) ? Math.log2(26) : 6;
+  return key.length * bits < 128;
 }
 
 /** The zone this machine keeps, as `Intl` reads it (`TZ` included), or UTC where it reads none. */

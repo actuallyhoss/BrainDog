@@ -264,14 +264,24 @@
    * with what was last added said under it (AH23). Not on a record kept for long: one that holds more than a first
    * week's worth by hand is not offered it, whatever this browser remembers.
    */
-  let tellKept = $state<TellKept>(readTell(apiBase()));
+  /* PER PERSON, AND NOTHING WHILE SEEING AS SOMEBODY (RG11): the lines name who and what the last press added. */
+  const tellWho = $derived(seeingAs() === null ? (data.me?.person ?? null) : null);
+  let tellKept = $state<TellKept>({});
+  let tellFor: string | null = null;
+  $effect.pre(() => {
+    const at = `${apiBase()} ${tellWho ?? ''}`;
+    if (at !== tellFor) {
+      tellFor = at;
+      tellKept = readTell(apiBase(), tellWho);
+    }
+  });
   $effect(() => {
-    if ((tell || first) && tellKept.from === undefined && added <= SLIM_MOST) tellKept = keepTell(apiBase(), { from: Date.now() });
+    if ((tell || first) && tellKept.from === undefined && added <= SLIM_MOST) tellKept = keepTell(apiBase(), tellWho, { from: Date.now() }, untrack(() => tellKept));
   });
   const slim = $derived(first && !tell && added <= SLIM_MOST && slimShown(tellKept, Date.now()));
   const lastTold = $derived(lastLines(tellKept, Date.now()));
   function keepTold(lines: ToldLine[]) {
-    if (lines.length > 0) tellKept = keepTell(apiBase(), { last: { at: Date.now(), lines } });
+    if (lines.length > 0) tellKept = keepTell(apiBase(), tellWho, { last: { at: Date.now(), lines } }, tellKept);
   }
 
   /* THE NEXT STEPS' OWN CODE, LOADED ON A FIRST TODAY ONLY (`want-more.ts`): it reads every use case this build ships, and
@@ -1573,7 +1583,7 @@
           keepTold(lines);
           void reread();
         }}
-        onhide={() => (tellKept = keepTell(apiBase(), { hidden: true }))}
+        onhide={() => (tellKept = keepTell(apiBase(), tellWho, { hidden: true }, tellKept))}
       />{/if}
 
     {#if calm && lands}

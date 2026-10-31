@@ -512,8 +512,10 @@ export const FOUNDER = {
      before any project it opens on "Add your first project, and its numbers come here" over a box to add one, where a
      minute-old founder was told no numbers came in thirty days and to fix a feed nobody had made. Fix the feed is said
      only once a feed has sent a number; before that, a project's numbers are set up. Blocks added and nothing taken
-     away, so a minor step; 3.8.2 is published. */
-  version: '3.9.0',
+     away, so a minor step; 3.8.2 is published.
+     3.9.1 (review 31 Oct g, RG17): the Dashboard's place is after Agents, not after Work, so a full rail keeps what it
+     had and the Dashboard waits under More. Its place only, so a patch step; 3.9.0 is published. */
+  version: '3.9.1',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
@@ -716,8 +718,10 @@ export const FOUNDER = {
            this page says: thirty days of every number, and where each came from. */
         page: 'dashboard',
         title: 'Dashboard',
-        /* ITS PLACE ON THE RAIL, SINCE 3.9.0 (AH4): a starter's own page is a place from the first minute. */
-        nav: { section: 'Dashboard', order: 10, place: 20 },
+        /* ITS PLACE ON THE RAIL, SINCE 3.9.0 (AH4): a starter's own page is a place from the first minute. AFTER AGENTS
+           (60), SINCE 3.9.1 (RG17): at 20 it took a rail of seven places, and Agents went under More on a record that
+           pressed Update. */
+        nav: { section: 'Dashboard', order: 10, place: 70 },
         icon: 'observe',
         /* AND PROJECTS, SINCE 3.9.0: the first project is named on this page before any number comes. */
         requires: ['register.datapoints', 'register.organisations', 'register.things'],
