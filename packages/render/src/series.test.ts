@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SERIES_AHEAD, SERIES_DUE, SERIES_PARTIAL, evenPlaces, seriesNice, seriesPlan, seriesValue } from './series.ts';
+import { SERIES_AHEAD, SERIES_DUE, SERIES_PARTIAL, amountLike, evenPlaces, seriesNice, seriesPlan, seriesValue } from './series.ts';
 import { figureLike } from './figure.ts';
 
 const HEAD = ['Month', 'in: Money in', 'out: Money out', 'state'];
@@ -118,4 +118,14 @@ test('ONE TABLE SAYS ITS MONEY ONE WAY: where one amount of a currency has pence
   assert.deepEqual(evenPlaces(['£11,050', '£19,516.90', '−£8,466.90', '—']), ['£11,050.00', '£19,516.90', '−£8,466.90', '—']);
   /* ANOTHER CURRENCY IS ITS OWN SET, and a count is no money at all. */
   assert.deepEqual(evenPlaces(['E£400', '£1.50', '12h']), ['E£400', '£1.50', '12h']);
+});
+
+test('A CELL DRAWN BY ITS SIGN ALONE IS READ BY ITS CURRENCY, never copied as a shape', () => {
+  /* "$1,950" on a record kept in pounds is the US dollar, as the writer draws another currency. */
+  assert.equal(amountLike('$1,950', 2400.5, 'GBP', 'exact'), '$2,400.50');
+  assert.equal(amountLike('$1,950', 2400, 'GBP', 'read'), '$2,400');
+  assert.equal(amountLike('£1,000', -250, 'GBP', 'exact'), '−£250.00');
+  assert.equal(figureLike('$1,950', 2400, 'EGP', 'read'), '$2,400');
+  /* A sign nobody owns keeps the shape it came in. */
+  assert.equal(amountLike('E£400', 500, 'GBP', 'read'), 'E£500');
 });
