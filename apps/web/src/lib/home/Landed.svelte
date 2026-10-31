@@ -27,7 +27,10 @@
 
   const words = {
     title: 'Arrivals',
-    all: 'Activity',
+    /* "ALL ACTIVITY", AS THE TILES BESIDE IT SAY THEIR DOORS ("All numbers", "All projects"), AN20: a foot that says
+       "all" is one the board's fit counts as saying there is more, so the "1 more" it laid on top of a bare "Activity",
+       with no gap, is not drawn. */
+    all: 'All activity',
     review: (n: number) => `${n.toLocaleString('en-GB')} to review`,
     names: (n: number) => `Show the ${n.toLocaleString('en-GB')}`,
     /* A GROUPED LINE IN PARTS, so its count and its list stand a step heavier: "BrainDog added 6 to Tools". */

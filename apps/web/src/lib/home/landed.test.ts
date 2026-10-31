@@ -60,12 +60,12 @@ test('what he told an agent is no arrival: a list the kernel declares is left ou
   /* MARKED KERNEL, NONE IS DRAWN, so Today never says "You filed 3 into Instructions". */
   assert.deepEqual(landedOf([...told, line('e')], named, 'p_me', NOW, new Map(), undefined, OWN).map((r) => r.key), ['e']);
   /* AND THE SAME LIST UNMARKED IS AN ORDINARY ONE: the name alone decides nothing. */
-  assert.equal(landedOf(told, named, 'p_me', NOW).length, 3);
+  const brought = told.map((t) => ({ ...t, actor: 'agent:claude' }));
+  assert.equal(landedOf(brought, named, 'p_me', NOW).length, 3);
 });
 
-test('the reader is You and a list the record does not name is not said', () => {
-  const [r] = landedOf([line('a', { actor: 'p_me', register: 'other' })], lists, 'p_me', NOW);
-  assert.equal(r?.who, 'You');
+test('a list the record does not name is not said', () => {
+  const [r] = landedOf([line('a', { register: 'other' })], lists, 'p_me', NOW);
   assert.equal(r?.to, null);
 });
 
@@ -90,10 +90,10 @@ test('a handle is said as a name, and no lowercase slug reaches a line on the se
   for (const d of drawn) assert.doesNotMatch(d.name, /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/u, `"${d.name}" reached the landed lines as a slug`);
 });
 
-test('THE READER FILED UNDER HER OWN NAME IS NO ARRIVAL: a new Today said Arrivals 1, Wenna, You, People', () => {
+test('WHAT THE READER ADDED HERSELF IS NO ARRIVAL (AN20): a new Today said Arrivals 1, Wenna, You, People', () => {
   /* Invented: the reader's minted id and the name the record holds for her. Sign-up files her as a person of her own
-     record, and that row was the only news on her first Today. Somebody she filed, and her name filed by somebody
-     else, are still arrivals. */
+     record, and that row was the only news on her first Today; somebody she filed by hand is hers too. Her name filed by
+     somebody else is still an arrival. */
   const me = 'p_01J0WENNA0000000000000000';
   const names = new Map([[me, 'Wenna Tregarth']]);
   const folk = new Map([['folk', 'People']]);
@@ -101,7 +101,7 @@ test('THE READER FILED UNDER HER OWN NAME IS NO ARRIVAL: a new Today said Arriva
   const rows = landedOf([own, line('met', { actor: me, register: 'folk', title: 'Ilar Penrose' }), line('told', { register: 'folk', title: 'Wenna Tregarth' })], folk, me, NOW, names);
   assert.deepEqual(
     rows.map((r) => r.key),
-    ['met', 'told'],
+    ['told'],
   );
   /* With nothing else new nothing is drawn, so the tile is not there at all. */
   assert.deepEqual(landedOf([own], folk, me, NOW, names), []);
