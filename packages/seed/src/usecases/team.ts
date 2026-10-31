@@ -263,8 +263,10 @@ export const TEAM = {
      days is called Open each morning. The lists' ids and the page's address stay. Words only, so a patch step; 2.30.0
      is published.
      2.30.2 (UP2): the rail's section says what it holds: Sprints, not Team, and Agent work sits under Agents beside the
-     agents it is about. Names on the rail only, so a patch step; 2.30.1 is in the catalogue. */
-  version: '2.30.2',
+     agents it is about. Names on the rail only, so a patch step; 2.30.1 is in the catalogue.
+     2.30.3 (audit 31 Oct l, AL11): Open each morning is called Sprint days, a noun beside Sprints and Sprint plan where
+     an instruction read as half a sentence. The list's id stays. Words only, so a patch step; 2.30.2 is published. */
+  version: '2.30.3',
   title: 'Team board',
   summary: 'Tickets, sprints and the agents on them.',
   author: 'BrainDog',
@@ -313,7 +315,7 @@ export const TEAM = {
     people: 'Teammates',
     'people:holds': 'everyone on the team, the part each one plays and how to reach them',
     'people.role.collaborator': 'Teammate',
-    cycle_days: 'Open each morning',
+    cycle_days: 'Sprint days',
   },
   skills: [
     { name: 'task-triage', trigger: 'when a ticket is opened, to set its priority, suggest an owner and say whether an agent can take it' },
@@ -385,7 +387,7 @@ export const TEAM = {
            itself each morning: the planned lines of the active cycle not ticked (`cycle_day` in `TEAM_AUTOMATIONS`).
            A person can still write a day, and the record then writes none for it. */
         register: 'cycle_days',
-        name: 'Open each morning',
+        name: 'Sprint days',
         one: 'morning count',
         icon: 'rows',
         holds: 'how many tickets were still open on each day of a sprint, one row a morning',

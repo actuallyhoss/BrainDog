@@ -164,8 +164,10 @@ export const PERSONAL = {
      inside More lists saying "Nothing here yet". Blocks added and nothing taken away, so a minor step; 2.8.0 is
      published.
      2.9.1 (audit 31 Oct h, AH21): the Log is called Progress and Put by is called Money saved, so a new person reads
-     what each holds. Words only, so a patch step; 2.9.0 is published. */
-  version: '2.9.1',
+     what each holds. Words only, so a patch step; 2.9.0 is published.
+     2.10.0 (audit 31 Oct l, AL13): Goals' line leaves out a count of nought, "1 goal on the go" and never "1 goal and 0
+     habits", by one line for each case. Blocks added and nothing taken away, so a minor step; 2.9.1 is published. */
+  version: '2.10.0',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -596,12 +598,29 @@ export const PERSONAL = {
         icon: 'star',
         requires: ['register.savings_goals', 'register.goals', 'register.goal_log', 'register.put_by'],
         blocks: [
+          /* THE PAGE'S ONE LINE, SINCE 2.2.0: what is put by, and how many goals and habits are on the go. SAID THREE WAYS
+             SINCE 2.10.0 (audit 31 Oct l, AL13), exactly one of them drawn: a first goal read "1 goal and 0 habits on the
+             go", since a clause of nought goes only between commas and "and" joins the two counts in one clause. */
           {
-            /* THE PAGE'S ONE LINE, SINCE 2.2.0: what is put by, and how many goals and habits are on the go. */
             kind: 'note',
             lead: true,
             span: 12,
+            when: { all: [{ metric: 'goals-active', gte: 1 }, { metric: 'habits-active', gte: 1 }] },
             body: '{{saved-toward-goals}} saved so far, {{goals-active}} goal(s) and {{habits-active}} habit(s) on the go',
+          },
+          {
+            kind: 'note',
+            lead: true,
+            span: 12,
+            when: { metric: 'habits-active', lt: 1 },
+            body: '{{saved-toward-goals}} saved so far, {{goals-active}} goal(s) on the go',
+          },
+          {
+            kind: 'note',
+            lead: true,
+            span: 12,
+            when: { all: [{ metric: 'goals-active', lt: 1 }, { metric: 'habits-active', gte: 1 }] },
+            body: '{{saved-toward-goals}} saved so far, {{habits-active}} habit(s) on the go',
           },
           /* A BOX TO ADD A GOAL OR A HABIT, SINCE 2.9.0 (AH4), and one to name a saving until one is named, as Home has. */
           { kind: 'capture', heading: 'Add a goal or a habit', icon: 'plus', span: 12, register: 'goals' },
