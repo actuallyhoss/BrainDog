@@ -9,7 +9,8 @@
  *
  * THE BUNDLE GATE COUNTS THE APP'S FRAME IN A RECORD'S FIRST LOAD (`tools/gates/bundle.mjs`), since every screen of a
  * record still waits for it. THE BUILD NAMES THESE SCREENS AGAIN (`LIGHT_PAGE` in `vite.config.ts`), to put what they
- * import in the light frame's preload list: a screen added here is added there.
+ * import in the light frame's preload list: a screen added here is added there. `/s` IS NOT: named there, the list
+ * pointed at a chunk the build had dropped (a 404 on every first open), and a link's page loads its own reads first anyway.
  */
 import type { Shell } from '../record/boot-live.ts';
 
