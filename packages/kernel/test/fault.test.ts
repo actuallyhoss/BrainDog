@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import faults0030 from '../src/migrations/0030_faults.ts';
-import { FAULT_FAMILIES, SAID, SAID_KIND, clearFault, familyOf, openFaults, raiseFault, saidOf } from '../src/fault.ts';
+import { FAULT_FAMILIES, SAID, SAID_KIND, addressKey, clearFault, familyOf, missedCause, missedSaid, openFaults, raiseFault, saidOf } from '../src/fault.ts';
 import { openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 3);
@@ -114,4 +114,17 @@ test('THE TABLE IS LOCAL: a fault does not travel in an export', () => {
   const sql = bare();
   assert.equal(sql.one<{ s: string }>("SELECT section AS s FROM dog_section WHERE table_name = 'fault'")!.s, 'local');
   sql.close();
+});
+
+test('RK5: A MEMBER WHO MISSED A MAIL IS A LINE OF THEIR OWN, BY NAME, and the next mail that reaches them clears it', () => {
+  const sql = bare();
+  const cause = missedCause('p_mia');
+  raiseFault(sql, cause, 'mail', 'the mail server has no such mailbox at RCPT TO', NOW, missedSaid('Mia', 'the summary "Monday money"'));
+  const [f] = openFaults(sql);
+  assert.deepEqual([f?.cause, f?.family, f?.said], [cause, 'mail', 'Mia didn\'t get the summary "Monday money": their address was refused.']);
+  assert.equal(missedSaid(null, 'a notice'), "Someone didn't get a notice: their address was refused.");
+  assert.ok(!addressKey('Mia@Example.com').includes('@'), 'an address was its own key');
+  assert.equal(addressKey('Mia@Example.com'), addressKey(' mia@example.com'));
+  assert.equal(clearFault(sql, cause, NOW + HOUR), true);
+  assert.deepEqual(openFaults(sql), []);
 });

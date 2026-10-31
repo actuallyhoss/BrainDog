@@ -735,7 +735,12 @@ async function serve(): Promise<void> {
   const send = smtp ? smtpSender(smtp) : undefined;
   /* A MAIL THAT FAILS IS A FAULT ON HEALTH AND ONE THAT GOES OUT CLEARS IT, THE SUMMARIES AS WELL AS THE SIGN-IN MAILS
      (PK4, RH14): the record is told once `start` below has opened it, and a mail before that is said in the log alone. */
-  const mailFault: MailFault = { failed: (error) => running.api.kernel.mailFailed(error), sent: () => running.api.kernel.mailSent() };
+  /* AND A MEMBER WHOSE MAILBOX WAS REFUSED WHILE THE REST GOT IT IS A LINE OF THEIR OWN ON HEALTH, by name (RK5). */
+  const mailFault: MailFault = {
+    failed: (error) => running.api.kernel.mailFailed(error),
+    sent: (delivered) => running.api.kernel.mailSent(delivered),
+    missed: (addresses, what) => running.api.kernel.mailMissed(addresses, what),
+  };
   const notices = send ? mailedNotices(send, mailFault) : undefined;
   const webhooks = signedWebhooks(webhookPost());
 

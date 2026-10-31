@@ -53,6 +53,26 @@ test('RJ7: ONE MEMBER WHOSE ADDRESS BOUNCES NEITHER RAISES NOR CLEARS THE MAIL F
   assert.equal(addressRefused('the mail server stopped answering'), false);
 });
 
+test('RK5: A SUMMARY THAT REACHED SOME MEMBERS AND BOUNCED FOR OTHERS SAYS WHO MISSED IT, and clears who got it', async () => {
+  const told: string[] = [];
+  const fault: MailFault = {
+    failed: (e) => told.push(`failed: ${e}`),
+    sent: (delivered) => told.push(`sent: ${(delivered ?? []).join(', ')}`),
+    missed: (addresses, what) => told.push(`missed: ${addresses.join(', ')} / ${what}`),
+  };
+  const notices = mailedNotices(async ({ to }) => ({ refused: [...to].filter((a) => a.startsWith('mia@')) }), fault);
+  await notices(job({ to: ['owner@example.com', 'mia@example.com'], subject: 'Monday money', because: 'digest.monday' }));
+  assert.deepEqual(told, ['sent: owner@example.com', 'missed: mia@example.com / the summary "Monday money"']);
+
+  /* ONE MEMBER AND HER MAILBOX REFUSED: the send fails as before, the server's fault is left alone, and she missed it. */
+  told.length = 0;
+  const alone = mailedNotices(async () => {
+    throw new Error('the mail server has no such mailbox (550 5.1.1 at RCPT TO), so the mail was not sent');
+  }, fault);
+  await assert.rejects(alone(job({ to: 'mia@example.com', subject: 'Something is due' })));
+  assert.deepEqual(told, ['missed: mia@example.com / a notice']);
+});
+
 test('RK5: ONLY A MAILBOX THE SERVER DOES NOT HAVE IS ONE BAD ADDRESS', () => {
   assert.equal(mailboxRefused({ code: 550, lines: ['5.1.1 <gone@example.com>: Recipient address rejected: User unknown'] }), true);
   assert.equal(mailboxRefused({ code: 553, lines: ['5.1.3 Bad recipient address syntax'] }), true);
