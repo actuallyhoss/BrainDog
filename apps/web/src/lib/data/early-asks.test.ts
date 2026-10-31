@@ -43,3 +43,14 @@ test('AN ANSWER OLDER THAN EARLY_FRESH_MS IS NOT HANDED, so a part never draws a
     Date.now = now;
   }
 });
+
+test('EVERY READ ASKED AHEAD SAYS SO TO THE CLIENT, so the rest leaves it out and the quiet mark does not (speed-f SF1)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  assert.match(read('../page/slot.ts'), /askEarly\(slotKey\(base\), \(\) => readSlot\(base, undefined, true\)\)/u);
+  assert.match(read('../money/books.ts'), /askEarly\(key\(base, book\), \(\) => readBooks\(base, book, true\)\)/u);
+  assert.match(read('../home/working-early.ts'), /createClient\(\{ base, ahead: true \}\)/u);
+  const screen = read('../ui/screen.svelte.ts');
+  assert.match(screen, /export function quiet\(\): boolean \{\s+return q\.out === 0 && q\.held === 0;/u, 'the quiet mark stopped counting reads asked ahead');
+  assert.match(screen, /const still = settled\(\) !== undefined && restful\(\);/u);
+});

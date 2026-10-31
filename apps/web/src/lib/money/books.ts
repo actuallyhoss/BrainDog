@@ -16,13 +16,13 @@ export const BOOKS_MOST = 12;
 
 const key = (base: string, book: SideList): string => `${base} books ${book.list}`;
 
-/** The record's `list` of the books, in name order, as the row reads it. */
-export const readBooks = (base: string, book: SideList) =>
-  createClient({ base }).list({ register: book.list, limit: BOOKS_MOST, order: [{ field: book.title, dir: 'asc' }] });
+/** The record's `list` of the books, in name order, as the row reads it; `ahead` when asked before the row draws. */
+export const readBooks = (base: string, book: SideList, ahead = false) =>
+  createClient({ base, ...(ahead ? { ahead } : {}) }).list({ register: book.list, limit: BOOKS_MOST, order: [{ field: book.title, dir: 'asc' }] });
 
 /** Ask the books now, for the row to take when it draws. */
 export function askBooks(base: string, book: SideList): void {
-  askEarly(key(base, book), () => readBooks(base, book));
+  askEarly(key(base, book), () => readBooks(base, book, true));
 }
 
 /** The books asked ahead, handed once while fresh: `null` when the row reads for itself. */

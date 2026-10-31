@@ -10,6 +10,10 @@
  * is its own: an answer held here is handed once, and not at all once it is older than `EARLY_FRESH_MS`. Keyed with
  * the record's address, so one record's answer is never another's. A read that fails is no answer, and the part asks.
  *
+ * ASKED AHEAD, SAID TO THE CLIENT (`createClient({ ahead: true })`). Each `read` here makes its calls through a client
+ * made with `ahead`, so the frame's rest (`ui/screen.svelte.ts` `rested`) does not wait for them: they are on the wire
+ * before the part mounts, and nothing the rest holds back could go in front of them. The quiet mark still counts them.
+ *
  * PURE ENOUGH FOR NODE: no rune, no `$lib`.
  */
 

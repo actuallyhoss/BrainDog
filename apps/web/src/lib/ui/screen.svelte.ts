@@ -179,11 +179,12 @@ export function settled(): Settled | undefined {
  * the client's calls out (`onCallsOut`) and any later read a screen has promised (`holdQuiet`) are both nothing.
  * Nothing waits on it in the app; the gates read it, after the drawn mark, with a short cap.
  */
-const q = $state({ out: 0, held: 0 });
+const q = $state({ out: 0, ahead: 0, held: 0 });
 
-/** The client's count of calls out, kept here for the layout to show. */
-export function callsOut(out: number): void {
+/** The client's count of calls out, and how many of them were asked ahead (`data/early-asks.ts`), kept here for the layout to show. */
+export function callsOut(out: number, ahead = 0): void {
   q.out = out;
+  q.ahead = ahead;
 }
 
 /** A read this screen means to start later (behind a timer or a chunk): quiet is not told until the returned function runs. */
@@ -198,9 +199,23 @@ export function holdQuiet(): () => void {
   };
 }
 
-/** Whether nothing is out and nothing is promised. */
+/** Whether nothing is out and nothing is promised. An asked-ahead read is out like any other: the quiet mark waits for it. */
 export function quiet(): boolean {
   return q.out === 0 && q.held === 0;
+}
+
+/**
+ * QUIET FOR THE REST, which is the quiet mark less the reads asked ahead (`data/early-asks.ts`, the client's `ahead`).
+ *
+ * WHY THEY ARE LEFT OUT HERE AND NOWHERE ELSE. The rest keeps a read the screen does not draw from from going in front of
+ * the screen's own in the record's one thread. A read asked ahead is already on the wire, sent before the part that
+ * draws it had mounted, so nothing asked after it can go in front of it; and it filled the gap between the page's reads
+ * and its parts' that the rest used to find, so the frame's extras waited for the slowest part on Money (speed-f SF1,
+ * 9.46 -> 11.0 s). The quiet mark (`quiet`) still counts them: a gate that navigates away with one out is told it was
+ * refused, which is what that mark is for.
+ */
+function restful(): boolean {
+  return q.out - q.ahead <= 0 && q.held === 0;
 }
 
 /** How long the screen must stay drawn and quiet before a read that can wait goes (`rested`), and the most it waits. */
@@ -211,7 +226,7 @@ export const REST_CAP_MS = 5_000;
  * WHEN THE SCREEN IS DRAWN AND AT REST, for a read that can wait for the screen's own: the sidebar's figures. The record
  * answers one call at a time, so a read the screen does not draw from, sent first, is a read every one of the screen's
  * waits behind. Drawn and quiet for `REST_MS` together, or `REST_CAP_MS` at most, so a screen that never rests still
- * gets it.
+ * gets it. Quiet here leaves out the reads asked ahead (`restful`), which are on the wire already.
  */
 export function rested(): Promise<void> {
   return new Promise((done) => {
@@ -219,7 +234,7 @@ export function rested(): Promise<void> {
     let since = 0;
     const look = (): void => {
       const now = Date.now();
-      const still = settled() !== undefined && quiet();
+      const still = settled() !== undefined && restful();
       since = still ? since || now : 0;
       if ((since !== 0 && now - since >= REST_MS) || now - start >= REST_CAP_MS) return done();
       setTimeout(look, 100);

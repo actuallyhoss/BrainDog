@@ -28,7 +28,7 @@ export function askWorking(base: string, owner: boolean): void {
   if (firstDrawn()) return;
   askEarly(key(base), async (): Promise<WorkingAsked> => {
     const { createClient } = await import('@braindog/client');
-    const c = createClient({ base });
+    const c = createClient({ base, ahead: true });
     const [presence, threads] = await Promise.all([c.presence(), owner ? c.instructionList({ limit: THREADS_READ }) : Promise.resolve(null)]);
     return { presence, threads, owner };
   });

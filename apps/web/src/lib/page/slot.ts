@@ -172,7 +172,7 @@ export const SLOT_READ = 20;
  * which writes nothing. A drawing BrainDog made unasked waits on the shelf, and the slot is where it is offered. A read
  * that fails is no suggestion.
  */
-export async function readSlot(base: string, io?: Fetch): Promise<SlotQuestion[]> {
+export async function readSlot(base: string, io?: Fetch, ahead = false): Promise<SlotQuestion[]> {
   const body = {
     page: 'slot',
     title: 'Suggestion',
@@ -182,7 +182,7 @@ export async function readSlot(base: string, io?: Fetch): Promise<SlotQuestion[]
     ],
   };
   try {
-    const out = await createClient({ base, ...(io ? { fetch: io } : {}) }).call<{ blocks?: unknown }>('previewPage', { body });
+    const out = await createClient({ base, ...(io ? { fetch: io } : {}), ...(ahead ? { ahead } : {}) }).call<{ blocks?: unknown }>('previewPage', { body });
     if (!out.ok) return [];
     const blocks: unknown[] = Array.isArray(out.value.blocks) ? out.value.blocks : [];
     const queue = blocks.flatMap((block) => (isBag(block) && Array.isArray(block.queue) ? (block.queue as unknown[]) : []));
@@ -207,7 +207,7 @@ export function askSlot(base: string, page: SlotPage, blocks: readonly { kind?: 
      whether or not it drew (`PageBody.svelte` `ownQuestions`). */
   const own = (b: (typeof blocks)[number]): boolean => b.kind === 'queue' && b.source === 'governance.open' && (b.drawn !== false || b.where !== undefined);
   if (slotPlace(page) === null || blocks.some(own)) return;
-  askEarly(slotKey(base), () => readSlot(base));
+  askEarly(slotKey(base), () => readSlot(base, undefined, true));
 }
 
 /** The suggestion asked ahead for the page at `base`, handed once while fresh: `null` when the slot reads for itself. */

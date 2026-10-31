@@ -40,6 +40,11 @@ export type ClientOptions = {
   token?: string | undefined;
   /** Injectable so a test can drive the client without a socket, and a Worker can pass its own. */
   fetch?: typeof globalThis.fetch;
+  /**
+   * The calls this client sends are asked AHEAD of the screen that will draw them (the app's `data/early-asks.ts`): still
+   * counted as out, and told apart (`onCallsOut`'s second count), so a wait for the screen's own reads can leave them out.
+   */
+  ahead?: boolean;
 };
 
 /**
@@ -1546,7 +1551,7 @@ export const READ_WAVE_MOST_MS = 30;
 const READS_WAVE_MOST = 32;
 /** The reads that always go by themselves. */
 const ALONE = new Set(['version', 'boot', 'reads']);
-type ReadAsk = { name: string; url: URL; writes: boolean; sent: string | undefined; args: Record<string, unknown>; done: (r: Result<unknown>) => void };
+type ReadAsk = { name: string; url: URL; writes: boolean; sent: string | undefined; args: Record<string, unknown>; ahead: boolean; done: (r: Result<unknown>) => void };
 type ReadWave = { asks: ReadAsk[]; quiet: ReturnType<typeof setTimeout> | undefined; most: ReturnType<typeof setTimeout> | undefined; hold: AbortController };
 /** The wave filling now, by the fetch it will go through and then the host and token. */
 let READ_WAVES = new WeakMap<object, Map<string, ReadWave>>();
@@ -1666,15 +1671,24 @@ const TAB = {};
 let LEAVING = false;
 /** Every call out now that the tab's leaving may stop (`LEAVING`); a call taken off it as it answers. */
 const OUTGOING = new Set<AbortController>();
-/** Who is told when the count of calls out changes: the app's quiet mark (`onCallsOut`). */
-const COUNTERS = new Set<(out: number) => void>();
+/**
+ * THE CALLS OUT NOW THAT WERE ASKED AHEAD (`ClientOptions.ahead`), each also in `OUTGOING`: a request already on the wire
+ * for a part that has not drawn yet. Only a request sent is in it, never a wave still filling, since a read asked while
+ * one fills joins it and the asked-ahead answer would wait for that read too.
+ */
+const AHEAD = new Set<AbortController>();
+/** Who is told when the count of calls out changes: the app's quiet mark and its rest (`onCallsOut`). */
+const COUNTERS = new Set<(out: number, ahead: number) => void>();
 const tell = (): void => {
-  for (const fn of COUNTERS) fn(OUTGOING.size);
+  for (const fn of COUNTERS) fn(OUTGOING.size, AHEAD.size);
 };
-/** How many calls are out now, told to `fn` at once and at every change; the returned function stops it. */
-export function onCallsOut(fn: (out: number) => void): () => void {
+/**
+ * How many calls are out now, and how many of those were asked ahead, told to `fn` at once and at every change; the
+ * returned function stops it. `out` counts every call, the asked-ahead ones too.
+ */
+export function onCallsOut(fn: (out: number, ahead: number) => void): () => void {
   COUNTERS.add(fn);
-  fn(OUTGOING.size);
+  fn(OUTGOING.size, AHEAD.size);
   return () => void COUNTERS.delete(fn);
 }
 const WINDOW = globalThis as { document?: unknown; addEventListener?: (type: string, fn: () => void) => void };
@@ -1684,6 +1698,7 @@ if (typeof WINDOW.addEventListener === 'function' && WINDOW.document !== undefin
     LEAVING = true;
     for (const out of OUTGOING) out.abort();
     OUTGOING.clear();
+    AHEAD.clear();
     tell();
     setTimeout(() => (LEAVING = false), 3000);
   };
@@ -1868,6 +1883,8 @@ const originOf = (base: string): string => {
 export function createClient(options: ClientOptions) {
   const doFetch = options.fetch ?? globalThis.fetch;
   const base = options.base.replace(/\/+$/, '');
+  /** Whether this client's calls are asked ahead of the screen that draws them (`ClientOptions.ahead`, `AHEAD`). */
+  const ahead = options.ahead === true;
 
   /** This client's kept schemas: dropped whole on a write it sent, and stale once a `version` answer moves. */
   const schemas = (): SchemaStore => {
@@ -2139,7 +2156,7 @@ export function createClient(options: ClientOptions) {
   function send<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean, args?: Record<string, unknown>): Promise<Result<T>> {
     const read = !WRITES.has(name) || POST_READS.has(name);
     const host = `${base} ${options.token ?? ''}`;
-    if (READ_BATCHING && read && args !== undefined && !outlives && !ALONE.has(name) && !NO_READS.has(host) && !LEAVING) return inReadWave<T>(host, { name, url, writes, sent, args });
+    if (READ_BATCHING && read && args !== undefined && !outlives && !ALONE.has(name) && !NO_READS.has(host) && !LEAVING) return inReadWave<T>(host, { name, url, writes, sent, args, ahead });
     return sendNow<T>(name, url, writes, sent, outlives);
   }
 
@@ -2177,7 +2194,7 @@ export function createClient(options: ClientOptions) {
   /** A wave of reads, sent: by itself for one, else as one `reads`, each answered as it would have been alone. */
   async function sendReadWave(asks: readonly ReadAsk[]): Promise<void> {
     const alone = (a: ReadAsk): Promise<void> =>
-      sendNow<unknown>(a.name, a.url, a.writes, a.sent, false).then(a.done, (e) => a.done({ ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }));
+      sendNow<unknown>(a.name, a.url, a.writes, a.sent, false, a.ahead).then(a.done, (e) => a.done({ ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }));
     if (asks.length === 1) return alone(asks[0]!);
     if (LEAVING) {
       for (const a of asks) a.done({ ok: false, refusal: unreachable('This page is being left.') });
@@ -2190,7 +2207,9 @@ export function createClient(options: ClientOptions) {
       args: a.writes ? a.args : Object.fromEntries(Object.entries(a.args).filter(([, v]) => v !== undefined && v !== null)),
       ...(a.writes ? {} : { at: a.url.toString() }),
     }));
-    const out = (await sendNow<{ answers?: { status: number; body: unknown }[] }>('reads', new URL(`${base}/api/reads`), true, JSON.stringify({ calls }), false).catch(
+    /* ASKED AHEAD ONLY WHEN EVERY READ IN IT WAS: a screen's own read in the wave makes the whole request the screen's. */
+    const allAhead = asks.every((a) => a.ahead);
+    const out = (await sendNow<{ answers?: { status: number; body: unknown }[] }>('reads', new URL(`${base}/api/reads`), true, JSON.stringify({ calls }), false, allAhead).catch(
       (e: unknown): Result<never> => ({ ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) }),
     ));
     const answers = out.ok ? out.value?.answers : undefined;
@@ -2208,17 +2227,21 @@ export function createClient(options: ClientOptions) {
     asks.forEach((a, i) => a.done(i === 0 ? out : (structuredClone(out) as Result<unknown>)));
   }
 
-  async function sendNow<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
+  async function sendNow<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean, early = ahead): Promise<Result<T>> {
     if (LEAVING && !outlives) return { ok: false, refusal: unreachable('This page is being left.') };
     let res: Response;
     const leaving = outlives ? null : new AbortController();
     if (leaving) {
       OUTGOING.add(leaving);
+      if (early) AHEAD.add(leaving);
       tell();
     }
     /* TAKEN OFF AS IT ANSWERS, whichever way it ends, so the count of calls out returns to nothing. */
     const done = (): void => {
-      if (leaving && OUTGOING.delete(leaving)) tell();
+      if (leaving && OUTGOING.delete(leaving)) {
+        AHEAD.delete(leaving);
+        tell();
+      }
     };
     /* A READ ANSWERED 503 IS ASKED AGAIN (`BUSY_TRIES`); a write never is, since it may have landed before the 503. */
     const reads = !WRITES.has(name) || POST_READS.has(name);
