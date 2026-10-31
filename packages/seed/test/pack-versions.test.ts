@@ -2477,7 +2477,7 @@ const DECLARED: Record<string, Version> = {
     holds: `
       metric.account-ages metric.account-gap metric.account-in-by-month metric.account-lines metric.account-now
       metric.account-out-by-month metric.accounts-open metric.arriving-30d metric.balance-by-account metric.balances-stale
-      metric.bills-in-no-book metric.book-cash metric.book-in-by-month metric.book-in-month metric.book-lasts-until
+      metric.bills-in-no-book metric.bills-open metric.book-cash metric.book-in-by-month metric.book-in-month metric.book-lasts-until
       metric.book-net-by-month metric.book-net-month metric.book-out-by-month metric.book-out-month metric.book-owed-by
       metric.book-owed-to metric.book-spent-month metric.books-held metric.budget-passed-on metric.budgets-monthly-total
       metric.budgets-set metric.budgets-total metric.budgets-unset metric.budgets-weekly metric.budgets-weekly-total
@@ -2501,13 +2501,13 @@ const DECLARED: Record<string, Version> = {
       metric.plan-parts-paid-by-plan metric.project-in-by-month metric.project-in-month metric.project-kept-month
       metric.project-out-by-month metric.project-out-month metric.project-owed metric.received-30d metric.received-7d
       metric.received-a-month metric.received-all metric.received-last metric.received-month metric.received-three
-      metric.received-three-months-back metric.received-year metric.repeating-in-no-book metric.repeating-overdue metric.rule-filed
-      metric.rules-filing metric.rules-filing-30d metric.runs-out-on metric.runway-days metric.settled-in-7d metric.spent-30d
-      metric.spent-all metric.spent-by-category-last-month metric.spent-by-category-month metric.spent-by-category-to-date-last-month
-      metric.spent-by-category-week metric.spent-by-category-year metric.spent-in-category-by-week metric.spent-last
-      metric.spent-last-month metric.spent-three metric.spent-vs-last-month metric.spent-year metric.spoken-for-month
-      metric.spoken-for-share metric.statement-oldest-days metric.stripe-below-zero-count metric.txn-uncategorised
-      metric.uncategorised-share-30d metric.unfiled-month metric.unfiled-spent-month metric.unnamed-paid-90d
+      metric.received-three-months-back metric.received-year metric.repeating-held metric.repeating-in-no-book
+      metric.repeating-overdue metric.rule-filed metric.rules-filing metric.rules-filing-30d metric.runs-out-on metric.runway-days
+      metric.settled-in-7d metric.spent-30d metric.spent-all metric.spent-by-category-last-month metric.spent-by-category-month
+      metric.spent-by-category-to-date-last-month metric.spent-by-category-week metric.spent-by-category-year
+      metric.spent-in-category-by-week metric.spent-last metric.spent-last-month metric.spent-three metric.spent-vs-last-month
+      metric.spent-year metric.spoken-for-month metric.spoken-for-share metric.statement-oldest-days metric.stripe-below-zero-count
+      metric.txn-uncategorised metric.uncategorised-share-30d metric.unfiled-month metric.unfiled-spent-month metric.unnamed-paid-90d
       page.money page.money-account page.money-accounts page.money-bill page.money-book page.money-budgets page.money-coming
       page.money-forecast page.money-ledger page.money-payees page.money-plan page.money-reports page.money-rules
       register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments
@@ -2527,7 +2527,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '25faa3d6f8712d37',
+    declares: 'a04f3a06af13f9d7',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
@@ -2540,6 +2540,7 @@ const DECLARED: Record<string, Version> = {
       'Before 3.33.0 shipped, `page.money` leads with late bills, or the low point when cash goes under within 12 weeks, the card second; no id added or taken away -> c7bebadea464c85a',
       'Before 3.33.0 shipped, `page.money` links the late figure in its first line and its Heads up drops the repeated Bills late line; no id added or taken away -> 6ed7ba30566e892e',
       'Before 3.33.0 shipped, `rule.invoice-chased` notes say "in Needs you", where they said "in Decide"; no id added or taken away -> 25faa3d6f8712d37',
+      'Before 3.33.0 shipped, `metric.bills-open` and `metric.repeating-held` are added and `page.money` asks for a bill when nothing is due; two ids added, none taken away -> a04f3a06af13f9d7',
     ],
   },
   'work@1.17.0': {

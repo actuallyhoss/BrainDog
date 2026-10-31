@@ -70,7 +70,9 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
    "script.ledger_twice#0",
    "metric.moved-since#0",
    "metric.filing-rule-filed#0",
-   "metric.filing-rules#0"
+   "metric.filing-rules#0",
+   "metric.bills-open#0",
+   "metric.repeating-held#0"
   ],
   "was": {
    "script.learn_category#0": {

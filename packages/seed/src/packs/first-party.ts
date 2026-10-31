@@ -902,6 +902,8 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   and Heads up no longer repeats it (`page.money`).
  * - money-core 3.33.0, before it shipped (audit 31 Oct g, AG1): a chased invoice's note says "in Needs you", where it
  *   said "in Decide" (`rule.invoice-chased`).
+ * - money-core 3.33.0, before it shipped (audit 31 Oct h, AH15): with nothing due Money asks for a bill, and
+ *   `metric.bills-open` and `metric.repeating-held` are added.
  * - portfolio 1.30.2 (audit 31 Oct g, AG22): a card's key number field reads "Shown first", where it read "Leads the
  *   card". Words only, so a patch step.
  * - work 1.20.1, before it shipped (audit 31 Oct f, AF20): Work's folded groups say how many they hold (`page.work`).
