@@ -1,0 +1,141 @@
+/**
+ * The mail door's question about an arrival is settled with the arrival (audit 31 Oct k, AK12): filing or setting the
+ * mail aside closes it, an undo of the filing or a put back asks it again, and a mail saying somebody paid one of our
+ * invoices offers to mark that invoice paid, never a new bill with its amount unread.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import type { Result } from '@braindog/ports';
+
+import { openRecord, type Declaration, type Kernel } from './index.ts';
+import { fixedClock, openSqlite, type NodeSql } from '../test/sqlite.ts';
+
+const NOW = Date.UTC(2026, 9, 20, 12);
+const PERSON = { actor: 'p_1' };
+
+const reg = (id: string, name: string, body: Record<string, unknown>): Declaration => ({ id: `register.${id}`, kind: 'register', body: { id, name, ...body } as never });
+
+const DECLS: Declaration[] = [
+  reg('dues', 'Dues', {
+    title: 'what',
+    state: 'state',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'direction', type: 'enum', values: ['owed_by_me', 'owed_to_me'], required: true },
+      { id: 'amount', type: 'money', required: true },
+      { id: 'due', type: 'day', deadline: true, required: true },
+      { id: 'state', type: 'enum', values: ['open', 'paid'], default: 'open', required: true },
+    ],
+  }),
+  reg('notes', 'Notes', { title: 'what', fields: [{ id: 'what', type: 'text', required: true }] }),
+];
+
+async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const done = await k.install(DECLS);
+  assert.ok(done.ok, JSON.stringify(done));
+  return { k, sql };
+}
+
+const value = <T>(r: Result<T>): T => {
+  assert.ok(r.ok, JSON.stringify(r));
+  return (r as { ok: true; value: T }).value;
+};
+
+let n = 0;
+function mail(k: Kernel, from: string, subject: string, body: string): { raw: string; state: string; suggestion?: string } {
+  n += 1;
+  return value(k.arrive({ channel: 'email', headers: { from, to: 'tok@in.example', subject }, body, sha256: `mail-settle-${String(n)}` }) as Result<{ raw: string; state: string; suggestion?: string }>);
+}
+
+/** A new vendor's bill: the door asks about it in To review, with the arrival as the question's one mail. */
+const asked = (k: Kernel): { raw: string; question: string } => {
+  const got = mail(k, 'Loomhouse <billing@loomhouse.example>', 'Your invoice', 'Invoice INV-9\nAmount due: GBP 48.00\nPayment due by 14 November 2026\n');
+  assert.equal(got.state, 'review');
+  assert.ok(got.suggestion, 'the door asked nothing');
+  return { raw: got.raw, question: got.suggestion };
+};
+
+const statusOf = (sql: NodeSql, id: string) => sql.one<{ status: string; resolved_as: string | null }>('SELECT status, resolved_as FROM suggestion WHERE id = ?', id);
+const stateOf = (sql: NodeSql, raw: string): string | undefined => sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', raw)?.state;
+const lastStateBatch = (sql: NodeSql, raw: string): string =>
+  sql.one<{ batch: string }>("SELECT batch FROM event WHERE target = ? AND kind = 'state' ORDER BY rowid DESC LIMIT 1", `inbox_raw:${raw}`)!.batch;
+
+test('FILING THE MAIL CLOSES THE DOOR’S QUESTION ABOUT IT, in the same batch', async () => {
+  const { k, sql } = await record();
+  const { raw, question } = asked(k);
+  assert.equal(statusOf(sql, question)?.status, 'open');
+
+  value(k.fileArrival(raw, 'notes', null, PERSON));
+  assert.equal(stateOf(sql, raw), 'matched');
+  assert.deepEqual(statusOf(sql, question), { status: 'resolved', resolved_as: 'moot' });
+  const closed = sql.one<{ note: string; batch: string }>("SELECT note, batch FROM event WHERE target = ? AND kind = 'resolve' ORDER BY rowid DESC LIMIT 1", `suggestion:${question}`);
+  assert.equal(closed?.note, 'Settled by filing the mail in Notes.');
+  assert.equal(closed?.batch, lastStateBatch(sql, raw), 'the question closed in a batch of its own');
+  sql.close();
+});
+
+test('UNDOING THE FILING PUTS THE MAIL BACK IN THE INBOX AND ASKS THE QUESTION AGAIN', async () => {
+  const { k, sql } = await record();
+  const { raw, question } = asked(k);
+  value(k.fileArrival(raw, 'notes', null, PERSON));
+  assert.equal(k.count('notes'), 1);
+
+  const batch = lastStateBatch(sql, raw);
+  const plan = value(k.undoPlan({ batch }));
+  value(k.undoApply({ batch }, plan.hash, 'p_1'));
+
+  assert.equal(k.count('notes'), 0, 'the row it was filed as is still there');
+  assert.equal(stateOf(sql, raw), 'review', 'the inbox still says filed');
+  assert.equal(statusOf(sql, question)?.status, 'open', 'the door’s question stayed closed');
+  sql.close();
+});
+
+test('SETTING THE MAIL ASIDE CLOSES THE QUESTION TOO, and putting it back asks it again', async () => {
+  const { k, sql } = await record();
+  const { raw, question } = asked(k);
+
+  value(k.archiveArrival(raw, 'p_1'));
+  assert.deepEqual(statusOf(sql, question), { status: 'resolved', resolved_as: 'moot' });
+  const closed = sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'resolve' ORDER BY rowid DESC LIMIT 1", `suggestion:${question}`);
+  assert.equal(closed?.note, 'Settled by setting the mail aside.');
+
+  value(k.returnArrival(raw, 999, PERSON));
+  assert.equal(statusOf(sql, question)?.status, 'open');
+  const again = sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'suggest' ORDER BY rowid DESC LIMIT 1", `suggestion:${question}`);
+  assert.equal(again?.note, 'Asked again: the mail is back in the inbox.');
+  sql.close();
+});
+
+test('A MAIL SAYING THEY PAID OUR INVOICE OFFERS TO MARK IT PAID, and makes no bill', async () => {
+  const { k, sql } = await record();
+  const owed = value(
+    k.create('dues', { what: 'Priya Nair invoice INV-2026-041', direction: 'owed_to_me', amount: { amount: 120000, currency: 'GBP' }, due: '2026-10-15' }, PERSON),
+  );
+  const got = mail(k, 'Priya Nair <priya@nairdesign.example>', 'Payment for invoice INV-2026-041', 'Hi,\nWe have paid invoice INV-2026-041 today.\nAmount: GBP 1,200.00\nPriya\n');
+
+  assert.equal(got.state, 'review');
+  assert.equal(k.count('dues'), 1, 'a remittance was offered as a new bill');
+  assert.ok(got.suggestion);
+  const said = sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'suggest' ORDER BY rowid LIMIT 1", `suggestion:${got.suggestion}`);
+  assert.equal(said?.note, 'Mark invoice INV-2026-041 paid?');
+  const body = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', got.suggestion)!.body) as { rows: { at: string; patch: Record<string, unknown> }[]; review?: boolean };
+  assert.deepEqual(body.rows.map((r) => [r.at, r.patch]), [[owed.id, { state: 'paid' }]]);
+  /* MARKING MONEY PAID IS HIS WORD: asked in Needs you, never filed alone and never in To review. */
+  assert.equal(body.review, undefined);
+  const open = k.openSuggestions();
+  assert.ok(open.ok && open.value.some((s) => s.id === got.suggestion), 'not asked in Needs you');
+  sql.close();
+});
+
+test('A REMITTANCE FOR AN INVOICE ALREADY PAID OFFERS NOTHING', async () => {
+  const { k, sql } = await record();
+  value(k.create('dues', { what: 'Priya Nair invoice INV-2026-042', direction: 'owed_to_me', amount: { amount: 50000, currency: 'GBP' }, due: '2026-10-15', state: 'paid' }, PERSON));
+  const got = mail(k, 'Priya Nair <priya@nairdesign.example>', 'Payment for invoice INV-2026-042', 'We have paid invoice INV-2026-042.\nAmount: GBP 500.00\n');
+  assert.equal(got.state, 'skipped');
+  assert.equal(got.suggestion, undefined);
+  sql.close();
+});

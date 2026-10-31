@@ -517,6 +517,9 @@ const acts = (s: string): boolean => ORDER.test(s) || PAID.test(s) || GOT.test(s
 /* The words around an order's total that say nothing more of it: "total", "not paid yet", "owed". */
 const TOTAL_WORDS = /\b(?:the\s+total(?:\s+is)?|total(?:\s+is)?|in\s+all|not\s+paid(?:\s+yet)?|unpaid|still\s+owed|owed|to\s+pay|due)\b/giu;
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+/* "NEXT", "NEXT DUE", "DUE NEXT" LEFT BESIDE A DAY, the words an answer to "When is it next due?" comes in: "Netflix 180 a
+   month, next on the 5th", "next due 5 Nov". The day is read off and these say nothing more (AL4 follow). */
+const NEXT_SAID = /(?:^|\s+)(?:(?:it(?:['’]s| is)\s+)?(?:next(?:\s+(?:due|one|payment))?|due\s+next))(?:\s+(?:on|by))?\s*$/iu;
 const trimWords = (s: string): string => oneLine(s).replace(/^(?:of|the|some)\s+/iu, '').replace(/[\s,.;:!?]+$/u, '').replace(/\s+(?:please|pls|thanks|thank you)$/iu, '');
 
 /* ── the shapes a first sentence takes, past an order and a payment (first-hour audit AH1, AH2, AH24) ── */
@@ -672,6 +675,8 @@ const WHY = {
       : `Which ${plural} are they? Say whose with the figure, like ${figure} ${like} ${plural}.`;
   },
   whichWay: (name: string) => `Did ${name} pay you, or did you pay ${name}?`,
+  /* ASKED, NEVER GUESSED: money that comes round is kept with the next day it falls on, and no day was said. */
+  whenNext: 'When is it next due? Say the day with it, like on the 5th or next Friday.',
   bankNoCurrency: 'That text names no currency, so nothing is kept from it. Paste it as the bank sent it.',
   known: (name: string, list: string) => `${name} is already in ${list}.`,
   offer: 'Or keep it as one of these:',
@@ -754,6 +759,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let metRow: number | null = null;
   /* Somebody new said to have "paid", with no "me": which way the money went is asked, and nobody is made (MC1). */
   let whichWay: string | null = null;
+  /* Money that comes round was read with no day it next falls on: the day is asked, and the entry waits for it. */
+  let whenNext = false;
 
   const personOf = (name: string): TellValue | null => {
     const known = knownAs(name, opts.people ?? []);
@@ -865,7 +872,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     }
     if (!self && !acts(c) && (measure(c) || loan(c) || income(c) || bill(c))) continue;
     /* A DAY SAID ON ITS OWN after what it is the day of was read with it: "Invoice Acme 1,200 USD, due in 14 days". */
-    if (placed && takeDay(c, opts.today).day !== null && trimWords(takeDay(c, opts.today).rest.replace(/^(?:due|by|on)$/iu, '')) === '') continue;
+    if (placed && takeDay(c, opts.today).day !== null && trimWords(takeDay(c, opts.today).rest.replace(NEXT_SAID, '').replace(/^(?:due|by|on)$/iu, '')) === '') continue;
     /* AND THE DAY A LOAN COMES BACK, said after it: "Borrowed 300 from Sara, pay back by Friday". */
     if (loaned && takeDay(c, opts.today).day !== null && BACK_SAID.test(trimWords(takeDay(c, opts.today).rest))) continue;
     const forSomebody = !self && !acts(c) ? FOR_SOMEBODY.exec(c) : null;
@@ -917,6 +924,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     }
     if (bankBare) return { rows, left, why: WHY.bankNoCurrency };
     if (whichWay !== null) return { rows, left, why: WHY.whichWay(whichWay) };
+    if (whenNext) return { rows, left, why: WHY.whenNext };
     if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney };
     if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency(unsureWord?.word ?? null, unsureWord?.figure ?? '300') };
     if (known !== null && !placed && rows.length === 0) return { rows, left: [], why: WHY.known(known, people?.name ?? 'People') };
@@ -1098,6 +1106,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     fields[often.id] = cadence;
     const next = pick(l, 'day', /next|due/, (f) => f.required === true);
     if (next && k.day) fields[next.id] = k.day;
+    if (next && !k.day && next.default === undefined) whenNext = true;
     const party = pick(l, 'ref', /party|who/, (f) => f.to === PEOPLE);
     if (party && k.payer !== null) fields[party.id] = k.payer;
     startIn(l, fields);
@@ -1157,7 +1166,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const [a] = amountsIn(own.rest, opts.currency, held);
     if (!a) return false;
     if (loose && a.word === null) {
-      const after = oneLine(own.rest.slice(a.at + a.text.length).replace(EVERY, ' ')).replace(/^(?:due|by|on)$/iu, '');
+      const after = oneLine(own.rest.slice(a.at + a.text.length).replace(EVERY, ' ')).replace(NEXT_SAID, '').replace(/^(?:due|by|on)$/iu, '');
       const size = numberOf(a.digits, a.thousand) ?? 0;
       if (after !== '' || TIME_BEFORE.test(own.rest.slice(0, a.at)) || own.rest.slice(0, a.at).trim() === '') return false;
       if (!THING_PAID.test(c) && !EVERY.test(c) && size < 100) return false;
@@ -1186,6 +1195,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (invoice) rest = rest.replace(INVOICE, '');
     else if (pay) rest = rest.replace(PAY, '');
     if (every) rest = rest.replace(every[0], ' ');
+    if (every) rest = oneLine(rest).replace(NEXT_SAID, '');
     const plain = trimWords(rest.replace(/^(?:for|to)\s+(?:the\s+)?/iu, '').replace(/\s+(?:due|on|by|is)$/iu, ''));
     const who = invoice?.[1] ?? null;
     const what = capital(plain) || (who ? `Invoice to ${who}` : 'A bill');
@@ -1209,6 +1219,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const repeats = every ? REPEATS[words(every[1] ?? every[2] ?? '')] : undefined;
     const repeat = repeats ? l.fields.find((f) => f.type === 'enum' && f.values?.includes(repeats) && f.values.includes('none')) : undefined;
     if (repeat && repeats) fields[repeat.id] = repeats;
+    if (repeats && due && !day && due.required === true && due.default === undefined) whenNext = true;
     if (who) {
       const party = pick(l, 'ref', /party|who|client|from/, (f) => f.to === PEOPLE);
       const ref = personOf(who);

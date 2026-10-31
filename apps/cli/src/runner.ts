@@ -66,6 +66,7 @@ import { approveRunner } from './login.ts';
 import { listedProfiles } from './placed.ts';
 import { profileNameOf } from './position.ts';
 import { envFor } from './setup.ts';
+import { saidDay } from './said-day.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -487,7 +488,7 @@ async function enrol(args: string[], io: RunnerIo): Promise<number> {
     io.say(`The machine was approved and ${io.file} could not be written, so the enrolment was not kept. Run braindog runner enrol ${got.key} to start again.`);
     return REFUSED;
   }
-  io.say(`enrolled on ${got.key} as ${got.label} · runner expires ${got.expires.slice(0, 10)}`);
+  io.say(`enrolled on ${got.key} as ${got.label} · runner expires ${saidDay(got.expires)}`);
   io.say('Map a folder with braindog runner repos add <name> <folder>, then start it with braindog runner run.');
   io.answer?.({ value: { host: got.key, label: got.label, expires: got.expires } });
   return 0;

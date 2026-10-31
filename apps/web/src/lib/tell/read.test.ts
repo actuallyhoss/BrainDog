@@ -637,3 +637,27 @@ test('A FOREIGN AMOUNT IS SAID BY ITS OWN SIGN, AND "DINARS" IS ASKED IN WORDS (
   const held = tellRead('Sent mum 1,000 dinars', { ...founder, home: 'EGP', held: ['EGP', 'JOD'] }).rows;
   assert.deepEqual(held[0]!.fields.amount, { amount: 1000000, currency: 'JOD' });
 });
+
+test('MONEY THAT COMES ROUND WITH NO DAY ASKS WHEN IT IS NEXT DUE, and takes the answer (never a day made up)', () => {
+  const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
+  /* Asked as Tell asks which way a payment went, with the entry waiting for its day. */
+  const asked = tellRead('Netflix 180 a month', withRepeating);
+  assert.equal(asked.why, 'When is it next due? Say the day with it, like on the 5th or next Friday.');
+  assert.equal(asked.rows[0]!.fields.next_due, undefined);
+  assert.deepEqual(asked.rows[0]!.missing, ['the day it is due']);
+  /* A repeating bill, where the record keeps no Repeating, is asked the same. */
+  assert.equal(tellRead('Gym membership 900 a month', founder).why, 'When is it next due? Say the day with it, like on the 5th or next Friday.');
+  /* The answer, said with the line in any of the ways a person says it. */
+  for (const said of ['Netflix 180 a month on the 5th', 'Netflix 180 a month, next on the 5th', 'Netflix 180 a month next due 5 Nov', 'Netflix 180 a month, next due 5 Nov']) {
+    const told = tellRead(said, withRepeating);
+    assert.equal(told.why, undefined, said);
+    assert.deepEqual(told.left, [], said);
+    assert.equal(told.rows.length, 1, said);
+    assert.equal(told.rows[0]!.fields.what, 'Netflix', said);
+    assert.equal(told.rows[0]!.fields.next_due, '2026-11-05', said);
+    assert.deepEqual(told.rows[0]!.missing, [], said);
+  }
+  const friday = tellRead('Netflix 180 a month next Friday', withRepeating);
+  assert.equal(friday.why, undefined);
+  assert.equal(typeof friday.rows[0]!.fields.next_due, 'string');
+});

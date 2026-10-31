@@ -105,7 +105,7 @@ test('the start hook prints the warning first, above whatever else it says, and 
   const { code, stdout } = await hookStart(config);
   assert.equal(code, 0);
   const [first, ...rest] = stdout.trimEnd().split('\n');
-  assert.match(first ?? '', /^BrainDog: the login to http:\/\/127\.0\.0\.1:\d+ lapses on \d{4}-\d{2}-\d{2}, in 5 days\./);
+  assert.match(first ?? '', /^BrainDog: the login to http:\/\/127\.0\.0\.1:\d+ lapses on \d{1,2} [A-Z][a-z]{2}( \d{4})?, in 5 days\./);
   assert.ok(first?.includes(`${SIGN_IN} ${host}`), first);
   /* THE HOOK'S OWN LINE IS STILL THERE BENEATH IT: a host that did not answer, here. */
   assert.match(rest.join('\n'), /^BrainDog did not answer within 1 seconds/);

@@ -38,6 +38,7 @@ import { budgetOf, hostKey, hostsPath, inTheClear, isLoopback, target } from './
 import { refuse } from './json.ts';
 import { checkInScratch, previewOf } from './scratch.ts';
 import type { AgentIo } from './skills.ts';
+import { saidDay } from './said-day.ts';
 
 const saidWithCode = (r: Result<unknown>): string => (refused(r) ? oneLine(`${r.refusal.fix} (${r.refusal.code})`) : 'The Kennel did not answer that.');
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -261,7 +262,7 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
     if (pending.length === 0) io.out('Nothing is waiting for review.');
     for (const p of pending) {
       const shown = printable(p);
-      io.out(`${shown.entry.kind} ${shown.entry.id} ${shown.version.version}  ${shown.entry.title} by ${shown.entry.publisher.name} (${publisherKey(p.entry.publisher)}), sent ${shown.submitted_at.slice(0, 10)}`);
+      io.out(`${shown.entry.kind} ${shown.entry.id} ${shown.version.version}  ${shown.entry.title} by ${shown.entry.publisher.name} (${publisherKey(p.entry.publisher)}), sent ${saidDay(shown.submitted_at)}`);
       for (const line of reachSaid(p.version.reach)) io.out(line);
     }
     if (turned.length > 0) io.out(`Refused lately: ${turned.slice(0, 5).map((r) => oneLine(`${r.kind} ${r.id} ${r.version} (${r.reason})`)).join('; ')}.`);

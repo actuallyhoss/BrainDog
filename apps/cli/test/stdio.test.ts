@@ -663,7 +663,7 @@ test('A STARTUP FAILURE IS ONE LINE ON STDERR, nothing on stdout, and exit 1', a
   );
   const cases: [Record<string, string>, { args?: string[]; config?: string }, RegExp][] = [
     [{}, {}, /^No BrainDog host is set\./],
-    [{}, { config: expired }, /^The login to https:\/\/a\.example expired on 2020-01-01\. Run braindog login https:\/\/a\.example\.$/],
+    [{}, { config: expired }, /^The login to https:\/\/a\.example expired on 1 Jan 2020\. Run braindog login https:\/\/a\.example\.$/],
     [{ BRAINDOG_HOST: 'http://a.example', BRAINDOG_TOKEN: TOKEN }, {}, /^http:\/\/a\.example is http, not https\./],
     [{ BRAINDOG_HOST: 'https://a.example' }, { args: ['mcp', TOKEN] }, /^braindog mcp takes --agent, --host and --local, and nothing else\./],
     [{ BRAINDOG_HOST: 'https://a.example' }, { args: ['mcp', '--agent', 'robot'] }, /^--agent is one of claude, codex, cursor, other\.$/],
