@@ -5030,8 +5030,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             current?.id ?? '',
           );
           /* A ROW THE WRITER CANNOT READ IS NAMED BY NO COLLISION, so uniqueness is not a way to test
-             whether a row exists: a list she cannot read, or a row outside what she may write. */
-          if (clash && (hidden(register) || (door.within !== undefined && !admits(register, door.within, clash.id))))
+             whether a row exists: a list she cannot read, a row outside what she may write, or a row somebody else
+             kept private (audit 31k, RK3). */
+          if (clash && (hidden(register) || (door.within !== undefined && !admits(register, door.within, clash.id)) || hiddenFrom(clash.id, writerPerson(w))))
             return no<Entry>('FORBIDDEN', `That can't be added here. ${askOwner()}`, { at: f.id });
           if (clash)
             return no<Entry>(
@@ -5083,7 +5084,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          caller may fold and delete in one write. */
       const keyedHere = keyedOf(register);
       const foldField = keyedHere === undefined ? undefined : mergeFieldOf(keyedHere);
-      const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door, w.reads);
+      const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door, w.reads, writerPerson(w));
       if (door_) return { ok: false, refusal: door_ };
       /* ── a second row saying what a first says, on a list declaring `same:` (`same.ts`) ──
          Refused for every write, a rule's, a flow's or an ingest's too, as a second person is; an accepted rowset is the
@@ -6556,6 +6557,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return keyedLists(registers.values()).find((l) => l.register === register);
   }
 
+  /** The person a write is by, as `hiddenFrom` reads a viewer: a token's own person before its run signs, else `personOf`. */
+  function writerPerson(w: WriteContext): string | undefined {
+    const token = w.principal?.kind === 'token' ? w.principal.token : undefined;
+    if (typeof token === 'string') return sql.one<{ p: string }>('SELECT person_id AS p FROM token WHERE id = ?', token)?.p ?? undefined;
+    return personOf(sql, w.actor) ?? undefined;
+  }
+
   /**
    * THE MERGE DOOR: what a write that folds a row, unfolds it, or deletes or restores
    * a folded one must pass, and what a restore of a keyed row must not collide with. A refusal, or `null`.
@@ -6588,6 +6596,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     field: string | undefined,
     door: Door,
     reads: WriteContext['reads'],
+    viewer?: string | undefined,
   ): Refusal | null {
     if (list === undefined) return null;
     const was = field === undefined || current === null ? undefined : current.fields[field];
@@ -6634,7 +6643,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const them = list.role === 'meets' ? 'them' : 'it';
       for (const key of rowKeys(list, merged)) {
         const held = holderOf(sql, key);
-        if (held === null || held.register !== register) continue;
+        /* A HOLDER KEPT PRIVATE FROM THE WRITER IS NOT THERE FOR THEM (audit 31k, RK3): refused, the write would say the
+           row exists. The new row carries the key and the hidden row keeps holding it (`claim`). */
+        if (held === null || held.register !== register || hiddenFrom(held.id, viewer)) continue;
         const at = parts.find((f) => merged[f] !== undefined && rowKeys(list, { [f]: merged[f] }).includes(key)) ?? field ?? 'fields';
         const kind = key.slice(0, key.indexOf(':'));
         const said = key.slice(key.indexOf(':') + 1);
@@ -6649,7 +6660,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (patch.deleted_at === null && current !== null && current.deleted_at !== null && typeof (is ?? was) !== 'string') {
       for (const key of rowKeys(list, merged)) {
         const held = holderOf(sql, key);
-        if (held === null || held.id === current.id) continue;
+        if (held === null || held.id === current.id || hiddenFrom(held.id, viewer)) continue;
         const kind = key.slice(0, key.indexOf(':'));
         const said = key.slice(key.indexOf(':') + 1);
         const plain = kind === 'email' || kind === 'domain' ? said : `${said} on ${kind}`;
@@ -11922,7 +11933,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * a run included.
      * The caller's `version` and `opId` are not carried, because they describe no row meet writes.
      */
-    meet: (args: MeetArgs, w: WriteContext, o: { viewer?: string | undefined } = {}): Result<Met> => {
+    meet: (args: MeetArgs, w: WriteContext, o: { viewer?: string | null | undefined } = {}): Result<Met> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
       const as: WriteContext = {
@@ -11948,8 +11959,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             typed: as.principal?.kind === 'person' && as.principal.token === undefined,
             /* A ROW KEPT PRIVATE FROM WHOEVER IS MEETING IS NOT THERE FOR THE MEETING (`PeopleDeps.hidden`): the viewer
                the record names (`o.viewer`), else the person the write is by, a run read as the person whose key opened
-               it. A rule, an import or the system is nobody and meets every row, as before. */
-            hidden: ((viewer) => (viewer === null ? undefined : (id: string) => hiddenFrom(id, viewer)))(o.viewer ?? personOf(sql, as.actor)),
+               it. A rule, an import or the system is nobody and meets every row, as before. `null` says nobody: the person
+               meeting themself, on an invitation or at onboarding, is met wherever they are kept (audit 31k, RK3). */
+            hidden: ((viewer) => (viewer === null ? undefined : (id: string) => hiddenFrom(id, viewer)))(o.viewer === null ? null : (o.viewer ?? personOf(sql, as.actor))),
             /* AN AGENT'S WORD IS CAPPED AT A COMMIT'S, whatever its source says (`people.ts` `trustOf`). */
             token: as.principal?.kind === 'token' || as.principal?.token !== undefined,
             remote: () => as.session?.remote ?? null,

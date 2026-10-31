@@ -552,12 +552,16 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   /* A ROW KEPT PRIVATE FROM THE CALLER IS NOT THERE FOR THIS MEETING (`hidden`, audit 10k AK5). Matched onto it, the
      record refused the meeting, while an address nobody held was added: the refusal said that somebody kept private
      holds that address. Now the meeting goes as it would if that row were not there: the person is added, or found
-     among the rows the caller does see, and a key only the hidden row holds stays with it, unclaimed and unwritten,
-     so the address on a unique field does not collide with it either. */
+     among the rows the caller does see.
+     AND IT CARRIES WHAT IT WAS MET BY (audit 31k, RK3): the row added keeps every key it was met by, an address the
+     hidden row holds in `keys` ("Known by"), since the email field is unique on the list (`placeKeys`). The key stays
+     the hidden row's in the key table (`claim` keeps the first holder), and the record's doors let a row carry a key only
+     a row hidden from its writer holds. A later meeting by the same address finds the row the caller sees that carries
+     it (`carrierOf`), a key match like any other; a name alone never decides, as everywhere else meet reads one. */
   const found = held.filter((h) => deps.hidden?.(h.id) !== true);
   const veiled = new Set(held.filter((h) => deps.hidden?.(h.id) === true).flatMap((h) => h.keys));
   const own = veiled.size === 0 ? keys : keys.filter((k) => !veiled.has(k));
-  const hit = found[0] ? rowById(deps.sql, found[0].id) : veiled.size > 0 ? sameNamed(deps, list, s.name ?? nameFromKeys(keys)) : null;
+  const hit = found[0] ? rowById(deps.sql, found[0].id) : veiled.size > 0 ? carrierOf(deps, list, [...veiled]) : null;
   /* NOBODY NEW FROM A RULE THAT SAID `only: 'known'`: a sender the record has no reason to know is a sighting, not a
      person, and nothing about them is written onto anybody. */
   if (!hit && s.only === 'known' && !knownAddress(deps, list, keys)) {
@@ -601,7 +605,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     written = deps.write(list.register, hit.id, patch, { version: hit.version });
   } else {
     linked = project !== null;
-    const placed = placeKeys(list, own, s);
+    const placed = placeKeys(list, keys, s, veiled);
     written = deps.write(list.register, null, {
       [at.name]: s.name ?? nameFromKeys(keys),
       ...placed,
@@ -652,22 +656,25 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
 }
 
 /**
- * The one row the caller sees that goes by this name and holds none of its keys, or `null`: who a meeting is when the
- * only row holding its keys is kept private from the caller (`hidden`). The person an earlier such meeting added is
- * found again by their name, since the key they were met by is the hidden row's, so a second meeting adds no second row.
+ * The first live row the caller sees that carries one of `keys` in its own fields without holding it, or `null`: who a
+ * meeting is when the only row holding those keys is kept private from the caller (`hidden`). The person an earlier such
+ * meeting added carries the address it was met by, so a second meeting finds them by it and adds no second row. Read
+ * only on that path, and over the list's rows, since the key table names the hidden row and no other.
  */
-function sameNamed(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, list: DeclaredList<MeetsFields>, name: string): Row | null {
-  const said = nameKey(name);
-  if (said === '') return null;
-  const named = deps.sql
-    .all<{ id: string; seq: number | null; version: number; fields: string }>(
-      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND json_extract(fields, ?) IS NOT NULL ORDER BY seq`,
-      ...live(list.register, list.fields.merged_into),
-      path(list.fields.name),
-    )
-    .map(hydrate)
-    .filter((r) => deps.hidden?.(r.id) !== true && typeof r.fields[list.fields.name] === 'string' && nameKey(String(r.fields[list.fields.name])) === said);
-  return named.length === 1 ? named[0]! : null;
+function carrierOf(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, list: DeclaredList<MeetsFields>, keys: readonly string[]): Row | null {
+  const want = new Set(keys);
+  return (
+    deps.sql
+      .all<{ id: string; seq: number | null; version: number; fields: string }>(`SELECT id, seq, version, fields FROM entry WHERE ${LIVE} ORDER BY seq`, ...live(list.register, list.fields.merged_into))
+      .map(hydrate)
+      .find((r) => deps.hidden?.(r.id) !== true && keysOfRow(list, r).some((k) => want.has(k))) ?? null
+  );
+}
+
+/** Who holds one key, as the caller may know it: a holder kept private from them (`hidden`) holds nothing they can see. */
+function seenHolderOf(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, key: string): { register: string; id: string } | null {
+  const held = holderOf(deps.sql, key);
+  return held === null || deps.hidden?.(held.id) === true ? null : held;
 }
 
 /**
@@ -708,13 +715,16 @@ const metRow = (deps: PeopleDeps, register: string, row: Row): MetRow => ({
 /**
  * Where a new person's keys go: the email field takes a real mailbox, `handles` takes logins, and `keys` the rest. A
  * key the list has nowhere for is not written, and the person simply does not answer to it.
+ *
+ * `held` ARE KEYS ANOTHER ROW HOLDS, one kept private from the caller (RK3): the email field is unique on the list, so
+ * such an address goes with the rest, in `keys`, where the person still answers to it.
  */
-function placeKeys(list: DeclaredList<MeetsFields>, keys: readonly string[], s: { email?: string }): Record<string, unknown> {
+function placeKeys(list: DeclaredList<MeetsFields>, keys: readonly string[], s: { email?: string }, held?: ReadonlySet<string>): Record<string, unknown> {
   const at = list.fields;
   const out: Record<string, unknown> = {};
   const emailKey = keys.find((k) => kindOfKey(k) === 'email');
   /* THE ADDRESS AS SAID, since the key folds Gmail's dots and a person reads their own spelling. */
-  if (emailKey !== undefined && s.email !== undefined && keyOf('email', s.email) === emailKey) out[at.email] = s.email;
+  if (emailKey !== undefined && s.email !== undefined && keyOf('email', s.email) === emailKey && held?.has(emailKey) !== true) out[at.email] = s.email;
   const rest = keys.filter((k) => !(k === emailKey && out[at.email] !== undefined));
   const handles = rest.filter((k) => kindOfKey(k) !== 'email' && kindOfKey(k) !== 'bank' && kindOfKey(k) !== 'domain');
   const others = rest.filter((k) => !handles.includes(k));
@@ -725,20 +735,21 @@ function placeKeys(list: DeclaredList<MeetsFields>, keys: readonly string[], s: 
 }
 
 /** What a matched person gains of the keys this meeting carried, in the fields it already has. Nothing is replaced. */
-const carryKeys = (deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row, s: { email?: string }, keys: readonly string[]): Record<string, unknown> =>
+const carryKeys = (deps: Pick<PeopleDeps, 'sql' | 'hidden'>, list: DeclaredList<MeetsFields>, row: Row, s: { email?: string }, keys: readonly string[]): Record<string, unknown> =>
   keysPatch(deps, list, row, keys, s);
 
 /**
  * The patch that gives a person the keys they lack, each in the field it belongs in, the address as it was said when
  * there is one (`s.email`). Only a key nobody else answers to, so it is also what an offer of a new address writes.
  */
-function keysPatch(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row, keys: readonly string[], s: { email?: string }): Record<string, unknown> {
+function keysPatch(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, list: DeclaredList<MeetsFields>, row: Row, keys: readonly string[], s: { email?: string }): Record<string, unknown> {
   const at = list.fields;
   const f = row.fields;
   const has = new Set(keysOf({ email: textOf(f[at.email]), handles: at.handles === undefined ? [] : listOf(f[at.handles]), keys: at.keys === undefined ? [] : listOf(f[at.keys]) }));
-  /* ONLY A KEY NOBODY ELSE ANSWERS TO: one held by another live row stays theirs, and the bridge is asked about. */
-  const fresh = keys.filter((k) => !has.has(k) && (holderOf(deps.sql, k)?.id ?? row.id) === row.id);
-  const placed = placeKeys(list, fresh, s);
+  /* ONLY A KEY NOBODY ELSE ANSWERS TO: one held by another live row stays theirs, and the bridge is asked about. One held
+     by a row kept private from the caller is carried as a free one is, so what the row gains says nothing of it (RK3). */
+  const fresh = keys.filter((k) => !has.has(k) && (seenHolderOf(deps, k)?.id ?? row.id) === row.id);
+  const placed = placeKeys(list, fresh, s, new Set(fresh.filter((k) => (holderOf(deps.sql, k)?.id ?? row.id) !== row.id)));
   const patch: Record<string, unknown> = {};
   if (placed[at.email] !== undefined && textOf(f[at.email]) === undefined) patch[at.email] = placed[at.email];
   else if (placed[at.email] !== undefined) {
@@ -772,8 +783,30 @@ function orgFor(deps: PeopleDeps, s: Said, keys: readonly string[]): string | nu
   const mail = keys.find((k) => kindOfKey(k) === 'email');
   const domain = mail === undefined ? null : registrable(valueOfKey(mail));
   if (domain === null) return null;
-  const held = holderOf(deps.sql, `domain:${domain}`);
-  return held !== null && held.register === orgs.register ? held.id : null;
+  /* NEVER AN ORGANISATION KEPT PRIVATE FROM THE CALLER (audit 31k, RK4): a pointer to it on a row they see would say it
+     is there. One they see that carries the domain without holding it is theirs to be pointed at. */
+  return orgSeenAt(deps, orgs, `domain:${domain}`);
+}
+
+/**
+ * The organisation the caller knows by one key, as a row id, or `null`: its holder, or, when that holder is kept private
+ * from them, the one they see that carries the key without holding it (`orgCarrierOf`).
+ */
+function orgSeenAt(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, orgs: DeclaredList<OrgFields>, key: string): string | null {
+  const held = holderOf(deps.sql, key);
+  if (held === null || held.register !== orgs.register) return null;
+  return deps.hidden?.(held.id) !== true ? held.id : (orgCarrierOf(deps, orgs, [key])?.id ?? null);
+}
+
+/** The first live organisation the caller sees that carries one of `keys` without holding it (`carrierOf`'s, for organisations). */
+function orgCarrierOf(deps: Pick<PeopleDeps, 'sql' | 'hidden'>, orgs: DeclaredList<OrgFields>, keys: readonly string[]): Row | null {
+  const want = new Set(keys);
+  return (
+    deps.sql
+      .all<{ id: string; seq: number | null; version: number; fields: string }>(`SELECT id, seq, version, fields FROM entry WHERE ${LIVE} ORDER BY seq`, ...live(orgs.register, orgs.fields.merged_into))
+      .map(hydrate)
+      .find((r) => deps.hidden?.(r.id) !== true && keysOfOrg(orgs, r).some((k) => want.has(k))) ?? null
+  );
 }
 
 /**
@@ -807,9 +840,18 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
 
   /* A PAYEE STORED UNDER ITS OLD KEY (`bank:wwwtalabat`) IS FOUND WHEN THE NEW ONE MISSES; the new key is added beside it when the meeting is trusted. */
   const old = legacyKeysOf({ keys: s.keys, domain, email: s.email !== undefined && githubOfAddress(s.email) === null ? s.email : undefined, handle: s.handle });
-  let hit = holders(deps.sql, orgs.register, keys)[0] ?? (old.length === 0 ? undefined : holders(deps.sql, orgs.register, old)[0]);
+  /* AN ORGANISATION KEPT PRIVATE FROM THE CALLER IS NOT THERE FOR THIS MEETING (audit 31k, RK4), as a person is not
+     (`meetPerson`): matched onto it, `heldMet` refused the meeting while a domain nobody held was added. Its keys found
+     only it, so the organisation the caller sees that carries them is found instead, or one is added carrying them. */
+  const seen = (found: { id: string; keys: string[] }[]): { id: string; keys: string[] }[] => found.filter((h) => deps.hidden?.(h.id) !== true);
+  const heldAll = holders(deps.sql, orgs.register, keys);
+  let hit = seen(heldAll)[0] ?? (old.length === 0 ? undefined : seen(holders(deps.sql, orgs.register, old))[0]);
+  if (!hit && heldAll.length > 0) {
+    const carrier = orgCarrierOf(deps, orgs, heldAll.flatMap((h) => h.keys));
+    if (carrier) hit = { id: carrier.id, keys: [] };
+  }
   if (!hit && name !== undefined) {
-    const named = byOrgName(deps.sql, orgs, name);
+    const named = byOrgName(deps.sql, orgs, name, deps.hidden);
     if (named) hit = { id: named.id, keys: [] };
   }
   const row = hit ? rowById(deps.sql, hit.id) : null;
@@ -820,9 +862,9 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
     const patch: Record<string, unknown> = {};
     if (at.met !== undefined) patch[at.met] = metLines(listOf(f[at.met]), [line]);
     /* WHAT A MEETING WOULD GIVE THE ORGANISATION: a domain where it has none, and keys nobody holds. */
-    const newDomain = at.domain !== undefined && domain !== undefined && textOf(f[at.domain]) === undefined && holderOf(deps.sql, `domain:${domain}`) === null;
+    const newDomain = at.domain !== undefined && domain !== undefined && textOf(f[at.domain]) === undefined && seenHolderOf(deps, `domain:${domain}`) === null;
     const now = at.keys === undefined ? [] : listOf(f[at.keys]);
-    const fresh = at.keys === undefined ? [] : keys.filter((k) => !k.startsWith('domain:') && !now.includes(k) && holderOf(deps.sql, k) === null);
+    const fresh = at.keys === undefined ? [] : keys.filter((k) => !k.startsWith('domain:') && !now.includes(k) && seenHolderOf(deps, k) === null);
     if (!s.untrusted && !s.commit) {
       if (at.projects !== undefined && project !== null && !listOf(f[at.projects]).includes(project)) patch[at.projects] = [...listOf(f[at.projects]), project];
       if (newDomain) patch[at.domain!] = domain;
@@ -906,7 +948,7 @@ function kindValue(orgs: DeclaredList<OrgFields>, role: string | undefined): str
   return field?.type === 'enum' ? (field.values?.includes(said) ? said : undefined) : said;
 }
 
-function byOrgName(sql: Sql, orgs: DeclaredList<OrgFields>, name: string): Row | null {
+function byOrgName(sql: Sql, orgs: DeclaredList<OrgFields>, name: string, hidden?: (id: string) => boolean): Row | null {
   const want = orgNameKey(name);
   if (want === '') return null;
   const first = want.split(' ')[0]!;
@@ -921,7 +963,7 @@ function byOrgName(sql: Sql, orgs: DeclaredList<OrgFields>, name: string): Row |
         first,
       )
       .map(hydrate)
-      .find((r) => typeof r.fields[orgs.fields.name] === 'string' && orgNameKey(String(r.fields[orgs.fields.name])) === want) ?? null
+      .find((r) => hidden?.(r.id) !== true && typeof r.fields[orgs.fields.name] === 'string' && orgNameKey(String(r.fields[orgs.fields.name])) === want) ?? null
   );
 }
 
@@ -1074,7 +1116,7 @@ function askOrgPairs(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, row: Row):
     )
     .map(hydrate)
     .filter((o) => typeof o.fields[orgs.fields.name] === 'string' && sameWords(name, String(o.fields[orgs.fields.name])))
-    .filter((o) => deps.othersRow?.(o.id) !== true && !refused(deps, orgs as Keyed, row, o))
+    .filter((o) => deps.hidden?.(o.id) !== true && deps.othersRow?.(o.id) !== true && !refused(deps, orgs as Keyed, row, o))
     .slice(0, ORG_PAIRS_MOST);
   let first: string | null = null;
   for (const other of others) {
@@ -1156,7 +1198,7 @@ function reaskOrgs(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, ids: readonl
     const ends = named.map((r) => (r === null ? null : liveEnd(deps, keyed, r)));
     if (offer !== null) {
       const row = ends[0] ?? null;
-      const patch = row === null ? {} : orgOfferPatch(orgs, row, offer.filter((k) => holderOf(deps.sql, k) === null));
+      const patch = row === null ? {} : orgOfferPatch(orgs, row, offer.filter((k) => seenHolderOf(deps, k) === null));
       if (row === null || Object.keys(patch).length === 0) close(deps, id, 'What it offered is settled.');
       else rewrite(deps, id, { ...body, rows: [{ at: deps.nameOf(row.id), version: row.version, patch }] });
       continue;
@@ -1214,7 +1256,7 @@ function askDomainOrgs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: R
   ];
   let first: string | null = null;
   for (const domain of domains) {
-    if (holderOf(deps.sql, `domain:${domain}`) !== null) continue;
+    if (seenHolderOf(deps, `domain:${domain}`) !== null) continue;
     const asked = deps.sql.one<{ n: number }>(
       "SELECT 1 AS n FROM suggestion WHERE body_kind = 'rowset' AND json_extract(body, '$.register') = ? AND json_extract(body, '$.join.domain') = ? LIMIT 1",
       orgs.register,
@@ -1240,7 +1282,7 @@ function askDomainOrgs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: R
     const name = domainOrgName(domain, deps.remote?.() ?? null);
     const names = groups.map((g) => nameOfRow(list, g[0]!) || 'someone unnamed');
     const who = names.length <= 3 ? listed(names) : `${names.slice(0, 2).join(', ')} and ${names.length - 2} others`;
-    const kept = byOrgName(deps.sql, orgs, name);
+    const kept = byOrgName(deps.sql, orgs, name, deps.hidden);
     const join = { domain, people: people.map((r) => deps.nameOf(r.id)) };
     const opened =
       kept === null
@@ -1297,8 +1339,9 @@ export function joinOrganisation(deps: PeopleDeps, suggestion: string): Result<s
     return ok([]);
   }
   if (typeof domain !== 'string') return ok([]);
-  const held = holderOf(deps.sql, `domain:${domain}`);
-  if (held === null || held.register !== orgs.register) return ok([]);
+  const heldId = orgSeenAt(deps, orgs, `domain:${domain}`);
+  if (heldId === null) return ok([]);
+  const held = { id: heldId };
   const linked: string[] = [];
   for (const at of named) {
     /* THE PERSON AS THEY ARE NOW: one folded since is the row they were folded into, which is them. */
@@ -1404,7 +1447,7 @@ function knownAddress(deps: PeopleDeps, list: DeclaredList<MeetsFields>, keys: r
   const orgs = deps.orgs?.register;
   for (const mail of mails) {
     const domain = orgs === undefined ? null : registrable(mail);
-    const held = domain === null ? null : holderOf(deps.sql, `domain:${domain}`);
+    const held = domain === null ? null : seenHolderOf(deps, `domain:${domain}`);
     if (held !== null && held.register === orgs) return true;
   }
   return wroteTo(deps, list, mails);
@@ -2099,7 +2142,7 @@ function offerArrival(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said
   const known = nameOfRow(list, other) || 'someone unnamed';
   const what = keys.some((k) => kindOfKey(k) === 'email') ? 'address' : 'handle';
   const question = `Is the ${name} met in ${s.source} the ${known} you already know${evidence(deps, list, other)}? Yes adds the new ${what} to ${known}. Nobody new is added either way.`;
-  const offered = keys.filter((k) => holderOf(deps.sql, k) === null);
+  const offered = keys.filter((k) => seenHolderOf(deps, k) === null);
   const opened = deps.propose({
     question,
     body_kind: 'rowset',

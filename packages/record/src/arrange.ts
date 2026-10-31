@@ -1825,7 +1825,7 @@ export function arranger(d: ArrangeDeps) {
     const fields = new Set((kernel.register(meets.register)?.fields ?? []).filter((f) => f.retired !== true).map((f) => f.id));
     const self = parts.self !== undefined && fields.has(parts.self) ? parts.self : null;
     const by = { actor, note: 'Added when this BrainDog was set up.' };
-    const met = kernel.meet({ name, ...(email === null ? {} : { email }), where: 'onboarding' }, { actor, principal: { kind: 'person' } });
+    const met = kernel.meet({ name, ...(email === null ? {} : { email }), where: 'onboarding' }, { actor, principal: { kind: 'person' } }, { viewer: null });
     const row = met.ok ? met.value.row : null;
     if (met.ok && row !== null) {
       const theirs = met.value.created || met.value.matched_by === 'key';

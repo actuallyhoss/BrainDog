@@ -220,7 +220,7 @@ they are. So the controls are about who may, what may never, and what is kept.
 | Only a key whose person owns the record, and whose scope and settings row let it write. A run that read text from outside the record (the ladder's `untrusted`) asks for the rest of it, his word or not, because that text could carry words he never said | enforced in the record |
 | `said` must hold words. An empty one is refused at `said` | enforced in the record |
 | A question the agent's own key asked is never answered by it, on any word: the person answers it in BrainDog, or the agent makes the change with `said` (which takes its question back) or withdraws it. Otherwise an agent could ask and then answer itself (audit 10k, AK2) | enforced in the record |
-| A question somebody else opened (another person, a mail or feed, a project key, another person's agent) is answered in BrainDog only | enforced in the record |
+| A question somebody else opened (another person, a mail or feed, a project key, another person's agent) is answered in BrainDog only. However the question is signed (a person, a key, or the run a key opened), it is read back to the person behind it, and only the owner's own keys and the record's own automations pass | enforced in the record |
 | No word reaches a key (a list of keys, or an automation that calls out with one) or an amount of money set on what is already there | enforced in the record |
 | The answer runs the record's own `decide` as the owner with `onWord` set. `admin` and `vault` refuse `onWord`, so erasing, deleting the record, the keychain, tokens, sharing and billing stay a browser session's. `decide` lets `onWord` alone accept what installs | enforced in the record |
 | A token still never calls `decide` itself | architectural |

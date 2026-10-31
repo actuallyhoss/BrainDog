@@ -36,6 +36,7 @@ import {
   REPLY_STATES,
   SEEN_HOW,
   SEAT_NAME,
+  SESSION_PREFIX,
   ANSWERS_MOST,
   agentOf as kindOf,
   instructionsTakenBy,
@@ -544,6 +545,20 @@ export function methods(deps: RecordDeps) {
     );
   };
 
+  /** Whether a question's opener is anybody but `by` and the record's own, read through every way a question is signed. */
+  const askedBySomebodyElse = (opener: string, by: string): boolean => {
+    if (opener === '' || opener === 'system' || opener === 'slash' || opener.startsWith('rule:') || opener.startsWith('script:')) return false;
+    if (opener.startsWith('p_')) return opener !== by;
+    const named = opener.startsWith('token:') ? opener.slice(6) : opener;
+    const run = new RegExp(`^${SESSION_PREFIX}[1-9]\\d*$`, 'u').test(named);
+    const token = named.startsWith('t_') ? named : run ? tokenOfRun(sql, named) : null;
+    /* A RUN NO KEY OPENED is an automation's, which is the record's own. */
+    if (token === null) return !run;
+    const key = sql.one<{ person_id: string | null; label: string | null }>('SELECT person_id, label FROM token WHERE id = ?', token);
+    if (key === undefined || (key.label ?? '').startsWith('report:')) return true;
+    return key.person_id !== by;
+  };
+
   /**
    * A run answers a question he told it to answer, in the conversation, his words sent as `said` (the owner's decision
    * of 27 October; `wordOf` and `wordFault` in `index.ts` say who may and what no word reaches). The answer is his own
@@ -590,10 +605,12 @@ export function methods(deps: RecordDeps) {
     if (fault !== null) return no('FORBIDDEN', fault, { at: 'answer' });
     const { by, byName, said: words } = word.value;
     /* A QUESTION SOMEBODY ELSE OPENED IS THEIR WORDS, which the run had to read to answer: another person's, a feed's or
-       a project key's, or an agent of somebody else's. It is answered in BrainDog, never on a word carried past them. */
-    const opener = String(row.opened_by ?? '');
-    const openerPerson = opener.startsWith('t_') ? (sql.one<{ person_id: string }>('SELECT person_id FROM token WHERE id = ?', opener)?.person_id ?? opener) : opener;
-    if (opener.startsWith('ingest:') || opener.startsWith('report:') || (openerPerson.startsWith('p_') && openerPerson !== by))
+       a project key's, or an agent of somebody else's. It is answered in BrainDog, never on a word carried past them.
+       EVERY WAY A QUESTION IS SIGNED (audit 31k, RK1): a token's question is signed by its run (`S41`), so the run is
+       read back to its key and the key to its person; a key named outright (`t_…`, `token:t_…`) the same. Only his own
+       keys pass, and a run no key opened (an automation), a rule, a script, Slash or the system, which are the record's
+       own. An agent no run was opened for (`agent:<name>`) names nobody, so it is refused with the rest. */
+    if (askedBySomebodyElse(String(row.opened_by ?? ''), by))
       return no('FORBIDDEN', `${given} was asked by somebody else, so it is answered in BrainDog and not on a word. Ask ${byName} to answer it there.`, { at: 'answer' });
     const as: CallContext = { principal: { kind: 'person', id: by, level: 'owner' }, registers: '*', credentialed: true, onWord: run };
     const out = await deps.decideAs({ id, decide: { option: chosen, reason: `${byName} told ${run}: "${words}"` } }, as);
