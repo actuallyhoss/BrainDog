@@ -544,10 +544,11 @@
    * read as words.
    */
   const heldTitle = (h: { address: string; title?: string }): string => {
+    /* A TITLE THAT IS ITS ADDRESS is no title: a skill is listed under its name, `reconcile-invoice`. */
     const own = h.title?.trim();
-    if (own) return own;
+    if (own && own !== h.address) return own;
     const named = (shell?.nav ?? []).find((n) => n.id === h.address)?.title?.trim();
-    if (named) return named;
+    if (named && named !== h.address) return named;
     const words = h.address.replace(/[-_]+/gu, ' ').trim();
     return words.charAt(0).toUpperCase() + words.slice(1);
   };

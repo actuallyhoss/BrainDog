@@ -32,6 +32,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { isGlyph } from '$lib/ui/icons.ts';
+  import { focusOnceDrawn } from '$lib/ui/keep-focus.ts';
   import { addedSaid, countWord, heldSaid, readyAt, readyRows } from './first-today.ts';
   import type { ToldLine } from './tell-line.ts';
 
@@ -107,6 +108,7 @@
   async function send(sent: { register: string; fields: Record<string, unknown> }[], shown: readonly TellRow[], at: readonly number[]) {
     if (sending || sent.length === 0) return;
     sending = true;
+    const pressed = typeof document === 'undefined' ? null : document.activeElement;
     const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: listName(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
     const client = createClient({ base: apiBase() });
     /* THE UNDO IS THE RECORD'S, by the batch the capture answers: `run` offers `undoChange(base, batch)` on the receipt. */
@@ -130,8 +132,11 @@
       },
     });
     sending = false;
-    /* THE FIELD KEEPS THE FOCUS (AH20): the next thing is typed straight away, never from the top of the page. */
-    field?.focus();
+    /* THE FIELD KEEPS THE FOCUS (AH20): the next thing is typed straight away, never from the top of the page. AND THE
+       SLIM LINE TAKES IT WHEN THIS CARD MAKES WAY FOR IT (AJ7): the first Add it by a click left the focus on a button
+       that was gone, so it is watched for until the line is drawn, and moved off the pressed button too. */
+    const was = field;
+    focusOnceDrawn(() => (was?.isConnected ? was : [...document.querySelectorAll<HTMLElement>('[data-tell-one] .tell-one-field')].find((f) => f !== was)), { from: pressed });
   }
 
   function add(e: SubmitEvent) {
