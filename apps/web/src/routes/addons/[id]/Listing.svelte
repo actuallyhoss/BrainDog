@@ -559,8 +559,11 @@
   );
   /* ONCE IT IS IN, ITS FIRST PAGE, so one press lands on what it brought (`offer.ts` `firstPageOf`). */
   const opens = $derived(adds ? firstPageOf(adds.pages, declared) : null);
+  /* AN ADD-ON THAT READS TEXTS AND HAS NO PAGE, ONCE IT IS IN, OPENS THE PASTE BOX (first-hour audit AH10): Card alerts
+     said "Installed" and nothing about where an alert goes. What comes in, Texts, takes a bank text pasted in. */
+  const pastes = $derived(opens === null && (adds?.reads.includes('texts') ?? false));
   /* SOMETHING TO PRESS: the phone's bar is drawn only then, and never to say "Installed" over the last tile. */
-  const doable = $derived(listing !== null && listing !== undefined && filed === null && (action?.kind !== 'installed' || opens !== null) && (trust?.kind === 'changed' || !untrusted));
+  const doable = $derived(listing !== null && listing !== undefined && filed === null && (action?.kind !== 'installed' || opens !== null || pastes) && (trust?.kind === 'changed' || !untrusted));
 
   const publisherWords = $derived(
     !listing
@@ -595,6 +598,8 @@
     <p class="said" role="status">{words.asked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{words.openDecide}</a>{/if}</p>
   {:else if action?.kind === 'installed' && opens}
     <Button weight="primary" href={at(`/p/${opens.id}`)}>{words.open(opens.title)}</Button>
+  {:else if action?.kind === 'installed' && pastes}
+    <Button weight="primary" href={at('/settings/ingest#texts')}>{words.pasteText}</Button>
   {:else if action?.kind === 'installed'}
     <Button weight="primary" disabled>{label}</Button>
   {:else if trust?.kind === 'changed'}

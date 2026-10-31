@@ -148,6 +148,8 @@ export const words = {
   update: (to: string): string => `Update to ${to}`,
   turnOn: (title: string): string => `Turn on ${title}`,
   installed: 'Installed',
+  /** Once an add-on that reads bank texts is in, where one goes (AH10). */
+  pasteText: 'Paste a bank text',
   /* AFTER INSTALL, THE ONE PRESS: its first page, by name. */
   open: (title: string): string => `Open ${title}`,
   turnedOn: (title: string): string => `${title} is on.`,
