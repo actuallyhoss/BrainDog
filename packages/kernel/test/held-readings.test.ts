@@ -124,3 +124,29 @@ test("A SPLIT ROW'S PARTS ARE READ THROUGH A VIEW THAT KEEPS EACH ROW'S LIST, so
   /* A VIEW WRITTEN BY HAND, one word off the kernel's, is no view this knows: its rows are any list's. */
   assert.equal(figureHeld(over.replace("register <> 'tasks'", "register <> 'projects'"), '$.amount', 'tasks').whole, true);
 });
+
+test("TWO FIGURES OVER ONE WALK ARE BOTH HELD ON ITS LISTS: the second, handed the read's walk, moves with a bill as the first does", async () => {
+  const raw = openSqlite();
+  const k = await openRecord(raw, fixedClock(NOW));
+  const bills: Declaration = {
+    id: 'register.obligations',
+    kind: 'register',
+    body: { id: 'obligations', name: 'Bills', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'amount', type: 'money' }, { id: 'due', type: 'day' }, { id: 'direction', type: 'text' }] },
+  } as never;
+  const legs = [{ register: 'obligations', on: 'due', amount: 'amount', incoming: { field: 'direction', is: 'owed_to_me' } }];
+  const walked = (metric: string, walk: string): Declaration =>
+    ({ id: `metric.${metric}`, kind: 'metric', body: { metric, name: metric, source: 'forecast.runway', legs, value: { walk, within: '30d' }, format: 'money', target: { gte: 0 }, window: '30d', compare: 'none' } }) as never;
+  assert.ok((await k.install([ACCOUNTS, bills, walked('arriving-30d', 'in'), walked('leaving-30d', 'out')])).ok);
+  /* A LINE IN THE LOG FIRST, so the lists are not read as for the first time after the bill. */
+  assert.ok(k.create('accounts', { name: 'Current' }, OWNER).ok);
+  const out = (): unknown => {
+    const b = k.pageWalk().block({ kind: 'stat', cells: [{ metric: 'arriving-30d' }, { metric: 'leaving-30d' }] } as never) as unknown as { readings: { metric: string; reading: { value: unknown } | null }[] };
+    return b.readings.find((r) => r.metric === 'leaving-30d')?.reading?.value;
+  };
+  assert.equal(out(), 0);
+  assert.ok(k.create('obligations', { name: 'Rent', amount: { amount: 12_000, currency: 'EGP' }, due: '2026-10-05' }, OWNER).ok);
+  assert.equal(out(), 12_000, 'Out, 30 days kept the nought it read before the bill');
+  assert.ok(k.create('obligations', { name: 'Power', amount: { amount: 850, currency: 'EGP' }, due: '2026-10-06' }, OWNER).ok);
+  assert.equal(out(), 12_850);
+  raw.close();
+});

@@ -1274,3 +1274,38 @@ test('A LINE THAT FITS NOWHERE, ON A RECORD WITH NO THINGS TO DO, IS OFFERED A T
   /* A record that keeps Work is never offered it. */
   assert.equal(tellRead('Run 10k on Saturday morning', founder).needsTodo, undefined);
 });
+
+test('A PART OF THE DAY SAID WITH IT IS TAKEN WHOLE AS THE DAY, never left in the name', () => {
+  /* 7 Oct is a Wednesday: Saturday is the 10th. */
+  const run = tellRead('Run 10k on Saturday morning', founder).rows;
+  assert.deepEqual(run.map((r) => [r.register, r.fields.what, r.fields.by]), [['tasks', 'Run 10k', '2026-10-10']]);
+  assert.deepEqual(tellRead('Book the venue tomorrow evening', founder).rows.map((r) => [r.fields.what, r.fields.by]), [['Book the venue', '2026-10-08']]);
+  assert.deepEqual(tellRead('Pack the van Friday night', founder).rows.map((r) => [r.fields.what, r.fields.by]), [['Pack the van', '2026-10-09']]);
+  assert.deepEqual(tellRead('Send the deck this afternoon', founder).rows.map((r) => [r.fields.what, r.fields.by]), [['Send the deck', TODAY]]);
+  /* A list with a time of day keeps it there. */
+  const timed: TellList = { ...TASKS, fields: [...TASKS.fields, { id: 'time', label: 'Time of day', type: 'enum', values: ['morning', 'afternoon', 'evening', 'night'] }] };
+  const kept = tellRead('Run 10k on Saturday morning', { ...founder, lists: [PEOPLE, timed, THINGS, NUMBERS, LEDGER, DUE] }).rows[0]!;
+  assert.equal(kept.fields.what, 'Run 10k');
+  assert.equal(kept.fields.time, 'morning');
+  assert.match(kept.detail, /due Saturday morning/u);
+});
+
+test('A DATE STILL TO COME ON A SPEND IS A BILL, never paid a month or a year back (RQ2)', () => {
+  const netflix = tellRead('Netflix 180 on the 20th', founder).rows;
+  assert.deepEqual(netflix.map((r) => [r.register, r.fields.direction, r.fields.due]), [['obligations', 'owed_by_me', '2026-10-20']]);
+  assert.notEqual(netflix[0]!.fields.state, 'paid');
+  assert.ok(!tellRead('Hotel 3,000 on 20 Nov', founder).rows.some((r) => r.fields.state === 'paid' || String(r.fields.due ?? '').startsWith('2025')));
+  /* A bare weekday is still the one gone. */
+  assert.equal(tellRead('Uber 85 on Monday', founder).rows[0]!.fields.due, '2026-10-05');
+});
+
+test('A DAY SAID WITH A FIGURE IS KEPT AS ITS WHEN (RQ10)', () => {
+  assert.equal(tellRead('Sales were 40 yesterday', founder).rows[0]!.fields.at, '2026-10-06T12:00:00.000Z');
+  assert.equal(tellRead('Sales were 40', founder).rows[0]!.fields.at, undefined);
+});
+
+test('A DATE IN ONE CLAUSE NEVER TURNS ANOTHER CLAUSE\'S WEEKDAY INTO A DATE (RQ12)', () => {
+  const told = tellRead('Netflix 180 a month on the 10th, Electricity 850 due Friday', { ...founder, lists: [...founder.lists, RECURRING] }).rows;
+  const power = told.find((r) => /Electricity/u.test(String(r.fields.what ?? r.said)))!;
+  assert.match(power.detail, /due Friday/u);
+});

@@ -1429,11 +1429,8 @@ export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
    * read that keeps no memo groups it for the one project as well.
    */
   const memo = <T>(key: unknown[], make: () => T): T => {
-    const k = JSON.stringify(['worked', ...key, ctx.viewer ?? null, until]);
-    if (ctx.walks?.has(k)) return ctx.walks.get(k) as T;
-    const made = make();
-    ctx.walks?.set(k, made);
-    return made;
+    const memo = ctx.walks;
+    return memo === undefined ? make() : memo.once(JSON.stringify(['worked', ...key, ctx.viewer ?? null, until]), make);
   };
 
   /* THE TASKS: each list that hands work out and points at the projects, its newest write on a row of this one. */

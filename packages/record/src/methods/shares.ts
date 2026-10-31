@@ -253,14 +253,33 @@ export const badSaid = (text: string): string => {
  * something, and keeps its words, and so does one a colon leads up to ("Keys are here: [Keychain](/keychain)"), which is
  * the thing named (review i, RI3).
  */
+/* A CLAUSE OF AN OPENING LINE THAT SPEAKS TO THE OWNER (finish 31 Oct): People's "{{questions-open-in:people}}
+   question(s) for you", Work's "{{tasks-waiting}} waiting on you" and "None of your tasks is late" are his words, the
+   questions only he can answer and the work that waits on him. A link leaves the clause out, as `leadShown` leaves one
+   at nought, and the line goes on from the next clause. */
+const OWNER_CLAUSE = '(?:\\{\\{questions-open-in:[^{}]+\\}\\}|\\d+) question(?:\\(s\\)|s)? for you|(?:\\{\\{[^{}]+\\}\\}|\\d+) waiting on you|None of your tasks is late';
+const OWNER_FIRST = new RegExp(`(^|[.!?…][ \\t]+)(?:${OWNER_CLAUSE})(?:,[ \\t]*(?:and[ \\t]+)?|(?=[.!?…]|$))`, 'gmu');
+const OWNER_AFTER = new RegExp(`,[ \\t]*(?:and[ \\t]+)?(?:${OWNER_CLAUSE})(?=[,.!?…]|$)`, 'gmu');
+const ownerLeftOut = (text: string): string => {
+  let out = text;
+  for (let was = ''; was !== out; ) {
+    was = out;
+    out = out.replace(OWNER_FIRST, '$1').replace(OWNER_AFTER, '');
+  }
+  return out;
+};
+
 export const wordsShown = (text: string): string =>
-  badSaid(text)
+  ownerLeftOut(badSaid(text))
     /* A SENTENCE THAT ASKS HIM TO ADD SOMETHING IS HIS, NEVER THE LINK'S (audit 31 Oct o, AO9): Money's "[Add an
        account](/r/accounts?new=1) to see what you have." was the first line a stranger read. It goes whole, as a link
        that is its own sentence does below. */
     .replace(/(?:^|(?<=[.!?…])[ \t]+)[^.!?…\n[]*\[[^\]]*\]\(\s*\/[^)]*[?&]new=1\b[^)]*\)[^.!?…\n]*[.!?…]?/gmu, '')
     /* AND "BESIDES YOU" IS SAID TO THE OWNER: People's "1 person besides you" is "1 person" on a link. */
     .replace(/ besides you\b/gu, '')
+    /* AND SO ARE A CIRCLE'S PAYOUTS, his: "comes back to you" and "your payout has come" are "comes back" and "the payout". */
+    .replace(/ comes back to you\b/gu, ' comes back')
+    .replace(/\byour payout\b/gu, 'the payout')
     .replace(/([.!?…])[ \t]+\[[^\]]*\]\(\s*[/#][^)]*\)[.!]?[ \t]*$/gmu, '$1')
     .replace(/\[([^\]]*)\]\(\s*[/#][^)]*\)/gu, '$1');
 
