@@ -6459,12 +6459,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        own id and no member row has it, so a person's agent drew every line as unread however far the person had
        read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
     if (!beyond && b.source === 'activity') {
-      const heard = unmuted(ctx, b);
+      const heard = figuresSeen(ctx, unmuted(ctx, b));
       return 'seen' in heard ? { ...heard, seen: markOf(readerOf(ctx)) } : heard;
     }
     if (!beyond) {
       const part = narrowedSource(ctx, b);
-      return part === null ? b : ownRows(ctx, b, part);
+      return figuresSeen(ctx, part === null ? b : ownRows(ctx, b, part));
     }
     /* A BLOCK HELD FOR ANOTHER KIND OF READER (`when: { reader: owner }`) THAT ANSWERED NO WAS NEVER READ (`drawn: false, why: 'when'`),
        so there is nothing to refuse her: it stays undrawn, blanked as any held block is, and is not drawn as a sentence about
@@ -6472,6 +6472,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const shell = shellOf(b, beyond, log !== null);
     const forReader = b.drawn === false && b.why === 'when' && JSON.stringify((b as { when?: unknown }).when ?? null).includes('"reader"');
     return forReader ? { ...shell, refusals: [], drawn: false, why: 'when' as const } : shell;
+  };
+
+  /**
+   * WHAT EACH FIGURE A DRAWN BLOCK NAMES IS (`figures`, `pages.ts` `figuresOf`), kept for a figure `metric` answers her
+   * and no other: every list it reads is one she reads whole (`readable`, `sight.whole`), as `metric` asks. The kernel
+   * names a figure by every word of a `{{path}}`, so `{{notes.overdue}}` on a block over Notes, drawn to a member invited
+   * to Notes alone, carried the declaration of a figure called overdue over Bills: its name, the list it reads, its
+   * `where` and its target. A figure left out here is one the host does not know, as for a record that never declared it.
+   */
+  const figuresSeen = <B,>(ctx: CallContext, b: B): B => {
+    const figures = (b as { figures?: unknown }).figures;
+    if (figures === null || typeof figures !== 'object' || ctx.principal.kind === 'system' || holdsRowids(ctx)) return b;
+    const all = Object.entries(figures as Record<string, unknown>);
+    const kept = all.filter(([id]) => {
+      const decl = kernel.metricDecl(id);
+      return decl !== null && kernel.figureLists(decl).every((list) => readable(ctx, list) === null && sight.whole(ctx, list));
+    });
+    return kept.length === all.length ? b : { ...b, figures: Object.fromEntries(kept) };
   };
 
   /** What a block worked out from a whole list says to a reader whose grant shows them part of that list. */
