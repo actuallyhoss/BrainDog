@@ -480,7 +480,12 @@ export const account = {
   theKeyIs: 'Locked with a key kept outside BrainDog, which cannot show it to you.',
   /* NAMED BY ITS FILE ON A SELF-HOST: it began "If you run BrainDog yourself", said only to the
      person who does. `kek` in the data folder is where `braindog init` writes it (`apps/selfhost/src/main.ts`). */
-  theKeyWhere: 'It is the backup key file, named kek, in the data folder. Keep a copy somewhere else.',
+  /* AND WHAT IT SEALS, TRUE TO THE BYTE (AI17): a copy is plain SQLite, and only the saved keys inside it are sealed.
+     ON DOCKER the data folder is inside a volume, so the way off it is named (AI24). */
+  theKeyWhere: 'It is the backup key file, named kek, in the data folder. Without it your saved keys stay sealed; everything else in a copy is readable, so keep copies as private as the key. Keep a copy of the key somewhere else.',
+  theKeyDocker: 'On Docker, copy it off the volume with:',
+  theKeyDockerCommand: 'mkdir -p ~/braindog-backups && docker compose cp braindog:/data/kek ~/braindog-backups/',
+  downloadNeedsKey: 'A downloaded copy is put back with the key file beside it.',
   restore: 'Restore',
   /**
    * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.
@@ -643,7 +648,12 @@ export const account = {
   exceptionCancel: 'Cancel',
   peopleUnrouted: 'This BrainDog does not list its people yet.',
   /* Lane F: backups, putting a copy back, erasing a person and deleting the record */
-  backedUp: (id: string) => `Backed up. The copy is ${id}.`,
+  /* NO MACHINE NAME IN THE TOAST (AI23): the copy is the newest row in the list, named in local words there. */
+  backedUp: 'Backed up.',
+  /* WHO TOOK A COPY, from the label the host gives its name (`apps/selfhost/src/snapshots.ts`). */
+  copyBy: { now: 'taken by you', nightly: 'nightly', 'before-restore': 'kept before a restore' } as Record<string, string>,
+  copyToday: 'Today',
+  copyYesterday: 'Yesterday',
   sizeOnDisk: (size: string) => `${size} on disk`,
   restoreThis: 'Restore this copy',
   restoreLive: 'Put everything back to one of the copies above. What it holds now is kept as a copy first.',
@@ -755,6 +765,8 @@ export const account = {
     magic
       ? 'Sign in with a link from your mail, then remove the lost passkey here. With no passkey and no mail, the person who runs this BrainDog can let you back in.'
       : 'Sign in with another passkey, then remove the lost one here. With none left, the person who runs this BrainDog can let you back in.',
+  /* THE OWNER OF A SELF-HOST IS THAT PERSON (AI30): the way back is the server key, at the sign-in page. */
+  passkeyLostSelfHost: 'Lost every passkey? Sign in with the server key at /signin, then add a new one.',
 
   /* Sign-up for a stranger, a record of your own for somebody signed in with none, and the passkey the first run ends on */
   signupClosedTitle: 'Sign-up is not open yet',

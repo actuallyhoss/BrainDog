@@ -1073,15 +1073,14 @@ assertion pair, an RS256 pair, each generated once with `subtle` and stored.
 - `ponytail:` passkey challenges live in memory for five minutes; a restart forgets a ceremony in flight.
 - `ponytail:` no Inference adapter; `infer.*` rows wait in `pending`. A BYO key is the same adapter with a base URL (33 §1) when tier B lands.
 - `ponytail:` `idle_ms` is a constant 1500; the runner backs off itself.
-- `ponytail:` the lockout keys on `X-Forwarded-For`'s first value; the reverse proxy is the boundary that makes it honest.
-- `ponytail:` the nightly hour is 02:00 UTC + a slug-hashed minute, not the record's `tz`.
-- `ponytail:` `Snapshots.restore` throws; restore is `braindog import` into a fresh directory, offline.
+- `ponytail:` the lockout keys on the socket's address; with `BRAINDOG_TRUST_PROXY` set (`1` for a loopback or private peer, or a list of proxy addresses) it reads `X-Forwarded-For` only from such a peer, right to left past trusted hops, and the server key's strikes also count against that peer (100 in fifteen minutes).
+- `ponytail:` the nightly copy runs at `BRAINDOG_BACKUP_AT` (03:20 UTC by default), not in the record's `tz`.
 - `ponytail:` attachments are the five image types; PDF when a register asks for it.
-- `ponytail:` inbound email trusts the forwarder's `Authentication-Results`; DKIM verification in-process (~150 lines, DNS + RSA) when a self-hoster runs their own MX.
+- `ponytail:` inbound email checks DKIM itself against DNS (`server.ts`); a forwarder's own `Authentication-Results` line is never the verdict.
 - `ponytail:` on Windows the KEK mode check is skipped; ACL inspection when a Windows self-host matters.
 - `ponytail:` a second WebAssembly instance per run is about 2 ms on the machine it was measured on, which a run every fifteen minutes can pay; a pool when a record runs scripts often enough to see it.
 
-Seventeen, counted.
+Sixteen, counted.
 
 ---
 
@@ -1132,7 +1131,7 @@ so its row is what this spec needs from it:
 |---|---|---|
 | 1 | **Passkeys are specified here (§5.10) and land in phase 3 with the web app; phase 2 closes with the magic link and the token exchange.** WebAuthn is a browser ceremony and phase 2 has no browser to drive it; ES256 and RS256, no attestation, registration behind a session | build phase 3: "+ `/auth/passkey/*`"; 12 §3 self-host row |
 | 2 | `POST /auth/token` exchanges the server key (`BRAINDOG_SERVER_KEY`, formerly `BRAINDOG_TOKEN`) for an owner session — the browser bootstrap without SMTP, and the session a first passkey is registered behind; refused when the Directory holds more than one person | 33 §6 Auth row; 12 §3 |
-| 3 | **Inbound email on a self-host is a forwarding webhook**, `POST /in/email/<token>`, raw RFC 5322 in the body; the forwarding MTA's `Authentication-Results` pass is what makes a row eligible to match; no SMTP receive, no DKIM in-process | 33 §4 (a row); 07 §1 self-host column: "a forwarding webhook, or your own MX" |
+| 3 | **Inbound email on a self-host is a forwarding webhook**, `POST /in/email/<token>`, raw RFC 5322 in the body; the host checks the message's DKIM signature against DNS itself, and that pass is what makes a row eligible to match; no SMTP receive | 33 §4 (a row); 07 §1 self-host column: "a forwarding webhook, or your own MX" |
 | 4 | **Phase 2 polls; `/ws` is 404.** The client's own 15 s fallback is the live channel; a WebSocket is §10's first line | 33 §4 `/ws` row: "Cloud; self-host phase 2: 404, the client polls" |
 | 5 | **`wake()` kicks the in-process poller** (`setImmediate`) instead of being a no-op; the poller's tick is **15 s** and is the belt for abandoned leases | 33 §1 `wake()` comment; 30 §8 doorbell row; 09 §1 self-hosted paragraph |
 | 6 | **The SMTP client is ~90 lines over `node:tls`** — implicit TLS on 465 or STARTTLS on 587, AUTH PLAIN, text/plain base64; configured by `BRAINDOG_SMTP_URL` and `BRAINDOG_SMTP_FROM`; without it, `/auth/methods` says so and `notify.email` is not leased | 33 §6 (an SMTP row) |

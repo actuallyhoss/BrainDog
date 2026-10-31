@@ -56,7 +56,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
-import { keyLockout, ONE_PLACE, proxied, type KeyLockout } from './key-lockout.ts';
+import { keyLockout, nearPeer, ONE_PLACE, PEER_TRIES, placeOf, proxied, type KeyLockout, type Place, type ProxyTrust } from './key-lockout.ts';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
@@ -389,6 +389,8 @@ type Site = {
   firstRead: FirstReadDoor;
   /** The server key's lockout at `/api` and `/mcp` (`./key-lockout.ts`), built once so its count lasts the whole process. */
   keyLock: KeyLockout;
+  /** The same lockout counted by the socket's own peer when a proxy's header named the place (AI16, `PEER_TRIES`). */
+  peerLock: KeyLockout;
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -488,24 +490,29 @@ function validFrom(): string | undefined {
  * the same person at the same level through either, and `surface` is only what the token's listing shows as
  * where it was last used.
  */
-async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', ip: string, door?: string, cli?: string, request?: Request): Promise<Known> {
+async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: Place, door?: string, cli?: string, request?: Request): Promise<Known> {
   const { api, token } = site;
   /* A BEARER SHAPED LIKE THE SERVER KEY IS COUNTED AGAINST THE PLACE IT CAME FROM (SEC5), and a place that missed ten
      times in fifteen minutes is refused before anything is compared: a miss used to be a 401 and nothing else, so the
      key could be guessed in a loop. The lock, the compare and the strike run with no await between them. */
   const keyShaped = token !== undefined && !sent.includes('.');
+  /* AND THE PEER AS WELL, WHEN A PROXY'S HEADER NAMED THE PLACE (AI16): a header is words, and the socket is not. */
+  const viaProxy = at.peer !== '' && at.ip !== at.peer;
   if (keyShaped) {
-    const wait = site.keyLock.locked(ip);
+    const wait = site.keyLock.locked(at.ip) ?? (viaProxy ? site.peerLock.locked(at.peer) : null);
     if (wait !== null) return { bare: 429, retryAfter: wait };
   }
   /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
      differs, so how long a wrong guess took said how much of it was right. */
   const isKey = token !== undefined && sameKeyNow(sent, token);
   if (isKey) {
-    site.keyLock.clear(ip);
+    site.keyLock.clear(at.ip);
     return owner(api, true);
   }
-  if (keyShaped) site.keyLock.strike(ip);
+  if (keyShaped) {
+    site.keyLock.strike(at.ip);
+    if (viaProxy) site.peerLock.strike(at.peer);
+  }
 
   /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
      one shared string would be a deployment where an agent cannot be given less than everything.
@@ -595,7 +602,7 @@ async function keychainToken(request: Request, site: Site | null): Promise<Resul
   /* ONLY A LOGIN TOKEN OPENS THIS DOOR, and a token carries a `.`: anything else is refused here unread, so this door is
      no way to try the server key past its lockout (SEC5). */
   if (site === null || sent === undefined || !sent.includes('.')) return refused;
-  const known = await bearerFor(sent, site, 'api', '', undefined, cliOf(request));
+  const known = await bearerFor(sent, site, 'api', { ip: '', peer: '' }, undefined, cliOf(request));
   if (!('ctx' in known) || known.ctx.principal.kind !== 'token') return refused;
   const over = await overLimit(site, { door: 'bearer', ctx: known.ctx }, '', 'write');
   if (over !== null) {
@@ -644,14 +651,14 @@ async function operationFor(sent: string, api: Api, request?: Request): Promise<
  * `host` IS THE `Host` HEADER AS THE SOCKET RECEIVED IT, because in open mode it is the check: a page that
  * rebinds its own name to 127.0.0.1 reaches this port with its own name in `Host`, and gets a 421.
  */
-async function contextFor(request: Request, host: string, site: Site, ip: string, door?: string): Promise<Seen> {
+async function contextFor(request: Request, host: string, site: Site, at: Place, door?: string): Promise<Seen> {
   const { api, token } = site;
   const sent = presented(request);
 
   /* ONE · A BEARER, which is an agent, the server key or an operation, and never a browser, so the origin checks below
      do not apply to it: nothing ambient sends an `Authorization` header. `door` is the method the path names, the one
      thing an operation bearer is checked against. */
-  if (sent !== undefined) return bearerFor(sent, site, 'api', ip, door, cliOf(request), request);
+  if (sent !== undefined) return bearerFor(sent, site, 'api', at, door, cliOf(request), request);
 
   /* TWO · THE SESSION COOKIE. A BAD ONE IS A 401 AND IS CLEARED, AND NEVER FALLS THROUGH TO OPEN MODE: a
      cookie that names no session is somebody who thinks they are signed in, and answering them as the
@@ -1217,8 +1224,12 @@ export async function start(options: {
    * `sessionKey`, and with neither, no link is made or opened.
    */
   shareKey?: Uint8Array | undefined;
-  /** `BRAINDOG_TRUST_PROXY=1`: count the lockout against the address the proxy saw, not the proxy's own. */
-  trustProxy?: boolean | undefined;
+  /**
+   * `BRAINDOG_TRUST_PROXY`: count the lockout against the address the proxy saw, not the proxy's own. `true` trusts a
+   * peer on loopback or a private network (`nearPeer`); a function names which peers are proxies (`proxyTrustOf`). The
+   * header from any other peer is ignored (AI16).
+   */
+  trustProxy?: boolean | ProxyTrust | undefined;
   /**
    * The front doors' limiter (`@braindog/host/limits`, `overLimit` below): 600 reads and 120 writes a minute for one
    * caller. `null` limits nobody, and a test hands in its own over a pinned clock.
@@ -1951,7 +1962,8 @@ export async function start(options: {
      program and not this one (measured). `::` takes both where the machine has IPv6, and Node falls back to `0.0.0.0`
      where it has none. */
   const host = options.host ?? (options.token === undefined ? '127.0.0.1' : '::');
-  const trustProxy = options.trustProxy === true;
+  const trusts: ProxyTrust | null = options.trustProxy === true ? nearPeer : typeof options.trustProxy === 'function' ? options.trustProxy : null;
+  const trustProxy = trusts !== null;
   /* SET THE MOMENT THE PORT IS KNOWN, and nothing is answered before: see below. */
   let site: Site | null = null;
   /* NOTHING A REQUEST CAN DO ENDS THE PROCESS. `void answer(…)` discarded the promise and `answer`
@@ -2027,7 +2039,7 @@ export async function start(options: {
     }
     /* A CRASH IS ANSWERED BY REFERENCE AND NEVER BY ITS REASON (`crashAnswer`): this answered the thrown sentence, and a
        driver's sentence can name a row. */
-    void answer(req, res, handlers, site, shell, trustProxy).catch((e: unknown) => {
+    void answer(req, res, handlers, site, shell, trusts).catch((e: unknown) => {
       try {
         const [status, body] = crashAnswer(req.url ?? '/', e);
         res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -2220,6 +2232,7 @@ export async function start(options: {
     }),
     /* THE SERVER KEY'S LOCKOUT, built once so a strike outlives the request that earned it (SEC5). */
     keyLock: keyLockout(clock.now),
+    peerLock: keyLockout(clock.now, PEER_TRIES),
     /* THE FIRST READ OF A STRANGER'S SENTENCE, built once here where the origin is known, so its count lasts the process. */
     firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup, catalogue: catalogueDir ?? null }),
     snapshots: kept,
@@ -2349,20 +2362,25 @@ const json = (status: number, body: object, extra: readonly (readonly [string, s
   return new Response(JSON.stringify(body), { status, headers });
 };
 
-/**
- * The address the lockout counts against: the socket's, or, behind a proxy this host was told to trust
- * (`BRAINDOG_TRUST_PROXY=1`), the last `X-Forwarded-For` entry, which is the one that proxy wrote.
- *
- * THE LAST AND NOT THE FIRST. The first entry is whatever the client sent, and a proxy appends to it rather
- * than replacing it, so counting the first would let anybody lock anybody out by naming them. Without the
- * setting the header is ignored, for the same reason.
- */
 /** Whether `ONE_PLACE` was said, so a proxied host says it once and not on every request. */
 let proxyTold = false;
 
-function ipOf(req: IncomingMessage, trustProxy: boolean): string {
-  const forwarded = trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',').pop()?.trim() : '';
-  return forwarded || req.socket.remoteAddress || '';
+/**
+ * The place the lockouts and limits count (`placeOf`): the socket's, or, when that socket is a proxy this host was told
+ * to trust, the caller that proxy wrote at the right of `X-Forwarded-For`.
+ *
+ * THE RIGHT AND NOT THE LEFT. The left entry is whatever the client sent, and a proxy appends to it rather than
+ * replacing it, so counting it would let anybody lock anybody out by naming them. AND ONLY FROM A TRUSTED PEER (AI16):
+ * with the setting on, the header was read from any caller, so one that reached the port directly named a new place per
+ * guess and was never locked.
+ */
+function placeAt(req: IncomingMessage, trusts: ProxyTrust | null): Place {
+  const xff = req.headers['x-forwarded-for'];
+  return placeOf(req.socket.remoteAddress ?? '', Array.isArray(xff) ? xff.join(', ') : xff, trusts);
+}
+
+function ipOf(req: IncomingMessage, trusts: ProxyTrust | null): string {
+  return placeAt(req, trusts).ip;
 }
 
 /**
@@ -2535,8 +2553,9 @@ async function answer(
   handlers: Record<string, Handler>,
   site: Site | null,
   shell: ((request: Request, origin: string) => Response) | null,
-  trustProxy: boolean,
+  trusts: ProxyTrust | null,
 ): Promise<void> {
+  const trustProxy = trusts !== null;
   /* A PROXY IN FRONT, NOT TRUSTED, IS SAID ONCE (RD7): the lockout then counts the proxy and nobody else. */
   if (!trustProxy && !proxyTold && site?.token !== undefined && proxied(req.socket.remoteAddress ?? '', req.headers)) {
     proxyTold = true;
@@ -2565,7 +2584,7 @@ async function answer(
      else. The app is what makes `/signin` the same origin as the cookie it asks for. `/mcp` is taken before a
      byte of the body is read, because it reads the body only for a bearer it knows. */
   const path = new URL(url).pathname;
-  if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site, ipOf(req, trustProxy)));
+  if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site, placeAt(req, trusts)));
   /* OAUTH 2.1, BEFORE THE BODY IS WEIGHED, as `/mcp` is: its doors read at most their own few kilobytes, counted as they
      arrive, so a body is handed over unread and the hundred mebibytes below are never held for a stranger here. The
      request is built at the origin the socket was reached by (`originAt`), because the metadata names the address the
@@ -2573,7 +2592,7 @@ async function answer(
   if (servesOAuth(path)) {
     const at = new URL(`${path.replace(/^\/+/, '/')}${asked.search}`, site.oauth.originAt(req.headers.host ?? ''));
     const init: RequestInit = SAFE.has(method) ? { method, headers } : { method, headers, body: bodyOf(req), duplex: 'half' };
-    return write(res, await site.oauth.serve(new Request(at, init), ipOf(req, trustProxy)));
+    return write(res, await site.oauth.serve(new Request(at, init), ipOf(req, trusts)));
   }
 
   /* A BODY IS WEIGHED AS IT ARRIVES, BEFORE ANYBODY IS KNOWN. Every byte was held in memory before the credential was
@@ -2596,7 +2615,7 @@ async function answer(
   if (/^\/+auth(?:\/|$)/.test(path)) {
     /* LIMITED BY ADDRESS BEFORE THE DIRECTORY IS ASKED, on top of its own lockouts: nobody at this door has said who they
        are yet, and the address the lockouts count is the one thing here a caller cannot choose (`ipOf`). */
-    const ip = ipOf(req, trustProxy);
+    const ip = ipOf(req, trusts);
     const over = await overLimit(site, null, ip, SAFE_METHODS.has(method) ? 'read' : 'write');
     /* A STRANGER'S FIRST SENTENCE, READ BY THIS HOST'S MODEL (`./first-read.ts`): off until `FIRST_READ_DAILY` is set,
        and read by `readSetup`, with no record, owner or ledger. */
@@ -2661,7 +2680,7 @@ async function answer(
      those requests is a credential this record does not know, 401, and is still good for the one it was minted for. It
      is not told 403 under a foreign name, because telling it that would mean spending it to learn it is real. */
   const door = method === 'POST' && !foreign ? /^\/+api\/+([A-Za-z]+)\/*$/.exec(path)?.[1] : undefined;
-  const seen = await contextFor(request, req.headers.host ?? '', site, ipOf(req, trustProxy), door);
+  const seen = await contextFor(request, req.headers.host ?? '', site, placeAt(req, trusts), door);
   /* A NAME THAT IS NOT THIS RECORD'S, TO A CALLER THIS HOST KNOWS. One record is served here, so no credential reaches
      another, and the sentence is the Directory's for a name that is not yours, whether or not it names anything. A
      caller it does not know falls through to the root's own refusal below, which never reaches the record. */
@@ -2670,7 +2689,7 @@ async function answer(
      A cookie rotated on the way in rides back on the 429, as it does on every answer here. */
   if ('ctx' in seen) {
     const who: LimitDoor = { door: request.headers.has('authorization') ? 'bearer' : 'session', ctx: seen.ctx };
-    const over = await overLimit(site, who, ipOf(req, trustProxy), classAt(path));
+    const over = await overLimit(site, who, ipOf(req, trusts), classAt(path));
     if (over !== null) return write(res, over, seen.cookie);
   }
   /* THE SESSION HEADERS ON EVERY DOOR, checked: the record reads a token's and ignores anybody else's. */
@@ -2785,12 +2804,12 @@ async function copyOf(id: string, ctx: CallContext, site: Site): Promise<Respons
  * A BEARER AND NOTHING ELSE: the path `/api` takes for one, and nothing that path falls back to. The cookie is
  * never read and open mode never applies, because an agent carries its own credential and a browser has the app.
  */
-async function agent(req: IncomingMessage, url: string, method: string, headers: [string, string][], site: Site, ip: string): Promise<Response> {
+async function agent(req: IncomingMessage, url: string, method: string, headers: [string, string][], site: Site, at: Place): Promise<Response> {
   const head = new Request(url, { method, headers });
   const early = gate(head);
   if (early) return early;
   const sent = presented(head);
-  const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp', ip, undefined, cliOf(head));
+  const seen = sent === undefined ? null : await bearerFor(sent, site, 'mcp', at, undefined, cliOf(head));
   /* THE 401 NAMES WHERE TO SIGN IN, as the Worker's does, so an MCP client holding no token starts OAuth from it
      (RFC 9728): at the name this process was reached by, and not at all while OAuth is off. */
   const metadata = site.oauth.metadata(req.headers.host ?? '');

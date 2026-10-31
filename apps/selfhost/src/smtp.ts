@@ -175,6 +175,46 @@ function messageOf(from: string, to: readonly string[], subject: string, text: s
  * goes stale overnight. `tls` is for a test's own certificate authority and nothing else.
  */
 export function smtpSender(config: SmtpConfig, tls: ConnectionOptions = {}): SendLetter {
+  const open = signedIn(config, tls);
+  return async (letter) => {
+    const to = typeof letter.to === 'string' ? [letter.to] : [...letter.to];
+    if (to.length === 0 || to.some((a) => BREAK.test(a) || !a.includes('@')) || BREAK.test(letter.subject))
+      throw new Error('a mail needs one or more addresses and a one-line subject');
+    const wire = await open();
+    try {
+      wire.write(`MAIL FROM:<${config.from}>`);
+      await expect(wire, 'MAIL FROM', is2);
+      for (const address of to) {
+        wire.write(`RCPT TO:<${address}>`);
+        await expect(wire, 'RCPT TO', is2);
+      }
+      wire.write('DATA');
+      await expect(wire, 'DATA', (c) => c === 354);
+      wire.write(messageOf(config.from, to, letter.subject, letter.text, new Date()));
+      await expect(wire, 'the end of the message', is2);
+      wire.write('QUIT');
+    } finally {
+      wire.socket.end();
+    }
+  };
+}
+
+/**
+ * MAIL THAT CANNOT GO OUT IS SAID AT START (AI20): connect, greet, upgrade and sign in, then QUIT with nothing sent. The
+ * start line said only where mail goes, so a closed port or a wrong password was found by the person waiting for a
+ * sign-in link that never came. Throws the same sentences a send would.
+ */
+export async function smtpCheck(config: SmtpConfig, tls: ConnectionOptions = {}): Promise<void> {
+  const wire = await signedIn(config, tls)();
+  try {
+    wire.write('QUIT');
+  } finally {
+    wire.socket.end();
+  }
+}
+
+/** A fresh connection, greeted, upgraded to TLS and signed in, ready for MAIL FROM; it closes itself on any failure. */
+function signedIn(config: SmtpConfig, tls: ConnectionOptions): () => Promise<Wire> {
   const upgraded = (socket: Socket | undefined): Promise<TLSSocket> =>
     new Promise((done, failed) => {
       const secured = connectTls({ ...tls, host: config.host, port: config.port, servername: config.host, ...(socket ? { socket } : {}) }, () =>
@@ -183,11 +223,7 @@ export function smtpSender(config: SmtpConfig, tls: ConnectionOptions = {}): Sen
       secured.once('error', failed);
     });
 
-  return async (letter) => {
-    const to = typeof letter.to === 'string' ? [letter.to] : [...letter.to];
-    if (to.length === 0 || to.some((a) => BREAK.test(a) || !a.includes('@')) || BREAK.test(letter.subject))
-      throw new Error('a mail needs one or more addresses and a one-line subject');
-
+  return async () => {
     let wire: Wire;
     if (config.secure) wire = wireOf(await upgraded(undefined));
     else {
@@ -225,20 +261,10 @@ export function smtpSender(config: SmtpConfig, tls: ConnectionOptions = {}): Sen
         /* THE ONE STAGE WHOSE REFUSAL HAS ITS OWN SENTENCE, because it is the one the operator fixes in the URL. */
         if (signed.code !== 235) throw new Error(`the mail server refused the username and password in BRAINDOG_SMTP_URL (${String(signed.code)})`);
       }
-
-      wire.write(`MAIL FROM:<${config.from}>`);
-      await expect(wire, 'MAIL FROM', is2);
-      for (const address of to) {
-        wire.write(`RCPT TO:<${address}>`);
-        await expect(wire, 'RCPT TO', is2);
-      }
-      wire.write('DATA');
-      await expect(wire, 'DATA', (c) => c === 354);
-      wire.write(messageOf(config.from, to, letter.subject, letter.text, new Date()));
-      await expect(wire, 'the end of the message', is2);
-      wire.write('QUIT');
-    } finally {
+      return wire;
+    } catch (e) {
       wire.socket.end();
+      throw e;
     }
   };
 }

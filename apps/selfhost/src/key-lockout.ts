@@ -18,6 +18,8 @@
  * is 256 random bits and its own check, and an agent retrying a revoked token never locks the owner out.
  */
 
+import { BlockList, isIP } from 'node:net';
+
 import { ipBucket } from '@braindog/record/directory';
 
 export type KeyLockout = {
@@ -31,6 +33,16 @@ export type KeyLockout = {
 
 /** Ten wrong keys in fifteen minutes; the lock lasts fifteen minutes. */
 export const KEY_TRIES = { most: 10, window: 15 * 60_000 } as const;
+
+/**
+ * THE PROXY ITSELF IS COUNTED TOO (AI16), against a hundred in the same fifteen minutes. With `BRAINDOG_TRUST_PROXY` on,
+ * the place counted is the one the proxy wrote; a caller that reached the port past the proxy, from an address that
+ * looks like one (the Docker gateway, anybody on the LAN), wrote its own and reset its count with each guess. Every key
+ * that came through one peer is now also that peer's, so a forged header buys a hundred guesses and not unlimited ones,
+ * and ten strangers behind a real proxy do not lock the key for everybody, which is what one shared count of ten did
+ * (RD7).
+ */
+export const PEER_TRIES = { most: 100, window: 15 * 60_000 } as const;
 
 /** The most places remembered at once; the one struck longest ago goes first, so a flood of places costs bounded memory. */
 const PLACES_MOST = 50_000;
@@ -70,7 +82,7 @@ export function keyLockout(now: () => number, rule: { most: number; window: numb
  * locked the server key for everyone, again every fifteen minutes, and nothing said why.
  */
 export const ONE_PLACE =
-  'Requests reach this BrainDog through a proxy, and BRAINDOG_TRUST_PROXY is not set, so the sign-in lockout counts every visitor as the proxy: ten wrong keys from anywhere lock the server key for everyone for fifteen minutes. Set BRAINDOG_TRUST_PROXY=1 if a proxy you run is the only way in.';
+  'This looks like it is behind a proxy, and BRAINDOG_TRUST_PROXY is not set, so the sign-in lockout counts every visitor as the proxy: ten wrong keys from anywhere lock the server key for everyone for fifteen minutes. Set BRAINDOG_TRUST_PROXY=1 (or the proxy\'s address) if a proxy you run is the only way in.';
 
 /** An address on this machine or a private network: where a proxy in front of this process stands. */
 export function nearPeer(address: string): boolean {
@@ -83,4 +95,54 @@ export function nearPeer(address: string): boolean {
 /** Whether one request reads as a proxy's: a forwarding header, from a peer on this machine or its network. */
 export function proxied(peer: string, headers: Readonly<Record<string, string | string[] | undefined>>): boolean {
   return nearPeer(peer) && ['x-forwarded-for', 'forwarded', 'x-real-ip', 'cf-connecting-ip'].some((h) => headers[h] !== undefined);
+}
+
+/** Whether a direct peer is a proxy whose `X-Forwarded-For` this host reads. */
+export type ProxyTrust = (peer: string) => boolean;
+
+/**
+ * `BRAINDOG_TRUST_PROXY`: unset or `0` reads no header; `1` trusts a peer on this machine or a private network
+ * (`nearPeer`), which is where Caddy, nginx, cloudflared or the Docker gateway stand; anything else is the proxies'
+ * own addresses or ranges, comma or space separated (`127.0.0.1, 172.16.0.0/12, fd00::/8`). A value that reads as
+ * neither stops the server with `wrong`, rather than a guess at which header to believe.
+ */
+export function proxyTrustOf(setting: string | undefined): ProxyTrust | null | { wrong: string } {
+  const said = setting?.trim() ?? '';
+  if (said === '' || /^(0|false|off|no)$/iu.test(said)) return null;
+  if (/^(1|true|on|yes)$/iu.test(said)) return nearPeer;
+  const list = new BlockList();
+  for (const part of said.split(/[\s,]+/u).filter(Boolean)) {
+    const [address = '', bits] = part.split('/');
+    const plain = address.replace(/^\[|\]$/gu, '').toLowerCase().replace(/^::ffff:(?=\d+\.)/u, '');
+    const family = isIP(plain);
+    const width = bits === undefined ? (family === 6 ? 128 : 32) : Number(bits);
+    if (family === 0 || !Number.isInteger(width) || width < 0 || width > (family === 6 ? 128 : 32))
+      return { wrong: `BRAINDOG_TRUST_PROXY takes 1, or the addresses of the proxies in front (such as 127.0.0.1 or 172.16.0.0/12), and "${part}" is neither.` };
+    list.addSubnet(plain, width, family === 6 ? 'ipv6' : 'ipv4');
+  }
+  return (peer) => {
+    const a = peer.toLowerCase().replace(/^::ffff:(?=\d+\.)/u, '');
+    const family = isIP(a);
+    return family !== 0 && list.check(a, family === 6 ? 'ipv6' : 'ipv4');
+  };
+}
+
+/** Where a request came from: `ip`, the place the lockouts and limits count, and `peer`, the socket that sent it. */
+export type Place = { ip: string; peer: string };
+
+/**
+ * THE PLACE A REQUEST COMES FROM (AI16). The header is read only when the socket's own peer is a proxy this host trusts;
+ * from anybody else it is the caller's own words and ignored, so reaching the port directly no longer lets a caller name
+ * a fresh place per guess. Behind the proxy, the entries are read from the right, past every hop that is itself a
+ * trusted proxy, and the first one that is not is the caller: the left of the header is whatever the client sent.
+ */
+export function placeOf(peer: string, forwarded: string | undefined, trusts: ProxyTrust | null): Place {
+  if (trusts === null || peer === '' || !trusts(peer)) return { ip: peer, peer };
+  const hops = (forwarded ?? '').split(',').map((h) => h.trim()).filter(Boolean);
+  let ip = '';
+  while (hops.length > 0) {
+    ip = hops.pop()!;
+    if (!trusts(ip)) break;
+  }
+  return { ip: ip || peer, peer };
 }

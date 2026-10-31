@@ -20,3 +20,12 @@ test('NOTHING IS SAID ON LOOPBACK, WITH TLS, BEHIND AN https PROXY, OR WITH NO K
   assert.equal(plainLine({ key: true, tls: false, listen: undefined, origin: 'https://studio.example' }), null);
   assert.equal(plainLine({ key: false, tls: false, listen: '0.0.0.0', origin: 'http://localhost:8080' }), null);
 });
+
+test('AI19: IN THE IMAGE THE LINE READS WHERE COMPOSE PUBLISHES, AND NEVER NAMES BRAINDOG_LISTEN', () => {
+  const base = { key: true, tls: false, listen: undefined, origin: 'http://localhost:8080', image: true };
+  assert.equal(plainLine({ ...base, publish: undefined }), null);
+  assert.equal(plainLine({ ...base, publish: '127.0.0.1' }), null);
+  const wide = plainLine({ ...base, publish: '0.0.0.0' }) ?? '';
+  assert.match(wide, /BRAINDOG_PUBLISH/u);
+  assert.doesNotMatch(wide, /BRAINDOG_LISTEN/u);
+});

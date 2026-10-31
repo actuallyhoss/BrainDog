@@ -31,7 +31,7 @@
  */
 
 import { createPrivateKey, randomBytes, X509Certificate, type KeyObject } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { argv, env, exit, stderr } from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -51,13 +51,13 @@ import { degradeLines, setupLine } from './first-run.ts';
 import { commandFor, inImage, listenOf, originOf, plainLine, serverKeyOf } from './how.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
-import { ONE_PLACE } from './key-lockout.ts';
+import { ONE_PLACE, proxyTrustOf } from './key-lockout.ts';
 import { initFrom } from './restore.ts';
 import { openSqlite, signedWebhooks, start } from './server.ts';
 import { rewrapAtStart } from './rewrap.ts';
 import { webhookPost } from './actions.ts';
 import { outboundOf } from './script.ts';
-import { authMail, mailedNotices, smtpLine, smtpOf, smtpSender } from './smtp.ts';
+import { authMail, mailedNotices, smtpCheck, smtpLine, smtpOf, smtpSender } from './smtp.ts';
 
 /**
  * One sentence on stderr, and nothing on stdout, ever.
@@ -692,16 +692,23 @@ async function serve(): Promise<void> {
      Either way it is 32 bytes by HKDF, and it is zero-filled once the Directory holds its own copy. */
   /* AN EMPTY SERVER KEY IS NO KEY: set but blank, it would open every interface to anyone presenting nothing. */
   const serverKey = serverKeyOf(env);
+  /* IN THE IMAGE A SERVER WITH NO KEY IS ONE NOBODY CAN REACH (AI18): without a key it binds loopback, which inside a
+     container is nowhere, so it came up healthy and answered nobody. There it is refused, and "remove the line" is never
+     offered. Outside the image, no key is the loopback-only start the README gives. */
+  const MAKE_KEY = "openssl rand -base64 32 | tr '+/' '-_' | tr -d '='";
+  const orLoopback = inImage() ? '' : ', or remove the line to run on loopback only with nobody signing in';
+  if (inImage() && (serverKey.value === undefined || serverKey.value.trim() === '') && listenOf(env) === undefined)
+    return refuse(`Set BRAINDOG_SERVER_KEY in .env (make one with ${MAKE_KEY}): in a container nothing outside can reach a server without one.`);
   if (serverKey.value !== undefined && serverKey.value.trim() === '')
-    return refuse(
-      `${serverKey.name} is set but empty. Put a long random value in it (openssl rand -base64 32 | tr '+/' '-_' | tr -d '='), or remove the line to run on loopback only with nobody signing in.`,
-    );
+    return refuse(`${serverKey.name} is set but empty. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
   /* AND A SHORT ONE IS A KEY SOMEBODY CAN GUESS (SEC5): it is the owner to whoever presents it, on every interface. The
-     lockout slows a guess at `/api` and `/mcp`; it cannot make eight characters into a secret. */
+     lockout slows a guess at `/api` and `/mcp`; it cannot make eight characters into a secret. AND ONE OF A FEW
+     CHARACTERS OVER AND OVER IS SHORT TOO (AI26): thirty-two copies of "a" passed. Sixteen distinct characters is far
+     under what any random key of this length has, and far over what a typed pattern does. */
   if (serverKey.value !== undefined && serverKey.value.trim().length < 32)
-    return refuse(
-      `${serverKey.name} is shorter than 32 characters, so it could be guessed. Put a long random value in it (openssl rand -base64 32 | tr '+/' '-_' | tr -d '='), or remove the line to run on loopback only with nobody signing in.`,
-    );
+    return refuse(`${serverKey.name} is shorter than 32 characters, so it could be guessed. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
+  if (serverKey.value !== undefined && new Set(serverKey.value.trim()).size < 16)
+    return refuse(`${serverKey.name} repeats a few characters, so it could be guessed. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
   const secret = env.BRAINDOG_SESSION_SECRET;
   if (secret !== undefined && secret.length < 32)
     return refuse('BRAINDOG_SESSION_SECRET is shorter than 32 characters. Make it 32 random bytes in base64url, or unset it to derive one from the key file.');
@@ -723,6 +730,10 @@ async function serve(): Promise<void> {
 
   /* THE OPERATOR'S SWITCH (`49 §5.24`): an add-on's requests to other servers leave only when `BRAINDOG_OUTBOUND=on`.
      A value that is neither stops the server, rather than a guess that sends when the operator meant it not to. */
+  /* WHICH PEERS ARE PROXIES WHOSE X-Forwarded-For IS READ (AI16): `1` for one on this machine or a private network, or
+     their addresses. Anything else stops the server, rather than a guess at whose header to believe. */
+  const trusts = proxyTrustOf(env.BRAINDOG_TRUST_PROXY);
+  if (trusts !== null && 'wrong' in trusts) return refuse(trusts.wrong);
   const outbound = outboundOf(env.BRAINDOG_OUTBOUND);
   if (outbound === null) return refuse('BRAINDOG_OUTBOUND takes on or off. Set it to on to let add-ons send requests to other servers, or unset it to keep them held.');
 
@@ -741,7 +752,7 @@ async function serve(): Promise<void> {
     ...(env.BRAINDOG_CATALOGUE === undefined ? {} : { catalogue: env.BRAINDOG_CATALOGUE }),
     sessionKey,
     shareKey: store.shareKey,
-    trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
+    ...(trusts === null ? {} : { trustProxy: trusts }),
     /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name, AND ONLY
        WHEN THE OPERATOR SAID SO. This passed `{}` for every operator once, which made the server's "off unless asked"
        on for everybody (HD.306). Absent, `start` holds each action with the sentence `script.ts` keeps. */
@@ -787,7 +798,7 @@ async function serve(): Promise<void> {
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
   /* AND WHEN THAT KEY GOES OVER PLAIN HTTP TO EVERY INTERFACE, said beside it (`plainLine`). */
-  const plain = plainLine({ key: serverKey.value !== undefined, tls: tls !== undefined, listen: listenOf(env), origin: running.signIn.origin });
+  const plain = plainLine({ key: serverKey.value !== undefined, tls: tls !== undefined, listen: listenOf(env), origin: running.signIn.origin, image: inImage(), publish: env.BRAINDOG_PUBLISH });
   if (plain) say(plain);
   /* AND WHEN THERE IS NO APP TO OPEN, SAID BEFORE ANY ADDRESS IS FOLLOWED. A start with no web build printed a sign-in
      address that answered a JSON 404; the root now answers a page saying the same as this line. */
@@ -808,9 +819,33 @@ async function serve(): Promise<void> {
       tty: !inImage() && process.stdout.isTTY ? (line) => void process.stdout.write(`${line}\n`) : undefined,
     });
     if (first) say(first);
+    /* AND THE SPENT LINK LEAVES THE DISK ONCE THE FIRST PASSKEY EXISTS (AI29), not at the next restart. Looked for every
+       ten seconds while the file is there, off the event loop's count so it never holds the process up. */
+    if (existsSync(claimFile)) {
+      const look = setInterval(() => {
+        try {
+          if (!existsSync(claimFile)) clearInterval(look);
+          else if (running.directorySql.one('SELECT 1 AS x FROM dir_passkey LIMIT 1')) {
+            rmSync(claimFile, { force: true });
+            clearInterval(look);
+          }
+        } catch {
+          /* A closed Directory at shutdown: nothing to remove now, and the next start removes it. */
+          clearInterval(look);
+        }
+      }, 10_000);
+      look.unref();
+    }
   }
   /* AND WHERE MAIL GOES, by host and port and never with what password. */
   if (smtp) say(`  ${smtpLine(smtp)}`);
+  /* AND WHETHER IT CAN (AI20): signed in to and left with nothing sent, said when it answers, without holding the start. */
+  if (smtp)
+    void smtpCheck(smtp).then(
+      () => say(`  mail: signed in to ${smtp.host}:${String(smtp.port)}. The domain of ${smtp.from} needs SPF and DKIM set up at your mail provider, or links land in spam.`),
+      (e: unknown) =>
+        say(`  mail: could not reach or sign in to ${smtp.host}:${String(smtp.port)} (${e instanceof Error ? e.message : 'no answer'}). Sign-in links and notices will not go out until it can.`),
+    );
   for (const line of degradeLines(env, smtp !== null)) say(line);
   /* AND HOW AN AGENT GETS IN, with OAuth said either way: a default host listens on every interface at a plain-http
      origin, where OAuth is off, and nothing at start said so. */
@@ -834,7 +869,7 @@ async function serve(): Promise<void> {
   if (wrong) say(`  ${wrong}`);
   /* AND A PROXY IN FRONT THAT THE LOCKOUT CANNOT SEE PAST (RD7): an https name served as plain http here is the proxy
      shape, and without the setting every wrong key counts against the proxy, which locks everybody out at once. */
-  if (serverKey.value !== undefined && env.BRAINDOG_TRUST_PROXY !== '1' && tls === undefined && running.signIn.origin.startsWith('https:')) say(`  ${ONE_PLACE}`);
+  if (serverKey.value !== undefined && trusts === null && tls === undefined && running.signIn.origin.startsWith('https:')) say(`  ${ONE_PLACE}`);
 
   /* AND WHETHER THE NAME MOVED SINCE LAST TIME, which nothing anywhere used to say. A passkey is bound to
      the hostname it was made at, so changing `BRAINDOG_ORIGIN` or swapping the certificate for one naming
@@ -885,6 +920,8 @@ function help(): void {
   ];
   say('The self-host. Each command, as you run it here:');
   for (const [words, does] of rows) say(`  ${commandFor(words).trimEnd()}\n      ${does}`);
+  /* A BACKUP IN THE IMAGE IS WRITTEN INSIDE THE VOLUME, and this is the step that takes it off (README, Backups). */
+  if (inImage()) say('  docker compose cp braindog:/data/backups/. ~/braindog-backups/\n      take the backups off the volume, into a folder outside the repository.');
   say('Every setting it reads is in selfhost.env.example, and apps/selfhost/README.md has the steps.');
 }
 

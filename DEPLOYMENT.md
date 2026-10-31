@@ -216,7 +216,7 @@ required but the data directory.
 | `BRAINDOG_OUTBOUND` | `off`: add-ons send no requests to other servers, and their scheduled actions are held | `on`: add-ons may send them. The public add-on registry has its own switch, `BRAINDOG_KENNEL` |
 | `BRAINDOG_ORIGIN` | `http://localhost:<port>` | the public origin: sign-in links, the passkeys' relying party, the CSRF check |
 | `BRAINDOG_HOST` | `127.0.0.1` without a token, `0.0.0.0` with one | the interface to listen on |
-| `BRAINDOG_TRUST_PROXY` | the socket's address is the caller's | `1`: the last `X-Forwarded-For` entry is, behind a proxy you run |
+| `BRAINDOG_TRUST_PROXY` | the socket's address is the caller's | `1`: behind a proxy on loopback or a private network, the caller it wrote into `X-Forwarded-For` is; or a list of the proxies' addresses. The header is ignored from any other peer |
 | `PORT` | `8080` | |
 | `BRAINDOG_OWNER` | first start with an empty data directory refuses, naming `init` | the owner's email: that start makes the record (`BRAINDOG_RECORD`, default `home`) and prints a one-time sign-in link |
 

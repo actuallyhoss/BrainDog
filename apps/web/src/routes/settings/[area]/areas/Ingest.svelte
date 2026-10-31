@@ -10,7 +10,7 @@
   /* THE APPROVAL `/keychain` SENDS TOO, from one module, so a fresh sign-in means one thing on every screen. */
   import { reprove } from '$lib/record/keychain.ts';
   /* THE FORWARDING ADDRESS, which the Worker minted and nothing in this app asked for. See the section below. */
-  import { addressCommand, mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
+  import { addressCommand, dockerAddressCommand, mailUrl, reachableForMail, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { untrack } from 'svelte';
   import { closed, closedAfter, opened } from '$lib/ui/screen.svelte.ts';
@@ -367,6 +367,10 @@
         <!-- THE COMMAND BEHIND A FOLD: the person who runs the machine opens it, and nobody else reads a shell line. -->
         <details class="command">
           <summary>{words.unrouted}</summary>
+          {#if origin && !reachableForMail(origin)}<p class="hint">{mailWords.notReachable(origin)}</p>{/if}
+          <p class="hint">{mailWords.onDocker}</p>
+          <CodeLine text={dockerAddressCommand(origin, shell.index.slug)} />
+          <p class="hint">{mailWords.noDocker}</p>
           <CodeLine text={addressCommand(origin, shell.index.slug)} />
         </details>
       {/if}
