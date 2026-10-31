@@ -33,6 +33,9 @@ export const PLACES = ['work', 'orders', 'shop', 'projects', 'money', 'people', 
 /** How many places the rail draws, Today and Decide included. */
 export const RAIL_MOST = 7;
 
+/** Where Projects ranks on a starter's record (AL3): after every place that declares or is given a number. */
+export const LATE = 999;
+
 /** The rail, as it is drawn. */
 export type Rail<T> = {
   /** Today, Decide, then the sections, seven at most. */
@@ -56,10 +59,18 @@ const PLACE_AT: Readonly<Record<string, number>> = { work: 10, orders: 20, shop:
  * or 25, so it sits after Work as the record orders it (`packages/record/src/places.ts`), and the phone's bar, which
  * takes its places in the same numbers (`tabsOf`), draws it too (FB4).
  */
-function rankOf(item: FlatItem): number {
+function rankOf(item: FlatItem, starter: boolean): number {
   const name = plainOf(item.key === 'work' ? 'work' : item.key.replace(/^section:/u, ''));
+  /* ON A STARTER'S RECORD PROJECTS COMES AFTER THE PLACES THAT RANK (AL3), as on the phone's bar (`atOf` in `nav.ts`):
+     it is no place until the first project, and stepping in at 30 then moved Money and pushed the starter's own place
+     past the seventh. */
+  if (starter && name === 'projects') return LATE;
   return item.place ?? PLACE_AT[name] ?? 1000;
 }
+
+/** Whether the record holds a starter's own place: a section that declares where it sits and is none of `PLACES`. */
+const starterOf = (items: readonly FlatItem[]): boolean =>
+  items.some((i) => i.key.startsWith('section:') && typeof i.place === 'number' && !PLACES.includes(plainOf(i.key.replace(/^section:/u, ''))));
 
 /**
  * The rail, from the flat nav (`flatNav`): its rows and the rows it put under More are one list again, ordered by
@@ -71,10 +82,11 @@ export function railOf<T extends { href: string; row?: boolean | undefined; tabs
   const activity = all.find((i) => i.key === 'activity');
   const decide: FlatItem = all.find((i) => i.key === 'decide') ?? { key: 'decide', href: '/decide', label: decideWord, icon: 'decide', near: ['/decide'] };
   /* A STABLE SORT, so the sections none of the places name keep the reader's order among themselves. */
+  const starter = starterOf(all);
   const sections = all
     .filter((i) => i.key === 'work' || i.key.startsWith('section:'))
     .map((item, i) => ({ item, i }))
-    .sort((a, b) => rankOf(a.item) - rankOf(b.item) || a.i - b.i)
+    .sort((a, b) => rankOf(a.item, starter) - rankOf(b.item, starter) || a.i - b.i)
     .map((x) => x.item);
   const things = flat.groups.flatMap(([section, list]): [string, T[]][] => {
     const rows = list.filter((e) => e.row === true);

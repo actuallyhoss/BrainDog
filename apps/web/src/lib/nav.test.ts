@@ -9,6 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { railOf } from './nav/rail.ts';
 import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf, withOrder } from './nav.ts';
 
 type Entry = { section: string; href: string; order: number };
@@ -168,7 +169,19 @@ test("A STARTER'S OWN PLACE IS ON THE PHONE'S BAR AS ON THE RAIL, by the place i
     ['People', [placed('People', '/p/people', 50)]],
     ['Goals', [placed('Goals', '/p/goals', 20)]],
   ] as const;
-  assert.deepEqual(tabsOf(flatNav(personal, 1, WORDS).main, 4).map((i) => i.label), ['Today', 'Needs you', 'Goals', 'Projects']);
+  assert.deepEqual(tabsOf(flatNav(personal, 1, WORDS).main, 4).map((i) => i.label), ['Today', 'Needs you', 'Goals', 'Money']);
+});
+
+test("THE FIRST PROJECT MOVES NOTHING ON A STARTER'S BAR (AL3): Projects takes the slot after the founder's own places", () => {
+  const placed = (title: string, href: string, place: number) => ({ ...page(title, href), place });
+  const before = [
+    ['Money', [placed('Money', '/p/money', 40)]],
+    ['Dashboard', [placed('Dashboard', '/p/dashboard', 70)]],
+  ] as const;
+  const after = [['Projects', [placed('Projects', '/p/projects', 30)]], ...before] as const;
+  const bar = (sections: typeof before | typeof after) => tabsOf(railOf(flatNav(sections, 1, WORDS), 'Needs you').places, 4).map((i) => i.label);
+  assert.deepEqual(bar(before), ['Today', 'Needs you', 'Money', 'Dashboard']);
+  assert.deepEqual(bar(after), ['Today', 'Needs you', 'Money', 'Dashboard']);
 });
 
 test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a gone page is skipped', () => {
