@@ -120,7 +120,7 @@ test('RED: a briefing that hands an older step, or none, while a newer one was l
   assert.equal(stale.state, 'red');
   /* AND THE OLD BRIEFING STILL NAMES THE IMPORT'S OWN RUN LIVE, three days quiet: a second thing not true. */
   assert.equal(stale.said, 'The briefing for kiln hands the step "Kerning pass" left, 3 days before the newest, from "Glyph audit". And 1 more thing is not true.');
-  assert.deepEqual(stale.facts, ['The briefing for kiln names "Agent run" as live, and it was last heard from 3 days ago.']);
+  assert.deepEqual(stale.facts, ['The briefing for kiln names "An agent" as live, and it was last heard from 3 days ago.']);
   const none = await readBriefingSign({ sql, briefing: () => ({ ...older, handoff: null, live: { same_repo: [], elsewhere: [] } }) }, clock.now());
   assert.equal(none.said, 'The briefing for kiln hands no step, though "Glyph audit" left one a moment ago.');
 });

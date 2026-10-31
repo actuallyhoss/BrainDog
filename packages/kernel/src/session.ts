@@ -495,20 +495,98 @@ export function agentOf(hints: Pick<SessionHints, 'agent' | 'client'>, kinds: re
   return { agent, name };
 }
 
-/** An agent's name and where it works, "Claude Code in BrainDog", or the agent's alone where nothing says where. */
+/** An agent's name and where it works, "Claude Code in BrainDog", or the agent's alone where nothing says where: the old shape, "Claude run". */
 const titled = (name: string, place: string | null): string => (place ? clipTitle(`${name} in ${place}`) : `${name} run`);
+
+/** The kinds of machine a host's name says, as a person calls each (`deviceOf`). */
+export const DEVICES: readonly string[] = ['MacBook', 'iMac', 'Mac mini', 'Mac Studio', 'Mac Pro', 'iPhone', 'iPad', 'Windows laptop', 'Windows PC', 'Raspberry Pi'];
+
+/**
+ * The kind of machine a host's name says, "MacBook" for `Maras-MacBook-Pro.local`, or `null` where it says none. NEVER THE
+ * HOST'S OWN NAME, which is somebody's label and often an id ("DESKTOP-7F3K2Q"). The same reading as `deviceOf` in the
+ * MCP package's words, so a run is "on MacBook" in its name and in what an agent is told.
+ */
+export function deviceOf(host: unknown): string | null {
+  if (typeof host !== 'string' || host === '') return null;
+  const h = host.toLowerCase();
+  if (h.includes('macbook')) return 'MacBook';
+  if (h.includes('imac')) return 'iMac';
+  if (/mac-?mini/u.test(h)) return 'Mac mini';
+  if (/mac-?studio/u.test(h)) return 'Mac Studio';
+  if (/mac-?pro/u.test(h)) return 'Mac Pro';
+  if (h.includes('iphone')) return 'iPhone';
+  if (h.includes('ipad')) return 'iPad';
+  if (/^laptop-/u.test(h)) return 'Windows laptop';
+  if (/^(desktop|win)-/u.test(h)) return 'Windows PC';
+  if (h.includes('raspberry')) return 'Raspberry Pi';
+  return null;
+}
+
+/** Names an app gives itself that say no app: a bridge or a library's default. */
+const NO_APP: ReadonlySet<string> = new Set(['mcp', 'mcp client', 'mcp remote', 'client', 'agent', 'app', 'test', 'unknown', 'braindog']);
+
+/**
+ * An app nobody listed in `CLIENTS`, by the name it gives itself in its hello (`clientInfo.name`), in plain words: `zed`
+ * is "Zed" and `my-notes-app` "My notes app". `null` for a name that is not plain words, because a digit or a symbol in
+ * it is a build or an id, and for a name that says no app (`NO_APP`).
+ */
+export function plainApp(said: unknown): string | null {
+  if (typeof said !== 'string') return null;
+  const words = said.trim().replace(/[\s._-]+/gu, ' ').trim();
+  if (words.length > 32 || !/^[A-Za-z]+(?: [A-Za-z]+){0,3}$/u.test(words) || NO_APP.has(words.toLowerCase())) return null;
+  return words === words.toLowerCase() ? `${words[0]!.toUpperCase()}${words.slice(1)}` : words;
+}
+
+/** What a run of an app nobody named is called where no place names it: "An agent", and never "Agent run". */
+const NAMELESS = 'An agent';
+
+/**
+ * The app and the machine a run is on, "Claude Code on MacBook", or the app alone where the host says no kind of machine
+ * ("Claude" for claude.ai, which names none). What a run with no place is called, so no run reads "Agent run (S9)".
+ */
+const machined = (name: string, host: unknown): string => {
+  const app = name === KIND_NAMES.other ? NAMELESS : name;
+  const device = deviceOf(host);
+  return clipTitle(device ? `${app} on ${device}` : app);
+};
+
+/**
+ * Whether a run's name is one `machined` gives it: the app alone or on a kind of machine. The app's case aside, so a reader
+ * holding the client's own `zed` or the kind `claude` knows "Zed on MacBook" and "Claude" for the record's.
+ */
+export function onMachine(doing: string, name: string): boolean {
+  const app = (name === KIND_NAMES.other ? NAMELESS : name).toLowerCase();
+  const said = doing.trim().toLowerCase();
+  return app !== '' && (said === app || DEVICES.some((d) => said === `${app} on ${d.toLowerCase()}`));
+}
+
+/** A run's name from its app and where it works: "Claude Code in BrainDog" with a place, "Claude Code on MacBook" without. */
+const named = (name: string, place: string | null, host: unknown): string => (place ? clipTitle(`${name} in ${place}`) : machined(name, host));
+
+/**
+ * What to call the app a run is in, from its hello: the app `CLIENTS` knows it as, else the name it gave itself in plain
+ * words (`plainApp`), else its kind's.
+ */
+function appNamed(hints: Pick<SessionHints, 'agent' | 'client'>, kinds: readonly string[]): string {
+  const { name } = agentOf(hints, kinds);
+  if (name !== KIND_NAMES.other || clientOf(hints.client)) return name;
+  return plainApp(hints.client) ?? name;
+}
 
 /**
  * What a run is called before its agent says what it is doing, so a new run is never an untitled row.
  *
- * THE AGENT AND WHERE IT WORKS: the project it was placed in, else its repository, "Claude Code in BrainDog"; and the
- * agent alone, "Claude run", where nothing says where. NEVER A DAY. "Agent run, 1 Oct" told a person reading a board of
+ * THE APP AND WHERE IT WORKS: the project it was placed in, else its repository, "Claude Code in BrainDog"; and the app
+ * and its machine, "Claude Code on MacBook", where nothing says where. THE APP IS THE ONE ITS HELLO NAMED (MCP's
+ * `initialize` `clientInfo`, or the command line's `x-braindog-client-name`), an app nobody listed by its own name in
+ * plain words, and "An agent" only where nothing names one: "Agent run (S9)" and "Claude run (S9)" named no app and no
+ * machine, on the Agents page, Activity, the bell and the command line alike (audit 31 Oct, AK15). NEVER A DAY. "Agent run, 1 Oct" told a person reading a board of
  * runs nothing the board did not already say, 439 times. It is only a starting title: the agent's `doing`, through
  * `attach` or `handoff`, replaces it, and so does its first proposal's question, and while it stands it follows what the
  * record learns about the run (`learned`).
  */
 export function provisionalTitle(hints: SessionHints, project: string | null, kinds: readonly string[] = KINDS): string {
-  return titled(agentOf(hints, kinds).name, project ?? (hints.repo ? hints.repo : null));
+  return named(appNamed(hints, kinds), project ?? (hints.repo ? hints.repo : null), hints.host);
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -539,7 +617,11 @@ export function recordNamed(
   const real = (name: string): string | null => (name === KIND_NAMES.other ? null : name);
   const repo = typeof run.fields.repo === 'string' && run.fields.repo.trim() !== '' ? run.fields.repo : null;
   const places = [project, repo, ...known].filter((p): p is string => p !== null && p.trim() !== '');
-  for (const name of NAMES) if (doing === `${name} run` || places.some((place) => doing === titled(name, place))) return { name: real(name) };
+  /* AND THE RUN'S OWN APP BY ITS OWN NAME, "Zed on MacBook", which only this run's hello could have given it. */
+  const own = plainApp(run.fields.client);
+  const apps = own !== null && clientOf(run.fields.client) === undefined && !NAMES.includes(own) ? [own, ...NAMES] : NAMES;
+  for (const name of apps)
+    if (doing === `${name} run` || onMachine(doing, name) || places.some((place) => doing === titled(name, place))) return { name: real(name) };
   const day = `${String(Number(run.created_at.slice(8, 10)))} ${MONTHS[Number(run.created_at.slice(5, 7)) - 1] ?? ''}`;
   if (doing.endsWith(`, ${day}`)) {
     const head = doing.slice(0, -(day.length + 2));
@@ -595,9 +677,11 @@ export function learned(
   const made = keep.includes('doing') ? null : recordNamed(run, project, known);
   if (made) {
     const client = clientOf(app === null ? hints.client : run.fields.client);
-    const name = client?.called ?? made.name ?? KIND_NAMES[out.agent ?? was] ?? KIND_NAMES.other!;
+    const said = app === null ? hints.client : run.fields.client;
+    const name = client?.called ?? made.name ?? (client === undefined ? plainApp(said) : null) ?? KIND_NAMES[out.agent ?? was] ?? KIND_NAMES.other!;
     const repo = typeof run.fields.repo === 'string' && run.fields.repo !== '' ? run.fields.repo : null;
-    const title = titled(name, project ?? repo);
+    const host = typeof run.fields.host === 'string' && run.fields.host !== '' ? run.fields.host : hints.host;
+    const title = named(name, project ?? repo, host);
     if (title !== run.fields.doing) out.doing = title;
   }
   return out;

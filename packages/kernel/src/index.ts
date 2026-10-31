@@ -73,7 +73,7 @@ import { markHand } from './hold.ts';
 import { accessNight, countLists, deadPaths } from './night-counts.ts';
 import { actionsBlocking } from './signs-actions.ts';
 import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, sweepDoorMarks, type DoorMark, type DoorSigns } from './door.ts';
-import { clearFault, MAIL_FAULT, openFaults, raiseFault, type Fault } from './fault.ts';
+import { addressKey, clearFault, MAIL_FAULT, missedCause, missedSaid, openFaults, raiseFault, type Fault } from './fault.ts';
 import { copyFacts, copyFailed, copyKept, type CopyFacts } from './copies.ts';
 import {
   closePassed as closePassedHandoffs,
@@ -420,7 +420,7 @@ export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 /** The `field` of the line `setPrivate` writes on a row, kept private or shared again (leak matrix N1). */
 export const PRIVATE_NOTE = 'private';
 export { DRAFT_FIELD, TOPIC_MAX, cleanName, firstProjectFields, firstProjectName, noPlace, topicName } from './first-project.ts';
-export { KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
+export { DEVICES, KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, onMachine, plainApp, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* A FIELD WORKED OUT FROM OTHER FIELDS: its shapes and refusals, and the rows filled at read. `shapeOf` is the
    ingest's name here, so the derive's is exported as `deriveShapeOf`. */
 export { DERIVE_SHAPES, DERIVE_REFUSES, NORMALISE_HOW, deriveFault, derived, isDerived, shapeOf as deriveShapeOf, sourcesOf, type Derive, type DeriveField, type DeriveShape } from './derive.ts';
@@ -449,7 +449,7 @@ export {
   type OpenHandoff,
   type Taken,
 } from './handoff.ts';
-export { MAIL_FAULT, SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts';
+export { MAIL_FAULT, SAID, clearFault, missedCause, missedSaid, openFaults, raiseFault, type Fault } from './fault.ts';
 /* THE RECORD'S COPIES AS THREE FACTS, and the night's two writes (`copies.ts`). */
 export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, keptNote, nightWhy, type CopyFacts, type Lifecycle } from './copies.ts';
 /* `canon` IS ALSO MIGRATE'S NAME (a script written one way), so a value written one way is `canonValue` out here. */
@@ -2102,6 +2102,18 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /** A sentence with the spoken ids in it said as the rows' names; one nothing answers to stays as written. */
   const nameSpoken = (text: string): string => nameSpokenIn(text, titleOfRow);
+
+  /**
+   * Who a mail address is, for a mail that missed them (`mailMissed`): the person holding it, by their id and name, or
+   * a hash of the address where nobody does. The address itself is never the key.
+   */
+  function mailedKey(address: string): { key: string; name: string | null } {
+    const who = sql.one<{ id: string; name: string | null }>(
+      'SELECT id, name FROM person WHERE lower(email) = lower(?) ORDER BY suspended_at IS NOT NULL, id LIMIT 1',
+      address.trim(),
+    );
+    return who ? { key: who.id, name: who.name } : { key: addressKey(address), name: null };
+  }
 
   /** What a keychain label's live entry says it opens, for a script's line to name beside the key (`scriptEgress`). */
   function opensOf(label: string): string | null {
@@ -13323,9 +13335,23 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (schemaRefusal(state)) return;
       raiseFault(sql, MAIL_FAULT, 'mail', error, clock.now());
     },
-    mailSent: (): void => {
+    mailSent: (delivered: readonly string[] = []): void => {
       if (schemaRefusal(state)) return;
       clearFault(sql, MAIL_FAULT, clock.now());
+      /* AND A PERSON WHO MISSED ONE IS CLEARED BY THE NEXT THAT REACHES THEM (`mailMissed`). */
+      for (const address of delivered) clearFault(sql, missedCause(mailedKey(address).key), clock.now());
+    },
+    /**
+     * MEMBERS WHO MISSED A MAIL THE REST GOT (review k, RK5): the server refused their mailbox and took the others, so
+     * nothing failed for the server and Health said nothing. Each person is a line of their own on Health, by name
+     * (`missedSaid`), cleared when a mail next reaches them (`mailSent`). `what` is what they missed, as the host says it.
+     */
+    mailMissed: (addresses: readonly string[], what: string): void => {
+      if (schemaRefusal(state)) return;
+      for (const address of addresses) {
+        const who = mailedKey(address);
+        raiseFault(sql, missedCause(who.key), 'mail', 'the mail server has no such mailbox at RCPT TO', clock.now(), missedSaid(who.name, what));
+      }
     },
     /**
      * Queue the job a fault is about once more: `outbox#<kind>`'s dead letters go back on the outbox with their attempts

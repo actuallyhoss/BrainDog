@@ -459,7 +459,7 @@ test('ATTACH NAMES A RUN THE RECORD NAMED AGAIN, and what the agent says it is d
   const { api, sql, clock } = await record();
   /* The start hook, with git too slow to answer: the session and its machine, and nothing of the repository. */
   const opened = value<Attached>(await api.attach({ source: 'startup', client_id: 'c-1' }, agent({ host: 'dev-pc', agent: 'claude' })));
-  assert.equal(opened.session.fields.doing, 'Claude run');
+  assert.equal(opened.session.fields.doing, 'Claude');
 
   /* A compaction comes back with where it is, and the record names the run for it. */
   clock.advance(5 * MIN);
@@ -485,7 +485,7 @@ test('A CLIENT THAT NAMES NO AGENT NEVER MAKES A CLAUDE RUN NAMELESS, and one th
 
   /* A remote client that says only what it is: MCP's `clientInfo`, as the host hands it on. */
   const remote = value<Attached>(await api.attach({ source: 'startup', client_id: 'c-2' }, agent({ client: 'claude-ai', client_version: '1.0.0' })));
-  assert.deepEqual([remote.session.fields.agent, remote.session.fields.doing], ['claude', 'Claude run']);
+  assert.deepEqual([remote.session.fields.agent, remote.session.fields.doing], ['claude', 'Claude']);
   sql.close();
 });
 

@@ -16,7 +16,7 @@
  * and the commits since are always said, so a reader can weigh it.
  */
 
-import { agentOf, presenceOf, type Json } from '@braindog/kernel';
+import { agentOf, onMachine, presenceOf, type Json } from '@braindog/kernel';
 
 /** The warning, said once on a card when another working run is in the same tree. */
 export const TREE_WARNING = 'Two sessions in one working tree overwrite each other. Coordinate or stop.';
@@ -147,13 +147,14 @@ const heard = (run: TreeRun): number => {
 
 /**
  * What a run says it is doing, or `null` when it has said nothing yet. The title a run is given before it speaks,
- * "Claude Code in BrainDog" or "Claude Code run" (`provisionalTitle`), says nothing its name does not, so it is left out.
+ * "Claude Code in BrainDog", "Claude Code on MacBook" or the older "Claude Code run" (`provisionalTitle`), says nothing its
+ * name does not, so it is left out.
  */
 const doingOf = (run: TreeRun): string | null => {
   const doing = textOf(run.fields.doing);
   if (doing === null) return null;
   const name = agentName(run);
-  if (doing === `${name} run` || doing.startsWith(`${name} in `)) return null;
+  if (doing === `${name} run` || doing.startsWith(`${name} in `) || onMachine(doing, name)) return null;
   return clipped(doing, DOING_MOST).replace(/[.!]+$/u, '');
 };
 

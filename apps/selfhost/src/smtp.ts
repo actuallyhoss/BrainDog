@@ -34,8 +34,17 @@ export type SmtpConfig = { secure: boolean; host: string; port: number; user: st
 /** One message: who to, what about, and its words. The self-host sends words only; the Worker's letters add HTML. */
 export type Letter = { to: string | readonly string[]; subject: string; text: string };
 
-/** Sends one message, or throws with a sentence that names a stage and a status and never the password or an address. */
-export type SendLetter = (letter: Letter) => Promise<void>;
+/**
+ * What a send that went says of it: the addresses the server refused while it took the rest (`smtpSender` skips a
+ * mailbox it does not have), so the people behind them can be told about on Health. Empty when everybody got it.
+ */
+export type Sent = { refused: readonly string[] };
+
+/**
+ * Sends one message, or throws with a sentence that names a stage and a status and never the password or an address.
+ * A sender that cannot tell who it reached answers nothing, which reads as everybody.
+ */
+export type SendLetter = (letter: Letter) => Promise<Sent | void>;
 
 /** The most addresses one `notify.email` names, as the Worker's own ceiling is: a longer list is a mistake, not a digest. */
 export const MOST_RECIPIENTS = 50;
@@ -210,6 +219,8 @@ export function smtpSender(config: SmtpConfig, tls: ConnectionOptions = {}): Sen
       wire.write(messageOf(config.from, taken, letter.subject, letter.text, new Date()));
       await expect(wire, 'the end of the message', is2);
       wire.write('QUIT');
+      /* AND WHO IT MISSED, so a member skipped above is said on Health by name and not only in nobody's log. */
+      return { refused: to.filter((a) => !taken.includes(a)) };
     } finally {
       wire.socket.end();
     }
@@ -316,17 +327,33 @@ export function mailedNotices(send: SendLetter, fault?: MailFault): (job: Outbox
        does. AND AN ADDRESS THE SERVER REFUSED IS NOT THE SERVER'S FAULT (RJ7): one member whose mailbox answers 550 every
        night raised it and the owner's digest a minute later cleared it, so Health said whichever ran last. That refusal
        is the job's own dead letter, and the fault is left as it stood. */
+    const what = missedWhat(payload);
+    let sent: Sent | void;
     try {
-      await send({ to, subject, text: typeof payload.text === 'string' ? payload.text : '' });
+      sent = await send({ to, subject, text: typeof payload.text === 'string' ? payload.text : '' });
     } catch (e) {
       const raw = e instanceof Error ? e.message : 'the mail server did not take it';
       const why = withoutAddresses(raw);
       if (fault && !addressRefused(raw)) tellRecord(() => fault.failed(`a summary mail was not sent: ${why}`));
+      /* ONE PERSON'S MAILBOX REFUSED, AND NOBODY ELSE TO SEND TO: that person missed it, said on Health by name. */
+      else if (fault?.missed && to.length === 1) tellRecord(() => fault.missed!(to, what));
       /* THROWN ON WITHOUT ITS ADDRESSES, so the dead letter the outbox keeps names nobody either. */
       throw new Error(why);
     }
-    if (fault) tellRecord(fault.sent);
+    /* SENT, AND SOME MEMBERS MISSED IT (review k, RK5): the server took the others and refused their mailboxes. Before,
+       this cleared Health and nobody heard that Mia never got the week's summary. */
+    const refused = sent ? sent.refused : [];
+    if (fault) tellRecord(() => fault.sent(to.filter((a) => !refused.includes(a))));
+    if (fault?.missed && refused.length > 0) tellRecord(() => fault.missed!(refused, what));
   };
+}
+
+/** What a member missed, in the words Health says it with: the summary by its name, or a notice. */
+function missedWhat(payload: { subject?: unknown; because?: unknown }): string {
+  const subject = typeof payload.subject === 'string' ? payload.subject.replace(/\s+/gu, ' ').trim() : '';
+  if (typeof payload.because === 'string' && payload.because.startsWith('digest.') && subject !== '')
+    return `the summary "${subject.length > 60 ? `${subject.slice(0, 59).trimEnd()}…` : subject}"`;
+  return 'a notice';
 }
 
 /**
@@ -371,8 +398,15 @@ export function letterOf(kind: SignInMailKind | undefined, link: string): { subj
   };
 }
 
-/** Where a mail that went out or failed is told to the record, so Health says it (PK4). */
-export type MailFault = { failed: (error: string) => void; sent: () => void };
+/**
+ * Where a mail that went out or failed is told to the record, so Health says it (PK4). `sent` names who it reached, so a
+ * person who missed one before is cleared, and `missed` who it did not (`mailMissed` in the kernel).
+ */
+export type MailFault = {
+  failed: (error: string) => void;
+  sent: (delivered?: readonly string[]) => void;
+  missed?: (addresses: readonly string[], what: string) => void;
+};
 
 /** Tell the record, which may not be open yet or may be refused: the log line still says it. */
 function tellRecord(f: () => void): void {

@@ -98,7 +98,7 @@ test('A NEW RUN IS NEVER UNTITLED: named for its agent and where it works, never
   value(k.create('tasks', { what: 'One' }, agent({ host: 'dev-pc', repo: 'braindog', branch: 'master', agent: 'claude' })));
   assert.equal(k.get('S1')!.fields.doing, 'Claude in braindog');
   value(k.create('tasks', { what: 'Two' }, { ...agent({ agent: 'codex' }), principal: { kind: 'token', token: 't_2' } }));
-  assert.equal(k.get('S2')!.fields.doing, 'Codex run');
+  assert.equal(k.get('S2')!.fields.doing, 'Codex');
   value(k.create('tasks', { what: 'Three' }, { ...agent({ host: 'dev-pc', repo: 'site', doing: 'Fix the footer' }), principal: { kind: 'token', token: 't_3' } }));
   assert.equal(k.get('S3')!.fields.doing, 'Fix the footer', 'what the agent said wins over the starting title');
   value(k.update('session', k.get('S1')!.id, { doing: 'Title the runs' }, agent({ host: 'dev-pc', repo: 'braindog' })));
@@ -106,9 +106,10 @@ test('A NEW RUN IS NEVER UNTITLED: named for its agent and where it works, never
 
   assert.equal(provisionalTitle({ repo: 'braindog' }, null), 'Agent in braindog');
   assert.equal(provisionalTitle({ agent: 'claude', repo: 'braindog' }, 'Lanternly'), 'Claude in Lanternly', 'the project is the place, over the repository');
-  assert.equal(provisionalTitle({ agent: 'other' }, null), 'Agent run');
+  assert.equal(provisionalTitle({ agent: 'other' }, null), 'An agent');
+  assert.equal(provisionalTitle({ agent: 'claude', client: 'claude-code', host: 'Adas-MacBook-Air.local' }, null), 'Claude Code on MacBook');
   assert.equal(provisionalTitle({ client: 'claude-code' }, 'BrainDog'), 'Claude Code in BrainDog');
-  for (const title of ['Claude in braindog', 'Codex run', 'Agent in braindog', 'Claude in Lanternly', 'Agent run', 'Claude Code in BrainDog'])
+  for (const title of ['Claude in braindog', 'Codex', 'Agent in braindog', 'Claude in Lanternly', 'An agent', 'Claude Code in BrainDog', 'Claude Code on MacBook'])
     assert.doesNotMatch(title, /\d/u, `${title} carries a day`);
   sql.close();
 });

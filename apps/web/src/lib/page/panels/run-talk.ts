@@ -14,6 +14,7 @@
  * `runTalk` IS PURE: the row, what was read beside it (`readRunParts`), the clock and the reader's zone.
  */
 import { createClient, type ClientOptions } from '@braindog/client';
+import { onMachine } from '@braindog/kernel';
 import { gapSaid as gapBetween, runWho } from '../../record/api.ts';
 
 /** A run's row as the record answers it: its number, its state and its fields. */
@@ -144,7 +145,8 @@ const FINISHED: readonly string[] = ['done', 'abandoned'];
  * Whether a run's name is still the one the record gave it, so it says nothing of what the run is doing.
  *
  * THE RECORD'S OWN SHAPES AND ONLY THOSE (`kernel/session.ts` `recordNamed`): no name at all, "Claude Code in BrainDog"
- * after its project or its repository, "Claude run", either with the day it opened, and "braindog on main" or
+ * after its project or its repository, "Claude Code on MacBook" or the app alone, the older "Claude run", either with the
+ * day it opened, and "braindog on main" or
  * "braindog" after its repository. "Claude in the loop" is an agent's own sentence and is kept.
  */
 export function placeholderName(fields: Readonly<Record<string, unknown>>, project: string | null = null): boolean {
@@ -157,7 +159,7 @@ export function placeholderName(fields: Readonly<Record<string, unknown>>, proje
   const dated = cut > 0 && A_DAY.test(doing.slice(cut + 2));
   const head = dated ? doing.slice(0, cut) : doing;
   for (const name of names) {
-    if (head === `${name} run`) return true;
+    if (head === `${name} run` || (!dated && onMachine(doing, name))) return true;
     if (!dated) for (const place of places) if (doing === `${name} in ${place}`) return true;
   }
   if (dated) return text(project) !== '' && head === text(project);

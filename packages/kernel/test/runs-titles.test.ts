@@ -114,7 +114,7 @@ test('ELSE THE AGENT AND WHERE IT WORKS: its project by name and never by number
   value(k.create('tasks', { what: 'b' }, as({ host: 'mbp', repo: 'lanternfish', agent: 'codex', client_id: 'cc-2' })));
   value(k.create('tasks', { what: 'c' }, as({ client_id: 'cc-3', agent: 'cursor' })));
   value(k.create('tasks', { what: 'd' }, as({ client_id: 'cc-4' })));
-  assert.deepEqual(['S1', 'S2', 'S3', 'S4'].map((s) => doing(k, s)), ['Claude in BrainDog', 'Codex in lanternfish', 'Cursor run', 'Agent run']);
+  assert.deepEqual(['S1', 'S2', 'S3', 'S4'].map((s) => doing(k, s)), ['Claude in BrainDog', 'Codex in lanternfish', 'Cursor', 'An agent']);
   for (const s of ['S1', 'S2', 'S3', 'S4']) assert.doesNotMatch(String(doing(k, s)), /\d|things#/u, `${s} is named with a number`);
   sql.close();
 });
@@ -123,7 +123,7 @@ test('A NAME THE RECORD GAVE FOLLOWS WHAT IT LEARNS: placed again by its host se
   const { k, sql, clock } = await record();
   /* A hook that could not read git: a host session id and a folder, and so no project. */
   value(k.runFor(as({ client_id: 'cc-1', host: 'mbp', cwd: '/tmp/x', agent: 'claude' }), 'opened: startup'));
-  assert.equal(doing(k, 'S1'), 'Claude run');
+  assert.equal(doing(k, 'S1'), 'Claude');
   const opened = k.get('S1')!;
 
   /* A tool call of the same session from the checkout: the run is placed in BrainDog, and named for it. */
@@ -176,6 +176,11 @@ test('THE OLD NAMES ARE THE RECORD’S TOO: "Claude run, 2 Oct", "Kiln, 2 Oct" i
   /* A place must be the run's project, its repository or a known project, so the name is read with it. */
   assert.deepEqual(recordNamed(run('Claude Code in BrainDog'), 'BrainDog'), { name: 'Claude Code' });
   assert.deepEqual(recordNamed(run('Agent run')), { name: null });
+  /* AND THE NAMES A RUN IS GIVEN NOW, from its hello and its machine: "Claude Code on MacBook", an app nobody listed by its own name. */
+  assert.deepEqual(recordNamed(run('Claude Code on MacBook')), { name: 'Claude Code' });
+  assert.deepEqual(recordNamed(run('An agent')), { name: null });
+  assert.deepEqual(recordNamed(run('Zed on MacBook', { client: 'zed' })), { name: 'Zed' });
+  assert.equal(recordNamed(run('Zed on MacBook')), null, 'an app the run never named was read as its own');
   assert.deepEqual(recordNamed(run('Lanternly, 1 Oct'), 'Lanternly'), { name: null });
   assert.deepEqual(recordNamed(run('braindog on master', { repo: 'braindog' })), { name: null });
   assert.equal(recordNamed(run('Lanternly, 3 Oct'), 'Lanternly'), null, 'a day the run did not open on is somebody’s words');
@@ -206,7 +211,7 @@ test('ANOTHER KEY NAMES NOTHING OF A RUN IT DID NOT OPEN: its question and its h
   const options = { body_kind: 'options' as const, body: { options: [{ id: 'keep', label: 'Keep it', because: 'Invoices print it.' }, { id: 'drop', label: 'Drop it', because: 'Nobody reads it.' }] } };
   value(k.runFor(as({ client_id: 'cc-1', host: 'mbp', cwd: '/tmp/x' })));
   const before = k.get('S1')!;
-  assert.deepEqual([before.fields.agent, before.fields.doing], ['other', 'Agent run']);
+  assert.deepEqual([before.fields.agent, before.fields.doing], ['other', 'An agent']);
 
   /* A second key, naming the first key's run as a stale folder file would, and saying it is Claude in BrainDog. Its
      question and its note are refused as its writes are, rather than signed as S1 (`foreignRun`). */
@@ -219,6 +224,6 @@ test('ANOTHER KEY NAMES NOTHING OF A RUN IT DID NOT OPEN: its question and its h
     else assert.fail('refused without a refusal');
   }
   const after = k.get('S1')!;
-  assert.deepEqual([after.fields.agent, after.fields.doing, after.fields.client], ['other', 'Agent run', undefined], 'another key renamed the run');
+  assert.deepEqual([after.fields.agent, after.fields.doing, after.fields.client], ['other', 'An agent', undefined], 'another key renamed the run');
   sql.close();
 });

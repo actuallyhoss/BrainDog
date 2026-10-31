@@ -87,6 +87,33 @@ export function familyOf(cause: string): FaultFamily {
  */
 export const MAIL_FAULT = 'mail#send';
 
+/**
+ * ONE MEMBER'S MAILBOX THE SERVER REFUSED while the rest of the mail went (review k, RK5, after the send that skips a
+ * refused mailbox): a fault of its own for each person, `mail#missed.<person>`, so Health says who missed it, "Mia didn't
+ * get the summary "Monday money": their address was refused.", and the next mail that reaches them clears it. Keyed by
+ * the person, or by a hash of an address no person holds, and never the address, which a cause would carry to the operator's door.
+ */
+export const missedCause = (key: string): string => `mail#missed.${key}`;
+
+/** A short hash of an address no person holds, for its cause: FNV-1a, which names it without spelling it. */
+export function addressKey(address: string): string {
+  let h = 0x811c9dc5;
+  for (const ch of address.trim().toLowerCase()) {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `a${h.toString(36)}`;
+}
+
+/**
+ * The line Health says for one person who missed a mail: their name, or "Someone" where no person holds the address, and
+ * `what` as the host says it, "the summary "Monday money"" or "a notice". Never the address.
+ */
+export function missedSaid(name: string | null | undefined, what: string): string {
+  const who = typeof name === 'string' && name.trim() !== '' ? name.trim() : 'Someone';
+  return `${who} didn't get ${what}: their address was refused.`;
+}
+
 /** The kind a cause names: `outbox#infer.resolve` is `infer.resolve`. */
 const kindOf = (cause: string): string => cause.split('#', 2)[1] ?? cause;
 
@@ -98,9 +125,9 @@ const ERROR_MAX = 500;
 /**
  * Raise a fault, or count one more of it: the count goes up by one, `last_at` moves to now, and a cleared fault opens
  * again. `said` is written from the tables every time, so a sentence improved in a release reaches the faults already
- * open.
+ * open; `said` handed in is a fault whose sentence names who it is about (`missedSaid`), which no table can.
  */
-export function raiseFault(sql: Sql, cause: string, kind: string, error: string, nowMs: number): void {
+export function raiseFault(sql: Sql, cause: string, kind: string, error: string, nowMs: number, said: string = saidOf(cause)): void {
   const at = iso(nowMs);
   sql.exec(
     `INSERT INTO fault (cause, kind, first_at, last_at, count, error, said, cleared_at)
@@ -112,7 +139,7 @@ export function raiseFault(sql: Sql, cause: string, kind: string, error: string,
     at,
     at,
     error.slice(0, ERROR_MAX),
-    saidOf(cause),
+    said,
   );
 }
 

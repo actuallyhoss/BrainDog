@@ -21,6 +21,7 @@
  */
 
 import { createClient } from '@braindog/client';
+import { DEVICES, onMachine } from '@braindog/kernel';
 import type { InstructChoice, InstructView, PresenceView, ThreadReceipts, ThreadStep, ThreadView } from 'braindog-render/svelte';
 
 import { AGENT_NAMES } from './names.ts';
@@ -279,6 +280,8 @@ export function doingSaid(r: Pick<LiveRun, 'doing' | 'agent' | 'repo' | 'branch'
   const own =
     doing === '' ||
     /^(?:an? )?agent run\b/iu.test(doing) ||
+    onMachine(doing, 'Agent') ||
+    (who !== null && new RegExp(`^${escaped(who)}(?: [A-Z][A-Za-z]*)?(?: on (?:${DEVICES.map(escaped).join('|')}))?$`, 'u').test(doing)) ||
     (who !== null && new RegExp(`^${escaped(who)}(?: [A-Z][A-Za-z]*)? (?:run\\b|in \\S+$)`, 'u').test(doing)) ||
     (r.repo !== null && (doing === r.repo || doing.startsWith(`${r.repo} on `)));
   if (!own) return doing;
