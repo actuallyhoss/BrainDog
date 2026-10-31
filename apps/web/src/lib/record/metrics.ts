@@ -261,6 +261,10 @@ export function fxNote(r: {
 }): string | null {
   if (!r.fx) return null;
   if (r.parts) {
+    /* ONE CURRENCY IS SAID AS IT IS, AND NEEDS NO RATE (audit 31 Oct o, AO6): a founder whose first money line was
+       "Stripe paid out 1,950 USD today" on a pound record was told "Not added up yet: there is no rate from USD to EGP"
+       in his first minutes, over one amount with nothing to add it to. Rates are raised once two currencies meet. */
+    if (r.parts.length < 2) return null;
     /* A SUM THAT CONVERTED WHAT IT COULD: the first part is the least the whole can be, and `noRate` is what
        no rate reached. It says so, and names each pair, where it used to say nothing was added up. */
     const least = r.atLeast && r.noRate?.length ? r.parts[0] : undefined;

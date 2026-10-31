@@ -361,6 +361,13 @@
   /** The entries of a list as this tab has named them, by the number a person can say. */
   const knownIn = (register: string | null | undefined) => [...(register ? (TITLES.get(register) ?? []) : [])].map(([seq, name]) => ({ seq, name }));
 
+  /** The reader's name as the bar's face takes it: the record's name for them, else `boot`'s `me.name`. */
+  const readerName = $derived.by(() => {
+    const id = data.me?.person;
+    const named = id && data.names && Object.hasOwn(data.names, id) ? (data.names[id] ?? '').trim() : '';
+    return named || (data.me?.name ?? '').trim();
+  });
+
   /** What the card reads a sentence against: the lists, her day, the record's currency, its people and accounts. */
   const tellOptions = $derived.by((): TellOptions => {
     void learnt;
@@ -375,6 +382,8 @@
       /* THE ORGANISATIONS KEPT, so the company somebody met is from is linked, never made twice (AM12). */
       orgs: knownIn(lists.find((l) => l.id === PEOPLE)?.fields.find((f) => f.type === 'ref' && f.id === 'org')?.to),
       titled: Object.fromEntries(lists.map((l) => [l.id, knownIn(l.id)])),
+      /* WHO IS TELLING IT, never the one their money was paid to (AO12). */
+      me: readerName,
     };
   });
 
@@ -1386,11 +1395,7 @@
   const headed = $derived(board && !tell && !data.refused && !empty);
 
   /** The greeting, by the reader's name as the bar's face takes it: the record's name for them, else `boot`'s `me.name`. */
-  const greeting = $derived.by(() => {
-    const id = data.me?.person;
-    const named = id && data.names && Object.hasOwn(data.names, id) ? (data.names[id] ?? '').trim() : '';
-    return greetingOf(data.now, named || (data.me?.name ?? '').trim());
-  });
+  const greeting = $derived(greetingOf(data.now, readerName));
 
   /* THE BAR SAYS THE GREETING, ONCE (29 October): its crumb ends on it in place of "Today", and the greeting here is the
      unseen `h1` wherever a bar is drawn. */

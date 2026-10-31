@@ -27,7 +27,7 @@
 
   import { apiBase, at } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
-  import type { MoneyAsk } from '$lib/tell/money-on.ts';
+  import type { HomeChoice, MoneyAsk } from '$lib/tell/money-on.ts';
   import type { Open, TellChange, TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -102,6 +102,11 @@
     moneyNotAdded: "Money is on, but this wasn't added yet. Press Add to try again.",
     /* AN OPEN BILL, INVOICE OR ORDER SAID PAID BY ITS NUMBER, marked paid as its own page does. */
     markIt: 'Mark it paid',
+    /* THE RECORD'S CURRENCY, ASKED ONCE IN WORDS AND KEPT (AO2): the answer is every later amount's too. */
+    whichHome: 'Which currency is your money in?',
+    homeOnce: 'It is kept for every amount after this one, so you are asked once.',
+    homeOther: 'Another one? Say it with the figure, like 2,400 euros.',
+    homeKept: (name: string) => `Your currency is the ${name} now`,
   };
 
   let typed = $state('');
@@ -322,6 +327,8 @@
   let moneyFix = $state<string | null>(null);
   /** What Money's plan would also approve, said on the card; the next press approves these lines and no others (RN3). */
   let moneyAsk = $state<MoneyAsk | null>(null);
+  /** The words a press of "Turn on Money" read and the lists Money brought, until the page reads them itself (AO2). */
+  let turned = $state<{ words: string; lists: TellList[] } | null>(null);
   async function moneyOn() {
     if (sending || moneyWait || reader === null) return;
     moneyFix = null;
@@ -346,13 +353,62 @@
         /* ONE PRESS, ONE TOAST: "Turned on Money. Added …" names Money, so the rail does not say it came as well. */
         if (go.length > 0) toasts.named(MONEY_PLACE);
         /* AND A LINE THAT DID NOT GO IN IS SAID ON THE CARD, still in the box, for Add once the page knows Money (RP1). */
-        if (go.length > 0 && !(await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists))) moneyFix = say.moneyNotAdded;
-        else if (go.length === 0) moneyFix = out.told.why ?? null;
+        if (go.length > 0) {
+          if (!(await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists))) moneyFix = say.moneyNotAdded;
+        }
+        /* NO CURRENCY SAID AND NONE KEPT (AO2): the card asks which, in words, and the answer adds the line. */
+        else if (out.home === null && currencyMissing(words, out.lists)) turned = { words, lists: out.lists };
+        else moneyFix = out.told.why ?? null;
       }
       await invalidateAll();
     } finally {
       moneyWait = false;
     }
+    /* THE FOCUS STAYS IN TELL (AO2), never dropped to the page under a card that changed shape. */
+    if (field?.isConnected) field.focus();
+  }
+
+  /* ── the record's currency, asked once (AO2) ──
+     A LINE WITH AN AMOUNT AND NO CURRENCY, ON A RECORD THAT KEEPS NONE, asked "Which currency is that in?" on every
+     money line after Money was turned on, while Money's own setup suggested the device's. Now it is asked once, as a
+     choice in words with the likeliest first, and the answer is kept as the record's home currency and adds the line in
+     the same press. A currency is never guessed: the reader is asked whether a figure with one in its place reads. */
+  /** Any currency, put in the place of the one the line did not say, to learn whether that is all it lacks. */
+  const PROBE = 'USD';
+  function currencyMissing(words: string, lists: readonly TellList[]): boolean {
+    if (reader === null) return false;
+    const as = { ...options, lists };
+    if (readyRows(reader(words, as).rows).length > 0) return false;
+    return readyRows(reader(words, { ...as, currency: PROBE, home: null }).rows).length > 0;
+  }
+  /** The lists the currency question reads against: the ones Money brought, until the page holds them. */
+  const homeLists = $derived.by((): TellList[] | null => {
+    if (reader === null || typed.trim() === '' || options.currency !== null) return null;
+    if (turned !== null && turned.words === typed) return turned.lists;
+    if (told?.needsMoney || ready.length > 0) return null;
+    return currencyMissing(typed, options.lists) ? [...options.lists] : null;
+  });
+  let choices = $state<HomeChoice[]>([]);
+  $effect(() => {
+    if (homeLists === null || choices.length > 0) return;
+    void import('$lib/tell/money-on.ts').then((m) => m.homeChoices(typed)).then((c) => (choices = c), () => (choices = []));
+  });
+  let homeFix = $state<string | null>(null);
+  /** The answer kept as the record's currency, then the line read in it and added, all in one press. */
+  async function keepHome(c: HomeChoice) {
+    const lists = homeLists;
+    if (sending || reader === null || lists === null) return;
+    homeFix = null;
+    sending = true;
+    const { keepHome: keep } = await import('$lib/tell/money-on.ts');
+    const fix = await keep(apiBase(), c.code).catch(() => null);
+    sending = false;
+    if (fix !== null) return void (homeFix = fix);
+    const out = reader(typed, { ...options, lists, currency: c.code, home: c.code });
+    const go = readyRows(out.rows);
+    turned = null;
+    if (go.length > 0) await send(go, out.rows, readyAt(out.rows), say.homeKept(c.name), lists);
+    await invalidateAll();
   }
 
   /* CMD OR CTRL AND ENTER ADDS (AH20): Enter alone is a new line, for a pasted message. */
@@ -417,7 +473,19 @@
         </div>
       </div>
     {/if}
-    {#if told && told.why}
+    {#if homeLists !== null && choices.length > 0}
+      <!-- THE RECORD'S CURRENCY, ASKED ONCE IN WORDS (AO2): the answer is kept and adds the line in the same press. -->
+      <div class="tell-one-becomes" aria-live="polite">
+        <p class="tell-one-why">{say.whichHome} <span class="tell-one-quiet">{say.homeOnce}</span></p>
+        <div class="tell-one-offers">
+          {#each choices as c, i (c.code)}
+            <Button weight={i === 0 ? 'primary' : 'quiet'} disabled={sending} onclick={() => void keepHome(c)}>{c.name}</Button>
+          {/each}
+        </div>
+        <p class="tell-one-quiet">{say.homeOther}</p>
+        {#if homeFix}<p class="tell-one-needs" role="alert">{homeFix}</p>{/if}
+      </div>
+    {:else if told && told.why}
       <!-- NOTHING PLACED IS SAID IN WORDS, with the way on: never a card over nothing to press (AH1). -->
       <div class="tell-one-becomes" aria-live="polite">
         <p class="tell-one-why">{told.why}</p>

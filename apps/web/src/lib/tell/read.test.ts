@@ -578,6 +578,15 @@ test('"PAID NADIA 300 FOR THE LOGO" KEEPS NADIA AND THE LOGO (AL2)', () => {
   assert.ok(!tellRead('Paid Netflix 180', founder).rows.some((r) => r.register === 'people'));
 });
 
+test('THE READER IS NEVER THE PAYEE (AO12): "Paid Nadia 300" on Nadia\'s own BrainDog asks, and somebody else called Nadia is paid', () => {
+  const nadia = { ...founder, me: 'Nadia', people: [{ seq: 1, name: 'Nadia' }] };
+  const told = tellRead('Paid Nadia 300 for the logo', nadia);
+  assert.deepEqual(told.rows, []);
+  assert.match(told.why ?? '', /^You are Nadia here\. Was it paid to you, or to somebody else called Nadia\?/u);
+  assert.deepEqual(tellRead('Paid Nadia Salem 300 for the logo', nadia).rows.map((r) => r.register), ['people', 'obligations']);
+  assert.deepEqual(tellRead('Paid Omar 300 for the logo', nadia).rows.map((r) => r.register), ['people', 'obligations']);
+});
+
 test('PLAIN MONEY LINES ARE MONEY, never tasks (AL4)', () => {
   const power = tellRead('Electricity 850 due Thursday', founder).rows;
   assert.deepEqual(power.map((r) => r.register), ['obligations']);

@@ -111,13 +111,13 @@ function drawn(k: Kernel): { tile: LiveBlock; line: string | undefined } {
 
 const cells = (b: LiveBlock): string[][] => (b.drawn ? (b.metrics ?? []).map((m) => [m.label, m.value]) : []);
 
-test('THE TILE IS MONEY\'S OWN TWO FIGURES, EACH BY ITS OWN NAME ("Paid", "Came in"), side by side, and what is owed beside them, drawn only where Money has them', () => {
+test('THE TILE IS MONEY\'S OWN TWO FIGURES, EACH BY ITS OWN NAME ("Came in", "Into your accounts"), side by side, and what is owed beside them, drawn only where Money has them', () => {
   const b = weekMoney();
   assert.equal(b.kind, 'stat');
   assert.equal(b.heading, MONEY_WEEK);
   assert.deepEqual(b.cells, [
-    { metric: 'settled-in-7d', label: 'Paid' },
-    { metric: 'received-7d', label: 'Came in' },
+    { metric: 'settled-in-7d', label: 'Came in' },
+    { metric: 'received-7d', label: 'Into your accounts' },
     { metric: OWED, label: OWED_TO_YOU },
   ]);
   assert.deepEqual(WEEK_IN, ['settled-in-7d', 'received-7d']);
@@ -135,7 +135,7 @@ test('A FRESH SHOP READS NO MONEY TILE, and after "Nadia paid 900 on InstaPay" i
   assert.deepEqual(cells(drawn(k).tile), [], 'nothing paid, nothing owed: no tile, never "Paid 0"');
   paid(k, 'Nadia', 90_000, 'EGP');
   const { tile, line } = drawn(k);
-  assert.deepEqual(cells(tile), [['Paid', 'EGP 900.00']], 'the paid invoice is paid; the empty Ledger and nothing owed are not drawn');
+  assert.deepEqual(cells(tile), [['Came in', 'EGP 900.00']], 'the paid invoice is paid; the empty Ledger and nothing owed are not drawn');
   assert.equal(line, 'EGP 900 came in this week.');
 });
 
@@ -171,7 +171,7 @@ test('A TRANSFER BETWEEN TWO OF HER OWN ACCOUNTS IS NOT MONEY IN: only what some
   assert.doesNotMatch(drawn(k).line ?? '', /came in|paid/u);
   /* WHAT SOMEBODY PAID INTO HER WALLET IS IN, beside the transfer, which still is not. */
   moved(k, wallet, 'in', 30_000, 'EGP', 'A customer');
-  assert.deepEqual(cells(drawn(k).tile), [['Came in', 'EGP 300.00']]);
+  assert.deepEqual(cells(drawn(k).tile), [['Into your accounts', 'EGP 300.00']]);
 });
 
 /* RED UNTIL `lib/record/metrics.ts` `partsShown` writes a bare `money` format's parts in each currency's own units
@@ -182,7 +182,7 @@ test('TWO CURRENCIES ARE WRITTEN IN THEIR OWN UNITS, in the tile and in the line
   paid(k, 'Nadia', 90_000, 'EGP');
   paid(k, 'Sam', 4_000, 'USD');
   const { tile, line } = drawn(k);
-  assert.deepEqual(cells(tile).map(([l, v]) => [l, v!.replace(/\s*·\s*/gu, ' · ')]), [['Paid', 'EGP 900.00 · USD 40.00']]);
+  assert.deepEqual(cells(tile).map(([l, v]) => [l, v!.replace(/\s*·\s*/gu, ' · ')]), [['Came in', 'EGP 900.00 · USD 40.00']]);
   assert.equal(line, 'EGP 900 and USD 40 came in this week.');
 });
 
@@ -195,14 +195,14 @@ test('A WEEK WITH NOTHING PAID SAYS NOTHING: a nought is no figure, and a tile o
   assert.doesNotMatch(none.sentence?.text ?? '', /came in|paid/u);
   /* WHAT IS OWED IS SAID WHERE IT IS SOMETHING, beside what came in. */
   const owed = home(tile({ 'settled-in-7d': 'EGP 900.00', 'received-7d': '0', 'owed-to-you': 'EGP 1,350.00' }));
-  assert.deepEqual(cells(owed.blocks[0]!), [['Paid', 'EGP 900.00'], ['Still to come in', 'EGP 1,350.00']]);
+  assert.deepEqual(cells(owed.blocks[0]!), [['Came in', 'EGP 900.00'], ['Still to come in', 'EGP 1,350.00']]);
   /* AND WHAT IS OWED IS NEVER SAID AS COME IN. */
   assert.equal(owed.sentence?.text, 'EGP 900 came in this week.');
   /* EGP 900 IN BOTH FIGURES (a payment marked paid, and one of that amount in the ledger) IS TWO MONEYS: the tile names
      both figures and so does the line, each by its name and never added. Equal amounts are not one payment. */
   const both = home(tile({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00', 'owed-to-you': '0' }));
-  assert.deepEqual(cells(both.blocks[0]!), [['Paid', 'EGP 900.00'], ['Came in', 'EGP 900.00']]);
-  assert.equal(both.sentence?.text, 'EGP 900 was paid, and EGP 900 came in this week.');
+  assert.deepEqual(cells(both.blocks[0]!), [['Came in', 'EGP 900.00'], ['Into your accounts', 'EGP 900.00']]);
+  assert.equal(both.sentence?.text, 'EGP 900 came in, and EGP 900 reached your accounts this week.');
   /* A FIGURE THE RECORD COULD NOT READ still says so, and is never taken for nought. */
   assert.equal(cells(home(tile({ 'settled-in-7d': '—' })).blocks[0]!).length, 1);
 });

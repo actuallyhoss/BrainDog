@@ -10,6 +10,7 @@
 
 import { createClient } from '@braindog/client';
 
+import { learnHome } from '../record/api.ts';
 import { forget, readBoot } from '../record/boot-live.ts';
 import { REGISTERS } from '../record/held.ts';
 import { packDocument, type PackState } from '../record/packs.ts';
@@ -144,11 +145,15 @@ export async function moneyThenRead(
   options: TellOptions,
   reader: typeof tellRead,
   approved: readonly string[] = [],
-): Promise<{ fix: string } | { ask: MoneyAsk } | { told: Told; lists: TellList[] }> {
+): Promise<{ fix: string } | { ask: MoneyAsk } | { told: Told; lists: TellList[]; home: string | null }> {
   const on = await turnOnMoney(base, approved).catch(() => fixOf(null));
   if (typeof on === 'string') return { fix: on };
   if (on !== null) return on;
   const client = createClient({ base });
+  /* THE RECORD'S OWN CURRENCY, WHERE IT HAS ONE (audit 31 Oct o, AO2): Money turned off and on again keeps the home its
+     settings hold, so a line with no currency is read in it, never asked. */
+  const home = options.currency ?? (await homeHeld(client));
+  if (home !== null && options.currency === null) learnHome(home);
   const packs = (await client.packs().catch(() => null)) as (Wire & { value?: PackState[] }) | null;
   const ids = (packs?.ok ? (packs.value ?? []) : []).find((p) => p.id === MONEY_MODULE)?.registers ?? [];
   const asked = new Map<string, Promise<void>>();
@@ -160,8 +165,79 @@ export async function moneyThenRead(
   const known = options.accounts ?? [];
   const unread = known.length === 0 && accountListsOf(lists).some((id) => (lists.find((l) => l.id === id)?.count ?? 0) > 0);
   const accounts = unread ? await accountsOf(client, lists) : known;
-  return { told: reader(words, { ...options, lists, accounts }), lists };
+  return { told: reader(words, { ...options, lists, accounts, currency: home, ...(home === null ? {} : { home }) }), lists, home };
 }
+
+/** The `home_currency` Money's settings hold, or `null` where none is set or it cannot be read. */
+async function homeHeld(client: ReturnType<typeof createClient>): Promise<string | null> {
+  const read = (await client.packConfig({ id: MONEY_MODULE }).catch(() => null)) as (Wire & { value?: { values?: Record<string, unknown> } }) | null;
+  const held = read?.ok ? read.value?.values?.home_currency : null;
+  const code = typeof held === 'string' ? held.trim().toUpperCase() : '';
+  return /^[A-Z]{3}$/u.test(code) ? code : null;
+}
+
+/**
+ * KEEP THE ANSWER AS THE RECORD'S HOME CURRENCY (audit 31 Oct o, AO2): a line with no currency on a record that has none
+ * is asked which currency once, in words, and the answer is kept where the record keeps its home (the settings of the
+ * add-on that declares `home_currency`, Money's first, as the first run keeps it), so the next line is never asked
+ * again. `null` once kept, else the sentence that says why not.
+ */
+export async function keepHome(base: string, code: string): Promise<string | null> {
+  const client = createClient({ base });
+  const read = (await client.packs().catch(() => null)) as (Wire & { value?: PackState[] }) | null;
+  const on = (read?.ok ? ((read.value ?? []) as PackState[]) : []).filter((p) => p.disabled_at === null).map((p) => p.id);
+  const order = [...on.filter((id) => id === MONEY_MODULE), ...on.filter((id) => id !== MONEY_MODULE)];
+  for (const id of order) {
+    const config = (await client.packConfig({ id }).catch(() => null)) as (Wire & { value?: { config?: Record<string, unknown> } }) | null;
+    if (!config?.ok || !Object.hasOwn(config.value?.config ?? {}, 'home_currency')) continue;
+    const set = (await client.setPackConfig({ id, values: { home_currency: code } }).catch(() => null)) as Wire | null;
+    if (!set?.ok) return set && !set.ok ? (set.refusal?.fix ?? HOME_NOT_KEPT) : HOME_NOT_KEPT;
+    learnHome(code);
+    forget();
+    return null;
+  }
+  return HOME_NOT_KEPT;
+}
+
+/** Said when the currency could not be kept. */
+const HOME_NOT_KEPT = 'That currency could not be kept. Try again, or choose it in Money’s settings.';
+
+/** One currency offered as the answer: its code, and its name as a person says it ("Egyptian pound"). */
+export type HomeChoice = { code: string; name: string };
+
+/** What is offered when nothing points at a currency: the ones most money is kept in. */
+const FALLBACK = ['USD', 'EUR', 'GBP'];
+
+/**
+ * THE CURRENCIES OFFERED, THE LIKELIEST FIRST: the one the words named, then the one of the region whose time this device
+ * keeps and its language's (`currencyChoices`, as the first run asks it), else the ones most money is kept in. Each by its
+ * name in words, never its code.
+ */
+export async function homeChoices(said: string): Promise<HomeChoice[]> {
+  const { browserCurrencyEnv, currencyChoices } = await import('../../routes/start/building.ts');
+  let zone: string | null = null;
+  try {
+    zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    zone = null;
+  }
+  const nav = typeof navigator === 'undefined' ? null : navigator;
+  const env = browserCurrencyEnv(nav?.language ?? 'en', nav?.languages ?? [], zone);
+  const asked = currencyChoices(said, env);
+  const first = asked.suggested ? [asked.suggested] : [];
+  const codes = [...new Set([...first, ...asked.choices.map((c) => c.code), ...FALLBACK])].slice(0, 3);
+  const names = (() => {
+    try {
+      return new Intl.DisplayNames(['en'], { type: 'currency' });
+    } catch {
+      return null;
+    }
+  })();
+  return codes.map((code) => ({ code, name: spokenCurrency(names?.of(code) ?? code) }));
+}
+
+/** "Egyptian Pound" as a person says it: "Egyptian pound", the kind of money in lower case. */
+export const spokenCurrency = (english: string): string => english.replace(/\s(\p{Lu})(\p{Ll}+)$/u, (_, a: string, b: string) => ` ${a.toLowerCase()}${b}`);
 
 /**
  * The lists a line is read against once Money is on: those already read, and each Money brought as `declared` says it,

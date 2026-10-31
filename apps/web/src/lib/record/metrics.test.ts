@@ -309,6 +309,8 @@ test('A SUM THAT CONVERTED WHAT IT COULD SAYS AT LEAST, names the pair it lacks,
   /* A SUM NO RATE REACHED ANY OF keeps the sentence it had. */
   const none = { value: null, parts: [{ currency: 'EGP', amount: 420000 }, usd], fx: { ...fx, asOf: null } };
   assert.equal(fxNote(none), 'Not added up yet: there is no rate from USD to EGP. Add one to Exchange rates.');
+  /* ONE CURRENCY NEEDS NO RATE (AO6): $1,950 on a pound record is said as it is, and no rate is asked for. */
+  assert.equal(fxNote({ parts: [usd], fx: { ...fx, asOf: null } }), null);
   /* A LOWER BOUND IS NOT THE FIGURE, so it is neither on its target nor off it, whichever way the target runs. */
   assert.equal(meetsTarget({ ...METRICS.overdue!, target: { gte: 100 } }, 420000, least), null);
   assert.equal(meetsTarget({ ...METRICS.overdue!, target: { lte: 100 } }, 420000, least), null);
