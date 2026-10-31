@@ -655,6 +655,9 @@ const shownBlock = (whole: BlockResult, showing: Showing): Record<string, unknow
   if (typeof whole.kind !== 'string' || !shareKind(whole.kind) || !shareDraws(whole.source)) return null;
   if (showing.reads(whole).some((list) => NEVER_READ.has(list))) return null;
   if (whole.refusals.length > 0) return null;
+  /* WHAT THE OWNER'S PAGE DOES NOT DRAW IS NOT ON THE LINK (AH7, `markDrawn`): a note whose `when` failed said "No project
+     yet" over a page with one. */
+  if ((whole as { drawn?: unknown }).drawn === false) return null;
   const b = showing.money ? whole : moneyFree(whole, showing);
   if (b === null) return null;
   const block = b as unknown as Record<string, unknown>;
