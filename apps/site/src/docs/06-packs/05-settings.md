@@ -15,7 +15,7 @@ A pack's settings are the few values its owner should choose rather than you: wh
 
 A setting's name is lower-case letters, digits and underscores. Each one has a `type`, and may have a `default`, a `label` a person reads and a `note` that says what it does. An `enum` names its `values`, and a `list` is a few lines of text, with `max` saying how many.
 
-The types a setting may take are `CONFIG_TYPES` in `packages/kernel/src/declare.ts`: `text`, `enum`, `bool`, `money`, `day`, `duration`, `number` and `list`. Three field types are left out on purpose, and a setting of one is refused:
+The types a setting may take are `text`, `enum`, `bool`, `money`, `day`, `duration`, `number` and `list`. Three field types are left out on purpose, and a setting of one is refused:
 
 - **`ref`**, because a setting that pointed at a list would let a pack configure its way into a list it did not declare.
 - **`secret` and `file`**, because a manifest is a file people share, so a setting never holds a credential or a document. A key a script sends is held in the Keychain and named by its label.

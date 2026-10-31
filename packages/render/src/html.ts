@@ -625,6 +625,13 @@ function grid(b: Block, o: RenderOptions): string {
   return `<div class="grid" style="--cells:${shown.length}">${body}</div>`;
 }
 
+/**
+ * WHETHER A ROW'S VALUE IS A FIGURE (audit 31 Oct i, AI10): a figure keeps `num` and stays on one line; words wrap.
+ * "code, run in a sandbox and never inside the record" was held to one line and cut at "reco" on a phone. A value with a
+ * digit and no word longer than three letters is a figure ("£4,050", "Tue 15 Sep", "GBP 14.00", "3.2%").
+ */
+export const isFigure = (text: string | undefined): boolean => text !== undefined && /\d/u.test(text) && !/\p{L}{4,}/u.test(text);
+
 function rows(b: Block, o: RenderOptions): string {
   if (b.kind === 'inputs') return inputs(b, o);
   /* A DAY THIS YEAR DROPS ITS YEAR, AND MONEY MOVING BY NOTHING IS NOT SAID (`rowsCell`). An empty value is still
@@ -634,7 +641,7 @@ function rows(b: Block, o: RenderOptions): string {
   const body = drawnRows(b, o)
     .map(({ row: r }) => {
       const value = r.cells[1] ? rowsCell(r.cells[1], o.now) : undefined;
-      return `<div class="row">${cell('row-label', r.cells[0], o)}<span class="row-value num">${
+      return `<div class="row">${cell('row-label', r.cells[0], o)}<span class="${value === undefined || isFigure(value) ? 'row-value num' : 'row-value'}">${
         value === undefined ? MISSING : value ? renderInline(inline(value, o), o) : ''
       }</span>${cell('row-note', rowsCell(r.cells[2], o.now), o)}</div>`;
     })

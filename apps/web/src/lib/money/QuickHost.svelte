@@ -109,6 +109,12 @@
   }
 
   @media (width < 900px) {
+    /* ROOM UNDER THE PAGE FOR THE +, so its last line is never under the button (audit 31 Oct i, AI2): the button's
+       height and a gap each side. */
+    :global(:root:has(.qa-fab) .page) {
+      padding-block-end: calc(56px + 2 * var(--sp-4));
+    }
+
     .qa-fab {
       position: fixed;
       inset-inline-end: var(--sp-4);

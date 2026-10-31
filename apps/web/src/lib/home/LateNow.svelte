@@ -14,6 +14,7 @@
   things to do; the rest open in place.
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
   import { goto } from '$app/navigation';
   import { apiBase, at } from '$lib/at.ts';
   import { homeCurrency } from '$lib/record/api.ts';
@@ -94,12 +95,37 @@
     try {
       const m = await import('./late-finish.ts');
       const out = await m.finishLate(apiBase(), line.key, onfinished);
-      if (out.ok) done = new Set([...done, line.key]);
-      else if ('open' in out) {
+      if (out.ok) {
+        done = new Set([...done, line.key]);
+        void focusOnward(line.key);
+      } else if ('open' in out) {
         if (line.href) await goto(at(line.href));
       } else toasts.push(out.fix, { intent: 'warn' });
     } finally {
       busy = new Set([...busy].filter((k) => k !== line.key));
+    }
+  }
+
+  let list = $state<HTMLUListElement | null>(null);
+
+  /**
+   * FOCUS STAYS IN THE LIST WHEN A LINE IS FINISHED (audit 31 Oct i, AI1). Its buttons wait and then leave, and focus fell
+   * to the page, so the next Tab began again at "Skip to content". It moves to the next line's first button, or the
+   * line before's, or to the list's heading once nothing is left.
+   */
+  async function focusOnward(key: string): Promise<void> {
+    await tick();
+    const was = document.activeElement as HTMLElement | null;
+    if (was && was !== document.body && was.isConnected && !(was as HTMLButtonElement).disabled) return;
+    const rows = [...(list?.querySelectorAll<HTMLElement>(':scope > li') ?? [])];
+    const at = rows.findIndex((r) => r.dataset['row'] === key);
+    const pick = (li: HTMLElement | undefined) => li?.querySelector<HTMLElement>('button:not([disabled]), a[href]') ?? null;
+    const next = (at >= 0 ? (pick(rows.slice(at + 1).find((r) => !('done' in r.dataset))) ?? pick(rows.slice(0, at).reverse().find((r) => !('done' in r.dataset)))) : null) ?? null;
+    if (next) return void next.focus();
+    const head = list?.closest('section')?.querySelector<HTMLElement>('h2');
+    if (head) {
+      head.tabIndex = -1;
+      head.focus();
     }
   }
 
@@ -115,7 +141,7 @@
 </script>
 
 <Tile icon="clock" title={heading} count={kept.length + more} data-late-tile>
-  <ul class="late">
+  <ul class="late" bind:this={list}>
     {#each shown as line (line.key)}
       {@const verb = verbOf(line, writes)}
       {@const bill = isBill(line)}

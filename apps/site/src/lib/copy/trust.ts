@@ -80,7 +80,7 @@ export const trust = {
   security: {
     meta: {
       title: 'Security · BrainDog',
-      description: 'How your BrainDog is kept safe: its own database, sealed keys, sealed nightly copies, passkeys and export at any time.',
+      description: 'How your BrainDog is kept safe: its own database, sealed keys, sealed nightly copies, sign-in with no password and export at any time.',
     },
     title: 'Security',
     lede: 'How your BrainDog is kept safe, and how to tell us about a weakness.',
@@ -106,11 +106,11 @@ export const trust = {
           glyph: 'lock',
           text: 'Every night a copy is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
         },
-        // docs/12-SECURITY.md §3 (passkey primary, email link fallback, no password anywhere).
+        // apps/web/src/lib/copy/account.ts `signInLede` and apps/worker/src/google.ts (email, Google or a passkey; no password).
         {
-          title: 'A passkey, no password',
+          title: 'No password',
           glyph: 'shield',
-          text: 'You sign in with a passkey, or an emailed link. There is no password to steal.',
+          text: 'You sign in with your email, Google or a passkey. There is no password to steal.',
         },
         // docs/16-DECISIONS.md ADR-060 (scopes read, propose, write; no admin scope; VAULT and erasure stay a browser session).
         {
@@ -138,8 +138,8 @@ export const trust = {
       nightsFrom: '30 nights ago',
       nightsTo: 'Last night',
       nightsRead: 'The last 30 copies are kept, and each one is sealed.',
-      signin: ['A passkey first', 'Or a link by email', 'No password, anywhere'],
-      signinLabel: 'Signing in: a passkey first, an emailed link as the fallback, and no password field',
+      signin: ['A link by email', 'Or Google', 'Or a passkey', 'No password, anywhere'],
+      signinLabel: 'Signing in: a link by email, Google or a passkey, and no password field',
       /* The token's reach, row by row, as ADR-060 draws it: the first three a token may do, the rest only a person. */
       reach: {
         head: ['What it can do', 'An AI tool', 'You, signed in'],

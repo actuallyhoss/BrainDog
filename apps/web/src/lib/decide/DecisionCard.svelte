@@ -1176,7 +1176,11 @@
   }
 
   /* "READ ALL", a quiet ink link right under the cut question. */
+  /* 24px TALL AT THE LEAST (audit 31 Oct i, AI5): its words alone were a 49 by 20 target. */
   .dc-read {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 24px;
     justify-self: start;
     margin-block-start: calc(var(--sp-2) * -1);
     padding: 0;

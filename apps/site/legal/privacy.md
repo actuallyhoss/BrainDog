@@ -1,11 +1,11 @@
 # Privacy Policy
 
-Last updated: 2026-10-22
+Last updated: 2026-10-31
 
 ## The short version
 
 - BrainDog keeps a record for you: your lists, pages, rules, files and history. We host it and run it. We don't sell it, show ads, or use it to train AI models.
-- You sign in with a passkey, or a link we email you. There are no passwords.
+- You sign in with a link we email you, with Google, or with a passkey. There are no passwords.
 - Every record is its own database, so what's in your record is never stored alongside another customer's.
 - The keys you save for other services are sealed before they are stored.
 - We can technically read a record's rows. We only look to support you, keep BrainDog safe or follow the law.
@@ -54,6 +54,7 @@ We keep, in a directory separate from any record:
 - **your passkeys.** Only the public half of each passkey is stored, with a label such as "iPhone". Your fingerprint or face never leaves your device;
 - **your sessions**: a scrambled form (a keyed hash) of each session's ID, when it was proved and when it was last used. It is what Settings shows as your list of devices;
 - **sign-in links**: a scrambled form of each link, never the link itself. A link works once;
+- **signing in with Google**, if you choose it: Google tells us your email address and that it checked it, and Google learns that you signed in to BrainDog. We keep nothing else from Google, and it never makes an account;
 - **failed attempts**: to stop guessing, we count failed sign-ins and link requests against your address and your network address, and forget them after 15 minutes;
 - **which records you belong to**, and your role in each;
 - **apps you've let in**: which app, which record, and the access you approved.
@@ -227,7 +228,7 @@ BrainDog is for people aged 18 and over. We don't knowingly collect information 
 
 ## Keeping it safe
 
-- There are no passwords to steal. You sign in with a passkey, or a link that works once.
+- There are no passwords to steal. You sign in with a link that works once, with Google, or with a passkey.
 - Every record is its own database, so no query can reach from one record into another.
 - Saved keys are sealed before they are stored, and nightly backups are sealed to a key kept outside Cloudflare.
 - An agent's key can't open your saved keys, erase data or delete a record.

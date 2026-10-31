@@ -878,10 +878,6 @@
   <div class="pull" role="status" style:transform={`translateY(${pullBusy ? 16 : pulled - 24}px)`}>{pullBusy ? 'Refreshing' : pulled >= PULL_AT / 2 ? 'Let go to refresh' : 'Pull to refresh'}</div>
 {/if}
 
-{#if mode !== 'preview' && live}
-  <QuickHost fab={mode === 'page' && moneyPage && pageOfLedger(live.page.page.requires, quick.ledger)} />
-{/if}
-
 {#if got === null}
   {#if railed}
     <!-- THE HEAD FROM THE RAIL'S OWN ENTRY, AND BARS ONLY FOR THE BLOCKS, until the record answers. -->
@@ -1226,6 +1222,12 @@
       <PageBody mode="preview" page={live.page.page} blocks={all} now={live.now} writes={null} ids={pre} level={3} />
     {/if}
   </section>
+{/if}
+
+<!-- LAST IN THE PAGE, so the floating + is the last stop before the tab bar and not the second after the skip link
+     (audit 31 Oct i, AI2): it floats, so where it stands in the page changes only the order Tab meets it. -->
+{#if mode !== 'preview' && live}
+  <QuickHost fab={mode === 'page' && moneyPage && pageOfLedger(live.page.page.requires, quick.ledger)} />
 {/if}
 
 <style>

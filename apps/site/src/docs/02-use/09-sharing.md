@@ -38,6 +38,29 @@ An invitation that has not been accepted is listed with the level it gives and t
 
 A colleague who holds some lists and not all of BrainDog lands on a Today that names their lists. The rest belongs to its owner, who can see everything they add.
 
+## Share something
+
+The Share sheet shares one thing with one person, a group or an email: a project, a list, the rows a view shows, or a single row. Open it from **Share**, then **Share with people**, on a project's page; from **Share this view** on a list; or from **Share something** in Settings, under People & sharing. Only an owner or an Admin can share.
+
+```comparison | The Share sheet
+Field | What it says
+Start from | Accountant, Contractor, Assistant or Reviewer fill the rest for you
+With | A name, a group or an email. An email waits for that person, and the sheet shows a link to send them, once
+Can | View, Comment, Edit or Manage
+What | Everything in it, one of its lists, or only the rows where a field has a value
+Hide | Amounts, or a field you pick
+Until | 1 day, 1 week, 30 days, a date, or no end
+More | Weekdays 9 to 6, Just once, Their agents too, and Can delete
+```
+
+**Can** says what they can do with what you share. **View** reads it. **Comment** reads it and proposes changes that wait for you. **Edit** also adds, changes and deletes rows. **Manage** is Edit plus sharing it on to others, inside their own share. These are separate from the levels above, which cover somebody's whole place in your BrainDog.
+
+**Amounts start hidden for anybody outside your team.** Money fields are left out, and amounts written in notes are taken out of the text they read too. Somebody on your team sees amounts, as their role already does. Press **Amounts** under Hide to change it either way.
+
+Under the fields, one sentence says the whole share back, with what they would see now, money included or not. Sharing with no end, or letting somebody new change things, asks you to **Confirm it's you** with Face ID or your passkey first. Nothing is shared until that passes.
+
+On a phone the sheet shows With, Can and Until, and **More choices** opens the rest.
+
 ## Different on one list
 
 A level over all of BrainDog covers every list, including lists added later. To give somebody a different level on one list, choose **Different on one part**. It replaces their level for that list only, so it can open more or less than the rest.
@@ -60,7 +83,11 @@ The People list shows when each person last looked, or that they have not opened
 
 ## Share one page with anybody
 
-For somebody who should see one page and nothing else, press **Share** on the page and make a read-only link. Anybody with it can read that page as it is now. They cannot change anything, open any other page, or see the names of your lists. Choose how long it works; close it early in Settings, under Links. The link is shown once, so copy it when it appears.
+For somebody who should see one page and nothing else, press **Share** on the page and make a read-only link. Anybody with it can read that page as it is now. They cannot change anything, open any other page, or see the names of your lists. Choose how long it works: 1, 7, 30 or 90 days. Close it early in Settings, under People & sharing. The link is shown once, so copy it when it appears.
+
+**Include money** says whether amounts, bills and money figures go on the link. Left off, they are not on it at all. It starts off on a project's page, where the bills are rarely meant for whoever holds the link, and on everywhere else.
+
+Only an owner can make a link. A BrainDog can have read-only links switched off by its host. Share then says so, and still offers sharing with people and as a template.
 
 ## Agents have levels too
 

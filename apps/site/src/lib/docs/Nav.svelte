@@ -163,6 +163,7 @@
       position: sticky;
       inset-block-start: var(--sp-5);
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 2px;
       max-block-size: calc(100vh - 2 * var(--sp-5));
       overflow-y: auto;

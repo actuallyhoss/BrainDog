@@ -9,14 +9,36 @@
 @layer components {
   /* A PATH'S VIEW SWITCH: "<label> · Everything" as a segmented control, `packages/render/svelte/Path.svelte`'s
      own markup. The stones under it already reach 44px through `.tap`; this is the switch above them. */
+  /* DRAWN AS THE APP'S SEGMENTED CONTROL IN BOTH THEMES (audit 31 Oct i, AI13): on the site, which loads no app controls,
+     it was the browser's grey button, its words at 2.97:1. One `--tile-2` track, the chosen segment raised in
+     `--segment-on` at 600 in `--ink`, the other at 500 in `--ink-2`. */
   .path-switch {
-    display: flex;
-    gap: var(--sp-1);
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 2px;
     margin-block-end: var(--sp-2);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
   }
 
   .path-view {
     min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+  }
+
+  .path-view[aria-pressed='true'] {
+    background: var(--segment-on);
+    color: var(--ink);
+    font-weight: 600;
   }
 
   @media (pointer: coarse) {

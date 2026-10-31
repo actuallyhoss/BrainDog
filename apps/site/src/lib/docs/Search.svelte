@@ -72,9 +72,15 @@
 {/if}
 
 <style>
+  /* NEVER WIDER THAN ITS RAIL (audit 31 Oct i, AI12): an input's own width (twenty characters) set the column, so in the
+     220px rail the field ran 22px past it, its × and the end of its placeholder cut. The track is the rail, and the input
+     takes what the field leaves. */
   .search {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-2);
+    box-sizing: border-box;
+    inline-size: 100%;
     min-inline-size: 0;
   }
 
@@ -104,6 +110,7 @@
   /* SIXTEEN PIXELS IN THE FIELD, so a phone does not zoom the page when it takes focus. */
   .search-input {
     flex: 1;
+    inline-size: 0;
     min-inline-size: 0;
     min-block-size: var(--tap);
     padding: 0;

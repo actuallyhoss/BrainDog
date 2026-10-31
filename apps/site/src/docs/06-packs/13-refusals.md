@@ -2,7 +2,7 @@
 
 A pack that cannot install is refused with one sentence saying what is wrong and what to do, and a code in capitals naming the kind of fault. `braindog addon check` says the same sentence a record would, so you meet each of these on your own machine first. This page lists them by where you meet them, each with its sentence.
 
-Sentences in a code block are copied from what `braindog addon check` printed. The rest are written the way the code writes them, with the parts that change in angle brackets. The codes themselves are kept in `packages/ports/src/index.ts`, and the pack family is the list headed "Pack and declaration" there.
+Sentences in a code block are copied from what `braindog addon check` printed. The rest are written the way the code writes them, with the parts that change in angle brackets. The codes are the ones on this page.
 
 ## Reading the file
 

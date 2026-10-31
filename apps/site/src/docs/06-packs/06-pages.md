@@ -2,7 +2,7 @@
 
 A pack's page is a declared page: a title, a place in the rail, the lists it reads, and blocks in order. It uses the same keys as any page in the dialect, so [declared pages](/docs/dialect/pages) is the reference for every key and every kind of block. This page is what a pack author needs on top of it.
 
-## A page in a pack
+## A page in an add-on
 
 ```code | A page with a side rail
 {
@@ -37,7 +37,7 @@ A page names intent and never appearance. `tone` is `good`, `warn`, `bad` or `in
 
 ## Blocks
 
-A block's `kind` is one the renderer draws, and the list is `BLOCK_KINDS` in `packages/kernel/src/declare.ts` together with the kinds registered in `packages/kernel/src/kinds/`. Each kind reads its own keys, and a key the kind does not read is refused with its name, so a misspelt key is caught at install and not by a reader.
+A block's `kind` is one the renderer draws, and the list is the blocks in [Writing pages](/docs/dialect/overview). Each kind reads its own keys, and a key the kind does not read is refused with its name, so a misspelt key is caught at install and not by a reader.
 
 A block that reads a list names it in `source` and filters it with `where`, in the words the dialect's filters use: `state is open`, `due before +7d`, `tags has soon`. `order` and `limit` shape what it shows.
 

@@ -14,6 +14,14 @@ A key never goes in a row, a note or a tool call. An agent that finds one puts i
 braindog keys put deploy-token --opens "Deploys to the staging server" --kind api_token
 ```
 
+```code | sh
+braindog keys list
+braindog keys scan ./my-repo
+braindog keys put --from .env --project Kiln
+```
+
+`keys list` shows the keys your BrainDog holds, one line each, with what each opens, where it applies and the day it expires, never a value. `keys scan` names every key lying in a folder's files (.env, .secrets, .pem) and the command that seals them, and sends nothing unless you add `--deposit`. `keys put --from` seals every key in a file of `NAME=value` lines, or a folder of one key a file, asking about each first.
+
 At a terminal, `keys put` asks for the value and shows nothing as you type or paste it. A script pipes it in instead: `printf '%s' "$DEPLOY_TOKEN" | braindog keys put deploy-token`. The value is never an argument, because an argument is kept in shell history and shown in every process list. The host seals it and BrainDog keeps only the sealed bytes. On a machine with no keychain access, the machine's sign-in is used: the key goes into the session's project as a new key, and a name already there is refused, so a sign-in that leaks can add a key and never swap one.
 
 ## Using a key
@@ -25,17 +33,19 @@ braindog keys exec deploy-token --as API_TOKEN -- node sync.js
 
 `run`, or `keys exec` under its longer name, opens the key and hands it to one command in one environment variable, named from the key unless `--as` names it. It is never printed, never written to a file and never put on the command line. A variable that would change the command itself, such as `PATH`, `NODE_OPTIONS` or `LD_PRELOAD`, is refused before anything is sent.
 
-`keys headers` prints a key as one HTTP header, for a program that asks for its headers on standard output, such as Claude Code's `headersHelper`. It refuses to print to a terminal.
+`keys headers <key> --as <Header>` prints a key as one HTTP header, for a program that asks for its headers on standard output, such as Claude Code's `headersHelper`. `keys helper` prints the key alone, for Claude Code's `apiKeyHelper`. Both refuse to print to a terminal.
 
 ## Keychain access
 
 Reading a key back takes keychain access, which is separate from the sign-in:
 
 ```code | sh
-braindog login https://app.brain.dog/<slug> --keychain my-project
+braindog login https://app.brain.dog/<slug> --keychain things#3
 ```
 
-It prints six digits for you to approve in the app. The grant opens the keys of that one project; `--keychain '*'` asks for the keys that belong to no project. It is kept on the machine beside the sign-in, and `braindog logout` removes both. Every time a key is opened BrainDog logs it against the session that asked, so each key's page can say which runs used it, on which machine, and when.
+`--keychain` names a project by its list and number, as `things#3`, never by its name. To find it, open the project's list, move to the project's row and press `y`, which copies it. `--keychain '*'` asks for the keys that belong to no project instead.
+
+It prints six digits for you to approve in the app, in the Keychain or in Settings, under Agents. The grant opens the keys of that one project. The same `--keychain` on `keys exec`, `run`, `keys headers` and `keys helper` says which grant to use. It is kept on the machine beside the sign-in, and `braindog logout` removes both. Every time a key is opened BrainDog logs it against the session that asked, so each key's page can say which runs used it, on which machine, and when.
 
 Only you, signed in to the app, can see the list of grants and revoke one. An agent that wants a key to apply somewhere else proposes it.
 

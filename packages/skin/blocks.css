@@ -276,6 +276,12 @@
     white-space: nowrap;
   }
 
+  /* WORDS WRAP (audit 31 Oct i, AI10): only a figure is held to one line, and the renderer marks a figure `num`. */
+  .row-value:not(.num) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .row-note {
     color: var(--ink-3);
     font-size: var(--fs-meta);
