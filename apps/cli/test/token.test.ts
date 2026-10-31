@@ -73,7 +73,7 @@ test('--inbox MINTS A TOKEN THAT READS THE INBOX ON A SELF-HOST, printed once; w
 
   assert.equal(await tokenCommand(['create', '--name', 'triage', '--inbox'], s.io), 0, s.said.join('\n'));
   assert.equal(s.out.length, 4, s.out.join('\n'));
-  assert.match(s.out[0]!, /^triage · read · reads the inbox · expires \d{4}-\d{2}-\d{2} · t_\S+$/);
+  assert.match(s.out[0]!, /^triage · read · reads the inbox · expires \d{1,2} [A-Z][a-z]{2}( \d{4})? · t_\S+$/);
   assert.equal(s.out[1], '');
   assert.equal(s.out[3], 'shown once');
   const granted = s.out[2]!;

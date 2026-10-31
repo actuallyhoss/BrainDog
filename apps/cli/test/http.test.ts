@@ -151,7 +151,7 @@ test('nothing to reach is one sentence, and none of them carries a token', (t) =
   const says = (fn: () => unknown, pattern: RegExp) =>
     assert.throws(fn, (e: Error) => pattern.test(e.message) && !e.message.includes('stub-bearer') && !e.message.includes('hunter2'));
 
-  says(() => target(undefined, {}, file), /^The login to https:\/\/a\.example expired on 2020-01-01\. Run braindog login https:\/\/a\.example\.$/);
+  says(() => target(undefined, {}, file), /^The login to https:\/\/a\.example expired on 1 Jan 2020\. Run braindog login https:\/\/a\.example\.$/);
   says(() => target(undefined, {}, join(file, '..', 'none.json')), /^No BrainDog host is set/);
   says(() => target('http://a.example', { BRAINDOG_TOKEN: TOKEN }, file), /is http, not https\. BrainDog sends a token only over https, except to this machine\.$/);
   says(() => target('https://me:hunter2@a.example', {}, file), /carries a name or a password/);

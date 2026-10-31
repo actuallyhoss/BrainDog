@@ -23,6 +23,7 @@ import { inTheClear, isLoopback, withFixOf } from './http.ts';
 import { refuse } from './json.ts';
 import { approveOperation, heldLogin } from './login.ts';
 import type { BrainfileIo } from './brainfile.ts';
+import { saidDay } from './said-day.ts';
 
 export type TokenIo = BrainfileIo & {
   /**
@@ -164,7 +165,7 @@ export async function tokenCommand(args: string[], io: TokenIo): Promise<number>
     return 1;
   }
 
-  const expires = typeof minted.expires_at === 'string' ? minted.expires_at.slice(0, 10) : '';
+  const expires = typeof minted.expires_at === 'string' ? saidDay(minted.expires_at) : '';
   io.out(`${values.name ?? 'no name'} · ${minted.scope}${inbox ? ' · reads the inbox' : ''} · expires ${expires} · ${minted.id}`);
   io.out('');
   io.out(minted.bearer);

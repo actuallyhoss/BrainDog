@@ -104,7 +104,7 @@ test('APPROVED: pending twice, then the token kept in the hosts file, the defaul
   assert.equal(out.code, 0, out.stderr);
   assert.equal(out.stdout, '');
   assert.ok(out.stderr.includes(`Open ${host.base}/settings/agents and enter 123 456 (10 minutes)`), out.stderr);
-  assert.match(out.stderr, new RegExp(`Logged in to ${host.base.replaceAll('.', '\\.')} as .+ · token expires 2099-01-01`));
+  assert.match(out.stderr, new RegExp(`Logged in to ${host.base.replaceAll('.', '\\.')} as .+ · token expires 1 Jan 2099`));
   hidden(out);
 
   const hosts = readHosts(out.file);

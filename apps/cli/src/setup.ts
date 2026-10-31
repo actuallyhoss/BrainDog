@@ -57,6 +57,7 @@ import { approveOperation, login, machineName } from './login.ts';
 import { connect, isObject, syncSkills, valueOf, type AgentIo, type Connected } from './skills.ts';
 import { SKILLS_ASK, skillsAllowed } from './skills-consent.ts';
 import { writeTools } from './tools.ts';
+import { saidDay } from './said-day.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -954,7 +955,7 @@ export async function agentTokens(apps: Client[], key: string, file: string, dry
       continue;
     }
     changed = true;
-    io.out(`6. Tokens, ${title}: it has a token of its own, ${label}, until ${made.expires.slice(0, 10)}${sent === undefined ? '' : ', made from the key in BRAINDOG_TOKEN'}. Sessions started from now on use it.`);
+    io.out(`6. Tokens, ${title}: it has a token of its own, ${label}, until ${saidDay(made.expires)}${sent === undefined ? '' : ', made from the key in BRAINDOG_TOKEN'}. Sessions started from now on use it.`);
   }
   return { changed, failed };
 }

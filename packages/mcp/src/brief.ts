@@ -166,10 +166,18 @@ export function durationSaid(seconds: number, unit: string | undefined): string 
   return `${grouped(n)} ${n === 1 ? one : `${one}s`}`;
 }
 
-/** A row's words: its title field, else its first text, else nothing. */
+/**
+ * The names the record gives a run before its agent says what it does (`provisionalTitle` in the kernel's session.ts):
+ * "Agent run", "Claude run", and the older "Claude run, 1 Oct". They name no app and no task: "Agent run (S9)" was what an
+ * agent was told about a run, and what it read out (audit 31 Oct k, AK15).
+ */
+const RECORD_RUN_NAME = /^(?:Claude Code|Claude|Codex|Cursor|Gemini|Copilot|Windsurf|ChatGPT|VS Code|Agent) run(?:, \d{1,2} [A-Z][a-z]{2})?$/u;
+
+/** A row's words: its title field, else its first text, else nothing. A run the record named is said by its app. */
 export function titleOf(fields: Record<string, unknown> | undefined, decl: Decl | undefined): string {
   const f = fields ?? {};
   const named = decl?.title === undefined ? undefined : f[decl.title];
+  if (decl?.id === RUNS && (typeof named !== 'string' || named.trim() === '' || RECORD_RUN_NAME.test(named.trim()))) return runnerOf(f);
   if (typeof named === 'string' && named.trim() !== '' && !ULID.test(named)) return named;
   for (const [id, value] of Object.entries(f))
     if (typeof value === 'string' && value.trim() !== '' && !ULID.test(value) && !RUN_INSIDES.has(id) && !/^[a-z]+:\/\//u.test(value)) return value;
@@ -358,7 +366,9 @@ function runLine(row: Shaped, head: string, look: Look): string {
   const state = row.state ?? (typeof f.state === 'string' ? f.state : undefined);
   const seen = typeof f.last_seen === 'string' ? `seen ${when(f.last_seen, look.now)}` : null;
   const repo = typeof f.repo === 'string' && f.repo !== '' ? `in ${f.repo}` : null;
-  return [head, runnerOf(f), state, repo, seen].filter((p): p is string => typeof p === 'string' && p !== '').join(' · ');
+  /* A RUN NAMED BY ITS APP SAYS THE APP ONCE: "Claude Code (S9) · Claude Code" said it twice. */
+  const app = runnerOf(f);
+  return [head, head.startsWith(`${app} (`) ? null : app, state, repo, seen].filter((p): p is string => typeof p === 'string' && p !== '').join(' · ');
 }
 
 /** The most a text field says on a `get`, where a list line says 48: a whole read is asked for, not glanced at. */

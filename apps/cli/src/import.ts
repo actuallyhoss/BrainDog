@@ -54,6 +54,7 @@ import { readSource } from './usecase.ts';
 import { cliBuild } from './position.ts';
 
 import { createClient } from '@braindog/client';
+import { saidDay } from './said-day.ts';
 
 const USAGE =
   'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict] [--yes], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is the path of an adapter module, or an add-on by its id: from packs/ here, or else from the catalogue, asked about once. --yes is for a script: it says yes to running an add-on\'s adapter without asking.';
@@ -1107,7 +1108,7 @@ export async function applyPlan(
   const newest = o.newest ?? null;
   if (retiring.length > 0 && newest !== null && plan.taken !== null && Date.parse(plan.taken) < Date.parse(newest)) {
     const sameDay = plan.taken.slice(0, 10) === newest.slice(0, 10);
-    const when = (taken: string) => (sameDay ? `${taken.slice(0, 16).replace('T', ' ')} UTC` : taken.slice(0, 10));
+    const when = (taken: string) => (sameDay ? `${saidDay(taken)} ${taken.slice(11, 16)} UTC` : saidDay(taken));
     plan = {
       ...plan,
       skipped: [
@@ -1867,7 +1868,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string; to?: Pi
   const name = (register: string) => nameIn(words, register);
   const { source } = words;
   const lines: string[] = [];
-  const when = plan.taken ? `, exported ${plan.taken.slice(0, 10)}` : '';
+  const when = plan.taken ? `, exported ${saidDay(plan.taken)}` : '';
   lines.push(`${o.dryRun || report.missing.length > 0 ? 'Read, and wrote nothing' : 'Imported'}: ${o.file}${when}.`);
   if (report.missing.length > 0) {
     const need = [...new Set(report.missing.map((r) => words.map.targets.providedBy[r] ?? r))];

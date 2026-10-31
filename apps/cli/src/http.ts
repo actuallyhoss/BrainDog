@@ -15,6 +15,7 @@ import { createClient, type Client } from '@braindog/client';
 import { unbom } from './unbom.ts';
 import { cliBuild } from './position.ts';
 import type { Result } from '@braindog/ports';
+import { saidDay } from './said-day.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -235,7 +236,7 @@ export function target(flag: string | undefined, env: Env, file: string, now: nu
     const entry = Object.entries(read().hosts).find(([written]) => sameHost(written, key))?.[1]?.token;
     if (isObject(entry) && typeof entry.value === 'string' && entry.value) {
       const until = typeof entry.expires === 'string' ? Date.parse(entry.expires) : Number.NaN;
-      if (until <= now) throw new Error(`The login to ${key} expired on ${String(entry.expires).slice(0, 10)}. Run braindog login ${key}.`);
+      if (until <= now) throw new Error(`The login to ${key} expired on ${saidDay(String(entry.expires), now)}. Run braindog login ${key}.`);
       token = entry.value;
       from = 'login';
     }
@@ -343,7 +344,7 @@ export function runnerTarget(flag: string | undefined, env: Env, file: string, n
     throw new Error(`This machine is not enrolled as a runner on ${key}. Run braindog runner enrol ${key}.`);
   /* AN EXPIRY THAT DOES NOT READ AS A DATE IS AN ENDED ONE, so a hand-edited file never runs on a bearer of unknown age. */
   const until = typeof held.expires === 'string' ? Date.parse(held.expires) : Number.NaN;
-  if (!(until > now)) throw new Error(`The runner enrolment on ${key} ended on ${String(held.expires).slice(0, 10)}. Run braindog runner enrol ${key}.`);
+  if (!(until > now)) throw new Error(`The runner enrolment on ${key} ended on ${saidDay(String(held.expires), now)}. Run braindog runner enrol ${key}.`);
   return { key, base: url.origin, bearer: held.value, label: typeof held.label === 'string' ? held.label : '' };
 }
 

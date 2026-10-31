@@ -37,6 +37,7 @@ import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { keyFromText, open } from './sealer.ts';
 import { storeFor, syncKeyItem, type SecretStore } from './secret-store.ts';
 import type { Git } from './sync.ts';
+import { saidDay } from './said-day.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -602,7 +603,7 @@ export async function ready(io: SyncIo, host: string | undefined, verb: string):
     await store.remove(syncKeyItem(joined.record));
     keepJoined(io.home, to.key, null);
     io.say(
-      `This machine was retired as ${joined.machine} on ${mine.at.slice(0, 10)}, so it sends and places nothing more. Its sync key is gone from ${store.name}. To use it again, join under a new name with braindog sync join --name <name>.`,
+      `This machine was retired as ${joined.machine} on ${saidDay(mine.at)}, so it sends and places nothing more. Its sync key is gone from ${store.name}. To use it again, join under a new name with braindog sync join --name <name>.`,
     );
     return 1;
   }

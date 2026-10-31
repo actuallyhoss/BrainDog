@@ -24,6 +24,7 @@ import { parseArgs } from 'node:util';
 import { fixOf, refused, type Result } from '@braindog/ports';
 
 import { printable } from './clip.ts';
+import { saidDay } from './said-day.ts';
 import { budgetOf, clientFor, target, type Target } from './http.ts';
 import { looksLikeToken } from './install.ts';
 import { machine, refuse, type Saying } from './json.ts';
@@ -137,18 +138,11 @@ export function readKeys(rows: readonly unknown[], names: ReadonlyMap<string, st
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 /**
  * A day as the app says it (audit 31 Oct g, AG34): `2026-11-02` is `2 Nov` inside this year and `2 Nov 2027` outside
  * it, where it read `2 November 2026`. Anything else the record sent is said as it is.
  */
-export function dayOf(day: string, now: number = Date.now()): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
-  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
-  if (!m || !month) return day;
-  return `${String(Number(m[3]))} ${month}${m[1] === String(new Date(now).getFullYear()) ? '' : ` ${m[1]!}`}`;
-}
+export const dayOf = saidDay;
 
 /** One key's line. A key past its day says "expired", a word and never a colour. */
 export function keyLine(k: KeyRead): string {

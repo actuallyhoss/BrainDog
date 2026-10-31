@@ -37,6 +37,7 @@ import type { Target } from './http.ts';
 import { keyFromText, keyText, newSyncKey, passphraseFault, readWrapped, seal, unwrapKey, wrapKey } from './sealer.ts';
 import { storeFor, syncKeyItem } from './secret-store.ts';
 import { askTerminal } from './setup.ts';
+import { saidDay } from './said-day.ts';
 import {
   bundlesIn,
   callerFor,
@@ -319,7 +320,7 @@ export async function syncJoin(args: string[], io: JoinIo): Promise<number> {
     if (isFail(retired)) return fail(retired);
     const was = retired.get(slug);
     if (was !== undefined) {
-      io.say(`${oneLine(machine)} was retired on ${was.at.slice(0, 10)}, and a retired name is never used again. Join under another with --name <name>.`);
+      io.say(`${oneLine(machine)} was retired on ${saidDay(was.at)}, and a retired name is never used again. Join under another with --name <name>.`);
       return 1;
     }
     if (sends && (before === null || slugOf(before.machine) !== slug) && (await ask(`${machine} already sends bundles to this BrainDog. Is this that machine, set up again? [y/N] `)) !== true) {
@@ -393,7 +394,7 @@ export async function syncRetire(args: string[], io: SyncIo): Promise<number> {
   const name = oneLine(machine);
   const was = r.retired.get(slug);
   if (was !== undefined) {
-    io.out(`${name} was retired on ${was.at.slice(0, 10)} already.`);
+    io.out(`${name} was retired on ${saidDay(was.at)} already.`);
     return 0;
   }
   const here = slug === slugOf(r.joined.machine);

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { hostKey, inTheClear, isLoopback, readHosts, sameHost, saveHosts } from './http.ts';
 import type { Answering } from './json.ts';
+import { saidDay } from './said-day.ts';
 
 /* ── the machine's own name ───────────────────────────────────────────── */
 
@@ -125,7 +126,7 @@ export function lapseWarning(env: Record<string, string | undefined>, file: stri
   if (left <= 0 || left > LAPSE_WARN_DAYS * DAY_MS) return null;
   const days = Math.floor(left / DAY_MS);
   const when = days === 0 ? 'within a day' : `in ${String(days)} ${days === 1 ? 'day' : 'days'}`;
-  return `BrainDog: the login to ${held.host} lapses on ${held.expires.slice(0, 10)}, ${when}. After that every session starts without BrainDog. Tell the person to sign in again before then: ${loginCommand(held.host)}`;
+  return `BrainDog: the login to ${held.host} lapses on ${saidDay(held.expires, now)}, ${when}. After that every session starts without BrainDog. Tell the person to sign in again before then: ${loginCommand(held.host)}`;
 }
 
 export type LoginIo = {
@@ -251,8 +252,8 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
   }
   io.say(
     vault === undefined
-      ? `Logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
-      : `keychain access for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
+      ? `Logged in to ${key} as ${label} · token expires ${saidDay(expires)}`
+      : `keychain access for ${vault} on ${key} kept as ${label} · expires ${saidDay(expires)}`,
   );
   io.answer?.({ value: { host: key, label, expires, vault: vault ?? null } });
   return 0;

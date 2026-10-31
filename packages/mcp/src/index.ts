@@ -3559,10 +3559,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return read === null ? undefined : callOf(name, { ...args, [key!]: { ...fields, [refusal.at]: read } });
     }
     /* A FIELD THE LIST NEEDS AND THE CALL LEFT OUT, when it is a choice: the call with its first value, the values named in
-       the fix (`requiredFor`). */
+       the fix (`choiceFor`). A MONEY CHOICE GETS NO TRY: a bill's way in or out, picked first, is a guess at his money. */
     if (refusal.code === 'REQUIRED_MISSING' && typeof refusal.at === 'string' && allowed.length > 0 && (name === 'create' || name === 'triage')) {
       const fields = isObject(args.fields) ? args.fields : {};
       if (Object.hasOwn(fields, refusal.at)) return undefined;
+      if (typeof args.register === 'string' && !decls.has(args.register)) await learnPrefix(args.register, ctx);
+      if (moneyChoice(args.register, refusal.at)) return undefined;
       return callOf(name, { ...args, fields: { ...fields, [refusal.at]: allowed[0]! } });
     }
     /* A NOTE ON A SET-ASIDE, WHICH FILES NO ROW: the same call without it. */
@@ -3662,7 +3664,19 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const values = field?.type === 'enum' && Array.isArray(field.values) ? field.values.filter((v): v is string => typeof v === 'string') : [];
     if (values.length === 0) return refusal;
     const said = values.slice(0, 12).map((v) => (field?.labels?.[v] && field.labels[v] !== v ? `${v} (${field.labels[v]})` : v));
-    return { ...refusal, fix: `${refusal.fix} It is one of ${said.join(', ')}.`, allowed: values } as Refusal;
+    const ask = moneyChoice(args.register, refusal.at) ? ' Ask the person which; a money choice is never guessed.' : '';
+    return { ...refusal, fix: `${refusal.fix} It is one of ${said.join(', ')}.${ask}`, allowed: values } as Refusal;
+  }
+
+  /**
+   * A choice that is about money: a field on a list that keeps money (one with a money field), or one that names a
+   * direction, a currency or an amount. Its values are named and none is picked, so no `try` writes a bill as owed when
+   * it was owing.
+   */
+  function moneyChoice(register: unknown, field: string): boolean {
+    if (/direction|currency|amount/iu.test(field)) return true;
+    const decl = typeof register === 'string' ? decls.get(register) : undefined;
+    return decl?.fields.some((f) => f.type === 'money') === true;
   }
 
   /**

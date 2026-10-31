@@ -20,6 +20,7 @@ import type { Result } from '@braindog/ports';
 
 import { ANY_HOST, heldLogin, loginCommand } from './login.ts';
 import type { Ctx } from './surface.ts';
+import { saidDay } from './said-day.ts';
 
 /**
  * The refusal's sentence when this machine is not signed in for the host `mcp` would reach, or `null` when it is (or
@@ -36,7 +37,7 @@ export function signedOutFix(flag: string | undefined, env: Record<string, strin
   if (held.host === null)
     return `This machine is not signed in to BrainDog, so nothing was read or written. Tell the person to run ${loginCommand(ANY_HOST)} with their own BrainDog's address in place of that one, ${after}`;
   if (held.expires !== null && Date.parse(held.expires) <= now)
-    return `The login to ${held.host} expired on ${held.expires.slice(0, 10)}, so nothing was read or written. Tell the person to run ${loginCommand(held.host)} ${after}`;
+    return `The login to ${held.host} expired on ${saidDay(held.expires)}, so nothing was read or written. Tell the person to run ${loginCommand(held.host)} ${after}`;
   return null;
 }
 
