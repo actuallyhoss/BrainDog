@@ -84,7 +84,7 @@
   import { valueSaid } from '$lib/voice.ts';
   import { seenWords } from '$lib/record/blocks.ts';
   import { flip } from 'svelte/animate';
-  import { arrive, depart, springy } from '$lib/motion/index.ts';
+  import { arrive, depart, listMotion, springy } from '$lib/motion/index.ts';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { deskCards, type Desk } from '$lib/home/desk-part.ts';
@@ -957,7 +957,9 @@
   <!-- A QUEUE THAT SAYS HOW MANY IT SHOWS (`most`, Needs you's groups) shows that many cards and opens the rest in place. -->
   {@const most = (!compact || inPlace) && typeof block.most === 'number' && !open && every.length > block.most ? block.most : null}
   {@const entries = most === null ? every : every.slice(0, most)}
-  <div class="queue" data-compact={compact ? '' : undefined}>
+  <!-- AN ANSWERED QUESTION LETS GO AND THE REST CLOSE THE GAP, and a new one rises into place (`listMotion`): its card
+       sits in an `{#if}`, where a card's own `out:` never plays. -->
+  <div class="queue" data-compact={compact ? '' : undefined} {@attach listMotion('.qa, .alike')}>
     <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->
     <!-- QUESTIONS OF ONE CAUSE ARE ONE CARD outside a compact queue (`alike.ts`). -->
     {#each entries as entry, n (entry.kind === 'one' ? entry.q.id : entry.lead.id)}{#if entry.kind === 'many'}<AlikeCard lead={entry.lead} rest={entry.rest} onanswered={() => {}} />{:else}{@const question = entry.q}<QueueAnswer

@@ -190,5 +190,65 @@ export const settleOn =
     if (had && was !== key && !calm()) settleHere(node);
   };
 
+/* ── a list Svelte cannot animate ────────────────────────────────────────── */
+
+/**
+ * A LIST WHOSE ITEMS ARRIVE AND LEAVE WITH MOTION, watched from the list itself, as an attachment:
+ * `<div {@attach listMotion('.qa')}>`. For a list whose items sit inside an `{#if}` in their `{#each}`, where a local
+ * `in:` or `out:` never plays (Svelte plays one only for the block the element is in, and the `{#if}` is that block).
+ *
+ * AN ITEM THAT ARRIVES rises into place as `arrive` does. AN ITEM THAT GOES is put back where it stood for a moment, out
+ * of reach (`inert`, hidden from a reader, `data-leaving`), lets go (sinks and fades), and then the room it held closes,
+ * gap and all, so the items under it rise into place instead of jumping. Nothing in a screen's first second; under
+ * reduced motion an arrival fades and a leaving item is simply gone.
+ */
+export const listMotion =
+  (match: string) =>
+  (box: HTMLElement): (() => void) | void => {
+    if (typeof MutationObserver === 'undefined') return;
+    const seen = new MutationObserver((records) => {
+      if (calm()) return;
+      const out = new Set<Node>();
+      for (const r of records) for (const n of r.removedNodes) out.add(n);
+      for (const r of records) {
+        for (const n of r.addedNodes) if (n instanceof HTMLElement && !out.has(n) && n.matches(match) && !n.hasAttribute('data-leaving')) arriveNow(n);
+        for (const n of r.removedNodes)
+          if (n instanceof HTMLElement && !n.isConnected && !n.inert && n.matches(match) && !n.hasAttribute('data-leaving')) leaveFrom(box, n, r.nextSibling, r.previousSibling);
+      }
+    });
+    seen.observe(box, { childList: true });
+    return () => seen.disconnect();
+  };
+
+function arriveNow(el: HTMLElement): void {
+  if (still()) void play(el, { opacity: [0, 1] }, { duration: FADE });
+  else play(el, { opacity: [0, 1], transform: ['translateY(10px) scale(0.97)', 'none'] }, { duration: ms('--form-in', 320) });
+}
+
+function leaveFrom(box: HTMLElement, el: HTMLElement, next: Node | null, prev: Node | null): void {
+  if (still() || typeof el.animate !== 'function') return;
+  const before = next && next.parentNode === box ? next : prev && prev.parentNode === box ? prev.nextSibling : null;
+  el.setAttribute('data-leaving', '');
+  el.setAttribute('aria-hidden', 'true');
+  el.inert = true;
+  box.insertBefore(el, before);
+  const h = el.offsetHeight;
+  const gap = Number.parseFloat(getComputedStyle(box).rowGap) || 0;
+  const last = el.nextElementSibling === null;
+  const room = last ? 'marginBlockStart' : 'marginBlockEnd';
+  el.style.overflow = 'clip';
+  el.style.pointerEvents = 'none';
+  const a = el.animate(
+    [
+      { opacity: 1, transform: 'none', blockSize: `${h}px`, [room]: '0px', offset: 0, easing: 'cubic-bezier(0.4, 0, 1, 0.5)' },
+      { opacity: 0, transform: 'scale(0.97)', blockSize: `${h}px`, [room]: '0px', offset: 0.4, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+      { opacity: 0, transform: 'scale(0.97)', blockSize: '0px', [room]: `${-gap}px`, offset: 1 },
+    ],
+    { duration: ms('--form-out', 180) + ms('--form-settle', 380) * 0.75, fill: 'forwards' },
+  );
+  const gone = () => el.remove();
+  void a.finished.then(gone, gone);
+}
+
 /** An element's place in a group assembling (`[data-forming]` in `app.css`): `style="--form-i: …"` in one word. */
 export const forming = (i: number): string => `--form-i: ${Math.max(0, Math.min(i, 8))}`;
