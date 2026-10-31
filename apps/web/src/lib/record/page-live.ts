@@ -1775,7 +1775,8 @@ export function blockOf(
        2027-01-13" and "EGP 560,563.82, down −11%", so its line takes the days in words, the money in whole units and a
        direction said once. */
     if (own !== '') return { ...shell, body: stopped(datesIn(wholeMoneyIn(own), now).replace(/\b(down|up) [−+-](?=\d)/gu, '$1 ')), modelLine: true };
-    const lead = leadOf(body, namedResolverOf(values, unnamedOf(b)));
+    /* A LINE WHOSE FIRST CLAUSE WENT STARTS ON A CAPITAL: Founder overview read "on what is due it runs out in 5 days." */
+    const lead = leadOf(body, namedResolverOf(values, unnamedOf(b))).replace(/^\p{Ll}/u, (c) => c.toUpperCase());
     return lead.trim() === '' ? { ...shell, body: '', drawn: false } : { ...shell, body: stopped(lead) };
   }
   /* AN `inputs` BLOCK IS ONE ROW'S FIELDS TO TYPE INTO, read by `register:` and never by `source:`, so it is answered

@@ -15,6 +15,7 @@
 import { createClient } from '@braindog/client';
 
 import type { Fetch } from './boot-live.ts';
+import type { Measure } from './measures.ts';
 import { layoutOf, type Layout } from '../page/layout.ts';
 import { wrote, type Wrote } from './settings-write.ts';
 
@@ -180,7 +181,7 @@ export type SharedCell = { type: string; of?: string; value: unknown; label?: st
  * A column a shared block keeps: the field it draws, the label the owner reads, its role, a money column's sign, and the
  * field it reads where its own holds nothing (`or`, the Ledger's name: who was paid, else the line's own words).
  */
-export type SharedColumn = { field: string; or?: string; label?: string; as?: string; sign?: { field: string; minus: string } };
+export type SharedColumn = { field: string; or?: string; label?: string; as?: string; sign?: { field: string; minus: string }; deadline?: true; ref?: true };
 
 /**
  * One row as a link shows it: each drawn field's typed cell, the same row as plain values for a record that sends no
@@ -192,7 +193,10 @@ export type SharedRow = {
   state: string | null;
   /** A card's trend, when the record sent its cards' runs (`trends`, one a row): oldest first, a gap `null`. */
   trend?: (number | null)[];
-  /** What a budget's category spent, in its figure's minor units, when the record sent the budgets' parts (`spent_rows`). */
+  /**
+   * What a budget's category spent, in its figure's minor units, when the record sent the budgets' parts (`spent_rows`);
+   * on a block of goals (`SharedBlock.toward`), what was logged toward the goal, in its own units.
+   */
   spent?: number;
 };
 
@@ -242,6 +246,10 @@ export type SharedBlock = {
   done: string[] | null;
   /** What a card's trend is, its figure's name ("Done, by week"), sent beside the cards' runs (`SharedRow.trend`). */
   trendLabel?: string | null;
+  /** A `progress` block's rows are goals, each set against what was logged toward it (`SharedRow.spent`), not budgets. */
+  toward?: boolean;
+  /** A `lines` block's measures as the record read them, a line a measure (`measures` on the block), when it sent any. */
+  measures?: Measure[];
 };
 
 /**
@@ -265,6 +273,40 @@ export type SharedPage = {
 
 /** What the reader draws: the page, a link that does not open, or a record it could not reach. */
 export type SharedRead = { from: 'live'; page: SharedPage } | { from: 'shut' } | { from: 'unreached'; why: string };
+
+/** A run of numbers as a measure holds one: a number, or `null` for a bucket with no reading. */
+const runOf = (x: unknown): (number | null)[] | null =>
+  Array.isArray(x) ? x.map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)) : null;
+
+/**
+ * A `lines` block's measures, each kept only whole: its name, unit, bucket, its days and the two runs aligned with them,
+ * and the newest reading when it has one. Anything else is no measure, and is left out rather than drawn wrong.
+ */
+function measuresOf(x: unknown): Measure[] {
+  if (!Array.isArray(x)) return [];
+  return x.flatMap((m): Measure[] => {
+    if (!isObject(m) || typeof m.name !== 'string' || typeof m.unit !== 'string' || (m.bucket !== 'day' && m.bucket !== 'week')) return [];
+    const keys = Array.isArray(m.keys) && m.keys.every((k) => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(k)) ? (m.keys as string[]) : null;
+    const now = runOf(m.now);
+    const was = runOf(m.was);
+    if (keys === null || now === null || was === null || now.length !== keys.length || was.length !== keys.length) return [];
+    const l = m.latest;
+    const latest = isObject(l) && typeof l.value === 'number' && typeof l.at === 'string' && typeof l.day === 'string' ? { value: l.value, at: l.at, day: l.day } : undefined;
+    return [
+      {
+        name: m.name,
+        unit: m.unit,
+        bucket: m.bucket,
+        keys,
+        now,
+        was,
+        ...(typeof m.of === 'string' ? { of: m.of } : {}),
+        ...(typeof m.group === 'string' ? { group: m.group } : {}),
+        latest: latest ?? null,
+      } as Measure,
+    ];
+  });
+}
 
 function isObject(x: unknown): x is Record<string, unknown> {
   return x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -345,6 +387,8 @@ const columnOf = (c: unknown): SharedColumn[] => {
       /* AN EMPTY LABEL IS KEPT EMPTY (SB4): the owner's pack left the fact unnamed, as the app draws it. */
       ...(typeof c.label === 'string' ? { label: c.label.trim() === '' ? '' : c.label } : {}),
       ...(typeof c.as === 'string' ? { as: c.as } : {}),
+      ...(c.deadline === true ? { deadline: true as const } : {}),
+      ...(c.ref === true ? { ref: true as const } : {}),
       ...(sign === null ? {} : { sign }),
     },
   ];
@@ -400,6 +444,8 @@ export function blockShared(x: unknown): SharedBlock {
     area: b.area === 'rail' ? 'rail' : 'main',
     done: Array.isArray(b.done) ? b.done.filter((d): d is string => typeof d === 'string') : null,
     trendLabel: rows.some((r) => r.trend !== undefined) ? text(b.trend_label) : null,
+    ...(b.toward === true ? { toward: true } : {}),
+    ...((m) => (m.length === 0 ? {} : { measures: m }))(measuresOf(b.measures)),
   };
 }
 

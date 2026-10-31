@@ -15,6 +15,7 @@
 import { dateSaid, kindSpec, parse, type Segment } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 
+import { latestText, linesAndLatest, linesText } from '../../lib/record/measures.ts';
 import { fieldSaid, type SharedColumn, type SharedPart, type SharedReading, type SharedRow } from '../../lib/record/share-write.ts';
 import { cellSaid, figureSaid, moneySaid, plainSaid, trendLine, type Said, type Shown, type Where } from './reading.ts';
 
@@ -53,7 +54,7 @@ const freeOf = (row: SharedRow, c: SharedColumn, role: string): string | null =>
 };
 
 /** The kinds whose cells are a list's fields in the declared order, each a place (`projectRows` in `blocks.ts`). */
-const PLACED: ReadonlySet<string> = new Set(['todo', 'steps', 'timeline', 'board', 'roadmap', 'lanes', 'calendar', 'spec', 'params']);
+const PLACED: ReadonlySet<string> = new Set(['todo', 'steps', 'timeline', 'board', 'roadmap', 'lanes', 'calendar', 'spec', 'params', 'heat']);
 
 /** The most of each card role a card may hold (`braindog-render`'s `cards.ts`): one of each, three facts. */
 const ONE_ROLES = ['title', 'figure', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'hue', 'picture', 'quiet'] as const;
@@ -120,7 +121,7 @@ function cardRows(s: Shown, where: Where): string[] | null {
 }
 
 /** The kinds that place a row on a calendar by its day, which their drawer reads as `2026-09-12` (`calendar.ts`, `roadmap.ts`). */
-const DATED: ReadonlySet<string> = new Set(['roadmap', 'calendar', 'lanes']);
+const DATED: ReadonlySet<string> = new Set(['roadmap', 'calendar', 'lanes', 'heat']);
 
 /** Seconds in each unit a duration is declared in, and the dialect's own letter for it (`roadmap.ts` `EFFORT`). */
 const UNIT_SECONDS: Readonly<Record<string, number>> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
@@ -168,9 +169,38 @@ function tableOf(s: Shown, where: Where): Drawing['table'] {
     const figure = figured(s, c);
     return { field: c.field, label: c.label, width: i === 0 ? 'minmax(0, 2fr)' : figure ? 'minmax(max-content, 1fr)' : 'minmax(0, 1fr)', align: figure ? 'end' : 'start', truncate: figure ? 'never' : 'end' };
   });
-  const rows: TableRow[] = s.rows.map((row, n) => ({ key: `r${n}`, cells: s.columns.map((c) => textOf(cellSaid(row, c, where)) || null) }));
+  /* A COLUMN OF AMOUNTS IS WRITTEN ALIKE (`moneySet`): all whole and none shows its pence, "EGP 1,350" over "EGP 600";
+     one with pence and every one shows two places, so the digits line up. A link wrote "EGP 1,350.00" on every line. */
+  const pence = new Set(
+    s.columns
+      .filter((c) => s.rows.some((r) => { const said = cellSaid(r, c, where); return 'money' in said && said.money.fraction !== ''; }))
+      .map((c) => c.field),
+  );
+  const finished = finishedIn(s.block);
+  const today = todayIn(where);
+  const rows: TableRow[] = s.rows.map((row, n) => ({
+    key: `r${n}`,
+    cells: s.columns.map((c) => dueSaid(row, c, finished, today) ?? (textOf(cellSaid(row, c, pence.has(c.field) ? { ...where, pence: true } : where)) || null)),
+  }));
   return { columns, rows };
 }
+
+/**
+ * A ROW DUE SOON SAYS WHEN IN ITS DEADLINE'S CELL, as the app's table says it (`soonSaid` in `page-live.ts`): "Due today",
+ * "Due tomorrow" or "Due in 6 days" for a row not finished and due in the next two weeks, where a link said "6 Nov". A
+ * late row and one further off keep their day. `null` for any other cell.
+ */
+function dueSaid(row: SharedRow, c: SharedColumn, finished: ReadonlySet<string>, today: string): string | null {
+  const cell = row.cells[c.field];
+  if (c.deadline !== true || cell?.type !== 'day' || typeof cell.value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(cell.value)) return null;
+  if (row.state !== null && finished.has(row.state)) return null;
+  const days = Math.round((Date.parse(`${cell.value}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  if (!Number.isFinite(days) || days < 0 || days >= 14) return null;
+  return days === 0 ? DUE_WORDS.today : days === 1 ? DUE_WORDS.tomorrow : DUE_WORDS.inDays(days);
+}
+
+/** A close deadline's words, the app's (`DUE_WORDS` in `page-live.ts`). */
+const DUE_WORDS = { today: 'Due today', tomorrow: 'Due tomorrow', inDays: (n: number): string => `Due in ${n} days` } as const;
 
 const CURRENCY = /^[A-Z]{3}$/u;
 
@@ -203,7 +233,7 @@ function partsDrawn(s: Shown, where: Where): string[] | null {
  */
 function budgetDrawn(s: Shown, where: Where): string[] | null {
   const b = s.block;
-  if (b.kind !== 'progress' || s.rows.length === 0 || !s.rows.some((r) => r.spent !== undefined)) return null;
+  if (b.kind !== 'progress' || b.toward === true || s.rows.length === 0 || !s.rows.some((r) => r.spent !== undefined)) return null;
   const [name, limit] = allColumns(s);
   if (name === undefined || limit === undefined) return null;
   const rows = s.rows.flatMap((row) => {
@@ -215,6 +245,62 @@ function budgetDrawn(s: Shown, where: Where): string[] | null {
     return spent === null || most === '' ? [] : [`${escapeCell(textOf(cellSaid(row, name, where)))} | ${escapeCell(spent)} | ${escapeCell(most)} | `];
   });
   return rows.length > 0 ? rows : null;
+}
+
+/**
+ * GOALS AS THE APP DRAWS THEM (`progressRows` in `blocks.ts`, a goal's reading): each goal's aim against what was logged
+ * toward it, "29.5 of 100" over "km", from what the record matched to each row (`spent`, `toward`). A link drew the
+ * figure's whole, "Logged this week, by goal 11.5", over a table of aims, so a habit's week read as every run logged.
+ */
+function goalsDrawn(s: Shown, where: Where): string[] | null {
+  const b = s.block;
+  if (b.kind !== 'progress' || b.toward !== true || s.rows.length === 0) return null;
+  const [name, aim, note] = allColumns(s);
+  if (name === undefined || aim === undefined) return null;
+  const unit = b.readings[0]?.unit ?? null;
+  const rows = s.rows.map((row) => {
+    const part = row.spent ?? 0;
+    const own = row.cells[aim.field];
+    const currency = unit !== null && CURRENCY.test(unit) ? unit : own?.type === 'money' && isAmount(own.value) ? own.value.currency : null;
+    const logged = currency === null ? String(Math.round(part * 100) / 100) : (amountSaid(part, currency, where) ?? String(part));
+    const noted = note === undefined ? '' : textOf(cellSaid(row, note, where));
+    return `${escapeCell(textOf(cellSaid(row, name, where)))} | ${escapeCell(logged)} | ${escapeCell(textOf(cellSaid(row, aim, where)))} | ${escapeCell(noted)}`;
+  });
+  return rows.length > 0 ? rows : null;
+}
+
+/** Whether a value is an amount as a money cell holds one. */
+const isAmount = (v: unknown): v is { amount: number; currency: string } =>
+  v !== null && typeof v === 'object' && typeof (v as { amount?: unknown }).amount === 'number' && typeof (v as { currency?: unknown }).currency === 'string';
+
+/**
+ * A COUNT AS THE APP DRAWS IT (`progressRows` in `blocks.ts`, the third reading): the rows grouped by the first column,
+ * each group filled by how many say yes in the second, or are in a state the list counts finished. "Garden shed 2 of 4"
+ * and "Sprint 14 1 of 5", where a link drew a table of "No, No, Yes, Yes" under "Done".
+ */
+function countsDrawn(s: Shown, where: Where): string[] | null {
+  const b = s.block;
+  if (b.kind !== 'progress' || b.toward === true || b.rows.length === 0 || b.rows.some((r) => r.spent !== undefined)) return null;
+  const [label, value] = allColumns(s);
+  if (label === undefined || value === undefined) return null;
+  const finished = finishedIn(b);
+  const kinds = new Set(b.rows.map((r) => r.cells[value.field]?.type ?? typeof r.fields[value.field]));
+  const yes = (r: SharedRow): boolean | null => {
+    const v = r.cells[value.field]?.value ?? r.fields[value.field];
+    if (typeof v === 'boolean') return v;
+    return kinds.has('enum') && typeof v === 'string' ? finished.has(v) : null;
+  };
+  if (!b.rows.every((r) => yes(r) !== null || (r.cells[value.field] === undefined && r.fields[value.field] === undefined))) return null;
+  if (!kinds.has('bool') && !kinds.has('boolean') && !kinds.has('enum')) return null;
+  const groups = new Map<string, { done: number; all: number }>();
+  for (const r of b.rows) {
+    const key = textOf(cellSaid(r, label, where)).trim() || (b.heading ?? '');
+    const g = groups.get(key) ?? { done: 0, all: 0 };
+    g.all += 1;
+    if (yes(r) === true) g.done += 1;
+    groups.set(key, g);
+  }
+  return [...groups].map(([key, g]) => `${escapeCell(key)} | ${g.done} | ${g.all} | `);
 }
 
 /** Today in the record's zone, `YYYY-MM-DD`. */
@@ -295,6 +381,21 @@ export function drawingOf(s: Shown, where: Where): Drawing {
   if (budget !== null) {
     const drawn = fenced('progress budget', budget);
     if (drawn) return { segments: drawn, table: null, authored: false };
+  }
+  for (const rows of [goalsDrawn(s, where), countsDrawn(s, where)]) {
+    if (rows === null) continue;
+    const drawn = fenced('progress', rows);
+    if (drawn) return { segments: drawn, table: null, authored: false };
+  }
+
+  /* A LINE A MEASURE, AS THE APP DRAWS A `lines` BLOCK (`linesAndLatest` in `blocks.ts`): the period as the line, the
+     period before as the dashed one, and a measure read once said once under them. A link drew nothing where Team's
+     Home draws its open tickets each morning. */
+  if (b.kind === 'lines' && b.measures !== undefined && b.measures.length > 0) {
+    const { lines, latest } = linesAndLatest(b.measures);
+    const text = [linesText(lines, latest), latestText(latest, lines.length > 0, lines)].filter((t) => t !== '').join('\n\n');
+    const drawn = parse(text, { page: true }).filter((seg) => seg.type !== 'degraded');
+    if (drawn.length > 0) return { segments: drawn, table: null, authored: false };
   }
 
   /* THE FIGURES, as a `stat`. */
