@@ -288,7 +288,7 @@
   {/if}
 {/if}
 {#if !barred}
-<header class="page-head" data-titled={titled ? '' : undefined} data-under={under ? '' : undefined} data-kicked={crumb && !headless ? '' : undefined} data-headless={headless ? '' : undefined} data-tiled={tiled ? '' : undefined}>
+<header class="page-head" data-titled={titled ? '' : undefined} data-under={under ? '' : undefined} data-kicked={crumb && !headless && !titled ? '' : undefined} data-headless={headless ? '' : undefined} data-tiled={tiled ? '' : undefined}>
   <div class="head-main">
     {#if tiled}
       <!-- THE NAME IS THE LEAD TILE'S. -->
@@ -440,7 +440,8 @@
     display: none;
   }
 
-  /* A kicker already stands between the row and the top of the work. */
+  /* A kicker already stands between the row and the top of the work. A titled head draws no kicker (the bar holds the
+     way), so it keeps the full gap (AH34: Today's first line sat 4 under the bar's rule). */
   .page-head[data-kicked] {
     padding-block-start: calc(var(--sp-1) + var(--shell-inset, 0px));
   }
@@ -733,7 +734,9 @@
     min-block-size: 0;
   }
 
-  .page-head[data-titled]:has(.head-actions) .head-main {
+  /* A SENTENCE WITH NO BUTTONS BESIDE IT STANDS WHERE ONE WITH BUTTONS DOES (AH34): Today's first line sat 16 under the
+     bar's rule while every page with actions had the row's height to sit in. */
+  .page-head[data-titled]:has(.head-actions, .head-said) .head-main {
     min-block-size: var(--ctl-h);
   }
 
