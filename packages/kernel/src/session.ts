@@ -255,9 +255,9 @@ export type Found = {
  * of another token found there comes back `foreign`, and the caller refuses it: a person's other key,
  * or another person's, never writes, hands off or attaches as that run. Rung 4 only guesses, so it
  * looks at the caller's own runs and a collision on one machine and repository opens a run instead.
- * A run with no `token_id` was made by a person, from the app, for an agent to take up, which is how a
- * run is shared: any key may name it. `token` is the caller's token id; `undefined` reads without an
- * owner, as a person's view does.
+ * A run with no `token_id` was made from the app, for an agent to take up. One a person made is theirs, and only
+ * their own keys may name it (`othersRun`, RM1); one an automation or the record made is shared: any key may name it.
+ * `token` is the caller's token id; `undefined` reads without an owner, as a person's view does.
  */
 export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?: string | null): Found | null {
   const pick = (by: Found['by'], where: string, ...params: (string | number | null)[]): Found | null => {
@@ -267,7 +267,7 @@ export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?
       ...params,
     );
     if (!row) return null;
-    const foreign = token !== undefined && owned(row.token_id, token);
+    const foreign = token !== undefined && othersRun(sql, row.seq, row.token_id, token);
     return { id: row.id, seq: row.seq, state: row.state, project: row.project ?? null, by, foreign };
   };
   const since = new Date(nowMs - STALE_MS).toISOString();
@@ -367,6 +367,35 @@ function sameAgent(kind: string | null, client: string | null, agent: string | n
  */
 export function owned(owner: unknown, token: string | null): boolean {
   return typeof owner === 'string' && owner !== token;
+}
+
+/**
+ * Whether run `seq` keeps the caller's key out: `owned` for a run a key opened, and for one no key opened, whether
+ * somebody made it and the key is not theirs.
+ *
+ * A RUN A PERSON MADE IS THEIRS (RM1). The owner makes S41 in the app for an agent to take up; a member's key that
+ * named it asked through it, signed as S41, and the owner's agent then answered that question as him. Now only the
+ * maker's own keys work as such a run. A run its create line signs with a key (`token:t_…`) is that key's person's in
+ * the same way. A run an automation, Slash or the record made, or one nothing signs, stays shared, as it was.
+ */
+export function othersRun(sql: Sql, seq: number | null, owner: unknown, token: string | null): boolean {
+  if (typeof owner === 'string') return owner !== token;
+  if (token === null || seq === null) return false;
+  const made = sql.one<{ a: string }>(
+    `SELECT e.actor AS a FROM entry n JOIN event e ON e.target = 'entry:' || n.id AND e.kind = 'create'
+     WHERE n.register = '${SESSION}' AND n.seq = ? ORDER BY e.rowid LIMIT 1`,
+    seq,
+  )?.a;
+  if (made === undefined) return false;
+  const personOf = (key: string): string | null => sql.one<{ p: string | null }>('SELECT person_id AS p FROM token WHERE id = ?', key)?.p ?? null;
+  if (made.startsWith('p_')) return personOf(token) !== made;
+  if (made.startsWith('token:t_')) {
+    const key = made.slice('token:'.length);
+    if (key === token) return false;
+    const person = personOf(key);
+    return person === null || personOf(token) !== person;
+  }
+  return false;
 }
 
 /**

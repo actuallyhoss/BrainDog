@@ -42,6 +42,7 @@ import {
   agentOf as kindOf,
   instructionsTakenBy,
   placesHeard,
+  askedKeyOf,
   tokenOfRun,
   type Instr,
   type InstrAnswer,
@@ -546,30 +547,42 @@ export function methods(deps: RecordDeps) {
     );
   };
 
-  /** Whether a question's opener is anybody but `by` and the record's own, read through every way a question is signed. */
-  const askedBySomebodyElse = (opener: string, by: string): boolean => {
+  /** Who drafted a question, which keeps the key that asked through a run no key opened (`askedKeyOf`). */
+  const draftedOf = (id: string): string | null => sql.one<{ d: string | null }>('SELECT drafted_by AS d FROM suggestion WHERE id = ?', id)?.d ?? null;
+
+  /**
+   * Whether a question's asker is anybody but `by` and the record's own, read through every way a question is signed.
+   *
+   * THE KEY THAT CALLED, NEVER THE RUN IT IS FILED UNDER (RM1). A run no key opened is signed by whichever key it is
+   * shared with, so its question keeps that key (`askedKeyOf`, `drafted_by: token:<id>`), and the key's person is who
+   * asked. Only a question no key is kept on falls back to the run: an automation's is the record's own, and one a person
+   * made in the app is that person's (RL1), since only their own keys may work as it now (`othersRun`).
+   */
+  const askedBySomebodyElse = (opener: string, drafted: unknown, by: string): boolean => {
+    const keyOf = (token: string): boolean => {
+      const key = sql.one<{ person_id: string | null; label: string | null }>('SELECT person_id, label FROM token WHERE id = ?', token);
+      if (key === undefined || (key.label ?? '').startsWith('report:')) return true;
+      return key.person_id !== by;
+    };
+    const kept = askedKeyOf(sql, '', drafted);
+    if (kept !== null) return keyOf(kept);
     if (opener === '' || opener === 'system' || opener === 'slash' || opener.startsWith('rule:') || opener.startsWith('script:')) return false;
     if (opener.startsWith('p_')) return opener !== by;
     const named = opener.startsWith('token:') ? opener.slice(6) : opener;
     const run = new RegExp(`^${SESSION_PREFIX}[1-9]\\d*$`, 'u').test(named);
     const token = named.startsWith('t_') ? named : run ? tokenOfRun(sql, named) : null;
-    /* A RUN NO KEY OPENED is the record's own only when an automation made it. One a person made in the app, for an
-       agent to take up, is that person's: its create line says who was signed in (RL1), and a run nothing signs is
-       nobody's to pass. */
-    if (token === null) {
-      if (!run) return true;
-      const made = sql.one<{ a: string }>(
-        `SELECT e.actor AS a FROM entry n JOIN event e ON e.target = 'entry:' || n.id AND e.kind = 'create'
-         WHERE n.register = '${SESSION}' AND n.seq = ? ORDER BY e.rowid LIMIT 1`,
-        Number(named.slice(SESSION_PREFIX.length)),
-      )?.a;
-      if (made === undefined) return true;
-      if (made === 'system' || made === 'slash' || made.startsWith('rule:') || made.startsWith('script:')) return false;
-      return made !== by;
-    }
-    const key = sql.one<{ person_id: string | null; label: string | null }>('SELECT person_id, label FROM token WHERE id = ?', token);
-    if (key === undefined || (key.label ?? '').startsWith('report:')) return true;
-    return key.person_id !== by;
+    if (token !== null) return keyOf(token);
+    if (!run) return true;
+    const made = sql.one<{ a: string }>(
+      `SELECT e.actor AS a FROM entry n JOIN event e ON e.target = 'entry:' || n.id AND e.kind = 'create'
+       WHERE n.register = '${SESSION}' AND n.seq = ? ORDER BY e.rowid LIMIT 1`,
+      Number(named.slice(SESSION_PREFIX.length)),
+    )?.a;
+    if (made === undefined) return true;
+    if (made === 'system' || made === 'slash' || made.startsWith('rule:') || made.startsWith('script:')) return false;
+    /* A RUN A KEY MADE WITHOUT STAMPING IT is that key's person's, read as a key named outright. */
+    if (made.startsWith('token:t_')) return keyOf(made.slice(6));
+    return made !== by;
   };
 
   /**
@@ -595,7 +608,7 @@ export function methods(deps: RecordDeps) {
        taken back with withdraw once they have said. */
     const askedBy = String(row.opened_by ?? '');
     const key = ctx.principal.kind === 'token' ? ctx.principal.id : null;
-    if (askedBy === run || (key !== null && (askedBy === key || tokenOfRun(sql, askedBy) === key)))
+    if (askedBy === run || (key !== null && (askedBy === key || askedKeyOf(sql, askedBy, draftedOf(id)) === key)))
       return no(
         'FORBIDDEN',
         `You asked ${given} yourself, so the person answers it in BrainDog. If they told you what to do, make that change with said on create or update, or take the question back.`,
@@ -623,7 +636,7 @@ export function methods(deps: RecordDeps) {
        read back to its key and the key to its person; a key named outright (`t_…`, `token:t_…`) the same. Only his own
        keys pass, and a run no key opened (an automation), a rule, a script, Slash or the system, which are the record's
        own. An agent no run was opened for (`agent:<name>`) names nobody, so it is refused with the rest. */
-    if (askedBySomebodyElse(String(row.opened_by ?? ''), by))
+    if (askedBySomebodyElse(String(row.opened_by ?? ''), draftedOf(id), by))
       return no('FORBIDDEN', `${given} was asked by somebody else, so it is answered in BrainDog and not on a word. Ask ${byName} to answer it there.`, { at: 'answer' });
     const as: CallContext = { principal: { kind: 'person', id: by, level: 'owner' }, registers: '*', credentialed: true, onWord: run };
     const out = await deps.decideAs({ id, decide: { option: chosen, reason: `${byName} told ${run}: "${words}"` } }, as);

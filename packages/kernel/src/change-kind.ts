@@ -529,6 +529,18 @@ export function tokenOfRun(sql: Sql, actor: string): string | null {
   return typeof token === 'string' && token !== '' ? token : null;
 }
 
+/** What `suggestion.drafted_by` begins with when it keeps the key that asked through a run no key opened (RM1). */
+export const ASKED_KEY = 'token:';
+
+/**
+ * The key that asked a question: the one kept on it (`ASKED_KEY`), or the one its run was opened under, or `null`. The
+ * kept key comes first, since a run no key opened is signed by whichever key it is shared with.
+ */
+export function askedKeyOf(sql: Sql, openedBy: string, draftedBy: unknown): string | null {
+  if (typeof draftedBy === 'string' && draftedBy.startsWith(`${ASKED_KEY}t_`)) return draftedBy.slice(ASKED_KEY.length);
+  return tokenOfRun(sql, openedBy);
+}
+
 /**
  * Who climbs the ladder for an actor: the token its run was opened under, or Slash. `null` for a person, a rule, the
  * system, or a run no token opened, none of which has a rung.

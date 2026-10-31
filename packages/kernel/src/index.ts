@@ -349,7 +349,7 @@ import {
 } from './instruction.ts';
 import { profileById, profileFor as profileMatching, readProfiles, setProfile as writeProfile, type Profile, type ProfileRow, type ProfileWho } from './agent-profile.ts';
 import { agentsDataSteps } from './migrations/0042_agents.ts';
-import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
+import { ASKED_KEY, agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
 import { foldPlan as planFold, isFold as foldMade, type FoldDeps, type FoldPlan } from './undo-fold.ts';
@@ -369,7 +369,7 @@ import {
   learned,
   opening,
   openingStamp,
-  owned,
+  othersRun,
   provisionalTitle,
   recordNamed,
   type Found,
@@ -695,7 +695,7 @@ export { ANSWERED_IN, CHANGED_NOTE, GONE_NOTE, APART_PREF, apartIds, apartJson, 
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
 export {
   ATTACH, ADDONS, AUTOMATION, CALL, FLOORS, KEPT_DAYS, RUNGS, agentOf as ladderAgentOf, dearest, keysOfStamp, kindOfEvent, kindOfAttach, kindOfWrite, kindsOfProposal, kindsOfWrite, madeByIn,
-  personOf, recordReader, rungOf, seedLadder, shapeIn, stampOf, tokenOfRun,
+  personOf, recordReader, rungOf, seedLadder, shapeIn, stampOf, tokenOfRun, askedKeyOf, ASKED_KEY,
   type ChangeKind, type Floor, type KindReader, type ListShape, type Rung, type WriteSaid,
 } from './change-kind.ts';
 /* UNDO ON THE SERVER (`undo.ts`) and THE WALK OVER WHAT THE RECORD ALREADY HOLDS (`backfill.ts`), each also a kernel
@@ -4942,7 +4942,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (w.principal?.kind === 'token') {
         const foreign = locate().found;
         if (foreign?.foreign) return notYours<Entry>(`${registers.get(SESSION)?.seq_prefix ?? 'S'}${foreign.seq}`);
-        if (register === SESSION && current && owned(current.fields.token_id, w.principal.token ?? null))
+        if (register === SESSION && current && othersRun(sql, current.seq, current.fields.token_id, w.principal.token ?? null))
           return notYours<Entry>(nameOf(current.id));
       }
       const scoped = w.principal?.kind === 'token' ? scopeFieldOf(decl.fields) : undefined;
@@ -5890,7 +5890,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const said = w.session?.parent?.trim();
     if (!said || !isRunName(said) || !runRegister().has('parent')) return null;
     const run = bySeq(SESSION, Number(said.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)));
-    if (!run || owned(run.fields.token_id, w.principal?.token ?? null)) return null;
+    if (!run || othersRun(sql, run.seq, run.fields.token_id, w.principal?.token ?? null)) return null;
     return said;
   }
 
@@ -5999,7 +5999,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const by = getGovernance(sql, 'suggestion', suggestion)?.opened_by;
     if (typeof by !== 'string' || !isRunName(by)) return;
     const run = bySeq(SESSION, Number(by.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)));
-    if (!run || (w.principal?.kind === 'token' && owned(run.fields.token_id, w.principal.token ?? null))) return;
+    if (!run || (w.principal?.kind === 'token' && othersRun(sql, run.seq, run.fields.token_id, w.principal.token ?? null))) return;
     if (recordNamed(run, projectNamed(run.fields.project), knownProjects()) === null) return;
     sql.exec("UPDATE entry SET fields = json_set(fields, '$.doing', ?) WHERE id = ?", clipTitle(asked), run.id);
     const now = byId(run.id);
@@ -6202,7 +6202,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return no<Ended>('ROW_UNKNOWN', `${said} is not a run here, so there is nothing to end. Leave the name out to end this session's own run.`, {
           at: 'session',
         });
-      if (named && owned(named.fields.token_id, token ?? null)) return notYours<Ended>(said);
+      if (named && othersRun(sql, named.seq, named.fields.token_id, token ?? null)) return notYours<Ended>(said);
       const run = named ?? (at.found ? byId(at.found.id) : null);
       if (!run)
         return no<Ended>('ROW_UNKNOWN', 'This session wrote nothing to this BrainDog, so it has no run to end. Ending is for a session that wrote.', {
@@ -7677,7 +7677,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         out.run = { id: by, ...(doing === '' ? {} : { name: clipTitle(doing) }), app: runAgentOf(hints).name };
       }
     }
-    if (typeof r.drafted_by === 'string' && r.drafted_by !== '') out.drafted_by = r.drafted_by;
+    if (typeof r.drafted_by === 'string' && r.drafted_by !== '' && !r.drafted_by.startsWith(ASKED_KEY)) out.drafted_by = r.drafted_by;
     const kinds = keysOfStamp(typeof r.kind === 'string' ? r.kind : null);
     if (kinds.length > 0) out.kinds = kinds;
     if (kind !== 'rowset' || !Array.isArray(body.rows)) return out;
@@ -11877,7 +11877,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const sees = typeof w === 'string' ? undefined : w.sees;
         const base = governDeps();
         const deps: GovernDeps = sees === undefined ? base : { ...base, row: (register, at) => { const row = base.row(register, at); return row && sees(register, row.id) ? row : null; } };
-        const out = openSuggestion(deps, () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
+        let signer = '';
+        const out = openSuggestion(deps, () => (signer = signedBy(typeof w === 'string' ? { actor: w } : w)), asked, drafted);
+        /* THE KEY THAT ASKED, WHERE ITS RUN DOES NOT SAY IT (RM1). A run no key opened is the one a person or an automation
+           made, and any key it is shared with signs as it, so the run alone never says who asked. The calling key is kept
+           as `drafted_by: token:<id>`, which `askedBy` reads before the run, and which no screen says. */
+        const key = typeof w === 'string' || w.principal?.kind !== 'token' ? undefined : w.principal.token;
+        if (out.ok && !out.value.joined && drafted === undefined && key !== undefined && isRunName(signer) && tokenOfRun(sql, signer) === null)
+          sql.exec('UPDATE suggestion SET drafted_by = ? WHERE id = ? AND drafted_by IS NULL', `${ASKED_KEY}${key}`, out.value.id);
         /* A JOINING RUN IS NOT TITLED after somebody else's question. */
         if (out.ok && !out.value.joined && out.value.answered === undefined) {
           nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
