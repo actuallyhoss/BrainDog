@@ -71,7 +71,7 @@ const frontOf = (h: Heard): UseCase => ({
 
 /**
  * AN AGENT IS THE AGENTS ADD-ON'S WORD, NEVER A USE CASE'S: "what my agents did" made a
- * one-person record a team's, with Cycles, a Cycle plan and Cycle days. The add-on hears the words its own signals say
+ * one-person record a team's, with Sprints, a Sprint plan and Open each morning. The add-on hears the words its own signals say
  * (`AGENTS_SIGNALS`), so a use case is ranked on the rest of what it heard, by the same order `arrange` keeps.
  */
 const ADDON_WORDS: ReadonlySet<string> = new Set(AGENTS_SIGNALS.map((w) => w.toLowerCase()));

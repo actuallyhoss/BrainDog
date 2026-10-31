@@ -1376,7 +1376,7 @@ test('A CERAMICS STUDIO IS A SHOP WITH MONEY AND PEOPLE, never somebody’s savi
   assert.ok(!p.also.includes('personal'), `a bare "money" beside a shop is Money, never Personal: ${p.also.join(', ')}`);
   const places = p.places.map((x) => x.name);
   for (const name of ['Orders', 'Products', 'Money', 'People']) assert.ok(places.includes(name), `${name} in ${places.join(', ')}`);
-  for (const name of ['Savings goals', 'Goals', 'Put by', 'Project steps', 'Projects']) assert.ok(!places.includes(name), `no ${name} in ${places.join(', ')}`);
+  for (const name of ['Savings goals', 'Goals', 'Money saved', 'Project steps', 'Projects']) assert.ok(!places.includes(name), `no ${name} in ${places.join(', ')}`);
   const became = (phrase: string): string | undefined => p.heard.find((h) => h.phrase.includes(phrase))?.became;
   assert.equal(became('a small ceramics studio'), 'Orders and Products', 'the trade is the shop, not a project');
   assert.equal(became('two potters'), 'People');
