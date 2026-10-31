@@ -650,21 +650,37 @@ export const SIGNS_KEPT_MS = 15 * MIN;
 /** How long the alarm leaves a kept reading as it is while nothing a sign reads moved: inside `SIGNS_KEPT_MS`, so a briefing still reads the pref. */
 export const SIGNS_REKEEP_MS = 10 * MIN;
 
-/** One red sign as a briefing names it: its name, its sentence, and its sentence to a reader without the inbox. */
-export type KeptSign = { name: string; said: string; quiet: string };
+/**
+ * One red sign as a briefing names it: its name and its sentence, and both as a reader without the inbox is told them.
+ * THE NAME TOO (RF2): a failure is titled by its question's own words (AG7), "The backup on 3 Sep did not run", so the
+ * name a read token for the lists is briefed is the sign's own (`quietSign`), as the sentence is.
+ */
+export type KeptSign = { name: string; said: string; quiet: string; quietName: string };
 /** What is kept: when it was read, and the red signs then. */
 export type KeptSigns = { at: number; red: KeptSign[] };
 
 /** The red signs of a reading, kept as `KeptSigns`. */
 export function keptSigns(signs: readonly VitalSign[], nowMs: number): KeptSigns {
-  return { at: nowMs, red: signs.filter((s) => s.state === 'red').map((s) => ({ name: s.name, said: s.said, quiet: quietSign(s).said })) };
+  return {
+    at: nowMs,
+    red: signs
+      .filter((s) => s.state === 'red')
+      .map((s) => {
+        const quiet = quietSign(s);
+        return { name: s.name, said: s.said, quiet: quiet.said, quietName: quiet.name };
+      }),
+  };
 }
 
-/** The red signs kept, when `value` is a reading in shape and no older than `SIGNS_KEPT_MS`; else `null`, to read them again. */
+/**
+ * The red signs kept, when `value` is a reading in shape and no older than `SIGNS_KEPT_MS`; else `null`, to read them again.
+ * A reading kept before the quiet name was (RF2) is not in shape, so it is read again once rather than briefing a name
+ * the inbox's words may be in.
+ */
 export function keptNow(value: unknown, nowMs: number): KeptSign[] | null {
   if (value === null || typeof value !== 'object') return null;
   const { at, red } = value as { at?: unknown; red?: unknown };
   if (typeof at !== 'number' || !(at <= nowMs && nowMs - at <= SIGNS_KEPT_MS) || !Array.isArray(red)) return null;
-  const fine = red.every((s: unknown) => s !== null && typeof s === 'object' && ['name', 'said', 'quiet'].every((k) => typeof (s as Record<string, unknown>)[k] === 'string'));
+  const fine = red.every((s: unknown) => s !== null && typeof s === 'object' && ['name', 'said', 'quiet', 'quietName'].every((k) => typeof (s as Record<string, unknown>)[k] === 'string'));
   return fine ? (red as KeptSign[]) : null;
 }

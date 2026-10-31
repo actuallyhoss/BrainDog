@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext, type Context } from '../src/index.ts';
+import { keptNow, keptSigns } from '../src/signs.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 12);
@@ -94,4 +95,28 @@ test('THE INBOX’S WORDS ARE BRIEFED ONLY TO WHO MAY READ THE INBOX, as `signs`
   assert.ok(reds.length > 0);
   assert.deepEqual(quiet.signs, reds);
   sql.close();
+});
+
+test('RF2: A FAILURE TITLED BY ITS QUESTION IS BRIEFED BY THE SIGN\'S OWN NAME to who may not read the inbox', async () => {
+  const { sql, api } = await record(2);
+  /* THE RECORD ITSELF FAILED, so the sign is titled by the question's own words (AG7). */
+  assert.ok(api.kernel.propose({ question: 'The backup on 3 Sep did not run', body_kind: 'options', body: { ...OPTIONS, about: 'backup' } } as never, 'system').ok);
+  const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+  const named = (c: Context) => c.signs.find((s) => /backup/iu.test(`${s.name} ${s.said}`));
+  assert.match(named(await briefed(api, owner))?.name ?? '', /^The backup on 3 Sep did not run$/u);
+  const quiet = await briefed(api, whole);
+  assert.equal(named(quiet), undefined, JSON.stringify(quiet.signs));
+  /* AND WHAT IT IS BRIEFED IS WHAT `signs` TELLS THE SAME KEY, name and sentence. */
+  const told = await api.signs({}, whole);
+  assert.ok(told.ok);
+  assert.deepEqual(quiet.signs, told.value.signs.filter((s) => s.state === 'red').map((s) => ({ name: s.name, said: s.said })));
+  sql.close();
+});
+
+test('RF2: A READING KEPT BEFORE THE QUIET NAME WAS IS READ AGAIN, never briefed', () => {
+  const now = NOW;
+  const fresh = keptSigns([], now);
+  assert.deepEqual(keptNow(fresh, now), []);
+  const older = { at: now, red: [{ name: 'The backup on 3 Sep did not run', said: 'x', quiet: 'y' }] };
+  assert.equal(keptNow(older, now), null);
 });

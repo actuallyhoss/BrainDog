@@ -10785,13 +10785,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * a person or key at a level that reads, held to no list and no part of one (`methods/signs.ts`, and `readsEveryList`
    * for a grant narrowed to some rows). A record that cannot read its signs briefs none rather than refusing the
    * briefing. AND THE INBOX'S WORDS ONLY TO WHO MAY READ THE INBOX (`quietSign`): a read token for the lists is told a
-   * red sign in that file's words, never a message or a question quoted from the inbox.
+   * red sign in that file's words, never a message or a question quoted from the inbox, in its name as in its sentence:
+   * a failure is titled by its question (AG7), and the name went to her whole (RF2).
    */
   const redSigns = (ctx: CallContext): Context['signs'] => {
     if (!readsWhole(ctx)) return [];
     const red = signsKept();
     const inbox = allows(ctx, 'owner') === null || inboxReached(ctx);
-    return red.map((s) => ({ name: s.name, said: inbox ? s.said : s.quiet }));
+    return red.map((s) => (inbox ? { name: s.name, said: s.said } : { name: s.quietName, said: s.quiet }));
   };
 
   /**
