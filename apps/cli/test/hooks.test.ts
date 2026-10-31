@@ -168,9 +168,13 @@ async function stubHost(
 /**
  * The machine's own BrainDog and Claude settings stay out: an empty config folder, no BRAINDOG_ variable, and none of
  * the variables Claude Code gives the shell it runs these tests in, so a child does not take this session for its own.
+ * THE HOME FOLDER IS THE CONFIG FOLDER'S OWN, so a child never reads or writes the real `~/.braindog` (the skills yes,
+ * the day's start, the update check), and two runs with one config folder share one home, as one machine does.
  */
 function envFor(config: string, extra: Record<string, string>): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, XDG_CONFIG_HOME: config };
+  const home = join(config, 'home');
+  mkdirSync(home, { recursive: true });
+  const env: NodeJS.ProcessEnv = { ...process.env, XDG_CONFIG_HOME: config, HOME: home, USERPROFILE: home };
   for (const name of Object.keys(env))
     if (name.startsWith('BRAINDOG_') || name.startsWith('CLAUDE_CODE_') || ['CLAUDECODE', 'CLAUDE_SESSION_ID', 'CLAUDE_PID', 'CLAUDE_CONFIG_DIR'].includes(name)) delete env[name];
   return { ...env, ...extra };
@@ -775,8 +779,13 @@ test('THE MCP SERVER SENDS WHAT ITS CLIENT SAID IT IS, from the hello on, with t
 
   const out = await run(['mcp', '--agent', 'claude'], env, `${[hello, ...calls].join('\n')}\n`, folder('kiln'));
   assert.equal(out.code, 0, out.stderr);
-  assert.ok(host.seen.length > 0, `the server never asked the host: ${out.stderr}`);
-  for (const asked of host.seen)
+  /* BEFORE THE HELLO, AT MOST ONE `createToken`: the agent's own token tried from BRAINDOG_TOKEN (D4, `agentTokenFromKey`),
+     which a token there is refused, so the server sends it as it always did. It goes before the client has said a word. */
+  const minted = host.seen.filter((s) => s.method === 'createToken');
+  assert.ok(minted.length <= 1 && (minted.length === 0 || host.seen[0] === minted[0]), host.seen.map((s) => s.method).join(' '));
+  const said = host.seen.filter((s) => s.method !== 'createToken');
+  assert.ok(said.length > 0, `the server never asked the host: ${out.stderr}`);
+  for (const asked of said)
     assert.deepEqual(
       ['x-braindog-client-name', 'x-braindog-client-version', 'x-braindog-client', 'x-braindog-agent'].map((name) => asked.headers[name]),
       ['claude-code', '2.1.287', 'claude-run-mine', 'claude'],
@@ -792,7 +801,8 @@ test('THE MCP SERVER FOLLOWS ITS WINDOW ACROSS A CLEAR: the run its own windowâ€
   const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CODE_SESSION_ID: 'claude-run-old' });
   const call = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list', arguments: { register: 'tasks' } } })}\n`;
   /* Every request the call made, as the run and the client it named, once each. */
-  const named = () => [...new Set(host.seen.splice(0).map((s) => `${String(s.headers['x-braindog-session'])} ${String(s.headers['x-braindog-client'])}`))];
+  /* Not the `createToken` before the hello (D4), which names no run because none is read before the first request. */
+  const named = () => [...new Set(host.seen.splice(0).filter((s) => s.method !== 'createToken').map((s) => `${String(s.headers['x-braindog-session'])} ${String(s.headers['x-braindog-client'])}`))];
 
   /* The clear's start hook, under the window that started this server (its parent, here this test): the window's file. */
   writeSession(windowPath(env, String(process.pid)), { host: host.base, spoken: 'S8', client_id: 'claude-run-new', head_at_start: null, at: new Date().toISOString(), pid: String(process.pid) });
@@ -811,7 +821,8 @@ test('TWO WINDOWS IN ONE FOLDER EACH KEEP THEIR OWN RUN: the second start hook d
   const cwd = realpathSync(folder('kiln'));
   const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
   const call = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list', arguments: { register: 'tasks' } } })}\n`;
-  const named = () => [...new Set(host.seen.splice(0).map((s) => `${String(s.headers['x-braindog-session'])} ${String(s.headers['x-braindog-client'])}`))];
+  /* Not the `createToken` before the hello (D4), which names no run because none is read before the first request. */
+  const named = () => [...new Set(host.seen.splice(0).filter((s) => s.method !== 'createToken').map((s) => `${String(s.headers['x-braindog-session'])} ${String(s.headers['x-braindog-client'])}`))];
   const now = () => new Date().toISOString();
 
   /* Window A started first, window B a minute later in the same folder, and B's start hook wrote the folder's file. */
