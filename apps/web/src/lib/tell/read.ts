@@ -896,7 +896,7 @@ const WHY = {
   whichWay: (name: string) => `Did ${name} pay you, or did you pay ${name}?`,
   /* THE OWNER IS NEVER THE PAYEE (AO12): "Paid Nadia 300" on Nadia's own BrainDog paid herself, with no question. */
   selfPaid: (name: string, figure: string) =>
-    `You are ${name} here. Was it paid to you, or to somebody else called ${name}? Say it like got ${figure}, or paid ${name} and their surname ${figure}.`,
+    `You are ${name} here. Was it paid to you, or to somebody else called ${name}? Say got ${figure} if it came to you, or give their full name.`,
   /* A PLAIN LINE THAT SAYS NO WAY, AND NAMES NOBODY (RL5): "Wages 12,000 due Friday". */
   inOrOut: (figure: string) => `Is that money you get, or money you pay? Say which with it, like got ${figure} or paid ${figure}.`,
   /* A NUMBER A THING IS KNOWN BY, AND NO AMOUNT (RO3): "Order 57 paid". */

@@ -1171,8 +1171,9 @@ const CASH_NOW = 'cash-now';
 function cashDrawn(b: LiveBlock): LiveBlock {
   const all = b.metrics ?? [];
   const now = all.find((m) => m.id === CASH_NOW);
-  if (now !== undefined && now.value !== MISSING) return b;
-  const metrics = all.filter((m) => m.id !== CASH_NOW && m.value !== MISSING && !nought(m.value));
+  /* A CASH NOW OVER NO ACCOUNT HOLDS NOTHING (`nothingHeld`) and is not drawn, though it reads nought. */
+  if (now !== undefined && now.value !== MISSING && !now.nothingHeld) return b;
+  const metrics = all.filter((m) => m.id !== CASH_NOW && m.value !== MISSING && !m.nothingHeld && !nought(m.value));
   if (metrics.length === all.length) return b;
   return metrics.length === 0 ? { ...b, metrics, drawn: false } : { ...b, metrics };
 }
