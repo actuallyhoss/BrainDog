@@ -264,12 +264,16 @@ export function nameOnly(said: string): string | null {
  * answer or pass on. A handle whose words were not read is said as the list's word for one beside it ("the tool
  * tools#8"); a row id is its words and handle, or "an entry you cannot open", never the 26 characters.
  */
-export function plainOf(said: string, look: Look, handles = true): string {
+export function plainOf(said: string, look: Look, handles = true, sums = true): string {
   /* THE ADDRESSES FIRST, because `jo@studio.local` would otherwise lose its machine's name and keep its person's. */
   let out = unaddressed(oneLine(said))
     .replace(/(?<![\w./\\-])[A-Za-z0-9][A-Za-z0-9-]*\.local(?![\w-]|\.\w)/gu, (host) => deviceOf(host) ?? 'this machine')
     .replace(/\b(?:DESKTOP|LAPTOP)-[A-Z0-9]{4,}\b/gu, (host) => deviceOf(host) ?? 'this machine')
     .replace(/(?<=^|[\s("'])(?:~|\.{1,2})?\/[^\s,;)"']+/gu, (path) => path.replace(/\/+$/u, '').split('/').at(-1) || 'a folder');
+  /* MONEY AS EVERY ANSWER SAYS IT (AK22): a question the record wrote as "GBP 39.00" read beside context's "£39". ONLY
+     IN THE SENTENCE ITSELF, BEFORE A ROW'S WORDS GO IN (RL11): a title or a field is the record's own words, and an agent
+     that copies "$1,200" back from one writes it over "USD 1,200.00". `sums` false says the sentence is a row's own. */
+  if (sums) out = moneyInText(out);
   if (handles)
     out = out.replace(HANDLE, (handle) => {
       /* A ROW'S WORDS MAY BE AN ADDRESS, a person met by mail before anybody knew their name, so they pass too. */
@@ -280,8 +284,7 @@ export function plainOf(said: string, look: Look, handles = true): string {
       return one ? `the ${one} ${handle}` : handle;
     });
   /* AFTER THE HANDLES, because a row id's words carry its handle, which the pass above would name a second time. */
-  /* MONEY AS EVERY ANSWER SAYS IT (AK22): a question the record wrote as "GBP 39.00" read beside context's "£39". */
-  return moneyInText(out)
+  return out
     .replace(new RegExp(ULID.source, 'gu'), (id) => {
       const title = look.title(id);
       return title === undefined ? 'an entry you cannot open' : unaddressed(title);
@@ -1225,7 +1228,8 @@ function changeValue(v: unknown, look: Look): string | null {
       const words = look.title(t);
       return words === undefined ? null : namedIn(nameOnly(words) ?? '', t, look, 40);
     }
-    return clip(plainOf(t, look), 60);
+    /* A FIELD'S OWN WORDS, so their money is left as the row writes it (RL11). */
+    return clip(plainOf(t, look, true, false), 60);
   }
   if (Array.isArray(v)) {
     const each = v.map((x) => changeValue(x, look));

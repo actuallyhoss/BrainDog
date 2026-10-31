@@ -36,6 +36,7 @@ import {
   REPLY_STATES,
   SEEN_HOW,
   SEAT_NAME,
+  SESSION,
   SESSION_PREFIX,
   ANSWERS_MOST,
   agentOf as kindOf,
@@ -552,8 +553,20 @@ export function methods(deps: RecordDeps) {
     const named = opener.startsWith('token:') ? opener.slice(6) : opener;
     const run = new RegExp(`^${SESSION_PREFIX}[1-9]\\d*$`, 'u').test(named);
     const token = named.startsWith('t_') ? named : run ? tokenOfRun(sql, named) : null;
-    /* A RUN NO KEY OPENED is an automation's, which is the record's own. */
-    if (token === null) return !run;
+    /* A RUN NO KEY OPENED is the record's own only when an automation made it. One a person made in the app, for an
+       agent to take up, is that person's: its create line says who was signed in (RL1), and a run nothing signs is
+       nobody's to pass. */
+    if (token === null) {
+      if (!run) return true;
+      const made = sql.one<{ a: string }>(
+        `SELECT e.actor AS a FROM entry n JOIN event e ON e.target = 'entry:' || n.id AND e.kind = 'create'
+         WHERE n.register = '${SESSION}' AND n.seq = ? ORDER BY e.rowid LIMIT 1`,
+        Number(named.slice(SESSION_PREFIX.length)),
+      )?.a;
+      if (made === undefined) return true;
+      if (made === 'system' || made === 'slash' || made.startsWith('rule:') || made.startsWith('script:')) return false;
+      return made !== by;
+    }
     const key = sql.one<{ person_id: string | null; label: string | null }>('SELECT person_id, label FROM token WHERE id = ?', token);
     if (key === undefined || (key.label ?? '').startsWith('report:')) return true;
     return key.person_id !== by;

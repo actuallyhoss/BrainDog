@@ -547,6 +547,70 @@ export type Filed = { id: string; joined?: true; widened?: number; answered?: Re
 /** How a question another one covered is closed: this, then the question whose accept settled it. */
 export const COVERED = 'Settled by';
 
+/**
+ * A mail put back in the inbox, given back to the questions its settling let go of it from (`settleAsked` in
+ * `index.ts`, RL10): each `suggest` line on `raws` in the settling's batch holds the row it let go of. The question takes
+ * the row back, reopened if it closed when its last mail was filed, and keeps beside it only the mail still in the inbox,
+ * so a yes never files a mail that was filed meanwhile. Read by a put back (`returnArrival`) and an undo of the filing.
+ */
+export function askAgainLetGo(
+  sql: Sql,
+  mint: () => string,
+  at: string,
+  lines: readonly { kind: string; target: string | null; field: string | null; from_v: string | null }[],
+  raw: string,
+  actor: string,
+  batch: string,
+): void {
+  for (const l of lines) {
+    if (l.kind !== 'suggest' || l.field !== 'raws' || l.target === null || !l.target.startsWith('suggestion:')) continue;
+    const id = l.target.slice('suggestion:'.length);
+    let was: { raw?: unknown; row?: unknown } | null;
+    try {
+      was = JSON.parse(l.from_v ?? 'null') as { raw?: unknown; row?: unknown } | null;
+    } catch {
+      continue;
+    }
+    if (was === null || was.raw !== raw || was.row === null || typeof was.row !== 'object') continue;
+    const q = sql.one<{ status: string; resolved_as: string | null; body: string }>('SELECT status, resolved_as, body FROM suggestion WHERE id = ?', id);
+    if (q === undefined || (q.status !== 'open' && q.resolved_as !== 'moot')) continue;
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(q.body) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const raws = Array.isArray(body.raws) ? (body.raws as unknown[]) : [];
+    const rows = Array.isArray(body.rows) ? (body.rows as unknown[]) : [];
+    if (raws.length !== rows.length || raws.includes(raw)) continue;
+    const waiting = new Set(
+      sql
+        .all<{ id: string }>("SELECT id FROM inbox_raw WHERE id IN (SELECT value FROM json_each(?)) AND state IN ('untriaged', 'review')", JSON.stringify(raws))
+        .map((r) => r.id),
+    );
+    const keep = raws.map((r, n) => [r, rows[n]] as const).filter(([r]) => typeof r === 'string' && waiting.has(r));
+    const next = { ...body, rows: [...keep.map(([, row]) => row), was.row], raws: [...keep.map(([r]) => r), raw], count: keep.length + 1 };
+    sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(next), id);
+    if (q.status !== 'open')
+      sql.exec(
+        `UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL,
+           cause = CASE WHEN EXISTS (SELECT 1 FROM suggestion o WHERE o.status = 'open' AND o.cause = suggestion.cause AND o.id <> suggestion.id) THEN NULL ELSE cause END
+         WHERE id = ?`,
+        id,
+      );
+    sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', 'rows', ?, ?, 'Asked again: the mail is back in the inbox.', ?)",
+      mint(),
+      at,
+      actor,
+      `suggestion:${id}`,
+      String(rows.length),
+      String(next.rows.length),
+      batch,
+    );
+  }
+}
+
 /** The one sentence a rowset that would change nothing is refused with. */
 export const NOTHING_TO_DECIDE = 'Everything this asks for is already so. Nothing to decide.';
 
