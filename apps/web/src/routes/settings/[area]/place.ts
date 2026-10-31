@@ -87,7 +87,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       area('/settings/appearance', 'Appearance', 'sun', 'Theme, density, phone bar'),
       area('/settings/navigation', 'Pages', 'rows', 'Sidebar and bar'),
       area('/settings/words', 'Words and money', 'tag', 'List names, currency'),
-      area('/settings/notifications', 'Notifications', 'bell', 'Quiet hours, summaries'),
+      area('/settings/notifications', 'Notifications', 'bell', 'Quiet hours, summaries, time zone'),
       area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts'),
       area('/settings/signing-in', 'Signing in', 'key', 'Passkeys, devices'),
     ],

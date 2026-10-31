@@ -1,6 +1,6 @@
 <!--
   Settings > Notifications: when this product interrupts, the rules that tell you things and which of them you muted,
-  the record's quiet hours, and whether this device is rung.
+  the record's quiet hours and the time zone they are read in, and whether this device is rung.
 -->
 <script lang="ts">
   import { BASE, apiBase } from '$lib/at.ts';
@@ -11,8 +11,12 @@
   import { read } from '$lib/data/read.svelte.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { invalidateAll } from '$app/navigation';
+  import { forget } from '$lib/record/boot-live.ts';
+  import { learnZone, recordZone } from '$lib/record/zone.ts';
   import { createClient } from '@braindog/client';
-  import { TONES } from 'braindog-render';
+  import { TONES, readerZone } from 'braindog-render';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -38,7 +42,66 @@
     interrupts: 'Urgent only, at most hourly: expiring keys, held runs, urgent rules.',
     mac: 'Mac notifications',
     macLine: 'New questions and handoffs, once each',
+    zone: 'Time zone',
+    zoneWhy: 'Today, late and due days, and the quiet hours are counted here.',
+    zoneOwner: 'Only an owner can change it.',
+    zoneDevice: (place: string) => `This device: ${place}`,
+    zoneNow: (place: string) => `Time zone is now ${place}.`,
   } as const;
+
+  /* ── the time zone (MC2) ─────────────────────────────────────────────── */
+
+  /** "Africa/Cairo" as a person reads it: "Cairo", in the group "Africa"; "America/Argentina/Buenos_Aires" is "Buenos Aires". */
+  const placeOf = (tz: string): string => (tz === 'UTC' ? 'UTC' : (tz.split('/').pop() ?? tz).replace(/_/g, ' '));
+  const areaOf = (tz: string): string => (tz.includes('/') ? tz.slice(0, tz.indexOf('/')).replace(/_/g, ' ') : '');
+  const zoneSaid = (tz: string): string => (areaOf(tz) ? `${placeOf(tz)} (${areaOf(tz)})` : placeOf(tz));
+
+  /**
+   * THE ZONES ON OFFER: the browser's own list, as the record checks a zone against the runtime's, grouped by area. The
+   * zone held and this device's zone are always offered, though a runtime may file either under another name.
+   */
+  const device = readerZone();
+  let zoneHeld = $state(recordZone());
+  const zoneGroups = $derived.by(() => {
+    let all: string[] = [];
+    try {
+      all = Intl.supportedValuesOf('timeZone');
+    } catch {
+      all = [];
+    }
+    const listed = new Set(all);
+    for (const z of [zoneHeld, device]) if (z && z !== 'UTC' && !listed.has(z)) all = [...all, z].sort();
+    const groups = new Map<string, string[]>();
+    for (const z of all) {
+      if (z === 'UTC' || !z.includes('/')) continue;
+      const area = areaOf(z);
+      groups.set(area, [...(groups.get(area) ?? []), z]);
+    }
+    return [...groups].map(([area, zones]) => ({ area, zones: zones.sort((a, b) => placeOf(a).localeCompare(placeOf(b))) }));
+  });
+  let zoneBusy = $state(false);
+  let zoneRefusal = $state('');
+
+  /** A pick is the change, kept at once with Undo; the shell is asked again so every "today" counts in the new zone. */
+  async function putZone(next: string, undoing = false, select?: HTMLSelectElement): Promise<void> {
+    if (zoneBusy || next === '' || next === zoneHeld) return;
+    const was = zoneHeld;
+    zoneBusy = true;
+    zoneRefusal = '';
+    const at = opened();
+    const out = wrote(await clientOf().setZone(next));
+    closed(true, at);
+    zoneBusy = false;
+    if (!out.ok) {
+      if (select) select.value = was;
+      zoneRefusal = out.fix;
+      return;
+    }
+    zoneHeld = learnZone(out.value.tz);
+    if (!undoing) toasts.push(words.zoneNow(zoneSaid(zoneHeld)), { undo: () => void putZone(was, true) });
+    forget();
+    await invalidateAll();
+  }
 
   /**
    * THE QUIET HOURS IN 24-HOUR TIME, ALWAYS (agents F20). A native time field draws in the browser's own language, so an
@@ -212,6 +275,27 @@
     {/if}
   {/if}
 </Tile>
+<!-- THE RECORD'S TIME ZONE, which "today" and the quiet hours above are counted in: the owner picks it, everybody reads it. -->
+<Tile icon="globe" title={words.zone}>
+  {#if owner}
+    <div class="zone">
+      <label class="quiet-word" for="zone-pick">{words.zone}</label>
+      <select class="zone-pick" id="zone-pick" value={zoneHeld} disabled={zoneBusy} onchange={(e) => void putZone(e.currentTarget.value, false, e.currentTarget)}>
+        {#if device && device !== zoneHeld}<option value={device}>{words.zoneDevice(zoneSaid(device))}</option>{/if}
+        <option value="UTC">UTC</option>
+        {#each zoneGroups as g (g.area)}
+          <optgroup label={g.area}>{#each g.zones as z (z)}<option value={z}>{placeOf(z)}</option>{/each}</optgroup>
+        {/each}
+      </select>
+    </div>
+    {#if zoneRefusal}
+      <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {zoneRefusal}</p>
+    {/if}
+    <p class="hint">{words.zoneWhy}</p>
+  {:else}
+    <StateRow icon="globe" title={zoneSaid(zoneHeld)} line={`${words.zoneWhy} ${words.zoneOwner}`} />
+  {/if}
+</Tile>
 <!-- THE ONE CONTROL ON THIS SCREEN THAT IS ABOUT THE DEVICE, NOT THE RECORD. It says whether this browser is rung when
      something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here.
      THE TILE IS THIS WRAPPER, so the toggle's section lies flat inside it and the test sits under the switch in the same
@@ -250,6 +334,33 @@
     column-gap: var(--sp-3);
     min-block-size: var(--row-h-2);
     padding-block: var(--sp-2);
+  }
+
+  /* THE ZONE, AS ONE ROW: its word and the picker, which takes the rest of the row and never runs past it. */
+  .zone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+  }
+
+  .zone-pick {
+    flex: 1 1 16ch;
+    min-inline-size: 0;
+    max-inline-size: 40ch;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2);
+    background: var(--tile);
+    border: 1px solid var(--switch-off);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 400;
   }
 
   /* THE FACTS OF WHAT INTERRUPTS, said once, at the body size and kept to 75 characters. */
@@ -375,6 +486,12 @@
 
     .quiet-time {
       inline-size: 100%;
+      min-block-size: var(--tap);
+    }
+
+    .zone-pick {
+      flex-basis: 100%;
+      max-inline-size: none;
       min-block-size: var(--tap);
     }
   }

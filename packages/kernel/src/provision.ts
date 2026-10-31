@@ -69,7 +69,7 @@ export function createRecord(
   if (!args.name.trim()) return no<Provisioned>('REQUIRED_MISSING', 'A BrainDog has a name a person would say.', { at: 'name' });
   /* THE TIMEZONE IS CHECKED AGAINST THE RUNTIME'S OWN DATA, never against a list shipped here: a
      table of zones is a table that is wrong the next time a government moves one. */
-  if (!isZone(args.tz)) return no<Provisioned>('VALUE_MALFORMED', zoneRefused(args.tz), { at: 'tz' });
+  if (!placeZone(args.tz)) return no<Provisioned>('VALUE_MALFORMED', zoneRefused(args.tz), { at: 'tz' });
 
   const existing = sql.one<{ id: string; slug: string }>('SELECT id, slug FROM record WHERE singleton = 1');
   /* AN OBJECT IS ADDRESSED, NOT CREATED, so a second create is the ordinary case — a retried signup,
@@ -243,7 +243,7 @@ const zones = (): ReadonlySet<string> => (ZONES ??= new Set(Intl.supportedValues
  * the browser's zone, so refusing those would refuse everybody in India. A name shaped `Area/Place`, outside `Etc/` and
  * `SystemV/`, that the runtime resolves to a zone in the list is kept as typed; `EST`, `GB` and `PRC` have no `/`.
  */
-function isZone(tz: string): boolean {
+export function placeZone(tz: string): boolean {
   if (UTC_NAMES.has(tz) || zones().has(tz)) return true;
   if (!/^[A-Z][A-Za-z_-]*(\/[A-Za-z0-9_+-]+)+$/.test(tz) || /^(Etc|SystemV)\//.test(tz)) return false;
   try {
@@ -257,7 +257,7 @@ function isZone(tz: string): boolean {
  * The one sentence a refused zone gets. It names what was typed and offers the browser's own zone, which is always a
  * place, because a zone is typed only by the operator's command and the person typing it has a browser to ask.
  */
-function zoneRefused(tz: string): string {
+export function zoneRefused(tz: string): string {
   return `${tz} is not a place's time zone, so use the one your browser reports, a place such as Africa/Cairo or America/New_York, or UTC.`;
 }
 
