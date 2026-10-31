@@ -159,3 +159,46 @@ test('what each account holds is a row an account, the card in its minus (AL12)'
   assert.ok(bars && bars.type === 'block' && bars.kind === 'bar');
   assert.deepEqual(bars.rows.map((r) => r.cells.slice(0, 2)), [['Tax reserve', '£24,000'], ['Company card', '−£1,240']]);
 });
+
+test('goals set against what was logged are tracks, "29.5 of 100" over their unit, never the figure\'s whole', () => {
+  const b = block({
+    kind: 'progress',
+    toward: true,
+    columns: [{ field: 'what', label: 'Goal' }, { field: 'target', label: 'Aim' }, { field: 'unit', label: 'Counted in' }],
+    readings: [{ metric: 'logged-by-goal', label: 'Logged, by goal', value: 34.5, unit: null }],
+    rows: [{ ...row({ what: { type: 'text', value: 'Run 100 km' }, target: { type: 'decimal', value: 100 }, unit: { type: 'text', value: 'km' } }, 'active'), spent: 29.5 }],
+  });
+  const d = drawingOf(shown(b), where);
+  assert.equal(d.table, null);
+  const bars = d.segments.find((s) => s.type === 'block');
+  assert.ok(bars && bars.type === 'block' && bars.kind === 'progress');
+  assert.deepEqual(bars.rows[0]?.cells, ['Run 100 km', '29.5', '100', 'km']);
+});
+
+test('a count is one track a group, its rows done of all, where a link drew a column of Yes and No', () => {
+  const b = block({
+    kind: 'progress',
+    columns: [{ field: 'thing', label: 'Project', ref: true }, { field: 'done', label: 'Done' }],
+    rows: [true, true, false, false].map((done) => row({ thing: { type: 'text', value: 'Garden shed' }, done: { type: 'bool', value: done } })),
+  });
+  const bars = drawingOf(shown(b), where).segments.find((s) => s.type === 'block');
+  assert.ok(bars && bars.type === 'block' && bars.kind === 'progress');
+  assert.deepEqual(bars.rows[0]?.cells.slice(0, 3), ['Garden shed', '2', '4']);
+});
+
+test('a table says a close deadline as the app does, and writes a whole column of amounts without pence', () => {
+  const b = block({
+    kind: 'table',
+    done: ['paid'],
+    columns: [{ field: 'what', label: 'Order' }, { field: 'total', label: 'Total' }, { field: 'due', label: 'Due', deadline: true }],
+    rows: [
+      row({ what: { type: 'text', value: 'Three candles' }, total: { type: 'money', value: { amount: 135000, currency: 'EGP' } }, due: { type: 'day', value: '2026-09-04' } }, 'ready'),
+      row({ what: { type: 'text', value: 'Gift box' }, total: { type: 'money', value: { amount: 120000, currency: 'EGP' } }, due: { type: 'day', value: '2026-09-04' } }, 'paid'),
+    ],
+  });
+  const d = drawingOf(shown(b), where);
+  assert.deepEqual(d.table?.rows.map((r) => r.cells), [
+    ['Three candles', 'EGP 1,350', 'Due in 2 days'],
+    ['Gift box', 'EGP 1,200', '4 Sep'],
+  ]);
+});

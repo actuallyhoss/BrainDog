@@ -153,8 +153,10 @@
     </table>
   {/if}
 
+  <!-- NO `home`: every amount is already said as the app says it (`tableOf`), whole where its column is, and the table
+       writing it again against the home currency put the pence back on every line ("EGP 1,350.00"). -->
   {#if d.table}
-    <Table columns={d.table.columns} rows={d.table.rows} total={d.table.rows.length} label={b.heading ?? copy.kindNames[b.kind]} home={where.home ?? null} now={where.now} />
+    <Table columns={d.table.columns} rows={d.table.rows} total={d.table.rows.length} label={b.heading ?? copy.kindNames[b.kind]} now={where.now} />
   {/if}
   {#if s.rows.length > 0 && s.matched > s.rows.length}<p class="part-note">{words.sharedMore(s.matched - s.rows.length)}</p>{/if}
 {/snippet}

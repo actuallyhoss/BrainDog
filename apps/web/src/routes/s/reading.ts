@@ -41,8 +41,9 @@ export function headOf(got: SharedRead): { title: string; line: string } {
 /**
  * Where a page is read: the record's language and zone, the moment the record said its clock read, and its home
  * currency, whose amounts are written by their sign alone as the app writes them ("£4,050", never "£4,050 GBP").
+ * `pence` keeps nought pence, for a column where another amount has some (`tableOf` in `drawing.ts`).
  */
-export type Where = { language: string; zone: string; now: number; home?: string | null };
+export type Where = { language: string; zone: string; now: number; home?: string | null; pence?: boolean };
 
 /**
  * HOW THE OWNER'S NOTES ARE DRAWN HERE: in the record's clock, zone and home currency, and with no link into the record.
@@ -88,11 +89,12 @@ const numberSaid = (n: number, language: string): string => {
  * other with its code, and never two added. `headline` is a tile's figure, in whole units from ten thousand up; a cell
  * keeps its pence unless they are all noughts ("£14", "−£8,530", "£12.40"). `null` for a value that is not whole money.
  */
-export function moneySaid(amount: unknown, currency: unknown, setting: 'exact' | 'headline' = 'exact', home: string | null = null): (Drawn & { text: string }) | null {
+export function moneySaid(amount: unknown, currency: unknown, setting: 'exact' | 'headline' | 'pence' = 'exact', home: string | null = null): (Drawn & { text: string }) | null {
   if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || typeof currency !== 'string' || !CURRENCY.test(currency)) return null;
   const text = money(amount, currency);
   const parts = drawn(text, home, setting === 'headline' ? 'headline' : false);
   if (parts === null) return null;
+  /* `pence` KEEPS NOUGHT PENCE, for a column where another amount has some, so its digits line up (`moneySet`). */
   const fraction = setting === 'exact' && /^\.0+$/u.test(parts.fraction) ? '' : parts.fraction;
   return { ...parts, fraction, text: `${parts.lead}${parts.whole}${fraction}${parts.iso === null ? '' : `${AMOUNT_SPACE}${parts.iso}`}` };
 }
@@ -142,7 +144,7 @@ const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typ
  */
 function typedSaid(type: string, value: unknown, label: string | undefined, where: Where, minus = false, unit?: string, field?: string): Said {
   if (type === 'money' && isObject(value) && typeof value.amount === 'number') {
-    const m = moneySaid(minus ? -value.amount : value.amount, value.currency, 'exact', where.home ?? null);
+    const m = moneySaid(minus ? -value.amount : value.amount, value.currency, where.pence === true ? 'pence' : 'exact', where.home ?? null);
     return m === null ? { text: '' } : { money: m };
   }
   if (type === 'quantity' && isObject(value) && typeof value.value === 'number')
@@ -304,10 +306,12 @@ export function shownBlocks(blocks: readonly SharedBlock[], where: Where): { lea
     }
     const all = columnsOf(b);
     const columns = all.filter((c) => b.rows.some((r) => !blank(cellSaid(r, c, where))));
-    const title = columns[0];
+    /* THE ROW'S NAME IS ITS FIRST COLUMN THAT IS NOT ANOTHER ROW'S: an order nobody is named on is still an order, where
+       a Who first left it out. */
+    const title = columns.find((c) => c.ref !== true) ?? columns[0];
     const rows = title === undefined ? [] : b.rows.filter((r) => !blank(cellSaid(r, title, where)));
     const matched = Math.max(rows.length, b.matched - (b.rows.length - rows.length));
-    const says = rows.length > 0 || b.readings.length > 0 || b.authored.some((cells) => cells.some((c) => plainSaid(c, where) !== '')) || Boolean(b.body) || Boolean(b.refused);
+    const says = rows.length > 0 || b.readings.length > 0 || (b.measures?.length ?? 0) > 0 || b.authored.some((cells) => cells.some((c) => plainSaid(c, where) !== '')) || Boolean(b.body) || Boolean(b.refused);
     if (says) out.push({ block: b, columns, rows, matched });
   }
   return { lead, blocks: overSomething(out) };

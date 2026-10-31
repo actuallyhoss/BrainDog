@@ -40,6 +40,8 @@ import type { Refusal, Result } from '@braindog/ports';
 import { TYPED, dateSaid, formatTyped, kindSpec, splitRow, writeAmount, type TypedForm } from 'braindog-render';
 import { ok } from '@braindog/ports';
 
+import { labelsOf } from '@braindog/declare';
+import { speakingNow } from '../arrange.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -250,13 +252,25 @@ const plain = (v: Json): boolean => isScalar(v) || (Array.isArray(v) && v.every(
  * `fields` IS THE SAME ROW AS PLAIN VALUES, for the reader that predates `cells` (`share-write.ts`), so money is in
  * `cells` alone: that reader drew an amount blank, and would draw an object as its braces.
  */
-const rowShown = (row: Entry, drawn: readonly string[], lists: ReadonlyMap<string, RegisterDecl>) => {
+const rowShown = (row: Entry, drawn: readonly string[], lists: ReadonlyMap<string, RegisterDecl>, refSaid?: (id: string) => string | undefined) => {
   const decl = lists.get(row.register);
   const fields: Record<string, Json> = {};
   const cells: Record<string, SharedCell> = {};
   for (const id of drawn) {
     const field = decl?.fields.find((f) => f.id === id);
     if (field === undefined || !Object.hasOwn(row.fields, id)) continue;
+    /* A LINK TO ANOTHER ROW IS SAID BY THAT ROW'S NAME, as the owner's page says it ("Toward: Run 100 km", a ticket's
+       Owner, an order's Who), and never by its id. `refSaid` answers only a row a link may name (`sharedPage`), so a
+       column the owner reads as a name was a hole on the link: Logged lately had no Toward, a sprint plan no Ticket. */
+    if (field.type === 'ref') {
+      const value = row.fields[id];
+      const title = typeof value === 'string' && refSaid !== undefined ? refSaid(value) : undefined;
+      if (title !== undefined && title !== '' && !inside(title)) {
+        fields[id] = title;
+        cells[id] = { type: 'text', value: title };
+      }
+      continue;
+    }
     const shown = valueShown(field, row.fields[id]);
     if (shown === undefined) continue;
     if (plain(shown)) fields[id] = shown;
@@ -499,6 +513,101 @@ const moneyCellsOut = (lines: readonly string[], money: (key: string) => boolean
   return out;
 };
 
+/** The verbs a sentence makes agree with its figure, each as its one form and its many (`VERB` in the app's `metrics.ts`). */
+const VERB: Readonly<Record<string, readonly [string, string]>> = { is: ['is', 'are'], are: ['is', 'are'], was: ['was', 'were'], were: ['was', 'were'], has: ['has', 'have'], have: ['has', 'have'] };
+
+/**
+ * THE PLURALS OF A TEMPLATE SETTLED BY ITS FIGURES, every `{{path}}` kept for the filling after (`pluralsIn` in the app's
+ * `metrics.ts`, rule for rule): `{{n}} order(s)` is "order" for one and "orders" for more, a verb after it agrees, and a
+ * verb after a figure's names agrees with how many it named. Any `(s)` left is a plural.
+ */
+export const pluralsSettled = (template: string, said: (path: string) => string | undefined): string =>
+  template
+    .replace(
+      /(\{\{\s*([a-z][a-z0-9_-]*\.names)\s*\}\})(\s+)(?:([A-Za-z]+)\(s\)|(are|is|were|was|have|has)\b)/gu,
+      (_, hole: string, path: string, gap: string, verb: string | undefined, be: string | undefined) => {
+        const single = !/ and /u.test(said(path) ?? '');
+        if (verb !== undefined) return `${hole}${gap}${verb}${single ? 's' : ''}`;
+        const forms = VERB[be!]!;
+        return `${hole}${gap}${single ? forms[0] : forms[1]}`;
+      },
+    )
+    .replace(
+      /(\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*(?::[^{}\s]+)?)\s*\}\}|(?<![\d.,])\b\d[\d,]*(?:\.\d+)?)((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)(?:(\s+)(are|is|were|was|have|has)\b)?/gu,
+      (_, figure: string, path: string | undefined, between: string, word: string, gap: string | undefined, verb: string | undefined) => {
+        const single = (path === undefined ? figure : (said(path) ?? '')).trim() === '1';
+        const forms = verb !== undefined && Object.hasOwn(VERB, verb) ? VERB[verb] : undefined;
+        return `${figure}${between} ${single ? word : `${word}s`}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
+      },
+    )
+    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
+
+/** A sentence that already ends as one: a stop, a question, an ellipsis or a colon, even inside a closing quote (`stopped`). */
+const STOPPED = /[.!?…:]["”’)\]]*$/u;
+
+/** A figure said as nothing: nought, in any currency, as a count, a share or an amount ("0", "EGP 0", "£0", "0%"). */
+const NOUGHT_SAID = /^[-\u2212+]?(?:[A-Z]{3}\s?|\p{Sc})?[-\u2212]?0+(?:[.,]0+)?\s?%?$/u;
+
+/**
+ * Whether one clause of an opening line stands (`leadSentence` in the app's `metrics.ts`): it holds no figure, or every
+ * figure in it is said and one of them is more than nought, and nothing it says names a row by its id.
+ */
+const clauseStands = (clause: string, fill: (key: string) => string | undefined): boolean => {
+  const holes = keysIn(clause).filter((k) => !/^(?:bad|icon):/u.test(k));
+  if (holes.length === 0) return true;
+  const figures = holes.map(fill);
+  if (figures.some((f) => f === undefined || f.trim() === '' || new RegExp(SPOKEN_ID.source, 'u').test(f))) return false;
+  return figures.some((f) => !NOUGHT_SAID.test(f!.trim()));
+};
+
+/**
+ * A NOTE'S OPENING LINE AS THE APP SAYS IT (`leadOf`): sentence by sentence, each clause that does not stand left out on
+ * its own (a clause that opens on "with" leans on the one before it), its plurals settled, a line left opening on "and"
+ * starting at its next word, and each sentence ending on a stop. A sentence with no figure leans on the one before it.
+ * The first letter is a capital, since a line whose first clause went starts mid-sentence.
+ */
+export const leadShown = (template: string, fill: (key: string) => string | undefined): string => {
+  const out: string[] = [];
+  let before = true;
+  for (const sentence of template.split(/(?<=[.!?])\s+(?=\S)/u)) {
+    if (keysIn(sentence).length === 0) {
+      if (before && sentence.trim() !== '') out.push(sentence.trim());
+      continue;
+    }
+    let lean = true;
+    const kept = sentence.split(/,\s+/u).filter((clause) => (lean = clauseStands(clause, fill) && (lean || !/^with\b/iu.test(clause))));
+    const said = filledIn(pluralsSettled(kept.join(', '), fill), fill)
+      .replace(/^and\s+/u, '')
+      .replace(/\s{2,}/gu, ' ')
+      .trim();
+    before = said !== '';
+    if (said !== '') out.push(STOPPED.test(said) ? said : `${said}.`);
+  }
+  /* AND IT ENDS AS A SENTENCE DOES, whatever it held (`stopped` in the app): a project's line is its own words, filled. */
+  const line = out.join(' ').trim();
+  const stopped = line === '' || STOPPED.test(line) ? line : `${line}.`;
+  return stopped.replace(/^\p{Ll}/u, (c) => c.toUpperCase());
+};
+
+/**
+ * WHAT A NOTE SAYS THAT A LINK NEVER READS, or `null` for a block it keeps off whole. A block whose lists include one no
+ * link reads (`NEVER_READ`) is held back, but a note is its sentences: Team's line "4 open tickets, 1 blocked, 2
+ * suggestions from agents" counted the agents' questions, which read the whole record, and a link lost the whole line
+ * for one clause. So a note's holes are asked one at a time, and the ones that read such a list are said as nothing,
+ * which takes their clause or sentence with them, while the rest of the note stays only if nothing else of it reads one.
+ */
+const heldHoles = (b: BlockResult, showing: Showing): ReadonlySet<string> | null => {
+  const never = (x: unknown): boolean => showing.reads(x as BlockResult).some((list) => NEVER_READ.has(list));
+  if (!never(b)) return new Set();
+  const body = (b as { body?: unknown }).body;
+  if (b.kind !== 'note' || typeof body !== 'string' || (b.source !== undefined && b.source !== null && b.source !== '')) return null;
+  const keys = [...new Set(keysIn(body))];
+  const held = new Set(keys.filter((k) => never({ kind: 'note', body: `{{${k}}}`, rows: [], refusals: [] })));
+  if (held.size === 0) return null;
+  const rest = keys.filter((k) => !held.has(k)).map((k) => `{{${k}}}`).join(' ');
+  return never({ ...b, body: rest }) ? null : held;
+};
+
 /**
  * A note's body as a link shows it.
  *
@@ -588,6 +697,39 @@ type Showing = {
   money: boolean;
   /** Whether a figure, by its id and any parameter after its first colon, is money (`figureIsMoney`). */
   moneyFigure: (metric: string) => boolean;
+  /** The name of a row another row links to, or `undefined` for one a link may not name (`sharedPage`'s `refSaid`). */
+  refSaid?: (id: string) => string | undefined;
+};
+
+/**
+ * THE LISTS AS THE OWNER READS THEM, relabelled by the speaking use case's words as the app relabels them (`relabel` in
+ * the app's `voice.ts`): a list's name and the word for one of its rows, a field's label, and an enum's values. A list
+ * no label names is the same object.
+ */
+export const voiced = (lists: ReadonlyMap<string, RegisterDecl>, labels: Readonly<Record<string, string>>): ReadonlyMap<string, RegisterDecl> => {
+  const keys = Object.keys(labels);
+  if (keys.length === 0) return lists;
+  const out = new Map<string, RegisterDecl>();
+  for (const [id, decl] of lists) {
+    if (labels[id] === undefined && !keys.some((k) => k.startsWith(`${id}.`) || k.startsWith(`${id}:`))) {
+      out.set(id, decl);
+      continue;
+    }
+    const fields = decl.fields.map((f) => {
+      const own = labels[`${id}.${f.id}`];
+      const at = `${id}.${f.id}.`;
+      const values = keys.filter((k) => k.startsWith(at));
+      if (own === undefined && values.length === 0) return f;
+      return {
+        ...f,
+        ...(own === undefined ? {} : { label: own }),
+        ...(values.length === 0 ? {} : { labels: { ...f.labels, ...Object.fromEntries(values.map((k) => [k.slice(at.length), labels[k]!])) } }),
+      };
+    });
+    const one = labels[`${id}:one`];
+    out.set(id, { ...decl, ...(labels[id] === undefined ? {} : { name: labels[id] }), ...(one === undefined ? {} : { one }), fields } as RegisterDecl);
+  }
+  return out;
 };
 
 /**
@@ -689,6 +831,10 @@ const moneyFree = (b: BlockResult, showing: Showing): BlockResult | null => {
      names alone under "This month's budgets" (AL6). */
   const spent = (b as { spent?: unknown }).spent;
   if (b.kind === 'progress' && typeof spent === 'string' && showing.moneyFigure(spent)) return null;
+  /* NOR A GOAL SET AGAINST A MONEY FIGURE (`toward:`, what was put by toward each saving): its targets go with the
+     money, and what is left is names over nothing. */
+  const toward = (b as { toward?: unknown }).toward;
+  if (b.kind === 'progress' && typeof toward === 'string' && showing.moneyFigure(toward)) return null;
   const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
   /* THE LISTS ITS ROWS COME FROM, not every list its figures count: "Open 7" over the work stays beside "Still to come
      in", which goes as a figure in a currency. */
@@ -779,7 +925,7 @@ const FIGURE_FORMATS = /^(?:int|decimal|pct|days|day|money(?:\.[A-Z]{3})?)$/u;
  * A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign, and the
  * second field it reads where its own holds nothing (`or`, the Ledger's name: who was paid, else the bank's line).
  */
-type ColumnShown = { field: string; or?: string; label: string; as?: string; sign?: { field: string; minus: string } };
+type ColumnShown = { field: string; or?: string; label: string; as?: string; sign?: { field: string; minus: string }; deadline?: true; ref?: true };
 
 /** A walk's step without the list and the row it came from (`source`, `spoken`). */
 const stepShown = (step: unknown) => {
@@ -821,7 +967,14 @@ const FIGURE_COLUMN_OUT: Readonly<Record<string, string>> = { trend: 'trends', w
  * done by week), and the column is asked of `NEVER_READ` by the lists that figure reads, like any other. The money rules
  * still hold after this (`moneyFree` drops a trend over a money figure).
  */
-const neverReadCut = (b: BlockResult, showing: Showing): BlockResult => {
+const neverReadCut = (given: BlockResult, showing: Showing): BlockResult => {
+  /* A BLOCK THAT MARKS WHICH OF ITS ROWS HAS AN AGENT AT WORK NOW (`working: true`) READS THE AGENTS' RUNS FOR THAT DOT
+     ALONE, and a link never reads them: Team's In flight, its tickets as cards, went whole. The dot goes and the cards
+     stay, drawn from the tickets' own rows; whatever else the block reads is still asked after. */
+  const b: BlockResult =
+    (given as { working?: unknown }).working === true
+      ? (({ working: _working, working_now: _now, ...rest }) => rest as unknown as BlockResult)(given as unknown as Record<string, unknown>)
+      : given;
   if (!Array.isArray(b.columns) || !b.columns.some((c) => typeof c.metric === 'string')) return b;
   const cut = new Set<string>();
   const columns = b.columns.filter((c) => {
@@ -850,7 +1003,8 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
   const { lists, figure, said, typed, cell } = showing;
   if (typeof given.kind !== 'string' || !shareKind(given.kind) || !shareDraws(given.source)) return null;
   const whole = neverReadCut(given, showing);
-  if (showing.reads(whole).some((list) => NEVER_READ.has(list))) return null;
+  const held = heldHoles(whole, showing);
+  if (held === null) return null;
   if (whole.refusals.length > 0) return null;
   /* WHAT THE OWNER'S PAGE DOES NOT DRAW IS NOT ON THE LINK (AH7, `markDrawn`): a note whose `when` failed said "No project
      yet" over a page with one. */
@@ -867,7 +1021,22 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
   const values = inMoney === undefined ? written : Object.fromEntries(Object.entries(written).filter(([key]) => !inMoney(key)));
   const fill = tokenSaid(values, said, typed);
   const amount = inMoney === undefined ? undefined : (key: string): boolean => amountKey(written)(key) || inMoney(key);
-  for (const key of WORDS) if (typeof kept[key] === 'string') kept[key] = key === 'body' ? noteShown(kept[key], fill, tokenSaid(values, said, cell), amount) : filledIn(wordsShown(kept[key]), fill);
+  /* A FIGURE A LINK NEVER READS (`heldHoles`) IS SAID AS NOTHING, so its clause or its sentence goes as an amount's does. */
+  const bodyFill = held.size === 0 ? fill : (key: string): string | undefined => (held.has(key) ? undefined : fill(key));
+  const cellFill = tokenSaid(values, said, cell);
+  const bodyCell = held.size === 0 ? cellFill : (key: string): string | undefined => (held.has(key) ? undefined : cellFill(key));
+  /* A NOTE'S PROSE SETTLES ITS PLURALS AS THE APP'S DOES (`pluralsIn`), and ITS OPENING LINE IS SAID BY THE APP'S RULES
+     (`leadOf`): a clause whose figure is nought or not shown goes on its own, and the line ends as a sentence does. A link
+     read "3 goal(s) and 2 habit(s) on the go" with no stop, said "0 ticket(s) with an agent" where the app says nothing,
+     and lost Goals' whole line on a link with money off for the one clause that was an amount. */
+  const prose = b.kind === 'note' && block.document !== true;
+  for (const key of WORDS) {
+    const text = kept[key];
+    if (typeof text !== 'string') continue;
+    if (key !== 'body') kept[key] = filledIn(wordsShown(text), fill);
+    else if (prose && kept.lead === true && !/[`#|]/u.test(text)) kept[key] = leadShown(wordsShown(text), bodyFill);
+    else kept[key] = noteShown(prose ? pluralsSettled(text, bodyFill) : text, bodyFill, bodyCell, amount);
+  }
   if (kept.body === '') delete kept.body;
 
   /* `figures`, WHAT EACH FIGURE THE BLOCK NAMES IS AS DECLARED (`pages.ts` `figuresOf`), IS NEVER SENT: its `where` and
@@ -901,7 +1070,16 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
        that fact with no name over it, and a link said the field's own label, "Health", beside every project. */
     const blank = typeof c.label === 'string' && c.label.trim() === '';
     const owned = typeof c.label === 'string' && c.label.trim() !== '' ? c.label : undefined;
-    const shown: ColumnShown = { field: c.field, label: blank ? '' : (owned ?? declared?.fields.find((f) => f.id === c.field)?.label ?? idSaid(c.field)) };
+    /* OVER A LIST'S TITLE, WITH NO LABEL OF HER OWN, THE WORD FOR ONE OF ITS ROWS (`columnHeading` in the app's `api.ts`):
+       a team's tasks are headed Ticket, where a link said the field's own label, "Description". */
+    const one = (declared as { one?: unknown } | undefined)?.one;
+    const titled = declared?.title === c.field && typeof one === 'string' && one !== '' ? one.charAt(0).toUpperCase() + one.slice(1) : undefined;
+    const field = declared?.fields.find((f) => f.id === c.field);
+    const shown: ColumnShown = { field: c.field, label: blank ? '' : (owned ?? titled ?? field?.label ?? idSaid(c.field)) };
+    /* AND WHETHER IT IS THE LIST'S DEADLINE, which the app says as "Due in 3 days" while it is close (`soonSaid`). */
+    if (field?.type === 'day' && field.deadline === true) shown.deadline = true;
+    /* AND WHETHER IT NAMES ANOTHER ROW, which may be empty on a row that is whole: an order nobody is named on. */
+    if (field?.type === 'ref') shown.ref = true;
     /* AND THE FIELD IT READS WHERE ITS OWN HOLDS NOTHING (AL1): the Ledger's name is who was paid, else the line's own
        words (`or: 'what'`), and a link sent the payee alone, so every line no payee was read for said a day and an
        amount with nobody between them. The second field is drawn in the same cell the app draws it in, so it shows
@@ -923,8 +1101,19 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
   }
   const drawn = (register: string): string[] =>
     columns.length > 0 ? columns.flatMap((c) => [c.field, ...(c.or === undefined ? [] : [c.or]), ...(c.sign === undefined ? [] : [c.sign.field])]) : [lists.get(register)?.title ?? ''];
-  kept.rows = b.rows.map((row) => {
-    const shown = rowShown(row, drawn(row.register), lists);
+  /* A BOARD'S LANES IN THE ORDER ITS LIST DECLARES THEM (`boardOrder` in the app's `blocks.ts`): To do, Doing, Marked,
+     where a link drew them in the order the rows came, Marked before Doing. Only where nothing else rides aligned with
+     the rows, so no flag lands on another row. */
+  const laneField = b.kind === 'board' ? b.columns?.[0]?.field : undefined;
+  const lanes = laneField === undefined ? undefined : declared?.fields.find((f) => f.id === laneField)?.values;
+  const aligned = ['rings', 'nexts', 'trends', 'done_now', 'scopes', 'scope_marks', 'whens', 'working_now', 'quiet', 'bylines', 'changes'].some((k) => Array.isArray(block[k]));
+  const rank = (row: Entry): number => {
+    const at = lanes === undefined ? -1 : lanes.indexOf(String(row.fields[laneField ?? ''] ?? ''));
+    return at < 0 ? (lanes?.length ?? 0) : at;
+  };
+  const inOrder = lanes !== undefined && !aligned ? [...b.rows].sort((x, y) => rank(x) - rank(y)) : b.rows;
+  kept.rows = inOrder.map((row) => {
+    const shown = rowShown(row, drawn(row.register), lists, showing.refSaid);
     return showing.money ? shown : unitless(shown);
   });
   /* WHAT EACH BUDGET HAS SPENT, ONE A ROW (AL6), as the app sets each category's limit against the part of the figure
@@ -935,11 +1124,20 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
   const spentBy = (block as { spent?: unknown }).spent;
   const labelField = b.columns?.[0]?.field;
   const parts = b.readings?.[0]?.reading?.groups;
-  if (showing.money && b.kind === 'progress' && typeof spentBy === 'string' && typeof labelField === 'string' && Array.isArray(parts))
-    kept.spent_rows = b.rows.map((row) => {
-      const part = parts.find((g) => g.key === row.id || g.key === String(row.fields[labelField] ?? ''));
-      return typeof part?.value === 'number' && Number.isFinite(part.value) ? part.value : 0;
-    });
+  const partOf = (row: Entry): number => {
+    const part = parts?.find((g) => g.key === row.id || g.key === String(row.fields[labelField ?? ''] ?? ''));
+    return typeof part?.value === 'number' && Number.isFinite(part.value) ? part.value : 0;
+  };
+  if (showing.money && b.kind === 'progress' && typeof spentBy === 'string' && typeof labelField === 'string' && Array.isArray(parts)) kept.spent_rows = b.rows.map(partOf);
+  /* AND WHAT WAS LOGGED TOWARD EACH GOAL, ONE A ROW (`toward:`), as the app sets each goal's aim against the part of the
+     figure keyed by that goal: a link drew the figure's whole, "Logged, by goal 34.5", over a table of aims, so a
+     habit's week read as the sum of every run logged. `toward` says the rows are goals and not budgets. A goal set
+     against money is on a link with money only (`moneyFree`). */
+  const towardBy = (block as { toward?: unknown }).toward;
+  if (b.kind === 'progress' && spentBy === undefined && typeof towardBy === 'string' && typeof labelField === 'string' && Array.isArray(parts)) {
+    kept.spent_rows = b.rows.map(partOf);
+    kept.toward = true;
+  }
   /* THE STATES ITS LISTS COUNT AS FINISHED (SB2), each list's own declared `done:`, so a shared `todo` ticks the rows the
      owner's ticks and not the ones a word guessed at. The list's declaration, never a row: the same words for every row. */
   if (b.rows.length > 0) {
@@ -1014,6 +1212,7 @@ type ReadIn = {
   reads: Showing['reads'];
   money: boolean;
   moneyFigure: Showing['moneyFigure'];
+  refSaid?: Showing['refSaid'];
 };
 
 /**
@@ -1030,6 +1229,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
     reads: where.reads,
     money: where.money,
     moneyFigure: where.moneyFigure,
+    ...(where.refSaid === undefined ? {} : { refSaid: where.refSaid }),
     said: moneyKept(where.money, saidIn(language, where.home, where.now)),
     typed: typedKept(where.money, typedIn(where.now, zone, where.home)),
     cell: typedKept(where.money, typedIn(where.now, zone, where.home, true)),
@@ -1159,6 +1359,20 @@ export function methods(deps: RecordDeps) {
               (bound.row === undefined ? p.about.seq === bound.seq : p.row === bound.row),
           );
     return here?.slug ?? null;
+  };
+
+  /**
+   * THE WORDS THE SPEAKING USE CASE GIVES THE LISTS (`labelsOf`), as the app reads them from `boot`'s voice: a team's
+   * Tickets and To do. A link read the lists' own words ("Description", "Open") under the same headings.
+   */
+  const voiceLabels = (): Record<string, string> => {
+    const pack = speakingNow(kernel);
+    if (pack === null) return {};
+    const read = kernel.packConfig(pack);
+    if (!read.ok) return {};
+    const config: Record<string, { label?: unknown }> = {};
+    for (const [setting, decl] of Object.entries(read.value.config)) config[setting] = { label: (decl as { label?: unknown }).label };
+    return labelsOf({ ...read.value.values }, config);
   };
 
   /** When a link was closed, or `null` while it is open. `share.close` is for good, so the first one is the one. */
@@ -1353,9 +1567,23 @@ export function methods(deps: RecordDeps) {
       const held = kernel.homeCurrency() === null ? kernel.moneyCurrencies(() => true, 2, NOBODY) : [];
       const home = kernel.homeCurrency() ?? (held.length === 1 ? held[0]! : null);
       const reads = (b: BlockResult): readonly string[] => kernel.blockRegisters(b as unknown as Parameters<typeof kernel.blockRegisters>[0]);
-      const lists = kernel.registers();
+      /* THE LISTS IN THE WORDS THE OWNER READS THEM IN (`voiced`): a team's tasks are Tickets, a ticket To do. */
+      const lists = voiced(kernel.registers(), voiceLabels());
       const moneyFigure = figureIsMoney(kernel, lists);
-      return ok(shownPage(out.value, opened.expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money: moneyOf(opened.bound), moneyFigure }));
+      const money = moneyOf(opened.bound);
+      /* A ROW ANOTHER ROW LINKS TO IS NAMED ONLY WHERE THE LINK MAY NAME IT: a row that is there, kept private by nobody,
+         on a list that is neither personal nor one no link reads, and on a link with money off, not a row of a list that
+         is money. Its name and nothing else: never its id, its list or its address. */
+      const personal = new Set(kernel.personalLists());
+      const refSaid = (id: string): string | undefined => {
+        if (!ULID.test(id)) return undefined;
+        const row = kernel.get(id);
+        if (row === null || row.deleted_at !== null || personal.has(row.register) || NEVER_READ.has(row.register)) return undefined;
+        if (!money && moneyList(lists.get(row.register))) return undefined;
+        if (sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', row.id) !== undefined) return undefined;
+        return kernel.titleOfRow(row.id) ?? undefined;
+      };
+      return ok(shownPage(out.value, opened.expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money, moneyFigure, refSaid }));
     },
   };
 }
