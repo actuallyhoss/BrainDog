@@ -22,7 +22,7 @@ import type { QueueQuestion } from '@braindog/kernel';
 import { copy } from '../copy.ts';
 import { figuresIn, summaryTitle, words as citeWords } from '../cite.ts';
 import { listName } from '../record/names.ts';
-import { atCap, nearCap, resetsWords } from '../ui/slash-asks.ts';
+import { atCap, nearCap, resetsWords } from '../ui/slash-cap.ts';
 
 /**
  * The fold's line for the figures an ask read, as the engine writes it (`FIGURES_TRACE` in

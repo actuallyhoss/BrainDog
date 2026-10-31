@@ -7,7 +7,7 @@
  */
 
 import type { EngineHealth, SlashStatus } from '@braindog/client';
-import { metered, resetsWords } from './slash-asks.ts';
+import { metered, resetsWords } from './slash-cap.ts';
 
 /** The line cut into what is wrong (`lead`, drawn as needing him) and what follows it. */
 export type EngineLine = { lead: string; rest: string };
