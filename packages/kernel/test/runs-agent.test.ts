@@ -62,15 +62,16 @@ test('THE CLIENT’S NAME SAYS WHICH AGENT A RUN IS: claude-code is Claude, call
   assert.deepEqual(
     runs.map((r) => [r.fields.agent, r.fields.doing]),
     [
-      ['claude', 'Claude Code run'],
-      ['codex', 'Codex run'],
-      ['cursor', 'Cursor run'],
-      ['claude', 'Claude run'],
-      ['gemini', 'Gemini run'],
-      ['other', 'Agent run'],
+      ['claude', 'Claude Code'],
+      ['codex', 'Codex'],
+      ['cursor', 'Cursor'],
+      ['claude', 'Claude'],
+      ['gemini', 'Gemini'],
+      /* AN APP NOBODY LISTED IS CALLED BY THE NAME ITS HELLO GAVE, in plain words, never "Agent run". */
+      ['other', 'A tool nobody listed'],
       /* A kind the caller named wins over the one its client implies, and `other` names none. */
-      ['codex', 'Codex run'],
-      ['claude', 'Claude Code run'],
+      ['codex', 'Codex'],
+      ['claude', 'Claude Code'],
     ],
   );
   /* THE REGISTER KEEPS THE APP (migration 22), so each run holds the name and version its client sent, as it sent them. */
@@ -86,14 +87,14 @@ test('A RUN THAT SAID NO AGENT LEARNS ITS KIND from the first call that names on
   const { k, sql, clock } = await record();
   value(k.create('tasks', { what: 'From a script' }, as({ host: 'mbp' })));
   const before = k.get('S1')!;
-  assert.deepEqual([before.fields.agent, before.fields.doing], ['other', 'Agent run']);
+  assert.deepEqual([before.fields.agent, before.fields.doing], ['other', 'An agent']);
 
   clock.advance(MIN);
   value(k.create('tasks', { what: 'From the MCP server' }, as({ host: 'mbp', client: 'claude-code', client_version: '2.1.4' })));
   const learnt = k.get('S1')!;
   assert.deepEqual(
     [learnt.fields.agent, learnt.fields.client, learnt.fields.client_version, learnt.fields.doing],
-    ['claude', 'claude-code', '2.1.4', 'Claude Code run'],
+    ['claude', 'claude-code', '2.1.4', 'Claude Code'],
   );
   assert.deepEqual([learnt.version, lines(sql, learnt.id)], [before.version, 1], 'learning who the run is was an edit with a line of its own');
 
@@ -115,6 +116,11 @@ test('WHERE THE REGISTER KEEPS THE CLIENT, its name and version are recorded, an
   assert.deepEqual(opening(hints, REGISTER_2), { host: 'mbp' }, 'migration 2’s register kept a field it does not declare');
   /* A kind the register has no value for is left to the register's `other`, and the run still wears its own name. */
   assert.equal(provisionalTitle(hints, 'Kiln', REGISTER_2.kinds), 'Gemini in Kiln');
+  /* WITH NO PLACE, THE APP AND ITS KIND OF MACHINE, never the host's own name and never "run". */
+  assert.equal(provisionalTitle({ client: 'claude-code', host: 'Maras-MacBook-Pro.local' }, null), 'Claude Code on MacBook');
+  assert.equal(provisionalTitle({ client: 'zed', host: 'DESKTOP-7F3K2Q' }, null), 'Zed on Windows PC');
+  assert.equal(provisionalTitle({ client: 'mcp-remote', host: 'box-17' }, null), 'An agent');
+  assert.equal(provisionalTitle({ client: 'claude-ai' }, null), 'Claude');
 
   const run = { fields: { agent: 'gemini', client: 'gemini-cli-mcp-client', client_version: '0.8.0', doing: 'Gemini run' }, created_at: new Date(NOW).toISOString() };
   assert.deepEqual(learned(run, hints, 'Kiln', keeps), { client_version: '0.8.1', doing: 'Gemini in Kiln' });

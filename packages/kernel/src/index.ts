@@ -420,7 +420,7 @@ export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 /** The `field` of the line `setPrivate` writes on a row, kept private or shared again (leak matrix N1). */
 export const PRIVATE_NOTE = 'private';
 export { DRAFT_FIELD, TOPIC_MAX, cleanName, firstProjectFields, firstProjectName, noPlace, topicName } from './first-project.ts';
-export { KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
+export { DEVICES, KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, onMachine, plainApp, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* A FIELD WORKED OUT FROM OTHER FIELDS: its shapes and refusals, and the rows filled at read. `shapeOf` is the
    ingest's name here, so the derive's is exported as `deriveShapeOf`. */
 export { DERIVE_SHAPES, DERIVE_REFUSES, NORMALISE_HOW, deriveFault, derived, isDerived, shapeOf as deriveShapeOf, sourcesOf, type Derive, type DeriveField, type DeriveShape } from './derive.ts';

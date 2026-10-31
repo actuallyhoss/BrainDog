@@ -101,7 +101,7 @@ test('A RUN’S APP IS LEARNED ONCE, NEVER SWAPPED: another app naming the run l
   const run = { fields: { agent: 'claude', client: 'claude-code', client_version: '2.1.4', doing: 'Claude Code run' }, created_at: '2026-10-06T12:00:00.000Z' };
   assert.deepEqual(learned(run, { client: 'chatgpt', client_version: '9' }, null), {});
   assert.deepEqual(learned(run, { client: 'claude-code', client_version: '2.1.5' }, null), { client_version: '2.1.5' });
-  assert.deepEqual(learned({ ...run, fields: { doing: 'Agent run' } }, { client: 'chatgpt' }, null), { client: 'chatgpt', doing: 'ChatGPT run' });
+  assert.deepEqual(learned({ ...run, fields: { doing: 'Agent run' } }, { client: 'chatgpt' }, null), { client: 'chatgpt', doing: 'ChatGPT' });
 });
 
 test('ONLY THE RECORD’S OWN NAMES ARE THE RECORD’S: "<Name> run", and "<Name> in" a project it knows or the run’s repository', () => {

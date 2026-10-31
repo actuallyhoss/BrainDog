@@ -13,7 +13,7 @@
  */
 
 import { since } from 'braindog-render';
-import { presenceOf } from '@braindog/kernel';
+import { onMachine, presenceOf } from '@braindog/kernel';
 import { createClient } from '@braindog/client';
 import { rowOf, rowsOf as rulesOf, type AutomationRow, type RunRow } from '../flow/source.ts';
 import { ruleMonthOf, type ActionRow } from './actions.ts';
@@ -71,8 +71,8 @@ export function didOf(f: Readonly<Record<string, unknown>>): string | null {
   const doing = text(f.doing);
   if (!doing || /[\\/]|[a-z][a-z0-9_]*#\d|\b[0-9a-f]{12,}\b/u.test(doing)) return null;
   const repo = text(f.repo);
-  const own = (name: string | null) => !!name && (doing === `${name} run` || doing.startsWith(`${name} in `) || doing.startsWith(`${name} run, `));
-  if (own(runWho(f)) || own(text(f.agent)) || /^Agent run\b/u.test(doing) || (repo !== '' && (doing === repo || doing.startsWith(`${repo} on `)))) return null;
+  const own = (name: string | null) => !!name && (doing === `${name} run` || doing.startsWith(`${name} in `) || doing.startsWith(`${name} run, `) || onMachine(doing, name));
+  if (own(runWho(f)) || own(text(f.agent)) || /^Agent run\b/u.test(doing) || onMachine(doing, 'Agent') || (repo !== '' && (doing === repo || doing.startsWith(`${repo} on `)))) return null;
   return doing;
 }
 

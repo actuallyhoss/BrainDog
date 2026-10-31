@@ -285,7 +285,7 @@ test('TIME IN WORDS', () => {
    name for it, and lists a run waiting on him only while it called inside three hours. */
 test('WHAT A RUN IS DOING IS ITS OWN WORDS, else where it works, and never the name the record gave it', () => {
   assert.equal(doingSaid(CLAUDE), 'Variable axis QA, instances 3 of 9');
-  for (const own of ['Claude run', 'Claude Code in BrainDog', 'Claude in kiln-type', 'kiln-type', 'kiln-type on axis-qa', ''])
+  for (const own of ['Claude run', 'Claude Code in BrainDog', 'Claude in kiln-type', 'kiln-type', 'kiln-type on axis-qa', '', 'Claude Code on MacBook', 'Claude', 'An agent on iMac'])
     assert.equal(doingSaid(run({ doing: own })), 'In kiln-type, on axis-qa', own);
   assert.equal(doingSaid(run({ doing: 'Claude run', repo: null, branch: null })), 'Has not said what it is doing');
   /* WORDS AN AGENT WROTE THAT ONLY START LIKE A NAME ARE ITS OWN. */

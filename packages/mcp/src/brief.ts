@@ -169,7 +169,8 @@ export function durationSaid(seconds: number, unit: string | undefined): string 
 /**
  * The names the record gives a run before its agent says what it does (`provisionalTitle` in the kernel's session.ts):
  * "Agent run", "Claude run", and the older "Claude run, 1 Oct". They name no app and no task: "Agent run (S9)" was what an
- * agent was told about a run, and what it read out (audit 31 Oct k, AK15).
+ * agent was told about a run, and what it read out (audit 31 Oct k, AK15). A new run is named by its app where it is
+ * made, "Claude Code on MacBook" (`provisionalTitle`), so this reads only the runs made before that.
  */
 const RECORD_RUN_NAME = /^(?:Claude Code|Claude|Codex|Cursor|Gemini|Copilot|Windsurf|ChatGPT|VS Code|Agent) run(?:, \d{1,2} [A-Z][a-z]{2})?$/u;
 
