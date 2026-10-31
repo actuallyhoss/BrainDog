@@ -23,16 +23,16 @@ function all(): Kept {
   }
 }
 
-/** What the making wrote into the record at `base`, by list id, or nothing where this device kept none. */
-export function madeOf(base: string): Record<string, number> {
-  const v = all()[base];
+/** What the making wrote into the record at `slug`, by list id, or nothing where this device kept none. */
+export function madeOf(slug: string): Record<string, number> {
+  const v = all()[slug];
   return isCounts(v) ? v : {};
 }
 
-/** Keep what the making wrote into the record at `base`. */
-export function keepMade(base: string, counts: Record<string, number>): void {
+/** Keep what the making wrote into the record at `slug`. */
+export function keepMade(slug: string, counts: Record<string, number>): void {
   try {
-    globalThis.localStorage?.setItem(KEY, JSON.stringify({ ...all(), [base]: counts }));
+    globalThis.localStorage?.setItem(KEY, JSON.stringify({ ...all(), [slug]: counts }));
   } catch {
     /* Not kept: Today counts every entry, as before. */
   }

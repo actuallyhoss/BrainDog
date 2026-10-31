@@ -28,7 +28,6 @@ import { moduleName } from '@braindog/seed/usecases/names';
 
 import { firstRun } from '../../lib/first-run.ts';
 import { write as writePref } from '../../lib/pref.ts';
-import { apiBase } from '../../lib/at.ts';
 import { keepMade } from '../../lib/home/made-counts.ts';
 import { packDocument, relabelDocument, type PackState } from '../../lib/record/packs.ts';
 import { fileDrafted, type Drafted, type SlashClient } from '../../lib/record/slash.ts';
@@ -375,11 +374,15 @@ const CASE = 'usecase-';
  * The entries go in all or none, so one refused hands every one of them back for the next press, which is sent with
  * `again` and writes only what is missing.
  */
-/** How many entries each list holds now, by id, the empty ones left out; `null` where the record did not answer. */
-async function madeCounts(client: Client): Promise<Record<string, number> | null> {
-  const out = (await (client as { boot?: () => Promise<unknown> }).boot?.().catch(() => null)) as Wire<{ registers?: { id: string; count: number }[] }> | null | undefined;
-  if (!out?.ok || !Array.isArray(out.value.registers)) return null;
-  return Object.fromEntries(out.value.registers.filter((r) => typeof r.id === 'string' && Number.isFinite(r.count) && r.count > 0).map((r) => [r.id, r.count]));
+/**
+ * How many entries each list holds now, by id, the empty ones left out, and the record's address they are kept under;
+ * `null` where the record did not answer. By the record's own slug, since sign-up asks it from outside its address.
+ */
+async function madeCounts(client: Client): Promise<{ slug: string; counts: Record<string, number> } | null> {
+  const out = (await (client as { boot?: () => Promise<unknown> }).boot?.().catch(() => null)) as Wire<{ record?: { slug?: string } | null; registers?: { id: string; count: number }[] }> | null | undefined;
+  if (!out?.ok || !Array.isArray(out.value.registers) || typeof out.value.record?.slug !== 'string') return null;
+  const counts = Object.fromEntries(out.value.registers.filter((r) => typeof r.id === 'string' && Number.isFinite(r.count) && r.count > 0).map((r) => [r.id, r.count]));
+  return { slug: out.value.record.slug, counts };
 }
 
 export async function accept(client: Client, asked: Accepting): Promise<Accepted> {
@@ -439,7 +442,7 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   /* WHAT THE MAKING WROTE, COUNTED ONCE IT IS IN (AH19): a Guide's plan is the starter's, not something the person added,
      so Today still offers to tell it one real thing. Before the file, which the person brought. */
   const made = await madeCounts(client);
-  if (made !== null) keepMade(apiBase(), made);
+  if (made !== null) keepMade(made.slug, made.counts);
 
   /* THE FILE THEY POINTED AT, LAST, once the list it maps into is there. In the currency the preview drew it in: the one
      chosen for Money, or the one typed where Money is not kept. */
