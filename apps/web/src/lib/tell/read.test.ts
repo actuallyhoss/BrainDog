@@ -962,9 +962,36 @@ test('MONEY IN THAT NOBODY OWED IS NEVER "KEPT IN BILLS" (AN10)', () => {
 test('A BIRTHDAY FOR SOMEBODY KEPT, WITH NO DATES KEPT, IS OFFERED ON THEM', () => {
   const told = tellRead("Mum's birthday is 14 Nov", { ...founder, people: [{ seq: 3, name: 'Mum' }] });
   assert.deepEqual(told.rows, []);
-  assert.deepEqual(told.change, { register: 'people', seq: 3, name: 'Mum', field: 'note', line: 'Birthday 14 Nov', ask: "Add 14 Nov as Mum's birthday?", done: "Added 14 Nov as Mum's birthday" });
+  assert.deepEqual(told.change, { register: 'people', seq: 3, name: 'Mum', field: 'note', line: 'Birthday 14 Nov', ask: "Add 14 Nov as Mum's birthday?", done: "Added 14 Nov as Mum's birthday", already: "Mum's birthday is already 14 Nov." });
   /* Somebody new still gets it in their note, and nothing is offered as a change. */
   assert.equal(tellRead("Mum's birthday is 14 Nov", founder).change, undefined);
+});
+
+test('TWO BIRTHDAYS IN ONE LINE ARE BOTH OFFERED, AND A RECORD THAT KEEPS DATES NEVER PUTS ONE IN A NOTE (RP2)', () => {
+  const both = { ...founder, people: [{ seq: 3, name: 'Mum' }, { seq: 4, name: 'Dad' }] };
+  for (const s of ["Mum's birthday is 14 Nov and Dad's is 3 Mar", "Mum's birthday is 14 Nov, Dad's is 3 Mar", "Mum's birthday is 14 Nov and Dad's birthday is 3 Mar"]) {
+    const told = tellRead(s, both);
+    assert.deepEqual(told.rows, [], s);
+    assert.equal(told.change?.seq, 3, s);
+    assert.deepEqual(told.change?.also?.map((k) => [k.seq, k.line]), [[4, 'Birthday 3 Mar']], s);
+    assert.equal(told.change?.ask, "Add 14 Nov as Mum's birthday and 3 Mar as Dad's?", s);
+  }
+  /* Where a list of dates is kept, a birthday is never offered on the note. */
+  const DATES: TellList = {
+    id: 'fixed_dates',
+    name: 'Dates',
+    one: 'date',
+    title: 'what',
+    pack: 'dates',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'day', type: 'day', required: true },
+      { id: 'comes_round', type: 'enum', values: ['no', 'yearly'], default: 'no', required: true },
+    ],
+  };
+  const dated = tellRead("Mum's birthday is 14 Nov and Dad's is 3 Mar", { ...both, lists: [...founder.lists, DATES] });
+  assert.equal(dated.change, undefined);
+  assert.deepEqual(dated.rows.map((r) => r.fields.what), ["Mum's birthday", "Dad's birthday"]);
 });
 
 /* ── review 31 Oct o: paid only when it was, a platform that pays him, a number a thing is known by, a count, a day gone ── */

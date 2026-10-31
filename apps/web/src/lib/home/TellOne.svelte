@@ -35,6 +35,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import { focusOnceDrawn } from '$lib/ui/keep-focus.ts';
+  import { noteWith } from '$lib/tell/kept-note.ts';
   import { addedSaid, countWord, heldSaid, readyAt, readyRows } from './first-today.ts';
   import type { ToldLine } from './tell-line.ts';
 
@@ -93,8 +94,12 @@
     moneyTurned: 'Turned on Money',
     /* WHAT MONEY'S PLAN ASKS BEYOND ITS LISTS, said before the press approves it (RN3). */
     moneyAlso: 'Money will also:',
-    /* A BIRTHDAY FOR SOMEBODY KEPT, kept on them (their note) where no list of dates is. */
-    keepOn: (name: string) => `Add it to ${name}`,
+    /* A BIRTHDAY FOR SOMEBODY KEPT, kept on them (their note) where no list of dates is; two people's in one line, both. */
+    keepOn: (names: readonly string[]) => `Add it to ${names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`}`,
+    /* THE UNDO'S CODE DID NOT LOAD (RP1): offline, or an old tab after a deploy. The press says so and can be pressed again. */
+    notLoaded: "Couldn't add it. Try again.",
+    /* MONEY WENT ON AND THE LINE DID NOT GO IN (RP1): said on the card, and the line stays in the box for Add. */
+    moneyNotAdded: "Money is on, but this wasn't added yet. Press Add to try again.",
     /* AN OPEN BILL, INVOICE OR ORDER SAID PAID BY ITS NUMBER, marked paid as its own page does. */
     markIt: 'Mark it paid',
   };
@@ -146,18 +151,18 @@
   const iconOf = (r: TellRow) => (isGlyph(r.icon) ? r.icon : 'rows');
   const listName = (register: string): string => options.lists.find((l) => l.id === register)?.name ?? register;
 
-  /** Adds these entries of the preview (`shown`), all under one batch, and keeps the lines they were said in. */
-  async function send(sent: { register: string; fields: Record<string, unknown> }[], shown: readonly TellRow[], at: readonly number[], first: string | null = null, lists: readonly TellList[] = options.lists) {
+  /** Adds these entries of the preview (`shown`), all under one batch, and keeps the lines they were said in. True when they landed. */
+  async function send(sent: { register: string; fields: Record<string, unknown> }[], shown: readonly TellRow[], at: readonly number[], first: string | null = null, lists: readonly TellList[] = options.lists): Promise<boolean> {
     const nameOf = (register: string): string => lists.find((l) => l.id === register)?.name ?? register;
-    if (sending || sent.length === 0) return;
+    if (sending || sent.length === 0) return false;
     sending = true;
     const pressed = typeof document === 'undefined' ? null : document.activeElement;
     const lines: ToldLine[] = at.flatMap((i) => (shown[i] ? [{ said: shown[i]!.said, list: nameOf(shown[i]!.register), href: `/r/${shown[i]!.register}` }] : []));
     const client = createClient({ base: apiBase() });
     const run = await runOf();
-    if (run === null) return void (sending = false);
+    if (run === null) return notLoaded();
     /* THE UNDO IS THE RECORD'S, by the batch the capture answers: `run` offers `undoChange(base, batch)` on the receipt. */
-    await run({
+    const out = await run({
       apply: () => {},
       revert: () => {},
       send: async () => {
@@ -182,6 +187,14 @@
        that was gone, so it is watched for until the line is drawn, and moved off the pressed button too. */
     const was = field;
     focusOnceDrawn(() => (was?.isConnected ? was : [...document.querySelectorAll<HTMLElement>('[data-tell-one] .tell-one-field')].find((f) => f !== was)), { from: pressed });
+    return out.ok;
+  }
+
+  /** The undo's code did not load: said, and the press is free again, so the next one asks for it again (RP1). */
+  function notLoaded(): false {
+    toasts.push(say.notLoaded, { intent: 'warn' });
+    sending = false;
+    return false;
   }
 
   function add(e: SubmitEvent) {
@@ -195,49 +208,68 @@
   }
 
   /* ── a fact about somebody kept, kept on them ──
-     "Mum's birthday is 14 Nov" with Mum in People and no dates kept: one press adds "Birthday 14 Nov" to her note, after
-     what it holds, at the version just read, and the receipt's Undo writes the note back as it was. */
+     "Mum's birthday is 14 Nov" with Mum in People and no dates kept: one press keeps "Birthday 14 Nov" on her note at the
+     version just read, replacing a birthday it already holds (`noteWith`, RP2), and the receipt's Undo writes the note
+     back as it was. Two people's birthdays in one line are kept in the same press (`also`). A note that already says it
+     is not written: the receipt says so, with no Undo. */
   async function keepOn(c: TellChange) {
     if (sending) return;
     sending = true;
     const pressed = typeof document === 'undefined' ? null : document.activeElement;
     const client = createClient({ base: apiBase() });
-    const href = `/r/${c.register}/${c.seq}`;
-    let had = '';
+    const each = [c, ...(c.also ?? [])];
+    /* What each note written held before, and the version it landed at, for the Undo. */
+    const wrote = new Map<TellChange, { had: string; version: number }>();
+    const putBack = async (): Promise<string | null> => {
+      for (const [one, w] of wrote) {
+        const out = await client.update({ register: one.register, seq: one.seq, patch: { [one.field]: w.had === '' ? null : w.had }, version: w.version });
+        if (!out.ok) return 'refusal' in out ? out.refusal.fix : say.raced;
+      }
+      return null;
+    };
     const run = await runOf();
-    if (run === null) return void (sending = false);
-    await run<{ version: number }>({
+    if (run === null) return void notLoaded();
+    await run<{ wrote: number; batch?: string }>({
       apply: () => {},
       revert: () => {},
       send: async () => {
-        const got = await client.get(c.register, c.seq);
-        const row = got.ok ? (got.value as { fields?: Record<string, unknown>; version?: number } | null) : null;
-        if (!row?.fields || typeof row.version !== 'number') return { ok: false as const, fix: say.raced };
-        const note = row.fields[c.field];
-        had = typeof note === 'string' ? note.trim() : '';
-        /* SAID ALREADY, it is not said twice. */
-        if (had.includes(c.line)) return { ok: true as const, value: { version: row.version } };
-        const next = had === '' ? c.line : `${had}${/[.!?]$/u.test(had) ? '' : '.'} ${c.line}`;
-        const out = await client.update({ register: c.register, seq: c.seq, patch: { [c.field]: next }, version: row.version });
-        if (!out.ok) return { ok: false as const, fix: 'refusal' in out ? out.refusal.fix : say.raced };
-        const landed = out.value as { version?: number; batch?: string };
-        return { ok: true as const, value: { ...landed, version: typeof landed.version === 'number' ? landed.version : row.version + 1 } };
+        let batch: string | undefined;
+        for (const one of each) {
+          const got = await client.get(one.register, one.seq);
+          const row = got.ok ? (got.value as { fields?: Record<string, unknown>; version?: number } | null) : null;
+          const fix = !row?.fields || typeof row.version !== 'number' ? say.raced : null;
+          const note = row?.fields?.[one.field];
+          const had = typeof note === 'string' ? note.trim() : '';
+          const next = fix === null ? noteWith(had, one.line) : null;
+          const out = next === null ? null : await client.update({ register: one.register, seq: one.seq, patch: { [one.field]: next }, version: row!.version! });
+          /* ONE NOTE REFUSED TAKES BACK THE ONES ALREADY WRITTEN, so a press keeps all of it or none. */
+          const refused = fix ?? (out !== null && !out.ok ? ('refusal' in out ? out.refusal.fix : say.raced) : null);
+          if (refused !== null) return { ok: false as const, fix: (await putBack()) ?? refused };
+          if (out === null || !out.ok) continue;
+          const landed = out.value as { version?: number; batch?: string };
+          wrote.set(one, { had, version: typeof landed.version === 'number' ? landed.version : row!.version! + 1 });
+          batch = landed.batch;
+        }
+        /* THE RECORD'S UNDO TAKES ONE BATCH, so it is offered for one note written; two are put back by this card. */
+        return { ok: true as const, value: wrote.size === 1 && batch !== undefined ? { wrote: 1, batch } : { wrote: wrote.size } };
       },
-      said: c.done,
-      undo: (value) => ({
-        apply: () => {},
-        revert: () => {},
-        send: async () => {
-          const out = await client.update({ register: c.register, seq: c.seq, patch: { [c.field]: had === '' ? null : had }, version: value.version });
-          if (!out.ok) return { ok: false as const, fix: 'refusal' in out ? out.refusal.fix : say.raced };
-          return { ok: true as const, value: null };
-        },
-        settle: () => void reread(),
-      }),
-      settle: () => {
+      said: (value) => (value.wrote === 0 ? (c.already ?? '') : c.done),
+      undo: (value) =>
+        value.wrote === 0
+          ? null
+          : {
+              apply: () => {},
+              revert: () => {},
+              send: async () => {
+                const fix = await putBack();
+                return fix === null ? { ok: true as const, value: null } : { ok: false as const, fix };
+              },
+              settle: () => void reread(),
+            },
+      settle: (value) => {
         typed = '';
         void reread();
-        onadded?.([{ said: `${c.name}, ${c.line.charAt(0).toLowerCase()}${c.line.slice(1)}`, list: listName(c.register), href }]);
+        if (value.wrote > 0) onadded?.([...wrote.keys()].map((one) => ({ said: `${one.name}, ${one.line.charAt(0).toLowerCase()}${one.line.slice(1)}`, list: listName(one.register), href: `/r/${one.register}/${one.seq}` })));
       },
     });
     sending = false;
@@ -267,6 +299,7 @@
           onadded?.([{ said: `${c.name}, ${c.done.split(' ').pop()}`, list: listName(c.register), href: `/r/${c.register}/${c.seq}` }]);
         },
       });
+    else toasts.push(say.notLoaded, { intent: 'warn' });
     sending = false;
     const was = field;
     focusOnceDrawn(() => (was?.isConnected ? was : [...document.querySelectorAll<HTMLElement>('[data-tell-one] .tell-one-field')].find((f) => f !== was)), { from: pressed });
@@ -290,6 +323,11 @@
     moneyWait = true;
     const words = typed;
     try {
+      /* THE UNDO'S CODE FIRST (RP1): Money is never turned on for a line that then cannot be added. */
+      if ((await runOf()) === null) {
+        moneyFix = say.notLoaded;
+        return;
+      }
       const { moneyThenRead } = await import('$lib/tell/money-on.ts');
       const out = await moneyThenRead(apiBase(), words, options, reader, moneyAsk?.approve ?? []);
       if ('ask' in out) {
@@ -302,8 +340,9 @@
         const go = readyRows(out.told.rows);
         /* ONE PRESS, ONE TOAST: "Turned on Money. Added …" names Money, so the rail does not say it came as well. */
         if (go.length > 0) toasts.named(MONEY_PLACE);
-        if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists);
-        else moneyFix = out.told.why ?? null;
+        /* AND A LINE THAT DID NOT GO IN IS SAID ON THE CARD, still in the box, for Add once the page knows Money (RP1). */
+        if (go.length > 0 && !(await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists))) moneyFix = say.moneyNotAdded;
+        else if (go.length === 0) moneyFix = out.told.why ?? null;
       }
       await invalidateAll();
     } finally {
@@ -369,7 +408,7 @@
       <div class="tell-one-becomes" aria-live="polite">
         <p class="tell-one-why">{change.ask}</p>
         <div class="tell-one-offers">
-          <Button weight={rows.length === 0 ? 'primary' : 'quiet'} disabled={sending} onclick={() => void changeOn(change)}>{change.mark ? say.markIt : say.keepOn(change.name)}</Button>
+          <Button weight={rows.length === 0 ? 'primary' : 'quiet'} disabled={sending} onclick={() => void changeOn(change)}>{change.mark ? say.markIt : say.keepOn([change, ...(change.also ?? [])].map((k) => k.name))}</Button>
         </div>
       </div>
     {/if}

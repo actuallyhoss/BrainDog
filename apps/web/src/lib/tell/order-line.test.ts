@@ -42,3 +42,10 @@ test('a line that is no order, or more than one, is left to the box as it was', 
   assert.equal(orderLine('lavender candles', ORDERS, PEOPLE, [], TODAY), null);
   assert.equal(orderLine('20 candles for Salma', { ...ORDERS, name: 'Products', one: 'product' }, PEOPLE, [], TODAY), null);
 });
+
+test('an order keeps a first word that has its own capitals: "iPhone cases", never "IPhone cases" (RP3)', () => {
+  assert.equal(orderLine('3 iPhone cases for Salma', ORDERS, PEOPLE, [{ seq: 4, name: 'Salma' }], TODAY)!.fields.what, 'iPhone cases');
+  assert.equal(orderLine('Nour ordered 2 eBay labels', ORDERS, PEOPLE, [{ seq: 5, name: 'Nour' }], TODAY)!.fields.what, 'eBay labels');
+  /* A first word all in small letters still starts with a capital. */
+  assert.equal(orderLine('3 vanilla jars for Salma', ORDERS, PEOPLE, [{ seq: 4, name: 'Salma' }], TODAY)!.fields.what, 'Vanilla jars');
+});
