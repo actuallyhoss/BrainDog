@@ -88,7 +88,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
-    { version: '2.30.0', notes: 'Cycles is in your sidebar from the start, and opens on a box to start a cycle. Nothing you hold changes.' },
+    { version: '2.30.0', notes: 'Cycles is in your sidebar from the start, and opens on a box to add a cycle. Nothing you hold changes.' },
     { version: '2.29.2', notes: 'A project\'s And from everywhere cards say what each thing is, not its kind.' },
     { version: '2.29.1', notes: SUMMARY },
     { version: '2.29.0', notes: 'Team task list is part of Team board now: a cycle can carry a write-up of how it went.' },

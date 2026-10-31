@@ -2475,8 +2475,8 @@ const DECLARED: Record<string, Version> = {
       setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
       setting.voice_working_now
     `,
-    declares: 'fe2e8e18c2ea61f6',
-    history: ['`page.cycles` takes its place on the rail and opens on a box to start a cycle (audit 31 Oct h, AH4); no id added or taken away -> fe2e8e18c2ea61f6'],
+    declares: '7ee971b7a8020e12',
+    history: ['`page.cycles` takes its place on the rail and opens on a box to add a cycle (audit 31 Oct h, AH4); no id added or taken away -> 7ee971b7a8020e12'],
   },
 };
 

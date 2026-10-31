@@ -9433,9 +9433,9 @@
       "versions": [
         {
           "version": "2.30.0",
-          "checksum": "fed1cf8fc20c712cbced896f8590097f824ced65cd0372bf606d889809052f3a",
-          "bytes": 37693,
-          "published_at": "2026-10-31T00:51:40.419Z",
+          "checksum": "bfd8c7f2932ee60dfe79e7cc3f01201baa25bf0c86029f41f52f84d760961988",
+          "bytes": 37691,
+          "published_at": "2026-10-31T01:06:28.275Z",
           "bump": "patch",
           "reach": {
             "modules": [

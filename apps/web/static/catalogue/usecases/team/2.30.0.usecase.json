@@ -708,7 +708,7 @@
           },
           {
             "kind": "capture",
-            "heading": "Start a cycle",
+            "heading": "Add a cycle",
             "icon": "plus",
             "span": 12,
             "register": "cycles"
