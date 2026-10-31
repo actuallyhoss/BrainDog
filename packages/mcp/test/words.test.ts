@@ -22,21 +22,26 @@ test('THE EXPONENT TABLE IS THE APP\'S, code for code, over every currency the r
   assert.deepEqual(differ, [], 'the brief answers and the app give these currencies different decimals');
 });
 
-test('MONEY READS AS THE APP DRAWS IT, code first, with its own decimals and a plain minus', () => {
-  assert.equal(money(145_000, 'EGP'), 'EGP 1,450.00');
-  assert.equal(money(1_299, 'JPY'), 'JPY 1,299');
+test('MONEY READS AS CONTEXT SAYS IT, by its sign where it has one, its own decimals only when not nought, and a plain minus', () => {
+  assert.equal(money(145_000, 'EGP'), 'EGP 1,450');
+  assert.equal(money(145_050, 'EGP'), 'EGP 1,450.50');
+  assert.equal(money(3_900, 'GBP'), '£39');
+  assert.equal(money(3_950, 'GBP'), '£39.50');
+  assert.equal(money(1_299, 'JPY'), '¥1,299');
   assert.equal(money(1_500, 'KWD'), 'KWD 1.500');
-  assert.equal(money(-4_800, 'GBP'), 'GBP -48.00');
-  assert.equal(money(5, 'USD'), 'USD 0.05');
+  assert.equal(money(-4_800, 'GBP'), '-£48');
+  assert.equal(money(5, 'USD'), '$0.05');
   /* ON THE DIGITS, SO THE LARGEST AMOUNT THE RECORD HOLDS IS NOT ROUNDED on its way to a sentence. */
-  assert.equal(money(Number.MAX_SAFE_INTEGER, 'USD'), 'USD 90,071,992,547,409.91');
+  assert.equal(money(Number.MAX_SAFE_INTEGER, 'USD'), '$90,071,992,547,409.91');
+  /* THE APP'S DIGITS, WHATEVER THE FORM: the amount drawn and the amount said are one number. */
+  const digitsOf = (s: string): string => s.replace(/[^\d.]/gu, '').replace(/\.0+$/u, '');
   for (const currency of ['EGP', 'GBP', 'JPY', 'KWD', 'CLF', 'USD'])
     for (const minor of [0, 1, 99, 100, 145_000, -4_800, 123_456_789])
-      assert.equal(money(minor, currency), drawn(minor, currency).replace('−', '-'), `${String(minor)} ${currency}`);
+      assert.equal(digitsOf(money(minor, currency)), digitsOf(drawn(minor, currency)), `${String(minor)} ${currency}`);
   /* A PART OF A PENNY, WHICH AN AVERAGE OF MONEY READS IN, IS NEVER A HUNDRED POUNDS: `101.5` was said `GBP 101.5`. */
-  assert.equal(money(101.5, 'GBP'), 'about GBP 1.02');
-  assert.equal(money(-101.4, 'GBP'), 'about GBP -1.01');
-  assert.equal(money(1_299.6, 'JPY'), 'about JPY 1,300');
+  assert.equal(money(101.5, 'GBP'), 'about £1.02');
+  assert.equal(money(-101.4, 'GBP'), 'about -£1.01');
+  assert.equal(money(1_299.6, 'JPY'), 'about ¥1,300');
   assert.equal(money(Number.NaN, 'GBP'), 'GBP, an amount that could not be read');
 });
 
@@ -132,7 +137,7 @@ test('A DURATION IS SAID IN ITS FIELD\'S UNIT, from the whole seconds the record
 
 test('A PAGE\'S NOTE IS SAID AS PROSE: no fenced block, money as money, no heading marks', () => {
   const note = '```chips\n● | 3 | cuts\n```\n\n# Kiln\n\nEarning. {{money:1840000 GBP}} in a year, {{pct:61}} direct.\n\n```bar | Revenue\nDirect | 1\n```\n\nIt carries it.';
-  assert.equal(prose(note), 'Kiln. Earning. GBP 18,400.00 in a year, 61% direct. It carries it.');
+  assert.equal(prose(note), 'Kiln. Earning. £18,400 in a year, 61% direct. It carries it.');
 });
 
 test('A NOTE SAYS NONE OF ITS OWN MARKUP: a link is its words, a mark in braces is in brackets, a heading has no number', () => {
@@ -166,7 +171,7 @@ test('TWO AMOUNTS ON ONE LINE SAY WHICH IS WHICH, and one amount alone is the ro
   } as Decl;
   const look: Look = { now: Date.UTC(2026, 8, 22), decl: () => decl, title: () => undefined, actor: (by) => by, decider: 'Ada' };
   const both = { spoken: 'things#1', fields: { name: 'Kiln', revenue: { amount: 1_840_000, currency: 'GBP' }, revenue_before: { amount: 1_412_000, currency: 'GBP' } } };
-  assert.equal(rowLine(both, 'things', look), 'Kiln (things#1) · earned in a year GBP 18,400.00 · earned the year before GBP 14,120.00');
+  assert.equal(rowLine(both, 'things', look), 'Kiln (things#1) · earned in a year £18,400 · earned the year before £14,120');
   const one = { spoken: 'things#2', fields: { name: 'Marlow', revenue: { amount: 420_000, currency: 'GBP' } } };
-  assert.equal(rowLine(one, 'things', look), 'Marlow (things#2) · GBP 4,200.00');
+  assert.equal(rowLine(one, 'things', look), 'Marlow (things#2) · £4,200');
 });

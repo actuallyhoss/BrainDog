@@ -164,6 +164,7 @@ import {
   handledOn,
   settleWaiting,
   HANDLED_RULE,
+  COVERED,
   reopen,
   withdraw as withdrawSuggestion,
   keepApplied,
@@ -10123,6 +10124,76 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
 
   /**
+   * The questions the mail door asked about this arrival, settled with it (audit 10k, AK12): filing or setting aside an
+   * arrival closes the door's own question about it in the same batch, so Needs you does not keep asking what the inbox
+   * already says was done. A question that holds other arrivals too keeps them and lets go of this one, its row with it.
+   *
+   * CLOSED AS MOOT WITH `COVERED`'S LINE, so an undo of the filing asks it again (`undo.ts`'s `answered`), and a put back
+   * reopens it (`reaskArrival`).
+   */
+  const settleAsked = (id: string, said: string, batch: string): void => {
+    const asked = sql.all<{ id: string; body: string }>(
+      `SELECT id, body FROM suggestion WHERE status = 'open' AND body_kind = 'rowset'
+         AND EXISTS (SELECT 1 FROM json_each(suggestion.body, '$.raws') WHERE value = ?) ORDER BY rowid`,
+      id,
+    );
+    for (const q of asked) {
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(q.body) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const raws = Array.isArray(body.raws) ? (body.raws as unknown[]) : [];
+      const rows = Array.isArray(body.rows) ? (body.rows as unknown[]) : [];
+      if (raws.length > 1 && rows.length === raws.length) {
+        const at = raws.indexOf(id);
+        const left = rows.filter((_, n) => n !== at);
+        sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, rows: left, raws: raws.filter((_, n) => n !== at), count: left.length }), q.id);
+        continue;
+      }
+      if (raws.length > 1) continue;
+      sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", q.id);
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note, batch) VALUES (?, ?, 'system', 'resolve', ?, 'suggestion', 'moot', ?, ?)",
+        mint(),
+        instant(clock.now()),
+        `suggestion:${q.id}`,
+        `${COVERED} ${said}`.slice(0, 280),
+        batch,
+      );
+    }
+  };
+
+  /** The door's questions a settlement closed (`settleAsked`), asked again when the arrival is put back in the inbox. */
+  const reaskArrival = (settled: string | null, actor: string, batch: string): void => {
+    if (settled === null) return;
+    const shut = sql.all<{ q: string }>(
+      `SELECT substr(e.target, 12) AS q FROM event e JOIN suggestion s ON s.id = substr(e.target, 12)
+        WHERE e.batch = ? AND e.kind = 'resolve' AND e.to_v = 'moot' AND e.target LIKE 'suggestion:%' AND e.note LIKE ? || '%'
+          AND s.status = 'resolved' AND s.resolved_as = 'moot'`,
+      settled,
+      COVERED,
+    );
+    for (const { q } of shut) {
+      sql.exec(
+        `UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL,
+           cause = CASE WHEN EXISTS (SELECT 1 FROM suggestion o WHERE o.status = 'open' AND o.cause = suggestion.cause AND o.id <> suggestion.id) THEN NULL ELSE cause END
+         WHERE id = ?`,
+        q,
+      );
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note, batch) VALUES (?, ?, ?, 'suggest', ?, 'suggestion', 'reopened', 'Asked again: the mail is back in the inbox.', ?)",
+        mint(),
+        instant(clock.now()),
+        actor,
+        `suggestion:${q}`,
+        batch,
+      );
+    }
+  };
+
+  /**
    * The person's settlement that put this arrival in `state`: its NEWEST `state` event, and only when that event's `to_v`
    * is `state`. `undefined` when the arrival is where it is for some other reason.
    *
@@ -11320,6 +11391,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const out = write(register, null, patch, { ...w, batch });
         if (!out.ok) return out as unknown as Result<ArrivalSettled>;
         settleArrival(id, raw.state, 'matched', w.actor, `Filed as ${register}#${out.value.seq ?? ''}.`, batch);
+        settleAsked(id, `filing the mail in ${registers.get(register)?.name ?? register}.`, batch);
         return ok<ArrivalSettled>({ id, state: 'matched', entry: out.value, already: false });
       }),
 
@@ -11338,7 +11410,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           return no<ArrivalSettled>('OUT_OF_BOUNDS', `This arrival has already left the inbox, as ${raw.state}. Nothing was changed.`, {
             at: 'id',
           });
-        settleArrival(id, raw.state, 'ignored', actor, 'Archived from the inbox.', mint());
+        const batch = mint();
+        settleArrival(id, raw.state, 'ignored', actor, 'Archived from the inbox.', batch);
+        settleAsked(id, 'setting the mail aside.', batch);
         return ok<ArrivalSettled>({ id, state: 'ignored', entry: null, already: false });
       }),
 
@@ -11389,6 +11463,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           entry = out.value;
         }
         settleArrival(id, raw.state, back, w.actor, raw.state === 'matched' ? 'Filing taken back; in the inbox again.' : 'Archive taken back; in the inbox again.', batch);
+        reaskArrival(settled.batch, w.actor, batch);
         return ok<ArrivalSettled>({ id, state: back, entry, already: false });
       }),
 

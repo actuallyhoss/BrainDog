@@ -936,7 +936,7 @@ export function keepOrderAnswer(
     'decision',
     ORDERED_FIELD,
     k.instruction.id,
-    `Answered by ${k.run} on ${k.byName}'s order (${k.instruction.id}).`,
+    `Answered by ${k.run} on ${k.byName === 'The owner' ? 'the owner' : k.byName}'s order (${k.instruction.id}).`,
     k.batch ?? null,
   );
 }
@@ -958,7 +958,7 @@ export function keepWordAnswer(
     `decision:${k.decision}`,
     ON_WORD_FIELD,
     k.run,
-    `Answered by ${k.run} on ${k.byName}'s word: "${k.said}"`,
+    `Answered by ${k.run} on ${k.byName === 'The owner' ? 'the owner' : k.byName}'s word: "${k.said}"`,
     k.batch ?? null,
   );
 }

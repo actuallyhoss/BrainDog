@@ -76,11 +76,47 @@ export function personNamed(sql: Sql, id: string | null): string {
  * The line an instruction reaches an agent as, in his voice and marked as his (§10.2): what he said, quoted, with the
  * one thing to do about it. A stop or a pause says what the record now refuses.
  */
+/**
+ * A person's name in the middle of a sentence: "the owner" where the record has no name for them, never "on The owner's
+ * word" (audit 10k, AK23).
+ */
+export function nameMid(name: string): string {
+  return name === 'The owner' ? 'the owner' : name;
+}
+
+/**
+ * Words quoted at the end of a sentence, with the sentence's full stop only where the quote does not end in one already:
+ * `"Send Tom the PDFs today.".` was two (AK23).
+ */
+export function quotedEnd(said: string): string {
+  return /[.!?…]$/u.test(said) ? `"${said}"` : `"${said}".`;
+}
+
+/**
+ * An answer as the question offered it: an option's own label ("Halden"), never its id ("a"), and accept or reject as
+ * yes or no (audit 10k, AK15).
+ */
+function optionSaid(row: Record<string, unknown>, option: string): string {
+  const body = typeof row.body === 'object' && row.body !== null ? (row.body as Record<string, unknown>) : {};
+  for (const o of Array.isArray(body.options) ? body.options : []) {
+    const { id, label } = (typeof o === 'object' && o !== null ? o : {}) as { id?: unknown; label?: unknown };
+    if (id === option && typeof label === 'string' && label.trim() !== '') return `"${label.trim().replace(/\s+/gu, ' ').slice(0, 60)}"`;
+  }
+  return option === 'accept' ? 'yes' : option === 'reject' ? 'no' : option;
+}
+
+/** A question by its own words with its handle beside them, "Which licence? (SG14)", or the handle where it has none. */
+function askedSaid(row: Record<string, unknown>, given: string): string {
+  const words = typeof row.question === 'string' ? row.question.replace(/\s+/gu, ' ').trim() : '';
+  if (words === '') return given;
+  return `"${words.length > 80 ? `${words.slice(0, 79)}…` : words}" (${given})`;
+}
+
 export function lineOf(i: Instr, by: string): string {
   const said = i.said.replace(/\s+/gu, ' ').trim();
-  if (i.kind === 'stop') return `${by} stopped this run in BrainDog (${i.id}): "${said}". Reply with instructions, then end.`;
-  if (i.kind === 'pause') return `${by} paused this run in BrainDog (${i.id}): "${said}". Wait; reply with instructions if you must.`;
-  if (i.kind === 'resume') return `${by} resumed this run in BrainDog (${i.id}): "${said}".`;
+  if (i.kind === 'stop') return `${by} stopped this run in BrainDog (${i.id}): ${quotedEnd(said)} Reply with instructions, then end.`;
+  if (i.kind === 'pause') return `${by} paused this run in BrainDog (${i.id}): ${quotedEnd(said)} Wait; reply with instructions if you must.`;
+  if (i.kind === 'resume') return `${by} resumed this run in BrainDog (${i.id}): ${quotedEnd(said)}`;
   const answer = i.taken_by === null ? `Take it with instructions take ${i.id}.` : `Reply with instructions reply ${i.id} when it is done.`;
   /* THE QUESTIONS IT NAMES, by name, with the call that answers one: the run gives his answer, never its own. */
   const open = (i.answers ?? []).filter((a) => !(i.answered ?? []).includes(a.question)).map((a) => a.question);
@@ -88,7 +124,7 @@ export function lineOf(i: Instr, by: string): string {
   /* WHAT HE SENT WITH IT AND WHETHER IT MAY CHANGE FILES, said in the same line, so every path hands both on. */
   const rows = (i.attach ?? []).length === 0 ? '' : ` ${by} sent ${i.attach.join(', ')} with it: read each with get.`;
   const leave = i.may_change === true ? ' You may change files for it.' : i.may_change === false ? ' Change no file for it; propose what should change instead.' : '';
-  return `${by} said in BrainDog (${i.id}): "${said}".${rows}${leave} ${answer}${named}`;
+  return `${by} said in BrainDog (${i.id}): ${quotedEnd(said)}${rows}${leave} ${answer}${named}`;
 }
 
 /** An instruction as `Told`, its maker named once. */
@@ -503,7 +539,7 @@ export function methods(deps: RecordDeps) {
     return ok(
       mineOf(run, ctx, {
         instruction: toldOf(sql, now),
-        answered: { question: given, option: named.option, decision, said: `Answered ${given} with ${named.option}, on ${byName}'s order (${i.id}).` },
+        answered: { question: given, option: named.option, decision, said: `Answered ${askedSaid(row, given)} with ${optionSaid(row, named.option)}, on ${nameMid(byName)}'s order (${i.id}).` },
       }),
     );
   };
@@ -565,7 +601,7 @@ export function methods(deps: RecordDeps) {
     const decided = (typeof out.value === 'object' && out.value !== null ? out.value : {}) as { decision?: unknown; batch?: unknown };
     const decision = typeof decided.decision === 'string' ? decided.decision : null;
     if (decision !== null) kernel.keepWordAnswer({ run, decision, by, byName, said: words, batch: typeof decided.batch === 'string' ? decided.batch : undefined });
-    return ok(mineOf(run, ctx, { answered: { question: given, option: chosen, decision, said: `Answered ${given} with ${chosen}, on ${byName}'s word. Undo is in BrainDog.` } }));
+    return ok(mineOf(run, ctx, { answered: { question: given, option: chosen, decision, said: `Answered ${askedSaid(row, given)} with ${optionSaid(row, chosen)}, on ${nameMid(byName)}'s word. Undo is in BrainDog.` } }));
   };
 
   /** What a run is answered with: its stamp, what is pending, what stops it, and the lines in his voice. */

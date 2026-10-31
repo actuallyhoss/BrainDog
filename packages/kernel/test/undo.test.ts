@@ -242,7 +242,7 @@ test('NOTES STAY, and a link back to a row deleted since is left', async () => {
   );
 
   const p = plan(r, { batch });
-  assert.deepEqual(p.lines, ['Sets project on "Glaze" back to Kiln (now Launch).', 'The note stays.']);
+  assert.deepEqual(p.lines, ['Sets the project of "Glaze" back to Kiln (now Launch).', 'The note stays.']);
   assert.equal(p.notes, 1);
 
   value(r.k.update('projects', kiln.id, { deleted_at: true }, MARA));
@@ -268,7 +268,7 @@ test('A PLAN THAT WENT STALE IS REFUSED, and the plan read again applies', async
   assert.equal(r.k.get(made.id)!.fields.name, 'Write the docs', 'nothing was written');
 
   const fresh = plan(r, scope);
-  assert.deepEqual(fresh.lines, ['Sets name on "Write the docs" back to "Write docs" (now "Write the docs").', 'Leaves "Write the docs" as it is: Mara has changed due since.']);
+  assert.deepEqual(fresh.lines, ['Sets the name of "Write the docs" back to "Write docs" (now "Write the docs").', 'Leaves "Write the docs" as it is: Mara has changed due since.']);
   value(undoApply(r.parts, scope, fresh.hash, 'p_mara'));
   assert.equal(r.k.get(made.id)!.fields.name, 'Write docs');
   r.sql.close();

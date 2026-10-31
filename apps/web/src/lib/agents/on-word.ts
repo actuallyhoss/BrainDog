@@ -12,8 +12,10 @@ export const ON_WORD_PREF = 'agents.answer_on_word' as const;
 
 export const onWordWords = {
   title: 'Agents answer when you say so',
-  on: 'Each says it was your word, and you can undo it. Money and keys still wait for you.',
-  off: 'Agents always ask you here.',
+  /* THE SAME AS THE AGENT IS TOLD (`ON_WORD` in `packages/record/src/methods/agent-profile.ts`): on his word, changes
+     and deletes go through; money and keys are always asked. */
+  on: 'When you tell an agent to, it goes ahead, deletes too, and says it was your word. You can undo it. Money and keys always wait for you.',
+  off: 'Deletes, money and keys wait for you here, even when you told the agent.',
 } as const;
 
 /** Whether the switch is on, from the person's prefs as `boot` answered them. Anything but `false` is on. */

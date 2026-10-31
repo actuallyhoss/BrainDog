@@ -2,7 +2,7 @@
  * Mail forwarded to the record's address is read for who and what, after no pattern took it.
  *
  * WHO: the sender and the people it names are met (`meet`), never given an address the mail did not print.
- * WHAT: an invoice or receipt becomes a bill, a renewal notice moves a service's renewal day, a shipping or booking
+ * WHAT: an invoice or receipt becomes a bill, a remittance offers to mark our invoice paid, a renewal notice moves a service's renewal day, a shipping or booking
  * confirmation becomes a dated task on the project it names. Each is a question BrainDog files itself only when it is
  * sure (the vendor is held, the amount and day read cleanly, the row it belongs to found); otherwise it waits in To
  * review with the filing as the button, and money that did not read cleanly asks in Needs you: only what is sure is filed alone.
@@ -236,6 +236,42 @@ function billPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | null {
   };
 }
 
+/**
+ * Somebody telling us they paid one of our invoices (audit 10k, AK12): it offers to mark that invoice paid, found by the
+ * reference the mail prints in a bill's title. It was offered as a new bill owed by us, "amount unread". With no one
+ * open bill of that reference it offers nothing and the mail waits in the inbox as it came. Never filed alone: marking
+ * money paid is a person's word, so it asks in Needs you.
+ */
+function remittancePlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | null {
+  const bills = billsList(deps.lists, deps.people);
+  const { read } = f;
+  if (!bills?.state || !read.ref) return null;
+  const ref = read.ref;
+  const hits = rowsOf(deps, bills.id).filter((r) => whole(String(r.fields[bills.title] ?? '').toLowerCase(), ref));
+  const open = hits.filter((r) => r.fields[bills.state!] !== 'paid');
+  if (open.length === 0) return hits.length > 0 ? { skipped: `Invoice ${ref} is already marked paid.` } : null;
+  if (open.length > 1) return null;
+  const row = open[0]!;
+  const kept = row.fields[bills.amount] as { amount?: number; currency?: string } | undefined;
+  const differs = read.amount !== undefined && kept?.amount !== undefined && (kept.amount !== read.amount.amount || kept.currency !== read.amount.currency);
+  const notes = [
+    `${f.vendor} says it was paid.`,
+    differs ? 'The amount in the mail is not the one kept, so please check it.' : '',
+    f.known ? '' : `${f.vendor} is new to your BrainDog.`,
+  ].filter((t) => t !== '');
+  return {
+    register: bills.id,
+    rows: [{ at: row.id, version: row.version, patch: { [bills.state]: 'paid' } }],
+    question: cut(`Mark invoice ${ref} paid?`),
+    sure: cut(`Filed by BrainDog: invoice ${ref} marked paid`),
+    context: `Mail from ${read.domain}. ${notes.join(' ')}`.trim(),
+    isSure: false,
+    /* MONEY MARKED PAID ASKS IN NEEDS YOU, as money not read cleanly does. */
+    moneyDoubt: true,
+    adds: false,
+  };
+}
+
 function renewalPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | null {
   const services = servicesList(deps.lists);
   const { read } = f;
@@ -350,7 +386,14 @@ export function readMailArrival(deps: MailDeps, arrival: { raw: string; headers:
     today: new Date(deps.ing.nowMs).toISOString().slice(0, 10),
     viaModel,
   };
-  const plan = read.kind === 'renewal' ? renewalPlan(deps, facts) : read.kind === 'shipping' ? shippingPlan(deps, facts) : billPlan(deps, facts);
+  const plan =
+    read.kind === 'renewal'
+      ? renewalPlan(deps, facts)
+      : read.kind === 'shipping'
+        ? shippingPlan(deps, facts)
+        : read.kind === 'remittance'
+          ? remittancePlan(deps, facts)
+          : billPlan(deps, facts);
   if (plan === null) return { handled: false };
 
   const store = (state: 'matched' | 'review' | 'skipped', reason: string): void =>

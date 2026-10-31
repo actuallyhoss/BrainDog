@@ -131,7 +131,7 @@ test('ON HIS WORD A RUN ANSWERS A QUESTION AS HIS, his words and the run kept on
   const done = value<Mine>(await api.instructionsMine({ answer: a, option: 'yes', said: 'Yes, add the bounce report.' } as never, ctx));
   const run = done.run;
   assert.equal(done.answered?.option, 'accept', 'his "yes" is the yes this question takes');
-  assert.equal(done.answered?.said, `Answered ${a} with accept, on Teodor's word. Undo is in BrainDog.`);
+  assert.match(done.answered?.said ?? '', new RegExp(`^Answered "[^"]+" \\(${a}\\) with yes, on Teodor's word\\. Undo is in BrainDog\\.$`, 'u'));
   assert.equal(statusOf(api, a), 'resolved');
   assert.equal(tasks(sql, 'Write the bounce report'), 1);
 

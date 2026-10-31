@@ -70,7 +70,7 @@ propose {"question": "Which client should we chase first?", "body_kind": "option
 ```code | text
 handoff {"doing": "Reconciling March", "next": "Match the two unpaid invoices to their payments."}
 handoff {"tried": "Matching by amount alone: three payments share the same total."}
-meet {"name": "Ada Park", "email": "ada@example.com", "where": "commit 4464966 in site"}
+meet {"name": "Ada Park", "email": "ada@example.com", "where": "session in site"}
 ```
 
 ## The inbox
@@ -78,7 +78,7 @@ meet {"name": "Ada Park", "email": "ada@example.com", "where": "commit 4464966 i
 `triage` files one arrival from the inbox as a row in a list, or sets it aside. Only a token its owner gave the inbox reach may call it; [the inbox reach](/docs/agents/inbox) says how.
 
 ```code | text
-triage {"arrival": "<id from braindog:inbox>", "register": "bills"}
+triage {"arrival": "<id from braindog:inbox>", "register": "obligations"}
 triage {"arrival": "<id from braindog:inbox>", "ignore": true}
 ```
 

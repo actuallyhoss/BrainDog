@@ -48,7 +48,7 @@ import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, ra
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
-import { OWN_RUN, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
+import { OWN_RUN, nameMid, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
@@ -1456,6 +1456,12 @@ export type Boot = {
     lens?: string;
     /** What this person arranged for themselves (`setPref`), key by key as `Prefs` says. A person only. */
     prefs?: Prefs;
+    /**
+     * A key's own run, by its handle (`S6`), and the app its key was made for, by the key's label: so an answer says
+     * "You" for the caller's own write and the app's name where a run kept none (audit 10k, AK15). A token only.
+     */
+    run?: string;
+    app?: string;
   };
   /**
    * The pages the caller may open, as `pages` lists them, each with its place in the rail when it has one, and the row a
@@ -7767,7 +7773,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (!word.ok) return word as Result<never>;
     const beyond = beyondWord(rung.gate.kinds);
     if (beyond !== null) return no('FORBIDDEN', beyond, { at: 'said' });
-    const line = `On ${word.value.byName}'s word: "${word.value.said}"`;
+    const line = `On ${nameMid(word.value.byName)}'s word: "${word.value.said}"`;
     return ok(typeof note === 'string' && note.trim() !== '' ? `${note.trim()} (${line})` : line);
   };
 
@@ -7864,7 +7870,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const named = titleOf(self.fields) ?? `this one in ${list}`;
     if (Object.hasOwn(patch, 'deleted_at')) return patch.deleted_at === null ? `Bring back ${named}?` : `Delete ${named} from ${list}?`;
     const state = decl?.state;
-    if (state !== undefined && typeof patch[state] === 'string' && Object.keys(patch).length === 1) return `Mark ${named} ${String(patch[state]).replace(/[_-]+/gu, ' ')}?`;
+    if (state !== undefined && typeof patch[state] === 'string' && Object.keys(patch).length === 1) {
+      const to = String(patch[state]);
+      if (to === 'done') return `Mark ${named} done?`;
+      /* ANY OTHER STATE BY ITS LABEL, THE TITLE QUOTED: "Mark Turn auto-renew back on for kilnfonts.example doing?" read
+         as two sentences run together (audit 10k, AK23). */
+      const spec = decl?.fields.find((f) => f.id === state) as { labels?: Readonly<Record<string, string>> } | undefined;
+      const label = spec?.labels?.[to] ?? to.replace(/[_-]+/gu, ' ');
+      return `Move "${named}" to ${label.slice(0, 1).toUpperCase()}${label.slice(1)}?`;
+    }
     /* A CHANGE SAYS WHAT IT CHANGES: "Change the cost and due date of Ship?". Each field by the name a person reads, in
        the order sent; a field the list does not hold is left out, and with none to say the question stays as short as it was. */
     const labels = Object.keys(patch).flatMap((id) => {
@@ -9941,6 +9955,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(ctx.grant === undefined ? {} : { grant: { ...ctx.grant } }),
         ...((lens) => (lens === null ? {} : { lens }))(lensMark(ctx)),
         /* NOT THEIR OWN TODAY'S BODY, which `today` draws: a few kilobytes on every boot, and no screen reads it here. */
+        ...(p.kind === 'token'
+          ? ((run, label) => ({
+              ...(run === null ? {} : { run: kernel.nameOf(run.id) }),
+              ...(label === null || label.trim() === '' ? {} : { app: agentSaid(label) }),
+            }))(kernel.findRun(ctx.session ?? {}, p.id), sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', p.id)?.label ?? null)
+          : {}),
         ...(p.kind === 'person' ? { prefs: ((own) => (Object.hasOwn(own, OWN_TODAY) ? Object.fromEntries(Object.entries(own).filter(([k]) => k !== OWN_TODAY)) : own))(prefs as Record<string, unknown>) as Prefs } : {}),
       },
       pages,

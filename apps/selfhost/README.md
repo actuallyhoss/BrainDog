@@ -64,8 +64,10 @@ The address of your record is the server's address and the record's name, such a
   token once. Send it as `Authorization: Bearer <token>` to `http://localhost:8080/mcp`.
 - **Claude's and ChatGPT's connectors** sign in with OAuth, which needs the server at an https address: put https in
   front (or set `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY`), set `BRAINDOG_ORIGIN` to it, and add `<that address>/mcp`
-  as a custom connector. At a plain http address OAuth is off, since a sign-in there could be read on the network. The
-  start log says which, in its `oauth:` line.
+  as a custom connector. At a plain http address OAuth is off, since a sign-in there could be read on the network,
+  except when the server listens on this machine alone (`BRAINDOG_LISTEN=127.0.0.1`), where nothing crosses the
+  network: then a connector on this machine can add `http://localhost:8080/mcp`. The start log says which, in its
+  `oauth:` line.
 - **With no server key** (the start without Docker above), nobody signs in, so there are no tokens and no OAuth. The
   command line on that machine reaches it with `BRAINDOG_HOST=http://localhost:8080/<record name>` and no token.
 
@@ -80,7 +82,7 @@ The server says each of these in one line when it starts. None is an error.
 - Model: off until someone adds their own key in the app (Settings, Keys). Nothing else needs it.
 - Billing: always off. Nothing is charged or counted.
 - Turnstile: off. Self-host has no public sign-up.
-- OAuth: off at a plain http address. See Connect your agents.
+- OAuth: off at a plain http address, unless the server listens on this machine alone. See Connect your agents.
 - Add-ons: they send no requests to other servers until `BRAINDOG_OUTBOUND=on`. The public add-on registry is read
   either way; `BRAINDOG_KENNEL=off` stops that.
 

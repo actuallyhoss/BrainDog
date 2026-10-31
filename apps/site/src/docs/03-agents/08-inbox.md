@@ -64,7 +64,7 @@ Neither goes with `state`, `cursor`, `limit` or `repeats`, or with the other: th
 ## Filing and setting aside
 
 ```code | text
-triage {"arrival": "<id>", "register": "bills", "fields": {"payee": "City Water"}, "note": "Monthly water bill."}
+triage {"arrival": "<id>", "register": "obligations", "fields": {"direction": "owed_by_me"}, "note": "Monthly water bill."}
 triage {"arrival": "<id>", "ignore": true}
 triage {"arrival": "<id>", "back": true, "version": 1}
 ```

@@ -19,7 +19,7 @@
  * a brief answer for. A handle travels only beside a name: `Kiln (things#1)`, `Claude Code`.
  */
 
-import { callOf, clip, counted, day, deviceOf, gist, grouped, isCurrency, money, moneyIn, oneLine, runnerOf, ULID, when } from './words.ts';
+import { callOf, clip, counted, day, deviceOf, gist, grouped, isCurrency, money, moneyIn, moneyInText, oneLine, runnerOf, ULID, when } from './words.ts';
 
 /** One field as a register declares it, the keys a line reads and nothing else. */
 export type Field = {
@@ -271,7 +271,8 @@ export function plainOf(said: string, look: Look, handles = true): string {
       return one ? `the ${one} ${handle}` : handle;
     });
   /* AFTER THE HANDLES, because a row id's words carry its handle, which the pass above would name a second time. */
-  return out
+  /* MONEY AS EVERY ANSWER SAYS IT (AK22): a question the record wrote as "GBP 39.00" read beside context's "£39". */
+  return moneyInText(out)
     .replace(new RegExp(ULID.source, 'gu'), (id) => {
       const title = look.title(id);
       return title === undefined ? 'an entry you cannot open' : unaddressed(title);
@@ -538,6 +539,9 @@ export function eventSaid(e: Record<string, unknown>, decl: Decl | undefined, lo
     case 'create':
       return note && !/^opened: /u.test(note) ? `added: ${note}` : 'added';
     case 'edit': {
+      /* A NOTE WITH NO FIELD IS WHAT `log` ON A ROW WRITES (an empty patch and the note), and history said "changed a
+         field" for every one (audit 10k, AK9): the note is the line. */
+      if (typeof e.field !== 'string' && note) return `noted: ${note}`;
       const what = label || 'a field';
       const gone = e.to === null || e.to === undefined || e.to === '';
       /* A TEXT TOO LONG FOR A LINE SAYS HOW LONG IT WAS AND IS, where it said nothing of either. */
@@ -586,8 +590,11 @@ function targetSaid(e: Record<string, unknown>, look: Look): string | null {
   const kind = typeof e.target_kind === 'string' ? e.target_kind : target.split(':')[0] ?? '';
   const after = target.slice(target.indexOf(':') + 1);
   /* A QUESTION'S HANDLE BESIDE WHAT IT IS, as a row's is beside its words: `SG7` alone named nothing a person knows. */
-  if ((kind === 'suggestion' || kind === 'decision' || kind === 'prediction') && /^[A-Z]{1,3}\d+$/u.test(after))
-    return `${kind === 'suggestion' ? 'a question' : `a ${kind}`} (${after})`;
+  if ((kind === 'suggestion' || kind === 'decision' || kind === 'prediction') && /^[A-Z]{1,3}\d+$/u.test(after)) {
+    /* BY ITS OWN WORDS WHERE THE ANSWER READ THEM (`questionsNamed`), and by what it is where it did not. */
+    const words = look.title(after);
+    return words === undefined ? `${kind === 'suggestion' ? 'a question' : `a ${kind}`} (${after})` : `"${words}" (${after})`;
+  }
   if (kind === 'inbox_raw') return 'an arrival';
   if (kind === 'declaration') {
     const [what, id] = after.split('.');
@@ -731,7 +738,7 @@ function governanceOne(row: Record<string, unknown>, look: Look): string {
   const id = String(row.id ?? '');
   const lines = [`${typeof row.question === 'string' ? clip(plainOf(row.question, look), 200) : 'A question'} (${id})`];
   const status = typeof row.status === 'string' ? row.status : typeof row.answer === 'string' ? `decided ${row.answer}` : null;
-  const by = typeof row.opened_by === 'string' ? `asked by ${look.actor(row.opened_by)}` : typeof row.decided_by === 'string' ? `by ${look.actor(row.decided_by)}` : null;
+  const by = typeof row.opened_by === 'string' ? `asked by ${inLine(look.actor(row.opened_by))}` : typeof row.decided_by === 'string' ? `by ${inLine(look.actor(row.decided_by))}` : null;
   const at = typeof row.opened_at === 'string' ? when(row.opened_at, look.now) : typeof row.ts === 'string' ? when(row.ts, look.now) : null;
   lines.push([status, by, at].filter(Boolean).join(' · '));
   const body = isObject(row.body) ? row.body : null;
@@ -751,6 +758,9 @@ function governanceOne(row: Record<string, unknown>, look: Look): string {
   if (row.status === 'open') lines.push(`${sentence(look.decider)} decides in BrainDog.`);
   return lines.filter((l) => l !== '').join('\n');
 }
+
+/** Who did it, inside a sentence: the caller's own run is "you" there, and "You" only where a line begins. */
+const inLine = (who: string): string => (who === 'You' ? 'you' : who);
 
 /** Words that open a sentence, with a capital: "the owner" begins one as "The owner". */
 const sentence = (words: string): string => words.slice(0, 1).toUpperCase() + words.slice(1);
@@ -882,7 +892,7 @@ export function refusalBrief(refusal: Record<string, unknown>): string {
 /** A write that arrived second: who wrote first, the row as it stands, and the version to send with the change again. */
 export function conflictBrief(conflict: { version: number; actor: string; current: unknown }, register: string | undefined, look: Look): string {
   const current = isObject(conflict.current) ? (conflict.current as Shaped) : null;
-  const lines = [`Not saved, VERSION_STALE: ${look.actor(conflict.actor)} changed it after you read it, and it is at version ${String(conflict.version)} now.`];
+  const lines = [`Not saved, VERSION_STALE: ${inLine(look.actor(conflict.actor))} changed it after you read it, and it is at version ${String(conflict.version)} now.`];
   if (current && typeof current.spoken === 'string' && register !== undefined) lines.push(`Now: ${rowLine(current, register, look)}`);
   lines.push(`Re-apply your change to it as it is now and send version ${String(conflict.version)}.`);
   return lines.join('\n');
@@ -1126,7 +1136,8 @@ export function triagedBrief(settled: Record<string, unknown>, entry: Shaped | n
   const state = typeof settled.state === 'string' ? settled.state : 'settled';
   if (settled.already === true) return `That arrival was already ${state}, so nothing changed.`;
   if (entry && register !== undefined) return `Filed: ${rowLine(entry, register, look)} · version ${String(entry.version ?? 1)}`;
-  return state === 'ignored' ? 'Set aside. It stays in the inbox under ignored.' : `The arrival is ${state} now.`;
+  /* THE INBOX'S OWN WORD (`INBOX_WORDS`): "under ignored" here and "Archived: 1" in braindog:inbox were one state (AK12). */
+  return state === 'ignored' ? 'Archived. It stays in the inbox under Archived.' : `The arrival is ${INBOX_WORDS[state] ?? state} now.`;
 }
 
 /**
@@ -1197,6 +1208,8 @@ function changeValue(v: unknown, look: Look): string | null {
   if (typeof v === 'string') {
     const t = v.trim();
     if (ULID.test(t)) return null;
+    /* A DAY AS EVERY ANSWER SAYS ONE, `8 Sep` (AK22): "Changes Due from 2026-09-08 to 2026-09-11". */
+    if (/^\d{4}-\d{2}-\d{2}$/u.test(t)) return day(t, look.now);
     if (/^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(t)) {
       const words = look.title(t);
       return words === undefined ? null : namedIn(nameOnly(words) ?? '', t, look, 40);
