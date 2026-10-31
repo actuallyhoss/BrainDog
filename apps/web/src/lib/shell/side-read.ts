@@ -14,7 +14,7 @@ import { REGISTERS } from '../record/held.ts';
 import { learn } from '../record/remote.ts';
 import { rowHref } from '../record/row-href.ts';
 import { MONEY_IN, monthsOf, type MoneyIn } from '../../routes/r/[register]/[seq]/figures.ts';
-import { lanesOf, type Lanes, type ListFacts, type SideProject } from './side.ts';
+import { laneSaid, lanesOf, type Lanes, type ListFacts, type SideProject } from './side.ts';
 import { keepSide, keptPerson, keptSide, type SideCopy } from './side-copy.ts';
 
 /** The most projects read: more than any record holds, and the limit the desk and the pages ask, so all share one read. */
@@ -83,7 +83,8 @@ export function keptRead(base: string): SideRead | null {
 
 /** The sidebar's read from what it keeps of it: its lanes and their words rebuilt from the values the list declares. */
 function sideOf(copy: SideCopy): SideRead {
-  const label = (lane: string): string => copy.labels[lane] ?? (lane === '' ? '' : lane.charAt(0).toUpperCase() + lane.slice(1));
+  /* EACH LANE AS EVERY OTHER SCREEN SAYS IT (`laneSaid`): the list's own label, else the value as a word. */
+  const label = (lane: string): string => laneSaid(copy.labels, lane);
   return { list: copy.list, rows: copy.rows, lanes: lanesOf({ done: copy.done }, copy.values), label };
 }
 

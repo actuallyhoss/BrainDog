@@ -375,6 +375,7 @@ export class ShapeHold {
     return {
       name: this.name,
       lane,
+      ...(this.status.lane === '' ? {} : { laneWord: this.status.lane }),
       next: this.shape?.facts.next ?? '',
       about: text(read.fields.about),
       since: this.status.since || null,

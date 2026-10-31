@@ -79,8 +79,8 @@
       <!-- NO EARNING TILE WHILE NOTHING EARNS AND NO PROJECT IS MARKED EARNING (AH17): "No project is earning yet" beside
            a shop's one new project was a founder's tile with nothing in it. -->
       {#if b.earning.total || b.earning.count > 0}
-      <section class="b-earn" aria-label="Earning, a month">
-        <header class="t-head"><IconWell name="coins" size="m" /><h2 class="t-title">Earning, a month</h2>{#if b.earning.count > 0}<span class="t-meta">{b.earning.count} {b.earning.count === 1 ? 'project' : 'projects'}</span>{/if}</header>
+      <section class="b-earn" aria-label={`${b.said.earning}, a month`}>
+        <header class="t-head"><IconWell name="coins" size="m" /><h2 class="t-title">{b.said.earning}, a month</h2>{#if b.earning.count > 0}<span class="t-meta">{b.earning.count} {b.earning.count === 1 ? 'project' : 'projects'}</span>{/if}</header>
         {#if b.earning.total}
           <p class="e-total num">{b.earning.total}</p>
           {#if b.earning.year}<p class="small">{b.earning.year}</p>{/if}

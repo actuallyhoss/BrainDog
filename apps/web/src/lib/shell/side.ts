@@ -87,6 +87,29 @@ export const EARNING_LANE = 'earning';
 export const earningOf = (lane: string, lanes: Lanes = LANES_DEFAULT): boolean => lane === EARNING_LANE && inPlayOf(lane, lanes);
 export const buildingOf = (lane: string, lanes: Lanes = LANES_DEFAULT): boolean => lane !== EARNING_LANE && inPlayOf(lane, lanes);
 
+/** What a projects list calls each lane, by its value, as its state field labels it (Personal's `building` is "Active"). */
+export type LaneLabels = Readonly<Record<string, string>>;
+
+/** The labels a list's state field gives its lanes, or none. */
+export function laneLabelsOf(decl: { state?: string | undefined; fields: readonly { id: string; labels?: LaneLabels | undefined }[] } | undefined): LaneLabels | undefined {
+  return decl?.state ? decl.fields.find((f) => f.id === decl.state)?.labels : undefined;
+}
+
+/**
+ * A LANE IN THE RECORD'S OWN WORDS, said once for every screen that names one (the sidebar's folds, the Projects board,
+ * a card, a project's page while it opens): the label the list's state field gives the value, else `fallback`, else
+ * the value with its first letter up. Personal's projects list calls `building` "Active", and screens said Building.
+ */
+export function laneSaid(labels: LaneLabels | undefined, lane: string, fallback?: string): string {
+  const said = labels?.[lane];
+  if (typeof said === 'string' && said.trim() !== '') return said.trim();
+  if (fallback !== undefined) return fallback;
+  return lane === '' ? '' : lane.charAt(0).toUpperCase() + lane.slice(1).replace(/_/gu, ' ');
+}
+
+/** A lane's word inside a sentence ("3 on hold"): its first letter down, unless the word is an initialism ("MVP"). */
+export const laneInLine = (word: string): string => (/^\p{Lu}{2}/u.test(word) ? word : word.charAt(0).toLowerCase() + word.slice(1));
+
 /** The projects split into in play, parked and finished, each keeping the order it came in. */
 export function splitOf<P extends Pick<SideProject, 'lane'>>(list: readonly P[], lanes: Lanes): { play: P[]; parked: P[]; finished: P[] } {
   const out = { play: [] as P[], parked: [] as P[], finished: [] as P[] };

@@ -14,6 +14,7 @@ import { nextSplit } from './next-split.ts';
 import { cadenceOf, feedAgeOf } from './feed-age.ts';
 import { isForecast } from '../home/card-kpi.ts';
 import { ago, dayChip, daysBetween, endedAs, trailOf } from '../home/projects-board.ts';
+import { laneInLine } from '../shell/side.ts';
 
 /* ── what is read ──────────────────────────────────────────────────────── */
 
@@ -50,6 +51,8 @@ export type FactHistory = { note: string; by: string; at: string };
 export type FactsIn = {
   name: string;
   lane: string;
+  /** The lane in its list's own words, as the hero says it (Personal's `parked` is "On hold"). */
+  laneWord?: string | undefined;
   next: string;
   about: string;
   since: string | null;
@@ -324,7 +327,7 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
     facts.push(`${f.name} brought in ${f.format(money.now.minor, money.now.currency)} in ${month}${moved}.`);
   }
   if (numbers.banner && numbers.newest) facts.push(`No numbers have come from ${f.name} since ${daySaid(numbers.newest, f.today)}.`);
-  if (f.lane === 'parked' && f.since) facts.push(`${f.name} has been parked since ${f.since}.`);
+  if (f.lane === 'parked' && f.since) facts.push(`${f.name} has been ${laneInLine(f.laneWord ?? 'parked')} since ${f.since}.`);
   if (due.length > 0) facts.push(due.length === 1 ? `${quoted(due[0]!.title)} is due ${dayChip(due[0]!.by!)}.` : `${due.length} tasks fall due this week, the first ${dayChip(due[0]!.by!)}.`);
   const run = f.runs[0];
   if (run) facts.push(`${runSaid(run, f.now)}.`);

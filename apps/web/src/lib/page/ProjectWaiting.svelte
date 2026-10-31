@@ -17,9 +17,15 @@
   import { copy } from '$lib/copy.ts';
   import { slotStyle } from '$lib/home/project-cards.ts';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { laneLabelsOf, laneSaid } from '$lib/shell/side.ts';
   import type { KnownProject } from './known-project.ts';
 
   let { project, tiles = 3 }: { project: KnownProject; tiles?: number } = $props();
+
+  /* ITS LANE AS THE HERO WILL SAY IT, in its list's own words (`laneSaid`): Personal's page opened on "Building" and
+     landed on "Active". */
+  const lane = $derived(laneSaid(laneLabelsOf(project.list ? REGISTERS[project.list] : undefined), project.lane));
 
   /* The tiles' own lines, of different lengths, so the frames read as tiles of words and not as a list. */
   const LINES = [
@@ -35,7 +41,7 @@
     <span class="pw-well" aria-hidden="true"><ProjectWell mark={project.mark} name={project.name} hue={project.hue} size="xl" /></span>
     <div class="pw-name">
       <h1 class="pw-title" dir="auto">{project.name}</h1>
-      {#if project.lane}<p class="pw-status">{project.lane.charAt(0).toUpperCase() + project.lane.slice(1)}</p>{:else}<span class="bar status"></span>{/if}
+      {#if project.lane}<p class="pw-status">{lane}</p>{:else}<span class="bar status"></span>{/if}
     </div>
     <span class="bar news" aria-hidden="true"></span>
   </section>

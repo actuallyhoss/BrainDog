@@ -15,7 +15,7 @@ test('A PROJECT DRAWN IS KNOWN BY ITS PAGE AND ITS ROW, on its own record only, 
   forgetProjects();
   assert.equal(knownProject(BASE, '/p/lanternfish'), null);
   knowProjects(BASE, [lanternfish, { ...lanternfish, key: 'things#4', href: '/p/blank', name: '  ' }], '/p/projects');
-  assert.deepEqual(knownProject(BASE, '/p/lanternfish'), { name: 'Lanternfish', mark: 'L', hue: 210, lane: 'building' });
+  assert.deepEqual(knownProject(BASE, '/p/lanternfish'), { name: 'Lanternfish', mark: 'L', hue: 210, lane: 'building', list: 'things' });
   assert.deepEqual(knownRow(BASE, 'things#3'), knownProject(BASE, '/p/lanternfish'));
   assert.equal(knownProject(BASE, '/p/blank'), null, 'a project with no name was kept');
   assert.equal(knownProject('https://brain.example/r/copperleaf', '/p/lanternfish'), null, 'another record drew this one');

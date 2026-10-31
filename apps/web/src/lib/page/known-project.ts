@@ -11,10 +11,10 @@
  */
 
 /** A project as its page's shape is drawn before the page answers. */
-export type KnownProject = { name: string; mark: string; hue: number | null; lane: string };
+export type KnownProject = { name: string; mark: string; hue: number | null; lane: string; list?: string };
 
 /** A project as a list of them names it: the address its page opens on, and its row in its list. */
-export type ProjectSeen = KnownProject & { href: string; key: string };
+export type ProjectSeen = Omit<KnownProject, 'list'> & { href: string; key: string };
 
 const byHref = new Map<string, KnownProject>();
 const byKey = new Map<string, KnownProject>();
@@ -24,7 +24,9 @@ const places = new Map<string, string>();
 export function knowProjects(base: string, seen: readonly ProjectSeen[], place?: string | null): void {
   for (const p of seen) {
     if (p.name.trim() === '') continue;
-    const one: KnownProject = { name: p.name, mark: p.mark, hue: p.hue, lane: p.lane };
+    /* ITS LIST TOO, by its row (`things#3`), so the page while it opens says the lane in that list's words. */
+    const list = p.key.includes('#') ? p.key.slice(0, p.key.indexOf('#')) : '';
+    const one: KnownProject = { name: p.name, mark: p.mark, hue: p.hue, lane: p.lane, ...(list === '' ? {} : { list }) };
     byHref.set(`${base} ${p.href}`, one);
     byKey.set(`${base} ${p.key}`, one);
   }

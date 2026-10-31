@@ -19,7 +19,7 @@
 
 import { nextSplit } from '../page/next-split.ts';
 import { cadenceOf, feedAgeOf, measureStale, type FeedMeasure } from '../page/feed-age.ts';
-import { EARNING_LANE, LANES_DEFAULT, inPlayOf, shownName, type Lanes } from '../shell/side.ts';
+import { EARNING_LANE, LANES_DEFAULT, inPlayOf, laneInLine, laneSaid, shownName, type Lanes } from '../shell/side.ts';
 import { isForecast } from './card-kpi.ts';
 import { counted, names } from './phrase.ts';
 import { article } from '../copy/english.ts';
@@ -160,8 +160,8 @@ export type Board = {
   groups: BoardGroup[];
   parked: Parked[];
   finished: { count: number; names: string[] };
-  /** The parked strip's title and the finished count's word, in the record's own lane words. */
-  said: { parked: string; finished: string };
+  /** The earning tile's title, the parked strip's title and the finished count's word, in the record's own lane words. */
+  said: { earning: string; parked: string; finished: string };
 };
 
 /* ── words ─────────────────────────────────────────────────────────────── */
@@ -510,7 +510,8 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
       currency: null,
       count: earning.length,
       lines: [],
-      empty: earning.length === 0 ? 'No project is earning yet.' : 'No money linked yet.',
+      /* IN THE RECORD'S OWN WORD for the lane, as the tile's title says it: Personal's "No project is ongoing yet." */
+      empty: earning.length === 0 ? `No project is ${laneInLine(laneSaid(input.laneLabels, EARNING_LANE, 'Earning'))} yet.` : 'No money linked yet.',
       also: null,
     };
   /* ONE CURRENCY ADDED UP, the home one where any line is in it: two currencies are never summed. */
@@ -626,17 +627,19 @@ export function boardOf(input: BoardInput): Board {
   const earning = earningOf(input, fs);
   /* THE GROUPS IN THE RECORD'S OWN LANE WORDS (as `ProjectCard` says a card's lane): Personal's projects list calls
      `building` "Active" and `earning` "Ongoing", and the board said Building and Earning over them. */
-  const laneSaid = (lane: string, fallback: string): string => {
-    const said = input.laneLabels?.[lane];
-    return typeof said === 'string' && said.trim() !== '' ? said.trim() : fallback;
-  };
-  const buildingSaid = laneSaid('building', 'Building');
+  /* ONE HELPER FOR EVERY SCREEN'S LANE WORD (`side.ts` `laneSaid`), and the date line and renewals in them too: "3 on
+     hold · 2 finished", where the board said "3 parked · 2 closed" under groups called Active and On hold. */
+  const said = (lane: string, fallback: string): string => laneSaid(input.laneLabels, lane, fallback);
+  const buildingSaid = said('building', 'Building');
+  const earningSaid = said(EARNING_LANE, 'Earning');
+  const finishedLane = [...lanes.finished][0];
+  const parkedSaid = said('parked', 'Parked');
+  const finishedSaid = finishedLane === undefined ? 'Closed' : said(finishedLane, 'Closed');
   const groups: BoardGroup[] = [
-    { id: 'earning' as const, name: laneSaid(EARNING_LANE, 'Earning'), said: `${earningFs.length}`, rows: earningFs.map(rowOf) },
+    { id: 'earning' as const, name: earningSaid, said: `${earningFs.length}`, rows: earningFs.map(rowOf) },
     { id: 'moving' as const, name: buildingSaid, said: `${movingFs.length}`, rows: movingFs.map(rowOf) },
     { id: 'quiet' as const, name: `${buildingSaid}, quiet`, said: `${quietFs.length} · nothing in ${WEEK_DAYS} days`, rows: quietFs.map(rowOf) },
   ].filter((g) => g.rows.length > 0);
-  const finishedLane = [...lanes.finished][0];
 
   /* ── this week ── */
   const lateLines = ordered(live.filter((f) => f.late.length > 0)).flatMap((f) => f.late.map((t) => ({ day: dayShortest(t.by!.slice(0, 10)), project: f.p.name, text: t.title, href: t.href })));
@@ -659,7 +662,7 @@ export function boardOf(input: BoardInput): Board {
     .sort((a, b) => a.day.localeCompare(b.day))
     .map((r) => {
       const p = r.project ? projectOf(r.project, input.projects) : null;
-      return { day: `${Number(r.day.slice(8, 10))} ${MONTH_SHORT[Number(r.day.slice(5, 7)) - 1]}`, project: r.name, text: p ? `${lanes.parked.has(p.lane) ? 'parked ' : ''}${shownName(p.name)}, in ${plural(daysBetween(input.today, r.day), 'day', 'days')}` : `in ${plural(daysBetween(input.today, r.day), 'day', 'days')}`, href: r.href };
+      return { day: `${Number(r.day.slice(8, 10))} ${MONTH_SHORT[Number(r.day.slice(5, 7)) - 1]}`, project: r.name, text: p ? `${lanes.parked.has(p.lane) ? `${laneInLine(parkedSaid)} ` : ''}${shownName(p.name)}, in ${plural(daysBetween(input.today, r.day), 'day', 'days')}` : `in ${plural(daysBetween(input.today, r.day), 'day', 'days')}`, href: r.href };
     });
 
   const lateCount = lateLines.length;
@@ -673,7 +676,7 @@ export function boardOf(input: BoardInput): Board {
 
   return {
     /* A COUNT OF NOUGHT IS LEFT OUT (AH17): "1 in play · 0 parked · 0 closed" said two things that are not there. */
-    date: [dateLine(input.today), `${live.length} in play`, ...(parked.length > 0 ? [`${parked.length} parked`] : []), ...(finished.length > 0 ? [`${finished.length} closed`] : [])].join(' · '),
+    date: [dateLine(input.today), `${live.length} in play`, ...(parked.length > 0 ? [`${parked.length} ${laneInLine(parkedSaid)}`] : []), ...(finished.length > 0 ? [`${finished.length} ${laneInLine(finishedSaid)}`] : [])].join(' · '),
     headline,
     lede,
     acts: {
@@ -703,7 +706,7 @@ export function boardOf(input: BoardInput): Board {
       })
       .sort((a, b) => Number(b.due !== null) - Number(a.due !== null) || a.name.localeCompare(b.name)),
     finished: { count: finished.length, names: finished.map((f) => f.p.name).sort() },
-    said: { parked: laneSaid('parked', 'Parked'), finished: finishedLane === undefined ? 'Closed' : laneSaid(finishedLane, 'Closed') },
+    said: { earning: earningSaid, parked: parkedSaid, finished: finishedSaid },
   };
 }
 

@@ -234,8 +234,10 @@ test('THE GROUPS SAY THE RECORD’S OWN LANE WORDS: Personal’s Active, never B
   assert.ok(said.groups.every((g) => !/^(?:Building|Earning)/u.test(g.name)));
   assert.equal(said.groups.find((g) => g.id === 'moving')?.name, 'Active');
   assert.equal(said.groups.find((g) => g.id === 'quiet')?.name, 'Active, quiet');
-  assert.deepEqual(said.said, { parked: 'On hold', finished: 'Finished' });
+  assert.deepEqual(said.said, { earning: 'Ongoing', parked: 'On hold', finished: 'Finished' });
+  assert.match(said.date, / · 1 on hold · 1 finished$/u, 'the date line counts in the same words');
   const plain = boardOf(base());
   assert.equal(plain.groups.find((g) => g.id === 'moving')?.name, 'Building');
-  assert.deepEqual(plain.said, { parked: 'Parked', finished: 'Closed' });
+  assert.deepEqual(plain.said, { earning: 'Earning', parked: 'Parked', finished: 'Closed' });
+  assert.match(plain.date, / · 1 parked · 1 closed$/u);
 });
