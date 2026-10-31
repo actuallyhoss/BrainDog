@@ -101,6 +101,8 @@ const SIGN = 'US\\$|C\\$|A\\$|NZ\\$|[eE]£|£|€|¥|₹|\\$';
 const FIGURES = new RegExp(`(?<![\\p{L}\\p{N}.,/:])(?:(${SIGN}|[A-Za-z]{3})\\s?)?(${FIGURE})(?:\\s?([kK])(?![\\p{L}\\p{N}]))?(?![\\p{N}])`, 'gu');
 /* What follows a figure: a sign, or a word. */
 const NEXT = new RegExp(`^\\s?(${SIGN}|[\\p{L}.]+)`, 'u');
+/* Another figure next, with or without a sign in front. */
+const FIGURE_NEXT = new RegExp(`^\\s+(?:${SIGN})?\\s?\\p{N}`, 'u');
 /* WORDS THAT JOIN A FIGURE TO THE REST, so the figure before them is no count: "850 due", "40 for hosting", "15 a month". */
 const JOINING = new Set([
   'for', 'to', 'at', 'on', 'due', 'by', 'of', 'from', 'in', 'per', 'a', 'an', 'the', 'each', 'every', 'and', 'or', 'plus',
@@ -153,6 +155,10 @@ function figuresIn(line: string, known: string | null, home: string | null, labe
         end += next[0].length;
       } else if (after === undefined && /^\p{L}/u.test(word) && !JOINING.has(word.toLowerCase().replace(/\.$/u, ''))) count = true;
     }
+    /* A SMALL FIGURE RIGHT AFTER A NAME WORD, WITH ANOTHER FIGURE AFTER IT, IS PART OF THE NAME (MB2): "Room 2 850" is
+       850 for Room 2, and "Flat 4 1,200" is 1,200 for Flat 4. */
+    if (code === undefined && k === undefined && /^\p{N}{1,3}$/u.test(figure!) && /\p{L}[\p{L}\p{M}'’.-]*\s+$/u.test(line.slice(0, at)) && FIGURE_NEXT.test(rest))
+      count = true;
     /* "total 1350": the field's name goes with its figure, so the title is not left saying "total". */
     const named = label.exec(line.slice(0, at));
     if (named) at = named.index + named[0].search(/\p{L}/u);
@@ -165,7 +171,7 @@ function figuresIn(line: string, known: string | null, home: string | null, labe
  * THE AMOUNT A LINE NAMES, and only one it plainly names (RG1). A figure is money when a currency is said with it
  * ("$40", "850 EGP", "300 pounds"), when it follows the field's own name ("total 1350"), or, for a list whose one
  * required field is its amount (Bills), when it is the first bare figure that counts nothing: "Rent for 2 rooms 850"
- * and "Rent 850 for flat 4" are 850, and "Launch 3 apps" on Projects is no money at all. With several said with a currency, the first.
+ * and "Rent 850 for flat 4" are 850, so is "Room 2 850", and "Launch 3 apps" on Projects is no money at all. With several said with a currency, the first.
  *
  * `bare` IS A FIGURE THAT IS MONEY AND HAS NO CURRENCY ANYBODY SAID, for the line to ask about, and only where the
  * amount is required (RG10). Anywhere else the figure stays in the words.
