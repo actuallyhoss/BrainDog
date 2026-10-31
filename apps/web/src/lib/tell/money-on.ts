@@ -63,11 +63,45 @@ export async function turnOnMoney(base: string, approved: readonly string[] = []
   const approve = Array.isArray(lines) ? lines.filter((a): a is string => typeof a === 'string') : [];
   if (approve.some((line) => !approved.includes(line))) {
     const { callsOutOf, callLine } = await import('../record/actions.ts');
-    const calls = callsOutOf(planned.value?.diff?.calls_out).map(callLine);
-    return calls.length === 0 ? MONEY_ELSEWHERE : { ask: { lines: calls, approve } };
+    return moneyAskOf(approve, planned.value?.diff?.calls_out, (raw) => {
+      const [call] = callsOutOf([raw]);
+      return call ? callLine(call) : null;
+    });
   }
   const put = (await client.installPack({ doc, source: { kind: 'local' }, planHash: hash, ...(approve.length === 0 ? {} : { approve }) }).catch(() => null)) as Wire | null;
   return put?.ok ? null : fixOf(put);
+}
+
+/* The sentence a plan ends its lines with when a scheduled action sends a key: said on the card as it is written. */
+const KEY_NOTE = /^A scheduled action opens this key with nobody present\b/u;
+
+/**
+ * WHAT THE CARD SAYS FOR EACH LINE THE PRESS WOULD APPROVE, OR MODULES (RO10). The card said the plan's call-outs and the
+ * press approved every line in `approve`, so a key or a schedule with no call-out to say it went through unread. Now
+ * each line is said: a call-out's own line and its key line by the call they belong to (`say`, `callLine` read off the
+ * plan's `calls_out`), the key sentence as written. A line nothing here can say sends him to Modules, where each part is
+ * shown, and nothing is approved.
+ */
+export function moneyAskOf(approve: readonly string[], callsOut: unknown, say: (raw: unknown) => string | null): string | { ask: MoneyAsk } {
+  const lines: string[] = [];
+  const said = new Set<string>();
+  for (const raw of Array.isArray(callsOut) ? callsOut : []) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const o = raw as Record<string, unknown>;
+    const own = [o.line, o.key_line].filter((l): l is string => typeof l === 'string' && approve.includes(l));
+    if (own.length === 0) continue;
+    const line = say(raw);
+    if (line === null || line.trim() === '') continue;
+    lines.push(line);
+    for (const l of own) said.add(l);
+  }
+  for (const a of approve) {
+    if (said.has(a) || !KEY_NOTE.test(a) || lines.length === 0) continue;
+    lines.push(a);
+    said.add(a);
+  }
+  if (lines.length === 0 || approve.some((a) => !said.has(a))) return MONEY_ELSEWHERE;
+  return { ask: { lines, approve: [...approve] } };
 }
 
 /** A ref an entry of money must name, an account: the list it links to. */

@@ -258,6 +258,14 @@ function takeDay(text: string, today: string): { day: string | null; rest: strin
   return { day, rest: oneLine(`${text.slice(0, m.index)} ${text.slice(m.index + m[0].length)}`), gone };
 }
 
+/* THE DAY WORDS THAT POINT AHEAD (RO5): "due Friday", "by the 5th", "tomorrow", "next Monday", "in 3 days". Any other day
+   said of a spend is the one gone: "Uber 85 on Monday" was last Monday. */
+const AHEAD = /^(?:due|by|before|until|for)\b|\b(?:tomorrow|tmrw|next|this week|this weekend)\b|(?:^|\s)in\s+\S+\s+(?:days?|weeks?)\b/iu;
+const aheadSaid = (text: string): boolean => {
+  const m = DAY.exec(text);
+  return m !== null && AHEAD.test(oneLine(m[0]));
+};
+
 /* ── amounts ──────────────────────────────────────────────────────────── */
 
 /* A FIGURE AS TYPED, in any digits and grouping (`FIGURE`), read by the one money reader (`minorOf`, RG8). */
@@ -593,15 +601,55 @@ const MEASURE = /^(MRR|ARR|revenue|sales|sign-?ups|users|active users|subscriber
 const SPAN = /\b(?:this|last) (?:month|week|year|quarter)\b|\btoday\b|\bso far\b/giu;
 /* "TALLOW HIT 1,000 SIGNUPS" IS A NUMBER FOR TALLOW (AN9), never a task: a name, the word for reaching, a figure and
    what it counts. Case kept on the name, which is told by its capital. */
-const HIT = new RegExp(`^(${NAME})\\s+(?:hit|has hit|reached|has reached|passed|crossed|topped|is at|is now at)\\s+(.+)$`, 'u');
+const HIT = new RegExp(`^(${NAME})\\s+(hit|has hit|reached|has reached|passed|crossed|topped|is at|is now at)\\s+(.+)$`, 'u');
+/* WORDS OF WHEN ARE NEVER WHAT A FIGURE COUNTS (RO7): "Sales were 40 yesterday" was a number with the unit "yesterday",
+   "MRR is 4,200 now" one with "now". Taken off before the unit is read, as `SPAN` is. */
+const WHEN_SAID = /\b(?:right now|now|already|yesterday|tonight|currently|at the moment|still|again)\b/giu;
+/* "Karim is at 3pm" is a time, never a number called "Karim pm". */
+const CLOCK = /^(?:[ap]\.?m\.?|o['’]clock)$/iu;
+/* What a project counts, said after a name that may be somebody's (RO7): "Tallow hit 1,000 signups" is a number,
+   "Sara hit 3 meetings" is not. */
+const METRIC = /^(?:(?:active|paying|paid|new|monthly|daily|weekly|total)\s+)?(?:sign-?ups|users|subscribers|customers|clients|downloads|installs|followers|stars|sales|orders|pre-?orders|members|visitors|views|readers|listeners|reviews|ratings|students|bookings|backers|supporters|leads|trials|accounts|teams|seats|transactions|mau|dau|wau|mrr|arr|waitlist)$/iu;
 /* What a figure counts, said after it: "months", "active users", or a per cent. */
 const UNIT = /^%$|^\p{Ll}[\p{L}\p{M}'’-]*(?:\s+\p{Ll}[\p{L}\p{M}'’-]*){0,2}$/u;
 /* "MAY RENT 12,000 PAID" WAS PAID (AN7): a figure, what it was for, and "paid" last, never a bill still to pay. */
 const PAID_LAST = /^(.*?\d.*?)\s+(?:(?:is|was|has been|have been|already|now|all|fully)\s+)*paid(?:\s+(?:already|off|in full|now))?$/iu;
 /* Words before that "paid" that say it is not yet: "to be paid", "not paid". */
-const NOT_YET = /\b(?:not|to be|will be|needs? to be|must be|should be|be|to)$|\b(?:not|unpaid|owed?|owes|due)\b/iu;
+/* AND A CONTRACTION, NEVER OR THE FUTURE (RO1): "isn't paid", "never paid", "will get paid" are not paid yet. */
+const NOT_YET = /\b(?:not|to be|will be|needs? to be|must be|should be|be|to)$|\b(?:not|never|unpaid|owed?|owes|due|will|gets?|getting|yet)\b|n['’]t\b/iu;
+/* PART OF IT PAID IS NOT ALL OF IT (RO1): "Rent 12,000 half paid" was all 12,000 paid. How much is asked. */
+const PART_PAID = /^(?:half|partly|partially|part|some|mostly|almost|nearly)(?:\s+of\s+it)?$/iu;
+/* THE WORDS A BILL STILL TO PAY IS SAID WITH, off its name: "Rent 12,000 isn't paid" is "Rent", to pay. */
+const NOT_PAID_TAIL = /(?:\s+(?:is|isn['’]t|was|wasn['’]t|has|hasn['’]t|have|haven['’]t|not|never|still|yet|been|be|to|will|won['’]t|get|gets|getting))+\s+paid(?:\s+(?:yet|off|in full))?$|\s+(?:unpaid|not paid)(?:\s+yet)?$/iu;
+/* A NUMBER A THING IS KNOWN BY IS NEVER ITS AMOUNT (RO3): "Order 57 paid", "Invoice 1042 paid", "Room 12", "#57", "No. 57".
+   A bare "bill" before a figure is its amount ("Electricity bill 850"), unless it opens the line or says "#" or "No.". */
+const REF_BEFORE = /(?:^|[^\p{L}])(?:order|invoice|inv|receipt|ref|reference|booking|room)\s*(?:#|no\.?|number)?\s*$|(?:#|(?:^|\s)no\.|(?:^|\s)number)\s*$/iu;
+const BILL_HASH = /(?:^|[^\p{L}])bill\s*(?:#|no\.?|number)\s*$/iu;
+/**
+ * Whether a figure is the number a thing is known by, never an amount (RO3): no currency said with it, digits alone, and
+ * right after "order", "invoice", "room", "#" or "No.". `bill` says when a bare "bill" before it counts too: never (a
+ * bill's own line, "Bill 850 due Friday"), only when it opens the words ("Bill 1042 paid"), or anywhere, where another
+ * figure is said beside it.
+ */
+function refAt(text: string, a: Amount, bill: 'never' | 'opening' | 'any'): boolean {
+  if (a.word !== null || a.thousand || !/^\p{Nd}+$/u.test(a.digits)) return false;
+  const before = text.slice(0, a.at);
+  if (REF_BEFORE.test(before) || BILL_HASH.test(before)) return true;
+  return bill === 'any' ? /(?:^|[^\p{L}])bill\s*$/iu.test(before) : bill === 'opening' ? /^\s*bill\s*$/iu.test(before) : false;
+}
 /* A SHOP, A SERVICE OR A THING BOUGHT, SAID WITH ITS FIGURE AND NOTHING MORE, WAS SPENT (AN9): "Uber 85", "Coffee 45". */
-const SPENT_ON = (lead: string): boolean => SERVICE_BRANDS.test(lead) || SERVICES.test(lead) || COMPANIES.test(lead) || /^(?:petrol|fuel|parking|snacks?|takeaway|takeout)$/iu.test(lead);
+/* NEVER A PLATFORM THAT PAYS HIM (RO2): "Apple 1,200" or "App Store 1,200 USD" is App Store money coming in as often as
+   going out, and "Airbnb 4,500" a host's payout. Which way is asked. The ride and food apps stay spends (23 Oct). */
+const SPENT_ON = (lead: string): boolean => !paysHim(lead) && (SERVICE_BRANDS.test(lead) || SERVICES.test(lead) || COMPANIES.test(lead) || /^(?:petrol|fuel|parking|snacks?|takeaway|takeout)$/iu.test(lead));
+const RIDES = /^(?:uber|careem|talabat|deliveroo)$/iu;
+const MARKETS = /^(?:booking|booking\.com|noon|jumia)$/iu;
+const paysHim = (lead: string): boolean => (PROVIDERS.test(lead.trim()) && !RIDES.test(lead.trim())) || MARKETS.test(lead.trim());
+/* A COUNT OF THINGS IS NO MONEY ALONE (RO4): "Tickets 40", "Books 3" are asked, unless a currency is said or the figure
+   is 100 or more, as a loose bill is. */
+const COUNTED = /^(?:tickets?|flights?|books?|classes|lessons?|shoes|clothes)$/iu;
+/* WHAT A BUSINESS SELLS AS WELL AS BUYS SAYS NO WAY (RO4, RO6): "Seats 1,200 a month" on a SaaS founder's record, "Ads paid
+   300" from AdMob, "Training 15,000" from a trainer. Which way is asked, and none of them is ever somebody. */
+const EITHER_WAY = /^(?:seats?|licen[cs]es?|software|saas|cloud|storage|backups?|ads|advertising|marketing|office|accounting|workspace|vpn|analytics|crm|printing|packaging|supplies|inventory|materials|equipment|transport|training|courses?|delivery|shipping)\b/iu;
 /* "SPRINT 14 STARTS MONDAY" IS A SPRINT, never a ticket called "Sprint 14 starts" (AM12): a sprint, cycle or iteration
    by its number, when it starts or ends. */
 const CYCLE = /^(?:(?:the|our)\s+)?(?:next\s+)?((?:sprint|cycle|iteration)\s+\d{1,4})\s+(starts|begins|kicks off|ends|finishes|wraps up)\b\s*(.*)$/iu;
@@ -611,10 +659,12 @@ const INVOICE = new RegExp(`^(?:[Ii]nvoice|[Bb]ill|[Cc]harge)\\s+(${NAME})(?=\\s
 const BILL_WORD = /\b(?:bill|subscription|membership|rent|fees?|insurance|loan|tuition|invoice|instal(?:l)?ment|premium)\b/iu;
 /* What a bill is for, said as the first word of "Rent paid 12000": a bill word or a thing a household pays for, never anybody. */
 /* AND WHAT A BUSINESS PAYS FOR (AN6): "Hosting 45 USD a month" is a cost that comes round, never "Did Hosting pay you". */
-const COSTS = 'hosting|web hosting|domains?|servers?|vps|software|saas|cloud|storage|backups?|ads|advertising|marketing|office|coworking|co-working|accounting|bookkeeping|payroll|licen[cs]es?|seats?|workspace|vpn|cdn|analytics|crm|printing|packaging|supplies|inventory|materials|equipment|utilities|transport|commute|taxes|vat';
+/* ONLY WHAT IS NEVER SOLD BY THE ONE TELLING IT (RO6): seats, licences, software, ads and supplies ask (`EITHER_WAY`). */
+const COSTS = 'hosting|web hosting|domains?|servers?|vps|cdn|coworking|co-working|bookkeeping|payroll|utilities|commute|taxes|vat';
 const THING_PAID = new RegExp(`^(?:${BILL_WORD.source.slice(2, -2)}|${COSTS}|electricity|electric|water|gas|internet|wifi|broadband|phone|mobile|groceries|petrol|fuel|parking|school|gym|netflix|spotify)\\b`, 'iu');
 /* A WORD FOR WORK DONE, said alone, is a thing and nobody (AN6): "Hosting", "Cleaning", "Tutoring", "Marketing". */
-const GERUND = /^\p{L}{4,}ing$/iu;
+/* ONLY THE WORDS FOR WORK, NEVER ANY WORD ENDING IN "ING" (RO8): Meiling, Xiaoling, Sterling and Fleming are people. */
+const GERUND = /^(?:cleaning|tutoring|hosting|web hosting|consulting|coaching|catering|printing|marketing|accounting|bookkeeping|training|shipping|parking|housekeeping|gardening|plumbing|babysitting|landscaping|painting|editing|advertising|packaging|copywriting|translating|proofreading|filming|recording|engineering|programming|coding|designing|tailoring|ironing|washing|baking|cooking|boarding|grooming|dog walking|moving|banking|billing|invoicing|licensing|branding|recruiting|staffing|outsourcing|freelancing|modelling|modeling|lodging|clothing|flooring|roofing|tiling|wiring|heating|servicing|decorating|plastering|welding|towing|dry cleaning|ticketing|streaming|messaging)$/iu;
 const EVERY = /\b(?:a|per|each|every)\s+(month|year|quarter|week)\b|\b(monthly|yearly|annually|quarterly|weekly)\b/iu;
 const EVERY_SAID: Record<string, string> = { monthly: 'month', yearly: 'year', quarterly: 'quarter', weekly: 'week' };
 const REPEATS: Record<string, string> = { month: 'monthly', monthly: 'monthly', year: 'yearly', yearly: 'yearly', annually: 'yearly', quarter: 'quarterly', quarterly: 'quarterly', week: 'weekly', weekly: 'weekly' };
@@ -638,7 +688,7 @@ const COMPANY_END = /\s(?:bank|telecom|airways|airlines|air|ltd|llc|inc|co|corp|
 /** Whether a capitalised name reads as somebody: never a place, a company, a provider, a bill, or letters in capitals. */
 const readsAsSomebody = (name: string): boolean => {
   const n = name.trim();
-  return aName(n) && !GERUND.test(n) && !PLACES.test(n) && !COMPANIES.test(n) && !SERVICE_BRANDS.test(n) && !COMPANY_END.test(n) && !PROVIDERS.test(n) && !THING_PAID.test(n) && !SERVICES.test(n) && !/^\p{Lu}{2,}$/u.test(n);
+  return aName(n) && !GERUND.test(n) && !PLACES.test(n) && !COMPANIES.test(n) && !SERVICE_BRANDS.test(n) && !COMPANY_END.test(n) && !PROVIDERS.test(n) && !THING_PAID.test(n) && !EITHER_WAY.test(n) && !SERVICES.test(n) && !/^\p{Lu}{2,}$/u.test(n);
 };
 /* WHO A PAST PAYMENT WENT TO, as Tell titles one: "Paid to Halden", "Payout from Stripe", "Groceries at Carrefour". */
 const PAID_TITLE = /^(?:paid to|payout from)\s+(.+)$|\s+at\s+(.+)$/iu;
@@ -674,12 +724,34 @@ function heldThings(opts: TellOptions): ReadonlySet<string> {
   }
   return out;
 }
+/* HIS OWN LISTS OF WHAT HE SELLS (RO4), by id or name: Orders, Products, Services, a menu or a catalogue. */
+const SELLS = /\b(?:orders?|products?|services?|menus?|catalog(?:ue)?s?|listings?|offerings?|stock)\b/iu;
+/** A name as its words are matched: lower case, one space, and each word without a plural's "s". */
+const bare = (name: string): string =>
+  oneLine(words(name))
+    .replace(/[^\p{L}\p{N}\s'’-]+/gu, ' ')
+    .split(/\s+/u)
+    .filter(Boolean)
+    .map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
+    .join(' ');
+/** What the record's Orders, Products and Services name, as `bare` says each (RO4). */
+function soldBy(opts: TellOptions): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const l of opts.lists) {
+    if (l.id === PEOPLE || !SELLS.test(`${l.id} ${l.name}`)) continue;
+    for (const { name } of opts.titled?.[l.id] ?? []) {
+      const b = bare(name);
+      if (b) out.add(b);
+    }
+  }
+  return out;
+}
 /* A SERVICE OR A THING PAID FOR, SAID FIRST, IS NOBODY: a phone gives the first word its capital, so "Dentist 800 due
    Monday" asked "Did Dentist pay you" (rl-tell). Who is paid for the work, by what they do, and the work itself. */
 const SERVICES = /^(?:dentist|doctor|vet|plumber|electrician|mechanic|carpenter|painter|cleaner|cleaners|cleaning|maid|nanny|babysitter|tutor|tutoring|driver|gardener|hairdresser|barber|salon|haircut|lawyer|accountant|landlord|nursery|daycare|kindergarten|therapist|therapy|physio|physiotherapy|optician|dental|pharmacy|garage|laundry|dry cleaning|car wash|car service|service|repairs?|maintenance|lessons?|classes|course|training|pilates|yoga|swimming|piano|guitar|dance|doorman|security|delivery|shipping|taxi|uber|car|flat|house|groceries|food|coffee|lunch|dinner|tickets?|flights?|hotel|clothes|shoes|books?|medicine|meds|vet bill)$/iu;
 /* A word a phone capitalised, said again inside a sentence: "Rent" after "for" is "rent". A brand keeps its capital. */
 const saidAsTyped = (s: string): string =>
-  /^\p{Lu}\p{Ll}/u.test(s) && !/^(?:netflix|spotify)\b/iu.test(s) && !SERVICE_BRANDS.test(s) && !COMPANIES.test(s) && (THING_PAID.test(s) || INCOME_WORD.test(s) || SERVICES.test(s.split(/\s+/u)[0] ?? '')) ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+  /^\p{Lu}\p{Ll}/u.test(s) && !/^(?:netflix|spotify)\b/iu.test(s) && !SERVICE_BRANDS.test(s) && !COMPANIES.test(s) && (THING_PAID.test(s) || EITHER_WAY.test(s) || INCOME_WORD.test(s) || SERVICES.test(s.split(/\s+/u)[0] ?? '')) ? s.charAt(0).toLowerCase() + s.slice(1) : s;
 /* MONEY LENT OR BORROWED BETWEEN TWO PEOPLE IS OWED, never a payment and never "Not sure" (first-hour audit, FB3):
    "Lent Omar 500 yesterday", "Omar owes me 500", "Borrowed 300 from Sara", "Sara lent me 300", "I owe Sara 300". Case
    kept on the name, as everywhere: it is told by its capital. Each is [who, the rest] and whose the money is. */
@@ -821,6 +893,10 @@ const WHY = {
   whichWay: (name: string) => `Did ${name} pay you, or did you pay ${name}?`,
   /* A PLAIN LINE THAT SAYS NO WAY, AND NAMES NOBODY (RL5): "Wages 12,000 due Friday". */
   inOrOut: (figure: string) => `Is that money you get, or money you pay? Say which with it, like got ${figure} or paid ${figure}.`,
+  /* A NUMBER A THING IS KNOWN BY, AND NO AMOUNT (RO3): "Order 57 paid". */
+  howMuch: (what: string) => `How much was paid for ${what}, and which way? Say it like got 1,350 for ${what} or paid 1,350 for ${what}.`,
+  /* PART OF IT PAID (RO1): "Rent 12,000 half paid". */
+  partPaid: (figure: string, half: string | null, what: string) => `How much of the ${figure} was paid? Say it with the figure, like paid ${half ?? figure}${what ? ` for ${what}` : ''}.`,
   /* ASKED, NEVER GUESSED: money that comes round is kept with the next day it falls on, and no day was said. */
   whenNext: 'When is it next due? Say the day with it, like on the 5th or next Friday.',
   bankNoCurrency: 'That text names no currency, so nothing is kept from it. Paste it as the bank sent it.',
@@ -875,6 +951,13 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
      accounts, bills, subscriptions or past payees. Somebody in People is found before this is asked. */
   const things = heldThings(opts);
   const somebody = (name: string): boolean => readsAsSomebody(name) && !things.has(words(name.trim()));
+  /* WHAT HE SELLS, BY HIS OWN LISTS (RO4): the names his Orders, Products or Services hold, each word without its plural, so
+     "Candles 300" where he sells lavender candles is never money he spent. */
+  const sold = soldBy(opts);
+  const sells = (name: string): boolean => {
+    const said = bare(name);
+    return said !== '' && [...sold].some((t) => t === said || ` ${t} `.includes(` ${said} `));
+  };
 
   /* Who each name is: an entry already kept, or a new one made the first time they are named. */
   const made = new Map<string, number>();
@@ -917,6 +1000,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let inOrOut: string | null = null;
   /* Money that comes round was read with no day it next falls on: the day is asked, and the entry waits for it. */
   let whenNext = false;
+  /* "Order 57 paid": the line named what was paid by its number and said no amount (RO3). How much is asked. */
+  let howMuch: string | null = null;
+  /* "Rent 12,000 half paid": part of it was paid (RO1). How much is asked, with half of it as the example. */
+  let partPaid: { figure: string; half: string | null; what: string } | null = null;
 
   /** Somebody kept, made in this sentence, shared by two, or a name that reads as a person: never a platform or a shop. */
   const isSomebody = (name: string): boolean =>
@@ -973,6 +1060,13 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (opener && !knownAs(opener[1]!, opts.people ?? []) && THING_PAID.test(opener[1]!) && PAID.test(after)) {
       if (readMoney(`${after} ${opener[1]!}`, null, false)) placed = true;
       else left.push(whole);
+      continue;
+    }
+    /* "ADS PAID 300" MAY BE ADMOB PAYING HIM (RO6): a word for what is sold as well as bought, or one of his own things
+       for sale, before "paid" is asked which way, never money out and never "Did Ads pay you". */
+    const either = opener && !knownAs(opener[1]!, opts.people ?? []) && PAID.test(after) && (EITHER_WAY.test(opener[1]!) || sells(opener[1]!)) ? amountsIn(after, opts.currency, held)[0] : undefined;
+    if (either) {
+      askWay(whole, either, null);
       continue;
     }
     const opened = opener !== null && aName(opener[1]!) && (acts(after) || PAYOUT.test(after));
@@ -1095,6 +1189,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (bankBare) return { rows, left, why: WHY.bankNoCurrency };
     if (whichWay !== null) return { rows, left, why: WHY.whichWay(whichWay) };
     if (inOrOut !== null) return { rows, left, why: WHY.inOrOut(inOrOut) };
+    if (howMuch !== null) return { rows, left, why: WHY.howMuch(howMuch) };
+    if (partPaid !== null) return { rows, left, why: WHY.partPaid(partPaid.figure, partPaid.half, partPaid.what) };
     if (whenNext) return { rows, left, why: WHY.whenNext };
     if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney, needsMoney: true };
     if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency(unsureWord?.word ?? null, unsureWord?.figure ?? '300') };
@@ -1369,17 +1465,24 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const m = MEASURE.exec(c);
     const hit = m ? null : HIT.exec(c);
     if (!m && !hit) return false;
-    const phrase = (m ? m[2]! : hit![2]!).replace(SPAN, ' ');
+    /* A DAY OR A TIME SAID WITH IT IS NEVER ITS UNIT (RO7). */
+    const phrase = takeDay((m ? m[2]! : hit![3]!).replace(SPAN, ' ').replace(WHEN_SAID, ' '), opts.today).rest;
     const [a, ...more] = amountsIn(phrase, opts.currency, held);
     if (!a || more.length > 0) return false;
     /* WHAT IT COUNTS IS KEPT WITH IT (AN9): "Runway is 9 months" was "Runway, 9". */
     const after = trimWords(oneLine(phrase.slice(a.at + a.text.length)));
+    if (CLOCK.test(after)) return false;
     const unit = UNIT.test(after) ? after : '';
     const project = hit ? hit[1]! : null;
     if (project !== null && (unit === '' || unit === '%' || trimWords(phrase.slice(0, a.at)) !== '' || knownAs(project, opts.people ?? []) !== null || !aName(project))) return false;
     const titleField = textField(l)!;
     const projects = projectList(opts.lists);
     const kept = project !== null ? keptAs(project) : null;
+    /* A NAME THAT MAY BE SOMEBODY GETS A NUMBER ONLY AS A PROJECT (RO7): "Sara is at 3 meetings" and "Sara hit 3 meetings"
+       are no number. A project kept, or a name that reads as nobody, is; and a name nobody keeps yet only with what a
+       project counts, so "Tallow hit 1,000 signups" is still Tallow's. */
+    const asProject = kept !== null && projects !== undefined && kept.list === projects;
+    if (project !== null && !asProject && somebody(project) && (/^is\b/iu.test(hit![2]!) || !METRIC.test(unit))) return false;
     const thing = kept && projects && kept.list === projects ? l.fields.find((f) => f.type === 'ref' && f.to === projects.id && !f.retired) : undefined;
     const fields: Record<string, TellValue> = { [titleField.id]: m ? (/^[a-z]/u.test(m[1]!) ? capital(m[1]!) : m[1]!) : thing ? capital(unit) : `${project} ${unit}` };
     if (thing && kept) fields[thing.id] = `${projects!.id}#${kept.seq}`;
@@ -1541,11 +1644,33 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const m = PAID_LAST.exec(dated.rest);
     if (!m || NOT_YET.test(m[1]!.trim())) return false;
     const lead = m[1]!;
-    const [a, ...more] = amountsIn(lead, opts.currency, held);
+    const found = amountsIn(lead, opts.currency, held);
+    const figures = found.filter((x) => !refAt(lead, x, 'opening'));
+    /* "ORDER 57 PAID" SAYS NO AMOUNT (RO3): 57 is the order, never EGP 57 out. How much, and which way, is asked. */
+    if (figures.length === 0 && found.length > 0) {
+      if (!moneyList(opts.lists) && !dueList(opts.lists)) noMoney = true;
+      else howMuch ??= capital(trimWords(lead));
+      left.push(c);
+      return true;
+    }
+    const [a, ...more] = figures;
     if (!a || more.length > 0 || TIME_BEFORE.test(lead.slice(0, a.at))) return false;
+    /* NOTHING BUT "PAID" AFTER THE FIGURE, or the words "is", "was", "already" the shape takes (RO1): "Rent 12,000 isn't
+       paid" was paid in full, and so was "half paid". Part of it paid is asked; any other word is no payment made. */
+    const between = trimWords(lead.slice(a.at + a.text.length));
+    if (between !== '') {
+      if (!PART_PAID.test(between)) return false;
+      const n = numberOf(a.digits, a.thousand);
+      if (!moneyList(opts.lists) && !dueList(opts.lists)) noMoney = true;
+      else partPaid ??= { figure: a.digits, half: n === null ? null : (n / 2).toLocaleString('en-GB'), what: saidAsTyped(trimWords(lead.slice(0, a.at))) };
+      left.push(c);
+      return true;
+    }
     const what = trimWords(oneLine(`${lead.slice(0, a.at)} ${lead.slice(a.at + a.text.length)}`));
     /* A salary or a wage "paid" may be his or his staff's: the income reader asks. */
     if (what === '' || INCOME_WORD.test(what)) return false;
+    /* Seats, ads, a platform that pays him, or something he sells, "paid", may have paid him (RO2, RO6). */
+    if (EITHER_WAY.test(what) || paysHim(what) || sells(what)) return askWay(c, a, null);
     const who = nameBefore(what);
     if (who !== null) return askWay(c, a, who);
     if (readMoney(oneLine(`paid ${a.text} for ${what} ${dayText(c)}`), null, false)) placed = true;
@@ -1556,11 +1681,19 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   /** "Uber 85": money spent on a shop, a service or a thing bought, today or on the day gone it names (AN9). */
   function spentOn(c: string): boolean {
     const dated = takeDay(c, opts.today);
-    if (dated.day !== null && dated.day > opts.today) return false;
+    /* A DAY GONE IS WHEN IT WAS SPENT (RO5): "Uber 85 on Monday" is last Monday, "Coffee 45 on 28 Oct" the 28th gone. Only
+       words that point ahead ("tomorrow", "next", "due", "in 3 days") are no spend: a bill, read after. */
+    if (dated.day !== null && (aheadSaid(c) || (dated.gone ?? dated.day) > opts.today)) return false;
     const [a, ...more] = amountsIn(dated.rest, opts.currency, held);
     if (!a || more.length > 0) return false;
     const lead = trimWords(dated.rest.slice(0, a.at));
-    if (lead === '' || trimWords(dated.rest.slice(a.at + a.text.length)) !== '' || !SPENT_ON(lead)) return false;
+    if (lead === '' || trimWords(dated.rest.slice(a.at + a.text.length)) !== '') return false;
+    /* A PLATFORM THAT PAYS HIM, A WORD FOR WHAT IS SOLD AS WELL AS BOUGHT, OR ONE OF HIS OWN THINGS FOR SALE says no way
+       (RO2, RO4): "Apple 1,200", "Training 15,000", "Candles 300" where he sells candles. Which way is asked. */
+    if (paysHim(lead) || EITHER_WAY.test(lead) || sells(lead)) return askWay(c, a, null);
+    /* A COUNT IS NO SPEND WITHOUT A CURRENCY OR A FIGURE THAT READS AS MONEY (RO4): "Tickets 40", "Books 3". */
+    if (COUNTED.test(lead) && a.word === null && (numberOf(a.digits, a.thousand) ?? 0) < 100) return askWay(c, a, null);
+    if (!SPENT_ON(lead)) return false;
     if (readMoney(oneLine(`paid ${a.text} for ${lead} ${dayText(c)}`), null, false)) placed = true;
     else left.push(c);
     return true;
@@ -1577,7 +1710,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const loose = !billSaid && (THING_PAID.test(c) || EVERY.test(c) || /\bdue\b/iu.test(c));
     if (!billSaid && !loose) return false;
     const own = takeDay(c, opts.today);
-    const [a] = amountsIn(own.rest, opts.currency, held);
+    /* A NUMBER A THING IS KNOWN BY IS NEVER WHAT IS OWED (RO3): "Invoice 1042 3,000 due Friday" is 3,000, and "Invoice
+       1042 due Friday" no bill at all. */
+    const [a] = amountsIn(own.rest, opts.currency, held).filter((x) => !refAt(own.rest, x, 'never'));
     if (!a) return false;
     if (loose && a.word === null) {
       const after = oneLine(own.rest.slice(a.at + a.text.length).replace(EVERY, ' ')).replace(NEXT_SAID, '').replace(/^(?:due|by|on)$/iu, '');
@@ -1590,7 +1725,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        paid for, a company he pays or one of his accounts is the bill it reads as. */
     if (loose && !/\bowe/iu.test(c)) {
       const who = nameBefore(own.rest.slice(0, a.at));
-      if (who !== null || INCOME_WORD.test(c)) return askWay(c, a, who);
+      /* AND SO DOES A PLATFORM THAT PAYS HIM, OR WHAT HE SELLS AS WELL AS BUYS (RO2, RO6): "Seats 1,200 a month" asks. */
+      const lead = trimWords(own.rest.slice(0, a.at));
+      if (who !== null || INCOME_WORD.test(c) || paysHim(lead) || EITHER_WAY.test(lead) || sells(lead)) return askWay(c, a, who);
     }
     const l = dueList(opts.lists);
     if (!l) {
@@ -1619,7 +1756,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (every) rest = oneLine(rest).replace(NEXT_SAID, '');
     /* EVERY WORD OF WHEN IS DROPPED FROM ITS NAME (audit 31 Oct m, AM23): "Rent 12,000 due on the 1st every month" was
        named "Rent due", the "on" before the day taken and the "due" before it kept. */
-    const plain = trimWords(trimWords(rest).replace(/^(?:for|to)\s+(?:the\s+)?/iu, '').replace(/(?:\s+(?:due|on|by|is|starting))+$/iu, ''));
+    /* AND "ISN'T PAID", "NOT PAID", "GETS PAID" (RO1): "Rent 12,000 isn't paid" is a bill called Rent. */
+    const plain = trimWords(trimWords(trimWords(rest).replace(NOT_PAID_TAIL, '')).replace(/^(?:for|to)\s+(?:the\s+)?/iu, '').replace(/(?:\s+(?:due|on|by|is|starting))+$/iu, ''));
     const who = invoice?.[1] ?? null;
     const what = capital(plain) || (who ? `Invoice to ${who}` : 'A bill');
     /* MONEY THAT COMES ROUND IS REPEATING, where the record keeps it (AL4): "Netflix 180 a month" is a cost every month,
@@ -1674,7 +1812,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const fit = (n: string | undefined): string | null => {
       /* A MONTH OR A WEEKDAY IS NEVER WHO PAID (RM5), nor a service he pays ("Netflix 200 due Friday"). */
       const name = undated(n ?? '').name;
-      if (!name || THING_PAID.test(name) || GERUND.test(name) || SERVICES.test(name) || SERVICE_BRANDS.test(name) || INCOME_WORD.test(name) || ownAccount(name) || PLACES.test(name) || COMPANIES.test(name)) return null;
+      if (!name || THING_PAID.test(name) || EITHER_WAY.test(name) || GERUND.test(name) || SERVICES.test(name) || SERVICE_BRANDS.test(name) || INCOME_WORD.test(name) || ownAccount(name) || PLACES.test(name) || COMPANIES.test(name)) return null;
       return knownAs(name, opts.people ?? []) !== null || aName(name) ? name : null;
     };
     const own = new RegExp(`^(${NAME})['’]s(?![\\p{L}\\p{M}])`, 'u').exec(said);
@@ -1863,7 +2001,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* The day first, so "on the 12th" is never twelve of anything. */
     const dated = takeDay(phrase, opts.today);
     const day = dated.gone;
-    const [a, ...more] = amountsIn(dated.rest, opts.currency, held);
+    /* "Paid 900 for order 57" is 900, for order 57, never 900 and a second figure of 57 said back (RO3). */
+    const all = amountsIn(dated.rest, opts.currency, held);
+    const figures = all.filter((x) => !refAt(dated.rest, x, 'any'));
+    const [a, ...more] = figures.length > 0 ? figures : all;
     if (!a) return false;
     /* WHERE NO MONEY IS KEPT, that is what is said, before any question of which currency: unless an order just placed
        keeps what was paid for it, as a shop with no Money keeps it on the order. */

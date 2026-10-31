@@ -966,3 +966,98 @@ test('A BIRTHDAY FOR SOMEBODY KEPT, WITH NO DATES KEPT, IS OFFERED ON THEM', () 
   /* Somebody new still gets it in their note, and nothing is offered as a change. */
   assert.equal(tellRead("Mum's birthday is 14 Nov", founder).change, undefined);
 });
+
+/* ── review 31 Oct o: paid only when it was, a platform that pays him, a number a thing is known by, a count, a day gone ── */
+
+test('"ISN\'T PAID", "WILL GET PAID" AND "HALF PAID" ARE NEVER PAID IN FULL (RO1)', () => {
+  for (const s of ["Rent 12,000 isn't paid", "Rent 12,000 hasn't been paid", "Rent 12,000 wasn't paid", 'Rent 12,000 never paid', 'Rent 12,000 will get paid', 'Rent 12,000 gets paid on the 1st', 'Rent 12,000 half paid', 'Rent 12,000 partly paid'])
+    assert.ok(!tellRead(s, founder).rows.some((r) => r.fields.state === 'paid'), s);
+  /* Not paid yet is a bill to pay, named without the words that said so. */
+  const owed = tellRead("Rent 12,000 isn't paid", founder).rows;
+  assert.deepEqual(owed.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_by_me', 'Rent']]);
+  /* Part of it paid asks how much. */
+  const half = tellRead('Rent 12,000 half paid', founder);
+  assert.deepEqual(half.rows, []);
+  assert.equal(half.why, 'How much of the 12,000 was paid? Say it with the figure, like paid 6,000 for rent.');
+  /* Paid is still paid. */
+  assert.equal(tellRead('Rent 12,000 already paid', founder).rows[0]!.fields.state, 'paid');
+});
+
+test('A FIGURE AFTER A PLATFORM THAT PAYS HIM IS ASKED WHICH WAY, never money spent (RO2)', () => {
+  for (const s of ['App Store 1,200 USD', 'Apple 1,200', 'YouTube 3,000', 'Airbnb 4,500', 'Amazon 2,000', 'Booking.com 900', 'Stripe 1,200', 'Gumroad 300']) {
+    const told = tellRead(s, founder);
+    assert.deepEqual(told.rows, [], s);
+    assert.match(told.why ?? '', /^Is that money you get, or money you pay\?/u, s);
+  }
+  /* A ride, a meal or a subscription is still money spent today (23 Oct). */
+  for (const s of ['Uber 85', 'Netflix 180', 'Talabat 240']) assert.deepEqual(tellRead(s, founder).rows.map((r) => [r.register, r.fields.direction]), [['obligations', 'owed_by_me']], s);
+});
+
+test('A NUMBER A THING IS KNOWN BY IS NEVER THE AMOUNT (RO3)', () => {
+  for (const s of ['Order 57 paid', 'Invoice 1042 paid', 'Order #57 paid', 'Bill 1042 paid']) {
+    const told = tellRead(s, founder);
+    assert.deepEqual(told.rows, [], s);
+    assert.match(told.why ?? '', /^How much was paid for /u, s);
+  }
+  assert.equal(tellRead('Order 57 paid', founder).why, 'How much was paid for Order 57, and which way? Say it like got 1,350 for Order 57 or paid 1,350 for Order 57.');
+  /* With the amount said beside it, the number stays in the name. */
+  const paid = tellRead('Invoice 1042 3,000 paid', founder).rows;
+  assert.deepEqual(paid.map((r) => [r.register, r.fields.what, r.fields.amount]), [['obligations', 'Invoice 1042', { amount: 300000, currency: 'EGP' }]]);
+  assert.deepEqual(tellRead('Paid 900 for order 57', founder).left, []);
+  /* A bill's own figure is still its amount. */
+  assert.equal(tellRead('Electricity bill 850 paid', founder).rows[0]!.fields.state, 'paid');
+});
+
+test('A COUNT, OR WHAT HE SELLS, SAID WITH A FIGURE IS NO SPEND (RO4)', () => {
+  for (const s of ['Tickets 40', 'Books 3', 'Classes 4', 'Lessons 2', 'Flights 2', 'Training 15,000', 'Course 3,000', 'Delivery 50']) {
+    const told = tellRead(s, founder);
+    assert.deepEqual(told.rows, [], s);
+    assert.match(told.why ?? '', /^Is that money you get, or money you pay\?/u, s);
+  }
+  /* With a currency, or a figure that reads as money, a count of things bought is spent. */
+  assert.equal(tellRead('Tickets 400', founder).rows[0]!.fields.direction, 'owed_by_me');
+  assert.equal(tellRead('Books 30 EGP', founder).rows[0]!.fields.direction, 'owed_by_me');
+  /* A word his own Products list holds is never a spend. */
+  const PRODUCTS: TellList = { id: 'products', name: 'Products', one: 'product', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+  const candles = tellRead('Candles 300', { ...founder, lists: [...founder.lists, PRODUCTS], titled: { products: [{ seq: 1, name: 'Lavender candles' }] } });
+  assert.deepEqual(candles.rows, []);
+  assert.match(candles.why ?? '', /^Is that money you get, or money you pay\?/u);
+});
+
+test('A DAY GONE ON A SPEND IS WHEN IT WAS SPENT, never the next one to come (RO5)', () => {
+  const uber = tellRead('Uber 85 on Monday', founder).rows;
+  assert.deepEqual(uber.map((r) => [r.register, r.fields.direction, r.fields.what, r.fields.due]), [['obligations', 'owed_by_me', 'Uber', '2026-10-05']]);
+  assert.equal(tellRead('Coffee 45 on 6 Oct', founder).rows[0]!.fields.due, '2026-10-06');
+  assert.equal(tellRead('Taxi 60 on 5/10', founder).rows[0]!.fields.due, '2026-10-05');
+  /* A day to come is still a bill to pay. */
+  const due = tellRead('Uber 200 due Friday', founder).rows;
+  assert.deepEqual(due.map((r) => [r.register, r.fields.direction, r.fields.due]), [['obligations', 'owed_by_me', '2026-10-09']]);
+  assert.notEqual(due[0]!.fields.state, 'paid');
+});
+
+test('SEATS, LICENCES, SOFTWARE AND ADS ASK WHICH WAY; HOSTING IS STILL A COST (RO6)', () => {
+  const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
+  for (const s of ['Seats 1,200 a month', 'Licences 4,000 a month', 'Software 900 a month', 'Ads paid 300']) {
+    const told = tellRead(s, withRepeating);
+    assert.deepEqual(told.rows, [], s);
+    assert.match(told.why ?? '', /^Is that money you get, or money you pay\?/u, s);
+  }
+  assert.equal(tellRead('Hosting 45 USD a month', withRepeating).rows[0]!.fields.direction, 'out');
+});
+
+test("A DAY OR A TIME IS NEVER A NUMBER'S UNIT, AND SOMEBODY IS NO NUMBER (RO7)", () => {
+  const sales = tellRead('Sales were 40 yesterday', founder).rows;
+  assert.deepEqual(sales.map((r) => [r.register, r.fields.name, r.fields.value, r.fields.unit]), [['datapoints', 'Sales', 40, undefined]]);
+  assert.equal(tellRead('MRR is 4,200 now', founder).rows[0]!.fields.unit, undefined);
+  for (const s of ['Karim is at 3pm', 'Sara is at 3 meetings', 'Sara hit 3 meetings']) assert.ok(!tellRead(s, founder).rows.some((r) => r.register === 'datapoints'), s);
+  /* A project's number is still its own. */
+  assert.equal(tellRead('Tallow hit 1,000 signups', founder).rows[0]!.fields.name, 'Tallow signups');
+});
+
+test('A NAME ENDING IN "ING" CAN BE SOMEBODY; A WORD FOR WORK STAYS NOBODY (RO8)', () => {
+  const meiling = tellRead('Meiling paid me 300', founder).rows;
+  assert.deepEqual(meiling.map((r) => r.register), ['people', 'obligations']);
+  assert.equal(meiling[0]!.fields.name, 'Meiling');
+  assert.deepEqual(tellRead('Paid Xiaoling 300', founder).rows.map((r) => r.register), ['people', 'obligations']);
+  assert.ok(!tellRead('Paid Cleaning 300', founder).rows.some((r) => r.register === 'people'));
+});
