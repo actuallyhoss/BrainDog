@@ -21,9 +21,9 @@ const days = (vals: number[], last: string, step: number) =>
 
 /* ── figures ──────────────────────────────────────────────────────────────── */
 
-test('money is written by money.ts: the home currency by its sign, another with its code after, a signless one code first', () => {
+test('money is written by money.ts: the home currency by its sign, another by its own sign, a signless one code first', () => {
   assert.deepEqual(kpiFigure(461000, 'GBP', 'GBP'), { text: '£4,610', before: '', main: '£4,610', after: '' });
-  assert.deepEqual(kpiFigure(370000, 'USD', 'GBP'), { text: '$3,700\u00a0USD', before: '', main: '$3,700', after: 'USD' });
+  assert.deepEqual(kpiFigure(370000, 'USD', 'GBP'), { text: '$3,700', before: '', main: '$3,700', after: '' });
   assert.equal(kpiFigure(4875000, 'EGP', 'GBP').before, 'EGP');
   /* A display figure is whole: £4,610.49 reads £4,610. */
   assert.equal(kpiFigure(461049, 'GBP', 'GBP').text, '£4,610');

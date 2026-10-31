@@ -82,23 +82,27 @@ test('a currency English writes by its code has no sign, whatever narrow form th
     assert.equal(w.text, `${currency}${S}1,200.00`);
   }
   assert.equal(text(120000n, 'XXX', null, 'exact'), `XXX${S}1,200.00`, 'the mark for no currency is not a sign');
-  /* And these are written by a sign, the narrow one, with the code after it away from home. */
-  for (const [currency, sign] of [['USD', '$'], ['CAD', '$'], ['GBP', '£'], ['EUR', '€'], ['BRL', 'R$'], ['INR', '₹']] as const) {
-    assert.equal(text(120000n, currency, null, 'exact'), `${sign}1,200.00${S}${currency}`);
+  /* And these are written by a sign away from home, each by its own among the others (AM15): no code after it. */
+  for (const [currency, sign] of [['USD', '$'], ['CAD', 'CA$'], ['GBP', '£'], ['EUR', '€'], ['BRL', 'R$'], ['INR', '₹']] as const) {
+    assert.equal(text(120000n, currency, null, 'exact'), `${sign}1,200.00`);
   }
 });
 
-test('another currency with a sign carries its code after', () => {
+test('another currency with a sign is written by its own sign, and carries its code after only where the sign is the home\'s', () => {
+  assert.deepEqual(writeAmount({ minor: 294795n, currency: 'USD' }, 'EGP', 'exact'), {
+    minus: '', sign: '$', whole: '2,947', fraction: '.95', code: '', codePlace: null, text: '$2,947.95',
+  });
+  assert.equal(text(480000n, 'USD', 'EGP', 'read'), '$4,800');
+  assert.equal(text(108621341n, 'EUR', 'GBP', 'exact'), '€1,086,213.41');
+  assert.equal(text(2832000n, 'GBP', 'GBP', 'exact'), '£28,320.00');
+  assert.equal(text(2832000n, 'GBP', null, 'exact'), '£28,320.00', 'no home: every currency by its own sign');
+  assert.equal(text(5000n, 'CAD', 'USD', 'read'), 'CA$50', 'two dollars never look alike');
   /* The code is held in a name: a key called `code` beside a word in capitals reads as a refusal code to the refusals gate. */
   const usd = 'USD';
-  assert.deepEqual(writeAmount({ minor: 294795n, currency: 'USD' }, 'EGP', 'exact'), {
+  /* A DOLLAR ON A CANADIAN RECORD KEEPS ITS CODE: there `$` is the home's own sign. */
+  assert.deepEqual(writeAmount({ minor: 294795n, currency: 'USD' }, 'CAD', 'exact'), {
     minus: '', sign: '$', whole: '2,947', fraction: '.95', code: usd, codePlace: 'after', text: `$2,947.95${S}USD`,
   });
-  assert.equal(text(480000n, 'USD', 'EGP', 'read'), `$4,800${S}USD`);
-  assert.equal(text(108621341n, 'EUR', 'GBP', 'exact'), `€1,086,213.41${S}EUR`);
-  assert.equal(text(2832000n, 'GBP', 'GBP', 'exact'), '£28,320.00');
-  assert.equal(text(2832000n, 'GBP', null, 'exact'), `£28,320.00${S}GBP`, 'no home: every currency says its code');
-  assert.equal(text(5000n, 'CAD', 'USD', 'read'), `$50${S}CAD`, 'two dollars never look alike');
 });
 
 test('a currency with no sign keeps its code in front, home or not', () => {
@@ -115,7 +119,7 @@ test('a currency with no sign keeps its code in front, home or not', () => {
 test('a negative amount has a true minus in front of everything, and nought has none', () => {
   assert.equal(text(-49726n, 'GBP', 'GBP', 'exact'), '−£497.26');
   assert.equal(text(-7361527n, 'EGP', 'EGP', 'exact'), `−EGP${S}73,615.27`);
-  assert.equal(text(-1200n, 'USD', 'EGP', 'exact'), `−$12.00${S}USD`);
+  assert.equal(text(-1200n, 'USD', 'EGP', 'exact'), '−$12.00');
   assert.equal(text(-120000n, 'CHF', 'EGP', 'exact'), `−CHF${S}1,200.00`);
   assert.equal(writeAmount({ minor: -49726n, currency: 'EGP' }, 'EGP', 'exact')?.minus, '−');
   for (const setting of ['exact', 'read', 'axis'] as const) {
@@ -127,7 +131,7 @@ test('a negative amount has a true minus in front of everything, and nought has 
 });
 
 test('a large amount keeps every digit it was handed', () => {
-  assert.equal(text(900719925474099312n, 'JPY', 'EGP', 'exact'), `¥900,719,925,474,099,312${S}JPY`);
+  assert.equal(text(900719925474099312n, 'JPY', 'EGP', 'exact'), '¥900,719,925,474,099,312');
   assert.equal(text(123456789012345678901234n, 'EGP', 'EGP', 'exact'), `EGP${S}1,234,567,890,123,456,789,012.34`);
   assert.equal(text(123456789012345678901200n, 'EGP', 'EGP', 'read'), `EGP${S}1,234,567,890,123,456,789,012`);
   assert.equal(text(123840762n, 'EGP', 'EGP', 'read'), `EGP${S}1,238,407.62`, 'ten thousand and over is not whole units');
@@ -152,7 +156,7 @@ test('an axis is compact, and only an axis', () => {
   assert.equal(text(3124055n, 'GBP', 'GBP', 'axis'), '£31k');
   assert.equal(text(-160000n, 'GBP', 'GBP', 'axis'), '−£1.6k');
   assert.equal(text(85040n, 'CHF', 'EGP', 'axis'), `CHF${S}850`);
-  assert.equal(text(3124055n, 'USD', 'EGP', 'axis'), `$31k${S}USD`, 'an axis in another currency still says which');
+  assert.equal(text(3124055n, 'USD', 'EGP', 'axis'), '$31k', 'an axis in another currency still says which, by its sign');
   assert.equal(text(99970000n, 'EGP', 'EGP', 'axis'), `EGP${S}1m`, 'the step is chosen after the rounding');
   assert.equal(text(108621341n, 'EGP', 'EGP', 'axis'), `EGP${S}1.1m`);
   assert.equal(text(250000000000n, 'EGP', 'EGP', 'axis'), `EGP${S}2.5bn`);
@@ -179,8 +183,9 @@ test('a code is never broken: whole, three letters, and joined to its figure', (
       }
     }
   }
-  assert.equal(text(0n, 'USD', 'EGP', 'exact'), `$0.00${S}USD`, 'the screen that read "$0 USI"');
-  assert.equal(text(0n, 'USD', 'EGP', 'read'), `$0${S}USD`);
+  assert.equal(text(0n, 'USD', 'EGP', 'exact'), '$0.00', 'the screen that read "$0 USI"');
+  assert.equal(text(0n, 'USD', 'EGP', 'read'), '$0');
+  assert.equal(text(0n, 'USD', 'CAD', 'read'), `$0${S}USD`);
 });
 
 test('every stored amount in a sentence is written, and the rest of the sentence is left alone', () => {
@@ -188,13 +193,13 @@ test('every stored amount in a sentence is written, and the rest of the sentence
   assert.equal(amountsIn('Rent of EGP 12,000.00 is due.', 'EGP', 'read'), `Rent of EGP${S}12,000 is due.`);
   assert.equal(
     amountsIn('EGP 1,086,213.41 here, USD 2,947.95 there and EGP −73,615.27 owed', 'EGP', 'read'),
-    `EGP${S}1,086,213.41 here, $2,947.95${S}USD there and −EGP${S}73,615.27 owed`,
+    `EGP${S}1,086,213.41 here, $2,947.95 there and −EGP${S}73,615.27 owed`,
   );
   assert.equal(
     amountsIn('GBP 1,086,213.41 here and GBP −73,615.27 owed', 'GBP', 'read'),
     '£1,086,213.41 here and −£73,615.27 owed',
   );
-  assert.equal(amountsIn('Pay EGP 1,299.00, then JPY 1,299.', 'EGP', 'exact'), `Pay EGP${S}1,299.00, then ¥1,299${S}JPY.`);
+  assert.equal(amountsIn('Pay EGP 1,299.00, then JPY 1,299.', 'EGP', 'exact'), `Pay EGP${S}1,299.00, then ¥1,299.`);
   assert.equal(amountsIn('(CHF 1,200.00)', 'EGP', 'exact'), `(CHF${S}1,200.00)`);
   assert.equal(amountsIn('EGP 1,299.00', 'EGP', 'axis'), `EGP${S}1.3k`);
   assert.equal(amountsIn('CLF 100.0000 and UYW 1.0000', 'EGP', 'exact'), `CLF${S}100.0000 and UYW${S}1.0000`, 'a rare code is a code');

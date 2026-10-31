@@ -1592,7 +1592,7 @@ test('A LEADING CURRENCY CODE is split from the amount money() wrote, and nothin
 test('a figure is drawn with a symbol where its currency has one, and keeps its code where it has none', () => {
   assert.equal(symbolFigure(money(2_832_000, 'GBP')), '£28,320.00');
   assert.equal(symbolFigure(money(-129_900, 'GBP')), '−£1,299.00');
-  assert.equal(symbolFigure(money(480_000, 'USD')), 'US$4,800.00', 'a dollar never reads as another dollar');
+  assert.equal(symbolFigure(money(480_000, 'USD')), '$4,800.00', 'the dollar by its own sign, as every screen says it');
   assert.equal(symbolFigure(money(129_900, 'EGP')), null, 'no symbol of its own, so the code stays');
   assert.equal(symbolFigure('Kiln'), null);
   assert.equal(money(2_832_000, 'GBP'), 'GBP 28,320.00', 'the written text is unchanged');

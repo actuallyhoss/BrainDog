@@ -100,7 +100,7 @@ test('THE RECORD\'S OWN FACTS DRAW: money from each row, the run by what it was 
   );
   assert.deepEqual(byWords(card.by), ['Claude Code', 'Tidy the March invoices'], 'a run is named by its app, never An agent or S42');
   assert.equal(card.by.kind, 'agent');
-  assert.equal(card.money, 'Moves −£17.98 and $7\u00a0USD');
+  assert.equal(card.money, 'Moves −£17.98 and $7');
   assert.equal(card.ways[0]?.label, 'Accept');
   assert.equal(card.enter, null, 'Enter never accepts money');
   assert.equal(card.slash, true, 'drafted by Slash');

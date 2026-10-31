@@ -98,7 +98,7 @@ for (const [name, shape] of Object.entries(AMOUNTS)) {
     const html = mirror(shape.src, HOME);
     const texts = said(html, shape.cls);
     assert.equal(texts[shape.at[0]!], writer(EGP, 'EGP'), 'the home currency');
-    assert.equal(texts[shape.at[1]!], writer(USD, 'EGP'), 'another currency, its code after');
+    assert.equal(texts[shape.at[1]!], writer(USD, 'EGP'), 'another currency, by its own sign');
     assert.doesNotMatch(html, /E£/u, 'the Egyptian pound is written by its code');
     assert.doesNotMatch(html, /US\$/u, 'a dollar is said once, by the writer');
     assert.equal(drawer(shape.src, HOME), html, 'the Svelte drawer draws the same tree');
@@ -128,11 +128,11 @@ test('A GAUGE SAYS ITS VALUE AND ITS TARGET AS THE WRITER DOES, and a bare numbe
   assert.equal(mirror(bare, HOME), mirror(bare), 'a number that is not money is not rewritten');
 });
 
-test('A RECORD WITH NO HOME CURRENCY writes every sign with its code, and never two marks of one currency', () => {
+test('A RECORD WITH NO HOME CURRENCY writes every currency by its own sign, and never two marks of one currency', () => {
   const src = `\`\`\`stat\nHarbour | ${USD} | \nRent | GBP 1,200.00 | paid GBP 300.00 so far\n\`\`\``;
   const html = mirror(src, { home: null });
   assert.deepEqual(said(html, 'cell-figure num'), [writer(USD, null), writer('GBP 1,200.00', null)]);
-  assert.match(html, /paid £300 GBP so far/u, 'a note says its amount the same way');
+  assert.match(html, /paid £300 so far/u, 'a note says its amount the same way');
   assert.equal(drawer(src, { home: null }), html);
 });
 

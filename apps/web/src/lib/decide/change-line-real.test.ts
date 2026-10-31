@@ -86,8 +86,8 @@ test('THE QUESTION, THE RECORD’S LINE AND THE CARD SAY THE SAME CHANGE, in the
   /* THE CARD says both as they are, money in the reader's form. */
   const card = cardOf(q, { now: NOW, lead: true });
   assert.equal(card.question, 'Change the cost, stage and 2 more of Kiln?');
-  assert.equal(card.does, 'Sets Cost to £1,250\u00a0GBP, changes Stage from Building to Live, changes Due on from 20 October 2026 to 3 November 2026, changes Led by in Projects.');
-  assert.equal(card.money, 'Moves £1,250\u00a0GBP');
+  assert.equal(card.does, 'Sets Cost to £1,250, changes Stage from Building to Live, changes Due on from 20 October 2026 to 3 November 2026, changes Led by in Projects.');
+  assert.equal(card.money, 'Moves £1,250');
 
   /* THE THREE AGREE. Every field the card draws from and to is one the line names, in the line's order, and the
      first two are the two the question names. */
@@ -98,7 +98,7 @@ test('THE QUESTION, THE RECORD’S LINE AND THE CARD SAY THE SAME CHANGE, in the
   assert.deepEqual(where, [...where].sort((a, b) => a - b));
   assert.match(card.question, new RegExp(`the ${drawn[0]!.toLowerCase()}, ${drawn[1]!.toLowerCase()} and 2 more of`, 'u'));
   /* The same values, where both say one: the money and the choice. */
-  assert.deepEqual([card.lines[0]?.after, card.lines[1]?.before, card.lines[1]?.after], ['£1,250\u00a0GBP', 'Building', 'Live']);
+  assert.deepEqual([card.lines[0]?.after, card.lines[1]?.before, card.lines[1]?.after], ['£1,250', 'Building', 'Live']);
   for (const said of [card.lines[0]!.after, card.lines[1]!.before, card.lines[1]!.after]) assert.ok(card.does.includes(said), said);
 
   /* AND NONE OF THEM SAYS AN ID: the link's old and new holder are ids in the patch. */
@@ -117,7 +117,7 @@ test('A CHANGE BELOW THE LEAD IS HANDED ITS LINE, and the line says the change t
   assert.equal(q.does, 'Sets Cost to EUR 9.00, changes Notes in Projects.');
 
   const card = cardOf(q, { now: NOW });
-  assert.equal(card.does, 'Sets Cost to €9\u00a0EUR, changes Notes in Projects.');
+  assert.equal(card.does, 'Sets Cost to €9, changes Notes in Projects.');
   /* The note names a file, so the card draws no line of it; the record's line is where it is said, by its field. */
   assert.deepEqual(
     card.lines.map((l) => l.what),

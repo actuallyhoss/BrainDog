@@ -190,8 +190,10 @@ test('the money accepting writes is summed in each currency and never across two
 
 test('Accept names the amount when money moves, and the record’s Reject is Decline', () => {
   assert.equal(amountSaid([{ amount: 1298, currency: 'GBP' }], 'GBP'), '£12.98');
-  /* A CURRENCY'S CODE IS HELD TO ITS FIGURE BY A NO-BREAK SPACE, so a button never wraps between them. */
-  assert.equal(amountSaid([{ amount: 1298, currency: 'GBP' }, { amount: 500, currency: 'USD' }], 'GBP'), '£12.98 and $5\u00a0USD');
+  /* ANOTHER CURRENCY BY ITS OWN SIGN (AM15); where it keeps its code (the home's sign is the same), a no-break space
+     holds the code to its figure, so a button never wraps between them. */
+  assert.equal(amountSaid([{ amount: 1298, currency: 'GBP' }, { amount: 500, currency: 'USD' }], 'GBP'), '£12.98 and $5');
+  assert.equal(amountSaid([{ amount: 1298, currency: 'GBP' }, { amount: 500, currency: 'USD' }], 'CAD'), '£12.98 and $5\u00a0USD');
   assert.equal(amountSaid([], 'GBP'), '');
 
   const q = change();
