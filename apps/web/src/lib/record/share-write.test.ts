@@ -109,3 +109,12 @@ test('a figure keeps its trend, a point that is not a number a gap, and one with
   assert.equal(b.readings[1]?.trend, undefined);
   assert.equal(b.readings[2]?.trend, undefined);
 });
+
+test('A HOST THAT MAKES NO LINKS IS SAID AS COMING, and a sentence for this person is not (AH12)', async () => {
+  const { linksOff, words } = await import('./share-write.ts');
+  assert.equal(linksOff({ can: false, why: SHARES_OFF }), true);
+  assert.equal(linksOff({ can: false }), true);
+  assert.equal(linksOff({ can: false, why: 'Only an owner of Hollow Pine Bakery can do this.' }), false);
+  assert.equal(linksOff({ can: true }), false);
+  assert.equal(words.shareComing, 'Read-only links are coming.');
+});
