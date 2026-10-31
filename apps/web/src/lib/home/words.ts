@@ -35,11 +35,17 @@ export const words = {
   cashNow: 'Cash now',
   /** Under the cash figure: the day it runs out on what is due, from the Money page's own figure. */
   lastsTo: 'Lasts to {{runs-out-on}}',
-  comingIn: 'To come in, next 30 days',
+  /**
+   * TODAY'S OWN SHORT LABELS for the two figures beside the cash, under "Cash ahead" (his call of 23 Oct): at about
+   * 1280 wide the Money page's words, "To come in, next 30 days" and "Bills and usual spending, next 30 days", wrapped
+   * beside their figures and Cash ahead clipped at the board's shortest row. Money keeps its long words, where the
+   * figure has room.
+   */
+  comingIn: 'In, 30 days',
   /** The weekday on today's date block in Coming up. */
   today: 'Today',
-  /** Bills, plans and the usual everyday spending, named for what it holds so it never reads as Coming up's repeating bills. */
-  goingOut: 'Bills and usual spending, next 30 days',
+  /** Bills, plans and the usual everyday spending going out (Money names it in full); short beside the cash, as `comingIn`. */
+  goingOut: 'Out, 30 days',
   /**
    * The work that falls due this week, under Work's own heading (audit Q10): yours, as Work's band says it (finish F51),
    * so it never reads as Projects' "This week" or Timeline's "due in 7 days", which count agents' work and what waits on you.

@@ -9,7 +9,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { wrote } from '$lib/record/settings-write.ts';
-  import { renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
+  import { forgetOwn, renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
   import { forgetSignedOut } from '$lib/record/signed-out.ts';
   import { passkeysSaid } from '$lib/ui/signing-in.ts';
   import { PEOPLE } from '$lib/who.ts';
@@ -315,6 +315,8 @@
     closeRefusal = '';
     closeStale = false;
     const mark = opened();
+    /* Who is leaving, read before the close ends the session, so their own pictures and publisher key go with it. */
+    const leaving = s.hostAuth?.me?.person ?? null;
     let answer: { ok?: unknown; refusal?: { code?: unknown; fix?: unknown } } | undefined;
     try {
       const res = await fetch('/account/close', {
@@ -333,6 +335,7 @@
     if (answer?.ok === true) {
       /* AN ACCOUNT CLOSED ENDS ITS SESSIONS: what this browser kept of what they read goes now, as on a sign-out. */
       forgetSignedOut();
+      await forgetOwn(leaving);
       closedNow = true;
       return;
     }

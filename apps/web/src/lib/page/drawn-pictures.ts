@@ -8,7 +8,13 @@
  * the person who saw it, so one person's never shows to another: keyed by code and size alone, the next person on a
  * shared device was drawn the last one's figures before their own component ran (SEC23), and wiping every picture on
  * sign-out to stop that made a sign-in redraw every widget from nothing. Now each is kept under who saw it and where,
- * survives sign-out, and is drawn only to that person on that BrainDog. A frame that cannot say who reads keeps none.
+ * survives a session that only lapsed, and is drawn only to that person on that BrainDog. A frame that cannot say who
+ * reads keeps none.
+ *
+ * AN EXPLICIT SIGN-OUT TAKES THE PERSON'S OWN (RE11, his call of 23 Oct): they are renders of that person's figures, and
+ * a person who presses Sign out on a shared Mac means to leave nothing of theirs behind. Each key starts with a tag of
+ * the person alone, before the BrainDog, so `forgetPicturesOf` finds every one of theirs on every BrainDog in one pass,
+ * and nobody else's is touched. A session that just expires keeps them, so the next sign-in draws at once.
  */
 
 /** How many pictures are kept, and the most one may weigh, in characters. */
@@ -28,12 +34,15 @@ function hash(text: string): string {
   return (h >>> 0).toString(36);
 }
 
+/** The tag of the person alone that starts every `whoseOf`, so a sign-out finds theirs on every BrainDog. */
+const personTag = (person: string): string => `${hash(person)}_`;
+
 /**
- * Who a picture is kept for: the person reading and the BrainDog they read (its API base), hashed into one short word,
- * or `null` where either is unknown, and then no picture is kept or drawn.
+ * Who a picture is kept for: the person reading (alone, then with the BrainDog they read, its API base), hashed into
+ * one short word, or `null` where either is unknown, and then no picture is kept or drawn.
  */
 export const whoseOf = (base: string, person: string | null | undefined): string | null =>
-  typeof person === 'string' && person !== '' && base !== '' ? hash(`${base}\n${person}`) : null;
+  typeof person === 'string' && person !== '' && base !== '' ? `${personTag(person)}${hash(`${base}\n${person}`)}` : null;
 
 /** The key a picture is kept under: who it was drawn for (`whoseOf`), the code, the frame's size (or the page), and light or dark. */
 export const pictureKey = (whose: string, code: string, size: string | null, mode: 'light' | 'dark'): string => `${whose}.${hash(code)}.${size ?? 'page'}.${mode}`;
@@ -78,5 +87,42 @@ export function keepPicture(key: string, picture: string, height: number): void 
     s.setItem(INDEX, JSON.stringify(index));
   } catch {
     /* A full or blocked store keeps nothing; the component still draws alive. */
+  }
+}
+
+/**
+ * DROP THE PICTURES KEPT FOR ONE PERSON, on every BrainDog, at their explicit sign-out (RE11). Every picture in a shape
+ * kept before the person's tag led its key belongs to nobody it can name, so it goes too. `null`, a person nobody could
+ * name at the press, drops every picture: the press said to leave nothing behind. Never throws.
+ */
+export function forgetPicturesOf(person: string | null, s: Pick<Storage, 'length' | 'key' | 'getItem' | 'setItem' | 'removeItem'> | null = store()): void {
+  if (!s) return;
+  const tag = person === null || person === '' ? null : personTag(person);
+  /* The key past the prefix, its first segment who it is for: theirs, or one with no person's tag at all. */
+  const goes = (key: string): boolean => {
+    const whose = key.split('.')[0] ?? '';
+    return tag === null || whose.startsWith(tag) || !whose.includes('_');
+  };
+  try {
+    const gone: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k !== null && k.startsWith(PREFIX) && goes(k.slice(PREFIX.length))) gone.push(k);
+    }
+    for (const k of gone) s.removeItem(k);
+    const index = ((): string[] => {
+      try {
+        const v = JSON.parse(s.getItem(INDEX) ?? '[]') as unknown;
+        return Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : [];
+      } catch {
+        return [];
+      }
+    })();
+    const kept = index.filter((k) => !goes(k));
+    for (const k of index) if (goes(k)) s.removeItem(PREFIX + k);
+    if (kept.length === 0) s.removeItem(INDEX);
+    else s.setItem(INDEX, JSON.stringify(kept));
+  } catch {
+    /* blocked storage keeps nothing to drop */
   }
 }

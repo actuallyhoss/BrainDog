@@ -283,8 +283,9 @@ test('signing out, listing and removing passkeys', async () => {
   assert.deepEqual(await signOut(io), { ok: true, value: null });
   assert.deepEqual(await passkeys(io), { ok: true, value: [{ id: 'a', label: 'Laptop', backedUp: false, createdAt: 1, lastUsed: 2 }] });
   assert.deepEqual(await removePasskey('a', io), { ok: true, value: null });
-  assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['POST /auth/logout', 'GET /auth/passkeys', 'POST /auth/passkey/remove']);
-  assert.deepEqual(seen[2]?.body, { id: 'a' });
+  /* Who is leaving is asked first, while the cookie can say, so their own pictures go with them. */
+  assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['GET /auth/session', 'POST /auth/logout', 'GET /auth/passkeys', 'POST /auth/passkey/remove']);
+  assert.deepEqual(seen[3]?.body, { id: 'a' });
 });
 
 /* ── the address, and the promises ───────────────────────────────────────── */
@@ -376,11 +377,11 @@ test("an empty name comes back as the host's own sentence", async () => {
 
 test("the frame's Sign out ends the session first and only then loads the sign-in screen in full", async () => {
   const went: string[] = [];
-  const { io, seen } = host({ '/auth/logout': () => ok({}) });
+  const { io, seen } = host({ '/auth/session': () => ok(WHO), '/auth/logout': () => ok({}) });
   const out = await signOutAndLeave('/signin', (to) => went.push(`${seen.length}:${to}`), io);
   assert.deepEqual(out, { ok: true, value: null });
-  assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['POST /auth/logout']);
-  assert.deepEqual(went, ['1:/signin'], 'the load comes after the logout answered');
+  assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['GET /auth/session', 'POST /auth/logout']);
+  assert.deepEqual(went, ['2:/signin'], 'the load comes after the logout answered');
   const down = host({ '/auth/logout': () => json(502, {}) });
   const kept: string[] = [];
   assert.equal((await signOutAndLeave('/signin', (to) => kept.push(to), down.io)).ok, false);

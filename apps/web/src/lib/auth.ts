@@ -14,6 +14,7 @@
  */
 
 import { forgetSignedOut } from './record/signed-out.ts';
+import { forgetPicturesOf } from './page/drawn-pictures.ts';
 
 /** Who a live session belongs to. */
 export type Who = { person: string; email: string; record: string | null; provedAt: number };
@@ -475,13 +476,35 @@ export async function redeemLink(link: Link, io: Io = live()): Promise<Said<Who>
   return signedIn(call(io, '/auth/magic/redeem', link.kind === 'magic' ? { linkToken: link.token } : { claimToken: link.token }));
 }
 
+/** Who this browser's session belongs to, asked just before an explicit sign-out ends it, or `null` when it cannot say. */
+async function whoNow(io: Io): Promise<string | null> {
+  const out = await call(io, '/auth/session');
+  return out.ok && isObj(out.value) && typeof out.value.person === 'string' && out.value.person !== '' ? out.value.person : null;
+}
+
+/**
+ * WHAT ONLY AN EXPLICIT SIGN-OUT DROPS (his call of 23 Oct): the person's own drawn widget pictures (`drawn-pictures.ts`,
+ * RE11). A session that only lapsed keeps them, so the same person's next sign-in draws at once. Exported for the
+ * account close. THE PUBLISHER KEY STAYS: it is kept per person, and the store takes an update only with the key that
+ * signed the add-on, so dropping it on sign-out would leave every add-on he published unable to take an update.
+ */
+export async function forgetOwn(person: string | null): Promise<void> {
+  forgetPicturesOf(person);
+}
+
 /**
  * End this session. WHAT THIS BROWSER KEPT OF WHAT THEY READ GOES WITH IT (`signed-out.ts`), from the frame's menu and from
- * Settings alike, so the next person to sign in here is never drawn the last one's week, threads or places.
+ * Settings alike, so the next person to sign in here is never drawn the last one's week, threads or places. AND WHAT IS
+ * THEIR OWN (`forgetOwn`), since this is the press that says they are leaving: who they are is asked before the session
+ * ends, while the cookie can still say.
  */
 export async function signOut(io: Io = live()): Promise<Said<null>> {
+  const person = await whoNow(io);
   const out = await done(call(io, '/auth/logout', {}));
-  if (out.ok) forgetSignedOut();
+  if (out.ok) {
+    forgetSignedOut();
+    await forgetOwn(person);
+  }
   return out;
 }
 
@@ -558,10 +581,14 @@ export async function sessions(io: Io = live()): Promise<Said<SessionInfo[]>> {
  * screen has to ask for by name, and the host reads anything but `none` the same way.
  */
 export async function signOutEverywhere(keep: 'this' | 'none' = 'this', io: Io = live()): Promise<Said<number>> {
+  const person = keep === 'none' ? await whoNow(io) : null;
   const out = await call(io, '/auth/logout/all', { keep });
   if (!out.ok) return out;
   const ended = isObj(out.value) && typeof out.value.ended === 'number' ? out.value.ended : null;
-  if (ended !== null && keep === 'none') forgetSignedOut();
+  if (ended !== null && keep === 'none') {
+    forgetSignedOut();
+    await forgetOwn(person);
+  }
   return ended === null ? { ok: false, kind: 'refused', fix: null } : { ok: true, value: ended };
 }
 

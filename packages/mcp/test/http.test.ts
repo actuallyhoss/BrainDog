@@ -229,10 +229,10 @@ test('THE APP A CLIENT SAYS IT IS REACHES THE HOST WITH EVERY CALL, with or with
   ]);
 });
 
-test('A METHOD THIS SERVER DOES NOT HAVE IS 404 WITH -32601, as the 2026-07-28 binding asks; a bad argument is still a 200', async () => {
+test('A METHOD THIS SERVER DOES NOT HAVE IS -32601 ON A 200, never a 404 a client reads as the endpoint gone (D38); a bad argument is still a 200', async () => {
   const { surface } = stub();
   const missing = await serveMcp(post(rpc('completion/complete', {})), surface, ctx);
-  assert.equal(missing.status, 404);
+  assert.equal(missing.status, 200);
   assert.equal((await read(missing)).wire?.error?.code, -32601);
   const params = await serveMcp(post(rpc('tools/call', { arguments: {} })), surface, ctx);
   assert.equal(params.status, 200);

@@ -15,6 +15,9 @@
  * not redraw every widget from nothing (sec-follow M3). A picture kept before that, under the code and size alone
  * (`LEGACY_PICTURE`), is never read again and belongs to nobody it can name, so a sign-out drops it (RE11).
  *
+ * WHAT ONLY AN EXPLICIT SIGN-OUT DROPS is not here: this runs on every session end, a lapse too. The person's own
+ * pictures and publisher key go at the press alone (`auth.ts` `forgetOwn`, his call of 23 Oct).
+ *
  * THE KEYS ARE WRITTEN OUT HERE, not imported, so sign-out loads none of the screens that keep them;
  * `signed-out.test.ts` holds each to the constant its own module keeps it under.
  *

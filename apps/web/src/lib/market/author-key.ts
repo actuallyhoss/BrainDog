@@ -19,12 +19,16 @@
  * goes to the first person who asks for a key on this browser: it is the key their add-ons are pinned to, and a fresh
  * one would have the store refuse every update to them.
  *
+ * AN EXPLICIT SIGN-OUT DROPS THE PERSON'S KEY (`author-key-forget.ts`, his call of 23 Oct), so nothing of theirs that
+ * signs is left on a shared device; their next publish here makes a new one. A session that only lapsed keeps it.
+ *
  * LOADED ONLY WHEN SOMEBODY PUBLISHES: `publish.ts` imports this file with `import()` at the press, so no page pays for
  * the declare package or IndexedDB until then. The store is injectable for tests, and IndexedDB is opened only when called.
  */
 
 import { fileChecksum, keyIdOf, readCatalogueFile, signedText, verifySignature, type EntryKind, type Signature } from '@braindog/declare/catalogue';
 import { verifyYank, yankText } from '@braindog/declare/kennel';
+import { KEY_DB, KEY_LEGACY_SLOT, KEY_SHELF, keySlotOf } from './author-key-forget.ts';
 
 /** One key as a store keeps it: the private half as the browser's own non-extractable object, and what is public. */
 export type KeptKey = { privateKey: CryptoKey; public_key: string; key_id: string; created_at: string };
@@ -46,12 +50,13 @@ export type AuthorKeyHandle = {
 };
 
 const ALG = { name: 'Ed25519' } as const;
-const DB = 'braindog-author-key';
-const SHELF = 'keys';
+/* WHERE THE KEY IS KEPT is named once, in the small file an explicit sign-out loads to drop it (`author-key-forget.ts`). */
+const DB = KEY_DB;
+const SHELF = KEY_SHELF;
 /** The one slot every key was kept in before keys were kept per person, read once to hand its key on (`indexedStore`). */
-const LEGACY_SLOT = 'publisher';
+const LEGACY_SLOT = KEY_LEGACY_SLOT;
 /** The slot one person's key is kept in. */
-export const slotOf = (person: string): string => `${LEGACY_SLOT}:${person}`;
+export const slotOf = keySlotOf;
 
 const toB64 = (bytes: ArrayBuffer): string => {
   let s = '';
