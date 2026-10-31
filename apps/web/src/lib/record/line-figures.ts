@@ -18,6 +18,7 @@
 import { exponentOf } from 'braindog-render';
 
 import { currencyFor, homeCurrency, labelOf } from './api.ts';
+import { codeOf, FIGURE, minorOf } from './currency-words.ts';
 import { REGISTERS } from './held.ts';
 import type { Fields, FieldDecl } from './schema.ts';
 import { recordToday } from './zone.ts';
@@ -30,7 +31,6 @@ const MONTHS: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
 };
 const WEEKDAYS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-const SYMBOLS: Record<string, string> = { '£': 'GBP', $: 'USD', '€': 'EUR', '¥': 'JPY', '₹': 'INR', 'e£': 'EGP' };
 
 const MONTH = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
 const LEAD = '(?:(?:due|by|on|for)\\s+)?';
@@ -38,16 +38,6 @@ const ORD = '(\\d{1,2})(?:st|nd|rd|th)?';
 /* A DAY SAID IN WORDS IS READ ONLY AT THE END of the line, as Today's light syntax reads it: "Write the Monday
    newsletter" keeps its Monday, and "Call the plumber tomorrow" is due tomorrow. A date with its month is read anywhere. */
 const END = '(?=[\\s.,;!]*$)';
-
-/** A known three-letter code. */
-function knownCode(code: string): boolean {
-  if (!/^[A-Z]{3}$/u.test(code)) return false;
-  try {
-    return Intl.supportedValuesOf('currency').includes(code);
-  } catch {
-    return true;
-  }
-}
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
@@ -105,25 +95,101 @@ function dayIn(line: string, today: string): { day: string; at: number; end: num
   return null;
 }
 
-/** The figure a line names with its currency, and the stretch it was named in, or `null`. */
-function amountIn(line: string, fallback: string | null): { amount: number; currency: string; at: number; end: number } | null {
-  const re = /(?<![\p{L}\p{N}.,])(?:(£|\$|€|¥|₹|e£|[A-Z]{3})\s?)?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,3}))?(?:\s?([A-Z]{3}|[kK])(?![\p{L}]))?(?![\p{N}])/gu;
-  for (const m of line.matchAll(re)) {
-    const [, before, whole, part, after] = m;
-    const k = after === 'k' || after === 'K';
-    const code = (before ? (SYMBOLS[before.toLowerCase()] ?? (knownCode(before) ? before : null)) : null) ?? (after && !k && knownCode(after) ? after : null);
-    /* A CODE IN FRONT THAT IS NO CURRENCY IS A WORD ("VAT 20"), and that figure is not the amount. */
-    if (before && !SYMBOLS[before.toLowerCase()] && !knownCode(before)) continue;
-    const currency = code ?? fallback;
-    if (currency === null) return null;
-    const places = exponentOf(currency);
-    const value = Number(`${whole!.replace(/,/gu, '')}${part ? `.${part}` : ''}`) * (k ? 1000 : 1);
-    if (!Number.isFinite(value) || value <= 0) continue;
-    const at = m.index ?? 0;
-    const end = at + m[0].length - (after && !k && !knownCode(after) ? after.length : 0);
-    return { amount: Math.round(value * 10 ** places), currency, at, end };
+/* A FIGURE, with a sign or a code in front of it when one was typed there. Not the tail of a word ("Q3"), a day or a time
+   ("30/10", "14:00"), and not a figure inside a longer one. */
+const SIGN = 'US\\$|C\\$|A\\$|NZ\\$|[eE]£|£|€|¥|₹|\\$';
+const FIGURES = new RegExp(`(?<![\\p{L}\\p{N}.,/:])(?:(${SIGN}|[A-Za-z]{3})\\s?)?(${FIGURE})(?:\\s?([kK])(?![\\p{L}\\p{N}]))?(?![\\p{N}])`, 'gu');
+/* What follows a figure: a sign, or a word. */
+const NEXT = new RegExp(`^\\s?(${SIGN}|[\\p{L}.]+)`, 'u');
+/* WORDS THAT JOIN A FIGURE TO THE REST, so the figure before them is no count: "850 due", "40 for hosting", "15 a month". */
+const JOINING = new Set([
+  'for', 'to', 'at', 'on', 'due', 'by', 'of', 'from', 'in', 'per', 'a', 'an', 'the', 'each', 'every', 'and', 'or', 'plus',
+  'paid', 'owed', 'total', 'monthly', 'weekly', 'yearly', 'annually', 'quarterly', 'today', 'tomorrow', 'tonight', 'next',
+  'this', 'is', 'was', 'with', 'via', 'incl', 'including', 'excl', 'net', 'gross', 'only', 'left', 'owing',
+]);
+
+/** A figure on the line: where, as typed, the currency said with it, and what it reads as. */
+type Figure = {
+  at: number;
+  end: number;
+  figure: string;
+  thousand: boolean;
+  /** The code said with it; `null` for a currency word or sign that is unsure here ("$" on a pound record); `undefined` for none. */
+  code: string | null | undefined;
+  /** Said after the money field's own name: "total 1350". */
+  labelled: boolean;
+  /** A count of something ("3 apps", "2 rooms", "20%"), never an amount. */
+  count: boolean;
+};
+
+/** The figures a line holds, read against the currency the list or the record keeps. */
+function figuresIn(line: string, known: string | null, home: string | null, label: RegExp): Figure[] {
+  const said = (word: string): string | null | undefined => {
+    const code = codeOf(word, known);
+    return code === null && (word === '$' || word === '¥') ? (codeOf(word, home) ?? null) : code;
+  };
+  const out: Figure[] = [];
+  for (const m of line.matchAll(FIGURES)) {
+    const [whole, before, figure, k] = m;
+    let at = m.index ?? 0;
+    let end = at + whole.length;
+    let code: string | null | undefined;
+    if (before) {
+      code = said(before);
+      /* A CODE IN FRONT THAT IS NO CURRENCY IS A WORD ("VAT 20"), and that figure is not the amount. */
+      if (code === undefined && /^[A-Z]{3}$/u.test(before)) continue;
+      /* A plain word in front ("for 3") is not the figure's. */
+      if (code === undefined) at += whole.indexOf(figure!, before.length);
+    }
+    const rest = line.slice(end);
+    const next = NEXT.exec(rest);
+    let count = /^[%/:]/u.test(rest);
+    if (next) {
+      const word = next[1]!;
+      const after = said(word);
+      /* "$12 EGP": the code after a sign says which, as it does in Tell. */
+      if (after !== undefined && (code === undefined || (code === null && after !== null))) {
+        code = after;
+        end += next[0].length;
+      } else if (after === undefined && /^\p{L}/u.test(word) && !JOINING.has(word.toLowerCase().replace(/\.$/u, ''))) count = true;
+    }
+    /* "total 1350": the field's name goes with its figure, so the title is not left saying "total". */
+    const named = label.exec(line.slice(0, at));
+    if (named) at = named.index + named[0].search(/\p{L}/u);
+    out.push({ at, end, figure: figure!, thousand: k !== undefined, code, labelled: named !== null, count });
   }
-  return null;
+  return out;
+}
+
+/**
+ * THE AMOUNT A LINE NAMES, and only one it plainly names (RG1). A figure is money when a currency is said with it
+ * ("$40", "850 EGP", "300 pounds"), when it follows the field's own name ("total 1350"), or, for a list whose one
+ * required field is its amount (Bills), when it is the last bare figure that counts nothing: "Rent for 2 rooms 850"
+ * is 850, and "Launch 3 apps" on Projects is no money at all. With several said with a currency, the first.
+ *
+ * `bare` IS A FIGURE THAT IS MONEY AND HAS NO CURRENCY ANYBODY SAID, for the line to ask about, and only where the
+ * amount is required (RG10). Anywhere else the figure stays in the words.
+ */
+function amountIn(
+  line: string,
+  money: FieldDecl,
+  known: string | null,
+  home: string | null,
+): { amount: number; currency: string; at: number; end: number } | { bare: string } | null {
+  const names = [labelOf(money), money.id.replace(/_/gu, ' ')].map((n) => n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
+  const label = new RegExp(`(?:^|[^\\p{L}])(?:${names.join('|')})\\s*[:=]?\\s*$`, 'iu');
+  const all = figuresIn(line, known, home, label);
+  const pick =
+    all.find((f) => f.code !== undefined) ??
+    all.find((f) => f.labelled) ??
+    (money.required ? all.filter((f) => !f.count).at(-1) : undefined);
+  if (!pick) return null;
+  const currency = pick.code === undefined ? known : pick.code;
+  if (currency === null) return money.required ? { bare: line.slice(pick.at, pick.end).trim() } : null;
+  const amount = minorOf(pick.figure, currency, pick.thousand);
+  /* A FIGURE NO CONVENTION READS IN THAT CURRENCY ("1,2,3", "EGP 1,25,000") is left in the words, never guessed. */
+  if (amount === null) return null;
+  return { amount, currency, at: pick.at, end: pick.end };
 }
 
 /** The words with one stretch taken out, the spaces closed up, and a dangling joining word dropped. */
@@ -169,13 +235,10 @@ export function lineFigures(register: string, typed: string, now: number): LineF
     }
   }
   if (money) {
-    const known = currencyFor(register, money.id) ?? homeCurrency();
-    const a = amountIn(left, known);
+    const home = homeCurrency();
+    const a = amountIn(left, money, currencyFor(register, money.id) ?? home, home);
     /* A FIGURE WITH NO CURRENCY ANYBODY SAID is named back, so the line can ask which one rather than drop it. */
-    if (!a && known === null) {
-      const figure = amountIn(left, 'XXX');
-      if (figure) return { text: left, fields, said, bare: left.slice(figure.at, figure.end).trim() };
-    }
+    if (a && 'bare' in a) return { text: left, fields, said, bare: a.bare };
     if (a) {
       const rest = cut(left, a.at, a.end);
       if (rest !== '') {
@@ -209,5 +272,9 @@ export function lineValues(register: string, typed: string, now: number): Record
 }
 
 /** What the add line says when a figure was typed and nobody has chosen a currency yet. */
-export const whichCurrency = (figure: string): string =>
-  `Which currency is ${figure} in? Type it with the figure, like ${figure} EGP, or set your home currency in Money.`;
+export function whichCurrency(figure: string): string {
+  const digits = figure.replace(/^[^\p{N}]+|[^\p{N}kK]+$/gu, '');
+  /* The code in the example is the one the sign most likely meant, else the record's, so it never reads as a guess made. */
+  const like = figure.includes('$') ? 'USD' : figure.includes('¥') ? 'JPY' : (homeCurrency() ?? 'EGP');
+  return `Which currency is ${figure} in? Type its code with the figure, like ${digits} ${like}${homeCurrency() === null ? ', or set your home currency in Money' : ''}.`;
+}
