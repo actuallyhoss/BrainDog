@@ -892,7 +892,7 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - people 4.2.2 (finish loop, 30 Oct): People's held-twice note says "may be listed twice" (`page.people`). Words
  *   only, so a patch step.
  * - people 4.2.2, before it shipped (audit 31 Oct m, AM17): People's line says "contacts besides you", since the
- *   list shows the owner too (`page.people`).
+ *   list shows the owner too (`page.people`), and "people besides you" since audit 31 Oct n (AN16).
  * - money-core 3.33.0, before it shipped (numbers-agree): Forecast opens on 12 weeks like Money and Today, Reports'
  *   All line says the day money first moved (`metric.moved-since`).
  * - estate 2.6.1 (finish loop, 30 Oct, audit 2 B14): `rule.renew-soon` asks only about a service that costs more than
