@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { money } from './format.ts';
-import { AMOUNT_SPACE, amountsIn, readAmount, writeAmount, type AmountSetting } from './money.ts';
+import { AMOUNT_SPACE, amountsIn, currencyOfFigure, currencyOfSign, readAmount, writeAmount, type AmountSetting } from './money.ts';
 
 const S = AMOUNT_SPACE;
 const text = (minor: bigint | number, currency: string, home: string | null, setting: AmountSetting): string | undefined =>
@@ -212,4 +212,22 @@ test('every stored amount in a sentence is written, and the rest of the sentence
   for (const t of left) assert.equal(amountsIn(t, 'EGP', 'read'), t, JSON.stringify(t));
   const once = amountsIn('Rent of EGP 12,000.00 and USD 5.00', 'EGP', 'read');
   assert.equal(amountsIn(once, 'EGP', 'read'), once, 'written once: a second pass changes nothing');
+});
+
+test('A SIGN ALONE SAYS ITS CURRENCY BY THE WRITER\'S OWN TABLE, the home\'s first', () => {
+  assert.equal(currencyOfSign('$', null), 'USD');
+  assert.equal(currencyOfSign('£', null), 'GBP');
+  assert.equal(currencyOfSign('CA$', null), 'CAD');
+  assert.equal(currencyOfSign('$', 'CAD'), 'CAD', 'on a Canadian record "$" is the home dollar, as the writer draws it');
+  assert.equal(currencyOfSign('$', 'GBP'), 'USD');
+  assert.equal(currencyOfSign('E£', null), null, 'nobody writes the pound that way');
+  assert.equal(currencyOfFigure('$1,950', null), 'USD');
+  assert.equal(currencyOfFigure('−CA$900.00', 'GBP'), 'CAD');
+  assert.equal(currencyOfFigure(`£1,000.00${S}GBP`, null), 'GBP');
+  assert.equal(currencyOfFigure('EGP 1,200.00', null), 'EGP');
+  assert.equal(currencyOfFigure('$31k', null), null, 'a compact figure is not one whole figure');
+  /* Every other currency the writer draws by its sign reads back as itself. */
+  for (const c of ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'INR']) {
+    assert.equal(currencyOfFigure(text(123_400, c, null, 'read')!, null), c);
+  }
 });

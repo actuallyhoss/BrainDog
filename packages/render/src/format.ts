@@ -8,7 +8,7 @@
  * Eastern Arabic digits break tabular alignment: prose may use the locale's digits, a ledger may not.
  */
 
-import { amountsIn, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
+import { amountsIn, currencyOfSign, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
 
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
@@ -328,6 +328,9 @@ function minorPlaces(text: string): number {
   /* BY ISO 4217, as a record stores it, never by CLDR (Intl), which differs on IQD and MGA. */
   if (/^[A-Z]{3}$/u.test(code)) return exponentOf(code);
   if (code === '') return 0;
+  /* A SIGN ALONE BY THE WRITER'S OWN TABLE (`currencyOfSign`): `$` is the dollar's two places, `₫` the dong's none. */
+  const owner = currencyOfSign(code, null);
+  if (owner !== null) return exponentOf(owner);
   return /[¥₩]/u.test(code) ? 0 : 2;
 }
 

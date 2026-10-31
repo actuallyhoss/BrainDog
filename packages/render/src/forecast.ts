@@ -33,7 +33,7 @@
 import { MISSING, axisFigure, exponentOf, headlineFigure } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
-import { readAmount, writeAmount, type AmountSetting } from './money.ts';
+import { currencyOfFigure, readAmount, writeAmount, type AmountSetting } from './money.ts';
 import { addDays, daysBetween, shortDay, shortMonth } from './day-math.ts';
 
 export { addDays, daysBetween, shortDay, shortMonth };
@@ -230,6 +230,7 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
   const horizon = Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180;
   const home = homeOf(rows.find((r) => r[0]?.trim() === 'home'));
   const currency = currencyOf(opening[3]!.trim(), home);
+  const inWalk = inWalkMoney(opening[3]!, currency, home);
   const knobWords = (rows.find((r) => r[0]?.trim() === 'knobs')?.[1] ?? '').split(/\s+/u);
   return {
     today,
@@ -251,11 +252,11 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     lateName: rows.find((r) => r[0]?.trim() === 'late')?.[2]?.trim() || null,
     under: whole(rows.find((r) => r[0]?.trim() === 'under')?.[1], 1),
     group: groupOf(rows.find((r) => r[0]?.trim() === 'group')),
-    sells: sellsOf(rows, opening[3]!),
+    sells: sellsOf(rows, inWalk),
     shows: showsOf(rows),
     home,
-    spent: spentOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
-    measured: measuredOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
+    spent: spentOf(rows.find((r) => r[0]?.trim() === 'spent'), inWalk),
+    measured: measuredOf(rows.find((r) => r[0]?.trim() === 'spent'), inWalk),
     known: knownOf(rows.find((r) => r[0]?.trim() === 'known'), today),
     headline: rows.some((r) => r[0]?.trim() === 'headline' && r[1]?.trim() === 'under'),
     /* ANY OTHER WORD IS FITTED, the board's own axis: the record refuses one at install, so a stray word here is a host's. */
@@ -281,10 +282,10 @@ function homeOf(row: readonly string[] | undefined): string | null {
  * ONLY IN THE WALK'S OWN MONEY, as a `sell` figure is (`sellsOf`): the number is read without the unit it is written in,
  * so an average in dollars beside a walk in pounds would set the slider's reach by the wrong amount.
  */
-function spentOf(row: readonly string[] | undefined, opening: string): number | null {
+function spentOf(row: readonly string[] | undefined, inWalk: (cell: string) => boolean): number | null {
   const cell = row?.[3]?.trim() ?? '';
   const v = Math.abs(signedOf(cell));
-  return cell && Number.isFinite(v) && v > 0 && unitOf(cell) === unitOf(opening) ? v : null;
+  return cell && Number.isFinite(v) && v > 0 && inWalk(cell) ? v : null;
 }
 
 /**
@@ -293,9 +294,9 @@ function spentOf(row: readonly string[] | undefined, opening: string): number | 
  * ONLY BESIDE A FIGURE THIS WALK READS: months with no amount the walk can use would say how something unsaid was
  * measured. Two months out of order, or a cell in any other shape, say nothing rather than a wrong span.
  */
-function measuredOf(row: readonly string[] | undefined, opening: string): ForecastModel['measured'] {
+function measuredOf(row: readonly string[] | undefined, inWalk: (cell: string) => boolean): ForecastModel['measured'] {
   const [from = '', to = '', ...more] = (row?.[2] ?? '').trim().split('..');
-  if (more.length || !MONTH.test(from) || !MONTH.test(to) || from > to || spentOf(row, opening) === null) return null;
+  if (more.length || !MONTH.test(from) || !MONTH.test(to) || from > to || spentOf(row, inWalk) === null) return null;
   return { from, to };
 }
 
@@ -368,11 +369,12 @@ const spaced = (text: string): string => text.replace(/\s+/gu, ' ').trim();
 /**
  * The currency an opening cell is in, or `null` when the cell does not say.
  *
- * A HOST WRITES THE STORED FORM, `EGP 34,850.00`, and `readAmount` reads that and nothing else. A host that has already
- * written the cell for a screen sends `£34,850.00` or `$4,800.00 USD`, and this file holds no table of signs to read
- * one back with. So the writer is asked instead: the cell is in a currency when writing the cell's own number in that
- * currency gives the cell back. The currencies tried are a code the cell holds and the record's own, and nothing else,
- * so a bare `£` on a record that named no currency stays a figure whose currency is not known.
+ * A HOST WRITES THE STORED FORM, `EGP 34,850.00`, and `readAmount` reads that. A host that has already written the cell
+ * for a screen sends `£34,850.00`, `$1,950` or `£1,000.00 GBP`. Such a cell is in a currency when writing its own number
+ * in that currency gives the cell back; failing that, its code or its sign says it (`currencyOfFigure`, by the writer's
+ * own sign table). Since other currencies are written by their own sign, "$1,950" on a record with no home row is the
+ * US dollar: asking only for a code after the figure lost it, and with it the currency of the spend knob and every
+ * sell. A sign nobody owns (`E£`) stays a figure whose currency is not known.
  */
 function currencyOf(cell: string, home: string | null): string | null {
   const stored = readAmount(cell)?.currency;
@@ -386,7 +388,8 @@ function currencyOf(cell: string, home: string | null): string | null {
       }
     }
   }
-  return null;
+  /* A CODE AFTER A SIGN THE WRITER NO LONGER ADDS (`£1,000.00 GBP`), OR A SIGN ALONE (`$1,950`). */
+  return currencyOfFigure(cell, home);
 }
 
 /**
@@ -468,19 +471,28 @@ function stepsOf(rows: readonly (readonly string[])[], today: string): ForecastS
 const unitOf = (figure: string): string => figure.replace(/[\d.,\s−+-]/gu, '');
 
 /**
+ * Whether a figure is in the walk's own money. BY ITS CURRENCY WHERE BOTH SAY ONE (`currencyOf`), not by its spelling:
+ * `$900` and `USD 900.00`, or `£2,000` beside an opening of `£1,000.00 GBP`, are one money written two ways, and compared
+ * as text the sell and the spend average in them were left out. Where either says none, the spelling is all there is.
+ */
+const inWalkMoney = (opening: string, currency: string | null, home: string | null) => (cell: string): boolean => {
+  const said = currency === null ? null : currencyOf(cell, home);
+  return said !== null ? said === currency : unitOf(cell) === unitOf(opening);
+};
+
+/**
  * The `sell | | label | figure` rows whose figure is written in the walk's own money.
  *
  * A FIGURE IN ANOTHER MONEY IS LEFT OUT, NEVER ADDED. `signedOf` reads the number and drops the sign it is written in, so
  * holdings of $900.00 beside a walk in pounds read as 900 and would have walked as £900.00. The host converts what it
  * can before it writes the row; what reaches here in another unit is a figure this walk cannot add.
  */
-function sellsOf(rows: readonly (readonly string[])[], opening: string): ForecastSell[] {
-  const unit = unitOf(opening);
+function sellsOf(rows: readonly (readonly string[])[], inWalk: (cell: string) => boolean): ForecastSell[] {
   return rows.flatMap((r) => {
     const cell = r[3]?.trim() ?? '';
     const v = signedOf(cell);
     const label = r[2]?.trim() ?? '';
-    return r[0]?.trim() === 'sell' && label && Number.isFinite(v) && v > 0 && unitOf(cell) === unit ? [{ label, value: v }] : [];
+    return r[0]?.trim() === 'sell' && label && Number.isFinite(v) && v > 0 && inWalk(cell) ? [{ label, value: v }] : [];
   });
 }
 
