@@ -6528,6 +6528,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     'rows', 'matched', 'refusals', 'drawn', 'seen', 'types', 'home', 'fills', 'window', 'fx', 'next', 'open',
     'scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'done_now', 'short_now', 'changes', 'working_now', 'quiet', 'files',
     'wholeRead',
+    /* WHAT A FIGURE THE BLOCK NAMES IS (`figures`): the record's declaration, read from no row. */
+    'figures',
   ]);
 
   /** Whether an answer key holds anything: an empty list, an empty map, nought and `false` say nothing of a row. */

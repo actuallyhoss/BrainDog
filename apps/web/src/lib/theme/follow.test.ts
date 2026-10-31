@@ -7,6 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import * as pref from '../pref.ts';
 import { ACCENTS } from '../accent.ts';
@@ -163,4 +164,25 @@ test('WHAT THE LAST BOOT COULD NOT SEND IS SENT BEFORE ADOPTING, and the record\
 test('unstampedOf leaves out a colour no swatch wears and a contrast left off', () => {
   assert.deepEqual(unstampedOf({ theme: '#123456', contrast: undefined, density: 'roomy' }, {}), { 'look.density': 'roomy' });
   assert.deepEqual(unstampedOf({ scheme: 'dark' }, { 'look.scheme': 'light' }), {});
+});
+
+test('THE THEME BUILDER IS NOT LOADED FOR A PAGE IN THE HOUSE COLOUR: follow imports no accent.ts', () => {
+  const src = readFileSync(new URL('./follow.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /^import[^;]*from '\.\.\/accent\.ts';/mu, 'follow.ts pulls the theme builder onto every open again');
+});
+
+test('A SWATCH THE RECORD NAMES IS IN THE COOKIE AT ONCE, so the shell restores it and not the device’s older colour', async () => {
+  const [first, second] = ACCENTS;
+  page(cookie({ theme: first!.hex, who: 'fa' }));
+  const record = keeping();
+  try {
+    follow(at('east', 'fa', { 'look.accent': second!.name }), record.send);
+    assert.equal(pref.read().theme, second!.hex);
+    follow(at('west', 'fa', { 'look.accent': 'House' }), record.send);
+    assert.equal(pref.read().theme, undefined, 'House over a painted colour left the colour in the cookie');
+    await pref.settled();
+    assert.deepEqual(record.sent, []);
+  } finally {
+    pref.follow(null);
+  }
 });

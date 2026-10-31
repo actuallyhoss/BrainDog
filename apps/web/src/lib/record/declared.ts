@@ -19,5 +19,7 @@ import type { MetricDecl } from './metrics.ts';
 
 export const METRICS = SEED_METRICS as unknown as Record<string, MetricDecl>;
 
-/* AND SO DO THE FILES ON TODAY'S FIRST LOAD, which read them through `figures-known.ts` once this has loaded. */
+/* AND SO DOES EVERY FILE THAT READS `figures-known.ts`, under what a record has said of a figure. The page path no longer
+   imports this file: a record says each figure it draws with the figure (`figures-known.ts`), and this loads for a
+   record built before it said them, and for the screens that list every figure (the palette, a row's page, Decide). */
 knowFigures(METRICS);

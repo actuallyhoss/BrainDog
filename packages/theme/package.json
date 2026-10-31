@@ -7,6 +7,7 @@
   "license": "Apache-2.0",
   "exports": {
     ".": "./src/index.ts",
+    "./accents.ts": "./src/accents.ts",
     "./look-b.css": "./look-b.css",
     "./look-b.ts": "./src/look-b.ts",
     "./scale.ts": "./src/scale.ts"

@@ -6,13 +6,14 @@
   LINKS, NOT A FILTER: each book already has its own page (`money-book`, one per row of `books`), and Money's home is
   everything. So the row is a `nav` of addresses, and the back button walks it as a person would expect.
 
-  It reads the books once through the record's ordinary `list`; a refusal or a slow read draws nothing. WHICH LIST THE
+  It reads the books once through the record's ordinary `list` (`books.ts`), asked with Money's own first read where it
+  can be; a refusal or a slow read draws nothing. WHICH LIST THE
   BOOKS ARE IS THE LEDGER'S TO SAY (`ledger.ts` `book`), handed by the page, never named here.
 -->
 <script lang="ts">
-  import { createClient } from '@braindog/client';
 
   import { at } from '../at.ts';
+  import { readBooks, takeBooks } from './books.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import type { SideList } from './ledger.ts';
 
@@ -22,12 +23,11 @@
   let books = $state<Book[]>([]);
 
   $effect(() => {
-    const client = createClient({ base });
     let gone = false;
-    void client
-      .list({ register: book.list, limit: 12, order: [{ field: book.title, dir: 'asc' }] })
+    /* ASKED WITH MONEY'S OWN FIRST READ WHERE THE LEDGER WAS KNOWN BY THEN (`books.ts`), else now. */
+    void (takeBooks(base, book) ?? readBooks(base, book))
       .then((got) => {
-        if (gone || !got.ok) return;
+        if (gone || !got?.ok) return;
         const rows = ((got.value as { rows?: unknown } | null)?.rows ?? []) as { seq?: unknown; fields?: Record<string, unknown> }[];
         books = rows
           .filter((r) => typeof r.seq === 'number')

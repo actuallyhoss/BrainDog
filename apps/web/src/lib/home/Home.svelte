@@ -574,10 +574,12 @@
     const base = apiBase();
     let declared: Record<string, unknown> | null = null;
     let version: number | undefined;
+    let answered: unknown = null;
     const drawn = await m.drawnOf({ page: slug, blocks: [] }, base, undefined, async (client) => {
       const out = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide');
       if (out.ok) {
         tiles.askTiles((out.value as { blocks?: unknown }).blocks);
+        answered = (out.value as { blocks?: unknown }).blocks;
         const said = out.value as { declared?: unknown; declared_version?: unknown };
         if (said.declared !== null && typeof said.declared === 'object' && !Array.isArray(said.declared)) declared = said.declared as Record<string, unknown>;
         if (typeof said.declared_version === 'number') version = said.declared_version;
@@ -585,6 +587,8 @@
       return out;
     });
     const decl = declared as Record<string, unknown> | null;
+    /* AND THE TILES' OWN FIRST READS, now the page has been read and before it draws (`tile-code.ts` `askReads`). */
+    if (drawn.from === 'live') tiles.askReads(answered, { base, owner: data.me?.owner === true });
     if (drawn.from !== 'live' || decl === null || decl.board !== true) return null;
     const { blocks: kept, ...declOwn } = decl;
     declaredBlocks = Array.isArray(kept) ? (kept as Record<string, unknown>[]) : [];
@@ -634,9 +638,13 @@
     const [m, t, tiles] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts')]);
     const base = apiBase();
     /* AND THE SHOWN TILES' OWN CODE THE MOMENT THE ANSWER SAYS WHICH THEY ARE (`tile-code.ts`), beside the page reader's. */
+    let answered: unknown = null;
     let drawn = await m.drawnOf(asked, base, undefined, async (client) => {
       const out = await t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut, shape);
-      if (out.ok) tiles.askTiles((out.value as { blocks?: unknown }).blocks);
+      if (out.ok) {
+        tiles.askTiles((out.value as { blocks?: unknown }).blocks);
+        answered = (out.value as { blocks?: unknown }).blocks;
+      }
       return out;
     });
     /* A RECORD BUILT BEFORE BOARDS refuses a board's keys (`board: is not a key a page has`): Today is asked without them
@@ -652,6 +660,8 @@
       } else drawn = again;
     }
     if (drawn.from === 'live') {
+      /* AND THE TILES' OWN FIRST READS, now the page has been read and before it draws (`tile-code.ts` `askReads`). */
+      tiles.askReads(answered, { base, owner: data.me?.owner === true });
       const at = drawn.now;
       const blocks = withLeft(drawn.blocks, body.blocks, left, (b) => leftBlock(b, at) as unknown as LiveBlock);
       return {

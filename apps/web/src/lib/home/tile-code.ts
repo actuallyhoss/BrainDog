@@ -14,6 +14,8 @@
  * PURE ENOUGH FOR NODE: no rune, no `$lib`.
  */
 
+import { askWorking } from './working-early.ts';
+
 /** A drawn block as this reads one: its key and whatever it lists. */
 type Answered = { key?: unknown; rows?: unknown; queue?: unknown; feed?: unknown; entries?: unknown };
 
@@ -37,6 +39,19 @@ export function askTiles(blocks: unknown): void {
     else if (tile === 'working') void Promise.all([import('./WorkingNow.svelte'), import('./desk-live.ts')]).catch(() => null);
     else void import('../decide/card-load.ts').then((m) => m.loadCard()).catch(() => null);
   }
+}
+
+/** The record Today is on and whether its reader is the owner, for the reads a tile is asked ahead (`working-early.ts`). */
+export type TileAt = { base: string; owner: boolean };
+
+/**
+ * THE TILES' OWN FIRST READS, asked once Today's page has been read and before it draws (speed-e SE3): Working now read
+ * who is working only after the first screen had drawn, a round trip after it. NOT WITH THE ANSWER, beside the page's
+ * own reads of its lists: asked there it took a share of the connection those reads were waiting on, and Today drew
+ * later for it.
+ */
+export function askReads(blocks: unknown, at: TileAt): void {
+  if (tilesOf(blocks).includes('working')) askWorking(at.base, at.owner);
 }
 
 /**

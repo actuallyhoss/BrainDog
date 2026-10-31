@@ -57,7 +57,9 @@ import { rowHref, spokenOf } from './row-href.ts';
 import { linkOf, REST_MARK, TALLY_LAST, TALLY_TIMES, staleOf } from './blocks.ts';
 import { thingName } from './project.ts';
 import { bylineOf } from './byline.ts';
-import { METRICS } from './declared.ts';
+import { FIGURES_KNOWN as METRICS } from './figures-known.ts';
+import { figuresFor, learnFigures } from './figures-said.ts';
+import { askSlot } from '../page/slot.ts';
 import { readBoot } from './boot-live.ts';
 import { kept as keptAnswers, pageKey } from './kept-pages.ts';
 import { beyondOf, format, fxNote, hrefFor, leadOf, markOf, pluralsIn, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
@@ -1640,8 +1642,15 @@ export function blockOf(
     /* WHAT A CARD BLOCK'S CARDS ARE GROUPED BY, AND EACH CARD'S GROUP BY NAME, taken by name and narrowed below. */
     group: grouped,
     groups: groupNames,
+    /* WHAT EACH FIGURE THE BLOCK NAMES IS, AS THE RECORD DECLARES IT, learnt before anything below reads a figure
+       (`figures-known.ts`), and taken by name so it never rides through `rest` onto a block a page could save. */
+    figures: told,
     ...rest
   } = b;
+  learnFigures(told);
+  /* A BLOCK FROM A RECORD BUILT BEFORE `figures` ASKS FOR THIS BUILD'S TABLES, which the next drawing reads: the page
+     readers wait for them first (`figuresFor`), and a block drawn by any other path is not held up for them. */
+  if (told === undefined) void figuresFor([b]);
   /* THE ROWS THE BLOCK IS DRAWN FROM: the ones sent, or for a sum kind short of its match the whole's lines (below). */
   let got = sent;
 
@@ -2700,6 +2709,10 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       }
 
       const { blocks = [], read_at, look: arranged, ...bare } = out.value as AnsweredPage;
+      /* WHAT EACH FIGURE ON IT IS, AS THE RECORD SAID, before a block's figure is read below; this build's own tables
+         only for a record that said nothing of them (`figures-known.ts`). */
+      const owed = figuresFor(blocks);
+      if (owed) await owed;
       /* THE ZONE THE PAGE WAS READ IN IS THE RECORD'S, which every day drawn from it is counted in (`zone.ts`). */
       learnZone((out.value as { zone?: unknown }).zone);
       /* HOW THE ENGINE ARRANGED IT, narrowed, and left off a page whose look this build cannot read. */
@@ -2821,6 +2834,10 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const got = await actionsOf(io ?? ((url, init) => fetch(url, init)), base).actions();
         held = got.ok && Array.isArray(got.value) ? got.value : null;
       }
+      /* THE PAGE OPENED BY ITS ADDRESS ASKS ITS SUGGESTION NOW (`slot.ts` `askSlot`), its own reads done and before it
+         draws, and the slot takes it when it draws, where it asked only once the page had drawn and the browser was
+         idle. NOT BESIDE THE PAGE'S READS: batched with them, the page waited for the suggestion too. */
+      if (early !== null) askSlot(base, page, blocks);
       /* A PAGE ABOUT A ROW NAMED AS A SLUG IS TITLED IN WORDS (`slugWords`): a skill's page read "review-pr". */
       const titled = param && typeof page.title === 'string' ? { ...page, title: slugWords(page.title) } : page;
       return {

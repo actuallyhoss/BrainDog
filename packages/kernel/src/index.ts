@@ -852,7 +852,7 @@ export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extra
 export type { CycleLine, ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, HeldNotice, Level, Sent } from './digest.ts';
-export type { BlockResult, DecidedQuestion, HostSource, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, PageSees, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
+export type { BlockResult, DecidedQuestion, FigureFacts, HostSource, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, PageSees, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, Crossed, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, TrendSaid, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, KeyAccessRow, KeyAnswer, KeyAskRow, KeyAskStatus, KeyGate, KeyRule, LeasedSeal, LockAfter, SealedGrant } from './keychain.ts';
