@@ -66,7 +66,7 @@
   import { KEYS_REGISTER } from '$lib/record/keychain.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
-  import { MENU, WORK, arrange, flatNav, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { MENU, WORK, arrange, flatNav, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
@@ -387,8 +387,11 @@
      row of zeros and empty bands. `index.registers` carries each list's count, which `data.lists` does not; the first
      task brings Work back, and until then the palette and Today's capture line both add one. */
   const holdsTasks = $derived(data.index.registers.some((r) => r.id === TASKS && r.count > 0));
+  /* AND HOW MANY ROWS EACH LIST HOLDS, so Projects takes its slot on a starter's bar by its projects and not its pages
+     (RM10). From the shell's own index, never the facts read later, so the bar is drawn once and does not move after. */
+  const counts = $derived(listCounts(data.index.registers));
   const flat = $derived(
-    flatNav(grouped, open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
+    flatNav(grouped, open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null, counts }),
   );
   /**
    * THE RAIL'S SECTIONS (`railOf`): the seven places, each section's own things under its name, and the

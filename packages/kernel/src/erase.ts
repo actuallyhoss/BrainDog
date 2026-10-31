@@ -23,6 +23,7 @@
 import type { Sql } from '@braindog/ports';
 
 import { jcs } from './declare.ts';
+import { missedCause } from './fault.ts';
 import { bumpEpoch, revokeShare } from './shares.ts';
 import { project, projectedText } from './fts.ts';
 
@@ -326,6 +327,8 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
        is a row the erasure touched. */
     const rung = sql.one<{ n: number }>('SELECT count(*) AS n FROM push_sub WHERE person_id = ?', person)?.n ?? 0;
     sql.exec('DELETE FROM push_sub WHERE person_id = ?', person);
+    /* AND HEALTH'S LINE THAT THEY MISSED A MAIL, which says their name (RM9). */
+    sql.exec('DELETE FROM fault WHERE cause = ?', missedCause(person));
     phones += Number(rung);
     members += Number(held);
     sql.exec('UPDATE person SET email = ?, name = ? WHERE id = ?', ERASED, ERASED, person);

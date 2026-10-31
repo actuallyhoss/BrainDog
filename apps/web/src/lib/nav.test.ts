@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { railOf } from './nav/rail.ts';
-import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf, withOrder } from './nav.ts';
+import { WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, withOrder } from './nav.ts';
 
 type Entry = { section: string; href: string; order: number };
 
@@ -211,6 +211,31 @@ test("A TEAM'S TICKETS ARE ON ITS PHONE BAR (AM6): Work in a starter's own word 
   ] as const;
   const bar = tabsOf(railOf(flatNav(team, 1, WORDS, { work: WORK }), 'Needs you').places, 4).map((i) => i.label);
   assert.deepEqual(bar, ['Today', 'Needs you', 'Tickets', 'Sprints']);
+});
+
+test("PROJECTS IS COUNTED BY ITS PROJECTS, NOT ITS PAGES, AND OUTGROWS THE STARTER'S OWN PLACE BEFORE IT TAKES A SLOT (RM10)", () => {
+  const placed = (title: string, href: string, place: number) => ({ ...page(title, href), place });
+  const list = (id: string, name: string, count: number) => ({ id, name, count });
+  const founder = [
+    ['Projects', [placed('Projects', '/p/projects', 30)]],
+    ['Money', [placed('Money', '/p/money', 40)]],
+    ['Agents', [placed('Agents', '/p/agents', 60)]],
+    ['Dashboard', [placed('Dashboard', '/p/dashboard', 70)]],
+  ] as const;
+  const bar = (sections: readonly (readonly [string, readonly Page[]])[], counts: Record<string, number>) =>
+    tabsOf(railOf(flatNav(sections, 1, WORDS, { counts }), 'Needs you').places, 5).map((i) => i.label);
+  /* His Solo founder record: twenty projects, none with a page of its own. */
+  assert.deepEqual(bar(founder, listCounts([list('projects', 'Projects', 20)])), ['Today', 'Needs you', 'Projects', 'Money', 'Agents']);
+  /* A fresh Founder record's first projects move nothing it already had (AL3). */
+  assert.deepEqual(bar(founder, listCounts([list('projects', 'Projects', 3)])), ['Today', 'Needs you', 'Money', 'Agents', 'Dashboard']);
+  /* A Personal record with twelve goals and six projects keeps Goals and Money where they were. */
+  const personal = [
+    ['Projects', [placed('Projects', '/p/projects', 30)]],
+    ['Money', [placed('Money', '/p/money', 40)]],
+    ['Goals', [placed('Goals', '/p/goals', 20)]],
+  ] as const;
+  assert.deepEqual(bar(personal, listCounts([list('projects', 'Projects', 6), list('goals', 'Goals', 12)])).slice(0, 4), ['Today', 'Needs you', 'Goals', 'Money']);
+  assert.deepEqual(bar(personal, listCounts([list('projects', 'Projects', 13), list('goals', 'Goals', 12)])).slice(0, 4), ['Today', 'Needs you', 'Goals', 'Projects']);
 });
 
 test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a gone page is skipped', () => {

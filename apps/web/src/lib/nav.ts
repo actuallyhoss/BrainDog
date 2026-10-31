@@ -11,7 +11,7 @@
  * mistake `+layout.ts` already has a paragraph about.
  */
 
-import { LATE, PLACES, projectsLate } from './nav/rail.ts';
+import { LATE, PLACES, projectsLate, starterItems } from './nav/rail.ts';
 import { TASKS } from './work/list.ts';
 import { WORK_PAGE } from './work/page.ts';
 
@@ -144,6 +144,11 @@ export type FlatItem = {
   place?: number;
   /** How many pages about one thing the section holds (`row`): a project's page per project, under Projects. */
   rows?: number;
+  /**
+   * How many rows the list the section is named for holds (`flatNav`'s `counts`): Projects' projects, Goals' goals. A
+   * project kept with no page of its own is counted here, which `rows` never sees (RM10).
+   */
+  holds?: number;
 };
 
 /** The words the fixed rows say, handed in so this module stays pure and the words stay in `copy`. */
@@ -182,10 +187,18 @@ function leadOf<T extends { title: string; row?: boolean | undefined }>(entries:
    rail's Projects is the same picture on every record. Any other section wears its lead page's glyph. */
 const SECTION_ICONS: Readonly<Record<string, string>> = { projects: 'projects', work: 'work' };
 
-function sectionItem<T extends { href: string; icon: string; place?: number | undefined; row?: boolean | undefined }>(section: string, lead: T, entries: readonly T[]): FlatItem {
+function sectionItem<T extends { href: string; icon: string; place?: number | undefined; row?: boolean | undefined; register?: string | undefined }>(
+  section: string,
+  lead: T,
+  entries: readonly T[],
+  counts: Readonly<Record<string, number>>,
+): FlatItem {
   const icon = SECTION_ICONS[plainOf(section)] ?? lead.icon;
   const places = entries.flatMap((e) => (typeof e.place === 'number' ? [e.place] : []));
   const rows = entries.filter((e) => e.row === true).length;
+  /* THE LIST IT IS NAMED FOR, or the list its pages about one thing are rows of. */
+  const list = [plainOf(section), ...entries.flatMap((e) => (e.row === true && typeof e.register === 'string' ? [plainOf(e.register)] : []))].find((k) => Object.hasOwn(counts, k));
+  const holds = list === undefined ? undefined : counts[list];
   return {
     key: `section:${section}`,
     href: lead.href,
@@ -194,7 +207,19 @@ function sectionItem<T extends { href: string; icon: string; place?: number | un
     near: entries.map((e) => e.href),
     ...(places.length > 0 ? { place: Math.min(...places) } : {}),
     ...(rows > 0 ? { rows } : {}),
+    ...(holds === undefined ? {} : { holds }),
   };
+}
+
+/**
+ * How many rows each list holds, by its id and by its name (`flatNav`'s `counts`), so Projects is counted by its
+ * projects and not its pages (RM10).
+ */
+export function listCounts(registers: readonly { id: string; name: string; count: number }[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of registers) out[plainOf(r.id)] = r.count;
+  for (const r of registers) if (!Object.hasOwn(out, plainOf(r.name))) out[plainOf(r.name)] = r.count;
+  return out;
 }
 
 /**
@@ -204,16 +229,16 @@ function sectionItem<T extends { href: string; icon: string; place?: number | un
  * Today leads, Activity and Decide follow the first sections (Decide only while something waits on it), and the list
  * stops at `FLAT_MOST`: what does not fit is a row under More, the sections that come last going first.
  */
-export function flatNav<T extends { title: string; href: string; icon: string; row?: boolean | undefined }>(
+export function flatNav<T extends { title: string; href: string; icon: string; row?: boolean | undefined; register?: string | undefined }>(
   sections: readonly (readonly [string, readonly T[]])[],
   open: number,
   words: FlatWords,
-  { work = null }: { work?: string | null } = {},
+  { work = null, counts = {} }: { work?: string | null; counts?: Readonly<Record<string, number>> } = {},
 ): Flat<T> {
   type Row = { section: string; lead: T | undefined; entries: readonly T[]; item: FlatItem; screen?: true };
   const rows: Row[] = sections.flatMap(([section, entries]) => {
     const lead = leadOf(entries);
-    return lead ? [{ section, lead, entries, item: sectionItem(section, lead, entries) }] : [];
+    return lead ? [{ section, lead, entries, item: sectionItem(section, lead, entries, counts) }] : [];
   });
   /* THE WORK SCREEN, ON A RECORD THAT HOLDS TASKS (`lib/work/Work.svelte`). Its row is the Work section's, opening on the
      screen, and the section's own pages go under More with the others; a record with tasks and no Work section gets
@@ -308,14 +333,15 @@ const FIVE_AT: Readonly<Record<string, number>> = { orders: 20, shop: 20, projec
 const placeName = (i: FlatItem): string => plainOf(i.key.replace(/^section:/u, ''));
 
 /**
- * Where a place sits on the bar. ON A STARTER'S RECORD A NEW PROJECTS COMES LAST (audit 31 Oct l, AL3): Projects is no
- * place until the first project is kept, and ranked by its 30 it then stepped in ahead of Money, so a Founder's Money
- * moved a slot and his Dashboard fell into Menu. After the starter's own place and the rest, it takes the next free slot
- * or waits in Menu, and nothing he already had moves. ONLY WHILE IT IS NEW (RL6): his own record is on Solo founder,
- * whose Dashboard declares its place, and holds twenty-odd projects, so a record with a bar's worth of projects keeps
- * Projects at its 30, on the bar as it always was.
+ * Where a place sits on the bar. ON A STARTER'S RECORD PROJECTS COMES LAST (audit 31 Oct l, AL3): Projects is no place
+ * until the first project is kept, and ranked by its 30 it then stepped in ahead of Money, so a Founder's Money moved a
+ * slot and his Dashboard fell into Menu. After the starter's own place and the rest, it takes the next free slot or
+ * waits in Menu, and nothing he already had moves. UNTIL IT HOLDS MORE THAN THE STARTER'S OWN PLACE DOES (RL6, RM10):
+ * his own record is on Solo founder, whose Dashboard declares its place, and holds twenty-odd projects, so it keeps
+ * Projects at its 30, on the bar as it always was (`projectsLate`). `starter` is how many things the starter's own
+ * place holds, `null` on a record with none.
  */
-export function atOf(item: FlatItem, starter: boolean): number {
+export function atOf(item: FlatItem, starter: number | null): number {
   if (projectsLate(item, placeName(item), starter)) return LATE;
   return item.place ?? FIVE_AT[placeName(item)] ?? (renamedWork(item) ? WORK_AT : 100);
 }
@@ -350,7 +376,7 @@ export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly str
      place that says none by where the five put it. */
   const own = tail.filter((i) => (!PLACES.includes(placeName(i)) && typeof i.place === 'number') || renamedWork(i));
   const named = [...FIVE.flatMap((name) => tail.filter((i) => placeName(i) === name)), ...own]
-    .map((item, i) => ({ item, at: atOf(item, own.length > 0), i }))
+    .map((item, i) => ({ item, at: atOf(item, own.length > 0 ? starterItems(own) : null), i }))
     .sort((a, b) => a.at - b.at || a.i - b.i)
     .map((x) => x.item);
   const others = tail.filter((i) => !named.includes(i));

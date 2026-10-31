@@ -12,7 +12,7 @@
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { arrange, flatNav, tabsOf, workOf } from '$lib/nav.ts';
+  import { arrange, flatNav, listCounts, tabsOf, workOf } from '$lib/nav.ts';
   import { railOf } from '$lib/nav/rail.ts';
   import { said as voiced } from '$lib/voice.svelte.ts';
   import { navPrefs, type NavShape, type Saved } from '$lib/nav-prefs.svelte.ts';
@@ -59,7 +59,7 @@
   const places = $derived.by(() => {
     const views = new Set(shell.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     const nav = navPrefs.relabel(shell.nav.filter((n) => !n.cut && !views.has(n.href) && !navPrefs.isHidden(n.href)));
-    const flat = flatNav(arrange(nav, navPrefs.order), 1, { today: copy.today, activity: copy.audit, decide: voiced('decide') }, { work: workOf(shell.index.registers) });
+    const flat = flatNav(arrange(nav, navPrefs.order), 1, { today: copy.today, activity: copy.audit, decide: voiced('decide') }, { work: workOf(shell.index.registers), counts: listCounts(shell.index.registers) });
     return railOf(flat, voiced('decide')).places;
   });
   /* WHAT THE PHONE BAR DRAWS NOW, Today first and left out of the picks: it is always there. */

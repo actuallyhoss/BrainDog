@@ -343,7 +343,7 @@ export function mailedNotices(send: SendLetter, fault?: MailFault): (job: Outbox
     /* SENT, AND SOME MEMBERS MISSED IT (review k, RK5): the server took the others and refused their mailboxes. Before,
        this cleared Health and nobody heard that Mia never got the week's summary. */
     const refused = sent ? sent.refused : [];
-    if (fault) tellRecord(() => fault.sent(to.filter((a) => !refused.includes(a))));
+    if (fault) tellRecord(() => fault.sent(to.filter((a) => !refused.includes(a)), what));
     if (fault?.missed && refused.length > 0) tellRecord(() => fault.missed!(refused, what));
   };
 }
@@ -404,7 +404,8 @@ export function letterOf(kind: SignInMailKind | undefined, link: string): { subj
  */
 export type MailFault = {
   failed: (error: string) => void;
-  sent: (delivered?: readonly string[]) => void;
+  /** `what` is what went, as `missed` says it: the next run of a summary drops the lines about its last one (RM9). */
+  sent: (delivered?: readonly string[], what?: string) => void;
   missed?: (addresses: readonly string[], what: string) => void;
 };
 

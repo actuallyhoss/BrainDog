@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import type { RegisterDecl } from '@braindog/kernel';
 
-import { leadShown, pluralsSettled, voiced } from '../src/methods/shares.ts';
+import { addressOnly, leadShown, pluralsSettled, voiced } from '../src/methods/shares.ts';
 
 const said = (values: Record<string, string>) => (key: string): string | undefined => values[key];
 
@@ -39,4 +39,21 @@ test('a list is read in the use case\'s words: its row word, a field\'s label an
   assert.equal(t.name, 'Tickets');
   assert.equal(t.one, 'ticket');
   assert.equal(t.fields[0]?.labels?.open, 'To do');
+});
+
+test('a sentence of the owner\'s own words that says an id is left out of the opening line (RM6)', () => {
+  const fill = said({ open: '4' });
+  assert.equal(leadShown('Ship D41 before Friday. {{open}} open ticket(s).', fill), '4 open tickets.');
+  assert.equal(leadShown('Run S42 is late. Kept as tasks#3 for now.', fill), '');
+  assert.equal(leadShown('{{open}} open ticket(s), see SG31.', fill), '');
+  assert.equal(leadShown('Building a shed for the bikes. {{open}} open ticket(s).', fill), 'Building a shed for the bikes. 4 open tickets.');
+});
+
+test('a linked row named by an address or a phone number is not named on a link (RM2)', () => {
+  assert.equal(addressOnly('lund@clinic.example'), true);
+  assert.equal(addressOnly('Lund <lund@clinic.example>'), true);
+  assert.equal(addressOnly('+44 20 7946 0958'), true);
+  assert.equal(addressOnly('Mia Lund'), false);
+  assert.equal(addressOnly('2026-10-31'), false);
+  assert.equal(addressOnly('Run 100 km'), false);
 });
