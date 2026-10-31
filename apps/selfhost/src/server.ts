@@ -501,14 +501,12 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: P
      key could be guessed in a loop. The lock, the compare and the strike run with no await between them. */
   const keyShaped = token !== undefined && !sent.includes('.');
   /* AND THE PEER AS WELL, WHEN A LOOSELY TRUSTED PROXY'S HEADER NAMED THE PLACE (AI16): a header is words, and the
-     socket is not. Over its ceiling the peer is HELD TO ONE COMPARE PER TURN BEFORE THE LOCK IS READ, never locked (RG3,
-     RH7): every caller behind the proxy shares it, the owner too, so a lock there was a stranger's way to shut him out.
-     One waits for the next turn and the rest are a 429 at once. The wait comes first so the lock, the compare and the
-     strike below still run with nothing in between. */
+     socket is not. Over its ceiling the peer's WRONG KEYS are held to one answer per turn, never locked (RG3, RH7): every
+     caller behind the proxy shares it, the owner too. THE RIGHT KEY IS NEVER HELD (RJ2): it is compared first and let in
+     at once, so a stranger flooding the peer cannot starve the owner's agents of their turns as he did when every key
+     queued for one. Only a miss takes a turn: one waits for the next and the rest are a 429 at once, so sockets and
+     timers stay bounded. The lock, the compare and the strike still run with nothing in between. */
   const peerCount = keyShaped && at.peer !== '' && at.ip !== at.peer ? site.peerSlow : null;
-  const turn = peerCount?.turn(at.peer) ?? { wait: 0 };
-  if ('full' in turn) return { bare: 429, retryAfter: turn.retryAfter };
-  if (turn.wait > 0) await new Promise((done) => setTimeout(done, turn.wait));
   if (keyShaped) {
     const wait = site.keyLock.locked(at.ip);
     if (wait !== null) return { bare: 429, retryAfter: wait };
@@ -523,6 +521,9 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', at: P
   if (keyShaped) {
     site.keyLock.strike(at.ip);
     if (peerCount?.strike(at.peer) === true) console.error(slowedLine(at.peer));
+    const turn = peerCount?.turn(at.peer) ?? { wait: 0 };
+    if ('full' in turn) return { bare: 429, retryAfter: turn.retryAfter };
+    if (turn.wait > 0) await new Promise((done) => setTimeout(done, turn.wait));
   }
 
   /* AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A self-host that recognised only
