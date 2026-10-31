@@ -414,6 +414,8 @@ const INTRODUCED = /^(?:(?:hi|hello|hey)\b[\s,.!]*)?(?:i['’]?m|i am|my name is
 const ORDER = /^(?:wants?|would like|ordered|orders|needs?|asked for|is getting|booked|reserved|(?:can|could) (?:i|we) (?:get|have)|i['’]?d like|i would like|i want|i['’]?ll take)\s+(?:to (?:order|get|buy|have)\s+)?/iu;
 const PAID = /^(?:paid|pays|sent|transferred)\b\s*/iu;
 const GOT = /^(?:received|got)\b\s*/iu;
+/* "PAID" WITH NO "ME" GOES EITHER WAY (MC1): "Mark paid 50" may be Mark paying you or you paying Mark. */
+const PAID_ONLY = /^(?:paid|pays)\b(?!\s+(?:me|us)\b)/iu;
 const SPENT = /^(?:i|we)\s+(?:paid|spent|sent|transferred)\b\s*|^spent\b\s*/iu;
 const QTY = /^(\d{1,4}|a dozen|a couple of|a couple|dozen|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|an?)\s+/iu;
 /* A COUNT OF THINGS FOR SOMEBODY NAMED IS AN ORDER FROM THEM: "14 mugs for Lina", "two vases for Omar
@@ -516,6 +518,7 @@ const WHY = {
   reads: (kinds: readonly string[]) => (kinds.length === 0 ? '' : ` It reads ${orOf(kinds)}.`),
   noMoney: 'This BrainDog keeps no money yet, so the amount has nowhere to go.',
   whichCurrency: 'Which currency is that in? Write its code beside the figure, like 300 USD or 300 EGP.',
+  whichWay: (name: string) => `Did ${name} pay you, or did you pay ${name}?`,
   bankNoCurrency: 'That text names no currency, so nothing is kept from it. Paste it as the bank sent it.',
   known: (name: string, list: string) => `${name} is already in ${list}.`,
   offer: 'Or keep it as one of these:',
@@ -572,6 +575,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let loaned = false;
   /* The person the sentence met, whose note what is said after them goes into. */
   let metRow: number | null = null;
+  /* Somebody new said to have "paid", with no "me": which way the money went is asked, and nobody is made (MC1). */
+  let whichWay: string | null = null;
 
   const personOf = (name: string): TellValue | null => {
     const known = knownAs(name, opts.people ?? []);
@@ -626,6 +631,14 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       continue;
     }
     const opened = opener !== null && aName(opener[1]!) && (acts(after) || PAYOUT.test(after));
+    /* A NAME BEFORE A BARE "PAID" IS ASKED ABOUT (MC1): "Mark paid 50" made a person Mark who paid 50 in, when the
+       50 may have gone to Mark. It reads in only for somebody on the record, somebody who ordered in this sentence, or
+       a line that says "paid me". */
+    const name = opener?.[1] ?? '';
+    if (opened && PAID_ONLY.test(after) && amountsIn(after, opts.currency).length > 0 && !knownAs(name, opts.people ?? []) && !sharedBy(name, opts.people ?? []) && !ordered.has(words(name))) {
+      whichWay ??= name;
+      continue;
+    }
     if (opened) {
       subject = opener[1]!;
       c = after;
@@ -664,7 +677,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (room(2)) personOf(subject);
       /* The day may sit outside the order's words, as a label before it: "Firing on Thursday: 14 mugs for Lina". */
       const around = oneLine(`${c.slice(0, forSomebody.index)} ${c.slice(forSomebody.index + forSomebody[0].length)}`);
-      if (readOrder(forSomebody[1]!.trim(), subject, around)) continue;
+      if (readOrder(forSomebody[1]!.trim(), subject, around)) {
+        ordered.add(words(subject));
+        continue;
+      }
       rows.length = before;
       for (const [name, at] of made) if (at >= before) made.delete(name);
     }
@@ -702,6 +718,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (row && note && said.length > 0) row.fields[note.id] = said.join('. ');
     }
     if (bankBare) return { rows, left, why: WHY.bankNoCurrency };
+    if (whichWay !== null) return { rows, left, why: WHY.whichWay(whichWay) };
     if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney };
     if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency };
     if (known !== null && !placed && rows.length === 0) return { rows, left: [], why: WHY.known(known, people?.name ?? 'People') };

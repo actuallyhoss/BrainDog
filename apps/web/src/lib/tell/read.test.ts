@@ -123,7 +123,7 @@ test('on a fresh record, money the reader paid is a paid item owed by her, and t
   assert.deepEqual(two.map((r) => r.fields.amount), [{ amount: 50000, currency: 'EGP' }, { amount: 4000, currency: 'USD' }]);
   assert.deepEqual(two.map((r) => r.fields.party), [{ $row: 0 }, { $row: 0 }]);
   /* Paid on a day she names is due and paid that day. */
-  const monday = tellRead('Mark paid 50 on Monday', fresh).rows[1]!;
+  const monday = tellRead('Mark paid me 50 on Monday', fresh).rows[1]!;
   assert.equal(monday.fields.due, '2026-10-05');
   assert.equal(monday.fields.settled, '2026-10-05');
   for (const r of tellRead(NADIA, fresh).rows) for (const line of [r.said, r.detail]) assert.doesNotMatch(line, /#\d|—|\brow\b|[0-9A-HJKMNP-TV-Z]{26}/u);
@@ -150,20 +150,20 @@ test('on a record with no orders list, the same sentence is a client and money i
 });
 
 test('an amount with a currency word keeps it, and one with none takes the record\'s', () => {
-  const euros = tellRead('Nadia paid 50 euros', shop).rows.find((r) => r.register === 'transactions');
+  const euros = tellRead('Nadia paid me 50 euros', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(euros!.fields.amount, { amount: 5000, currency: 'EUR' });
-  const code = tellRead('Omar paid USD 1,200.50 by card', shop).rows.find((r) => r.register === 'transactions');
+  const code = tellRead('Omar paid me USD 1,200.50 by card', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(code!.fields.amount, { amount: 120050, currency: 'USD' });
   assert.equal(code!.said, '$1,200.50\u00a0USD from Omar, by card');
-  const pounds = tellRead('Omar paid 300 pounds', shop).rows.find((r) => r.register === 'transactions');
+  const pounds = tellRead('Omar paid me 300 pounds', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(pounds!.fields.amount, { amount: 30000, currency: 'EGP' });
 });
 
 test('an amount it cannot put a currency to is left, never guessed', () => {
-  const { rows, left } = tellRead('Omar paid 300 dollars', shop);
+  const { rows, left } = tellRead('Omar paid me 300 dollars', shop);
   assert.ok(!rows.some((r) => r.register === 'transactions'));
-  assert.deepEqual(left, ['Omar paid 300 dollars']);
-  assert.ok(!tellRead('Omar paid 300', { ...shop, currency: null }).rows.some((r) => r.register === 'transactions'));
+  assert.deepEqual(left, ['Omar paid me 300 dollars']);
+  assert.ok(!tellRead('Omar paid me 300', { ...shop, currency: null }).rows.some((r) => r.register === 'transactions'));
 });
 
 test('money the reader paid goes out, for what they said', () => {
@@ -223,7 +223,7 @@ test('a first name two people share is asked, never guessed and never made a thi
 });
 
 test('a payment is put on an order only when the same person placed it', () => {
-  const { rows } = tellRead('Nadia wants 3 jars, Omar wants 2 jars, Nadia paid 900', shop);
+  const { rows } = tellRead('Nadia wants 3 jars, Omar wants 2 jars, Nadia paid me 900', shop);
   const orders = rows.filter((r) => r.register === 'orders');
   assert.deepEqual(orders.map((r) => r.fields.paid), [undefined, undefined]);
   assert.equal(rows.filter((r) => r.register === 'transactions').length, 1);
@@ -237,25 +237,25 @@ test('money never mixes two currencies: a second payment adds in only in the sam
   assert.deepEqual(two[1]!.fields.paid, { amount: 50000, currency: 'EGP' });
   assert.deepEqual(two.filter((r) => r.register === 'transactions').map((r) => r.fields.amount), [{ amount: 50000, currency: 'EGP' }, { amount: 4000, currency: 'USD' }]);
   /* A symbol after the figure is still its currency, and a second figure in one clause is said back. */
-  assert.deepEqual(tellRead('Salma paid 900 €', shop).rows[1]!.fields.amount, { amount: 90000, currency: 'EUR' });
-  assert.deepEqual(tellRead('Nadia paid 900 and 300', shop).left, ['300']);
+  assert.deepEqual(tellRead('Salma paid me 900 €', shop).rows[1]!.fields.amount, { amount: 90000, currency: 'EUR' });
+  assert.deepEqual(tellRead('Nadia paid me 900 and 300', shop).left, ['300']);
 });
 
 test('money paid on a weekday or a date of the month is the one gone, and a comma after a figure still parts', () => {
-  assert.equal(tellRead('Mark paid 50 on Monday', shop).rows[1]!.fields.on, '2026-10-05');
-  assert.equal(tellRead('Mark paid 50 on the 12th', shop).rows[1]!.fields.on, '2026-09-12');
+  assert.equal(tellRead('Mark paid me 50 on Monday', shop).rows[1]!.fields.on, '2026-10-05');
+  assert.equal(tellRead('Mark paid me 50 on the 12th', shop).rows[1]!.fields.on, '2026-09-12');
   /* "the 12th" is a day, never twelve of anything. */
-  assert.deepEqual(tellRead('Mark paid 50 on the 12th', shop).rows[1]!.fields.amount, { amount: 5000, currency: 'EGP' });
-  const { rows } = tellRead('Nadia paid 900, Omar wants 2 jars', shop);
+  assert.deepEqual(tellRead('Mark paid me 50 on the 12th', shop).rows[1]!.fields.amount, { amount: 5000, currency: 'EGP' });
+  const { rows } = tellRead('Nadia paid me 900, Omar wants 2 jars', shop);
   assert.deepEqual(rows.map((r) => r.register), ['people', 'transactions', 'people', 'orders']);
 });
 
 test('a clause that places nothing leaves no one behind', () => {
-  assert.deepEqual(tellRead('Nadia paid 0', shop), { rows: [], left: ['Nadia paid 0'] });
+  assert.deepEqual(tellRead('Nadia paid me 0', shop), { rows: [], left: ['Nadia paid me 0'] });
 });
 
 test('A BARE "$" IS THE RECORD\'S OWN DOLLAR OR A QUESTION, NEVER US DOLLARS ON EVERY RECORD (ruling 438); a code beside it wins', () => {
-  const paid = (said: string, currency: string): unknown => tellRead(`Mark paid ${said}`, { ...fresh, currency }).rows.find((r) => r.register === 'obligations')?.fields.amount;
+  const paid = (said: string, currency: string): unknown => tellRead(`Mark paid me ${said}`, { ...fresh, currency }).rows.find((r) => r.register === 'obligations')?.fields.amount;
   assert.equal(paid('$40', 'EGP'), undefined, 'a dollar on a pound record is asked, not written');
   assert.deepEqual(paid('$40', 'USD'), { amount: 4000, currency: 'USD' });
   assert.deepEqual(paid('$40', 'CAD'), { amount: 4000, currency: 'CAD' });
@@ -470,4 +470,19 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
   assert.equal(way('I paid 900 on 30/10')?.fields.on, '2026-10-30');
   /* RG16: "paid out" with no platform named is money out. */
   assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP 300.00 out');
+});
+
+test('A NEW NAME BEFORE A BARE "PAID" IS ASKED WHICH WAY, never made a person who paid you (MC1)', () => {
+  const on = { ...shop, today: '2026-10-31' };
+  for (const s of ['Plumber paid 300', 'Mark paid 50'])
+    assert.deepEqual(tellRead(s, on), { rows: [], left: [], why: `Did ${s.split(' ')[0]} pay you, or did you pay ${s.split(' ')[0]}?` });
+  /* Somebody on the record, or a line that says "paid me", is money in from them. */
+  const known = tellRead('Mark paid 50', { ...on, people: [{ seq: 7, name: 'Mark Adel' }] }).rows;
+  assert.deepEqual(known.map((r) => [r.register, r.fields.direction]), [['transactions', 'in']]);
+  const sara = tellRead('Sara paid me 200', on).rows;
+  assert.deepEqual(sara.map((r) => r.register), ['people', 'transactions']);
+  assert.equal(sara[1]!.fields.direction, 'in');
+  /* "Paid Omar 300" is money out, and nobody new. */
+  const omar = tellRead('Paid Omar 300', on).rows;
+  assert.deepEqual(omar.map((r) => [r.register, r.fields.direction]), [['transactions', 'out']]);
 });

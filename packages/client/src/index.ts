@@ -3177,6 +3177,8 @@ export function createClient(options: ClientOptions) {
        back for everybody. `quiet: null` puts 21:00 to 08:00 back. */
     quietHours: () => call<Answer<'quietHours'>>('quietHours'),
     setQuietHours: (quiet: { from: string; to: string } | 'off' | null) => call<Answer<'setQuietHours'>>('setQuietHours', { quiet }),
+    /* THE RECORD'S TIME ZONE (MC2): ADMIN, since every member's "today" is counted in it; read in `boot`'s `zone`. */
+    setZone: (tz: string) => call<Answer<'setZone'>>('setZone', { tz }),
 
     /* A PERSON'S OWN NAME AND SIGN-IN ADDRESS. The name is a record method, DATA, a person only; the address is
        the account's: a link mailed to the new one, then pressed from a sign-in in the last fifteen minutes. */
