@@ -1389,6 +1389,8 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
            In touch took over (services-people-five-parts-101). */
         now
           .filter((b) => !(b.kind === 'queue' && b.where === 'list is people') && b.heading !== 'In touch' && b.heading !== 'What agents did')
+          /* AND PEOPLE 4.2.2'S "besides you" (AM17) off first, newer still. */
+          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace(/ contact\(s\) besides you$/u, ' contact(s)') } : b))
           .map((b) => (b.kind === 'note' && b.body === '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)' ? { ...b, body: `${b.body}, {{people-in-touch-30d}} in touch in the last 30 days` } : b))
           .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:people}} question(s) for you, ', '') } : b))
           .map(peopleBefore6)

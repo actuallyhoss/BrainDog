@@ -362,6 +362,9 @@ export const OWED_TO_YOU = 'Still to come in';
 /** Any figure at all: a `when:` that asks only that the record has the figure (`home-arrange.ts` `whileHeld`). */
 const ANY = -Number.MAX_SAFE_INTEGER;
 
+/** The week's money cells: what was paid to him, what came in, and what is still to come in. */
+const weekCells = () => [...WEEK_IN.map((metric) => ({ metric, label: WEEK_IN_SAID[metric] })), { metric: OWED, label: OWED_TO_YOU }];
+
 /**
  * THE WEEK'S MONEY TILE, drawn only where the record has Money's week figures: a record on an older Money, or with none,
  * reads no tile rather than three that cannot be read. A cell that reads nothing is left out by Home (`weekMoneyDrawn`),
@@ -371,9 +374,41 @@ export const weekMoney = (): PageBlock => ({
   kind: 'stat',
   heading: MONEY_WEEK,
   icon: 'wallet',
-  cells: [...WEEK_IN.map((metric) => ({ metric, label: WEEK_IN_SAID[metric] })), { metric: OWED, label: OWED_TO_YOU }],
+  cells: weekCells(),
   when: { metric: WEEK_IN[0], gte: ANY },
 });
+
+/** The figure that counts the accounts open, money-core's own (`accounts-open`): nought until the first is added. */
+export const ACCOUNTS_OPEN = 'accounts-open';
+
+/**
+ * WHAT HE PAID OUT THIS WEEK, money-core's own (`settled-out-7d`): a bill or a payment he owed and told as paid, kept
+ * paid on Bills and invoices while there is no account ("Paid Nadia 300 for the logo"). It is its own cell, signed as
+ * money going out, and never added to "Paid", which is money paid to him: the two go opposite ways.
+ */
+export const PAID_OUT = 'settled-out-7d';
+/** Its cell's words on the tile. */
+export const PAID_OUT_SAID = 'Paid out';
+
+/**
+ * MONEY TOLD BEFORE AN ACCOUNT IS OPEN (audit 31 Oct m, AM3): Cash ahead reads the accounts, so with none it draws
+ * nothing, and the Founder's "Stripe paid out 1,950 USD today", kept as a paid invoice, was on no tile of his Today. Until
+ * the first account is open, the week's money says what was told: what was paid to him, what came in, what is still to
+ * come in and what he paid out (`PAID_OUT`), and once one is open Cash ahead says it and this tile goes (`when`). A
+ * record that keeps a week has the week's money already (`weekBlocks`), and one on a Money without either figure draws
+ * neither.
+ */
+export const toldMoney = (): PageBlock =>
+  ({
+    ...weekMoney(),
+    ...keyed('week-money'),
+    /* AND WHAT HE TOLD AS PAID OUT, beside what was paid to him: with no account it is on no other tile. */
+    cells: [...weekCells(), { metric: PAID_OUT, label: PAID_OUT_SAID, sign: 'out' }],
+    size: 'wide',
+    span: 3,
+    /* TWO TESTS IN ONE (`all`), which the record reads as one condition; the app's type names only a leaf. */
+    when: { all: [{ metric: WEEK_IN[0], gte: ANY }, { metric: ACCOUNTS_OPEN, is: 0 }] },
+  }) as unknown as PageBlock;
 
 /** The figure that counts the vital signs reading red now, by the name the kernel answers it under (`built-in-figures.ts`). */
 export const SIGNS_RED = 'signs-red';
@@ -590,6 +625,8 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
     ...(holds.quiet ? [quietTile()] : []),
     /* THE FEW KEY NUMBERS THAT LEAD: drawn only where the record keeps one. */
     numbersTile(),
+    /* AND THE MONEY TOLD BEFORE AN ACCOUNT, where no week says it already (`toldMoney`). */
+    ...(holds.money && !holds.week ? [toldMoney()] : []),
     /* THE PROJECTS IN PLAY, as their cards, where the record keeps a list of them. */
     ...(holds.projects ? [projectsTile(holds.projects)] : []),
     /* WHAT FALLS DUE WITH MONEY ON IT (audit Q10): Money's own due list (`source: deadlines`, `amount is set`, as Money's
@@ -1094,7 +1131,12 @@ const spokenOf = (value: string): string => andOf(value.split(/\s*·\s*/u).map((
  * "Paid 0" and nothing owed is not a figure, and a tile left with none is not drawn. Every other figure is as it came.
  */
 function weekMoneyDrawn(b: LiveBlock): LiveBlock {
-  const metrics = (b.metrics ?? []).filter((m) => !(([...WEEK_IN, OWED] as string[]).includes(m.id) && nought(m.value)));
+  const metrics = (b.metrics ?? []).filter(
+    (m) =>
+      !(([...WEEK_IN, OWED, PAID_OUT] as string[]).includes(m.id) && nought(m.value)) &&
+      /* A MONEY THAT DOES NOT KEEP WHAT WAS PAID OUT YET draws no cell for it, never a dash. */
+      !(m.id === PAID_OUT && m.value === MISSING),
+  );
   if (metrics.length === b.metrics?.length) return b;
   return metrics.length === 0 ? { ...b, metrics, drawn: false } : { ...b, metrics };
 }

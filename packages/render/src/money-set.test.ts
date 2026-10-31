@@ -22,10 +22,11 @@ test('A SINGLE AMOUNT SHOWS PENCE ONLY WHEN THEY ARE NOT .00', () => {
   assert.deepEqual(texts([3950]), ['£39.50']);
 });
 
-test('THE HOME CURRENCY NEVER PRINTS ITS CODE; another puts its code after; minus is U+2212', () => {
-  assert.deepEqual(texts([480000], 'USD', 'GBP'), [`$4,800${AMOUNT_SPACE}USD`]);
+test('THE HOME CURRENCY NEVER PRINTS ITS CODE; another is said by its own sign; minus is U+2212', () => {
+  assert.deepEqual(texts([480000], 'USD', 'GBP'), ['$4,800']);
   assert.deepEqual(texts([-3900]), ['−£39']);
-  assert.deepEqual(texts([125000], 'JPY', 'GBP'), [`¥125,000${AMOUNT_SPACE}JPY`]);
+  assert.deepEqual(texts([125000], 'JPY', 'GBP'), ['¥125,000']);
+  assert.deepEqual(texts([480000], 'USD', 'CAD'), [`$4,800${AMOUNT_SPACE}USD`], 'where the sign is the home\'s, the code says which');
 });
 
 test('A DISPLAY FIGURE IS WHOLE, rounded half away from nought', () => {

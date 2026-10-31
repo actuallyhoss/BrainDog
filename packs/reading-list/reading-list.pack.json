@@ -1,10 +1,10 @@
 {
   "pack": "reading-list",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "icon": "book-open",
   "title": "Reading list",
   "summary": "Books and articles to read, what you are reading now, and a line on each one you finish.",
-  "changes": "Nothing on your list changes. Each book keeps its title in Name, as it has since 2.0.0, and this version says so in plain words. Now draws its own icon.",
+  "changes": "Nothing on your list changes. Its fields now go by Title, Author, Kind, Status, Finished and Thoughts, the words its pages already used.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -14,12 +14,12 @@
       "name": "Readings",
       "title": "name",
       "fields": [
-        { "id": "name", "type": "text", "required": true },
-        { "id": "by", "type": "text" },
-        { "id": "kind", "type": "enum", "values": ["book", "article", "paper"], "default": "book" },
-        { "id": "state", "type": "enum", "values": ["queued", "reading", "finished"], "default": "queued" },
-        { "id": "finished", "type": "day" },
-        { "id": "thoughts", "type": "text" }
+        { "id": "name", "label": "Title", "type": "text", "required": true },
+        { "id": "by", "label": "Author", "type": "text" },
+        { "id": "kind", "label": "Kind", "type": "enum", "values": ["book", "article", "paper"], "default": "book" },
+        { "id": "state", "label": "Status", "type": "enum", "values": ["queued", "reading", "finished"], "default": "queued" },
+        { "id": "finished", "label": "Finished", "type": "day" },
+        { "id": "thoughts", "label": "Thoughts", "type": "text" }
       ]
     },
     {
@@ -37,7 +37,7 @@
           "where": "state is reading",
           "columns": [
             { "field": "name", "label": "Title", "width": "minmax(20ch,1fr)" },
-            { "field": "by", "label": "By", "width": "20ch" }
+            { "field": "by", "label": "Author", "width": "20ch" }
           ],
           "limit": 20,
           "empty": "Nothing is being read."

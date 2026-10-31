@@ -370,17 +370,18 @@ test('and a money value renders in its OWN currency wherever it appears', () => 
 
 /* ── drawing an amount ──────────────────────────────────────────────────── */
 
-test('THE HOME CURRENCY IS WRITTEN WITH ITS SYMBOL, and any other keeps its code after it', () => {
+test('THE HOME CURRENCY IS WRITTEN WITH ITS SYMBOL, and any other by its own sign', () => {
   assert.deepEqual(drawn('GBP 28,320.00', 'GBP'), { lead: '£', whole: '28,320', fraction: '.00', iso: null });
-  assert.deepEqual(drawn('USD −4,800.00', 'GBP'), { lead: '−$', whole: '4,800', fraction: '.00', iso: 'USD' });
-  assert.deepEqual(drawn('JPY 1,299', 'GBP'), { lead: '¥', whole: '1,299', fraction: '', iso: 'JPY' });
+  assert.deepEqual(drawn('USD −4,800.00', 'GBP'), { lead: '−$', whole: '4,800', fraction: '.00', iso: null });
+  assert.deepEqual(drawn('USD −4,800.00', 'CAD'), { lead: '−$', whole: '4,800', fraction: '.00', iso: 'USD' }, 'where the sign is the home\'s, the code says which');
+  assert.deepEqual(drawn('JPY 1,299', 'GBP'), { lead: '¥', whole: '1,299', fraction: '', iso: null });
   assert.equal(drawn('about 12', 'GBP'), null, 'text money() did not write is not redrawn');
 });
 
 test('a sentence redraws its figures, and a currency with no symbol keeps its code in front', () => {
   assert.equal(symbolText('no more than GBP 20,000.00', 'GBP'), 'no more than £20,000');
-  assert.equal(symbolText('was EUR 4.00', 'GBP'), 'was €4 EUR', 'the code stays with its amount');
-  assert.equal(symbolText('was EUR 4.50', 'GBP'), 'was €4.50 EUR');
+  assert.equal(symbolText('was EUR 4.00', 'GBP'), 'was €4', 'its own sign says which');
+  assert.equal(symbolText('was EUR 4.50', 'GBP'), 'was €4.50');
   assert.equal(symbolText('costs ZZZ 12.00', 'GBP'), 'costs ZZZ 12.00');
 });
 
@@ -399,7 +400,7 @@ test('A SENTENCE AND A HEADLINE DROP A FRACTION OF ALL ZEROS, and a ledger keeps
   assert.equal(symbolText('GBP 33,850.00', 'GBP', 'exact'), '£33,850.00');
   assert.equal(symbolText('GBP 0.00', 'GBP', 'exact'), '£0.00');
   assert.equal(symbolText('GBP 0.00', 'GBP'), '£0');
-  assert.equal(symbolText('USD 4,800.00', 'GBP', 'exact'), '$4,800.00 USD');
+  assert.equal(symbolText('USD 4,800.00', 'GBP', 'exact'), '$4,800.00');
 });
 
 /**
@@ -421,9 +422,9 @@ test('A HEADLINE IS WHOLE UNITS, AND EGP IS WRITTEN EGP THERE AS EVERYWHERE: "EG
   assert.equal(symbolText('GBP 4.37', 'GBP', 'headline'), '£4.37');
   assert.equal(symbolText('GBP 12.00', 'GBP', 'headline'), '£12');
 
-  /* ONLY THE RECORD'S OWN CURRENCY TAKES THE SIGN: any other is said by its code, which already names it. */
+  /* EVERY CURRENCY WITH A SIGN TAKES ITS OWN (AM15): a dollar on an Egyptian record is `$`, the code only where the sign is the home's. */
   assert.equal(symbolText('EGP 412,300.00', 'GBP', 'headline'), 'EGP\u00a0412,300');
-  assert.equal(symbolText('USD 48,000.70', 'EGP', 'headline'), '$48,001\u00a0USD');
+  assert.equal(symbolText('USD 48,000.70', 'EGP', 'headline'), '$48,001');
   /* AND ONLY A SIGN THE FIGURES ARE READ BACK BY: a narrow form that is letters keeps the code, as one with none does. */
   assert.equal(symbolText('SEK 1,200.00', 'SEK', 'headline'), 'SEK\u00a01,200');
   assert.equal(symbolText('KWD 12,345.678', 'KWD', 'headline'), 'KWD\u00a012,346');
@@ -450,15 +451,16 @@ test('A HEADLINE IS ROUNDED ONLY FROM TEN THOUSAND UP, and a bar\'s value is nev
   /* A BAR'S VALUE IS READ AGAINST THE BARS BESIDE IT, so it keeps every minor unit. */
   assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'figure'), 'EGP\u00a01,086,213.41');
   assert.equal(symbolText('EGP 58,185.00', 'EGP', 'figure'), 'EGP\u00a058,185', 'a fraction of all zeros still goes');
-  assert.equal(symbolText('USD 48,000.70', 'EGP', 'figure'), '$48,000.70\u00a0USD');
+  assert.equal(symbolText('USD 48,000.70', 'EGP', 'figure'), '$48,000.70');
   assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', 'figure'), { lead: 'EGP\u00a0', whole: '1,086,213', fraction: '.41', iso: null });
 });
 
-test('ANY OTHER CURRENCY KEEPS ITS CODE IN EVERY SETTING, a headline too, and the home one never carries it', () => {
-  assert.equal(symbolText('Cash is GBP 33,850.00', 'USD', true), 'Cash is £33,850 GBP', 'a sterling figure on a dollar record read as its own');
-  assert.equal(symbolText('was EUR 4.00', 'GBP', true), 'was €4 EUR');
-  assert.equal(symbolText('CAD 1,200.00 and USD 1,200.00', 'USD'), '$1,200 CAD and $1,200', 'two dollars looked alike');
-  assert.equal(symbolText('GBP 39.00', null), '£39 GBP', 'with no home currency every figure keeps its code');
+test('ANY OTHER CURRENCY IS SAID BY ITS OWN SIGN IN EVERY SETTING, a headline too, with its code only where the sign is the home one', () => {
+  assert.equal(symbolText('Cash is GBP 33,850.00', 'USD', true), 'Cash is £33,850', 'a sterling figure on a dollar record read as its own');
+  assert.equal(symbolText('was EUR 4.00', 'GBP', true), 'was €4');
+  assert.equal(symbolText('CAD 1,200.00 and USD 1,200.00', 'USD'), 'CA$1,200 and $1,200', 'two dollars looked alike');
+  assert.equal(symbolText('USD 1,200.00 and CAD 1,200.00', 'CAD'), '$1,200\u00a0USD and $1,200', 'on a Canadian record the US dollar keeps its code');
+  assert.equal(symbolText('GBP 39.00', null), '£39', 'with no home currency every figure is said by its own sign');
 });
 
 /**

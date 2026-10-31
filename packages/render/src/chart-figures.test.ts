@@ -19,7 +19,7 @@ test('A BAR\'S VALUE IS GROUPED, and a zero minor part is dropped while any othe
   assert.equal(barFigure('£11,200.00'), '£11,200');
   assert.equal(barFigure('£11200.50'), '£11,200.50');
   assert.equal(barFigure(money(1_120_000, 'GBP')), 'GBP 11,200');
-  assert.equal(barFigure('$4,800.00 USD'), 'US$4,800', 'one mark of currency, never a symbol and its code');
+  assert.equal(barFigure('$4,800.00 USD'), '$4,800', 'one mark of currency, never a symbol and its code');
   assert.equal(barFigure('−£39.00'), '−£39');
   assert.equal(barFigure('+£850.00'), '+£850');
   // A hyphen is the minus it stands for.
@@ -33,7 +33,7 @@ test('AN AXIS LABEL IS COMPACT, in the unit the figure was written in', () => {
   assert.equal(axisFigure('£4,200.00'), '£4.2k');
   assert.equal(axisFigure('−£1,600.00'), '−£1.6k');
   assert.equal(axisFigure(money(-160_000, 'GBP')), 'GBP −1.6k');
-  assert.equal(axisFigure(symbolFigure(money(250_000_000, 'USD')) ?? ''), 'US$2.5m');
+  assert.equal(axisFigure(symbolFigure(money(250_000_000, 'USD')) ?? ''), '$2.5m');
   assert.equal(axisFigure('CHF 58,185.54'), 'CHF 58k');
   assert.equal(axisFigure('£850.40'), '£850');
   assert.equal(axisFigure('4'), '4');
@@ -76,9 +76,9 @@ test('WITH A HOME CURRENCY, AN AXIS IS COMPACT IN THE HOME SIGN: £8m, and what 
   assert.deepEqual(plan.ticks.map((t) => t.label), ['£8m', '0', '−£4m'], 'zero is 0 in any currency');
   assert.equal(plan.buckets[0]!.net, '£6,800,000.00', 'a net is an amount, so every minor unit');
   assert.deepEqual(plan.totals.map((t) => t.value), ['£21,600,000', '£9,100,000']);
-  /* The same figures on a record whose home is another currency, or none, say which currency they are in. */
-  assert.equal(seriesPlan(series('GBP'), true, 'EGP').top, `£8m${NB}GBP`);
-  assert.equal(seriesPlan(series('GBP'), true, null).bottom, `−£4m${NB}GBP`);
+  /* The same figures on a record whose home is another currency, or none, say which currency they are in by its own sign. */
+  assert.equal(seriesPlan(series('GBP'), true, 'EGP').top, '£8m');
+  assert.equal(seriesPlan(series('GBP'), true, null).bottom, '−£4m');
 });
 
 test('A HOME OF EGYPTIAN POUNDS READS AS THE WRITER WRITES IT, compact on the axis and never a second way', () => {
@@ -99,14 +99,14 @@ test('A LINE CHART\'S AXIS THE SAME, and a currency with no sign keeps its code 
   assert.equal(chf.top, `CHF${NB}58k`);
   assert.equal(chf.bottom, `−CHF${NB}1.2k`);
   const usd = linesPlan([['Day', 'Balance'], ['1 Sep', money(250_000_000, 'USD')], ['2 Sep', money(100_000, 'USD')], ['3 Sep', money(0, 'USD')]], 'EGP');
-  assert.equal(usd.top, `$2.5m${NB}USD`);
+  assert.equal(usd.top, '$2.5m');
 });
 
 test('WHAT IS LEFT, A TOTAL AND A DIAL\'S CENTRE ARE AMOUNTS: never compact, a fraction of zeros dropped', () => {
   const [goal] = progressPlan([{ value: money(120_000, 'GBP'), target: money(300_000, 'GBP') }], 'goal', 'GBP');
   assert.equal(goal!.left, progressToGo('£1,800'));
   const [over] = progressPlan([{ value: money(394_795, 'USD'), target: money(100_000, 'USD') }], 'budget', 'EGP');
-  assert.equal(over!.left, progressOver(`$2,947.95${NB}USD`));
+  assert.equal(over!.left, progressOver('$2,947.95'));
   const [egp] = progressPlan([{ value: money(120_000, 'EGP'), target: money(300_000, 'EGP') }], 'budget', 'EGP');
   assert.equal(egp!.left, progressLeft(said(180_000, 'EGP', 'EGP', 'read')));
   const range = rangePlan([
@@ -120,11 +120,11 @@ test('WHAT IS LEFT, A TOTAL AND A DIAL\'S CENTRE ARE AMOUNTS: never compact, a f
   assert.equal(one.left, progressToGo('£1,800'));
 });
 
-test('A TABLE CELL OF MONEY IS READ ONCE AND WRITTEN ONCE: the home by its sign, another with its code after', () => {
+test('A TABLE CELL OF MONEY IS READ ONCE AND WRITTEN ONCE: the home by its sign, another by its own sign', () => {
   const cell = (text: string, home: string | null = 'GBP') => tableCellBody(text, home).body;
   const usd = cell(money(294_795, 'USD'));
-  assert.equal(usd.kind === 'symbol' && usd.text, `$2,947.95${NB}USD`);
-  assert.equal(usd.kind === 'symbol' && usd.amount?.codePlace, 'after');
+  assert.equal(usd.kind === 'symbol' && usd.text, '$2,947.95');
+  assert.equal(usd.kind === 'symbol' && usd.amount?.codePlace, null);
   assert.deepEqual(cell(money(294_795, 'USD'), 'EGP'), usd, 'the dollar reads the same on a record kept in Egyptian pounds');
   const home = cell(money(5_818_500, 'GBP'));
   assert.equal(home.kind === 'symbol' && home.text, '£58,185.00', 'a table is exact: every minor unit');
@@ -134,7 +134,7 @@ test('A TABLE CELL OF MONEY IS READ ONCE AND WRITTEN ONCE: the home by its sign,
   /* No sign of its own: the code leads, and the minus stands in front of the code. */
   assert.deepEqual(cell(money(-120_000, 'CHF')), { kind: 'coded', sign: '−', currency: 'CHF', rest: '1,200.00', amount: writeAmount({ minor: -120_000, currency: 'CHF' }, 'GBP', 'exact') });
   /* No home told: every currency is written as another's. */
-  assert.equal((cell(money(129_900, 'GBP'), null) as { text: string }).text, `£1,299.00${NB}GBP`);
+  assert.equal((cell(money(129_900, 'GBP'), null) as { text: string }).text, '£1,299.00');
   /* The Egyptian pound, home or not, is whatever the writer writes, in the kind a drawer already draws. */
   for (const h of ['EGP', 'GBP', null]) {
     const written = writeAmount({ minor: -7_361_527, currency: 'EGP' }, h, 'exact')!;
@@ -153,7 +153,7 @@ test('A CELL THAT IS NOT STORED MONEY IS LEFT ALONE, and so is every caller that
   }
   /* MONEY COMING IN, WRITTEN WITH ITS PLUS, is one whole figure and the writer's too (`writeFigure`): the plus stays in
      front of everything, where a minus stands. A caller that names no home still leaves it as it came. */
-  assert.equal((tableCellBody('+GBP 850.00', 'EGP').body as { text: string }).text, `+£850.00${NB}GBP`);
+  assert.equal((tableCellBody('+GBP 850.00', 'EGP').body as { text: string }).text, '+£850.00');
   assert.equal((tableCellBody('+GBP 850.00', 'GBP').body as { text: string }).text, '+£850.00');
   assert.deepEqual(tableCellBody('+GBP 850.00').body, { kind: 'symbol', text: '+£850.00' });
   assert.deepEqual(tableCellBody(money(129_900, 'GBP')).body, { kind: 'symbol', text: '£1,299.00' });

@@ -429,9 +429,9 @@ test('A FORECAST WRITES EVERY AMOUNT WITH THE ONE WRITER: the table reads the sa
     assert.deepEqual(chips, [read(96_000), read(-4_010_000)], `${currency}: what counts`);
     assert.ok(knobs.includes(`>${forecastPerMonth(read(0))}<`), `${currency}: the spend slider at rest`);
   }
-  /* AND ANOTHER CURRENCY KEEPS ITS CODE while the home currency's is the record's to drop, whatever the rule's table says. */
+  /* AND ANOTHER CURRENCY IS SAID BY ITS OWN SIGN (AM15), whatever the rule's table says. */
   const usd = tableFigures(tree(toHTML([page(walkIn('USD', 'EGP'))])));
-  assert.ok(usd.every((f) => f.includes('USD')), 'a dollar on a pound record says it is a dollar');
+  assert.ok(usd.every((f) => f.includes('$') && !f.includes('USD')), 'a dollar on a pound record says it is a dollar by its sign');
   assert.ok(usd[3]!.startsWith('−'), 'and what goes out has a true minus in front');
 });
 
@@ -451,7 +451,7 @@ test('A BRIDGE TOLD THE HOME IS ONE TREE IN BOTH DRAWERS: the one writer spells 
   const mixed = tree(toHTML([two], { home: 'EGP' }));
   assert.doesNotMatch(mixed, /class="bridge-chart"/u, 'steps in two currencies are not added into bars');
   assert.ok(decode(mixed).includes(BRIDGE_MIXED), 'and the warn line says why');
-  assert.ok(decode(mixed).includes(said(20_000, 'USD')), 'the dollar step keeps its code on a pound record');
+  assert.ok(decode(mixed).includes(said(20_000, 'USD')), 'the dollar step is said by its own sign on a pound record');
 });
 
 test('a walk shown in another currency is written by the same writer, and the model holds a currency and numbers', () => {

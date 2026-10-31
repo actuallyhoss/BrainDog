@@ -211,11 +211,13 @@ function amountIn(
   return { amount, currency, at: pick.at, end: pick.end };
 }
 
-/** The words with one stretch taken out, the spaces closed up, and a dangling joining word dropped. */
+/** The words with one stretch taken out, the spaces closed up, and a dangling joining word dropped. TRIMMED FIRST
+    (AN17): "Domain renewal 2027 for 15 USD" left "Domain renewal 2027 for ", whose "for" ended on a space and stayed. */
 const cut = (line: string, at: number, end: number): string =>
   `${line.slice(0, at)} ${line.slice(end)}`
     .replace(/\s+/gu, ' ')
     .replace(/\s+[,.;:-]+(\s|$)/gu, '$1')
+    .trim()
     .replace(/\s+(?:of|for|at|due|by|on)$/iu, '')
     .trim();
 

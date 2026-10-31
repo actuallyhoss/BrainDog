@@ -154,7 +154,7 @@ test('an amount with a currency word keeps it, and one with none takes the recor
   assert.deepEqual(euros!.fields.amount, { amount: 5000, currency: 'EUR' });
   const code = tellRead('Omar paid me USD 1,200.50 by card', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(code!.fields.amount, { amount: 120050, currency: 'USD' });
-  assert.equal(code!.said, '$1,200.50\u00a0USD from Omar, by card');
+  assert.equal(code!.said, '$1,200.50 from Omar, by card');
   const pounds = tellRead('Omar paid me 300 pounds', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(pounds!.fields.amount, { amount: 30000, currency: 'EGP' });
 });
@@ -871,4 +871,90 @@ test('A PLACE SOMEBODY IS FROM IS NO ORGANISATION, AND A KEPT ONE IS FOUND BY IT
   assert.match(String(lina[0]!.fields.note ?? ''), /From Dubai/u);
   const hana = tellRead('Met Hana from Brightside', { ...team, orgs: [{ seq: 3, name: 'Brightside Ltd' }] }).rows;
   assert.deepEqual(hana.map((r) => [r.register, r.fields.org]), [['people', 'organisations#3']]);
+});
+
+/* ── audit 31 Oct n: a cost by the month, money already paid, a platform, whole lines, money in ───────────────────── */
+
+test('"HOSTING 45 USD A MONTH" IS A COST THAT COMES ROUND, never "Did Hosting pay you" (AN6)', () => {
+  const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
+  const hosting = tellRead('Hosting 45 USD a month', withRepeating);
+  assert.deepEqual(hosting.rows.map((r) => [r.register, r.fields.direction, r.fields.every, r.fields.what]), [['recurring', 'out', 'monthly', 'Hosting']]);
+  assert.deepEqual(hosting.rows[0]!.fields.amount, { amount: 4500, currency: 'USD' });
+  assert.doesNotMatch(hosting.why ?? '', /pay you/u);
+  /* A person named is still asked. */
+  assert.equal(tellRead('Omar 3,000 a month', withRepeating).why, 'Did Omar pay you, or did you pay Omar?');
+});
+
+test('"MAY RENT 12,000 PAID" IS MONEY ALREADY PAID OUT, NAMED "MAY RENT" (AN7)', () => {
+  const told = tellRead('May rent 12,000 paid', founder);
+  assert.equal(told.why, undefined);
+  assert.deepEqual(told.rows.map((r) => [r.register, r.fields.direction, r.fields.state, r.fields.what]), [['obligations', 'owed_by_me', 'paid', 'May rent']]);
+  assert.deepEqual(told.rows[0]!.missing, []);
+  assert.match(told.rows[0]!.said, /12,000 out, for May rent$/u);
+  /* "Not paid" is still a bill to pay. */
+  assert.ok(!tellRead('Rent 12,000 not paid', founder).rows.some((r) => r.fields.state === 'paid'));
+});
+
+test('A PLATFORM THAT PAID HIM IS NOBODY IN PEOPLE (AN8)', () => {
+  for (const s of ['Got 3,000 from Upwork', 'Got 500 from Fiverr', 'Received 200 USD from PayPal', 'Got 900 from Payoneer']) {
+    const told = tellRead(s, founder);
+    assert.ok(!told.rows.some((r) => r.register === 'people'), s);
+    assert.equal(told.rows.find((r) => r.register === 'obligations')?.fields.direction, 'owed_to_me', s);
+  }
+  assert.equal(tellRead('Upwork paid 3,000', founder).why, undefined);
+  /* Somebody who reads as a person is still made. */
+  assert.ok(tellRead('Got 2,000 from Dad', founder).rows.some((r) => r.register === 'people'));
+});
+
+test('TELL KEEPS WHOLE LINES: A BIRTHDAY, A UNIT, A PROJECT\'S NUMBER, A SPEND, AND SOMEBODY KEPT (AN9)', () => {
+  /* The birthday is said with the person, kept in their note, and among the dates where the record keeps them. */
+  const mum = tellRead("Mum's birthday is 14 Nov", founder).rows;
+  assert.deepEqual(mum.map((r) => r.register), ['people']);
+  assert.match(mum[0]!.detail, /birthday 14 Nov/u);
+  assert.match(String(mum[0]!.fields.note), /Birthday 14 Nov/u);
+  /* The Dates add-on's list, as its manifest declares it. */
+  const DATES: TellList = {
+    id: 'fixed_dates',
+    name: 'Dates',
+    one: 'date',
+    title: 'what',
+    pack: 'dates',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'day', type: 'day', required: true },
+      { id: 'until', type: 'day' },
+      { id: 'kind', type: 'enum', values: ['deadline', 'event'], default: 'deadline', required: true },
+      { id: 'comes_round', type: 'enum', values: ['no', 'weekly', 'monthly', 'yearly', 'month_start', 'month_end'], default: 'no', required: true },
+      { id: 'repeats_from', type: 'day' },
+    ],
+  };
+  const dated = tellRead("Mum's birthday is 14 Nov", { ...founder, lists: [...founder.lists, DATES] }).rows;
+  assert.deepEqual(dated.map((r) => [r.register, r.fields.name ?? r.fields.what, r.fields.day, r.fields.comes_round]), [['people', 'Mum', undefined, undefined], ['fixed_dates', "Mum's birthday", '2026-11-14', 'yearly']]);
+  const kept = tellRead("Mum's birthday is 14 Nov", { ...founder, lists: [...founder.lists, DATES], people: [{ seq: 3, name: 'Mum' }] }).rows;
+  assert.deepEqual(kept.map((r) => r.register), ['fixed_dates']);
+  /* "Runway is 9 months" keeps its months. */
+  const runway = tellRead('Runway is 9 months', founder).rows;
+  assert.deepEqual(runway.map((r) => [r.register, r.fields.name, r.fields.value, r.fields.unit]), [['datapoints', 'Runway', 9, 'months']]);
+  assert.equal(runway[0]!.said, 'Runway, 9 months');
+  /* "Tallow hit 1,000 signups" is a number for Tallow, linked where Tallow is kept. */
+  const signups = tellRead('Tallow hit 1,000 signups', { ...founder, titled: { things: [{ seq: 2, name: 'Tallow' }] } }).rows;
+  assert.deepEqual(signups.map((r) => [r.register, r.fields.name, r.fields.value, r.fields.thing]), [['datapoints', 'Signups', 1000, 'things#2']]);
+  assert.equal(tellRead('Tallow hit 1,000 signups', founder).rows[0]!.fields.name, 'Tallow signups');
+  /* "Uber 85" is money spent, never a task. */
+  const uber = tellRead('Uber 85', founder).rows;
+  assert.deepEqual(uber.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_by_me', 'Uber']]);
+  /* A line that fits nothing and names somebody kept offers their page. */
+  const goals: TellList = { id: 'goals', name: 'Goals', one: 'goal', title: 'what', pack: 'usecase-personal', fields: [{ id: 'what', type: 'text', required: true }, { id: 'by', type: 'day' }] };
+  const mona = tellRead('Coffee with Mona on Sunday', { lists: [PEOPLE, goals, DUE], today: TODAY, currency: 'EGP', people: [{ seq: 6, name: 'Mona Adel' }] });
+  assert.deepEqual(mona.about, { name: 'Mona Adel', href: '/r/people/6' });
+  assert.match(mona.why ?? '', /Mona Adel/u);
+});
+
+test('MONEY IN THAT NOBODY OWED IS NEVER "KEPT IN BILLS" (AN10)', () => {
+  const personal = { lists: [PEOPLE, DUE], today: TODAY, currency: 'EGP' };
+  const salary = tellRead('Got paid 45,000 salary today', personal).rows[0]!;
+  assert.equal(salary.fields.what, 'Salary');
+  assert.equal(salary.detail, 'kept in Money');
+  /* A client's payment is still the invoice it settles. */
+  assert.equal(tellRead(NADIA, fresh).rows[2]!.detail, 'paid, kept in Bills and invoices');
 });

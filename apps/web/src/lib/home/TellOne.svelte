@@ -33,6 +33,7 @@
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import { focusOnceDrawn } from '$lib/ui/keep-focus.ts';
   import { addedSaid, countWord, heldSaid, readyAt, readyRows } from './first-today.ts';
@@ -76,6 +77,8 @@
     /* Some wait for what they need: the button names only what goes, never "all" over lines that stay. */
     addReady: (n: number) => (n === 1 ? 'Add the one that is ready' : `Add the ${countWord(n)} that are ready`),
     addTo: (list: string) => `Add it to ${list}`,
+    /* A LINE THAT NAMES SOMEBODY KEPT is offered their page (AN9). */
+    openPage: (name: string) => `Open ${name}`,
     notYet: 'Nothing is added until you press.',
     undoOne: 'One Undo takes it back.',
     undoAll: (n: number) => (n === 2 ? 'One Undo takes both back.' : `One Undo takes all ${countWord(n)} back.`),
@@ -163,6 +166,8 @@
      added, all in one press, under one batch with the one Undo every add has: the lists Money holds are learnt here
      (`learn`), the sentence read against them, and the rail read again after. Money stays on after an Undo; the line is
      what is taken back. A line that still cannot be placed once Money is on (which currency) says so on the card. */
+  /** Money's own page, the address its place on the rail answers to. */
+  const MONEY_PLACE = '/p/money';
   let moneyWait = $state(false);
   let moneyFix = $state<string | null>(null);
   /** What Money's plan would also approve, said on the card; the next press approves these lines and no others (RN3). */
@@ -183,6 +188,8 @@
       if ('fix' in out) moneyFix = out.fix;
       else {
         const go = readyRows(out.told.rows);
+        /* ONE PRESS, ONE TOAST: "Turned on Money. Added …" names Money, so the rail does not say it came as well. */
+        if (go.length > 0) toasts.named(MONEY_PLACE);
         if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists);
         else moneyFix = out.told.why ?? null;
       }
@@ -197,7 +204,7 @@
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
     e.preventDefault();
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
-    else if (rows.length === 0 && offers.length === 1) addOffer(offers[0]!);
+    else if (rows.length === 0 && offers.length === 1 && !told?.about) addOffer(offers[0]!);
     /* AND NEVER TURNS MONEY ON (RN3): ⌘↵ adds a line where a home for it exists; a module goes on by its own button. */
   }
 
@@ -260,10 +267,11 @@
           </div>
           {#if moneyFix}<p class="tell-one-needs" role="alert">{moneyFix}</p>{/if}
         {/if}
-        {#if offers.length > 0}
+        {#if told.about || offers.length > 0}
           <div class="tell-one-offers">
+            {#if told.about}<Button weight="primary" href={at(told.about.href)}>{say.openPage(told.about.name)}</Button>{/if}
             {#each offers as offer (offer.register)}
-              <Button weight={offers.length === 1 ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
+              <Button weight={offers.length === 1 && !told.about ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
             {/each}
           </div>
         {/if}

@@ -75,7 +75,7 @@ test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count 
      (whoever `meet` added) reads "12 contacts" and never "0 of your 12 contacts were in touch". */
   const clauses = body.split(/,\s+/u);
   assert.match(clauses[0]!, /^\{\{questions-open-in:people\}\} question\(s\) for you$/u);
-  assert.match(clauses[1]!, /^\{\{people-count\}\} contact\(s\)$/u);
+  assert.match(clauses[1]!, /^\{\{people-count\}\} contact\(s\) besides you$/u);
   for (const clause of clauses.slice(1)) assert.equal(clause.match(/\{\{/gu)?.length, 1, clause);
   /* THE SAMPLE HAS SOMEBODY QUIET, so the named line is the one drawn, and it names the one quiet longest, from the rows. */
   assert.equal(counts!.drawn, false);

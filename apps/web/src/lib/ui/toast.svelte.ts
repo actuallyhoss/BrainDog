@@ -68,6 +68,9 @@ const LIFE_ACTION = 8_000;
 /** Four, then the oldest goes. A stack that grows without bound covers the work it is reporting on. */
 const CAP = 4;
 
+/** How long a place a toast named is not said again as arrived (`named`). */
+const NAMED_MS = 30_000;
+
 /** A toast's window: its own, else eight seconds when it draws an action and five when it only reports. */
 const lifeOf = (t: Toast | undefined): number => t?.life ?? (t?.undo && t.offer !== false ? LIFE_ACTION : LIFE);
 
@@ -163,6 +166,27 @@ class Toasts {
       this.held = false;
       for (const t of this.items) this.#arm(t.id);
     });
+  }
+
+  /**
+   * PLACES A TOAST HAS ALREADY NAMED, by an address the place answers to, and when (AM4): "Turned on Money. Added a
+   * payment" says Money came, so the rail's own "Money is on your bar now." would be a second toast for one press. Kept
+   * half a minute, the time the rail takes to draw the place, and never read reactively.
+   */
+  #named = new Map<string, number>();
+
+  /** Says that a toast this press pushes names the place at `href`, so the rail does not say it again. */
+  named(href: string, now: number = Date.now()): void {
+    this.#named.set(href, now);
+  }
+
+  /** Whether a toast named the place at `href` in the last half minute (`named`). */
+  wasNamed(href: string, now: number = Date.now()): boolean {
+    const at = this.#named.get(href);
+    if (at === undefined) return false;
+    if (now - at <= NAMED_MS) return true;
+    this.#named.delete(href);
+    return false;
   }
 
   #arm(id: number) {

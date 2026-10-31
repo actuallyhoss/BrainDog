@@ -62,7 +62,7 @@ test('A CHATGPT CALL ON CLAUDE’S KEY OPENS ITS OWN RUN, and Claude’s run kee
   clock.advance(MIN);
   write(k, 'From Claude again', CLAUDE);
   write(k, 'From ChatGPT again', CHATGPT);
-  assert.deepEqual(runs(sql), ['claude-code: Claude Code run', 'chatgpt: ChatGPT run']);
+  assert.deepEqual(runs(sql), ['claude-code: Claude Code', 'chatgpt: ChatGPT']);
   sql.close();
 });
 
@@ -72,7 +72,7 @@ test('TWO APPS OF KIND OTHER ARE TWO RUNS, and one app spelled two ways is one',
   write(k, 'b', { client: 'Visual Studio Code', agent: 'other' });
   write(k, 'c', { client: 'ChatGPT ', agent: 'other' });
   write(k, 'd', { client: 'vscode' });
-  assert.deepEqual(runs(sql), ['chatgpt: ChatGPT run', 'Visual Studio Code: VS Code run']);
+  assert.deepEqual(runs(sql), ['chatgpt: ChatGPT', 'Visual Studio Code: VS Code']);
   sql.close();
 });
 
@@ -81,26 +81,27 @@ test('A RUN THAT SAYS NOTHING OF ITS APP IS STILL ADOPTED, and learns which agen
   /* A remote client that names no app and calls itself `other`: nothing says it is not the Claude that writes next. */
   write(k, 'a', { agent: 'other' });
   write(k, 'b', CLAUDE);
-  assert.deepEqual(runs(sql), ['claude-code: Claude Code run']);
+  assert.deepEqual(runs(sql), ['claude-code: Claude Code']);
   assert.equal(k.get('S1')?.fields.agent, 'claude');
 
   /* An app the record does not know is still another app. */
   write(k, 'c', { client: 'Some Tool' });
-  assert.deepEqual(runs(sql), ['claude-code: Claude Code run', 'Some Tool: Agent run']);
+  assert.deepEqual(runs(sql), ['claude-code: Claude Code', 'Some Tool: Some Tool']);
 
   /* An `other` run that names its app is that app's, and a Claude call never joins it. */
   const { k: k2, sql: sql2 } = await record();
   write(k2, 'a', CHATGPT);
   write(k2, 'b', { agent: 'claude' });
-  assert.deepEqual(runs(sql2), ['chatgpt: ChatGPT run', '-: Claude run']);
+  assert.deepEqual(runs(sql2), ['chatgpt: ChatGPT', '-: Claude']);
   sql.close();
   sql2.close();
 });
 
 test('A RUN’S APP IS LEARNED ONCE, NEVER SWAPPED: another app naming the run leaves its app as it was', () => {
   const run = { fields: { agent: 'claude', client: 'claude-code', client_version: '2.1.4', doing: 'Claude Code run' }, created_at: '2026-10-06T12:00:00.000Z' };
-  assert.deepEqual(learned(run, { client: 'chatgpt', client_version: '9' }, null), {});
-  assert.deepEqual(learned(run, { client: 'claude-code', client_version: '2.1.5' }, null), { client_version: '2.1.5' });
+  /* The old "Claude Code run" is the record's own name, so it is said again as the app is now (left-d), whoever calls. */
+  assert.deepEqual(learned(run, { client: 'chatgpt', client_version: '9' }, null), { doing: 'Claude Code' });
+  assert.deepEqual(learned(run, { client: 'claude-code', client_version: '2.1.5' }, null), { client_version: '2.1.5', doing: 'Claude Code' });
   assert.deepEqual(learned({ ...run, fields: { doing: 'Agent run' } }, { client: 'chatgpt' }, null), { client: 'chatgpt', doing: 'ChatGPT' });
 });
 

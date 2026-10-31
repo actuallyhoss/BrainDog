@@ -461,14 +461,14 @@ test('THE WASH IS ONE CLOSED SHAPE from the zero rule, under the remembered line
   assert.match(plan.area, new RegExp(`L1000 ${plan.zero}Z$`, 'u'), 'and closes on zero under the horizon');
 });
 
-test('A FIGURE A HOST DREW WITH ITS CODE AFTER IT IS SAID SHORT on the axis, keeps its code on the readout and the switches, and is exact in the table', () => {
+test('A FIGURE A HOST DREW WITH ITS CODE AFTER IT IS SAID SHORT on the axis, by its own sign on the readout and the switches, and is exact in the table', () => {
   const rows = ROWS.map((r) => (/£/u.test(r[3] ?? '') ? [r[0]!, r[1]!, r[2]!, `${r[3]}\u00a0GBP`] : r));
   const m = forecastModel(rows)!;
   const s = scenario(m, baseKnobs(m));
   const plan = forecastPlan(m, s, null);
   assert.deepEqual(plan.axis.map((a) => a.label), ['£1.5k', '£1k', '£500', '£0', '−£500', '−£1k'], 'not £1,500.00 GBP');
-  assert.equal(readoutAt(m, s, plan, 1).balance, '−£900\u00a0GBP', 'the writer keeps the code of a currency the record did not name as its own');
-  assert.deepEqual(countsOf(m).out[0], { label: 'Tax', amount: '−£2,400\u00a0GBP' });
+  assert.equal(readoutAt(m, s, plan, 1).balance, '−£900', 'a currency the record did not name as its own is said by its own sign (AM15)');
+  assert.deepEqual(countsOf(m).out[0], { label: 'Tax', amount: '−£2,400' });
   const src = ['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n');
   assert.match(toHTML(parse(src, { page: true })), /<td class="num">−£1,200\.00\u00a0GBP<\/td>/u, 'the table keeps every penny and the code');
 });
@@ -662,4 +662,13 @@ test('A GROUP OFFERS EVERY WALK’S PAIRS AND HOLDINGS, and selling the first wa
   assert.equal(knobsMoved(second, walkKnobs(second, group, 'EGP')), false);
   /* A day held by the group's shared knobs from before is not read by a walk of a group: its own key's day is. */
   assert.equal(walkKnobs(second, { knobs: { ...group.knobs, sell: '2026-10-05' }, sold: {} }, 'EGP').sell, null);
+});
+
+test('A WALK DRAWN BY ITS SIGN ALONE, OR ITS CODE AFTER, STILL KNOWS ITS CURRENCY with no home row', () => {
+  const dollars = forecastModel([['opening', '2026-09-17', 'Cash now', '$1,950'], ['sell', '', 'Bonds', 'USD 900.00'], ['sell', '', 'Gold', '£500.00'], ['spent', '3', '', '$400']])!;
+  assert.equal(dollars.currency, 'USD');
+  assert.deepEqual(dollars.sells, [{ label: 'Bonds', value: 900 }], 'one money written two ways is one money; pounds stay out');
+  assert.equal(dollars.spent, 400);
+  assert.equal(forecastModel([['opening', '2026-09-17', 'Cash now', '£1,000.00 GBP']])!.currency, 'GBP');
+  assert.equal(forecastModel([['opening', '2026-09-17', 'Cash now', '$1,950'], ['home', 'CAD', '', '']])!.currency, 'CAD');
 });

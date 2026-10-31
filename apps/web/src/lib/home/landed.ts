@@ -2,8 +2,8 @@
  * What landed on Today's desk: the things that arrived since the reader last looked, as the record's `whatsNew` says
  * them, each with who brought it, its name, when, and the list it was filed in.
  *
- * ARRIVALS ONLY. A row created, a thing that arrived, matched, extracted or pulled in: not every edit, which the page's
- * own feed already tells. A line with no name to say is left out (never an id), and so is a line in a list the kernel
+ * ARRIVALS ONLY. A row created, a thing that arrived, matched, extracted or pulled in, by somebody or something other than
+ * the reader: not every edit, which the page's own feed already tells, and not what she added herself. A line with no name to say is left out (never an id), and so is a line in a list the kernel
  * declares itself (the runs' heartbeat, what he told an agent), known by its declaration (`own`) and never by a name.
  * Pure, so `landed.test.ts` holds the rules.
  */
@@ -79,9 +79,6 @@ export function landedOf(
   own: ReadonlySet<string> = new Set(),
 ): Landed[] {
   const out: Landed[] = [];
-  /* THE READER FILED UNDER HER OWN NAME IS HER, NOT NEWS: sign-up files the owner as a
-     person of her own record, and "Arrivals 1, Mariam, You, People" was the only thing on her first Today. */
-  const mine = me === null ? '' : (names.get(me) ?? '').trim();
   for (const l of lines) {
     if (!ARRIVED.has(l.kind) || (l.register !== null && own.has(l.register))) continue;
     /* A SCRIPT'S WORK IS SETUP, NOT AN ARRIVAL (audit 6f AF11): Arrivals led with "Give each plan a page and count what is
@@ -91,8 +88,11 @@ export function landedOf(
     if (l.made === true) continue;
     const name = displayName(l.title ?? '');
     if (name === '' || ULID.test(name)) continue;
-    if (mine !== '' && l.actor === me && name === mine) continue;
     const who = actor(l.actor, me, names, l.run_by ?? null);
+    /* WHAT THE READER ADDED HERSELF IS NO ARRIVAL (AN20): an arrival came in from outside, by an agent, a rule, a mail or
+       an import. "Lina Haddad, You, People" was the only line on Omar's first Today, a person he had just added by hand,
+       as her own name filed at sign-up had been ("Arrivals 1, Mariam, You, People"). Activity keeps every one. */
+    if (who.kind === 'you') continue;
     const note = (l.note ?? '').replaceAll(/\s*—\s*/gu, ', ').trim();
     out.push({
       key: l.id,

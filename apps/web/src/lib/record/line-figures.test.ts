@@ -35,3 +35,10 @@ test('RJ3: A YEAR IS NEVER THE AMOUNT WHEN ANOTHER FIGURE IS THERE', () => {
 test('RJ3: A YEAR ALONE IS STILL READ', () => {
   assert.equal(amountOf('School fees 2026'), 202600);
 });
+
+test('AN17: NO "FOR" IS LEFT HANGING ON THE NAME ONCE THE AMOUNT AFTER IT IS TAKEN', () => {
+  const read = lineFigures('bills_rj3', 'Domain renewal 2027 for 15 USD', Date.UTC(2026, 9, 31));
+  assert.equal(read.text, 'Domain renewal 2027');
+  assert.deepEqual(read.fields.amount, { amount: 1500, currency: 'USD' });
+  assert.equal(lineFigures('bills_rj3', 'Hosting of 40 USD', Date.UTC(2026, 9, 31)).text, 'Hosting');
+});

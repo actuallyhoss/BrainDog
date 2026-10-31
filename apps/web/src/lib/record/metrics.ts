@@ -29,6 +29,9 @@ import { homeCurrency } from './api.ts';
 import { joinsWithOr, registerHref, schemaOf } from './where.ts';
 import type { Entry } from './schema.ts';
 
+/** A noun's many: an s, except "person(s)", which is people and never "persons" (AN16). */
+const manyOf = (word: string): string => (word === 'person' ? 'people' : word === 'Person' ? 'People' : `${word}s`);
+
 /* ── the document ────────────────────────────────────────────────────────── */
 
 /** The ten this build reads. `median`, `last`, `running` and `trend` are §2.3 and series-only. */
@@ -899,8 +902,8 @@ export function noteOf(template: string, said: (id: string) => string | null | t
       const v = said(id);
       return v === UNNAMED ? id : (v ?? '');
     })
-    .replace(/(^|[^\d.,])(\d[\d,]*) ([A-Za-z]+)\(s\)/gu, (_, lead: string, n: string, word: string) => `${lead}${n} ${n === '1' ? word : `${word}s`}`)
-    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
+    .replace(/(^|[^\d.,])(\d[\d,]*) ([A-Za-z]+)\(s\)/gu, (_, lead: string, n: string, word: string) => `${lead}${n} ${n === '1' ? word : manyOf(word)}`)
+    .replace(/([A-Za-z]+)\(s\)/gu, (_, word: string) => manyOf(word));
 }
 
 /** A `{{path}}` a lead sentence may name: a figure's id, and the page's own paths such as `steps.count` or `tasks#12.state`. */
@@ -1019,10 +1022,10 @@ export function pluralsIn(template: string, said: (path: string) => string | nul
       (_, figure: string, path: string | undefined, between: string, word: string, gap: string | undefined, verb: string | undefined) => {
         const single = one(path === undefined ? figure : (said(path) ?? ''));
         const forms = verb !== undefined && Object.hasOwn(VERB, verb) ? VERB[verb] : undefined;
-        return `${figure}${between} ${single ? word : `${word}s`}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
+        return `${figure}${between} ${single ? word : manyOf(word)}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
       },
     )
-    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
+    .replace(/([A-Za-z]+)\(s\)/gu, (_, word: string) => manyOf(word));
 }
 
 /** A figure as `resolverOf` writes it, `0`, `0.0`, `0%` or `GBP 0.00`, one part or several joined by ` · `. */

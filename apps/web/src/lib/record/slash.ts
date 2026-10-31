@@ -8,6 +8,8 @@
  * on Decide, where the owner answers it.
  */
 
+import { recordToday } from './zone.ts';
+
 type Refused = { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: unknown };
 type Answer<T> = { ok: true; value: T } | Refused;
 
@@ -29,10 +31,18 @@ export type Asked = { by: string; filed: { id: string; question: string; by: str
 /** One suggestion as the screen draws it: its question, and where it stands. */
 export type Suggestion = { question: string; state: 'new' | 'waiting' | 'answered'; href: string | null; said: string };
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** `2026-09-17` as a person says it: 17 September 2026. */
-const spokenDay = (day: string): string => (/^\d{4}-\d{2}-\d{2}$/u.test(day) ? `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}` : day);
+/**
+ * `2026-09-17` AS EVERY OTHER DATE READS (AN22): "on 17 Sep", the year only when it is not this one, and "today" for
+ * today. "It last looked on 31 October 2026" was the one date in Settings that said its month whole and its year.
+ */
+const spokenDay = (day: string, today: string): string => {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(day)) return `on ${day}`;
+  if (day === today) return 'today';
+  const said = `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]}`;
+  return `on ${day.slice(0, 4) === today.slice(0, 4) ? said : `${said} ${day.slice(0, 4)}`}`;
+};
 
 export const words = {
   title: 'Slash',
@@ -64,7 +74,7 @@ export const words = {
   dailySwitch: 'Let Slash look once a day',
   dailyOn: 'Up to 3 new suggestions a day, in Needs you.',
   dailyOff: 'Only when you open Slash and ask.',
-  dailyLast: (day: string) => `It last looked on ${spokenDay(day)}.`,
+  dailyLast: (day: string, today: string = recordToday()) => `It last looked ${spokenDay(day, today)}.`,
   dailySaidOn: 'Slash will look once a day.',
   dailySaidOff: 'Slash will wait for you to ask.',
   dailyMore: 'Open Slash',
@@ -235,7 +245,7 @@ export async function fileDrafted(client: SlashClient, draft: Drafted, keep: boo
 }
 
 /** The line under the switch: what on or off means, and when Slash last looked. */
-export const dailySaid = (daily: Daily): string => (daily.on ? words.dailyOn : words.dailyOff) + (daily.last ? ` ${words.dailyLast(daily.last)}` : '');
+export const dailySaid = (daily: Daily, today: string = recordToday()): string => (daily.on ? words.dailyOn : words.dailyOff) + (daily.last ? ` ${words.dailyLast(daily.last, today)}` : '');
 
 /** The switch: Slash looking once a day, on or off. Only the owner, in a browser. */
 export async function setDaily(client: SlashClient, on: boolean): Promise<{ ok: true; daily: Daily; said: string } | { ok: false; fix: string }> {

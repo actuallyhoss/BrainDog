@@ -79,10 +79,10 @@ test('TOLD THE HOME, A BRIDGE WRITES EVERY FIGURE AS A TABLE CELL DOES, and not 
   }
   assert.deepEqual(
     cells.map((c) => bridgeFigure(c, 'EGP')),
-    [`EGP${AMOUNT_SPACE}9,000.00`, `+$40.00${AMOUNT_SPACE}USD`, `−EGP${AMOUNT_SPACE}1,600.00`, 'US$3.63', 'soon', ''],
+    [`EGP${AMOUNT_SPACE}9,000.00`, '+$40.00', `−EGP${AMOUNT_SPACE}1,600.00`, 'US$3.63', 'soon', ''],
   );
   assert.equal(bridgeFigure('USD 40.00', 'USD'), '$40.00', 'the home currency is said by its sign');
-  assert.equal(bridgeFigure('USD 40.00', null), `$40.00${AMOUNT_SPACE}USD`, 'a record with no home says every code');
+  assert.equal(bridgeFigure('USD 40.00', null), '$40.00', 'a record with no home says another currency by its own sign');
   assert.deepEqual(cells.map((c) => bridgeFigure(c)), cells, 'not told a home, every figure is as its cell wrote it');
   assert.equal(bridgeWritten('soon', 'EGP'), null);
 });
