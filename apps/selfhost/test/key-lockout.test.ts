@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { KEY_TRIES, keyLockout, nearPeer, proxied } from '../src/key-lockout.ts';
+import { KEY_TRIES, keyLockout, nearPeer, placeOf, proxied, proxyTrustOf } from '../src/key-lockout.ts';
 import { start } from '../src/server.ts';
 
 test('SEC5: TEN MISSES ARE COMPARED, THE ELEVENTH IS NOT, AND THE LOCK OUTLASTS A RIGHT KEY UNTIL IT ENDS', () => {
@@ -76,4 +76,24 @@ test('RD7: A FORWARDING HEADER FROM A PEER ON THIS MACHINE OR ITS NETWORK READS 
     assert.equal(proxied(peer, {}), false, `${peer} with no forwarding header`);
   }
   for (const peer of ['198.51.100.7', '172.32.0.1', '2001:db8::1']) assert.equal(proxied(peer, { 'x-forwarded-for': '203.0.113.9' }), false, peer);
+});
+
+test('AI16: THE HEADER IS READ ONLY FROM A PEER THAT IS A TRUSTED PROXY, and from the right past every trusted hop', () => {
+  const near = proxyTrustOf('1');
+  assert.ok(near !== null && !('wrong' in near));
+  /* A CALLER THAT REACHED THE PORT DIRECTLY NAMES NOTHING. */
+  assert.deepEqual(placeOf('203.0.113.9', '198.51.100.1', near), { ip: '203.0.113.9', peer: '203.0.113.9' });
+  /* BEHIND THE PROXY, THE ENTRY IT WROTE, NOT THE ONE THE CLIENT SENT. */
+  assert.deepEqual(placeOf('::ffff:172.18.0.1', '1.1.1.1, 203.0.113.9', near), { ip: '203.0.113.9', peer: '::ffff:172.18.0.1' });
+  assert.equal(placeOf('127.0.0.1', '1.1.1.1, 203.0.113.9, 10.0.0.2', near).ip, '203.0.113.9');
+  assert.equal(placeOf('203.0.113.9', '1.1.1.1', null).ip, '203.0.113.9');
+  const listed = proxyTrustOf('10.0.0.5, fd00::/8');
+  assert.ok(listed !== null && !('wrong' in listed));
+  assert.equal(placeOf('127.0.0.1', '1.1.1.1', listed).ip, '127.0.0.1');
+  assert.equal(placeOf('::ffff:10.0.0.5', '1.1.1.1', listed).ip, '1.1.1.1');
+  assert.equal(placeOf('fd12::1', '2001:db8::1', listed).ip, '2001:db8::1');
+  assert.equal(proxyTrustOf(undefined), null);
+  assert.equal(proxyTrustOf('0'), null);
+  const bad = proxyTrustOf('caddy');
+  assert.ok(bad !== null && 'wrong' in bad);
 });
