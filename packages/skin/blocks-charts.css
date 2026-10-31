@@ -1776,6 +1776,14 @@
     translate: var(--sp-2) var(--sp-1);
   }
 
+  /* NO CORNER IS FREE (`data-over`, A23): a dot high on a walk that falls away from it, in the longer views, had the line
+     running through "Today £33,850". The words stand on the tile's own colour, so the line passes behind them. */
+  .forecast-now-label[data-over] {
+    padding-inline: var(--sp-1);
+    background: var(--tile);
+    border-radius: var(--r-xs);
+  }
+
   .forecast-now-label[data-place='under']:dir(rtl) {
     translate: calc(-1 * var(--sp-2)) var(--sp-1);
   }
