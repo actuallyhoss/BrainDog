@@ -71,3 +71,17 @@ test('a link is read by somebody else: no line asking the owner to add, and no "
   assert.equal(wordsShown('{{people-count}} person(s) besides you'), '{{people-count}} person(s)');
   assert.equal(wordsShown('Kept in the [Keychain](/keychain).'), 'Kept in the Keychain.');
 });
+
+test('a link leaves out every clause of an opening line that speaks to the owner', () => {
+  assert.equal(wordsShown('{{questions-open-in:people}} question(s) for you, {{people-count}} person(s) besides you'), '{{people-count}} person(s)');
+  assert.equal(
+    wordsShown('{{questions-open-in:people}} question(s) for you, {{people-quiet.first}} has been quiet since {{people-quiet.since}}'),
+    '{{people-quiet.first}} has been quiet since {{people-quiet.since}}',
+  );
+  assert.equal(wordsShown('{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you'), '{{tasks-late-yours}} late');
+  assert.equal(wordsShown('None of your tasks is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you'), '');
+  assert.equal(wordsShown('{{questions-open-in:services}} question(s) for you, {{estate-month}} a month to keep everything running.'), '{{estate-month}} a month to keep everything running.');
+  assert.equal(wordsShown('One circle: {{circles-month}} goes in each month, and {{circles-payouts}} comes back to you.'), 'One circle: {{circles-month}} goes in each month, and {{circles-payouts}} comes back.');
+  /* And the line reads on from what is left. */
+  assert.equal(leadShown(wordsShown('{{questions-open-in:people}} question(s) for you, {{people-count}} person(s) besides you'), said({ 'questions-open-in:people': '2', 'people-count': '5' })), '5 people.');
+});
