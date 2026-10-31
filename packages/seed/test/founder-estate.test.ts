@@ -126,7 +126,7 @@ test("A FOUNDER'S PROJECT DRAWS WHAT IT RUNS ON: a domain pointed at it is on it
   const blocks = drawn(k, page.slug) as (Drawn & { rows?: { fields: Record<string, unknown> }[] })[];
   const glance = blocks.find((b) => b.heading === 'At a glance');
   assert.deepEqual((glance?.cells ?? []).map((c) => c.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week'], 'the cost tile is back now the services are held');
-  const alive = blocks.find((b) => b.heading === 'Keeping it alive');
+  const alive = blocks.find((b) => b.heading === 'Services');
   assert.ok(alive, `no services block among ${blocks.map((b) => b.heading).join(', ')}`);
   assert.deepEqual(alive.rows?.map((r) => r.fields.name), ['harbour.example']);
   assert.ok(blocks.some((b) => b.heading === 'Send numbers here'), 'the founder half of the page is still under it');
@@ -233,5 +233,5 @@ test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither 
   const pages = k.pages() as unknown as { slug: string; title: string }[];
   const project = pages.find((p) => p.title === 'Northwind app');
   assert.ok(project, 'the example project kept its page');
-  assert.ok(drawn(k, project.slug).some((b) => b.heading === 'Keeping it alive'), 'and the page now draws what it runs on');
+  assert.ok(drawn(k, project.slug).some((b) => b.heading === 'Services'), 'and the page now draws what it runs on');
 });

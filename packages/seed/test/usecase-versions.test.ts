@@ -1740,6 +1740,28 @@ const DECLARED: Record<string, Version> = {
     declares: 'ca8024f0e5283005',
     history: ["`page.project` labels the cards of And from everywhere \"What it is\", not \"Kind\". Words only, no id added or taken away -> ca8024f0e5283005"],
   },
+  'founder@3.8.2': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
+      extends.register.datapoints.organisation extends.register.datapoints.about_service
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
+      metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
+      metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '20df92ca8b5bb812',
+    history: ["`page.project` heads the project's services Services, not Keeping it alive, beside Runs on. Words only, no id added or taken away -> 20df92ca8b5bb812"],
+  },
   'founder@3.7.1': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3

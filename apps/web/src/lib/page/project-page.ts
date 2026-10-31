@@ -100,7 +100,7 @@ export function onProject<T extends Block>(blocks: readonly T[], register: strin
   return [...kept.slice(0, at), section, ...ordered, ...kept.slice(end)].filter((_, n) => n !== plan);
 }
 
-/** "Bills and invoices 9 · Keeping it alive 2 · Notes · Plan by date": what a folded More about holds, as its labels. */
+/** "Bills and invoices 9 · Services 2 · Notes · Plan by date": what a folded More about holds, as its labels. */
 export function moreSaid(blocks: readonly Block[]): string {
   const at = blocks.findIndex((b) => b.kind === 'section' && b.fold === true && b.box === true);
   if (at === -1) return '';

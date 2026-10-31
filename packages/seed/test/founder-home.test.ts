@@ -281,6 +281,8 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
       /* AND FOUNDER 3.4.0 (Z20 of 25 October): Last worked read the tasks alone, and the numbers were headed thirty
          days, laid back here as 2.6.0 drew them. */
       if (b.kind === 'lines' && b.heading === 'Numbers') return [{ ...b, heading: 'Numbers, 30 days' }];
+      /* AND FOUNDER 3.8.2 (31 October, AG22): what keeps it running was headed Keeping it alive. */
+      if (b.kind === 'cards' && b.heading === 'Services' && b.source === 'register.services') return [{ ...b, heading: 'Keeping it alive' }];
       if (b.kind === 'stat' && Array.isArray(b.cells))
         return [{ ...b, cells: (b.cells as { metric?: string }[]).map((c) => (c.metric === 'project-worked:{{name}}' ? { ...c, metric: 'project-last-worked:{{name}}' } : c)) }];
       return [b];

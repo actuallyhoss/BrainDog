@@ -1637,7 +1637,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'table',
         heading: 'Bills and invoices',
         icon: 'receipt',
-        /* THE WHOLE WIDTH SINCE 24 October (things, not rows), and so is Keeping it alive: a parked project's page, which
+        /* THE WHOLE WIDTH SINCE 24 October (things, not rows), and so is Services: a parked project's page, which
            the look orders by what it has, put a half alone in a row of its own, beside a hole. */
         span: 12,
         source: 'register.obligations',
@@ -1657,9 +1657,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       {
         /* WHAT KEEPS IT RUNNING: one card a service, its name, what it costs a cycle and which cycle, and the day it
            renews, what renews first first. No `when:`: a domain imported with no cost is still what the project runs on,
-           so a figure of what it costs cannot say whether there is anything here. */
+           so a figure of what it costs cannot say whether there is anything here.
+
+           CALLED SERVICES SINCE portfolio 1.30.2 (31 October, AG22): "Keeping it alive" beside "Runs on" read as the same
+           services under two names, and Services is what Estate and the list itself call them. */
         kind: 'cards',
-        heading: 'Keeping it alive',
+        heading: 'Services',
         icon: 'server',
         span: 12,
         source: 'register.services',

@@ -250,7 +250,7 @@ test('A TEAM’S PRODUCT IN PLAY HAS A PAGE: where it stands, its tickets and it
   for (const b of page.blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const headings = page.blocks.map((b) => b.heading);
   assert.ok(headings.includes('Where it stands') && headings.includes('Waiting on you') && headings.includes('Agents'), headings.join(', '));
-  assert.ok(!headings.includes('Money') && !headings.includes('Keeping it alive'), 'a team record holds no money or services');
+  assert.ok(!headings.includes('Money') && !headings.includes('Services'), 'a team record holds no money or services');
   /* WHAT IS HANDED BACK IS THE WORK TILE'S WITH YOU SINCE team 2.25.0: the page declares the shape's parts,
      which the app draws from its read of the product, and its own tile of the same tasks went. */
   /* AND SINCE team 2.28.0 (the project page of 27 October) THREE BLOCKS: the hero beside its lane's tile, its numbers

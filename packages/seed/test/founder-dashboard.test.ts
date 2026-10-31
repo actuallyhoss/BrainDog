@@ -278,7 +278,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     /* NO MONEY BY MONTH SINCE founder 3.3.0: the Money tile's bars say it. */
     'Notes',
     'Bills and invoices',
-    'Keeping it alive',
+    'Services',
     /* SINCE founder 2.6.0's last step: what it runs on has a heading of its own, with what reaches it from everywhere. */
     'Runs on',
     'Keys',

@@ -454,7 +454,7 @@ test('A PROJECT PAGE SAYS WHAT WAS FINISHED THIS WEEK AT A GLANCE, ITS MONEY BY 
 
   /* WHAT IT RUNS ON IS CARDS, what renews first first, and the dates are weeks above the plan. IN THE MAIN COLUMN SINCE
      work 1.15.0, a part of the one More about tile, where it was folded shut in the rail. */
-  const alive = page.blocks.find((b) => b.heading === 'Keeping it alive')!;
+  const alive = page.blocks.find((b) => b.heading === 'Services')!;
   assert.deepEqual([alive.kind, (alive as { area?: string }).area], ['cards', undefined]);
   const renews = alive.rows.map((r) => String(r.fields.renews ?? '')).filter((d) => d !== '');
   assert.deepEqual(renews, [...renews].sort());
@@ -469,7 +469,7 @@ test('A PROJECT PAGE ON A RECORD WITH NO MONEY HAS NO MONTH OF MONEY, rather tha
   const team = projectTemplate(['things', 'tasks', 'people']);
   const headings = (team.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.ok(!headings.includes('This month so far'), 'a row of money figures was made up from the tasks instead');
-  assert.ok(!headings.includes('Money by month') && !headings.includes('Keeping it alive'));
+  assert.ok(!headings.includes('Money by month') && !headings.includes('Services'));
   assert.ok(!headings.includes('Done, by week') && headings.includes('The plan'), 'what a record without Money still has');
   /* AND AT A GLANCE IS MADE UP FROM ITS TASKS, what was finished this week last, with its line, as on a record with
      Money: Open, what falls due soon and what is handed back before it. */

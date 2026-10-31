@@ -24,7 +24,8 @@ const PAGES_ADDED: Readonly<Record<string, ReadonlySet<string>>> = {
 };
 
 /** A page over every project as a use case declared it before 24 October: only those building or earning had one. */
-const HALVES = new Set(['Bills and invoices', 'Keeping it alive']);
+/* SERVICES TOO, the heading since founder 3.8.2 (AG22): this step runs before the rename is undone (`projectBefore`). */
+const HALVES = new Set(['Bills and invoices', 'Keeping it alive', 'Services']);
 
 const inPlay = (d: Body): Body => {
   const f = d.for as Body | undefined;

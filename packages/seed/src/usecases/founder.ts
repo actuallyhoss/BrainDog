@@ -505,8 +505,10 @@ export const FOUNDER = {
      parts, the Numbers lines and Where it was seen go from the project page, and Send numbers here is folded last.
      Projects 1.30.0 leads with its board. No id added or taken away, so a minor step.
      3.7.1: the card's summary is one short line. Words only, so a patch step.
-     3.8.1: the project page's And from everywhere cards say "What it is", not "Kind". Words only, so a patch step. */
-  version: '3.8.1',
+     3.8.1: the project page's And from everywhere cards say "What it is", not "Kind". Words only, so a patch step.
+     3.8.2: the project page's services are headed Services, not Keeping it alive, beside Runs on (AG22). Words only,
+     so a patch step. */
+  version: '3.8.2',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',

@@ -38,6 +38,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.8.2', notes: 'A project\'s services are headed Services.' },
     { version: '3.8.1', notes: 'A project\'s And from everywhere cards say what each thing is, not its kind.' },
     { version: '3.8.0', notes: 'The founder page is called Founder overview, not Today. While no numbers came in thirty days, the Dashboard says so in one line, shows what went quiet and links to fixing the feed.' },
     { version: '3.7.1', notes: SUMMARY },
