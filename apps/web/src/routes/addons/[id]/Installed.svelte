@@ -1108,6 +1108,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     max-inline-size: var(--measure);
+    min-inline-size: 0;
   }
 
   .when {
@@ -1237,6 +1238,11 @@
   /* A SELECT OR A DATE IS A FIELD: the `--tile-2` well, no border, the `--r-pop` corner, 40 tall and 44 under a thumb. The
      house chevron is `controls.css`'s. */
   .setting-select {
+    /* NEVER WIDER THAN ITS CARD (audit j, AJ10): a select is as wide as its longest choice, and the home currency's
+       "United Arab Emirates dirham" ran it past the card's edge on a phone. */
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    text-overflow: ellipsis;
     min-block-size: 40px;
     padding: 0 var(--sp-3);
     background-color: var(--tile-2);
