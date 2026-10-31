@@ -306,8 +306,10 @@ export type ArrangeDeps = {
   /**
    * An install that is in and kept a page the owner changed: the record asks its one question about what the page goes
    * without (declare-edited-page-60, `keptAsk` in `index.ts`). `packSaid` is the add-on by the name the catalogue gives it.
+   * It answers the lines that say what the update reworded on a page or list he changed (`rewordSaid`, RJ6), which go
+   * in the press's answer as `said`, so Decide says them as the night does.
    */
-  kept?: ((pack: Pack, diff: Diff, packSaid: (id: string) => string) => void) | undefined;
+  kept?: ((pack: Pack, diff: Diff, packSaid: (id: string) => string) => readonly string[] | void) | undefined;
 };
 
 /** What a proposal found in the host's whole catalogue: each document by pack id, the modules under it, and its entry. */
@@ -1855,7 +1857,8 @@ export function arranger(d: ArrangeDeps) {
   }
 
   async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string, by: Own = {}): Promise<Result<Body>> {
-    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; me: string[]; rows: string[]; declarations: string[] } = {
+    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; me: string[]; rows: string[]; declarations: string[]; said: string[] } = {
+      said: [],
       installed: [],
       enabled: [],
       disabled: [],
@@ -2005,7 +2008,9 @@ export function arranger(d: ArrangeDeps) {
       if (!put.ok) return stopped(put);
       /* AND WHAT A PAGE IT KEPT GOES WITHOUT IS ASKED ABOUT, once it is in. A question that will not file leaves it in. */
       try {
-        d.kept?.(pack.value, diff, titleOf);
+        const said = d.kept?.(pack.value, diff, titleOf);
+        /* AND WHAT IT REWORDED ON A PAGE OR LIST HE CHANGED, said in the answer Decide reads back (RJ6). */
+        if (said) done.said.push(...said);
       } catch {
         /* The page is kept either way. */
       }

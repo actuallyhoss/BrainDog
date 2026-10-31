@@ -323,8 +323,15 @@ export const movesOf = (plan: SharedPlan): string[] => plan.packs.flatMap((p) =>
  * Install the plan that was read, a pack at a time through `planPack` and `installPack`. The modules that are off are
  * turned on first. Answers the packs that went in, and the sentence that stopped it, if one did.
  */
-export async function installShared(client: SharingClient, plan: SharedPlan, relabel = true): Promise<{ ok: boolean; done: string[]; fix: string | null; stale: boolean }> {
+/**
+ * What an install's answer says it carried into a page or list he changed (`said`, RJ6): the update's new words, in the
+ * record's own sentences, for the screen to say beside "Installed". Empty for anything else.
+ */
+export const saidOf = (value: unknown): string[] => (isMap(value) ? strings(value.said) : []);
+
+export async function installShared(client: SharingClient, plan: SharedPlan, relabel = true): Promise<{ ok: boolean; done: string[]; fix: string | null; stale: boolean; said?: string[] }> {
   const done: string[] = [];
+  const said: string[] = [];
   for (const id of plan.enable) {
     const on = await client.enablePack({ id });
     if (!on.ok) return { ok: false, done, fix: refusalOf(on).fix, stale: false };
@@ -346,8 +353,9 @@ export async function installShared(client: SharingClient, plan: SharedPlan, rel
       return { ok: false, done, fix: refusal.fix, stale: refusal.code === 'PLAN_STALE' };
     }
     done.push(pack.id);
+    said.push(...saidOf(put.value));
   }
-  return { ok: true, done, fix: null, stale: false };
+  return { ok: true, done, fix: null, stale: false, ...(said.length > 0 ? { said } : {}) };
 }
 
 /**

@@ -61,7 +61,7 @@ test('a page still at the pack’s old place on the rail takes the new one, and 
   const start = { ...START, nav: { section: 'Dashboard', order: 10, place: 20 } };
   const next = { ...START, nav: { section: 'Dashboard', order: 10, place: 70 } };
   const moved = { ...start, blocks: [START.blocks[1]!, START.blocks[0]!] };
-  assert.deepEqual(reworded(start, moved, next), { body: { ...moved, nav: { section: 'Dashboard', order: 10, place: 70 } }, words: [] });
+  assert.deepEqual(reworded(start, moved, next), { body: { ...moved, nav: { section: 'Dashboard', order: 10, place: 70 } }, words: [], rail: true });
   assert.equal(reworded(start, { ...moved, nav: { section: 'Dashboard', order: 10, place: 5 } }, next), null);
 });
 

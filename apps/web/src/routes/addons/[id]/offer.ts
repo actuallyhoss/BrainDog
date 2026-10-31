@@ -27,7 +27,7 @@ import type { Listing } from '../../../lib/market/listing.ts';
 import { holderFirst, marked, type Waiting } from '../../../lib/market/update-order.ts';
 import { words } from '../../../lib/market/words.ts';
 import { packDocument, relabelDocument, type PackState } from '../../../lib/record/packs.ts';
-import { afterInstall, installShared, keepVoice, planShared, speakingStates, switchTo, voiceQuestion, type SharedPlan } from '../sharing.ts';
+import { afterInstall, installShared, keepVoice, planShared, saidOf, speakingStates, switchTo, voiceQuestion, type SharedPlan } from '../sharing.ts';
 import { firstPartyUpdates, inTurn, landed } from '../../decide/improved.ts';
 import { askForVersion, indexForUpdates, readShippedCatalogue, updatesFor } from '../catalogue.ts';
 
@@ -204,7 +204,8 @@ export async function waitingOf(fetcher: typeof fetch, index: CatalogueIndex | n
 }
 
 /** An install that went through: the arrangement to keep, and the updates a run in turn took in first, by title. */
-export type Installed = { ok: true; nav: string[] | null; first?: readonly string[] };
+/** `said` is what the update carried into a page or list he changed, in the record's sentences (RJ6), to say beside "Installed". */
+export type Installed = { ok: true; nav: string[] | null; first?: readonly string[]; said?: readonly string[] };
 
 const asksOf = (p: Planned): readonly string[] => (p.kind === 'pack' ? p.approve : p.plan.approve);
 
@@ -221,7 +222,7 @@ const asksOf = (p: Planned): readonly string[] => (p.kind === 'pack' ? p.approve
  */
 export async function installInTurn(
   planned: Planned,
-  by: { replan: (u: Offered) => Promise<{ ok: true; planned: Planned } | Refused>; install: (p: Planned) => Promise<{ ok: true; nav: string[] | null } | Refused> },
+  by: { replan: (u: Offered) => Promise<{ ok: true; planned: Planned } | Refused>; install: (p: Planned) => Promise<{ ok: true; nav: string[] | null; said?: readonly string[] } | Refused> },
 ): Promise<Installed | Refused> {
   if (planned.kind !== 'pack' || !planned.after || planned.after.first.length === 0) return by.install(planned);
   const { after, ...own } = planned;
@@ -230,6 +231,7 @@ export async function installInTurn(
   /* `inTurn` installs the first plan as it stands and plans every later one again, so the one in hand is the last planned. */
   let at: Offered = after.first[0]!.of;
   const first: string[] = [];
+  const said: string[] = [];
   const out = await inTurn<Offered, Planned>([...after.first.map((t) => ({ u: t.of, p: t.planned })), { u: after.self, p: own }], {
     replan: async (u) => {
       at = u;
@@ -242,13 +244,14 @@ export async function installInTurn(
     install: async (p) => {
       const went = await by.install(p);
       if (went.ok) nav = went.nav ?? nav;
+      if (went.ok) said.push(...(went.said ?? []));
       else code = went.code;
       if (went.ok && at !== after.self && at.title !== '') first.push(at.title);
       return went;
     },
     unread: turnWords.unread,
   });
-  if (out.fix === '') return { ok: true, nav, ...(first.length > 0 ? { first } : {}) };
+  if (out.fix === '') return { ok: true, nav, ...(first.length > 0 ? { first } : {}), ...(said.length > 0 ? { said } : {}) };
   return { ok: false, fix: out.fix, code, ...(first.length > 0 ? { first, ...(at.title !== '' ? { stopped: at.title } : {}) } : {}) };
 }
 
@@ -277,7 +280,9 @@ export async function install(
       ...(planned.approve.length > 0 ? { approve: planned.approve } : {}),
       ...(Array.isArray(removals) && removals.length > 0 ? { retireWithRows: true } : {}),
     });
-    return out.ok ? { ok: true, nav: null } : refusedOf(out, fallback);
+    if (!out.ok) return refusedOf(out, fallback);
+    const said = saidOf(out.value);
+    return { ok: true, nav: null, ...(said.length > 0 ? { said } : {}) };
   }
   const heard = await speakingStates(client, states);
   const updating = states.some((s) => s.id === `usecase-${planned.plan.usecase.id}`);
@@ -286,7 +291,7 @@ export async function install(
   const after = await afterInstall(client, planned.plan, arrangement);
   const asked = updating ? null : voiceQuestion(heard, planned.plan.usecase.id);
   if (asked) await keepVoice(client, heard, planned.plan.usecase.id, asked.rule);
-  return { ok: true, nav: after.nav };
+  return { ok: true, nav: after.nav, ...(out.said ? { said: out.said } : {}) };
 }
 
 /** Turn a listing on that this record holds and has off: a use case by switching to it, anything else by `enablePack`. */

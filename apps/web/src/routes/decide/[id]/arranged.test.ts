@@ -126,6 +126,11 @@ test('what was applied is said plainly, with what is new in the sidebar', () => 
   assert.deepEqual(appliedLines({}, {}), ['Everything it asked for was already in place.']);
 });
 
+test('what an update carried into a page he changed is said with the rest (RJ6)', () => {
+  const line = 'Your Home page takes the update\'s new words where it still had the old ones: "Saved lately". What you wrote yourself stays.';
+  assert.deepEqual(appliedLines({ said: [line] }, {}), [line]);
+});
+
 test('a partial apply says what was done, what was not, and why it stopped', () => {
   const fix = 'usecase-student now calls out something this proposal did not show: CALLS OUT x. Propose it again. Already applied, and kept: portfolio.';
   assert.deepEqual(partialOf('arrange', STUDENT, fix), {

@@ -788,7 +788,7 @@ const pageTitle = (id: string, body: Row): string => {
 /* ── what an accepted one did ───────────────────────────────────────────── */
 
 /** `applied` as `decide` answers it: what was installed, turned on and off, and which pages and settings were set. */
-export type Applied = { installed?: string[]; enabled?: string[]; disabled?: string[]; pages?: string[]; settings?: string[]; rows?: string[] };
+export type Applied = { installed?: string[]; enabled?: string[]; disabled?: string[]; pages?: string[]; settings?: string[]; rows?: string[]; said?: string[] };
 
 /** What was applied, as sentences, with what is new in the sidebar when the screen could tell. */
 export function appliedLines(applied: Applied, body: Row, sidebar: readonly string[] = []): string[] {
@@ -799,6 +799,8 @@ export function appliedLines(applied: Applied, body: Row, sidebar: readonly stri
   const updated = (applied.installed ?? []).filter((id) => updates.has(id));
   if (installed.length) out.push(copy.arrangeDidInstall(installed.map(name)));
   for (const id of updated) out.push(copy.arrangeDidUpdate(name(id), updates.get(id)!.from, updates.get(id)!.to));
+  /* WHAT AN UPDATE CARRIED INTO A PAGE OR LIST HE CHANGED, in the record's own sentences (`rewordSaid`, RJ6). */
+  for (const line of applied.said ?? []) if (typeof line === 'string' && line.trim() !== '') out.push(line);
   if (applied.enabled?.length) out.push(copy.arrangeDidEnable(applied.enabled.map(name)));
   if (applied.disabled?.length) out.push(copy.arrangeDidDisable(applied.disabled.map(name)));
   if (applied.pages?.length) out.push(copy.arrangeDidPages(applied.pages.map((id) => pageTitle(id, body))));

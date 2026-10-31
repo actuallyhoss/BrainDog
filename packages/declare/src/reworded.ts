@@ -220,8 +220,11 @@ function carried(start: Json, mine: Json, next: Json, carries: Carries, words: s
   return Object.fromEntries(Object.entries(mine).map(([k, x]) => [k, Object.hasOwn(start, k) && Object.hasOwn(next, k) ? carried(start[k]!, x, next[k]!, carries, words, k, key) : x]));
 }
 
-/** What a carry made: the owner's body with the update's change in, and the new words it took, each once. */
-export type Reworded = { body: Json; words: string[] };
+/**
+ * What a carry made: the owner's body with the update's change in, and the new words it took, each once. `rail` is
+ * true when the page's place on the rail moved (RJ6), so that is said only when it did, and never for a word emptied.
+ */
+export type Reworded = { body: Json; words: string[]; rail?: true };
 
 function carry(start: Json, mine: Json, next: Json, carries: Carries): Reworded | null {
   const words: string[] = [];
@@ -234,7 +237,9 @@ function carry(start: Json, mine: Json, next: Json, carries: Carries): Reworded 
  * of the pack's that the owner's page still holds changed. Each is a page's body; the answer's `body` is one too.
  */
 export function reworded(start: Json, mine: Json, next: Json): Reworded | null {
-  return carry(start, mine, next, PAGE);
+  const out = carry(start, mine, next, PAGE);
+  if (out === null || !isMap(mine) || !isMap(out.body)) return out;
+  return JSON.stringify(mine.nav ?? null) === JSON.stringify(out.body.nav ?? null) ? out : { ...out, rail: true };
 }
 
 /**

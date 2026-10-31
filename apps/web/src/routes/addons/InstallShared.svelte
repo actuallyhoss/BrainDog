@@ -159,7 +159,7 @@
           const after = await afterInstall(c, p.plan, pref.read().nav ?? []);
           if (asked) await keepVoice(c, heard, p.plan.usecase.id, choice);
           if (after.nav) pref.write({ nav: after.nav });
-          toasts.push(words.installed(p.plan.usecase.title), { intent: 'good' });
+          toasts.push([words.installed(p.plan.usecase.title), ...(out.said ?? [])].join(' '), { intent: 'good' });
           planned = null;
           oninstalled();
           return;
@@ -173,7 +173,7 @@
       }
       const out = await install(c, p, installed, pref.read().nav ?? [], copy.writeRaced);
       if (out.ok) {
-        toasts.push(words.installed(last?.title ?? ''), { intent: 'good' });
+        toasts.push([words.installed(last?.title ?? ''), ...(out.said ?? [])].join(' '), { intent: 'good' });
         planned = null;
         oninstalled();
         return;
