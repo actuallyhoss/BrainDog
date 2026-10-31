@@ -2477,27 +2477,28 @@ const DECLARED: Record<string, Version> = {
     holds: `
       metric.account-ages metric.account-gap metric.account-in-by-month metric.account-lines metric.account-now
       metric.account-out-by-month metric.accounts-open metric.arriving-30d metric.balance-by-account metric.balances-stale
-      metric.bills-in-no-book metric.bills-open metric.book-cash metric.book-in-by-month metric.book-in-month metric.book-lasts-until
-      metric.book-net-by-month metric.book-net-month metric.book-out-by-month metric.book-out-month metric.book-owed-by
-      metric.book-owed-to metric.book-spent-month metric.books-held metric.budget-passed-on metric.budgets-monthly-total
-      metric.budgets-set metric.budgets-total metric.budgets-unset metric.budgets-weekly metric.budgets-weekly-total
-      metric.budgets-yearly metric.budgets-yearly-total metric.card-to-pay metric.card-to-pay-on metric.cash-accounts
-      metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check metric.cash-foreign-share metric.cash-now
-      metric.categories-against-direction metric.chasing metric.currencies-held metric.days-late-in metric.due-30d
-      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-net metric.every-month-out
-      metric.filed-by-rule-30d metric.filed-for-you-30d metric.filed-today metric.filing-rule-filed metric.filing-rules
-      metric.held-beyond-cash metric.in-30d metric.in-ahead-by-month metric.in-by-month metric.in-due-by-month
-      metric.installments-a-month metric.installments-after-next-by-plan metric.installments-due-30d metric.installments-late
-      metric.installments-left metric.installments-left-by-plan metric.installments-next-due-by-plan metric.installments-paid-by-plan
-      metric.installments-total-by-plan metric.instalments-in-no-book metric.kept-share-90d metric.lasts-no-income metric.late-in
-      metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days metric.ledger-rows-7d metric.left-all metric.left-last
-      metric.left-month metric.left-three metric.left-year metric.lines-by-account metric.moved-since metric.net-by-month
-      metric.net-worth metric.net-worth-nights metric.nights-missed-30d metric.out-30d metric.out-ahead-by-month metric.out-by-month
-      metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-over-time metric.owed-to-you metric.paid-last-by-payee
-      metric.paid-times-by-payee-90d metric.paid-to-by-week metric.payees-paid-90d metric.pending-lines metric.pending-out-month
-      metric.pending-out-month-count metric.plan-after-next-by-plan metric.plan-last-due metric.plan-late metric.plan-left
-      metric.plan-left-by-plan metric.plan-next-due metric.plan-next-due-by-plan metric.plan-paid metric.plan-paid-by-quarter
-      metric.plan-parts metric.plan-parts-by-plan metric.plan-parts-cancelled metric.plan-parts-open metric.plan-parts-paid
+      metric.bills-held metric.bills-in-no-book metric.bills-open metric.book-cash metric.book-in-by-month metric.book-in-month
+      metric.book-lasts-until metric.book-net-by-month metric.book-net-month metric.book-out-by-month metric.book-out-month
+      metric.book-owed-by metric.book-owed-to metric.book-spent-month metric.books-held metric.budget-passed-on
+      metric.budgets-monthly-total metric.budgets-set metric.budgets-total metric.budgets-unset metric.budgets-weekly
+      metric.budgets-weekly-total metric.budgets-yearly metric.budgets-yearly-total metric.card-to-pay metric.card-to-pay-on
+      metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check
+      metric.cash-foreign-share metric.cash-now metric.categories-against-direction metric.chasing metric.currencies-held
+      metric.days-late-in metric.due-30d metric.due-items-30d metric.every-month-by-category metric.every-month-in
+      metric.every-month-net metric.every-month-out metric.filed-by-rule-30d metric.filed-for-you-30d metric.filed-today
+      metric.filing-rule-filed metric.filing-rules metric.held-beyond-cash metric.in-30d metric.in-ahead-by-month metric.in-by-month
+      metric.in-due-by-month metric.installments-a-month metric.installments-after-next-by-plan metric.installments-due-30d
+      metric.installments-late metric.installments-left metric.installments-left-by-plan metric.installments-next-due-by-plan
+      metric.installments-paid-by-plan metric.installments-total-by-plan metric.instalments-in-no-book metric.kept-share-90d
+      metric.lasts-no-income metric.late-in metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days
+      metric.ledger-rows-7d metric.left-all metric.left-last metric.left-month metric.left-three metric.left-year
+      metric.lines-by-account metric.moved-since metric.net-by-month metric.net-worth metric.net-worth-nights metric.nights-missed-30d
+      metric.out-30d metric.out-ahead-by-month metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-over-time metric.owed-to-you metric.paid-last-by-payee metric.paid-times-by-payee-90d metric.paid-to-by-week
+      metric.payees-paid-90d metric.pending-lines metric.pending-out-month metric.pending-out-month-count
+      metric.plan-after-next-by-plan metric.plan-last-due metric.plan-late metric.plan-left metric.plan-left-by-plan
+      metric.plan-next-due metric.plan-next-due-by-plan metric.plan-paid metric.plan-paid-by-quarter metric.plan-parts
+      metric.plan-parts-by-plan metric.plan-parts-cancelled metric.plan-parts-open metric.plan-parts-paid
       metric.plan-parts-paid-by-plan metric.project-in-by-month metric.project-in-month metric.project-kept-month
       metric.project-out-by-month metric.project-out-month metric.project-owed metric.received-30d metric.received-7d
       metric.received-a-month metric.received-all metric.received-last metric.received-month metric.received-three
@@ -2527,7 +2528,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'e6eb76a485ee7c05',
+    declares: '199f1f241a0a0d26',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
@@ -2543,6 +2544,7 @@ const DECLARED: Record<string, Version> = {
       'Before 3.33.0 shipped, `metric.bills-open` and `metric.repeating-held` are added and `page.money` asks for a bill when nothing is due; two ids added, none taken away -> a04f3a06af13f9d7',
       'Before 3.33.0 shipped, `page.money-plan` names its summary cell "Paid", where it said "Paid in"; no id added or taken away -> 0bc4bf113bd883c0',
       'Before 3.33.0 shipped, `page.money-plan` draws its summary as one tile set at a time, so a plan with nothing late has no "Late £0" and a paid plan no "Left £0"; no id added or taken away -> e6eb76a485ee7c05',
+      'Before 3.33.0 shipped, `metric.bills-held` is added, `page.money` opens on an account to add when none is kept and signs its hero tiles by their way, `widget.cash-today` signs the same; one id added, none taken away -> 199f1f241a0a0d26',
     ],
   },
   'work@1.17.0': {

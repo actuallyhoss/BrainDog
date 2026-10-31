@@ -72,7 +72,8 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
    "metric.filing-rule-filed#0",
    "metric.filing-rules#0",
    "metric.bills-open#0",
-   "metric.repeating-held#0"
+   "metric.repeating-held#0",
+   "metric.bills-held#0"
   ],
   "was": {
    "script.learn_category#0": {
