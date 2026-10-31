@@ -14,6 +14,7 @@
   import { symbolOf } from '$lib/record/money.ts';
   import { updateRow } from '$lib/record/page-write.ts';
   import { rowWriter } from '$lib/record/rows-write.ts';
+  import type { Fields } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { Ledger } from './ledger.ts';
@@ -105,7 +106,7 @@
     busy = l.seq;
     /* A LINE NOT YET A CATEGORY IS WRITTEN AS ONE, spending money, with its budget on it. */
     if (l.seq < 0) {
-      const made = await rowWriter(apiBase()).create(category.list, { [category.title]: l.name, ...(category.way ? { [category.way.field]: category.way.out } : {}), ...patch });
+      const made = await rowWriter(apiBase()).create(category.list, { [category.title]: l.name, ...(category.way ? { [category.way.field]: category.way.out } : {}), ...patch } as Fields);
       busy = null;
       if (!made.ok) {
         toasts.push(made.fix, { intent: 'warn' });

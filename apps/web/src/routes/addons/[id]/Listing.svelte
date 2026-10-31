@@ -97,19 +97,6 @@
   const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);
   const latest = $derived(listing ? latestOf(listing) : null);
   const action = $derived(listing && states ? actionOf(listing, states) : null);
-  /**
-   * WHAT IT NEEDS FIRST THAT THIS RECORD DOES NOT HOLD (audit 31 Oct h, AH6): BrainDog's own parts its reach names, not
-   * installed or switched off here. Debts on a shop with no Money offered Install, and the press answered a line of list
-   * and pack ids; now the button adds Money first, and Install follows once it is in.
-   */
-  const ownParts = new Set(firstPartyModules().map((m) => m.id));
-  const needsFirst = $derived(
-    action?.kind === 'install' && states && listing?.kind !== 'module'
-      ? ((reach ?? latest?.reach)?.modules ?? []).filter((m) => ownParts.has(m) && !states.some((s) => s.id === m && s.disabled_at === null))
-      : [],
-  );
-  /** The part being added first, while its plan is on the sheet, so the sheet's yes says that part's name. */
-  let addingFirst = $state<string | null>(null);
 
   /**
    * ITS OWN GLYPH (agents F25): a built-in wears the place it brings (`glyph.ts`), a built-in use case its Home's or its
@@ -136,6 +123,19 @@
   let file = $state.raw<{ doc: Record<string, unknown> | null; text: string | null } | null>(null);
   /** What it can reach, computed from the file for a built-in and by the catalogue for a Kennel entry. */
   let reach = $state.raw<Reach | null>(null);
+  /**
+   * WHAT IT NEEDS FIRST THAT THIS RECORD DOES NOT HOLD (audit 31 Oct h, AH6): BrainDog's own parts its reach names, not
+   * installed or switched off here. Debts on a shop with no Money offered Install, and the press answered a line of list
+   * and pack ids; now the button adds Money first, and Install follows once it is in.
+   */
+  const ownParts = new Set(firstPartyModules().map((m) => m.id));
+  const needsFirst = $derived.by((): string[] => {
+    const held = states;
+    if (action?.kind !== 'install' || held === null || listing?.kind === 'module') return [];
+    return ((reach ?? latest?.reach)?.modules ?? []).filter((m) => ownParts.has(m) && !held.some((s) => s.id === m && s.disabled_at === null));
+  });
+  /** The part being added first, while its plan is on the sheet, so the sheet's yes says that part's name. */
+  let addingFirst = $state<string | null>(null);
   /** A Kennel version that did not verify, or a plan or install the record refused. */
   let refused = $state<{ fix: string; code: string | null } | null>(null);
   let trust = $state.raw<Trust | null>(null);

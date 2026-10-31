@@ -191,7 +191,8 @@
       /* AND ON AN EMPTY PAGE, FROM WHAT THE PAGE REQUIRES (audit 31 Oct h, AH3): a fresh People draws no block, so the
          press found no list and the record refused it as naming no row. The action's own list, then a drawn block's,
          then the first list the page says it needs. */
-      const named = typeof a.args?.register === 'string' && a.args.register !== '' ? a.args.register : undefined;
+      const args = a.args && !Array.isArray(a.args) ? (a.args as Readonly<Record<string, unknown>>) : null;
+      const named = typeof args?.register === 'string' && args.register !== '' ? args.register : undefined;
       const required = (live?.page.page.requires ?? []).flatMap((r) => (typeof r === 'string' && r.startsWith('register.') ? [r.slice('register.'.length)] : []));
       const register =
         named ??
