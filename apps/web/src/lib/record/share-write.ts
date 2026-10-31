@@ -182,7 +182,13 @@ export type SharedColumn = { field: string; label?: string; as?: string; sign?: 
  * One row as a link shows it: each drawn field's typed cell, the same row as plain values for a record that sends no
  * cells, and its state. No id, no list and no number.
  */
-export type SharedRow = { cells: Record<string, SharedCell>; fields: Record<string, unknown>; state: string | null };
+export type SharedRow = {
+  cells: Record<string, SharedCell>;
+  fields: Record<string, unknown>;
+  state: string | null;
+  /** A card's trend, when the record sent its cards' runs (`trends`, one a row): oldest first, a gap `null`. */
+  trend?: (number | null)[];
+};
 
 /**
  * One figure a block read, with the label the owner reads for it, and how it moved: `trend` is the record's run of it, one
@@ -211,6 +217,8 @@ export type SharedBlock = {
   matched: number;
   readings: SharedReading[];
   authored: unknown[][];
+  /** What a card's trend is, its figure's name ("Done, by week"), sent beside the cards' runs (`SharedRow.trend`). */
+  trendLabel?: string | null;
 };
 
 /**
@@ -309,11 +317,21 @@ export function blockShared(x: unknown): SharedBlock {
   const values = isObject(b.values) ? b.values : {};
   const refusals = Array.isArray(b.refusals) ? b.refusals : [];
   const first = refusals[0];
-  const rows = (Array.isArray(b.rows) ? b.rows : []).flatMap((r): SharedRow[] =>
-    isObject(r) && (isObject(r.cells) || isObject(r.fields))
-      ? [{ cells: cellsOf(r.cells), fields: isObject(r.fields) ? r.fields : {}, state: typeof r.state === 'string' ? r.state : null }]
-      : [],
-  );
+  /* A CARD'S TREND RIDES ON ITS ROW HERE, aligned as the record sent them (`trends`, one a row), so a row left out on the
+     way to the screen takes its line with it. A list of another length is no answer, and draws no line. */
+  const sentRows = Array.isArray(b.rows) ? b.rows : [];
+  const trends = Array.isArray(b.trends) && b.trends.length === sentRows.length ? b.trends : null;
+  const trendAt = (n: number): (number | null)[] | null => {
+    const run = trends?.[n];
+    if (!Array.isArray(run)) return null;
+    const line = run.map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null));
+    return line.some((v) => v !== null) ? line : null;
+  };
+  const rows = sentRows.flatMap((r, n): SharedRow[] => {
+    if (!isObject(r) || !(isObject(r.cells) || isObject(r.fields))) return [];
+    const trend = trendAt(n);
+    return [{ cells: cellsOf(r.cells), fields: isObject(r.fields) ? r.fields : {}, state: typeof r.state === 'string' ? r.state : null, ...(trend === null ? {} : { trend }) }];
+  });
   const authored = (Array.isArray(b.authored) ? b.authored : []).map((r) =>
     isObject(r) && Array.isArray(r.cells) ? r.cells.map((c) => (typeof c === 'string' ? (filled(c, values) ?? '') : c)) : [],
   );
@@ -330,6 +348,7 @@ export function blockShared(x: unknown): SharedBlock {
     matched: typeof b.matched === 'number' && Number.isFinite(b.matched) ? b.matched : rows.length,
     readings: (Array.isArray(b.readings) ? b.readings : []).map(readingOf).filter((r) => r !== null),
     authored,
+    trendLabel: rows.some((r) => r.trend !== undefined) ? text(b.trend_label) : null,
   };
 }
 

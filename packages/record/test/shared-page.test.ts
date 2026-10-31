@@ -594,3 +594,65 @@ test('SC1: A PROJECTS PAGE\'S CARDS REACH A LINK without the column that reads t
   }
   sql.close();
 });
+
+test('SL2: A PROJECT CARD\'S TREND REACHES A LINK from the project\'s own rows, never from a key number, and named as its figure', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  sql.exec(
+    "INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, 'rec_1', 'studio', 'Studio', 'en-GB', 'Europe/London', 1, '2026-10-01T00:00:00.000Z')",
+  );
+  const THINGS = { id: 'register.things', kind: 'register', body: { id: 'things', name: 'Projects', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } } as never;
+  const TASKS = {
+    id: 'register.tasks',
+    kind: 'register',
+    body: {
+      id: 'tasks',
+      name: 'Tasks',
+      title: 'what',
+      states: ['open', 'done'],
+      done: ['done'],
+      fields: [
+        { id: 'what', type: 'text', required: true },
+        { id: 'thing', type: 'text' },
+        { id: 'done_on', type: 'day' },
+      ],
+    },
+  } as never;
+  const DONE = figure('project-done-by-week', {
+    name: 'Done, by week',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, state is done',
+    value: { count: 'id' },
+    group_by: 'done_on',
+    bucket: 'week',
+    format: 'int',
+  });
+  const PROJECTS = page('portfolio', [
+    {
+      kind: 'cards',
+      heading: 'In play',
+      source: 'register.things',
+      columns: [{ field: 'name', as: 'title' }, { metric: 'project-done-by-week:{{name}}', kpi: 'headline', as: 'trend' }],
+    },
+  ], ['register.things', 'register.tasks']);
+  value(await api.kernel.install([THINGS, TASKS, DONE, PROJECTS]));
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  value(api.kernel.create('things', { name: 'Kiln' }, { actor: 'p_owner' }));
+  value(api.kernel.create('things', { name: 'Tallow' }, { actor: 'p_owner' }));
+  for (const [what, thing, done_on] of [['Cut one', 'Kiln', '2026-09-01'], ['Cut two', 'Kiln', '2026-09-15'], ['Cut three', 'Kiln', '2026-09-22'], ['Elsewhere', 'Tallow', '2026-09-15']])
+    value(api.kernel.create('tasks', { what, thing, done_on, state: 'done' }, { actor: 'p_owner' }));
+  const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
+  const { id } = value<{ id: string }>(await direct.openShare({ slug: 'portfolio', money: false }, owner));
+  const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'portfolio')));
+  const cards = shown.blocks.find((b) => b.kind === 'cards') as { rows: Row[]; trends?: ((number | null)[] | null)[]; trend_label?: string } | undefined;
+  assert.ok(cards);
+  assert.equal(cards.trends?.length, cards.rows.length, 'the cards came back without their lines');
+  assert.equal(cards.trend_label, 'Done, by week');
+  /* KILN'S LINE COUNTS KILN'S TASKS ALONE: three done, one a week, and Tallow's one is on Tallow's line. */
+  const kiln = cards.rows.findIndex((r) => r.cells.name?.value === 'Kiln');
+  const sum = (run: (number | null)[] | null | undefined) => (run ?? []).reduce<number>((n, v) => n + (v ?? 0), 0);
+  assert.equal(sum(cards.trends?.[kiln]), 3);
+  assert.equal(sum(cards.trends?.[1 - kiln]), 1);
+  sql.close();
+});
