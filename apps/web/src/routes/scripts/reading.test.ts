@@ -23,9 +23,9 @@ const ran = (outcome: string): Run => ({ id: outcome, at: '2026-09-29T08:00:00Z'
 test('the sentence counts the scripts and this month’s runs from the rows, and is calm when nothing is wrong', () => {
   const said = sentenceOf([row({}), row({ title: 'Invoices', month: { runs: 31, ok: 31, refused: 0 } })]);
   assert.ok(said);
-  assert.equal(plain(said), '2 scripts, 41 runs this month.');
+  assert.equal(plain(said), '2 scripts ran 41 times this month.');
   assert.equal(said.some((p) => p.tone === 'needs'), false);
-  assert.equal(plain(sentenceOf([row({ month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '1 script, no runs this month.');
+  assert.equal(plain(sentenceOf([row({ month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '1 script, not run this month.');
   assert.equal(sentenceOf([]), null);
 });
 
@@ -36,7 +36,7 @@ test('a paused script and a refused last run are the red phrases, and a paused o
     row({ title: 'Digest', month: { runs: 1, ok: 1, refused: 0 } }),
   ]);
   assert.ok(said);
-  assert.equal(plain(said), '3 scripts, 21 runs this month; 1 is paused, and Invoices was refused on its last run.');
+  assert.equal(plain(said), '3 scripts ran 21 times this month; 1 is paused, and Invoices was refused on its last run.');
   assert.deepEqual(
     said.filter((p) => p.tone === 'needs').map((p) => p.text),
     ['1 is paused', 'Invoices was refused on its last run'],
@@ -102,13 +102,13 @@ test('the month says what started the runs it counts, from what starts each scri
   const rule = { every: null, door: null, rule: true };
   const both = { every: '1d', door: null, rule: true };
   const door = { every: null, door: 'kiln-orders', rule: false };
-  assert.equal(plain(sentenceOf([row({ runs: clock }), row({ title: 'Glaze log', runs: rule })]) ?? []), '2 scripts, 20 runs this month, on their clocks and when an automation started one.');
-  assert.equal(plain(sentenceOf([row({ runs: rule })]) ?? []), '1 script, 10 runs this month, when an automation started it.');
-  assert.equal(plain(sentenceOf([row({ runs: both })]) ?? []), '1 script, 10 runs this month, on its clock and when an automation started it.');
-  assert.equal(plain(sentenceOf([row({ runs: door }), row({ title: 'Glaze log', runs: door })]) ?? []), '2 scripts, 20 runs this month, as something arrived.');
+  assert.equal(plain(sentenceOf([row({ runs: clock }), row({ title: 'Glaze log', runs: rule })]) ?? []), '2 scripts ran 20 times this month, on their clocks and when an automation started one.');
+  assert.equal(plain(sentenceOf([row({ runs: rule })]) ?? []), '1 script ran 10 times this month, when an automation started it.');
+  assert.equal(plain(sentenceOf([row({ runs: both })]) ?? []), '1 script ran 10 times this month, on its clock and when an automation started it.');
+  assert.equal(plain(sentenceOf([row({ runs: door }), row({ title: 'Glaze log', runs: door })]) ?? []), '2 scripts ran 20 times this month, as something arrived.');
   /* A SCRIPT THAT DID NOT RUN SAYS NOTHING OF WHAT STARTS IT, and a month with no runs says no more than that. */
-  assert.equal(plain(sentenceOf([row({ runs: clock }), row({ title: 'Glaze log', runs: rule, month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '2 scripts, 10 runs this month, on their clocks.');
-  assert.equal(plain(sentenceOf([row({ runs: rule, month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '1 script, no runs this month.');
+  assert.equal(plain(sentenceOf([row({ runs: clock }), row({ title: 'Glaze log', runs: rule, month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '2 scripts ran 10 times this month, on their clocks.');
+  assert.equal(plain(sentenceOf([row({ runs: rule, month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '1 script, not run this month.');
 });
 
 /* ONE SCRIPTS LIST: `/p/scripts` drew the same scripts again, so the page's address goes to

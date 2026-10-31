@@ -6071,7 +6071,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   /* `listed` IS THE LIST THE LINE'S ROW IS ON WHERE THE CALLER HAS ALREADY READ IT (`null` for a row gone from the table),
      so a feed that read its rows in one query asks no second one a line. */
-  function bookkeeping(e: Pick<EventLine, 'actor' | 'kind' | 'target' | 'field' | 'ts' | 'to'> & { from?: Json | null }, listed?: string | null): boolean {
+  function bookkeeping(e: Pick<EventLine, 'actor' | 'kind' | 'target' | 'field' | 'ts' | 'to'> & { from?: Json | null; note?: string | null }, listed?: string | null): boolean {
+    /* AN ADD-ON PUT IN AGAIN AT THE VERSION IT HELD, BY THE RECORD AND SAYING NOTHING (audit j, AJ6): Money re-put for
+       the lists Certificates brought into Cash ahead. Nothing a person chose changed; the log keeps the line. A part that
+       waited and arrived carries its `because` as the note, and a reinstall somebody approved carries the lines, so both
+       stay in the feed. */
+    if (e.kind === 'install' && e.target?.startsWith('pack:') && e.actor === 'system' && typeof e.from === 'string' && e.from === e.to && (e.note ?? null) === null) return true;
     /* A SCRIPT'S QUIET RUN (`script-run.ts` stamps `quiet`): it wrote nothing, asked nothing and stopped nothing, so a
        script that runs every night adds no line to a feed on a quiet one. Its history keeps it. */
     if (e.kind === 'pull' && e.target?.startsWith('declaration:script.') && e.to !== null && typeof e.to === 'object' && !Array.isArray(e.to) && e.to.quiet === 1) return true;
@@ -8469,9 +8474,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         for (const e of batch) {
           before = Number(e.rowid);
           walked += 1;
-          /* ONLY AN EDIT AND A SCRIPT'S RUN ARE BOOKKEEPING BY WHAT THEY HOLD, so only theirs are parsed, and the list a
+          /* ONLY AN EDIT, A SCRIPT'S RUN AND AN ADD-ON PUT IN ARE BOOKKEEPING BY WHAT THEY HOLD, so only theirs are parsed, and the list a
              line's row is on is the one the batch's query found. */
-          const holds = e.kind === 'edit' || e.kind === 'pull';
+          const holds = e.kind === 'edit' || e.kind === 'pull' || e.kind === 'install';
           const id = entryOf(e);
           const listed = id === null || sees ? undefined : (about.get(id)?.register ?? null);
           if (!bookkeeping({ ...e, from: holds ? read(e.from_v) : null, to: holds ? read(e.to_v) : null }, listed) && seen(e)) lines.push(e);
@@ -12996,6 +13001,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            upgrade or a reinstall whose plan held nothing back writes NULL over what the last one left, so a part that
            has arrived stops being counted as waiting. NULL and never `[]`, which is what `packsWaiting` reads by. */
         const waiting = row.waiting !== undefined && row.waiting.length > 0 ? jcs(row.waiting.map((w) => ({ at: w.at, holds: [...w.holds] })) as unknown as Json) : null;
+        /* THE VERSION IT HELD BEFORE, as the line's `from_v`, so a reinstall at the same version is told from a first
+           install: Money put in again for Certificates' legs read "Installed the Money add-on" and every list it holds
+           as added (audit j, AJ6). `bookkeeping` leaves such a line out of the feed and Activity; the log keeps it. */
+        const was = sql.one<{ version: string }>('SELECT version FROM pack WHERE id = ?', row.id)?.version ?? null;
         sql.exec(
           `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum, waiting)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -13013,11 +13022,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         );
         const approved = row.approved !== undefined && row.approved.length > 0;
         sql.exec(
-          "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'install', ?, 'pack', ?, ?)",
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v, note) VALUES (?, ?, ?, 'install', ?, 'pack', ?, ?, ?)",
           mint(),
           instant(clock.now()),
           (approved || row.because !== undefined) && row.by ? row.by : 'system',
           `pack:${row.id}`,
+          was,
           row.version,
           approved ? row.approved!.join('\n') : (row.because ?? null),
         );

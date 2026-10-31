@@ -456,7 +456,7 @@ export type PageBlock = {
   drawn?: boolean;
 
   /** A `series`'s lines: figures grouped by one date bucket, each `in` or `out`, and `then:` for buckets to come. */
-  series?: readonly { metric: string; then?: string; label?: string; dir?: 'in' | 'out' }[];
+  series?: readonly { metric: string; then?: string; label?: string; dir?: 'in' | 'out'; running?: boolean }[];
   /** A `series`'s reach, in buckets: back from the current one, including it, and ahead of it. */
   back?: number;
   ahead?: number;

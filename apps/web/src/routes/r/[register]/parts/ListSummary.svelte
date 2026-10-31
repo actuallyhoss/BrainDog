@@ -32,6 +32,7 @@
 <script lang="ts">
   import { dayShort } from 'braindog-render';
   import { labelOf } from '$lib/record/api.ts';
+  import { wayOfValue } from '$lib/record/money-way.ts';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
   import StateDot from '$lib/ui/StateDot.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -168,11 +169,12 @@
   const figureNamed = (f: Figured, n: number): string => (f.field.type === 'money' ? said(f, n) : `${said(f, n)} ${labelOf(f.field).toLowerCase()}`);
   /* The late line of a side, in the list's own figures: "2 late · £10,540". */
   const lateSaid = (late: { count: number; value: number }): string => words.late(late.count, fig ? said(fig, late.value) : null);
-  /* A side's short name on a phone: "Out" and "In" for the two ways money goes, else the side's own name. */
+  /* A side's short name on a phone: "Out" and "In" for the two ways money goes, named by what the side's value says
+     (`out`, `owed_by_me`), never by where it sits in the list's values; else the side's own name. */
   const shortOf = (side: Side): string | null => {
     if (side.label === null || !figured?.by) return side.label;
-    const at = (figured.by.values ?? []).indexOf(side.key);
-    return at === 0 ? words.out : at === 1 ? words.in : side.label;
+    const way = wayOfValue(figured.by, side.key);
+    return way === 'out' ? words.out : way === 'in' ? words.in : side.label;
   };
 </script>
 

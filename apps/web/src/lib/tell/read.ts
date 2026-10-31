@@ -550,10 +550,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   /* A self-introduction names the reader, who is never a new person: "I'm Mariam, Nadia wants..." reads from Nadia. */
   if (INTRODUCED.test(text)) text = hear(text).bio || text;
   const people = peopleList(opts.lists);
-  /* AN AMOUNT IS SPELLED AS `Money` SPELLS IT, by the one writer against the record's home currency: "$1,350.00" on a
-     dollar record, never the stored "USD 1,350.00" this said before, which no other screen shows. */
+  /* AN AMOUNT IS SPELLED AS `Money` SPELLS IT, by the one writer against the record's home currency: "$1,350" on a
+     dollar record, never the stored "USD 1,350.00" this said before, which no other screen shows. IN A SENTENCE, SO A
+     ROUND AMOUNT HAS NO ".00" (audit j, AJ11): the preview said "$4,200.00 USD" and "EGP 12,000.00" over rows Bills
+     then drew "EGP 850"; pence that are not round are still said. */
   const home = opts.home === undefined ? homeCurrency() : opts.home;
-  const spelled = (amount: number, currency: string): string => symbolText(money(amount, currency), home, 'exact');
+  const spelled = (amount: number, currency: string): string => symbolText(money(amount, currency), home, 'sentence');
   const room = (n: number): boolean => rows.length + n <= MOST;
 
   /* Who each name is: an entry already kept, or a new one made the first time they are named. */

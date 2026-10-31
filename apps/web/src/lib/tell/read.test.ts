@@ -79,7 +79,7 @@ test('the Nadia sentence on a fresh shop record is a client, an order from her a
     settled: TODAY,
     party: { $row: 0 },
   });
-  assert.equal(paid!.said, 'EGP\u00a0900.00 from Nadia, by InstaPay');
+  assert.equal(paid!.said, 'EGP\u00a0900 from Nadia, by InstaPay');
   assert.equal(paid!.detail, 'paid, kept in Bills and invoices');
   /* Nothing is missing, so one press adds all three. */
   assert.deepEqual(paid!.missing, []);
@@ -95,7 +95,7 @@ test('a record that holds an account keeps the payment on its Ledger, filed to t
   assert.equal(paid.fields.state, 'cleared');
   assert.equal(paid.fields.account, 'accounts#1');
   assert.equal(paid.fields.what, 'Payment from Nadia, by InstaPay');
-  assert.equal(paid.said, 'EGP\u00a0900.00 from Nadia, by InstaPay');
+  assert.equal(paid.said, 'EGP\u00a0900 from Nadia, by InstaPay');
   assert.equal(paid.detail, 'paid, kept in Ledger');
   assert.deepEqual(paid.missing, []);
 });
@@ -117,7 +117,7 @@ test('with no account and no Bills and invoices, the Ledger entry says the accou
 test('on a fresh record, money the reader paid is a paid item owed by her, and two currencies stay two items', () => {
   const [wax] = tellRead('I paid 200 for wax', fresh).rows;
   assert.deepEqual(wax!.fields, { what: 'Wax', amount: { amount: 20000, currency: 'EGP' }, state: 'paid', direction: 'owed_by_me', due: TODAY, settled: TODAY });
-  assert.equal(wax!.said, 'EGP\u00a0200.00 out');
+  assert.equal(wax!.said, 'EGP\u00a0200 out');
   assert.deepEqual(wax!.missing, []);
   const two = tellRead('Nadia wants 3 jars, paid 500, paid US$40', fresh).rows.filter((r) => r.register === 'obligations');
   assert.deepEqual(two.map((r) => r.fields.amount), [{ amount: 50000, currency: 'EGP' }, { amount: 4000, currency: 'USD' }]);
@@ -171,7 +171,7 @@ test('money the reader paid goes out, for what they said', () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0]!.fields.direction, 'out');
   assert.equal(rows[0]!.fields.what, 'Wax');
-  assert.equal(rows[0]!.said, 'EGP\u00a0200.00 out');
+  assert.equal(rows[0]!.said, 'EGP\u00a0200 out');
 });
 
 test('a pasted message is from the person who sent it', () => {
@@ -290,7 +290,7 @@ test('"14 MUGS FOR LINA, SHE PAID 1200" IS ONE ORDER FROM LINA, paid, on the day
   assert.equal(order.detail, '14 mugs, due tomorrow, paid');
   const paid = rows[2]!;
   assert.deepEqual(paid.fields.party, { $row: 0 });
-  assert.equal(paid.said, 'EGP 1,200.00 from Lina');
+  assert.equal(paid.said, 'EGP 1,200 from Lina');
   assert.equal(paid.detail, 'paid, kept in Bills and invoices');
   /* ONE LINE A PERSON READS, never "in" over "into". */
   for (const r of rows) assert.doesNotMatch(`${r.said} ${r.detail}`, /\bin\b.*\binto\b/u);
@@ -458,14 +458,14 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
   const on = { ...shop, today: '2026-10-31' };
   const way = (s: string, c: Partial<typeof on> = {}) => tellRead(s, { ...on, ...c }).rows.find((r) => r.register === 'transactions');
   /* RG4: a refund is money back, and money put into the account is in. */
-  assert.equal(way('Refund of EGP 500 credited to your card ending 1234 for your purchase at Amazon')?.said, 'EGP 500.00 in, from Amazon');
-  assert.equal(way('EGP 500 transferred to your a/c from Ahmed')?.said, 'EGP 500.00 in, from Ahmed');
+  assert.equal(way('Refund of EGP 500 credited to your card ending 1234 for your purchase at Amazon')?.said, 'EGP 500 in, from Amazon');
+  assert.equal(way('EGP 500 transferred to your a/c from Ahmed')?.said, 'EGP 500 in, from Ahmed');
   /* RG5: a balance is never the amount, so a text whose amount names no currency keeps nothing. */
   assert.equal(way('Purchase of 450.00 at CARREFOUR. Your available balance is EGP 12,000.00'), undefined);
   /* RG6: "Rent paid 12000" is the rent paid, out, and nobody called Rent. */
   const rent = tellRead('Rent paid 12000', on).rows;
   assert.deepEqual(rent.map((r) => r.register), ['transactions']);
-  assert.equal(rent[0]!.said, 'EGP 12,000.00 out');
+  assert.equal(rent[0]!.said, 'EGP 12,000 out');
   /* RG7: a bare "$" is the record's dollar, and a question anywhere else. */
   assert.deepEqual(way('I paid $40 for hosting', { currency: 'CAD' })?.fields.amount, { amount: 4000, currency: 'CAD' });
   /* RG8: lakhs and a decimal comma, by the one money reader. */
@@ -474,7 +474,7 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
   /* RG9: "30/10" told on 31 Oct is yesterday. */
   assert.equal(way('I paid 900 on 30/10')?.fields.on, '2026-10-30');
   /* RG16: "paid out" with no platform named is money out. */
-  assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP 300.00 out');
+  assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP 300 out');
 });
 
 test('A NEW NAME BEFORE A BARE "PAID" IS ASKED WHICH WAY, never made a person who paid you (MC1)', () => {
