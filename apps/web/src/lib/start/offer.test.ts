@@ -82,10 +82,11 @@ test('A STATED TRADE OFFERS ITS ADD-ON BY NAME (FB5): its own name, or two words
   const PHOTO = { kind: 'usecase', id: 'photographer', title: 'Photographer', summary: 'Shoots.', signals: ['photographer', 'shoots', 'clients'], modules: ['photographer'] };
   const FOLDED = { kind: 'usecase', id: 'studies', title: 'Studies', summary: 'Courses.', signals: ['my courses', 'reading list'], modules: ['studies'] };
   const catalogue = catalogueOfferOf({ format: 1, entries: [LETTING, PHOTO, FOLDED, { kind: 'pack', id: 'studies', title: 'Studies', summary: 'Now part of Student.' }] });
-  assert.deepEqual(tradeAddons(SAID, catalogue).map((u) => u.id), ['letting-desk']);
+  const LET = 'I rent out six flats, each on a tenancy';
+  assert.deepEqual(tradeAddons(LET, catalogue).map((u) => u.id), ['letting-desk']);
   assert.deepEqual(tradeAddons("I'm a photographer in Cairo", catalogue).map((u) => u.id), ['photographer']);
   assert.deepEqual(tradeAddons("I freelance as a designer and want to track my clients", catalogue), [], '"clients" is a starter\'s word');
   assert.deepEqual(tradeAddons('My courses and my reading list', catalogue), [], 'a folded add-on is never offered');
-  assert.deepEqual(tradesKept(JSON.stringify(tradeAddons(SAID, catalogue).map(({ id, title, summary }) => ({ id, title, summary })))).map((u) => u.id), ['letting-desk']);
+  assert.deepEqual(tradesKept(JSON.stringify(tradeAddons(LET, catalogue).map(({ id, title, summary }) => ({ id, title, summary })))).map((u) => u.id), ['letting-desk']);
   assert.deepEqual(tradesKept('nonsense'), []);
 });
