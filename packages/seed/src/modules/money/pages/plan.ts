@@ -92,7 +92,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
     lead(HAS_OPEN, '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, the last due on {{plan-last-due:{{name}}}}.'),
     lead(ALL_PAID, '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, and nothing is left. The last was due on {{plan-last-due:{{name}}}}.'),
     {
-      /* THE SUMMARY: paid in, left, and what is late, which is red while it is not nought: the block's tone is bad, so a
+      /* THE SUMMARY: paid, left, and what is late, which is red while it is not nought: the block's tone is bad, so a
          figure off its line is drawn red and not amber. A cell with nothing to say is left out, so a plan all paid reads
          paid in alone. */
       kind: 'stat',
@@ -102,7 +102,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       span: 12,
       when: HAS_PARTS,
       cells: [
-        { metric: 'plan-paid:{{name}}', label: 'Paid in' },
+        { metric: 'plan-paid:{{name}}', label: 'Paid' },
         { metric: 'plan-left:{{name}}', label: 'Left' },
         { metric: 'plan-late:{{name}}', label: 'Late' },
       ],

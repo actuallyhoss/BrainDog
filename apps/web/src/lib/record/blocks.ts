@@ -661,7 +661,7 @@ function seriesRows(block: BlockResult): string[] {
   const currency = bars.unit ?? (inMoney ? homeCurrency() : null);
   const head = [
     escapeCell(copy.seriesAxis[bars.bucket] ?? bars.bucket),
-    ...lines.map((l) => `${l.dir === 'out' ? 'out' : 'in'}: ${escapeCell(l.label ?? l.metric)}`),
+    ...lines.map((l) => `${l.dir === 'out' ? 'out' : 'in'}${l.running ? ' running' : ''}: ${escapeCell(l.label ?? l.metric)}`),
     'state',
   ].join(' | ');
   const rows = bars.keys.map((key, i) => {

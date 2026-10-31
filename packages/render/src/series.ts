@@ -42,7 +42,8 @@ export type SeriesTotal = { label: string; value: string };
 export type SeriesPlan = {
   /** What the first column names: `Month`. */
   axis: string;
-  series: { label: string; dir: SeriesDir; step: number }[];
+  /** `running` where each cell is the total so far, whose total is its last cell and never the cells added. */
+  series: { label: string; dir: SeriesDir; step: number; running?: boolean }[];
   buckets: {
     label: string;
     /** The first word of the label, for a narrow container. */
@@ -108,9 +109,10 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
   const named = head.slice(1, stated ? -1 : undefined).slice(0, SERIES_MOST);
   const steps = { in: 0, out: 0 };
   const series = named.map((cell) => {
-    const m = /^(in|out):\s*(.*)$/iu.exec(cell.trim());
+    /* `in running: Paid in all` is a line whose every cell is the total so far (the kernel's `running:`). */
+    const m = /^(in|out)( running)?:\s*(.*)$/iu.exec(cell.trim());
     const dir: SeriesDir = m && m[1]!.toLowerCase() === 'out' ? 'out' : 'in';
-    return { label: m ? m[2]! : cell.trim(), dir, step: steps[dir]++ };
+    return { label: m ? m[3]! : cell.trim(), dir, step: steps[dir]++, ...(m?.[2] ? { running: true } : {}) };
   });
   const stateAt = stated ? head.length - 1 : -1;
   /* A CHART OF MONEY OUT ALONE STANDS UP: with nothing coming in to stand over it, money out hung under a zero line read
@@ -243,6 +245,9 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
       mixed = true;
       return [];
     }
+    /* A RUNNING LINE'S TOTAL IS ITS LAST CELL (audit j, AJ4): each cell is already the total so far, so adding them
+       said "£11,250 Paid in all" over a plan whose quarters ran £3,750 then £7,500. */
+    if (sr.running) return [{ label: sr.label, value: amountLike(cells[0]!, seriesValue(cells[cells.length - 1]!)!, home, 'read') }];
     const places = Math.max(0, ...cells.map((c) => /\.(\d+)/u.exec(c.replace(/,/gu, ''))?.[1]?.length ?? 0));
     const minor = cells.reduce((t, c) => t + Math.round(seriesValue(c)! * 10 ** places), 0);
     return [{ label: sr.label, value: amountLike(cells[0]!, minor / 10 ** places, home, 'read') }];
