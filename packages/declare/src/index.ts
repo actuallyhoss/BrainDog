@@ -31,7 +31,7 @@ import { credentialKey as credential, credentialValue, looksLikeCredential, NEST
 import { FIRST_PARTY_LISTS, MODULES, readChanges, type ListWords } from './usecase.ts';
 import { cardsFault } from './cards.ts';
 import { addressFault } from './address.ts';
-import { reworded } from './reworded.ts';
+import { relisted, reworded } from './reworded.ts';
 import { columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
@@ -479,7 +479,7 @@ export type Diff = {
    * `lane.sold` for a value). `install` stages the update's body as the pack's and this one after it as the owner's, so
    * the owner's row stays detached from the pack's newest body and the next update is asked the same question.
    */
-  kept: { id: string; adds?: string[]; rebased?: string }[];
+  kept: { id: string; adds?: string[]; rebased?: string; words?: string[] }[];
   /**
    * What this version adds to a page the owner changed, which the install keeps as the owner left it: the title, when
    * the update gives the page another one, and each block the update's page has that the page the edit started from
@@ -1830,6 +1830,8 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   const changes: Diff['changes'] = [];
   const conflicts: Diff['conflicts'] = [];
   const kept: Diff['kept'] = [];
+  /* THE LISTS KEPT AS THE OWNER LEFT THEM WITH ONLY AN UPDATE'S WORDS CARRIED IN (`relisted`, RH3): still the owner's shape. */
+  const worded = new Set<string>();
   const brings: Brought[] = [];
   const stays: Diff['stays'] = [];
   const retypes: Diff['retypes'] = [];
@@ -1873,10 +1875,11 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
         /* A PAGE KEPT TAKES THE UPDATE'S WORDS WHERE IT STILL SAYS THE PACK'S OLD ONES (`reworded`, UP1): staged as a
            rebased list is, the update's page as the pack's and the owner's after it, so the next update starts from this one. */
         const worded = decl.kind === 'page' ? rewordedPage(edited.body, already.body, decl.canonical) : null;
-        kept.push({ id: decl.id, ...(worded === null ? {} : { rebased: worded }) });
+        kept.push({ id: decl.id, ...(worded === null ? {} : { rebased: worded.body, words: worded.words }) });
         /* AND WHAT THE OWNER'S PAGE GOES WITHOUT IS NAMED (`Diff.brings`), so Decide asks once instead of keeping
-           the page and saying nothing of the table the update was written for. */
-        const more = decl.kind === 'page' ? broughtTo(decl.id, edited.body, already.body, decl.body) : null;
+           the page and saying nothing of the table the update was written for. Asked of the page with the new words in,
+           so a heading or title the update only reworded is carried and not offered again as something missing. */
+        const more = decl.kind === 'page' ? broughtTo(decl.id, edited.body, worded?.body ?? already.body, decl.body) : null;
         if (more !== null) brings.push(more);
         continue;
       }
@@ -1886,7 +1889,15 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
          the body it started from plus fields and enum values that body lacks has nothing the update could undo, so the
          update's body is staged as the pack's and the additions are laid over it as the owner's row. */
       const over = rebased(edited.body, already.body, decl.body);
-      if (over === null) conflicts.push({ id: decl.id, pack: OWN, changed: true });
+      /* OR ALL THE UPDATE DID WAS REWORD IT (RH3). Team 2.30.1 says Sprints for Cycles on three lists, and a record whose
+         owner had changed one of them beyond adding fields was refused that update and every later one, each night,
+         with nothing reaching Decide. The update changes no shape, so the owner's list is kept as they left it, with the
+         update's words carried in where it still says the pack's old ones (`relisted`), staged as a rebased list is. */
+      const words = over === null ? relistedList(edited.body, already.body, decl.canonical) : null;
+      if (words !== null) {
+        kept.push({ id: decl.id, ...(words.body === null ? {} : { rebased: words.body, words: words.words }) });
+        worded.add(decl.id);
+      } else if (over === null) conflicts.push({ id: decl.id, pack: OWN, changed: true });
       else if ('clash' in over) conflicts.push({ id: decl.id, pack: OWN, changed: true, field: over.clash });
       else {
         const rows = installed.rows[decl.id.slice('register.'.length)] ?? 0;
@@ -2148,7 +2159,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   }
 
   /* A KEPT PAGE WITH THE UPDATE'S WORDS CARRIED IN IS STILL THE OWNER'S PAGE, read as it was. */
-  const misreads = misreadsOf(pack, installed, new Set(kept.filter((k) => k.rebased === undefined || live.get(k.id)?.kind === 'page').map((k) => k.id)), gone);
+  const misreads = misreadsOf(pack, installed, new Set(kept.filter((k) => k.rebased === undefined || live.get(k.id)?.kind === 'page' || worded.has(k.id)).map((k) => k.id)), gone);
   const unresolved = unresolvedOf(pack, installed, retires);
   /* A LIST THE RECORD LACKS HAS NOTHING TO LAY ON, and `unresolved` names it with the module that declares it. */
   const extensions: Diff['extends'] = Object.entries(pack.manifest.extends ?? {}).flatMap(([id, ext]) => {
@@ -2795,10 +2806,26 @@ function movedFields(was: string, now: unknown): { fields: Map<string, Record<st
 const keptKind = (id: string): DeclKind => (id.startsWith('page.') ? 'page' : 'register');
 
 /** The owner's page with the update's words carried in (`reworded`), as stored text, or `null` for no word to carry. */
-function rewordedPage(from: string, mine: string, now: string): string | null {
+function rewordedPage(from: string, mine: string, now: string): { body: string; words: string[] } | null {
   try {
     const out = reworded(JSON.parse(from) as Json, JSON.parse(mine) as Json, JSON.parse(now) as Json);
-    return out === null ? null : canonicalise(out);
+    const body = out === null ? null : canonicalise(out.body);
+    return out === null || body === null ? null : { body, words: out.words };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The owner's list with a words-only update's words carried in (`relisted`), as stored text; `{ body: null }` for an
+ * update that only rewords it where the owner's list keeps none of the old words, and `null` for one that changes more.
+ */
+function relistedList(from: string, mine: string, now: string): { body: string | null; words: string[] } | null {
+  try {
+    const out = relisted(JSON.parse(from) as Json, JSON.parse(mine) as Json, JSON.parse(now) as Json);
+    if (out === null || out.body === null) return out === null ? null : { body: null, words: [] };
+    const body = canonicalise(out.body);
+    return body === null ? null : { body, words: out.words };
   } catch {
     return null;
   }
