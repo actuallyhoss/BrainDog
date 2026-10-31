@@ -5159,7 +5159,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
               if (typeof current.fields.stretch_at !== 'string' && runs.has('stretch_at')) merged.stretch_at = now;
             }
             if (touched.includes('doing') && typeof merged.doing === 'string') merged.doing = clipTitle(merged.doing);
-            Object.assign(merged, learned({ fields: merged, created_at: current.created_at }, w.session ?? {}, projectNamed(merged.project), runRegister(), touched));
+            Object.assign(merged, learned({ fields: merged, created_at: current.created_at }, w.session ?? {}, projectNamed(merged.project), runRegister(), touched, [], nameTaken));
           }
         }
         w = { ...w, actor: run.actor };
@@ -5914,7 +5914,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        project is named by its title and never by its number, which is no name a person reads. */
     if (typeof fields.doing !== 'string') {
       const agent = typeof fields.agent === 'string' ? { agent: fields.agent } : {};
-      fields.doing = provisionalTitle({ ...w.session, ...agent }, project === null ? null : titleOfRow(project), runs.kinds);
+      fields.doing = provisionalTitle({ ...w.session, ...agent }, project === null ? null : titleOfRow(project), runs.kinds, nameTaken);
     }
     const opened = writing(SESSION, null, fields, {
       actor: `${prefix}${seq}`,
@@ -5952,6 +5952,17 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * Whether a name an app gives itself is somebody's here: a person's name on the record, whole or its first word, or the
+   * record's own name (RM8). Such an app is said "An app calling itself Sam", never "Sam" alone (`selfNamed`).
+   */
+  function nameTaken(name: string): boolean {
+    const said = name.trim().toLowerCase();
+    if (said === '') return false;
+    if (sql.one("SELECT 1 AS y FROM dog_meta WHERE key = 'record_name' AND lower(trim(value)) = ?", said) !== undefined) return true;
+    return sql.one("SELECT 1 AS y FROM person WHERE lower(trim(name)) = ? OR lower(trim(name)) LIKE ? || ' %' LIMIT 1", said, said) !== undefined;
+  }
+
+  /**
    * What a call made as a run says of who the run is, written onto the run in place (`learned` in `session.ts`). In a
    * transaction only.
    *
@@ -5962,7 +5973,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   function learnRun(id: string, hints: SessionHints): void {
     const run = byId(id);
     if (!run) return;
-    const said = learned(run, hints, projectNamed(run.fields.project), runRegister(), [], knownProjects());
+    const said = learned(run, hints, projectNamed(run.fields.project), runRegister(), [], knownProjects(), nameTaken);
     if (Object.keys(said).length === 0) return;
     for (const [key, value] of Object.entries(said)) sql.exec('UPDATE entry SET fields = json_set(fields, ?, ?) WHERE id = ?', `$.${key}`, value, id);
     if (said.doing !== undefined) {

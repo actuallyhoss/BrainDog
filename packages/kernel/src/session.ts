@@ -566,6 +566,32 @@ export function plainApp(said: unknown): string | null {
   return words === words.toLowerCase() ? `${words[0]!.toUpperCase()}${words.slice(1)}` : words;
 }
 
+/**
+ * WORDS OF THE APP ITSELF, which an app calling itself one of them would read as BrainDog at work (RM8): "Owner on
+ * MacBook" or "BrainDog Health on iPad" on the Agents page and the bell.
+ */
+const APP_WORDS: readonly string[] = ['owner', 'you', 'me', 'braindog', 'health', 'settings', 'slash', 'system', 'admin', 'today', 'activity', 'agents', 'money'];
+
+/**
+ * Whether a name an app gave itself could pass for somebody: a word of the app (`APP_WORDS`) in it, or a name `taken`
+ * says is a person's or the record's own (`nameTaken` in `index.ts`).
+ */
+const passesFor = (app: string, taken: (name: string) => boolean): boolean =>
+  app.toLowerCase().split(' ').some((w) => APP_WORDS.includes(w)) || taken(app);
+
+/** What an app's own name is said as when it could pass for somebody: never the name alone (RM8). */
+const CALLING = 'An app calling itself';
+
+/**
+ * An app nobody listed, by the name it gave itself (`plainApp`), or that name after "An app calling itself" where it
+ * could pass for a person, the owner, the record or BrainDog's own words: "An app calling itself Sam on MacBook", never
+ * "Sam on MacBook". `null` where `plainApp` gives none.
+ */
+export function selfNamed(said: unknown, taken: (name: string) => boolean = () => false): string | null {
+  const app = plainApp(said);
+  return app === null ? null : passesFor(app, taken) ? `${CALLING} ${app}` : app;
+}
+
 /** What a run of an app nobody named is called where no place names it: "An agent", and never "Agent run". */
 const NAMELESS = 'An agent';
 
@@ -594,12 +620,12 @@ const named = (name: string, place: string | null, host: unknown): string => (pl
 
 /**
  * What to call the app a run is in, from its hello: the app `CLIENTS` knows it as, else the name it gave itself in plain
- * words (`plainApp`), else its kind's.
+ * words (`selfNamed`, which never lets it pass for a person), else its kind's.
  */
-function appNamed(hints: Pick<SessionHints, 'agent' | 'client'>, kinds: readonly string[]): string {
+function appNamed(hints: Pick<SessionHints, 'agent' | 'client'>, kinds: readonly string[], taken: (name: string) => boolean): string {
   const { name } = agentOf(hints, kinds);
   if (name !== KIND_NAMES.other || clientOf(hints.client)) return name;
-  return plainApp(hints.client) ?? name;
+  return selfNamed(hints.client, taken) ?? name;
 }
 
 /**
@@ -614,8 +640,8 @@ function appNamed(hints: Pick<SessionHints, 'agent' | 'client'>, kinds: readonly
  * `attach` or `handoff`, replaces it, and so does its first proposal's question, and while it stands it follows what the
  * record learns about the run (`learned`).
  */
-export function provisionalTitle(hints: SessionHints, project: string | null, kinds: readonly string[] = KINDS): string {
-  return named(appNamed(hints, kinds), project ?? (hints.repo ? hints.repo : null), hints.host);
+export function provisionalTitle(hints: SessionHints, project: string | null, kinds: readonly string[] = KINDS, taken: (name: string) => boolean = () => false): string {
+  return named(appNamed(hints, kinds, taken), project ?? (hints.repo ? hints.repo : null), hints.host);
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -648,9 +674,11 @@ export function recordNamed(
   const places = [project, repo, ...known].filter((p): p is string => p !== null && p.trim() !== '');
   /* AND THE RUN'S OWN APP BY ITS OWN NAME, "Zed on MacBook", which only this run's hello could have given it. */
   const own = plainApp(run.fields.client);
-  const apps = own !== null && clientOf(run.fields.client) === undefined && !NAMES.includes(own) ? [own, ...NAMES] : NAMES;
+  const apps = own !== null && clientOf(run.fields.client) === undefined && !NAMES.includes(own) ? [own, `${CALLING} ${own}`, ...NAMES] : NAMES;
+  /* THE APP'S OWN NAME IS NOT CARRIED ON: `learned` says it again through `selfNamed`, so a run once titled "Sam on
+     MacBook" is said "An app calling itself Sam on MacBook" at its next call (RM8). */
   for (const name of apps)
-    if (doing === `${name} run` || onMachine(doing, name) || places.some((place) => doing === titled(name, place))) return { name: real(name) };
+    if (doing === `${name} run` || onMachine(doing, name) || places.some((place) => doing === titled(name, place))) return { name: apps !== NAMES && !NAMES.includes(name) ? null : real(name) };
   const day = `${String(Number(run.created_at.slice(8, 10)))} ${MONTHS[Number(run.created_at.slice(5, 7)) - 1] ?? ''}`;
   if (doing.endsWith(`, ${day}`)) {
     const head = doing.slice(0, -(day.length + 2));
@@ -683,6 +711,7 @@ export function learned(
   register: RunRegister = RUNS,
   keep: readonly string[] = [],
   known: readonly string[] = [],
+  taken: (name: string) => boolean = () => false,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   const was = typeof run.fields.agent === 'string' && run.fields.agent !== '' ? run.fields.agent : 'other';
@@ -707,7 +736,7 @@ export function learned(
   if (made) {
     const client = clientOf(app === null ? hints.client : run.fields.client);
     const said = app === null ? hints.client : run.fields.client;
-    const name = client?.called ?? made.name ?? (client === undefined ? plainApp(said) : null) ?? KIND_NAMES[out.agent ?? was] ?? KIND_NAMES.other!;
+    const name = client?.called ?? made.name ?? (client === undefined ? selfNamed(said, taken) : null) ?? KIND_NAMES[out.agent ?? was] ?? KIND_NAMES.other!;
     const repo = typeof run.fields.repo === 'string' && run.fields.repo !== '' ? run.fields.repo : null;
     const host = typeof run.fields.host === 'string' && run.fields.host !== '' ? run.fields.host : hints.host;
     const title = named(name, project ?? repo, host);
