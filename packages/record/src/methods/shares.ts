@@ -45,6 +45,9 @@ import { speakingNow } from '../arrange.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
+/** A noun's many: an s, except "person(s)", which is people and never "persons" (AN16). */
+const manyOf = (word: string): string => (word === 'person' ? 'people' : word === 'Person' ? 'People' : `${word}s`);
+
 /** How long a link opens for when the owner does not say, and the longest they may say, in days. */
 export const SHARE_DAYS = 30;
 export const SHARE_DAYS_MOST = 90;
@@ -547,10 +550,10 @@ export const pluralsSettled = (template: string, said: (path: string) => string 
       (_, figure: string, path: string | undefined, between: string, word: string, gap: string | undefined, verb: string | undefined) => {
         const single = (path === undefined ? figure : (said(path) ?? '')).trim() === '1';
         const forms = verb !== undefined && Object.hasOwn(VERB, verb) ? VERB[verb] : undefined;
-        return `${figure}${between} ${single ? word : `${word}s`}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
+        return `${figure}${between} ${single ? word : manyOf(word)}${forms ? `${gap ?? ' '}${single ? forms[0] : forms[1]}` : ''}`;
       },
     )
-    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
+    .replace(/([A-Za-z]+)\(s\)/gu, (_, word: string) => manyOf(word));
 
 /** A sentence that already ends as one: a stop, a question, an ellipsis or a colon, even inside a closing quote (`stopped`). */
 const STOPPED = /[.!?…:]["”’)\]]*$/u;
