@@ -68,8 +68,8 @@ test('A TOOLS-ONLY AGENT READS A FIGURE: get of its id answers the reading, one 
   /* A VALUE THAT IS NULL IS LEFT OUT OF THE ANSWER, and two currencies are still never one number. */
   assert.equal(figure.value ?? null, null, 'two currencies were added into one number');
   /* AND THE TEXT SAYS EACH AMOUNT IN ITS OWN CURRENCY, with its own decimals. */
-  assert.match(got.text, /EGP 52,000\.00/u, got.text);
-  assert.match(got.text, /USD 3,400\.50/u, got.text);
+  assert.match(got.text, /EGP 52,000(?!\.)/u, got.text);
+  assert.match(got.text, /\$3,400\.50/u, got.text);
   sql.close();
 });
 

@@ -304,7 +304,7 @@ test('A RESULT IS PLAIN LINES, with the whole JSON beside it as structuredConten
   assert.equal(r.content[0]!.type, 'text');
   /* THE LINES NAME THE THING AND SAY MONEY AS A PERSON READS IT, and never the row's own id. */
   assert.equal(textOf(reply).split('\n')[0], 'Renew the domain (obligations#41) · open · version 3');
-  assert.match(textOf(reply), /^Amount: EGP 1,450\.00$/mu);
+  assert.match(textOf(reply), /^Amount: EGP 1,450$/mu);
   assert.doesNotMatch(textOf(reply), /01M3VMPS/);
   /* AND THE JSON IS THE ROW AS EVERY TOOL ANSWERS ONE, minor units and all. */
   assert.deepEqual(said(reply), { spoken: 'obligations#41', version: 3, state: 'open', fields: ROW.fields });

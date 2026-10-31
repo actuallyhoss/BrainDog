@@ -6,7 +6,8 @@
 
 import { isCurrencyCode } from './coerce.ts';
 
-export type MailKind = 'invoice' | 'receipt' | 'renewal' | 'shipping' | 'none';
+/** `remittance` is somebody telling us they paid one of our invoices, which is not a bill of ours (audit 10k, AK12). */
+export type MailKind = 'invoice' | 'receipt' | 'remittance' | 'renewal' | 'shipping' | 'none';
 
 export type MailMoney = { amount: number; currency: string };
 
@@ -258,7 +259,12 @@ function classify(subject: string, body: string, hasRenewDay: boolean): MailKind
   const ship = score(/\b(shipped|dispatched|tracking|out for delivery|delivery|booking|reservation|itinerary|check-?in|e-?ticket)\b/iu);
   const paid = score(/\b(receipt|you paid|payment received|thank you for your payment|paid in full)\b/iu);
   const bill = score(/\b(invoice|amount due|balance due|bill|payment due)\b/iu);
-  if (hasRenewDay && renew > 0 && renew >= Math.max(bill, paid)) return 'renewal';
+  /* THEY PAID US: a remittance names our invoice, so it outweighs the word "invoice" it carries. */
+  const remit = score(
+    /\b(remittance|(?:we|i)(?: have|['’]ve)?(?: now| just| today)? (?:paid|sent (?:the |your )?payment|made (?:the |your )?payment)|payment (?:has been |was )?(?:made|sent) (?:for|against|towards) (?:your |the )?invoice)\b/iu,
+  );
+  if (hasRenewDay && renew > 0 && renew >= Math.max(bill, paid, remit)) return 'renewal';
+  if (remit > 0 && remit >= paid) return 'remittance';
   if (paid > 0 && paid >= bill) return 'receipt';
   if (bill > 0 && bill >= ship) return 'invoice';
   if (ship > 0) return 'shipping';

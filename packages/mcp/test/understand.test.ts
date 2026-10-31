@@ -74,9 +74,9 @@ test('QUESTIONS BY DIFFERENT HANDS, OR WHOSE BODIES MOVE DIFFERENT AMOUNTS, ARE 
 });
 
 test('A NEGATIVE HALF ROUNDS AWAY FROM ZERO, as a positive one does', () => {
-  assert.equal(money(-101.5, 'GBP'), 'about GBP -1.02');
-  assert.equal(money(101.5, 'GBP'), 'about GBP 1.02');
-  assert.equal(money(-101.4, 'GBP'), 'about GBP -1.01');
+  assert.equal(money(-101.5, 'GBP'), 'about -£1.02');
+  assert.equal(money(101.5, 'GBP'), 'about £1.02');
+  assert.equal(money(-101.4, 'GBP'), 'about -£1.01');
 });
 
 /* ── meet, said ─────────────────────────────────────────────────────────── */
@@ -189,7 +189,7 @@ test('A NAME ALONE IS NOTED, and the answer says what would add them', async () 
     }).surface,
   );
   const said = await mcp.answer('meet', { name: 'Priya', where: 'a note in Lanternfish' }, { who: 'agent' });
-  assert.equal(said.text, `Noted Priya on Lanternfish; add an email or handle to add them\nReceipt: Nothing was written.`);
+  assert.equal(said.text, `Noted Priya on Lanternfish; add an email or handle to add them\nReceipt: Nobody was added to People, so there is nothing to undo.`);
 });
 
 test('GET OF A MERGED ROW ANSWERS THE ROW KEPT, saying which it was asked for', async () => {

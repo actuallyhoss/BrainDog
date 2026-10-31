@@ -140,7 +140,7 @@ import {
   type Shaped,
 } from './brief.ts';
 import { briefed, handlesIn } from './briefing.ts';
-import { actorWords, agentOf, bare, callOf, clip, closest, counted, cursorIn, cursorOut, grouped, moneyIn, runnerOf } from './words.ts';
+import { actorWords, agentOf, bare, callOf, clip, closest, counted, cursorIn, cursorOut, dayInWords, grouped, moneyIn, runnerOf } from './words.ts';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -932,6 +932,13 @@ const parse = (spoken: unknown): { register: string; seq: number } | null => {
 };
 
 const ROW_OR_ID = 'Name an item by list and number, like tasks#41, or its id, like S42.';
+
+/**
+ * A name nothing is called, said first, and what a name finds: the description promises "a name", and the sentence
+ * opened on "Name an item by list and number" as though names were not taken (audit 10k, AK21).
+ */
+const notNamed = (said: string): string =>
+  `Nothing you can read is called ${clip(said, 60)}. A name finds an item in any list when it is the item's whole title, or the one item search finds for it; search finds it by its words, or name it as tasks#41.`;
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -1731,7 +1738,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
        the first as `try`, so nothing is written to a row the agent did not mean. */
     if (!PREFIXED.test(said) && !ROW_ID.test(said)) {
       const found = await named(said, ctx, { text: false, titles: new Map() });
-      if (found === null) return badSpoken(said === '' ? ROW_OR_ID : `${ROW_OR_ID} Nothing you can read is called ${clip(said, 60)}; search finds it by its words.`);
+      if (found === null) return badSpoken(said === '' ? ROW_OR_ID : notNamed(said));
       if ('one' in found) return { ok: true, value: found.one };
       return { ok: false, refusal: ambiguous(said, found.many, asked === undefined ? undefined : callOf(asked.tool, { ...asked.args, spoken: found.many.handles[0]! })) };
     }
@@ -2162,7 +2169,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * and "the owner" otherwise. `boot.names` is the record's to give: the owner and a reader of People are told names,
    * and anybody else is told none, so a line says "Someone on this record" for them as the app does.
    */
-  const peopleOf = async (ctx: C, turn: Turn): Promise<{ names: Map<string, string>; decider: string; now: number }> => {
+  const peopleOf = async (ctx: C, turn: Turn): Promise<{ names: Map<string, string>; decider: string; now: number; run?: string; app?: string }> => {
     const boot = await bootOf(ctx, turn);
     const value = boot.ok && isObject(boot.value) ? boot.value : {};
     const names = new Map<string, string>();
@@ -2170,7 +2177,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const me = isObject(value.me) ? value.me : {};
     const mine = typeof me.name === 'string' && me.name.trim() !== '' ? me.name.trim() : typeof me.person === 'string' ? names.get(me.person) : undefined;
     const now = typeof value.now === 'string' ? Date.parse(value.now) : NaN;
-    return { names, decider: me.level === 'owner' && mine ? mine : 'the owner', now: Number.isFinite(now) ? now : Date.now() };
+    return {
+      names,
+      decider: me.level === 'owner' && mine ? mine : 'the owner',
+      now: Number.isFinite(now) ? now : Date.now(),
+      ...(typeof me.run === 'string' && RUN_HANDLE.test(me.run) ? { run: me.run } : {}),
+      ...(typeof me.app === 'string' && me.app.trim() !== '' ? { app: me.app.trim() } : {}),
+    };
   };
 
   /**
@@ -2191,17 +2204,26 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * the runs where the answer already read them, so `context` asks for its two runs once and not twice.
    */
   const lookOf = async (ctx: C, turn: Turn, wants: Done['names'] = {}, read?: Map<string, Record<string, unknown>>): Promise<Look> => {
+    const named = wants.runs !== undefined && wants.runs.length > 0;
     const [people, runs] = await Promise.all([
-      wants.people === true ? peopleOf(ctx, turn) : Promise.resolve(null),
-      read ?? (wants.runs && wants.runs.length > 0 ? runsOf(wants.runs, ctx) : Promise.resolve(new Map<string, Record<string, unknown>>())),
+      /* THE CALLER'S OWN RUN IS READ WHENEVER A RUN SIGNS A LINE, so its own write says "You" (audit 10k, AK15). */
+      wants.people === true || named ? peopleOf(ctx, turn) : Promise.resolve(null),
+      read ?? (named ? runsOf(wants.runs!, ctx) : Promise.resolve(new Map<string, Record<string, unknown>>())),
     ]);
-    const apps = new Map([...runs].map(([spoken, fields]) => [spoken, runnerOf(fields)]));
+    /* A RUN THAT KEPT NO APP IS CALLED BY ITS KEY'S, where it is the caller's own: "An agent (S6)" for a key made for Claude Code. */
+    const apps = new Map(
+      [...runs].map(([spoken, fields]) => {
+        const said = runnerOf(fields);
+        return [spoken, said.startsWith('An agent') && spoken === people?.run && people.app !== undefined ? people.app : said];
+      }),
+    );
     const names = people?.names ?? new Map<string, string>();
+    const mine = people?.run;
     return {
       now: people?.now ?? Date.now(),
       decl: (register) => decls.get(register),
       title: (spoken) => turn.titles.get(spoken),
-      actor: (by) => actorWords(by, names, apps),
+      actor: (by) => (mine !== undefined && by.trim() === mine ? 'You' : actorWords(by, names, apps)),
       decider: people?.decider ?? 'the owner',
     };
   };
@@ -2307,6 +2329,26 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         turn.titles.set(id, words ? `${clip(words, 40)} (${spoken})` : typeof one === 'string' && one !== '' ? `Untitled ${one} (${spoken})` : spoken);
       }),
     ]);
+  };
+
+  /**
+   * The questions and decisions lines of the log are about, by their own words, read once each and at most eight: what
+   * `targetSaid` says beside the handle, `"Which licence?" (SG14)`. One the caller may not read keeps its handle alone.
+   */
+  const questionsNamed = async (lines: readonly Record<string, unknown>[], ctx: C, turn: Turn): Promise<void> => {
+    const wanted = new Map<string, 'suggestion' | 'decision'>();
+    for (const e of lines) {
+      const m = typeof e.target === 'string' ? /^(suggestion|decision):([A-Z]{1,3}\d+)$/u.exec(e.target) : null;
+      if (m && !turn.titles.has(m[2]!) && wanted.size < 8) wanted.set(m[2]!, m[1] as 'suggestion' | 'decision');
+    }
+    await Promise.all(
+      [...wanted].map(async ([id, register]) => {
+        const got = await surface.governance({ register, id } as never, ctx);
+        const row = got.ok && isObject(got.value) ? got.value : null;
+        const words = row && typeof row.question === 'string' ? row.question.trim() : '';
+        if (words !== '') turn.titles.set(id, clip(words, 60));
+      }),
+    );
   };
 
   /**
@@ -2683,7 +2725,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         };
       }
       /* A NAME, WHICH IS NO HANDLE AND NO FIGURE'S SHAPE: the one thing called that, else the row forms as before. */
-      if (!FIGURE.test(said)) return (await byName(said, args, ctx, turn)) ?? { result: badSpoken(said === '' ? ROW_OR_ID : `${ROW_OR_ID} Nothing you can read is called ${clip(said, 60)}; search finds it by its words.`) };
+      if (!FIGURE.test(said)) return (await byName(said, args, ctx, turn)) ?? { result: badSpoken(said === '' ? ROW_OR_ID : notNamed(said)) };
       /**
        * A FIGURE IS READ AS `braindog:metric/<id>` READS IT, through the record's `metric`, so its answer is the record's
        * whole reading and its permission is the record's. Two currencies with no rate between them are one amount each
@@ -2875,6 +2917,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const page = out.value as Page;
       /* AND A CHANGED LINK IS SAID AS A HISTORY SAYS IT, each line by its own list. */
       if (turn.text) await handlesNamed(linksIn(page.rows.filter(isObject), (_e, i) => lists[i]), ctx, turn);
+      /* A QUESTION OR A DECISION BY ITS OWN WORDS: "settled a question · a question (SG11)" named nothing (AK15). */
+      if (turn.text) await questionsNamed(page.rows.filter(isObject), ctx, turn);
       return { result: out, say: (look) => cutSaid('activity', args, ACTIVITY_MOST, page, (p) => activityBrief(args, p, look, lists)), names: { people: peopleIn(page.rows), runs: actorsIn(page.rows) } };
     },
 
@@ -3459,6 +3503,36 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const best = closest(args.project, allowed.map((id) => ({ id })));
       return best === null ? undefined : callOf(name, { ...args, project: best });
     }
+    /* A `where` THAT ASKS FOR A VALUE THE FIELD DOES NOT HAVE, `{"field":"state","is":"started"}`: the same where with the
+       value it most likely meant (audit 10k, AK14). */
+    if (refusal.code === 'ENUM_VALUE_UNKNOWN' && allowed.length > 0 && typeof refusal.at === 'string' && isObject(args.where)) {
+      const field = refusal.at;
+      let moved = false;
+      const mend = (node: unknown): unknown => {
+        if (Array.isArray(node)) return node.map(mend);
+        if (!isObject(node)) return node;
+        if (node.field === field) {
+          const out: Record<string, unknown> = { ...node };
+          for (const k of ['is', 'eq', 'not', 'in', 'not_in']) {
+            const v = node[k];
+            const one = (x: unknown): unknown => (typeof x === 'string' && !allowed.includes(x) ? (enumMeant(x, allowed) ?? x) : x);
+            const to = Array.isArray(v) ? v.map(one) : one(v);
+            if (JSON.stringify(to) !== JSON.stringify(v)) {
+              out[k] = to;
+              moved = true;
+            }
+          }
+          return out;
+        }
+        return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, k === 'all' || k === 'any' || k === 'none' ? mend(v) : v]));
+      };
+      const where = mend(args.where);
+      return moved ? callOf(name, { ...args, where }) : undefined;
+    }
+    if (refusal.code === 'ENUM_VALUE_UNKNOWN' && name === 'propose' && refusal.at === 'body_kind' && typeof args.body_kind === 'string') {
+      const best = enumMeant(args.body_kind, [...allowed, ...(allowed.includes('widget') ? [] : ['widget'])]);
+      return best === null ? undefined : callOf(name, { ...args, body_kind: best });
+    }
     if ((refusal.code === 'FIELD_UNKNOWN' || refusal.code === 'ENUM_VALUE_UNKNOWN') && allowed.length > 0 && typeof refusal.at === 'string') {
       const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
       const fields = key === null ? null : args[key];
@@ -3470,9 +3544,38 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         return callOf(name, { ...args, [key!]: { ...rest, [best]: was } });
       }
       const value = fields[refusal.at];
-      const best = typeof value === 'string' ? closest(value, allowed.map((id) => ({ id }))) : null;
+      /* THE VALUE IT MOST LIKELY MEANT, BY SPELLING OR BY MEANING: "started" is no typo of doing, and got no try (AK14). */
+      const best = typeof value === 'string' ? enumMeant(value, allowed) : null;
       return best === null ? undefined : callOf(name, { ...args, [key!]: { ...fields, [refusal.at]: best } });
     }
+    /* A DAY SAID IN WORDS, "next friday", where a field takes one as YYYY-MM-DD: the day those words are, by the record's
+       own clock (AK14). Words it cannot read are left to the sentence. */
+    if (refusal.code === 'VALUE_MALFORMED' && typeof refusal.at === 'string' && refusal.fix.includes('takes a day, as YYYY-MM-DD')) {
+      const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
+      const fields = key === null ? null : args[key];
+      if (!isObject(fields) || typeof fields[refusal.at] !== 'string') return undefined;
+      const { now } = await peopleOf(ctx, turn);
+      const read = dayInWords(fields[refusal.at] as string, now);
+      return read === null ? undefined : callOf(name, { ...args, [key!]: { ...fields, [refusal.at]: read } });
+    }
+    /* A FIELD THE LIST NEEDS AND THE CALL LEFT OUT, when it is a choice: the call with its first value, the values named in
+       the fix (`requiredFor`). */
+    if (refusal.code === 'REQUIRED_MISSING' && typeof refusal.at === 'string' && allowed.length > 0 && (name === 'create' || name === 'triage')) {
+      const fields = isObject(args.fields) ? args.fields : {};
+      if (Object.hasOwn(fields, refusal.at)) return undefined;
+      return callOf(name, { ...args, fields: { ...fields, [refusal.at]: allowed[0]! } });
+    }
+    /* A NOTE ON A SET-ASIDE, WHICH FILES NO ROW: the same call without it. */
+    if (refusal.code === 'VALUE_MALFORMED' && name === 'triage' && (refusal.at === 'note' || refusal.at === 'fields') && Object.hasOwn(args, refusal.at)) {
+      const { [refusal.at]: _gone, ...rest } = args;
+      return callOf(name, rest);
+    }
+    /* A MEETING WITH NO WHERE: this session is where an agent met them. */
+    if (refusal.code === 'REQUIRED_MISSING' && name === 'meet' && refusal.at === 'where') return callOf(name, { ...args, where: 'this session' });
+    /* A BATCH NO WRITE WAS MADE UNDER: the changes lately, each with the batch its receipt named. */
+    if (refusal.code === 'ROW_UNKNOWN' && name === 'undo' && refusal.at === 'batch') return callOf('activity', { limit: 10, format: 'full' });
+    /* A WRITE HIS WORD CANNOT CARRY, FROM A RUN THAT READ SOMEBODY ELSE'S WORDS: the same change, asked (AK14). */
+    if (refusal.code === 'FORBIDDEN' && refusal.at === 'said' && /Ask with propose\.$/u.test(refusal.fix)) return askedCall(name, args, turn);
     if (refusal.code === 'VALUE_MALFORMED' && refusal.at === 'spoken' && typeof args.spoken === 'string') {
       const said = args.spoken.trim();
       /* THE FORMS AN AGENT GETS NEARLY RIGHT: a capital in the list, a lower-case prefix, and a bare word that is a list
@@ -3520,6 +3623,21 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if ('one' in found) return taught({ ...refusal, fix: `${refusal.fix} ${clip(value.trim(), 60)} is ${handle}.` } as Refusal, tried);
     const more = found.many.count > 5 ? ` and ${String(found.many.count - 5)} more` : '';
     return taught({ ...refusal, fix: `${refusal.fix} ${String(found.many.count)} are called ${clip(value.trim(), 60)}: ${found.many.each.join(', ')}${more}.`, allowed: found.many.handles } as Refusal, tried);
+  }
+
+  /**
+   * A field a new row needs and the call left out, when it is a choice of values: the refusal with the values said, each
+   * by its label, and as `allowed`, so `tryFor` hands the call with one. A field that is no choice stays as it came.
+   */
+  async function choiceFor(name: string, args: Args, refusal: Refusal, ctx: C): Promise<Refusal> {
+    if (refusal.code !== 'REQUIRED_MISSING' || typeof refusal.at !== 'string' || refusal.allowed !== undefined) return refusal;
+    if ((name !== 'create' && name !== 'triage') || typeof args.register !== 'string') return refusal;
+    if (!decls.has(args.register)) await learnPrefix(args.register, ctx);
+    const field = decls.get(args.register)?.fields.find((f) => f.id === refusal.at);
+    const values = field?.type === 'enum' && Array.isArray(field.values) ? field.values.filter((v): v is string => typeof v === 'string') : [];
+    if (values.length === 0) return refusal;
+    const said = values.slice(0, 12).map((v) => (field?.labels?.[v] && field.labels[v] !== v ? `${v} (${field.labels[v]})` : v));
+    return { ...refusal, fix: `${refusal.fix} It is one of ${said.join(', ')}.`, allowed: values } as Refusal;
   }
 
   /**
@@ -3624,6 +3742,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       /* A REF FIELD GIVEN A NAME: the row it names, as `try`. */
       const reffed = await refFor(name, sent, result.refusal, ctx, turn);
       if (reffed !== result.refusal) result = { ok: false, refusal: reffed };
+      /* A CHOICE THE LIST NEEDS AND THE CALL LEFT OUT, with its values named: "obligations needs direction." named none. */
+      const needed = await choiceFor(name, sent, result.refusal, ctx);
+      if (needed !== result.refusal) result = { ok: false, refusal: needed };
+      /* `widget` IS A KIND propose TAKES, answered by this door before the record's list of kinds is read (AK14). */
+      if (name === 'propose' && result.refusal.code === 'ENUM_VALUE_UNKNOWN' && result.refusal.at === 'body_kind' && Array.isArray(result.refusal.allowed) && !result.refusal.allowed.includes('widget'))
+        result = { ok: false, refusal: { ...result.refusal, allowed: [...result.refusal.allowed, 'widget'] } as Refusal };
       const fix = await tryFor(name, sent, result.refusal, ctx, turn);
       /* A `try` THAT IS THE CALL JUST MADE IS NO TRY: the instructions say never to send a call again unchanged. */
       if (fix !== undefined && fix !== callOf(name, sent) && (result.refusal as { try?: unknown }).try === undefined)
@@ -4237,7 +4361,9 @@ function receiptOf(name: string, said: string, turn: Turn, value: unknown, inTex
   const landed = ruled !== null && !('filed' in ruled);
   if (!landed && (name === 'propose' || (isObject(value) && 'filed' in value))) return `${head} Nothing was written, so there is nothing to undo.`;
   /* A NAME ALONE IS NOTED, NOT WRITTEN: `meet` says `mention` and files no question, so there is nothing to put back. */
-  if (name === 'meet' && isObject(value) && value.mention === true && value.question === undefined) return `${head} Nothing was written.`;
+  if (name === 'meet' && isObject(value) && value.mention === true && value.question === undefined) return `${head} Nobody was added to People, so there is nothing to undo.`;
+  /* TRIAGE HAS ITS OWN WAY BACK, `back` (AK23): "the owner can put it back from the app" sent the agent away from it. */
+  if (name === 'triage') return `${head} To put it back to review, call triage with the same arrival and "back": true.`;
   return `${head} No undo handle came back for this one; the owner can put it back from the app.`;
 }
 
@@ -4267,6 +4393,47 @@ function strayIn(name: string, sent: Args): { ok: false; refusal: Refusal } | nu
   const { [stray]: was, ...rest } = sent;
   const call = meant === null || Object.hasOwn(sent, meant) ? undefined : callOf(name, { ...rest, [meant]: was });
   return { ok: false, refusal: taught({ code: 'FIELD_UNKNOWN', fix: `${stray} is not something ${name} takes.`, at: stray, allowed: takes }, call) };
+}
+
+/**
+ * The value of `allowed` a word most likely meant: by spelling (`closest`), then by meaning, "started" for doing and
+ * "finished" for done, and else the first, so a refusal that lists the values always hands a call (audit 10k, AK14).
+ */
+const MEANINGS: Readonly<Record<string, readonly string[]>> = {
+  doing: ['started', 'start', 'in progress', 'in_progress', 'inprogress', 'active', 'working', 'wip', 'ongoing', 'underway', 'progress'],
+  done: ['finished', 'finish', 'complete', 'completed', 'closed', 'resolved', 'shipped', 'over'],
+  open: ['new', 'todo', 'to do', 'to_do', 'pending', 'not started', 'unstarted'],
+  backlog: ['later', 'someday', 'icebox'],
+  waiting: ['blocked', 'on hold', 'on_hold', 'held', 'paused', 'stuck'],
+  cancelled: ['canceled', 'dropped', 'abandoned', 'killed', 'wontdo'],
+  paid: ['settled', 'cleared'],
+};
+export function enumMeant(said: string, allowed: readonly string[]): string | null {
+  if (allowed.length === 0) return null;
+  const among = allowed.map((id) => ({ id }));
+  const spelt = closest(said, among);
+  if (spelt !== null) return spelt;
+  const word = said.trim().toLowerCase();
+  for (const [meant, words] of Object.entries(MEANINGS)) if (words.includes(word)) return closest(meant, among) ?? allowed[0]!;
+  return allowed[0]!;
+}
+
+/**
+ * The question a refused write would have been, as the call that asks it: a change to a row as a rowset on it, a new
+ * row as a rowset of one, with a question said in the row's words. `undefined` for a tool that writes no row.
+ */
+function askedCall(name: string, args: Args, turn: Turn): string | undefined {
+  if (name === 'update' && typeof args.spoken === 'string' && isObject(args.patch)) {
+    const title = turn.titles.get(args.spoken.trim());
+    return callOf('propose', {
+      question: `Change ${title === undefined ? 'this one' : `"${clip(title, 60)}"`}?`,
+      body_kind: 'rowset',
+      body: { rows: [{ at: args.spoken.trim(), ...(typeof args.version === 'number' ? { version: args.version } : {}), patch: args.patch }] },
+    });
+  }
+  if (name === 'create' && typeof args.register === 'string' && isObject(args.fields))
+    return callOf('propose', { question: `Add this to ${args.register}?`, body_kind: 'rowset', body: { register: args.register, rows: [args.fields] } });
+  return undefined;
 }
 
 /** A refusal with its corrected call beside it, or as it was where there is none. */

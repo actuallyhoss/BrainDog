@@ -74,7 +74,7 @@ test('every step says its list and number, and only this one takes back that row
   );
 
   const one = value(undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.b.seq } }));
-  assert.deepEqual(one.lines, ['Sets due on "Ship the beta" back to 9 Oct 2026 (now 21 Oct 2026).']);
+  assert.deepEqual(one.lines, ['Sets the due of "Ship the beta" back to 9 Oct 2026 (now 21 Oct 2026).']);
   assert.equal(one.say, 'Puts back one change.');
   assert.notEqual(one.hash, whole.hash, "the row's hash is its own");
 
@@ -93,7 +93,7 @@ test('every step says its list and number, and only this one takes back that row
 
   /* WHAT IS LEFT OF THE WRITE is the other row, and that row again is undone already. */
   const rest = value(undoPlan(r.sql, { batch: B }));
-  assert.deepEqual(rest.lines, ['Sets due on "Fix login" back to 8 Oct 2026 (now 20 Oct 2026).']);
+  assert.deepEqual(rest.lines, ['Sets the due of "Fix login" back to 8 Oct 2026 (now 20 Oct 2026).']);
   const again = value(undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.b.seq } }));
   assert.equal(again.steps.length, 0);
   assert.equal(again.already, true);
@@ -148,7 +148,7 @@ test("only this one stops the message that row queued, and leaves the rest of th
     JSON.stringify({ channel: 'call', batch: B }),
   );
   const one = value(undoPlan(r.sql, { batch: B, row: { register: 'tasks', seq: r.b.seq } }));
-  assert.deepEqual(one.lines, ['Sets due on "Ship the beta" back to 9 Oct 2026 (now 21 Oct 2026).', 'Stops a call to another app before it goes out.']);
+  assert.deepEqual(one.lines, ['Sets the due of "Ship the beta" back to 9 Oct 2026 (now 21 Oct 2026).', 'Stops a call to another app before it goes out.']);
   assert.equal(one.steps[1]!.register, undefined, 'a stopped message is no row');
   value(undoApply(r.parts, { batch: B, row: { register: 'tasks', seq: r.b.seq } }, one.hash, 'p_mara'));
   const state = (id: string): string | undefined => r.sql.one<{ state: string }>('SELECT state FROM outbox WHERE id = ?', id)?.state;

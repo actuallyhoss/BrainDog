@@ -242,6 +242,11 @@ export type ContextFacts = {
   stamp?: string | undefined;
   /** Outside any project: the projects this agent worked on last, by name. */
   recent?: readonly string[] | undefined;
+  /**
+   * The record asks this run which project it is in (`Context.ask`, an agent with no folder), in its own line naming
+   * `topic`: the card then says "No project here." and names no argument of its own (audit 10k, AK24).
+   */
+  asks?: boolean | undefined;
   /** This run's first call: the teaching lines are said, once. */
   first?: boolean | undefined;
   teach?: readonly string[] | undefined;
@@ -342,7 +347,7 @@ function otherLine(r: OtherRun): string {
 
 /** A task in the lane: its words, handle and version, its state, and whose. */
 const laneLine = (t: LaneRow): string =>
-  `${words(t.name, 70)} (${t.spoken}${typeof t.version === 'number' ? ` v${String(t.version)}` : ''})${t.state ? ` · ${words(t.state, 16)}` : ''} · ${t.mine ? 'yours' : 'free'}`;
+  `${words(t.name, 70)} (${t.spoken}${typeof t.version === 'number' ? ` v${String(t.version)}` : ''})${t.state ? ` · ${words(t.state, 16)}` : ''} · ${t.mine ? 'yours' : 'nobody has it yet'}`;
 
 /** The lane's call: the tasks handed to this kind of agent, or that nobody holds. */
 const laneCall = (list: string, agent: string | null | undefined): string =>
@@ -391,7 +396,9 @@ function planCard(f: ContextFacts, lesson: string | null, builder: boolean, clas
   const recent = (f.recent ?? []).map((r) => words(r, 30)).filter(Boolean).slice(0, 3);
   const first = who.placed
     ? who.who
-    : `${who.who.replace(/, no project yet:.*$/u, '')}. No project here.${recent.length > 0 ? ` Lately: ${and(recent)}; name one to context as project.` : ' Name it to context as project.'}`;
+    : `${who.who.replace(/, no project yet:.*$/u, '')}. No project here.${
+        f.asks === true ? (recent.length > 0 ? ` Lately: ${and(recent)}.` : '') : recent.length > 0 ? ` Lately: ${and(recent)}; name one to context as project.` : ' Name it to context as project.'
+      }`;
   const inHand = f.told.find((t) => t.taken_by && f.run && t.taken_by === f.run && t.kind !== 'stop' && t.kind !== 'pause');
   const top = f.lane.find((t) => t.mine);
   const next = inHand
@@ -667,6 +674,7 @@ export function factsFromContext(c: Context, at: FactsAt): ContextFacts {
     ...(at.since ? { since: at.since } : {}),
     ...(at.stamp ? { stamp: at.stamp } : {}),
     ...(at.recent ? { recent: at.recent } : {}),
+    ...(typeof c.ask === 'string' && c.ask !== '' ? { asks: true } : {}),
     ...(at.first !== undefined ? { first: at.first } : {}),
     ...(at.teach ? { teach: at.teach } : {}),
     ...(at.extra ? { extra: at.extra } : {}),

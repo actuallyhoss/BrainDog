@@ -75,7 +75,11 @@ const CURRENCIES: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency
 export const isCurrency = (code: unknown): code is string => typeof code === 'string' && /^[A-Z]{3}$/u.test(code) && CURRENCIES.has(code);
 
 /**
- * An amount in minor units, as a person reads it: `EGP 1,450.00`, `JPY 1,299`, `KWD 1.500`, `GBP -48.00`.
+ * An amount in minor units, as a person reads it: `£39`, `£39.50`, `-£48`, `EGP 1,450`, `JPY 1,299`, `KWD 1.500`.
+ *
+ * ONE FORM IN EVERY ANSWER (audit 10k, AK22): `context` said `£39` and `activity` `GBP 39.00` for one amount. The
+ * sign where a currency has one of its own, as the kernel's `{{short:}}` writes a message (`SIGN` in
+ * `packages/kernel/src/rules.ts`), its code where it has none, and the minor part only where it is not nought.
  *
  * DONE ON THE DIGITS, NOT BY DIVIDING, so no amount the record holds (up to 2^53 - 1 minor units) is ever rounded on
  * its way to a sentence. The minus is the plain one, because a model reads this before a person does.
@@ -95,20 +99,45 @@ export function money(minor: number, currency: string): string {
   const exp = EXPONENT[code] ?? 2;
   const digits = String(Math.abs(near)).padStart(exp + 1, '0');
   const whole = grouped(Number(digits.slice(0, digits.length - exp)));
-  const part = exp > 0 ? `.${digits.slice(digits.length - exp)}` : '';
-  const said = `${code} ${near < 0 ? '-' : ''}${whole}${part}`;
+  const fraction = exp > 0 ? digits.slice(digits.length - exp) : '';
+  const part = /[1-9]/u.test(fraction) ? `.${fraction}` : '';
+  const minus = near < 0 ? '-' : '';
+  const sign = SIGN[code];
+  const said = sign === undefined ? `${code} ${minus}${whole}${part}` : `${minus}${sign}${whole}${part}`;
   return near === minor ? said : `about ${said}`;
+}
+
+/**
+ * The currencies written by a sign, each sign one currency's alone: the kernel's table (`SIGN` in
+ * `packages/kernel/src/rules.ts`), so an answer and a message the record sends write one amount alike. Any other is
+ * written by its code, `EGP 1,450`.
+ */
+const SIGN: Readonly<Record<string, string>> = {
+  GBP: '£', EUR: '€', USD: '$', JPY: '¥', CNY: 'CN¥', INR: '₹', KRW: '₩', ILS: '₪',
+  CAD: 'CA$', AUD: 'A$', NZD: 'NZ$', HKD: 'HK$', SGD: 'S$', MXN: 'MX$', BRL: 'R$',
+};
+
+/**
+ * An amount written into a sentence by its code, said as `money` says one: "Pay GBP 39.00?" is "Pay £39?", as the
+ * context card says it (`moneyPlain` in `packages/record/src/card.ts`). A code with no sign is left as written, so three
+ * capitals that are no currency are never touched.
+ */
+export function moneyInText(text: string): string {
+  return text.replace(/\b([A-Z]{3}) ([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,3}))?(?![\d.,]*\d)/gu, (whole, code: string, minus: string, units: string, minor: string | undefined) => {
+    const sign = SIGN[code];
+    if (sign === undefined) return whole;
+    return `${minus === '' ? '' : '-'}${sign}${units}${minor !== undefined && /[1-9]/u.test(minor) ? `.${minor}` : ''}`;
+  });
 }
 
 /** A money value as the record stores one, `{ amount, currency }`, or `null` for anything else. */
 export const moneyIn = (value: unknown): { amount: number; currency: string } | null =>
   isObject(value) && typeof value.amount === 'number' && isCurrency(value.currency) ? { amount: value.amount, currency: value.currency } : null;
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * A calendar day as a person says it: `Fri 4 Oct`, and the year only when it is not this one.
+ * A calendar day as a person says it: `4 Oct`, and the year only when it is not this one.
  *
  * A DAY IS NOT AN INSTANT, so it is read from its own digits and never shifted by a zone: the 4th is the 4th wherever
  * it is read.
@@ -117,9 +146,59 @@ export function day(said: string, now: number): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(said);
   if (!m) return said;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const weekday = DAYS[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()] ?? '';
+  /* `29 Oct`, AS EVERY ANSWER AND THE APP SAY A DAY (AK22): `Tue 8 Sep` here and `8 Sep 2026` in an undo were one day. */
   const year = new Date(now).getUTCFullYear() === y ? '' : ` ${String(y)}`;
-  return `${weekday} ${String(d)} ${MONTHS[mo - 1] ?? ''}${year}`.trim();
+  return `${String(d)} ${MONTHS[mo - 1] ?? ''}${year}`.trim();
+}
+
+/**
+ * A day said in words, as YYYY-MM-DD beside `now`, or `null` for words this does not read: today, tomorrow, yesterday,
+ * a weekday ("friday", "next friday", the coming one), "in 3 days", "next week", "29 Oct", "October 29 2026",
+ * "29/10/2026", and an instant's own day. What a refusal's `try` hands an agent that sent `by: "next friday"` (AK14).
+ */
+export function dayInWords(said: string, now: number): string | null {
+  const w = said.trim().toLowerCase().replace(/[.,]/gu, ' ').replace(/\s+/gu, ' ').trim();
+  const base = new Date(now);
+  const today = Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate());
+  const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+  const DAY_MS = 86_400_000;
+  const instant = /^(\d{4}-\d{2}-\d{2})t/u.exec(w);
+  if (instant) return instant[1]!;
+  if (w === 'today' || w === 'now') return iso(today);
+  if (w === 'tomorrow') return iso(today + DAY_MS);
+  if (w === 'yesterday') return iso(today - DAY_MS);
+  if (w === 'next week') return iso(today + 7 * DAY_MS);
+  const ahead = /^in (\d{1,3}) (day|days|week|weeks)$/u.exec(w);
+  if (ahead) return iso(today + Number(ahead[1]) * (ahead[2]!.startsWith('week') ? 7 : 1) * DAY_MS);
+  const WEEK = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const weekday = /^(?:(next|this|on|coming) )?([a-z]+)$/u.exec(w);
+  if (weekday) {
+    const at = WEEK.findIndex((d) => d === weekday[2] || (weekday[2]!.length >= 3 && d.startsWith(weekday[2]!)));
+    if (at >= 0) {
+      const gap = (at - new Date(today).getUTCDay() + 7) % 7 || 7;
+      return iso(today + gap * DAY_MS);
+    }
+  }
+  const month = (m: string): number => MONTHS.findIndex((x) => m.startsWith(x.toLowerCase()));
+  const real = (y: number, mo: number, d: number): string | null => {
+    const at = new Date(Date.UTC(y, mo, d));
+    return at.getUTCFullYear() === y && at.getUTCMonth() === mo && at.getUTCDate() === d ? iso(at.getTime()) : null;
+  };
+  const dm = /^(\d{1,2}) ([a-z]{3,9})(?: (\d{4}))?$/u.exec(w) ?? null;
+  const md = /^([a-z]{3,9}) (\d{1,2})(?: (\d{4}))?$/u.exec(w) ?? null;
+  const named = dm ? { d: Number(dm[1]), m: month(dm[2]!), y: dm[3] } : md ? { d: Number(md[2]), m: month(md[1]!), y: md[3] } : null;
+  if (named && named.m >= 0) {
+    const y = named.y === undefined ? base.getUTCFullYear() : Number(named.y);
+    const day = real(y, named.m, named.d);
+    /* A DAY WITH NO YEAR THAT HAS GONE BY THIS YEAR IS NEXT YEAR'S, as a person means "3 Jan" said in December. */
+    if (day !== null && named.y === undefined && day < iso(today)) return real(y + 1, named.m, named.d);
+    return day;
+  }
+  const slashed = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/u.exec(w);
+  if (slashed) return real(Number(slashed[3]), Number(slashed[2]) - 1, Number(slashed[1]));
+  const ymd = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/u.exec(w);
+  if (ymd) return real(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+  return null;
 }
 
 /** How long ago `seconds` was, the short way: `just now`, `12m ago`, `5h ago`, `3d ago`. */

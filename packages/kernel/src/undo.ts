@@ -427,6 +427,8 @@ function whoOf(sql: Sql, actor: string): string {
     return typeof agent === 'string' && agent !== 'other' && agent !== '' ? spaced(agent) : 'An agent';
   }
   if (actor === SLASH) return 'Slash';
+  /* AN AGENT'S KEY UNDOING ITS OWN WRITE was "Someone undid this" (audit 10k, AK15). */
+  if (actor.startsWith('t_') || actor.startsWith('agent:')) return 'An agent';
   if (actor === 'rule:ladder' || actor === 'rule:additive' || actor === 'rule:update' || actor === 'rule:handled' || actor === 'system') return 'BrainDog';
   if (actor.startsWith('rule:')) return 'A rule';
   if (actor.startsWith('ingest:')) return 'An import';
@@ -866,8 +868,9 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
           : field === decl.state
             ? `Moves ${named(title)} back to ${was} (now ${now}).`
             : from === null
-              ? `Clears ${label} on ${named(title)} (now ${now}).`
-              : `Sets ${label} on ${named(title)} back to ${was} (now ${now}).`;
+              ? `Clears the ${label} of ${named(title)} (now ${now}).`
+              : /* "Sets due on "Ship" back to" READ AS A DAY AND A FIELD RUN TOGETHER (audit 10k, AK22). */
+                `Sets the ${label} of ${named(title)} back to ${was} (now ${now}).`;
       step({ do: 'set', label, ...(was === null ? {} : { from: was }), ...(now === null ? {} : { to: now }), line }, valued);
     }
     if (w.restore || Object.keys(w.patch).length > 0) work.push(w);
@@ -1530,7 +1533,9 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
  * the rows), and otherwise whoever wrote its first line.
  */
 function makerOf(sql: Sql, key: string, lines: readonly Line[]): string | null {
-  const resolved = lines.find((l) => keyOf(l) === key && l.kind === 'resolve' && l.target?.startsWith('suggestion:'));
+  /* NOT A QUESTION CLOSED AS MOOT BESIDE IT, such as the mail door's own question a filing settles: that one was not
+     the answer, and its asker did not make the batch. */
+  const resolved = lines.find((l) => keyOf(l) === key && l.kind === 'resolve' && l.to_v !== 'moot' && l.target?.startsWith('suggestion:'));
   if (resolved) {
     const by = sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', resolved.target!.slice('suggestion:'.length))?.by;
     if (by) return by;

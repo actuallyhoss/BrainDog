@@ -117,10 +117,10 @@ test('MOVES IS SAID ONE CURRENCY AT A TIME, and two currencies are never added',
       { amount: -798, currency: 'GBP' },
       { amount: 700, currency: 'USD' },
     ]),
-    'Moves GBP -17.98 and USD 7.00',
+    'Moves -£17.98 and $7',
   );
   /* A PAYMENT OUT AND A REFUND IN ARE TWO MOVEMENTS, never netted to less. */
-  assert.equal(movesSaid([{ amount: -1000, currency: 'GBP' }, { amount: 400, currency: 'GBP' }]), 'Moves GBP 14.00');
+  assert.equal(movesSaid([{ amount: -1000, currency: 'GBP' }, { amount: 400, currency: 'GBP' }]), 'Moves £14');
   assert.equal(movesSaid({ amount: 1500, currency: 'JPY' }), 'Moves JPY 1,500');
   /* AN AMOUNT ON A ROW ACCEPTING ADDS IS RECORDED: a bank text added to the Ledger moves no money (20 Oct). */
   assert.equal(movesSaid({ amount: 3462000, currency: 'EGP' }, true), 'Records EGP 34,620.00');
@@ -143,7 +143,7 @@ test('CHANGES IS SAID BY LABEL, from what it holds to what it will, the first th
       ],
       look,
     ),
-    'Changes Status from open to paid; Amount from nothing to GBP 12.00; Due on from 2026-10-01 to 2026-10-08 and 1 more change',
+    'Changes Status from open to paid; Amount from nothing to £12; Due on from 1 Oct to 8 Oct and 1 more change',
   );
   assert.equal(changesSaid(undefined, look), null);
   assert.equal(changesSaid([{ field: 'payee', before: null, after: '01M345FTM0D4F495AW6K6NDA06' }], look), null);
@@ -160,7 +160,7 @@ test('A PROPOSAL\'S ANSWER SAYS WHAT IT MOVES AND CHANGES between the question a
     proposedBrief(filed, 'Pay the studio rent?', look),
     [
       'Asked Mara: Pay the studio rent? (SG9)',
-      'Moves GBP -17.98',
+      'Moves -£17.98',
       'Changes Status from open to paid',
       'Mara decides in BrainDog at https://brain.dog/mara/decide/SG9.',
     ].join('\n'),
