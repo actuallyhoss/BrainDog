@@ -132,7 +132,17 @@ export function withOrder(carried: readonly string[], arrangement: readonly stri
  * One row of the flat nav: where it goes, what it says, its glyph, a count when it carries one, and the addresses that
  * mean "you are here" on it (`near`), each compared as itself or anything under it (`exact` for Today's `/`).
  */
-export type FlatItem = { key: string; href: string; label: string; icon: string; count?: number; near: readonly string[]; exact?: true };
+export type FlatItem = {
+  key: string;
+  href: string;
+  label: string;
+  icon: string;
+  count?: number;
+  near: readonly string[];
+  exact?: true;
+  /** Where the section sits on the rail, the lowest its pages declare (`nav.place`), when one does. */
+  place?: number;
+};
 
 /** The words the fixed rows say, handed in so this module stays pure and the words stay in `copy`. */
 export type FlatWords = { today: string; activity: string; decide: string };
@@ -170,9 +180,10 @@ function leadOf<T extends { title: string; row?: boolean | undefined }>(entries:
    rail's Projects is the same picture on every record. Any other section wears its lead page's glyph. */
 const SECTION_ICONS: Readonly<Record<string, string>> = { projects: 'projects', work: 'work' };
 
-function sectionItem<T extends { href: string; icon: string }>(section: string, lead: T, entries: readonly T[]): FlatItem {
+function sectionItem<T extends { href: string; icon: string; place?: number | undefined }>(section: string, lead: T, entries: readonly T[]): FlatItem {
   const icon = SECTION_ICONS[plainOf(section)] ?? lead.icon;
-  return { key: `section:${section}`, href: lead.href, label: section, icon, near: entries.map((e) => e.href) };
+  const places = entries.flatMap((e) => (typeof e.place === 'number' ? [e.place] : []));
+  return { key: `section:${section}`, href: lead.href, label: section, icon, near: entries.map((e) => e.href), ...(places.length > 0 ? { place: Math.min(...places) } : {}) };
 }
 
 /**
@@ -279,6 +290,9 @@ export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): bo
  */
 const FIVE = PLACES.filter((name) => name !== 'work' && name !== 'people');
 
+/** Where each of the five sits when its pages declare no place, the numbers their own modules declare. */
+const FIVE_AT: Readonly<Record<string, number>> = { orders: 20, shop: 20, projects: 30, money: 40, agents: 60 };
+
 /** A place's plain name, its section's or its own key's. */
 const placeName = (i: FlatItem): string => plainOf(i.key.replace(/^section:/u, ''));
 
@@ -296,7 +310,15 @@ export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly str
   const rest = main.filter((i) => i !== decide && i.key !== 'activity');
   const [lead, ...tail] = rest;
   if (lead === undefined) return [];
-  const named = FIVE.flatMap((name) => tail.filter((i) => placeName(i) === name));
+  /* A STARTER'S OWN PLACE IS ON THE BAR AS IT IS ON THE RAIL (audit 31 Oct h, AH13 and FB4): Products, Goals, Studies, a
+     team's Sprints and a founder's Dashboard declare where they sit (`nav.place`, before Projects), and ranked after the
+     five they fell into Menu while the rail drew them. Each of the five and each such place goes by that number, a
+     place that says none by where the five put it. */
+  const own = tail.filter((i) => !PLACES.includes(placeName(i)) && typeof i.place === 'number');
+  const named = [...FIVE.flatMap((name) => tail.filter((i) => placeName(i) === name)), ...own]
+    .map((item, i) => ({ item, at: item.place ?? FIVE_AT[placeName(item)] ?? 100, i }))
+    .sort((a, b) => a.at - b.at || a.i - b.i)
+    .map((x) => x.item);
   const others = tail.filter((i) => !named.includes(i));
   return [lead, ...(decide ? [decide] : []), ...named, ...others].slice(0, most);
 }

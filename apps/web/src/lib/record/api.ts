@@ -1470,6 +1470,8 @@ export type NavEntry = {
   href: string;
   section: string;
   order: number;
+  /** Where its section sits on the rail, as the page declares it (`nav.place`), lowest first; most pages say nothing. */
+  place?: number | undefined;
   icon: IconName;
   /** The frozen hue of the row this page is about, when it is about one. */
   hue?: number | undefined;
