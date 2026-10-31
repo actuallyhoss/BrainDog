@@ -27,6 +27,7 @@
 import { exponentOf, money } from 'braindog-render';
 
 import { homeCurrency } from '../record/api.ts';
+import { CODES, FIGURE, SYMBOLS, bareDollar, codeOf, minorOf, numberOf } from '../record/currency-words.ts';
 import { symbolText } from '../record/money.ts';
 import type { FieldDecl, MoneyValue } from '../record/schema.ts';
 import { GREETINGS, PEOPLE, hear } from '../who.ts';
@@ -222,91 +223,25 @@ function takeDay(text: string, today: string): { day: string | null; rest: strin
   if (!m || day === null) return { day: null, rest: text, gone: null };
   const nth = /^the (\d{1,2})/.exec(phrase);
   /* A month's day to come is last year's when it is read for something done: "charged on 14 Nov" in October is gone. */
-  const named = /[a-z]{3}/.test(phrase) && /\d/.test(phrase) && !phrase.startsWith('in ');
+  /* AND SO IS A SLASHED DAY WITH NO YEAR (RG9): "on 30/10" read on 31 Oct is yesterday, never next October. */
+  const named = (/[a-z]{3}/.test(phrase) && /\d/.test(phrase) && !phrase.startsWith('in ')) || /^\d{1,2}\/\d{1,2}$/.test(phrase);
   const gone = day <= today ? day : WEEKDAYS[phrase] !== undefined ? addDays(day, -7) : nth ? dayOfMonthGone(Number(nth[1]), today) : named ? `${Number(day.slice(0, 4)) - 1}${day.slice(4)}` : day;
   return { day, rest: oneLine(`${text.slice(0, m.index)} ${text.slice(m.index + m[0].length)}`), gone };
 }
 
 /* ── amounts ──────────────────────────────────────────────────────────── */
 
-const NUM = '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)(\\s?k\\b)?';
-/* A word that is a family of currencies: it takes the record's own when the record's is one of them, and is a question
-   otherwise, because "900 pounds" on a dollar record is sterling or Egyptian and a guess would be written into money. */
-const CODES = new Set(Intl.supportedValuesOf('currency'));
-/** A currency's sign as the runtime writes it in English, `symbol` (`CA$`) or `narrowSymbol` (`$`). */
-const signOf = (code: string, display: 'symbol' | 'narrowSymbol'): string =>
-  new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay: display }).formatToParts(1).find((p) => p.type === 'currency')?.value ?? code;
-/* A BARE "$" IS A DOLLAR, and which one is the record's (ruling 438): every currency whose narrow sign is "$", read off
-   the runtime, so no list of them is typed here. On a record kept in one of them it is that one; anywhere else it is
-   unsure, and asked, never written as US dollars. */
-const DOLLAR_HOMES = new Set([...CODES].filter((c) => signOf(c, 'narrowSymbol') === '$'));
-const bareDollar = (record: string | null): string | null => (record !== null && DOLLAR_HOMES.has(record) ? record : null);
-/* EVERY OTHER SIGN THAT IS ONE CURRENCY'S ALONE, off the runtime too: `£` is sterling's own sign, `E£` the Egyptian
-   pound's narrow one. A sign two currencies share is no currency, and the spellings people type that the runtime does not
-   write (`US$`, `C$`) are said here. */
-const SYMBOLS: Record<string, string> = (() => {
-  const by = new Map<string, Set<string>>();
-  for (const display of ['symbol', 'narrowSymbol'] as const)
-    for (const c of CODES) {
-      const sign = signOf(c, display);
-      if (sign === c || /^[A-Za-z]+$/u.test(sign) || sign === '$') continue;
-      if (display === 'narrowSymbol' && by.has(sign) && !by.get(sign)!.has(c)) continue;
-      by.set(sign, new Set([...(by.get(sign) ?? []), c]));
-    }
-  const one = Object.fromEntries([...by].flatMap(([sign, codes]) => (codes.size === 1 ? [[sign, [...codes][0]!]] : [])));
-  return { ...one, US$: 'USD', C$: 'CAD', A$: 'AUD', NZ$: 'NZD' };
-})();
-/* L.E., the pound written on a shop's sign there, is the currency whose narrow sign is E£. */
-const LIVRE = [...CODES].find((c) => signOf(c, 'narrowSymbol') === 'E£') ?? null;
-/* A word that is one currency wherever it is said. */
-const WORD_CODES: Record<string, string> = {
-  euro: 'EUR',
-  euros: 'EUR',
-  sterling: 'GBP',
-  quid: 'GBP',
-  ...(LIVRE === null ? {} : { le: LIVRE, 'l.e.': LIVRE, 'l.e': LIVRE }),
-};
-/* EACH FAMILY IS READ OFF THE RUNTIME'S OWN NAMES (`Intl.DisplayNames`), every tender code whose English name ends in
-   the word: the runtime says what currencies there are (02 §3 rule 1), so no list of codes is typed here. */
-const CURRENCY_NAMES = new Intl.DisplayNames('en', { type: 'currency' });
-const endingIn = (word: string): string[] => [...CODES].filter((c) => new RegExp(`\\b${word}$`, 'iu').test(CURRENCY_NAMES.of(c) ?? ''));
-const FAMILIES: Record<string, readonly string[]> = {
-  pound: endingIn('pound'),
-  dollar: endingIn('dollar'),
-  dirham: endingIn('dirham'),
-  riyal: endingIn('ri(?:y)?al'),
-  dinar: endingIn('dinar'),
-  rupee: endingIn('rupee'),
-};
-const FAMILY_WORD = /^(pound|dollar|buck|dirham|riyal|rial|dinar|rupee)s?$/i;
-const FAMILY_OF: Record<string, string> = { buck: 'dollar', rial: 'riyal' };
-/* Lower-case codes read only where they are plainly money; `try`, `top`, `all` and `cup` are currencies and words. */
-const SAFE_LOWER = new Set(['usd', 'eur', 'gbp', 'aed', 'sar', 'qar', 'kwd', 'jod', 'cad', 'aud', 'chf', 'inr']);
+/* A FIGURE AS TYPED, in any digits and grouping (`FIGURE`), read by the one money reader (`minorOf`, RG8). */
+const NUM = `(${FIGURE})(\\s?k\\b)?`;
 
 const AMOUNT = new RegExp(
-  `(US\\$|A\\$|C\\$|NZ\\$|E£|£|€|\\$)\\s?${NUM}` +
+  `(US\\$|A\\$|C\\$|NZ\\$|E£|£|€|¥|₹|\\$)\\s?${NUM}` +
     `|\\b([A-Za-z]{3})\\s?${NUM}` +
-    `|${NUM}(?:\\s?(E£|£|€|\\$|l\\.e\\.?|le\\b|[A-Za-z]{3}\\b|euros?\\b|sterling\\b|quid\\b|(?:pound|dollar|buck|dirham|riyal|rial|dinar|rupee)s?\\b))?`,
+    `|${NUM}(?:\\s?(E£|£|€|¥|₹|\\$|l\\.e\\.?|le\\b|[A-Za-z]{3}\\b|euros?\\b|sterling\\b|quid\\b|(?:pound|dollar|buck|dirham|riyal|rial|dinar|rupee)s?\\b))?`,
   'giu',
 );
 
 type Amount = { at: number; text: string; digits: string; thousand: boolean; currency: string | null; word: string | null };
-
-/** The code a word after or before a figure names, `null` for no currency word, or `undefined` for a word it is not. */
-function codeOf(word: string, record: string | null): string | null | undefined {
-  if (word === '$') return bareDollar(record);
-  const w = word.toLowerCase();
-  if (SYMBOLS[word]) return SYMBOLS[word]!;
-  if (WORD_CODES[w]) return WORD_CODES[w]!;
-  if (/^[A-Z]{3}$/.test(word) && CODES.has(word)) return word;
-  if (SAFE_LOWER.has(w) || (record && w === record.toLowerCase())) return w.toUpperCase();
-  const family = FAMILY_WORD.exec(w)?.[1];
-  if (family) {
-    const named = FAMILIES[FAMILY_OF[family] ?? family] ?? [];
-    return record && named.includes(record) ? record : null;
-  }
-  return undefined;
-}
 
 /** Every figure in a stretch of words, with the currency typed beside it. A bare count before a word is still read. */
 function amountsIn(text: string, record: string | null): Amount[] {
@@ -317,7 +252,7 @@ function amountsIn(text: string, record: string | null): Amount[] {
       /* A CODE WRITTEN BESIDE A BARE "$" SAYS WHICH DOLLAR, or that it is no dollar: "$12 EGP" and "EGP $12" are EGP 12. */
       const written = m[1] === '$' ? (/^\s?([A-Za-z]{3})\b/u.exec(text.slice(at + m[0].length))?.[1] ?? /\b([A-Za-z]{3})\s?$/u.exec(text.slice(0, at))?.[1]) : undefined;
       const code = written !== undefined && CODES.has(written.toUpperCase()) ? written.toUpperCase() : null;
-      out.push({ at, text: m[0], digits: m[2]!, thousand: Boolean(m[3]), currency: code ?? (m[1] === '$' ? bareDollar(record) : (SYMBOLS[m[1]] ?? null)), word: m[1] });
+      out.push({ at, text: m[0], digits: m[2]!, thousand: Boolean(m[3]), currency: code ?? codeOf(m[1], record) ?? null, word: m[1] });
     }
     else if (m[4]) {
       const code = codeOf(m[4], record);
@@ -327,7 +262,7 @@ function amountsIn(text: string, record: string | null): Amount[] {
         /* "PAID OUT 1,950 USD": the three letters before the figure were a word, and the code typed after it is still
            the currency (founder audit AH2, where the record's own was written in its place). */
         const digitsAt = m[0].search(/\d/);
-        const after = /^\s?(E£|£|€|[A-Za-z]{3}\b|euros?\b|sterling\b|quid\b|(?:pound|dollar|buck|dirham|riyal|rial|dinar|rupee)s?\b)/u.exec(text.slice(at + m[0].length));
+        const after = /^\s?(E£|£|€|¥|₹|[A-Za-z]{3}\b|euros?\b|sterling\b|quid\b|(?:pound|dollar|buck|dirham|riyal|rial|dinar|rupee)s?\b)/u.exec(text.slice(at + m[0].length));
         const code = after ? codeOf(after[1]!, record) : undefined;
         if (after && code !== undefined)
           out.push({ at: at + digitsAt, text: m[0].slice(digitsAt) + after[0], digits: m[5]!, thousand: Boolean(m[6]), currency: code, word: after[1]! });
@@ -345,14 +280,8 @@ function amountsIn(text: string, record: string | null): Amount[] {
   return out;
 }
 
-/** Minor units, or `null` for more decimal places than the currency has. */
-function minor(a: Amount, currency: string): number | null {
-  const plain = a.digits.replace(/,/g, '');
-  const exp = exponentOf(currency);
-  if (!a.thousand && (plain.split('.')[1]?.length ?? 0) > exp) return null;
-  const out = Math.round(Number(plain) * (a.thousand ? 1000 : 1) * 10 ** exp);
-  return Number.isSafeInteger(out) && out > 0 ? out : null;
-}
+/** Minor units, or `null` for more decimal places than the currency has or a grouping it does not print. */
+const minor = (a: Amount, currency: string): number | null => minorOf(a.digits, currency, a.thousand);
 
 /* ── names ────────────────────────────────────────────────────────────── */
 
@@ -528,6 +457,8 @@ const SPAN = /\b(?:this|last) (?:month|week|year|quarter)\b|\btoday\b|\bso far\b
 const PAY = /^(?:(?:i|we)\s+(?:need to|have to|must)\s+)?(?:pay|paying)\s+(?:the\s+|my\s+|our\s+)?/iu;
 const INVOICE = new RegExp(`^(?:[Ii]nvoice|[Bb]ill|[Cc]harge)\\s+(${NAME})(?=\\s|$)\\s*`, 'u');
 const BILL_WORD = /\b(?:bill|subscription|membership|rent|fees?|insurance|loan|tuition|invoice|instal(?:l)?ment|premium)\b/iu;
+/* What a bill is for, said as the first word of "Rent paid 12000": a bill word or a thing a household pays for, never anybody. */
+const THING_PAID = new RegExp(`^(?:${BILL_WORD.source.slice(2, -2)}|electricity|electric|water|gas|internet|wifi|broadband|phone|mobile|groceries|petrol|fuel|parking|school|gym|netflix|spotify)\\b`, 'iu');
 const EVERY = /\b(?:a|per|each|every)\s+(month|year|quarter|week)\b|\b(monthly|yearly|annually|quarterly|weekly)\b/iu;
 const EVERY_SAID: Record<string, string> = { monthly: 'month', yearly: 'year', quarterly: 'quarter', weekly: 'week' };
 const REPEATS: Record<string, string> = { month: 'monthly', monthly: 'monthly', year: 'yearly', yearly: 'yearly', annually: 'yearly', quarter: 'quarterly', quarterly: 'quarterly', week: 'weekly', weekly: 'weekly' };
@@ -555,10 +486,23 @@ const ASSIGN = new RegExp(`(?:^|[\\s,;])(?:[Aa]ssign(?:ed)?|[Gg]ive it)\\s+(?:it
 const BANKISH = /\b(?:debited|credited|charged|purchase|withdrawn|withdrawal|deposited|avl\.? ?bal|available balance|card ending|card no|a\/c|acct)\b/iu;
 /* The words only a bank prints. With none of them, a sentence that says "purchase" is read as a sentence. */
 const BANK_ONLY = /\b(?:debited|credited|avl\.? ?bal|available balance|card ending|card no|a\/c|acct)\b/iu;
-const BANK_IN = /\b(?:credited|deposited|received|refund(?:ed)?|incoming)\b/iu;
-const BANK_OUT = /\b(?:debited|charged|purchase|withdrawn|withdrawal|spent)\b/iu;
-const BALANCE_BEFORE = /\b(?:bal(?:ance)?|limit)\b[\s:.]*$/iu;
-const PAYEE = /\b(?:at|to|from)\s+(.+?)(?=\s+on\s|\s+using\s|\s+with\s|\s+via\s|\s+ref\b|\.\s|\.$|,|;|$)/iu;
+/* WHICH WAY A BANK'S TEXT MOVED THE MONEY (RG4). A refund or a reversal is money back, whatever else it names ("Refund
+   of EGP 500 credited to your card for your purchase at Amazon"). Then money taken from the account is out, even when
+   it is credited to somebody else ("debited from a/c XX12 and credited to Ahmed"). Then money put in is in ("EGP 500
+   transferred to your a/c from Ahmed"). A text that says neither is a card payment, out. */
+const BANK_BACK = /\b(?:refund(?:ed)?|reversal|reversed|cashback)\b/iu;
+const BANK_TAKEN = /\b(?:debited|withdrawn|withdrawal)\b/iu;
+const BANK_IN = /\b(?:credited|deposited|received|incoming)\b|\btransferred to your\b|\bto your (?:a\/c|acct|account)\b/iu;
+const bankInto = (text: string): boolean => BANK_BACK.test(text) || (!BANK_TAKEN.test(text) && BANK_IN.test(text));
+/* A BALANCE OR A LIMIT IS NO AMOUNT THAT MOVED (RG5): a figure after its word, joining words and all ("available balance
+   is EGP 12,000.00", "Avl Bal after txn: EGP 3,200"), and every figure after the first such word, is not the one kept. */
+const BALANCE_WORD = /\b(?:bal(?:ance)?|limit|lmt)\b/iu;
+const BALANCE_BEFORE = /\b(?:bal(?:ance)?|limit|lmt)\b(?:[\s:.=-]|\b(?:is|of|now|was|after|txn|transaction)\b)*$/iu;
+/* Who the money went to or came from, never the reader's own card or account. */
+const PAYEE_END = '(?=\\s+on\\s|\\s+using\\s|\\s+with\\s|\\s+via\\s|\\s+ref\\b|\\s+for\\s|\\s+card\\b|\\.\\s|\\.$|,|;|$)';
+const NOT_THEM = '(?!(?:your|you|a\\/c|acct|account|card)\\b)';
+const PAYEE = new RegExp(`\\b(?:at|to|from)\\s+${NOT_THEM}(.+?)${PAYEE_END}`, 'iu');
+const PAYER = new RegExp(`\\bfrom\\s+${NOT_THEM}(.+?)${PAYEE_END}`, 'iu');
 
 /** "CARREFOUR MAADI" as a person writes it: "Carrefour Maadi". Mixed case is kept as typed. */
 const titled = (s: string): string => (/\p{Ll}/u.test(s) ? s : s.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase()));
@@ -674,7 +618,15 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     let someone = false;
     const opener = SUBJECT.exec(c);
     const after = opener ? c.slice(opener[0].length).trim() : '';
-    if (opener && aName(opener[1]!) && (acts(after) || PAYOUT.test(after))) {
+    /* A BILL OR A THING PAID IS NOBODY (RG6). A phone gives the first word its capital, so "Rent paid 12000" and
+       "Electricity paid 850" opened on a "person" who paid 12,000 in. It is money out, for the rent. */
+    if (opener && !knownAs(opener[1]!, opts.people ?? []) && THING_PAID.test(opener[1]!) && PAID.test(after)) {
+      if (readMoney(`${after} ${opener[1]!}`, null, false)) placed = true;
+      else left.push(whole);
+      continue;
+    }
+    const opened = opener !== null && aName(opener[1]!) && (acts(after) || PAYOUT.test(after));
+    if (opened) {
       subject = opener[1]!;
       c = after;
     } else if (PRONOUN.test(c) && acts(c.replace(PRONOUN, ''))) {
@@ -688,8 +640,15 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        when none is written, so the Orders page can say who still owes. A clause with anything else in it is not this. */
     if (!self && !acts(c) && totalOf(c)) continue;
     /* A PAYOUT names who paid it, and makes nobody (AH2: Stripe was "a client, new in People"). */
+    /* "PAID OUT" WITH NOBODY NAMED IS MONEY OUT (RG16): "Paid out 300 to the cleaner" went to the cleaner. A payout is
+       one a platform named in the clause paid, or one called a payout. */
+    if (PAYOUT.test(c) && !opened && !/^payout\b/iu.test(c)) {
+      if (readMoney(c.replace(PAYOUT, 'paid ').replace(/^paid\s+(.*?)\s+to\s+/iu, 'paid $1 for '), null, false)) placed = true;
+      else left.push(whole);
+      continue;
+    }
     if (PAYOUT.test(c)) {
-      if (payout(c.replace(PAYOUT, ''), subject)) continue;
+      if (payout(c.replace(PAYOUT, ''), opened ? subject : null)) continue;
       left.push(whole);
       continue;
     }
@@ -893,8 +852,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       shown = spelled(amount, currency);
     } else {
       const value = l.fields.find((f) => f.type === 'decimal');
-      const n = Number(a.digits.replace(/,/g, '')) * (a.thousand ? 1000 : 1);
-      if (!value || !Number.isFinite(n) || (a.word !== null && currency === null)) return false;
+      const n = numberOf(a.digits, a.thousand);
+      if (!value || n === null || (a.word !== null && currency === null)) return false;
       fields[value.id] = n;
       shown = n.toLocaleString('en-GB');
     }
@@ -1055,7 +1014,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   function bankText(whole: string): boolean {
     const found = amountsIn(whole, opts.currency);
     if (found.length === 0) return false;
-    const named = found.filter((a) => a.word !== null && a.currency !== null && !BALANCE_BEFORE.test(whole.slice(Math.max(0, a.at - 24), a.at)));
+    const balanceAt = BALANCE_WORD.exec(whole)?.index ?? Infinity;
+    const named = found.filter((a) => a.word !== null && a.currency !== null && a.at < balanceAt && !BALANCE_BEFORE.test(whole.slice(Math.max(0, a.at - 40), a.at)));
     const a = named[0];
     if (!a) {
       if (!BANK_ONLY.test(whole)) return false;
@@ -1065,9 +1025,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const currency = a.currency!;
     const amount = minor(a, currency);
     if (amount === null) return false;
-    const into = BANK_IN.test(whole) && !BANK_OUT.test(whole);
+    const into = bankInto(whole);
     const after = whole.slice(a.at + a.text.length);
-    const payee = PAYEE.exec(after)?.[1]?.trim().replace(/[.,;:]+$/u, '');
+    const payee = ((into ? PAYER.exec(after) : null) ?? PAYEE.exec(after))?.[1]?.trim().replace(/[.,;:]+$/u, '');
     const shown = payee ? titled(payee) : null;
     const { gone } = takeDay(after, opts.today);
     if (!keepMoney({
