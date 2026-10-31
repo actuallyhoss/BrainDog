@@ -181,6 +181,42 @@ function listLine(a: AutomationRow, named: Named = asIs): string {
   return `  ${said.join(' ')}`;
 }
 
+/** Whether an automation needs a look: it is on and its last run failed. One turned off, or never run, is counted with the rest. */
+const needsLook = (a: AutomationRow): boolean => a.enabled && a.last?.state === 'failed';
+
+/** Whether an automation has never fired: the record's count where it keeps one, else no run kept. */
+const neverRan = (a: AutomationRow): boolean => (typeof a.fired === 'number' ? a.fired <= 0 : a.last === null);
+
+/**
+ * WHAT `list` PRINTS, SHORT ENOUGH FOR A PHONE (audit 31 Oct k, AK25), as `signs` is: the automations that need a look,
+ * each on its line, then one line counting the rest. Forty lines, most of them "Has not run yet. No entry has been added
+ * to … since it was turned on.", hid the one that failed. `all` says every one, as it always did.
+ */
+export function listLines(rows: readonly AutomationRow[], named: Named = asIs, all = false): string[] {
+  if (rows.length === 0) return ['No automation you can read is set up on this BrainDog.'];
+  if (all) return ['Automations on this BrainDog, each with the name braindog automations show takes:', ...rows.map((a) => listLine(a, named))];
+  const look = rows.filter(needsLook);
+  const rest = rows.filter((a) => !needsLook(a));
+  const out: string[] = [];
+  if (look.length > 0) {
+    const n = rows.length === 1 ? 'Your one automation needs' : `${String(look.length)} of ${String(rows.length)} automations ${look.length === 1 ? 'needs' : 'need'}`;
+    out.push(`${n} a look, each with the name braindog automations show takes:`, ...look.map((a) => listLine(a, named)));
+  } else out.push(rows.length === 1 ? 'Your one automation needs no look.' : `None of the ${String(rows.length)} automations needs a look.`);
+  if (rest.length === 0) return out;
+  const off = rest.filter((a) => !a.enabled).length;
+  const idle = rest.filter((a) => a.enabled && neverRan(a)).length;
+  const ran = rest.length - off - idle;
+  const parts = [
+    ...(ran > 0 ? [`${String(ran)} ${ran === 1 ? 'has' : 'have'} run`] : []),
+    ...(idle > 0 ? [`${String(idle)} ${idle === 1 ? 'has' : 'have'} not run yet`] : []),
+    ...(off > 0 ? [`${String(off)} ${off === 1 ? 'is' : 'are'} turned off`] : []),
+  ];
+  const said = parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]!}`;
+  if (look.length > 0) out.push('', `Of the rest, ${said}. braindog automations list --all says each.`);
+  else out.push(`${said.charAt(0).toUpperCase()}${said.slice(1)}. braindog automations list --all says each.`);
+  return out;
+}
+
 /** How a run began, as the record keeps its trigger's kind. */
 const began = (trigger: string): string =>
   trigger === 'written' ? 'on a write' : trigger === 'arrival' ? 'on an arrival' : trigger === 'every' ? 'on the clock' : trigger === 'manual' ? 'by Run now' : trigger === 'metric' ? 'on a figure' : trigger === 'decided' ? 'on a decision' : `on ${trigger}`;
@@ -200,7 +236,7 @@ function runLines(r: AutomationRun): string[] {
   return lines;
 }
 
-const USAGE = 'braindog automations takes list, show <id>, run <id> or cancel <run>, and --host where a verb takes it.';
+const USAGE = 'braindog automations takes list [--all], show <id>, run <id> or cancel <run>, and --host where a verb takes it.';
 
 /** `braindog automations list|show|run|cancel`, and the exit code the command decides. */
 export async function automations(args: string[], io: AgentIo): Promise<number> {
@@ -233,11 +269,11 @@ function oneArgument(args: string[], io: AgentIo, wrong: string): { name: string
 }
 
 async function list(args: string[], io: AgentIo): Promise<number> {
-  let values: { host?: string | undefined };
+  let values: { host?: string | undefined; all?: boolean | undefined };
   try {
-    ({ values } = parseArgs({ args, strict: true, options: { host: { type: 'string' } } }));
+    ({ values } = parseArgs({ args, strict: true, options: { host: { type: 'string' }, all: { type: 'boolean' } } }));
   } catch {
-    io.say('braindog automations list takes --host <host>, and nothing else.');
+    io.say('braindog automations list takes --all and --host <host>, and nothing else.');
     return 1;
   }
   const at = await connect(values.host, io);
@@ -250,12 +286,8 @@ async function list(args: string[], io: AgentIo): Promise<number> {
   }
   /* "YOU CAN READ", because the record holds the list to the lists the caller reads: a token scoped to one project is
      told it sees none, not that the record has none. */
-  if (answer.value.length === 0) io.out('No automation you can read is set up on this BrainDog.');
-  else {
-    io.out('Automations on this BrainDog, each with the name braindog automations show takes:');
-    const named = await namesOf(at.client);
-    for (const a of printable(answer.value)) io.out(listLine(a, named));
-  }
+  const named = answer.value.length === 0 ? asIs : await namesOf(at.client);
+  for (const line of listLines(printable(answer.value), named, values.all === true)) io.out(line);
   io.answer?.({ value: answer.value });
   return 0;
 }

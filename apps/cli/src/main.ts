@@ -375,7 +375,7 @@ const fullUsage = () =>
     '  Name a new key as the successor of the old one in a catalogue, signed by the old key, so readers who trusted it trust the new one.',
     'braindog addon key revoke <key file> --to <folder> --reason <why> [--successor <key id>]',
     '  Mark a key as untrusted in a catalogue, signed by that key. Versions it signed are said as untrusted and not offered.',
-    'braindog automations list|show <id> [--host <host>]',
+    'braindog automations list [--all]|show <id> [--host <host>]',
     '  Say every automation you can read, what starts it and how its runs went; or one, with its last ten runs step by step.',
     'braindog automations run <id>|cancel <run> [--host <host>]',
     "  Start an automation now, or stop a run that has not finished. Only the owner may, so these work with a self-host's server key in BRAINDOG_TOKEN; a login or an agent's token is told to use the app.",

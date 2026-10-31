@@ -198,9 +198,28 @@ async function setup(t: { after: (fn: () => void | Promise<void>) => void }, opt
 
 const called = (seen: Seen[], method: string) => seen.filter((s) => s.method === method);
 
-test('automations list: one line each, saying what starts it, whether it is on, and how its last run went', async (t) => {
+test('automations list: the ones that need a look first, then one line counting the rest (AK25)', async (t) => {
   const h = await setup(t);
   assert.equal(await automations(['list'], h.io), 0);
+  assert.deepEqual(h.out, [
+    '1 of 2 automations needs a look, each with the name braindog automations show takes:',
+    '  Chase late invoices (chase). When an entry in invoices is written, as a run. Last run failed at 21 Sep 14:02 UTC: The mail step was refused. 1 run open. This month 4 runs: 3 done, 1 failed.',
+    '',
+    'Of the rest, 1 is turned off. braindog automations list --all says each.',
+  ]);
+  assert.deepEqual(h.answered, [{ value: ROWS }]);
+});
+
+test('automations list: with nothing to look at it is two lines', async (t) => {
+  const quiet = ROWS.map((r) => ({ ...r, last: null, month: { runs: 0, done: 0, failed: 0, cancelled: 0 } }));
+  const h = await setup(t, { rows: quiet });
+  assert.equal(await automations(['list'], h.io), 0);
+  assert.deepEqual(h.out, ['None of the 2 automations needs a look.', '1 has not run yet and 1 is turned off. braindog automations list --all says each.']);
+});
+
+test('automations list --all: one line each, saying what starts it, whether it is on, and how its last run went', async (t) => {
+  const h = await setup(t);
+  assert.equal(await automations(['list', '--all'], h.io), 0);
   assert.deepEqual(h.out, [
     'Automations on this BrainDog, each with the name braindog automations show takes:',
     '  Chase late invoices (chase). When an entry in invoices is written, as a run. Last run failed at 21 Sep 14:02 UTC: The mail step was refused. 1 run open. This month 4 runs: 3 done, 1 failed.',
@@ -217,8 +236,8 @@ test('automations list: none is one sentence, and an unknown flag is refused bef
   assert.deepEqual(h.out, ['No automation you can read is set up on this BrainDog.']);
 
   const seen = h.seen.length;
-  assert.equal(await automations(['list', '--all'], h.io), 1);
-  assert.deepEqual(h.said, ['braindog automations list takes --host <host>, and nothing else.']);
+  assert.equal(await automations(['list', '--every'], h.io), 1);
+  assert.deepEqual(h.said, ['braindog automations list takes --all and --host <host>, and nothing else.']);
   assert.equal(h.seen.length, seen, 'a bad flag sends nothing');
 });
 
@@ -349,7 +368,7 @@ test('automations list and scripts list: every name, list, pack, project and las
     },
   ];
   const h = await setup(t, { rows, scripts: scriptRows });
-  assert.equal(await automations(['list'], h.io), 0);
+  assert.equal(await automations(['list', '--all'], h.io), 0);
   assert.equal(await scripts(['list'], h.io), 0);
   assert.deepEqual(controlled(h.out), [], 'a printed line carries a control character');
   assert.deepEqual(h.answered, [{ value: rows }, { value: scriptRows }]);
