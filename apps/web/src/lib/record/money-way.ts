@@ -33,16 +33,22 @@ const OUT = /^(?:out|outgoing|spent|expense|debit)$|_out$|_by_me$/u;
 /** A value that brings money in, by its own word. */
 const IN = /^(?:in|incoming|income|credit)$|_in$|_to_me$/u;
 
-/** Which way a row's amount went: `out`, `in`, or `null` where the list or the row does not say. */
-export function wayOf(decl: RegisterDecl | undefined, fields: Readonly<Fields>): 'in' | 'out' | null {
-  const by = wayField(decl);
-  if (!by) return null;
-  const v = fields[by.id];
-  if (typeof v !== 'string') return null;
+/**
+ * WHICH WAY ONE VALUE OF THE WAY FIELD GOES, by the value's own word and never by where it sits in the list's values:
+ * Repeating declares `in` before `out`, and a phone named its sides by position, so money in read "Out".
+ */
+export function wayOfValue(by: FieldDecl | undefined, v: unknown): 'in' | 'out' | null {
+  if (!by || typeof v !== 'string') return null;
   const outs = (by.values ?? []).filter((x) => OUT.test(x));
   const ins = (by.values ?? []).filter((x) => IN.test(x));
   if (outs.length !== 1 || ins.length !== 1) return null;
   return v === outs[0] ? 'out' : v === ins[0] ? 'in' : null;
+}
+
+/** Which way a row's amount went: `out`, `in`, or `null` where the list or the row does not say. */
+export function wayOf(decl: RegisterDecl | undefined, fields: Readonly<Fields>): 'in' | 'out' | null {
+  const by = wayField(decl);
+  return by ? wayOfValue(by, fields[by.id]) : null;
 }
 
 /** An amount as a cell says it, with its way: "−EGP 279.03", "+EGP 600.00". One that is signed already keeps its sign. */
