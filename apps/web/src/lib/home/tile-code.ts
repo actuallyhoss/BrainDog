@@ -58,15 +58,22 @@ export function askReads(blocks: unknown, at: TileAt): void {
  * THE TILES TODAY AS THE PAGE ASKED IT BESIDE `boot` (`app.html`) SHOWS, asked from that answer, which is in the tab
  * seconds before the reader that takes it (`earlyToday` in `today-read.ts`) has loaded. A look only: the answer stays
  * for that reader to take and check, and a guess that turns out wrong costs a few kilobytes of code and nothing else.
+ *
+ * AND, GIVEN `at`, THE TILES' OWN FIRST READS FROM IT TOO (`askReads`, speed-g SG1): Working now's went out once Today's
+ * page had been read, in one request with the screen's own suggestion, three seconds after this answer was in the tab.
+ * Asked here it goes by itself (the client's `ahead` reads fill a wave of their own) and is answered before the tile
+ * mounts; `askReads` after the page's read then finds it held and asks nothing.
  */
-export function askEarlyTiles(url: string): void {
+export function askEarlyTiles(url: string, at?: TileAt): void {
   const early = (globalThis as { __bdToday?: { url?: unknown; at?: unknown } | undefined }).__bdToday;
   if (early === undefined || early.url !== url || !(early.at instanceof Promise)) return;
   void (early.at as Promise<{ ok?: unknown; body?: unknown } | null>)
     .then((res) => {
       if (res?.ok !== true || typeof res.body !== 'string') return;
       const said = JSON.parse(res.body) as { ok?: unknown; value?: { page?: { blocks?: unknown } } } | null;
-      if (said?.ok === true) askTiles(said.value?.page?.blocks);
+      if (said?.ok !== true) return;
+      askTiles(said.value?.page?.blocks);
+      if (at !== undefined) askReads(said.value?.page?.blocks, at);
     })
     .catch(() => undefined);
 }

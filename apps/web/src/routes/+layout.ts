@@ -129,11 +129,17 @@ async function shellOf({ url, fetch, depends }: Event): Promise<FrameData> {
   /* SEEN AS SOMEBODY, NOTHING KEPT IS DRAWN AND NOTHING IS KEPT: the last shell and the local copy are the owner's. */
   const seen = seeingAs() !== null;
   if (first && depends && !spared) void import('$lib/data/local-tab.ts').then((c) => c.warmLocal(api), () => undefined);
+  /* THE EARLY PAGE'S WALKS' CODE IS FETCHED NOW, beside the frame's (`walks-early.ts`), and asked below. */
+  const walks = first && !seen && !spared && (globalThis as { __bdPage?: unknown }).__bdPage ? import('$lib/page/walks-early.ts') : null;
+  walks?.catch(() => null);
   const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
   /* THE LISTS' DECLARATIONS ARE ASKED BESIDE `boot` AND IN ONE READ (`firstOpen`): Today, its desk and its page's reader
      each learn every list, twenty-five asks on the seed that a browser sent six at a time, after `boot`, ahead of the
      page. On before any screen draws, and for the tab. */
   if (first) live.firstOpen(api);
+  /* AND A PAGE OPENED BY ITS ADDRESS WALKS THE LISTS ITS REFS POINT AT FROM ITS EARLY ANSWER (`walks-early.ts`), once
+     the lists' declarations are the client's (`firstOpen`): before, each would be asked of the network. */
+  if (walks) void walks.then((m) => m.askPageWalks(api), () => undefined);
   depends?.('braindog:boot');
   const copies = await import('$lib/record/boot-copy.ts');
   /* ON A COLD OPEN THE SHELL IS DRAWN FROM THE LAST COPY AT ONCE, then `boot` is read behind it and this load runs again

@@ -285,6 +285,15 @@
     });
   });
 
+  /* AND MONEY'S BOOKS THE MOMENT ITS LEDGER IS FOUND, where that was after Money's read went out (a cold open): the row
+     read them for itself as it drew, a read of the screen's own in the gap the frame's rest waits for, and once the
+     page drew sooner (speed-g SG2) it filled that gap and the frame's extras waited another poll. Taken by the row. */
+  $effect(() => {
+    const book = quick.ledger?.book;
+    if (slug !== 'money' || !book || quick.base !== apiBase()) return;
+    untrack(() => askBooks(apiBase(), book));
+  });
+
   /* A CHOICE CHANGED ON THE SAME PAGE: read again without blanking it, so the strip stays under the finger. */
   $effect(() => {
     const f = filter;

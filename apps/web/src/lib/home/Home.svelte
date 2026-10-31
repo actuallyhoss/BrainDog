@@ -492,7 +492,7 @@
       void import('$lib/record/page-drawn.ts').catch(() => null);
       void import('./today-read.ts').catch(() => null);
       /* AND THE CODE OF THE TILES TODAY'S EARLY ANSWER SHOWS (`tile-code.ts`), which is in the tab long before that read. */
-      if (declares === null) void import('./tile-code.ts').then((m) => m.askEarlyTiles(`${apiBase()}/api/today`), () => null);
+      if (declares === null) void import('./tile-code.ts').then((m) => m.askEarlyTiles(`${apiBase()}/api/today`, { base: apiBase(), owner: data.me?.owner === true }), () => null);
       const slug = declares;
       const before = new Set(Object.keys(REGISTERS));
       /* EVERY LIST LEARNT ALREADY (Today drawn before in this tab): nothing waits for the copy. */
