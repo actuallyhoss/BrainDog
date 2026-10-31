@@ -480,7 +480,7 @@
         <p class="tell-one-quiet">{say.becomes}</p>
         <ul class="tell-one-lines">
           {#each rows as row, i (i)}
-            <li class="tell-one-line">
+            <li class="tell-one-line" data-forming="told">
               <IconWell name={iconOf(row)} />
               <span class="tell-one-words">
                 <span class="tell-one-said">{row.said}</span>

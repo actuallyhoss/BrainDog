@@ -162,7 +162,7 @@
     </header>
     <ul class="cards">
       {#each inLane as c (c.key)}
-        <li {@attach ownMenu((p) => ((menuCard = c), (point = p)))}>
+        <li data-forming="project" data-project={c.key} data-draft-card={c.draft ? '' : undefined} {@attach ownMenu((p) => ((menuCard = c), (point = p)))}>
           {#if c.draft}
             <div class="draft" style={slotStyle(c.hue)}>
               <a class="d-open" href={at(c.href)}>
