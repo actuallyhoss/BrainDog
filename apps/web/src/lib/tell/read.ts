@@ -107,7 +107,16 @@ export type Told = {
   needsMoney?: true;
   /** Somebody kept on the record whom the line names, when it fits no list: their page is offered (AN9). */
   about?: { name: string; href: string };
+  /** What the line says of somebody kept, offered as a change to their entry: one press keeps it on them. */
+  change?: TellChange;
 };
+
+/**
+ * A FACT ABOUT SOMEBODY ALREADY KEPT, KEPT ON THEM: "Mum's birthday is 14 Nov" where Mum is in People and no list of
+ * dates is kept. Tell only adds, so it said "Mum is already in People" and dropped the day. It is offered as `ask`
+ * ("Add 14 Nov as Mum's birthday?"), and the press adds `line` to their `field` (their note), after what it holds.
+ */
+export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string };
 
 /** The most one sentence becomes. More is a paste of a whole day, and the rest is said back as left. */
 export const MOST = 8;
@@ -877,6 +886,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let noMoney = false;
   /* Somebody met who is already on the record. */
   let known: string | null = null;
+  /* What the line says of somebody kept, offered on their entry (`keptOn`). */
+  let change: TellChange | null = null;
   /* The bank's own text named no currency: never kept in the record's. */
   let bankBare = false;
   /* An amount said with no currency to put to it, on a record with none or a word that is several. */
@@ -1087,8 +1098,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (whenNext) return { rows, left, why: WHY.whenNext };
     if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney, needsMoney: true };
     if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency(unsureWord?.word ?? null, unsureWord?.figure ?? '300') };
+    if (change !== null && !placed && rows.length === 0) return { rows, left: [], change };
     if (known !== null && !placed && rows.length === 0) return { rows, left: [], why: WHY.known(known, people?.name ?? 'People') };
-    if (placed || unsureOf || noMoney) return { rows, left };
+    if (placed || unsureOf || noMoney) return { rows, left, ...(change ? { change } : {}) };
 
     /* WITH NOTHING THAT FITS, ONE TASK WITH THE WORDS AS ITS TITLE, due on the day they name, given to whoever it is
        assigned to, and short: the sentence's first clause when the whole is long. */
@@ -1242,8 +1254,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (!name || !aName(name)) return false;
     if (knownAs(name, opts.people ?? [])) {
       subject = name;
-      /* A BIRTHDAY OF SOMEBODY KEPT IS STILL KEPT, among the dates, where the record keeps them (AN9). */
+      /* A BIRTHDAY OF SOMEBODY KEPT IS STILL KEPT, among the dates, where the record keeps them (AN9), and on them where
+         it keeps none: offered as a change to their note. */
       if (born && birthday(name, born[2]!)) return true;
+      if (born && keptOn(knownAs(name, opts.people ?? [])!, born[2]!)) return true;
       known = name;
       return true;
     }
@@ -1293,6 +1307,17 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const rest = trimWords(oneLine(takeDay(met?.[4] ?? joined?.[3] ?? '', opts.today).rest).replace(/^(?:the\s+)?team\b/iu, ''));
     if (rest) said.push(capital(rest));
     if (said.length > 0) notes.set(ref.$row, said);
+    return true;
+  }
+
+  /** "Mum's birthday is 14 Nov" for Mum, already in People, on a record with no dates: offered on her note. */
+  function keptOn(them: Known, when: string): boolean {
+    const day = takeDay(when, opts.today).day;
+    const note = people ? pick(people, 'text', /note/, (f) => f.id !== people.title) : undefined;
+    if (!people || !note || day === null || change !== null) return false;
+    const [, m = 1, d = 1] = day.split('-').map(Number);
+    const on = `${d} ${capital(MONTHS[m - 1]!)}`;
+    change = { register: people.id, seq: them.seq, name: them.name, field: note.id, line: `Birthday ${on}`, ask: `Add ${on} as ${them.name}'s birthday?`, done: `Added ${on} as ${them.name}'s birthday` };
     return true;
   }
 

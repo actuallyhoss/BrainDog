@@ -958,3 +958,11 @@ test('MONEY IN THAT NOBODY OWED IS NEVER "KEPT IN BILLS" (AN10)', () => {
   /* A client's payment is still the invoice it settles. */
   assert.equal(tellRead(NADIA, fresh).rows[2]!.detail, 'paid, kept in Bills and invoices');
 });
+
+test('A BIRTHDAY FOR SOMEBODY KEPT, WITH NO DATES KEPT, IS OFFERED ON THEM', () => {
+  const told = tellRead("Mum's birthday is 14 Nov", { ...founder, people: [{ seq: 3, name: 'Mum' }] });
+  assert.deepEqual(told.rows, []);
+  assert.deepEqual(told.change, { register: 'people', seq: 3, name: 'Mum', field: 'note', line: 'Birthday 14 Nov', ask: "Add 14 Nov as Mum's birthday?", done: "Added 14 Nov as Mum's birthday" });
+  /* Somebody new still gets it in their note, and nothing is offered as a change. */
+  assert.equal(tellRead("Mum's birthday is 14 Nov", founder).change, undefined);
+});

@@ -29,7 +29,7 @@
   import { run } from '$lib/data/optimistic.svelte.ts';
   import { reread } from '$lib/data/live.svelte.ts';
   import type { MoneyAsk } from '$lib/tell/money-on.ts';
-  import type { TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
+  import type { TellChange, TellList, TellOptions, TellRow, tellRead } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -94,6 +94,8 @@
     moneyTurned: 'Turned on Money',
     /* WHAT MONEY'S PLAN ASKS BEYOND ITS LISTS, said before the press approves it (RN3). */
     moneyAlso: 'Money will also:',
+    /* A BIRTHDAY FOR SOMEBODY KEPT, kept on them (their note) where no list of dates is. */
+    keepOn: (name: string) => `Add it to ${name}`,
   };
 
   let typed = $state('');
@@ -161,6 +163,55 @@
     void send([{ register: row.register, fields: row.fields as Record<string, unknown> }], [row], [0]);
   }
 
+  /* ── a fact about somebody kept, kept on them ──
+     "Mum's birthday is 14 Nov" with Mum in People and no dates kept: one press adds "Birthday 14 Nov" to her note, after
+     what it holds, at the version just read, and the receipt's Undo writes the note back as it was. */
+  async function keepOn(c: TellChange) {
+    if (sending) return;
+    sending = true;
+    const pressed = typeof document === 'undefined' ? null : document.activeElement;
+    const client = createClient({ base: apiBase() });
+    const href = `/r/${c.register}/${c.seq}`;
+    let had = '';
+    await run<{ version: number }>({
+      apply: () => {},
+      revert: () => {},
+      send: async () => {
+        const got = await client.get(c.register, c.seq);
+        const row = got.ok ? (got.value as { fields?: Record<string, unknown>; version?: number } | null) : null;
+        if (!row?.fields || typeof row.version !== 'number') return { ok: false as const, fix: say.raced };
+        const note = row.fields[c.field];
+        had = typeof note === 'string' ? note.trim() : '';
+        /* SAID ALREADY, it is not said twice. */
+        if (had.includes(c.line)) return { ok: true as const, value: { version: row.version } };
+        const next = had === '' ? c.line : `${had}${/[.!?]$/u.test(had) ? '' : '.'} ${c.line}`;
+        const out = await client.update({ register: c.register, seq: c.seq, patch: { [c.field]: next }, version: row.version });
+        if (!out.ok) return { ok: false as const, fix: 'refusal' in out ? out.refusal.fix : say.raced };
+        const landed = out.value as { version?: number; batch?: string };
+        return { ok: true as const, value: { ...landed, version: typeof landed.version === 'number' ? landed.version : row.version + 1 } };
+      },
+      said: c.done,
+      undo: (value) => ({
+        apply: () => {},
+        revert: () => {},
+        send: async () => {
+          const out = await client.update({ register: c.register, seq: c.seq, patch: { [c.field]: had === '' ? null : had }, version: value.version });
+          if (!out.ok) return { ok: false as const, fix: 'refusal' in out ? out.refusal.fix : say.raced };
+          return { ok: true as const, value: null };
+        },
+        settle: () => void reread(),
+      }),
+      settle: () => {
+        typed = '';
+        void reread();
+        onadded?.([{ said: `${c.name}, ${c.line.charAt(0).toLowerCase()}${c.line.slice(1)}`, list: listName(c.register), href }]);
+      },
+    });
+    sending = false;
+    const was = field;
+    focusOnceDrawn(() => (was?.isConnected ? was : [...document.querySelectorAll<HTMLElement>('[data-tell-one] .tell-one-field')].find((f) => f !== was)), { from: pressed });
+  }
+
   /* ── turning Money on for a money line (AM4) ──
      THE PRESS TURNS MONEY ON, THEN THE SAME WORDS ARE READ AGAIN AGAINST THE LISTS IT BROUGHT and what they become is
      added, all in one press, under one batch with the one Undo every add has: the lists Money holds are learnt here
@@ -205,6 +256,7 @@
     e.preventDefault();
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
     else if (rows.length === 0 && offers.length === 1 && !told?.about) addOffer(offers[0]!);
+    else if (rows.length === 0 && told?.change) void keepOn(told.change);
     /* AND NEVER TURNS MONEY ON (RN3): ⌘↵ adds a line where a home for it exists; a module goes on by its own button. */
   }
 
@@ -249,6 +301,16 @@
         <Button weight="primary" type="submit" disabled={sending || ready.length === 0}>{ready.length < rows.length && ready.length > 0 ? say.addReady(ready.length) : ready.length <= 1 ? say.addOne : say.addAll(ready.length)}</Button>
       </div>
     {/if}
+    {#if told?.change}
+      <!-- SOMETHING SAID OF SOMEBODY KEPT is offered on them, one press (a birthday where no dates are kept). -->
+      {@const change = told.change}
+      <div class="tell-one-becomes" aria-live="polite">
+        <p class="tell-one-why">{change.ask}</p>
+        <div class="tell-one-offers">
+          <Button weight={rows.length === 0 ? 'primary' : 'quiet'} disabled={sending} onclick={() => void keepOn(change)}>{say.keepOn(change.name)}</Button>
+        </div>
+      </div>
+    {/if}
     {#if told && told.why}
       <!-- NOTHING PLACED IS SAID IN WORDS, with the way on: never a card over nothing to press (AH1). -->
       <div class="tell-one-becomes" aria-live="polite">
@@ -278,7 +340,7 @@
       </div>
     {/if}
   </form>
-  {#if !slim || rows.length > 0 || offers.length > 0 || told?.needsMoney}
+  {#if !slim || rows.length > 0 || offers.length > 0 || told?.needsMoney || told?.change}
     <p class="tell-one-quiet">{say.notYet} {ready.length > 1 ? say.undoAll(ready.length) : ready.length === 1 ? say.undoOne : say.undoAny}</p>
   {/if}
   {#if last.length > 0 && typed.trim() === ''}
