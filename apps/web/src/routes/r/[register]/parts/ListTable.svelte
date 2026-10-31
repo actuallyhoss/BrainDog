@@ -519,6 +519,7 @@
               tabindex="-1"
               aria-label={copy.moreOn(name)}
               aria-haspopup="menu"
+              aria-expanded="false"
               {@attach menuAt((p) => openCardMenu(seq, p.back ?? document.body, p))}
               onclick={(e) => {
                 e.stopPropagation();

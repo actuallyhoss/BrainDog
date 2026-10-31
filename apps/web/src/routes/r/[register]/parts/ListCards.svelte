@@ -69,6 +69,7 @@
       class="card-more tap"
       aria-label={copy.moreOn(display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow)}
       aria-haspopup="menu"
+      aria-expanded="false"
       {@attach menuAt((p) => openCardMenu(e.seq, p.back ?? document.body, p))}
       onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
     >

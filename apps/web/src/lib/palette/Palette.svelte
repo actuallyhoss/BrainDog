@@ -1672,7 +1672,7 @@
   }
 </script>
 
-<dialog bind:this={el} class="palette" data-mode={inAsk ? 'ask' : undefined} onclick={onbackdrop} {oncancel} onclose={() => (open = false)}>
+<dialog bind:this={el} class="palette" aria-label={inAsk ? 'Ask Slash' : 'Search'} data-mode={inAsk ? 'ask' : undefined} onclick={onbackdrop} {oncancel} onclose={() => (open = false)}>
   <div class="p-head">
     <span class="p-field">
     {#if inAsk}<span class="p-ask-mark" aria-hidden="true"><Icon name="slash" size="m" /></span>{:else}<Icon name="search" size="m" />{/if}

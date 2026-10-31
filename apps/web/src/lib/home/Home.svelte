@@ -1903,7 +1903,14 @@
   }
 
   /* A VITAL SIGN READING RED, one line in the red under what needs you, the link to the place the signs are. */
+  /* A 24px TARGET AT THE LEAST, ABOVE THE HIT BOX OF THE LINK OVER IT (audit 31 Oct i, AI5): it was a 20px line whose top
+     8px were under the 44px box of "8 more in Needs you". */
   .signs-line {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    min-block-size: 24px;
     margin-block-start: auto;
     padding-block-start: var(--sp-2);
     color: var(--red);

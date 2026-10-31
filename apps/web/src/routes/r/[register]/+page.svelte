@@ -2673,7 +2673,17 @@
     const r = el.getBoundingClientRect();
     menuAt = point ? { x: point.x, y: point.y, height: point.height } : { x: r.x, y: r.y, height: r.height };
     menuSeq = seq;
+    /* THE "…" SAYS IT IS OPEN, as the shared Menu's trigger does (audit 31 Oct i, AI4). */
+    menuFrom?.setAttribute('aria-expanded', 'false');
+    menuFrom = el.hasAttribute('aria-haspopup') ? el : null;
+    menuFrom?.setAttribute('aria-expanded', 'true');
   }
+  let menuFrom: HTMLElement | null = null;
+  $effect(() => {
+    if (menuAt !== null || menuFrom === null) return;
+    menuFrom.setAttribute('aria-expanded', 'false');
+    menuFrom = null;
+  });
 
   /** The Table speaks in row KEYS (`register#seq`), which is the id a row is addressed by. */
   const selectedKeys = $derived(new Set([...selected].map((seq) => `${id}#${seq}`)));

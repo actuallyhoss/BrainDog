@@ -600,6 +600,21 @@
       undo: () => void putBack(register, n, label, putBackOf(before, patch, heldDecl), version),
     });
     void refreshHistory(register, n);
+    void keepFocusInHead();
+  }
+
+  /**
+   * THE BUTTON PRESSED IS GONE ONCE THE ROW IS FINISHED (audit 31 Oct i, AI1), and focus fell to the page, so the next Tab
+   * began again at "Skip to content". It stays in the head: on the head's next control, or on the page's name.
+   */
+  async function keepFocusInHead() {
+    await tick();
+    const was = document.activeElement as HTMLElement | null;
+    if (was && was !== document.body && was.isConnected && !(was as HTMLButtonElement).disabled) return;
+    const head = document.querySelector<HTMLElement>('.row-head');
+    const seen = (el: HTMLElement) => el.getClientRects().length > 0;
+    const next = [...(head?.querySelectorAll<HTMLElement>('.head-actions button:not([disabled]), .head-actions a[href]') ?? [])].find(seen) ?? head?.querySelector<HTMLElement>('h1');
+    next?.focus();
   }
 
   /** Archive the row, or put it back: the same verb the list offers on the same row. */
@@ -1791,10 +1806,12 @@
   }
 
   /* A FACT THAT OPENS ANOTHER ROW reads as the value it is, in ink, and shows it is a way there under a pointer. */
+  /* 24px TALL AT THE LEAST (audit 31 Oct i, AI5): a project's chip was 69 by 23 on a phone. */
   .ref-link {
     position: relative;
     display: inline-flex;
     align-items: center;
+    min-block-size: 24px;
     gap: var(--sp-2);
     color: inherit;
     text-decoration: underline;

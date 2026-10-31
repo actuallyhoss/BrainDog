@@ -190,6 +190,7 @@
       aria-label={copy.moreOn(name)}
       title={copy.moreOn(name)}
       aria-haspopup="menu"
+      aria-expanded="false"
       {@attach menuAt((p) => openCardMenu(e.seq, p.back ?? document.body, p))}
       onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
     >
