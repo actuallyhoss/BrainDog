@@ -557,6 +557,16 @@ const PAYOUT = /^(?:paid out|pays out|paying out|payout(?:\s+of)?)\b\s*/iu;
 const PROVIDERS = /^(?:stripe|paypal|paddle|gumroad|lemon ?squeezy|shopify|etsy|ebay|amazon|apple|app store|google|google play|adsense|upwork|fiverr|payoneer|wise|square|substack|patreon|youtube|twitch|airbnb|uber|deliveroo|talabat|careem|fawry|paymob|kickstarter|teachable|kajabi|ko-fi|buy me a coffee|tiktok|meta|facebook|instagram)$/iu;
 /* "... to my bank", "into our account": the money came to him, whoever paid it out. */
 const INTO_MINE = /\b(?:to|into)\s+(?:my|our)\s+(?:bank|account|a\/c|acct|card|wallet|balance|current account|savings)\b/iu;
+/* A PLACE OR A COMPANY IS NOBODY (RL7): "tickets to Dubai", "Paid Vodafone 450", "Sent CIB 1,000" each made a person.
+   The places and companies a person here pays or goes to, and the words a company's name ends on. */
+const PLACES = /^(?:dubai|abu dhabi|sharjah|cairo|giza|alexandria|sharm|sharm el sheikh|hurghada|gouna|el gouna|dahab|luxor|aswan|siwa|sahel|north coast|ain sokhna|sokhna|riyadh|jeddah|mecca|makkah|medina|doha|kuwait|bahrain|manama|muscat|oman|amman|beirut|istanbul|london|paris|rome|milan|madrid|barcelona|berlin|amsterdam|athens|new york|nyc|los angeles|san francisco|toronto|tokyo|bali|bangkok|egypt|uae|saudi|saudi arabia|qatar|lebanon|turkey|greece|italy|spain|france|germany|uk|england|usa|us|america|canada|europe|asia|africa)$/iu;
+const COMPANIES = /^(?:vodafone|etisalat|e&|orange|we|telecom egypt|cib|nbe|qnb|hsbc|banque misr|alex bank|adib|aaib|mashreq|emirates nbd|fab|enbd|valu|instapay|vodafone cash|noon|carrefour|spinneys|ikea|jumia|swvl|microsoft|adobe|zoom|slack|notion|figma|github|aws|vercel|cloudflare|openai|anthropic|anghami|shahid|osn|emirates|egyptair|etihad|qatar airways|flydubai|booking|booking\.com|dhl|aramex|fedex|ups|bosta|starbucks|mcdonald['’]?s|kfc)$/iu;
+const COMPANY_END = /\s(?:bank|telecom|airways|airlines|air|ltd|llc|inc|co|corp|group|hotel|resort|clinic|hospital|pharmacy|school|university|academy|studio|studios|agency|store|shop|market|mall|cafe|restaurant|club|gym)$/iu;
+/** Whether a capitalised name reads as somebody: never a place, a company, a provider, a bill, or letters in capitals. */
+const readsAsSomebody = (name: string): boolean => {
+  const n = name.trim();
+  return aName(n) && !PLACES.test(n) && !COMPANIES.test(n) && !COMPANY_END.test(n) && !PROVIDERS.test(n) && !THING_PAID.test(n) && !/^\p{Lu}{2,}$/u.test(n);
+};
 /* MONEY LENT OR BORROWED BETWEEN TWO PEOPLE IS OWED, never a payment and never "Not sure" (first-hour audit, FB3):
    "Lent Omar 500 yesterday", "Omar owes me 500", "Borrowed 300 from Sara", "Sara lent me 300", "I owe Sara 300". Case
    kept on the name, as everywhere: it is told by its capital. Each is [who, the rest] and whose the money is. */
@@ -576,11 +586,18 @@ const LOAN_WORDS = /\b(?:back|as a loan|on loan|to pay back|to be paid back|pay(
 /* WHO THE READER PAID, BY NAME (AL2): "Paid Nadia 300 for the logo", "I sent Mum 1,000", "Paid 300 to Nadia". Case kept
    on the name, which is told by its capital. */
 const PAID_TO = new RegExp(`^(?:(?:I|i|We|we)\\s+)?(?:[Pp]aid|[Ss]ent|[Tt]ransferred)\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
-const TO_SOMEBODY = new RegExp(`\\bto\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
+/* "to Nadia" only right after the act or the figure ("paid 300 to Nadia", the figure taken out), never after what was
+   paid for ("for tickets to Dubai", RL7). */
+const TO_SOMEBODY = new RegExp(`^(?:(?:I|i|We|we)\\s+)?(?:(?:[Pp]aid|[Ss]ent|[Tt]ransferred|[Gg]ave)\\s+)?to\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
 /* MONEY THAT CAME IN, SAID WITHOUT A CURRENCY OR A VERB OF PAYING (AL4): "Salary 30,000 came in today", "Refund from
    Amazon 450". A refund said to somebody ("Refund Nadia 300") is the reader paying back, and is not this. */
 const CAME_IN = /\b(?:came in|come in|comes in|has come in|arrived|landed|went in|hit (?:my|our|the) account|got paid)\b/iu;
 const INCOME_WORD = /^(?:(?:my|our|the)\s+)?(?:salary|wages?|pay ?cheque|paycheck|bonus|refund|dividends?|commission|allowance|pension|rent from)\b/iu;
+/* AN INCOME WORD SAYS NO WAY ALONE (RL5): "Wages 12,000 due Friday" may be his staff's, "Bonus for Omar 500" is Omar's.
+   It is money in only with a word of arriving, "from ...", or "my"/"our" before it, and never when it is for somebody,
+   to somebody, or due. */
+const INCOME_MINE = /^(?:my|our)\s/iu;
+const INCOME_NOT = new RegExp(`\\b(?:[Ff]or|[Tt]o)\\s+(${NAME})(?![\\p{L}\\p{M}'’-])|\\bdue\\b`, 'u');
 const CAME_IN_WORDS = /\b(?:came in|come in|comes in|has come in|arrived|landed|went in|hit (?:my|our|the) account|got paid|into (?:my|our) (?:account|bank))\b/giu;
 /* A FIGURE SAID AS A TIME is no amount: "Call the bank at 3 tomorrow". */
 const TIME_BEFORE = /\b(?:at|around|from|until|till|by)\s*$/iu;
@@ -675,6 +692,8 @@ const WHY = {
       : `Which ${plural} are they? Say whose with the figure, like ${figure} ${like} ${plural}.`;
   },
   whichWay: (name: string) => `Did ${name} pay you, or did you pay ${name}?`,
+  /* A PLAIN LINE THAT SAYS NO WAY, AND NAMES NOBODY (RL5): "Wages 12,000 due Friday". */
+  inOrOut: (figure: string) => `Is that money you get, or money you pay? Say which with it, like got ${figure} or paid ${figure}.`,
   /* ASKED, NEVER GUESSED: money that comes round is kept with the next day it falls on, and no day was said. */
   whenNext: 'When is it next due? Say the day with it, like on the 5th or next Friday.',
   bankNoCurrency: 'That text names no currency, so nothing is kept from it. Paste it as the bank sent it.',
@@ -759,6 +778,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let metRow: number | null = null;
   /* Somebody new said to have "paid", with no "me": which way the money went is asked, and nobody is made (MC1). */
   let whichWay: string | null = null;
+  /* A plain money line that names nobody and says no way (RL5): which way is asked, with the figure it said. */
+  let inOrOut: string | null = null;
   /* Money that comes round was read with no day it next falls on: the day is asked, and the entry waits for it. */
   let whenNext = false;
 
@@ -924,6 +945,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     }
     if (bankBare) return { rows, left, why: WHY.bankNoCurrency };
     if (whichWay !== null) return { rows, left, why: WHY.whichWay(whichWay) };
+    if (inOrOut !== null) return { rows, left, why: WHY.inOrOut(inOrOut) };
     if (whenNext) return { rows, left, why: WHY.whenNext };
     if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney };
     if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency(unsureWord?.word ?? null, unsureWord?.figure ?? '300') };
@@ -1126,6 +1148,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (!a || more.length > 0 || TIME_BEFORE.test(dated.rest.slice(0, a.at))) return false;
     /* "3 boxes arrived" is no money: with no word like salary, nothing but where it came from is said after the figure. */
     if (!worded && a.word === null && !/^(?:from\b.*)?$/iu.test(oneLine(dated.rest.slice(a.at + a.text.length).replace(CAME_IN_WORDS, ' ')))) return false;
+    /* NO WORD OF ARRIVING, NO "FROM", NO "MY": the way is asked, never taken from the word (RL5). */
+    if (!CAME_IN.test(c)) {
+      const not = INCOME_NOT.exec(c);
+      if (not || !(/\bfrom\s/iu.test(c) || INCOME_MINE.test(c))) return askWay(c, a, not?.[1] && aName(not[1]) ? not[1] : nameBefore(dated.rest.slice(0, a.at)));
+    }
     if (!moneyList(opts.lists) && !dueList(opts.lists)) {
       noMoney = true;
       return true;
@@ -1144,8 +1171,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const named = trimWords(oneLine(rest.replace(EVERY, ' ')).replace(/^(?:my|our)\s+/iu, ''));
     const what = capital(named) || (party ? `From ${party}` : 'Money in');
     /* Somebody who paid it is a person; a shop or a platform that refunded it is only named. */
-    const payer = party && !PROVIDERS.test(party) && !THING_PAID.test(party) && !ownAccount(party) ? personOf(party) : null;
-    /* "Salary 30,000 a month" comes round: Repeating, money in, where the record keeps it. */
+    const payer = party && (knownAs(party, opts.people ?? []) !== null || readsAsSomebody(party)) && !ownAccount(party) ? personOf(party) : null;
+    /* "My salary 30,000 a month" comes round: Repeating, money in, where the record keeps it. */
     const every = EVERY.exec(c);
     const r = every ? repeatList(opts.lists) : undefined;
     if (every && r) return repeating(r, { value: { amount, currency }, into: true, what, day: dated.day !== null && dated.day > opts.today ? dated.day : null, every: words(every[1] ?? every[2] ?? ''), payer });
@@ -1170,6 +1197,13 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       const size = numberOf(a.digits, a.thousand) ?? 0;
       if (after !== '' || TIME_BEFORE.test(own.rest.slice(0, a.at)) || own.rest.slice(0, a.at).trim() === '') return false;
       if (!THING_PAID.test(c) && !EVERY.test(c) && size < 100) return false;
+    }
+    /* A LOOSE LINE SAYS NO WAY (RL5): "Acme 1,200 due Friday" may be Acme's invoice to collect, "Omar 3,000 a month"
+       Omar's. One that names somebody, or an income word, is asked which way, never kept as a bill to pay. A thing
+       paid for, a company he pays or one of his accounts is the bill it reads as. */
+    if (loose && !/\bowe/iu.test(c)) {
+      const who = nameBefore(own.rest.slice(0, a.at));
+      if (who !== null || INCOME_WORD.test(c)) return askWay(c, a, who);
     }
     const l = dueList(opts.lists);
     if (!l) {
@@ -1230,6 +1264,37 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     rows.push({ register: l.id, fields, said: what, detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
+  }
+
+  /** Which way the money went is asked, and nothing is kept (RL5). Where no money is kept, that is what is said. */
+  function askWay(c: string, a: Amount, who: string | null): boolean {
+    if (!moneyList(opts.lists) && !dueList(opts.lists)) {
+      noMoney = true;
+      return true;
+    }
+    if (who !== null) whichWay ??= who;
+    else inOrOut ??= a.digits;
+    left.push(c);
+    return true;
+  }
+
+  /** Somebody a plain money line names before its figure, or null: "Acme", "Omar's deposit", "Deposit for Omar". A
+      place, a company he pays, a thing paid for or one of his accounts is nobody. */
+  function nameBefore(lead: string): string | null {
+    const said = oneLine(lead).replace(/[\s,;:–-]+$/u, '');
+    const fit = (n: string | undefined): string | null => {
+      const name = n?.trim() ?? '';
+      if (!name || THING_PAID.test(name) || INCOME_WORD.test(name) || ownAccount(name) || PLACES.test(name) || COMPANIES.test(name)) return null;
+      return knownAs(name, opts.people ?? []) !== null || aName(name) ? name : null;
+    };
+    const own = new RegExp(`^(${NAME})['’]s(?![\\p{L}\\p{M}])`, 'u').exec(said);
+    if (own) return fit(own[1]);
+    const only = new RegExp(`^(${NAME})$`, 'u').exec(said);
+    if (only) return fit(only[1]);
+    const by = new RegExp(`\\b(?:for|to|from)\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u').exec(said);
+    if (by) return fit(by[1]);
+    const known = (opts.people ?? []).find((p) => words(p.name) !== '' && ` ${words(said)} `.includes(` ${words(p.name)} `));
+    return known ? known.name : null;
   }
 
   /**
@@ -1440,7 +1505,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       const parts = (to?.[1] ?? '').split(' ');
       while (parts.length > 1 && CODES.has(parts[parts.length - 1]!)) parts.pop();
       const name = parts.join(' ');
-      if (to && name && aName(name) && !THING_PAID.test(name) && !PROVIDERS.test(name) && !ownAccount(name)) {
+      /* ONLY SOMEBODY IS A PAYEE (RL7): one already in People, or a name that reads as a person, never a place, a
+         company, a provider, a bill or one of his accounts. "Paid Vodafone 450" keeps Vodafone as what it was for. */
+      if (to && name && (knownAs(name, opts.people ?? []) !== null || made.has(words(name)) || readsAsSomebody(name)) && !THING_PAID.test(name) && !ownAccount(name)) {
         payee = name;
         rest = oneLine(`${to[0].startsWith('to') ? rest.slice(0, to.index) : 'paid'} ${rest.slice(to.index + to[0].length)}`);
         payeeRef = personOf(name);

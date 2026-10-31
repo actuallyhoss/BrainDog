@@ -661,3 +661,42 @@ test('MONEY THAT COMES ROUND WITH NO DAY ASKS WHEN IT IS NEXT DUE, and takes the
   assert.equal(friday.why, undefined);
   assert.equal(typeof friday.rows[0]!.fields.next_due, 'string');
 });
+
+/* ── review 31 Oct l: no way nobody said, and nobody who is a place or a company ─────────────────────────────────── */
+
+test('A PLAIN MONEY LINE THAT SAYS NO WAY IS ASKED, never kept as in or out (RL5)', () => {
+  const inOrOut = 'Is that money you get, or money you pay? Say which with it, like got 12,000 or paid 12,000.';
+  assert.deepEqual(tellRead('Wages 12,000 due Friday', founder), { rows: [], left: ['Wages 12,000 due Friday'], why: inOrOut });
+  assert.deepEqual(tellRead('Acme 1,200 due Friday', founder), { rows: [], left: ['Acme 1,200 due Friday'], why: 'Did Acme pay you, or did you pay Acme?' });
+  for (const [s, who] of [
+    ['Bonus for Omar 500', 'Omar'],
+    ['Commission to Sara 3,000', 'Sara'],
+    ["Omar's deposit 2,000 due Monday", 'Omar'],
+    ['Omar 3,000 a month', 'Omar'],
+  ] as const) {
+    const told = tellRead(s, founder);
+    assert.deepEqual(told.rows, [], s);
+    assert.equal(told.why, `Did ${who} pay you, or did you pay ${who}?`, s);
+  }
+  const kids = tellRead('Allowance for the kids 500 a week', { ...founder, lists: [...founder.lists, RECURRING] });
+  assert.deepEqual(kids.rows, []);
+  assert.match(kids.why ?? '', /^Is that money you get, or money you pay\?/u);
+  /* A word of arriving, "from", "my" or a thing paid for still settles it. */
+  assert.equal(tellRead('Salary 30,000 came in today', founder).rows[0]!.fields.direction, 'owed_to_me');
+  assert.equal(tellRead('My salary 30,000', founder).rows[0]!.fields.direction, 'owed_to_me');
+  assert.equal(tellRead('Refund from Amazon 450', founder).rows[0]!.fields.direction, 'owed_to_me');
+  assert.equal(tellRead('Electricity 850 due Thursday', founder).rows[0]!.fields.direction, 'owed_by_me');
+  assert.equal(tellRead('Vodafone 450 due Friday', founder).rows[0]!.fields.direction, 'owed_by_me');
+});
+
+test('A PLACE, A COMPANY OR A BANK AFTER "TO" OR "PAID" IS NOBODY NEW (RL7)', () => {
+  const dubai = tellRead('Paid 2,000 for tickets to Dubai', founder).rows;
+  assert.ok(!dubai.some((r) => r.register === 'people'));
+  assert.equal(dubai[0]!.fields.what, 'Tickets to Dubai');
+  for (const s of ['Paid Vodafone 450', 'Sent CIB 1,000', 'Paid Etisalat 300', 'Paid 500 to Carrefour', 'Paid 900 to Cairo Airways'])
+    assert.ok(!tellRead(s, founder).rows.some((r) => r.register === 'people'), s);
+  assert.equal(tellRead('Paid Vodafone 450', founder).rows[0]!.fields.what, 'Vodafone');
+  /* Somebody who reads as a person, or is already in People, is still the payee. */
+  assert.deepEqual(tellRead('Paid Nadia 300 for the logo', founder).rows.map((r) => r.register), ['people', 'obligations']);
+  assert.equal(tellRead('Paid Dubai 300', { ...founder, people: [{ seq: 9, name: 'Dubai' }] }).rows[0]!.fields.party, 'people#9');
+});

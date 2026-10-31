@@ -11,7 +11,7 @@
  * mistake `+layout.ts` already has a paragraph about.
  */
 
-import { LATE, PLACES } from './nav/rail.ts';
+import { LATE, PLACES, projectsLate } from './nav/rail.ts';
 import { TASKS } from './work/list.ts';
 import { WORK_PAGE } from './work/page.ts';
 
@@ -142,6 +142,8 @@ export type FlatItem = {
   exact?: true;
   /** Where the section sits on the rail, the lowest its pages declare (`nav.place`), when one does. */
   place?: number;
+  /** How many pages about one thing the section holds (`row`): a project's page per project, under Projects. */
+  rows?: number;
 };
 
 /** The words the fixed rows say, handed in so this module stays pure and the words stay in `copy`. */
@@ -180,10 +182,19 @@ function leadOf<T extends { title: string; row?: boolean | undefined }>(entries:
    rail's Projects is the same picture on every record. Any other section wears its lead page's glyph. */
 const SECTION_ICONS: Readonly<Record<string, string>> = { projects: 'projects', work: 'work' };
 
-function sectionItem<T extends { href: string; icon: string; place?: number | undefined }>(section: string, lead: T, entries: readonly T[]): FlatItem {
+function sectionItem<T extends { href: string; icon: string; place?: number | undefined; row?: boolean | undefined }>(section: string, lead: T, entries: readonly T[]): FlatItem {
   const icon = SECTION_ICONS[plainOf(section)] ?? lead.icon;
   const places = entries.flatMap((e) => (typeof e.place === 'number' ? [e.place] : []));
-  return { key: `section:${section}`, href: lead.href, label: section, icon, near: entries.map((e) => e.href), ...(places.length > 0 ? { place: Math.min(...places) } : {}) };
+  const rows = entries.filter((e) => e.row === true).length;
+  return {
+    key: `section:${section}`,
+    href: lead.href,
+    label: section,
+    icon,
+    near: entries.map((e) => e.href),
+    ...(places.length > 0 ? { place: Math.min(...places) } : {}),
+    ...(rows > 0 ? { rows } : {}),
+  };
 }
 
 /**
@@ -297,13 +308,15 @@ const FIVE_AT: Readonly<Record<string, number>> = { orders: 20, shop: 20, projec
 const placeName = (i: FlatItem): string => plainOf(i.key.replace(/^section:/u, ''));
 
 /**
- * Where a place sits on the bar. ON A STARTER'S RECORD PROJECTS COMES LAST (audit 31 Oct l, AL3): Projects is no place
- * until the first project is kept, and ranked by its 30 it then stepped in ahead of Money, so a Founder's Money moved a
- * slot and his Dashboard fell into Menu. After the starter's own place and the rest, it takes the next free slot or
- * waits in Menu, and nothing he already had moves. A record with no starter place (his own) keeps the five's order.
+ * Where a place sits on the bar. ON A STARTER'S RECORD A NEW PROJECTS COMES LAST (audit 31 Oct l, AL3): Projects is no
+ * place until the first project is kept, and ranked by its 30 it then stepped in ahead of Money, so a Founder's Money
+ * moved a slot and his Dashboard fell into Menu. After the starter's own place and the rest, it takes the next free slot
+ * or waits in Menu, and nothing he already had moves. ONLY WHILE IT IS NEW (RL6): his own record is on Solo founder,
+ * whose Dashboard declares its place, and holds twenty-odd projects, so a record with a bar's worth of projects keeps
+ * Projects at its 30, on the bar as it always was.
  */
 export function atOf(item: FlatItem, starter: boolean): number {
-  if (starter && placeName(item) === 'projects') return LATE;
+  if (projectsLate(item, placeName(item), starter)) return LATE;
   return item.place ?? FIVE_AT[placeName(item)] ?? 100;
 }
 

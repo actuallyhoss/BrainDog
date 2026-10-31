@@ -253,18 +253,29 @@ const SHIPS = /(?:deliver(?:y|ed)?(?: date)?|arriv(?:es|al)|estimated(?: deliver
 
 const MONEYISH = /\b(invoice|receipt|bill|payment|statement|amount due|order total|subscription|renew|renewal|charged)\b/iu;
 
+/* THEY PAID US, said in so many words: "we have paid your invoice", "we have sent the payment". The bare word
+ * "remittance" is not one, since an invoice's own footer asks for "remittance advice" (RL3), and "we have paid" counts
+ * only with what was paid, never "we have paid the courier". */
+const REMIT_SAID =
+  /\b(?:(?:we|i)(?: have|['’]ve)?(?: now| just| today)? (?:paid|settled) (?:(?:your|the|our|this|that) )?(?:invoice|bill|balance|outstanding|amount (?:due|owed))|(?:we|i)(?: have|['’]ve)?(?: now| just| today)? (?:sent|made) (?:the |your |a )?payment|payment (?:has been |was )?(?:made|sent) (?:for|against|towards) (?:your |the )?invoice)\b/giu;
+/* Only a subject names a remittance by its title: "Remittance advice", "Payment for invoice INV-204", never one that
+ * is still due. */
+const REMIT_TITLE = /\b(?:remittance advice|payment (?:for|against|towards) (?:your |the )?invoice(?![^\n]*\b(?:due|overdue|reminder|outstanding)\b))\b/giu;
+
 function classify(subject: string, body: string, hasRenewDay: boolean): MailKind {
-  const score = (re: RegExp): number => (re.test(subject) ? 3 : 0) + (re.test(body) ? 1 : 0);
+  const has = (re: RegExp, text: string): boolean => {
+    re.lastIndex = 0;
+    return re.test(text);
+  };
+  const score = (re: RegExp, s = subject, b = body): number => (has(re, s) ? 3 : 0) + (has(re, b) ? 1 : 0);
   const renew = score(/\b(renew(?:s|al|ed)?|auto-?renew|expires?|expiry|expiring)\b/iu);
   const ship = score(/\b(shipped|dispatched|tracking|out for delivery|delivery|booking|reservation|itinerary|check-?in|e-?ticket)\b/iu);
   const paid = score(/\b(receipt|you paid|payment received|thank you for your payment|paid in full)\b/iu);
-  const bill = score(/\b(invoice|amount due|balance due|bill|payment due)\b/iu);
-  /* THEY PAID US: a remittance names our invoice, so it outweighs the word "invoice" it carries. */
-  const remit = score(
-    /\b(remittance|(?:we|i)(?: have|['’]ve)?(?: now| just| today)? (?:paid|sent (?:the |your )?payment|made (?:the |your )?payment)|payment (?:has been |was )?(?:made|sent) (?:for|against|towards) (?:your |the )?invoice)\b/iu,
-  );
+  const remit = (has(REMIT_TITLE, subject) ? 3 : 0) + score(REMIT_SAID);
+  /* A REMITTANCE NAMES OUR INVOICE, so the word "invoice" inside its own words is not a bill's; any other is. */
+  const bill = score(/\b(invoice|amount due|balance due|bill|payment due)\b/iu, subject.replace(REMIT_TITLE, ' ').replace(REMIT_SAID, ' '), body.replace(REMIT_SAID, ' '));
   if (hasRenewDay && renew > 0 && renew >= Math.max(bill, paid, remit)) return 'renewal';
-  if (remit > 0 && remit >= paid) return 'remittance';
+  if (remit > 0 && remit >= paid && remit >= bill) return 'remittance';
   if (paid > 0 && paid >= bill) return 'receipt';
   if (bill > 0 && bill >= ship) return 'invoice';
   if (ship > 0) return 'shipping';

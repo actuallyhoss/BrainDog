@@ -247,7 +247,18 @@ function remittancePlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | 
   const { read } = f;
   if (!bills?.state || !read.ref) return null;
   const ref = read.ref;
-  const hits = rowsOf(deps, bills.id).filter((r) => whole(String(r.fields[bills.title] ?? '').toLowerCase(), ref));
+  /* ONLY A BILL OWED TO US IS THEIRS TO PAY (RL3): a reminder about a bill we owe never marks it paid, and a bill kept
+   * against somebody is theirs only when the mail comes from them. */
+  const fromThem = (r: Row): boolean => {
+    const party = bills.party ? r.fields[bills.party.id] : undefined;
+    if (typeof party !== 'string' || party === '' || !bills.party) return true;
+    const who = rowsOf(deps, bills.party.to).find((p) => p.id === party);
+    const kept = who ? JSON.stringify(who.fields).toLowerCase() : '';
+    return read.domain !== '' && (kept.includes(`@${read.domain.toLowerCase()}`) || (read.from !== null && kept.includes(read.from.email.toLowerCase())));
+  };
+  const hits = rowsOf(deps, bills.id).filter(
+    (r) => r.fields[bills.direction] === 'owed_to_me' && fromThem(r) && whole(String(r.fields[bills.title] ?? '').toLowerCase(), ref),
+  );
   const open = hits.filter((r) => r.fields[bills.state!] !== 'paid');
   if (open.length === 0) return hits.length > 0 ? { skipped: `Invoice ${ref} is already marked paid.` } : null;
   if (open.length > 1) return null;

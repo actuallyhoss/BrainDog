@@ -139,3 +139,15 @@ test('A REMITTANCE FOR AN INVOICE ALREADY PAID OFFERS NOTHING', async () => {
   assert.equal(got.suggestion, undefined);
   sql.close();
 });
+
+test('A REMINDER ABOUT A BILL HE OWES OFFERS NOTHING TO MARK PAID (RL3)', async () => {
+  const { k, sql } = await record();
+  value(k.create('dues', { what: 'Halden invoice INV-204', direction: 'owed_by_me', amount: { amount: 120000, currency: 'GBP' }, due: '2026-10-15' }, PERSON));
+  const got = mail(k, 'Halden <accounts@halden.example>', 'Payment for invoice INV-204', 'We have sent the payment for INV-204? Not yet, it seems.\nPlease send remittance.\n');
+  if (got.suggestion) {
+    const said = sql.one<{ note: string }>("SELECT note FROM event WHERE target = ? AND kind = 'suggest' ORDER BY rowid LIMIT 1", `suggestion:${got.suggestion}`);
+    assert.notEqual(said?.note, 'Mark invoice INV-204 paid?');
+  }
+  assert.equal(k.count('dues'), 1);
+  sql.close();
+});

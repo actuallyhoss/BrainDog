@@ -79,3 +79,16 @@ test('AN AMOUNT WRITTEN IN TEXT IS TAKEN OUT, its currency kept, and a number wi
   assert.equal(maskMoneyText('Room 42, 3 chairs, ABC 120, 2026-10-22'), 'Room 42, 3 chairs, ABC 120, 2026-10-22');
   assert.equal(maskMoneyText('01JZ8QK3F7R2M9V4XN6T9USD and e.Ab3GBP'), '01JZ8QK3F7R2M9V4XN6T9USD and e.Ab3GBP');
 });
+
+test('AN INVOICE WITH A REMITTANCE FOOTER IS STILL A BILL, and "we have paid the courier" is no remittance (RL3)', () => {
+  const footer = readMail({
+    from: 'Halden <accounts@halden.example>',
+    subject: 'Invoice INV-204, amount due £1,200',
+    body: 'Invoice INV-204\nAmount due: GBP 1,200.00\nPayment due by 14 November 2026\nPlease send remittance advice to accounts@halden.example\n',
+  });
+  assert.equal(footer.kind, 'invoice');
+  const courier = readMail({ from: 'a@b.example', subject: 'Your order', body: 'We have paid the courier, so the order ships Monday.\nInvoice to follow.' });
+  assert.notEqual(courier.kind, 'remittance');
+  const paid = readMail({ from: 'Priya <priya@nair.example>', subject: 'Payment for invoice INV-2026-041', body: 'We have paid invoice INV-2026-041 today.' });
+  assert.equal(paid.kind, 'remittance');
+});
