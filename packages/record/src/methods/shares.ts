@@ -253,10 +253,22 @@ export const badSaid = (text: string): string => {
  * something, and keeps its words, and so does one a colon leads up to ("Keys are here: [Keychain](/keychain)"), which is
  * the thing named (review i, RI3).
  */
-const wordsShown = (text: string): string =>
+export const wordsShown = (text: string): string =>
   badSaid(text)
+    /* A SENTENCE THAT ASKS HIM TO ADD SOMETHING IS HIS, NEVER THE LINK'S (audit 31 Oct o, AO9): Money's "[Add an
+       account](/r/accounts?new=1) to see what you have." was the first line a stranger read. It goes whole, as a link
+       that is its own sentence does below. */
+    .replace(/(?:^|(?<=[.!?…])[ \t]+)[^.!?…\n[]*\[[^\]]*\]\(\s*\/[^)]*[?&]new=1\b[^)]*\)[^.!?…\n]*[.!?…]?/gmu, '')
+    /* AND "BESIDES YOU" IS SAID TO THE OWNER: People's "1 person besides you" is "1 person" on a link. */
+    .replace(/ besides you\b/gu, '')
     .replace(/([.!?…])[ \t]+\[[^\]]*\]\(\s*[/#][^)]*\)[.!]?[ \t]*$/gmu, '$1')
     .replace(/\[([^\]]*)\]\(\s*[/#][^)]*\)/gu, '$1');
+
+/** A figure's cell's `sign`, the way its money goes, as the page declared it (`cells[].sign`). */
+const signOf = (r: unknown): 'in' | 'out' | undefined => {
+  const sign = isRecord(r) ? r.sign : undefined;
+  return sign === 'in' || sign === 'out' ? sign : undefined;
+};
 
 /** An address that leaves this BrainDog: the only kind of `url` value a shared row keeps. */
 const outward = (x: unknown): boolean => typeof x === 'string' && /^(?:https:\/\/|mailto:)/iu.test(x.trim());
@@ -1102,6 +1114,8 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
     else kept[key] = noteShown(prose ? pluralsSettled(text, bodyFill) : text, bodyFill, bodyCell, amount);
   }
   if (kept.body === '') delete kept.body;
+  /* A NOTE WHOSE EVERY WORD WAS HIS (AO9), Money's "Add an account to see what you have.", is no block on a link. */
+  if (prose && kept.body === undefined && kept.heading === undefined && typeof block.body === 'string' && block.body.trim() !== '' && block.readings === undefined) return null;
 
   /* `figures`, WHAT EACH FIGURE THE BLOCK NAMES IS AS DECLARED (`pages.ts` `figuresOf`), IS NEVER SENT: its `where` and
      `source` name lists and fields, and its `target` is a number in the figure's own money. A shared block says each
@@ -1217,6 +1231,8 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
       label: r.label ?? figure(r.metric) ?? idSaid(r.metric),
       /* AND HOW IT IS WRITTEN (SB1): a day the money runs out is held as days since 1970, and said "20,756" without it. */
       ...(typeof r.format === 'string' && FIGURE_FORMATS.test(r.format) ? { format: r.format } : {}),
+      /* AND THE WAY ITS MONEY GOES (AO9), as the owner's tile signs it: "+£11,490" to come in, "−£43,047" going out. */
+      ...(signOf(r) === undefined ? {} : { sign: signOf(r) }),
       reading: readingShown(r.reading),
       ...(r.trend === undefined ? {} : { trend: r.trend }),
       ...(r.target === undefined ? {} : { target: r.target }),

@@ -240,6 +240,33 @@
   /* WHERE YOU ARE, IN THE PHONE'S BAR: the shell's lit row, else this page's name. */
   const where = $derived(frame.here || title);
 
+  /* A GREETING THAT DOES NOT FIT THE PHONE'S BAR LOSES ITS "GOOD" (audit 31 Oct o, AO15): "Good morning, Nad…" cut a
+     five-letter name at 390, where "Morning, Nadia" says it whole. Only when the whole line overflows, read off the bar
+     itself, so a short name keeps "Good morning", and the width it needed is kept so a wider bar takes it back. */
+  let whereEl = $state<HTMLElement | null>(null);
+  let tight = $state(false);
+  const shortGreeting = (s: string): string | null => {
+    const m = /^Good (morning|afternoon|evening)(, .+)$/u.exec(s);
+    return m ? `${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)}${m[2]!}` : null;
+  };
+  const whereShown = $derived(tight ? (shortGreeting(where) ?? where) : where);
+  $effect(() => {
+    const el = whereEl;
+    const said = where;
+    tight = false;
+    if (!el || shortGreeting(said) === null || typeof ResizeObserver === 'undefined') return;
+    let needs = 0;
+    const fit = () => {
+      if (!tight && el.scrollWidth > el.clientWidth + 1) {
+        needs = el.scrollWidth;
+        tight = true;
+      } else if (tight && el.clientWidth >= needs) tight = false;
+    };
+    const watch = new ResizeObserver(fit);
+    watch.observe(el);
+    return () => watch.disconnect();
+  });
+
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
   const parts = $derived(typeof sentence === 'string' ? partsOf(stopped(sentence), needs) : null);
 
@@ -265,7 +292,7 @@
   {/if}
   <div class="bar-lead">
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
-    <p class="bar-where" dir="auto">{where}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
+    <p class="bar-where" dir="auto" bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
     <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
   </div>
   <span class="bar-end">

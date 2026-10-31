@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import type { RegisterDecl } from '@braindog/kernel';
 
-import { addressOnly, badSaid, leadShown, pluralsSettled, voiced } from '../src/methods/shares.ts';
+import { addressOnly, badSaid, leadShown, pluralsSettled, voiced, wordsShown } from '../src/methods/shares.ts';
 
 const said = (values: Record<string, string>) => (key: string): string | undefined => values[key];
 
@@ -63,4 +63,11 @@ test('a word in the danger colour is said as its words on a link (AN3)', () => {
   assert.equal(badSaid('{{bad:{{tasks.late}} late}} and more'), '{{tasks.late}} late and more');
   assert.equal(badSaid('{{ bad : late {estimate}}}'), 'late {estimate}');
   assert.equal(badSaid('{{bad:overdue'), '{{bad:overdue');
+});
+
+test('a link is read by somebody else: no line asking the owner to add, and no "besides you" (AO9)', () => {
+  assert.equal(wordsShown('[Add an account](/r/accounts?new=1) to see what you have.'), '');
+  assert.equal(wordsShown('You hold 3. [Add one](/r/accounts?new=1) for more. Then rest.'), 'You hold 3. Then rest.');
+  assert.equal(wordsShown('{{people-count}} person(s) besides you'), '{{people-count}} person(s)');
+  assert.equal(wordsShown('Kept in the [Keychain](/keychain).'), 'Kept in the Keychain.');
 });

@@ -268,8 +268,10 @@ export const TEAM = {
      an instruction read as half a sentence. The list's id stays. Words only, so a patch step; 2.30.2 is published.
      2.30.4 (audit 31 Oct m, AM17): People is called People, as the rail, Today and the People page say it, where the
      list was Teammates and sat apart under More lists; a team keeps clients and people it met there too. The setting
-     stays. Words only, so a patch step; 2.30.3 is published. */
-  version: '2.30.4',
+     stays. Words only, so a patch step; 2.30.3 is published.
+     2.30.5 (audit 31 Oct o, AO14): Sprints draws its own glyph, where it drew Menu's three lines on the phone bar. The
+     look only, so a patch step; 2.30.4 is published. */
+  version: '2.30.5',
   title: 'Team board',
   summary: 'Tickets, sprints and the agents on them.',
   author: 'BrainDog',
@@ -576,7 +578,9 @@ export const TEAM = {
            its lists hold only what the starter planted. */
         /* THE SECTION IS CALLED BY WHAT IT HOLDS, SINCE 2.30.2 (UP2): it was "Team", which read as the people on it. */
         nav: { section: 'Sprints', order: 10, place: 20 },
-        icon: 'rows',
+        /* ITS OWN GLYPH, SINCE 2.30.5 (audit 31 Oct o, AO14): it was `rows`, the three lines the phone bar's Menu draws,
+           so Team's bar showed Sprints and Menu alike. A sprint comes round again. */
+        icon: 'refresh',
         requires: ['register.tasks', 'register.cycles', 'register.cycle_plan'],
         blocks: [
           {

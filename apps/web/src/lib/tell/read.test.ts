@@ -1061,3 +1061,16 @@ test('A NAME ENDING IN "ING" CAN BE SOMEBODY; A WORD FOR WORK STAYS NOBODY (RO8)
   assert.deepEqual(tellRead('Paid Xiaoling 300', founder).rows.map((r) => r.register), ['people', 'obligations']);
   assert.ok(!tellRead('Paid Cleaning 300', founder).rows.some((r) => r.register === 'people'));
 });
+
+test('A LINE THAT FITS NOWHERE, ON A RECORD WITH NO THINGS TO DO, IS OFFERED A TO-DO LIST, AND THEN KEEPS ITS DAY (AO7)', () => {
+  const personal = { lists: [PEOPLE, THINGS, DUE], today: TODAY, currency: 'EGP' };
+  const before = tellRead('Run 10k on Saturday morning', personal);
+  assert.equal(before.rows.length, 0);
+  assert.equal(before.needsTodo, true);
+  /* Once Work is on, the same words are a task due that Saturday. */
+  const after = tellRead('Run 10k on Saturday morning', { ...personal, lists: [...personal.lists, TASKS] });
+  assert.deepEqual(after.rows.map((r) => r.register), ['tasks']);
+  assert.equal(after.needsTodo, undefined);
+  /* A record that keeps Work is never offered it. */
+  assert.equal(tellRead('Run 10k on Saturday morning', founder).needsTodo, undefined);
+});

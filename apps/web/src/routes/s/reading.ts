@@ -142,10 +142,10 @@ const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typ
  * One typed cell by its type, as the owner's own table draws it: an amount as Money writes it, a duration and a share
  * in words ("3 days", "60%"), a day as "30 Aug", an agent by its name. `minus` turns an amount the row says went out.
  */
-function typedSaid(type: string, value: unknown, label: string | undefined, where: Where, minus = false, unit?: string, field?: string): Said {
+function typedSaid(type: string, value: unknown, label: string | undefined, where: Where, minus = false, unit?: string, field?: string, plus = false): Said {
   if (type === 'money' && isObject(value) && typeof value.amount === 'number') {
     const m = moneySaid(minus ? -value.amount : value.amount, value.currency, where.pence === true ? 'pence' : 'exact', where.home ?? null);
-    return m === null ? { text: '' } : { money: m };
+    return m === null ? { text: '' } : { money: plus && value.amount > 0 && !minus ? plusOf(m) : m };
   }
   if (type === 'quantity' && isObject(value) && typeof value.value === 'number')
     return { text: withUnit(numberSaid(value.value, where.language), typeof value.unit === 'string' ? value.unit : null) };
@@ -158,6 +158,12 @@ function typedSaid(type: string, value: unknown, label: string | undefined, wher
   if (type === 'instant' && typeof value === 'string') return { text: since(value, where.now, where.zone) };
   return { text: plainSaid(value, where) };
 }
+
+/**
+ * AN AMOUNT COMING IN, SIGNED AS THE APP SIGNS IT (audit 31 Oct o, AO9): the owner reads "+EGP 3,000" for a payment from
+ * Upwork where its column says which way money goes, and the link read "EGP 3,000". Nought and a minus are left.
+ */
+const plusOf = (m: Drawn & { text: string }): Drawn & { text: string } => ({ ...m, lead: `+${m.lead}`, text: `+${m.text}` });
 
 /** A list's cell: each value by the type it holds, joined. An amount in a list is said whole, one after another. */
 function listSaid(cell: SharedCell, where: Where): Said {
@@ -199,7 +205,7 @@ function fieldSaid1(row: SharedRow, column: Pick<SharedColumn, 'field' | 'sign'>
   if (cell.type === 'list') return listSaid(cell, where);
   const sign = column.sign;
   const minus = sign !== undefined && (row.cells[sign.field]?.value ?? row.fields[sign.field]) === sign.minus;
-  return typedSaid(cell.type, cell.value, cell.label, where, minus, cell.unit, column.field);
+  return typedSaid(cell.type, cell.value, cell.label, where, minus, cell.unit, column.field, sign !== undefined);
 }
 
 /** A figure: an amount when its unit is a currency, a count with its unit, or the words for a reading with none. */
@@ -216,19 +222,23 @@ export function trendLine(r: SharedReading): number[] | null {
 
 /** One point of a figure's trend in words, as the figure itself is written: "EGP 80,115.99", "42 %". */
 export function pointSaid(r: SharedReading, n: number, where: Where): string {
-  const s = figureSaid({ ...r, value: n }, where);
+  const { sign: _sign, ...unsigned } = r;
+  const s = figureSaid({ ...unsigned, value: n }, where);
   return 'money' in s ? s.money.text : s.text;
 }
 
 export function figureSaid(r: SharedReading, where: Where): Said {
   if (r.value === null) return { text: words.sharedNoFigure };
+  /* A FIGURE ITS TILE SIGNS (AO9) is said the way its money goes: "+£11,490" to come in, "−£43,047" going out. */
+  const value = r.sign === 'out' && r.value > 0 ? -r.value : r.value;
+  const signed = (m: Drawn & { text: string }): Drawn & { text: string } => (r.sign === 'in' && value > 0 ? plusOf(m) : m);
   if (r.unit !== null && CURRENCY.test(r.unit)) {
-    const m = moneySaid(r.value, r.unit, 'headline', where.home ?? null);
-    if (m !== null) return { money: m };
+    const m = moneySaid(value, r.unit, 'headline', where.home ?? null);
+    if (m !== null) return { money: signed(m) };
   }
   if (r.unit === null && r.format !== undefined) {
-    const said = formatSaid(r.format, r.value, where);
-    if (said !== null) return said;
+    const said = formatSaid(r.format, r.format.startsWith('money') ? value : r.value, where);
+    if (said !== null) return 'money' in said ? { money: signed(said.money) } : said;
   }
   return { text: withUnit(numberSaid(r.value, where.language), r.unit) };
 }

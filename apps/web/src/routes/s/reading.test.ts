@@ -61,6 +61,10 @@ test('a money cell is drawn whole in its own currency, and turned when its row s
   assert.equal(said(cellSaid(row, { field: 'total' }, where)), 'EGP 1,234.50');
   assert.equal(said(cellSaid(row, { field: 'total', sign: { field: 'way', minus: 'out' } }, where)), '−EGP 1,234.50');
   assert.equal(said(cellSaid(row, { field: 'way' }, where)), 'Paid out');
+  /* COMING IN, ITS PLUS KEPT AS THE APP KEEPS IT (AO9). */
+  assert.equal(said(cellSaid(row, { field: 'total', sign: { field: 'way', minus: 'in' } }, where)), '+EGP 1,234.50');
+  assert.equal(said(figureSaid({ metric: 'arriving-30d', value: 1_149_000, unit: 'GBP', sign: 'in' }, { ...where, home: 'GBP' })), '+£11,490');
+  assert.equal(said(figureSaid({ metric: 'leaving-30d', value: 4_304_700, unit: 'GBP', sign: 'out' }, { ...where, home: 'GBP' })), '−£43,047');
   const gbp = moneySaid(999, 'GBP');
   assert.equal(gbp?.text, '£9.99', 'no home: sterling by its own sign');
 });

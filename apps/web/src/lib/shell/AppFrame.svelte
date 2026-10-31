@@ -1184,6 +1184,7 @@
     frame.records = records;
     frame.refused = recordsRefused;
     frame.person = personName;
+    frame.actor = data.me.person;
     frame.open = (r) => void openOther(r);
     frame.news = data.whatsNew ?? [];
     frame.asks = open;

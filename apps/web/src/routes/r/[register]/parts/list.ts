@@ -593,6 +593,7 @@ const words = {
   open: (n: number) => `${n} open`,
   atWork: (n: number) => `${n} at work`,
   toSettle: (n: number) => `${n} to settle`,
+  toShip: (n: number) => `${n} to ship`,
   renew: (n: number) => `${n} renew`,
   nextNamed: (title: string, when: string) => `next ${title} ${when}`,
   nothingOpen: 'Nothing is open',
@@ -677,7 +678,9 @@ export function readingOf(
       ? `${words.atWork(atWorkIn(entries, now))}, ${words.open(open.length)}`
       : decl.state && staged
         ? settles && dated
-          ? words.toSettle(open.length)
+          ? /* ORDERS ARE SHIPPED, NOT SETTLED (audit 31 Oct o, AO16): the list said "3 to settle" where the Orders page
+               over the same rows says "3 to ship". One word for one count. */
+            (/^orders?$/iu.test(decl.one ?? '') || /^orders?$/iu.test(decl.name) ? words.toShip : words.toSettle)(open.length)
           : words.open(open.length)
         : counted(decl, open.length);
   /* A LINE THAT IS ONLY THE COUNT IS NOT SAID: the head beside the title already draws it ("Projects 4" over "4 projects."). */
