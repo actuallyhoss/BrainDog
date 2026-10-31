@@ -184,6 +184,10 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
     '```',
     '',
     'Settled by research. The comparison is D41.',
+    '',
+    'Oldest balance from last week. [Update](/r/balances?new=1)',
+    '',
+    'Keys are kept in the [Keychain](/keychain).',
   ].join('\n');
   value(await api.kernel.install([INVOICES, page('notes', [{ kind: 'note', heading: 'Notes', body }])]));
   sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
@@ -199,7 +203,10 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
   assert.match(note, /^\d{1,2} Aug \| Raised the studio tier/mu);
   assert.match(note, /Letting it lapse breaks links\.\n```/u);
   assert.match(note, /^Settled by research\.$/mu);
-  assert.doesNotMatch(note, /SG31|D41|Tracked|invoices|\{\{|\}\}|\u0000/u);
+  /* PL1: A LINK THAT IS ITS OWN SENTENCE IS A THING TO DO, and goes; one inside a sentence keeps its words. */
+  assert.match(note, /^Oldest balance from last week\.$/mu);
+  assert.match(note, /^Keys are kept in the Keychain\.$/mu);
+  assert.doesNotMatch(note, /SG31|D41|Tracked|invoices|Update|\{\{|\}\}|\u0000/u);
   sql.close();
 });
 
