@@ -14,7 +14,7 @@
  */
 
 import { RULE_NAMES, SCRIPT_NAMES } from '@braindog/seed/usecases/names';
-import { handleName } from 'braindog-render';
+import { handleName, timelineTitle } from 'braindog-render';
 
 import { copy } from '../copy/frame.ts';
 import { REGISTERS } from './held.ts';
@@ -91,10 +91,12 @@ const HANDLED: ReadonlySet<string> = new Set(['tools', 'skills']);
 
 /**
  * A ROW'S NAME AS A PERSON READS IT: a tool or a skill by its name ("Fenwick", "Review PR", "Nordhaven DNS") rather than
- * the handle it is filed under (audit of 31 October, A19), and every other row by its title as written. Only for drawing:
+ * the handle it is filed under (audit of 31 October, A19), a Ledger line's bank capitals as words (B4: its page was titled
+ * "HALDEN TYPE CO INV 2026-035"), and every other row by its title as written. Only for drawing:
  * a field being edited, a search and a merge keep the title as it is stored.
  */
-export const rowNameSaid = (register: string, title: string): string => (HANDLED.has(register) ? handleName(title) : title);
+export const rowNameSaid = (register: string, title: string): string =>
+  HANDLED.has(register) ? handleName(title) : register === 'transactions' ? timelineTitle(title) || title : title;
 
 /**
  * What a list is called, by its id: the name its declaration gives, else its id in words.

@@ -393,8 +393,9 @@ const unitAfter = (unit: string | null | undefined): string => (unit ? `${unit =
  * the seed's frozen 3 September 2026, so a live screen that passed nothing banded a record's instants against the
  * sample's day; the sample's readers in `fixtures/readers.ts` pass the sample's clock themselves.
  */
-/** The fields that hold a payee's name or the words a rule matches, which a bank sends in capitals. */
-const BANK_WORDS: ReadonlySet<string> = new Set(['transactions.payee', 'filing_rules.match']);
+/** The fields that hold a payee's name, a Ledger line's description or the words a rule matches, which a bank sends in
+    capitals. Said as words on screen only: the stored text is untouched (B4, the Ledger's own table). */
+const BANK_WORDS: ReadonlySet<string> = new Set(['transactions.payee', 'transactions.what', 'filing_rules.match']);
 
 export function display(
   register: string,
