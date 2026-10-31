@@ -479,7 +479,7 @@ export type Diff = {
    * `lane.sold` for a value). `install` stages the update's body as the pack's and this one after it as the owner's, so
    * the owner's row stays detached from the pack's newest body and the next update is asked the same question.
    */
-  kept: { id: string; adds?: string[]; rebased?: string; words?: string[] }[];
+  kept: { id: string; adds?: string[]; rebased?: string; words?: string[]; rail?: true }[];
   /**
    * What this version adds to a page the owner changed, which the install keeps as the owner left it: the title, when
    * the update gives the page another one, and each block the update's page has that the page the edit started from
@@ -1875,7 +1875,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
         /* A PAGE KEPT TAKES THE UPDATE'S WORDS WHERE IT STILL SAYS THE PACK'S OLD ONES (`reworded`, UP1): staged as a
            rebased list is, the update's page as the pack's and the owner's after it, so the next update starts from this one. */
         const worded = decl.kind === 'page' ? rewordedPage(edited.body, already.body, decl.canonical) : null;
-        kept.push({ id: decl.id, ...(worded === null ? {} : { rebased: worded.body, words: worded.words }) });
+        kept.push({ id: decl.id, ...(worded === null ? {} : { rebased: worded.body, words: worded.words, ...(worded.rail ? { rail: true as const } : {}) }) });
         /* AND WHAT THE OWNER'S PAGE GOES WITHOUT IS NAMED (`Diff.brings`), so Decide asks once instead of keeping
            the page and saying nothing of the table the update was written for. Asked of the page with the new words in,
            so a heading or title the update only reworded is carried and not offered again as something missing. */
@@ -2806,11 +2806,11 @@ function movedFields(was: string, now: unknown): { fields: Map<string, Record<st
 const keptKind = (id: string): DeclKind => (id.startsWith('page.') ? 'page' : 'register');
 
 /** The owner's page with the update's words carried in (`reworded`), as stored text, or `null` for no word to carry. */
-function rewordedPage(from: string, mine: string, now: string): { body: string; words: string[] } | null {
+function rewordedPage(from: string, mine: string, now: string): { body: string; words: string[]; rail?: true } | null {
   try {
     const out = reworded(JSON.parse(from) as Json, JSON.parse(mine) as Json, JSON.parse(now) as Json);
     const body = out === null ? null : canonicalise(out.body);
-    return out === null || body === null ? null : { body, words: out.words };
+    return out === null || body === null ? null : { body, words: out.words, ...(out.rail ? { rail: true as const } : {}) };
   } catch {
     return null;
   }

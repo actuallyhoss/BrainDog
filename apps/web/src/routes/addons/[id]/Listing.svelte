@@ -494,7 +494,8 @@
         if (entry && trust) await keepFirstKey(keys, `${entry.kind}:${entry.id}`, trust);
         /* A run that took other updates in first names them (`offer.ts` `installInTurn`), so nobody finds one moved unsaid. */
         const title = addingFirst !== null ? moduleTitle(addingFirst) : listing.title;
-        toasts.push(out.first ? turnWords.installedAfter(title, out.first) : copy.shareInstalled(title), { intent: 'good' });
+        /* AND WHAT THE UPDATE CARRIED INTO A PAGE OR LIST HE CHANGED, in the record's own words (RJ6). */
+        toasts.push([out.first ? turnWords.installedAfter(title, out.first) : copy.shareInstalled(title), ...(out.said ?? [])].join(' '), { intent: 'good' });
         planned = null;
         const wasFirst = addingFirst !== null;
         addingFirst = null;

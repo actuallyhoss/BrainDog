@@ -3624,7 +3624,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     installed: () => installedState(),
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
     shelf: deps.catalogueShelf,
-    kept: (pack, diff, packSaid) => void keptAsk(pack, diff, packSaid),
+    kept: (pack, diff, packSaid) => {
+      try {
+        keptAsk(pack, diff, packSaid);
+      } catch {
+        /* The page is kept either way. */
+      }
+      return rewordSaid(diff);
+    },
   });
 
   /** The caller's own read of each list, which is all of the record Slash is handed for her (`readUsage`). */
@@ -4535,20 +4542,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return typeof name === 'string' && name.trim() !== '' ? `your ${name} list` : 'a list of yours';
   };
   /**
-   * WHAT THE NIGHT CARRIED INTO A PAGE OR LIST HE CHANGED, said (RH9): the update's new words, put in only where his page
-   * or list still said the pack's old ones (`reworded`, `relisted` in `@braindog/declare`). Carried silently, his
-   * words looked changed behind his back. One line each, the first few words named.
+   * WHAT AN UPDATE CARRIED INTO A PAGE OR LIST HE CHANGED, said (RH9, RJ6): the update's new words, put in only where his
+   * page or list still said the pack's old ones (`reworded`, `relisted` in `@braindog/declare`). Carried silently, his
+   * words looked changed behind his back. Said wherever an update goes in: the night's pass, Decide and Add-ons.
+   *
+   * IN PLAIN WORDS ONLY. A word that still holds a figure's slot (`{{overdue}}`), a link's markup (`](`) or is a path
+   * is not what he reads on the page, so it is counted as "and N more" and never shown raw. The rail line is said only
+   * when the page's place on the rail moved (`rail`), never for a word the update emptied.
    */
   const rewordSaid = (diff: Awaited<ReturnType<typeof plan>>): string[] =>
     diff.kept.flatMap((k) => {
       if (k.rebased === undefined || k.words === undefined) return [];
-      const whose = k.id.startsWith('page.') ? ownPageSaid(k.id) : ownListSaid(k.id);
+      const page = k.id.startsWith('page.');
+      const whose = page ? ownPageSaid(k.id) : ownListSaid(k.id);
       const Whose = whose.charAt(0).toUpperCase() + whose.slice(1);
-      if (k.words.length === 0) return k.id.startsWith('page.') ? [`${Whose} takes the update's place for it on the rail.`] : [];
-      const shown = k.words.slice(0, 3).map((w) => `"${w.length > 60 ? `${w.slice(0, 59).trimEnd()}…` : w}"`);
+      const rail = page && k.rail === true ? [`${Whose} takes the update's place for it on the rail.`] : [];
+      if (k.words.length === 0) return rail;
+      const plain = k.words.filter((w) => w.trim() !== '' && !w.includes('{{') && !w.includes('](') && !w.trimStart().startsWith('/'));
+      const shown = plain.slice(0, 3).map((w) => `"${w.length > 60 ? `${w.slice(0, 59).trimEnd()}…` : w}"`);
       const more = k.words.length - shown.length;
+      if (shown.length === 0) return [`${Whose} takes the update's new words in ${more === 1 ? 'one place' : `${more} places`} where it still had the old ones. What you wrote yourself stays.`, ...rail];
       const named = more > 0 ? `${shown.join(', ')} and ${more} more` : shown.length === 1 ? shown[0]! : `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)!}`;
-      return [`${Whose} takes the update's new words where it still had the old ones: ${named}. What you wrote yourself stays.`];
+      return [`${Whose} takes the update's new words where it still had the old ones: ${named}. What you wrote yourself stays.`, ...rail];
     });
   /** File the one question for an update that is in, and answer its sentence for the night's log, or `null` for none. */
   const keptAsk = (pack: Parameters<typeof plan>[0], diff: Awaited<ReturnType<typeof plan>>, packSaid: (id: string) => string): string | null => {
@@ -14706,6 +14721,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         } catch {
           /* The page is kept either way. */
         }
+      /* AND WHAT IT REWORDED ON A PAGE OR LIST HE CHANGED IS IN THE ANSWER (RJ6), as the night says it in its log. */
+      let reworded: string[] = [];
+      if (put.ok)
+        try {
+          reworded = rewordSaid(diff);
+        } catch {
+          /* The words are in either way. */
+        }
       /* A USE CASE INSTALLED BESIDE THE ONE SPEAKING NEVER TAKES ITS VOICE (`declare` `voiceWhenAdding`), whichever way the ids
          sort: the answer is written down. A person who chose the new one to speak says so with its setting after. */
       if (put.ok && from === null && spoke !== null && pack.value.manifest.pack.startsWith('usecase-')) writeVoice(kernel, spoke, actorOf(ctx));
@@ -14713,7 +14736,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          what this install brought is there with no press, signed by whoever installed it. */
       if (put.ok) await waitedFor(ctx);
       if (put.ok) await legsFollow(ctx);
-      return tail(put);
+      return tail(put.ok && reworded.length > 0 ? { ...put, value: { ...put.value, said: reworded } } : put);
     },
 
     /** Take one back out. Its declarations are retired and its rows are kept, which is the point. */

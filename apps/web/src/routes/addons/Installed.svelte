@@ -424,7 +424,8 @@
     if (out.ok) {
       if (out.nav) pref.write({ nav: out.nav });
       if (u?.entry && u.trust) await keepFirstKey(keys, u.key, u.trust);
-      toasts.push(words.installed(title), { intent: 'good' });
+      /* AND WHAT THE UPDATE CARRIED INTO A PAGE OR LIST HE CHANGED, in the record's own words (RJ6). */
+      toasts.push([words.installed(title), ...(out.said ?? [])].join(' '), { intent: 'good' });
       return true;
     }
     if (u && notOwner(out.code)) await askOwner(u, p);
@@ -470,7 +471,7 @@
     if (out.ok) {
       if (out.nav) pref.write({ nav: out.nav });
       if (u.entry && u.trust) await keepFirstKey(keys, u.key, u.trust);
-      toasts.push(out.first ? turnWords.installedAfter(u.title, out.first) : words.installed(u.title), { intent: 'good' });
+      toasts.push([out.first ? turnWords.installedAfter(u.title, out.first) : words.installed(u.title), ...(out.said ?? [])].join(' '), { intent: 'good' });
       return true;
     }
     const stopped = (updates ?? []).find((o) => o.key === at.key) ?? u;
