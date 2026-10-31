@@ -94,7 +94,7 @@ const lightFrame = new Set<string>();
 const kitEntry = new Set<string>();
 const lightDeps = new Set<string>();
 const LIGHT_FRAME = /[\\/]src[\\/]lib[\\/]shell[\\/]LightFrame\.svelte$/u;
-const LIGHT_PAGE = /[\\/]src[\\/]routes[\\/](?:signin|signup)[\\/](?:desktop[\\/])?\+page\.svelte$/u;
+const LIGHT_PAGE = /[\\/]src[\\/]routes[\\/](?:signin|signup|s)[\\/](?:desktop[\\/])?\+page\.svelte$/u;
 
 const entryGraphPlugin: Plugin = {
   name: 'braindog:entry-graph',
