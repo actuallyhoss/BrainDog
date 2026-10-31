@@ -24,8 +24,14 @@ export type Drawing = { segments: Segment[]; table: { columns: Column[]; rows: T
 /** A said value as one line of words. */
 const textOf = (s: Said): string => ('money' in s ? s.money.text : s.text);
 
-/** A cell as the dialect holds one: one line, its own pipes and backslashes escaped, as `blocks.ts` writes a cell. */
-export const escapeCell = (c: string): string => c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+/**
+ * A cell as the dialect holds one: one line, its own pipes and backslashes escaped, as `blocks.ts` writes a cell. AND
+ * NEVER A LINE THAT CLOSES THE FENCE (RH15): a row whose first cell is three backticks or more read as the fence's end,
+ * and every row after it as page words. The dialect has no escape for a backtick, so an invisible space goes after the
+ * first one, and the cell still reads as written.
+ */
+export const escapeCell = (c: string): string =>
+  c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|').replace(/^`(?=``)/u, '`\u200b');
 
 /**
  * THE STATES A ROW IS FINISHED IN, which a shared `todo` ticks: the block's lists' own `done:`, as the record sends it

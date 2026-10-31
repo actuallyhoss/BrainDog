@@ -57,7 +57,7 @@ import { openSqlite, signedWebhooks, start } from './server.ts';
 import { rewrapAtStart } from './rewrap.ts';
 import { webhookPost } from './actions.ts';
 import { outboundOf } from './script.ts';
-import { authMail, mailedNotices, smtpCheck, smtpLine, smtpOf, smtpSender } from './smtp.ts';
+import { authMail, mailedNotices, smtpCheck, smtpLine, smtpOf, smtpSender, type MailFault } from './smtp.ts';
 
 /**
  * One sentence on stderr, and nothing on stdout, ever.
@@ -733,7 +733,10 @@ async function serve(): Promise<void> {
   const smtp = smtpOf(env.BRAINDOG_SMTP_URL, env.BRAINDOG_MAIL_FROM);
   if (smtp && 'wrong' in smtp) return refuse(smtp.wrong);
   const send = smtp ? smtpSender(smtp) : undefined;
-  const notices = send ? mailedNotices(send) : undefined;
+  /* A MAIL THAT FAILS IS A FAULT ON HEALTH AND ONE THAT GOES OUT CLEARS IT, THE SUMMARIES AS WELL AS THE SIGN-IN MAILS
+     (PK4, RH14): the record is told once `start` below has opened it, and a mail before that is said in the log alone. */
+  const mailFault: MailFault = { failed: (error) => running.api.kernel.mailFailed(error), sent: () => running.api.kernel.mailSent() };
+  const notices = send ? mailedNotices(send, mailFault) : undefined;
   const webhooks = signedWebhooks(webhookPost());
 
   /* THE OPERATOR'S SWITCH (`49 §5.24`): an add-on's requests to other servers leave only when `BRAINDOG_OUTBOUND=on`.
@@ -781,7 +784,7 @@ async function serve(): Promise<void> {
     deliver: (job, keys) => (job.kind === 'notify.email' && notices ? notices(job) : webhooks(job, keys)),
     /* SIGN-IN LINKS, AN INVITATION'S PROOF AND THE PASSKEY NOTICES go out the same way, and `start` turns links on with it. */
     /* AND ONE THAT FAILS IS A FAULT ON HEALTH (PK4), told to the record once it is open. */
-    ...(send ? { mail: authMail(send, say, { failed: (error) => running.api.kernel.mailFailed(error), sent: () => running.api.kernel.mailSent() }) } : {}),
+    ...(send ? { mail: authMail(send, say, mailFault) } : {}),
     /* AND MAIL THIS HOST CANNOT SEND IS SAID ONCE rather than left to wait unseen. The jobs stay queued, where dropping
        them would lose the digest somebody was promised; `start` says nothing when `notify.email` is delivered. */
     unsentMail: (waiting) =>

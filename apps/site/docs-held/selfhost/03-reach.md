@@ -41,7 +41,7 @@ BRAINDOG_ORIGIN=https://braindog.example.com
 BRAINDOG_TRUST_PROXY=1
 ```
 
-`BRAINDOG_TRUST_PROXY=1` makes the server read the client's address from the proxy, so the sign-in lockout counts the person trying rather than the proxy. Only set it when every request really comes through the proxy. `1` believes anything on this machine or your local network, so if other machines can reach the port, put the proxy's own address there instead, such as `127.0.0.1`, or `172.16.0.0/12` for a proxy in Docker.
+`BRAINDOG_TRUST_PROXY=1` makes the server read the client's address from the proxy, so the sign-in lockout counts the person trying rather than the proxy. Only set it when every request really comes through the proxy. `1` believes anything on this machine or your local network, so if other machines can reach the port, put the proxy's own address there instead, such as `127.0.0.1`, or the proxy container's address in Docker. A range such as `172.16.0.0/12` works too, but then wrong keys through the proxy are also rate limited, to one every two seconds after 200 in fifteen minutes.
 
 ## Names, not addresses
 

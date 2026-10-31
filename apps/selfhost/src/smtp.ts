@@ -281,7 +281,7 @@ const recipients = (v: unknown): string[] | null => {
  * IT THROWS ON FAILURE AND DECIDES NO RETRIES, as every deliverer here does: the record's ladder retries a 4xx and a
  * dropped connection the same way, and a dead letter names the stage for the owner.
  */
-export function mailedNotices(send: SendLetter): (job: OutboxRow) => Promise<void> {
+export function mailedNotices(send: SendLetter, fault?: MailFault): (job: OutboxRow) => Promise<void> {
   return async (job) => {
     let payload: { to?: unknown; subject?: unknown; text?: unknown };
     try {
@@ -294,7 +294,17 @@ export function mailedNotices(send: SendLetter): (job: OutboxRow) => Promise<voi
     if (!to || subject === '') throw new Error('a notify.email needs a recipient and a subject');
     if (to.length > MOST_RECIPIENTS)
       throw new Error(`a notify.email goes to at most ${String(MOST_RECIPIENTS)} addresses, and this one names ${String(to.length)}`);
-    await send({ to, subject, text: typeof payload.text === 'string' ? payload.text : '' });
+    /* ONLY THE SEND ITSELF IS TOLD TO HEALTH (RH14): a payload this host cannot read is the queue's fault, not the mail
+       server's, and its dead letter already says so. A summary that goes out clears a standing fault, as a sign-in mail does. */
+    try {
+      await send({ to, subject, text: typeof payload.text === 'string' ? payload.text : '' });
+    } catch (e) {
+      const why = withoutAddresses(e instanceof Error ? e.message : 'the mail server did not take it');
+      if (fault) tellRecord(() => fault.failed(`a summary mail was not sent: ${why}`));
+      /* THROWN ON WITHOUT ITS ADDRESSES, so the dead letter the outbox keeps names nobody either. */
+      throw new Error(why);
+    }
+    if (fault) tellRecord(fault.sent);
   };
 }
 
@@ -343,6 +353,23 @@ export function letterOf(kind: SignInMailKind | undefined, link: string): { subj
 /** Where a mail that went out or failed is told to the record, so Health says it (PK4). */
 export type MailFault = { failed: (error: string) => void; sent: () => void };
 
+/** Tell the record, which may not be open yet or may be refused: the log line still says it. */
+function tellRecord(f: () => void): void {
+  try {
+    f();
+  } catch {
+    /* Nothing to tell yet. */
+  }
+}
+
+/**
+ * A mail server's refusal with every address in it taken out (RH14). The raw text is kept on Health and printed in the
+ * log, and a server's `550 <someone@example.com> no such user` names who the mail was for.
+ */
+export function withoutAddresses(error: string): string {
+  return error.replace(/<?[^\s<>"'(),;:]+@[^\s<>"'(),;:]+>?/gu, 'an address');
+}
+
 /**
  * What the auth door calls to mail a person: called and not awaited, so a known and an unknown address answer in the same
  * time, and it never throws. A send that fails is said in one line that names the kind and never the address or the link,
@@ -350,21 +377,14 @@ export type MailFault = { failed: (error: string) => void; sent: () => void };
  * owner looked. The next mail that goes out clears it.
  */
 export function authMail(send: SendLetter, say: (line: string) => void, fault?: MailFault): (to: string, link: string, kind?: SignInMailKind) => void {
-  const told = (f: () => void): void => {
-    try {
-      f();
-    } catch {
-      /* The record is not open yet or refused: the log line still says it. */
-    }
-  };
   return (to, link, kind) => {
     const letter = letterOf(kind, link);
     void send({ to, ...letter }).then(
-      () => fault && told(fault.sent),
+      () => fault && tellRecord(fault.sent),
       (e: unknown) => {
-        const why = e instanceof Error ? e.message : 'the mail server did not take it';
+        const why = withoutAddresses(e instanceof Error ? e.message : 'the mail server did not take it');
         say(`braindog · a ${kind ?? 'sign-in'} mail was not sent: ${why}`);
-        if (fault) told(() => fault.failed(`a ${kind ?? 'sign-in'} mail was not sent: ${why}`));
+        if (fault) tellRecord(() => fault.failed(`a ${kind ?? 'sign-in'} mail was not sent: ${why}`));
       },
     );
   };

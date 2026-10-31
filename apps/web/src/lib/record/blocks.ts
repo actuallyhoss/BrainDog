@@ -713,7 +713,8 @@ export function trendCell(trend: readonly (number | null)[] | undefined, money =
 /* AND A VALUE'S OWN LINE BREAKS ARE SPACES: a row is one line of the dialect, so a note of two paragraphs broke its row,
    and the rest of the note was drawn as a card of its own. */
 const escapeCell = (c: string): string =>
-  c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+  /* AND A FIRST CELL OF THREE BACKTICKS NEVER CLOSES THE FENCE (RH15): an invisible space goes after the first. */
+  c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|').replace(/^`(?=``)/u, '`\u200b');
 
 /**
  * A chips row over a register: GROUP AND COUNT.

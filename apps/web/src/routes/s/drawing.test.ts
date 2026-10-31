@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { SharedBlock, SharedRow } from '../../lib/record/share-write.ts';
-import { drawingOf } from './drawing.ts';
+import { drawingOf, escapeCell } from './drawing.ts';
 import type { Shown, Where } from './reading.ts';
 
 const where: Where = { language: 'en-GB', zone: 'Europe/London', now: Date.parse('2026-09-02T12:00:00Z'), home: 'GBP' };
@@ -93,4 +93,18 @@ test('a card\'s cost of nothing is Free, as the app says it', () => {
   ).segments.find((s) => s.type === 'block');
   assert.ok(cards && cards.type === 'block');
   assert.equal(cards.rows[1]?.cells[1], 'Free');
+});
+
+test('RH15: a title of three backticks never closes the fence, and the rows after it still draw', () => {
+  assert.notEqual(escapeCell('```').slice(0, 3), '```');
+  assert.equal(escapeCell('```').replaceAll('\u200b', ''), '```');
+  assert.equal(escapeCell('a ``` b'), 'a ``` b');
+  const cards = drawingOf(
+    shown(block({ kind: 'cards', columns: [{ field: 'name', label: 'Name', as: 'title' }], rows: [row({ name: { type: 'text', value: '```' } }), row({ name: { type: 'text', value: 'Kiln' } })] })),
+    where,
+  ).segments.filter((s) => s.type === 'block');
+  assert.equal(cards.length, 1, 'the fence was closed early');
+  const only = cards[0];
+  assert.ok(only && only.type === 'block');
+  assert.ok(only.rows.some((r) => r.cells.includes('Kiln')), 'a row after the backticks was lost');
 });

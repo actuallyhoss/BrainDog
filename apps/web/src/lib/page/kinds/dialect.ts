@@ -15,8 +15,12 @@ import { TONES, parse } from 'braindog-render';
 
 import type { DrawOptions, Drawn } from './index.ts';
 
-/** A cell as the dialect reads it back: a `|` in a value is a pipe and not the end of the cell. */
-export const escapeCell = (c: string): string => c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+/**
+ * A cell as the dialect reads it back: a `|` in a value is a pipe and not the end of the cell. And a first cell of three
+ * backticks never closes the fence (RH15): the dialect has no escape for one, so an invisible space goes after the first.
+ */
+export const escapeCell = (c: string): string =>
+  c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|').replace(/^`(?=``)/u, '`\u200b');
 
 /** The list a block reads, from its `source: register.<id>`, or null for a block over no list. */
 export function listOf(result: BlockResult): string | null {
