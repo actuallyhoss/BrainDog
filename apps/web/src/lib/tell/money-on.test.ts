@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { firstPartyDocument } from '@braindog/seed/packs';
 
 import type { FieldDecl } from '../record/schema.ts';
-import { listsOn } from './money-on.ts';
+import { MONEY_ELSEWHERE, listsOn, moneyAskOf } from './money-on.ts';
 import { tellRead, type TellList } from './read.ts';
 
 type Declared = { register?: string; name: string; title: string; fields: FieldDecl[]; state?: string };
@@ -40,4 +40,14 @@ test('Money turned on where no account was ever kept still keeps the payment as 
   const told = tellRead(LINE, { lists, today: '2026-10-31', currency: 'EGP', accounts: [] });
   assert.ok(told.rows.some((r) => r.register === 'obligations'));
   assert.ok(!told.rows.some((r) => r.register === 'transactions'));
+});
+
+test('Turning Money on approves only the lines its card said (RO10)', () => {
+  const say = (raw: unknown): string => `Calls ${(raw as { host: string }).host}`;
+  const call = { host: 'api.bank.example', line: 'CALLS OUT api.bank.example · every 6h · grant "Bank"', key_line: 'Sends the key Bank to api.bank.example' };
+  const note = 'A scheduled action opens this key with nobody present, so the server that runs it can open it too.';
+  assert.deepEqual(moneyAskOf([call.line, call.key_line, note], [call], say), { ask: { lines: ['Calls api.bank.example', note], approve: [call.line, call.key_line, note] } });
+  /* A line no call-out on the card says sends him to Modules, and nothing is approved. */
+  assert.equal(moneyAskOf([call.line, 'CALLS OUT other.example · every 1d'], [call], say), MONEY_ELSEWHERE);
+  assert.equal(moneyAskOf(['CALLS OUT other.example · every 1d'], [], say), MONEY_ELSEWHERE);
 });
