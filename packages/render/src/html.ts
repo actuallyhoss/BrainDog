@@ -630,7 +630,7 @@ function grid(b: Block, o: RenderOptions): string {
  * "code, run in a sandbox and never inside the record" was held to one line and cut at "reco" on a phone. A value with a
  * digit and no word longer than three letters is a figure ("£4,050", "Tue 15 Sep", "GBP 14.00", "3.2%").
  */
-const isFigure = (text: string | undefined): boolean => text !== undefined && /\d/u.test(text) && !/\p{L}{4,}/u.test(text);
+export const isFigure = (text: string | undefined): boolean => text !== undefined && /\d/u.test(text) && !/\p{L}{4,}/u.test(text);
 
 function rows(b: Block, o: RenderOptions): string {
   if (b.kind === 'inputs') return inputs(b, o);

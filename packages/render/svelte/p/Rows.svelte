@@ -13,7 +13,7 @@
 <script lang="ts">
   import { inline, MISSING, type Block, type RenderOptions } from '../../src/index.ts';
   import { rowsCell } from '../../src/timeline.ts';
-  import { drawnRows, emptied } from '../../src/html.ts';
+  import { drawnRows, emptied, isFigure } from '../../src/html.ts';
   import Text from '../Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -34,7 +34,8 @@
     {@const value = row.cells[1] ? rowsCell(row.cells[1], opts.now) : undefined}
     <div class="row">
       <span class="row-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
-      <span class="row-value num">
+      <!-- A FIGURE KEEPS `num` AND ONE LINE, AND WORDS WRAP (`isFigure`), as `html.ts` draws it. -->
+      <span class={value === undefined || isFigure(value) ? 'row-value num' : 'row-value'}>
         {#if value === undefined}{MISSING}{:else if value}<Text nodes={inline(value, opts)} {opts} />{/if}
       </span>
       <span class="row-note"><Text nodes={inline(rowsCell(row.cells[2], opts.now), opts)} {opts} /></span>
