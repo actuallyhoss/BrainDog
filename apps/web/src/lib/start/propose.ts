@@ -885,9 +885,11 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
     }),
   );
   const parts = p.modules.map((id) => {
-    /* A PART IS SAID BY ITS ONE LIST (Portfolio is Projects), or by its name where its first list has it (People). */
+    /* A PART IS SAID BY ITS ONE LIST (Portfolio is Projects), or by its name where its first list has it (People). WORK
+       IN A STARTER'S OWN WORD IS THAT WORD (AN19): a team's Work is Tickets on its rail from the first minute. */
     const lead = leadOf(id);
-    const name = partName(id, p.names);
+    const own = id === TO_DO ? (p.names?.[TASKS_LIST] ?? cases.map((u) => u.labels[TASKS_LIST]).find((w) => typeof w === 'string' && w.trim() !== '')) : undefined;
+    const name = own ?? partName(id, p.names);
     const said = first((h) => (h.you === true && id === PEOPLE) || partsOfBecame(h.became).some((w) => w === moduleName(id) || w === name || w === lead?.name || w.startsWith(`${name} `)));
     const by = said ?? cases.filter((u) => u.modules.includes(id)).map(caseLine).find((h) => h !== null) ?? null;
     return place('module', id, name, by);
@@ -895,8 +897,17 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
   const leaned = new Set(p.modules.flatMap((id) => closeOver([id]).filter((on) => on !== id)));
   const shown = parts.filter((x) => x.phrase !== null || !leaned.has(x.id));
   const order = (a: Place, b: Place): number => (a.at?.[0] ?? Number.MAX_SAFE_INTEGER) - (b.at?.[0] ?? Number.MAX_SAFE_INTEGER);
-  return [place('today', 'today', 'Today', null), ...lists, ...shown.sort(order)];
+  /* A STARTER'S OWN PLACE THAT NO LIST OF ITS OWN LEADS TO (AN19): the Founder's Dashboard is on his rail from the first
+     minute, and the made line said "with People and Money" without it. Said by its page, as `railPlaces` says a list's. */
+  const listed = new Set(cases.flatMap((u) => caseLists(u).length > 0 ? [u.usecase] : []));
+  const pages = cases
+    .filter((u) => !listed.has(u.usecase))
+    .flatMap((u) => caseSections(u).map((x) => place('list', x.page, x.section, caseLine(u))));
+  return [place('today', 'today', 'Today', null), ...lists, ...pages, ...shown.sort(order)];
 }
+
+/** Work's list, whose name in a starter's words is Work's (`placesOf`). */
+const TASKS_LIST = 'tasks';
 
 /** The parts that are no place on the rail until they hold something: Projects until a project, Work until a task. */
 const WAITS_FOR_FIRST: ReadonlySet<string> = new Set([PORTFOLIO_ID, TO_DO]);
@@ -920,7 +931,8 @@ export function railPlaces(places: readonly Place[], filled: (p: Place) => boole
   const out: Place[] = [];
   const said = (name: string): boolean => out.some((x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase());
   for (const p of places) {
-    if (p.kind === 'module' && WAITS_FOR_FIRST.has(p.id) && !filled(p)) continue;
+    /* A PART IN A STARTER'S OWN WORD IS ITS PLACE AT ONCE (AN19): a team's Tickets, second on its rail before a ticket. */
+    if (p.kind === 'module' && WAITS_FOR_FIRST.has(p.id) && !filled(p) && p.name === partName(p.id)) continue;
     const u = p.kind === 'list' ? USE_CASES.find((c) => caseLists(c).some((l) => l.id === p.id)) : undefined;
     const sections = u ? caseSections(u) : [];
     if (u === undefined || sections.length === 0) {
@@ -934,7 +946,28 @@ export function railPlaces(places: readonly Place[], filled: (p: Place) => boole
       if (!said(x.section)) out.push({ kind: 'list', id: x.page, name: x.section, phrase: i === 0 ? (by?.phrase ?? null) : null, at: i === 0 ? (by?.at ?? null) : null });
     });
   }
-  return out;
+  /* IN THE RAIL'S ORDER (AN19), Today first: the Team's "Tickets, Sprints, People and Agents", as its rail reads down. */
+  const at = out.map((p, i) => ({ p, i, rank: p.kind === 'today' ? -1 : rankOfPlace(p) }));
+  return at.sort((a, b) => a.rank - b.rank || a.i - b.i).map((x) => x.p);
+}
+
+/**
+ * Where the rail draws a place (`PLACE_AT` in `lib/nav/rail.ts`): a part by its own number, a starter's page by the
+ * place it declares (`nav.place`), a starter's list with no page of its own among a starter's places, and anything
+ * else after them all.
+ */
+const PART_AT: Readonly<Record<string, number>> = { work: 10, portfolio: 30, 'money-core': 40, people: 50, agents: 60 };
+/** A starter's own place that declares none, ranked as the rail ranks one with a number it says: after Work. */
+const STARTER_AT = 25;
+function rankOfPlace(p: Place): number {
+  if (p.kind === 'module') return PART_AT[p.id] ?? 1000;
+  for (const u of USE_CASES)
+    for (const d of (u.pack?.declarations ?? []) as { page?: unknown; nav?: { place?: unknown; section?: unknown } }[]) {
+      if (d.page !== p.id) continue;
+      if (typeof d.nav?.place === 'number') return d.nav.place;
+      if (typeof d.nav?.section === 'string') return PART_AT[d.nav.section.toLocaleLowerCase()] ?? STARTER_AT;
+    }
+  return STARTER_AT;
 }
 
 /** The rail place a use case's list is kept in: the section of the first of its pages that needs it, else `null`. */
