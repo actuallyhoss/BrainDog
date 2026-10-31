@@ -202,8 +202,11 @@ const slotKey = (base: string): string => `${base} slot`;
  * and the browser was next idle (speed-e SE3). Not for a page that is no place to decide (`slotPlace`), nor one that
  * draws its own queue of questions, where the slot reads from that queue and asks nothing.
  */
-export function askSlot(base: string, page: SlotPage, blocks: readonly { kind?: unknown; source?: unknown; drawn?: unknown }[]): void {
-  if (slotPlace(page) === null || blocks.some((b) => b.kind === 'queue' && b.source === 'governance.open' && b.drawn !== false)) return;
+export function askSlot(base: string, page: SlotPage, blocks: readonly { kind?: unknown; source?: unknown; drawn?: unknown; where?: unknown }[]): void {
+  /* A QUEUE OF ITS OWN, drawn, or narrowed to the page's own questions (`where`), which keeps the slot off the page
+     whether or not it drew (`PageBody.svelte` `ownQuestions`). */
+  const own = (b: (typeof blocks)[number]): boolean => b.kind === 'queue' && b.source === 'governance.open' && (b.drawn !== false || b.where !== undefined);
+  if (slotPlace(page) === null || blocks.some(own)) return;
   askEarly(slotKey(base), () => readSlot(base));
 }
 
