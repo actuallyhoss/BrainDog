@@ -20,15 +20,15 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { AMOUNT_SPACE, parse } from 'braindog-render';
-  import { Block, Markdown } from 'braindog-render/svelte';
+  import { parse } from 'braindog-render';
+  import { Block, Markdown, Table } from 'braindog-render/svelte';
   /* THE KINDS' AND THE CHARTS' SHEETS, as a declared page loads them (`PageView`), so a note's bar is bars here too. */
   import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
   import { titleOf } from '$lib/title.ts';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { fieldSaid, readShared, words, type SharedRead } from '$lib/record/share-write.ts';
+  import { readShared, words, type SharedRead } from '$lib/record/share-write.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Lockup from '$lib/ui/Lockup.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -42,8 +42,11 @@
     openOutside('https://brain.dog');
   };
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
-  import { cellSaid, figureSaid, headOf, noteOpts, plainSaid, pointSaid, shownBlocks, takeShared, trendLine, type Said, type Shown, type Where } from './reading.ts';
-  import Sparkline from '$lib/viz/Sparkline.svelte';
+  import { headOf, noteOpts, plainSaid, shownBlocks, takeShared, type Shown, type Where } from './reading.ts';
+  import { drawingOf } from './drawing.ts';
+  import { isGlyph, pathOf, glyphSet, glyphSetNow } from '$lib/ui/icons.ts';
+  import { agentKindOf } from '$lib/ui/face.ts';
+  import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
 
   /* THE ONE WORD THIS SCREEN ADDS: the action under a dead link. The rest are `share-write.ts`'s. */
   const shareWords = { whatItIs: 'See what BrainDog is' };
@@ -95,7 +98,17 @@
    * path is linked as one that is shared too.
    */
   const segmentsOf = (body: string) => parse(body, { page: true }).filter((s) => s.type !== 'degraded');
-  const opts = $derived(noteOpts(where));
+  /* AND AS THE APP'S BLOCKS ARE HANDED THEM (`BlockSlot.svelte`): a glyph by its name, and an agent's mark on a card's
+     face ("Claude"), from the same set the app's faces draw. Neither reads the record. */
+  const opts = $derived({
+    ...noteOpts(where),
+    icon: (name: string): string | null => (isGlyph(name) ? (pathOf(name, glyphSetNow()) ?? null) : null),
+    iconSet: glyphSet,
+    agentMark: (name: string) => {
+      const k = agentKindOf(name);
+      return isMarked(k) ? AGENT_MARKS[k] : null;
+    },
+  });
 </script>
 
 <svelte:head>
@@ -104,10 +117,6 @@
   <meta name="referrer" content="no-referrer" />
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
-
-{#snippet value(s: Said)}
-  {#if 'money' in s}<span class="sum num">{s.money.lead}{s.money.whole}<span class="fraction">{s.money.fraction}</span>{#if s.money.iso}<span class="iso">{AMOUNT_SPACE}{s.money.iso}</span>{/if}</span>{:else}{s.text}{/if}
-{/snippet}
 
 {#snippet blockBody(s: Shown)}
   {@const b = s.block}
@@ -121,20 +130,15 @@
     </div>
   {/if}
 
-  {#if b.readings.length > 0}
-    <dl class="figs">
-      {#each b.readings as r, n (n)}
-        {@const line = trendLine(r)}
-        <div class="fig">
-          <dt class="fig-label">{r.label ?? fieldSaid(r.metric)}</dt>
-          <dd class="fig-value num">{@render value(figureSaid(r, where))}</dd>
-          {#if line}<dd class="fig-trend"><Sparkline values={line} subject={r.label ?? fieldSaid(r.metric)} format={(n) => pointSaid(r, n, where)} /></dd>{/if}
-        </div>
-      {/each}
-    </dl>
-  {/if}
+  <!-- THE FIGURES, THE CARDS AND THE LISTS AS THE APP DRAWS THEM (SL1, `drawing.ts`): the renderer's own `stat`, `cards`,
+       `todo`, `roadmap` and the rest through `Block`, and a list with columns through its `Table`, a card a row on a phone.
+       Nothing in them is pressable or leads into the record: no row carries a reference and no callback is handed. -->
+  {@const d = drawingOf(s, where)}
+  {#each d.segments as segment, n (n)}
+    {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} {opts} /></div>{/if}
+  {/each}
 
-  {#if b.authored.length > 0}
+  {#if d.authored}
     <table class="sheet">
       <tbody>
         {#each b.authored as cells, n (n)}
@@ -144,23 +148,10 @@
     </table>
   {/if}
 
-  {#if cols.length > 0 && s.rows.length > 0}
-    <table class="sheet">
-      <thead>
-        <tr>{#each cols as c (c.field)}<th class="sheet-head" scope="col">{c.label}</th>{/each}</tr>
-      </thead>
-      <tbody>
-        {#each s.rows as row, n (n)}
-          <tr>
-            {#each cols as c (c.field)}
-              <td class="sheet-cell" data-label={c.label}>{@render value(cellSaid(row, c, where))}</td>
-            {/each}
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-    {#if s.matched > s.rows.length}<p class="part-note">{words.sharedMore(s.matched - s.rows.length)}</p>{/if}
+  {#if d.table}
+    <Table columns={d.table.columns} rows={d.table.rows} total={d.table.rows.length} label={b.heading ?? copy.kindNames[b.kind]} home={where.home ?? null} now={where.now} />
   {/if}
+  {#if s.rows.length > 0 && s.matched > s.rows.length}<p class="part-note">{words.sharedMore(s.matched - s.rows.length)}</p>{/if}
 {/snippet}
 
 <div class="shared">
@@ -379,6 +370,12 @@
     color: var(--ink);
   }
 
+  /* THE RENDERER'S BLOCK SITS IN THE TILE AS IT DOES IN A BLOCK'S SLOT: the tile's gap spaces it, and the margin a block
+     keeps between blocks of a running document would leave a hole under the last row. */
+  .part > :global(.block) {
+    margin-block: 0;
+  }
+
   .part-head {
     margin: 0;
     color: var(--ink);
@@ -405,51 +402,6 @@
     line-height: 22px;
   }
 
-  /* ── Figures ──────────────────────────────────────────────────────────────────────────── */
-
-  .figs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-    gap: var(--sp-5) var(--sp-4);
-    margin: 0;
-  }
-
-  .fig {
-    display: grid;
-    align-content: start;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-  }
-
-  .fig-label {
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
-    line-height: 18px;
-  }
-
-  .fig-value {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-figure);
-    font-weight: var(--fw-semi);
-    line-height: 28px;
-    font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
-  }
-
-  /* THE FIGURE'S TREND, UNDER ITS NUMBER: the app's own sparkline, at most its 120px and narrower in a narrow tile. */
-  .fig-trend {
-    margin: var(--sp-1) 0 0;
-    min-inline-size: 0;
-  }
-
-  /* AN AMOUNT'S FRACTION AND ITS CODE ARE QUIETER than its whole, as the app's own money is set. */
-  .fraction,
-  .iso {
-    color: var(--ink-2);
-  }
-
   /* ── Tables: hairlines between the rows and none round the table ──────────────────────── */
 
   .sheet {
@@ -457,15 +409,6 @@
     border-collapse: collapse;
     font-size: var(--fs-body);
     line-height: 22px;
-  }
-
-  .sheet-head {
-    padding: 0 var(--sp-3) var(--sp-2);
-    border-block-end: 1px solid var(--rule);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
-    text-align: start;
   }
 
   .sheet-cell {
@@ -479,12 +422,10 @@
     border-block-start: 1px solid var(--rule);
   }
 
-  .sheet-head:first-child,
   .sheet-cell:first-child {
     padding-inline-start: 0;
   }
 
-  .sheet-head:last-child,
   .sheet-cell:last-child {
     padding-inline-end: 0;
   }
@@ -521,40 +462,6 @@
     .made-link:hover {
       color: var(--ink);
       text-decoration: underline;
-    }
-  }
-
-  /* BELOW 640px A ROW IS A STACK: each cell on its own line under its column's name, so a wide table never pushes the
-     page sideways. */
-  @media (width < 640px) {
-    .sheet thead {
-      display: none;
-    }
-
-    .sheet tr {
-      display: grid;
-      gap: var(--sp-2);
-      padding-block: var(--sp-3);
-    }
-
-    .sheet tr + tr {
-      border-block-start: 1px solid var(--rule);
-    }
-
-    .sheet tr + tr .sheet-cell {
-      border-block-start: 0;
-    }
-
-    .sheet-cell {
-      padding: 0;
-    }
-
-    .sheet-cell[data-label]::before {
-      content: attr(data-label);
-      display: block;
-      color: var(--ink-3);
-      font-size: var(--fs-meta);
-      line-height: 18px;
     }
   }
 
