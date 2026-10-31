@@ -39,7 +39,7 @@ function startedBy(rows: readonly SaidRow[]): string {
 }
 
 /**
- * "3 scripts, 41 runs this month, on their clocks; 1 is paused, and FX rate was refused on its last run."
+ * "3 scripts ran 41 times this month, on their clocks; 1 is paused, and FX rate was refused on its last run."
  *
  * RED FOR WHAT HAS STOPPED OR IS STOPPING: a paused script runs no more until he resumes it, and a refused last run is
  * one refusal nearer to pausing. A paused script's own refusals are the pause, so they are not said twice.
@@ -47,7 +47,11 @@ function startedBy(rows: readonly SaidRow[]): string {
 export function sentenceOf(rows: readonly SaidRow[]): Said | null {
   if (rows.length === 0) return null;
   const runs = rows.reduce((s, r) => s + r.month.runs, 0);
-  const lead = `${rows.length === 1 ? '1 script' : `${count(rows.length)} scripts`}, ${runs === 0 ? 'no runs' : runs === 1 ? '1 run' : `${count(runs)} runs`} this month${runs === 0 ? '' : startedBy(rows)}`;
+  /* THE SCRIPTS' OWN RUNS, SAID AS THEIRS (audit j, AJ12): "23 scripts, 190 runs this month" stood beside Usage's and
+     Automations' "182 runs this month", which count the automations' runs; a script also runs on its clock and as
+     something arrives, and one automation's run may start none. So the count is what the scripts did. */
+  const one = rows.length === 1;
+  const lead = `${one ? '1 script' : `${count(rows.length)} scripts`}${runs === 0 ? `, ${one ? 'not run' : 'none run'} this month` : ` ran ${runs === 1 ? 'once' : `${count(runs)} times`} this month`}${runs === 0 ? '' : startedBy(rows)}`;
   const paused = rows.filter((r) => r.status === 'paused').length;
   const refused = rows.filter((r) => r.status !== 'paused' && r.last?.outcome === 'refused');
 
