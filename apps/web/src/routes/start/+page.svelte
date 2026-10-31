@@ -61,7 +61,7 @@
   import { landing } from '$lib/record/landing.ts';
   import { INSTALL_ORDER, LEANS_ON } from '$lib/shape.ts';
   import { byRules, draftChange, type Drafted, type SlashClient } from '$lib/record/slash.ts';
-  import { draftBrief, outsideCatalogue, propose, proposeFirst, type Proposal } from '$lib/start/propose.ts';
+  import { draftBrief, filledBy, outsideCatalogue, propose, proposeFirst, railPlaces, type Proposal } from '$lib/start/propose.ts';
   import { slashAsks } from '$lib/start/ask.ts';
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, tradesKept, type CatalogueOffer, type TradeOffer } from '$lib/start/offer.ts';
   import { BYTES_MOST, drawnWith, entriesOf, EXPORTS_MOST, leftSaid, mapExport, newListDeclarations, ownList, readExports, type Export, type Mapping } from '$lib/start/export.ts';
@@ -723,7 +723,7 @@
       (await import('$lib/record/boot-live.ts')).forget();
       if (out.failed.length === 0) {
         madeModules = asked.modules;
-        madePlaces = asked.proposal.places.filter((x) => x.kind !== 'today').map((x) => x.name);
+        madePlaces = railPlaces(asked.proposal.places, filledBy(asked.proposal.rows)).filter((x) => x.kind !== 'today').map((x) => x.name);
         madeAddons = tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }));
         made = true;
         globalThis.scrollTo?.({ top: 0 });

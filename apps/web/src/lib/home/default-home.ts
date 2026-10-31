@@ -206,7 +206,7 @@ export const onDesk = (b: { key?: string | undefined }): boolean => typeof b.key
 /* ── a record's week ───────────────────────────────────────────────────── */
 
 /** A list's declaration, as `weekOf` reads it. */
-export type WeekDecl = Pick<RegisterDecl, 'id' | 'name' | 'one' | 'title' | 'fields' | 'state' | 'done'>;
+export type WeekDecl = Pick<RegisterDecl, 'id' | 'name' | 'one' | 'title' | 'fields' | 'state' | 'done' | 'pack'>;
 
 /**
  * WHAT A RECORD'S WEEK IS MADE OF, where it keeps a list of things that fall due for somebody: a shop's orders, each
@@ -221,10 +221,13 @@ export type WeekDecl = Pick<RegisterDecl, 'id' | 'name' | 'one' | 'title' | 'fie
  * week Nadia paid EGP 900. It is Money's own two figures now (`weekMoney`), the same on every record.
  */
 export type Week = {
-  due: { register: string; name: string; one: string; day: string; who: string; what: string; open: string | null; paid: string | null };
+  /** `who` is `null` on a list of the reader's own (a student's assignments), which is nobody else's. */
+  due: { register: string; name: string; one: string; day: string; who: string | null; what: string; open: string | null; paid: string | null };
 };
 
 const live = (f: FieldDecl): boolean => f.retired !== true;
+/** How a starter's own pack is named (`usecase-student`), whose lists are the person's from the first minute. */
+const STARTER_PACK = 'usecase-';
 /** A field whose id or label says `re`. */
 const saysOf = (f: FieldDecl, re: RegExp): boolean => re.test(f.id) || re.test(f.label ?? '');
 
@@ -235,24 +238,28 @@ const saysOf = (f: FieldDecl, re: RegExp): boolean => re.test(f.id) || re.test(f
  * owes one, and Late already says a bill). The tasks are Today's own blocks and are never it.
  */
 export function weekOf(decls: readonly WeekDecl[], people: string | null): Week | undefined {
-  if (people === null) return undefined;
-  const due = decls.find(
-    (d) =>
-      d.id !== TASKS &&
-      d.id !== people &&
-      (d.done?.length ?? 0) > 0 &&
-      !d.fields.some((f) => live(f) && f.type === 'money' && f.required) &&
-      d.fields.some((f) => live(f) && f.type === 'day' && f.deadline) &&
-      d.fields.some((f) => live(f) && f.type === 'ref' && f.to === people),
-  );
+  /* A LIST THAT FALLS DUE AND IS DONE ONCE IT IS, owing no amount (a bill owes one, and Late already says a bill), and
+     never the tasks, which are Today's own blocks. */
+  const falls = (d: WeekDecl): boolean =>
+    d.id !== TASKS &&
+    d.id !== people &&
+    (d.done?.length ?? 0) > 0 &&
+    !d.fields.some((f) => live(f) && f.type === 'money' && f.required) &&
+    d.fields.some((f) => live(f) && f.type === 'day' && f.deadline);
+  const theirs = (d: WeekDecl): boolean => people !== null && d.fields.some((f) => live(f) && f.type === 'ref' && f.to === people);
+  /* SOMEBODY'S FIRST (a shop's orders); ELSE THE READER'S OWN, ONE A STARTER GAVE (audit 31 Oct m, AM5): a student's
+     essay due Thursday was on Studies and nowhere on Today, since an assignment is nobody else's. Only a starter's own
+     list: Work's threads and a service that renews fall due too, and neither is the week a person opens Today on. */
+  const starters = (d: WeekDecl): boolean => d.pack?.startsWith(STARTER_PACK) === true;
+  const due = decls.find((d) => falls(d) && theirs(d)) ?? decls.find((d) => falls(d) && starters(d));
   if (!due) return undefined;
   const day = due.fields.find((f) => live(f) && f.type === 'day' && f.deadline)!;
-  const who = due.fields.find((f) => live(f) && f.type === 'ref' && f.to === people)!;
+  const who = people === null ? undefined : due.fields.find((f) => live(f) && f.type === 'ref' && f.to === people);
   /* ONE CLAUSE FOR EACH DONE STATE, all of them holding: the grammar reads no "is not a or b". */
   const open = due.state && due.done?.length ? due.done.map((s) => `${due.state} is not ${s}`).join(', ') : null;
   /* ONLY A FIELD THAT SAYS IT WAS PAID: an order's total is what it comes to, never what came in. */
   const paid = due.fields.find((f) => live(f) && f.type === 'money' && saysOf(f, /paid/i));
-  return { due: { register: due.id, name: due.name, one: due.one, day: day.id, who: who.id, what: due.title, open, paid: paid?.id ?? null } };
+  return { due: { register: due.id, name: due.name, one: due.one, day: day.id, who: who?.id ?? null, what: due.title, open, paid: paid?.id ?? null } };
 }
 
 /**
@@ -458,7 +465,7 @@ function weekBlocks(w: Week): PageBlock[] {
     icon: 'calendar',
     source: `register.${w.due.register}`,
     where: dueWhere(w),
-    columns: [{ field: w.due.who }, { field: w.due.what }, { field: w.due.day }],
+    columns: [...(w.due.who === null ? [] : [{ field: w.due.who }]), { field: w.due.what }, { field: w.due.day }],
     order: [{ field: w.due.day, dir: 'asc' }],
     limit: 8,
     empty: `No ${w.due.one.toLowerCase()} is due this week.`,
@@ -1131,7 +1138,7 @@ function weekInSaid(blocks: readonly LiveBlock[], due: LiveBlock | undefined, w:
       const p = (e.fields as Record<string, unknown>)[paid];
       return isMoney(p) && money(p.amount, p.currency) === came[0]!.value ? [n] : [];
     });
-    const col = due.columns.findIndex((c) => c.field === w.due.who);
+    const col = w.due.who === null ? -1 : due.columns.findIndex((c) => c.field === w.due.who);
     const who = at.length === 1 && col >= 0 ? (due.rows[at[0]!]?.cells[col] ?? '').trim() : '';
     if (who) return `${who} paid ${said}.`;
   }

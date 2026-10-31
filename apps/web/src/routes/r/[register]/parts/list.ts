@@ -600,6 +600,7 @@ const words = {
   noneLate: 'none late',
   nextDue: (when: string) => `the next due ${when}`,
   newest: (when: string) => `newest ${when}`,
+  besidesYou: 'besides you',
   match: (n: number, of: number) => `${n} of ${of} ${n === 1 ? 'matches' : 'match'}.`,
   today: 'today',
   tomorrow: 'tomorrow',
@@ -644,7 +645,7 @@ export function readingOf(
   decl: RegisterDecl | undefined,
   entries: readonly Entry[],
   now: number,
-  at: { whole: boolean; filtered: boolean; matched: number; total: number },
+  at: { whole: boolean; filtered: boolean; matched: number; total: number; besides?: boolean },
 ): Reading | null {
   if (!decl) return null;
   if (at.filtered) return plain(words.match(at.matched, at.total));
@@ -652,7 +653,10 @@ export function readingOf(
   const dated = deadlineOf(decl);
   if (!decl.state && !dated) {
     const newest = entries.reduce<string>((best, e) => (e.created > best ? e.created : best), '');
-    return plain(newest ? `${counted(decl, entries.length)}, ${words.newest(since(newest, now))}.` : `${counted(decl, entries.length)}.`);
+    /* "1 PERSON" OVER TWO NAMES (audit 31 Oct m, AM17): you are on the list, marked You, and never counted, so the count
+       says whom it is besides. */
+    const many = `${counted(decl, entries.length)}${at.besides ? ` ${words.besidesYou}` : ''}`;
+    return plain(newest ? `${many}, ${words.newest(since(newest, now))}.` : `${many}.`);
   }
   const open = entries.filter((e) => !isDone(decl, e));
   if (open.length === 0) return plain(`${words.nothingOpen}.`);

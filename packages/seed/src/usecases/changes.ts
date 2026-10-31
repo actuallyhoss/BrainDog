@@ -91,6 +91,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.30.4', notes: 'Teammates is called People, as your sidebar and Today say it. Nothing you hold changes.' },
     { version: '2.30.3', notes: 'Open each morning is called Sprint days. Nothing you hold changes.' },
     { version: '2.30.2', notes: 'Sprints has its own place in your sidebar, and Agent work sits under Agents. Nothing you hold changes.' },
     { version: '2.30.1', notes: 'Cycles are called Sprints, the Cycle plan is the Sprint plan, and Cycle days is called Open each morning. Nothing you hold changes.' },
