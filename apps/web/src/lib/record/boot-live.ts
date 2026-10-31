@@ -27,7 +27,7 @@ import { hueOf, iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
 import { homeOf, learnHome, learnMoney } from './api.ts';
 import { forgetZone, learnZone } from './zone.ts';
 import { currencyOf } from './money.ts';
-import { learnPages, REGISTERS } from './held.ts';
+import { learnPages, PAGES, REGISTERS } from './held.ts';
 import { learnRowPages } from './row-href.ts';
 import { copy } from '../copy.ts';
 import { forgetKept } from '../data/kept.ts';
@@ -768,13 +768,16 @@ function accessText(e: EventLine): string | null {
 }
 
 /**
- * A READ-ONLY LINK MADE OR CLOSED, AS A SENTENCE (AH28): the bell said "Share open". The page is the event's `field`, by
- * its slug, said in words.
+ * A READ-ONLY LINK MADE OR CLOSED, AS A SENTENCE (AH28): the bell said "Share open". The page is the event's `field`, its
+ * slug, SAID BY THE PAGE'S OWN TITLE (AM14) as `boot` named it (`PAGES`): Team's Sprints lives at `cycles`, and the bell
+ * said "You shared Cycles with a link". A page this tab never heard of is its slug in words.
  */
 function shareText(e: EventLine): string | null {
   if (e.kind !== 'share.open' && e.kind !== 'share.close') return null;
-  const slug = typeof e.field === 'string' && e.field !== '' ? e.field.replace(/[-_]+/gu, ' ').trim() : '';
-  const page = slug === '' ? 'a page' : slug.charAt(0).toUpperCase() + slug.slice(1);
+  const slug = typeof e.field === 'string' && e.field !== '' ? e.field : '';
+  const titled = slug === '' ? '' : (PAGES[slug]?.title ?? '').trim();
+  const words = titled !== '' ? titled : slug.replace(/[-_]+/gu, ' ').trim();
+  const page = words === '' ? 'a page' : words.charAt(0).toUpperCase() + words.slice(1);
   return e.kind === 'share.open' ? `You shared ${page} with a link` : `You closed the link to ${page}`;
 }
 

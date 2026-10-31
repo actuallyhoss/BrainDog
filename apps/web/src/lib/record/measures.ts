@@ -218,9 +218,13 @@ export function staleTilesText(measures: readonly Measure[], ago: (iso: string) 
  * the measure's name as its heading. A block hands this only its measures with a line to draw (`linesAndLatest`), and
  * `beside` the ones read once it draws under them, so a name two projects share is told apart across both.
  */
-export function linesText(measures: readonly Measure[], beside: readonly Latest[] = []): string {
+export function linesText(measures: readonly Measure[], beside: readonly Latest[] = [], over: string | null = null): string {
   const shown = measures.slice(0, CHARTS_MOST);
   const shared = sharedNames([...shown, ...beside.slice(0, CHARTS_MOST).map((m) => ({ name: m.measure, of: m.of }))]);
+  /* ONE CHART UNDER ITS TILE'S OWN HEADING IS NOT NAMED AGAIN (Team's "Open tickets, each morning" read "Open tickets"
+     a second time over its line): the tile says what it is once, and the legend still names the line. With two or
+     more, or readings beside it, each keeps its name, which is what tells them apart. */
+  const named = !(shown.length === 1 && beside.length === 0 && (over ?? '').trim() !== '');
   return shown
     .map((m) => {
       const label = measureLabel(m, shared);
@@ -229,7 +233,7 @@ export function linesText(measures: readonly Measure[], beside: readonly Latest[
         const cell = (v: number | null | undefined) => (v === null || v === undefined ? '' : escapeCell(figureOf(v, m.unit)));
         return `${escapeCell(dayLabel(d))} | ${cell(m.now[i])} | ${cell(m.was[i])}`;
       });
-      return ['```lines | ' + escapeCell(label), head, ...rows, '```'].join('\n');
+      return [named ? '```lines | ' + escapeCell(label) : '```lines', head, ...rows, '```'].join('\n');
     })
     .join('\n\n');
 }

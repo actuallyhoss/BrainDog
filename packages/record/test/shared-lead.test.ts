@@ -26,6 +26,12 @@ test('a clause that is nought or not shown goes alone, and the line is a sentenc
   assert.equal(leadShown('Building a shed for the bikes', fill), 'Building a shed for the bikes.');
 });
 
+test('Team\'s and Student\'s lines say no "(s)" and no nought on a link (AM7)', () => {
+  assert.equal(leadShown('{{tickets-planned}} ticket(s) planned into sprints, {{tickets-blocked}} blocked', said({ 'tickets-planned': '0', 'tickets-blocked': '0' })), '');
+  assert.equal(leadShown('{{tickets-planned}} ticket(s) planned into sprints, {{tickets-blocked}} blocked', said({ 'tickets-planned': '1', 'tickets-blocked': '0' })), '1 ticket planned into sprints.');
+  assert.equal(leadShown('{{homework-open}} piece(s) of work to hand in, {{courses-held}} course(s)', said({ 'homework-open': '2', 'courses-held': '0' })), '2 pieces of work to hand in.');
+});
+
 test('a list is read in the use case\'s words: its row word, a field\'s label and its values', () => {
   const tasks = { id: 'tasks', name: 'Tasks', title: 'what', fields: [{ id: 'state', type: 'enum', values: ['open'], labels: {} }] } as unknown as RegisterDecl;
   const lists = voiced(new Map([['tasks', tasks]]), { tasks: 'Tickets', 'tasks:one': 'ticket', 'tasks.state.open': 'To do' });

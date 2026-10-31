@@ -3382,10 +3382,26 @@ function unnamed(kind: DeclKind, body: unknown): string | null {
   return canonicalise(rest);
 }
 
+/** A list's fields as a line: each one's label, else its id in words, the first four and "and 2 more" after them. */
+const fieldsSaid = (fields: unknown): string => {
+  const said = (Array.isArray(fields) ? fields : []).flatMap((f): string[] => {
+    if (f === null || typeof f !== 'object') return [];
+    const { label, id } = f as { label?: unknown; id?: unknown };
+    const words = typeof label === 'string' && label.trim() !== '' ? label.trim() : typeof id === 'string' ? id.replace(/[_-]+/gu, ' ').trim() : '';
+    return words === '' ? [] : [words];
+  });
+  if (said.length === 0) return 'No fields';
+  const shown = said.slice(0, 4).map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w));
+  const more = said.length - shown.length;
+  return more > 0 ? `${shown.join(', ')} and ${more} more` : shown.length === 1 ? shown[0]! : `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`;
+};
+
 const summarise = (decl: PackDeclaration): string => {
   const body = decl.body as Record<string, unknown>;
   /* A LIST THAT PLAYS A PART FOR THE AGENTS SAYS SO: its rows become what every agent of the owner's is told. */
-  if (decl.kind === 'register') return `${(body.fields as unknown[])?.length ?? 0} fields${typeof body.role === 'string' ? `, read by your agents as their ${body.role}` : ''}`;
+  /* AND IT SAYS WHAT IT HOLDS BY ITS FIELDS' LABELS (AM20), the first four and how many more: the sheet said "Readings,
+     6 fields", the record's counting and not his. */
+  if (decl.kind === 'register') return `${fieldsSaid(body.fields)}${typeof body.role === 'string' ? `, read by your agents as their ${body.role}` : ''}`;
   if (decl.kind === 'page') return `${(body.blocks as unknown[])?.length ?? 0} blocks`;
   if (decl.kind === 'rule') return `${(body.then as unknown[])?.length ?? 0} actions`;
   return decl.kind;

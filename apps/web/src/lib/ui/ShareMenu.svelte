@@ -36,7 +36,7 @@
   import { kennelFetch, nextVersion, publishedHref, publishedLink, publishedSaid, publishWords, submitToKennel, type Submitted } from '../market/publish.ts';
   import { templateOf, templateWords, wordsOf, type Template, type TemplateSetting } from '../market/template.ts';
   import { words as market } from '../market/words.ts';
-  import { linkOf, linksOff, openLink, daysSaid, shareableOnce, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
+  import { linkEmpty, linkOf, linksOff, openLink, daysSaid, shareableOnce, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import Menu from './Menu.svelte';
@@ -68,6 +68,24 @@
   let can = $state.raw<{ state: 'asking' } | { state: 'yes' } | { state: 'off' } | { state: 'no'; why: string }>({ state: 'asking' });
   let asks = 0;
   onMount(() => void ask());
+
+  /**
+   * WHETHER A LINK TO THIS PAGE WOULD SHOW NOTHING (AM21), asked of the record while the sheet is open, for the page and
+   * the money tick as they stand. An answer for an older ask is dropped; no answer is not empty.
+   */
+  let empty = $state(false);
+  let emptyAsks = 0;
+  $effect(() => {
+    if (!open || can.state !== 'yes') {
+      empty = false;
+      return;
+    }
+    const n = (emptyAsks += 1);
+    const [which, withMoney] = [slug, money];
+    void linkEmpty(createClient({ base: apiBase() }), which, withMoney).then((said) => {
+      if (n === emptyAsks) empty = said;
+    });
+  });
 
   /** Which of the sheet's two jobs it is doing: the read-only link, or the page as a template. */
   let mode = $state<'link' | 'template'>('link');
@@ -235,19 +253,10 @@
       <Button weight="bare" onclick={() => (mode = 'link')}>{templateWords.back}</Button>
     {:else if made}
       <p class="once" id="{ids}once">{words.shareOnce}</p>
-      <label class="share-label" for="{ids}link">{words.shareLinkLabel}</label>
-      <!-- ONE LINE THAT SCROLLS (AH29): three wrapped lines of token cut the link mid-line at 390. Read only, and
-           selected on focus, so a long press or a click takes all of it; Copy the link is the press it is here for. -->
-      <input
-        class="share-link"
-        id="{ids}link"
-        type="text"
-        readonly
-        spellcheck="false"
-        autocomplete="off"
-        aria-describedby="{ids}once"
-        value={made.link}
-        onfocus={(e) => e.currentTarget.select()} />
+      <!-- THE LINK IS SAID AS READY, NEVER SPELT OUT (AM21): its whole address is the record's id and a signature, and the
+           box read "https://…/s#rec_01M6…". Copy the link is the press it is here for; where the clipboard refuses, the
+           address is under Show the link, one line that scrolls and is selected on focus (AH29). -->
+      <p class="share-ready" id="{ids}link"><Icon name="check" size="s" />{words.shareReady}</p>
       <div class="share-actions">
         <Button weight="primary" onclick={() => made && void put(made.link, words.shareLinkLabel, words.shareCopied)}>
           <Icon name="copy" size="s" />
@@ -256,6 +265,20 @@
         <Button weight="bare" onclick={forget}>{words.shareDone}</Button>
       </div>
       <p class="share-hint">{words.shareUntil(made.until)}</p>
+      <details class="share-show">
+        <summary class="share-show-h">{words.shareShow}</summary>
+        <label class="share-label" for="{ids}address">{words.shareLinkLabel}</label>
+        <input
+          class="share-link"
+          id="{ids}address"
+          type="text"
+          readonly
+          spellcheck="false"
+          autocomplete="off"
+          aria-describedby="{ids}once"
+          value={made.link}
+          onfocus={(e) => e.currentTarget.select()} />
+      </details>
       <Button weight="bare" onclick={() => (made = null)}>{words.shareAnother}</Button>
     {:else if can.state === 'asking'}
       <!-- THE ASK IS SILENT (AH27): it said "Checking whether this BrainDog makes links" after unrelated presses. -->
@@ -284,6 +307,9 @@
           <span class="share-hint" id="{ids}money-why">{words.shareMoneyWhy}</span>
         </span>
       </label>
+      <!-- A PAGE WHOSE LINK WOULD SHOW NOTHING SAYS SO BEFORE THE LINK IS MADE (AM21), as the record reads it for this
+           tick of money (`shareable` with the page): an empty Money made a 30-day link to "nothing a link can show". -->
+      {#if empty}<p class="share-empty" role="status"><Icon name="info" size="s" />{words.shareEmpty}</p>{/if}
       {#if refused}<p class="refused" role="alert">{refused}</p>{/if}
       <div class="share-actions">
         <Button weight="primary" disabled={busy} aria-busy={busy ? 'true' : undefined} onclick={() => void make()}>
@@ -389,6 +415,38 @@
 
   /* A FIELD ON ONE LINE: the `--tile-2` fill with no border, radius 8, as `controls.css` draws `.field`; the link scrolls
      inside it, and Copy the link takes it whole. */
+  /* THE LINK, READY: one line with its tick, where the address stood (AM21). */
+  .share-ready,
+  .share-empty {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+  }
+
+  .share-empty {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .share-show {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .share-show-h {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    cursor: pointer;
+  }
+
+  .share-show[open] > .share-show-h {
+    margin-block-end: var(--sp-2);
+  }
+
   .share-link {
     box-sizing: border-box;
     inline-size: 100%;

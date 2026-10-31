@@ -393,7 +393,7 @@ export function drawingOf(s: Shown, where: Where): Drawing {
      Home draws its open tickets each morning. */
   if (b.kind === 'lines' && b.measures !== undefined && b.measures.length > 0) {
     const { lines, latest } = linesAndLatest(b.measures);
-    const text = [linesText(lines, latest), latestText(latest, lines.length > 0, lines)].filter((t) => t !== '').join('\n\n');
+    const text = [linesText(lines, latest, b.heading ?? null), latestText(latest, lines.length > 0, lines)].filter((t) => t !== '').join('\n\n');
     const drawn = parse(text, { page: true }).filter((seg) => seg.type !== 'degraded');
     if (drawn.length > 0) return { segments: drawn, table: null, authored: false };
   }

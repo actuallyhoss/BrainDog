@@ -192,13 +192,14 @@
 <style>
   /**
    * THE WORK'S WIDTH, from the window's start to what the docked panel takes at the end, with the toasts at its start.
-   * No rail stands at the start any more, so `--toast-start` is the window's edge.
+   * WHERE THE SIDEBAR OR ITS RAIL STANDS, `--toast-start` is its edge (`--toast-side`, set by the shell, AM19): a toast
+   * sat over the sidebar's Usage and Settings at 1,512. With neither, the window's edge.
    *
    * `--dock-w` WITH ITS FALLBACK, because only `Panel.svelte`'s stylesheet declares it, and a screen that draws no
    * panel has not loaded that sheet. An unset variable throws out the whole `inset-inline`, both edges.
    */
   .stack {
-    --toast-start: 0px;
+    --toast-start: var(--toast-side, 0px);
 
     position: fixed;
     inset-block-end: calc(env(safe-area-inset-bottom) + var(--sp-5));

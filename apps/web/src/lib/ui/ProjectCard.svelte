@@ -34,6 +34,7 @@
   import AgentFace from './AgentFace.svelte';
   import { money } from 'braindog-render';
   import { homeCurrency } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { Sparkline } from '$lib/viz/index.ts';
   import { shownName } from '$lib/shell/side.ts';
@@ -56,8 +57,16 @@
     inset?: boolean;
   } = $props();
 
-  /* The lane as a word: its first letter up, since a list keeps it lower case. */
-  const lane = $derived(card.lane === '' ? '' : card.lane.charAt(0).toUpperCase() + card.lane.slice(1).replace(/_/gu, ' '));
+  /* THE LANE AS THE LIST SAYS IT, by the label its state field gives the value (a person's "Active", where the value is
+     `building`), as the lane bar over the cards and the project's own page say it; else the value with its first
+     letter up, since a list keeps it lower case. Personal's card said "Building" over a status of Active. */
+  const lane = $derived.by(() => {
+    if (card.lane === '') return '';
+    const list = REGISTERS[card.key.slice(0, Math.max(card.key.indexOf('#'), 0))];
+    const state = list?.state ? list.fields.find((f) => f.id === list.state) : undefined;
+    const said = state?.labels?.[card.lane];
+    return typeof said === 'string' && said.trim() !== '' ? said : card.lane.charAt(0).toUpperCase() + card.lane.slice(1).replace(/_/gu, ' ');
+  });
   const health = $derived(HEALTH[card.health] ?? null);
   /* ITS LEAD KEY NUMBER, where its project keeps one: its figure, its name and its own line stand for the money ones. */
   const kpi = $derived(card.kpi ?? null);
