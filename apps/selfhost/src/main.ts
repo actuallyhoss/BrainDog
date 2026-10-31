@@ -738,7 +738,7 @@ async function serve(): Promise<void> {
   /* AND A MEMBER WHOSE MAILBOX WAS REFUSED WHILE THE REST GOT IT IS A LINE OF THEIR OWN ON HEALTH, by name (RK5). */
   const mailFault: MailFault = {
     failed: (error) => running.api.kernel.mailFailed(error),
-    sent: (delivered) => running.api.kernel.mailSent(delivered),
+    sent: (delivered, what) => running.api.kernel.mailSent(delivered, what),
     missed: (addresses, what) => running.api.kernel.mailMissed(addresses, what),
   };
   const notices = send ? mailedNotices(send, mailFault) : undefined;

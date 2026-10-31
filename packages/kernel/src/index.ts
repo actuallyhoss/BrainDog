@@ -13406,11 +13406,21 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (schemaRefusal(state)) return;
       raiseFault(sql, MAIL_FAULT, 'mail', error, clock.now());
     },
-    mailSent: (delivered: readonly string[] = []): void => {
+    mailSent: (delivered: readonly string[] = [], what?: string): void => {
       if (schemaRefusal(state)) return;
       clearFault(sql, MAIL_FAULT, clock.now());
       /* AND A PERSON WHO MISSED ONE IS CLEARED BY THE NEXT THAT REACHES THEM (`mailMissed`). */
       for (const address of delivered) clearFault(sql, missedCause(mailedKey(address).key), clock.now());
+      /* AND A LINE ABOUT THE LAST RUN OF THIS SUMMARY GOES WITH THE NEXT RUN OF IT (RM9): somebody it no longer names, a
+         member taken off or an address on no list, would otherwise be said to have missed it for ever. A run is minutes
+         long, so a line raised within the hour is this run's and stays; one still refused is raised again by its send. */
+      if (what !== undefined && what.startsWith('the summary '))
+        sql.exec(
+          "UPDATE fault SET cleared_at = ? WHERE cause LIKE 'mail#missed.%' AND cleared_at IS NULL AND instr(said, ?) > 0 AND last_at < ?",
+          new Date(clock.now()).toISOString(),
+          `didn't get ${what}:`,
+          new Date(clock.now() - 3_600_000).toISOString(),
+        );
     },
     /**
      * MEMBERS WHO MISSED A MAIL THE REST GOT (review k, RK5): the server refused their mailbox and took the others, so

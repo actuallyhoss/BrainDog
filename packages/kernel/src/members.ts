@@ -21,6 +21,7 @@ import { compile, type Compiled, type Json, type Schema } from '@braindog/where'
 
 import { lensOf, type Catalog, type LensLevel, type LensSources } from './lens.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
+import { clearFault, missedCause } from './fault.ts';
 import { instant } from './migrate.ts';
 import { epochOf, meOf, narrowsOf, saysMe, sharesFor, type LensCache } from './shares.ts';
 
@@ -539,6 +540,10 @@ export function invite(
     return no<Member>('LEVEL_REQUIRED', 'A BrainDog keeps one owner. Make somebody else an owner first.', { at: 'level' });
 
   const at = instant(deps.nowMs);
+  /* A NEW ADDRESS IS NOT THE ONE THAT WAS REFUSED (RM9): Health's "didn't get the summary" line about them goes. */
+  const before = deps.sql.one<{ email: string | null }>('SELECT email FROM person WHERE id = ?', args.person)?.email ?? null;
+  if (typeof args.email === 'string' && args.email.trim() !== '' && before !== null && before.trim().toLowerCase() !== args.email.trim().toLowerCase())
+    clearFault(deps.sql, missedCause(args.person), deps.nowMs);
   /* THE PERSON ROW IS A MIRROR AND IS WRITTEN WITHOUT OVERWRITING WHAT IT KNOWS. An invitation that
      carried no name would otherwise blank the name the Directory already had. */
   deps.sql.exec(
@@ -698,6 +703,8 @@ export function remove(deps: MemberDeps, by: string, person: string, why?: strin
   const at = instant(deps.nowMs);
   for (const row of rows) event(deps, at, by, 'access.revoke', person, row.register, null, row.level, why ?? null);
   deps.sql.exec('DELETE FROM member WHERE person_id = ?', person);
+  /* AND HEALTH STOPS SAYING THEY MISSED A MAIL (RM9): no more is sent them, so none would ever clear it. */
+  clearFault(deps.sql, missedCause(person), deps.nowMs);
   /* THE PERSON ROW STAYS. Every event they ever wrote names them, and a history whose actors cannot
      be resolved is a history that reads as a list of identifiers. */
   return ok(null);
