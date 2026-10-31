@@ -27,7 +27,16 @@ import { caseOf, keepsCurrency } from '../start/preview.ts';
  * the host already holds. By then she is a person already, so the name the record is made under names the record alone.
  */
 export const nameSent = (p: Pick<Proposal, 'name'> | null, email = ''): string => p?.name ?? nameOfAddress(email);
-export const titleSent = (p: Pick<Proposal, 'title' | 'name'> | null, held: string | null): string | null => p?.title ?? held ?? (p?.name || null);
+export const titleSent = (p: Pick<Proposal, 'title' | 'name'> | null, held: string | null): string | null => p?.title ?? ownName(held ?? (p?.name || null));
+
+/**
+ * THE BRAINDOG'S NAME IS NOT ITS ADDRESS (first hour audit, AH26): with no business or project heard, Sam's BrainDog is
+ * "Sam's BrainDog", never "sam" or "lina-2". With no name at all, `null`, and the page says "Your BrainDog".
+ */
+export const ownName = (person: string | null | undefined): string | null => {
+  const n = person?.trim() ?? '';
+  return n === '' ? null : `${n}'s BrainDog`;
+};
 
 export type Extra = { amend: Amend; reply: Reply | null };
 

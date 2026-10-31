@@ -56,6 +56,10 @@ export const words = {
   calledFinding: 'Choosing a name from what you said',
   /** Over the name, so the box says whose name it is. */
   calledLabel: "Your BrainDog's name",
+  /** With no name heard at all (AH26). */
+  calledNone: 'Your BrainDog',
+  /** Under the name: where it lives, which Change changes. */
+  addressLabel: 'Its address',
   change: 'Change',
   send: 'Email me a link',
   sending: 'Sending',
