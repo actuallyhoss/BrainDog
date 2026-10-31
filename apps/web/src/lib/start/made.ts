@@ -92,7 +92,7 @@ export function madeOffers(lists: readonly KeptList[]): { agent: AgentOffer; sou
   const ids = lists.map(idOf);
   /* WHERE MAIL IS SET UP: Settings, What comes in, which mints the forwarding address and says when a host has none. */
   const source: SourceOffer = plays(ids, 'rates')
-    ? { kind: 'bank', name: firstRun.sourceBank, finds: firstRun.sourceBankFinds, go: firstRun.sourceGo, href: '/settings/ingest' }
+    ? { kind: 'bank', name: firstRun.sourceBank, finds: firstRun.sourceBankFinds, go: firstRun.sourceGo, href: '/settings/ingest#texts' }
     : plays(ids, 'meets')
       ? { kind: 'mail', name: firstRun.sourceMail, finds: firstRun.sourceMailFinds, go: firstRun.sourceGo, href: '/settings/ingest' }
       : { kind: 'file', name: firstRun.sourceFile, finds: firstRun.sourceFileFinds, go: firstRun.sourceFileGo, href: '/start' };

@@ -25,6 +25,7 @@
   const UNSIGNED_HELP = 'https://brain.dog/docs/use/inbox-and-doors#when-mail-arrives-unsigned';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
+  import PasteBank from '$lib/tell/PasteBank.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { doorState, doorsLine, doorWords } from '../../billing.ts';
   import Actions from '$lib/page/panels/Actions.svelte';
@@ -246,6 +247,12 @@
     unrouted: 'Show the command that prints it',
     unroutedHosted: 'Not offered here yet.',
     unsignedFix: 'How to keep forwarded mail signed',
+    /* A BANK'S TEXTS HAVE THEIR OWN STEPS AND A PASTE BOX (first-hour audit AH10): Today's "Forward your bank's texts"
+       opened this screen on a mail address and nothing said how a text gets here. */
+    textsTitle: "Your bank's texts",
+    textsLead: 'Money fills itself from the texts your bank sends when your card is used. Two ways in:',
+    textsForward: 'Forward them as mail to the address above. On an iPhone, a Shortcuts automation can do it for each text from your bank; on Android, an app that forwards texts to mail can.',
+    textsPaste: 'Or paste one below, and see what it becomes before anything is kept.',
   };
 </script>
 
@@ -443,6 +450,17 @@
         </li>
       </ol>
     {/if}
+  </div>
+</Tile>
+<!-- A BANK'S TEXTS: how they get here, and a box to paste one into (AH10). Today's next step opens here, at `#texts`. -->
+<Tile icon="money" class="section" data-surface="tile" title={words.textsTitle} id="texts">
+  <div class="section-body">
+    <p class="hint">{words.textsLead}</p>
+    <ol class="texts-ways">
+      <li class="hint">{words.textsForward}</li>
+      <li class="hint">{words.textsPaste}</li>
+    </ol>
+    <PasteBank {shell} />
   </div>
 </Tile>
 <!-- EVERY OTHER SENDER, AND RECORD METHODS RATHER THAN A HOST DOOR. `doors` lists what this record declares and
@@ -694,5 +712,12 @@
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  .texts-ways {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding-inline-start: var(--sp-5);
   }
 </style>
