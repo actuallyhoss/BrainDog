@@ -15,7 +15,7 @@
  */
 
 import { AGENTS_PACK } from '@braindog/seed/packs';
-import { MODULE_ORDER, USE_CASES } from '@braindog/seed/usecases';
+import { MODULE_ORDER, USE_CASES, signalsIn } from '@braindog/seed/usecases';
 import { moduleName } from '@braindog/seed/usecases/names';
 
 import type { Offer } from '../shape.ts';
@@ -23,7 +23,15 @@ import type { SetupOffer } from './ask.ts';
 import { FILLABLE, listsOf } from './lists.ts';
 
 /** One use case the catalogue serves as data: its front, the words it is heard in, and the modules it stands on. */
-export type CatalogueUsecase = { id: string; title: string; summary: string; signals: readonly string[]; modules: readonly string[] };
+export type CatalogueUsecase = {
+  id: string;
+  title: string;
+  summary: string;
+  signals: readonly string[];
+  modules: readonly string[];
+  /** Its pack says it is now part of a starter ("Now part of Student"), so it is never offered on its own. */
+  folded?: true;
+};
 export type CatalogueOffer = { usecases: readonly CatalogueUsecase[] };
 
 /** Where the web build's own catalogue is served, under the app's base. */
@@ -53,6 +61,47 @@ export const namedAddons = (catalogue: CatalogueOffer | null | undefined): Catal
   }
   return out;
 };
+
+/** Where sign-up leaves the add-ons a trade named for the end of the first run to offer, in the tab it opens next. */
+export const MADE_ADDONS = 'braindog.made.addons';
+
+/** An add-on offered at the end of the first run, as sign-up keeps it. */
+export type TradeOffer = { id: string; title: string; summary: string };
+
+/** What sign-up kept, read once: each offer whole, or none. */
+export function tradesKept(raw: string | null): TradeOffer[] {
+  try {
+    const kept: unknown = JSON.parse(raw ?? 'null');
+    if (!Array.isArray(kept)) return [];
+    return kept.flatMap((k): TradeOffer[] => {
+      const x = typeof k === 'object' && k !== null ? (k as Record<string, unknown>) : {};
+      return typeof x.id === 'string' && ID.test(x.id) && typeof x.title === 'string' && x.title !== '' ? [{ id: x.id, title: x.title, summary: typeof x.summary === 'string' ? x.summary : '' }] : [];
+    }).slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
+/* EVERY WORD A STARTER THIS BUILD SHIPS LISTENS FOR: "clients", "invoices" and "rent" are a starter's, so none of them
+   says a trade. */
+const STARTER_WORDS: ReadonlySet<string> = new Set(USE_CASES.flatMap((u) => u.signals.map((w) => w.toLowerCase())));
+
+/**
+ * THE ADD-ONS A STATED TRADE NAMES, to offer by name once the BrainDog is made, never to install (audit 31 Oct h, AH8,
+ * his call; FB5). "I rent out six flats" is Landlord and "I'm a photographer" is Photographer. A trade is said by the
+ * add-on's own name ("photographer", "landlord"), or by two of its words that no starter listens for ("rent out" and
+ * "flats"); "I freelance as a designer and track my clients" says none, since "clients" is the Small business starter's.
+ * An add-on folded into a starter (Studies, Team task list) is never offered.
+ */
+export function tradeAddons(said: string, catalogue: CatalogueOffer | null | undefined): CatalogueUsecase[] {
+  if (said.trim() === '') return [];
+  return namedAddons(catalogue).filter((u) => {
+    if (u.folded) return false;
+    const own = [...new Set(signalsIn(said, u.signals).map((s) => s.text.toLowerCase()))].filter((w) => !STARTER_WORDS.has(w));
+    const title = u.title.toLowerCase();
+    return own.some((w) => signalsIn(w, [title]).length > 0) || own.length >= 2;
+  });
+}
 
 /**
  * WHAT THE MODEL MAY CHOOSE FROM: every use case and every module this build ships, then each catalogue use case. The
@@ -97,7 +146,15 @@ function usecaseOf(e: unknown): CatalogueUsecase | null {
 /** What an index body offers, or `null` when it is not an index at all. */
 export function catalogueOfferOf(doc: unknown): CatalogueOffer | null {
   if (typeof doc !== 'object' || doc === null || !Array.isArray((doc as { entries?: unknown }).entries)) return null;
-  return { usecases: (doc as { entries: unknown[] }).entries.flatMap((e) => usecaseOf(e) ?? []) };
+  const entries = (doc as { entries: unknown[] }).entries;
+  /* A PACK THAT SAYS IT IS NOW PART OF A STARTER marks its use case folded, so no trade offers it on its own. */
+  const folded = new Set(
+    entries.flatMap((e) => {
+      const x = typeof e === 'object' && e !== null ? (e as Record<string, unknown>) : {};
+      return x.kind === 'pack' && typeof x.id === 'string' && typeof x.summary === 'string' && /^now part of\b/iu.test(x.summary.trim()) ? [x.id] : [];
+    }),
+  );
+  return { usecases: entries.flatMap((e) => usecaseOf(e) ?? []).map((u) => (folded.has(u.id) ? { ...u, folded: true as const } : u)) };
 }
 
 let once: Promise<CatalogueOffer | null> | null = null;

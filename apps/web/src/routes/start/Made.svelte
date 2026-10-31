@@ -19,6 +19,10 @@
 
   NO KEY IS SHOWN: an MCP app signs in by OAuth and `braindog setup` signs in itself.
 
+  `addons` are the add-ons a trade in the sentence named ("I rent out six flats" is Landlord, `tradeAddons` in
+  `lib/start/offer.ts`): offered by name in a tile of their own under Today's, each a link to its page in the store,
+  where it is installed only if the person presses Install (AH8, his call; FB5). The sentence installs none of them.
+
   `modules` (`made.modules`) is what was just made; nothing here reads it, and the prop stays so `/start`'s call is unchanged.
   `places` are the names of the places made, said in one line over the first step, so the screen first says what
   was built. Claude comes first and chosen at every width (AH25), and a command breaks only at its spaces (`CodeLine`
@@ -41,8 +45,13 @@
   import Button from '$lib/ui/Button.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
+  import type { TradeOffer } from '$lib/start/offer.ts';
 
-  let made: { modules?: readonly string[] | null | undefined; places?: readonly string[] | null | undefined } = $props();
+  let made: {
+    modules?: readonly string[] | null | undefined;
+    places?: readonly string[] | null | undefined;
+    addons?: readonly TradeOffer[] | undefined;
+  } = $props();
   const madeLine = $derived(firstWords.made(made.places ?? []));
 
   /* This screen's own words for the connect steps; the titles are `firstWords`. */
@@ -50,6 +59,10 @@
     apps: 'Your app',
     install: 'Install BrainDog',
     connect: 'Connect this BrainDog',
+    /* THE ADD-ONS A TRADE NAMED, offered and never added. */
+    addonsTitle: (n: number) => (n === 1 ? 'An add-on for what you do' : 'Add-ons for what you do'),
+    addonsSub: 'Nothing is added until you install it.',
+    seeAddon: (title: string) => `See ${title}`,
     /* WHAT `braindog setup` DOES NEXT, so the link and the six digits it prints are expected and not a surprise. */
     approve: 'It prints a link and six digits. Open the link, type the digits, and the terminal carries on.',
   } as const;
@@ -134,6 +147,27 @@
       <Button weight="primary" href="/">{firstWords.go}</Button>
     </div>
   </div>
+
+  {#if (made.addons ?? []).length > 0}
+    {@const addons = made.addons ?? []}
+    <section class="made-tile" aria-labelledby="addons-h">
+      <header class="head">
+        <h2 class="agent-h" id="addons-h">{words.addonsTitle(addons.length)}</h2>
+        <p class="agent-sub">{words.addonsSub}</p>
+      </header>
+      <ul class="addons">
+        {#each addons as a (a.id)}
+          <li class="addon">
+            <div class="addon-said">
+              <p class="addon-title">{a.title}</p>
+              {#if a.summary}<p class="agent-sub">{a.summary}</p>{/if}
+            </div>
+            <Button href={`/addons/${encodeURIComponent(a.id)}`}>{words.seeAddon(a.title)}</Button>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   <section class="made-tile agent" aria-labelledby="agent-h">
     <header class="head">
@@ -221,6 +255,39 @@
     font-size: var(--fs-body);
     line-height: 22px;
     text-wrap: pretty;
+  }
+
+  /* THE ADD-ONS A TRADE NAMED: each its name and line, its press beside them, under them on a phone. */
+  .addons {
+    display: grid;
+    gap: var(--sp-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .addon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .addon-said {
+    display: grid;
+    flex: 1 1 280px;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .addon-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: 22px;
   }
 
   /* WHAT WAS MADE, over the title in the body size and ink, so the first thing read is the record, not a command. */

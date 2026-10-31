@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import { BUNDLED, shape } from '../shape.ts';
 import { setupOffer } from './propose.ts';
-import { catalogueOfferOf, heardOf, namedAddons, offerOf, readCatalogueOffer, type CatalogueOffer } from './offer.ts';
+import { catalogueOfferOf, heardOf, namedAddons, offerOf, readCatalogueOffer, tradeAddons, tradesKept, type CatalogueOffer } from './offer.ts';
 
 const SAID = 'I rent out six flats and need to keep track of rent and repairs';
 const LETTING = { kind: 'usecase', id: 'letting-desk', title: 'Letting desk', summary: 'Flats, tenancies and repairs.', signals: ['flats', 'tenancy'], modules: ['money', 'letting-desk-lists'] };
@@ -76,4 +76,16 @@ test('A BROKEN INDEX, A FAILED FETCH AND A MISSING ONE EACH LEAVE THE COMPILED L
     assert.deepEqual(offerOf(catalogue), setupOffer());
     assert.deepEqual(heardOf(catalogue), []);
   }
+});
+
+test('A STATED TRADE OFFERS ITS ADD-ON BY NAME (FB5): its own name, or two words no starter listens for, and never a folded one', () => {
+  const PHOTO = { kind: 'usecase', id: 'photographer', title: 'Photographer', summary: 'Shoots.', signals: ['photographer', 'shoots', 'clients'], modules: ['photographer'] };
+  const FOLDED = { kind: 'usecase', id: 'studies', title: 'Studies', summary: 'Courses.', signals: ['my courses', 'reading list'], modules: ['studies'] };
+  const catalogue = catalogueOfferOf({ format: 1, entries: [LETTING, PHOTO, FOLDED, { kind: 'pack', id: 'studies', title: 'Studies', summary: 'Now part of Student.' }] });
+  assert.deepEqual(tradeAddons(SAID, catalogue).map((u) => u.id), ['letting-desk']);
+  assert.deepEqual(tradeAddons("I'm a photographer in Cairo", catalogue).map((u) => u.id), ['photographer']);
+  assert.deepEqual(tradeAddons("I freelance as a designer and want to track my clients", catalogue), [], '"clients" is a starter\'s word');
+  assert.deepEqual(tradeAddons('My courses and my reading list', catalogue), [], 'a folded add-on is never offered');
+  assert.deepEqual(tradesKept(JSON.stringify(tradeAddons(SAID, catalogue).map(({ id, title, summary }) => ({ id, title, summary })))).map((u) => u.id), ['letting-desk']);
+  assert.deepEqual(tradesKept('nonsense'), []);
 });
