@@ -210,7 +210,38 @@ export function figureSaid(r: SharedReading, where: Where): Said {
     const m = moneySaid(r.value, r.unit, 'headline', where.home ?? null);
     if (m !== null) return { money: m };
   }
+  if (r.unit === null && r.format !== undefined) {
+    const said = formatSaid(r.format, r.value, where);
+    if (said !== null) return said;
+  }
   return { text: withUnit(numberSaid(r.value, where.language), r.unit) };
+}
+
+/** A day as whole days since 1970, as a figure declared `format: day` holds one: 20,756 is 30 Oct 2026. */
+const DAY_MS = 86_400_000;
+
+/**
+ * A figure with no unit said as its declared format, as the app's tile says it (`format` in `lib/record/metrics.ts`): a
+ * day as "30 Oct", a count of days as "57 days", a share as "62%", money in its currency. `null` for a format said as a
+ * plain number.
+ */
+function formatSaid(format: string, value: number, where: Where): Said | null {
+  if (format === 'day') {
+    const day = new Date(Math.round(value) * DAY_MS);
+    return Number.isFinite(day.getTime()) ? { text: daySaid(day.toISOString().slice(0, 10), where) } : null;
+  }
+  if (format === 'days') {
+    const n = Math.round(value);
+    return { text: `${numberSaid(n, where.language)} ${n === 1 ? 'day' : 'days'}` };
+  }
+  if (format === 'pct') return { text: `${numberSaid(Math.round(value * 1000) / 10, where.language).replace(/^-/u, '−')}%` };
+  if (format === 'int') return { text: numberSaid(Math.round(value), where.language) };
+  const currency = format === 'money' ? (where.home ?? null) : format.startsWith('money.') ? format.slice('money.'.length) : null;
+  if (currency !== null) {
+    const m = moneySaid(Math.round(value), currency, 'headline', where.home ?? null);
+    return m === null ? null : { money: m };
+  }
+  return null;
 }
 
 /** A cell that says nothing: no words and no amount. */
@@ -265,7 +296,26 @@ export function shownBlocks(blocks: readonly SharedBlock[], where: Where): { lea
     const says = rows.length > 0 || b.readings.length > 0 || b.authored.some((cells) => cells.some((c) => plainSaid(c, where) !== '')) || Boolean(b.body) || Boolean(b.refused);
     if (says) out.push({ block: b, columns, rows, matched });
   }
-  /* A SECTION WITH NOTHING UNDER IT before the next section, or the end, goes. */
-  const kept = out.filter((s, i) => s.block.kind !== 'section' || (out[i + 1] !== undefined && out[i + 1]!.block.kind !== 'section'));
-  return { lead, blocks: kept };
+  return { lead, blocks: overSomething(out) };
+}
+
+/** A section with nothing under it before the next section of its column, or the end, goes. */
+const overSomething = (out: readonly Shown[]): Shown[] =>
+  out.filter((s, i) => {
+    if (s.block.kind !== 'section') return true;
+    const next = out.slice(i + 1).find((t) => t.block.area === s.block.area);
+    return next !== undefined && next.block.kind !== 'section';
+  });
+
+/**
+ * THE PAGE'S TWO COLUMNS, AS THE OWNER'S PAGE LAYS THEM (SB3, `layout.ts` in the app): on a page with a rail, the blocks
+ * in its main column and the ones in its rail, each in declared order and a section kept only over something in its own
+ * column. `rail` is `null` on a page with none, or where only one column has anything to show, which then takes the page.
+ */
+export function areasOf(blocks: readonly Shown[], layout: { rail: number } | null): { main: Shown[]; rail: Shown[] | null } {
+  if (layout === null) return { main: [...blocks], rail: null };
+  const main = overSomething(blocks.filter((s) => s.block.area !== 'rail'));
+  const rail = overSomething(blocks.filter((s) => s.block.area === 'rail'));
+  if (main.length === 0) return { main: rail, rail: null };
+  return { main, rail: rail.length === 0 ? null : rail };
 }

@@ -43,7 +43,7 @@ test('a dead or closed link reads This page is not shared., and never why', () =
 });
 
 test('a live page heads with its name and the day its link stops', () => {
-  const page = { title: 'Weekly bakes', expires_at: '2026-11-14T00:00:00.000Z', read_at: '2026-10-15T12:00:00.000Z', language: 'en', zone: 'UTC', home: null, empty: null, blocks: [] };
+  const page = { title: 'Weekly bakes', expires_at: '2026-11-14T00:00:00.000Z', read_at: '2026-10-15T12:00:00.000Z', language: 'en', zone: 'UTC', home: null, empty: null, layout: null, blocks: [] };
   /* A DAY IN THE YEAR THE RECORD IS IN IS SAID WITHOUT ITS YEAR, as the app says one. */
   assert.deepEqual(headOf({ from: 'live', page }), { title: 'Weekly bakes', line: 'This link works until 14 Nov.' });
   const east = { ...page, expires_at: '2026-11-14T03:00:00.000Z', zone: 'America/New_York' };
@@ -118,9 +118,13 @@ test('effort is said in words, a share sits on its figure, and an agent is named
   assert.equal(said(cellSaid(row, { field: 'progress' }, where)), '60%');
   assert.equal(said(cellSaid(row, { field: 'agent' }, where)), 'Claude');
   assert.equal(said(figureSaid({ metric: 'done', value: 42, unit: '%' }, where)), '42%');
+  /* A FIGURE SAID AS ITS FORMAT (SB1): a day held as days since 1970, a count of days, a share. */
+  assert.equal(said(figureSaid({ metric: 'runs-out-on', value: 20_756, unit: null, format: 'day' }, where)), '30 Oct');
+  assert.equal(said(figureSaid({ metric: 'runway-days', value: 57, unit: null, format: 'days' }, where)), '57 days');
+  assert.equal(said(figureSaid({ metric: 'kept', value: 0.625, unit: null, format: 'pct' }, where)), '62.5%');
 });
 
-const block = (b: Partial<SharedBlock>): SharedBlock => ({ kind: 'table', heading: null, lead: false, body: null, empty: null, span: null, refused: null, columns: [], rows: [], matched: 0, readings: [], authored: [], ...b });
+const block = (b: Partial<SharedBlock>): SharedBlock => ({ kind: 'table', heading: null, lead: false, body: null, empty: null, span: null, refused: null, columns: [], rows: [], matched: 0, readings: [], authored: [], area: 'main', done: null, ...b });
 
 test('a block with nothing in it is no tile, the opening line is under the title, and a blank column or row is left out', () => {
   const keys = { cells: { scope: { type: 'text', value: 'All' } }, fields: {}, state: null };
