@@ -152,6 +152,7 @@ export const words = {
   namePlaceholder: 'Current account',
   kind: 'Type',
   balance: (code: string) => `Balance today (${code})`,
+  accountIn: 'Its currency',
   addons: 'Add-ons',
   addonsLine: 'Switch on what you keep. Each one adds its own page to Money.',
   moreAddons: (n: number) => `More add-ons (${String(n)})`,

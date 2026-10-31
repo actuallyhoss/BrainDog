@@ -154,10 +154,14 @@ export function symbolFigure(text: string, home?: Home): string | null {
   return `${coded.sign}${minus}${symbol}${coded.rest.slice(minus.length)}`;
 }
 
-/** The symbol British English writes a currency with (`\u00a3`, `US$`), or `null` for one it writes by its code (`EGP`). */
+/**
+ * The symbol English writes a currency with among others (`\u00a3`, `$`, `CA$`), or `null` for one it writes by its code
+ * (`EGP`). THE WRITER'S OWN SIGN (`money.ts`, AM15): British English's `US$` drew one payout "+US$1,950" in a table
+ * while every other screen said "$1,950".
+ */
 function symbolOf(currency: string): string | null {
   try {
-    const symbol = new Intl.NumberFormat('en-GB', { style: 'currency', currency, currencyDisplay: 'symbol' })
+    const symbol = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'symbol' })
       .formatToParts(0)
       .find((p) => p.type === 'currency')?.value;
     return symbol && symbol.toUpperCase() !== currency ? symbol : null;

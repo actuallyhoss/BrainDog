@@ -14,7 +14,8 @@
  * to reverse: another answer changes that table and nothing else in this file.
  *
  *   the home currency, with a sign      sign, amount                 £1,086,213.41
- *   any other currency with a sign      sign, amount, code after     $2,947.95 USD
+ *   any other currency with a sign      its own sign, amount         $2,947.95, CA$900, €50
+ *   ... whose sign is the home's too    sign, amount, code after     $2,947.95 USD (on a Canadian record)
  *   a currency with no sign             code, amount                 EGP 1,200.00
  *   a negative amount                   a true minus in front        −EGP 497.26
  *   `exact` (tables, ledgers, forms)    every minor unit             EGP 58,185.00
@@ -58,6 +59,14 @@ export type WrittenAmount = {
 /** Whether the home currency drops its code when it has a sign. `false` writes the code first everywhere. */
 const HOME_BY_SIGN = true;
 
+/**
+ * WHETHER ANOTHER CURRENCY IS WRITTEN BY ITS OWN SIGN ALONE (audit 31 Oct m, AM15): one payout read "$1,950" on Today,
+ * "+$1,950 USD" on a phone's Bills and "+US$1,950" in its table. English gives each currency a sign of its own among
+ * the others (`$`, `CA$`, `A$`, `€`), so the code after it said nothing the sign did not, except where the sign is the
+ * home's own: a dollar on a Canadian record keeps its code. `false` writes the code after every other currency again.
+ */
+const OTHERS_BY_SIGN = true;
+
 /** A sign is the runtime's narrow form when it is a currency sign with at most two capitals before it: `$`, `£`, `R$`. Not `kr`, not `CHF`. */
 const A_SIGN = /^[A-Z]{0,2}\p{Sc}$/u;
 
@@ -89,6 +98,26 @@ function signOf(currency: string): string {
     /* Not a code the runtime will format: it is written by its code. */
   }
   signs.set(currency, sign);
+  return sign;
+}
+
+const own = new Map<string, string>();
+
+/**
+ * The sign English writes a currency by among others (`symbol`, never the narrow form): `$` is the US dollar's alone,
+ * the Canadian one is `CA$`. `''` for one written by its code.
+ */
+function ownSignOf(currency: string): string {
+  const known = own.get(currency);
+  if (known !== undefined) return known;
+  let sign = '';
+  try {
+    const symbol = written(currency, 'symbol');
+    if (symbol && symbol !== currency && symbol !== '¤' && A_SIGN.test(symbol)) sign = symbol;
+  } catch {
+    /* Not a code the runtime will format. */
+  }
+  own.set(currency, sign);
   return sign;
 }
 
@@ -219,10 +248,15 @@ export function writeAmount(
     if (exp > 0 && !(setting === 'read' && /^0+$/u.test(tail))) fraction = `.${tail}`;
   }
 
-  const sign = signOf(currency);
+  const narrow = signOf(currency);
   /* A caller in plain JavaScript may hand no home at all: read as a record with none, never a throw. */
   const isHome = typeof home === 'string' && home.toUpperCase() === currency;
-  const codePlace: WrittenAmount['codePlace'] = sign === '' ? 'before' : isHome && HOME_BY_SIGN ? null : 'after';
+  /* ANOTHER CURRENCY BY ITS OWN SIGN, unless that sign is the home's too (`OTHERS_BY_SIGN`). */
+  const homeSign = typeof home === 'string' && !isHome ? signOf(home.toUpperCase()) : '';
+  const other = narrow !== '' && !isHome && OTHERS_BY_SIGN ? ownSignOf(currency) : '';
+  const bySign = other !== '' && other !== homeSign;
+  const sign = bySign ? other : narrow;
+  const codePlace: WrittenAmount['codePlace'] = sign === '' ? 'before' : (isHome && HOME_BY_SIGN) || bySign ? null : 'after';
   const code = codePlace === null ? '' : currency;
   const minus = minor < 0n && !nought ? MINUS : '';
   const figure = `${whole}${fraction}`;
