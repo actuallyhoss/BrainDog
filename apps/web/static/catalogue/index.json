@@ -5074,8 +5074,30 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.0.3",
       "versions": [
+        {
+          "version": "2.0.3",
+          "checksum": "c7bfd11cb59ee9f6692e64073de12198dcb6b3e4fd3ed4ca27aba74f45efc83e",
+          "bytes": 2711,
+          "published_at": "2026-10-31T04:13:59.969Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Readings"
+            ],
+            "pages": [
+              "Reading"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing on your list changes. Its fields now go by Title, Author, Kind, Status, Finished and Thoughts, the words its pages already used.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "f4446975f6ec54091ce6d6712ba82f00508f0a6fe6307e7ae489b182c2b2d2c0",

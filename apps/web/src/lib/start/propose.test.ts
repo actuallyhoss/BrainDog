@@ -1421,7 +1421,7 @@ test('A BLANK BRAINDOG TAKES ITS FIRST THING (AM2): a name alone brings People a
 
 test('SIGN-UP NAMES THE PLACES THE RAIL WILL SHOW (AM10)', () => {
   const sam = propose("I'm Sam. I want my life admin under control: my bills, my budget, rent and payday, and training for a marathon.", CAIRO);
-  assert.deepEqual(railPlaces(sam.places, filledBy(sam.rows)).map((x) => x.name), ['Today', 'Goals', 'People', 'Money']);
+  assert.deepEqual(railPlaces(sam.places, filledBy(sam.rows)).map((x) => x.name), ['Today', 'Goals', 'Money', 'People'], 'in the rail’s order');
   assert.ok(sam.heard.some((h) => h.phrase === 'training for a marathon'), 'one phrase, as typed');
   assert.ok(!sam.heard.some((h) => h.became === 'Bills'), 'a word for money is Money');
   const ali = propose("I'm Ali.", CAIRO);
@@ -1436,4 +1436,11 @@ test('WHAT I HEARD SAYS A STARTER’S PLACES, and the line keeps its lists under
   assert.equal(becameShown(life, sam), 'Goals');
   const money = sam.heard.find((h) => /Money/u.test(h.became));
   if (money) assert.equal(becameShown(money, sam), money.became, 'a part is said as it is');
+});
+
+test('SIGN-UP NAMES A STARTER’S OWN PLACES IN THE RAIL’S ORDER (AN19): the Founder’s Dashboard, the Team’s Tickets', () => {
+  const omar = propose("I'm Omar, a solo founder. I run two SaaS apps and want one dashboard for MRR, runway and signups.", CAIRO);
+  assert.deepEqual(railPlaces(omar.places, filledBy(omar.rows)).map((x) => x.name), ['Today', 'Money', 'People', 'Dashboard']);
+  const priya = propose("I'm Priya, a product manager. Our team of six runs two-week sprints and I want one board for our tickets and the agents on them.", CAIRO);
+  assert.deepEqual(railPlaces(priya.places, filledBy(priya.rows)).map((x) => x.name), ['Today', 'Tickets', 'Sprints', 'People', 'Agents']);
 });

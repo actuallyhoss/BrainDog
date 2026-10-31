@@ -383,7 +383,7 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     name: 'People',
     source: 'register.people',
     /* THE PEOPLE EVERYONE DRAWS, SINCE People 3.6.0: never the owner and never somebody folded into another, so the
-       page's "6 contacts" is the number of cards under it. */
+       page's "6 people" is the number of cards under it. */
     where: 'merged_into is empty, self is not true',
     value: { count: 'id' },
     format: 'int',
@@ -532,8 +532,8 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
       {
         /* THE PAGE'S ONE LINE, said from the figures, so the line and the chart under it cannot disagree. A clause whose
            every figure is nought is left out by the writer (`leadOf` in apps/web), so a record where nobody is quiet
-           does not say "0 quiet". `contact(s)` because the writer settles a plural by adding an s, and "persons" is
-           not a word anybody says.
+           does not say "0 quiet". `person(s)` is "person" for one and "people" for more (`manyOf` in the writers), so
+           the line says the list's own word one press away, "1 person besides you" (AN16), never "contacts".
 
            HOW MANY STANDS IN A CLAUSE OF ITS OWN, so the line never says "0 of your 12 contacts were in touch" about a
            record that simply has no Last in touch days yet (people `meet` adds, until it stamps the day): it says
@@ -548,7 +548,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM: "Add Priya to People?"
            names no row of its own, and the line said no question was open while it waited in Needs you. The kernel
            counts a rowset on People here now (`openOnList`), and Waiting on you lists it. */
-        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s) besides you',
+        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} person(s) besides you',
       },
       {
         /* WHO HAS GONE QUIET, BY NAME, SINCE People 2.7.0 (the visual review of October 2nd), where the line said "1 quiet

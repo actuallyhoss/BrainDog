@@ -36,6 +36,9 @@ import { exponentOf } from '@braindog/kernel';
 
 import { nothingWaits, type WaitingNow } from './waiting.ts';
 
+/** A noun's many: an s, except "person(s)", which is people and never "persons" (AN16). */
+const manyOf = (word: string): string => (word === 'person' ? 'people' : word === 'Person' ? 'People' : `${word}s`);
+
 /** A headline is a line, not a paragraph: what fits beside a page's title on a phone. */
 export const HEADLINE_MOST = 140;
 
@@ -359,10 +362,10 @@ export function rulesLine(template: string, values: Readonly<Record<string, Json
     .replace(/\[([^\]]*)\]\([^)\s]*\)/gu, '$1')
     .replace(/\{\{\s*([^{}\s]+)\s*\}\}((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)/gu, (_, path: string, between: string, word: string) => {
       const figure = said(path) ?? '';
-      return `${figure}${between} ${figure.trim() === '1' ? word : `${word}s`}`;
+      return `${figure}${between} ${figure.trim() === '1' ? word : manyOf(word)}`;
     })
     .replace(/\{\{\s*([^{}\s]+)\s*\}\}/gu, (_, path: string) => said(path) ?? '')
-    .replace(/([A-Za-z]+)\(s\)/gu, '$1s')
+    .replace(/([A-Za-z]+)\(s\)/gu, (_, word: string) => manyOf(word))
     .replace(/\s{2,}/gu, ' ')
     .trim();
 }

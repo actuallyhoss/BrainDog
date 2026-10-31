@@ -55,7 +55,7 @@
   import PreviewPage from '$lib/market/PreviewPage.svelte';
   import { addsOf, fieldsOf, namesOf } from '$lib/market/adds.ts';
   import { readCounts } from '$lib/market/counts.ts';
-  import { actionOf, entryOf, latestOf, listingKey, listingsOf, unlistedListing, type ListingKind } from '$lib/market/listing.ts';
+  import { actionOf, compareVersion, entryOf, latestOf, listingKey, listingsOf, unlistedListing, type ListingKind } from '$lib/market/listing.ts';
   import { readVersionPreview, type PreviewRead } from '$lib/market/preview.ts';
   import { words } from '$lib/market/words.ts';
   import { readyFor, readyWords, type Ready } from '$lib/market/update-ready.ts';
@@ -98,8 +98,14 @@
   const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);
   const latest = $derived(listing ? latestOf(listing) : null);
   const action = $derived(listing && states ? actionOf(listing, states) : null);
-  /** Whether this record holds a version of it already, so what a newer one changed is something to read. */
-  const held = $derived(action !== null && action.kind !== 'install');
+  /**
+   * THE VERSION THIS RECORD HELD WHEN THE PAGE OPENED (AN15), so what a newer one changed is said to whoever had an
+   * older one, and still after he updates here. Installed fresh on this page, nothing was held, and "Each book keeps its
+   * title in Name, as it has since 2.0.0" answered nothing he asked.
+   */
+  let arrived = $state.raw<PackState[] | null>(null);
+  const heldFrom = $derived(listing && arrived ? (arrived.find((s) => s.id === listing.installedId)?.version ?? null) : null);
+  const noteFor = (v: CatalogueVersion): boolean => !v.bump || (heldFrom !== null && compareVersion(heldFrom, v.version) < 0);
 
   /**
    * ITS OWN GLYPH (agents F25): a built-in wears the place it brings (`glyph.ts`), a built-in use case its Home's or its
@@ -329,6 +335,7 @@
         return false;
       }
       states = chosen.first.value;
+      arrived = chosen.first.value;
       return true;
     });
   });
@@ -606,7 +613,7 @@
     <span class="v-line"><span class="v num">{v.version}</span><span class="quiet">{[v.bump ? words.bump[v.bump] : words.first, v.published_at ? words.published(v.published_at) : ''].filter(Boolean).join(' · ')}</span></span>
     <!-- WHAT A VERSION CHANGED IS SAID TO WHOEVER HAD THE ONE BEFORE IT (AM20): to somebody who never had it, "Each book
          keeps its title in Name, as it has since 2.0.0" answered nothing they asked. A first version's note says what it is. -->
-    {#if v.notes && (held || !v.bump)}<span class="notes">{v.notes}</span>{/if}
+    {#if v.notes && noteFor(v)}<span class="notes">{v.notes}</span>{/if}
     {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
     {#if listing?.source === 'kennel' && signedLine(v.signature, ours)}<span class="quiet">{signedLine(v.signature, ours)}</span>{/if}
   </li>

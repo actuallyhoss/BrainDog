@@ -64,7 +64,7 @@ test('THE FILE IS reading-list, AND EVERY VERSION THE CATALOGUE ALREADY LISTS FO
 
 test('WHAT THIS VERSION CHANGED IS SAID IN A READER’S WORDS: no kernel, no declares, no field ids', () => {
   const doc = JSON.parse(TEXT) as { version: string; changes: string };
-  assert.equal(doc.version, '2.0.2');
+  assert.equal(doc.version, '2.0.3');
   assert.doesNotMatch(doc.changes, /kernel|declares|readings|field named/u);
 });
 
