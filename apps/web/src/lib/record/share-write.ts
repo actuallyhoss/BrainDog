@@ -176,8 +176,11 @@ export function linkState(row: ShareRow, now: number): 'open' | 'ran-out' | 'clo
  */
 export type SharedCell = { type: string; of?: string; value: unknown; label?: string; unit?: string };
 
-/** A column a shared block keeps: the field it draws, the label the owner reads, its role, and a money column's sign. */
-export type SharedColumn = { field: string; label?: string; as?: string; sign?: { field: string; minus: string } };
+/**
+ * A column a shared block keeps: the field it draws, the label the owner reads, its role, a money column's sign, and the
+ * field it reads where its own holds nothing (`or`, the Ledger's name: who was paid, else the line's own words).
+ */
+export type SharedColumn = { field: string; or?: string; label?: string; as?: string; sign?: { field: string; minus: string } };
 
 /**
  * One row as a link shows it: each drawn field's typed cell, the same row as plain values for a record that sends no
@@ -189,7 +192,12 @@ export type SharedRow = {
   state: string | null;
   /** A card's trend, when the record sent its cards' runs (`trends`, one a row): oldest first, a gap `null`. */
   trend?: (number | null)[];
+  /** What a budget's category spent, in its figure's minor units, when the record sent the budgets' parts (`spent_rows`). */
+  spent?: number;
 };
+
+/** One part of a figure that is cut by something (an account, a plan, a category): its words and its value. */
+export type SharedPart = { key: string; label?: string; value: number | null };
 
 /**
  * One figure a block read, with the label the owner reads for it, and how it moved: `trend` is the record's run of it, one
@@ -204,6 +212,8 @@ export type SharedReading = {
   trend?: (number | null)[];
   /** How the figure is declared to be written (`day`, `days`, `pct`, `int`, `money.GBP`...): a day is held as days since 1970. */
   format?: string;
+  /** Its parts, for a figure cut by something ("What each account holds", parts paid by plan), as the record named them. */
+  groups?: SharedPart[];
 };
 
 /**
@@ -284,11 +294,21 @@ const readingOf = (x: unknown): SharedReading | null => {
   const unit = typeof r.unit === 'string' && r.unit !== '' ? r.unit : null;
   /* THE TREND RIDES BESIDE THE READING, as the record sends it (`shares.ts`); a point that is not a number is a gap. */
   const trend = Array.isArray(x.trend) ? x.trend.map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)) : null;
+  /* ITS PARTS, by the words the record keyed them by (`readingShown` keys none by a row's id), so a link draws an
+     account a row and a plan a track, as the app does (AL6, AL12). A part with no words is no part. */
+  const groups = Array.isArray(r.groups)
+    ? r.groups.flatMap((g): SharedPart[] =>
+        isObject(g) && typeof g.key === 'string' && (g.key.trim() !== '' || (typeof g.label === 'string' && g.label.trim() !== ''))
+          ? [{ key: g.key, ...(typeof g.label === 'string' && g.label.trim() !== '' ? { label: g.label } : {}), value: typeof g.value === 'number' && Number.isFinite(g.value) ? g.value : null }]
+          : [],
+      )
+    : null;
   return {
     metric: x.metric,
     ...(typeof x.label === 'string' && x.label !== '' ? { label: x.label } : {}),
     value,
     unit,
+    ...(groups === null ? {} : { groups }),
     ...(trend !== null && trend.some((v) => v !== null) ? { trend } : {}),
     ...(typeof x.format === 'string' && /^[a-z][a-z.A-Z]{0,15}$/u.test(x.format) ? { format: x.format } : {}),
   };
@@ -321,6 +341,7 @@ const columnOf = (c: unknown): SharedColumn[] => {
   return [
     {
       field: c.field,
+      ...(typeof c.or === 'string' && c.or !== '' && c.or !== c.field ? { or: c.or } : {}),
       /* AN EMPTY LABEL IS KEPT EMPTY (SB4): the owner's pack left the fact unnamed, as the app draws it. */
       ...(typeof c.label === 'string' ? { label: c.label.trim() === '' ? '' : c.label } : {}),
       ...(typeof c.as === 'string' ? { as: c.as } : {}),
@@ -344,10 +365,21 @@ export function blockShared(x: unknown): SharedBlock {
     const line = run.map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null));
     return line.some((v) => v !== null) ? line : null;
   };
+  /* AND A BUDGET'S SPENDING, one a row in the same way (`spent_rows`, AL6). */
+  const spents = Array.isArray(b.spent_rows) && b.spent_rows.length === sentRows.length ? b.spent_rows : null;
   const rows = sentRows.flatMap((r, n): SharedRow[] => {
     if (!isObject(r) || !(isObject(r.cells) || isObject(r.fields))) return [];
     const trend = trendAt(n);
-    return [{ cells: cellsOf(r.cells), fields: isObject(r.fields) ? r.fields : {}, state: typeof r.state === 'string' ? r.state : null, ...(trend === null ? {} : { trend }) }];
+    const spent = spents?.[n];
+    return [
+      {
+        cells: cellsOf(r.cells),
+        fields: isObject(r.fields) ? r.fields : {},
+        state: typeof r.state === 'string' ? r.state : null,
+        ...(trend === null ? {} : { trend }),
+        ...(typeof spent === 'number' && Number.isFinite(spent) ? { spent } : {}),
+      },
+    ];
   });
   const authored = (Array.isArray(b.authored) ? b.authored : []).map((r) =>
     isObject(r) && Array.isArray(r.cells) ? r.cells.map((c) => (typeof c === 'string' ? (filled(c, values) ?? '') : c)) : [],

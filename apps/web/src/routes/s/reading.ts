@@ -169,7 +169,21 @@ function listSaid(cell: SharedCell, where: Where): Said {
  * One column of one row: its typed cell when the record sent one, else the plain value a record without cells sent.
  * A money column with a `sign` turns its amount when the row's sign field says it went out.
  */
-export function cellSaid(row: SharedRow, column: Pick<SharedColumn, 'field' | 'sign'>, where: Where): Said {
+export function cellSaid(row: SharedRow, column: Pick<SharedColumn, 'field' | 'sign' | 'or'>, where: Where): Said {
+  /* A COLUMN'S `or` IS READ WHERE ITS OWN FIELD SAYS NOTHING (AL1), as the app reads it (`toRows`): the Ledger's name is
+     who was paid, else the line's own words, and the timeline makes a bank's capitals words (`timelineTitle`). */
+  if (column.or !== undefined) {
+    const own = fieldSaid1(row, { field: column.field, ...(column.sign === undefined ? {} : { sign: column.sign }) }, where);
+    return textOfSaid(own).trim() !== '' ? own : fieldSaid1(row, { field: column.or }, where);
+  }
+  return fieldSaid1(row, column, where);
+}
+
+/** A said value's words. */
+const textOfSaid = (s: Said): string => ('money' in s ? s.money.text : s.text);
+
+/** One field of a row as words, the way `cellSaid` says a column with no second field. */
+function fieldSaid1(row: SharedRow, column: Pick<SharedColumn, 'field' | 'sign'>, where: Where): Said {
   const cell = row.cells[column.field];
   /* A NAME FILED AS A HANDLE IS SAID AS THE APP SAYS IT (`thingName` on a project's page): a shared Kiln read its tools
      "fenwick" and "outline-check" where the owner reads "Fenwick" and "Outline check" (audit of 31 October, A19). */

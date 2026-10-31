@@ -667,3 +667,22 @@ test('SL2: A PROJECT CARD\'S TREND REACHES A LINK from the project\'s own rows, 
   assert.equal(sum(cards.trends?.[1 - kiln]), 1);
   sql.close();
 });
+
+test('AL1: A COLUMN THAT READS A SECOND FIELD WHERE ITS OWN IS EMPTY SENDS BOTH, as the Ledger names a line with no payee', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  sql.exec(
+    "INSERT INTO record (singleton, id, slug, name, locale, tz, format_ver, created_at) VALUES (1, 'rec_1', 'studio', 'Studio', 'en-GB', 'Europe/London', 1, '2026-10-01T00:00:00.000Z')",
+  );
+  value(await api.kernel.install([INVOICES, page('ledger', [{ kind: 'table', source: 'register.invoices', columns: [{ field: 'where', or: 'client', label: 'Who' }] }])]));
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  value(api.kernel.create('invoices', { client: 'Grangemoor Events', stage: 'sent' }, { actor: 'p_owner' }));
+  const direct = shareMethods({ kernel: api.kernel, sql, clock: fixedClock(NOW), no, tail: async <T>(o: T) => o, scoped: () => null, admin: () => null, shares: () => ({ can: true }) } as unknown as RecordDeps);
+  const { id } = value<{ id: string }>(await direct.openShare({ slug: 'ledger', money: true }, owner));
+  const shown = value<SharedPage>(await api.sharedPage(undefined, link(id, 'ledger')));
+  const table = tableOf(shown) as ReturnType<typeof tableOf> & { columns: { or?: string }[] };
+  assert.equal(table.columns[0]?.or, 'client');
+  assert.deepEqual(table.rows[0]?.cells.client, { type: 'text', value: 'Grangemoor Events' });
+  sql.close();
+});

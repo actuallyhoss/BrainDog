@@ -12,11 +12,11 @@
  * block is never lost to its drawing.
  */
 
-import { kindSpec, parse, type Segment } from 'braindog-render';
+import { dateSaid, kindSpec, parse, type Segment } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 
-import { fieldSaid, type SharedColumn, type SharedRow } from '../../lib/record/share-write.ts';
-import { cellSaid, figureSaid, plainSaid, trendLine, type Said, type Shown, type Where } from './reading.ts';
+import { fieldSaid, type SharedColumn, type SharedPart, type SharedReading, type SharedRow } from '../../lib/record/share-write.ts';
+import { cellSaid, figureSaid, moneySaid, plainSaid, trendLine, type Said, type Shown, type Where } from './reading.ts';
 
 /** What one shared block draws: the renderer's segments, the renderer's table, or both (figures over a list). */
 export type Drawing = { segments: Segment[]; table: { columns: Column[]; rows: TableRow[] } | null; authored: boolean };
@@ -172,12 +172,130 @@ function tableOf(s: Shown, where: Where): Drawing['table'] {
   return { columns, rows };
 }
 
+const CURRENCY = /^[A-Z]{3}$/u;
+
+/** A part's words: the record's label, else its key with a capital where it was typed all in small letters (`page-live.ts`). */
+const partName = (g: SharedPart): string => g.label?.trim() || (/\p{Lu}/u.test(g.key) ? g.key : g.key.charAt(0).toUpperCase() + g.key.slice(1));
+
+/** An amount in minor units as a cell says it ("£7,000", "−£1,240"), or `null` where the unit is no currency. */
+const amountSaid = (minor: number, unit: string | null | undefined, where: Where): string | null =>
+  typeof unit === 'string' && CURRENCY.test(unit) ? (moneySaid(Math.round(minor), unit, 'exact', where.home ?? null)?.text ?? null) : null;
+
+/**
+ * A BAR OVER A FIGURE CUT INTO PARTS AS THE APP'S (`partsRows` in `blocks.ts`, AL12): an account a row with its own
+ * amount, largest first as the record sent them, where a link drew the figure's whole, "What each account holds £32,610",
+ * under a Cash now of £33,850 with no word that the card's bill is taken off it. Each account now says its own amount,
+ * the card's in its minus. `null` for a block that is not one.
+ */
+function partsDrawn(s: Shown, where: Where): string[] | null {
+  const b = s.block;
+  if ((b.kind !== 'bar' && b.kind !== 'split') || s.rows.length > 0 || b.readings.length !== 1) return null;
+  const r = b.readings[0]!;
+  const parts = (r.groups ?? []).filter((g): g is SharedPart & { value: number } => g.value !== null);
+  if (parts.length === 0) return null;
+  return parts.map((g) => `${escapeCell(partName(g))} | ${escapeCell(amountSaid(g.value, r.unit, where) ?? textOf(figureSaid({ ...r, value: g.value }, where)))} | `);
+}
+
+/**
+ * A BUDGET AS THE APP DRAWS ONE (`progressRows` in `blocks.ts`, AL6): each category's spending this month against its
+ * limit, "£0 of £7,000" and "£7,000 left", from what the record matched to each row (`spent`). A link drew the spending
+ * figure's whole as a bare "0" over a table headed "Most to spend" whose limits read as money spent.
+ */
+function budgetDrawn(s: Shown, where: Where): string[] | null {
+  const b = s.block;
+  if (b.kind !== 'progress' || s.rows.length === 0 || !s.rows.some((r) => r.spent !== undefined)) return null;
+  const [name, limit] = allColumns(s);
+  if (name === undefined || limit === undefined) return null;
+  const rows = s.rows.flatMap((row) => {
+    const cap = row.cells[limit.field];
+    const own = cap?.type === 'money' && cap.value !== null && typeof cap.value === 'object' ? (cap.value as { currency?: unknown }).currency : undefined;
+    const unit = b.readings[0]?.unit ?? (typeof own === 'string' ? own : null);
+    const spent = amountSaid(row.spent ?? 0, unit, where);
+    const most = textOf(cellSaid(row, limit, where));
+    return spent === null || most === '' ? [] : [`${escapeCell(textOf(cellSaid(row, name, where)))} | ${escapeCell(spent)} | ${escapeCell(most)} | `];
+  });
+  return rows.length > 0 ? rows : null;
+}
+
+/** Today in the record's zone, `YYYY-MM-DD`. */
+function todayIn(where: Where): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en', { timeZone: where.zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(where.now);
+    const of = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    return `${of('year')}-${of('month')}-${of('day')}`;
+  } catch {
+    return new Date(where.now).toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * WHAT IS BEING PAID IN PARTS AS THE APP DRAWS IT (`blockOf` in `page-live.ts`, AL12): a track a plan, its parts paid of
+ * its parts in all ("4 of 8"), and under it the next part, "Next £1,875 on 3 Sep". A link drew the five figures behind
+ * the tracks as five bare tiles, "Paid 4, Parts 8, Next due 3 Sep, Left £7,500, Left after £5,625".
+ *
+ * THE FIRST TWO FIGURES ARE THE COUNTS, by plan; after them, when the link keeps them, the day of each plan's next part
+ * and, on a link with money, what is left before and after it. A link with money off says the day alone. The plans
+ * still being paid come first, and six at most, as the app's tile.
+ */
+function plansDrawn(s: Shown, where: Where): string[] | null {
+  const b = s.block;
+  const [paid, parts, ...rest] = b.readings;
+  if (b.kind !== 'progress' || s.rows.length > 0 || paid === undefined || parts === undefined) return null;
+  if (!b.readings.every((r) => Array.isArray(r.groups)) || paid.unit !== null || parts.unit !== null) return null;
+  const by = (r: SharedReading | undefined) => new Map((r?.groups ?? []).map((g) => [g.key, g.value]));
+  const done = by(paid);
+  const days = by(rest.find((r) => r.format === 'day'));
+  const [leftR, afterR] = rest.filter((r) => r.unit !== null && CURRENCY.test(r.unit));
+  const left = by(leftR);
+  const after = by(afterR);
+  const today = todayIn(where);
+  const nextOf = (key: string): string => {
+    const at = days.get(key);
+    if (typeof at !== 'number' || !Number.isFinite(at)) return '';
+    const iso = new Date(Math.round(at) * 86_400_000).toISOString().slice(0, 10);
+    const on = dateSaid(iso, where.now);
+    const l = left.get(key);
+    const a = after.get(key);
+    const part = typeof l === 'number' && typeof a === 'number' && l > a ? amountSaid(l - a, leftR?.unit, where) : null;
+    if (iso < today) {
+      const late = Math.max(1, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${iso}T00:00:00Z`)) / 86_400_000));
+      return `${part === null ? '' : `${part} `}{{bad:${late.toLocaleString('en')} ${late === 1 ? 'day' : 'days'} late}}, due ${on}`;
+    }
+    return part === null ? `Next on ${on}` : `Next ${part} on ${on}`;
+  };
+  const plans = (parts.groups ?? []).map((g) => ({ key: g.key, name: partName(g), paid: done.get(g.key) ?? 0, of: g.value ?? 0 }));
+  if (plans.length === 0) return null;
+  const open = (p: (typeof plans)[number]): boolean => (p.paid ?? 0) < p.of;
+  return [...plans.filter(open), ...plans.filter((p) => !open(p))].slice(0, 6).map((p) => {
+    const said = open(p) ? nextOf(p.key) : '';
+    return `${escapeCell(p.name)} | ${p.paid ?? 0} | ${p.of} | ${said}`;
+  });
+}
+
 /** One shared block as the app would draw it. */
 export function drawingOf(s: Shown, where: Where): Drawing {
   const b = s.block;
   const segments: Segment[] = [];
   let table: Drawing['table'] = null;
   let authored = false;
+
+  /* A FIGURE CUT INTO PARTS, A BUDGET AND A PLAN PAID IN PARTS ARE DRAWN AS THE APP DRAWS THEM, their figures as bars and
+     tracks and never as tiles of their own (AL6, AL12). */
+  const parts = partsDrawn(s, where);
+  if (parts !== null) {
+    const drawn = fenced(b.kind, parts);
+    if (drawn) return { segments: drawn, table: null, authored: false };
+  }
+  const plans = plansDrawn(s, where);
+  if (plans !== null) {
+    const drawn = fenced('progress', plans);
+    if (drawn) return { segments: drawn, table: null, authored: false };
+  }
+  const budget = budgetDrawn(s, where);
+  if (budget !== null) {
+    const drawn = fenced('progress budget', budget);
+    if (drawn) return { segments: drawn, table: null, authored: false };
+  }
 
   /* THE FIGURES, as a `stat`. */
   if (b.readings.length > 0) segments.push(...(fenced('stat', statRows(s, where)) ?? []));

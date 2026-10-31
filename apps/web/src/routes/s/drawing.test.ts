@@ -108,3 +108,54 @@ test('RH15: a title of three backticks never closes the fence, and the rows afte
   assert.ok(only && only.type === 'block');
   assert.ok(only.rows.some((r) => r.cells.includes('Kiln')), 'a row after the backticks was lost');
 });
+
+test('a Ledger line with no payee is named by its own words, as the app names it (AL1)', () => {
+  const b = block({
+    kind: 'timeline',
+    columns: [{ field: 'on', label: 'Date' }, { field: 'payee', or: 'what', label: 'Paid to or from' }, { field: 'amount', label: 'Amount', sign: { field: 'direction', minus: 'out' } }],
+    rows: [
+      row({ on: { type: 'day', value: '2026-09-02' }, what: { type: 'text', value: 'GRANGEMOOR EVENTS, STAND DEPOSIT' }, amount: { type: 'money', value: { amount: 250000, currency: 'GBP' } }, direction: { type: 'enum', value: 'out' } }),
+      row({ on: { type: 'day', value: '2026-08-30' }, payee: { type: 'text', value: 'Lowry Street Studios' }, what: { type: 'text', value: 'LOWRY STREET STUDIOS' }, amount: { type: 'money', value: { amount: 165000, currency: 'GBP' } }, direction: { type: 'enum', value: 'out' } }),
+    ],
+  });
+  const line = drawingOf(shown(b), where).segments.find((s) => s.type === 'block');
+  assert.ok(line && line.type === 'block' && line.kind === 'timeline');
+  assert.equal(line.rows[0]?.cells[1], 'GRANGEMOOR EVENTS, STAND DEPOSIT', 'the bank line, which the timeline says as words');
+  assert.equal(line.rows[1]?.cells[1], 'Lowry Street Studios');
+});
+
+test('budgets are bars of what was spent against each limit, and no bare figure (AL6)', () => {
+  const b = block({
+    kind: 'progress',
+    columns: [{ field: 'name', label: 'Name' }, { field: 'budget', label: 'Most to spend' }],
+    rows: [{ ...row({ name: { type: 'text', value: 'Contractors' }, budget: { type: 'money', value: { amount: 700000, currency: 'GBP' } } }), spent: 0 }],
+    readings: [{ metric: 'spent-by-category-month', label: 'Spent this month, by category', value: 0, unit: null, groups: [] }],
+  });
+  const d = drawingOf(shown(b), where);
+  assert.equal(d.table, null);
+  assert.equal(d.segments.length, 1);
+  const bars = d.segments[0];
+  assert.ok(bars && bars.type === 'block' && bars.kind === 'progress');
+  assert.deepEqual(bars.rows[0]?.cells.slice(0, 3), ['Contractors', '£0', '£7,000']);
+});
+
+test('a plan paid in parts is a track with its next part under it, not five tiles (AL12)', () => {
+  const plan = (metric: string, value: number, unit: string | null, format?: string) => ({ metric, value, unit, ...(format ? { format } : {}), groups: [{ key: 'Proofing press', value }] });
+  const b = block({
+    kind: 'progress',
+    readings: [plan('installments-paid-by-plan', 4, null, 'int'), plan('installments-total-by-plan', 8, null, 'int'), plan('installments-next-due-by-plan', 20699, null, 'day'), plan('installments-left-by-plan', 750000, 'GBP', 'money'), plan('installments-after-next-by-plan', 562500, 'GBP', 'money')],
+  });
+  const track = drawingOf(shown(b), where).segments[0];
+  assert.ok(track && track.type === 'block' && track.kind === 'progress');
+  assert.deepEqual(track.rows[0]?.cells, ['Proofing press', '4', '8', 'Next £1,875 on 3 Sep']);
+});
+
+test('what each account holds is a row an account, the card in its minus (AL12)', () => {
+  const b = block({
+    kind: 'bar',
+    readings: [{ metric: 'balance-by-account', label: 'What each account holds', value: 3261000, unit: 'GBP', groups: [{ key: 'Tax reserve', value: 2400000 }, { key: 'Company card', value: -124000 }] }],
+  });
+  const bars = drawingOf(shown(b), where).segments[0];
+  assert.ok(bars && bars.type === 'block' && bars.kind === 'bar');
+  assert.deepEqual(bars.rows.map((r) => r.cells.slice(0, 2)), [['Tax reserve', '£24,000'], ['Company card', '−£1,240']]);
+});

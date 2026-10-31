@@ -685,6 +685,10 @@ const moneyFree = (b: BlockResult, showing: Showing): BlockResult | null => {
   if (b.walk !== undefined || b.walks !== undefined || b.source === 'forecast.runway') return null;
   /* A BAR OR A SPLIT OF A MONEY FIGURE'S PARTS is that figure and nothing else. */
   if (typeof b.source === 'string' && b.source.startsWith('metric.') && showing.moneyFigure(b.source.slice('metric.'.length))) return null;
+  /* NOR A BUDGET, a money figure's parts set against amounts (`spent:`): with both gone a link listed the categories'
+     names alone under "This month's budgets" (AL6). */
+  const spent = (b as { spent?: unknown }).spent;
+  if (b.kind === 'progress' && typeof spent === 'string' && showing.moneyFigure(spent)) return null;
   const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
   /* THE LISTS ITS ROWS COME FROM, not every list its figures count: "Open 7" over the work stays beside "Still to come
      in", which goes as a figure in a currency. */
@@ -771,8 +775,11 @@ const unitless = (row: ReturnType<typeof rowShown>): ReturnType<typeof rowShown>
 /** The formats a figure is declared in that a link says (`format:` on a figure): a day, a count of days, a share, a number, money. */
 const FIGURE_FORMATS = /^(?:int|decimal|pct|days|day|money(?:\.[A-Z]{3})?)$/u;
 
-/** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
-type ColumnShown = { field: string; label: string; as?: string; sign?: { field: string; minus: string } };
+/**
+ * A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign, and the
+ * second field it reads where its own holds nothing (`or`, the Ledger's name: who was paid, else the bank's line).
+ */
+type ColumnShown = { field: string; or?: string; label: string; as?: string; sign?: { field: string; minus: string } };
 
 /** A walk's step without the list and the row it came from (`source`, `spoken`). */
 const stepShown = (step: unknown) => {
@@ -895,6 +902,11 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
     const blank = typeof c.label === 'string' && c.label.trim() === '';
     const owned = typeof c.label === 'string' && c.label.trim() !== '' ? c.label : undefined;
     const shown: ColumnShown = { field: c.field, label: blank ? '' : (owned ?? declared?.fields.find((f) => f.id === c.field)?.label ?? idSaid(c.field)) };
+    /* AND THE FIELD IT READS WHERE ITS OWN HOLDS NOTHING (AL1): the Ledger's name is who was paid, else the line's own
+       words (`or: 'what'`), and a link sent the payee alone, so every line no payee was read for said a day and an
+       amount with nobody between them. The second field is drawn in the same cell the app draws it in, so it shows
+       nothing the owner's page does not. */
+    if (typeof c.or === 'string' && c.or !== '' && c.or !== c.field) shown.or = c.or;
     if (c.as !== undefined) shown.as = c.as;
     if (c.sign !== undefined) shown.sign = { field: c.sign.field, minus: c.sign.minus };
     return shown;
@@ -910,11 +922,24 @@ const shownBlock = (given: BlockResult, showing: Showing): Record<string, unknow
     kept.trend_label = owned ?? figure(id) ?? idSaid(id);
   }
   const drawn = (register: string): string[] =>
-    columns.length > 0 ? columns.flatMap((c) => (c.sign === undefined ? [c.field] : [c.field, c.sign.field])) : [lists.get(register)?.title ?? ''];
+    columns.length > 0 ? columns.flatMap((c) => [c.field, ...(c.or === undefined ? [] : [c.or]), ...(c.sign === undefined ? [] : [c.sign.field])]) : [lists.get(register)?.title ?? ''];
   kept.rows = b.rows.map((row) => {
     const shown = rowShown(row, drawn(row.register), lists);
     return showing.money ? shown : unitless(shown);
   });
+  /* WHAT EACH BUDGET HAS SPENT, ONE A ROW (AL6), as the app sets each category's limit against the part of the figure
+     keyed by that category (`progressRows` in the app's `blocks.ts`): the parts are keyed by the category's id, which a
+     link never sends, so the record matches them here and sends the amounts alone, aligned with the rows. A link drew the
+     figure's total as a bare "0" over a table of limits that read as spending. Only on a link that keeps money, the one
+     place a budget is sent at all. */
+  const spentBy = (block as { spent?: unknown }).spent;
+  const labelField = b.columns?.[0]?.field;
+  const parts = b.readings?.[0]?.reading?.groups;
+  if (showing.money && b.kind === 'progress' && typeof spentBy === 'string' && typeof labelField === 'string' && Array.isArray(parts))
+    kept.spent_rows = b.rows.map((row) => {
+      const part = parts.find((g) => g.key === row.id || g.key === String(row.fields[labelField] ?? ''));
+      return typeof part?.value === 'number' && Number.isFinite(part.value) ? part.value : 0;
+    });
   /* THE STATES ITS LISTS COUNT AS FINISHED (SB2), each list's own declared `done:`, so a shared `todo` ticks the rows the
      owner's ticks and not the ones a word guessed at. The list's declaration, never a row: the same words for every row. */
   if (b.rows.length > 0) {
