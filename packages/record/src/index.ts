@@ -10237,6 +10237,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        PLAN'S, ONE TEXT BYTE FOR BYTE: the start hook prints `card`, `context` over `/mcp` says `plan_card`, and
        `/api/context` answers `card`, so all three are the plan's card and an agent is never told one card at start and
        another by context. */
+    let todayOnce: { line: string | null } | undefined;
     const plan = planContext(
       factsFromContext(out, {
         ...cardAt,
@@ -10249,8 +10250,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(told.stamp ? { stamp: told.stamp } : {}),
         ...(where.task ? { task: taskFact(ctx, where.task) } : {}),
         ...(where.depth === 'card' ? {} : { kpis: kpisKept(ctx, told.project, at.agent) }),
-        /* TODAY'S FIRST LINE, by the briefing's rules, read only when the card has no step to give it (AK18). */
-        today: () => rulesBrief(kernel.transaction(() => briefFactsFor(methodDeps(), ctx, now)))[0]?.line ?? null,
+        /* TODAY'S FIRST LINE, by the briefing's rules, read only when the card has no step to give it (AK18). ONCE PER
+           CALL AND HELD WITH THE OTHER FACTS (audit 31k, RK8): it walks every list's deadlines, so a budget pass asks the
+           line it already has, and the same caller is answered it again while the record's version stands (`HELD_MS`). */
+        today: () => (todayOnce ??= { line: heldFor(todayHeld, callerKey(ctx), () => rulesBrief(kernel.transaction(() => briefFactsFor(methodDeps(), ctx, now)))[0]?.line ?? null) }).line,
       }),
       { budget: told.budget, depth: where.depth },
     );
@@ -10374,6 +10377,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * she is, neither of which a briefing reads.
    */
   const briefed = new Map<string, Held<Context>>();
+  /** Today's first line for an agent's card (`carded`), held per caller as a briefing is. */
+  const todayHeld = new Map<string, Held<string | null>>();
+  /** Which caller a held fact is for: everything the context says of her but the call's own batch and proof. */
+  const callerKey = (ctx: CallContext): string => {
+    const { batch: _batch, provedAt: _proved, ...caller } = ctx;
+    return JSON.stringify(caller);
+  };
   const briefing = (ctx: CallContext, where: Where = {}): Context => {
     const { batch: _batch, provedAt: _proved, ...caller } = ctx;
     /* ONE SNAPSHOT, so the kernel's per-transaction reads (which lists hold private rows) are asked once, not 200 times. */
