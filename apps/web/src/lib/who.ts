@@ -156,3 +156,26 @@ export const PEOPLE = 'people';
 export function personRow(asked: Introduction, bio: string): Record<string, string> {
   return { name: asked.name, ...(asked.email ? { email: asked.email } : {}), ...(bio ? { note: bio } : {}) };
 }
+
+/**
+ * THE SHORT PART OF THE SENTENCE THAT SAYS WHO THEY ARE, for their own card in People (audit 31 Oct m, AM16): under Sam
+ * it quoted "I want my life admin under control: my bills, my budget, ..." whole, where Omar's said "a solo founder".
+ * The first clause, when it says what they are or do ("a solo founder", "I run a small candle shop" as "Runs a small
+ * candle shop"); nothing when it says what they want, or runs long. The whole sentence is still what the first run
+ * reads; only the note is short.
+ */
+export function roleNote(bio: string): string {
+  const first = (bio.split(/[.;:!?,]\s|[.;:!?,]$|\s[–-]\s|\s+(?:and|but|so|because)\s+/u)[0] ?? '').trim();
+  if (first === '') return '';
+  if (/^(?:i|we)\s+(?:want|need|would|['’]d|hope|wish|try|am trying|keep|have|just|really|also|like|love|plan)\b/iu.test(first)) return '';
+  const am = /^(?:i['’]?m|i am)\s+(.+)$/iu.exec(first);
+  const does = /^i\s+(\p{Ll}+)\b(.*)$/u.exec(first);
+  let said = first;
+  if (am) said = am[1]!;
+  else if (does) {
+    const verb = does[1]!;
+    const third = /(?:s|sh|ch|x|z|o)$/u.test(verb) ? `${verb}es` : /[^aeiou]y$/u.test(verb) ? `${verb.slice(0, -1)}ies` : `${verb}s`;
+    said = `${third.charAt(0).toUpperCase()}${third.slice(1)}${does[2]!}`;
+  } else if (/^(?:i|we|my|our)\b/iu.test(first)) return '';
+  return said.length > 60 || said.split(/\s+/u).length > 10 ? '' : said;
+}

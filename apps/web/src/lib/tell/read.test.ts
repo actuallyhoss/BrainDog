@@ -117,7 +117,7 @@ test('with no account and no Bills and invoices, the Ledger entry says the accou
 test('on a fresh record, money the reader paid is a paid item owed by her, and two currencies stay two items', () => {
   const [wax] = tellRead('I paid 200 for wax', fresh).rows;
   assert.deepEqual(wax!.fields, { what: 'Wax', amount: { amount: 20000, currency: 'EGP' }, state: 'paid', direction: 'owed_by_me', due: TODAY, settled: TODAY });
-  assert.equal(wax!.said, 'EGP\u00a0200 out');
+  assert.equal(wax!.said, 'EGP\u00a0200 out, for wax');
   assert.deepEqual(wax!.missing, []);
   const two = tellRead('Nadia wants 3 jars, paid 500, paid US$40', fresh).rows.filter((r) => r.register === 'obligations');
   assert.deepEqual(two.map((r) => r.fields.amount), [{ amount: 50000, currency: 'EGP' }, { amount: 4000, currency: 'USD' }]);
@@ -171,7 +171,7 @@ test('money the reader paid goes out, for what they said', () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0]!.fields.direction, 'out');
   assert.equal(rows[0]!.fields.what, 'Wax');
-  assert.equal(rows[0]!.said, 'EGP\u00a0200 out');
+  assert.equal(rows[0]!.said, 'EGP\u00a0200 out, for wax');
 });
 
 test('a pasted message is from the person who sent it', () => {
@@ -468,7 +468,7 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
   /* RG6: "Rent paid 12000" is the rent paid, out, and nobody called Rent. */
   const rent = tellRead('Rent paid 12000', on).rows;
   assert.deepEqual(rent.map((r) => r.register), ['transactions']);
-  assert.equal(rent[0]!.said, 'EGP 12,000 out');
+  assert.equal(rent[0]!.said, 'EGP 12,000 out, for rent');
   /* RG7: a bare "$" is the record's dollar, and a question anywhere else. */
   assert.deepEqual(way('I paid $40 for hosting', { currency: 'CAD' })?.fields.amount, { amount: 4000, currency: 'CAD' });
   /* RG8: lakhs and a decimal comma, by the one money reader. */
@@ -477,7 +477,7 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
   /* RG9: "30/10" told on 31 Oct is yesterday. */
   assert.equal(way('I paid 900 on 30/10')?.fields.on, '2026-10-30');
   /* RG16: "paid out" with no platform named is money out. */
-  assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP 300 out');
+  assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP 300 out, for the cleaner');
 });
 
 test('A NEW NAME BEFORE A BARE "PAID" IS ASKED WHICH WAY, never made a person who paid you (MC1)', () => {
@@ -699,4 +699,77 @@ test('A PLACE, A COMPANY OR A BANK AFTER "TO" OR "PAID" IS NOBODY NEW (RL7)', ()
   /* Somebody who reads as a person, or is already in People, is still the payee. */
   assert.deepEqual(tellRead('Paid Nadia 300 for the logo', founder).rows.map((r) => r.register), ['people', 'obligations']);
   assert.equal(tellRead('Paid Dubai 300', { ...founder, people: [{ seq: 9, name: 'Dubai' }] }).rows[0]!.fields.party, 'people#9');
+});
+
+/* ── audit 31 Oct m: what money was for, a team's lines, a bill said first ───────────────────────────────────────── */
+
+const ORGS = seeded('people', 'organisations');
+
+test('MONEY KEEPS WHAT IT WAS FOR AND WHERE (AM8)', () => {
+  const personal = { lists: [PEOPLE, DUE], today: TODAY, currency: 'EGP' };
+  const groceries = tellRead('Spent 850 on groceries at Carrefour', personal).rows;
+  assert.deepEqual(groceries.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_by_me', 'Groceries at Carrefour']]);
+  assert.equal(groceries[0]!.said, 'EGP\u00a0850 at Carrefour, for groceries');
+  /* On the Ledger the shop is who was paid. */
+  const ledger = tellRead('Spent 850 on groceries at Carrefour', shop).rows[0]!;
+  assert.equal(ledger.fields.direction, 'out');
+  assert.equal(ledger.fields.counterparty_text, 'Carrefour');
+  const salary = tellRead('Got paid 45,000 salary today', personal).rows;
+  assert.deepEqual(salary.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_to_me', 'Salary']]);
+  assert.equal(salary[0]!.said, 'EGP\u00a045,000 in, salary');
+  /* "Bought wax for 2,300" is money out, never offered to Projects or Organisations. */
+  const wax = tellRead('Bought wax for 2,300', { lists: [PEOPLE, ORDERS, THINGS, ORGS, DUE], today: TODAY, currency: 'EGP' });
+  assert.equal(wax.offers, undefined);
+  assert.deepEqual(wax.rows.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_by_me', 'Wax']]);
+  assert.deepEqual(wax.rows[0]!.fields.amount, { amount: 230000, currency: 'EGP' });
+  /* A count bought for somebody is still their order. */
+  assert.ok(tellRead('Bought 3 candles for Salma', fresh).rows.some((r) => r.register === 'orders'));
+});
+
+test('A SERVICE SAID FIRST IS A BILL TO PAY, AND A SALARY THAT COMES ROUND IS MONEY IN (rl-tell)', () => {
+  const dentist = tellRead('Dentist 800 due Monday', founder);
+  assert.equal(dentist.why, undefined);
+  assert.deepEqual(dentist.rows.map((r) => [r.register, r.fields.direction, r.fields.what]), [['obligations', 'owed_by_me', 'Dentist']]);
+  const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
+  const salary = tellRead('Salary 30,000 a month', withRepeating).rows;
+  assert.deepEqual(salary.map((r) => [r.register, r.fields.direction, r.fields.every]), [['recurring', 'in', 'monthly']]);
+  /* Where no Repeating is kept, an invoice to come in that repeats, never one payment made today. */
+  const owed = tellRead('Salary 30,000 a month', founder).rows[0]!;
+  assert.deepEqual([owed.register, owed.fields.direction, owed.fields.repeats, owed.fields.state], ['obligations', 'owed_to_me', 'monthly', 'open']);
+  /* Wages and a salary for somebody are still asked. */
+  assert.ok(tellRead('Wages 12,000 due Friday', founder).why);
+  assert.equal(tellRead('Salary for Omar 5,000', founder).why, 'Did Omar pay you, or did you pay Omar?');
+});
+
+test("TEAM'S TELL: A SPRINT IS A SPRINT, A PROSPECT KEEPS THEIR COMPANY, AND A TRAILING NAME IS WHO IT IS FOR (AM12)", () => {
+  const sprints: TellList = {
+    id: 'cycles',
+    name: 'Sprints',
+    one: 'sprint',
+    title: 'name',
+    state: 'state',
+    fields: [
+      { id: 'name', label: 'Sprint', type: 'text', required: true },
+      { id: 'state', type: 'enum', values: ['planned', 'active', 'done'], default: 'planned', required: true },
+      { id: 'starts', label: 'Starts', type: 'day' },
+      { id: 'ends', label: 'Ends', type: 'day' },
+    ],
+  };
+  const team = { lists: [PEOPLE, ORGS, TASKS, sprints], today: TODAY, currency: null };
+  const sprint = tellRead('Sprint 14 starts Monday', team).rows;
+  assert.deepEqual(sprint.map((r) => [r.register, r.fields.name, r.fields.starts]), [['cycles', 'Sprint 14', '2026-10-12']]);
+  const hana = tellRead('Met Hana from Brightside, hana@brightside.example, wants a demo', team);
+  assert.deepEqual(hana.left, []);
+  assert.deepEqual(hana.rows.map((r) => r.register), ['organisations', 'people']);
+  assert.deepEqual(hana.rows[1]!.fields.org, { $row: 0 });
+  assert.equal(hana.rows[1]!.fields.note, 'Wants a demo');
+  assert.equal(hana.rows[1]!.fields.email, 'hana@brightside.example');
+  /* A company already kept is linked, never made twice. */
+  const kept = tellRead('Met Hana from Brightside', { ...team, orgs: [{ seq: 3, name: 'Brightside' }] }).rows;
+  assert.deepEqual(kept.map((r) => [r.register, r.fields.org]), [['people', 'organisations#3']]);
+  const ticket = tellRead('Fix the login bug on Android, Karim, by Tuesday', team).rows;
+  const task = ticket.find((r) => r.register === 'tasks')!;
+  assert.equal(task.fields.what, 'Fix the login bug on Android');
+  assert.deepEqual(task.fields.owner, { $row: ticket.findIndex((r) => r.register === 'people') });
+  assert.equal(ticket.find((r) => r.register === 'people')!.fields.name, 'Karim');
 });

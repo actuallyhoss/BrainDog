@@ -32,7 +32,7 @@ import { keepMade } from '../../lib/home/made-counts.ts';
 import { packDocument, relabelDocument, type PackState } from '../../lib/record/packs.ts';
 import { fileDrafted, type Drafted, type SlashClient } from '../../lib/record/slash.ts';
 import { withOrder } from '../../lib/nav.ts';
-import { hear, introduce, nameFromAddress, personRow, PEOPLE, type Heard } from '../../lib/who.ts';
+import { hear, introduce, nameFromAddress, personRow, PEOPLE, roleNote, type Heard } from '../../lib/who.ts';
 import { allLists } from '../../lib/start/lists.ts';
 import { entriesOf, newListDeclarations, ownList, type Export, type Mapping } from '../../lib/start/export.ts';
 import type { Proposal } from '../../lib/start/propose.ts';
@@ -309,7 +309,7 @@ export function bodyOf(asked: Accepting, formed: readonly SetupRow[] = []): Setu
     ...(u ? { usecase: u.usecase } : {}),
     ...(beside.length === 0 ? {} : { alongside: beside.map((b) => b.usecase) }),
     ...(install.length === 0 ? {} : { packs: { install } }),
-    ...(name ? { me: { name, ...(asked.email ? { email: asked.email } : {}), ...(who.bio === '' ? {} : { note: who.bio }) } } : {}),
+    ...(name ? { me: { name, ...(asked.email ? { email: asked.email } : {}), ...(roleNote(who.bio) === '' ? {} : { note: roleNote(who.bio) }) } } : {}),
     ...(Object.keys(names).length === 0 ? {} : { names: { ...names } }),
     ...(asked.currency === null ? {} : { settings: [{ values: { home_currency: asked.currency } }] }),
     ...(rows.length === 0 ? {} : { rows }),
@@ -760,7 +760,7 @@ function oldScript(client: Client): {
       const row = out.ok ? out.value.row : null;
       if (row && row.seq !== null) {
         /* THE WORDS AFTER THE NAME ARE THE PERSON'S NOTE, which is where a sentence these rules could not read is kept. */
-        if (out.ok && out.value.created && who.bio !== '') await client.update({ register: row.register, seq: row.seq, patch: { note: who.bio } }).catch(() => null);
+        if (out.ok && out.value.created && roleNote(who.bio) !== '') await client.update({ register: row.register, seq: row.seq, patch: { note: roleNote(who.bio) } }).catch(() => null);
         /* THIS IS THEM, SO THE ROW SAYS SO (People's `self`): their own commits and mail are never
            met as somebody new, and an imported copy of them folds into this row. A People list older than the part refuses
            it, and the row stays an ordinary person.
@@ -776,7 +776,7 @@ function oldScript(client: Client): {
            pack's fields), so the person is written as a plain entry instead, and is in People like anybody else. A name
            with no address is only a mention to `meet`, which keeps no row, and the person the record belongs to is no
            mention: they are written the same way. Marked as them where the list has the part, plain where it does not. */
-        const fields = personRow(met, who.bio);
+        const fields = personRow(met, roleNote(who.bio));
         let plain = (await client.create({ register: PEOPLE, fields: { ...fields, self: true } }).catch(() => null)) as Wire<unknown> | null;
         if (!plain?.ok) plain = (await client.create({ register: PEOPLE, fields }).catch(() => null)) as Wire<unknown> | null;
         if (!plain?.ok) failed.push({ said: firstRun.notMet(met.name), why: fixOf(plain ?? out, '') });

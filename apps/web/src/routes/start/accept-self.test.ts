@@ -73,7 +73,7 @@ test('A NAME WITH NO ROW OF ITS OWN IS WRITTEN AS THEM, marked where the list ha
   await accept(client, asked("Sami, I'm a student", null));
   const made = calls.filter((c) => c.name === 'create');
   assert.equal(made.length, 1);
-  assert.deepEqual((made[0]?.args as { fields: Record<string, unknown> }).fields, { name: 'Sami', note: "I'm a student", self: true });
+  assert.deepEqual((made[0]?.args as { fields: Record<string, unknown> }).fields, { name: 'Sami', note: 'a student', self: true });
 });
 
 test('WITH NO NAME HEARD, THE PERSON IS STILL THE FIRST IN PEOPLE, by the name in their address', async () => {
@@ -109,7 +109,7 @@ test('THE PERSON IS PEOPLE’S FIRST ENTRY, before any client the sentence named
 /* ── the body the press sends ──────────────────────────────────────────── */
 
 test('THE BODY SAYS WHO THE PERSON IS: the name typed, the address signed in with, and the words after the name', () => {
-  assert.deepEqual(bodyOf(asked("Sami, I'm a student", 'sami@example.com')).me, { name: 'Sami', email: 'sami@example.com', note: "I'm a student" });
+  assert.deepEqual(bodyOf(asked("Sami, I'm a student", 'sami@example.com')).me, { name: 'Sami', email: 'sami@example.com', note: 'a student' });
   assert.equal(bodyOf(asked("I'm a student", 'sami@example.com')).me?.name, 'Sami', 'no name heard, so the one in the address');
   const a = asked("I'm a student", 'sami.k@example.com');
   assert.equal(bodyOf({ ...a, proposal: { ...a.proposal, answers: { name: 'Layla' } } }).me?.name, 'Layla', 'the name answered comes before the address');

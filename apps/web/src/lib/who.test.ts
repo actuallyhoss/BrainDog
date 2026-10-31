@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from './copy.ts';
 import { STARTING_POINTS } from './first-run.ts';
-import { hear, heardAt, introduce, nameFromAddress, personRow, withChip } from './who.ts';
+import { hear, heardAt, introduce, nameFromAddress, personRow, roleNote, withChip } from './who.ts';
 
 test('A NAME BEFORE A COMMA, and the rest kept as the bio', () => {
   assert.deepEqual(hear('Sami, I run BrainDog and a couple of side projects.'), {
@@ -120,4 +120,13 @@ test('A NAME ENDS AT ITS FULL STOP, and an initial is still part of one', () => 
   assert.deepEqual(hear("Hi, I'm Tom. We run a little coffee shop"), { name: 'Tom', bio: 'We run a little coffee shop' });
   assert.deepEqual(hear("I'm Mariam. I run a small candle shop"), { name: 'Mariam', bio: 'I run a small candle shop' });
   assert.deepEqual(hear("I'm S. Marchetti, I teach"), { name: 'S. Marchetti', bio: 'I teach' });
+});
+
+test('A PERSON\'S OWN NOTE IS THE SHORT PART THAT SAYS WHO THEY ARE, never the whole sentence (AM16)', () => {
+  assert.equal(roleNote('I run a small candle shop and want to keep track of orders, what is owed and my stock'), 'Runs a small candle shop');
+  assert.equal(roleNote('I want my life admin under control: my bills, my budget, rent and payday'), '');
+  assert.equal(roleNote('a solo founder'), 'a solo founder');
+  assert.equal(roleNote("I'm a student"), 'a student');
+  assert.equal(roleNote('I teach maths at a secondary school'), 'Teaches maths at a secondary school');
+  assert.equal(roleNote(''), '');
 });

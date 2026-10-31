@@ -110,6 +110,7 @@
   import { learn } from '$lib/record/remote.ts';
   import { playedBy } from '$lib/start/parts.ts';
   import type { TellOptions } from '$lib/tell/read.ts';
+  import { PEOPLE } from '$lib/who.ts';
   import { createClient, wrote, type Cursor, type EngineHealth, type EventLine, type SlashStatus } from '@braindog/client';
   import { quietLine } from '$lib/ui/engine-line.ts';
   import { page } from '$app/state';
@@ -368,6 +369,8 @@
       currency: data.index.currency,
       people: knownIn(playedBy('meets')),
       accounts: into.flatMap((to) => knownIn(to)),
+      /* THE ORGANISATIONS KEPT, so the company somebody met is from is linked, never made twice (AM12). */
+      orgs: knownIn(lists.find((l) => l.id === PEOPLE)?.fields.find((f) => f.type === 'ref' && f.id === 'org')?.to),
     };
   });
 
