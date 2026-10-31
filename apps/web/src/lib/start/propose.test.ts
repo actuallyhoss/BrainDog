@@ -1403,3 +1403,12 @@ test('WITH NO NAME HEARD THE TRADE ITSELF NAMES THE RECORD, and a bare kind of p
   assert.equal(title('I run a shop'), null);
   assert.equal(title('I run a small business'), null);
 });
+
+test("a shop's own name is its BrainDog's, not a project in it (PK3)", () => {
+  const p = propose("I'm Nadia and I run Nadia's Candles, a small candle shop. I take orders online.", CTX);
+  assert.equal(p.usecase, 'shop');
+  assert.equal(p.title, "Nadia's Candles");
+  assert.ok(!p.rows.some((r) => r.register === 'things'), 'no project named after the shop');
+  assert.ok(!p.modules.includes('portfolio'), 'Projects is not turned on for it');
+  assert.equal(p.heard.find((h) => h.phrase === "Nadia's Candles")?.became, "Your BrainDog's name");
+});
