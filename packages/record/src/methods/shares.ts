@@ -197,11 +197,12 @@ const inside = (x: unknown): boolean => typeof x === 'string' && (/^\s*[/#]/u.te
  * A LINK THAT IS ITS OWN SENTENCE AT THE END OF A LINE IS A THING TO DO, AND GOES WHOLE (polish-l, PL1): Heads up's
  * "Oldest balance from 1 Sep. [Update](/r/balances?new=1)" read "Oldest balance from 1 Sep. Update" on a link, a word
  * that asks to be pressed with nothing behind it. A link inside a sentence ("kept in the [Keychain](/keychain).") names
- * something, and keeps its words.
+ * something, and keeps its words, and so does one a colon leads up to ("Keys are here: [Keychain](/keychain)"), which is
+ * the thing named (review i, RI3).
  */
 const wordsShown = (text: string): string =>
   text
-    .replace(/([.!?:…])[ \t]+\[[^\]]*\]\(\s*[/#][^)]*\)[.!]?[ \t]*$/gmu, '$1')
+    .replace(/([.!?…])[ \t]+\[[^\]]*\]\(\s*[/#][^)]*\)[.!]?[ \t]*$/gmu, '$1')
     .replace(/\[([^\]]*)\]\(\s*[/#][^)]*\)/gu, '$1');
 
 /** An address that leaves this BrainDog: the only kind of `url` value a shared row keeps. */

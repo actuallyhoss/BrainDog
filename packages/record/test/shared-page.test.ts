@@ -188,6 +188,8 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
     'Oldest balance from last week. [Update](/r/balances?new=1)',
     '',
     'Keys are kept in the [Keychain](/keychain).',
+    '',
+    'Next: [Call Lina](/r/tasks/12)',
   ].join('\n');
   value(await api.kernel.install([INVOICES, page('notes', [{ kind: 'note', heading: 'Notes', body }])]));
   sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', ?, ?)", OWNER.email, OWNER.name);
@@ -206,6 +208,8 @@ test('a note keeps what it says: a typed figure in words, a day as a day, and no
   /* PL1: A LINK THAT IS ITS OWN SENTENCE IS A THING TO DO, and goes; one inside a sentence keeps its words. */
   assert.match(note, /^Oldest balance from last week\.$/mu);
   assert.match(note, /^Keys are kept in the Keychain\.$/mu);
+  /* RI3: AFTER A COLON THE LINK IS THE THING NAMED, and keeps its words. */
+  assert.match(note, /^Next: Call Lina$/mu);
   assert.doesNotMatch(note, /SG31|D41|Tracked|invoices|Update|\{\{|\}\}|\u0000/u);
   sql.close();
 });
