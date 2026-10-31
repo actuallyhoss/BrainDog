@@ -1703,7 +1703,10 @@
    * `Archived` and its own `Put back`, and says so in a toast, so a row added by mistake is one press from gone and
    * one more from here again. Before this, the only way to take back a typed row was to find Archive in its menu.
    */
-  const takeBack = (entry: Entry) => () => void archiveOnRecord([entry.seq], `“${nameOf(entry.seq)}”`);
+  const takeBack = (entry: Entry) => () => void archiveOnRecord([entry.seq], `“${nameOf(entry.seq)}”`, madeFor.get(entry.seq));
+  /* THE PERSON AN ORDER MADE GOES AND COMES BACK WITH IT (RN5): "20 candles for Salma by Friday" made Salma in a write
+     of her own, and the order's Put back and ⌘Z left her in People. By the order's number, for this tab's life. */
+  const madeFor = new Map<number, { register: string; seq: number }>();
 
   /**
    * BRING THE ROW INTO VIEW, AND ONLY IF IT IS NOT ALREADY THERE.
@@ -1856,9 +1859,13 @@
     const figures = order && decl?.title && typeof order.fields[decl.title] === 'string' ? { text: String(order.fields[decl.title]), fields: order.fields as Fields } : lineFigures(id, said, now);
     const captured = capturedFields(id, figures.text, either ? [] : filters, now, result.entries);
     const fields: Fields = { ...captured.fields, ...figures.fields };
+    let madePerson: { register: string; seq: number; version: number } | null = null;
     if (order?.person && order.whoField) {
       const person = await writes().create(order.person.register, order.person.fields as Fields);
-      if (person.ok) fields[order.whoField] = `${order.person.register}#${person.entry.seq}`;
+      if (person.ok) {
+        fields[order.whoField] = `${order.person.register}#${person.entry.seq}`;
+        madePerson = { register: order.person.register, seq: person.entry.seq, version: person.entry.version };
+      }
     }
     /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
     const seq = -++typedSeq;
@@ -1875,10 +1882,13 @@
     if (out.ok && asked === was) swapInPlace();
     unline();
     if (!out.ok) {
+      /* A refused order leaves nobody behind: the person made for it goes too, so the next try makes one, not two. */
+      if (madePerson) void writes().archive(madePerson.register, madePerson.seq, madePerson.version);
       missed(was, out);
       onBack(said, out.fix);
       return null;
     }
+    if (madePerson) madeFor.set(out.entry.seq, { register: madePerson.register, seq: madePerson.seq });
     if (asked !== was) return null;
     addLanded(out.entry, mark);
     /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME (motion F12, F20, VERIFY H23): "Added “Motion test bill” to Bills and
@@ -2863,11 +2873,20 @@
    * record leaves it out of the next read. Put back and the toast's undo are the same write the other way: `deleted_at` null,
    * at the version the archive answered with. No dialog, because an undo says what happened and a dialog asks first.
    */
-  async function archiveOnRecord(seqs: readonly number[], named: string) {
+  async function archiveOnRecord(seqs: readonly number[], named: string, along?: { register: string; seq: number }) {
     const was = asked;
     const list = id;
     const landed: Entry[] = [];
     let first: string | null = null;
+    /* The entry made with this one (RN5), archived after it and put back with it. */
+    let alongGone: Entry | null = null;
+    const alongBack = (): void => {
+      const a = along;
+      const e = alongGone;
+      if (!a || !e) return;
+      alongGone = null;
+      void writes().restore(a.register, a.seq, e.version);
+    };
     /* ARCHIVED THE MOMENT IT IS PRESSED (`lib/data/optimistic.ts`): the row wears `Archived` before the record has
        answered, and the chip's Put back arrives with the answer, since a way back needs the version the archive made. A
        row the record refused goes back to its verbs, and the toast says why. */
@@ -2882,18 +2901,31 @@
       if (out.ok) {
         const row = out.entry;
         landRow(row);
-        receipt(seq, { mark: copy.markArchived, undo: () => void restoreOnRecord([row], list) });
+        receipt(seq, {
+          mark: copy.markArchived,
+          undo: () => {
+            void restoreOnRecord([row], list);
+            alongBack();
+          },
+        });
       } else if (out.why === 'conflict' && out.entry) landRow(out.entry);
     }
     if (landed.length === 0) {
       toasts.push(first ?? copy.writeNotReached, { intent: 'warn' });
       return;
     }
+    if (along) {
+      const gone = await writes().archive(along.register, along.seq);
+      if (gone.ok) alongGone = gone.entry;
+    }
     const line = landed.length === seqs.length ? copy.writeArchived(named) : copy.writeArchivedSome(landed.length, seqs.length);
     /* THE TOAST SAYS WHAT HAPPENED AND NOTHING MORE (motion F20): each row wears its own "Put back", so the toast draws no
        second Undo for the same change, and ⌘Z still reaches it. */
     toasts.push(first ? `${line} ${first}` : line, {
-      undo: () => void restoreOnRecord(landed, list),
+      undo: () => {
+        void restoreOnRecord(landed, list);
+        alongBack();
+      },
       offer: false,
       ...(first ? { intent: 'warn' as const } : { life: UNDO_MS }),
     });
