@@ -37,6 +37,9 @@
     captureRow,
     allFields,
     fault = null,
+    asked = null,
+    onsame,
+    onnew,
   }: {
     one: string;
     /** A name from the list itself, shown in the field as what a name here looks like. */
@@ -51,6 +54,11 @@
     allFields?: (() => void) | undefined;
     /** Why the last line was refused, in the list's words, said under the field (audit 31 Oct h, AH5). */
     fault?: string | null;
+    /** A question the line waits on, said under the field with its two answers (AM18): "Is this Salma, the client
+        already here?" */
+    asked?: string | null;
+    onsame?: (() => void) | undefined;
+    onnew?: (() => void) | undefined;
   } = $props();
 
   /* This part's own words. */
@@ -58,6 +66,8 @@
     title: (what: string) => `New ${what}`,
     ask: (eg: string | null) => (named === 'person' ? 'Who? e.g. Sam Lee' : named === 'org' ? 'Name, e.g. Northwind Ltd' : eg ? `What is it? e.g. ${eg}` : 'What is it?'),
     allFields: 'Fill in the rest',
+    same: 'Same person',
+    someoneNew: 'Someone new',
     close: 'Close',
   } as const;
 
@@ -85,7 +95,7 @@
 
 {#if !rowsAsCards()}
   {#if open}
-    <form class="capture capture-line" in:rowIn out:rowOut onsubmit={add} aria-label={words.title(one)}>
+    <form class="capture capture-line" class:capture-asking={asked} in:rowIn out:rowOut onsubmit={add} aria-label={words.title(one)}>
       <label class="capture-label" for="capture">{copy.captureIn(one)}</label>
       <div class="field capture-box">
         <Icon name="plus" size="s" />
@@ -108,6 +118,13 @@
         />
       </div>
       {#if fault}<p class="capture-fault" id="capture-fault" role="alert">{fault}</p>{/if}
+    {#if asked}
+      <div class="capture-ask" role="group" aria-labelledby="capture-asked">
+        <p id="capture-asked" role="status">{asked}</p>
+        <Button weight="primary" onclick={() => onsame?.()}>{words.same}</Button>
+        <Button weight="quiet" onclick={() => onnew?.()}>{words.someoneNew}</Button>
+      </div>
+    {/if}
       <Button weight="primary" type="submit" data-capture-go>{copy.captureAdd}</Button>
       {#if allFields}<Button weight="quiet" onclick={() => allFields?.()}>{words.allFields}</Button>{/if}
       <button type="button" class="capture-close tap" aria-label={words.close} onclick={closeLine}><Icon name="close" size="s" /></button>
@@ -132,6 +149,13 @@
       />
     </div>
     {#if fault}<p class="capture-fault" id="capture-fault" role="alert">{fault}</p>{/if}
+    {#if asked}
+      <div class="capture-ask" role="group" aria-labelledby="capture-asked">
+        <p id="capture-asked" role="status">{asked}</p>
+        <Button weight="primary" onclick={() => onsame?.()}>{words.same}</Button>
+        <Button weight="quiet" onclick={() => onnew?.()}>{words.someoneNew}</Button>
+      </div>
+    {/if}
   </form>
   {#snippet footer()}
     {#if allFields}
@@ -155,6 +179,23 @@
     margin: 4px 0 0;
     color: var(--red);
     font-size: var(--fs-cap);
+  }
+
+  /* THE QUESTION THE LINE WAITS ON, under the field, its two answers beside it, wrapping at a phone's width. */
+  .capture-ask {
+    order: 1;
+    display: flex;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
+  }
+
+  .capture-ask p {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--ink);
   }
 
   /* ONE FIELD, AND IT LOOKS LIKE ONE. The label is for a screen reader: the field's own placeholder says what to type,
@@ -200,6 +241,10 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
+  }
+
+  .capture-asking {
+    flex-wrap: wrap;
   }
 
   .capture-line .capture-box {

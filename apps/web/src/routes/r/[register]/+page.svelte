@@ -42,7 +42,7 @@
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
+  import { REGISTERS, TITLES } from '$lib/record/held.ts';
   import { handFor, readHolders } from '$lib/record/hand.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import KeyViews from '../../keychain/KeyViews.svelte';
@@ -60,6 +60,10 @@
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { lineFigures, lineValues, whichCurrency } from '$lib/record/line-figures.ts';
+  import { orderLine } from '$lib/tell/order-line.ts';
+  import { sameAsked, samePerson, type Twin } from '$lib/record/same-person.ts';
+  import { PEOPLE } from '$lib/who.ts';
+  import { recordToday } from '$lib/record/zone.ts';
   import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
   import { foldAsk, sameOf, thingWords, twiceLine } from './twice-fold.ts';
@@ -1763,10 +1767,54 @@
       });
   }
 
-  function captureRow() {
-    const said = capture.trim();
+  /* SOMEBODY ADDED BY A NAME A PERSON HERE ANSWERS TO IS ASKED ABOUT FIRST (AM18): "Is this Salma, the client already
+     here?", with the same person and someone new to press. The line stays as typed until one is. */
+  let twin = $state<(Twin & { said: string; asked: string }) | null>(null);
+  /* A line typed again since is a new line, and the question goes with the old one. */
+  $effect(() => {
+    if (twin && capture.trim() !== twin.said) twin = null;
+  });
+
+  function twinOf(said: string): (Twin & { said: string; asked: string }) | null {
+    if (captureNamed !== 'person' || !decl?.title) return null;
+    const title = decl.title;
+    const people = result.entries.flatMap((e) => (typeof e.fields[title] === 'string' && !e.fields.merged_into ? [{ seq: e.seq, name: String(e.fields[title]) }] : []));
+    const found = samePerson(said, people);
+    if (!found) return null;
+    const role = result.entries.find((e) => e.seq === found.seq)?.fields.role;
+    return { ...found, said, asked: sameAsked(found.name, typeof role === 'string' && role !== '' ? saidInLine('role', role) : null) };
+  }
+
+  /** The same person: their fuller name kept where the line said more, and nothing added. */
+  function twinSame() {
+    const t = twin;
+    twin = null;
+    if (!t || !decl?.title) return;
+    capture = '';
+    if (t.longer) setRowValue(t.seq, decl.title, t.said, t.said);
+    else toasts.push(`${t.name} is already here.`);
+  }
+
+  /** Someone new: added as the line said. */
+  function twinNew() {
+    const t = twin;
+    twin = null;
+    if (t) captureRow(t.said);
+  }
+
+  function captureRow(asNew?: string) {
+    const said = (asNew ?? capture).trim();
     if (!said) return;
     if (!decl?.title) return;
+    if (asNew === undefined) {
+      const asked = twinOf(said);
+      if (asked) {
+        twin = asked;
+        captureFault = null;
+        return;
+      }
+    }
+    twin = null;
     /* THE LINE EMPTIES AT ONCE, and what was typed goes back into it if the record says no. */
     /* A FIGURE AND NO CURRENCY ANYBODY CHOSE: asked in the sheet, and nothing is sent (AH5). */
     const bare = lineFigures(id, said, now).bare;
@@ -1802,12 +1850,21 @@
     /* UNDER "or" NO CHIP IS SOMETHING EVERY ENTRY HERE HOLDS, so none of them is written onto a new one. */
     /* THE AMOUNT AND DAY THE LINE CARRIES ARE READ OFF IT FIRST (audit 31 Oct h, AH5): "Electricity bill 850 due 5 Nov"
        was a bill called the whole line, refused for its amount. The words left are the title. */
-    const figures = lineFigures(id, said, now);
+    /* AN ORDER IS READ AS TELL READS ONE (AM11): "20 candles for Salma by Friday" is candles, 20 of them, for Salma, by
+       Friday, where the box made one called the whole line with only a day. Somebody new it is for is made first. */
+    const order = decl ? orderLine(said, { ...decl, id }, REGISTERS[PEOPLE] ? { ...REGISTERS[PEOPLE], id: PEOPLE } : undefined, [...(TITLES.get(PEOPLE) ?? [])].map(([seq, name]) => ({ seq, name })), recordToday(now)) : null;
+    const figures = order && decl?.title && typeof order.fields[decl.title] === 'string' ? { text: String(order.fields[decl.title]), fields: order.fields as Fields } : lineFigures(id, said, now);
     const captured = capturedFields(id, figures.text, either ? [] : filters, now, result.entries);
-    const fields = { ...captured.fields, ...figures.fields };
+    const fields: Fields = { ...captured.fields, ...figures.fields };
+    if (order?.person && order.whoField) {
+      const person = await writes().create(order.person.register, order.person.fields as Fields);
+      if (person.ok) fields[order.whoField] = `${order.person.register}#${person.entry.seq}`;
+    }
     /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
     const seq = -++typedSeq;
-    const line = typedRows.add({ seq, fields, version: 0, created: new Date(now).toISOString(), by: '' });
+    /* A LINK SAID AS `people#4` IS DRAWN AS THE ROW IT NAMES, by its number, as every row on the list holds one. */
+    const shown: Fields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, typeof v === 'string' && /^[a-z_]+#\d+$/u.test(v) ? Number(v.split('#')[1]) : v]));
+    const line = typedRows.add({ seq, fields: shown, version: 0, created: new Date(now).toISOString(), by: '' });
     receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
     const unline = () => {
       typedRows.drop(line);
@@ -3296,7 +3353,7 @@
       {#if !adds && !madeByAgents}
         <p class="reach">{reachWords.readOnly(decl.name)}</p>
       {:else if !arriving}
-        <CaptureLine one={decl.one} example={captureExample} named={captureNamed} bind:value={capture} bind:open={captureOpen} fault={captureFault} {captureRow} allFields={() => {
+        <CaptureLine one={decl.one} example={captureExample} named={captureNamed} bind:value={capture} bind:open={captureOpen} fault={captureFault} captureRow={() => captureRow()} asked={twin?.asked ?? null} onsame={twinSame} onnew={twinNew} allFields={() => {
           createValues = lineValues(id, capture, now);
           createOpen = true;
         }} />

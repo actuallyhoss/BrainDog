@@ -66,6 +66,8 @@ export type TellOptions = {
   people?: readonly Known[];
   /** The accounts on the record, for the one a payment came into. */
   accounts?: readonly Known[];
+  /** The organisations on the record, for the company somebody met is from (AM12). */
+  orgs?: readonly Known[];
   /** The list a plain line goes into, when the record says. Otherwise the list that calls one of its entries a task. */
   capture?: string;
   /** Every currency the record's money is in (`moneyCurrencies()` when not said): "dinars" on a record that holds
@@ -477,6 +479,10 @@ const offerLists = (lists: readonly TellList[]): TellList[] =>
 /** The list a new project goes into: one that calls an entry a project. */
 const projectList = (lists: readonly TellList[]): TellList | undefined => lists.find((l) => callsItself(l, /^projects?$/i) && textField(l) !== undefined);
 
+/** The list a sprint goes into: one that calls an entry a sprint, a cycle or an iteration, with a day it runs from. */
+const cycleList = (lists: readonly TellList[]): TellList | undefined =>
+  lists.find((l) => callsItself(l, /^(?:sprints?|cycles?|iterations?)$/i) && textField(l) !== undefined && l.fields.some((f) => f.type === 'day'));
+
 /** The list a figure somebody keeps an eye on goes into: one that calls an entry a number or a measure. */
 const numberList = (lists: readonly TellList[]): TellList | undefined =>
   lists.find((l) => callsItself(l, /^(?:numbers?|measures?)$/i) && textField(l) !== undefined && l.fields.some((f) => f.type === 'money' || f.type === 'decimal'));
@@ -517,7 +523,12 @@ const SAID_COUNT = ['a dozen', 'dozen', 'two', 'three', 'four', 'five', 'six', '
 const FOR_SOMEBODY = new RegExp(`(?:^|[\\s:])((?:\\d{1,4}|${SAID_COUNT})\\s+[^,.;:!?]+?)\\s+for\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
 const METHOD = new RegExp(`\\b(?:on|by|via|through|with|over|using)\\s+(${NAME}|cash|card|bank transfer|transfer|wallet)\\b`, 'u');
 /* The act a payment opens on, taken off before what is left says what it was for. */
-const ACT = /^(?:(?:i|we)\s+)?(?:paid|pays|spent|sent|transferred|received|got)\b\s*/iu;
+const ACT = /^(?:(?:i|we)\s+)?(?:got paid|paid|pays|spent|sent|transferred|received|got|bought|purchased)\b\s*/iu;
+/* "BOUGHT WAX FOR 2,300" IS MONEY OUT, FOR THE WAX (AM8), never "Not sure" with Projects and Organisations offered. Only
+   when a figure follows "for": "Bought 3 candles for Salma" is nobody's spending. Read as "I paid 2,300 for wax". */
+const BOUGHT = /^(?:(?:i|we)\s+)?(?:bought|purchased|picked up)\s+(.+)\s+for\s+(.+)$/iu;
+/* "AT CARREFOUR": the shop it was spent at, by its capital, never a time ("at 3") and never a person (AM8). */
+const AT_SHOP = new RegExp(`\\bat\\s+(?:the\\s+)?(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
 
 /* A greeting or a thanks on its own, as a pasted message opens and closes. */
 const PLEASANTRY = /^(?:hi|hello|hey|thanks|thank you|thx|please|ok|okay|cheers)(?:\s+\p{L}+)?$/iu;
@@ -549,6 +560,9 @@ const PROJECT = /^(?:(?:a|my|our)\s+)?(?:new\s+)?(?:(\p{L}+)\s+)?project\s*[:–
 /* "MRR is 4,200 USD this month": a figure kept an eye on, said with what it is. */
 const MEASURE = /^(MRR|ARR|revenue|sales|sign-?ups|users|active users|subscribers|customers|churn|burn|runway|NPS|GMV|DAU|WAU|MAU)\s+(?:is|was|are|were|hit|reached|at|of|=|:)\s+(.+)$/iu;
 const SPAN = /\b(?:this|last) (?:month|week|year|quarter)\b|\btoday\b|\bso far\b/giu;
+/* "SPRINT 14 STARTS MONDAY" IS A SPRINT, never a ticket called "Sprint 14 starts" (AM12): a sprint, cycle or iteration
+   by its number, when it starts or ends. */
+const CYCLE = /^(?:(?:the|our)\s+)?(?:next\s+)?((?:sprint|cycle|iteration)\s+\d{1,4})\s+(starts|begins|kicks off|ends|finishes|wraps up)\b\s*(.*)$/iu;
 /* A bill to pay or an invoice to send: "Pay rent 12000 on the 1st", "Electricity bill 850", "Invoice Acme 1,200 USD". */
 const PAY = /^(?:(?:i|we)\s+(?:need to|have to|must)\s+)?(?:pay|paying)\s+(?:the\s+|my\s+|our\s+)?/iu;
 const INVOICE = new RegExp(`^(?:[Ii]nvoice|[Bb]ill|[Cc]harge)\\s+(${NAME})(?=\\s|$)\\s*`, 'u');
@@ -573,8 +587,14 @@ const COMPANY_END = /\s(?:bank|telecom|airways|airlines|air|ltd|llc|inc|co|corp|
 /** Whether a capitalised name reads as somebody: never a place, a company, a provider, a bill, or letters in capitals. */
 const readsAsSomebody = (name: string): boolean => {
   const n = name.trim();
-  return aName(n) && !PLACES.test(n) && !COMPANIES.test(n) && !COMPANY_END.test(n) && !PROVIDERS.test(n) && !THING_PAID.test(n) && !/^\p{Lu}{2,}$/u.test(n);
+  return aName(n) && !PLACES.test(n) && !COMPANIES.test(n) && !COMPANY_END.test(n) && !PROVIDERS.test(n) && !THING_PAID.test(n) && !SERVICES.test(n) && !/^\p{Lu}{2,}$/u.test(n);
 };
+/* A SERVICE OR A THING PAID FOR, SAID FIRST, IS NOBODY: a phone gives the first word its capital, so "Dentist 800 due
+   Monday" asked "Did Dentist pay you" (rl-tell). Who is paid for the work, by what they do, and the work itself. */
+const SERVICES = /^(?:dentist|doctor|vet|plumber|electrician|mechanic|carpenter|painter|cleaner|cleaners|cleaning|maid|nanny|babysitter|tutor|tutoring|driver|gardener|hairdresser|barber|salon|haircut|lawyer|accountant|landlord|nursery|daycare|kindergarten|therapist|therapy|physio|physiotherapy|optician|dental|pharmacy|garage|laundry|dry cleaning|car wash|car service|service|repairs?|maintenance|lessons?|classes|course|training|pilates|yoga|swimming|piano|guitar|dance|doorman|security|delivery|shipping|taxi|uber|car|flat|house|groceries|food|coffee|lunch|dinner|tickets?|flights?|hotel|clothes|shoes|books?|medicine|meds|vet bill)$/iu;
+/* A word a phone capitalised, said again inside a sentence: "Rent" after "for" is "rent". A brand keeps its capital. */
+const saidAsTyped = (s: string): string =>
+  /^\p{Lu}\p{Ll}/u.test(s) && !/^(?:netflix|spotify)\b/iu.test(s) && (THING_PAID.test(s) || INCOME_WORD.test(s) || SERVICES.test(s.split(/\s+/u)[0] ?? '')) ? s.charAt(0).toLowerCase() + s.slice(1) : s;
 /* MONEY LENT OR BORROWED BETWEEN TWO PEOPLE IS OWED, never a payment and never "Not sure" (first-hour audit, FB3):
    "Lent Omar 500 yesterday", "Omar owes me 500", "Borrowed 300 from Sara", "Sara lent me 300", "I owe Sara 300". Case
    kept on the name, as everywhere: it is told by its capital. Each is [who, the rest] and whose the money is. */
@@ -605,6 +625,10 @@ const INCOME_WORD = /^(?:(?:my|our|the)\s+)?(?:salary|wages?|pay ?cheque|paychec
    It is money in only with a word of arriving, "from ...", or "my"/"our" before it, and never when it is for somebody,
    to somebody, or due. */
 const INCOME_MINE = /^(?:my|our)\s/iu;
+/* A SALARY, A PAY CHEQUE OR A PENSION SAID ON ITS OWN IS HIS (rl-tell): "Salary 30,000 a month" is money in that comes
+   round. Wages may be his staff's and a bonus or an allowance somebody else's, so those are still asked; and "for Omar",
+   "to Omar" or "due" still asks, by `INCOME_NOT`. */
+const INCOME_OWN = /^(?:salary|pay ?cheque|paycheck|pension)\b/iu;
 const INCOME_NOT = new RegExp(`\\b(?:[Ff]or|[Tt]o)\\s+(${NAME})(?![\\p{L}\\p{M}'’-])|\\bdue\\b`, 'u');
 const CAME_IN_WORDS = /\b(?:came in|come in|comes in|has come in|arrived|landed|went in|hit (?:my|our|the) account|got paid|into (?:my|our) (?:account|bank))\b/giu;
 /* A FIGURE SAID AS A TIME is no amount: "Call the bank at 3 tomorrow". */
@@ -612,6 +636,10 @@ const TIME_BEFORE = /\b(?:at|around|from|until|till|by)\s*$/iu;
 
 /* "assign to Omar", "assigned to Omar". */
 const ASSIGN = new RegExp(`(?:^|[\\s,;])(?:[Aa]ssign(?:ed)?|[Gg]ive it)\\s+(?:it\\s+)?to\\s+(${NAME})(?![\\p{L}\\p{M}'’-])`, 'u');
+/* A NAME SAID ON ITS OWN BETWEEN COMMAS, or last: "Fix the login bug on Android, Karim, by Tuesday" (AM12). */
+const TRAILING_NAME = new RegExp(`,\\s*(${NAME})\\s*(?=[,;]|$)`, 'u');
+/* What a ticket is about, said with a capital, that is never anybody: a platform or a device. */
+const NOT_SOMEBODY = /^(?:android|ios|iphone|ipad|web|mac|macos|windows|linux|chrome|safari|firefox|desktop|mobile|staging|production|prod|api|ui|ux)$/iu;
 /* A BANK'S OWN TEXT, as a card alert or an account alert prints it: one of these words, and a currency it names. */
 const BANKISH = /\b(?:debited|credited|charged|purchase|withdrawn|withdrawal|deposited|avl\.? ?bal|available balance|card ending|card no|a\/c|acct)\b/iu;
 /* The words only a bank prints. With none of them, a sentence that says "purchase" is read as a sentence. */
@@ -830,6 +858,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const whole = oneLine(piece ?? '');
     if (!whole || PLEASANTRY.test(whole)) continue;
     let c = whole;
+    const bought = BOUGHT.exec(c);
+    if (bought && amountsIn(bought[2]!, opts.currency, held)[0]?.at === 0) c = `I paid ${bought[2]!} for ${bought[1]!}`;
     const self = SPENT.test(c);
     if (!self && contact(c)) continue;
     /* A name or "she" opens a clause only before an act, so "Buy more wax" is nobody called Buy. */
@@ -899,7 +929,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       left.push(whole);
       continue;
     }
-    if (!self && !acts(c) && (measure(c) || loan(c) || income(c) || bill(c))) continue;
+    if (!self && !acts(c) && (measure(c) || cycle(c) || loan(c) || income(c) || bill(c))) continue;
     /* A DAY SAID ON ITS OWN after what it is the day of was read with it: "Invoice Acme 1,200 USD, due in 14 days". */
     if (placed && takeDay(c, opts.today).day !== null && trimWords(takeDay(c, opts.today).rest.replace(NEXT_SAID, '').replace(/^(?:due|by|on)$/iu, '')) === '') continue;
     /* AND THE DAY A LOAN COMES BACK, said after it: "Borrowed 300 from Sara, pay back by Friday". */
@@ -927,6 +957,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const from = FROM.exec(c);
     if (from && aName(from[1]!)) subject = from[1]!;
     const order = ORDER.exec(c);
+    /* WHAT SOMEBODY JUST MET WANTS, ON A RECORD THAT KEEPS NO ORDERS, IS SAID OF THEM (AM12): "Met Hana from
+       Brightside, wants a demo" left "wants a demo" unplaced. */
+    if (order && !self && metRow !== null && !orderList(opts.lists) && amountsIn(c, opts.currency, held).length === 0) {
+      notes.set(metRow, [...(notes.get(metRow) ?? []), capital(trimWords(c))]);
+      continue;
+    }
     if (order && !self && subject) ordered.add(words(subject));
     /* Made as soon as named, with room kept for what they did, so a full preview never ends on a person alone. */
     const before = rows.length;
@@ -988,9 +1024,20 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const what = textField(l);
     if (!what) return null;
     let rest = text;
-    const assigned = ASSIGN.exec(rest);
-    const owner = withPeople && assigned && aName(assigned[1]!) ? pick(l, 'ref', /owner|assign|who|person/, (f) => f.to === PEOPLE) : undefined;
-    if (owner && assigned) rest = oneLine(`${rest.slice(0, assigned.index)} ${rest.slice(assigned.index + assigned[0].length)}`);
+    /* WHO IT IS GIVEN TO: "assign to Omar", or a name said on its own after a comma (AM12): "Fix the login bug on
+       Android, Karim, by Tuesday" kept ", Karim" in the title and gave it to nobody. Somebody the record knows, or a
+       name that reads as a person, never a place, a company or a day. */
+    const ownerField = withPeople ? pick(l, 'ref', /owner|assign|who|person/, (f) => f.to === PEOPLE) : undefined;
+    const assignedSaid = ASSIGN.exec(rest);
+    const trailing = ownerField && !(assignedSaid && aName(assignedSaid[1]!)) ? TRAILING_NAME.exec(rest) : null;
+    const assigned =
+      assignedSaid && aName(assignedSaid[1]!)
+        ? assignedSaid
+        : trailing && (knownAs(trailing[1]!, opts.people ?? []) !== null || (readsAsSomebody(trailing[1]!) && !NOT_SOMEBODY.test(trailing[1]!))) && !ownAccount(trailing[1]!)
+          ? trailing
+          : null;
+    const owner = assigned ? ownerField : undefined;
+    if (owner && assigned) rest = oneLine(`${rest.slice(0, assigned.index)}${assigned === trailing ? '' : ' '}${rest.slice(assigned.index + assigned[0].length)}`);
     const { day, rest: undated } = takeDay(rest, opts.today);
     const due = day ? pick(l, 'day', /due|^by$|deadline|aim|target/, (f) => f.deadline === true || said(f, /due|^by$/)) : undefined;
     let title = trimWords((due ? undated : rest).replace(/\s*[,;]\s*(?=[,;]|$)/gu, '')).replace(/\s+(?:due|by|on)$/iu, '');
@@ -1053,7 +1100,25 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       return true;
     }
     if (!room(1)) return false;
+    /* THE COMPANY SOMEBODY MET IS FROM IS THEIR ORGANISATION, where the record keeps them (AM12): "Met Hana from
+       Brightside" dropped Brightside. One already kept is linked by its whole name; a new one comes before her, so her
+       link points back at it. Where no organisations are kept, it is said in her note. */
+    const company = met?.[3] ?? null;
+    const orgField = company ? people.fields.find((f) => f.type === 'ref' && f.to !== undefined && f.to !== PEOPLE && /org|company|organi[sz]ation/iu.test(`${f.id} ${f.label ?? ''}`)) : undefined;
+    const orgs = orgField ? opts.lists.find((l) => l.id === orgField.to && textField(l) !== undefined) : undefined;
+    let orgRef: TellValue | null = null;
+    if (company && orgs && knownAs(name, opts.people ?? []) === null && !made.has(words(name)) && room(2)) {
+      const kept = (opts.orgs ?? []).find((o) => words(o.name) === words(company));
+      if (kept) orgRef = `${orgs.id}#${kept.seq}`;
+      else {
+        const fields: Record<string, TellValue> = { [textField(orgs)!.id]: company };
+        rows.push({ register: orgs.id, fields, said: company, detail: `new in ${orgs.name}`, icon: iconOf(orgs), missing: missingOf(orgs, fields) });
+        orgRef = { $row: rows.length - 1 };
+      }
+    }
     const ref = personOf(name);
+    /* Nobody made, so no company made for them either. */
+    if ((ref === null || typeof ref !== 'object') && orgRef !== null && typeof orgRef === 'object' && '$row' in orgRef) rows.splice(orgRef.$row, 1);
     if (ref === null || typeof ref !== 'object' || !('$row' in ref)) return ref !== null;
     subject = name;
     placed = true;
@@ -1061,7 +1126,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const said: string[] = [];
     const role = met?.[1] ?? joined?.[2];
     if (role) said.push(`Your ${role}`);
-    if (met?.[3]) said.push(`From ${met[3]}`);
+    const row = rows[ref.$row];
+    if (row && orgField && orgRef !== null) {
+      row.fields[orgField.id] = orgRef;
+      row.detail = `${row.detail}, from ${company}`;
+    } else if (company) said.push(`From ${company}`);
     if (born) said.push(`Birthday ${trimWords(born[2]!)}`);
     const rest = trimWords(oneLine(takeDay(met?.[4] ?? joined?.[3] ?? '', opts.today).rest).replace(/^(?:the\s+)?team\b/iu, ''));
     if (rest) said.push(capital(rest));
@@ -1118,6 +1187,25 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     return true;
   }
 
+  /** "Sprint 14 starts Monday": a sprint, named, on the day it starts or ends (AM12). */
+  function cycle(c: string): boolean {
+    const m = CYCLE.exec(c);
+    const l = cycleList(opts.lists);
+    if (!m || !l || !room(1)) return false;
+    const { day, rest } = takeDay(m[3] ?? '', opts.today);
+    if (day === null || trimWords(rest).replace(/^(?:on|at|from|by)$/iu, '') !== '') return false;
+    const ends = /^(?:ends|finishes|wraps up)$/iu.test(m[2]!);
+    const when = ends ? /end|finish/ : /start|begin|from/;
+    const field = l.fields.find((f) => f.type === 'day' && said(f, when));
+    if (!field) return false;
+    const name = capital(oneLine(m[1]!).toLowerCase());
+    const fields: Record<string, TellValue> = { [textField(l)!.id]: name, [field.id]: day };
+    startIn(l, fields);
+    rows.push({ register: l.id, fields, said: name, detail: [`${ends ? 'ends' : 'starts'} ${dayWord(day, opts.today)}`, `new in ${l.name}`].join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
+    placed = true;
+    return true;
+  }
+
   /**
    * Money that comes round, in Repeating: what, which way, how much, how often, and the next day it falls on when one
    * was said. No day said is named in `missing`, never guessed.
@@ -1159,7 +1247,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* NO WORD OF ARRIVING, NO "FROM", NO "MY": the way is asked, never taken from the word (RL5). */
     if (!CAME_IN.test(c)) {
       const not = INCOME_NOT.exec(c);
-      if (not || !(/\bfrom\s/iu.test(c) || INCOME_MINE.test(c))) return askWay(c, a, not?.[1] && aName(not[1]) ? not[1] : nameBefore(dated.rest.slice(0, a.at)));
+      if (not || !(/\bfrom\s/iu.test(c) || INCOME_MINE.test(c) || INCOME_OWN.test(c))) return askWay(c, a, not?.[1] && aName(not[1]) ? not[1] : nameBefore(dated.rest.slice(0, a.at)));
     }
     if (!moneyList(opts.lists) && !dueList(opts.lists)) {
       noMoney = true;
@@ -1184,6 +1272,33 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const every = EVERY.exec(c);
     const r = every ? repeatList(opts.lists) : undefined;
     if (every && r) return repeating(r, { value: { amount, currency }, into: true, what, day: dated.day !== null && dated.day > opts.today ? dated.day : null, every: words(every[1] ?? every[2] ?? ''), payer });
+    /* AND WHERE THE RECORD KEEPS NO REPEATING, money in that comes round is an invoice to come in that repeats, as a bill
+       that repeats is one to pay, never one payment made today. */
+    const owed = every ? dueList(opts.lists) : undefined;
+    if (every && owed && room(1)) {
+      const repeats = REPEATS[words(every[1] ?? every[2] ?? '')];
+      const day = dated.day !== null && dated.day > opts.today ? dated.day : null;
+      const fields: Record<string, TellValue> = {};
+      const title = textField(owed);
+      if (title) fields[title.id] = what;
+      const sum = pick(owed, 'money', /^amount$/, (f) => f.required === true);
+      if (sum) fields[sum.id] = { amount, currency };
+      const way = owed.fields.find((f) => f.type === 'enum' && f.values?.includes('owed_to_me') && f.values.includes('owed_by_me'));
+      if (way) fields[way.id] = 'owed_to_me';
+      const due = pick(owed, 'day', /due/, (f) => f.deadline === true || said(f, /due/));
+      if (due && day) fields[due.id] = day;
+      if (due && !day && due.required === true && due.default === undefined) whenNext = true;
+      const stateField = owed.fields.find((f) => f.id === (owed.state ?? 'state') && f.type === 'enum');
+      if (stateField && stateField.default === undefined && stateField.values?.includes('open')) fields[stateField.id] = 'open';
+      const repeat = repeats ? owed.fields.find((f) => f.type === 'enum' && f.values?.includes(repeats) && f.values.includes('none')) : undefined;
+      if (repeat && repeats) fields[repeat.id] = repeats;
+      const party = pick(owed, 'ref', /party|who|client|from/, (f) => f.to === PEOPLE);
+      if (party && payer !== null) fields[party.id] = payer;
+      const bits = [`${spelled(amount, currency)} in`, ...(day ? [`due ${dayWord(day, opts.today)}`] : []), ...(repeats ? [`every ${EVERY_SAID[repeats] ?? repeats}`] : []), `in ${owed.name}`];
+      rows.push({ register: owed.id, fields, said: what, detail: bits.join(', '), icon: iconOf(owed), missing: missingOf(owed, fields) });
+      placed = true;
+      return true;
+    }
     return keepMoney({ value: { amount, currency }, into: true, party, payer, by: null, day: dated.gone, what, said: `${spelled(amount, currency)} in, ${what.charAt(0).toLowerCase()}${what.slice(1)}` });
   }
 
@@ -1292,7 +1407,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const said = oneLine(lead).replace(/[\s,;:–-]+$/u, '');
     const fit = (n: string | undefined): string | null => {
       const name = n?.trim() ?? '';
-      if (!name || THING_PAID.test(name) || INCOME_WORD.test(name) || ownAccount(name) || PLACES.test(name) || COMPANIES.test(name)) return null;
+      if (!name || THING_PAID.test(name) || SERVICES.test(name) || INCOME_WORD.test(name) || ownAccount(name) || PLACES.test(name) || COMPANIES.test(name)) return null;
       return knownAs(name, opts.people ?? []) !== null || aName(name) ? name : null;
     };
     const own = new RegExp(`^(${NAME})['’]s(?![\\p{L}\\p{M}])`, 'u').exec(said);
@@ -1508,17 +1623,32 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        logo" said only "EGP 300 out". Never a bill, a provider or one of his own accounts. */
     let payee: string | null = null;
     let payeeRef: TellValue | null = null;
+    /* WHERE IT WAS SPENT, A SHOP OR A COMPANY AND NEVER A PERSON (AM8): "Spent 850 on groceries at Carrefour" said only
+       "EGP 850 out", and kept neither the shop nor the groceries. "at" names where; "to" a company paid ("Paid 500 to
+       Carrefour"). Kept in the words and on the Ledger's payee, never made somebody in People. */
+    let shop: string | null = null;
+    let shopWord: 'at' | 'to' = 'at';
     if (!into) {
       const to = PAID_TO.exec(rest) ?? TO_SOMEBODY.exec(rest);
       const parts = (to?.[1] ?? '').split(' ');
       while (parts.length > 1 && CODES.has(parts[parts.length - 1]!)) parts.pop();
       const name = parts.join(' ');
+      const cutTo = (m: RegExpExecArray): string => oneLine(`${m[0].startsWith('to') ? rest.slice(0, m.index) : 'paid'} ${rest.slice(m.index + m[0].length)}`);
       /* ONLY SOMEBODY IS A PAYEE (RL7): one already in People, or a name that reads as a person, never a place, a
          company, a provider, a bill or one of his accounts. "Paid Vodafone 450" keeps Vodafone as what it was for. */
       if (to && name && (knownAs(name, opts.people ?? []) !== null || made.has(words(name)) || readsAsSomebody(name)) && !THING_PAID.test(name) && !ownAccount(name)) {
         payee = name;
-        rest = oneLine(`${to[0].startsWith('to') ? rest.slice(0, to.index) : 'paid'} ${rest.slice(to.index + to[0].length)}`);
+        rest = cutTo(to);
         payeeRef = personOf(name);
+      } else if (to && name && aName(name) && !THING_PAID.test(name) && !ownAccount(name) && !PLACES.test(name)) {
+        shop = name;
+        shopWord = 'to';
+        rest = cutTo(to);
+      }
+      const where = payee === null && shop === null ? AT_SHOP.exec(rest) : null;
+      if (where && aName(where[1]!) && !ownAccount(where[1]!) && knownAs(where[1]!, opts.people ?? []) === null) {
+        shop = where[1]!;
+        rest = oneLine(`${rest.slice(0, where.index)} ${rest.slice(where.index + where[0].length)}`);
       }
     }
     const payer = into && who ? personOf(who) : payeeRef;
@@ -1535,14 +1665,22 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       if (!before) lastOrder.detail = `${lastOrder.detail}, paid`;
     }
 
-    const plain = trimWords(rest.replace(ACT, '').replace(/^(?:for|from)\s+/iu, ''));
-    const what = who ? `Payment from ${who}${by ? `, by ${by}` : ''}` : capital(plain) || (payee ? `Paid to ${payee}` : into ? 'Money in' : 'Money out');
-    /* What it was for, in the words said: "EGP 300 to Nadia, for the logo". */
-    const reason = payee ? oneLine(rest.replace(ACT, '')).replace(/[\s,.;:!?]+$/u, '') : '';
+    /* The words said of it, with the act and a joining word left at either end taken off: "on groceries", "for wax". */
+    const told = oneLine(rest.replace(ACT, '')).replace(/[\s,.;:!?]+$/u, '').replace(/\s+(?:for|at|on|from)$/iu, '');
+    const plain = trimWords(told.replace(/^(?:for|from|on)\s+/iu, ''));
+    const named = capital(plain);
+    const what = who
+      ? `Payment from ${who}${by ? `, by ${by}` : ''}`
+      : shop
+        ? named ? `${named}${shopWord === 'at' ? ' at ' : ', '}${shop}` : shop
+        : named || (payee ? `Paid to ${payee}` : into ? 'Money in' : 'Money out');
+    /* WHAT IT WAS FOR, IN THE WORDS SAID (AL2, AM8): "EGP 300 to Nadia, for the logo", "EGP 850 at Carrefour, for
+       groceries", "EGP 200 out, for wax", "EGP 45,000 in, salary". Money out is said "for" what, money in as named. */
+    const reason = who ? '' : told === '' ? '' : payee || into ? saidAsTyped(told) : `for ${saidAsTyped(told.replace(/^(?:for|on)\s+/iu, ''))}`;
     /* ONE LINE, READ AS A PERSON SAYS IT: "EGP 1,200.00 from Lina", then "paid, kept in Bills and
        invoices", where it said "EGP 1,200.00 in" over "into Bills and invoices". */
-    const line = `${spelled(amount, currency)} ${into ? (who ? `from ${who}` : 'in') : payee ? `to ${payee}` : 'out'}${reason ? `, ${reason}` : ''}${by ? `, by ${by}` : ''}`;
-    const kept = keepMoney({ value, into, party: who ?? payee, payer, by, day, what, said: line });
+    const line = `${spelled(amount, currency)} ${into ? (who ? `from ${who}` : 'in') : payee ? `to ${payee}` : shop ? `${shopWord} ${shop}` : 'out'}${reason ? `, ${reason}` : ''}${by ? `, by ${by}` : ''}`;
+    const kept = keepMoney({ value, into, party: who ?? payee ?? shop, payer, by, day, what, said: line });
     if (!kept && !moneyList(opts.lists) && !dueList(opts.lists)) noMoney = true;
     return kept || paidField !== undefined;
   }
