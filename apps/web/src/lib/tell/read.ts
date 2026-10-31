@@ -1636,7 +1636,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   }
 
   /** The day words a clause said, as written, to say again after its figure, or nothing when it named no day. */
-  const dayText = (c: string): string => (takeDay(c, opts.today).day !== null ? (DAY.exec(c)?.[0] ?? '') : '');
+  /* A FUNCTION, NOT A CONST (audit 31 Oct o, AO1): `paidLast` and `spentOn` are hoisted and run before the reader's
+     `return finish(...)` above, so a const declared down here was not yet there when they called it. */
+  function dayText(c: string): string {
+    return takeDay(c, opts.today).day !== null ? (DAY.exec(c)?.[0] ?? '') : '';
+  }
 
   /** "May rent 12,000 paid": money out, already paid, for what it names (AN7). Somebody named first is asked which way. */
   function paidLast(c: string): boolean {
