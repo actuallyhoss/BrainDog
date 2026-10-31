@@ -448,3 +448,26 @@ test('NOTHING PLACED IS SAID, WITH THE WAY ON, never a card over nothing to pres
   assert.ok(told.why);
   assert.deepEqual(told.offers?.map((r) => r.register), ['things']);
 });
+
+test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oct g, RG4-RG9, RG16)', () => {
+  const on = { ...shop, today: '2026-10-31' };
+  const way = (s: string, c: Partial<typeof on> = {}) => tellRead(s, { ...on, ...c }).rows.find((r) => r.register === 'transactions');
+  /* RG4: a refund is money back, and money put into the account is in. */
+  assert.equal(way('Refund of EGP 500 credited to your card ending 1234 for your purchase at Amazon')?.said, 'EGP 500.00 in, from Amazon');
+  assert.equal(way('EGP 500 transferred to your a/c from Ahmed')?.said, 'EGP 500.00 in, from Ahmed');
+  /* RG5: a balance is never the amount, so a text whose amount names no currency keeps nothing. */
+  assert.equal(way('Purchase of 450.00 at CARREFOUR. Your available balance is EGP 12,000.00'), undefined);
+  /* RG6: "Rent paid 12000" is the rent paid, out, and nobody called Rent. */
+  const rent = tellRead('Rent paid 12000', on).rows;
+  assert.deepEqual(rent.map((r) => r.register), ['transactions']);
+  assert.equal(rent[0]!.said, 'EGP 12,000.00 out');
+  /* RG7: a bare "$" is the record's dollar, and a question anywhere else. */
+  assert.deepEqual(way('I paid $40 for hosting', { currency: 'CAD' })?.fields.amount, { amount: 4000, currency: 'CAD' });
+  /* RG8: lakhs and a decimal comma, by the one money reader. */
+  assert.deepEqual(way('INR 1,25,000.00 debited from a/c XX12 at Croma')?.fields.amount, { amount: 12500000, currency: 'INR' });
+  assert.deepEqual(way('I paid 12,50 € for coffee')?.fields.amount, { amount: 1250, currency: 'EUR' });
+  /* RG9: "30/10" told on 31 Oct is yesterday. */
+  assert.equal(way('I paid 900 on 30/10')?.fields.on, '2026-10-30');
+  /* RG16: "paid out" with no platform named is money out. */
+  assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP 300.00 out');
+});
