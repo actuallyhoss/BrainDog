@@ -14,17 +14,17 @@ const START = { page: 'goals', title: 'Goals', blocks: [note('{{saved}} put by s
 const NEXT = { page: 'goals', title: 'Goals', blocks: [note('{{saved}} saved so far'), { kind: 'capture', heading: 'Add a goal', register: 'goals' }, table('Saved lately', 'Nothing saved yet.')] };
 
 test('a page with its blocks moved takes the new words and keeps its order', () => {
-  const mine = { ...START, blocks: [START.blocks[1], START.blocks[0]] };
+  const mine = { ...START, blocks: [START.blocks[1]!, START.blocks[0]!] };
   assert.deepEqual(reworded(START, mine, NEXT), { ...START, blocks: [table('Saved lately', 'Nothing saved yet.'), note('{{saved}} saved so far')] });
 });
 
 test('a word the owner typed stays theirs', () => {
-  const mine = { ...START, blocks: [START.blocks[0], table('My savings', 'Nothing put by yet.')] };
+  const mine = { ...START, blocks: [START.blocks[0]!, table('My savings', 'Nothing put by yet.')] };
   assert.deepEqual(reworded(START, mine, NEXT), { ...START, blocks: [note('{{saved}} saved so far'), table('My savings', 'Nothing saved yet.')] });
 });
 
 test('nothing but words moves: an id or a list read is never changed, and no word to carry is null', () => {
-  const next = { ...START, blocks: [START.blocks[0], { ...table('Put by lately', 'Nothing put by yet.'), source: 'register.saved' }] };
+  const next = { ...START, blocks: [START.blocks[0]!, { ...table('Put by lately', 'Nothing put by yet.'), source: 'register.saved' }] };
   assert.equal(reworded(START, START, next), null);
   assert.equal(reworded(START, { ...START, blocks: [note('Mine'), table('Mine too', 'Mine as well')] }, NEXT), null);
 });
