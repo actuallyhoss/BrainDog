@@ -23,7 +23,7 @@ import type { TellList } from '../tell/read.ts';
 export type Holds = Pick<Boot, 'registers'>;
 
 /** What these read of the device's preferences: whether the next steps are hidden, and how work arrives. */
-export type Said = Pick<Pref, 'nextStepsHidden' | 'arrivesBy'>;
+export type Said = Pick<Pref, 'nextStepsHidden' | 'arrivesBy' | 'madeWith'>;
 
 /**
  * How many entries a person has put in, across every list.
@@ -32,20 +32,26 @@ export type Said = Pick<Pref, 'nextStepsHidden' | 'arrivesBy'>;
  * PERSON: a People list whose one entry is the person who signed up has had nothing added by hand, so its first entry is
  * not counted. A record that keeps no rates or no People counts every entry.
  */
-export function addedByHand(boot: Holds): number {
+export function addedByHand(boot: Holds, made: Readonly<Record<string, number>> = {}): number {
   const rates = playedBy('rates');
   const people = playedBy('meets');
   let n = 0;
   for (const r of boot.registers) {
     const count = Number.isFinite(r.count) && r.count > 0 ? r.count : 0;
     if (r.id === rates) continue;
+    /* WHAT THE MAKING WROTE IS NOT ADDED BY HAND (AH19, `madeWith`): a Guide's milestones and steps are the starter's. */
+    const kept = made[r.id] ?? 0;
+    if (kept > 0) {
+      n += Math.max(0, count - kept);
+      continue;
+    }
     n += r.id === people ? Math.max(0, count - 1) : count;
   }
   return n;
 }
 
 /** Whether Today offers the card to tell it one real thing: while nothing is added by hand, and the person has not hidden it. */
-export const showTell = (boot: Holds, pref: Said = {}): boolean => pref.nextStepsHidden !== true && addedByHand(boot) === 0;
+export const showTell = (boot: Holds, pref: Said = {}): boolean => pref.nextStepsHidden !== true && addedByHand(boot, pref.madeWith) === 0;
 
 /* THE NEXT STEPS THEMSELVES ARE `want-more.ts`'s, which Today loads on a first Today only: they read every use case this
    build ships, and this file is on every Today's first open. */

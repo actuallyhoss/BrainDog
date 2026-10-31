@@ -222,10 +222,9 @@
       count: counted ? (counted.get(l.id) ?? 0) : (data.index.registers.find((r) => r.id === l.id)?.count ?? 0),
     })),
   });
-  const added = $derived(addedByHand(kept));
-
   /** The device's own preferences: whether the next steps are hidden, and how her work arrives. Read again on Hide. */
   let prefs = $state(readPref());
+  const added = $derived(addedByHand(kept, prefs.madeWith));
   /** The card was pressed here: it goes at once and the next steps take its place, before `boot` counts what it added. */
   let pressed = $state(false);
   /**
