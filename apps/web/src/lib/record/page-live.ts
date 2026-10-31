@@ -2686,7 +2686,8 @@ export function earlyPage(base: string, slug: string, now: number = Date.now()):
 /** A page reader for one tab. `base` is the page's own origin; the app never holds a token. */
 export function pageReader(base: string, io?: Fetch, clock: () => number = () => Date.now()): PageReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const maps = new Map<string, RefMap>();
+  /* EACH MAP BY THE WALK IT WAS MADE FROM, so a walk the tab asked again makes it again. */
+  const maps = new Map<string, { rows: RecordRow[]; map: RefMap }>();
 
   /* A REF ARRIVES AS THE TARGET ROW'S ULID, so each register a ref points at is walked once and kept,
      as the row reader does. A register this reader may not list is left out, and its refs draw as ids. */
@@ -2694,7 +2695,10 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   /* A WALK OUT IS SHARED, as the walks go out together: a list a ref and a bar both point at is asked once. */
   const walking = new Map<string, Promise<RecordRow[] | null>>();
   function rowsOf(register: string): Promise<RecordRow[] | null> {
-    const kept = walked.get(register);
+    /* THE TAB'S WALK IS ASKED ON EVERY READ, since it keeps itself and asks again after a write this tab sent. Kept here
+       as well, it outlived that write: a person an Orders box made drew as "Unnamed person" on the page read after it,
+       until the page was opened again (audit 31 Oct n, AN18). A reader with a fetch of its own keeps its own walk. */
+    const kept = io ? walked.get(register) : undefined;
     if (kept) return Promise.resolve(kept);
     let out = walking.get(register);
     if (!out) {
@@ -2712,14 +2716,14 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   }
   const asked = new Map<string, Promise<void>>();
   async function mapOf(register: string): Promise<RefMap | null> {
-    const kept = maps.get(register);
-    if (kept) return kept;
     /* A use case's own list is declared before it is walked, or its rows have no title to be named by. */
     await learn(client.schema, register, asked);
     const rows = await rowsOf(register);
     if (!rows) return null;
+    const kept = maps.get(register);
+    if (kept && kept.rows === rows) return kept.map;
     const map = refMapOf(register, rows);
-    maps.set(register, map);
+    maps.set(register, { rows, map });
     return map;
   }
 

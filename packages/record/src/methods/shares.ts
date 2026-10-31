@@ -1513,7 +1513,9 @@ export function methods(deps: RecordDeps) {
       const can = hostSays();
       const slug = isRecord(args) ? args.slug : undefined;
       if (!can.can || typeof slug !== 'string' || slug === '' || kernel.refused() || !kernel.pages().some((p) => p.slug === slug) || personalPage(slug)) return ok(can);
-      const money = isRecord(args) && args.money === true;
+      /* ASKED AS A READ, its words come in the address, so the tick arrives as "true" (AN14): read as no, the sheet judged
+         every page with money off, and an empty Money with money ticked was never said to be empty. */
+      const money = isRecord(args) && (args.money === true || args.money === 'true');
       const shown = linkPage(slug, money, instant(clock.now() + SHARE_DAYS * DAY_MS));
       /* AND THE PAGE A LINK WOULD OPEN, so the sheet judges it as the link's page draws it (AN14): the reader leaves out a
          block with nothing a stranger can read (a heading over no rows, the owner's own "empty" line), and an empty Money

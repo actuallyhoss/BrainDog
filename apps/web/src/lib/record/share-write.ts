@@ -45,6 +45,8 @@ export const words = {
   shareShow: 'Show the link',
   /* A PAGE WHOSE LINK WOULD SHOW NOTHING, said before it is made (AM21). */
   shareEmpty: 'Nothing on this page yet, so the link would show nothing.',
+  /* A PAGE OF MONEY WITH THE TICK OFF (AN14): it has things on it, and the link would show none of them. */
+  shareEmptyMoney: 'With money left off, the link would show nothing.',
   shareCopy: 'Copy the link',
   shareCopied: 'Link copied',
   shareUntil: (day: string) => `It works until ${day}, or until you close it in Settings, under People & sharing.`,
