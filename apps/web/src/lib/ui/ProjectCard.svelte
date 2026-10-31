@@ -94,7 +94,9 @@
   const worked = $derived(life?.kind === 'working' && card.worked ? workedSaid(card.worked) : '');
   /* ONLY ITS NAME AND HOW IT STANDS ("Tallow · Building"): a grid that shares its row out draws it small, never as a
      whole-width card of white under one line (audit 31 Oct n, AN20). */
-  const thin = $derived(figure === null && !leadsWithProgress && card.progress === null && !card.next && life === null);
+  /* AND WHEN ALL IT ADDS IS WHEN IT LAST MOVED (audit 31 Oct o, AO17): a fresh Tallow says "Nothing changed since 31 Oct"
+     under its name, and was drawn the whole width for it. */
+  const thin = $derived(figure === null && !leadsWithProgress && card.progress === null && !card.next && (life === null || life.kind === 'quiet'));
   const named = $derived(
     [
       title,

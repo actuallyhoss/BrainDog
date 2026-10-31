@@ -96,7 +96,7 @@
     /* A LINE THAT FITS NOWHERE, ON A RECORD WITH NO THINGS TO DO (AO7): one press starts Work's list and adds it there. */
     todoOn: 'Start a to-do list and add it',
     todoTurning: 'Starting a to-do list…',
-    todoTurned: 'Started a to-do list',
+    todoTurned: 'Started a to-do list in Work',
     /* A BIRTHDAY FOR SOMEBODY KEPT, kept on them (their note) where no list of dates is. */
     keepOn: (name: string) => `Add it to ${name}`,
   };
@@ -281,6 +281,8 @@
       if ('fix' in out) todoFix = out.fix;
       else {
         const go = readyRows(out.told.rows);
+        /* ONE PRESS, ONE TOAST, as Money's: "Started a to-do list in Work" names Work, so the rail does not say it came. */
+        if (go.length > 0) for (const href of ['/?work', ...go.map((r) => `/r/${r.register}`)]) toasts.named(href);
         if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.todoTurned, out.lists);
         else todoFix = out.told.why ?? null;
       }

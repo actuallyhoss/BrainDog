@@ -297,7 +297,9 @@
   /* BUT CARDS THAT SAY ONLY A NAME AND HOW IT STANDS KEEP A CARD'S SIZE (AN20): the Founder's one "Tallow · Building"
      ran the whole width over a band of white. With every card that thin, the row keeps its four places and ends short. */
   @media (width >= 640px) {
-    .cards:not(:has(> li:not(:has(> :global([data-thin]))))) {
+    .cards:not(:has(> li:not(:has(> :global([data-thin]))))),
+    /* AND ONE CARD ALONE IS A CARD (AO17), never a band the width of the page: it takes its place of four. */
+    .cards:has(> li:only-child) {
       grid-template-columns: repeat(auto-fill, minmax(max(280px, calc((100% - 3 * 12px) / 4)), 1fr));
     }
   }

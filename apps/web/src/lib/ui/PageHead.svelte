@@ -257,7 +257,7 @@
     if (!el || shortGreeting(said) === null || typeof ResizeObserver === 'undefined') return;
     let needs = 0;
     const fit = () => {
-      if (!tight && el.scrollWidth > el.clientWidth + 1) {
+      if (!tight && el.scrollWidth > el.clientWidth) {
         needs = el.scrollWidth;
         tight = true;
       } else if (tight && el.clientWidth >= needs) tight = false;

@@ -906,6 +906,8 @@ const WHY = {
   /* A LINE THAT NAMES SOMEBODY KEPT, AND FITS NO LIST, IS OFFERED THEIR PAGE (AN9): "Coffee with Mona on Sunday". */
   about: (name: string, more: boolean) => `It names ${name}. Keep it on their page${more ? ', or as one of these:' : '.'}`,
   offer: 'Or keep it as one of these:',
+  /* WITH NOTHING TO OFFER BUT A TO-DO LIST (AO7), "one of these" over one button. */
+  offerTodo: 'Or keep it as a to-do:',
 };
 
 /** One sentence, read into the entries it would become. Writes nothing. */
@@ -1226,7 +1228,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     return {
       rows,
       left: [],
-      why: `${WHY.notSure}${WHY.reads(kinds)}${offers.length > 0 || !opts.lists.some((l) => l.pack === 'work') ? ` ${WHY.offer}` : ''}`,
+      why: `${WHY.notSure}${WHY.reads(kinds)}${offers.length > 0 ? ` ${WHY.offer}` : opts.lists.some((l) => l.pack === 'work') ? '' : ` ${WHY.offerTodo}`}`,
       ...(offers.length > 0 ? { offers } : {}),
       ...(opts.lists.some((l) => l.pack === 'work') ? {} : { needsTodo: true as const }),
     };
