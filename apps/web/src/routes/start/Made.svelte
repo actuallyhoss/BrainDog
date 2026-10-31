@@ -26,6 +26,8 @@
 -->
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
+  import { focusWhenDrawn } from '$lib/ui/keep-focus.ts';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { markOf } from '@braindog/skin/agent-marks.ts';
@@ -58,6 +60,9 @@
     step('saw_connect');
     void tick().then(() => heading?.focus());
   });
+  /* AND AGAIN ONCE THE NAVIGATION HAS SETTLED (first-hour audit AH20): after the passkey the router put the focus back on
+     the page after this mounted, so a keyboard started from the top. Only where it fell to the page. */
+  afterNavigate(() => focusWhenDrawn(() => heading));
 
   /* THIS RECORD'S LINES: the bare host, and the record's own address where the shell names it. */
   const slug = $derived(page.data.live === true ? (page.data.index?.slug ?? null) : null);

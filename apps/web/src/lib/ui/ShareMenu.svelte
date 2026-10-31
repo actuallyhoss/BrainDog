@@ -23,6 +23,7 @@
   Kennel as the signed-in person (`lib/market/publish.ts`), and the answer is one sentence with a link.
 -->
 <script lang="ts">
+  import { focusWhenDrawn } from './keep-focus.ts';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { apiBase, at } from '../at.ts';
@@ -163,8 +164,12 @@
     refused = null;
     try {
       const out = await openLink(apiBase(), slug, days, money);
-      if (out.ok) made = { link: linkOf(out.value.url, globalThis.location.origin), until: dateSaid(out.value.expires_at.slice(0, 10), recordNow()) };
-      else refused = out.fix;
+      if (out.ok) {
+        made = { link: linkOf(out.value.url, globalThis.location.origin), until: dateSaid(out.value.expires_at.slice(0, 10), recordNow()) };
+        /* COPY THE LINK TAKES THE FOCUS (first-hour audit AH20): Make the link is gone from under it once the link is drawn. */
+        const from = document.activeElement;
+        focusWhenDrawn(() => document.getElementById(`${ids}link`)?.parentElement?.querySelector<HTMLElement>('.share-actions a, .share-actions button'), from);
+      } else refused = out.fix;
     } finally {
       busy = false;
     }

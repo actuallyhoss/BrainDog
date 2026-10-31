@@ -17,6 +17,7 @@
  * each of them is a browser thing and the rules of a write are not.
  */
 
+import { holdFocus } from '../ui/keep-focus.ts';
 import type { Row, RowRef, TableRow } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -459,6 +460,8 @@ export function pageWrites(deps: WritesDeps) {
   async function captureLine(register: string, text: string, inherited: Record<string, string>) {
     const now = deps.now();
     if (now === null) return;
+    /* THE ADD BOX KEEPS THE FOCUS (first-hour audit AH20): read again, it is drawn anew, and the focus fell to the page. */
+    const back = holdFocus();
     const typed = text.trim();
     /* A QUESTION IS ASKED, NOT FILED: "what is due this week" goes to the palette, where search and Slash answer it,
        as Today's ask bar sends it. Only where the host can open one; elsewhere the line is a row as it always was. */
@@ -494,10 +497,11 @@ export function pageWrites(deps: WritesDeps) {
       said: words.added(read.text, REGISTERS[register]?.name ?? register, read.said, row.filled),
       undo: (landed) => () => void writer.archive(register, landed.seq, landed.version).then(() => deps.reread()),
     });
-    if (!out.ok) return;
+    if (!out.ok) return back();
     deps.touched?.({ register, seq: out.value.seq }, words.markAdded, read.text);
     await deps.reread();
     typedLine(register, drawn, false);
+    back();
   }
 
   /** A captured line drawn on the lists over `register`, or taken off them. */
