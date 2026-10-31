@@ -75,6 +75,13 @@ export function refuseSkills(home: string, host: string, now: number = Date.now(
 }
 
 /**
+ * WHAT `setup` AND `env apply` SAY AT THEIR SKILLS STEP WITH NO YES (RG12): they copy nothing either way, since only
+ * `braindog skills sync` checks the BrainDog is yours and asks.
+ */
+export const SKILLS_ASK =
+  'none synced, because BrainDog copies skills only after you say yes, and only with a BrainDog you own. Run braindog skills sync to see what it would copy and say yes.';
+
+/**
  * THE ONE LINE A START SAYS WHEN THERE IS NO YES, in the words to type. `braindog skills sync` is the only way on:
  * it says what it would copy, and asks.
  */

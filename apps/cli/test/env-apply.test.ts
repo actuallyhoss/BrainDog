@@ -21,6 +21,7 @@ import type { Client, Context } from '@braindog/client';
 
 import { envApply, RULES_END, RULES_START, withRules, type EnvApplyIo } from '../src/env-apply.ts';
 import { pinsFile, readPins } from '../src/pins.ts';
+import { allowSkills } from '../src/skills-consent.ts';
 import type { ProfileRunner } from '../src/setup.ts';
 
 /* Made up, in the shapes of a login and an issuer's key. Neither may reach a file or a line. */
@@ -87,6 +88,8 @@ function planted() {
   symlinkSync(join(main, 'skills'), join(work, 'skills'), 'junction');
   const config = join(home, 'config');
   const env = { BRAINDOG_HOST: HOST, BRAINDOG_TOKEN: LOGIN, XDG_CONFIG_HOME: config, APPDATA: config, PATH: dirname(process.execPath) };
+  /* THE YES `braindog skills sync` KEEPS, without which env apply copies no skill (RG12). */
+  allowSkills(home, HOST);
   return { home, main, studio, work, env };
 }
 type Planted = ReturnType<typeof planted>;
