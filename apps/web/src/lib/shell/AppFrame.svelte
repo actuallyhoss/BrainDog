@@ -417,10 +417,24 @@
   const overOn = $derived(!narrow && sideOver && !sideOn);
   /* THE PROJECTS PLACE is the one whose own things are projects' pages, else the section called Projects: its heading
      is the sidebar's projects part, never a place of its own. */
+  /* ONLY A PLACE WHOSE THINGS ARE PROJECTS (AH13): a Guide's milestone pages are its things too, and taken for projects
+     its place left the sidebar while the phone's bar kept it, so a laptop found the podcast plan two clicks into More. */
+  const projectsLists = $derived(new Set(sideLists.filter((l) => l.facts?.projects === true).map((l) => l.id)));
   const projectsPlace = $derived(
-    [...rail.places, ...rail.rest].find((p) => rail.things.some(([section]) => section === p.label)) ??
+    [...rail.places, ...rail.rest].find((p) => rail.things.some(([section, list]) => section === p.label && list.some((e) => typeof e.register === 'string' && projectsLists.has(e.register)))) ??
       [...rail.places, ...rail.rest].find((p) => p.key.replace(/^section:/u, '').trim().toLowerCase() === 'projects') ??
       null,
+  );
+  /* AND ANY OTHER PLACE'S THINGS ARE ITS OWN ROWS in the sidebar, as a view is (a Guide's milestone underway). */
+  const thingViews = $derived(
+    Object.fromEntries(
+      [...rail.places, ...rail.rest]
+        .filter((p) => p !== projectsPlace)
+        .flatMap((p) => {
+          const own = rail.things.find(([section]) => section === p.label)?.[1] ?? [];
+          return own.length > 0 ? [[p.key, own.map((e) => ({ href: e.href, label: e.title, icon: 'doc' }))] as const] : [];
+        }),
+    ),
   );
   /* A RECORD THAT KEEPS NO PROJECT HAS NO PROJECTS TAB (first-hour audit E7): the sidebar opens its projects only once
      one is kept (`holdsProjects`), and the phone's bar put an empty Projects where the rail has Money. Known by a project's
@@ -498,7 +512,12 @@
         : null,
       lists: sideLists,
       homes: sideHomes,
-      views: Object.fromEntries(Object.entries(rail.views).map(([key, list]) => [key, list.map((v) => ({ href: v.href, label: v.title, icon: 'doc' }))])),
+      views: Object.fromEntries(
+        [...new Set([...Object.keys(rail.views), ...Object.keys(thingViews)])].map((key) => [
+          key,
+          [...(rail.views[key] ?? []).map((v) => ({ href: v.href, label: v.title, icon: 'doc' })), ...(thingViews[key] ?? [])],
+        ]),
+      ),
       /* THE AGENTS' TOOLS ARE THE AGENTS': what runs by itself, and the keys they use. */
       tools: [
         /* A SCRIPT'S PAGE IS AUTOMATIONS' TOO (its Scripts tab), so it lights this row and its crumb reads "Agents ›
