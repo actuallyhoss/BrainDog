@@ -57,8 +57,9 @@
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase, at as inApp } from '$lib/at.ts';
+  import { madeOf } from '$lib/home/made-counts.ts';
   import { stillShown, type WidgetSize } from 'braindog-render';
-  import { recordToday } from '$lib/record/zone.ts';
+  import { recordToday, recordZone } from '$lib/record/zone.ts';
   import { partsOf } from '$lib/shell/headline.ts';
   import { barTitled, frame } from '$lib/shell/frame.svelte.ts';
   import { everyAsked, onAppendOnly, recordNow, type Shell } from '$lib/record/boot-live.ts';
@@ -183,13 +184,11 @@
    * because it named the day in UTC. The record's own `tz` is not read, because every host provisions `UTC` and nobody
    * sets it, so it cannot be told from a zone somebody chose. A quiet line over the title, not the title itself.
    */
-  const today = $derived(new Date(data.now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
+  /* THE RECORD'S DAY, IN ITS ZONE (AH22), as every other "today" on this screen counts it. */
+  const today = $derived(new Date(data.now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: recordZone() }));
 
   /** The same day as `YYYY-MM-DD`, which the card reads "Friday" against. */
-  const dayOn = (now: number): string => {
-    const d = new Date(now);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
+  const dayOn = (now: number): string => recordToday(now);
 
   /* TODAY IS TODAY ON EVERY RECORD: a use case adds words for new things and never renames
      one of the five places, so neither the title nor the calm line takes the voice's word ("Team", "Nothing needs your
@@ -225,10 +224,11 @@
       count: counted ? (counted.get(l.id) ?? 0) : (data.index.registers.find((r) => r.id === l.id)?.count ?? 0),
     })),
   });
-  const added = $derived(addedByHand(kept));
-
   /** The device's own preferences: whether the next steps are hidden, and how her work arrives. Read again on Hide. */
   let prefs = $state(readPref());
+  /* WHAT THE MAKING WROTE, which is not added by hand (AH19, `made-counts.ts`). */
+  const madeWith = $derived(madeOf(data.index.slug));
+  const added = $derived(addedByHand(kept, madeWith));
   /** The card was pressed here: it goes at once and the next steps take its place, before `boot` counts what it added. */
   let pressed = $state(false);
   /**
@@ -256,7 +256,7 @@
   const first = $derived(!data.refused && data.lists.length > 0 && landing(data) === null && may(data, 'append'));
 
   /* THE CARD, ON A RECORD WHERE NOTHING IS ADDED BY HAND YET, until it is pressed, and again once an Undo empties it. */
-  const tell = $derived(first && !told && showTell(kept, prefs));
+  const tell = $derived(first && !told && showTell(kept, { ...prefs, madeWith }));
 
   /*
    * AND ONCE SOMETHING IS IN, THE SLIM LINE (first-hour audit AH9, the call in QUEUE.md "Audit 31 Oct h"): the same
@@ -289,7 +289,7 @@
   const steps = $derived.by(() => {
     if (!first || prefs.nextStepsHidden === true || added > FIRST_TODAY_MOST) return [];
     if (nextSteps === null) return [];
-    return told ? nextSteps.madeSteps(kept.registers, prefs.arrivesBy) : nextSteps.wantMore(kept, prefs);
+    return told ? nextSteps.madeSteps(kept.registers, prefs.arrivesBy) : nextSteps.wantMore(kept, { ...prefs, madeWith });
   });
 
   /**

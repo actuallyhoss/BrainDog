@@ -23,6 +23,7 @@ import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } fro
 import { listsOfModule } from '@braindog/seed/packs/lists';
 import type { Bars, MeasureSeries, Part, QueueQuestion, Rate } from '@braindog/kernel';
 import { PEOPLE, QUIET_MS } from '@braindog/kernel/constants';
+import { recordToday } from './zone.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
 import { amountOf, currencyOf } from './money.ts';
@@ -829,7 +830,8 @@ export function toRows(
         /* A CARD'S DEADLINE PAST ITS DAY SAYS HOW LATE, as the list does: "38 days late · 27 Jul", never a red dot alone. */
         const v = e.fields[c.field];
         if (c.as === 'when' && decl(register, c.field)?.deadline && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v) && toneOf(register, e, now) === 'bad') {
-          const days = Math.floor(now / 86_400_000) - Math.floor(Date.parse(`${v}T00:00:00Z`) / 86_400_000);
+          /* FROM THE RECORD'S DAY (AH22), as the list counts late. */
+          const days = Math.round((Date.parse(`${recordToday(now)}T00:00:00Z`) - Date.parse(`${v}T00:00:00Z`)) / 86_400_000);
           if (days > 0) return `${days === 1 ? '1 day' : `${days} days`} late · ${cell(c.field) ?? v}`;
         }
         return cell(c.field) ?? (c.or === undefined ? null : cell(c.or));

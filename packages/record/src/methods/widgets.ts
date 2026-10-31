@@ -28,7 +28,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { fillConfig, type Json } from '@braindog/kernel';
+import { dayIn, fillConfig, type Json } from '@braindog/kernel';
 import {
   WIDGETS,
   WIDGET_GROUPS,
@@ -479,7 +479,8 @@ export function methods(deps: RecordDeps) {
     const read: SignalRead = { sql, nowMs: clock.now(), person, lists, figures, addons, dues, board, templates: cat.all, addonName: cat.addonName };
     const pages = new Map((deps.pagesNow?.() ?? kernel.pages()).map((p) => [String((p as { page?: unknown }).page ?? ''), String((p as { title?: unknown }).title ?? '')] as const));
     const signals = widgetSignals(read, pages, choices.project ?? []);
-    const today = new Date(clock.now()).toISOString().slice(0, 10);
+    /* THE RECORD'S DAY, IN ITS OWN ZONE (AH22). */
+    const today = dayIn(clock.now(), kernel.identity()?.tz);
     const values = (s: WidgetSignal): Record<string, string> => (s.blank ? { [s.blank.id]: s.blank.value } : (() => {
       const t = cat.byId(s.widget);
       return t ? filledOf(t, choices) : {};

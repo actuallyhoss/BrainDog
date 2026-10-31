@@ -18,7 +18,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { CHANGED_NOTE, COVERED, GONE_NOTE, HANDLED_REASONS, HANDLED_RULE, MOOT_GONE, MOOT_HELD } from '@braindog/kernel';
+import { CHANGED_NOTE, COVERED, GONE_NOTE, HANDLED_REASONS, HANDLED_RULE, MOOT_GONE, MOOT_HELD, dayIn } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -52,7 +52,8 @@ export function methods(deps: RecordDeps) {
     async handled(_args: unknown, ctx: CallContext): Promise<Result<Handled>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const today = new Date(clock.now()).toISOString().slice(0, 10);
+      /* THE RECORD'S DAY, IN ITS OWN ZONE (AH22). */
+      const today = dayIn(clock.now(), kernel.identity()?.tz);
       const found = sql.all<{ id: string; question: string; reason: string; ts: string; batch: string | null; body: string | null; undone: number | null }>(
         `SELECT d.id AS id, d.question AS question, d.reason AS reason, d.ts AS ts,
            (SELECT e.batch FROM event e WHERE e.kind = 'decide' AND e.target = 'decision:' || d.id ORDER BY e.rowid DESC LIMIT 1) AS batch,

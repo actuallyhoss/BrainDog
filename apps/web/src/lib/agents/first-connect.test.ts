@@ -3,28 +3,26 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { connectLines } from '../record/device.ts';
-import { appLines, firstWords, signOf } from './first-connect.ts';
+import { appLines, exampleOf, firstWords, signOf } from './first-connect.ts';
 
-test('five apps, each with a line for this record and no key', () => {
+test('five apps, Claude first at every width, each with a line for this record and no key', () => {
   const apps = appLines(connectLines('https://brain.dog', 'acme'));
   assert.deepEqual(
     apps.map((a) => a.name),
-    ['Claude Code', 'Claude', 'ChatGPT', 'VS Code', 'Cursor'],
+    ['Claude', 'ChatGPT', 'Claude Code', 'VS Code', 'Cursor'],
   );
-  assert.equal(apps[0]?.before, 'curl -fsSL https://brain.dog/cli/install.sh | sh', 'the install line comes before setup');
-  assert.equal(apps[0]?.line, 'braindog setup https://brain.dog/acme');
-  assert.equal(apps[1]?.before, null);
-  assert.equal(apps[1]?.line, 'https://brain.dog/mcp');
+  assert.equal(apps[0]?.before, null);
+  assert.equal(apps[0]?.line, 'https://brain.dog/mcp');
+  assert.equal(apps[2]?.before, 'curl -fsSL https://brain.dog/cli/install.sh | sh', 'the install line comes before setup');
+  assert.equal(apps[2]?.line, 'braindog setup https://brain.dog/acme');
   assert.ok(apps.every((a) => !/bearer|token|—/iu.test(a.line + a.what)));
 });
 
-test('ON A PHONE CLAUDE COMES FIRST, the one app there with no terminal', () => {
-  const lines = connectLines('https://brain.dog', 'acme');
-  assert.deepEqual(
-    appLines(lines, lines.install, true).map((a) => a.name),
-    ['Claude', 'ChatGPT', 'Claude Code', 'VS Code', 'Cursor'],
-  );
-  assert.equal(appLines(lines, lines.install, false)[0]?.name, 'Claude Code', 'a laptop still opens on Claude Code');
+test('THE EXAMPLE NAMES WHAT THE BRAINDOG KEEPS (AH25)', () => {
+  assert.equal(exampleOf(['orders', 'products', 'people', 'obligations']), 'an order, a bill or somebody you met');
+  assert.equal(exampleOf(['courses', 'assignments', 'study_sessions']), 'an essay that is due');
+  assert.equal(exampleOf([]), 'something to do, a bill or somebody you met');
+  assert.doesNotMatch(firstWords.sub(['assignments']), /order/u);
 });
 
 test('THE SCREEN FIRST SAYS WHAT WAS MADE, by the places on it', () => {
@@ -41,7 +39,7 @@ test('the sign waits, then names the agent and the machine', () => {
 
 test('WHAT TO DO IN THE APP LEADS, AND THE AGENT IS THE SECOND STEP, said as optional (first hour audit, E3)', () => {
   assert.doesNotMatch(firstWords.title, /agent|connect/iu, 'the first title is about an agent again');
-  assert.match(firstWords.sub, /Today/u);
+  assert.match(firstWords.sub(), /Today/u);
   assert.match(firstWords.agentTitle, /if you use one/u);
   assert.equal(firstWords.go, 'Go to Today');
 });

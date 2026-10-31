@@ -381,6 +381,13 @@ test('a week that has not started yet draws no bar, and the week today is in dra
   assert.equal(weeksOf(days, '2026-09', '2026-10-02').length, 5);
 });
 
+test('NO WEEK BEFORE THE BRAINDOG WAS MADE, and the first bar starts on its day (AH30)', () => {
+  const days = [{ day: '2026-10-31', runs: 3 }];
+  assert.deepEqual(weeksOf(days, '2026-10', '2026-10-31', '2026-10-31').map((w) => [w.label, w.runs]), [['31 Oct', 3]]);
+  assert.deepEqual(weeksOf(days, '2026-10', '2026-10-31', '2026-10-10').map((w) => w.label), ['10 Oct to 14 Oct', '15 Oct to 21 Oct', '22 Oct to 28 Oct', '29 Oct to 31 Oct']);
+  assert.equal(weeksOf(days, '2026-10', '2026-10-31', '2026-09-02').length, 5);
+});
+
 test('an interval is runs a month without the jitter, in the kernel\'s grammar where m is minutes', () => {
   assert.equal(runsAMonth('1h'), 730);
   assert.equal(runsAMonth('15m'), 2920);

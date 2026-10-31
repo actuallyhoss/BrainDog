@@ -3532,8 +3532,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!held || held.deleted_at) return ok(null);
       return kernel.update(register, row, fields, { actor: actorOf(ctx), cascade: false, pack: true } as never);
     },
-    /* THE RECORD'S OWN CLOCK, so a seed's `{ day }` counts from the day this record reads and not the machine's. */
-    today: () => new Date(clock.now()).toISOString().slice(0, 10),
+    /* THE RECORD'S OWN CLOCK AND ZONE, so a seed's `{ day }` counts from the day this record reads and not the machine's,
+       nor Greenwich's (AH22): a Guide made at 01:00 in Cairo dated its steps from the day before. */
+    today: () => localDays(readableZone(kernel.identity()?.tz))(clock.now()),
     remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),
     /* AND ITS FILE, kept while a part of it waited (`installHeld`), goes with it. */
     forget: (id) => {

@@ -13,6 +13,7 @@
 
 import { PLACES } from './nav/rail.ts';
 import { TASKS } from './work/list.ts';
+import { WORK_PAGE } from './work/page.ts';
 
 /* NOT EXPORTED. Both callers want the ORDER as well as the grouping, and a bare `group` beside an
    `arrange` is an invitation to reach for the one that skips the reader's arrangement — which is
@@ -197,7 +198,9 @@ export function flatNav<T extends { title: string; href: string; icon: string; r
      the row all the same, where Work sits among the sections a day runs through. */
   if (work !== null) {
     const item: FlatItem = { key: 'work', href: work, label: WORK_WORD, icon: 'work', near: [work] };
-    const held = rows.find((r) => plainOf(r.section) === 'work');
+    /* THE SECTION THAT HOLDS THE WORK PAGE IS WORK, WHATEVER IT IS CALLED (AH13): a team's is "Tickets", and its rail said
+       Tickets while its bar said Work, two rows for one place. */
+    const held = rows.find((r) => plainOf(r.section) === 'work') ?? rows.find((r) => r.entries.some((e) => e.href === `/p/${WORK_PAGE}`));
     if (held) Object.assign(held, { item: { ...item, label: held.section }, screen: true });
     else rows.unshift({ section: WORK_WORD, lead: undefined, entries: [], item, screen: true });
   }

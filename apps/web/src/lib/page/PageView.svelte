@@ -1493,7 +1493,7 @@
       gap: var(--sp-1);
     }
 
-    .lead-actions :global(.btn:has(.icon)) {
+    .lead-actions :global(.btn:has(.icon):not(dialog *)) {
       inline-size: var(--tap);
       min-inline-size: var(--tap);
       min-block-size: var(--tap);
@@ -1502,7 +1502,7 @@
       font-size: 0em;
     }
 
-    .lead-actions :global(:is(.btn[data-weight='quiet'], .share-trigger)) {
+    .lead-actions :global(:is(.btn[data-weight='quiet'], .share-trigger):not(dialog *)) {
       background: none;
     }
 

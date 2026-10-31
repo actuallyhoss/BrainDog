@@ -144,7 +144,7 @@
   import NoRecord from '../start/NoRecord.svelte';
   import PasskeyFirst from '../start/PasskeyFirst.svelte';
   import type { Accepting, NotMade } from '../start/accept.ts';
-  import { accepting, nameSent, picked, replyOf, settle, titleSent } from './build.ts';
+  import { accepting, nameSent, ownName, picked, replyOf, settle, titleSent } from './build.ts';
   import Apply from './Apply.svelte';
   import { askFirst, takeEarly } from './early.ts';
   import NameField from './NameField.svelte';
@@ -466,6 +466,8 @@
   const deviceOf = (): CurrencyEnv => (device ??= browserCurrencyEnv(locale, typeof navigator === 'undefined' ? [] : [...(navigator.languages ?? [])], here));
   const base = $derived(live === null ? null : settle(live, amends, null, sentence));
   const read = $derived(base === null ? null : reply === null ? base : answer(base, reply.about, reply.value, sentence));
+  /* WHERE THE BRAINDOG WILL LIVE, said apart from its name (AH26): this host, then its address. */
+  const addressHost = typeof location === 'undefined' ? '' : location.host;
   /** The one question it could not guess (`oneQuestion`), or none. */
   /** The rules' one question (`oneQuestion`), or none. */
   const ruled = $derived(base === null ? null : oneQuestion(base, sentence, deviceOf()));
@@ -1409,11 +1411,15 @@
           <NameField bind:value={slug} bind:free id="up-name" />
         {:else if naming || read?.title || slug !== ''}
           <!-- WHAT THE BOX HOLDS: a name alone in a box read as anybody's, the email's local part above all. -->
+          <!-- THE NAME, AND THE ADDRESS APART (AH26): "Sam's BrainDog" over "app.brain.dog/sam", and Change changes the address. -->
           <p class="field-label kept-label">{words.calledLabel}</p>
-          <div class="kept-head">
-            <h2 class="kept-name" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? slug)}</h2>
-            {#if !naming && slug !== ''}<button type="button" class="link plain" onclick={changeName}>{words.change}</button>{/if}
-          </div>
+          <h2 class="kept-name" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? ownName(nameSent(read, email)) ?? words.calledNone)}</h2>
+          {#if !naming && slug !== ''}
+            <div class="kept-head">
+              <p class="kept-at"><span class="kept-at-label">{words.addressLabel}</span> <span class="kept-at-url">{addressHost}/{slug}</span></p>
+              <button type="button" class="link plain" onclick={changeName}>{words.change}</button>
+            </div>
+          {/if}
         {/if}
       </section>
 
@@ -1977,6 +1983,20 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--sp-2);
+  }
+
+  .kept-at {
+    margin: 0;
+    min-inline-size: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .kept-at-url {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
   }
 
   .kept-name {

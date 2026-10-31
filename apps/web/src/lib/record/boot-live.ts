@@ -765,6 +765,17 @@ function accessText(e: EventLine): string | null {
   return level ? `Took away someone's ${level} access${on}` : `Took away someone's access${on}`;
 }
 
+/**
+ * A READ-ONLY LINK MADE OR CLOSED, AS A SENTENCE (AH28): the bell said "Share open". The page is the event's `field`, by
+ * its slug, said in words.
+ */
+function shareText(e: EventLine): string | null {
+  if (e.kind !== 'share.open' && e.kind !== 'share.close') return null;
+  const slug = typeof e.field === 'string' && e.field !== '' ? e.field.replace(/[-_]+/gu, ' ').trim() : '';
+  const page = slug === '' ? 'a page' : slug.charAt(0).toUpperCase() + slug.slice(1);
+  return e.kind === 'share.open' ? `You shared ${page} with a link` : `You closed the link to ${page}`;
+}
+
 /** One line of the log in the words the feed draws. */
 function textOf(e: EventLine): string {
   if (e.kind === 'setup') return setupText(e);
@@ -779,7 +790,7 @@ function textOf(e: EventLine): string {
     const said = declaredOf(e.target, e.note);
     if (said !== null) return said;
   }
-  const pack = packText(e) ?? exportText(e) ?? accessText(e);
+  const pack = packText(e) ?? exportText(e) ?? accessText(e) ?? shareText(e);
   if (pack) return pack;
   /* A RULE'S RUN BY THE RULE'S NAME (audit of 30 October, 7): the record notes a run "rule.weekly-review ran." */
   const ran = /^rule\.([a-z0-9][a-z0-9_-]*) ran\.?$/u.exec(e.note ?? '');

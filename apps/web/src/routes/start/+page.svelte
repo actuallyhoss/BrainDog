@@ -43,12 +43,13 @@
 -->
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { USE_CASES } from '@braindog/seed/usecases';
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { covered, typing } from '$lib/a11y/keys.svelte.ts';
   import { silenced } from '$lib/a11y/chars.ts';
   import { methods } from '$lib/auth.ts';
@@ -141,6 +142,13 @@
   /* THE PLACES MADE, by name, which the end says first. */
   let madePlaces = $state.raw<string[] | null>(null);
   onMount(() => {
+    /* A SET-UP BRAINDOG GOES TO TODAY (first hour audit, AH31): its address back at /start drew sign-up again over
+       "This BrainDog is set up". Only the end of the run (`#made`), an agent's set-up (`?agent=1`) and "Or bring in a
+       file" (`?more=1`, `made.ts`) open the question on a made record. */
+    if (location.hash !== '#made' && alreadyMade && !colleague && !page.url.searchParams.has('agent') && !page.url.searchParams.has('more')) {
+      void goto(at('/'), { replaceState: true });
+      return;
+    }
     if (location.hash !== '#made') return;
     history.replaceState(history.state, '', location.pathname + location.search);
     if (page.data.live) made = true;

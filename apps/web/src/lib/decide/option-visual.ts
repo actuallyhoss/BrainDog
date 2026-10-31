@@ -16,6 +16,7 @@ import { money } from 'braindog-render';
 
 import { leadFirst, movesOf, nameOrNull, shiftLinesOf, type Moved } from './card.ts';
 import { spoken } from './spoken.ts';
+import { recordToday } from '../record/zone.ts';
 
 /** What the host knows beyond the question; every part is optional and a missing one draws nothing that needs it. */
 export type VisualContext = {
@@ -77,7 +78,8 @@ function moneyVisual(m: Moved, ctx: VisualContext): OptionVisual | null {
 function dateVisual(before: unknown, after: unknown, now: number): OptionVisual | null {
   const due = dayOf(after);
   if (due === null) return null;
-  const today = Math.floor(now / 86_400_000);
+  /* THE RECORD'S DAY (AH22), not Greenwich's. */
+  const today = dayOf(recordToday(now)) ?? Math.floor(now / 86_400_000);
   return { kind: 'date', today, due, days: due - today, was: dayOf(before), late: due < today };
 }
 

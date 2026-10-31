@@ -8,7 +8,7 @@
   lives in this sheet's memory until the sheet closes, and closing forgets it. A person who lost it closes it in Settings,
   under People & sharing, and makes another; there is no way to see a link again, which is what makes one safe to hand out.
 
-  NO PRESS THAT FAILS. On opening, the sheet asks `shareable` (`readShareable`), and "Share a read-only link" is drawn
+  NO PRESS THAT FAILS. Once for the page, silently, Share asks `shareable` (`shareableOnce`), and "Share a read-only link" is drawn
   only on yes. An owner on a host that makes no links reads the host's own sentence instead; anybody who is not an owner
   reads the record's own sentence for that (`shareable` is ADMIN, as `openShare` is), rather than this guessing at a
   level it does not read. "Share as a template" is offered either way.
@@ -24,6 +24,7 @@
 -->
 <script lang="ts">
   import { focusWhenDrawn } from './keep-focus.ts';
+  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { apiBase, at } from '../at.ts';
@@ -35,7 +36,7 @@
   import { kennelFetch, nextVersion, publishedHref, publishedLink, publishedSaid, publishWords, submitToKennel, type Submitted } from '../market/publish.ts';
   import { templateOf, templateWords, wordsOf, type Template, type TemplateSetting } from '../market/template.ts';
   import { words as market } from '../market/words.ts';
-  import { linkOf, openLink, daysSaid, readShareable, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
+  import { linkOf, linksOff, openLink, daysSaid, shareableOnce, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import Menu from './Menu.svelte';
@@ -60,9 +61,13 @@
   let busy = $state(false);
   let made = $state<{ link: string; until: string } | null>(null);
   let refused = $state<string | null>(null);
-  /** Whether this BrainDog makes links, asked each time the sheet opens. */
-  let can = $state.raw<{ state: 'asking' } | { state: 'yes' } | { state: 'no'; why: string }>({ state: 'asking' });
+  /**
+   * Whether this BrainDog makes links, asked once for the page and never said while asked (AH27). `off` is a host
+   * that makes none, whose half of Share is hidden and said as coming (AH12); `no` is a sentence for this person.
+   */
+  let can = $state.raw<{ state: 'asking' } | { state: 'yes' } | { state: 'off' } | { state: 'no'; why: string }>({ state: 'asking' });
   let asks = 0;
+  onMount(() => void ask());
 
   /** Which of the sheet's two jobs it is doing: the read-only link, or the page as a template. */
   let mode = $state<'link' | 'template'>('link');
@@ -87,10 +92,9 @@
   /** Ask `shareable`. An answer for a sheet opened again since is dropped, so the newest ask is the one drawn. */
   async function ask() {
     const n = (asks += 1);
-    can = { state: 'asking' };
-    const said = await readShareable(createClient({ base: apiBase() }));
+    const said = await shareableOnce(apiBase(), createClient({ base: apiBase() }));
     if (n !== asks) return;
-    can = said.can ? { state: 'yes' } : { state: 'no', why: said.why ?? words.shareOff };
+    can = said.can ? { state: 'yes' } : linksOff(said) ? { state: 'off' } : { state: 'no', why: said.why ?? words.shareOff };
   }
 
   /* CLOSING FORGETS THE LINK, which is the whole of "shown once". */
@@ -180,7 +184,7 @@
   <Menu label={words.shareOpen} align="end">
     {#snippet trigger()}<span class="share-trigger"><Icon name="link" size="s" /><span class="share-word">{words.shareOpen}</span></span>{/snippet}
     <button type="button" role="menuitem" data-share-people onclick={() => people?.()}><Icon name="user-plus" size="s" />{peopleLabel ?? words.shareOpen}</button>
-    <button type="button" role="menuitem" onclick={show}><Icon name="link" size="s" />{words.shareTitle}</button>
+    {#if can.state !== 'off'}<button type="button" role="menuitem" onclick={show}><Icon name="link" size="s" />{words.shareTitle}</button>{/if}
     <button type="button" role="menuitem" onclick={() => { show(); void asTemplate(); }}><Icon name="doc" size="s" />{templateWords.open}</button>
   </Menu>
 {:else}
@@ -232,17 +236,18 @@
     {:else if made}
       <p class="once" id="{ids}once">{words.shareOnce}</p>
       <label class="share-label" for="{ids}link">{words.shareLinkLabel}</label>
-      <!-- A TEXTAREA AND NOT AN INPUT, so a link longer than the sheet wraps and can be read whole at 390px. Read only,
-           and selected on focus, so a long press or a click takes all of it. -->
-      <textarea
+      <!-- ONE LINE THAT SCROLLS (AH29): three wrapped lines of token cut the link mid-line at 390. Read only, and
+           selected on focus, so a long press or a click takes all of it; Copy the link is the press it is here for. -->
+      <input
         class="share-link"
         id="{ids}link"
+        type="text"
         readonly
-        rows="3"
         spellcheck="false"
+        autocomplete="off"
         aria-describedby="{ids}once"
         value={made.link}
-        onfocus={(e) => e.currentTarget.select()}></textarea>
+        onfocus={(e) => e.currentTarget.select()} />
       <div class="share-actions">
         <Button weight="primary" onclick={() => made && void put(made.link, words.shareLinkLabel, words.shareCopied)}>
           <Icon name="copy" size="s" />
@@ -253,11 +258,15 @@
       <p class="share-hint">{words.shareUntil(made.until)}</p>
       <Button weight="bare" onclick={() => (made = null)}>{words.shareAnother}</Button>
     {:else if can.state === 'asking'}
-      <p class="share-hint" role="status">{words.shareAsking}</p>
+      <!-- THE ASK IS SILENT (AH27): it said "Checking whether this BrainDog makes links" after unrelated presses. -->
+      <Button weight="bare" onclick={() => void asTemplate()}>{templateWords.open}</Button>
+    {:else if can.state === 'off'}
+      <!-- LINKS NOT ON THIS HOST YET (AH12): the link half is hidden, and said as coming. -->
+      <p class="share-line">{words.shareComing}</p>
       <Button weight="bare" onclick={() => void asTemplate()}>{templateWords.open}</Button>
     {:else if can.state === 'no'}
-      <!-- THE HOST'S OWN SENTENCE, and no press for a link it would refuse. -->
-      <p class="share-line" role="status">{can.why}</p>
+      <!-- THE RECORD'S SENTENCE FOR THIS PERSON, and no press for a link it would refuse. -->
+      <p class="share-line">{can.why}</p>
       <Button weight="bare" onclick={() => void asTemplate()}>{templateWords.open}</Button>
     {:else}
       <p class="share-hint">{words.shareLead}</p>
@@ -378,12 +387,13 @@
     font-weight: 500;
   }
 
-  /* The link wraps anywhere: a token has no spaces to break at, and a sideways scroll inside a sheet on a phone hides
-     the half that matters. */
-  /* A FIELD: the `--tile-2` fill with no border, radius 8, as `controls.css` draws `.field`. */
+  /* A FIELD ON ONE LINE: the `--tile-2` fill with no border, radius 8, as `controls.css` draws `.field`; the link scrolls
+     inside it, and Copy the link takes it whole. */
   .share-link {
+    box-sizing: border-box;
     inline-size: 100%;
-    min-block-size: 40px;
+    min-inline-size: 0;
+    min-block-size: var(--tap);
     padding: var(--sp-2) var(--sp-3);
     background: var(--tile-2);
     border: 0;
@@ -391,9 +401,7 @@
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
-    overflow-wrap: anywhere;
-    word-break: break-all;
-    resize: none;
+    text-overflow: ellipsis;
   }
 
   .share-actions {

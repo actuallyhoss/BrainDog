@@ -25,7 +25,7 @@
 
 import type { Result, Sql } from '@braindog/ports';
 import * as kernelModule from '@braindog/kernel';
-import { spoken } from '@braindog/kernel';
+import { dayIn, spoken } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -139,7 +139,8 @@ export function exceptionsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
 
   /** One exception in the words a person reads, or `null` when the record holds no name to say it by. */
   const seen = (e: KernelException, nowMs: number): ExceptionSeen | null => {
-    const today = new Date(nowMs).toISOString().slice(0, 10);
+    /* THE RECORD'S DAY, IN ITS OWN ZONE (AH22). */
+    const today = dayIn(nowMs, deps.kernel.identity()?.tz);
     const since = daySaid(e.since, today);
     const quiet = Math.max(1, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${e.since}T00:00:00Z`)) / DAY_MS));
     const row = rowOf(e.row);

@@ -45,6 +45,9 @@ export const words = {
   shareDone: 'Done',
   shareAsking: 'Checking whether this BrainDog makes links',
   shareOff: 'Read-only links are switched off on this BrainDog.',
+  /* WHERE THE HOST MAKES NO LINKS (AH12): the link half is hidden and this is said, never "switched off on this
+     BrainDog", which a new person read as something they had done and had nowhere to undo. */
+  shareComing: 'Read-only links are coming.',
   linksTitle: 'Links',
   linksLead: 'Read-only links to single pages. Closing one stops it working for good.',
   linksNone: 'No page is shared',
@@ -110,6 +113,23 @@ export const SHARES_OFF: string = words.shareOff;
 
 type Caller = { call: <T>(name: string, args?: Record<string, unknown>) => Promise<Wire<T>> };
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: unknown };
+
+/** Whether a no is the host's links being off, which the sheet says as coming, and not a sentence for this person. */
+export const linksOff = (s: Shareable): boolean => !s.can && (s.why ?? SHARES_OFF) === SHARES_OFF;
+
+/**
+ * `readShareable`, asked once for each record address and kept for the page's life (AH27): the sheet and the menu read
+ * the same answer, and the ask is never said on screen.
+ */
+const known = new Map<string, Promise<Shareable>>();
+export function shareableOnce(base: string, client: Caller): Promise<Shareable> {
+  let p = known.get(base);
+  if (!p) {
+    p = readShareable(client);
+    known.set(base, p);
+  }
+  return p;
+}
 
 export async function readShareable(client: Caller): Promise<Shareable> {
   const out = await client.call<unknown>('shareable');

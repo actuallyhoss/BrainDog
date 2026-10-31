@@ -905,6 +905,9 @@ export async function backlogAgain(io: { rows: TicketIo['rows']; link: (register
 export const TEAM_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   work: {
     Work: 'Tickets',
+    /* THE LIST'S OWN WORD ON ITS FIRST LINE (AH28): Tickets read "None of your tasks is late". */
+    'None of your tasks is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you':
+      'None of your tickets is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you',
     '{{tasks-late-yours.first}} is late, and {{tasks-late-yours.more}} more task(s) are too':
       '{{tasks-late-yours.first}} is late, and {{tasks-late-yours.more}} more ticket(s) are too',
     '{{open-tasks}} open task(s), {{tasks-waiting}} waiting on you': '{{open-tasks}} open ticket(s), {{tasks-waiting}} waiting on you',

@@ -460,7 +460,9 @@ async function init(args: readonly string[]): Promise<void> {
     id,
     slug,
     name: slug,
-    tz: 'UTC',
+    /* THE MACHINE'S ZONE, NOT GREENWICH'S (AH22): the hosted sign-up sends the person's zone, and a self-host made at
+       its own command line counts its days where it runs. `TZ` set on the machine wins; none read is UTC. */
+    tz: machineZone(),
     locale: 'en',
     owner: { id: person.value.id, email: person.value.email, name: person.value.name },
     keys,
@@ -919,4 +921,14 @@ try {
   } else refuse(`There is no ${command} here. It has serve, init, backup and restore; ${commandFor('--help')} says what each takes.`);
 } catch (e) {
   refuse(e instanceof Error ? e.message : String(e));
+}
+
+/** The zone this machine keeps, as `Intl` reads it (`TZ` included), or UTC where it reads none. */
+function machineZone(): string {
+  try {
+    const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof z === 'string' && z !== '' ? z : 'UTC';
+  } catch {
+    return 'UTC';
+  }
 }
