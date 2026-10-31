@@ -68,6 +68,9 @@ export type TellOptions = {
   accounts?: readonly Known[];
   /** The organisations on the record, for the company somebody met is from (AM12). */
   orgs?: readonly Known[];
+  /** The entries each list holds, by list id, as this tab has named them (RM5): a name kept as an organisation, a bill,
+      money that comes round, a subscription or a past payment's payee is never made a person. */
+  titled?: Readonly<Record<string, readonly Known[]>>;
   /** The list a plain line goes into, when the record says. Otherwise the list that calls one of its entries a task. */
   capture?: string;
   /** Every currency the record's money is in (`moneyCurrencies()` when not said): "dinars" on a record that holds
@@ -125,8 +128,9 @@ const IN_COUNT = Object.keys(COUNTS).filter((w) => !w.includes(' ')).join('|');
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const MONTH = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
 /* A weekday said bare only in full: "she sat down" is no Saturday. Its short form needs a word before it ("by fri"). */
+/* AND NEVER THE FIRST DIGITS OF A FIGURE (RM5): "Bonus for March 5,000" is 5,000, never 5 March and an amount of 000. */
 const DAY = new RegExp(
-  `\\b(?:(?:for|by|on|due|before|until)\\s+)?(today|tonight|tomorrow|tmrw|yesterday|this weekend|this week|next week|next (?:${WEEKDAY})|in (?:\\d{1,3}|${IN_COUNT}) (?:days?|weeks?)|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?|\\d{1,2}(?:st|nd|rd|th)?(?: of)? ${MONTH}|${MONTH} \\d{1,2}(?:st|nd|rd|th)?|the \\d{1,2}(?:st|nd|rd|th)|${FULL_DAY})\\b\\.?` +
+  `\\b(?:(?:for|by|on|due|before|until)\\s+)?(today|tonight|tomorrow|tmrw|yesterday|this weekend|this week|next week|next (?:${WEEKDAY})|in (?:\\d{1,3}|${IN_COUNT}) (?:days?|weeks?)|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?|\\d{1,2}(?:st|nd|rd|th)?(?: of)? ${MONTH}|${MONTH} \\d{1,2}(?:st|nd|rd|th)?|the \\d{1,2}(?:st|nd|rd|th)|${FULL_DAY})\\b(?![.,]\\d)\\.?` +
     `|\\b(?:for|by|on|due|before|until)\\s+(${WEEKDAY})\\b\\.?`,
   'iu',
 );
@@ -351,6 +355,15 @@ const NOT_A_NAME = new Set([
   'october', 'november', 'december',
 ]);
 const aName = (name: string): boolean => !NOT_A_NAME.has(words(name.split(' ')[0] ?? ''));
+/* A MONTH OR A WEEKDAY IS NOBODY, last in a name as first (RM5): "Paid Omar March 300" is Omar. */
+const DATE_WORDS: ReadonlySet<string> = new Set([...Object.keys(WEEKDAYS), 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']);
+/** A name with the months and weekdays said after it taken off, and the words taken. */
+function undated(name: string): { name: string; dropped: string[] } {
+  const ws = name.trim().split(/\s+/u);
+  const dropped: string[] = [];
+  while (ws.length > 1 && DATE_WORDS.has(words(ws[ws.length - 1]!))) dropped.unshift(ws.pop()!);
+  return { name: ws.join(' '), dropped };
+}
 
 /* "[09/10, 14:02] Nadia: can I get..." and "Nadia: ..." are a pasted message from Nadia. */
 const FROM_MESSAGE = new RegExp(`^(?:\\[[^\\]]*\\]\\s*)?(${NAME})\\s*:\\s+`, 'u');
@@ -583,12 +596,51 @@ const INTO_MINE = /\b(?:to|into)\s+(?:my|our)\s+(?:bank|account|a\/c|acct|card|w
    The places and companies a person here pays or goes to, and the words a company's name ends on. */
 const PLACES = /^(?:dubai|abu dhabi|sharjah|cairo|giza|alexandria|sharm|sharm el sheikh|hurghada|gouna|el gouna|dahab|luxor|aswan|siwa|sahel|north coast|ain sokhna|sokhna|riyadh|jeddah|mecca|makkah|medina|doha|kuwait|bahrain|manama|muscat|oman|amman|beirut|istanbul|london|paris|rome|milan|madrid|barcelona|berlin|amsterdam|athens|new york|nyc|los angeles|san francisco|toronto|tokyo|bali|bangkok|egypt|uae|saudi|saudi arabia|qatar|lebanon|turkey|greece|italy|spain|france|germany|uk|england|usa|us|america|canada|europe|asia|africa)$/iu;
 const COMPANIES = /^(?:vodafone|etisalat|e&|orange|we|telecom egypt|cib|nbe|qnb|hsbc|banque misr|alex bank|adib|aaib|mashreq|emirates nbd|fab|enbd|valu|instapay|vodafone cash|noon|carrefour|spinneys|ikea|jumia|swvl|microsoft|adobe|zoom|slack|notion|figma|github|aws|vercel|cloudflare|openai|anthropic|anghami|shahid|osn|emirates|egyptair|etihad|qatar airways|flydubai|booking|booking\.com|dhl|aramex|fedex|ups|bosta|starbucks|mcdonald['’]?s|kfc)$/iu;
+/* THE SERVICES A PERSON PAYS BY THE MONTH OR THE RIDE, for a record that holds none of them yet (RM5): "Paid Netflix 200",
+   "Uber 200 due Friday" and "Spotify 60 due Friday" are money out, never a person and never "did Netflix pay you". A
+   platform that pays him (Stripe, Upwork, PayPal) is not here: which way its money went is still asked. No word that
+   is also a given name ("Max", "Claude"). */
+const SERVICE_BRANDS = /^(?:netflix|spotify|apple music|apple tv\+?|apple one|icloud\+?|itunes|app store|apple|amazon|amazon prime|prime video|prime|audible|kindle(?: unlimited)?|google|google one|google play|youtube premium|youtube music|youtube|disney\+?|disney plus|hbo max|hbo|hulu|paramount\+?|peacock|crunchyroll|deezer|tidal|soundcloud|watch it|watchit|yango(?: play)?|starzplay|bein|xbox(?: game pass)?|game pass|playstation(?: plus)?|ps plus|psn|nintendo(?: switch online)?|steam|epic games|dropbox|chatgpt|chatgpt plus|midjourney|canva|grammarly|duolingo|linkedin(?: premium)?|microsoft 365|office 365|onedrive|1password|lastpass|nordvpn|expressvpn|surfshark|uber|uber eats|careem|talabat|deliveroo|instashop|breadfast|elmenus|bolt|lyft|indrive|airbnb|glovo|mrsool|hungerstation|jahez|noon minutes|amazon fresh|tabby|souhoola)$/iu;
 const COMPANY_END = /\s(?:bank|telecom|airways|airlines|air|ltd|llc|inc|co|corp|group|hotel|resort|clinic|hospital|pharmacy|school|university|academy|studio|studios|agency|store|shop|market|mall|cafe|restaurant|club|gym)$/iu;
 /** Whether a capitalised name reads as somebody: never a place, a company, a provider, a bill, or letters in capitals. */
 const readsAsSomebody = (name: string): boolean => {
   const n = name.trim();
-  return aName(n) && !PLACES.test(n) && !COMPANIES.test(n) && !COMPANY_END.test(n) && !PROVIDERS.test(n) && !THING_PAID.test(n) && !SERVICES.test(n) && !/^\p{Lu}{2,}$/u.test(n);
+  return aName(n) && !PLACES.test(n) && !COMPANIES.test(n) && !SERVICE_BRANDS.test(n) && !COMPANY_END.test(n) && !PROVIDERS.test(n) && !THING_PAID.test(n) && !SERVICES.test(n) && !/^\p{Lu}{2,}$/u.test(n);
 };
+/* WHO A PAST PAYMENT WENT TO, as Tell titles one: "Paid to Halden", "Payout from Stripe", "Groceries at Carrefour". */
+const PAID_TITLE = /^(?:paid to|payout from)\s+(.+)$|\s+at\s+(.+)$/iu;
+/**
+ * THE NAMES THE RECORD ALREADY KEEPS AS NOBODY (RM5): its organisations and accounts, and what its money lists hold (a
+ * bill, money that comes round, a subscription, a past payment and who it went to). Each is kept in lower case, and
+ * without the word a company's name ends on as well, so "Kiln Studio" kept makes "Paid Kiln 900" nobody new too. The
+ * list Tell's own words above cannot know, read off the record.
+ */
+function heldThings(opts: TellOptions): ReadonlySet<string> {
+  const out = new Set<string>();
+  const add = (name: string): void => {
+    const n = words(oneLine(name)).replace(/[.,;:]+$/u, '');
+    if (!n) return;
+    out.add(n);
+    const bare = n.replace(COMPANY_END, '');
+    if (bare && bare !== n) out.add(bare);
+  };
+  const titled = opts.titled ?? {};
+  for (const o of [...(opts.orgs ?? []), ...(opts.accounts ?? [])]) add(o.name);
+  /* Where People keeps the company a person is with, by the link it declares, as `contact` finds it. */
+  const people = opts.lists.find((l) => l.id === PEOPLE);
+  for (const f of people?.fields ?? []) if (f.type === 'ref' && f.to && f.to !== PEOPLE && /org|company|organi[sz]ation/iu.test(`${f.id} ${f.label ?? ''}`)) for (const o of titled[f.to] ?? []) add(o.name);
+  for (const l of opts.lists) {
+    if (l.id === PEOPLE || !l.fields.some((f) => f.type === 'money' && f.required)) continue;
+    for (const { name } of titled[l.id] ?? []) {
+      add(name);
+      const paid = PAID_TITLE.exec(name.trim());
+      if (paid) add(paid[1] ?? paid[2] ?? '');
+    }
+    /* And the accounts its entries move through. */
+    for (const f of l.fields) if (f.type === 'ref' && f.to && f.to !== PEOPLE && f.required && /account/iu.test(`${f.id} ${f.label ?? ''}`)) for (const o of titled[f.to] ?? []) add(o.name);
+  }
+  return out;
+}
 /* A SERVICE OR A THING PAID FOR, SAID FIRST, IS NOBODY: a phone gives the first word its capital, so "Dentist 800 due
    Monday" asked "Did Dentist pay you" (rl-tell). Who is paid for the work, by what they do, and the work itself. */
 const SERVICES = /^(?:dentist|doctor|vet|plumber|electrician|mechanic|carpenter|painter|cleaner|cleaners|cleaning|maid|nanny|babysitter|tutor|tutoring|driver|gardener|hairdresser|barber|salon|haircut|lawyer|accountant|landlord|nursery|daycare|kindergarten|therapist|therapy|physio|physiotherapy|optician|dental|pharmacy|garage|laundry|dry cleaning|car wash|car service|service|repairs?|maintenance|lessons?|classes|course|training|pilates|yoga|swimming|piano|guitar|dance|doorman|security|delivery|shipping|taxi|uber|car|flat|house|groceries|food|coffee|lunch|dinner|tickets?|flights?|hotel|clothes|shoes|books?|medicine|meds|vet bill)$/iu;
@@ -778,6 +830,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     return i === -1 ? text : `${body.slice(0, i)}${sign}${body.slice(i + narrow.length)}`;
   };
   const room = (n: number): boolean => rows.length + n <= MOST;
+  /* A NAME THE RECORD KEEPS AS NOBODY IS NOBODY NEW (RM5): somebody, by the words above, and not one of its companies,
+     accounts, bills, subscriptions or past payees. Somebody in People is found before this is asked. */
+  const things = heldThings(opts);
+  const somebody = (name: string): boolean => readsAsSomebody(name) && !things.has(words(name.trim()));
 
   /* Who each name is: an entry already kept, or a new one made the first time they are named. */
   const made = new Map<string, number>();
@@ -1033,7 +1089,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const assigned =
       assignedSaid && aName(assignedSaid[1]!)
         ? assignedSaid
-        : trailing && (knownAs(trailing[1]!, opts.people ?? []) !== null || (readsAsSomebody(trailing[1]!) && !NOT_SOMEBODY.test(trailing[1]!))) && !ownAccount(trailing[1]!)
+        : trailing && (knownAs(trailing[1]!, opts.people ?? []) !== null || (somebody(trailing[1]!) && !NOT_SOMEBODY.test(trailing[1]!))) && !ownAccount(trailing[1]!)
           ? trailing
           : null;
     const owner = assigned ? ownerField : undefined;
@@ -1247,7 +1303,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* NO WORD OF ARRIVING, NO "FROM", NO "MY": the way is asked, never taken from the word (RL5). */
     if (!CAME_IN.test(c)) {
       const not = INCOME_NOT.exec(c);
-      if (not || !(/\bfrom\s/iu.test(c) || INCOME_MINE.test(c) || INCOME_OWN.test(c))) return askWay(c, a, not?.[1] && aName(not[1]) ? not[1] : nameBefore(dated.rest.slice(0, a.at)));
+      if (not || !(/\bfrom\s/iu.test(c) || INCOME_MINE.test(c) || INCOME_OWN.test(c))) return askWay(c, a, not?.[1] && aName(not[1]) ? undated(not[1]).name : nameBefore(dated.rest.slice(0, a.at)));
     }
     if (!moneyList(opts.lists) && !dueList(opts.lists)) {
       noMoney = true;
@@ -1267,7 +1323,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const named = trimWords(oneLine(rest.replace(EVERY, ' ')).replace(/^(?:my|our)\s+/iu, ''));
     const what = capital(named) || (party ? `From ${party}` : 'Money in');
     /* Somebody who paid it is a person; a shop or a platform that refunded it is only named. */
-    const payer = party && (knownAs(party, opts.people ?? []) !== null || readsAsSomebody(party)) && !ownAccount(party) ? personOf(party) : null;
+    const payer = party && (knownAs(party, opts.people ?? []) !== null || somebody(party)) && !ownAccount(party) ? personOf(party) : null;
     /* "My salary 30,000 a month" comes round: Repeating, money in, where the record keeps it. */
     const every = EVERY.exec(c);
     const r = every ? repeatList(opts.lists) : undefined;
@@ -1406,8 +1462,9 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   function nameBefore(lead: string): string | null {
     const said = oneLine(lead).replace(/[\s,;:–-]+$/u, '');
     const fit = (n: string | undefined): string | null => {
-      const name = n?.trim() ?? '';
-      if (!name || THING_PAID.test(name) || SERVICES.test(name) || INCOME_WORD.test(name) || ownAccount(name) || PLACES.test(name) || COMPANIES.test(name)) return null;
+      /* A MONTH OR A WEEKDAY IS NEVER WHO PAID (RM5), nor a service he pays ("Netflix 200 due Friday"). */
+      const name = undated(n ?? '').name;
+      if (!name || THING_PAID.test(name) || SERVICES.test(name) || SERVICE_BRANDS.test(name) || INCOME_WORD.test(name) || ownAccount(name) || PLACES.test(name) || COMPANIES.test(name)) return null;
       return knownAs(name, opts.people ?? []) !== null || aName(name) ? name : null;
     };
     const own = new RegExp(`^(${NAME})['’]s(?![\\p{L}\\p{M}])`, 'u').exec(said);
@@ -1632,11 +1689,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       const to = PAID_TO.exec(rest) ?? TO_SOMEBODY.exec(rest);
       const parts = (to?.[1] ?? '').split(' ');
       while (parts.length > 1 && CODES.has(parts[parts.length - 1]!)) parts.pop();
-      const name = parts.join(' ');
-      const cutTo = (m: RegExpExecArray): string => oneLine(`${m[0].startsWith('to') ? rest.slice(0, m.index) : 'paid'} ${rest.slice(m.index + m[0].length)}`);
+      /* "Paid Omar March 300" is Omar, and "March" stays in the words (RM5). */
+      const { name, dropped } = undated(parts.join(' '));
+      const cutTo = (m: RegExpExecArray): string => oneLine(`${m[0].startsWith('to') ? rest.slice(0, m.index) : 'paid'} ${dropped.join(' ')} ${rest.slice(m.index + m[0].length)}`);
       /* ONLY SOMEBODY IS A PAYEE (RL7): one already in People, or a name that reads as a person, never a place, a
          company, a provider, a bill or one of his accounts. "Paid Vodafone 450" keeps Vodafone as what it was for. */
-      if (to && name && (knownAs(name, opts.people ?? []) !== null || made.has(words(name)) || readsAsSomebody(name)) && !THING_PAID.test(name) && !ownAccount(name)) {
+      if (to && name && (knownAs(name, opts.people ?? []) !== null || made.has(words(name)) || somebody(name)) && !THING_PAID.test(name) && !ownAccount(name)) {
         payee = name;
         rest = cutTo(to);
         payeeRef = personOf(name);
