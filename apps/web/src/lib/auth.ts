@@ -15,7 +15,6 @@
 
 import { forgetSignedOut } from './record/signed-out.ts';
 import { forgetPicturesOf } from './page/drawn-pictures.ts';
-import { forgetAuthorKey } from './market/author-key-forget.ts';
 
 /** Who a live session belongs to. */
 export type Who = { person: string; email: string; record: string | null; provedAt: number };
@@ -485,12 +484,12 @@ async function whoNow(io: Io): Promise<string | null> {
 
 /**
  * WHAT ONLY AN EXPLICIT SIGN-OUT DROPS (his call of 23 Oct): the person's own drawn widget pictures (`drawn-pictures.ts`,
- * RE11) and their publisher key (`author-key-forget.ts`). A session that only lapsed keeps both, so the same person's
- * next sign-in draws at once and publishes with the key their add-ons are signed with. Exported for the account close.
+ * RE11). A session that only lapsed keeps them, so the same person's next sign-in draws at once. Exported for the
+ * account close. THE PUBLISHER KEY STAYS: it is kept per person, and the store takes an update only with the key that
+ * signed the add-on, so dropping it on sign-out would leave every add-on he published unable to take an update.
  */
 export async function forgetOwn(person: string | null): Promise<void> {
   forgetPicturesOf(person);
-  await forgetAuthorKey(person);
 }
 
 /**

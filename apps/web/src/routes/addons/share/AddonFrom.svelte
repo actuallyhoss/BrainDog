@@ -346,7 +346,6 @@
           {publishing ? words.publishing : forId !== null ? words.sendUpdate : words.publish}
         </Button>
       </div>
-      <p class="quiet">{words.keyAfterSignOut}</p>
     </form>
 
     <Tile class="section" data-surface="tile" title={stateWords.heading} count={(subs === null ? mine.length : subs.length) || undefined}>

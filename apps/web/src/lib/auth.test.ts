@@ -283,7 +283,7 @@ test('signing out, listing and removing passkeys', async () => {
   assert.deepEqual(await signOut(io), { ok: true, value: null });
   assert.deepEqual(await passkeys(io), { ok: true, value: [{ id: 'a', label: 'Laptop', backedUp: false, createdAt: 1, lastUsed: 2 }] });
   assert.deepEqual(await removePasskey('a', io), { ok: true, value: null });
-  /* Who is leaving is asked first, while the cookie can say, so their own pictures and publisher key go with them. */
+  /* Who is leaving is asked first, while the cookie can say, so their own pictures go with them. */
   assert.deepEqual(seen.map((r) => `${r.method} ${r.url}`), ['GET /auth/session', 'POST /auth/logout', 'GET /auth/passkeys', 'POST /auth/passkey/remove']);
   assert.deepEqual(seen[3]?.body, { id: 'a' });
 });
