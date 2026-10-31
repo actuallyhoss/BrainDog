@@ -34,6 +34,8 @@
   import { live } from '$lib/data/live.svelte.ts';
   import { latesOf } from './card-late.ts';
   import { readLastRuns, readMoved, type LastRun } from './card-life.ts';
+  import { flip } from 'svelte/animate';
+  import { arrive, depart, settleOn, springy } from '$lib/motion/index.ts';
 
   let {
     cards,
@@ -162,7 +164,7 @@
     </header>
     <ul class="cards">
       {#each inLane as c (c.key)}
-        <li {@attach ownMenu((p) => ((menuCard = c), (point = p)))}>
+        <li {@attach ownMenu((p) => ((menuCard = c), (point = p)))} {@attach settleOn(c.draft)} in:arrive out:depart animate:flip={springy()}>
           {#if c.draft}
             <div class="draft" style={slotStyle(c.hue)}>
               <a class="d-open" href={at(c.href)}>
