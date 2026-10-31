@@ -2631,19 +2631,33 @@ export function forgetWalks(but: string | null = null): void {
   for (const slug of [...WALKS.keys()]) if (slug !== but) WALKS.delete(slug);
 }
 
+/** How long the page asked before the app arrived stands: the app's own code on a cold phone, and no longer. */
+export const EARLY_PAGE_MS = 15_000;
+
+/** Lets go of the page asked before the app arrived, unread, so no later read is handed it (`earlyPage`). */
+export const dropEarlyPage = (): void => {
+  (globalThis as { __bdPage?: unknown }).__bdPage = undefined;
+};
+
 /**
  * THE PAGE THE PAGE ASKED FOR BEFORE THE APP ARRIVED (`app.html`, an address `/p/<slug>` with nothing after it), as a
  * fetch that answers that one ask with it and sends every other, taken once and only for the address the reader would
  * ask at, or `null`. A page's first read waited for its whole code before it went out, two seconds and more on a cold
  * phone (speed-d SD2); a guess that turns out wrong is left unread, and the reader asks as it always did.
+ *
+ * ONE CHANCE, AND A SHORT ONE (RF6): the first page read of the tab takes it or lets it go, whatever it asks, and one
+ * asked more than `EARLY_PAGE_MS` ago is let go. It was kept until a plain read of the same address came, so a first
+ * screen that read another way (a walk, a filter, a reader of its own) left it standing, and the next plain read of
+ * that page, minutes and writes later, was handed the answer from when the tab opened.
  */
-function earlyPage(base: string, slug: string): Fetch | null {
+export function earlyPage(base: string, slug: string, now: number = Date.now()): Fetch | null {
   const url = new URL(`${base}/api/page`);
   url.searchParams.set('slug', slug);
   url.searchParams.set('shape', '1');
-  const held = (globalThis as { __bdPage?: { url?: unknown; at?: unknown } }).__bdPage;
+  const held = (globalThis as { __bdPage?: { url?: unknown; at?: unknown; t?: unknown } }).__bdPage;
+  dropEarlyPage();
   if (!held || held.url !== url.toString() || !(held.at instanceof Promise)) return null;
-  (globalThis as { __bdPage?: unknown }).__bdPage = undefined;
+  if (typeof held.t !== 'number' || !(now - held.t >= 0 && now - held.t <= EARLY_PAGE_MS)) return null;
   let early: Promise<Response> | null = held.at as Promise<Response>;
   return ((input: string | URL | Request, init?: RequestInit) => {
     const at = early;
@@ -2709,7 +2723,9 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
          is answered as it was. */
       const walk = opts.walk ?? WALKS.get(slug);
       /* THE FIRST READ OF A PAGE OPENED BY ITS ADDRESS MAY HAVE GONE OUT WITH THE PAGE ITSELF (`earlyPage`). */
-      const early = walk === undefined && io === undefined && !(filter && Object.keys(filter).length) ? earlyPage(base, slug) : null;
+      const plain = walk === undefined && io === undefined && !(filter && Object.keys(filter).length);
+      const early = plain ? earlyPage(base, slug) : null;
+      if (!plain) dropEarlyPage();
       const out =
         walk === undefined
           ? await (early ? createClient({ base, fetch: early }) : client).page(slug, filter, { shape: true })

@@ -6496,12 +6496,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        own id and no member row has it, so a person's agent drew every line as unread however far the person had
        read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
     if (!beyond && b.source === 'activity') {
-      const heard = unmuted(ctx, b);
+      const heard = figuresSeen(ctx, unmuted(ctx, b));
       return 'seen' in heard ? { ...heard, seen: markOf(readerOf(ctx)) } : heard;
     }
     if (!beyond) {
       const part = narrowedSource(ctx, b);
-      return part === null ? b : ownRows(ctx, b, part);
+      return figuresSeen(ctx, part === null ? b : ownRows(ctx, b, part));
     }
     /* A BLOCK HELD FOR ANOTHER KIND OF READER (`when: { reader: owner }`) THAT ANSWERED NO WAS NEVER READ (`drawn: false, why: 'when'`),
        so there is nothing to refuse her: it stays undrawn, blanked as any held block is, and is not drawn as a sentence about
@@ -6509,6 +6509,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const shell = shellOf(b, beyond, log !== null);
     const forReader = b.drawn === false && b.why === 'when' && JSON.stringify((b as { when?: unknown }).when ?? null).includes('"reader"');
     return forReader ? { ...shell, refusals: [], drawn: false, why: 'when' as const } : shell;
+  };
+
+  /**
+   * WHAT EACH FIGURE A DRAWN BLOCK NAMES IS (`figures`, `pages.ts` `figuresOf`), kept for a figure `metric` answers her
+   * and no other: every list it reads is one she reads whole (`readable`, `sight.whole`), as `metric` asks. The kernel
+   * names a figure by every word of a `{{path}}`, so `{{notes.overdue}}` on a block over Notes, drawn to a member invited
+   * to Notes alone, carried the declaration of a figure called overdue over Bills: its name, the list it reads, its
+   * `where` and its target. A figure left out here is one the host does not know, as for a record that never declared it.
+   */
+  const figuresSeen = <B,>(ctx: CallContext, b: B): B => {
+    const figures = (b as { figures?: unknown }).figures;
+    if (figures === null || typeof figures !== 'object' || ctx.principal.kind === 'system' || holdsRowids(ctx)) return b;
+    const all = Object.entries(figures as Record<string, unknown>);
+    const kept = all.filter(([id]) => {
+      const decl = kernel.metricDecl(id);
+      return decl !== null && kernel.figureLists(decl).every((list) => readable(ctx, list) === null && sight.whole(ctx, list));
+    });
+    return kept.length === all.length ? b : { ...b, figures: Object.fromEntries(kept) };
   };
 
   /** What a block worked out from a whole list says to a reader whose grant shows them part of that list. */
@@ -10804,13 +10822,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * a person or key at a level that reads, held to no list and no part of one (`methods/signs.ts`, and `readsEveryList`
    * for a grant narrowed to some rows). A record that cannot read its signs briefs none rather than refusing the
    * briefing. AND THE INBOX'S WORDS ONLY TO WHO MAY READ THE INBOX (`quietSign`): a read token for the lists is told a
-   * red sign in that file's words, never a message or a question quoted from the inbox.
+   * red sign in that file's words, never a message or a question quoted from the inbox, in its name as in its sentence:
+   * a failure is titled by its question (AG7), and the name went to her whole (RF2).
    */
   const redSigns = (ctx: CallContext): Context['signs'] => {
     if (!readsWhole(ctx)) return [];
     const red = signsKept();
     const inbox = allows(ctx, 'owner') === null || inboxReached(ctx);
-    return red.map((s) => ({ name: s.name, said: inbox ? s.said : s.quiet }));
+    return red.map((s) => (inbox ? { name: s.name, said: s.said } : { name: s.quietName, said: s.quiet }));
   };
 
   /**

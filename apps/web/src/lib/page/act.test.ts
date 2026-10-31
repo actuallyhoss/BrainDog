@@ -26,6 +26,7 @@ const ORDERS = {
   fields: [
     { id: 'what', type: 'text' },
     { id: 'state', type: 'enum', values: ['new', 'packed', 'shipped'], default: 'new' },
+    { id: 'gift', type: 'bool' },
   ],
 };
 
@@ -52,7 +53,7 @@ function page(reply?: (path: string, body: Record<string, unknown>) => Response)
     rows,
     columns: [],
     entries: [
-      { seq: 1, version: 3, fields: { what: 'Blue jug', state: 'new' }, created: '', by: '' },
+      { seq: 1, version: 3, fields: { what: 'Blue jug', state: 'new', gift: true }, created: '', by: '' },
       { seq: 2, version: 1, fields: { what: 'Ash bowl', state: 'packed' }, created: '', by: '' },
     ],
   } as unknown as LiveBlock & { rows: Row[] };
@@ -182,4 +183,17 @@ test('an add that sends nothing to add writes no blank one', async () => {
   await settle();
   assert.equal(p.sent.length, 0);
   assert.equal(p.toasts.at(-1)?.text, 'This does not say what to add, so nothing was added.');
+});
+
+test('RF7: "MARK AS" SETS A YES-OR-NO FIELD, NEVER FLIPS IT: pressed on a row already marked it stays marked, and only a press that says off clears', async () => {
+  const p = page();
+  const mark = { verb: 'row.update', label: 'Mark as a gift', args: { field: 'gift' } };
+  await p.writes.act(mark, p.rows[0], undefined, p.on);
+  await settle();
+  await p.writes.act(mark, p.rows[1], undefined, p.on);
+  await settle();
+  /* A SWITCH SAYS OFF, and only that clears it. */
+  await p.writes.act({ ...mark, label: 'A gift', as: 'switch' }, p.rows[0], 'off', p.on);
+  await settle();
+  assert.deepEqual(p.writesTo('/api/update').map((s) => s.body.patch), [{ gift: true }, { gift: true }, { gift: false }]);
 });

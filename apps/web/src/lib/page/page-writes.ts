@@ -875,17 +875,21 @@ export function pageWrites(deps: WritesDeps) {
       const to = a.verb === 'row.move' ? args.to : args.value;
       /* A YES-OR-NO FIELD NEEDS NO VALUE FROM THE PRESS (polish-i, PI4): a button "Mark as a subscription" bound to
          `subscription` turns it on, as a switch's "true" does, and the field's own type says it is one. Worked out
-         where the list's declaration is read (`flagged`), so a list a pack extended is read as the record declares it. */
-      const flag = a.verb === 'row.update' && field !== '' && (REGISTERS[at.ref.register]?.fields.find((f) => f.id === field)?.type === 'bool' || to === undefined);
+         where the list's declaration is read (`flagged`), so a list a pack extended is read as the record declares it.
+         AND IT SETS, NEVER FLIPS (RF7): "Mark as" pressed on a row already marked, or on a page that still shows it
+         unmarked after another tab marked it, unmarked it, because the press wrote the opposite of the page's copy. A
+         press clears the field only when it says off, as a switch does. */
+      /* AND A SWITCH'S ON OR OFF, so a list a pack declares is written true or false by its own type, never the word. */
+      const flag =
+        a.verb === 'row.update' && field !== '' && (REGISTERS[at.ref.register]?.fields.find((f) => f.id === field)?.type === 'bool' || to === undefined || sheetMod!.doneOf(to) !== null);
       if (field === '' || (to === undefined && !flag)) return (toasts.push(w.noChange, { intent: 'warn' }), { ok: false });
       if (flag) {
         /* AN UNSET FLAG GOES BACK TO UNSET, so its Undo is never "nothing to put back". */
         const undo = { [field]: at.fields[field] ?? null };
-        const was = at.fields[field];
         const flagged = (decl: Declared | null): Record<string, unknown> | null => {
           const typed = decl?.fields.find((f) => f.id === field)?.type ?? REGISTERS[at.ref!.register]?.fields.find((f) => f.id === field)?.type;
           if (typed !== 'bool') return to === undefined ? null : { [field]: to };
-          return { [field]: to === undefined ? was !== true : (sheetMod!.doneOf(to) ?? to) };
+          return { [field]: to === undefined ? true : (sheetMod!.doneOf(to) ?? to) };
         };
         const landed = await writeRow(at.ref, (_m, _ref, decl) => flagged(decl), at.title ?? label, {
           at: place,

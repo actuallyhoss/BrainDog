@@ -598,6 +598,10 @@
    *
    * THE RECORD'S OWN SENTENCE IS SHOWN IN THE SHEET rather than as a toast, because what it is about is a field
    * that is still on the screen, and a sheet that closes on a refusal is a sheet that throws away the typing.
+   *
+   * THE KEY ITSELF IS EMPTIED AS IT IS SENT, WHATEVER COMES BACK (RF4), as the passphrase is and as the install sheet's
+   * key is: a refusal keeps the sheet and every other field open, and the secret is pasted again rather than held on
+   * the screen while the sentence is read.
    */
   async function saveKey(e?: SubmitEvent) {
     e?.preventDefault();
@@ -619,6 +623,7 @@
       sheet.mode === 'add'
         ? { label: form.label, opens: form.opens, kind: form.kind, value: form.value, ...(form.project === '' ? {} : { project: form.project }), ...under, ...unlock }
         : { label: sheet.row.label, opens: sheet.row.opens, credential: sheet.row.id, value: form.value, ...under, ...unlock };
+    form.value = '';
     const out = await client.putKey(args);
     closed(true, at);
     saving = false;
