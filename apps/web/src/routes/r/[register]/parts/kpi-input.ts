@@ -40,7 +40,7 @@ export function kpiInputOf(
     ...(typeof f.target === 'number' || typeof f.target === 'string' ? { target: f.target } : isMoney(f.target_amount) ? { target: storedOf(f.target_amount) } : {}),
     ...(text(f.target_by) ? { target_by: text(f.target_by)! } : {}),
     ...(f.every === '1h' || f.every === '1d' || f.every === '1w' || f.every === '1m' ? { every: f.every } : {}),
-    ...(typeof f.kind === 'string' && KINDS.includes(f.kind) ? { kind: f.kind as KpiInput['kind'] } : {}),
+    ...(typeof f.kind === 'string' && KINDS.includes(f.kind) ? { kind: f.kind as NonNullable<KpiInput['kind']> } : {}),
     points,
   };
 }
