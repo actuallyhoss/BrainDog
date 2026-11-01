@@ -88,7 +88,14 @@
   const drafts = $derived.by(() => {
     if (kept === null) return [];
     const all = merge === null ? [...kept.drafts, ...rules] : merge(kept.drafts, rules);
-    return all.filter((d) => !kept.gone.includes(d.key)).map((d) => edits[d.key] ?? d);
+    /* NOR ANYTHING THIS BRAINDOG ALREADY HOLDS BY THAT NAME: somebody added since, or kept from Tell a moment ago. */
+    const held = (d: FirstDraft): boolean => {
+      const register = d.rows[d.main]?.register ?? '';
+      const t = d.title.trim().toLowerCase();
+      const known = [...(options.titled?.[register] ?? []), ...(register === 'people' ? (options.people ?? []) : [])];
+      return known.some((k) => k.name.trim().toLowerCase() === t);
+    };
+    return all.filter((d) => !kept.gone.includes(d.key) && !held(d)).map((d) => edits[d.key] ?? d);
   });
 
   /* NOTHING LEFT, NOTHING READING: the card says it is done, so Today stops loading it. Only once Tell's reading is in. */
