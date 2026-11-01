@@ -751,6 +751,9 @@ export const caseWords = (u: UseCase, names?: Readonly<Record<string, string>>):
    "bills", "budget" and "marathon" were all "Savings goals, Goals, Log, Put by and Project steps"). */
 const MONEY_SAID = /^(?:my money|money|personal finance|finances|budgets?|budgeting|spending|bills?|rent|pay ?day|debts?|groceries|household)$/iu;
 const GOAL_SAID = /^(?:habits?|goals?|my goals|running|gym|fitness|marathon|training for|diet|reading more)$/iu;
+/* A WISH, NOT A THING KEPT (audit AP18): "I want my bills, budget and rent under control" read "under control → Goals",
+   and nobody had said a goal. It still points at the use case; it is no line of its own in What I heard. */
+const WISH_SAID = /^(?:under control|on top of (?:it|things|everything)|sorted|organi[sz]ed)$/iu;
 
 /** A list's id and what it points at, read off the use case's own declaration. */
 const pointsAt = (u: UseCase, id: string): string[] => {
@@ -760,7 +763,8 @@ const pointsAt = (u: UseCase, id: string): string[] => {
 
 /**
  * WHAT A PHRASE A USE CASE HEARD READS AS: the one of its lists the phrase names ("orders" is Orders), or the list it
- * renamed ("tickets" is Team's Tickets); a word for money is Money, a word for a goal its Goals; else the lists it brings
+ * renamed ("tickets" is Team's Tickets); a word for money is Money, a word for a goal its Goals; a wish ("under control")
+ * nothing, so it is no line; else the lists it brings
  * that stand on their own ("a small candle shop" is Orders and Products), never one kept inside another (a goal's Log,
  * a saving's Put by, a cycle's days), and the use case's own title only where it brings none.
  */
@@ -769,6 +773,7 @@ export function caseBecame(u: UseCase, phrase: string): string {
   const lists = caseWords(u).slice(1);
   if (lists.length === 0) return u.title;
   const word = phrase.trim().toLocaleLowerCase();
+  if (WISH_SAID.test(word)) return '';
   const named = lists.find((n) => [word, plural(word)].includes(n.toLocaleLowerCase()));
   if (named) return named;
   /* A WORD FOR MONEY IS MONEY BEFORE IT IS A LIST MONEY KEEPS (audit 31 Oct m, AM10): Personal calls Money's bills
