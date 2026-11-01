@@ -921,6 +921,9 @@
         <div class="section-body">
           <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
           <ul class="ledger">
+            <!-- TWO PARTS, EACH NAMED (1 Nov): Money's Filing rules, Accounts and Ledger stood twice in one run, as a list
+                 and as a page, and read as the same thing said twice. -->
+            {#if addedLists.length > 0 && addedPages.length > 0}<li class="adds-part">{words.addsLists}</li>{/if}
             {#each addedLists as r (r)}
               <li>
                 <a class="line added" href={at(`/r/${r}`)}>
@@ -931,6 +934,7 @@
                 </a>
               </li>
             {/each}
+            {#if addedLists.length > 0 && addedPages.length > 0}<li class="adds-part">{words.addsPages}</li>{/if}
             {#each addedPages as p (p)}
               <li>
                 <a class="line added" href={at(`/p/${p}`)}>
@@ -953,6 +957,17 @@
 {/if}
 
 <style>
+  .adds-part {
+    padding: var(--sp-3) var(--sp-3) var(--sp-1);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+  }
+
+  .adds-part:first-child {
+    padding-block-start: 0;
+  }
+
   .page {
     display: flex;
     flex-direction: column;

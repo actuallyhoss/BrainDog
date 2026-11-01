@@ -273,6 +273,9 @@ export async function openSettings(client: Caller, id: string): Promise<{ source
 
 export const words = {
   settings: 'Settings',
+  /** The two parts of an add-on's What this adds, named so a list and the page of the same name read as two things. */
+  addsLists: 'Lists',
+  addsPages: 'Pages',
   /* THE ONE SENTENCE. The record fills `{{config:}}` when a pack is installed, so a saved value waits for that. */
   when: 'A change takes effect the next time this add-on is installed or updated, unless the setting says it is held at once.',
   save: 'Save',
