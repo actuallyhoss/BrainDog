@@ -317,8 +317,14 @@ export const shell = {
    * had been asked for. The heading says what was typed, and the links under it are the likeliest of what is here.
    */
   noPageCalled: (name: string) => `No page called ${name}`,
-  /** A place with nothing in it yet, by its own first step where it has one: "Nothing here yet. Add an account to start." */
-  emptyPlace: (step: string | null) => (step === null ? 'Nothing here yet.' : `Nothing here yet. ${step} to start.`),
+  /**
+   * A place with nothing in it yet, by its name and its own first step where it has one: "Nothing in Money yet. Add an
+   * account to start." Never "Nothing here yet" alone (Look B, audit 11-01 AP8): with no step it says how the place fills.
+   */
+  emptyPlace: (step: string | null, name: string | null = null) => {
+    const none = name === null || name.trim() === '' ? 'Nothing here yet.' : `Nothing in ${name.trim()} yet.`;
+    return step === null ? `${none} What you add or mention lands here.` : `${none} ${step} to start.`;
+  },
   nearPages: 'The closest pages here:',
   /**
    * THE HALF OF THE REFUSAL A PERSON CAN ACT ON, AND IT WAS A BARE FULL STOP.

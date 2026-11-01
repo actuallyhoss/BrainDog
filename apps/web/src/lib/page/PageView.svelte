@@ -528,7 +528,7 @@
     const judged = judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs));
     if (judged.length === 0 || judged.some((b) => b.drawn && b.kind !== 'capture')) return null;
     const step = judged.find((b) => b.drawn && b.kind === 'capture' && typeof b.heading === 'string')?.heading;
-    return copy.emptyPlace(typeof step === 'string' && step.trim() !== '' ? step.trim() : null);
+    return copy.emptyPlace(typeof step === 'string' && step.trim() !== '' ? step.trim() : null, live.page.page.title ?? null);
   });
 
   /* ── arranging a home ──────────────────────────────────────────────────────

@@ -1226,7 +1226,12 @@
       if (!engineGone) engine = { health, month: month?.ok ? month.value : null };
     });
   });
-  const quiet = $derived(quietLine(engine?.health ?? null, engine?.month ?? null, null));
+  /* NEVER TO A STRANGER (audit 11-01, AP10): a first Today said "the writing model is not answering" to somebody who had
+     just signed up, which is ours to mend and nothing they can act on. On a first Today only his own closed key is said,
+     since that one is his. */
+  const quiet = $derived(
+    first && added <= FIRST_TODAY_MOST && engine?.health?.health.state !== 'key_closed' ? null : quietLine(engine?.health ?? null, engine?.month ?? null, null),
+  );
 
   /**
    * WHAT BRAINDOG DID BY ITSELF TODAY, read beside the page and not after it, since its line is part of the first tile:
