@@ -586,7 +586,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         kind: 'note',
         key: 'brain-link',
         span: 12,
-        body: '[How the brain changed](/p/brain) · [Learnings](/r/learnings) · [Skills](/r/skills) · [Tools](/r/tools) · [Keys](/keychain)',
+        body: '[What changed](/p/brain) · [Learnings](/r/learnings) · [Skills](/r/skills) · [Tools](/r/tools) · [Keys](/keychain)',
       },
       /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, each line drawn only while its figure is above nought, so
          a record with nothing wrong draws none. Loose at the foot since 1.17.0 and no longer a tile headed Needs a look,
@@ -685,7 +685,8 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
      August, and read as a count of the list. The line says the whole too, so the two never read as one number. */
   brain: {
     page: 'brain',
-    title: 'How the brain changed',
+    /* WHAT CHANGED, SINCE 1.30.0 (audit 1 Nov, AP32): "How the brain changed" was the record's way of speaking. */
+    title: 'What changed',
     icon: 'learning',
     requires: ['register.learnings'],
     blocks: [
@@ -879,8 +880,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      over the web", where it said Transport: Stdio or Http, and its kind as MCP server or Command line; a key says its
      kind as the Keychain does, API token or SSH key. Only labels change: no value, list, field or figure goes.
      1.29.0 IS A DOOR, SO IT IS MINOR (AG16, 1 Nov): the foot's Keys opens the Keychain, the one Keys place, where it
-     opened the list of keys, which is the Keychain's List view. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.29.0', requires: ['register.things'] },
+     opened the list of keys, which is the Keychain's List view. No list, field or figure goes.
+     1.30.0 IS WORDS, SO IT IS MINOR (AP32, 1 Nov): How the brain changed is called What changed, as a page and as the
+     foot's first door. Its address stays /p/brain. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.30.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
