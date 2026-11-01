@@ -507,7 +507,7 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
      bridge has been off Money since. */
   assert.deepEqual(
     cells.filter((c) => c.where === 'money-core /money').map((c) => [c.metric, c.label]),
-    [['arriving-30d', 'To come in, next 30 days'], ['leaving-30d', 'Bills and usual spending, next 30 days']],
+    [['arriving-30d', 'In, next 30 days'], ['leaving-30d', 'Out, next 30 days']],
     'the Money page says the thirty days twice again',
   );
   /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0, which drew the walk's two under the cash

@@ -28,6 +28,15 @@ const MOVES_APART = 'Moves between your own accounts are left out.';
 /** The most a block over the Ledger reads, with no month picked: the thirteen the chart of months reads. */
 const BACK = 'on after -13m, on before +1d';
 
+/** Reports' Health tile, drawn with its "In other currencies" cell only while some cash is in another currency. */
+const HEALTH = { kind: 'stat', heading: 'Health', icon: 'heart-pulse', span: 12 };
+const HEALTH_CELLS = [
+  { metric: 'kept-share-90d', label: 'Kept, 90 days' },
+  { metric: 'spent-30d', label: 'Spent, last 30 days' },
+  { metric: 'received-30d', label: 'Received, last 30 days' },
+  { metric: 'lasts-no-income', label: 'Lasts with no income' },
+];
+
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: where the money came from and where it went.
  *
@@ -98,18 +107,16 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       /* HOW THE QUARTER WENT: what was kept of what came in, and the last thirty days in and out; how long the cash lasts
          with nothing coming in, and how much of it is in other currencies. No note says "against the 30 days before": a
          tile draws no change, so it named a comparison the tile never showed. */
-      kind: 'stat',
-      heading: 'Health',
-      icon: 'heart-pulse',
-      span: 12,
-      cells: [
-        { metric: 'kept-share-90d', label: 'Kept, 90 days' },
-        { metric: 'spent-30d', label: 'Spent, last 30 days' },
-        { metric: 'received-30d', label: 'Received, last 30 days' },
-        { metric: 'lasts-no-income', label: 'Lasts with no income' },
-        { metric: 'cash-foreign-share', label: 'In other currencies' },
-      ],
-      when: { metric: 'out-by-month', gt: 0 },
+      ...HEALTH,
+      cells: [...HEALTH_CELLS, { metric: 'cash-foreign-share', label: 'In other currencies' }],
+      when: { all: [{ metric: 'out-by-month', gt: 0 }, { metric: 'cash-foreign-share', gt: 0 }] },
+    },
+    {
+      /* AND WITH NOTHING IN ANOTHER CURRENCY, NO "In other currencies 0%", BEFORE money-core 3.33.0 SHIPPED (design pass
+         of 1 November, M24): a share of nothing is no figure. The same tile, its last cell left off. */
+      ...HEALTH,
+      cells: HEALTH_CELLS,
+      when: { all: [{ metric: 'out-by-month', gt: 0 }, { any: [{ metric: 'cash-foreign-share', lte: 0 }, { metric: 'cash-foreign-share', empty: true }] }] },
     },
     {
       /* WHAT IS ALREADY PROMISED, IN ONE PLAIN LINE UNDER HEALTH (round 1030): repeating bills and instalments as a share

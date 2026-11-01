@@ -917,6 +917,10 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   days, for Today's no-account tile.
  * - money-core 3.33.0, before it shipped (polish, 1 Nov): the Ledger tile says "36 came in today.", without "each
  *   under the day it happened" (`page.money`).
+ * - money-core 3.33.0, before it shipped (design pass of 1 Nov, M23 to M26): Money's hero says how long the money lasts
+ *   as one line under Cash now, "Lasts until 30 Oct (57 days)", with In and Out for 30 days beside it (`page.money`);
+ *   Coming up lists what is late once, first (`page.money-coming`); Reports' Health leaves out "In other currencies"
+ *   while nothing is (`page.money-reports`); Accounts draws one tile of balances (`page.money-accounts`).
  * - portfolio 1.30.2 (audit 31 Oct g, AG22): a card's key number field reads "Shown first", where it read "Leads the
  *   card". Words only, so a patch step.
  * - work 1.20.1, before it shipped (audit 31 Oct f, AF20): Work's folded groups say how many they hold (`page.work`).

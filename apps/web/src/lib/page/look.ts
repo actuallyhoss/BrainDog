@@ -185,7 +185,7 @@ export function nextOf(look: LiveLook | null, questions: ReadonlySet<string> = n
 export type FirstTile = {
   readonly queue?: readonly { readonly id: string }[] | undefined;
   readonly register?: string | undefined;
-  readonly entries?: readonly { readonly seq: number }[] | undefined;
+  readonly entries?: readonly { readonly seq: number; readonly fields?: Readonly<Record<string, unknown>> }[] | undefined;
 };
 
 /**
@@ -199,6 +199,9 @@ export function repeatsFirst(look: LiveLook | null, first: FirstTile | null | un
   if (first.queue?.[0]?.id === next) return true;
   const row = rowOfKey(next);
   const lead = first.entries?.[0];
+  /* OR A LIST OF WHAT FALLS DUE, whose first line names the row it is from (`fields.row`): Coming up opens on Late, and
+     "Legal review, June is 64 days late" stood over the same bill as Late's first line (design pass 1 Nov, M25). */
+  if (lead?.fields?.row === next) return true;
   return row !== null && lead !== undefined && first.register === row.register && lead.seq === row.seq;
 }
 
