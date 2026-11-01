@@ -706,7 +706,7 @@
     /* THE CHANGES THE QUERY NAMES, in the same modes, and none with nothing typed: an empty palette is as it was. */
     customise:
       parsed.prefix === null || parsed.prefix === '>'
-        ? customise(parsed.text, { look, places, hidden: navPrefs.hidden, home: navPrefs.home, pageMenu: pageHere, kept: lookKept })
+        ? customise(parsed.text, { look, places, hidden: navPrefs.hidden, home: navPrefs.home, pageMenu: pageHere, kept: lookKept, here: places.find((p) => p.list !== undefined && page.url.pathname.endsWith(p.href)) })
         : [],
     /* THE PAGE THE QUERY WOULD MAKE, in the same modes: found by its words with no name yet, a sentence once it has one. */
     page: parsed.prefix === null || parsed.prefix === '>' ? paging(parsed.text, pageWho) : null,

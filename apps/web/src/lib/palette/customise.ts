@@ -62,6 +62,8 @@ export type Here = {
   pageMenu: boolean;
   /** Where a look change is kept now, as `pref.whereKept` answers; absent is this device, the claim that is never wrong. */
   kept?: 'record' | 'pending' | 'device';
+  /** The list whose page is behind the palette, which "rename this list to Clients" names. */
+  here?: Place | undefined;
 };
 
 export type LookKey = 'scheme' | 'text' | 'density';
@@ -213,6 +215,14 @@ export const QUIET_HREF = '/settings/notifications';
  * so Enter on it is a step toward the sentence and never a guess at a name.
  */
 function renames(typed: string, here: Here): Offer[] {
+  /* "RENAME THIS LIST TO CLIENTS" ON A LIST'S PAGE is that list, by the record's call. */
+  const self = /^(?:this list|this|it)(?:\s+to(?:\s+(.*))?)?$/iu.exec(typed.trim());
+  if (self && here.here?.list !== undefined) {
+    const p = here.here;
+    const to = (self[1] ?? '').trim().slice(0, LABEL_MOST);
+    if (to === '') return [asking(p)];
+    return to === p.name ? [] : [{ id: `cz-rename-${p.href}`, title: w.rename(p.name, to), detail: w.renameListDetail, icon: 'edit', change: { kind: 'renameList', list: p.list!, from: p.name, to } }];
+  }
   const renamable = here.places.filter((p) => p.rename || p.list !== undefined);
   /* A PAGE WHOSE OWN NAME HOLDS " to " ("Back to work"), typed whole, is that page, and not "Back" renamed to "work". */
   const whole = terms(typed)?.join(' ') ?? '';
