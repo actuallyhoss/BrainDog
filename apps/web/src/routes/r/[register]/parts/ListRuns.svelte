@@ -51,13 +51,13 @@
 
   const iso = (v: unknown): string | null => (typeof v === 'string' && v !== '' && Number.isFinite(Date.parse(v)) ? v : null);
   const nowIso = $derived(new Date(now).toISOString());
-  const presence = (e: Entry) => presenceOf({ state: e.state ?? null, fields: e.fields as never }, now);
+  const presence = (e: Entry) => presenceOf({ fields: e.fields as never }, now);
   const liveOf = (e: Entry): RunLive => {
     const p = presence(e);
     return p === 'working' ? 'working' : p === 'quiet' ? 'quiet' : 'stopped';
   };
   const RANK: Record<RunLive, number> = { working: 0, quiet: 1, stopped: 2 };
-  const heard = (e: Entry): string => iso(e.fields.last_seen) ?? e.updated ?? e.created;
+  const heard = (e: Entry): string => iso(e.fields.last_seen) ?? e.created;
   const runs = $derived(
     [...entries].sort((a, b) => RANK[liveOf(a)] - RANK[liveOf(b)] || (heard(a) < heard(b) ? 1 : heard(a) > heard(b) ? -1 : 0)),
   );

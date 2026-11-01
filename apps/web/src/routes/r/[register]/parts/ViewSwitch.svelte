@@ -21,7 +21,7 @@
     view,
     board,
     groups = null,
-    groupsWord = 'Groups',
+    groupsWord: groupsWordAsked,
     onview,
   }: {
     view: View;
@@ -29,9 +29,11 @@
     /** A list of people by organisation, which opens grouped and offers it first: the list's own glyph, or null. */
     groups?: IconName | null;
     /** What the grouped view is called: "Groups" for people, "List" for the runs' ledger. */
-    groupsWord?: string;
+    groupsWord?: string | undefined;
     onview: (view: View) => void;
   } = $props();
+
+  const groupsWord = $derived(groupsWordAsked ?? 'Groups');
 
   /* This part's own words. */
   const words = { group: 'Show the list as', groups: 'Groups', table: 'Table', board: 'Board', cards: 'Cards' } as const;

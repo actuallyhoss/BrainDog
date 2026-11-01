@@ -65,6 +65,8 @@ export type RecordRow = {
   id: string;
   seq: number | null;
   fields: Record<string, unknown>;
+  /** The row's state, which the record answers beside its fields as well as in them. */
+  state?: string | null;
   version: number;
   created_at: string;
   /** A page's answer cut a long text in it short (the kernel's `leanRows`); `get` answers the same row whole. */
@@ -547,6 +549,11 @@ export function entryOf(register: string, row: RecordRow, refs: Refs): Entry {
     if (map && Array.isArray(value)) fields[key] = value.map((v) => (typeof v === 'string' ? (map.seqOf.get(v) ?? v) : v)) as Fields[string];
     else fields[key] = ((map && typeof value === 'string' ? map.seqOf.get(value) : undefined) ?? value) as Fields[string];
   }
+  /* THE ROW'S STATE, WHERE ITS FIELDS LEFT IT OUT: the record answers it beside the fields too (`state`), and a read
+     that asked for some fields only, or a copy kept from one, had no state to count, so the list said "16 open" over
+     sixteen live rows (1 Nov). */
+  const state = decl?.state;
+  if (state && !(state in fields) && typeof row.state === 'string' && row.state !== '') fields[state] = row.state;
   const id = typeof row.id === 'string' && row.id !== '' ? { id: row.id } : {};
   return { ...id, seq: row.seq ?? 0, fields, version: row.version, created: row.created_at, by: '', ...(row.clipped === true ? { clipped: true as const } : {}), ...(row.private === true ? { private: true as const } : {}), ...(row.mine === true ? { mine: true as const } : {}) };
 }

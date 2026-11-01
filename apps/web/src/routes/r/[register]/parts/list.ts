@@ -607,14 +607,17 @@ function runsSaid(entries: readonly Entry[], open: number, now: number): string 
   const working = atWorkIn(entries, now);
   const quiet = Math.max(0, open - working);
   const done = entries.length - open;
-  return [words.atWork(working), quiet > 0 ? words.quietRuns(quiet) : '', done > 0 ? words.finished(done) : ''].filter(Boolean).join(', ');
+  /* "0 AT WORK, 2 OPEN" STOOD OVER TWO ROWS MARKED ACTIVE (live check, 1 Nov): nothing at work is not said, and a run
+     that is active but not working is said as the row says it, active, and that it has gone quiet. */
+  const said = [working > 0 ? words.atWork(working) : '', quiet > 0 ? words.quietRuns(quiet) : '', done > 0 ? words.finished(done) : ''].filter(Boolean).join(', ');
+  return said.charAt(0).toUpperCase() + said.slice(1);
 }
 
 /* This module's own words, the sentence and the tile's reading lines. */
 const words = {
   open: (n: number) => `${n} open`,
   atWork: (n: number) => `${n} at work`,
-  quietRuns: (n: number) => `${n} quiet`,
+  quietRuns: (n: number) => `${n} active but quiet`,
   finished: (n: number) => `${n} finished`,
   toSettle: (n: number) => `${n} to settle`,
   toShip: (n: number) => `${n} to ship`,
