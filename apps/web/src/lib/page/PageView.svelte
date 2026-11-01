@@ -655,6 +655,11 @@
       dismissed: navPrefs.isDismissed(SETUP_KEY),
     };
   });
+  /* THE SETUP'S CODE ASKED FOR AS SOON AS THE PAGE IS A LEDGER'S HOME, before the record says whether setup is due, so
+     "Set up Money" is drawn the moment it is (coordinator's live check, 1 Nov: it came a second or two late). */
+  $effect(() => {
+    if (setupFacts?.home && setupFacts.accounts === 0) void import('$lib/money/MoneySetup.svelte');
+  });
   /**
    * THE BODY A HOME IS BUILT FROM WHILE THE RECORD HOLDS NONE, as its first Done keeps it (`previewedBody`), for Change
    * this page to draft over: the record's week with it, as Edit layout reads it.
@@ -1174,7 +1179,7 @@
          blocks follow. THE SHAPE'S CODE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a
          project's shape, so its first load does not carry one. While it is on its way the project waits in its own shape
          (`waiting`), and the page's other blocks wait on the shape's reads (`shapeWaits`). -->
-    <!-- WHAT WAS TOLD BEFORE AN ACCOUNT STAYS ABOVE THE SETUP (audit 31 Oct m, AM3): bills and what repeats, kept and
+    <!-- WHAT WAS TOLD BEFORE AN ACCOUNT STAYS, UNDER THE SETUP SINCE 1 NOV (audit 31 Oct m, AM3): bills and what repeats, kept and
          drawn, never "Nothing here yet" over them. Only while there is no account, when the page draws nothing else. -->
     <SetupGate facts={setupFacts} keep={blank === null && setupFacts?.accounts === 0}>
     {#snippet setup(close)}

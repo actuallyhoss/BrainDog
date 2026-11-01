@@ -65,6 +65,7 @@
     largest: 'Largest',
     unset: 'Not set',
     money: 'Money',
+    holding: (n: number, of: number, what: string) => `${n} of ${of} have ${/^[aeiou]/u.test(what) ? 'an' : 'a'} ${what}.`,
     share: (n: number) => `${n}%`,
     late: (n: number, said: string | null) => (said ? `${n} late · ${said}` : `${n} late`),
     out: 'Out',
@@ -156,10 +157,13 @@
   });
 
   const states = $derived(byState ? byStateOf(decl, entries) : null);
+  /* HOW MANY HOLD THE NUMBER, WHERE NOT ALL DO (next-money, M40): Categories said "Money $835" over sixteen categories,
+     three of them with a budget, and nothing said the $835 was those three. "3 of 16 have a budget." */
+  const holding = $derived(fig !== null && fig.seen < entries.length ? words.holding(fig.seen, entries.length, labelOf(fig.field).toLowerCase()) : null);
   const reading = $derived(
     fig?.latest !== undefined
       ? words.newest(labelOf(fig.field), dayShort(fig.latest), decl.one ?? 'row')
-      : [states ? stateReading(decl, states, entries, now, stateLabel, headSaid) : null, split?.reading ?? null].filter(Boolean).join(' '),
+      : [holding, states ? stateReading(decl, states, entries, now, stateLabel, headSaid) : null, split?.reading ?? null].filter(Boolean).join(' '),
   );
   const one = $derived(sides.length === 1 && sides[0]!.label === null ? sides[0]! : null);
   const lead = $derived(fig !== null || reading !== '');
