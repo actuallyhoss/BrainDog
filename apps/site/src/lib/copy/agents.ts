@@ -9,7 +9,7 @@
  */
 import { PEOPLE, PROJECTS } from '../demo/maya.ts';
 import { APPS_AND } from '../agents.ts';
-import { DOCS, MCP } from '../links.ts';
+import { DOCS } from '../links.ts';
 
 const DANA = PEOPLE.dana.name.split(' ')[0] ?? PEOPLE.dana.name;
 const TIDEPOOL = PROJECTS.tidepool.name;
@@ -40,10 +40,6 @@ export const agents = {
     },
     dev: {
       title: 'For developers',
-      mcp: 'MCP address',
-      address: MCP,
-      copy: 'Copy',
-      copied: 'Copied',
       links: [
         { label: 'The command line', href: `${DOCS}/agents/cli` },
         { label: 'Scopes and tokens', href: `${DOCS}/agents/scopes` },

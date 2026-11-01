@@ -8,6 +8,10 @@
 
   THE NIGHT HEAD, THEN ONE SHEET (Look B): the text's name and its one line in `PageHead`, then the
   words on one flat paper tile at a 68ch reading measure, its sections headed in Lexend like every title on the site.
+
+  A CONTENTS LIST AT ITS TOP (plan F26): the Terms run to ten screens at 1512 and sixteen on a phone, so each section is
+  a link from the top, two columns on a desk, and a section's heading is a step smaller on a phone so it keeps to one or
+  two lines.
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
@@ -20,6 +24,21 @@
   const l = trust.legal;
   const text = $derived(l.texts[data.name]);
   const address = $derived(`https://brain.dog/legal/${data.name}`);
+
+  /** A section's anchor, from its heading: "Who can use BrainDog" is `who-can-use-braindog`, numbered where two match. */
+  const sections = $derived.by(() => {
+    const seen = new Map<string, number>();
+    const out: { at: number; id: string; text: string }[] = [];
+    (data.text ?? []).forEach((block, at) => {
+      if (block.kind !== 'h2') return;
+      const base = block.text.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'part';
+      const n = (seen.get(base) ?? 0) + 1;
+      seen.set(base, n);
+      out.push({ at, id: n === 1 ? base : `${base}-${n}`, text: block.text });
+    });
+    return out;
+  });
+  const idAt = (at: number): string | undefined => sections.find((s) => s.at === at)?.id;
 </script>
 
 <Seo title="{text.title} · BrainDog" description={text.description} path="/legal/{data.name}" noindex={data.text === null} />
@@ -30,9 +49,17 @@
     {#if data.text === null}
       <p class="doc-p">{l.pending}</p>
     {:else}
-      {#each data.text as block}
+      {#if sections.length > 2}
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 class="toc-title" id="toc-title">{l.contents}</h2>
+          <ol>
+            {#each sections as s (s.id)}<li><a href="#{s.id}">{s.text}</a></li>{/each}
+          </ol>
+        </nav>
+      {/if}
+      {#each data.text as block, at}
         {#if block.kind === 'h2'}
-          <h2 class="doc-h2">{block.text}</h2>
+          <h2 class="doc-h2" id={idAt(at)}>{block.text}</h2>
         {:else if block.kind === 'h3'}
           <h3 class="doc-h3">{block.text}</h3>
         {:else if block.kind === 'ul'}
@@ -83,6 +110,68 @@
     margin-block-start: 0;
   }
 
+  .doc-h2 {
+    scroll-margin-block-start: 24px;
+    text-wrap: balance;
+  }
+
+  /* THE CONTENTS: a quiet heading and the sections as plain links, two columns from 760, a hairline under them. */
+  .toc {
+    padding-block-end: 20px;
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .toc-title {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-family: var(--ui);
+    font-size: var(--t-site-15);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .toc ol {
+    margin: 0;
+    padding-inline-start: 24px;
+    columns: 2;
+    column-gap: 32px;
+    color: var(--muted);
+    font-size: var(--t-site-15);
+    line-height: 1.5;
+  }
+
+  .toc li {
+    break-inside: avoid;
+    padding-block: 3px;
+  }
+
+  .toc a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .toc a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (pointer: coarse) {
+    .toc li {
+      padding-block: 0;
+    }
+
+    .toc a {
+      display: inline-block;
+      padding-block: 11px;
+    }
+  }
+
+  @media (width < 760px) {
+    .toc ol {
+      columns: 1;
+    }
+  }
+
   .doc-h3 {
     margin: 8px 0 0;
     color: var(--ink);
@@ -112,6 +201,12 @@
   @media (width < 640px) {
     .sheet-band {
       padding-block: 24px 64px;
+    }
+
+    /* A STEP SMALLER ON A PHONE, so a section's name keeps to one or two lines. */
+    .doc-h2 {
+      font-size: var(--t-site-22);
+      line-height: 1.2;
     }
   }
 </style>

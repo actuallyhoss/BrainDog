@@ -35,13 +35,14 @@
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
+  import type { Snippet } from 'svelte';
 
-  let { title, lede, parts }: { title: string; lede?: string; parts: readonly Part[] } = $props();
+  let { title, lede, parts, head }: { title: string; lede?: string; parts: readonly Part[]; head?: Snippet } = $props();
 
   const external = (href: string): boolean => /^https?:/.test(href);
 </script>
 
-<PageHead {title} {...(lede === undefined ? {} : { lead: lede })} />
+<PageHead {title} {...(lede === undefined ? {} : { lead: lede })} {...(head === undefined ? {} : { children: head })} />
 
 <section class="board" aria-label={title}>
   <div class="wrap parts">

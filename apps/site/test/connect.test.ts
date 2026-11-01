@@ -107,7 +107,7 @@ test("the page's words hold no em dash and no never-word outside code", () => {
     assert.doesNotMatch(s, NEVER, `a never-word in "${s}"`);
   }
   assert.equal(agents.agents.lead.startsWith(`${APPS_AND} can read your BrainDog`), true);
-  assert.equal(agents.agents.dev.address, MCP, 'the row for developers gives the address the box gives');
+  assert.ok(!('address' in agents.agents.dev), 'the address is the box\'s alone, said once (plan F18)');
 });
 
 test('the box draws every app and every way in the HTML, so it reads with scripting off', () => {

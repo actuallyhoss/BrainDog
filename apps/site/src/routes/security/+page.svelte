@@ -8,7 +8,7 @@
   EVERY FACT NAMES ITS SOURCE in a comment beside it in `copy/trust.ts`, and says only what is built. A fact that stops
   being true is fixed there, where the file it rests on is named. The drawings beside the facts say nothing the fact
   does not: a record beside records with nothing between them, a key sealed before it is stored, thirty sealed nights
-  (the pricing table's own "last 30 kept"), the sign-in with no password field, what a token may do, and the export.
+  (the pricing table's own "last 30 kept"), the sign-in with no password field, and the export. What a token may do is the agents page's (plan F21), linked.
 
   THE REPORTING ADDRESS IS THE SUPPORT ADDRESS, `SUPPORT_EMAIL`. While it is empty the last tile says when it arrives,
   and neither the address nor the repository's promise about mail is drawn, because nobody would be reading it. The
@@ -86,24 +86,7 @@
             {@render head('token-title', token.glyph, token.title)}
             <p class="fact-text">{token.text}</p>
           </div>
-          <table class="reach">
-            <thead>
-              <tr>
-                {#each d.reach.head as h}<th scope="col">{h}</th>{/each}
-              </tr>
-            </thead>
-            <tbody>
-              {#each d.reach.rows as [what, can]}
-                <tr>
-                  <th scope="row">{what}</th>
-                  <td class:no={!can}>
-                    <Icon name={can ? 'check' : 'x'} size="m" /><span class="sr">{can ? d.reach.can : d.reach.cannot}</span>
-                  </td>
-                  <td><Icon name="check" size="m" /><span class="sr">{d.reach.can}</span></td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
+          <a class="how" href={d.reachHref}>{d.reachLink}<Icon name="arrow-right" size="s" /></a>
         </section>
       {/if}
     </div>
@@ -502,49 +485,6 @@
     font-weight: 400;
   }
 
-  /* ── What a token can do ─────────────────────────────────────────────── */
-
-  .reach {
-    inline-size: 100%;
-    border-collapse: collapse;
-    font-size: var(--t-site-15);
-  }
-
-  .reach th,
-  .reach td {
-    padding-block: 10px;
-    padding-inline-end: 8px;
-    border-block-end: 1px solid var(--rule);
-    text-align: start;
-    overflow-wrap: anywhere;
-  }
-
-  .reach thead th {
-    color: var(--muted);
-    font-family: var(--ui);
-    font-weight: 500;
-    vertical-align: bottom;
-  }
-
-  .reach tbody th {
-    color: var(--ink);
-    font-family: var(--ui);
-    font-weight: 500;
-  }
-
-  .reach td {
-    inline-size: 28%;
-    color: var(--ink);
-  }
-
-  .reach td.no {
-    color: var(--muted);
-  }
-
-  .reach tbody tr:last-child > * {
-    border-block-end: 0;
-  }
-
   /* ── Export ──────────────────────────────────────────────────────────── */
 
   .export {
@@ -663,7 +603,33 @@
     }
   }
 
+  /* ON A PHONE EACH STEP IS ONE LINE (plan F22): its number, what happens, and when, where four stacked squares made the
+     report the page's tallest tile. */
   @media (width < 640px) {
+    .steps {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      column-gap: 10px;
+      align-items: center;
+    }
+
+    .step-n {
+      inline-size: 24px;
+      block-size: 24px;
+      margin: 0;
+      font-size: var(--t-site-13);
+    }
+
+    .step-when {
+      font-size: var(--t-site-14);
+      text-align: end;
+    }
+
     .board {
       padding-block: 24px 64px;
     }

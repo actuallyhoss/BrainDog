@@ -11,7 +11,9 @@
   ways to take it as text, then the opening and each `##` part in turn, a heading with its anchor and no tile round it.
 
   Nothing here is interactive: a board or a task list on a docs page is drawn read-only, which is what the renderer
-  draws when it is handed no callback.
+  draws when it is handed no callback. BUT A CODE BLOCK CAN BE COPIED (plan F25): once the script runs each one gains a
+  Copy button at its top corner, which says Copied only when the browser did; with scripting off the code is there to
+  select, as before.
 -->
 <script lang="ts">
   import '@braindog/skin/blocks.css';
@@ -20,9 +22,41 @@
   import type { Snippet } from 'svelte';
   import { inline } from 'braindog-render';
   import { Block, Degraded, Markdown, Text } from 'braindog-render/svelte';
+  import { tick } from 'svelte';
   import { bodyOf, partsOf, type Part } from './pages.ts';
+  import { docsWords } from './words.ts';
 
   let { src, head }: { src: string; head?: Snippet } = $props();
+
+  let sheet: HTMLElement | undefined = $state();
+
+  /* EACH CODE BLOCK'S COPY BUTTON, added once the page has drawn and again when it draws another page. */
+  $effect(() => {
+    void src;
+    const box = sheet;
+    if (!box) return;
+    void tick().then(() => {
+      for (const pre of box.querySelectorAll<HTMLPreElement>('pre:not([data-copies])')) {
+        pre.dataset.copies = '';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'code-copy';
+        b.textContent = docsWords.codeCopy;
+        b.setAttribute('aria-label', docsWords.codeLabel);
+        b.addEventListener('click', async () => {
+          const text = (pre.querySelector('code') ?? pre).textContent ?? '';
+          try {
+            await navigator.clipboard.writeText(text.replace(/\n$/u, ''));
+            b.textContent = docsWords.codeCopied;
+            setTimeout(() => (b.textContent = docsWords.codeCopy), 1600);
+          } catch {
+            b.textContent = docsWords.codeCopy;
+          }
+        });
+        pre.prepend(b);
+      }
+    });
+  });
 
   type Group = { heading: { id: string; text: string } | null; parts: Part[] };
 
@@ -51,7 +85,7 @@
   {/each}
 {/snippet}
 
-<div class="doc-body">
+<div class="doc-body" bind:this={sheet}>
   {#if head}<div class="doc-head">{@render head()}</div>{/if}
   {#each groups as group, g (g)}
     {#if group.heading}
@@ -162,6 +196,7 @@
 
   /* CODE SITS IN A WELL OF THE TILE'S FILL ON THE PAPER, and a long line scrolls inside it, never the page. */
   .doc-text :global(pre) {
+    position: relative;
     max-inline-size: 100%;
     overflow-x: auto;
     padding: var(--sp-4);
@@ -172,6 +207,37 @@
     font-family: var(--mono);
     font-size: var(--t-site-14-5);
     line-height: 1.6;
+  }
+
+  /* ITS COPY BUTTON at the well's top corner, quiet until pointed at; the code keeps room for it on its first line. */
+  .doc-text :global(pre[data-copies]) {
+    padding-inline-end: 80px;
+  }
+
+  .doc-text :global(.code-copy) {
+    position: absolute;
+    inset-block-start: 8px;
+    inset-inline-end: 8px;
+    min-block-size: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink2);
+    font: 500 13px/1 var(--ui);
+    cursor: pointer;
+  }
+
+  .doc-text :global(.code-copy:hover) {
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .doc-text :global(.code-copy) {
+      min-block-size: var(--tap);
+      inset-block-start: 4px;
+      inset-inline-end: 4px;
+    }
   }
 
   .doc-text :global(:not(pre) > code) {
