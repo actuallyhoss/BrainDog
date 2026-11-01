@@ -248,7 +248,7 @@
       {/if}
 
       <!-- HOW FAR IT MAY GO -->
-      <section class="part" aria-labelledby="{ids}-may">
+      <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-may">
         {@render head(`${ids}-may`, 'vault', 'How far it may go')}
         <Segmented role="group" aria-labelledby="{ids}-may" full>
           {#each CEILINGS as c (c)}
@@ -260,7 +260,7 @@
       </section>
 
       <!-- WHERE -->
-      <section class="part" aria-labelledby="{ids}-where">
+      <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-where">
         {@render head(`${ids}-where`, 'projects', 'Where it may change things')}
         {#if d.ceiling !== 'write'}
           <p class="pf-quiet">{d.ceiling === 'read' ? 'At Read it changes nothing, anywhere.' : 'At Suggest every change waits for you, wherever it is.'}</p>
@@ -307,7 +307,7 @@
       </section>
 
       <!-- TOOLS -->
-      <section class="part" aria-labelledby="{ids}-tools">
+      <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-tools">
         {@render head(`${ids}-tools`, 'grid', 'Tools')}
         <p class="pf-quiet">Its briefing and what you tell it are always on. A tool you turn off is hidden from it.</p>
         {#each GROUPS as [group, title] (group)}
@@ -325,7 +325,7 @@
       </section>
 
       <!-- BRIEF -->
-      <section class="part" aria-labelledby="{ids}-brief">
+      <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-brief">
         {@render head(`${ids}-brief`, 'doc', 'Its brief', true)}
         <p class="pf-quiet" id="{ids}-brief-help">Every run of {isDefault ? 'a new agent' : who} reads this first.</p>
         <textarea
@@ -341,7 +341,7 @@
       </section>
 
       <!-- WHEN -->
-      <section class="part" aria-labelledby="{ids}-when">
+      <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-when">
         {@render head(`${ids}-when`, 'clock', 'When')}
         <div class="switch-row">
           <div class="switch-row-words">
@@ -385,7 +385,7 @@
       </section>
 
       <!-- LIMITS -->
-      <section class="part" aria-labelledby="{ids}-limits">
+      <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-limits">
         {@render head(`${ids}-limits`, 'money', 'Cost and limits')}
         <p class="pf-quiet">Jobs it runs with nobody at the terminal stop at these, so it cannot run up a bill. Empty means no limit.</p>
         <div class="caps">
@@ -403,7 +403,7 @@
       </section>
 
       <!-- STOP AND LIVE PUSH -->
-      <section class="part" aria-labelledby="{ids}-stop">
+      <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-stop">
         {@render head(`${ids}-stop`, 'stop', 'Stop and live push')}
         <div class="switch-row">
           <div class="switch-row-words">
