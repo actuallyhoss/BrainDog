@@ -8,21 +8,24 @@
 import { BASE } from '$lib/at.ts';
 import { REGISTERS } from '$lib/record/held.ts';
 import { isFile } from '$lib/record/field-draft.ts';
-import { dropShared, sendPhoto, sharedPhotos, type Photo, type Sent } from './share.ts';
+import { dropShared, photoAt, sendPhoto, sharedPhotos, type Photo, type Sent } from './share.ts';
 
 export const shared = $state({ photos: [] as Photo[], urls: [] as string[] });
 
 /** Take the photos the share left (`photos` of them), and draw them. */
 export async function takeShared(count: number): Promise<void> {
   letGo(false);
-  const photos = await sharedPhotos(`${location.origin}${BASE}/`, count);
+  const scope = `${location.origin}${BASE}/`;
+  const photos = await sharedPhotos(scope, count);
   shared.photos = photos;
-  shared.urls = photos.map((p) => URL.createObjectURL(p.blob));
+  /* DRAWN FROM THE WORKER'S OWN ADDRESS FOR IT (`sharedPhoto`), since the page's policy draws no `blob:` image; the mark
+     makes a second share's photo a new address, never the first one's kept by the browser. */
+  const mark = Date.now().toString(36);
+  shared.urls = photos.map((_, i) => `${photoAt(scope, i)}?v=${mark}`);
 }
 
 /** Let the share go: off the screen, and, unless `keep`, out of the phone's cache. */
 export function letGo(drop = true): void {
-  for (const u of shared.urls) URL.revokeObjectURL(u);
   shared.photos = [];
   shared.urls = [];
   if (drop) void dropShared();

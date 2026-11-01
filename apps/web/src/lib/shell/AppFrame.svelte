@@ -1490,7 +1490,7 @@
   <!-- THE PHONE'S OWN WAYS (`lib/phone/Phone.svelte`): the status bar's colour, the iPhone's launch pictures, back from the
        left edge in the Home Screen app, and the two asks. Its own chunk, a moment after the shell has drawn. -->
   {#if phoneWays}
-    {#await import('$lib/phone/Phone.svelte') then { default: Phone }}<Phone waiting={open} path={page.url.pathname} />{/await}
+    {#await import('$lib/phone/Phone.svelte') then { default: Phone }}<Phone waiting={open} path={page.url.pathname} host={data.host} />{/await}
   {/if}
 
   <!--

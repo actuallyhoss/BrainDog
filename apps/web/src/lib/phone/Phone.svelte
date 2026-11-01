@@ -18,7 +18,7 @@
   import EdgeBack from './EdgeBack.svelte';
   import PhoneHints from './PhoneHints.svelte';
 
-  let { waiting = 0, path = '' }: { waiting?: number; path?: string } = $props();
+  let { waiting = 0, path = '', host }: { waiting?: number; path?: string; host?: 'cloud' | 'self-host' | undefined } = $props();
 
   onMount(() => {
     startupImages(`${location.origin}${BASE}`);
@@ -28,4 +28,4 @@
 </script>
 
 <EdgeBack />
-<PhoneHints {waiting} {path} />
+<PhoneHints {waiting} {path} {host} />

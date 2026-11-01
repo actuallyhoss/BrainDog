@@ -48,7 +48,7 @@
 import { CEILING, COPY, KEPT, accessEnded, fresh, markOf, route, words, type Route } from './lib/data/offline.ts';
 /* ─── the phone lane's imports: the kinds of push and a share from another app (`lib/phone/`) ─── */
 import { kindIn, pushLine } from './lib/phone/kinds.ts';
-import { SHARED, isShare, takeShare } from './lib/phone/share.ts';
+import { SHARED, isShare, isSharedPhoto, sharedPhoto, takeShare } from './lib/phone/share.ts';
 
 type Waits = { waitUntil(p: Promise<unknown>): void };
 type Opened = { url: string; focus(): Promise<unknown> };
@@ -146,6 +146,9 @@ sw.addEventListener('fetch', (e) => {
      A POST to `/add` is the Home Screen app's share target; the host has nothing to take it, so it is answered here: the
      photos wait in their own cache and the words open `/add` as a share always did. */
   if (isShare(req.url, req.method, sw.registration.scope)) return e.respondWith(takeShare(req, sw.registration.scope, sw.caches));
+  /* AND THE PHOTO IT KEPT, drawn under the palette's field at its own address of this origin, which the page's policy
+     lets an image come from (a `blob:` address it does not). */
+  if (isSharedPhoto(req.url, req.method, sw.registration.scope)) return e.respondWith(sharedPhoto(req.url, sw.caches));
   const kind = route(
     { url: req.url, method: req.method, mode: req.mode, authorised: req.headers.has('authorization') },
     sw.registration.scope,

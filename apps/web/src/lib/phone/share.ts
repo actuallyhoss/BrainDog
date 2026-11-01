@@ -78,6 +78,20 @@ export async function takeShare(req: Request, scope: string, box: CacheStorage):
   return Response.redirect(to.href, 303);
 }
 
+/** Whether a request is the page asking for a photo the share left: a GET of `~shared/<i>` under the scope. */
+export function isSharedPhoto(url: string, method: string, scope: string): boolean {
+  if (method !== 'GET') return false;
+  const u = new URL(url);
+  const root = new URL(scope);
+  return u.origin === root.origin && /^~shared\/\d$/u.test(u.pathname.slice(root.pathname.length));
+}
+
+/** The photo the share left at that address, or a 404 once it has gone. */
+export async function sharedPhoto(url: string, box: CacheStorage): Promise<Response> {
+  const held = await (await box.open(SHARED)).match(url, { ignoreSearch: true });
+  return held ?? new Response(null, { status: 404 });
+}
+
 /* ─── the page's half ─── */
 
 /** One photo of the share, as the page holds it. */

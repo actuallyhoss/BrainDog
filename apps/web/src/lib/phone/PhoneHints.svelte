@@ -22,7 +22,8 @@
   import { haptic, isAndroid, isIOS, onPhone, standalone } from './device.ts';
   import { asked, markAsked, openedToday, words } from './hints.ts';
 
-  let { waiting = 0, path = '' }: { waiting?: number; path?: string } = $props();
+  /* `host`: only the Worker sends pushes, so a self-host is never asked for a key it does not have (as `PushToggle`). */
+  let { waiting = 0, path = '', host }: { waiting?: number; path?: string; host?: 'cloud' | 'self-host' | undefined } = $props();
 
   type Prompted = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
 
@@ -43,7 +44,7 @@
 
   /* THE PUSH CARD, once something waits on him, where a push can arrive at all. */
   async function maybePush(): Promise<void> {
-    if (pushAsked || shown !== null || waiting < 1 || asked('push') || !onPhone()) return;
+    if (pushAsked || shown !== null || waiting < 1 || host === 'self-host' || asked('push') || !onPhone()) return;
     if (!(standalone() || isAndroid())) return;
     if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
     pushAsked = true;
