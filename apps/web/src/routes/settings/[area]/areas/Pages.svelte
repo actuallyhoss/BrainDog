@@ -24,7 +24,7 @@
   draw them. What a list itself is called, for everybody, is the record's word and lives in Words and money.
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
   import { apiBase, at } from '$lib/at.ts';
@@ -326,6 +326,15 @@
     return names.length <= 3 ? LIST.format(names) : `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`;
   };
   const LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' });
+  /* THE PRESS TAKES THE FOCUS TO THE FIRST PAGE IT OPENED: the row pressed is gone, and focus left on nothing falls back
+     to the top of the document. */
+  async function openSection(section: string, firstHref: string | undefined): Promise<void> {
+    openSections = [...openSections, section];
+    await tick();
+    if (firstHref === undefined) return;
+    const link = [...document.querySelectorAll<HTMLAnchorElement>('.pages a.page-link')].find((a) => a.getAttribute('href')?.endsWith(firstHref));
+    link?.focus();
+  }
   const outCount = $derived(hiddenRows.length + others.length);
   /* WHAT THE FOLD HOLDS, BY KIND: "Pages of 30 projects, 8 people and every agent run", never "1047 more pages". */
   const foldLine = $derived.by(() => {
@@ -556,7 +565,7 @@
             {@render pageRow(r.p)}
           {:else}
             <li class="page-row page-fold">
-              <button type="button" class="line line-tall fold-line" aria-expanded="false" onclick={() => (openSections = [...openSections, r.section])}>
+              <button type="button" class="line line-tall fold-line" aria-expanded="false" onclick={() => void openSection(r.section, r.rows[0]?.href)}>
                 <span class="line-mark"><IconWell name="rows" size="l" /></span>
                 <span class="line-main">
                   <span class="line-title">{foldNames(r.rows)}</span>

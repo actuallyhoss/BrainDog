@@ -18,6 +18,7 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
 
   const id = $derived(typeof page.params.id === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/u.test(page.params.id) ? page.params.id : null);
 
@@ -41,11 +42,10 @@
   {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
     <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
   {:else if summaries.length === 0}
-    <Tile>
-      <p class="said">{words.none}</p>
-      <p class="said quiet">{words.offer}</p>
-      <div class="foot"><Button href={offerHref}>{words.getIt}</Button></div>
-    </Tile>
+    <!-- THE HOUSE EMPTY STATE: what will be here and the one step that brings it, never "No summaries yet." alone. -->
+    <Empty kind="no-data-yet" glyph="bell" title={words.none.replace(/\.$/u, '')} body={words.offer}>
+      {#snippet actions()}<Button href={offerHref}>{words.getIt}</Button>{/snippet}
+    </Empty>
   {:else}
     {#each summaries as s (s.id)}
       <Tile icon={id === null ? "bell" : undefined} title={id === null ? s.name : undefined}>
