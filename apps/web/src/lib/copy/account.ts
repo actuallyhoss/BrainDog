@@ -176,6 +176,8 @@ export const account = {
   inviteTitle: 'Invite somebody',
   inviteHow: 'One use, one address, good for 24 hours.',
   invitePerson: 'Invite a person',
+  /* THE INVITE TILE WITH THE FORM IN ITS SHEET (G20), when no invitation is waiting. */
+  invitesNone: 'Nobody is waiting on an invitation. A link is one use, for one address, and good for 24 hours.',
   erasePerson: 'Erase a person',
   eraseWhat: 'Everything one person wrote, removed from sixteen places in one go. It cannot be undone.',
 

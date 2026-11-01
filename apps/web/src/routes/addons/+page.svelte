@@ -212,8 +212,8 @@
 
 <div class="page">
   <div class="tools">
-    <div class="find">
-      <Icon name="search" size="m" />
+    <div class="field find">
+      <Icon name="search" size="s" />
       <input class="find-input" type="search" bind:value={query} aria-label={words.searchLabel} placeholder={words.searchHint} autocomplete="off" enterkeyhint="search" />
     </div>
     {#if chips.length > 1}
@@ -318,17 +318,18 @@
     min-inline-size: 0;
   }
 
-  /* THE SEARCH ACROSS THE PAGE, THE CHIPS UNDER IT. */
+  /* THE SEARCH AND THE SHELVES SHARE ONE ROW WHERE THEY FIT (L43), as a list's search and its slices do; where they do
+     not (a laptop's 1280, a phone), the shelves wrap under the search. */
   .tools {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--sp-3);
     min-inline-size: 0;
   }
 
   .tools > :global(.segmented) {
     flex-wrap: nowrap;
-    align-self: flex-start;
     max-inline-size: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -354,24 +355,12 @@
     gap: var(--sp-2);
   }
 
+  /* THE LIST SEARCH'S FIELD (L44): the shared `.field`, a fill with no edge; it was the only bordered field on a board.
+     The store has no tile under it, so the fill is the tile's own, as a list's search fill reads against its tile. */
   .find {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    box-sizing: border-box;
-    inline-size: 100%;
-    max-inline-size: 40rem;
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3);
+    flex: 1 1 16rem;
+    max-inline-size: 24rem;
     background: var(--tile);
-    border-radius: var(--r-ctl);
-    box-shadow: inset 0 0 0 1px var(--switch-off);
-    color: var(--ink-3);
-  }
-
-  .find:focus-within {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
   }
 
   .find-input {

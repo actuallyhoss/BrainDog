@@ -15,6 +15,7 @@
   import Button from '$lib/ui/Button.svelte';
   import { VERB_LABELS, draftOf, sayStep, words, type Body, type Node, type Verb } from './flow.ts';
   import { durationOf, editWords, pathsOf, planPlaces, stepAnswer, type RunRow, type RunStep } from './source.ts';
+  import { plainFail } from './plain-fail.ts';
 
   let {
     run,
@@ -45,6 +46,7 @@
 
   const finished = $derived(run.state === 'done' || run.state === 'failed' || run.state === 'cancelled');
   const took = $derived(durationOf(run));
+  const said = $derived(plainFail(run.say));
   const started = $derived(run.trigger !== null && Object.hasOwn(editWords.startedBy, run.trigger) ? editWords.startedBy[run.trigger] : null);
 
   /** The canvas of the version it ran under, and each card's step row, found by its place in the plan. */
@@ -110,7 +112,13 @@
     {#if took !== null}<span class="rv-meta">{editWords.took(took)}</span>{/if}
     {#if started}<span class="rv-meta">{started}</span>{/if}
   </p>
-  {#if run.say}<p class="rv-say">{run.say}</p>{/if}
+  <!-- THE REASON IN PLAIN WORDS (L46), and the record's own words one press under it when they were said again. -->
+  {#if said}
+    <p class="rv-say">{said.plain}</p>
+    {#if said.plain !== said.raw}
+      <details class="rv-raw"><summary>As written</summary><p>{said.raw}</p></details>
+    {/if}
+  {/if}
 
   {#if canvas}
     {@render tree(canvas.nodes, canvas.stepOf)}
@@ -171,6 +179,20 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .rv-raw {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+  .rv-raw summary {
+    cursor: pointer;
+    width: fit-content;
+    color: var(--ink-2);
+  }
+  .rv-raw p {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
+  }
   .rv-say {
     margin: 0;
     color: var(--ink-2);

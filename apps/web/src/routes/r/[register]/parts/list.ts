@@ -324,9 +324,19 @@ export type View = 'table' | 'board' | 'cards' | 'groups';
  * twenty-four. That list's table is then `?view=table`, so a link to it still opens the table.
  */
 /** A list that draws in groups: people by organisation, and since 29 October organisations by kind. */
-export const groupsOf = (decl: RegisterDecl | undefined): boolean => orgFieldOf(decl) !== null || orgRoleOf(decl) !== null;
+export const groupsOf = (decl: RegisterDecl | undefined): boolean => orgFieldOf(decl) !== null || orgRoleOf(decl) !== null || runsList(decl) || kpisList(decl);
 
-export const homeViewOf = (decl: RegisterDecl | undefined): View => (groupsOf(decl) ? 'groups' : 'table');
+/** The list of agent runs, which opens as one ledger of faces (`ListRuns`), its "List" in the switch where People's says Groups (L17). */
+export const runsList = (decl: RegisterDecl | undefined): boolean => decl?.id === RUNS;
+
+/** The key numbers, which open as their readings with a small chart each (`ListKpis`), "List" in the switch (L11). */
+export const kpisList = (decl: RegisterDecl | undefined): boolean => decl?.id === 'kpis';
+
+/* A LIST OF SENTENCES OPENS AS CARDS (1 Nov, L13): Learnings at 1512 was a one-column table of long lines; two columns
+   of cards read them. Its table is `?view=table`. */
+const SENTENCE_LISTS: ReadonlySet<string> = new Set(['learnings']);
+
+export const homeViewOf = (decl: RegisterDecl | undefined): View => (groupsOf(decl) ? 'groups' : decl && SENTENCE_LISTS.has(decl.id) ? 'cards' : 'table');
 
 export const viewOf = (asked: string | null, decl: RegisterDecl | undefined): View => {
   if (asked === 'cards' || asked === 'table') return asked;
@@ -571,6 +581,13 @@ export function dueOf(decl: RegisterDecl | undefined, e: Entry, now: number): { 
   return { text: words.due(dayWord(due, now)), late: false };
 }
 
+/** A day as its month, "July", with the year when it is not the record's this year, "July 2025". */
+function monthOf(day: string, now: number): string {
+  const at = new Date(`${day}T12:00:00Z`);
+  const month = at.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
+  return at.getUTCFullYear() === new Date(now).getUTCFullYear() ? month : `${month} ${at.getUTCFullYear()}`;
+}
+
 /** The list's name for how many rows, "1 bill" or "12 bills". */
 const counted = (decl: RegisterDecl, n: number): string => `${n} ${(n === 1 ? decl.one : decl.name).toLowerCase()}`;
 
@@ -588,10 +605,58 @@ export function atWorkIn(entries: readonly Entry[], now: number): number {
   return working.filter((e) => !(typeof e.fields.parent === 'string' && runs.has(e.fields.parent))).length;
 }
 
+/* HOW MANY OF A CYCLE MAKE A MONTH, for a list that says how often each row renews. */
+const PER_MONTH: Readonly<Record<string, number>> = { weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12, annual: 1 / 12, annually: 1 / 12 };
+
+/**
+ * THE ROWS' COST A MONTH, said as money ("$628"): the list's first money field over a choice field of how often it
+ * renews (`cycle`, `billing`), each row's amount scaled to a month. Nothing where the rows hold two currencies, a cycle
+ * this cannot scale, or no amounts at all.
+ */
+function monthlyOf(decl: RegisterDecl, rows: readonly Entry[]): string | null {
+  const amount = decl.fields.find((f) => f.type === 'money' && !f.retired);
+  const cycle = decl.fields.find((f) => f.type === 'enum' && /^(cycle|billing|every|period)$/iu.test(f.id));
+  if (!amount || !cycle) return null;
+  let total = 0;
+  let currency: string | null = null;
+  for (const e of rows) {
+    const v = e.fields[amount.id];
+    const c = String(e.fields[cycle.id] ?? '');
+    if (!isMoney(v)) continue;
+    const per = PER_MONTH[c];
+    if (per === undefined) return null;
+    if (currency !== null && v.currency !== currency) return null;
+    currency = v.currency;
+    total += v.amount * per;
+  }
+  if (currency === null || total <= 0) return null;
+  /* A MONTH'S COST IS SAID IN WHOLE UNITS: a yearly plan scaled to a month has cents nobody pays. */
+  const unit = 10 ** exponentOf(currency);
+  return figureSaid({ currency }, Math.round(total / unit) * unit, true);
+}
+
+/**
+ * WHAT THE LIST OF RUNS SAYS, COUNTING WHAT ITS ROWS SHOW (1 Nov, L16): "2 at work, 2 open" stood over two working runs
+ * and one finished, the open two being the working two. Now each run is counted once, by what its line says: at work,
+ * quiet, finished.
+ */
+function runsSaid(entries: readonly Entry[], open: number, now: number): string {
+  const working = atWorkIn(entries, now);
+  const quiet = Math.max(0, open - working);
+  const done = entries.length - open;
+  /* "0 AT WORK, 2 OPEN" STOOD OVER TWO ROWS MARKED ACTIVE (live check, 1 Nov): nothing at work is not said, and a run
+     that is active but not working is said as the row says it, active, and that it has gone quiet. */
+  const said = [working > 0 ? words.atWork(working) : '', quiet > 0 ? words.quietRuns(quiet) : '', done > 0 ? words.finished(done) : ''].filter(Boolean).join(', ');
+  return said.charAt(0).toUpperCase() + said.slice(1);
+}
+
 /* This module's own words, the sentence and the tile's reading lines. */
 const words = {
   open: (n: number) => `${n} open`,
   atWork: (n: number) => `${n} at work`,
+  quietRuns: (n: number) => `${n} active but quiet`,
+  aMonth: (said: string) => `${said} a month`,
+  finished: (n: number) => `${n} finished`,
   toSettle: (n: number) => `${n} to settle`,
   toShip: (n: number) => `${n} to ship`,
   renew: (n: number) => `${n} renew`,
@@ -602,6 +667,12 @@ const words = {
   nextDue: (when: string) => `the next due ${when}`,
   newest: (when: string) => `newest ${when}`,
   besidesYou: 'besides you',
+  thisWeek: (n: number) => `${n} added this week`,
+  allThisWeek: (n: number) => `All ${n} added this week`,
+  newestNamed: (name: string) => `the newest ${name}`,
+  lastCame: (name: string, when: string) => `Nothing new this week; the last added was ${name}, ${when}.`,
+  noneThisWeek: 'Nothing new this week',
+  quietSince: (name: string, month: string) => `${name} quiet since ${month}`,
   match: (n: number, of: number) => `${n} of ${of} ${n === 1 ? 'matches' : 'match'}.`,
   today: 'today',
   tomorrow: 'tomorrow',
@@ -646,18 +717,30 @@ export function readingOf(
   decl: RegisterDecl | undefined,
   entries: readonly Entry[],
   now: number,
-  at: { whole: boolean; filtered: boolean; matched: number; total: number; besides?: boolean },
+  at: { whole: boolean; filtered: boolean; matched: number; total: number; besides?: boolean; quiet?: { name: string; day: string } | null },
 ): Reading | null {
   if (!decl) return null;
   if (at.filtered) return plain(words.match(at.matched, at.total));
   if (!at.whole || entries.length === 0) return null;
   const dated = deadlineOf(decl);
   if (!decl.state && !dated) {
-    const newest = entries.reduce<string>((best, e) => (e.created > best ? e.created : best), '');
-    /* "1 PERSON" OVER TWO NAMES (audit 31 Oct m, AM17): you are on the list, marked You, and never counted, so the count
-       says whom it is besides. */
-    const many = `${counted(decl, entries.length)}${at.besides ? ` ${words.besidesYou}` : ''}`;
-    return plain(newest ? `${many}, ${words.newest(since(newest, now))}.` : `${many}.`);
+    /* WHAT IS NEW, NOT HOW MANY (1 Nov, L1): the bar beside the title already counts the list ("People 7"), so "7 people
+       besides you, newest 2 min ago" said the count twice. The line says what came in this week and which came last,
+       by name, which no other part of the screen says. */
+    const newestE = entries.reduce<Entry | null>((best, e) => (!best || e.created > best.created ? e : best), null);
+    const name = newestE && decl.title ? String(newestE.fields[decl.title] ?? '').trim() : '';
+    const week = entries.filter((e) => now - Date.parse(e.created) < 7 * DAY_MS).length;
+    if (!newestE) return null;
+    /* ON A LIST OF PEOPLE, WHO HAS GONE QUIET LEADS (People's page says the same): "June Park quiet since July; 2 added
+       this week." The page hands it over (`quiet`), since when somebody was last in touch is the list's `meets`. */
+    const quiet = at.quiet ? words.quietSince(at.quiet.name, monthOf(at.quiet.day, now)) : '';
+    if (week > 0) {
+      const lead = week === entries.length && week > 1 ? words.allThisWeek(week) : words.thisWeek(week);
+      if (quiet) return plain(`${quiet}; ${lead.charAt(0).toLowerCase()}${lead.slice(1)}.`);
+      return plain(name && week > 1 ? `${lead}, ${words.newestNamed(name)}.` : name ? `${lead}: ${name}.` : `${lead}.`);
+    }
+    if (quiet) return plain(`${quiet}; ${words.noneThisWeek.toLowerCase()}.`);
+    return plain(name ? words.lastCame(name, since(newestE.created, now)) : `${words.noneThisWeek}.`);
   }
   const open = entries.filter((e) => !isDone(decl, e));
   /* ONE STATE SAYS ITSELF: "16 live" over sixteen Live categories and "All 143 cleared" over a cleared ledger, where
@@ -688,7 +771,7 @@ export function readingOf(
     renews
       ? words.renew(open.length)
       : decl.id === RUNS
-      ? `${words.atWork(atWorkIn(entries, now))}, ${words.open(open.length)}`
+      ? runsSaid(entries, open.length, now)
       : decl.state && staged
         ? settles && dated
           ? /* ORDERS ARE SHIPPED, NOT SETTLED (audit 31 Oct o, AO16): the list said "3 to settle" where the Orders page
@@ -698,8 +781,17 @@ export function readingOf(
             ? `${open.length.toLocaleString('en')} ${soleState(open)}`
             : words.open(open.length)
         : counted(decl, open.length);
-  /* A LINE THAT IS ONLY THE COUNT IS NOT SAID: the head beside the title already draws it ("Projects 4" over "4 projects."). */
-  if (!dated) return lead === counted(decl, entries.length) ? null : plain(`${lead}.`);
+  /* A LINE THAT IS ONLY THE COUNT IS NOT SAID: the head beside the title already draws it ("Projects 4" over "4 projects.").
+     A LIST OF KINDS SAYS HOW IT SPLITS INSTEAD (1 Nov, L18): Projects' lane is Building, Earning, Parked or Finished, so
+     its line is "2 building, 1 earning, 1 parked.", what the sidebar's "4 in play" is made of. */
+  if (!dated) {
+    if (lead !== counted(decl, entries.length)) return plain(`${lead}.`);
+    const f = decl.state ? decl.fields.find((x) => x.id === decl.state) : undefined;
+    const parts = (f?.type === 'enum' ? (f.values ?? []) : [])
+      .map((v) => ({ v, n: entries.filter((e) => String(e.fields[f!.id] ?? '') === v).length }))
+      .filter((x) => x.n > 0);
+    return parts.length >= 2 ? plain(`${parts.map((x) => `${x.n} ${labelOfValue(f!, x.v).toLowerCase()}`).join(', ')}.`) : null;
+  }
   const late = open.filter((e) => isLate(decl, e, now)).length;
   const coming = open
     .map((e) => ({ e, v: e.fields[dated] }))
@@ -708,7 +800,9 @@ export function readingOf(
   const next = coming[0]?.v;
   const nextTitle = decl.title && coming[0] ? String(coming[0].e.fields[decl.title] ?? '').trim() : '';
   const tail = next ? `, ${renews && nextTitle ? words.nextNamed(nextTitle, dayWord(next, now)) : words.nextDue(dayWord(next, now))}.` : '.';
-  if (renews && late === 0) return plain(`${lead}${tail}`);
+  /* WHAT IT ALL COSTS A MONTH (1 Nov, L14): "7 renew, $628 a month; next GitHub in 12 days." */
+  const monthly = renews ? monthlyOf(decl, open) : null;
+  if (renews && late === 0) return plain(monthly ? `${lead}, ${words.aMonth(monthly)}; ${tail.slice(2)}` : `${lead}${tail}`);
   return late > 0 ? { before: `${lead}, `, needs: words.late(late), after: tail } : plain(`${lead}, ${words.noneLate}${tail}`);
 }
 

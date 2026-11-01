@@ -21,14 +21,19 @@
     view,
     board,
     groups = null,
+    groupsWord: groupsWordAsked,
     onview,
   }: {
     view: View;
     board: boolean;
     /** A list of people by organisation, which opens grouped and offers it first: the list's own glyph, or null. */
     groups?: IconName | null;
+    /** What the grouped view is called: "Groups" for people, "List" for the runs' ledger. */
+    groupsWord?: string | undefined;
     onview: (view: View) => void;
   } = $props();
+
+  const groupsWord = $derived(groupsWordAsked ?? 'Groups');
 
   /* This part's own words. */
   const words = { group: 'Show the list as', groups: 'Groups', table: 'Table', board: 'Board', cards: 'Cards' } as const;
@@ -52,12 +57,12 @@
       class="segment view-seg"
       data-on={view === v ? '' : undefined}
       aria-pressed={view === v ? 'true' : 'false'}
-      title={words[v]}
+      title={v === 'groups' ? groupsWord : words[v]}
       onclick={() => {
         if (view !== v) onview(v);
       }}
     >
-      <Icon name={glyph} size="s" /><span class="view-word">{words[v]}</span>
+      <Icon name={glyph} size="s" /><span class="view-word">{v === 'groups' ? groupsWord : words[v]}</span>
     </button>
   {/each}
 </Segmented>

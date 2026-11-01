@@ -14,6 +14,7 @@
   import { SCALE_CSS } from '@braindog/theme/scale.ts';
 
   import Tile from '$lib/ui/Tile.svelte';
+  import Fold from './Fold.svelte';
 
   /* THE APP'S OWN FRAME (SPEC 1.1), light and dark, written as the declarations the book reads: the board, the tiles,
      the inks and the two reds the app is drawn in. It read the site's palette before the redesign. */
@@ -23,6 +24,10 @@
   const opts = { now: SHEET_NOW };
   const GROUPS = ['say', 'figure', 'list', 'plan', 'media'] as const;
   const words = {
+    /* THE BOOK'S SECTIONS (L50): the rules, the tokens, how a page is made, the blocks. Closed when the book opens. */
+    rulesGroup: 'The look and the voice',
+    tokensGroup: 'Colour, type, space and corners',
+    makeGroup: 'Composing and drawing',
     colours: 'Colour',
     type: 'Type scale',
     space: 'Space',
@@ -48,11 +53,31 @@
 <div class="book">
   <p class="book-lead">{book.about}</p>
 
+
   <!-- LOOK B FIRST (`loop/DESIGN-SYSTEM.md`): the rules every design follows, before the tables it uses. -->
+  <Fold id="book-rules" name={words.rulesGroup} count={3}>
+  <div class="book-tiles">
   <Tile title={words.look}>
     <ul class="plain">{#each book.look as line (line)}<li>{line}</li>{/each}</ul>
   </Tile>
 
+  <Tile title={words.voice}>
+    <ul class="plain">{#each book.voice as line (line)}<li>{line}</li>{/each}</ul>
+  </Tile>
+
+  <Tile title={words.layout}>
+    <dl class="rules">
+      {#each Object.entries(book.layout) as [name, rule] (name)}
+        <dt>{name.replaceAll('_', ' ')}</dt>
+        <dd>{rule}</dd>
+      {/each}
+    </dl>
+  </Tile>
+  </div>
+  </Fold>
+
+  <Fold id="book-tokens" name={words.tokensGroup} count={3}>
+  <div class="book-tiles">
   <Tile title={words.colours}>
     <ul class="swatches">
       {#each book.tokens.colours as c (c.name)}
@@ -85,19 +110,11 @@
     </ul>
   </Tile>
 
-  <Tile title={words.layout}>
-    <dl class="rules">
-      {#each Object.entries(book.layout) as [name, rule] (name)}
-        <dt>{name.replaceAll('_', ' ')}</dt>
-        <dd>{rule}</dd>
-      {/each}
-    </dl>
-  </Tile>
+  </div>
+  </Fold>
 
-  <Tile title={words.voice}>
-    <ul class="plain">{#each book.voice as line (line)}<li>{line}</li>{/each}</ul>
-  </Tile>
-
+  <Fold id="book-make" name={words.makeGroup} count={3}>
+  <div class="book-tiles">
   <Tile title={words.compose}>
     <ul class="plain">{#each book.compose as line (line)}<li>{line}</li>{/each}</ul>
     <ul class="plain">{#each book.reach_for as line (line)}<li>{line}</li>{/each}</ul>
@@ -111,7 +128,10 @@
     <ul class="plain">{#each book.check as line (line)}<li>{line}</li>{/each}</ul>
   </Tile>
 
-  <h2 class="book-h">{words.kinds}</h2>
+  </div>
+  </Fold>
+
+  <Fold id="book-kinds" name={words.kinds} count={book.kinds.length}>
   {#each GROUPS as g (g)}
     {#if book.kinds.some((k) => k.group === g)}
       <h3 class="book-g">{words.group[g]}</h3>
@@ -136,12 +156,23 @@
       </div>
     {/if}
   {/each}
+  </Fold>
 </div>
 
 <style>
-  .book {
+  .book-tiles {
     display: grid;
     gap: var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  .book {
+    display: grid;
+    gap: 0;
+  }
+
+  .book > .book-lead {
+    margin-block-end: var(--sp-3);
     min-inline-size: 0;
   }
 
@@ -160,14 +191,9 @@
     font-size: var(--fs-meta);
   }
 
-  .book-h,
   .book-g {
     margin: var(--sp-4) 0 0;
     font-family: var(--font-display);
-  }
-
-  .book-h {
-    font-size: var(--fs-figure);
   }
 
   .book-g {

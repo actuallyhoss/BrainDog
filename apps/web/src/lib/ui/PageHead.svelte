@@ -1069,6 +1069,17 @@
       margin: 0;
       inset-block-end: calc(100% + var(--sp-4));
     }
+
+    /* AND WHERE THE PAGE'S BODY IS THE PAGE ITSELF (Scripts under its tabs, L49): the same raise, into the tabs' row. */
+    :global(.head-below:has(+ .page > .home-page:first-child:not([data-arranging]) > .home-tools :is(button, a))) {
+      padding-inline-end: calc(var(--gutter) + var(--tap) + var(--sp-2));
+    }
+
+    :global(.head-below + .page > .home-page:first-child:not([data-arranging]) > .home-tools) {
+      position: absolute;
+      margin: 0;
+      inset-block-end: calc(100% + var(--sp-4));
+    }
   }
 
   /* FORCED COLOURS KEEP THE COMPACT ROW'S EDGE, so it is told from the work under it. */

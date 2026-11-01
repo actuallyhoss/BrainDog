@@ -151,9 +151,15 @@ export function moneyShown(money: readonly unknown[], trend: Trend | null, inByM
   return money.length > 0 || (trend !== null && trend.now > 0) || monthsDrawn(inByMonth) || monthsDrawn(outByMonth) || total(inByMonth) > 0 || total(outByMonth) > 0;
 }
 
-/** The parts that stand in the left column beside the right one, when a page's numbers and its dates are laid together. */
-export const LEFT_COLUMN: readonly string[] = ['numbers', 'dates'];
-export const RIGHT_COLUMN: readonly string[] = ['what-is-open', 'who-is-on-it', 'runs-on'];
+/**
+ * The parts that stand in the left column beside the right one, when a page's numbers and its dates are laid together.
+ * THE AGENTS UNDER THE DATES, WHAT HAPPENED UNDER WHAT IT RUNS ON (the lists review, L32): with the dates the last of
+ * the left column, they grew to the work's height and left 200px of white under six dates; the agents' tile, whose box
+ * to tell them goes to its foot, takes the difference instead, and the row of agents and what happened under the
+ * columns is gone.
+ */
+export const LEFT_COLUMN: readonly string[] = ['numbers', 'dates', 'agents-here'];
+export const RIGHT_COLUMN: readonly string[] = ['what-is-open', 'who-is-on-it', 'runs-on', 'happened', 'decisions'];
 
 /**
  * THE NUMBERS AND THE DATES IN ONE COLUMN, BESIDE THE WORK AND WHAT IT RUNS ON (bento, 1 Nov): laid as two rows, three

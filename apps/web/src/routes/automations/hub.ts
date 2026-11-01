@@ -24,6 +24,7 @@ import { ruleMonthOf } from '../../lib/record/actions.ts';
 import { humanize, ruleNameSaid } from '../../lib/record/names.ts';
 
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
+import { plainSay } from '../../lib/flow/plain-fail.ts';
 import type { ActionRow, Channel } from '../../lib/record/actions.ts';
 import type { Script } from '../../lib/record/scripts.ts';
 import type { IconName } from '../../lib/ui/icons.ts';
@@ -164,6 +165,7 @@ export const hubWords = {
   upkeepHide: 'Hide the rules BrainDog keeps for itself',
   /* WHY A RUN FAILED, under the month's bars: the rule, then the run's own words. */
   whyFailed: 'Why runs failed',
+  asWritten: 'As written',
   noReason: 'It did not say why.',
   nextUp: 'Next up',
   nextUpMeta: (days: number) => `Next ${days} days`,
@@ -758,13 +760,14 @@ const BAD = new Set(['failed', 'refused']);
 const outcomeOf = (state: string): string => ((Object.hasOwn(hubWords.ended, state) ? hubWords.ended[state] : undefined) ?? hubWords.ended.done!)('').split(' ')[0]!.replace(/[.,]$/u, '');
 
 /** A run's ending and its own sentence after it, when it said one. */
-function saidOf(outcome: string, at: string, say: string | null, now: number): string {
+function saidOf(outcome: string, at: string, say: string | null, now: number, own = ''): string {
   const when = since(at, now);
   const ended = Object.hasOwn(hubWords.ended, outcome) ? hubWords.ended[outcome] : undefined;
   /* A HELD RUN THAT SAID ITS OWN REASON is not held by the month's limit: the limit's words stay only when it gave none. */
-  if (outcome === 'held' && say) return `${hubWords.heldSaid(when)} ${say}`;
+  if (outcome === 'held' && say) return `${hubWords.heldSaid(when)} ${plainSay(say, own)}`;
   const line = (ended ?? hubWords.ended.done!)(when);
-  return say ? `${line} ${say}` : line;
+  /* THE REASON IN PLAIN WORDS (L46): the run's own sentence names `rule.x` and `script.y`; the run's page keeps it. */
+  return say ? `${line} ${plainSay(say, own)}` : line;
 }
 
 /**
@@ -787,10 +790,10 @@ export function runLines(
     const own = runs.get(a.id);
     if (own && own.length > 0) {
       for (const r of own) {
-        out.push({ key: `a:${r.id}`, kind: 'automation', name: ruleNameSaid(a.name, true), at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now), bad: BAD.has(r.state), path, outcome: outcomeOf(r.state) });
+        out.push({ key: `a:${r.id}`, kind: 'automation', name: ruleNameSaid(a.name, true), at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now, a.name), bad: BAD.has(r.state), path, outcome: outcomeOf(r.state) });
       }
     } else if (a.last) {
-      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: ruleNameSaid(a.name, true), at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now), bad: BAD.has(a.last.state), path, outcome: outcomeOf(a.last.state) });
+      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: ruleNameSaid(a.name, true), at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now, a.name), bad: BAD.has(a.last.state), path, outcome: outcomeOf(a.last.state) });
     } else {
       /* A RULE THE RECORD COUNTS AND KEEPS NO RUN OF STILL RAN (agents F2): "Ran 17 times, last on 3 Sep" on its row
          beside "Nothing has run yet" here was two answers to one question. Its last firing is its line, with the count. */
@@ -924,6 +927,25 @@ export function lastRunReading(runs: readonly RunRow[], places: readonly string[
 }
 
 /**
+ * THE LAST RUNS, ALIKE ONES AS ONE ROW (L48). Ten rows of "Failed, 9 min ago" said one thing ten times; runs side by
+ * side that ended the same way for the same reason are one row, "Failed 10 times, the last 9 min ago", with the reason
+ * under it in plain words. Opening the row opens its newest run.
+ */
+export function runGroups(runs: readonly RunRow[], max: number, own = ''): { run: RunRow; times: number; why: string }[] {
+  const out: { run: RunRow; times: number; why: string }[] = [];
+  for (const r of runs) {
+    const why = r.state === 'failed' ? plainSay(r.say, own) : '';
+    const prev = out.at(-1);
+    if (prev && prev.run.state === r.state && prev.why === why && r.state !== 'running' && r.state !== 'waiting' && r.state !== 'pending') prev.times += 1;
+    else {
+      if (out.length === max) break;
+      out.push({ run: r, times: 1, why });
+    }
+  }
+  return out;
+}
+
+/**
  * The page's sentence under its title: its last run and its next, and the failed clause as the phrase that needs him.
  * `null` for a draft that was never saved, which has nothing to report.
  */
@@ -940,7 +962,7 @@ export function pageSentence(row: Counted | null, now: number): Sentence | null 
   }
   const state = flowWords.runState[row.last.state] ?? row.last.state;
   const last = flowWords.lastRun(since(row.last.at, now), state);
-  const why = row.last.state === 'failed' && row.last.say ? ` ${row.last.say}` : '';
+  const why = row.last.state === 'failed' && row.last.say ? ` ${plainSay(row.last.say, row.name)}` : '';
   const text = [last + why, next].filter(Boolean).join(' ');
   return { text, needs: row.last.state === 'failed' ? last : '' };
 }

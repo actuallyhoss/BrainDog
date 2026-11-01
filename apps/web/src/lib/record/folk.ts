@@ -615,6 +615,8 @@ export const seenWords = {
   more: (n: number): string => `${n} more`,
   people: (n: number): string => (n === 1 ? '1 person' : `${n} people`),
   lastInTouch: (day: string): string => `Last in touch ${day}.`,
+  atPlace: (where: string): string => `at ${where}`,
+  isYou: 'This is you.',
   projects: (n: number): string => (n === 1 ? '1 project' : `${n} projects`),
   /* The list's grouped view and its disclosure. */
   showAll: (n: number, org: string): string => `Show all ${n} people at ${org}`,

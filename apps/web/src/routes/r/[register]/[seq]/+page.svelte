@@ -114,6 +114,7 @@
   import ScopeMove from './ScopeMove.svelte';
   import Timeline from './Timeline.svelte';
   import NoteText from './NoteText.svelte';
+  import KpiLead from './KpiLead.svelte';
   import { isMemo } from './note-text.ts';
   import { readingOf, readingSaid } from '$lib/record/reading.ts';
   import VisualStrip from '$lib/visual/VisualStrip.svelte';
@@ -734,6 +735,7 @@
   /* WHAT FINISHES IT, where it is still open and the reader may change it: the head's one primary (`finishOf`). */
   /* NONE ON AN AGENT'S RUN, which ends itself or is stopped from its live row (`row-finish.ts`, audit 6g AG10). */
   const finish = $derived(changes && !archived && id !== 'session' ? finishOf(decl, stateValue) : null);
+  const rareFinish = $derived(Boolean(finish && /supersed|retire/iu.test(finish.said)));
   /* WHERE ITS LIST DRAWS IT, on a list with a page of its own: that page, searched for the row's name. */
   const chartTo = $derived(row && decl ? chartOf(id, String(row.fields[decl.title] ?? '')) : null);
 
@@ -760,7 +762,9 @@
   const unsetValue = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && listLine(v) === null);
   const figureField = $derived(shortFields.find((f) => f.type === 'money'));
   const dueField = $derived(shortFields.find((f) => (f as { deadline?: boolean }).deadline === true));
-  const figure = $derived(figureField && row ? amountOf(row.fields[figureField.id]) : null);
+  /* A KEY NUMBER LEADS WITH ITS READING AND CHART (`KpiLead`, L25), so its target is a fact like the rest, not the figure. */
+  const kpiPage = $derived(id === 'kpis');
+  const figure = $derived(!kpiPage && figureField && row ? amountOf(row.fields[figureField.id]) : null);
   /**
    * PART PAID, UNDER THE FIGURE: "Paid £4,000 · £5,190 left" over a 6px track (money F9). The paid amount is the list's
    * second money field named for it ("Paid so far", which money's `settle` writes), in the figure's currency; a bill
@@ -827,12 +831,26 @@
    * under Details, so a reader looked in two places and in two shapes for one answer. A list of tags that holds only the
    * keys an import left is not one of them (`importKeysOnly`).
    */
+  /* THE FACTS A LIST PUTS FIRST (1 Nov, L19): a field marked `lead: true`, in the list's order; where a list marks none,
+     the few the web knows lead it (a key number: what it measures, which way is good, how often), then the rest. */
+  const LEAD_OF: Readonly<Record<string, readonly string[]>> = { kpis: ['measures', 'good', 'every', 'thing', 'source'] };
+  const leadOrder = $derived.by((): readonly string[] => {
+    const marked = (decl?.fields ?? []).filter((f) => (f as { lead?: unknown }).lead === true).map((f) => f.id);
+    return marked.length > 0 ? marked : (LEAD_OF[id] ?? []);
+  });
+  const leadRank = (field: string): number => {
+    const i = leadOrder.indexOf(field);
+    return i === -1 ? leadOrder.length : i;
+  };
   const facts = $derived(
     shownFields
       /* "SOURCE · TYPED" SAYS NOTHING: a number somebody typed is how most readings arrive, so only another source is said. */
       .filter((f) => editing === f.id || !(f.id === 'source' && f.type === 'enum' && row?.fields[f.id] === 'typed'))
       .filter((f) => !evidence.has(f.id) && (editing === f.id || !importKeysOnly(row?.fields[f.id])))
-      .sort((a, b) => Number(b.id === decl?.state) - Number(a.id === decl?.state)),
+      /* THE STATE ONCE (1 Nov, L24): where the sentence under the name says it ("Doing, due tomorrow"), its chip in the
+         facts said it again. It is changed from the head's verb or the "⋯"'s Edit. */
+      .filter((f) => editing === f.id || f.id !== decl?.state || !sentence.some((p) => p.kind === 'state'))
+      .sort((a, b) => Number(b.id === decl?.state) - Number(a.id === decl?.state) || leadRank(a.id) - leadRank(b.id)),
   );
 
   /**
@@ -887,6 +905,11 @@
    * THE LINE UNDER THE NAME. A person: "Contractor at Brightwell, on Kiln and Portage. Last in touch 2 Sep." An
    * organisation: "Client · 24 people, on Kiln and Portage." Each part only when the row has it.
    */
+  const lastSaid = (day: string): string => {
+    const at_ = meets?.met && row ? seenOf(row.fields[meets.met]).find((x) => x.last === day) : undefined;
+    const when = seenWords.lastInTouch(daySaid(day, clock));
+    return at_ ? `${when.replace(/\.$/u, '')}, ${seenWords.atPlace(at_.where)}.` : when;
+  };
   const lead = $derived.by(() => {
     if (!row || (!meets && !orgRole)) return null;
     if (meets) {
@@ -899,7 +922,9 @@
       return {
         parts: whoParts({ role: roleSaid, org, projects }),
         named: projects.length > 0,
-        last: day ? seenWords.lastInTouch(daySaid(day, clock)) : null,
+        /* WHEN, AND ABOUT WHAT (1 Nov, L21): "Last in touch 29 Oct, at Onboarding." where the newest place they were seen
+           is that day's. Yourself, never: "Last in touch" over your own name said nothing, so your page says it is you. */
+        last: self ? seenWords.isYou : day ? lastSaid(day) : null,
         /* THE FIELDS THE SENTENCE SAYS, so the facts do not say them a second time under it. */
         said: [roleSaid?.trim() || (role && row.fields[role] === 'other') ? role : null, org ? meets.org : null, day ? meets.in_touch : null].filter((x): x is string => Boolean(x)),
       };
@@ -1387,7 +1412,9 @@
            primary: a field is edited where it stands, and "Edit" is in the "…" (money F9). Edit and Archive stood beside
            each other at one weight, and neither was what a person opens an unpaid invoice to do. -->
       {#if finish}
-        <Button weight="primary" disabled={saving} data-finish data-head-primary onclick={() => void finishRow(finish)}>{finish.said}</Button>
+        <!-- A RARE ENDING IS INK, NOT RED (1 Nov, L26): "Mark superseded" on a learning is seldom what a person opens it
+             for, so the red is left unspent there. -->
+        <Button weight={rareFinish ? 'ink' : 'primary'} disabled={saving} data-finish data-head-primary onclick={() => void finishRow(finish)}>{finish.said}</Button>
       {/if}
       <!-- A ROW OF A LIST WITH A PAGE OF ITS OWN SAYS WHERE IT IS DRAWN: a reading opens its chart, the list's page
            searched for its name, so "CPU, bake" is one press from the line it is a point on. -->
@@ -1461,7 +1488,9 @@
     <!-- THE CONVERSATION: what was sent from this row and what came back, under its head, once something was. -->
     {#if live && row.seq !== null}<SendStrip ref="{id}#{row.seq}" kind={id} label={rowNameSaid(id, String(row.fields[decl.title] ?? ''))} />{/if}
 
-    <div class="board">
+    <!-- A ROW WITH LITTLE HISTORY TAKES THE WIDTH (1 Nov, L20): under three events the Activity tile was a narrow column
+         beside the row with one line in it, so it goes under the row at full width instead. -->
+    <div class="board" data-few={live && told && told.from !== 'refused' && history.length < 3 ? '' : undefined}>
       <div class="main">
         <!-- THE PROJECT'S ONE SHAPE leads, then the fields and whatever else the page holds. -->
         {#if pj && blocksOf(pj.facts).length > 0}
@@ -1498,11 +1527,13 @@
           </Tile>
         {/if}
 
+        {#if kpiPage && row.seq !== null}<KpiLead register={id} seq={row.seq} fields={row.fields} {names} now={clock} />{/if}
+
         <!-- THE FIELDS TILE. The amount first and large, since it is what a person opens a money line for; then every
              field the row has answered, and what a person or an organisation is known by, as one definition list; then
              "Add a field" for the rest. -->
         <Tile aria-label={rowWords.details}>
-          {#if self}
+          {#if self && !lead?.last}
             <!-- THE PERSON WHOSE RECORD THIS IS, MARKED: the list's `self` part, which the facts leave out because it is
                  said here, beside the face their row wears in every list. -->
             <p class="self-line"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={owner} size="m" /><span>{personWords.self}</span></p>
@@ -1798,6 +1829,10 @@
     .side {
       grid-column: 1 / -1;
     }
+  }
+
+  .board[data-few] > :is(.main, .side) {
+    grid-column: 1 / -1;
   }
 
   /* THE FIGURE TILES SIDE BY SIDE, each at least 280 wide, and one a row on a phone. */
@@ -2698,7 +2733,7 @@
       display: contents;
     }
 
-    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart], .sb)::after) {
+    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart])::after) {
       content: '';
       flex-basis: 100%;
       order: 1;
@@ -2709,10 +2744,12 @@
        and the "…"; the verbs are the row under it, the primary first. */
     .row-head :global(.page-head [data-head-primary]),
     .row-head :global(.page-head [data-row-chart]),
-    .row-head :global(.page-head .sb) {
+    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart]) .sb) {
       order: 2;
       margin-block-start: var(--sp-3);
     }
+
+    /* AND WITH NO PRIMARY, SEND STAYS BESIDE THE "…" (1 Nov, L22): alone, it stood on a row of its own under the name. */
   }
 
   /* FORCED COLOURS DROP THE FILLS, so a control keeps an edge to be told from the ground by. */

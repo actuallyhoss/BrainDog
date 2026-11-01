@@ -386,6 +386,8 @@ export const editWords = {
   putBack: 'Put this version back',
   putBackSaid: (n: number) => `Version ${n} is on the canvas. Save it to put it back.`,
   olderRuns: 'Show older runs',
+  /** Runs side by side that ended alike, as one row: "Failed 10 times, the last 9 min ago". */
+  runTimes: (state: string, n: number, when: string) => `${state} ${n.toLocaleString('en')} times, the last ${when}`,
   openRun: 'Open this run',
   retry: 'Run it again',
   retried: 'It runs again. The new run shows here once it has started.',

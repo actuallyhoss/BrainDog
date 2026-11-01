@@ -52,7 +52,7 @@
 
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
-  import { apiBase, at as inApp } from '$lib/at.ts';
+  import { apiBase, at as inApp, slugOf } from '$lib/at.ts';
   import { madeOf } from '$lib/home/made-counts.ts';
   import { stillShown, type WidgetSize } from 'braindog-render';
   import { recordToday, recordZone } from '$lib/record/zone.ts';
@@ -253,6 +253,12 @@
 
   /* ONLY WHO KEEPS THE RECORD AND MAY ADD TO IT: a colleague held to their own lists, or one who only reads, is not
      onboarded on somebody else's record. */
+  /* THE ADDRESS'S FIRST WORD, where it was read as a record's name and the record refused this reader (L52). */
+  const strayAt = $derived(data.refused ? slugOf(page.url.pathname) : null);
+  const strayWords = {
+    title: (slug: string) => `Nothing of yours is at /${slug}`,
+    open: 'Open your BrainDog',
+  } as const;
   const first = $derived(!data.refused && data.lists.length > 0 && landing(data) === null && may(data, 'append'));
 
   /* THE CARD, ON A RECORD WHERE NOTHING IS ADDED BY HAND YET, until it is pressed, and again once an Undo empties it. */
@@ -1668,6 +1674,12 @@
     {:else if onAppendOnly(data.refused)}
       <Empty kind="no-permission" title={data.refused.fix}>
         {#snippet actions()}<Button weight="primary" href="/settings/agents">{copy.inviteMakeAgentKey}</Button>{/snippet}
+      </Empty>
+    {:else if data.refused.code === 'FORBIDDEN' && strayAt}
+      <!-- AN ADDRESS WHOSE FIRST WORD IS NO RECORD OF YOURS (1 Nov, L52): "/nope-not-here" was read as a record's name and
+           drew "You are not on this BrainDog." with no way on. It says the address, and opens yours. -->
+      <Empty kind="no-permission" title={strayWords.title(strayAt)}>
+        {#snippet actions()}<Button weight="primary" href="/">{strayWords.open}</Button>{/snippet}
       </Empty>
     {:else}
       <Empty kind="no-permission" title={data.refused.fix} />

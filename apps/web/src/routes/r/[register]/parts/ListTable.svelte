@@ -241,7 +241,11 @@
   {#snippet enumSaid(row: TableRow, field: string, value: string)}
     {#if field === decl.state}
       {@const stored = String(rowAt(Number(row.key.split('#')[1]))?.fields[field] ?? '')}
-      <span class="state" data-stand={dotOf(decl, stored)}><StateDot state={dotOf(decl, stored)} /><span class="enum">{copy.valueWord(value)}</span></span>
+      {@const f = fieldOf(field)}
+      <!-- THE STATE A ROW IS BORN IN IS NOT SAID (1 Nov, L9): "Open" down every row of Tasks said nothing, so the column
+           names only what moved, Doing, Blocked or Done, and a screen reader still hears the word. -->
+      {#if f?.default !== undefined && stored === String(f.default) && dotOf(decl, stored) === 'open'}<span class="unsaid">{copy.valueWord(value)}</span>
+      {:else}<span class="state" data-stand={dotOf(decl, stored)}><StateDot state={dotOf(decl, stored)} /><span class="enum">{copy.valueWord(value)}</span></span>{/if}
     {:else}<span class="enum">{copy.valueWord(value)}</span>{/if}
   {/snippet}
   <!-- ANY OTHER VALUE: an amount as the column draws it, and a late row's deadline with how late it is before the day. -->
@@ -733,6 +737,38 @@
     margin-inline: calc(-1 * var(--sp-3));
   }
 
+  /* THE HAIRLINES STOP AT THE WORDS (1 Nov, L4): the grid hangs a cell's padding into the gutter so a washed row has
+     room round its words, and the row's border ran those 12px past the tile's padding at both ends. The rule is drawn
+     inset by that padding instead, and goes where the border went: under a washed row and over it. */
+  .table-slot :global(:is(.rowgroup .tr, .th-row)) {
+    border-block-end-color: transparent;
+    background-image: linear-gradient(var(--rule), var(--rule));
+    background-size: calc(100% - 2 * var(--sp-3)) 1px;
+    background-position: 50% 100%;
+    background-repeat: no-repeat;
+  }
+
+  .table-slot :global(.rowgroup .tr:is(:hover, [data-focused], [aria-selected='true'])),
+  .table-slot :global(.rowgroup .tr:has(+ :is(:hover, [data-focused], [aria-selected='true']))) {
+    background-size: 0 0;
+  }
+
+  /* HEARD AND NOT SEEN: the state a row was born in, which the column leaves out (L9). */
+  .unsaid {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A FINISHED ROW IS QUIETER THAN AN OPEN ONE (1 Nov, L10): Done rows stood in full ink among the open, so the eye had
+     to read the state to find the work left. Every cell of one takes the third ink, which still clears 4.5 on the tile. */
+  .table-slot :global(.rowgroup .tr:has(.state[data-stand='done']) .td) {
+    color: var(--ink-3);
+  }
+
   @media (pointer: coarse) {
     .table-slot {
       --table-row-h: max(var(--row-h), var(--tap));
@@ -853,13 +889,12 @@
      band read as a pointer stuck on it: the row's wash, its box and its verbs on a list nobody had touched. Away from
      the grid the caret's row is a row like the others, hairlines and all, and it comes back the moment focus does. */
   .table-slot:not(:focus-within) :global(.rowgroup .tr[data-focused]:not([aria-selected='true'], :hover)) {
-    background: none;
+    background: linear-gradient(var(--rule), var(--rule)) 50% 100% / calc(100% - 2 * var(--sp-3)) 1px no-repeat;
     border-radius: 0;
-    border-block-end-color: var(--rule);
   }
 
   .table-slot:not(:focus-within) :global(.rowgroup .tr:has(+ .tr[data-focused]:not([aria-selected='true'], :hover)):not(:hover, [aria-selected='true'])) {
-    border-block-end-color: var(--rule);
+    background-size: calc(100% - 2 * var(--sp-3)) 1px;
   }
 
   /**
@@ -961,6 +996,18 @@
     align-items: center;
     gap: var(--sp-2);
     justify-content: flex-end;
+  }
+
+  /* A RECEIPT LAYS ITSELF OVER THE ROW'S END (1 Nov, L2): the verbs' column is as wide as its two glyphs, and "Archived"
+     with its "Put back" is wider, so it stands on the row (`.tr` is the box it is placed in) on the tile's ground, over
+     the last cells' ends, for as long as it is there. Nothing moves when it comes or goes. */
+  .said {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: var(--sp-3);
+    padding-inline-start: var(--sp-3);
+    background: var(--tile);
+    line-height: normal;
   }
 
   /* A ROW'S VERBS ARE SMALL RECTANGLES: 28 tall, the meta size at 500, and a 28 square for a verb that is its glyph.

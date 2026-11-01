@@ -40,7 +40,9 @@
   import Tile from '$lib/ui/Tile.svelte';
   import { Bars, Ring } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
-  import { words } from '$lib/flow/flow.ts';
+  import { learnScripts, words } from '$lib/flow/flow.ts';
+  import { plainFail } from '$lib/flow/plain-fail.ts';
+  import { createClient } from '@braindog/client';
   import { editWords, openAutomations, rowTrigger, type AutomationRow, type Source } from '$lib/flow/source.ts';
   import AutomationSentence from './AutomationSentence.svelte';
   import HubRows from './HubRows.svelte';
@@ -102,22 +104,30 @@
    * WHY EACH OF THE MONTH'S FAILED RUNS FAILED, in the run's own words (Q30): read from the few rules that failed this
    * month, their newest runs, so the tile says the reason and not only a count. A read that fails leaves the count alone.
    */
-  let why = $state.raw<readonly { name: string; say: string }[]>([]);
+  let why = $state.raw<readonly { name: string; say: string; raw: string }[]>([]);
   async function readWhy(s: Source | null, all: readonly AutomationRow[]) {
     if (s === null) return;
     const failing = all.filter((r) => (r.month?.failures ?? 0) > 0).slice(0, 4);
+    if (failing.length === 0) return;
+    /* THE SCRIPTS' TITLES FIRST (L46), so a reason names a script as its step does and not by its id. */
+    const titles = await createClient({ base: apiBase() })
+      .scripts()
+      .catch(() => null);
+    if (titles?.ok) learnScripts(titles.value);
     const month = new Date().toISOString().slice(0, 7);
-    const out: { name: string; say: string }[] = [];
+    const out: { name: string; say: string; raw: string }[] = [];
     for (const r of failing) {
       const one = await s.automation(r.id, { limit: 20 }).catch(() => null);
       if (!one?.ok) continue;
       const said = new Set<string>();
       for (const run of one.value.runs) {
         if (run.state !== 'failed' || !run.started.startsWith(month)) continue;
-        const say = run.say?.trim() || w.noReason;
+        /* IN PLAIN WORDS (L46): "Its script, …, hit its 100 runs a day." The record's own sentence opens under it. */
+        const plain = plainFail(run.say, r.name);
+        const say = plain?.plain ?? w.noReason;
         if (said.has(say)) continue;
         said.add(say);
-        out.push({ name: r.name, say });
+        out.push({ name: r.name, say, raw: plain && plain.raw !== plain.plain ? plain.raw : '' });
       }
     }
     why = out;
@@ -227,7 +237,12 @@
           <details class="why-fold">
             <summary class="why-open"><span>{w.whyFailed}</span><span class="why-n num">{why.length}</span><Icon name="chevronDown" size="s" /></summary>
             <ul class="why" aria-label={w.whyFailed}>
-              {#each why as f, i (i)}<li><span class="why-name">{f.name}</span> {f.say}</li>{/each}
+              {#each why as f, i (i)}
+                <li>
+                  <span class="why-name">{f.name}</span> {f.say}
+                  {#if f.raw}<details class="why-raw"><summary>{w.asWritten}</summary><p>{f.raw}</p></details>{/if}
+                </li>
+              {/each}
             </ul>
           </details>
         {/if}
@@ -348,6 +363,17 @@
   .why-name {
     color: var(--ink);
     font-weight: var(--fw-medium);
+  }
+  /* THE RECORD'S OWN WORDS, ONE PRESS UNDER THE PLAIN ONES (L46). */
+  .why-raw summary {
+    width: fit-content;
+    color: var(--ink-3);
+    cursor: pointer;
+  }
+  .why-raw p {
+    margin: 2px 0 0;
+    color: var(--ink-3);
+    overflow-wrap: anywhere;
   }
 
   .upkeep {

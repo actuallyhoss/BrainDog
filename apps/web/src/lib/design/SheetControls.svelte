@@ -41,6 +41,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import Fold from './Fold.svelte';
 
   const WEIGHTS = ['primary', 'quiet', 'bare'] as const;
   const SIZES = ['m', 'sm'] as const;
@@ -57,6 +58,11 @@
   const SEVERAL_DEFAULT = 'kept';
 
   const words = {
+    /* THE SECTIONS THE SHEET OPENS IN (L50); closed, their names are the sheet's contents. */
+    pressGroup: 'Buttons and choices',
+    typeGroup: 'Fields and counts',
+    sayGroup: 'Messages and states',
+    rowsGroup: 'Rows',
     buttons: 'Buttons',
     weight: { primary: 'Primary', quiet: 'Quiet', bare: 'Bare' },
     size: { m: 'regular', sm: 'small' },
@@ -146,212 +152,241 @@
   });
 </script>
 
-<div class="sheet" data-sheet-name="controls">
-  <Tile title={words.buttons} class="sheet-wide">
-    {#each WEIGHTS as weight (weight)}
-      {#each SIZES as size (size)}
+<div class="sheet-folds" data-sheet-name="controls">
+
+  <Fold id="controls-press" name={words.pressGroup} count={3}>
+    <div class="sheet">
+
+      <Tile title={words.buttons} class="sheet-wide">
+        {#each WEIGHTS as weight (weight)}
+          {#each SIZES as size (size)}
+            <div class="group">
+              <h3 class="group-name">{words.weight[weight]}, {words.size[size]}</h3>
+              <div class="cells">
+                {#each STATES as state (state)}
+                  <figure class="cell">
+                    <Button
+                      {weight}
+                      {size}
+                      disabled={state === 'disabled'}
+                      data-state={state === 'hover' || state === 'focus' || state === 'pressed' ? state : undefined}
+                      data-sheet="button {weight} {size} {state}">{words.save}</Button
+                    >
+                    <figcaption class="said">{words.state[state]}{#if words.how[state]}<span class="how">{words.how[state]}</span>{/if}</figcaption>
+                  </figure>
+                {/each}
+              </div>
+            </div>
+          {/each}
+        {/each}
         <div class="group">
-          <h3 class="group-name">{words.weight[weight]}, {words.size[size]}</h3>
+          <h3 class="group-name">{words.keyCap}</h3>
           <div class="cells">
-            {#each STATES as state (state)}
+            {#each WEIGHTS as weight (weight)}
               <figure class="cell">
-                <Button
-                  {weight}
-                  {size}
-                  disabled={state === 'disabled'}
-                  data-state={state === 'hover' || state === 'focus' || state === 'pressed' ? state : undefined}
-                  data-sheet="button {weight} {size} {state}">{words.save}</Button
-                >
-                <figcaption class="said">{words.state[state]}{#if words.how[state]}<span class="how">{words.how[state]}</span>{/if}</figcaption>
+                <Button {weight} kbd="⌘S" data-sheet="button {weight} m key">{words.save}</Button>
+                <figcaption class="said">{words.weight[weight]}</figcaption>
               </figure>
             {/each}
           </div>
+          <p class="line-said">{words.keyCapLine}</p>
         </div>
-      {/each}
-    {/each}
-    <div class="group">
-      <h3 class="group-name">{words.keyCap}</h3>
-      <div class="cells">
-        {#each WEIGHTS as weight (weight)}
-          <figure class="cell">
-            <Button {weight} kbd="⌘S" data-sheet="button {weight} m key">{words.save}</Button>
-            <figcaption class="said">{words.weight[weight]}</figcaption>
+      </Tile>
+
+      <!-- THE WHOLE WIDTH, so five choices keep one row: in a third of the board at 1512 the track wrapped "Year" under the
+           rest. -->
+
+      <Tile title={words.segmented} class="sheet-wide">
+        {#each SEGMENTS as n (n)}
+          <figure class="cell cell-start">
+            <Segmented role="group" aria-label={words.choices(n)} full>
+              {#each words.segments.slice(0, n) as label, i (label)}
+                <button type="button" class="segment" aria-pressed={picked[n] === i} data-on={picked[n] === i ? '' : undefined} onclick={() => (picked[n] = i)}
+                  >{label}</button
+                >
+              {/each}
+            </Segmented>
+            <figcaption class="said">{words.choices(n)}</figcaption>
           </figure>
         {/each}
-      </div>
-      <p class="line-said">{words.keyCapLine}</p>
-    </div>
-  </Tile>
+      </Tile>
 
-  <!-- THE WHOLE WIDTH, so five choices keep one row: in a third of the board at 1512 the track wrapped "Year" under the
-       rest. -->
-  <Tile title={words.segmented} class="sheet-wide">
-    {#each SEGMENTS as n (n)}
-      <figure class="cell cell-start">
-        <Segmented role="group" aria-label={words.choices(n)} full>
-          {#each words.segments.slice(0, n) as label, i (label)}
-            <button type="button" class="segment" aria-pressed={picked[n] === i} data-on={picked[n] === i ? '' : undefined} onclick={() => (picked[n] = i)}
-              >{label}</button
-            >
+      <Tile title={words.switches}>
+        <div class="pair">
+          <span class="pair-name">{words.switchOn}</span>
+          <button type="button" class="switch" role="switch" aria-checked={on} aria-label={words.switchOn} onclick={() => (on = !on)}
+            ><span class="switch-track"></span></button
+          >
+        </div>
+        <div class="pair">
+          <span class="pair-name">{words.switchOff}</span>
+          <button type="button" class="switch" role="switch" aria-checked={off} aria-label={words.switchOff} onclick={() => (off = !off)}
+            ><span class="switch-track"></span></button
+          >
+        </div>
+      </Tile>
+    </div>
+  </Fold>
+
+  <Fold id="controls-type" name={words.typeGroup} count={3}>
+    <div class="sheet">
+
+      <Tile title={words.fields} class="sheet-wide">
+        <div class="cells cells-wide">
+          {#each FIELDS as f (f)}
+            <figure class="cell cell-start">
+              <div class="field-box">
+                <label class="field-label" for="sheet-field-{f}">{words.fieldLabel}</label>
+                <!-- THE ERROR IS THIS SHEET'S OWN RULE: `controls.css` has no refused state for a field yet, so the deeper red
+                     edge and the line under it are drawn here, with a mark and the words, never the colour alone. -->
+                <div class="field" data-refused={f === 'error' ? '' : undefined} data-state={f === 'focus' ? 'focus' : undefined}>
+                  <input
+                    class="field-input"
+                    id="sheet-field-{f}"
+                    type="text"
+                    value={f === 'empty' ? '' : words.fieldValue}
+                    placeholder={words.fieldHint}
+                    aria-invalid={f === 'error' ? 'true' : undefined}
+                    aria-describedby={f === 'error' ? 'sheet-field-error' : undefined}
+                    data-sheet="field {f}"
+                  />
+                </div>
+                {#if f === 'error'}<p class="refused" id="sheet-field-error"><Icon name="alert" size="s" />{words.fieldError}</p>{/if}
+              </div>
+              <figcaption class="said">{words.field[f]}{#if f === 'focus'}<span class="how">{words.how.focus}</span>{/if}</figcaption>
+            </figure>
           {/each}
-        </Segmented>
-        <figcaption class="said">{words.choices(n)}</figcaption>
-      </figure>
-    {/each}
-  </Tile>
+        </div>
+      </Tile>
 
-  <Tile title={words.switches}>
-    <div class="pair">
-      <span class="pair-name">{words.switchOn}</span>
-      <button type="button" class="switch" role="switch" aria-checked={on} aria-label={words.switchOn} onclick={() => (on = !on)}
-        ><span class="switch-track"></span></button
-      >
+      <Tile title={words.counts}>
+        <div class="counts">
+          {#each [3, 12, 120] as n (n)}<Count {n} label={words.waiting(n)} />{/each}
+        </div>
+        <p class="line-said">{words.countLine}</p>
+      </Tile>
+
+      <Tile title={words.code}>
+        <CodeLine text={words.codeLine} />
+        <p class="line-said">{words.codeInline} <CodeLine inline text="braindog sync" /> {words.codeInlineAfter}</p>
+      </Tile>
     </div>
-    <div class="pair">
-      <span class="pair-name">{words.switchOff}</span>
-      <button type="button" class="switch" role="switch" aria-checked={off} aria-label={words.switchOff} onclick={() => (off = !off)}
-        ><span class="switch-track"></span></button
-      >
+  </Fold>
+
+  <Fold id="controls-say" name={words.sayGroup} count={3}>
+    <div class="sheet">
+
+      <Tile title={words.banners} class="sheet-wide">
+        <div class="banners">
+          <Banner tone="late" icon="alert">
+            {words.bannerLate}
+            {#snippet actions()}<Button weight="primary" size="sm">{words.payAgain}</Button><Button size="sm">{words.exportCopy}</Button>{/snippet}
+          </Banner>
+          <Banner tone="warn" icon="alert">{words.bannerWarn}</Banner>
+        </div>
+      </Tile>
+
+      <Tile title={words.toasts} class="sheet-wide">
+        <div class="calls">
+          {#each PLACES as place (place)}
+            <figure class="call">
+              <!-- A PICTURE OF THE WORK: the rail's column and the board beside it, with the product's own stack at its foot. -->
+              <div class="work" data-place={place} inert>
+                <span class="work-rail"></span>
+                <Toasts />
+              </div>
+              <figcaption class="said">
+                {words.place[place]}
+                <span class="how">{place === TOAST_DEFAULT ? words.byDefault : words.other}</span>
+              </figcaption>
+            </figure>
+          {/each}
+        </div>
+      </Tile>
+
+      <Tile title={words.dots}>
+        <ul class="dots">
+          {#each DOTS as d (d)}<li><StateDot state={d} word={words.dot[d]} /></li>{/each}
+        </ul>
+      </Tile>
     </div>
-  </Tile>
+  </Fold>
 
-  <Tile title={words.fields} class="sheet-wide">
-    <div class="cells cells-wide">
-      {#each FIELDS as f (f)}
-        <figure class="cell cell-start">
-          <div class="field-box">
-            <label class="field-label" for="sheet-field-{f}">{words.fieldLabel}</label>
-            <!-- THE ERROR IS THIS SHEET'S OWN RULE: `controls.css` has no refused state for a field yet, so the deeper red
-                 edge and the line under it are drawn here, with a mark and the words, never the colour alone. -->
-            <div class="field" data-refused={f === 'error' ? '' : undefined} data-state={f === 'focus' ? 'focus' : undefined}>
-              <input
-                class="field-input"
-                id="sheet-field-{f}"
-                type="text"
-                value={f === 'empty' ? '' : words.fieldValue}
-                placeholder={words.fieldHint}
-                aria-invalid={f === 'error' ? 'true' : undefined}
-                aria-describedby={f === 'error' ? 'sheet-field-error' : undefined}
-                data-sheet="field {f}"
-              />
-            </div>
-            {#if f === 'error'}<p class="refused" id="sheet-field-error"><Icon name="alert" size="s" />{words.fieldError}</p>{/if}
-          </div>
-          <figcaption class="said">{words.field[f]}{#if f === 'focus'}<span class="how">{words.how.focus}</span>{/if}</figcaption>
-        </figure>
-      {/each}
+  <Fold id="controls-rows" name={words.rowsGroup} count={2}>
+    <div class="sheet">
+
+      <Tile title={words.lines} class="sheet-wide">
+        <!-- `rows.css` DRAWS FOUR OF THESE: the fill of a line the cursor is on, of a chosen one, and the wash of one that
+             just arrived, which fades in a second and a half and is held here so a still picture has it. THE FIFTH, a line
+             another hand changed, is `PageBody.svelte`'s own rule over a page's lines, written again in this sheet's style. -->
+        <ul class="ledger hold">
+          {#each LINES as state, i (state)}
+            <li
+              data-cursor={state === 'wash' ? '' : undefined}
+              data-selected={state === 'selected' ? '' : undefined}
+              data-arrived={state === 'arrived' ? '' : undefined}
+              data-changed={state === 'changed' ? '' : undefined}
+            >
+              <div class="line line-tall" data-sheet="line {state}">
+                <span class="line-mark"><span class="line-check" aria-hidden="true"></span></span>
+                <span class="line-main">
+                  <span class="line-title">{words.tasks[i]}</span>
+                  <span class="line-detail">{words.due}</span>
+                </span>
+                <span class="line-amount"></span>
+                <span class="line-when said">{words.line[state]}</span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </Tile>
+
+      <Tile title={words.several} class="sheet-wide">
+        <div class="calls">
+          {#each SEVERAL as several (several)}
+            <figure class="call">
+              <div class="work work-tall" inert>
+                <ul class={['ledger', several === 'none' && 'plain']}>
+                  {#each words.questions as q, n (q)}
+                    <li data-selected={several === 'kept' && n < 2 ? '' : undefined}>
+                      <div class="line line-tall">
+                        {#if several === 'kept'}
+                          <span class="line-mark"
+                            ><span class="line-check" role="checkbox" aria-checked={n < 2} aria-label={words.choose(q)}><Icon name="check" size="s" /></span></span
+                          >
+                        {/if}
+                        <span class="line-main">
+                          <span class="line-title">{q}</span>
+                          <span class="line-detail">{words.asked}</span>
+                        </span>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+                {#if several === 'kept'}<BatchBar picked={still} />{/if}
+              </div>
+              <figcaption class="said">
+                {words.severalWay[several]}
+                <span class="how">{several === SEVERAL_DEFAULT ? words.byDefault : words.other}</span>
+              </figcaption>
+            </figure>
+          {/each}
+        </div>
+      </Tile>
     </div>
-  </Tile>
+  </Fold>
 
-  <Tile title={words.counts}>
-    <div class="counts">
-      {#each [3, 12, 120] as n (n)}<Count {n} label={words.waiting(n)} />{/each}
-    </div>
-    <p class="line-said">{words.countLine}</p>
-  </Tile>
-
-  <Tile title={words.banners} class="sheet-wide">
-    <div class="banners">
-      <Banner tone="late" icon="alert">
-        {words.bannerLate}
-        {#snippet actions()}<Button weight="primary" size="sm">{words.payAgain}</Button><Button size="sm">{words.exportCopy}</Button>{/snippet}
-      </Banner>
-      <Banner tone="warn" icon="alert">{words.bannerWarn}</Banner>
-    </div>
-  </Tile>
-
-  <Tile title={words.code}>
-    <CodeLine text={words.codeLine} />
-    <p class="line-said">{words.codeInline} <CodeLine inline text="braindog sync" /> {words.codeInlineAfter}</p>
-  </Tile>
-
-  <Tile title={words.dots}>
-    <ul class="dots">
-      {#each DOTS as d (d)}<li><StateDot state={d} word={words.dot[d]} /></li>{/each}
-    </ul>
-  </Tile>
-
-  <Tile title={words.lines} class="sheet-wide">
-    <!-- `rows.css` DRAWS FOUR OF THESE: the fill of a line the cursor is on, of a chosen one, and the wash of one that
-         just arrived, which fades in a second and a half and is held here so a still picture has it. THE FIFTH, a line
-         another hand changed, is `PageBody.svelte`'s own rule over a page's lines, written again in this sheet's style. -->
-    <ul class="ledger hold">
-      {#each LINES as state, i (state)}
-        <li
-          data-cursor={state === 'wash' ? '' : undefined}
-          data-selected={state === 'selected' ? '' : undefined}
-          data-arrived={state === 'arrived' ? '' : undefined}
-          data-changed={state === 'changed' ? '' : undefined}
-        >
-          <div class="line line-tall" data-sheet="line {state}">
-            <span class="line-mark"><span class="line-check" aria-hidden="true"></span></span>
-            <span class="line-main">
-              <span class="line-title">{words.tasks[i]}</span>
-              <span class="line-detail">{words.due}</span>
-            </span>
-            <span class="line-amount"></span>
-            <span class="line-when said">{words.line[state]}</span>
-          </div>
-        </li>
-      {/each}
-    </ul>
-  </Tile>
-
-  <Tile title={words.toasts} class="sheet-wide">
-    <div class="calls">
-      {#each PLACES as place (place)}
-        <figure class="call">
-          <!-- A PICTURE OF THE WORK: the rail's column and the board beside it, with the product's own stack at its foot. -->
-          <div class="work" data-place={place} inert>
-            <span class="work-rail"></span>
-            <Toasts />
-          </div>
-          <figcaption class="said">
-            {words.place[place]}
-            <span class="how">{place === TOAST_DEFAULT ? words.byDefault : words.other}</span>
-          </figcaption>
-        </figure>
-      {/each}
-    </div>
-  </Tile>
-
-  <Tile title={words.several} class="sheet-wide">
-    <div class="calls">
-      {#each SEVERAL as several (several)}
-        <figure class="call">
-          <div class="work work-tall" inert>
-            <ul class={['ledger', several === 'none' && 'plain']}>
-              {#each words.questions as q, n (q)}
-                <li data-selected={several === 'kept' && n < 2 ? '' : undefined}>
-                  <div class="line line-tall">
-                    {#if several === 'kept'}
-                      <span class="line-mark"
-                        ><span class="line-check" role="checkbox" aria-checked={n < 2} aria-label={words.choose(q)}><Icon name="check" size="s" /></span></span
-                      >
-                    {/if}
-                    <span class="line-main">
-                      <span class="line-title">{q}</span>
-                      <span class="line-detail">{words.asked}</span>
-                    </span>
-                  </div>
-                </li>
-              {/each}
-            </ul>
-            {#if several === 'kept'}<BatchBar picked={still} />{/if}
-          </div>
-          <figcaption class="said">
-            {words.severalWay[several]}
-            <span class="how">{several === SEVERAL_DEFAULT ? words.byDefault : words.other}</span>
-          </figcaption>
-        </figure>
-      {/each}
-    </div>
-  </Tile>
 </div>
 
 <style>
   /* THE SHEET IS A BOARD OF TILES: as many columns as fit, one on a phone, and a tile that holds a table of states
      takes the whole width. The tile is `Tile.svelte`'s; nothing here gives it a fill, an edge or a shadow. */
+  /* THE SECTIONS ONE OVER THE OTHER, each a fold with the board of tiles inside it. */
+  .sheet-folds {
+    display: grid;
+    min-inline-size: 0;
+  }
+
   .sheet {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));

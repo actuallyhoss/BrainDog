@@ -68,6 +68,7 @@
   {@const b = board}
   <!-- THE BAR IS THE TOTAL'S: a month too old to be added (`left`) is said in the list and has no part of the bar. -->
   {@const earnTotal = b.earning.lines.filter((l) => !l.left).reduce((s, l) => s + l.minor, 0)}
+  {@const weekInLead = b.week.due.count + b.week.renewals.count > 0 && Boolean(b.earning.total || b.earning.count > 0)}
   <div class="projects-board">
     <div class="b-top" data-solo={b.earning.total || b.earning.count > 0 ? undefined : ''}>
       <section class="b-lead" aria-label="Where the projects are">
@@ -84,6 +85,24 @@
             {#if b.acts.late}<Button weight="primary" href={b.acts.late.href}>{b.acts.late.said}</Button>{/if}
             {#if b.acts.feed}<Button href={b.acts.feed.href}>{b.acts.feed.said}</Button>{/if}
             {#if b.acts.asks}<a class="b-ask" href={at(b.acts.asks.href)} dir="auto">{b.acts.asks.said}</a>{/if}
+          </div>
+        {/if}
+        <!-- THIS WEEK IN THE LEAD (the lists review, L30): beside the earning tile the lead stood 150px taller than its
+             sentence, and the week's due work and renewals were tiles of their own under it. Where the earning tile stands
+             beside it, the lead holds those two lists side by side, and the strip under it keeps late and quiet numbers. -->
+        {#if weekInLead}
+          <div class="b-lead-week">
+            {#each [{ title: 'This week', t: b.week.due }, { title: 'Renewals', t: b.week.renewals }].filter((x) => x.t.count > 0) as x (x.title)}
+              <div class="b-lead-list">
+                <p class="b-lead-week-head"><span class="strong">{x.title}</span> <span class="num">{x.t.count}</span> {x.t.said}</p>
+                <ul class="wk-lines">
+                  {#each x.t.lines as l, n (n)}
+                    <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a href={at(l.href)} dir="auto"><span class="strong">{l.project}</span> · {l.text}</a></li>
+                  {/each}
+                </ul>
+                {#if x.t.more > 0}<p class="small wk-more">and {x.t.more} more</p>{/if}
+              </div>
+            {/each}
           </div>
         {/if}
       </section>
@@ -116,12 +135,12 @@
 
     <!-- A WEEK TILE WITH NOTHING IN IT IS LEFT OUT, and the row with them when all four are (AH17): a shop with one project
          read Late 0, This week 0, Quiet numbers 0 and Renewals 0, a wall of noughts. -->
-    {#if b.week.late.count + b.week.due.count + b.week.quiet.count + b.week.renewals.count > 0}
-      <div class="b-week" role="list" aria-label="This week" style:--wk-n={[b.week.late, b.week.due, b.week.quiet, b.week.renewals].filter((t) => t.count > 0).length}>
+    {#if b.week.late.count + b.week.quiet.count + (weekInLead ? 0 : b.week.due.count + b.week.renewals.count) > 0}
+      <div class="b-week" role="list" aria-label="This week" style:--wk-n={[b.week.late, weekInLead ? null : b.week.due, b.week.quiet, weekInLead ? null : b.week.renewals].filter((t) => t !== null && t.count > 0).length}>
         {#if b.week.late.count > 0}{@render week('Late', 'clock', 'late', b.week.late)}{/if}
-        {#if b.week.due.count > 0}{@render week('This week', 'calendar', 'plain', b.week.due)}{/if}
+        {#if b.week.due.count > 0 && !weekInLead}{@render week('This week', 'calendar', 'plain', b.week.due)}{/if}
         {#if b.week.quiet.count > 0}{@render week('Quiet numbers', 'activity', 'warn', b.week.quiet)}{/if}
-        {#if b.week.renewals.count > 0}{@render week('Renewals', 'globe', 'plain', b.week.renewals)}{/if}
+        {#if b.week.renewals.count > 0 && !weekInLead}{@render week('Renewals', 'globe', 'plain', b.week.renewals)}{/if}
       </div>
     {/if}
 
@@ -297,6 +316,40 @@
     align-items: center;
     gap: 10px;
     margin-block-start: 18px;
+  }
+
+  .b-lead-week {
+    display: grid;
+    gap: 16px 24px;
+    margin-block-start: 20px;
+    padding-block-start: 14px;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  @media (width >= 640px) {
+    .b-lead-week {
+      grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    }
+  }
+
+  .b-lead-list {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    min-inline-size: 0;
+  }
+
+  .b-lead-week-head {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .b-lead-week .wk-lines a {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .b-ask {
@@ -528,21 +581,21 @@
   /* ON A PHONE A TILE IS ITS FIGURE AND ITS FIRST LINE, the day over the words in two lines at most; the figure says how
      many, so "and N more" is left to the desk. */
   @media (width < 640px) {
-    .wk-lines li:nth-child(n + 2),
-    .wk-more {
+    .wk .wk-lines li:nth-child(n + 2),
+    .wk .wk-more {
       display: none;
     }
 
-    .wk-lines li {
+    .wk .wk-lines li {
       flex-direction: column;
       gap: 0;
     }
 
-    .wk-lines b {
+    .wk .wk-lines b {
       inline-size: auto;
     }
 
-    .wk-lines a {
+    .wk .wk-lines a {
       display: -webkit-box;
       overflow: hidden;
       -webkit-box-orient: vertical;
@@ -570,7 +623,9 @@
   @media (width >= 1000px) {
     .r-head,
     .row {
-      grid-template-columns: 170px minmax(0, 1fr) 150px 190px 168px;
+      /* NEXT STEP LESS, THE NUMBER AND THE LAST WORK MORE (the lists review, L31): "Up 19% since 25 Oct" broke over three
+         lines in 190px and "Tasks changed 5 min ago" over two, beside a next step with room to spare. */
+      grid-template-columns: 170px minmax(0, 1.2fr) 112px minmax(0, 1fr) minmax(0, 0.8fr);
       align-items: start;
     }
 

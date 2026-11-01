@@ -729,6 +729,15 @@ function createdFields(decl: unknown, to: unknown, ids: ReadonlyMap<string, numb
     } else if (!PLAIN.has(f.type)) return null;
     out[k] = v;
   }
+  /* AND WHAT THE RECORD FILLS IN ON A CREATE, as it does: a field the line left out that declares a default (a list's
+     state above all, `live`, `open`). A row placed without its state was counted as open, so a list kept in this tab
+     said "16 open" over sixteen live categories once a create had landed in it (1 Nov). */
+  const fields = (decl as { fields?: unknown } | null)?.fields;
+  if (Array.isArray(fields))
+    for (const f of fields as { id?: unknown; type?: unknown; default?: unknown; retired?: unknown }[]) {
+      if (typeof f.id !== 'string' || f.id in out || f.retired === true || f.default === undefined || f.default === null) continue;
+      if (typeof f.type === 'string' && PLAIN.has(f.type) && typeof f.default !== 'object') out[f.id] = f.default;
+    }
   return out;
 }
 

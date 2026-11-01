@@ -31,6 +31,7 @@
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import Fold from './Fold.svelte';
   import {
     FAILED_RUN,
     SHEET_FORMS,
@@ -164,8 +165,8 @@
 {/snippet}
 
 <div class="sheet" data-sheet-name="charts">
-  <section class="band" aria-labelledby="sheet-yours">
-    <h2 class="band-name" id="sheet-yours">{words.yours}</h2>
+
+  <Fold id="sheet-yours" name={words.yours}>
     {#if !read}
       <p class="band-line" role="status">{words.reading}</p>
     {:else}
@@ -186,10 +187,9 @@
         {/each}
       </div>
     {/if}
-  </section>
+  </Fold>
 
-  <section class="band" aria-labelledby="sheet-sizes">
-    <h2 class="band-name" id="sheet-sizes">{words.sizes}</h2>
+  <Fold id="sheet-sizes" name={words.sizes}>
     <p class="band-line">{words.sizesLine}</p>
     <div class="tiles">
       {#each byForm as { form, specimens } (form)}
@@ -200,28 +200,25 @@
         </Tile>
       {/each}
     </div>
-  </section>
+  </Fold>
 
-  <section class="band" aria-labelledby="sheet-plan">
-    <h2 class="band-name" id="sheet-plan">{words.plan}</h2>
+  <Fold id="sheet-plan" name={words.plan}>
     <div class="tiles">
       {#each plans as s, n (s.key)}
         <Tile class={n === 0 ? 'sheet-wide' : undefined}>{@render drawn(s)}</Tile>
       {/each}
     </div>
-  </section>
+  </Fold>
 
-  <section class="band" aria-labelledby="sheet-parts">
-    <h2 class="band-name" id="sheet-parts">{words.parts}</h2>
+  <Fold id="sheet-parts" name={words.parts}>
     <div class="tiles">
       {#each parts as s (s.key)}
         <Tile>{@render drawn(s)}</Tile>
       {/each}
     </div>
-  </section>
+  </Fold>
 
-  <section class="band" aria-labelledby="sheet-faces">
-    <h2 class="band-name" id="sheet-faces">{words.faces}</h2>
+  <Fold id="sheet-faces" name={words.faces}>
     <div class="tiles">
       <Tile title={words.person}>
         <ul class="faces">
@@ -256,10 +253,9 @@
         </ul>
       </Tile>
     </div>
-  </section>
+  </Fold>
 
-  <section class="band" aria-labelledby="sheet-failed">
-    <h2 class="band-name" id="sheet-failed">{words.failed}</h2>
+  <Fold id="sheet-failed" name={words.failed}>
     <div class="tiles">
       {#each FAILED as failed (failed)}
         <Tile data-sheet="call failed {failed}">
@@ -271,24 +267,15 @@
         </Tile>
       {/each}
     </div>
-  </section>
+  </Fold>
 </div>
 
 <style>
   /* BANDS OF TILES, the whole width: a band's name on the board, and under it as many tiles as fit, one on a phone. */
+  /* THE BANDS ARE SECTIONS THAT OPEN (L50), one over the other, each closed when the sheet is drawn. */
   .sheet {
     display: grid;
-    gap: var(--sp-7);
-  }
-
-  .band {
     min-inline-size: 0;
-  }
-
-  .band-name {
-    margin: 0 0 var(--sp-2);
-    font-size: var(--fs-head);
-    font-weight: 600;
   }
 
   .band-line {

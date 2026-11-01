@@ -22,6 +22,7 @@ import { singularOf } from '../voice.ts';
 import { often } from '../record/actions.ts';
 import { DAYS, EVERY, calendarWords, clockWords, inMonths } from './calendar.ts';
 import { idWords } from './chips.ts';
+import { learnTitles } from './plain-fail.ts';
 import { OLDER, held, type ArgFrom, type FlowGrammar, type GrammarArg, type GrammarStep } from './grammar.ts';
 
 /* ── the definition, as §3 sketches it and `rules.ts` declares it ──────────── */
@@ -1649,6 +1650,7 @@ const SCRIPT_TITLES = new Map<string, string>();
 /** Learn the titles of the scripts the record listed (`scripts`), for every step sentence drawn after. */
 export function learnScripts(rows: readonly { script: string; title: string }[]): void {
   for (const r of rows) if (r.title.trim() !== '') SCRIPT_TITLES.set(r.script, r.title);
+  learnTitles(rows);
 }
 
 /** What a person calls a script: its declared title when the record has said it, else its id in words. A reference (`{{vars.which}}`) is left as the reference it is. */
