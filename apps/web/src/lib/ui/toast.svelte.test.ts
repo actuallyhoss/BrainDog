@@ -426,3 +426,13 @@ test('AN UNDO THAT IS NOT DRAWN keeps the report\'s window and still answers the
   t.mock.timers.tick(REPORT);
   assert.deepEqual(toasts.items, [], 'a toast with no drawn action kept the eight seconds of one that has one');
 });
+
+test('A MODULE TURNED ON HUSHES EVERY PLACE THAT COMES WITH IT, for half a minute (AP17)', (t) => {
+  fresh(t);
+  const at = 1_000_000;
+  assert.equal(toasts.wasNamed('/agents', at), false);
+  toasts.hush(at);
+  assert.equal(toasts.wasNamed('/agents', at + 1), true, 'the agents’ place that came with Money was said again');
+  assert.equal(toasts.wasNamed('/p/money', at + 29_000), true);
+  assert.equal(toasts.wasNamed('/agents', at + 31_000), false, 'a place that came long after was never said');
+});

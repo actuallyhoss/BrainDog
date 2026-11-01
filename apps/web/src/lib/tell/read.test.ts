@@ -80,7 +80,8 @@ test('the Nadia sentence on a fresh shop record is a client, an order from her a
     party: { $row: 0 },
   });
   assert.equal(paid!.said, 'EGP\u00a0900 from Nadia, by InstaPay');
-  assert.equal(paid!.detail, 'paid, kept in Bills and invoices');
+  /* EVERY PAYMENT IS SAID THE ONE WAY, kept in Money (AP27). */
+  assert.equal(paid!.detail, 'kept in Money');
   /* Nothing is missing, so one press adds all three. */
   assert.deepEqual(paid!.missing, []);
 });
@@ -96,7 +97,7 @@ test('a record that holds an account keeps the payment on its Ledger, filed to t
   assert.equal(paid.fields.account, 'accounts#1');
   assert.equal(paid.fields.what, 'Payment from Nadia, by InstaPay');
   assert.equal(paid.said, 'EGP\u00a0900 from Nadia, by InstaPay');
-  assert.equal(paid.detail, 'paid, kept in Ledger');
+  assert.equal(paid.detail, 'kept in Money');
   assert.deepEqual(paid.missing, []);
 });
 
@@ -291,7 +292,7 @@ test('"14 MUGS FOR LINA, SHE PAID 1200" IS ONE ORDER FROM LINA, paid, on the day
   const paid = rows[2]!;
   assert.deepEqual(paid.fields.party, { $row: 0 });
   assert.equal(paid.said, 'EGP 1,200 from Lina');
-  assert.equal(paid.detail, 'paid, kept in Bills and invoices');
+  assert.equal(paid.detail, 'kept in Money');
   /* ONE LINE A PERSON READS, never "in" over "into". */
   for (const r of rows) assert.doesNotMatch(`${r.said} ${r.detail}`, /\bin\b.*\binto\b/u);
 });
@@ -966,8 +967,9 @@ test('MONEY IN THAT NOBODY OWED IS NEVER "KEPT IN BILLS" (AN10)', () => {
   const salary = tellRead('Got paid 45,000 salary today', personal).rows[0]!;
   assert.equal(salary.fields.what, 'Salary');
   assert.equal(salary.detail, 'kept in Money');
-  /* A client's payment is still the invoice it settles. */
-  assert.equal(tellRead(NADIA, fresh).rows[2]!.detail, 'paid, kept in Bills and invoices');
+  /* A client's payment is still the invoice it settles, and said in Money as every payment is (AP27). */
+  assert.equal(tellRead(NADIA, fresh).rows[2]!.register, 'obligations');
+  assert.equal(tellRead(NADIA, fresh).rows[2]!.detail, 'kept in Money');
 });
 
 test('A BIRTHDAY FOR SOMEBODY KEPT, WITH NO DATES KEPT, IS OFFERED ON THEM', () => {
@@ -1308,4 +1310,68 @@ test('A DATE IN ONE CLAUSE NEVER TURNS ANOTHER CLAUSE\'S WEEKDAY INTO A DATE (RQ
   const told = tellRead('Netflix 180 a month on the 10th, Electricity 850 due Friday', { ...founder, lists: [...founder.lists, RECURRING] }).rows;
   const power = told.find((r) => /Electricity/u.test(String(r.fields.what ?? r.said)))!;
   assert.match(power.detail, /due Friday/u);
+});
+
+/* ── audit 1 Nov: mark paid by name or whose it is, "New project:" with no Projects, one place for a payment ─────── */
+
+test('"RENT PAID" AND "RENT 12,000 JUST PAID" MARK THE OPEN RENT, never a second payment (AP6)', () => {
+  const BILLS = { ...DUE, done: ['paid', 'written_off'] };
+  const SOLD = { ...ORDERS, done: ['paid'] };
+  const open = [
+    { register: 'obligations', seq: 4, name: 'Rent', due: '2026-10-12', amount: { amount: 1200000, currency: 'EGP' }, toMe: false },
+    { register: 'obligations', seq: 5, name: 'Electricity bill', due: '2026-10-09', amount: { amount: 85000, currency: 'EGP' }, toMe: false },
+    { register: 'orders', seq: 1, name: '3 vanilla jars', due: '2026-10-13', amount: { amount: 150000, currency: 'EGP' }, toMe: true, by: { seq: 2, name: '' } },
+  ];
+  const record = { lists: [PEOPLE, SOLD, LEDGER, BILLS, TASKS], today: TODAY, currency: 'EGP', people: [{ seq: 2, name: 'Salma Adel' }], open };
+  for (const s of ['Rent paid', 'Rent 12,000 just paid', 'Paid the rent', 'Rent paid today', 'Mark rent as paid']) {
+    const told = tellRead(s, record);
+    assert.deepEqual(told.rows, [], s);
+    assert.deepEqual([told.change?.register, told.change?.seq, told.change?.ask], ['obligations', 4, 'Mark Rent (due 12 Oct) paid?'], s);
+  }
+  for (const s of ['Electricity paid', 'I paid the electricity bill']) assert.equal(tellRead(s, record).change?.seq, 5, s);
+  /* BY WHOSE IT IS: her order, linked to her in People. */
+  for (const s of ["Salma's order is paid", "Mark Salma's order paid", 'Salma paid 1,500 for her order', 'Salma paid']) {
+    const told = tellRead(s, record);
+    assert.deepEqual(told.rows, [], s);
+    assert.deepEqual([told.change?.register, told.change?.seq, told.change?.ask], ['orders', 1, "Mark Salma's order (3 vanilla jars, due 13 Oct) paid?"], s);
+  }
+  /* ANOTHER FIGURE IS STILL KEPT AS PAID, and marking the rent is offered beside it. */
+  const less = tellRead('Rent 10,000 paid', record);
+  assert.equal(less.rows.length, 1);
+  assert.equal(less.change?.ask, 'Or mark Rent (due 12 Oct, EGP\u00a012,000) paid?');
+  /* Not paid yet is never marked, and paying somebody is never their order marked. */
+  assert.equal(tellRead("Rent isn't paid yet", record).change, undefined);
+  assert.equal(tellRead('Paid Nadia 300', record).change, undefined);
+  /* With nothing open, nothing is marked. */
+  assert.equal(tellRead('Rent paid', { ...record, open: [] }).change, undefined);
+});
+
+test('TWO OPEN ENTRIES THE LINE COULD MEAN ARE ASKED ABOUT, each its own press (AP6)', () => {
+  const BILLS = { ...DUE, done: ['paid', 'written_off'] };
+  const open = [
+    { register: 'obligations', seq: 4, name: 'Rent', due: '2026-10-12', amount: { amount: 1200000, currency: 'EGP' }, toMe: false },
+    { register: 'obligations', seq: 9, name: 'Rent', due: '2026-11-12', amount: { amount: 1250000, currency: 'EGP' }, toMe: false },
+  ];
+  const record = { lists: [PEOPLE, LEDGER, BILLS, TASKS], today: TODAY, currency: 'EGP', open };
+  const told = tellRead('Rent paid', record);
+  assert.deepEqual(told.rows, []);
+  assert.equal(told.which?.ask, 'Which one was paid?');
+  assert.deepEqual(told.which?.marks.map((m) => [m.seq, m.label]), [[4, 'Rent, due 12 Oct'], [9, 'Rent, due 12 Nov']]);
+  /* The figure said picks the one it comes to. */
+  assert.equal(tellRead('Rent 12,500 paid', record).change?.seq, 9);
+});
+
+test('"NEW PROJECT: …" WITH NO PROJECTS OFFERS TO START THEM, and names the thing without "New project:" (AP7)', () => {
+  const blank = { lists: [PEOPLE, TASKS], today: TODAY, currency: 'EGP' };
+  const told = tellRead('New project: Kitchen renovation, the whole lot', blank);
+  assert.deepEqual(told.rows, []);
+  assert.equal(told.needsProjects, true);
+  assert.equal(told.why, 'This BrainDog keeps no projects yet. Or keep it as one of these:');
+  assert.deepEqual(told.offers?.map((o) => [o.register, o.said]), [['tasks', 'Kitchen renovation']]);
+  /* A shop with nowhere else for it is offered Projects alone. */
+  const shopOnly = tellRead('New project: Kitchen renovation', { lists: [PEOPLE, ORDERS, LEDGER, DUE], today: TODAY, currency: 'EGP' });
+  assert.equal(shopOnly.needsProjects, true);
+  assert.equal(shopOnly.offers, undefined);
+  /* Where Projects is kept, it is a project, as before. */
+  assert.deepEqual(tellRead('New project: Kitchen renovation', { ...blank, lists: [PEOPLE, TASKS, THINGS] }).rows.map((r) => r.register), ['things']);
 });

@@ -84,8 +84,10 @@ export type TellOptions = {
   me?: string | null;
 };
 
-/** An entry still open, on the list it is kept in: one a line can mark paid by its number. */
-export type Open = Known & { register: string };
+/** An entry still open, on the list it is kept in: one a line can mark paid by its number, its name or whose it is. */
+/* AND WHAT IT IS SAID BY BESIDE ITS NAME (AP6): the day it is due, what it comes to, who it is linked to (`by`, a name
+   the record may not have sent, found again in `people` by its number) and which way its money goes (`toMe`). */
+export type Open = Known & { register: string; due?: string; amount?: MoneyValue; by?: Known; toMe?: boolean };
 
 /** A field's value: as the record takes it, or `{ $row: n }` for the entry at index `n` of the same call. */
 export type TellValue = string | number | boolean | MoneyValue | { $row: number };
@@ -119,6 +121,11 @@ export type Told = {
   needsMoney?: true;
   /** It fits nowhere on a record that keeps no things to do: the card offers to start a to-do list (Work) and add it (AO7). */
   needsTodo?: true;
+  /* NO LIST OF PROJECTS, for "New project: …" (AP7): the card offers to start Projects and add it. */
+  needsProjects?: true;
+  /** Two or more open entries the line could mean, "Rent paid" with May's and June's open (AP6): which is asked, each
+      its own press. */
+  which?: { ask: string; marks: TellChange[] };
   /** Somebody kept on the record whom the line names, when it fits no list: their page is offered (AN9). */
   about?: { name: string; href: string };
   /** What the line says of somebody kept, offered as a change to their entry: one press keeps it on them. */
@@ -136,7 +143,8 @@ export type Told = {
    `already` is what is said when every note already holds its day, and nothing is written. */
 /* AND THE PRESS RE-READS THE ENTRY FIRST (RQ5): `shut` is its list's finished states, and what is said, with nothing
    written, when the entry is in one already: paid (`paid`) or closed some other way, written off (`other`). */
-export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string; mark?: true; also?: readonly TellChange[]; already?: string; shut?: { states: readonly string[]; paid: string; other: string } };
+/* `label` is the few words its own button says when it is one of several (`Told.which`): "Rent, due 5 Nov". */
+export type TellChange = { register: string; seq: number; name: string; field: string; line: string; ask: string; done: string; mark?: true; also?: readonly TellChange[]; already?: string; shut?: { states: readonly string[]; paid: string; other: string }; label?: string };
 
 /** The state a list keeps an entry paid in, as it declares it: "paid" itself, finished, on a list keeping money. Never
     "cleared" or "done" (RQ3): a Ledger line cleared is no bill paid. */
@@ -713,6 +721,21 @@ const PART_PAID = /^(?:half|partly|partially|part|some|mostly|almost|nearly)(?:\
 const PAID_FOR = new RegExp(`\\s+((?:for\\s+)?(?:(?:the\\s+)?month\\s+of\\s+)?(?:${MONTH}|(?:this|last|next)\\s+(?:month|quarter|year)|q[1-4]|h[12]))$`, 'iu');
 /* "INVOICE 1042", "ORDER #57", "BILL NO. 12": a bill, an invoice or an order by its number and nothing else. */
 const REF_SAID = /^(order|invoice|inv|bill)\s*(?:#|no\.?|number)?\s*(\p{Nd}+)$/iu;
+/* AN OPEN ENTRY SAID PAID BY ITS NAME OR WHOSE IT IS (audit 1 Nov, AP6): "Rent paid", "Salma's order is paid", "Mark the
+   electricity bill as paid", "Rent 12,000 just paid". What was paid first, "paid" last, "mark" before it when he says so. */
+const MARK_LAST = /^(?:(?:i|we)\s+(?:have\s+|just\s+)?)?(?:mark(?:ed)?\s+)?(.+?)\s+(?:as\s+)?(?:(?:is|was|has been|have been|got|now|just|finally|already|all|fully|been)\s+)*paid(?:\s+(?:already|off|in full|now|up))?$/iu;
+/* "I paid the rent", "Paid the electricity bill", "Paid 300 for rent": the act first, what was paid after it. */
+const MARK_FIRST = /^(?:(?:i|we)\s+)?(?:just\s+|finally\s+|already\s+)?paid\s+(?:off\s+)?((?:the|my|our)\s+)?(.+)$/iu;
+/* "Salma paid 1,500 for her order", "Salma paid for the cake", "Salma has paid": somebody paying what they owe him. */
+const WHO_PAID = new RegExp(`^(${NAME})\\s+(?:has\\s+|just\\s+|finally\\s+|already\\s+)?paid(?:\\s+(?:me|us))?(?:\\s+(.+))?$`, 'u');
+/* "Salma's order", "salma's cake": whose it is, said first. */
+const WHOSE = /^([\p{L}\p{M}'’-]+?)['’]s\s+(.+)$/u;
+/* Words that say it is not paid yet, anywhere in the line: no open entry is offered as marked. */
+const STILL_OWED = /\b(?:not|never|unpaid|to be|will|needs? to|must|should|yet|owes?)\b|n['’]t\b/iu;
+/* What a line calls an entry without naming it: "the order", "the bill", "her invoice", "the payment". */
+const MARK_NOUN: Readonly<Record<string, 'order' | 'bill' | 'invoice' | 'any'>> = { order: 'order', bill: 'bill', invoice: 'invoice', inv: 'invoice', payment: 'any', one: 'any', it: 'any' };
+/* The most open entries a line may mean before it is too loose to ask which. */
+const MARK_MOST = 4;
 /* THE WORDS A BILL STILL TO PAY IS SAID WITH, off its name: "Rent 12,000 isn't paid" is "Rent", to pay. */
 const NOT_PAID_TAIL = /(?:\s+(?:is|isn['’]t|was|wasn['’]t|has|hasn['’]t|have|haven['’]t|not|never|still|yet|been|be|to|will|won['’]t|get|gets|getting))+\s+paid(?:\s+(?:yet|off|in full))?$|\s+(?:unpaid|not paid)(?:\s+yet)?$/iu;
 /* A NUMBER A THING IS KNOWN BY IS NEVER ITS AMOUNT (RO3): "Order 57 paid", "Invoice 1042 paid", "Room 12", "#57", "No. 57".
@@ -1012,6 +1035,10 @@ const WHY = {
   /* A LINE THAT NAMES SOMEBODY KEPT, AND FITS NO LIST, IS OFFERED THEIR PAGE (AN9): "Coffee with Mona on Sunday". */
   about: (name: string, more: boolean) => `It names ${name}. Keep it on their page${more ? ', or as one of these:' : '.'}`,
   offer: 'Or keep it as one of these:',
+  /* "NEW PROJECT: …" WHERE NO PROJECTS ARE KEPT (AP7): never a task called "New project: …". */
+  noProjects: 'This BrainDog keeps no projects yet.',
+  /* TWO OPEN ENTRIES THE LINE COULD MEAN (AP6). */
+  whichPaid: 'Which one was paid?',
   /* WITH NOTHING TO OFFER BUT A TO-DO LIST (AO7), "one of these" over one button. */
   offerTodo: 'Or keep it as a to-do:',
 };
@@ -1083,6 +1110,8 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   let known: string | null = null;
   /* What the line says of somebody kept, offered on their entry (`keptOn`). */
   let change: TellChange | null = null;
+  /* Two or more open entries a line marking one paid could mean (AP6): which is asked. */
+  let which: NonNullable<Told['which']> | null = null;
   /* A birthday was read, so "Dad's is 3 Mar" after it is one too (RP2). */
   let bornSaid = false;
   /* The bank's own text named no currency: never kept in the record's. */
@@ -1154,6 +1183,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
 
   /* A NEW PROJECT IS READ WHOLE TOO: what comes after its name says what it is. */
   if (project(text)) return finish();
+  /* AND WHERE NO PROJECTS ARE KEPT, STARTING THEM IS OFFERED (AP7), with the thing named properly where it could go. */
+  const unkept = projectList(opts.lists) ? null : noProjects();
+  if (unkept !== null) return unkept;
+
+  /* AN OPEN BILL, INVOICE OR ORDER SAID PAID BY ITS NAME OR WHOSE IT IS IS MARKED, never paid a second time (AP6). */
+  if (markNamed()) return finish();
 
   const message = FROM_MESSAGE.exec(text);
   if (message && aName(message[1]!)) subject = message[1]!;
@@ -1317,6 +1352,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     if (whenNext) return { rows, left, why: WHY.whenNext };
     if (noMoney && !placed) return { rows, left: [], why: WHY.noMoney, needsMoney: true };
     if (noCurrency && !placed) return { rows, left, why: WHY.whichCurrency(unsureWord?.word ?? null, unsureWord?.figure ?? '300') };
+    if (which !== null && !placed && rows.length === 0) return { rows, left: [], which };
     if (change !== null && !placed && rows.length === 0) return { rows, left: [], change };
     if (known !== null && !placed && rows.length === 0) return { rows, left: [], why: WHY.known(known, people?.name ?? 'People') };
     if (placed || unsureOf || noMoney) return { rows, left, ...(change ? { change } : {}) };
@@ -1624,6 +1660,160 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     rows.push({ register: l.id, fields, said: title, detail: [aboutSaid, `new in ${l.name}`].filter(Boolean).join(', '), icon: iconOf(l), missing: missingOf(l, fields) });
     placed = true;
     return true;
+  }
+
+  /** "New project: Kitchen renovation" on a record that keeps no projects (AP7): starting Projects is offered, and the
+      lists it could go into now, with its name and never "New project:" in it. `null` when the line is no such thing. */
+  function noProjects(): Told | null {
+    const m = PROJECT.exec(text);
+    const [name = ''] = m ? m[2]!.split(/,\s*|\.\s+|\s+[–-]\s+/u) : [];
+    const title = capital(trimWords(name));
+    if (!m || !title) return null;
+    text = title;
+    const seen = new Set<string>();
+    const offers = [taskList(opts.lists, opts.capture), ...offerLists(opts.lists)].flatMap((l) => {
+      if (!l || seen.has(l.id) || keepsSomebody(l, opts.lists)) return [];
+      seen.add(l.id);
+      const row = plainRow(l, false);
+      return row ? [row] : [];
+    });
+    const two = offers.slice(0, 2);
+    return { rows: [], left: [], why: `${WHY.noProjects}${two.length > 0 ? ` ${WHY.offer}` : ''}`, needsProjects: true, ...(two.length > 0 ? { offers: two } : {}) };
+  }
+
+  /**
+   * "RENT PAID", "SALMA'S ORDER IS PAID", "RENT 12,000 JUST PAID" (AP6): an open bill, invoice or order the line names by
+   * its name, or by whose it is, is offered as marked paid, "Mark Rent (due 5 Nov) paid?", never paid a second time. Two
+   * that it could mean are asked about, each its own press. A figure said that is not what the one entry comes to keeps
+   * the payment, with marking the entry offered beside it. False when no open entry fits, and the line reads as before.
+   */
+  function markNamed(): boolean {
+    const pool = (opts.open ?? []).filter((e) => {
+      const l = opts.lists.find((x) => x.id === e.register);
+      return l !== undefined && markKind(l) !== null && paidStateOf(l) !== null;
+    });
+    if (pool.length === 0) return false;
+    const line = text.replace(/[.!]+$/u, '');
+    if (STILL_OWED.test(line)) return false;
+    const said = takeDay(line, opts.today).rest;
+    let owner: string | null = null;
+    /* Somebody paying what they owe him: only an entry owed to him is theirs to pay. */
+    let fromThem = false;
+    let thing: string;
+    /* "Rent paid" is no Rent paying him: only somebody pays what they owe. */
+    const named = WHO_PAID.exec(said);
+    const who = named && isSomebody(named[1]!) ? named : null;
+    const last = who ? null : MARK_LAST.exec(said);
+    const first = who || last ? null : MARK_FIRST.exec(said);
+    if (who) {
+      owner = who[1]!;
+      thing = who[2] ?? '';
+      fromThem = true;
+    } else if (last) thing = last[1]!;
+    /* "Paid Nadia 300" is paying Nadia, never her bill marked: what follows a bare "paid" must read as nobody. */
+    else if (first && (first[1] || !/^\p{Lu}/u.test(first[2]!) || !isSomebody(first[2]!.split(/\s+/u)[0] ?? ''))) thing = first[2]!;
+    else return false;
+    /* A NUMBER IT IS KNOWN BY is the numbered reading's ("Order 57 paid"); more than one figure is no one entry. */
+    const found = amountsIn(thing, opts.currency, held);
+    if (found.length > 1 || found.some((x) => refAt(thing, x, 'opening'))) return false;
+    const a = found[0];
+    if (a) thing = oneLine(`${thing.slice(0, a.at)} ${thing.slice(a.at + a.text.length)}`);
+    const how = PAID_HOW.exec(thing);
+    if (how) thing = thing.replace(how[0], ' ');
+    thing = trimWords(oneLine(thing.replace(PAID_FOR, ' ').replace(PAID_ASIDE, ' ')))
+      .replace(/^(?:for|on)\s+/iu, '')
+      .replace(/^(?:the|my|our|her|his|their|this|that)\s+/iu, '')
+      .replace(/['’]s$/u, '');
+    const whose = owner === null ? WHOSE.exec(thing) : null;
+    if (whose) {
+      owner = capital(whose[1]!);
+      thing = whose[2]!.replace(/^(?:the|my|our)\s+/iu, '');
+    }
+    const ws = bare(thing).split(' ').filter(Boolean);
+    if (ws.length > 4) return false;
+    const noun = MARK_NOUN[ws[ws.length - 1] ?? ''];
+    if (noun !== undefined) ws.pop();
+    const kind = noun ?? 'any';
+    let core = ws.join(' ');
+    /* A NAME ALONE IS WHOSE IT IS: "Salma paid" is her order or her invoice, never a bill called Salma. */
+    if (owner === null && core !== '' && /^\p{Lu}/u.test(thing) && (knownAs(thing, opts.people ?? []) !== null || pool.some((e) => e.by !== undefined && knownAs(thing, [byOf(e.by)]) !== null))) {
+      owner = thing;
+      core = '';
+      fromThem = !/^(?:(?:i|we)\s+)?mark/iu.test(said);
+    }
+    if (owner === null && core === '' && kind === 'any') return false;
+    const listOf = (e: Open): TellList => opts.lists.find((x) => x.id === e.register)!;
+    const hasWord = (name: string, w: string): boolean => ` ${bare(name)} `.includes(` ${bare(w)} `);
+    const ownerSeq = owner === null ? undefined : knownAs(owner, opts.people ?? [])?.seq;
+    const fits = pool.filter((e) => {
+      const k = markKind(listOf(e));
+      if (kind === 'order' && k !== 'order') return false;
+      if ((kind === 'bill' || kind === 'invoice') && k !== 'bill') return false;
+      if (kind === 'invoice' && e.toMe === false && !/invoice/iu.test(e.name)) return false;
+      if (fromThem && e.toMe === false) return false;
+      if (owner !== null) {
+        const by = e.by === undefined ? null : byOf(e.by);
+        const theirs = (by !== null && ((ownerSeq !== undefined && by.seq === ownerSeq) || (by.name !== '' && knownAs(owner, [by]) !== null))) || hasWord(e.name, owner.split(' ')[0]!);
+        if (!theirs) return false;
+      }
+      return core === '' || hasWord(e.name, core);
+    });
+    if (fits.length === 0 || fits.length > MARK_MOST) return false;
+    /* WHAT IT COMES TO, AS SAID: one of several that comes to the figure is the one. */
+    const currency = a ? (a.currency ?? opts.currency) : null;
+    const minorSaid = a && currency ? minor(a, currency) : null;
+    const same = (e: Open): boolean => minorSaid !== null && e.amount !== undefined && e.amount.currency === currency && e.amount.amount === minorSaid;
+    const sized = a ? fits.filter(same) : [];
+    const chosen = sized.length === 1 ? sized : fits;
+    if (chosen.length > 1) {
+      const marks = chosen.map((e) => markOf(e, owner, false));
+      /* Two buttons that read the same say what each comes to as well. */
+      const twice = (m: TellChange): boolean => marks.filter((x) => x.label === m.label).length > 1;
+      which = { ask: WHY.whichPaid, marks: marks.map((m, i) => (twice(m) && chosen[i]!.amount ? { ...m, label: `${m.label}, ${spelled(chosen[i]!.amount!.amount, chosen[i]!.amount!.currency)}` } : m)) };
+      return true;
+    }
+    const it = chosen[0]!;
+    const differs = a !== undefined && it.amount !== undefined && !same(it);
+    const mark = markOf(it, owner, differs);
+    /* A FIGURE THAT IS NOT WHAT IT COMES TO is still kept as paid, and marking the entry is offered beside it. */
+    if (differs) {
+      change = { ...mark, ask: `Or ${mark.ask.charAt(0).toLowerCase()}${mark.ask.slice(1)}` };
+      return false;
+    }
+    change = mark;
+    return true;
+  }
+
+  /** Who an open entry is linked to, named from People where the record sent only their number. */
+  function byOf(by: Known): Known {
+    return by.name !== '' ? by : { seq: by.seq, name: (opts.people ?? []).find((p) => p.seq === by.seq)?.name ?? '' };
+  }
+
+  /** The offer to mark one open entry paid, said by its name, or whose it is, the day it is due, and what it comes to when
+      the line said another figure: "Mark Rent (due 5 Nov) paid?", "Mark Salma's order (3 vanilla jars, due Friday) paid?". */
+  function markOf(e: Open, owner: string | null, differs: boolean): TellChange {
+    const l = opts.lists.find((x) => x.id === e.register)!;
+    const to = paidStateOf(l)!;
+    const state = l.fields.find((f) => f.id === l.state)!;
+    const word = (state.labels?.[to] ?? to).toLowerCase();
+    const noun = markKind(l) === 'order' ? words(l.one ?? 'order') : e.toMe === true || /invoice/iu.test(e.name) ? 'invoice' : 'bill';
+    const name = oneLine(e.name);
+    const called = owner !== null ? `${owner}'s ${noun}` : name || capital(noun);
+    const due = e.due ? `due ${dayWord(e.due, opts.today, true)}` : '';
+    const bits = [...(owner !== null && name !== '' ? [name] : []), ...(due ? [due] : []), ...(differs && e.amount ? [spelled(e.amount.amount, e.amount.currency)] : [])];
+    const full = bits.length > 0 ? `${called} (${bits.join(', ')})` : called;
+    return {
+      register: l.id,
+      seq: e.seq,
+      name: name || capital(called),
+      field: state.id,
+      line: to,
+      ask: `Mark ${full} ${word}?`,
+      done: `Marked ${called} ${word}`,
+      mark: true,
+      shut: { states: [...(l.done ?? [])], paid: `${capital(called)} is already ${word}.`, other: `${capital(called)} isn't open any more.` },
+      label: [name || capital(called), ...(due ? [due] : [])].join(', '),
+    };
   }
 
   /** "MRR is 4,200 USD this month", "Runway is 9 months", "Tallow hit 1,000 signups": a figure, kept among the numbers,
@@ -2391,7 +2581,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        it shows, in Money, never "paid, kept in Bills". A client's payment is still the invoice it settles. */
     const plainIn = k.into && l !== ledger && k.payer === null;
     /* AND SAID IN MONEY AFTER THE ADD AS WELL (AO10): "Just added: ..., in Money", where it said "in Bills and invoices". */
-    rows.push({ register: l.id, fields, said: k.said, detail: plainIn ? 'kept in Money' : `${settled ? 'paid, ' : ''}kept in ${l.name}`, icon: iconOf(l), missing: missingOf(l, fields), ...(plainIn ? { where: { name: 'Money', href: '/p/money' } } : {}) });
+    /* AND EVERY PAYMENT SAID THE ONE WAY (audit 1 Nov, AP27): "EGP 3,000 from Upwork, kept in Money" sat beside "EGP 300 to
+       Nadia, paid, kept in Bills and invoices". Money that moved, kept in Money's own lists, is "kept in Money". */
+    const inMoney = plainIn || l.pack === undefined || l.pack === 'money-core';
+    rows.push({ register: l.id, fields, said: k.said, detail: inMoney ? 'kept in Money' : `${settled ? 'paid, ' : ''}kept in ${l.name}`, icon: iconOf(l), missing: missingOf(l, fields), ...(inMoney ? { where: { name: 'Money', href: '/p/money' } } : {}) });
     placed = true;
     return true;
   }
