@@ -564,10 +564,12 @@ export type Told = {
   key: string;
   e: AuditEvent;
   count: number;
-  many: { text: string; href: string; list: string } | null;
+  many: { text: string; href: string; list: string; rows?: number } | null;
   note: string;
   /** The oldest line's stamp, which is the burst's start; the event's own for a line on its own. */
   from: string;
+  /** The lines a minute's fold stands for (`minuteFolds`), newest first; absent on any other line. */
+  folded?: Told[];
 };
 
 const joins = (prev: AuditEvent, next: AuditEvent, first: AuditEvent, list: string): boolean =>
@@ -607,7 +609,7 @@ export function burstsOf(events: readonly AuditEvent[], nameOf: (list: string) =
       key: keyed(first),
       e: first,
       count: run.length,
-      many: rows > 1 ? { text: historyWords.rows(rows), href: `/r/${list}`, list: nameOf(list) } : null,
+      many: rows > 1 ? { text: historyWords.rows(rows), href: `/r/${list}`, list: nameOf(list), rows } : null,
       note: rows > 1 ? shared : [shared, historyWords.times(run.length)].filter(Boolean).join(' · '),
       from: run.at(-1)!.at,
     });
@@ -709,6 +711,72 @@ export function rolledRuns(told: readonly Told[]): Told[] {
   }
   return out;
 }
+
+/**
+ * ONE MINUTE'S RUN OF ONE KIND BY ONE DOER IS ONE LINE (the lists review, G28): setting up a record wrote ten "Gave
+ * access" and eleven "Created N entries" in the same minute, each its own 53px row. Lines of one minute, one doer and
+ * one kind, at least `BURST_MIN` of them, are one line at the place of the newest, holding the rest (`folded`), which
+ * open in place under it. Not a pass of the update (it folds its own steps) and not a rule's or a script's run
+ * (`rolledRuns` has said those), and never a line across two minutes: the minute is what the reader sees on the row.
+ */
+export function minuteFolds(told: readonly Told[]): Told[] {
+  const keyOfRun = (t: Told): string | null =>
+    t.folded !== undefined || ranOf(t.e) !== null || passOf(t.e as Passed) !== null ? null : `${dayOf(t.e.at)} ${clockOf(t.e.at)}\u0001${t.e.by}\u0001${t.e.kind}`;
+  const runs = new Map<string, Told[]>();
+  for (const t of told) {
+    const k = keyOfRun(t);
+    if (k === null) continue;
+    const run = runs.get(k) ?? [];
+    run.push(t);
+    runs.set(k, run);
+  }
+  const out: Told[] = [];
+  const placed = new Set<string>();
+  for (const t of told) {
+    const k = keyOfRun(t);
+    const run = k === null ? undefined : runs.get(k);
+    if (k === null || run === undefined || run.length < BURST_MIN) {
+      out.push(t);
+      continue;
+    }
+    if (placed.has(k)) continue;
+    placed.add(k);
+    out.push({
+      key: `fold:${run[0]!.key}`,
+      e: run[0]!.e,
+      count: run.reduce((n, r) => n + r.count, 0),
+      many: null,
+      note: '',
+      from: run.at(-1)!.from,
+      folded: run,
+    });
+  }
+  return out;
+}
+
+/**
+ * WHAT A MINUTE'S FOLD SAYS AS ITS TITLE: "Created 115 entries in 10 lists" where every line is about rows of a list,
+ * "Gave access to ChatGPT, Cursor and Claude" where each names something short, else "Closed 4 questions" or
+ * "Changed the page 3 times".
+ */
+export function foldSaid(word: string, kind: string, members: readonly { thing: string | null; rows: number | null; list: string | null; asked: boolean }[]): string {
+  const n = members.length;
+  if (members.every((m) => m.rows !== null && m.list !== null)) {
+    const rows = members.reduce((sum, m) => sum + (m.rows ?? 0), 0);
+    const lists = new Set(members.map((m) => m.list)).size;
+    return lists > 1 ? `${word} ${historyWords.rows(rows)} in ${count(lists)} lists` : `${word} ${historyWords.rows(rows)}`;
+  }
+  const names = [...new Set(members.map((m) => m.thing?.trim() ?? '').filter(Boolean))];
+  if (names.length === n && names.every((x) => x.length <= 32)) {
+    const said = n <= 3 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : `${names.slice(0, 2).join(', ')} and ${count(n - 2)} more`;
+    return `${word}${kind === 'access.grant' || kind === 'access.revoke' ? (kind === 'access.grant' ? ' to' : ' from') : ''} ${said}`;
+  }
+  if (members.every((m) => m.asked)) return `${word} ${count(n)} questions`;
+  return `${word} ${historyWords.times(n)}`;
+}
+
+/** THE MINUTE A LINE IS DRAWN UNDER, so a run of lines in one minute says its time once (G28). */
+export const minuteOf = (at: string): string => `${dayOf(at)} ${clockOf(at)}`;
 
 /**
  * THE LOG NEWEST FIRST BY WHEN, THEN BY ITS PLACE IN THE LOG (money F11). The record sends it by version, and a line
