@@ -47,6 +47,7 @@
   import { named } from '$lib/env.ts';
   import TabBar from '$lib/shell/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
+  import StepUp from '$lib/reauth/StepUp.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, followGrant, live, readingAs } from '$lib/data/live.svelte.ts';
   import { timingOpened } from '$lib/data/timing.ts';
@@ -1536,6 +1537,10 @@
      taken from a shared page still has to be able to report itself. ITS START IS CLEAR OF THE SIDEBAR OR ITS RAIL
      (AM19), whose width it is handed here, since the stack stands outside the shell. -->
 <div class="toasts-at" style:--toast-side={bare || endedSaid !== undefined ? undefined : sideOn ? `${sideWidth}px` : railOn ? `${RAIL_W}px` : undefined}><Toasts /></div>
+
+<!-- "CONFIRM IT'S YOU", ASKED IN PLACE (`lib/reauth`): a call refused for a stale sign-in is proved again here and sent
+     once more, on every surface the frame draws, the bare ones included. -->
+<StepUp />
 
 <!-- Debounced elsewhere; a live region that announces on every keystroke is unusable (13 §7). -->
 <div class="sr-only" role="status" aria-live="polite"></div>

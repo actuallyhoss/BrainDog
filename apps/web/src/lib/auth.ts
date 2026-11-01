@@ -15,6 +15,7 @@
 
 import { forgetSignedOut } from './record/signed-out.ts';
 import { forgetPicturesOf } from './page/drawn-pictures.ts';
+import { askProof, canAsk, purposeOf } from './reauth/ask.ts';
 
 /** Who a live session belongs to. */
 export type Who = { person: string; email: string; record: string | null; provedAt: number };
@@ -387,7 +388,10 @@ export function passkeyAutofill(io: Io = live(), clock: { wait: (ms: number, the
  */
 async function afresh<T>(io: Io, run: () => Promise<Said<T>>): Promise<Said<T>> {
   const first = await run();
-  if (first.ok || first.kind !== 'stale' || !io.credentials) return first;
+  if (first.ok || first.kind !== 'stale') return first;
+  /* INSIDE THE APP'S FRAME, THE ONE "CONFIRM IT'S YOU" (`lib/reauth`), which offers a mailed link where no passkey is. */
+  if (canAsk()) return (await askProof(purposeOf({ fix: first.fix ?? undefined }))) ? run() : first;
+  if (!io.credentials) return first;
   const proved = await passkeySignIn(io);
   return proved.ok ? run() : first;
 }

@@ -25,6 +25,7 @@
 import type { Fetch } from './boot-live.ts';
 import { copy } from '../copy.ts';
 import { wroteOutside } from '@braindog/client';
+import { isProof, NOT_CONFIRMED, provingFetch } from '../reauth/ask.ts';
 
 /**
  * Where a forwarded message is posted, built from the token the door answered.
@@ -112,7 +113,8 @@ type Answered = { ok?: unknown; value?: unknown; refusal?: Refusal };
 async function press(which: 'mint' | 'revoke', base: string, io?: Fetch): Promise<Said> {
   let res: Response;
   try {
-    res = await (io ?? fetch)(`${base.replace(/\/+$/, '')}/api/inbound/${which}`, { method: 'POST', credentials: 'same-origin' });
+    /* A STALE SIGN-IN IS ASKED FOR IN PLACE AND THE PRESS SENT AGAIN (`provingFetch`), as the client does for its calls. */
+    res = await provingFetch(() => (io ?? fetch)(`${base.replace(/\/+$/, '')}/api/inbound/${which}`, { method: 'POST', credentials: 'same-origin' }));
   } catch {
     return notReached;
   }
@@ -143,6 +145,8 @@ async function press(which: 'mint' | 'revoke', base: string, io?: Fetch): Promis
   if (refusal.code === 'ROUTE_UNKNOWN') return { kind: 'unrouted' };
   /* THE DOOR'S OWN SENTENCE, VERBATIM (`13 §6`), for the proof as well as for everything else: it says whether the
      sign-in is stale or missing, and this screen would only paraphrase it worse. */
+  /* A STALE SIGN-IN WAS ASKED FOR IN PLACE ALREADY (`lib/reauth`); what comes back is the plain line for a Cancel. */
+  if (isProof(refusal)) return { kind: 'refused', fix: NOT_CONFIRMED.write };
   if (refusal.code === 'UNAUTHORIZED' || refusal.code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix: refusal.fix };
   return { kind: 'refused', fix: refusal.fix };
 }

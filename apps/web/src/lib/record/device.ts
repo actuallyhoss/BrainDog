@@ -86,7 +86,7 @@ export function reportKeyOf(label: string | null): { name: string | null; regist
 export type Minted = { id: string; bearer: string; scope: string; expires_at: string };
 
 /** A refusal as the client hands one back, and only the keys read here. */
-export type Refusal = { code: string; fix: string };
+export type Refusal = { code: string; fix: string; at?: string | undefined };
 
 /**
  * The separators a code is printed with, gone, and nothing else.
@@ -139,8 +139,10 @@ export function answerOf(out: { ok: true; value: DeviceApproved } | { ok: false;
       return { kind: 'tries' };
     case 'DEVICE_CODE_EXPIRED':
       return { kind: 'expired' };
+    /* A STALE PROOF WAS ALREADY ASKED FOR IN PLACE ("Confirm it's you", `lib/reauth`), and the code went again had it
+       passed: what comes back is the plain line for a Cancel, not a second way to the same question. */
     case 'NEEDS_BROWSER_SESSION':
-      return { kind: 'signin' };
+      return out.refusal.at === 'proof' ? { kind: 'refused', fix: out.refusal.fix } : { kind: 'signin' };
     /* The field refuses these first; a record that disagrees about the shape is still a shape mistake. */
     case 'VALUE_MALFORMED':
       return { kind: 'malformed', why: 'other', digits: 0 };

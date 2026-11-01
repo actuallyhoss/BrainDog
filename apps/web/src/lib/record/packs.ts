@@ -16,6 +16,7 @@ import { exponentOf } from 'braindog-render';
 import { copy } from '../copy.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
 import { planOf, type Plan } from './keychain.ts';
+import { isProof } from '../reauth/ask.ts';
 
 /** A refusal as the record writes one, with only the keys this screen reads. */
 export type Refusal = { code: string; fix: string; at?: string | undefined; allowed?: readonly string[] | undefined };
@@ -434,4 +435,4 @@ export const fieldAt = (refusal: Refusal): string | null => (refusal.at?.startsW
  * Whether the answer to a refusal is signing in again: a session that is not a browser's, or not the
  * owner's. The same two the Agents settings and the Keychain offer the button for.
  */
-export const signInFor = (refusal: Refusal): boolean => refusal.code === 'NEEDS_BROWSER_SESSION' || refusal.code === 'FORBIDDEN';
+export const signInFor = (refusal: Refusal): boolean => !isProof(refusal) && (refusal.code === 'NEEDS_BROWSER_SESSION' || refusal.code === 'FORBIDDEN');

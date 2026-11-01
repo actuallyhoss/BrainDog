@@ -22,6 +22,7 @@ import { createClient } from '@braindog/client';
 import { sinceWords } from 'braindog-render';
 import type { Fetch } from '../record/boot-live.ts';
 import { copy } from '../copy.ts';
+import { isProof } from '../reauth/ask.ts';
 
 type Refusal = { code: string; fix: string };
 type Answered = { ok: true; value: unknown } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
@@ -91,6 +92,8 @@ function refusedAs(out: Answered): { kind: 'signin'; fix: string } | { kind: 're
      the screen drew the demo's sentence about having no account; there is no sample now, so it is a
      person not signed in, and the section's sign-in button is the way forward wherever they are. An unreachable host
      falls through to `refused` with the client's sentence, as it already did under a slug. */
+  /* A STALE SIGN-IN WAS ASKED FOR IN PLACE ALREADY (`lib/reauth`); what comes back is the plain line for a Cancel. */
+  if (isProof(refusal)) return { kind: 'refused', fix: refusal.fix };
   if (refusal.code === 'UNAUTHORIZED' || refusal.code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix: refusal.fix };
   return { kind: 'refused', fix: refusal.fix };
 }

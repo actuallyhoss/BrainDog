@@ -9,6 +9,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { wrote } from '$lib/record/settings-write.ts';
+  import { isProof, NOT_CONFIRMED, provingFetch } from '$lib/reauth/ask.ts';
   import { forgetOwn, renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
   import { forgetSignedOut } from '$lib/record/signed-out.ts';
   import { passkeysSaid } from '$lib/ui/signing-in.ts';
@@ -277,7 +278,8 @@
     moving = false;
     if (!out.ok) {
       moveRefusal = out.fix;
-      moveStale = out.code === 'NEEDS_BROWSER_SESSION';
+      /* A STALE SIGN-IN WAS ASKED FOR IN PLACE ALREADY (`lib/reauth`): a Cancel is the plain line and no button. */
+      moveStale = out.code === 'NEEDS_BROWSER_SESSION' && out.proof !== true;
       return;
     }
     movedTo = out.value.email;
@@ -319,13 +321,17 @@
     const leaving = s.hostAuth?.me?.person ?? null;
     let answer: { ok?: unknown; refusal?: { code?: unknown; fix?: unknown } } | undefined;
     try {
-      const res = await fetch('/account/close', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', accept: 'application/json' },
-        credentials: 'same-origin',
-        cache: 'no-store',
-        body: JSON.stringify({ email: typedClose.trim() }),
-      });
+      const body = JSON.stringify({ email: typedClose.trim() });
+      /* A STALE SIGN-IN IS ASKED FOR IN PLACE AND THE CLOSE SENT AGAIN (`provingFetch`). */
+      const res = await provingFetch(() =>
+        fetch('/account/close', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          credentials: 'same-origin',
+          cache: 'no-store',
+          body,
+        }),
+      );
       answer = await res.json().catch(() => undefined);
     } catch {
       answer = undefined;
@@ -341,7 +347,9 @@
     }
     const fix = answer?.refusal?.fix;
     closeRefusal = typeof fix === 'string' && fix !== '' ? fix : copy.closeUnreached;
-    closeStale = answer?.refusal?.code === 'NEEDS_BROWSER_SESSION';
+    const asked = isProof(answer?.refusal);
+    if (asked) closeRefusal = NOT_CONFIRMED.write;
+    closeStale = answer?.refusal?.code === 'NEEDS_BROWSER_SESSION' && !asked;
   }
 </script>
 

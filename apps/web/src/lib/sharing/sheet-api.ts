@@ -17,6 +17,7 @@ import { createClient, type Member } from '@braindog/client';
 import type { Share, ShareTarget } from '@braindog/kernel';
 
 import type { Fetch } from '../record/boot-live.ts';
+import { canAsk } from '../reauth/ask.ts';
 
 export type Preview = {
   sentence: string;
@@ -38,7 +39,9 @@ const refused = (out: { ok: false } & ({ refusal: { code: string; fix: string; a
   'refusal' in out ? { ok: false, code: out.refusal.code, fix: out.refusal.fix, at: out.refusal.at } : { ok: false, code: 'VERSION_STALE', fix: '', at: undefined };
 
 /** The confirm the record asks for before a share with no end, or Edit or Manage to an address (§6, default 1). */
-export const asksConfirm = (r: Refused): boolean => r.code === 'NEEDS_BROWSER_SESSION' && r.at === 'confirm';
+/* INSIDE THE APP'S FRAME THE CLIENT HAS ALREADY ASKED "Confirm it's you" (`lib/reauth`) and sent the share again had it
+   passed, so a confirm refusal that comes back is a Cancel, said as its plain line and not asked again in the sheet. */
+export const asksConfirm = (r: Refused): boolean => !canAsk() && r.code === 'NEEDS_BROWSER_SESSION' && r.at === 'confirm';
 
 export function sheetApi(base: string, io?: Fetch) {
   const c = createClient({ base, ...(io ? { fetch: io } : {}) });

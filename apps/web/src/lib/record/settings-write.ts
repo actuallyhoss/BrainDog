@@ -21,18 +21,20 @@ import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
 import type { Fetch } from './boot-live.ts';
 import type { Person } from './schema.ts';
+import { isProof } from '../reauth/ask.ts';
 
-type Wire<T> = { ok: true; value: T } | { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: unknown };
+type Wire<T> = { ok: true; value: T } | { ok: false; refusal: { code: string; fix: string; at?: string | undefined } } | { ok: false; conflict: unknown };
 
 export type Wrote<T> =
   | { ok: true; value: T }
-  | { ok: false; from: 'refused'; code: string; fix: string; raced: boolean };
+  /** `proof`: refused for a stale sign-in that was already asked for in place (`lib/reauth`), so no Sign in button follows. */
+  | { ok: false; from: 'refused'; code: string; fix: string; raced: boolean; proof?: boolean };
 
 /** The client's three arms as the screen's two: a conflict is a refusal that says it raced. */
 export function wrote<T>(out: Wire<T>): Wrote<T> {
   if (out.ok) return out;
   if (!('refusal' in out)) return { ok: false, from: 'refused', code: 'VERSION_STALE', fix: copy.writeRaced, raced: true };
-  return { ok: false, from: 'refused', code: out.refusal.code, fix: out.refusal.fix, raced: out.refusal.code === 'VERSION_STALE' };
+  return { ok: false, from: 'refused', code: out.refusal.code, fix: out.refusal.fix, raced: out.refusal.code === 'VERSION_STALE', ...(isProof(out.refusal) ? { proof: true } : {}) };
 }
 
 const clientOf = (base: string, io?: Fetch) => createClient({ base, ...(io ? { fetch: io } : {}) });

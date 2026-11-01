@@ -28,6 +28,7 @@ import { answerOf, codeOf, reachKey, type Answer, type Refusal } from './device.
 import { REGISTERS } from './held.ts';
 import { KEYS_REGISTER } from './keys-register.ts';
 import type { Scope } from './scope-move.ts';
+import { askProof, canAsk } from '../reauth/ask.ts';
 
 /** The scope a keychain access names when it opens the keys of no project. */
 export const GLOBAL = '*';
@@ -214,6 +215,8 @@ export type Auth = {
  * `next` lands on the app's front door, which is not the screen whose step this was.
  */
 export async function reprove(auth: Auth, go: (href: string) => void): Promise<boolean> {
+  /* INSIDE THE APP'S FRAME IT IS THE ONE "CONFIRM IT'S YOU" (`lib/reauth`): a passkey or a mailed link, without leaving. */
+  if (canAsk()) return askProof(null);
   const here = auth.support();
   const offered = await auth.methods();
   if (!(offered.ok && offered.value.passkey && here.webauthn && here.secure)) {

@@ -370,6 +370,14 @@
    * a record it had read, so a move out that is not a full load asks the record again rather than drawing the old one.
    */
   const enter = (via: 'passkey' | 'key' | 'link') => (who: Who) => {
+    /* SAID TO THE OTHER TABS: one waiting on "Confirm it's you" for this link (`lib/reauth/Reauth.svelte`) carries on. */
+    try {
+      const told = new BroadcastChannel('braindog.signin');
+      told.postMessage('in');
+      told.close();
+    } catch {
+      /* No channel in this browser: the waiting tab asks the account on its own clock instead. */
+    }
     forgetRead();
     entered = { who, via };
     link = null;

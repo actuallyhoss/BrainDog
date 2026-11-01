@@ -8,7 +8,7 @@ import { test } from 'node:test';
 
 import { keyPut } from './key-put.ts';
 
-const STALE = { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'principal' } };
+const STALE = { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'proof' } };
 const auth = (passkey: boolean, proves = true) => ({
   support: () => ({ webauthn: true, secure: true }),
   methods: async () => ({ ok: true as const, value: { passkey } }),
