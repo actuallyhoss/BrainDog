@@ -667,6 +667,27 @@
     askBox?.querySelector<HTMLElement>('button, input')?.focus();
   }
 
+  /*
+   * ENTER ANSWERS (1 Nov, keyboard first): on a choice it is that choice, and on the field what is typed; with nothing
+   * chosen it says so, as Continue does. On "What is it closest to?" a chip is chosen and the step goes on.
+   */
+  function askEnter(e: KeyboardEvent): void {
+    if (e.key !== 'Enter' || e.isComposing || e.shiftKey || readingNow) return;
+    const opt = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-value]') : null;
+    if (asks === 'closest') {
+      if (opt?.dataset.value) chosen = opt.dataset.value;
+      if (chosen === null) return;
+      e.preventDefault();
+      void keep();
+      return;
+    }
+    e.preventDefault();
+    const v = opt?.dataset.value ?? pick;
+    if (v === undefined || v === null || v.trim() === '') return unpicked();
+    pick = v;
+    void answerIt(v);
+  }
+
   async function answerIt(value: string | null): Promise<void> {
     const v = value === null || value.trim() === '' ? null : value.trim();
     if (asks === 'one' && q !== null && q.reply !== null) reply = { about: q.reply, value: v };
@@ -1434,7 +1455,8 @@
     <h1 class="entry-title" id="first-q" tabindex="-1">{words.questionTitle}</h1>
     {#if asks === 'one' && q !== null}
       <p class="entry-lede" id="first-q-ask">{q.question}</p>
-      <div class="ask-box" bind:this={askBox}>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="ask-box" bind:this={askBox} onkeydown={askEnter}>
       {#if q.reply === 'currency'}
         <Currency bind:value={pick} {locale} choices={q.choices.map((c) => ({ code: c.value, name: c.label, why: c.means ?? '' }))} suggested={q.suggested} find={q.find} />
       {:else if q.choices.length === 0}
@@ -1442,7 +1464,7 @@
       {:else}
         <div class="opts" role="radiogroup" aria-labelledby="first-q-ask">
           {#each q.choices as c (c.value)}
-            <button type="button" class="opt" role="radio" aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
+            <button type="button" class="opt" role="radio" data-value={c.value} aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
               <span class="opt-name">{#if pick === c.value}<Icon name="check" size="s" />{/if}{c.label}</span>
               {#if c.means}<span class="opt-means">{c.means}</span>{/if}
             </button>
@@ -1459,9 +1481,10 @@
     {:else}
       <p class="entry-lede">{words.closest}</p>
       <p class="quiet">{words.closestWhy}</p>
-      <div class="chips" role="group" aria-label={firstRun.mineFor}>
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div class="chips" role="group" aria-label={firstRun.mineFor} onkeydown={askEnter}>
         {#each USE_CASES as one (one.usecase)}
-          <Button weight="quiet" aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
+          <Button weight="quiet" data-value={one.usecase} aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
         {/each}
       </div>
       <div class="go sticky"><Button weight="primary" disabled={chosen === null} onclick={() => void keep()}>{words.questionNext}</Button></div>

@@ -80,6 +80,9 @@
   onMount(() => {
     const base = apiBase();
     draftsFor(base);
+    /* TODAY'S CARD AND TELL'S READER, FETCHED NOW, so the drafts draw with Today and do not push it down a beat later. */
+    void import('$lib/start/FirstDrafts.svelte').catch(() => undefined);
+    void import('$lib/tell/read.ts').catch(() => undefined);
     const s = made.said;
     const boot = page.data.live === true ? page.data.index : null;
     if (!s || !boot) return;
