@@ -31,7 +31,7 @@ import { learnPages, PAGES, REGISTERS } from './held.ts';
 import { learnRowPages } from './row-href.ts';
 import { copy } from '../copy.ts';
 import { forgetKept } from '../data/kept.ts';
-import { forgetRows } from '../data/ref-rows.ts';
+import { forgetWalks as forgetRows } from '../data/rows-forget.ts';
 import { forgetToday } from '../home/today-kept.ts';
 import { dropCopy } from './boot-copy.ts';
 import { forgetWith } from './forget-read.ts';
