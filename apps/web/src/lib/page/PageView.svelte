@@ -18,6 +18,21 @@
   the caller knows whether the reader is still on the page the answer is for, and a write that lands here asks it for
   the page again without blanking it.
 -->
+<script module lang="ts">
+  /* A PAGE'S OWN PARTS (`page-only.ts`), asked once by the first page drawn and kept for every one after it. */
+  type PageOnly = typeof import('./page-only.ts');
+  let pageOnlyIs: Promise<PageOnly> | null = null;
+  let pageOnlyHad: PageOnly | null = null;
+  const pageOnlyOf = (): Promise<PageOnly> =>
+    (pageOnlyIs ??= import('./page-only.ts').then(
+      (m) => (pageOnlyHad = m),
+      (e: unknown) => {
+        pageOnlyIs = null;
+        throw e;
+      },
+    ));
+</script>
+
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import type { Snippet } from 'svelte';
@@ -46,8 +61,6 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
-  import ShareMenu from '$lib/ui/ShareMenu.svelte';
-  import ShareLazy from '$lib/sharing/ShareLazy.svelte';
   import type { Subject } from '$lib/sharing/share-state.ts';
   import { canShare } from '$lib/sharing/may-share.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
@@ -81,9 +94,6 @@
   import { filterOf, filterQuery, filtersOf } from './filters.ts';
   import { Picked } from './picked.svelte.ts';
   import { RowHost } from './row-host.svelte.ts';
-  import RowPanel from './RowPanel.svelte';
-  import ChangesPanel from './ChangesPanel.svelte';
-  import RowVerbMenu from './RowVerbMenu.svelte';
   import { blockKeys } from './recompose.ts';
   import { pageBoards } from './page-boards.svelte.ts';
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
@@ -167,6 +177,13 @@
     /** What a home draws inside a block's tile (`PageBody`'s `inside`). */
     inside?: Snippet<[number]> | undefined;
   } = $props();
+
+  /* A PAGE'S OWN PARTS (`page-only.ts`): Share in the head and the row's panels, asked as soon as this is a page and
+     drawn the moment they land. Today's body and a preview never ask. */
+  let only = $state.raw<PageOnly | null>(pageOnlyHad);
+  $effect.pre(() => {
+    if (mode === 'page' && only === null) void pageOnlyOf().then((m) => (only = m), () => undefined);
+  });
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
   const live = $derived(got?.from === 'live' ? got : null);
@@ -360,6 +377,8 @@
     /* BY THE ROW AND WHETHER ANYTHING ASKS, and by nothing else: the page read again is a new answer naming the same row. */
     untrack(() => {
       if (!live || !about) return;
+      /* THE ROWS THAT DRAW THEM COME WITH THE READ (`BlockSlot.svelte` asks them by `import()`), so they draw with it. */
+      void import('./panels/ActionRows.svelte');
       void readHeld((url, init) => fetch(url, init), apiBase(), asking(live.page.blocks), { spoken: of, title: about.title }).then((rows) => {
         tally = { of, rows };
       });
@@ -1012,8 +1031,8 @@
         <!-- ONE SHARE ON AN ACCOUNT (audit of 30 October, 19): its first choice is sharing the account, the sheet
              `AccountShare.svelte` draws, where Share and "Share this account" stood side by side. -->
         {@const account = accountPage && sharable ? about : null}
-        <ShareMenu {slug} project={projectPage} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />
-        {#if sharing && sharable && !account}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
+        {#if only}<only.ShareMenu {slug} project={projectPage} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />{/if}
+        {#if sharing && sharable && !account && only}<only.ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
         {#if account}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="sheet" ask={accountAsk} seq={account.seq} name={account.title} />{/await}{/if}
         <ChangePage
           {slug}
@@ -1191,10 +1210,10 @@
     </SetupGate>
   {/if}
   </div>
-  {#if hosting}
-    <RowPanel {host} />
-    <ChangesPanel {host} />
-    <RowVerbMenu {host} {reread} />
+  {#if hosting && only}
+    <only.RowPanel {host} />
+    <only.ChangesPanel {host} />
+    <only.RowVerbMenu {host} {reread} />
   {/if}
 {:else if mode === 'home'}
   <!-- HOME'S BODY: the use case's page with its layout, spans and boxes, under Home's own head. Writes stay on, so a
