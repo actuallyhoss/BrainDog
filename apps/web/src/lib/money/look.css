@@ -1522,3 +1522,37 @@
   margin-inline-start: 0;
   color: var(--ink-3);
 }
+
+/* NO WORD LEFT ALONE ON A LINE (UI pass, 1 Nov): at 1280 the hero's "Lowest in the next 12 weeks: $28,226 on 24 Jan
+   2027" broke before "2027", and the page's sentence and the notes under figures did the same at other widths. Running
+   text on Money breaks where it reads, headings balance. */
+[data-money] :is(p, .cell-note, .prop-note, .item-meta, .cards-facts, .forecast-sum-note) {
+  text-wrap: pretty;
+}
+
+[data-money] :is(.block-name, .cards-title, .lead-name) {
+  text-wrap: balance;
+}
+
+/* A FIGURE AND ITS "OF" ON ONE LINE (UI pass, 1 Nov): at 1280 the budgets at a glance broke "$0 of $800" into "$0 of"
+   over "$800" in a 72px column, and Instalments' "3 of 12" the same; Forecast's "If income stopped" took two lines. */
+[data-money] :is(.progress-figure, .forecast-chip) {
+  white-space: nowrap;
+}
+
+/* THE HERO'S NOTE, TWO CLAUSES ("Lasts until …", "Lowest in the next 12 weeks …"), BREAKS INTO EVEN LINES: `pretty` left
+   "2027" alone on the second at 1280, since the note is one line at 1512 and only just two below it. */
+[data-money] .block[data-form='lead'] .cell:first-child .cell-note {
+  text-wrap: balance;
+}
+
+/* A CHIP CHOSEN IS A FILL THAT CHANGES, NOT ONE THAT JUMPS (UI pass, 1 Nov): the Ledger's, Reports' and an account's
+   filters swapped their ink fill in a frame, so a press read as a flicker across the row. The fill and the words cross
+   over `--d-menu` on the way in and `--d-exit` on the way out; nothing moves or scales, and reduced motion keeps the
+   change instant (`skin/a11y.css`). The list under them answers in place, as a filter is the same screen. */
+[data-money] :is(.filters-choice, .book-scope .segment) {
+  transition:
+    background-color var(--d-menu, 120ms) var(--ease-out, ease-out),
+    color var(--d-menu, 120ms) var(--ease-out, ease-out),
+    box-shadow var(--d-menu, 120ms) var(--ease-out, ease-out);
+}
