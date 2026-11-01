@@ -6,7 +6,7 @@
  * words reach a model only after the operator's yes, so the door is `on` only where `FIRST_READ_DAILY` is a whole number
  * above 0: that number is both the operator's yes and the day's ceiling across every stranger. Unset or 0, the door answers 501 and the page reads by rules.
  * Even on, it reads nothing without the included model (`includedInference`), a reader (`readSetup`, handed in), a bot
- * check keyed by `TURNSTILE_SECRET` and a place to count in (`MeterStore`); any one missing is the same 501.
+ * check keyed by both Turnstile keys (`turnstile.ts`) and a place to count in (`MeterStore`); any one missing is the same 501.
  *
  * THE COUNT IS THE DIRECTORY'S. Six readings a day for one address and the ceiling for all are counted by key and UTC
  * day over `MeterStore`, which the Cloud hands as the Directory's `firstReadHit`; `store: null` keeps the door off.
@@ -27,6 +27,7 @@ import type { Inference, SetupAnswer, SetupAsk, SetupOffer } from '@braindog/sla
 
 import { assetsReader, type Assets } from './catalogue.ts';
 import { includedInference, type SlashEnv } from './slash.ts';
+import { turnstileSecret, turnstileVerify } from './turnstile.ts';
 
 /** The reader: one model call over what was said and what is on offer, with no record, no owner and no ledger. */
 export type ReadSetup = (ask: SetupAsk, inference: Inference) => Promise<Result<SetupAnswer>>;
@@ -41,6 +42,7 @@ export type FirstReadEnv = SlashEnv & {
   /** The day's ceiling of readings for all strangers, and the operator's yes to them. Unset or 0 is off. */
   FIRST_READ_DAILY?: string | undefined;
   TURNSTILE_SECRET?: string | undefined;
+  TURNSTILE_SITE_KEY?: string | undefined;
   /** The static assets, holding the catalogue bundled with the shell (`/catalogue/index.json`); absent in a test. */
   ASSETS?: Assets | undefined;
 };
@@ -77,31 +79,16 @@ export function meterOver(store: MeterStore, daily: number): FirstReadDoor['mete
   };
 }
 
-/** Where Turnstile's answer is checked, as `start` checks it (`index.ts` `turnstilePassed`). */
-const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-
 /**
- * The bot check over `TURNSTILE_SECRET`, or `null` where it is unset. A COPY OF `start`'s CALL, which `index.ts` keeps to
- * itself, with one change: unset is `null` here and not a pass, because this door must not read behind an open one.
- * It fails closed on a malformed answer, Cloudflare unreachable, or anything but `success: true`.
+ * The bot check over `TURNSTILE_SECRET`, or `null` where it is unset: `turnstile.ts`'s one verify call, with one change:
+ * unset is `null` here and not a pass, because this door must not read behind an open one. The caller hands the secret
+ * only while both keys are set (`turnstileSecret`), so a half-keyed host has this door off rather than refusing every
+ * reading the page cannot earn an answer for.
  */
 export function turnstileCheck(secret: string | undefined, send: (input: string, init: RequestInit) => Promise<Response> = fetch): FirstReadDoor['botCheck'] {
   const key = (secret ?? '').trim();
   if (key === '') return null;
-  return async (answer, ip) => {
-    if (answer === '' || answer.length > 2048) return false;
-    const form = new FormData();
-    form.append('secret', key);
-    form.append('response', answer);
-    if (ip !== '') form.append('remoteip', ip);
-    try {
-      const res = await send(SITEVERIFY, { method: 'POST', body: form });
-      const verdict = (await res.json().catch(() => null)) as { success?: unknown } | null;
-      return verdict?.success === true;
-    } catch {
-      return false;
-    }
-  };
+  return (answer, ip) => turnstileVerify(key, answer, ip, send);
 }
 
 /** The field types a typed sentence can fill, as the first run's own offer keeps them (`apps/web/src/lib/start/lists.ts`). */
@@ -196,7 +183,7 @@ export function firstReadDoorOf(env: FirstReadEnv, deps: FirstReadDeps): FirstRe
   return {
     origin: deps.origin,
     on: daily > 0 && store !== null,
-    botCheck: turnstileCheck(env.TURNSTILE_SECRET, deps.send),
+    botCheck: turnstileCheck(turnstileSecret(env), deps.send),
     meter: store === null ? { take: async () => 'day' } : meterOver(store, daily),
     offer: () => catalogueOffer(env.ASSETS, deps.log),
     read: readerOver(deps.readSetup, includedInference(env)),

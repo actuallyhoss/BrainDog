@@ -210,7 +210,7 @@ test('QUESTION 7: sign-up must be what wrangler.jsonc switches it to, and a /hea
 });
 
 test('QUESTION 7: open beside a reason that stops sign-up is a miss, as a build from before the fix answered', async () => {
-  const refused = STOPPING.siteKey;
+  const refused = STOPPING.mail;
   const { code, misses, lines } = await run({
     'https://brain.example.test/healthz': healthz({ launch: { signup: 'open', botCheck: true, billing: 'off', why: [refused, 'Billing is off, so every new record is on Free.'] } }),
   });
@@ -239,7 +239,7 @@ test("QUESTION 7'S COUNT IS HELD TO launch.ts: a calm host passes it, and every 
     const state = launchState(env);
     assert.ok(state.why.length <= reasonsBeside(state.signup), state.why.join(' | '));
   }
-  const stopped = [...Object.keys(READY_ENV).map((k) => ({ ...READY_ENV, SIGNUP: 'open', [k]: undefined })), { ...READY_ENV, SIGNUP: 'open', TURNSTILE_SECRET: 's' }];
+  const stopped = Object.keys(READY_ENV).map((k) => ({ ...READY_ENV, SIGNUP: 'open', [k]: undefined }));
   for (const env of stopped) {
     assert.equal(launchState(env).signup, 'closed');
     assert.deepEqual(launchState(env).why, [SIGNUP_STOPPED]);
