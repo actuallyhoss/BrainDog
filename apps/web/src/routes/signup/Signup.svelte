@@ -490,16 +490,21 @@
         if (late) landed = s;
         return p;
       },
-      () => null,
+      /* A READ THAT THREW IS NO READING, at once: the rules' stands and nothing says it is still reading. */
+      () => {
+        if (lateFor === s) lateFor = null;
+        return 'failed' as const;
+      },
     );
     readingNow = true;
-    let quick: Proposal | null;
+    let quick: Proposal | 'failed' | null;
     try {
       quick = await Promise.race([model, new Promise<null>((done) => setTimeout(() => done(null), QUICK_MS))]);
     } finally {
       /* NEVER STUCK ON "Reading": a read that threw leaves Next pressable again. */
       readingNow = false;
     }
+    if (quick === 'failed') return reading(s);
     if (quick !== null) return quick;
     /* THE MODEL IS SLOW: on with the rules' reading of the same words, and the model's lands when it comes. */
     late = true;
