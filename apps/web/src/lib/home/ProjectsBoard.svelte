@@ -16,6 +16,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { pageButtons, take } from '$lib/page/page-buttons.svelte.ts';
   import { flip } from 'svelte/animate';
   import { arrive, depart, springy } from '$lib/motion/index.ts';
   import { apiBase, at } from '$lib/at.ts';
@@ -58,6 +59,9 @@
   /* A PROJECT'S VERBS AT THE POINTER: a right-click or a held thumb on its row, or `⇧F10` (`ownMenu`). */
   let menuRow = $state<BoardRow | null>(null);
   let point = $state<{ x: number; y: number; height: number } | null>(null);
+
+  /* THE PAGE'S BUTTONS, lent to the lead tile's first row from 900px. */
+  const lent = pageButtons();
 </script>
 
 {#if board}
@@ -67,7 +71,12 @@
   <div class="projects-board">
     <div class="b-top" data-solo={b.earning.total || b.earning.count > 0 ? undefined : ''}>
       <section class="b-lead" aria-label="Where the projects are">
-        <p class="b-date">{b.date}</p>
+        <!-- THE DAY, AND THE PAGE'S SHARE AND "⋯" AT ITS END from 900px, where the head held them on a row of their own
+             (`page-buttons.svelte.ts`). -->
+        <div class="b-date-row">
+          <p class="b-date">{b.date}</p>
+          {#if lent?.buttons}<div class="b-page-acts" {@attach take(lent)}>{@render lent.buttons()}</div>{/if}
+        </div>
         <h2 class="b-head" dir="auto">{b.headline}</h2>
         {#if b.lede}<p class="b-lede" dir="auto">{b.lede}</p>{/if}
         {#if b.acts.late || b.acts.feed || b.acts.asks}
@@ -194,6 +203,26 @@
     display: grid;
     gap: var(--inset, 12px);
     min-inline-size: 0;
+  }
+
+  .b-date-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .b-page-acts {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block: calc(-1 * var(--sp-1));
+  }
+
+  .b-page-acts :global(:is(.btn[data-weight='quiet'], .share-trigger)) {
+    background: var(--tile-2);
   }
 
   .b-lead,

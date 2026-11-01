@@ -1735,6 +1735,36 @@
     font-weight: inherit;
   }
 
+  /*
+   * WHERE THE BAR SAYS THE PAGE'S NAME, THE LEAD TILE'S FIRST ROW IS ONLY ITS BUTTONS, and it stood as a row of its own
+   * over the sentence: 56px of a tile holding Add, Share and "⋯" at its far end (People, 1 Nov). From 640 the buttons
+   * take the end of the sentence's first line instead, and the sentence keeps the rest of the row; on a phone, where
+   * the sentence needs the whole width, they stay a row over it.
+   */
+  @media (width >= 640px) {
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])) {
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: var(--sp-5);
+    }
+
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])) > :global(*) {
+      grid-column: 1 / -1;
+    }
+
+    .block-slot[data-lead] > :global(.lead-head[data-barred]) {
+      grid-row: 1;
+      grid-column: 2;
+      align-self: start;
+      /* Level with the sentence's first line (40px at the hero size). */
+      min-block-size: 40px;
+    }
+
+    .block-slot[data-lead] > :global(.lead-head[data-barred] + *) {
+      grid-row: 1;
+      grid-column: 1;
+    }
+  }
+
   .lead-under {
     min-inline-size: 0;
   }
