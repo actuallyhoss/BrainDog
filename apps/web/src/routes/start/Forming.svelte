@@ -9,19 +9,25 @@
 
   IT SETTLES IN: a row that arrives rises in on `$lib/motion`'s `arrive`, the rows that came with it one after another
   (35 apart, three at most, under 150ms in all), and holds the arrival wash for a second and a half; the rest make room
-  on the spring (`animate:flip`). A row taken out sinks away (`depart`). Under reduced motion each is a short fade.
+  on the spring (`animate:flip`). A row taken out fades where it stood (`leave`). Under reduced motion each is a short fade.
 
-  BEFORE A WORD (`ghost`), the four places a BrainDog usually has, greyed, so the tile is a picture from the first second.
+  BEFORE A WORD (`ghost`), the four places a BrainDog usually has, greyed, so the tile is a picture from the first second,
+  rising in one after another as the screen opens (`data-forming`). THE GREYED ROWS AND THE PARTS ARE ONE LIST (skills
+  pass, 2 Nov): the first answer used to swap the whole list at once, so the moment the BrainDog first formed was a cut.
+  Now a greyed place the answer turned on stays where it is and comes up to full ink (`--form-in`), the ones it did not
+  sink away, and the parts it added rise in under them. An entry the words fill later (a client named in a second
+  answer) rises into its part the same way, and the tile settles when it takes its name.
 
   NOT A LIVE REGION: the conversation says what each answer added, once.
 -->
 <script lang="ts">
   import { flip } from 'svelte/animate';
-  import { arrive, depart, springy } from '$lib/motion';
+  import { arrive, depart, settleOn, springy } from '$lib/motion';
   import Icon from '$lib/ui/Icon.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
+  import type { TransitionConfig } from 'svelte/transition';
   import { clauseOf } from '$lib/start/chat.ts';
   import type { Part as PartOf } from './building.ts';
 
@@ -80,6 +86,17 @@
     { id: 'portfolio', name: 'Projects', icon: 'projects' },
   ];
 
+  /* ONE LIST, GREYED OR HEARD, keyed by the part's id, so a greyed place the first answer turns on is the same row. */
+  type Row = { key: string; ghost: true; name: string; icon: IconName } | { key: string; ghost: false; part: PartOf };
+  const rows = $derived<Row[]>(ghost ? GHOSTS.map((g) => ({ key: g.id, ghost: true, name: g.name, icon: g.icon })) : parts.map((p) => ({ key: p.id, ghost: false, part: p })));
+
+  /**
+   * A ROW LEAVING, BY ITS OPACITY ALONE. While it fades Svelte lifts it out of the list (`animate:flip` holds it where it
+   * stood with a `translate` of its own), and `depart`'s sink wrote `transform` over that, so a row taken out jumped to
+   * the top of the tile, over Today, for as long as it faded. Its timing and curve are `depart`'s.
+   */
+  const leave = (node: Element): TransitionConfig => ({ ...depart(node), css: (t: number) => `opacity:${t}` });
+
   /** Why a part is here, in a few words. */
   function why(p: PartOf): { lead: string; words: string } | null {
     /* MADE, BUT ON THE SIDE ONLY ONCE IT HOLDS SOMETHING (`Part.waits`): said so, never as a place made now. */
@@ -121,29 +138,36 @@
   }
 </script>
 
-<Tile icon="home" title={title ?? words.title} meta={ghost || settled ? undefined : words.forming} data-build>
+<Tile icon="home" title={title ?? words.title} meta={ghost || settled ? undefined : words.forming} data-build {@attach settleOn(title)}>
   <ol class="rows">
-    <li class="row">
+    <li class="row" data-forming="today">
       <span class="well"><Icon name="sun" size="m" /></span>
       <span class="main">
         <span class="name">{words.today}</span>
         <span class="why">{words.todayWhy}</span>
       </span>
     </li>
-    {#if ghost}
-      {#each GHOSTS as g (g.id)}
-        <li class="row" data-ghost>
-          <span class="well"><Icon name={g.icon} size="m" /></span>
+    {#each rows as r (r.key)}
+      <!-- ONE ELEMENT FOR THE ROW WHETHER GREYED OR HEARD: a greyed place the answer turns on keeps its element and comes
+           up to full ink, rather than being thrown away and drawn again. -->
+      <li
+        class="row"
+        data-ghost={r.ghost ? '' : undefined}
+        data-forming={r.ghost ? 'ghost' : undefined}
+        data-arrived={!r.ghost && fresh.includes(r.key) ? '' : undefined}
+        in:arrive={{ delay: delayOf(r.key), rise: 8 }}
+        out:leave
+        animate:flip={springy()}
+      >
+        {#if r.ghost}
+          <span class="well"><Icon name={r.icon} size="m" /></span>
           <span class="main">
-            <span class="name">{g.name}</span>
+            <span class="name">{r.name}</span>
             <span class="why">{words.ghostWhy}</span>
           </span>
-        </li>
-      {/each}
-    {:else}
-      {#each parts as p (p.id)}
-        {@const w = why(p)}
-        <li class="row" data-arrived={fresh.includes(p.id) ? '' : undefined} in:arrive={{ delay: delayOf(p.id), rise: 8 }} out:depart animate:flip={springy()}>
+        {:else}
+          {@const p = r.part}
+          {@const w = why(p)}
           <span class="well"><Icon name={p.icon} size="m" /></span>
           <span class="main">
             <span class="name">{p.name}</span>
@@ -151,7 +175,7 @@
             {#if p.entries.length > 0}
               <ul class="entries">
                 {#each p.entries as e (e.key)}
-                  <li class="entry">
+                  <li class="entry" in:arrive={{ rise: 4, from: 1 }}>
                     <span class="entry-main">{e.title}{#if e.detail}<span class="entry-detail">, {e.detail.toLowerCase()}{#if e.due}, {day(e.due)}{/if}</span>{/if}</span>
                     {#if e.amount}<span class="num"><Money minor={e.amount.minor} currency={e.amount.currency} home={e.amount.currency} /></span>{/if}
                   </li>
@@ -164,19 +188,19 @@
               <Icon name="close" size="s" />
             </button>
           {/if}
-        </li>
-      {/each}
-    {/if}
+        {/if}
+      </li>
+    {/each}
   </ol>
   {#if left.length > 0 && onrestore}
-    <p class="left">
+    <p class="left" in:arrive={{ rise: 4, from: 1, delay: 120 }}>
       {words.left}
       {#each left as l, i (l.id)}
         <button type="button" class="back" disabled={busy} aria-label={words.putBack(l.name)} onclick={() => onrestore?.(l.id)}>{l.name}<Icon name="plus" size="s" /></button>{i < left.length - 1 ? ' ' : ''}
       {/each}
     </p>
   {/if}
-  {#if pages !== null && pages > 0}<p class="pages">{words.pages(pages)}</p>{/if}
+  {#if pages !== null && pages > 0}<p class="pages" in:arrive={{ rise: 4, from: 1, delay: 160 }}>{words.pages(pages)}</p>{/if}
 </Tile>
 
 <style>
@@ -196,7 +220,9 @@
     padding: var(--sp-3) var(--sp-2);
     margin-inline: calc(-1 * var(--sp-2));
     border-radius: var(--r-ctl);
-    transition: background-color 1500ms var(--ease-out);
+    transition:
+      background-color 1500ms var(--ease-out),
+      opacity var(--form-in) var(--ease-out);
   }
 
   .row + .row {
@@ -205,9 +231,10 @@
 
   .row[data-arrived] {
     background: var(--arrived);
-    transition: none;
+    transition: opacity var(--form-in) var(--ease-out);
   }
 
+  /* GREYED UNTIL HEARD: a place the answer turned on comes up to full ink over `--form-in` where it stands. */
   .row[data-ghost] {
     opacity: 0.45;
   }

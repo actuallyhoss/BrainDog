@@ -44,6 +44,8 @@
   import Button from '$lib/ui/Button.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
+  import Swap from '$lib/motion/Swap.svelte';
+  import { arrive, settleOn } from '$lib/motion';
   import type { TradeOffer } from '$lib/start/offer.ts';
   import type { SaidMade } from '$lib/start/made.ts';
   import { beginDrafts, draftsFor, firstDrafts } from '$lib/start/first-drafts.svelte.ts';
@@ -234,7 +236,9 @@
       <p class="entry-lede">{firstWords.sub(lists)}</p>
       <!-- NOTHING TO SAY IS NO LINE (AP11): the held line left a hole over Go to Today on the common screen. -->
       {#if draftLine}
-        <p class="draft-line" role="status" data-forming="drafts-line" data-state={drafting?.state}>{draftLine}</p>
+        <!-- THE LINE CHANGES IN PLACE (skills pass, 2 Nov): "Reading what you wrote" hands over to what it found with a
+             short rise, inside the same live region, so a reader hears the new words and the eye sees them change. -->
+        <p class="draft-line" role="status" data-forming="drafts-line" data-state={drafting?.state}>{#key draftLine}<span class="draft-words" in:arrive={{ rise: 4, from: 1 }}>{draftLine}</span>{/key}</p>
       {/if}
     </header>
     <div class="go">
@@ -284,22 +288,28 @@
       {/each}
     </Segmented>
 
-    {#if chosen}
-      {@const steps = stepsOf(chosen)}
-      <ol class="steps" data-numbered={steps.length > 1 ? '' : undefined} {@attach countCopies}>
-        {#each steps as s, i (s.said)}
-          <li class="cmd-step">
-            <p class="cmd-said">
-              {#if steps.length > 1}<span class="cmd-n" aria-hidden="true">{i + 1}</span>{/if}{s.said}
-            </p>
-            <div class="cmd"><CodeLine text={s.line} label={s.said} words /></div>
-            {#if s.line.startsWith('braindog setup')}<p class="cmd-then">{words.approve}</p>{/if}
-          </li>
-        {/each}
-      </ol>
-    {/if}
+    <!-- ONE APP'S STEPS HANDING OVER TO THE NEXT IN PLACE (skills pass, 2 Nov): the old fade out over `--d-exit`, the
+         new up with a 4px rise over `--d-swap`, in one cell so the sign under them does not jump. -->
+    <Swap key={chosen?.id}>
+      {#if chosen}
+        {@const steps = stepsOf(chosen)}
+        <ol class="steps" data-numbered={steps.length > 1 ? '' : undefined} {@attach countCopies}>
+          {#each steps as s, i (s.said)}
+            <li class="cmd-step">
+              <p class="cmd-said">
+                {#if steps.length > 1}<span class="cmd-n" aria-hidden="true">{i + 1}</span>{/if}{s.said}
+              </p>
+              <div class="cmd"><CodeLine text={s.line} label={s.said} words /></div>
+              {#if s.line.startsWith('braindog setup')}<p class="cmd-then">{words.approve}</p>{/if}
+            </li>
+          {/each}
+        </ol>
+      {/if}
+    </Swap>
 
-    <p class="sign" role="status" data-on={sign.connected ? '' : undefined}><span class="dot" aria-hidden="true"></span>{sign.said}</p>
+    <!-- CONNECTED SETTLES WHERE IT IS: the line gives a little and comes back on the spring the moment the agent is
+         heard, once, never on the first draw. -->
+    <p class="sign" role="status" data-on={sign.connected ? '' : undefined} {@attach settleOn(sign.connected)}><span class="dot" aria-hidden="true"></span>{sign.said}</p>
   </section>
 </section>
 
@@ -360,6 +370,11 @@
     font-size: var(--fs-body);
     line-height: 22px;
     text-wrap: pretty;
+  }
+
+  /* A BOX, so the line's handover rise moves it (a transform does not move an inline run). */
+  .draft-words {
+    display: inline-block;
   }
 
   .draft-line[data-state='ready'] {
