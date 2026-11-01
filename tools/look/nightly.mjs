@@ -221,7 +221,9 @@ async function open(page, url, quietCapMs, timeoutMs) {
   await Promise.all(pending);
   const state = await page.evaluate(() => document.querySelector('main#main')?.getAttribute('data-screen') ?? null).catch(() => null);
   const stamps = await page.evaluate(() => window.__speed ?? null).catch(() => null);
-  return { state, settleMs: stamps?.drawn ?? settled, quietMs: stamps?.quiet ?? quiet, calls: Object.values(calls).reduce((a, b) => a + b, 0), asked, refused: Object.values(refused).reduce((a, b) => a + b, 0), byMethod: calls, refusedBy: refused, bytes, recMedianMs: median(recs), recMaxMs: recs.length === 0 ? null : Math.max(...recs), all: total };
+  /* WHEN TODAY'S KEPT PICTURE WAS PAINTED, before the app had run (`kept-frame.ts`): an open the worker answers, else none. */
+  const framed = await page.evaluate(() => performance.getEntriesByName('kept-frame')[0]?.startTime ?? null).catch(() => null);
+  return { state, framedMs: framed === null ? null : Math.round(framed), settleMs: stamps?.drawn ?? settled, quietMs: stamps?.quiet ?? quiet, calls: Object.values(calls).reduce((a, b) => a + b, 0), asked, refused: Object.values(refused).reduce((a, b) => a + b, 0), byMethod: calls, refusedBy: refused, bytes, recMedianMs: median(recs), recMaxMs: recs.length === 0 ? null : Math.max(...recs), all: total };
 }
 
 /** The night's rows: each of the six at each width, cold then warm, `runs` times over, the middle of each kept. */
@@ -253,7 +255,7 @@ export async function walk({ app, screens, widths, runs, throttle = 1 }) {
           const got = tries[kind];
           const mid = (k) => median(got.map((g) => g[k]).filter((v) => v !== null));
           const last = got.at(-1);
-          rows.push({ screen: screen.key, route: screen.path, width, kind, state: last.state, settleMs: mid('settleMs'), quietMs: mid('quietMs'), calls: mid('calls'), refused: mid('refused'), bytes: mid('bytes'), recMedianMs: mid('recMedianMs'), recMaxMs: mid('recMaxMs'), byMethod: last.byMethod, refusedBy: last.refusedBy, asked: last.asked });
+          rows.push({ screen: screen.key, route: screen.path, width, kind, state: last.state, framedMs: mid('framedMs'), settleMs: mid('settleMs'), quietMs: mid('quietMs'), calls: mid('calls'), refused: mid('refused'), bytes: mid('bytes'), recMedianMs: mid('recMedianMs'), recMaxMs: mid('recMaxMs'), byMethod: last.byMethod, refusedBy: last.refusedBy, asked: last.asked });
           console.log(`  ${screen.key} @${width} ${kind}: settle ${rows.at(-1).settleMs ?? 'never'} ms, quiet ${rows.at(-1).quietMs ?? 'never'} ms, ${rows.at(-1).calls} calls (+${rows.at(-1).refused} refused), ${Math.round((rows.at(-1).bytes ?? 0) / 1024)} KB`);
         }
       }
