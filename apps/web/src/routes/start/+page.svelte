@@ -267,6 +267,8 @@
   let onByHand = $state.raw<Set<string>>(new Set());
   let offByHand = $state.raw<Set<string>>(new Set());
   let caseByHand = $state(false);
+  /** The use case the first answer read, kept through later readings without saying the person chose it. */
+  let caseKept = false;
 
 
   /** Take a reading, keeping what the person decided by hand. */
@@ -276,7 +278,7 @@
     if (nameAnswer !== null) p = withName(p, nameAnswer);
     proposal = p;
     owed = undefined;
-    if (!caseByHand) chosen = p.usecase;
+    if (!caseByHand && !caseKept) chosen = p.usecase;
     kept = [...new Set([...p.modules.filter((id) => !offByHand.has(id)), ...onByHand])];
     /* A CURRENCY TYPED IS THE ANSWER; one chosen by hand stands until a later turn types one. */
     currency = handCurrency && currency !== null ? currency : (namedCurrency(sentence, deviceOf()) ?? p.currency ?? null);
@@ -371,7 +373,7 @@
         take(p);
         /* THE FIRST ANSWER SETTLES WHAT KIND OF BRAINDOG IT IS: a later answer read with it adds parts, and never swaps
            the use case under the person (a founder's money answer read the whole as a small business). */
-        if (q.topic === 'what' && chosen !== null) caseByHand = true;
+        if (q.topic === 'what' && chosen !== null) caseKept = true;
         /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`), kept as by hand. */
         const part = TURNS_ON[q.topic];
         if (part !== undefined && adds !== '' && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !kept.includes(part) && offered.includes(part)) {
