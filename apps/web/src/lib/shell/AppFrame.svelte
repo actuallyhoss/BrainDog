@@ -67,7 +67,8 @@
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
-  import { MENU, WORK, arrange, flatNav, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { MENU, WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { byUse, keptUses, noteUse } from '$lib/shell/tab-use.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
@@ -468,8 +469,25 @@
   const keepsNoProject = $derived(
     projectsPlace !== null && !rail.things.some(([section]) => section === projectsPlace.label) && !sideLists.some((l) => l.facts?.projects === true && l.count > 0),
   );
-  /* THE PHONE'S FOUR, and Menu after them (`TabBar.svelte`): Today, Needs you, Projects, Money, or the four picked. */
-  const tabs = $derived(withThings(tabsOf(keepsNoProject ? rail.places.filter((p) => p !== projectsPlace) : rail.places, 4, navPrefs.tabs)));
+  /* THE PHONE'S FOUR, and Menu after them (`TabBar.svelte`): Today, Needs you, Projects, Money, or the four picked. WITH
+     NONE PICKED THEY FOLLOW WHAT HE OPENS MOST (`tab-use.ts`, plan F7), read once as the shell opens so the bar holds
+     still through a session; Today stays first. */
+  const tabUses = typeof window === 'undefined' ? [] : keptUses();
+  const tabs = $derived.by(() => {
+    const main = withThings(keepsNoProject ? rail.places.filter((p) => p !== projectsPlace) : rail.places);
+    const chosen = tabsOf(main, 4, navPrefs.tabs);
+    return navPrefs.tabs.length > 0 ? chosen : byUse(main, chosen, tabUses);
+  });
+  /** The place of the rail a page sits in, past Today: its own address, its section's pages, or a list under it. */
+  const placeAt = (path: string): FlatItem | undefined =>
+    withThings(rail.places)
+      .slice(1)
+      .find((p) => {
+        if (p.key === 'activity') return false;
+        if (isHere(p, path)) return true;
+        const own = model.places.find((m) => m.key === p.key)?.kids ?? (projectsPlace?.key === p.key ? (model.projects?.kids ?? []) : []);
+        return own.some((k) => path === k.href || path.startsWith(`${k.href}/`));
+      });
   /* ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE, at its own address (`MENU`); the desk draws Today there. */
   const phoneMenu = $derived(narrow && placeOf(here(page.url.pathname), page.url.searchParams) === MENU);
   $effect(() => {
@@ -819,6 +837,9 @@
   /* WHERE HE WENT, KEPT ON THIS DEVICE for the empty palette's Recent. The first screen counts too. */
   afterNavigate((nav) => {
     if (nav.to) noteOpened(`${nav.to.url.pathname}${nav.to.url.search}`, PRODUCT);
+    /* AND WHICH PLACE IT WAS IN, for the phone's four (`tab-use.ts`). */
+    const went = nav.to ? placeAt(placeOf(here(nav.to.url.pathname), nav.to.url.searchParams)) : undefined;
+    if (went) noteUse(went.href);
     /* THE RECORD FORMING (`$lib/motion`): a screen's first second draws still, so what was already there never flies in. */
     hush();
   });
