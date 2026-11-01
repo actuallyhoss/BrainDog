@@ -522,6 +522,14 @@
   const tiled = $derived(led && !projectPage && !plain);
 
   /**
+   * AND WHERE THE SENTENCE STAYS THE HEADER'S PLAIN LINE (`plain`, the Agents page) while the bar says the name, the
+   * head's row would hold nothing but the buttons, a row of their own over the sentence. They go to the sentence's end
+   * instead (`PageBody`'s `leadEnd`), and share its row whenever both fit. A desk's only: a phone's head already puts
+   * them on the row its bar leaves.
+   */
+  const besideLead = $derived(led && !tiled && !projectPage && frame.crumbed && wide.current);
+
+  /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
    * generic "One screen that gathers what you keep an eye on" under its title as well (`define`), which on Work stood
    * between the name and the page's own sentence and said less than it. Read whether or not the page opens on it, so the
@@ -1007,7 +1015,7 @@
     {tiled}
   >
     {#snippet actions()}
-      {#if !tiled}{@render pageButtons()}{/if}
+      {#if !tiled && !besideLead}{@render pageButtons()}{/if}
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
@@ -1189,6 +1197,7 @@
         {arrangement}
         headed={led && !placed}
         leadHead={tiled && !placed ? leadRow : null}
+        leadEnd={besideLead && !placed ? pageButtons : null}
         captured={placed ? -1 : (headLine?.at ?? -1)}
         under={headLine && (tiled || !wide.current) && !shapeWaits && !placed ? lineInHead : null}
         strip={strip && led && !shapeWaits && !placed ? narrow : null}
