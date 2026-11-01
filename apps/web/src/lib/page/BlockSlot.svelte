@@ -84,7 +84,7 @@
   import { valueSaid } from '$lib/voice.ts';
   import { seenWords } from '$lib/record/blocks.ts';
   import { flip } from 'svelte/animate';
-  import { arrive, depart, dismiss, lineIn, listMotion, springy } from '$lib/motion/index.ts';
+  import { arrive, depart, dismiss, lineIn, listMotion, settleOn, springy } from '$lib/motion/index.ts';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { deskCards, type Desk } from '$lib/home/desk-part.ts';
@@ -996,14 +996,14 @@
         <section class="project-lane" aria-label={g.name || undefined}>
           {#if g.name}<h3 class="lane-head"><span class="lane-name">{g.name}</span> <span class="lane-count">· {g.said}</span></h3>{/if}
           <ul class="project-cards">
-            {#each g.cards as p (p.card.key)}<li class="pc-cell" in:cardIn out:cardOut animate:flip={springy()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
+            {#each g.cards as p (p.card.key)}<li class="pc-cell" {@attach settleOn(p.card.draft)} in:cardIn out:cardOut animate:flip={springy()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
           </ul>
         </section>
       {/each}
     </div>
   {:else}
     <ul class="project-cards">
-      {#each laneCards as p (p.card.key)}<li class="pc-cell" in:cardIn out:cardOut animate:flip={springy()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
+      {#each laneCards as p (p.card.key)}<li class="pc-cell" {@attach settleOn(p.card.draft)} in:cardIn out:cardOut animate:flip={springy()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
     </ul>
   {/if}
 {:else}
