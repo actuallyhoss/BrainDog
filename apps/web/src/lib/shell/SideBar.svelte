@@ -45,7 +45,7 @@
     countsKept,
     factOf,
     holdsProjects,
-    phoneLine,
+    leadOf,
     pinsKept,
     shownName,
     splitOf,
@@ -117,7 +117,6 @@
     none: 'No projects yet.',
     more: 'More lists',
     moreOf: 'More',
-    review: 'Review',
     hide: 'Hide the sidebar',
     show: 'Show the sidebar',
     open: (name: string) => `${name}, what is under it`,
@@ -427,6 +426,12 @@
   }
 
   const showProjects = $derived(model.projects !== null && (read === null ? !answered : holdsProjects(read)));
+  /* THE PAGE IDEAS ARE A QUIET LINE UNDER PROJECTS (plan F1): in the foot beside Settings, "2 page ideas / Review" read
+     like a setting. They stay in the foot only where no projects are drawn. */
+  const penUnder = $derived(pen !== null && showProjects && read !== null && split !== null);
+  /* MORE LISTS FOLDS ONLY WHAT IS WORTH A FOLD (plan F2): one or two lists stand in the rail as rows of their own, and a
+     fold that opened on one row is a press for one thing. From three they fold as before. */
+  const MORE_FOLDS = 3;
 
   /* A PLACE ARRIVING MAKES ROOM ON TRANSFORM ALONE (audit 11-01, AP14): the rows are measured before the rail draws what
      changed and the ones that moved glide from where they stood (`glide`), while the new one slides in (`placeIn`). Its
@@ -460,10 +465,10 @@
     <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined} aria-keyshortcuts={phone ? undefined : 'ArrowRight'} onkeydown={phone ? undefined : toPin}>
       {@render mark(p)}
       {#if phone}
-        <!-- ITS LANE AND NEXT STEP UNDER ITS NAME ON THE PHONE (Z32 of 25 October), as the laptop's cards say them. -->
-        {@const line = read ? phoneLine(p, read.label) : null}
+        <!-- ITS STATE ONLY ON THE PHONE (plan F8): "1 late", "Money in this month". The next step, cut to "Settle how Kiln
+             is licensed, …" under the name, lives on the project's own page. -->
         {@const f = factOf(p)}
-        <span class="s-two"><span class="s-name" dir="auto">{name}</span>{#if line}<span class="s-sub" dir="auto">{line}</span>{/if}</span>
+        <span class="s-name" dir="auto">{name}</span>
         {#if f}<span class="s-fact" data-tone={f.tone}>{f.text}</span>{/if}
         {#if p.working && f?.tone !== 'live'}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
       {:else}
@@ -540,7 +545,7 @@
       </button>
     {/if}
     {#if open && p.kids.length > 0}
-      {@const lead = p.lead ?? p.kids.length}
+      {@const lead = leadOf(p)}
       {@const rest = p.kids.slice(lead)}
       {@const restOpen = placeMore[p.key] ?? rest.some((k) => isLit(k.href))}
       <ul class="s-list s-nested">
@@ -589,6 +594,11 @@
         {@render fold('parked', split.parked, read.label('parked'), 'archive')}
         {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
         {#each model.projects.kids as k (k.href)}{@render link(k, false)}{/each}
+        {#if penUnder && pen}
+          <li>
+            <a class="s-row s-link s-quiet tap" data-nested="" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><span class="s-name">{pen.label}</span></a>
+          </li>
+        {/if}
       </ul>
     {:else if !answered}
       {@render outline()}
@@ -597,7 +607,11 @@
 {/snippet}
 
 {#snippet morePart()}
-  {#if model.more.length > 0}
+  {#if model.more.length > 0 && model.more.length < MORE_FOLDS}
+    <ul class="s-list">
+      {#each model.more as l (l.href)}{@render link(l, false)}{/each}
+    </ul>
+  {:else if model.more.length > 0}
     <ul class="s-list">
       <li>
         <button type="button" class="s-row s-fold tap" aria-expanded={moreOpen} onclick={() => (folds.more = !moreOpen)}>
@@ -617,9 +631,9 @@
 {#snippet footPart()}
   <ul class="s-list s-end">
     {#each model.foot as l (l.href)}
-      {#if l.href === '/settings' && pen}
+      {#if l.href === '/settings' && pen && !penUnder}
         <li>
-          <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="m" /><span class="s-name">{pen.label}</span><span class="s-count">{words.review}</span></a>
+          <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="m" /><span class="s-name">{pen.label}</span></a>
         </li>
       {/if}
       {@render link(l, false)}
@@ -642,8 +656,13 @@
         {@render projectsPart()}
       </div>
     {/if}
-    <div class="s-tile">
-      {@render morePart()}
+    {#if model.more.length > 0}
+      <div class="s-tile">
+        {@render morePart()}
+      </div>
+    {/if}
+    <!-- THE RECORD'S TOOLS AND SETTINGS IN A SHORT TILE OF THEIR OWN AT THE FOOT (plan F9), not run on after More lists. -->
+    <div class="s-tile s-tile-foot">
       {@render footPart()}
     </div>
   </div>
@@ -941,6 +960,28 @@
     color: inherit;
   }
 
+  /* A QUIET LINE UNDER THE PROJECTS (the page ideas): no glyph, its name on the projects' names' edge, the third ink. */
+  .s-quiet {
+    padding-inline-start: calc(var(--sp-2) + 20px + var(--sp-2));
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+  }
+
+  /* IN THE DARK THE MARKS GO ONE STEP QUIETER (plan F4): the slot's tint and colour read louder than the place glyphs
+     beside them, so each leans toward the nav's surface and the quiet ink. */
+  :global(:root[data-theme='dark']) .s-pm:not(:empty) {
+    background: color-mix(in oklab, var(--ph-tint) 55%, var(--nav));
+    color: color-mix(in oklab, var(--ph) 70%, var(--ink-3));
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .s-pm:not(:empty) {
+      background: color-mix(in oklab, var(--ph-tint) 55%, var(--nav));
+      color: color-mix(in oklab, var(--ph) 70%, var(--ink-3));
+    }
+  }
+
   .s-late {
     flex: none;
     color: var(--red);
@@ -1218,6 +1259,17 @@
     border-radius: var(--r-tile);
   }
 
+  /* THE FOOT TILE carries no hairline of its own: the tile is the separation. */
+  .s-phone .s-tile-foot .s-end {
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  .s-phone .s-row.s-quiet {
+    padding-inline-start: calc(var(--sp-2) + 28px + var(--sp-3));
+    font-size: var(--fs-ctl);
+  }
+
   .s-phone .s-head {
     margin-block-start: var(--sp-2);
   }
@@ -1231,11 +1283,6 @@
 
   .s-phone .s-place {
     padding-inline-end: calc(var(--tap) + var(--sp-1));
-  }
-
-  /* A PROJECT ON TWO LINES gets its own air, so its next step does not touch the name under it. */
-  .s-phone .s-row:has(.s-two) {
-    padding-block: var(--sp-2);
   }
 
   .s-phone .s-nested .s-row {
@@ -1265,27 +1312,6 @@
     border-radius: var(--r-ctl);
     color: var(--ink-3);
     cursor: pointer;
-  }
-
-  /* THE NAME WITH ITS LANE AND NEXT STEP UNDER IT, on the phone's Menu. */
-  .s-two {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-inline-size: 0;
-  }
-
-  .s-two .s-name {
-    flex: none;
-  }
-
-  .s-sub {
-    overflow: hidden;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-regular);
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .s-fact {
