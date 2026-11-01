@@ -37,6 +37,7 @@
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
   import Icon from './Icon.svelte';
+  import { haptic } from '../phone/device.ts';
   import { PHONE_WIDTH, Pull, scrims, settled, unstall } from './panel.ts';
 
   let {
@@ -250,8 +251,10 @@
     const away = pull.drop(e.clientY, e.timeStamp, el.offsetHeight, e.type === 'pointercancel');
     delete el.dataset.pull;
     /* Past it, the sheet closes from where the finger left it, and is put back as it next opens. */
-    if (away) close();
-    else el.style.translate = '';
+    if (away) {
+      haptic('light');
+      close();
+    } else el.style.translate = '';
   }
 </script>
 

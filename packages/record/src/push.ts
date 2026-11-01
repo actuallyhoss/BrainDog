@@ -178,13 +178,14 @@ export function tellFinished(deps: FinishDeps, i: Pick<Instr, 'row' | 'state' | 
   }
   const { window, tz } = windowOf(deps.sql, profile);
   if (inQuietHours(deps.nowMs, tz ?? deps.tz, window)) return 'quiet';
-  const subs = ownersPushSubs(deps.sql);
+  /* AN AGENT'S PUSH IS `agents`, so an owner who turned that kind off on their phones is not rung (`push.off`). */
+  const subs = ownersPushSubs(deps.sql, 'agents');
   if (subs.length === 0) return 'no_phone';
   const cause = finishCause(i);
   const told = deps.sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'notify.push' AND json_extract(payload, '$.cause') = ?", cause)?.n ?? 0;
   if (Number(told) > 0) return 'told';
   /* AND WHERE IT OPENS: Needs you is answered in Decide, and Done is read on Agents. A path, never a word. */
   const open = i.state === 'needs_you' ? '/decide' : '/p/agents';
-  for (const id of subs) deps.outbox('notify.push', { sub: { id }, cause, open });
+  for (const id of subs) deps.outbox('notify.push', { sub: { id }, cause, open, kind: 'agents' });
   return 'sent';
 }

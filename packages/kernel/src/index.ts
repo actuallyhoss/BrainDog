@@ -107,7 +107,7 @@ import {
 import { ack, enqueue, lease, retryDead, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
-import { leasedPushTarget, ownersPushSubs, pushOpenOf, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
+import { leasedPushTarget, ownersPushSubs, pushKindOf, pushOpenOf, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
 import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import { activeAt, shareReach, type Cap as LensCapOf, type Catalog } from './lens.ts';
@@ -591,8 +591,8 @@ export { OUTBOX_KINDS, backoffMs, retryDead, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { ERASED, subjectsOf } from './erase.ts';
 export type { EraseReport, EraseRequest } from './erase.ts';
-export { PUSH_OPEN, ownersPushSubs, pushOpenOf } from './push.ts';
-export type { PushJob, PushSettled, PushTarget } from './push.ts';
+export { PUSH_KINDS, PUSH_OFF, PUSH_OPEN, ownersPushSubs, pushKindOf, pushOpenOf } from './push.ts';
+export type { PushJob, PushKind, PushSettled, PushTarget } from './push.ts';
 export type { QuietWindow } from './digest.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
@@ -8656,8 +8656,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* AND WHERE IT OPENS (E44 of 24 October): the notice's path in this record, a handle and never a word, so a tap
            opens the question that needs him (`pushOpenOf`). A url that is not such a path is left out. */
         const open = pushOpenOf((payload as { url?: unknown } | null)?.url);
-        const marked = { ...(typeof cause === 'string' && cause !== '' ? { cause } : {}), ...(open ? { open } : {}) };
-        for (const id of ownersPushSubs(sql)) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id }, ...marked });
+        /* AND WHAT KIND OF THING IT IS (`pushKindOf`), one word of a closed list, so an owner who turned that kind off
+           (`push.off`) is not rung for it, and the phone can say the kind without saying anything of what. */
+        const about = pushKindOf(payload as { cause?: unknown; url?: unknown } | null);
+        const marked = { ...(typeof cause === 'string' && cause !== '' ? { cause } : {}), ...(open ? { open } : {}), kind: about };
+        for (const id of ownersPushSubs(sql, about)) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id }, ...marked });
       },
       note: (actor, text, urgent) => noteEvent(sql, mint, clock.now(), actor, text, urgent),
       delivers: opts.delivers ?? [],

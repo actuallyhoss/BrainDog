@@ -7,7 +7,8 @@
  * (E44 of 24 October): the Worker encrypts `{ open }` to this phone, a path in the app such as
  * `/kiln/decide/sg_...`, and it is kept only when it is under this worker's scope and made of handle characters.
  * No word of it is ever drawn: the line stays fixed, and `push.test.ts` fires a push with a title in its payload and a
- * push whose payload throws when touched.
+ * push whose payload throws when touched. AND ITS KIND (`lib/phone/kinds.ts`), one word of a closed list, picks which
+ * fixed line: "An agent needs your answer", "Your BrainDog summary is ready", never what it is about.
  *
  * THE NETWORK FIRST FOR EVERY READ AND FILE, AND THE COPY ONLY WHEN IT FAILS. Every read and every file of the app goes
  * to the network as it did before this file cached anything, and what answers is what is drawn; the copy is written on
@@ -45,12 +46,19 @@
  */
 
 import { CEILING, COPY, KEPT, accessEnded, fresh, markOf, route, words, type Route } from './lib/data/offline.ts';
+/* ─── the phone lane's imports: the kinds of push and a share from another app (`lib/phone/`) ─── */
+import { kindIn, pushLine } from './lib/phone/kinds.ts';
+import { SHARED, isShare, isSharedPhoto, sharedPhoto, takeShare } from './lib/phone/share.ts';
 
 type Waits = { waitUntil(p: Promise<unknown>): void };
 type Opened = { url: string; focus(): Promise<unknown> };
 type Fetched = Waits & { request: Request; clientId: string; respondWith(r: Promise<Response>): void };
 type Scope = {
-  registration: { scope: string; showNotification(title: string, options?: { tag?: string; data?: { open: string } }): Promise<void> };
+  registration: {
+    scope: string;
+    showNotification(title: string, options?: { tag?: string; data?: { open: string } }): Promise<void>;
+  };
+  navigator?: { setAppBadge?(n?: number): Promise<void> };
   clients: {
     matchAll(o: { type: 'window'; includeUncontrolled: boolean }): Promise<readonly Opened[]>;
     openWindow(url: string): Promise<unknown>;
@@ -82,15 +90,30 @@ const openOf = (raw: unknown): string | null => {
    and the kernel already holds urgent ones to one an hour. */
 sw.addEventListener('push', (e) => {
   let open: string | null = null;
+  let body: unknown = null;
   try {
-    open = openOf(e.data?.json());
+    body = e.data?.json();
+    open = openOf(body);
   } catch {
     open = null;
   }
-  /* A SUMMARY SAYS IT IS ONE: the 08:00 and 17:00 notes open their own screen, and are not something that needs him. */
-  const summary = open !== null && new URL(open).pathname.includes('/agents/summary/');
+  /* THE LINE IS CHOSEN BY THE PUSH'S KIND (`lib/phone/kinds.ts`), a word from a closed list the record sends beside the
+     path, and still never a word of what: "An agent needs your answer", never the question. A summary says it is one:
+     the 08:00 and 17:00 notes open their own screen, and are not something that needs him. A push with no kind (a
+     record older than the kinds) says what every push said before. */
+  const kind = kindIn(body !== null && typeof body === 'object' ? (body as { kind?: unknown }).kind : undefined);
+  const path = open === null ? null : new URL(open).pathname;
+  const line = pushLine(kind, path);
+  /* ONE LINE PER KIND, so a summary does not replace the question waiting on him, and two of one kind are one line. */
+  const tag = kind === null ? 'braindog' : `braindog-${kind}`;
+  /* AND THE APP'S ICON WEARS A DOT where the platform has one (the Badging API): the push carries no count, so it is a
+     dot, and the page puts the real Needs you count on it the moment the app is opened (`setBadge`). */
+  const dot = kind === 'summary' ? Promise.resolve() : (sw.navigator?.setAppBadge?.() ?? Promise.resolve()).catch(() => {});
   e.waitUntil(
-    sw.registration.showNotification(summary ? 'Your BrainDog summary is ready' : 'Something in your BrainDog needs you', { tag: 'braindog', ...(open ? { data: { open } } : {}) }),
+    Promise.all([
+      sw.registration.showNotification(line, { tag, ...(open ? { data: { open } } : {}) }),
+      dot,
+    ]),
   );
 });
 
@@ -119,6 +142,13 @@ sw.addEventListener('activate', (e) => e.waitUntil(Promise.all([sw.clients.claim
 
 sw.addEventListener('fetch', (e) => {
   const req = e.request;
+  /* ─── the phone lane: a share from another app with a photo in it (`lib/phone/share.ts`) ───
+     A POST to `/add` is the Home Screen app's share target; the host has nothing to take it, so it is answered here: the
+     photos wait in their own cache and the words open `/add` as a share always did. */
+  if (isShare(req.url, req.method, sw.registration.scope)) return e.respondWith(takeShare(req, sw.registration.scope, sw.caches));
+  /* AND THE PHOTO IT KEPT, drawn under the palette's field at its own address of this origin, which the page's policy
+     lets an image come from (a `blob:` address it does not). */
+  if (isSharedPhoto(req.url, req.method, sw.registration.scope)) return e.respondWith(sharedPhoto(req.url, sw.caches));
   const kind = route(
     { url: req.url, method: req.method, mode: req.mode, authorised: req.headers.has('authorization') },
     sw.registration.scope,
@@ -126,7 +156,11 @@ sw.addEventListener('fetch', (e) => {
   if (kind === 'pass') return;
   /* THE COPY GOES BEFORE THE SESSION DOES, whatever the sign-out answers: a sign-out that failed half way still meant
      he wanted nothing of the record left on this phone. */
-  if (kind === 'out') return e.waitUntil(sw.caches.delete(COPY));
+  if (kind === 'out') return e.waitUntil(Promise.all([sw.caches.delete(COPY), sw.caches.delete(SHARED)]));
+  /* ─── the phone lane: Today offline. Today's read is sent as a POST (`today`, a read the host marks `postRead`), so it
+     was a write here, never kept, and a phone that opened offline drew Today's refusal. It is kept like a read now,
+     under its address and its question. ─── */
+  if (kind === 'write' && POST_READS.test(new URL(req.url).pathname) && !req.headers.has('authorization')) return e.respondWith(postRead(e, Date.now()));
   e.respondWith(answer(kind, e, Date.now()));
 });
 
@@ -187,6 +221,37 @@ async function network(req: Request): Promise<Response | null> {
   }
   if (res.status === 401 || accessEnded(res.headers)) await sw.caches.delete(COPY);
   return res;
+}
+
+/* ─── the phone lane: reads sent as a POST, kept as reads ─── */
+
+/** The reads a client sends as a POST because their question is a body (`postRead` in the host's table). */
+const POST_READS = /\/api\/(?:today|previewPage)$/u;
+
+/**
+ * A read sent as a POST, answered as a read is: the network's answer, kept under its address and its question (the
+ * body's mark, since the same address asked with another body is another answer); and when nothing answered, the kept
+ * one for the same question, with the page told how old it is, or the refusal every write gets offline.
+ */
+async function postRead(e: Fetched, now: number): Promise<Response> {
+  const req = e.request;
+  const body = await req.clone().text().catch(() => null);
+  const key = body === null ? null : `${req.url}?~asked=${markOfText(body)}`;
+  const net = await network(req);
+  if (net !== null) {
+    const json = (net.headers.get('content-type') ?? '').includes('application/json');
+    if (key !== null && net.ok && net.type === 'basic' && json) e.waitUntil(put(key, net.clone(), now));
+    return net;
+  }
+  const held = key === null ? null : await kept(key, now);
+  if (held) {
+    e.waitUntil(tell(e.clientId, held.at));
+    return held.res;
+  }
+  return new Response(JSON.stringify({ ok: false, refusal: { code: 'UNREACHABLE', fix: words.notSent } }), {
+    status: 503,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 /** The address several reads are sent to as one, under the session's record or a named one. */

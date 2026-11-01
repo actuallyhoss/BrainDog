@@ -434,6 +434,22 @@ test('A PUSH WITH A PATH SHOWS THE SAME LINE AND A TAP OPENS THAT PATH, never a 
   assert.deepEqual(other.shown[0]?.[1], { tag: 'braindog' });
 });
 
+test('A PUSH THAT NAMES ITS KIND SAYS THE KIND\'S LINE, ON A LINE OF ITS OWN, and still no word that came with it', async () => {
+  const w = await worker();
+  await w.fire('push', { data: { json: () => ({ open: `${BASE}/kiln/decide/sg_01JQ`, kind: 'agents', title: 'Invoice 41 is late' }) } });
+  assert.equal(w.shown[0]?.[0], 'An agent needs your answer');
+  assert.deepEqual(w.shown[0]?.[1], { tag: 'braindog-agents', data: { open: `https://brain.dog${BASE}/kiln/decide/sg_01JQ` } });
+  assert.doesNotMatch(JSON.stringify(w.shown), /Invoice/u, 'a word that came with the push was drawn');
+  const money = await worker();
+  await money.fire('push', { data: { json: () => ({ open: `${BASE}/kiln/r/installments`, kind: 'money' }) } });
+  assert.equal(money.shown[0]?.[0], 'Something in your money is coming due');
+  /* A KIND THAT IS NOT ONE IS NO KIND, and the line every push said before. */
+  const odd = await worker();
+  await odd.fire('push', { data: { json: () => ({ open: `${BASE}/kiln/decide`, kind: 'Invoice 41' }) } });
+  assert.equal(odd.shown[0]?.[0], 'Something in your BrainDog needs you');
+  assert.deepEqual(odd.shown[0]?.[1], { tag: 'braindog', data: { open: `https://brain.dog${BASE}/kiln/decide` } });
+});
+
 test('A PUSH SHOWS ONE FIXED LINE AND READS NOTHING THAT CAME WITH IT', async () => {
   const w = await worker();
   /* A PAYLOAD THAT THROWS WHEN TOUCHED. Today's kernel writes `{ title, url }` into `notify.push`, and `09 §3` is that a

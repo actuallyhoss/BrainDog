@@ -58,7 +58,7 @@ test('DONE RINGS ONCE, content-free: a phone id and a handle, none of the words 
   const out = r.pushes();
   assert.equal(out.length, 1);
   /* AND WHERE A TAP OPENS, a path and never a word: Done is read on Agents. */
-  assert.deepEqual(Object.keys(out[0]!).sort(), ['cause', 'open', 'sub']);
+  assert.deepEqual(Object.keys(out[0]!).sort(), ['cause', 'kind', 'open', 'sub']);
   assert.equal(out[0]!.open, '/p/agents');
   assert.deepEqual(out[0]!.sub, { id: 'ps_1' });
   assert.match(String(out[0]!.cause), /^instruction\.[^.]+\.done$/u);

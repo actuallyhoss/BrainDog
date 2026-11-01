@@ -82,6 +82,7 @@
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
+  import { words as offlineWords } from '$lib/data/offline.ts';
   import { holdIn, presses } from '$lib/data/held.svelte.ts';
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { tick, untrack, type Snippet } from 'svelte';
@@ -246,6 +247,12 @@
   const open = $derived(needYouCount(waitsNow(), data.open, toldNow().needs.length));
   /* THE DOCK BADGE FOLLOWS THE NEEDS YOU COUNT (the PWA badge in a browser that has one); 0 clears it. */
   $effect(() => setBadge(open));
+  /* THE PHONE'S OWN WAYS ARE LOADED A MOMENT AFTER THE SHELL, so their chunk never holds up a first screen. */
+  let phoneWays = $state(false);
+  $effect(() => {
+    const t = setTimeout(() => (phoneWays = true), 800);
+    return () => clearTimeout(t);
+  });
   /* A NEW QUESTION OR HANDOFF RINGS ONCE (`alerts.ts` dedups by id and seeds on the first hearing), never while this
      window is in front, and only with the Settings switch on. A click goes to the item through the shell's `goto`. */
   let rung: Set<string> | null = null;
@@ -1454,8 +1461,8 @@
       {#if CopyMark}<CopyMark />{/if}
       <Pull />
       {#if data.offline}
-        <!-- OFFLINE, THE ERROR PAGE'S OWN WORDS, as one line over what the local copy drew. -->
-        <p class="offline-line" role="status">{copy.errorPage.offline.title}. {copy.errorPage.offline.body}</p>
+        <!-- OFFLINE, CALMLY, as one line over what the local copy drew: what it shows, and that nothing saves until back. -->
+        <p class="offline-line" role="status">{offlineWords.lastSaw} {offlineWords.cannotSave}</p>
       {/if}
       <!-- SEEING AS SOMEBODY (§3.3): the banner is its own chunk, since only an owner or an Admin trying it loads it. -->
       {#if seeingAs() !== null}
@@ -1479,6 +1486,12 @@
   <div class="tab-slot">
     <TabBar tabs={phoneTabs} menu={MENU} live={workingNow().length > 0} />
   </div>
+
+  <!-- THE PHONE'S OWN WAYS (`lib/phone/Phone.svelte`): the status bar's colour, the iPhone's launch pictures, back from the
+       left edge in the Home Screen app, and the two asks. Its own chunk, a moment after the shell has drawn. -->
+  {#if phoneWays}
+    {#await import('$lib/phone/Phone.svelte') then { default: Phone }}<Phone waiting={open} path={page.url.pathname} host={data.host} />{/await}
+  {/if}
 
   <!--
     THE SEARCH BUTTON OF A DESKTOP WITH NO RAIL, and nowhere else.
@@ -1793,6 +1806,14 @@
     min-inline-size: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  /* A PHONE ON ITS SIDE HAS ITS NOTCH AT ONE END: the work steps in by the notch's inset there, and by nothing in
+     portrait, where both insets are 0. The tab bar pays its own. */
+  @media (width < 900px) {
+    .body {
+      padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+    }
   }
 
   /* THE ROOM THE SEARCH BUTTON IN THE BOTTOM CORNER NEEDS, and only on the shape that draws it: a floating button over

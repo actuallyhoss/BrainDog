@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type EraseReport, type Kernel } from '../src/index.ts';
-import { ownersPushSubs, pushSubsOf, pushTargets, settlePush } from '../src/push.ts';
+import { ownersPushSubs, pushKindOf, pushSubsOf, pushTargets, settlePush } from '../src/push.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 23, 12);
@@ -273,4 +273,27 @@ test('A PUSH THAT NAMES WHERE IT OPENS HANDS THE PATH AND THE PHONE\'S KEYS UNDE
   assert.deepEqual(Object.keys(target.keys ?? {}).sort(), ['auth', 'p256dh']);
   assert.deepEqual(value(k.pushTarget({ outbox: bad, leasedUntil: other.leasedUntil })), { id: 'ps_ada_laptop', endpoint: ADA_LAPTOP });
   sql.close();
+});
+
+test('A KIND AN OWNER TURNED OFF RINGS NONE OF THEIR PHONES, and every other kind still rings them', async () => {
+  const { k, sql } = await record();
+  subscribe(sql, 'ps_1', 'p_ada', 'https://fcm.googleapis.com/fcm/send/ada');
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_ada', 'push.off', '[\"money\",\"summary\"]', ?)", new Date(NOW).toISOString());
+  assert.deepEqual(ownersPushSubs(sql, 'money'), []);
+  assert.deepEqual(ownersPushSubs(sql, 'summary'), []);
+  assert.deepEqual(ownersPushSubs(sql, 'needs'), ['ps_1']);
+  /* WITH NO KIND, every owner's phone, as before: the test press and the counts read it so. */
+  assert.deepEqual(ownersPushSubs(sql), ['ps_1']);
+  void k;
+  sql.close();
+});
+
+test('A PUSH IS ONE KIND, read off its cause and where it opens, and never a word of it', () => {
+  assert.equal(pushKindOf({ url: '/agents/summary/money-weekly' }), 'summary');
+  assert.equal(pushKindOf({ cause: 'asked.sg_1', url: '/decide/sg_1' }), 'agents');
+  assert.equal(pushKindOf({ cause: 'instruction.e_1.done', open: '/p/agents' }), 'agents');
+  assert.equal(pushKindOf({ url: '/r/installments' }), 'money');
+  assert.equal(pushKindOf({ url: '/r/tasks' }), 'needs');
+  assert.equal(pushKindOf({ url: '/decide' }), 'needs');
+  assert.equal(pushKindOf(null), 'needs');
 });

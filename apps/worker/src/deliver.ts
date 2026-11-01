@@ -286,8 +286,14 @@ export function leasedOpener(ask: SealAsk, store: () => Promise<KeyStore | null>
  */
 export type PushTargetAsk = (args: { outbox: string; leasedUntil: string }) => Promise<Result<PushAddress | null>>;
 
+/**
+ * What a push carries to the phone, encrypted to it: where a tap opens and, when the record named one, the kind of thing
+ * it is, one lower-case word (`PUSH_KINDS` in the kernel), so the phone can say "An agent is asking you something".
+ */
+const bodyOf = (open: string, kind: string | undefined): { open: string; kind?: string } => (kind && /^[a-z]{1,16}$/u.test(kind) ? { open, kind } : { open });
+
 /** One subscription as the record hands it under the lease, and, where the job names one, the app path a tap opens. */
-export type PushAddress = { id: string; endpoint: string; open?: string; keys?: { p256dh: string; auth: string } };
+export type PushAddress = { id: string; endpoint: string; open?: string; kind?: string; keys?: { p256dh: string; auth: string } };
 
 /** The address one leased push rings, or `null` for nobody. A refusal throws its sentence, which is the dead letter's. */
 export type PushTargetOf = (job: OutboxRow) => Promise<PushAddress | null>;
@@ -411,7 +417,7 @@ export function makeDeliver(transports: Transports): Deliver {
       const open = found.open && found.keys && /^\/[a-z0-9][a-z0-9-]{0,63}\/[A-Za-z0-9_/-]{0,200}$/u.test(found.open) ? found.open : null;
       const { status } =
         open && found.keys
-          ? await send(endpoint, { ...headers, ...PUSH_BODY_HEADERS }, await encryptPush(found.keys, new TextEncoder().encode(JSON.stringify({ open }))))
+          ? await send(endpoint, { ...headers, ...PUSH_BODY_HEADERS }, await encryptPush(found.keys, new TextEncoder().encode(JSON.stringify(bodyOf(open, found.kind)))))
           : await send(endpoint, headers);
       if (status >= 200 && status < 300) {
         await count(transports, job);

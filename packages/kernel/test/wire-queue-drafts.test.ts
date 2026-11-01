@@ -165,8 +165,13 @@ test('AT ONE IN THE AFTERNOON IT SOUNDS, and at night too on a record that turne
   const day = await studio(NOON);
   value(day.k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
   assert.deepEqual(sounded(day.sql), ['notify.email', 'notify.push']);
-  /* A PUSH THAT NAMES NO CAUSE IS ITS PHONE'S ID AND NOTHING ELSE, as it was. */
-  assert.deepEqual(JSON.parse(day.sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'notify.push'")!.payload), { sub: { id: 'ps_1' } });
+  /* A PUSH THAT NAMES NO CAUSE IS ITS PHONE'S ID, WHERE IT OPENS AND ITS KIND: a rule's notice opens its list, and a
+     money list's is `money`. */
+  assert.deepEqual(JSON.parse(day.sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'notify.push'")!.payload), {
+    sub: { id: 'ps_1' },
+    open: '/r/obligations',
+    kind: 'money',
+  });
   day.sql.close();
 
   const night = await studio(NIGHT);

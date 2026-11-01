@@ -67,6 +67,8 @@ export type Prefs = {
   'nav.labels'?: Record<string, string>;
   /** THE RULES WHOSE NOTICES THIS PERSON MUTED, as `rule:<id>`. Urgent notices always arrive. */
   'notify.muted'?: string[];
+  /** THE KINDS OF PUSH THIS PERSON TURNED OFF on every phone (`needs`, `agents`, `money`, `summary`; `lib/phone/kinds.ts`). */
+  'push.off'?: string[];
   /**
    * HOW THE APP LOOKS TO THIS PERSON, on every device they sign in on: the record's `look.*` keys. Absent scheme is the
    * device's own; size and density are the cookie's words (`pref.ts`); accent is a suggested accent by name, or `House`.

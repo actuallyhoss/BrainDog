@@ -24,14 +24,48 @@ import { no, ok } from '@braindog/ports';
  * 24 October): a path in this record, a handle and never a word ("/decide/sg_..."), which the deliverer encrypts to the
  * phone's keys (RFC 8291) so a tap opens the thing that needs him. A job with none is still a push with no body.
  */
-export type PushTarget = { id: string; endpoint: string; open?: string; keys?: { p256dh: string; auth: string } };
+export type PushTarget = { id: string; endpoint: string; open?: string; kind?: PushKind; keys?: { p256dh: string; auth: string } };
+
+/**
+ * WHAT A PUSH IS ABOUT, AS ONE WORD FROM A CLOSED LIST, so the phone can say which kind of thing it is and a person can
+ * turn each kind off (`push.off`, their own preference). Never a word anybody wrote: `needs` is something waiting on
+ * him in Needs you, `agents` an agent asking or finishing, `money` a money list's notice (a bill or instalment due),
+ * `summary` the morning and evening summary.
+ */
+export const PUSH_KINDS = ['needs', 'agents', 'money', 'summary'] as const;
+export type PushKind = (typeof PUSH_KINDS)[number];
+
+/** The person's own preference that names the kinds they turned off on every phone (`setPref`). */
+export const PUSH_OFF = 'push.off';
+
+/** The money lists whose notices are `money`: what is due, owed or repeating. */
+const MONEY_LISTS = new Set(['installments', 'obligations', 'recurring', 'bills', 'invoices', 'subscriptions', 'plans', 'transactions', 'accounts']);
+
+/**
+ * The kind of a push from what its job already carries: its cause (`asked.` an agent's question, `instruction.` an
+ * agent's finished or stuck work) and where it opens. Anything else is something that needs him.
+ */
+export function pushKindOf(p: { cause?: unknown; url?: unknown; open?: unknown } | null | undefined): PushKind {
+  const cause = typeof p?.cause === 'string' ? p.cause : '';
+  const at = typeof p?.open === 'string' ? p.open : typeof p?.url === 'string' ? p.url : '';
+  if (at.startsWith('/agents/summary/')) return 'summary';
+  if (cause.startsWith('asked.') || cause.startsWith('instruction.')) return 'agents';
+  const list = /^\/r\/([A-Za-z0-9_-]+)/u.exec(at)?.[1];
+  if (list !== undefined && MONEY_LISTS.has(list)) return 'money';
+  return 'needs';
+}
+
+/** A kind as a job carries it, or `null` for anything that is not one. */
+export const pushKindIn = (v: unknown): PushKind | null => ((PUSH_KINDS as readonly unknown[]).includes(v) ? (v as PushKind) : null);
 
 /**
  * A path a push may open: one of the app's own screens in this record (Decide, Agents, Inbox, a list), made of handle
  * characters, and short. Anything else is no path, so a push that names one opens the record's home, as every push did
  * before. A digest opens its summary's screen, `/agents/summary/<id>`. `/decide/sg_01J...`, `/p/agents`, `/r/tasks/e_9`.
+ * `p` IS A PAGE, `/p/agents` among them: `tellFinished` has always sent a finished instruction there, and without `p` here
+ * that path was dropped and the tap opened Today.
  */
-export const PUSH_OPEN = /^\/(?:decide|agents|inbox|r)(?:\/[A-Za-z0-9_-]{1,64}){0,3}$/u;
+export const PUSH_OPEN = /^\/(?:decide|agents|inbox|r|p)(?:\/[A-Za-z0-9_-]{1,64}){0,3}$/u;
 export const pushOpenOf = (url: unknown): string | null => (typeof url === 'string' && PUSH_OPEN.test(url) ? url : null);
 
 /** What one delivery found: the ids the service accepted, and the ids it answered 404 or 410 for. */
@@ -54,13 +88,21 @@ export function pushSubsOf(sql: Sql, persons: readonly string[]): string[] {
  * cannot open the record the push would send them to, so ringing their phone is telling them about a door they are
  * locked out of.
  */
-export function ownersPushSubs(sql: Sql): string[] {
+export function ownersPushSubs(sql: Sql, kind?: PushKind): string[] {
+  /* AND, FOR A PUSH OF ONE KIND, NOT THE PHONES OF AN OWNER WHO TURNED THAT KIND OFF (`push.off`, a list of kinds). */
+  const off =
+    kind === undefined
+      ? ''
+      : `AND NOT EXISTS (SELECT 1 FROM pref f, json_each(f.value) j
+           WHERE f.person_id = s.person_id AND f.key = '${PUSH_OFF}' AND j.value = ?)`;
   return sql
     .all<{ id: string }>(
       `SELECT DISTINCT s.id FROM push_sub s
          JOIN member m ON m.person_id = s.person_id AND m.register = '*' AND m.level = 'owner'
          JOIN person p ON p.id = s.person_id AND p.suspended_at IS NULL
+       WHERE 1 = 1 ${off}
        ORDER BY s.id`,
+      ...(kind === undefined ? [] : [kind]),
     )
     .map((r) => r.id);
 }
@@ -126,14 +168,19 @@ export function leasedPushTarget(sql: Sql, nowMs: number, args: { outbox: string
   const target = pushTargets(sql, [id])[0] ?? null;
   if (target === null) return ok(null);
   let open: string | null = null;
+  let kind: PushKind | null = null;
   try {
-    open = pushOpenOf((JSON.parse(job.payload) as { open?: unknown } | null)?.open);
+    const payload = JSON.parse(job.payload) as { open?: unknown; kind?: unknown } | null;
+    open = pushOpenOf(payload?.open);
+    kind = pushKindIn(payload?.kind);
   } catch {
     open = null;
   }
   if (open === null) return ok(target);
   const keys = sql.one<{ p256dh: string; auth: string }>('SELECT p256dh, auth FROM push_sub WHERE id = ?', id);
-  return ok(keys ? { ...target, open, keys: { p256dh: keys.p256dh, auth: keys.auth } } : target);
+  /* THE KIND RIDES WITH THE PATH, a word from `PUSH_KINDS` and never a word anybody wrote, so the phone says what kind of
+     thing it is ("An agent is asking you something") and still nothing of what. */
+  return ok(keys ? { ...target, open, ...(kind ? { kind } : {}), keys: { p256dh: keys.p256dh, auth: keys.auth } } : target);
 }
 
 /**
