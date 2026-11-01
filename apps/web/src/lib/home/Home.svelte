@@ -76,7 +76,8 @@
   import Empty from '$lib/ui/Empty.svelte';
   import type ClearExamplesOf from '$lib/ui/ClearExamples.svelte';
   import type FirstDraftsOf from '$lib/start/FirstDrafts.svelte';
-  import { draftsFor, draftsWaiting } from '$lib/start/first-drafts.svelte.ts';
+  import { draftsFor, draftsWaiting, firstDrafts } from '$lib/start/first-drafts.svelte.ts';
+  import { assemble, ONCE_MS, todayFormedOnce } from '$lib/start/assembling.ts';
   import type PageViewOf from '$lib/page/PageView.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
@@ -1130,6 +1131,16 @@
     if (data.live) draftsFor(apiBase());
   });
   const drafting = $derived(Boolean(data.live) && draftsWaiting(apiBase()));
+  /* THE FIRST TODAY AFTER A SIGN-UP IN THIS TAB ASSEMBLES, ONCE, as it draws (`assembling.ts`): its project cards and
+     first lines rise into place. Any other open of Today draws as it is. */
+  let formedOnce = false;
+  $effect(() => {
+    if (formedOnce || !shown || !data.live) return;
+    const k = firstDrafts.now;
+    if (k === null || k.base !== apiBase()) return;
+    formedOnce = true;
+    if (!todayFormedOnce(apiBase())) assemble(ONCE_MS);
+  });
   $effect(() => {
     if (FirstDrafts === null && drafting) void import('$lib/start/FirstDrafts.svelte').then((m) => (FirstDrafts = m.default), () => undefined);
   });

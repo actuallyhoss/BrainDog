@@ -281,9 +281,6 @@
       animation: drafts-fill 9s cubic-bezier(0.15, 0.6, 0.3, 1) both;
     }
 
-    .draft {
-      animation: drafts-in var(--d-page) var(--ease-out) both;
-    }
   }
 
   @keyframes drafts-fill {
@@ -292,12 +289,6 @@
     }
     to {
       transform: scaleX(0.92);
-    }
-  }
-
-  @keyframes drafts-in {
-    from {
-      opacity: 0;
     }
   }
 
