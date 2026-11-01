@@ -1249,6 +1249,7 @@
             said={sentence}
             title={proposal?.title ?? null}
             ghost={proposal === null && brought.length === 0}
+            settled={talkDone}
             {busy}
             {locale}
             pages={proposal ? pageCount || null : null}
@@ -1405,7 +1406,8 @@
     position: absolute;
     inset-block-start: calc(100% + 2px);
     inset-inline-start: var(--sp-2);
-    max-inline-size: 60ch;
+    /* NEVER PAST THE WINDOW: at 320 the hint ran 200px off the screen's edge, its end cut. */
+    max-inline-size: min(60ch, calc(100vw - 6rem));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1457,15 +1459,11 @@
     gap: var(--sp-4);
     align-content: start;
     min-inline-size: 0;
-    padding: var(--sp-6);
+    /* THE LEAD TILE'S PADDING (`--tile-pad-lead`: 24, 16 on a phone), the board's one step, not a 32 of its own beside
+       the build's 20 (skills pass, bento, 2 Nov). */
+    padding: var(--tile-pad-lead);
     background: var(--tile);
     border-radius: var(--r-tile);
-  }
-
-  @media (width < 640px) {
-    .talk {
-      padding: 20px;
-    }
   }
 
   /* THE HEADING FOCUS LANDS ON AFTER A READ is a place, not a control: focus-ok: it is `tabindex="-1"`, reached only

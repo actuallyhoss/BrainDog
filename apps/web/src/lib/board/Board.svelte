@@ -13,7 +13,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { SIZE_WORDS, type WidgetSize } from 'braindog-render';
 
@@ -220,6 +220,31 @@
   async function added(got: { block: Record<string, unknown>; size: WidgetSize }): Promise<void> {
     await onadd?.(got.block, got.size);
   }
+  /*
+   * FOCUS FOLLOWS THE EDIT (skills pass, accessibility-review, 2 Nov): Edit Today is gone the moment it is pressed, and
+   * focus fell to the page, so a keyboard started again from the top; leaving, the bar went and the same happened.
+   * Entering, focus goes to the bar's first control (Add widget); leaving, back to Edit Today. Only where focus was lost
+   * to the page or sat in what is going: a press elsewhere keeps its own.
+   */
+  let bar = $state<HTMLElement | undefined>(undefined);
+  let wasEditing: boolean | null = null;
+  $effect(() => {
+    const now = model.editing;
+    const was = wasEditing;
+    wasEditing = now;
+    if (was === null || was === now) return;
+    const lost = () => {
+      const a = document.activeElement;
+      return !a || a === document.body || !a.isConnected || (bar !== undefined && bar.contains(a));
+    };
+    void tick().then(() => {
+      if (now) {
+        if (lost()) bar?.querySelector<HTMLElement>('button:not([disabled])')?.focus();
+      } else if (lost()) {
+        document.querySelector<HTMLElement>('.board-foot button')?.focus();
+      }
+    });
+  });
 </script>
 
 <svelte:window onkeydown={keys} />
@@ -235,7 +260,7 @@
 
   {#if model.editing}
     <!-- THE EDIT BAR (§5.1), sticky over the board while it is edited. -->
-    <div class="edit-bar" role="toolbar" aria-label={boardWords.editToday}>
+    <div class="edit-bar" role="toolbar" aria-label={boardWords.editToday} bind:this={bar}>
       <Button weight="quiet" size="sm" onclick={() => (sheetOpen = true)} aria-label={boardWords.addWidget}><Icon name="plus" size="s" /><span class="wide-only">{boardWords.addWidget}</span></Button>
       <span class="sep" aria-hidden="true"></span>
       <button type="button" class="ico" aria-label={boardWords.undo} title="{boardWords.undo} ({mod}Z)" disabled={model.past.length === 0} onclick={() => model.undo()}><Icon name="undo-2" size="s" /></button>

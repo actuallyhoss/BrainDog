@@ -7,7 +7,7 @@
   browser refuses is said once, in the toast, because the button cannot say it.
 
   WHOLE WORDS (`words`): a command breaks only at its spaces, and a word longer than the block scrolls inside it, so
-  "install.sh" is never read as "instal / l.sh".
+  "install.sh" is never read as "instal / l.sh". While it scrolls it is a tab stop, so a keyboard can scroll it too.
 
   INLINE (`inline`): a name in a sentence, 13px mono on `--tile-2` at radius 4, 2 by 6 in, no button.
 -->
@@ -52,13 +52,40 @@
   $effect(() => () => {
     if (back !== null) clearTimeout(back);
   });
+
+  /**
+   * A WORD TOO LONG FOR THE BLOCK SCROLLS, AND THE KEYBOARD CAN SCROLL IT (skills pass, 2 Nov; axe
+   * `scrollable-region-focusable` on Made at 320): only while it overflows, the block takes a tab stop and its label, so
+   * the arrow keys move along it; a command that fits is no stop at all.
+   */
+  function reachable(el: HTMLElement): () => void {
+    const fit = () => {
+      if (el.scrollWidth > el.clientWidth + 1) {
+        el.tabIndex = 0;
+        el.setAttribute('role', 'region');
+        el.setAttribute('aria-label', label ?? text);
+      } else {
+        el.removeAttribute('tabindex');
+        el.removeAttribute('role');
+        el.removeAttribute('aria-label');
+      }
+    };
+    fit();
+    const seen = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    seen?.observe(el);
+    return () => seen?.disconnect();
+  }
 </script>
 
 {#if inline}
   <code class="code-inline">{text}</code>
 {:else}
   <div class="code-line">
-    <code class="code-text" data-words={whole ? '' : undefined}>{text}</code>
+    {#if whole}
+      <code class="code-text" data-words {@attach reachable}>{text}</code>
+    {:else}
+      <code class="code-text">{text}</code>
+    {/if}
     <span class="code-copy">
       <Button size="sm" weight="quiet" onclick={() => void take()} aria-label={label ? `${words.copy} ${label}` : undefined}>
         <Icon name={copied ? 'check' : 'copy'} size="m" /><span aria-live="polite">{copied ? words.copied : words.copy}</span>

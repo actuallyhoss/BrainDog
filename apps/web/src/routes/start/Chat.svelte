@@ -130,7 +130,9 @@
   });
 
   /** BrainDog's newest line, said once to a screen reader. */
-  const spoken = $derived(done ? (closing ?? '') : current ? [turns.at(-1)?.ack ?? '', current.question].filter((s) => s !== '').join(' ') : '');
+  /* AND, WHILE IT READS, THAT IT IS READING: said through this one region, which is there from the first draw, rather
+     than a status mounted with its words (which a screen reader may never hear). */
+  const spoken = $derived(done ? (closing ?? '') : thinking ? chatWords.typing : current ? [turns.at(-1)?.ack ?? '', current.question].filter((s) => s !== '').join(' ') : '');
 </script>
 
 {#snippet dog(words: string, quiet = false)}
@@ -173,7 +175,7 @@
     {#if thinking}
       <li class="msg dog" in:arrive={{ rise: 4 }}>
         <span class="mark" aria-hidden="true"><Mark height={16} /></span>
-        <span class="typing" role="status"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="sr">{chatWords.typing}</span></span>
+        <span class="typing" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
       </li>
     {:else if current}
       {#key current}
@@ -230,7 +232,8 @@
           rows="1"
           autocomplete="off"
           maxlength="600"
-          aria-labelledby="chat-q"
+          aria-labelledby={current ? 'chat-q' : undefined}
+          aria-label={current ? undefined : chatWords.placeholder}
           placeholder={turns.length === 0 ? chatWords.placeholderFirst : chatWords.placeholder}
           bind:this={field}
           bind:value={text}
@@ -256,8 +259,11 @@
 </div>
 
 <style>
+  /* ONE TRACK THAT MAY SHRINK (`minmax(0, 1fr)`): an implicit track took the composer's widest line and pushed the log
+     12px past the tile at 320 (skills pass, 2 Nov). */
   .chat {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-5);
     min-inline-size: 0;
   }
@@ -275,6 +281,7 @@
 
   .log {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-5);
     margin: 0;
     padding: 0;
@@ -382,9 +389,12 @@
       border-color var(--d-press) var(--ease-standard);
   }
 
-  .pick:hover {
-    background: var(--hover);
-    border-color: var(--ink-3);
+  /* HOVER ONLY WHERE THERE IS A POINTER TO HOVER: on a phone a tapped answer kept the hover edge, which read as chosen. */
+  @media (hover: hover) {
+    .pick:hover {
+      background: var(--hover);
+      border-color: var(--ink-3);
+    }
   }
 
   .pick:active {
@@ -477,6 +487,7 @@
 
   .composer {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-2);
   }
 
@@ -512,6 +523,13 @@
     resize: none;
     outline: none;
     scroll-margin-block: var(--sp-6) var(--sp-8);
+  }
+
+  /* UNDER A THUMB THE FIELD ITSELF IS 44 TALL, so a tap anywhere on its line lands in it. */
+  @media (pointer: coarse) {
+    .field {
+      padding-block: 10px;
+    }
   }
 
   .field::placeholder {

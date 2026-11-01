@@ -233,6 +233,23 @@
    */
   let returnTo: HTMLElement | null = null;
   let dismissed = false;
+  /**
+   * WHETHER THE LAST THING DONE WAS A KEY (skills pass, 2 Nov). Opened or put away from the keyboard (⌘K, ⌘J, Esc, Enter
+   * in Today's ask bar), the palette is there and gone at once, as a launcher is: it is the most used thing in the app and
+   * a 240ms widening on every ⌘K read as the app being slow. Opened with the pointer or a thumb, it still widens out of the
+   * field it was pressed in, which shows where it came from.
+   */
+  let byKey = false;
+  const heardKey = (e: KeyboardEvent): void => {
+    if (!e.repeat) byKey = true;
+  };
+  const heardPointer = (): void => {
+    byKey = false;
+  };
+  const instantIf = (d: HTMLDialogElement): void => {
+    if (byKey) d.dataset.instant = '';
+    else delete d.dataset.instant;
+  };
   function dismiss(): void {
     dismissed = true;
     open = false;
@@ -1409,6 +1426,7 @@
           : ([...document.querySelectorAll<HTMLElement>('[data-palette-from], .launcher')].find((f) => f.checkVisibility()) ?? null);
       dismissed = false;
       placeOn(el);
+      instantIf(el);
       el.showModal();
       overlays.open();
       /* WHAT TODAY'S ASK BAR HANDED OVER, taken once and cleared, so the next open starts empty as it always has. */
@@ -1433,6 +1451,7 @@
       }
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
+      instantIf(el);
       el.close();
       overlays.close();
       /* A SHARED PHOTO NOBODY ADDED ANYTHING WITH goes when the palette does, with the phone's copy of it. */
@@ -1720,6 +1739,8 @@
     if (outside) dismiss();
   }
 </script>
+
+<svelte:window onkeydowncapture={heardKey} onpointerdowncapture={heardPointer} />
 
 <dialog bind:this={el} class="palette" aria-label={inAsk ? 'Ask Slash' : 'Search'} data-mode={inAsk ? 'ask' : undefined} onclick={onbackdrop} {oncancel} onclose={() => (open = false)}>
   <div class="p-head">
@@ -2034,6 +2055,12 @@
       opacity: 0;
       scale: 0.98;
     }
+  }
+
+  /* FROM THE KEYBOARD, AT ONCE (`byKey`): no widening, no fade, the scrim with it, both ways. */
+  .palette:global([data-instant]),
+  .palette:global([data-instant])::backdrop {
+    transition: none !important;
   }
 
   /* THE SCRIM, fading with it, so the page behind steps back and the palette is the one thing to read. */

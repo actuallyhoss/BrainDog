@@ -188,5 +188,13 @@
     .result-title {
       font-size: var(--fs-body);
     }
+
+    /* ITS OWN HEIGHT IN THE COLUMN: `flex: 1 1 0` is the row's share of the width beside the title, and in a column it
+       was a share of no height at all, so every line under a title was drawn 0px tall and clipped (skills pass, 2 Nov):
+       Tell's three "Add both things it heard" lost "from Company card", "from Tax reserve", … and read as one row three
+       times. */
+    .result-line {
+      flex: none;
+    }
   }
 </style>
