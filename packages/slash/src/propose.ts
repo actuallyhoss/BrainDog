@@ -1366,7 +1366,9 @@ const turnOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string): SetupA
     names: [],
     rows: [],
     draft: null,
-    ask: about === '' || question === '' ? null : { about, question, choices: Array.isArray(raw['taps']) ? raw['taps'] : [] },
+    /* ONLY A TOPIC THE TURN WAS OFFERED (`TURN_TOPICS`): a question about anything else ("your main expense category")
+       is dropped here, and the page asks the rules' next. */
+    ask: about === '' || question === '' || !TURN_TOPICS.some(([t]) => t === about) ? null : { about, question, choices: Array.isArray(raw['taps']) ? raw['taps'] : [] },
   };
   return { ...setupOf(reading, ask, by), quick: true };
 };
