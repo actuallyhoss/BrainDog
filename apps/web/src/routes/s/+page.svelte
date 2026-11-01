@@ -51,7 +51,8 @@
   import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
 
   /* THE ONE WORD THIS SCREEN ADDS: the action under a dead link. The rest are `share-write.ts`'s. */
-  const shareWords = { whatItIs: 'See what BrainDog is' };
+  /* AND SIGN IN BESIDE IT (the lists review, L41): somebody who has a BrainDog of their own was offered only the site. */
+  const shareWords = { whatItIs: 'See what BrainDog is', signIn: 'Sign in' };
 
   /* THE LINK, HELD IN THIS PAGE'S MEMORY ONLY: never in the address, never printed, never logged. */
   let token = '';
@@ -191,7 +192,7 @@
          where it came from, the product, rather than an empty end. -->
     <div class="gone">
       <Empty kind="no-permission" heading glyph="link" title={head.title} body={head.line}>
-        {#snippet actions()}<Button href="https://brain.dog" onclick={outside}>{shareWords.whatItIs}</Button>{/snippet}
+        {#snippet actions()}<Button href="https://brain.dog" onclick={outside}>{shareWords.whatItIs}</Button><Button weight="bare" href="/signin">{shareWords.signIn}</Button>{/snippet}
       </Empty>
     </div>
   {:else if got.from === 'unreached'}
