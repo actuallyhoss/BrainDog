@@ -106,3 +106,21 @@ test('reduced motion rewrites every step of the scale, and every older name is a
   assert.match(reduced, /transition-property: opacity, visibility, display, overlay !important;/u);
   assert.match(reduced, /transition-duration: 120ms !important;/u);
 });
+
+test('the record forming has its own five steps, each under half a second, and each a fade or nothing under reduced motion', () => {
+  const root = new Map(rules(read('tokens.css')).flatMap((r) => r.decls).filter(([n]) => /^--form-/u.test(n)));
+  const names = ['--form-in', '--form-out', '--form-settle', '--form-count', '--form-gap'];
+  for (const n of names) {
+    const v = root.get(n);
+    assert.ok(v && /^\d+ms$/u.test(v), `${n} is a millisecond step`);
+    assert.ok(Number.parseInt(v, 10) <= 420, `${n} is ${v}, past 420ms`);
+  }
+  assert.match(read('tokens.css'), /--ease-spring: linear\(/u, 'the spring is a linear() curve');
+  const reduced = block(read('a11y.css'), /@media \(prefers-reduced-motion: reduce\)/u);
+  const rewritten = new Map(rules(`x{${block(reduced, /:root\s*/u)}}`).flatMap((r) => r.decls));
+  for (const n of names) {
+    const v = rewritten.get(n);
+    assert.ok(v, `${n} is not rewritten under reduced motion`);
+    assert.ok(Number.parseInt(v, 10) <= 120, `${n} is ${v} under reduced motion, longer than the fade`);
+  }
+});
