@@ -35,7 +35,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import type { ShapeHold } from './shape-hold.svelte.ts';
-  import { rowLaid } from './project-parts.ts';
+  import { LEFT_COLUMN, RIGHT_COLUMN, rowLaid } from './project-parts.ts';
   import { happenedSaid } from './project-facts.ts';
 
   let { hold, parts }: { hold: ShapeHold; parts: readonly string[] } = $props();
@@ -97,6 +97,16 @@
      tell, is drawn unseen so it hears when a run arrives, and takes no room; a row of nothing else takes none either. */
   const laid = $derived(rowLaid(parts, hold.have));
   const empty = $derived(laid.every((x) => !x.seen));
+  /* TWO COLUMNS WHERE THE NUMBERS AND THE DATES ARE LAID TOGETHER (`columned`): the numbers over the dates on the left,
+     the work over who is on it and what it runs on at the right, each column its tiles at the board's gap. Only where
+     both columns show something; one alone is the row it always was. */
+  const cols = $derived.by(() => {
+    if (!parts.includes('numbers') || !parts.includes('dates')) return null;
+    const side = (names: readonly string[]) => laid.map((x, n) => ({ ...x, n })).filter((x) => names.includes(x.part));
+    const l = side(LEFT_COLUMN);
+    const r = side(RIGHT_COLUMN);
+    return l.some((x) => x.seen) && r.some((x) => x.seen) ? { l, r } : null;
+  });
   /* THE SESSIONS SAID AS LINES, less the ones on it now, which the run rows under them draw with their controls. */
   const agentLines = $derived(hold.here > 0 ? hold.sessionLines.filter((s) => !s.open) : hold.sessionLines);
   /* WHAT IT RUNS ON, ONE LIST: its services with when each renews, the numbers feed (its setup behind it), then the keys,
@@ -112,11 +122,23 @@
   ]);
 </script>
 
-<div class="shape-row" data-empty={empty ? '' : undefined}>
-  {#each laid as x (x.part)}
-    <div class="shape-part" data-shape={x.part} data-empty={x.seen ? undefined : ''} style={slotStyle(hold.hue)} style:--part={x.span}>{@render one(x.part)}</div>
-  {/each}
-</div>
+{#if cols}
+  <div class="shape-row" data-cols>
+    {#each [cols.l, cols.r] as side, k (k)}
+      <div class="shape-col">
+        {#each side as x (x.part)}
+          <div class="shape-part" data-shape={x.part} data-empty={x.seen ? undefined : ''} style={slotStyle(hold.hue)} style:order={x.n}>{@render one(x.part)}</div>
+        {/each}
+      </div>
+    {/each}
+  </div>
+{:else}
+  <div class="shape-row" data-empty={empty ? '' : undefined}>
+    {#each laid as x (x.part)}
+      <div class="shape-part" data-shape={x.part} data-empty={x.seen ? undefined : ''} style={slotStyle(hold.hue)} style:--part={x.span}>{@render one(x.part)}</div>
+    {/each}
+  </div>
+{/if}
 
 <!-- ONE PART. -->
 {#snippet one(part: string)}
@@ -1071,6 +1093,42 @@
 
     .shape-part {
       grid-column: span var(--part, 12);
+    }
+  }
+
+  /* THE TWO COLUMNS (`cols`): under 1100px their tiles stack in the order the page declares (`order`), as any row's do;
+     from there the numbers' column takes two thirds and the work's one, each its tiles one under the other, and the last
+     of each grows so the two columns end level and no hole stands under the shorter (bento, 1 Nov). */
+  .shape-col {
+    display: contents;
+  }
+
+  @media (width >= 1100px) {
+    .shape-row[data-cols] {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      align-items: stretch;
+    }
+
+    .shape-row[data-cols] > .shape-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--inset);
+      min-inline-size: 0;
+    }
+
+    .shape-row[data-cols] .shape-part {
+      align-self: stretch;
+      grid-column: auto;
+    }
+
+    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):last-child,
+    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) {
+      flex-grow: 1;
+    }
+
+    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):last-child > :global(:last-child),
+    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) > :global(:last-child) {
+      flex-grow: 1;
     }
   }
 

@@ -150,3 +150,32 @@ export function moneyShown(money: readonly unknown[], trend: Trend | null, inByM
   const total = (m: Months | null): number => m?.total ?? 0;
   return money.length > 0 || (trend !== null && trend.now > 0) || monthsDrawn(inByMonth) || monthsDrawn(outByMonth) || total(inByMonth) > 0 || total(outByMonth) > 0;
 }
+
+/** The parts that stand in the left column beside the right one, when a page's numbers and its dates are laid together. */
+export const LEFT_COLUMN: readonly string[] = ['numbers', 'dates'];
+export const RIGHT_COLUMN: readonly string[] = ['what-is-open', 'who-is-on-it', 'runs-on'];
+
+/**
+ * THE NUMBERS AND THE DATES IN ONE COLUMN, BESIDE THE WORK AND WHAT IT RUNS ON (bento, 1 Nov): laid as two rows, three
+ * figures stood over a band of 200px beside a tall Tasks, and the dates started under it. So, on a page read as it is laid
+ * out (not arranged, and not a board), the parts of the next block's first line, its dates, who is on it and what it runs
+ * on, join the numbers' block, which draws them as two columns (`ProjectPart.svelte`). The blocks keep their places, so a
+ * write still finds each; only which parts each draws moves.
+ */
+export function columned<B extends Row>(blocks: readonly B[]): B[] {
+  const out = [...blocks];
+  const at = out.findIndex((b) => b.drawn !== false && (partsIn(b) ?? []).includes('numbers'));
+  if (at < 0) return out;
+  const next = out.findIndex((b, i) => i > at && b.kind === 'project' && b.drawn !== false && (partsIn(b) ?? []).includes('dates'));
+  if (next < 0) return out;
+  const from = partsIn(out[next]!) ?? [];
+  const moves = from.filter((p) => LEFT_COLUMN.includes(p) || RIGHT_COLUMN.includes(p));
+  const withParts = (b: B, parts: string[]): B => {
+    const answer = typeof b.answer === 'object' && b.answer !== null ? { ...(b.answer as object), parts } : b.answer;
+    return { ...b, parts, ...(answer === undefined ? {} : { answer }) } as B;
+  };
+  out[at] = withParts(out[at]!, [...(partsIn(out[at]!) ?? []), ...moves]);
+  out[next] = withParts(out[next]!, from.filter((p) => !moves.includes(p)));
+  return out;
+}
+

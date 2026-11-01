@@ -60,6 +60,7 @@
   import { rowScreen } from '$lib/record/row-href.ts';
   import { hueOf as projectHue, slotStyle } from '$lib/home/project-cards.ts';
   import { onProject, moreSaid, modelLineOf, withShape } from './project-page.ts';
+  import { columned } from './project-parts.ts';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
@@ -713,7 +714,8 @@
     const reading = projectPage && !arrangement.editing && arrangement.slots === null && !toArrange;
     /* A PAGE OF AN OLDER USE CASE DECLARES NO PART OF THE SHAPE, and is drawn with the two its newer versions declare (`withShape`). */
     const parted = reading ? withShape(drawn, (raw) => blockOf({ ...raw, parts: [...raw.parts], rows: [], matched: 0, refusals: [] } as never, new Map(), live?.now ?? 0)) : drawn;
-    const shaped = reading ? onProject(parted, about?.register ?? '') : drawn;
+    /* AND READ AS LAID OUT, ITS NUMBERS AND DATES IN ONE COLUMN BESIDE ITS WORK AND WHAT IT RUNS ON (`columned`). */
+    const shaped = reading ? columned(onProject(parted, about?.register ?? '')) : drawn;
     const repeats = about && !shapeKnown ? withoutRepeats(shaped, ['runs-on'], counted?.length ?? null, null) : about && shapeDrew.length > 0 ? withoutRepeats(shaped, shapeDrew, counted?.length ?? null, shapeRow) : shaped;
     /* EACH PART OF THE PROJECT'S SHAPE IS DRAWN WHERE IT HAS SOMETHING, at its width (`project-parts.ts`), and none on a
        page about no project. */
