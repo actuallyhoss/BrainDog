@@ -1202,8 +1202,42 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.1.1",
       "versions": [
+        {
+          "version": "2.1.1",
+          "checksum": "22f0b91e21a4214d42d01e4676a87abe8fb02359251d82a5b8ea5ec606c90fe7",
+          "bytes": 20531,
+          "published_at": "2026-11-01T01:41:42.213Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Debts",
+              "Payoff plans"
+            ],
+            "pages": [
+              "Debts"
+            ],
+            "rules": [
+              "Work out the plans when a debt changes",
+              "Work out the plans when the extra changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Wears its own icon, a line going down, so it is told apart from Card alerts.",
+          "preview": true
+        },
         {
           "version": "2.1.0",
           "checksum": "d157ec257bff0ff8323f6226113701253cf6516663ca3ef38f9c932de83744ec",
@@ -1328,7 +1362,7 @@
         "name": "BrainDog"
       },
       "shelf": "money",
-      "icon": "credit-card"
+      "icon": "trending-down"
     },
     {
       "kind": "pack",

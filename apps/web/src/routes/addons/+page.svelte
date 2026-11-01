@@ -42,6 +42,7 @@
   import { readCounts } from '$lib/market/counts.ts';
   import { actionOf, latestOf, listingHref, listingsOf, searchListings, verifiedOf, type Listing } from '$lib/market/listing.ts';
   import { categoryName } from '$lib/market/chips.ts';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import { baseTurnedOn, SHELF_NAMES, SHELF_SLOTS, shelfOf, storeChips, storeOf } from '$lib/market/shelves.ts';
   import { suggestionsOf, type SignRead } from '$lib/market/suggest.ts';
   import { words } from '$lib/market/words.ts';
@@ -266,7 +267,7 @@
         {#each laid.starters as l (l.key)}{@render card(l, SHELF_SLOTS.starters, starterNote(l))}{/each}
         {#if laid.examples.length > 0 && !searching && chip === null}
           <li class="examples-card">
-            <h3 class="ex-name"><Icon name="grid" size="m" /><span>{store.examples}</span></h3>
+            <h3 class="ex-name"><IconWell name="grid" size="l" slot={SHELF_SLOTS.starters} /><span>{store.examples}</span></h3>
             <p class="ex-line">{store.examplesLine(laid.examples.map((l) => l.title))}</p>
             <div class="ex-foot">
               <Button size="sm" aria-expanded={examplesOpen} onclick={() => (examplesOpen = !examplesOpen)}>{examplesOpen ? store.hideExamples : store.seeExamples(laid.examples.length)}</Button>
@@ -441,10 +442,6 @@
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
     line-height: 22px;
-  }
-
-  .ex-name :global(.icon) {
-    color: var(--ink-2);
   }
 
   .ex-line {

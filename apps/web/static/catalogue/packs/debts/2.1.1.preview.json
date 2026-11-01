@@ -1,0 +1,229 @@
+{
+  "format": 1,
+  "made_at": "2026-11-01T01:41:42.213Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Two ways to clear your debts.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "how",
+              "label": "Way"
+            },
+            {
+              "as": "figure",
+              "field": "takes",
+              "label": "Debt-free in"
+            },
+            {
+              "as": "when",
+              "field": "debt_free",
+              "label": "Debt-free on"
+            },
+            {
+              "as": "fact",
+              "field": "saved",
+              "label": "Interest saved"
+            },
+            {
+              "as": "fact",
+              "field": "order",
+              "label": "Paid off in this order"
+            },
+            {
+              "as": "fact",
+              "field": "said",
+              "label": "What happened"
+            }
+          ],
+          "empty": "No debts yet.",
+          "heading": "Payoff plans",
+          "kind": "cards",
+          "limit": 2,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "how"
+            }
+          ],
+          "source": "register.payoff_plans",
+          "span": 12,
+          "key": "k0po1xcw",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "how",
+              "label": "Way",
+              "width": "14ch"
+            },
+            {
+              "align": "end",
+              "field": "extra",
+              "label": "Extra each month",
+              "width": "18ch"
+            },
+            {
+              "field": "takes",
+              "label": "Debt-free in",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "interest",
+              "label": "Interest paid",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "minimum_interest",
+              "label": "Interest at the minimums",
+              "width": "20ch"
+            },
+            {
+              "align": "end",
+              "field": "saved",
+              "label": "Interest saved",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "sooner",
+              "label": "Months sooner",
+              "width": "14ch"
+            }
+          ],
+          "empty": "Nothing to compare yet.",
+          "heading": "The two compared",
+          "kind": "table",
+          "limit": 2,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "how"
+            }
+          ],
+          "source": "register.payoff_plans",
+          "span": 12,
+          "key": "k0uq5y7w",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Avalanche: highest rate first, least interest. Snowball: smallest balance first.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Debt",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "align": "end",
+              "field": "left",
+              "label": "Balance left",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "apr",
+              "label": "Yearly rate %",
+              "width": "14ch"
+            },
+            {
+              "align": "end",
+              "field": "minimum",
+              "label": "Minimum each month",
+              "width": "18ch"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            }
+          ],
+          "empty": "No debts yet.",
+          "heading": "What you are paying off",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "left"
+            }
+          ],
+          "source": "register.debts",
+          "span": 12,
+          "key": "k0r6kygi",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a debt",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "debts",
+          "span": 12,
+          "key": "k1y88pcq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        }
+      ],
+      "icon": "trending-down",
+      "nav": {
+        "order": 55,
+        "section": "Money"
+      },
+      "page": "debts",
+      "requires": [
+        "register.debts",
+        "register.payoff_plans"
+      ],
+      "title": "Debts",
+      "read_at": "2026-11-01T01:41:42.213Z",
+      "zone": "UTC",
+      "look": {
+        "look": "debts",
+        "basis": "r1tcy3vl",
+        "by": "rule",
+        "hide": [
+          "k0po1xcw",
+          "k0uq5y7w",
+          "k0r6kygi"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

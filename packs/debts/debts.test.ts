@@ -93,7 +93,7 @@ test('THE PACK CARRIES payoff.js AS ITS SOURCE, byte for byte, fetches nothing, 
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'debts');
-  assert.equal(PACK.version, '2.1.0');
+  assert.equal(PACK.version, '2.1.1');
 });
 
 test('TWO DEBTS AT NO INTEREST: 300 and 600, 50 minimum each and 100 extra, clear in 5 months, against 12 at the minimums', async () => {
