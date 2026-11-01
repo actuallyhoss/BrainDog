@@ -22,6 +22,8 @@
   import Tile from '$lib/ui/Tile.svelte';
   import { kennelFetch, publishedHref, publishedLink, publishedSaid, submitToKennel, type Submitted } from '$lib/market/publish.ts';
   import { minesOf, personOf, readIndex, unpublish, unpublishWords, type Mine } from '$lib/market/unpublish.ts';
+  import { placesLines, withUses } from '$lib/market/asks.ts';
+  import { listWords } from '../sharing.ts';
   import { readSubmissions, stateLine, stateWords, versionAfter, type Submission } from '$lib/market/submissions.ts';
   import { addonId, argsOf, asksOf, fileName, groupsOf, offeredOf, previewLines, quietOf, skillsOffered, skillsPicked, summaryOf, words, writtenOf, type Line, type Offered, type OfferedSkill, type Written } from './addon-from.ts';
 
@@ -127,7 +129,9 @@
     if (draft === null) draft = { state: 'reading' };
     const out = await ask(c, args);
     if (mine !== drafts) return;
-    const written = out.ok ? writtenOf(out.value, fileName(addonId(args.title), args.version)) : null;
+    const wrote = out.ok ? writtenOf(out.value, fileName(addonId(args.title), args.version)) : null;
+    /* WHAT IT USES OF YOURS IS SAID IN THE FILE (`withUses`), because the store takes no add-on that leaves it unsaid. */
+    const written = wrote ? { ...wrote, text: withUses(wrote.text) } : null;
     draft = written ? { state: 'ready', written, lines: previewLines(written, offered ?? []) } : { state: 'refused', fix: fixOf(out) };
     asks = written ? await asksFrom(written.text) : [];
   }
@@ -137,7 +141,11 @@
     try {
       const { readCatalogueFile, reachOf } = await import('@braindog/declare/catalogue');
       const read = await readCatalogueFile(file, { kind: 'kennel' });
-      return read.ok ? asksOf(reachOf(read.value)) : [];
+      if (!read.ok) return [];
+      /* AND EVERY PLACE OF YOURS IT USES (`asks.ts`), named as this record names them, before what it sends where. */
+      const places = placesLines(JSON.parse(file), (id) => listWords(id.slice(id.indexOf('.') + 1)));
+      const calls = asksOf(reachOf(read.value));
+      return places.length > 0 ? [...places, ...calls.filter((l) => l !== words.asksNothing)] : calls;
     } catch {
       return [];
     }

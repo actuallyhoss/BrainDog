@@ -48,6 +48,7 @@ import {
   type Preview,
   type Publisher,
 } from './catalogue.ts';
+import { usesFault } from './uses.ts';
 import { isSignature, keyIdOf, REASON_MOST, revocationOf, rotatedFrom, verifiedStatements, verifySignature, type AuthorKey, type KeyStatements, type Signature } from './signing.ts';
 
 /** Where every host answers the Kennel: under `/api/*`, which the site already forwards to the app. */
@@ -381,6 +382,11 @@ export async function acceptSubmission(state: KennelState, text: string, identit
         `The Kennel takes the manifest keys BrainDog reads and no others, and this file also says ${quoted.length > 0 ? quoted.join(', ') : 'a key BrainDog does not read'}. Take ${stray.length === 1 ? 'it' : 'them'} out and submit it again.`,
         { at: quoted[0] ?? 'manifest' },
       );
+    /* WHAT IT USES OF YOURS IS SAID BY ITS AUTHOR, NOT ONLY READ OFF IT (`uses.ts`): a submission that names a list, a
+       figure or a page it does not own and does not list in `uses` is refused, with the line to add, so nothing from
+       outside waits for review or is listed with a reach its author left unsaid. */
+    const unasked = usesFault(doc, true);
+    if (unasked) return { ok: false, refusal: unasked };
   }
   const { id, version, author } = subjectOf(file);
   if (state.bundled.entries.some((e) => e.id === id) || state.reserved.includes(installedIdOf({ kind: file.kind, id })))

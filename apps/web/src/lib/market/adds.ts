@@ -22,6 +22,10 @@ export type Adds = {
   rules: string[];
   /** HOW WHAT IT READS ARRIVES, each way once ("texts", "mail"), from its `ingest` patterns (audit 31 Oct h, AH11). */
   reads: string[];
+  /** The widgets it ships for Today's widget sheet, by title. Nothing is placed by installing. */
+  widgets: string[];
+  /** The skills it gives the record's agents (their tools), by name. */
+  skills: string[];
   examples: number;
 };
 
@@ -45,11 +49,15 @@ const isList = (d: Body): boolean => typeof d.register === 'string' && typeof d.
 const idWords = (id: string): string => (id.charAt(0).toUpperCase() + id.slice(1)).replaceAll('_', ' ');
 
 /** The document's declarations wherever it keeps them: a pack's own, or a use case file's `pack`. */
-function declarationsOf(doc: unknown): { declarations: Body[]; seeds: number } {
+function declarationsOf(doc: unknown): { declarations: Body[]; seeds: number; at: Body | null } {
   const at = [doc, isMap(doc) ? doc.pack : null, isMap(doc) && isMap(doc.usecase) ? doc.usecase.pack : null].find((d) => isMap(d) && Array.isArray(d.declarations));
-  if (!isMap(at)) return { declarations: [], seeds: 0 };
-  return { declarations: (at.declarations as unknown[]).filter(isMap), seeds: Array.isArray(at.seeds) ? at.seeds.length : 0 };
+  if (!isMap(at)) return { declarations: [], seeds: 0, at: null };
+  return { declarations: (at.declarations as unknown[]).filter(isMap), seeds: Array.isArray(at.seeds) ? at.seeds.length : 0, at };
 }
+
+/** The titles of what a manifest lists under `key` (its widgets by `title`, its skills by `name`), each once. */
+const titlesOf = (at: Body | null, key: 'widgets' | 'skills', name: 'title' | 'name'): string[] =>
+  [...new Set((at && Array.isArray(at[key]) ? (at[key] as unknown[]) : []).filter(isMap).map((x) => str(x[name]).replaceAll('-', ' ')).filter((t) => t !== ''))];
 
 /** A target said plainly: "at least 0", "at most 12", "exactly 3". */
 function targetOf(t: unknown): string | null {
@@ -124,9 +132,9 @@ function ruleOf(d: Body, names: ReadonlyMap<string, string>): string {
 
 /** Everything a document adds, in the order it declares it. */
 export function addsOf(doc: unknown): Adds {
-  const { declarations, seeds } = declarationsOf(doc);
+  const { declarations, seeds, at } = declarationsOf(doc);
   const names = namesOf(doc);
-  const out: Adds = { lists: [], pages: [], figures: [], rules: [], reads: [], examples: seeds };
+  const out: Adds = { lists: [], pages: [], figures: [], rules: [], reads: [], widgets: titlesOf(at, 'widgets', 'title'), skills: titlesOf(at, 'skills', 'name'), examples: seeds };
   for (const d of declarations) {
     if (typeof d.rule === 'string') out.rules.push(ruleOf(d, names));
     else if (typeof d.ingest === 'string') {

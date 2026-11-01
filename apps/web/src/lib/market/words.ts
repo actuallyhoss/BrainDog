@@ -99,6 +99,8 @@ export const words = {
   addsModules: 'Needs first',
   addsNothing: 'Nothing of its own',
   addsFigures: 'Numbers it tracks',
+  addsWidgets: 'Widgets for Today',
+  addsSkills: 'Skills for your agents',
   atLeast: (n: string): string => `at least ${n}`,
   atMost: (n: string): string => `at most ${n}`,
   exactly: (n: string): string => `exactly ${n}`,

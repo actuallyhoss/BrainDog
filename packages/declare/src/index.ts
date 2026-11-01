@@ -36,6 +36,8 @@ import { columnsFault, readAddColumn, type PageColumnAddition } from './add-colu
 export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
 import { scriptSources, type ScriptSource } from './script-source.ts';
+import { usesFault, usesSaid } from './uses.ts';
+export { USES_MOST, usesFault, usesOf, usesSaid, type Use } from './uses.ts';
 import { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
 import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, intervalMs, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
@@ -226,6 +228,12 @@ export type Manifest = {
    * it ships none. In the checksum: a widget is drawn as it is written.
    */
   widgets?: PackWidget[];
+  /**
+   * The places of yours this add-on reads or changes that are not its own, as declaration ids (`register.transactions`,
+   * `metric.cash-now`, `page.project`), when its file says them. Held to what its declarations name (`uses.ts`): a file
+   * that names a place it did not list here is refused. In the checksum, because it is what a person is asked.
+   */
+  uses?: string[];
 };
 
 /**
@@ -859,6 +867,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   /* THE WIDGETS IT SHIPS FOR THE SHEET, read here so the checksum holds them and the plan names them. */
   const widgets = readPackWidgets(doc.widgets);
   if (!widgets.ok) return widgets as Result<Pack>;
+  /* THE PLACES OF YOURS IT SAYS IT USES, held to what its declarations name when it says them (`uses.ts`). */
+  const uses = usesSaid(doc);
+  if (!uses.ok) return no<Pack>(uses.refusal.code, uses.refusal.fix, { at: 'uses' });
+  const unasked = usesFault(doc);
+  if (unasked) return no<Pack>(unasked.code, unasked.fix, { at: 'uses' });
   const manifest: Manifest = {
     pack: id,
     version,
@@ -878,6 +891,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(changes.value === null ? {} : { changes: changes.value }),
     ...(skills.value.length === 0 ? {} : { skills: skills.value }),
     ...(widgets.value.length === 0 ? {} : { widgets: widgets.value }),
+    ...(uses.value === null ? {} : { uses: uses.value }),
   };
 
   /* A PACK WHOSE ONLY CONTENT IS `extends`, `adds` OR `hands` CHANGES SOMETHING (a pack that hands everything it had to another, Roadmap 2.0.0, is the add-on that is part of Work now), so it has no declarations to list and is not

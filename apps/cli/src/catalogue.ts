@@ -55,7 +55,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { addressFaults, exportUseCase, listingFault, sharedFileName } from '@braindog/declare';
+import { addressFaults, exportUseCase, listingFault, sharedFileName, usesFault, usesOf } from '@braindog/declare';
 import {
   addKeyStatement,
   CATALOGUE_INDEX,
@@ -429,9 +429,13 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
      where none may be, and a key a listing never says. Said here in the sentence those two say, and every one of them,
      where a record stops at the first. */
   const written: unknown = JSON.parse(read.text);
+  /* WHAT IT USES OF YOURS, and whether its `uses` line says so: the Kennel takes no add-on that leaves one unsaid. */
+  const uses = usesOf(written);
+  io.out(uses.length === 0 ? '  Uses of yours: nothing but its own lists.' : `  Uses of yours: ${uses.map((u) => `${u.id}${u.writes ? ' (changes it)' : ''}`).join(', ')}`);
   const remote = addressFaults(written);
-  const unlistable = listingFault(written);
-  for (const r of [...remote, ...(unlistable ? [unlistable] : [])]) io.out(`  ${oneLine(`${r.fix} (${r.code})`)}`);
+  const kennelOnly = [listingFault(written), usesFault(written, true)].filter((r) => r !== null);
+  const unlistable = kennelOnly.length > 0;
+  for (const r of [...remote, ...kennelOnly]) io.out(`  ${oneLine(`${r.fix} (${r.code})`)}`);
   if (remote.length > 0) {
     io.say(`${title} ${pack.manifest.version} would be refused by BrainDog, as said above.`);
     return 1;

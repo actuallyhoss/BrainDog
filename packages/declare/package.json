@@ -12,6 +12,7 @@
     "./kennel": "./src/kennel.ts",
     "./scrub": "./src/scrub.ts",
     "./shared": "./src/shared.ts",
+    "./uses": "./src/uses.ts",
     "./yaml": "./src/yaml.ts"
   },
   "dependencies": {
