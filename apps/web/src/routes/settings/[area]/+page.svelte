@@ -75,6 +75,8 @@
   import Delete from './areas/Delete.svelte';
   import Words from './areas/Words.svelte';
   import { homeCurrency } from '$lib/record/api.ts';
+  import { agentHead, nameOfSlug } from '$lib/agents/agent-page.svelte.ts';
+  import { KIND_NAMES } from '$lib/agents/profile.ts';
 
   /**
    * THE SHELL, AND NOT THE SAMPLE.
@@ -93,7 +95,9 @@
   openSettings(() => shell);
 
   /* NO AREA IS THE INDEX: `/settings` draws this file with nothing in the address. */
-  const param = $derived(page.params.area);
+  /* `/settings/agents/<agent>` (G14) is this screen too: the Agents area, drawing one agent's page. */
+  const agentParam = $derived((page.params as { agent?: string }).agent);
+  const param = $derived(page.params.area ?? (agentParam !== undefined ? 'agents' : undefined));
 
   /**
    * WHETHER THIS IS AN AREA AT ALL, which nothing asked.
@@ -451,7 +455,7 @@
 <!-- NO SEND TO SLASH ON SETTINGS: the red sign's sentence links to Health, where it is read, and Slash is asked from the
      top bar. A split button under the title read as a setting. -->
 
-<svelte:head><title>{titleOf(label, copy.settings)}</title></svelte:head>
+<svelte:head><title>{agentParam !== undefined ? titleOf(agentHead.name || nameOfSlug(agentParam, KIND_NAMES), label ?? copy.settings) : titleOf(label, copy.settings)}</title></svelte:head>
 
 {#if param === 'look'}
   <!-- On its way to `/design`. -->
@@ -486,7 +490,12 @@
 {/snippet}
 {#if known}
   <!-- EACH AREA UNDER ITS OWN GLYPH (agents F28): the sun for Appearance, the bell for Notifications. -->
-  <PageHead icon={known.icon} kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : undefined} />
+  {#if agentParam !== undefined}
+    <!-- ONE AGENT'S PAGE (G14): its name, under Agents, and Back goes to the list. -->
+    <PageHead icon={known.icon} kicker={label ?? known.label} back="/settings/agents" title={agentHead.name || nameOfSlug(agentParam, KIND_NAMES)} />
+  {:else}
+    <PageHead icon={known.icon} kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : undefined} />
+  {/if}
 {:else}
   <!-- THE INDEX OPENS ON A LEAD TILE, as a declared page does: its name and Arrange ride over the top of the tile and the
        line under them is the headline. Arrange waits for the pointer or the keyboard to reach the tile. `display:

@@ -10,6 +10,10 @@
   add-ons) asks first whatever this sheet says; the projects narrow changes and not reads, until sharing's lens lands;
   the stop switch and live push are Claude Code's only, and live push is a Claude Code preview, off by default.
 
+  A SHEET OR A PAGE (G14): Settings › Agents links each agent to its own page, `/settings/agents/<agent>`, which draws
+  this same content with `page`, each part a tile of its own two to a row on a desk, Save and Cancel at its foot. The
+  sheet stays for a screen that opens one agent over itself.
+
   SWITCHES ARE THE ONE SWITCH ROW (`settings.css` `.switch-row`), INK WHEN ON, never red; the one primary is Save, in
   the sheet's foot.
 -->
@@ -17,6 +21,8 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
   import { TONES } from 'braindog-render';
   import type { Place } from '$lib/record/scope-move.ts';
   import {
@@ -50,6 +56,8 @@
     followers = [],
     keepers = [],
     onsave,
+    page = false,
+    onclose,
   }: {
     open?: boolean;
     row: AgentRow | null;
@@ -62,6 +70,10 @@
     /** On Defaults: the agents heard from with no settings yet, which are given their own first and keep what they have. */
     keepers?: readonly string[];
     onsave: (args: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; fix: string }>;
+    /** Drawn on a page of its own, not in a sheet. */
+    page?: boolean;
+    /** Cancel, or a save that landed: the page goes back to the list. */
+    onclose?: () => void;
   } = $props();
 
   const GROUPS: readonly (readonly ['read' | 'write', string])[] = [['read', 'Reading'], ['write', 'Changing']];
@@ -90,13 +102,20 @@
   let saving = $state(false);
   let said = $state('');
 
-  /* A FRESH DRAFT EACH TIME IT OPENS, from the row as it stands. */
-  let was = false;
+  /* A FRESH DRAFT EACH TIME IT OPENS, from the row as it stands, and once the row arrives on a page, which is open
+     before the agents are read. */
+  let seeded: string | null = null;
   $effect(() => {
-    const now = open;
-    if (now && !was && row) {
+    const now = open || page;
+    if (!now) {
+      seeded = null;
+      return;
+    }
+    if (row && seeded !== row.key) {
+      seeded = row.key;
       d = clone(row.draft);
       said = '';
+      if (page) return;
       /* IT OPENS AT ITS TOP, ON HOW FAR IT MAY GO. The sheet hands the focus to its first field, which here is the
          brief halfway down, so the focus is moved to the chosen step and the body put back at its start. */
       requestAnimationFrame(() => {
@@ -105,8 +124,12 @@
         root?.querySelector<HTMLElement>('.segment[data-on]')?.focus({ preventScroll: true });
       });
     }
-    was = now;
   });
+
+  const close = () => {
+    open = false;
+    onclose?.();
+  };
 
   const isDefault = $derived(row?.key === 'default');
   const hooks = $derived(row ? hasHooks(row) : false);
@@ -162,13 +185,13 @@
       return;
     }
     if (row.stored !== null && sameDraft(d, row.draft)) {
-      open = false;
+      close();
       return;
     }
     saving = true;
     const out = await onsave(argsOf(row, d));
     saving = false;
-    if (out.ok) open = false;
+    if (out.ok) close();
     else said = out.fix;
   }
 
@@ -182,13 +205,35 @@
 {/snippet}
 
 {#snippet foot()}
-  <Button weight="quiet" onclick={() => (open = false)}>Cancel</Button>
+  <Button weight="quiet" onclick={close}>Cancel</Button>
   <Button weight="primary" disabled={saving} onclick={() => void save()}>Save</Button>
 {/snippet}
 
-<Sheet bind:open title={row?.name ?? ''} {subtitle} footer={foot}>
-  {#if row}
-    <div class="prof" data-profile-sheet={row.key} bind:this={root}>
+<!-- A PART'S HEADING: on a page, the tile's heading row (a neutral well, the title at 15/600); in the sheet, the title. -->
+{#snippet head(id: string, icon: IconName, text: string, label = false)}
+  {#if page}
+    <div class="part-head"><IconWell name={icon} size="m" /><h2 class="part-title" {id}>{#if label}<label for="{ids}-brief-text">{text}</label>{:else}{text}{/if}</h2></div>
+  {:else}
+    <h3 class="part-title" {id}>{#if label}<label for="{ids}-brief-text">{text}</label>{:else}{text}{/if}</h3>
+  {/if}
+{/snippet}
+
+{#if page}
+  <div class="prof-page" data-agent-page={row?.key ?? ''}>
+    {#if row}
+      {#if subtitle}<p class="pf-sub">{subtitle}</p>{/if}
+      {@render body(row)}
+      <div class="pf-foot">{@render foot()}</div>
+    {/if}
+  </div>
+{:else}
+  <Sheet bind:open title={row?.name ?? ''} {subtitle} footer={foot}>
+    {#if row}{@render body(row)}{/if}
+  </Sheet>
+{/if}
+
+{#snippet body(row: AgentRow)}
+    <div class="prof" data-profile-sheet={row.key} data-page={page ? '' : undefined} bind:this={root}>
       {#if isDefault && (followers.length > 0 || keepers.length > 0)}
         <p class="pf-note">
           {#if keepers.length > 0}{LIST.format(keepers)} {keepers.length === 1 ? 'keeps' : 'keep'} what {keepers.length === 1 ? 'it has' : 'they have'} now: saving gives {keepers.length === 1 ? 'it settings of its own' : 'each settings of its own'} first.{/if}
@@ -204,7 +249,7 @@
 
       <!-- HOW FAR IT MAY GO -->
       <section class="part" aria-labelledby="{ids}-may">
-        <h3 class="part-title" id="{ids}-may">How far it may go</h3>
+        {@render head(`${ids}-may`, 'vault', 'How far it may go')}
         <Segmented role="group" aria-labelledby="{ids}-may" full>
           {#each CEILINGS as c (c)}
             <button type="button" class="segment" aria-pressed={d.ceiling === c} data-on={d.ceiling === c ? '' : undefined} onclick={() => (d.ceiling = c)}>{LEVEL_WORDS[c]}</button>
@@ -216,7 +261,7 @@
 
       <!-- WHERE -->
       <section class="part" aria-labelledby="{ids}-where">
-        <h3 class="part-title" id="{ids}-where">Where it may change things</h3>
+        {@render head(`${ids}-where`, 'projects', 'Where it may change things')}
         {#if d.ceiling !== 'write'}
           <p class="pf-quiet">{d.ceiling === 'read' ? 'At Read it changes nothing, anywhere.' : 'At Suggest every change waits for you, wherever it is.'}</p>
         {:else}
@@ -263,7 +308,7 @@
 
       <!-- TOOLS -->
       <section class="part" aria-labelledby="{ids}-tools">
-        <h3 class="part-title" id="{ids}-tools">Tools</h3>
+        {@render head(`${ids}-tools`, 'grid', 'Tools')}
         <p class="pf-quiet">Its briefing and what you tell it are always on. A tool you turn off is hidden from it.</p>
         {#each GROUPS as [group, title] (group)}
           <h4 class="group-title">{title}</h4>
@@ -281,7 +326,7 @@
 
       <!-- BRIEF -->
       <section class="part" aria-labelledby="{ids}-brief">
-        <h3 class="part-title" id="{ids}-brief"><label for="{ids}-brief-text">Its brief</label></h3>
+        {@render head(`${ids}-brief`, 'doc', 'Its brief', true)}
         <p class="pf-quiet" id="{ids}-brief-help">Every run of {isDefault ? 'a new agent' : who} reads this first.</p>
         <textarea
           id="{ids}-brief-text"
@@ -297,7 +342,7 @@
 
       <!-- WHEN -->
       <section class="part" aria-labelledby="{ids}-when">
-        <h3 class="part-title" id="{ids}-when">When</h3>
+        {@render head(`${ids}-when`, 'clock', 'When')}
         <div class="switch-row">
           <div class="switch-row-words">
             <span class="switch-row-title">Quiet hours</span>
@@ -341,7 +386,7 @@
 
       <!-- LIMITS -->
       <section class="part" aria-labelledby="{ids}-limits">
-        <h3 class="part-title" id="{ids}-limits">Cost and limits</h3>
+        {@render head(`${ids}-limits`, 'money', 'Cost and limits')}
         <p class="pf-quiet">Jobs it runs with nobody at the terminal stop at these, so it cannot run up a bill. Empty means no limit.</p>
         <div class="caps">
           {#each CAP_FIELDS as [k, label] (k)}
@@ -359,7 +404,7 @@
 
       <!-- STOP AND LIVE PUSH -->
       <section class="part" aria-labelledby="{ids}-stop">
-        <h3 class="part-title" id="{ids}-stop">Stop and live push</h3>
+        {@render head(`${ids}-stop`, 'stop', 'Stop and live push')}
         <div class="switch-row">
           <div class="switch-row-words">
             <span class="switch-row-title">Stop switch</span>
@@ -401,13 +446,95 @@
         {#if said}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {said}{/if}
       </p>
     </div>
-  {/if}
-</Sheet>
+{/snippet}
 
 <style>
   .prof {
     display: grid;
     gap: var(--sp-6);
+  }
+
+  /* ON A PAGE (G14): each part a tile, two to a row once the area is wide enough for two, 12 apart like the board. */
+  .prof-page {
+    display: grid;
+    gap: var(--sp-3);
+    container-type: inline-size;
+  }
+
+  .prof[data-page] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+    align-items: start;
+  }
+
+  /* TWO COLUMNS THAT FILL DOWN, so a short part (its brief) does not leave a hole beside a long one (its tools). */
+  @container (width >= 820px) {
+    .prof[data-page] {
+      display: block;
+      columns: 2;
+      column-gap: var(--sp-3);
+    }
+
+    .prof[data-page] > * {
+      break-inside: avoid;
+      margin-block-end: var(--sp-3);
+    }
+
+    /* THE NOTE ABOVE THE PARTS, and what a save said, run the whole width. */
+    .prof[data-page] > .pf-note,
+    .prof[data-page] > .pf-said {
+      column-span: all;
+    }
+  }
+
+  .prof[data-page] > .part {
+    gap: var(--sp-2);
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  .prof[data-page] > .part + .part {
+    padding-block-start: var(--tile-pad);
+    border-block-start: 0;
+  }
+
+  .prof[data-page] > .pf-note {
+    background: var(--tile);
+  }
+
+  .part-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-block-end: var(--sp-1);
+  }
+
+  .part-head .part-title {
+    font-size: var(--fs-head);
+  }
+
+  .pf-sub {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  /* SAVE AND CANCEL AT THE PAGE'S FOOT, Save last; on a phone they stay in reach while the long form scrolls. */
+  .pf-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--sp-2);
+  }
+
+  @media (width < 640px) {
+    .pf-foot {
+      position: sticky;
+      inset-block-end: 0;
+      padding-block: var(--sp-3);
+      background: var(--board);
+    }
   }
 
   .part {

@@ -13,8 +13,9 @@ export const ON_WORD_PREF = 'agents.answer_on_word' as const;
 export const onWordWords = {
   title: 'Agents answer when you say so',
   /* THE SAME AS THE AGENT IS TOLD (`ON_WORD` in `packages/record/src/methods/agent-profile.ts`): on his word, changes
-     and deletes go through; money and keys are always asked. */
-  on: 'When you tell an agent to, it goes ahead, deletes too, and says it was your word. You can undo it. Money and keys always wait for you.',
+     and deletes go through; money and keys are asked. NOT "ALWAYS": with "Let agents do everything without asking" on
+     (`bypass.ts`), money goes through too, and only what `NEVER_BYPASS` keeps still waits (`BYPASS_SAYS`). */
+  on: 'When you tell an agent to, it goes ahead, deletes too, and says it was your word. You can undo it. Money and keys wait for you, unless agents may do everything without asking: then only keys, paying, and deleting or exporting all of BrainDog still wait.',
   off: 'Deletes, money and keys wait for you here, even when you told the agent.',
 } as const;
 

@@ -43,6 +43,8 @@
     type AgentRow, type ProfileView,
   } from '$lib/agents/profile.ts';
   import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
+  import { agentAt, agentHead, agentHref } from '$lib/agents/agent-page.svelte.ts';
+  import { goto } from '$app/navigation';
   import ChatAnswer from '$lib/agents/ChatAnswer.svelte';
   import OnWord from '$lib/agents/OnWord.svelte';
   import Bypass from '$lib/agents/Bypass.svelte';
@@ -268,12 +270,18 @@
   /** The lists a row may be held to: every list he has, but the record's own two for runs and instructions. */
   const sheetLists = $derived(shell.index.registers.filter((r) => r.id !== 'session' && r.id !== 'instructions').map((r) => ({ id: r.id, name: r.name })));
 
-  let picked = $state<AgentRow | null>(null);
-  let profileOpen = $state(false);
-  const openProfile = (a: AgentRow) => {
-    picked = a;
-    profileOpen = true;
-  };
+  /**
+   * EACH AGENT ITS OWN PAGE (G14): a row is a link to `/settings/agents/<agent>`, and on that address this area draws
+   * the agent's settings in place of the list, so a link to "Claude's settings" exists and Back works. It was a sheet
+   * over the list, with no address of its own.
+   */
+  const agentParam = $derived((page.params as { agent?: string }).agent);
+  const picked = $derived(agentParam === undefined ? null : (agentAt(agents, agentParam) ?? null));
+  $effect(() => {
+    agentHead.name = picked?.name ?? '';
+    return () => (agentHead.name = '');
+  });
+  const backToList = () => void goto(at('/settings/agents'));
 
   /** Save one row: `setAgentProfile`, his browser only. The list is read again so every row says what now applies. */
   async function saveProfile(args: Record<string, unknown>): Promise<{ ok: true } | { ok: false; fix: string }> {
@@ -351,6 +359,9 @@
     /* WHAT EACH LEVEL MEANS, in one line under the list: it was three lines, one a level. */
     levels: { write: 'makes changes; money, keys and deletes still wait', propose: 'asks you first', read: 'changes nothing' } as Record<string, string>,
     yours: 'Your agents',
+    noAgent: 'No agent by that name here',
+    noAgentWhy: 'It may have been removed, or it has not been heard from yet.',
+    allAgents: 'All agents',
     connections: 'Connections',
     noKeys: 'No machines or keys yet',
     noKeysWorking: (who: string, n: number) => `${who} ${n === 1 ? 'runs' : 'run'} without a key`,
@@ -621,7 +632,7 @@
       {:else}
         <AgentFace agent={a.kind} run={a.heard?.seq != null ? `S${a.heard.seq}` : ''} live={working ? 'working' : 'stopped'} size="m" />
       {/if}
-      <button type="button" class="agent" data-profile-row={a.key} onclick={() => openProfile(a)}>
+      <a class="agent" data-profile-row={a.key} href={at(agentHref(a))}>
         <span class="who-words">
           <span class="who-name" dir="auto">{a.name}</span>
           <!-- ITS OWN SENTENCE ONLY WHERE IT IS HELD TO LESS THAN ITS LEVEL; Defaults always says what it gives. -->
@@ -637,7 +648,7 @@
         </span>
         <span class="who-scope agent-may">{a.may ? LEVEL_WORDS[a.may] : ''}</span>
         <Icon name="chevron" size="s" />
-      </button>
+      </a>
     </div>
     <!-- ITS PROFILES, ONE CHIP EACH, under the row they belong to: each opens its own sheet. A chip says its level
          only where it is not its agent's, and carries the live dot while its run is at work. -->
@@ -646,9 +657,9 @@
         {#each g.chips as c (c.key)}
           {@const on = workingOf(c)}
           <li>
-            <button type="button" class="chip tap" data-profile-row={c.key} onclick={() => openProfile(c)}>
+            <a class="chip tap" data-profile-row={c.key} href={at(agentHref(c))}>
               {#if on}<span class="chip-dot" aria-hidden="true"></span>{/if}<span dir="auto">{chipName(c)}</span>{#if c.may && c.may !== a.may}<span class="chip-may">{LEVEL_WORDS[c.may]}</span>{/if}
-            </button>
+            </a>
           </li>
         {/each}
       </ul>
@@ -661,6 +672,27 @@
     A row is one button that opens its sheet, which holds everything that agent works under. A host that keeps no
     settings rows draws the agents heard from in the Connections panel, as it did before.
   -->
+  {#if agentParam !== undefined}
+    <!-- ONE AGENT'S PAGE (G14): everything it works under, each part a tile, Save at the foot; Back is the list. -->
+    {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+      <Tile icon="session" title={words.yours} data-wide><ReadState state={held.state} refusal={held.refusal} onretry={held.reread} /></Tile>
+    {:else if picked === null}
+      <Empty kind="error" heading title={words.noAgent} body={words.noAgentWhy}>
+        {#snippet actions()}<Button href="/settings/agents">{words.allAgents}</Button>{/snippet}
+      </Empty>
+    {:else}
+      <ProfileSheet
+        page
+        row={picked}
+        places={held.value?.places ?? null}
+        lists={sheetLists}
+        followers={picked.key === 'default' ? followers(agents) : []}
+        keepers={picked.key === 'default' ? keepersOf(agents).map((k) => k.name) : []}
+        onsave={saveProfile}
+        onclose={backToList}
+      />
+    {/if}
+  {:else}
   {#if !legacy}
     <Tile icon="session" title={words.yours} count={held.state === 'ready' && agentGroups.length > 0 ? agentGroups.length : undefined} actions={connectButton} data-wide data-part="your-agents">
       {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
@@ -688,17 +720,6 @@
       {/if}
     </Tile>
   {/if}
-
-  <!-- ONE SHEET FOR EVERY AGENT, Defaults included. -->
-  <ProfileSheet
-    bind:open={profileOpen}
-    row={picked}
-    places={held.value?.places ?? null}
-    lists={sheetLists}
-    followers={picked?.key === 'default' ? followers(agents) : []}
-    keepers={picked?.key === 'default' ? keepersOf(agents).map((k) => k.name) : []}
-    onsave={saveProfile}
-  />
 
   <!-- THE OWNER'S FOUR ANSWERING SWITCHES IN ONE TILE, a row each, second on the page because they are what he comes
        here to change: agents doing everything without asking (`Bypass.svelte`, first, the one that lifts the rest),
@@ -825,6 +846,7 @@
   {#if ConnectSheet}
     <ConnectSheet bind:open={sheetOpen} {lines} {listen} code={first ? undefined : codeForm} onchanged={() => void held.reread()} />
   {/if}
+  {/if}
 
 {:else}
   <!-- A COLLEAGUE CONNECTS THEIR OWN AGENT, with a key of their own capped by their own levels, rather than being shown
@@ -837,6 +859,7 @@
   panel. They were four more tiles down the page (connections, permissions, Slash, Slash's model), read now and then
   and scrolled past on every visit. A colleague sees Slash alone.
 -->
+{#if agentParam === undefined}
 <Tile icon="sliders-horizontal" title={anOwner ? words.more : words.slash} actions={anOwner && legacy ? connectButton : undefined} data-wide data-part="agents-more">
   <ul class="more">
     {#if anOwner}
@@ -864,6 +887,7 @@
     </li>
   </ul>
 </Tile>
+{/if}
 
 <!-- SLASH, IN ITS PANEL: its one line while no model is connected, what a model has when one is, the two switch rows,
      its model and its two depths, with Claude on the owner's Mac while a runner there is live. Never "host": the person
@@ -1042,6 +1066,7 @@
     color: inherit;
     font: inherit;
     text-align: start;
+    text-decoration: none;
     cursor: pointer;
   }
 
@@ -1105,6 +1130,7 @@
     font-weight: var(--fw-medium);
     overflow-wrap: anywhere;
     text-align: start;
+    text-decoration: none;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }

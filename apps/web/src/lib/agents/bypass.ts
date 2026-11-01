@@ -15,8 +15,11 @@ export const BYPASS_PREF = 'agents.bypass' as const;
 
 export const bypassWords = {
   title: 'Let agents do everything without asking',
-  on: 'Your agents change, delete, install, set up automations, share and handle money on their own, without asking. Agents will also act after reading things that came from outside, like bank texts or imports. Everything stays undoable, and each change shows which agent made it.',
-  off: 'Agents ask you before deletes, money, keys, add-ons and settings, and after reading things that came from outside.',
+  /* ONE LINE EACH (G15): it was two paragraphs under the switch. What the "on" line folded away (installs, automations,
+     bank texts and imports) is the same lift; what still needs him waits behind "What still needs you". */
+  on: 'Agents act without asking, money and outside reads too. Each change names its agent and can be undone.',
+  off: 'Agents ask before deletes, money, keys, add-ons and settings, and after reading things from outside.',
+  more: 'What still needs you',
   still: 'Still only you, here: seeing or adding a key, making new keys, deleting or exporting all of BrainDog, changing the owner, and paying.',
 } as const;
 
