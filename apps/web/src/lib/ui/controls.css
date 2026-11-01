@@ -9,7 +9,7 @@
  * A FIELD IS A SOFT WELL: 40 tall, 44 under a thumb, the `--tile-2` fill with no border, radius
  * `--r-ctl`, and its label above it in `--fs-meta` `--ink-2`. Focus is the 2px ink ring offset 2, the same ring every
  * other control takes from the a11y layer. A segmented control is one `--tile-2` rectangle (radius 8), with the chosen
- * segment raised in `--segment-on` (SPEC 2.A.9). A checkbox and a radio are `--red-fill` when they are on (a switch is ink),
+ * segment raised in `--segment-on` (SPEC 2.A.9). A checkbox and a radio are ink when they are on (as a switch is),
  * with a white mark (SPEC 1.1, 2.A.10).
  */
 
@@ -466,7 +466,7 @@
    * screen set `accent-color`, with the operating system's chevron on every select and a native
    * thumb on every slider, so one form spoke three design languages.
    * `appearance: none` takes the browser's drawing away and the rules below put the product's back:
-   * `--red-fill` for what is on with a white mark, the 3:1 grey of an off switch for a box's boundary (a control's
+   * ink for what is on with a mark in the tile colour, the 3:1 grey of an off switch for a box's boundary (a control's
    * boundary is held to 3:1, which the hairline `--rule-strong` is not), the `--tile-2` fill and `--r-ctl` for a
    * field, a round thumb.
    *
@@ -501,25 +501,26 @@
     border-radius: var(--r-round);
   }
 
-  /* ON IS THE RED FILL (SPEC 1.1). `:indeterminate` is the checkbox's alone: a radio matches it whenever no radio
-     in its group is chosen, and every option of an unanswered question would draw as chosen. */
+  /* ON IS THE INK FILL (Look B, design pass 1 Nov: "red is never selected, on or focused; those are ink"). It was the
+     red fill, so a chosen radio on Publish read as a warning. `:indeterminate` is the checkbox's alone: a radio matches
+     it whenever no radio in its group is chosen, and every option of an unanswered question would draw as chosen. */
   :where(input[type='checkbox']):checked,
   :where(input[type='checkbox']):indeterminate,
   :where(input[type='radio']):checked {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
+    background: var(--ink);
+    border-color: var(--ink);
   }
 
   /* THE MARK IS `::after` AND NEVER `::before`, because `::before` is taken twice over: `.tap` grows
      a small control's hit box with it, and the layout gate reads a control's `::before` as its
-     target. A tick drawn there would shrink the one and lie to the other. The mark is the label colour
-     of the red fill (`--on-red`); the fill alone still says "on" where a browser draws no
+     target. A tick drawn there would shrink the one and lie to the other. The mark is the tile's colour on
+     the ink fill, which holds in dark as in light; the fill alone still says "on" where a browser draws no
      pseudo-element on an input. */
   :where(input[type='checkbox']):checked::after {
     content: '';
     inline-size: 10px;
     block-size: 10px;
-    background: var(--on-red);
+    background: var(--tile);
     clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
   }
 
@@ -527,7 +528,7 @@
     content: '';
     inline-size: 8px;
     block-size: 2px;
-    background: var(--on-red);
+    background: var(--tile);
     clip-path: none;
   }
 
@@ -535,7 +536,7 @@
     content: '';
     inline-size: var(--dot);
     block-size: var(--dot);
-    background: var(--on-red);
+    background: var(--tile);
     border-radius: var(--r-round);
   }
 
@@ -656,7 +657,7 @@
     inline-size: 16px;
     block-size: 16px;
     margin-block-start: -6px;
-    background: var(--red-fill);
+    background: var(--ink);
     border: 0;
     border-radius: var(--r-round);
   }
@@ -665,7 +666,7 @@
     box-sizing: border-box;
     inline-size: 16px;
     block-size: 16px;
-    background: var(--red-fill);
+    background: var(--ink);
     border: 0;
     border-radius: var(--r-round);
   }
