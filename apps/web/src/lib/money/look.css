@@ -940,19 +940,19 @@
 /* ── the Ledger's filters: a row each, named, as a finance app's filter bar ─ */
 
 /* EACH FIELD ON A ROW OF ITS OWN WITH ITS NAME IN FRONT ("Account", "Category", "Show"), its choices as round chips, the
-   one chosen in ink, not three rows of words with a red "All" at the start of each. Month keeps its segmented track. */
+   one chosen in ink, not three rows of words with a red "All" at the start of each. */
 [data-money] .filters {
   flex-direction: column;
   align-items: stretch;
   gap: var(--sp-2);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) {
+[data-money] .filters-group {
   gap: 6px;
 }
 
 /* THE FIELD'S NAME IN FRONT OF ITS CHOICES, where the hairline between fields stood. */
-[data-money] .filters-group + .filters-group:not([data-control='segmented'])::before,
+[data-money] .filters-group + .filters-group::before,
 [data-money] .filters-group::before {
   content: attr(aria-label);
   position: static;
@@ -968,40 +968,38 @@
   font-weight: var(--fw-medium);
 }
 
+/* MONTH IS A ROW LIKE THE OTHERS, NAMED AND IN CHIPS (audit 11-01, AP24): as a segmented track with no name among three
+   rows of named chips it read as a fourth kind of control, and at 390 it stood unnamed between Category and Show. */
 [data-money] .filters-group[data-control='segmented'] {
-  align-self: flex-start;
+  padding: 0;
+  border-radius: 0;
+  background: none;
 }
 
-/* LEVEL WITH THE CHIPS of the rows named above and below it, not out at the edge under their names. */
-[data-money] .filters:has(> .filters-group:not([data-control='segmented'])) > .filters-group[data-control='segmented'] {
-  margin-inline-start: calc(72px + 6px);
-  max-inline-size: calc(100% - 78px);
-}
-
-[data-money] .filters-group[data-control='segmented']::before {
-  content: none;
+[data-money] .filters-group[data-control='segmented'] .filters-choice {
+  border-radius: var(--r-ctl);
 }
 
 /* A CHOICE IS A RECTANGLE, AS EVERY CHIP IS (1 Nov): Money's were the last pills in the app. */
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice {
+[data-money] .filters-group .filters-choice {
   border: 1px solid var(--rule);
   border-radius: var(--r-ctl);
   background: var(--tile);
   color: var(--ink-2);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice .filters-count {
+[data-money] .filters-group .filters-choice .filters-count {
   color: var(--ink-3);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice:is([aria-pressed='true'], [data-on]),
-[data-money] .filters-group:not([data-control='segmented']) button.filters-choice[aria-pressed='true']:hover {
+[data-money] .filters-group .filters-choice:is([aria-pressed='true'], [data-on]),
+[data-money] .filters-group button.filters-choice[aria-pressed='true']:hover {
   border-color: var(--ink);
   background: var(--ink);
   color: var(--tile);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice[aria-pressed='true'] .filters-count {
+[data-money] .filters-group .filters-choice[aria-pressed='true'] .filters-count {
   color: inherit;
   opacity: 0.75;
 }
@@ -1017,16 +1015,16 @@
     padding-inline-end: var(--sp-1);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']) {
+  [data-money] .filters-group {
     padding-inline-end: 24px;
     mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']):dir(rtl) {
+  [data-money] .filters-group:dir(rtl) {
     mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']) {
+  [data-money] .filters-group {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
@@ -1037,7 +1035,7 @@
     mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']):dir(rtl) {
+  [data-money] .filters-group:dir(rtl) {
     mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
   }
 
@@ -1049,12 +1047,6 @@
   [data-money] .filters-group .filters-choice,
   [data-money] .filters-group .filters-more {
     flex: none;
-  }
-
-  [data-money] .filters-group[data-control='segmented'] {
-    max-inline-size: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
   }
 }
 

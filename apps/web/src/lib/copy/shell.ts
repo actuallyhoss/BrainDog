@@ -256,7 +256,12 @@ export const shell = {
   /** `day` is "today" or "on 29 Oct", as Forecast says the lowest point. `window` is how far the walk looks, "12 weeks",
    *  said as Today says it ("Lowest in the next 13 weeks"), so the low is never read as the lowest ever (finish F2). */
   /*  THE MINUS HELD TO ITS FIGURE (finish F49): a wrapped line broke "−" from "£16,213", so a word joiner follows it. */
-  cashLowest: (amount: string, day: string, window: string) => `Lowest in the next ${window}: ${amount.replace(/^([−-])/u, '$1\u2060')} ${day}`,
+  /* A LOW BELOW NOUGHT IS SAID IN THE RED (1 Nov): "Lowest … −£16,213" read as calmly as a figure above it. The page's
+     one form for a phrase in the danger colour (`{{bad:…}}`, `braindog-render` `inline`), so the words still say it. */
+  cashLowest: (amount: string, day: string, window: string) => {
+    const said = amount.replace(/^([−-])/u, '$1\u2060');
+    return `Lowest in the next ${window}: ${/^[−-]/u.test(amount) ? `{{bad:${said}}}` : said} ${day}`;
+  },
   /* A BAR'S OWN NOTE, beside the bar and not under the chart: what its money was kept in before it was said in home. */
   convertedFrom: (codes: string) => `converted from ${codes}`,
   /**
