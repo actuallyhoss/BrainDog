@@ -20,6 +20,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { words, type CurrencyChoice } from './building.ts';
   import { currencies } from './preview.ts';
+  import { spokenName } from '$lib/start/place-currency.ts';
 
   let {
     value = $bindable(null),
@@ -27,6 +28,7 @@
     choices = [],
     suggested = null,
     find: start = null,
+    quiet = false,
   }: {
     value?: string | null;
     locale: string;
@@ -36,6 +38,8 @@
     suggested?: string | null;
     /** A word to start the search with, when the person named several currencies with one word. */
     find?: string | null;
+    /** Opened to change one already said (sign-up's Time and money): the one said is shown chosen, with no "Suggested" line over it. */
+    quiet?: boolean;
   } = $props();
 
   /* AT MOST EIGHT MATCHES, so the list under the field stays short while a phone's keyboard is up; typing more narrows
@@ -69,22 +73,22 @@
 
 <div class="currency" role="group" aria-labelledby="currency-q">
   <h3 class="currency-q" id="currency-q">{firstRun.currencyQuestion}</h3>
-  {#if offer}
-    <p class="currency-offer"><span class="currency-offer-name">{words.suggested(copy.recommended, offer.name, null)}</span> {offer.why ? `${offer.why.charAt(0).toUpperCase()}${offer.why.slice(1)}.` : ''}</p>
+  {#if offer && !(quiet && value !== null)}
+    <p class="currency-offer"><span class="currency-offer-name">{words.suggested(copy.recommended, spokenName(offer.name), null)}</span> {offer.why ? `${offer.why.charAt(0).toUpperCase()}${offer.why.slice(1)}.` : ''}</p>
   {/if}
 
   {#if choices.length > 0}
     <div class="currency-choices" role="group" aria-label={firstRun.currencyQuestion}>
       {#each choices as c, i (c.code)}
         <Button weight="quiet" kbd={String(i + 1)} aria-pressed={value === c.code} data-suggested={c.code === suggested ? '' : undefined} onclick={() => pick(c.code)}>
-          {#if value === c.code}<Icon name="check" size="m" />{/if}{c.name}
+          {#if value === c.code}<Icon name="check" size="m" />{/if}{spokenName(c.name)}
         </Button>
       {/each}
     </div>
   {/if}
 
   <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-  <p class="currency-said" role="status">{chosen ? chosen.name : ''}</p>
+  <p class="currency-said" role="status">{chosen && !choices.some((c) => c.code === chosen.code) ? spokenName(chosen.name) : ''}</p>
   <p class="currency-why">{firstRun.currencyFirst}</p>
 
   <label class="currency-label" for="currency-find">{firstRun.currencyFind}</label>
@@ -98,7 +102,7 @@
     {:else}
       <div class="currency-matches" role="group" aria-label={firstRun.currencyFind}>
         {#each matches as c (c.code)}
-          <Button weight="quiet" size="sm" aria-pressed={value === c.code} onclick={() => pick(c.code)}>{c.name}</Button>
+          <Button weight="quiet" size="sm" aria-pressed={value === c.code} onclick={() => pick(c.code)}>{spokenName(c.name)}</Button>
         {/each}
       </div>
     {/if}

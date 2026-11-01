@@ -115,7 +115,7 @@
   import { assemble } from '$lib/start/assembling.ts';
   import { becameShown, filledBy, placesOf, proposeFirst, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
   import { readAsks } from '$lib/start/ask.ts';
-  import { currencyWord } from '$lib/start/place-currency.ts';
+  import { currencyWord, keepCurrencyGuess } from '$lib/start/place-currency.ts';
   import { placeZone, zoneGroups, zonePlace } from '$lib/start/place-zone.ts';
   import { answer, oneQuestion, words as asked, type Question } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
@@ -595,10 +595,15 @@
   /** A place named in the words that keeps another clock than this device, offered as one tap on the keep step. */
   const zoneOffer = $derived(sentence.trim() === '' ? null : placeZone(sentence));
   const zoneNow = $derived(tzPick ?? here);
-  /** The currency the record is made in, said on the keep step: the one picked, else the reading's, where Money is kept. */
-  const moneyNow = $derived(money === null ? null : (currencyPick ?? read?.currency ?? null));
+  /**
+   * THE CURRENCY SAID ON THE KEEP STEP, WHATEVER THE STARTER (audit AP9): the one picked, else the reading's, else the
+   * one this device and the words point at. A Team or a Student keeps no Money yet, and was told the time alone; the
+   * first amount then asked again. Where Money is kept the record is made in it; where not, it is kept for the BrainDog
+   * on this device (`keepCurrencyGuess`) and Money is made in it the day it is turned on.
+   */
+  const moneyNow = $derived(currencyPick ?? read?.currency ?? (sentence.trim() === '' ? null : currencyChoices(sentence, deviceOf()).suggested));
   /** The currencies worth offering first when the person opens Change, as the one question offers them. */
-  const moneyAsk = $derived(money === null || !setOpen ? null : currencyChoices(sentence, deviceOf()));
+  const moneyAsk = $derived(!setOpen ? null : currencyChoices(sentence, deviceOf()));
   const zonesOffered = $derived(setOpen ? zoneGroups([zoneNow, here, zoneOffer?.zone ?? null]) : []);
   const placed = $derived(u !== null || modules.length > 0);
 
@@ -906,7 +911,8 @@
    */
   const draftNow = (): Draft => ({
     said: sentence.trim(),
-    currency: money === null ? null : (currencyPick ?? read?.currency ?? null),
+    /* THE CURRENCY SAID, Money or not (AP9): the build makes the record in it only where Money is kept. */
+    currency: money === null ? moneyNow : (currencyPick ?? read?.currency ?? null),
     usecase: chosen,
     reply,
     ...(live !== null && liveFor === sentence && sentence === sentence.trim() ? { reading: live } : {}),
@@ -1164,6 +1170,9 @@
       location.assign(at(draft ? `${BASE}/${name}/start` : fallback));
       return;
     }
+    /* THE CURRENCY SAID ON THE KEEP STEP, KEPT FOR THIS BRAINDOG ON THIS DEVICE (AP9): the record keeps it only where
+       Money is; elsewhere it waits here for the day Money is turned on, and the drafts on Today read amounts in it. */
+    keepCurrencyGuess(apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }), asked.currency ?? draft?.currency ?? currencyChoices(draft?.said ?? '', deviceOf()).suggested);
     const one = caseOf(asked.usecase);
     stage = words.makingParts([...(one ? [one.title] : []), ...asked.modules.map(moduleName)].slice(0, 4));
     /* A BUILD THIS DEVICE ALREADY PRESSED FOR (a reload mid-press): the same key, sent with `again`, so the record
@@ -1529,9 +1538,18 @@
         <section class="set" data-forming="set" aria-labelledby="set-h">
           <p class="field-label" id="set-h">{words.setTitle}</p>
           {#if !setOpen}
-            <div class="set-row">
+            <div class="set-row set-said">
               <p class="set-line">{words.setLine(zonePlace(zoneNow), moneyNow === null ? null : currencyWord(moneyNow))}</p>
-              <button type="button" class="link plain" aria-expanded="false" onclick={() => (setOpen = true)}>{words.setChange}</button>
+              <button
+                type="button"
+                class="link plain"
+                aria-expanded="false"
+                onclick={() => {
+                  /* THE CURRENCY SAID IS THE ONE SHOWN CHOSEN (AP19), never a row of bare words under "Suggested". */
+                  currencyPick ??= moneyNow;
+                  setOpen = true;
+                }}>{words.setChange}</button
+              >
             </div>
             {#if zoneOffer !== null && zoneOffer.zone !== zoneNow}
               {@const offer = zoneOffer}
@@ -1557,6 +1575,7 @@
                 {locale}
                 choices={moneyAsk.choices}
                 suggested={moneyNow ?? moneyAsk.suggested}
+                quiet
                 find={moneyAsk.find}
               />
             {/if}
@@ -1600,7 +1619,8 @@
 
       {#if said}<p class="bad" role="alert">{said}</p>{/if}
 
-      <div class="go sticky">
+      <!-- NOT HELD TO THE FOOT WHILE TIME AND MONEY ARE OPEN (AP19): on a phone it sat over the email field. -->
+      <div class="go" class:sticky={!setOpen}>
         <Button weight="primary" type="submit" disabled={busy || naming || slug === '' || !free} aria-busy={busy}>
           {signedIn ? words.makeNow : busy ? words.sending : waitsForCheck ? checkWords.send : words.send}
         </Button>
@@ -2176,6 +2196,19 @@
     justify-content: space-between;
     gap: var(--sp-2);
     min-inline-size: 0;
+  }
+
+  /* CHANGE BESIDE WHAT IT CHANGES, as the name's sits beside the address (AP19), never wrapped to a line of its own. */
+  .set-said {
+    flex-wrap: nowrap;
+  }
+
+  .set-said .set-line {
+    flex: 1 1 auto;
+  }
+
+  .set-said > .link {
+    flex: none;
   }
 
   .set-line {

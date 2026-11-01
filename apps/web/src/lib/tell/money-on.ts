@@ -11,6 +11,7 @@
 import { createClient } from '@braindog/client';
 
 import { learnHome } from '../record/api.ts';
+import { currencyGuessed } from '../start/place-currency.ts';
 import { forget, readBoot } from '../record/boot-live.ts';
 import { REGISTERS } from '../record/held.ts';
 import { packDocument, type PackState } from '../record/packs.ts';
@@ -152,7 +153,10 @@ export async function moneyThenRead(
   const client = createClient({ base });
   /* THE RECORD'S OWN CURRENCY, WHERE IT HAS ONE (audit 31 Oct o, AO2): Money turned off and on again keeps the home its
      settings hold, so a line with no currency is read in it, never asked. */
-  const home = options.currency ?? (await homeHeld(client));
+  let home = options.currency ?? (await homeHeld(client));
+  /* OR THE ONE SIGN-UP SAID FOR THIS BRAINDOG, kept on this device until Money was on to keep it (onboarding AP9). */
+  const guessed = home === null ? currencyGuessed(base) : null;
+  if (guessed !== null && (await keepHome(base, guessed).catch(() => 'no')) === null) home = guessed;
   if (home !== null && options.currency === null) learnHome(home);
   const packs = (await client.packs().catch(() => null)) as (Wire & { value?: PackState[] }) | null;
   const ids = (packs?.ok ? (packs.value ?? []) : []).find((p) => p.id === MONEY_MODULE)?.registers ?? [];

@@ -87,3 +87,42 @@ export function currencyWord(code: string): string {
   }
   return c;
 }
+
+/* ── the currency guessed at sign-up, kept for the BrainDog it was guessed for (audit AP9) ── */
+
+/**
+ * WHERE THE GUESS IS KEPT ON THIS DEVICE. A starter without Money has nowhere in the record to keep a currency (only the
+ * add-on that keeps money declares `home_currency`), so the one sign-up said ("money in Egyptian pounds") was dropped,
+ * and the first amount told stopped to ask again. It waits here, by the BrainDog's own address, until Money is turned
+ * on and keeps it there.
+ */
+const GUESS_KEY = 'braindog.currency.guess';
+
+/** The currency sign-up said for the BrainDog at `base`, kept on this device. */
+export function keepCurrencyGuess(base: string, code: string | null): void {
+  const c = code?.trim().toUpperCase() ?? '';
+  if (!/^[A-Z]{3}$/u.test(c)) return;
+  try {
+    const held = JSON.parse(globalThis.localStorage?.getItem(GUESS_KEY) ?? '{}') as Record<string, string>;
+    globalThis.localStorage?.setItem(GUESS_KEY, JSON.stringify({ ...(typeof held === 'object' && held !== null ? held : {}), [base]: c }));
+  } catch {
+    /* Storage off: the first amount asks, as before. */
+  }
+}
+
+/** The currency sign-up said for the BrainDog at `base`, or `null`. */
+export function currencyGuessed(base: string): string | null {
+  try {
+    const held = JSON.parse(globalThis.localStorage?.getItem(GUESS_KEY) ?? '{}') as Record<string, unknown>;
+    const c = typeof held?.[base] === 'string' ? (held[base] as string) : '';
+    return /^[A-Z]{3}$/u.test(c) ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A currency's name as a person says it, the kind of money in lower case: "Egyptian Pound" is "Egyptian pound", "US
+ * Dollar" is "US dollar" (audit AP19; Tell already says it so).
+ */
+export const spokenName = (name: string): string => name.replace(/\s(\p{Lu})(\p{Ll}+)$/u, (_, a: string, b: string) => ` ${a.toLowerCase()}${b}`);
