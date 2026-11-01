@@ -54,6 +54,17 @@ export function methods(deps: RecordDeps & { nudgeAction?: NudgeAction | undefin
    * ask `write` on the record.
    */
   const reaches = (ctx: CallContext, ingest: string): Refusal | null => {
+    /* AND THE LIST THE ACTION WRITES, which the project's list alone never asked: a key that writes Projects ran an action
+       that writes the Ledger. */
+    const body = sql.one<{ body: string }>(
+      "SELECT body FROM declaration WHERE kind = 'ingest' AND id = ? AND superseded_at IS NULL AND retired = 0",
+      `ingest.${ingest}`,
+    )?.body;
+    const writes = body === undefined ? undefined : (JSON.parse(body) as { writes?: { register?: unknown } }).writes?.register;
+    if (typeof writes === 'string') {
+      const held = guard(ctx, 'write', writes);
+      if (held) return held;
+    }
     const project = projectOf(ingest);
     const row = project === null ? null : kernel.get(project);
     if (row === null) return guard(ctx, 'write');

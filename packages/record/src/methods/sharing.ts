@@ -413,6 +413,24 @@ export function methods(deps: RecordDeps) {
     return out;
   };
 
+  /**
+   * WHAT AN ADMIN MAY SHARE: only what they read whole themselves, never with themselves or a group they are in, and never
+   * a change to a share about them. `team` let an Admin share the runs, Keys or a list the owner held from them with
+   * themselves, and end a deny the owner had set on them. An owner is held to none of it.
+   */
+  const adminKeeps = (ctx: CallContext, s: Share | null, was: Share | null): Refusal | null => {
+    const p = ctx.principal;
+    if (p.kind !== 'person' || p.level === 'owner') return null;
+    const aboutMe = (who: Share['who']): boolean =>
+      (who.kind === 'person' && who.id === p.id) || (who.kind === 'group' && (kernel.groupKept(who.id)?.people ?? []).includes(p.id));
+    if ((s !== null && aboutMe(s.who)) || (was !== null && aboutMe(was.who))) return { code: 'FORBIDDEN', fix: 'Only an owner can change what you can do here.', at: 'who' };
+    if (s === null || s.effect !== 'allow') return null;
+    for (const l of reachOf(s, kernel.catalog()))
+      if (deps.readable(ctx, l.list) !== null || ctx.wheres?.[l.list] !== undefined || (ctx.hides?.[l.list]?.length ?? 0) > 0)
+        return { code: 'FORBIDDEN', fix: `You can share only what you can see all of. Ask an owner to share ${l.name}.`, at: 'what' };
+    return null;
+  };
+
   /* ---------------------------------------------------------------------------------------------- the money shown */
 
   const moneyFields = (l: LensCatalogList): string[] => l.fields.filter((f) => !f.retired && !f.title && f.type === 'money').map((f) => f.id);
@@ -702,7 +720,7 @@ export function methods(deps: RecordDeps) {
       const was = id === undefined ? null : kernel.shareKept(id);
       if (id !== undefined && (was === null || was.revoked_at)) return refuse('REF_UNKNOWN', 'There is no live share with that id. Share it again instead.', 'id');
       const catalog = kernel.catalog();
-      const bad = await refusalOf(ctx, s, catalog, id);
+      const bad = (await refusalOf(ctx, s, catalog, id)) ?? adminKeeps(ctx, s, was);
       if (bad) return { ok: false, refusal: bad };
       const confirm = unconfirmed(ctx, s);
       if (confirm) return { ok: false, refusal: confirm };
@@ -738,6 +756,8 @@ export function methods(deps: RecordDeps) {
       const id = typeof args?.id === 'string' ? args.id : '';
       const was = id === '' ? null : kernel.shareKept(id);
       if (was === null || was.revoked_at) return refuse('REF_UNKNOWN', 'There is no live share with that id. It may have ended already.', 'id');
+      const mine = adminKeeps(ctx, null, was);
+      if (mine) return { ok: false, refusal: mine };
       const why = typeof args?.why === 'string' && args.why.trim() !== '' ? args.why.trim().slice(0, 500) : null;
       const ended = kernel.shareRevoke(ctx.principal.id, id, why);
       /* WHO EACH ENDED SHARE REACHED, READ AFTER IT ENDED: a group's members are still its members. */
@@ -784,6 +804,9 @@ export function methods(deps: RecordDeps) {
         return refuse('REF_UNKNOWN', 'There is nobody here by that id.', 'person');
       if (typeof args?.in !== 'boolean') return refuse('REQUIRED_MISSING', 'Put them in the group, or take them out?', 'in');
       if (args.in && owners().includes(person)) return refuse('FORBIDDEN', 'An owner already holds everything here, so a group adds nothing.', 'person');
+      /* AN ADMIN NEITHER PUTS THEMSELVES IN A GROUP NOR TAKES THEMSELVES OUT: either changes what they hold. */
+      if (ctx.principal.kind === 'person' && ctx.principal.level !== 'owner' && person === ctx.principal.id)
+        return refuse('FORBIDDEN', 'Only an owner can change what you can do here.', 'person');
       const said = kernel.groupMember(ctx.principal.id, g.id, person, args.in) ?? [];
       return deps.tail(ok({ ...groupOf(kernel.groupKept(g.id)!), said, left: args.in ? [] : leftOf([person]) }));
     },

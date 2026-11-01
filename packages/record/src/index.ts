@@ -3246,7 +3246,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (ctx.principal.kind !== 'person' || ctx.principal.level === 'owner') return null;
     const grants = args.level === 'owner' || Object.values(args.registers ?? {}).includes('owner');
     const holds = args.person !== undefined && kernel.members().some((m) => m.person_id === args.person && m.level === 'owner');
-    return grants || holds ? { code: 'FORBIDDEN', fix: 'Only an owner can make an owner, or change one.', at: 'level' } : null;
+    if (grants || holds) return { code: 'FORBIDDEN', fix: 'Only an owner can make an owner, or change one.', at: 'level' };
+    /* AND AN ADMIN NEVER CHANGES WHAT THEY HOLD THEMSELVES: `invite({ person: <self>, registers: { session: 'decide' } })`
+       gave an Admin the runs and instructions the record keeps from everybody but an owner. */
+    if (args.person !== undefined && args.person === ctx.principal.id)
+      return { code: 'FORBIDDEN', fix: 'Only an owner can change what you can do here.', at: 'person' };
+    /* NOR HANDS OUT A LIST THEY DO NOT READ THEMSELVES (Keys, the runs, a personal list, one the owner held from them),
+       at any level: what an Admin gives is a part of what they were given. */
+    for (const list of Object.keys(args.registers ?? {}))
+      if (readable(ctx, list) !== null) return { code: 'FORBIDDEN', fix: `Only an owner can give somebody ${listName(list)}.`, at: 'registers' };
+    /* AND ALL OF THIS BRAINDOG ONLY FROM AN ADMIN WHO READS ALL OF IT: one the owner held off a list, a field or some rows
+       would hand that part to whoever they invited at a whole level. */
+    if (args.level !== undefined && !readsAcross(ctx))
+      return { code: 'FORBIDDEN', fix: 'You were given part of this BrainDog, so you can give others parts of it, list by list. Only an owner can give all of it.', at: 'level' };
+    return null;
   };
 
   /**
@@ -8733,6 +8746,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AN ARRIVAL'S LINE IS THE INBOX'S, so it goes to whoever the inbox does (`inboxReached`), never to a reader of the record. */
     if (kind === 'inbox_raw') return inboxSees(ctx) ? bare : null;
     if (id.startsWith('register.')) return readable(ctx, id.slice('register.'.length)) ? null : bare;
+    /* THE DIGEST'S NOTE CARRIES EVERY SECTION'S FIGURE, money among them, so it goes to whoever reads every list, as
+       `digestToday` holds its sections; and a key's ask names the key, which is the owner's (`listGrants`). Both fell to
+       the rule for a line about nothing in particular, and every whole-record reader read them. */
+    const by = typeof e.actor === 'string' ? e.actor : '';
+    if (by.startsWith('digest:') || kind === 'digest') return readsEveryList(ctx) ? bare : null;
+    if (by.startsWith('key_ask:') || kind === 'key_ask') return allows(ctx, 'owner') === null ? bare : null;
     return wholeRecord(ctx) ? logOf(ctx, bare) : null;
   };
 
@@ -9873,7 +9892,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        which lists a page already reads and which slugs are taken. */
     const every = pagesNow();
     const drawn = drawnIn(ctx);
-    const opens = every.filter((page) => seesPage(ctx, page));
+    /* AND NEVER A PLACE WHOSE BLOCKS ARE EVERY ONE HELD FROM THIS CALLER, as `pages` leaves one out: a member given
+       Projects and Tasks had Money in her rail, because its page reads Tasks for one line, and it opened onto nothing.
+       Asked only of a page with a place in the rail and no row behind it, and only of somebody held from some list. */
+    const everyList = readsEveryList(ctx) && allows(ctx, 'read') === null;
+    const opens = every.filter((page) => seesPage(ctx, page) && (everyList || page.nav === null || page.about !== null || !drawnWithheld(ctx, page.slug)));
     /* HOME FOLLOWS THE VOICE, as the use case's own page (`homePageOf` in `@braindog/seed`, `home-<use case>`), and only
        a page this caller may open: a member held to one list is never handed a slug she would be refused. */
     const speaker = speakingNow(kernel);

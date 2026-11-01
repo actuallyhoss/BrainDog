@@ -98,6 +98,11 @@ export function methods(deps: RecordDeps) {
       const ask = askIn(args);
       if (ask === null)
         return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Say the list, the field and what it becomes: {"register":"<list>","field":"<field>","as":{"type":"<type>"}}.', at: 'as' } };
+      /* THE PLAN READS EVERY LIVE ROW, so it is answered only to somebody shown all of the list: a member held to some
+         rows, kept off a field, or kept from a colleague's private rows was handed their titles and values in `sample`. */
+      const owner = ctx.principal.kind === 'person' && ctx.principal.level === 'owner';
+      if (!owner && (kernel.scope(ctx, ask.register) !== undefined || (ctx.hides?.[ask.register]?.length ?? 0) > 0))
+        return { ok: false, refusal: { code: 'FORBIDDEN', fix: 'You can see only part of this list, so only an owner can see what changing this field would do.', at: 'register' } };
       return kernel.retypePlan(ask);
     },
 
