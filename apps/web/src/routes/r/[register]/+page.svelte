@@ -1293,9 +1293,11 @@
      * `hideLabel`, because the header of a column of controls is not a heading, and `truncate:
      * 'never'`, because a truncated verb is a different verb.
      */
-    /* 176 WHERE A ROW CAN CHANGE, so a receipt's "Archived" and its "Put back" fit beside each other and the way back is
-       never cut (motion F7.3). Fixed, so a receipt arriving moves no column. */
-    { field: 'act', label: copy.rowActions, hideLabel: true, width: changes ? '176px' : '11ch', align: 'end' as const, truncate: 'never' as const },
+    /* AS WIDE AS ITS VERBS AND NO WIDER (1 Nov, L2): Archive and "⋯" where a row can change, "⋯" alone where it cannot.
+       It was 176 so a receipt's "Archived" and "Put back" fit, which at 1512 read as 190px of dead space at the end of
+       every row; the receipt now lays itself over the row's end instead (`.said` in `ListTable`), so the column is
+       still fixed and a receipt arriving still moves no column (motion F7.3). */
+    { field: 'act', label: copy.rowActions, hideLabel: true, width: changes ? 'calc(2 * var(--ctl-h-sm) + var(--sp-2) + 2 * var(--sp-3))' : 'calc(var(--ctl-h-sm) + 2 * var(--sp-3))', align: 'end' as const, truncate: 'never' as const },
   ]);
 
   /**
