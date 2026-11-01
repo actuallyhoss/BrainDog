@@ -115,7 +115,8 @@ const MONEY_WORDS = /\b(paid|pay|pays|payment|invoice\w*|bill\w*|revenue|income|
 const PEOPLE_WORDS = /\b(alone|solo|by myself|just me|on my own|clients?|customers?|partner\w*|co-?founder\w*|team\w*|colleague\w*|classmates?|supervisor|cofounder|we|our|us|employees?|staff|contractors?)\b/iu;
 const TOOL_WORDS = /\b(claude|chatgpt|gpt|cursor|codex|copilot|gemini|windsurf|perplexity|ai tools?|no ai|none yet)\b/iu;
 /* A thing they work on, said by name: "clients Fenwick and Acme", "an app called Tidepool", "for Fenwick". */
-const NAMED_WORK = /\b(?:clients?|customers?|projects?|products?|apps?|called|named|for|with|on|building)\b[^.?!\n]{0,40}?\b\p{Lu}[\p{L}\p{N}'’-]+/u;
+/* A NAME HAS A SMALL LETTER AFTER ITS CAPITAL, so a currency code ("clients pay me in USD") is never taken for one. */
+const NAMED_WORK = /\b(?:clients?|customers?|projects?|products?|apps?|called|named|for|with|on|building)\b[^.?!\n]{0,40}?\b\p{Lu}\p{Ll}[\p{L}\p{N}'’-]*/u;
 
 /** The ISO codes a sentence names outright ("USD", "in EUR"). */
 function codesIn(said: string): string[] {
