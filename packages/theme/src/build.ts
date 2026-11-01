@@ -1281,13 +1281,17 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
        be leaning towards red instead of blue"): every neutral took hue 355 at two thirds of its saturation, its luminance
        held, so every pair above measures as it did (ink-3 on tile 5.7, on tile-2 5.0). Status tints keep their hues.
        The board alone is a true grey ("the main page background should be greyish not reddish"), #0B0B0B at the old
-       board's luminance, so the tiles' warmth reads against a neutral page. */
+       board's luminance, so the tiles' warmth reads against a neutral page.
+       2026-11-01, THE FRAME A DEEP CRIMSON, NOT AN OXBLOOD (his word: a red dark bar, but not oxblood or brown): #2B1418
+       sat at hue 9 with little colour, which at that depth reads brown. The bar is #2E0C18, hue 1 at half again the
+       colour (OKLCH 0.216 0.058 1), clearly red and leaning neither to yellow nor to violet, ink at 15.5 and ink-3 at
+       6.0 on it; its chosen place #431628 holds ink-3 at 5.1. */
     board: '#0B0B0B',
     tile: '#231A1A',
     'tile-2': '#322526',
     hover: '#2D2021',
-    nav: '#2B1418',
-    'nav-selected': '#421D23',
+    nav: '#2E0C18',
+    'nav-selected': '#431628',
     rule: '#3C2D2F',
     'rule-strong': '#4E3C3D',
     scrim: 'rgb(7 7 7 / 0.6)',
