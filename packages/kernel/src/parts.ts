@@ -29,6 +29,8 @@ import type { Observation } from './observe.ts';
 /** What `list` is asked: one register, narrowed, ordered and paged. */
 export type ListQuery = {
   register: string;
+  /** Who is reading, for a `where` that says `someone else` (a task's Owner is not someone else). Set by a page's read. */
+  reader?: string | undefined;
   /**
    * Structured, or as the sentence a person and an agent write.
    *

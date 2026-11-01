@@ -939,6 +939,8 @@
     const sized = (k: string): number => DESK_SHOWS[boardModel.sizeNow(k)];
     const desk = deskedOf(
       shaped.blocks.map((b, n): Desked<LiveBlock> => {
+        /* A BLOCK HELD FROM THIS READER TAKES NO CELL, whichever way the page reached the tab (kept or read). */
+        if ((b as { held?: true }).held === true) return { ...b, drawn: false };
         if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? bandHeading(bandShown, late?.more ?? 0, words.band) : late?.heading || voice.overdue, more: late?.more ?? 0, most: board ? lateMost : phone.current ? 3 : 5 } };
         if (lateAt.includes(n) || bandAt.includes(n)) return { ...b, drawn: false };
         /* WHAT ARRIVED IS HOME'S OWN READING (`Landed.svelte`), drawn in the place of the feed it stands for. */
@@ -986,7 +988,9 @@
   const boardShown = $derived.by((): ReadonlySet<string> => {
     const keys = new Set<string>();
     for (const b of deskedRaw ?? []) if (b.drawn) keys.add(boardKeyOf(b) ?? '');
-    if (boardWidgets.some((w) => w.key === 'needs-you')) keys.add('needs-you');
+    /* NOT FOR A COLLEAGUE THE QUESTIONS ARE HELD FROM: her Needs you is the record's to answer, and its cell was a hole. */
+    const heldAsked = ((deskedRaw ?? []).find((b) => b.key === 'needs-you') as { held?: true } | undefined)?.held === true;
+    if (!heldAsked && boardWidgets.some((w) => w.key === 'needs-you')) keys.add('needs-you');
     if (landed.length > 0) keys.add('arrivals');
     return keys;
   });

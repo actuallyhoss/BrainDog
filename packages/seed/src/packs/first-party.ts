@@ -920,6 +920,10 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - portfolio 1.30.2 (audit 31 Oct g, AG22): a card's key number field reads "Shown first", where it read "Leads the
  *   card". Words only, so a patch step.
  * - work 1.20.1, before it shipped (audit 31 Oct f, AF20): Work's folded groups say how many they hold (`page.work`).
+ * - work 1.21.0 (teams, 1 Nov): yours is unassigned or assigned to you (`owner is not someone else` on every yours
+ *   figure, `metric.tasks-this-week-yours` among them, and on `page.work`), and the field reads "Assigned to" where it
+ *   read "Owner" (`register.tasks`). A condition and words, nothing added or taken away; a minor step, since what a
+ *   figure counts changes on a record more than one person holds.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.1',
@@ -927,7 +931,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   people: '4.2.2',
   'money-core': '3.33.0',
   estate: '2.6.1',
-  work: '1.20.1',
+  work: '1.21.0',
 };
 
 type Body = Record<string, unknown>;

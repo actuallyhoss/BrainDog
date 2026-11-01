@@ -920,6 +920,8 @@ function localInstants(where: Predicate | undefined, schema: Schema, tz: string 
 export type ReadMemo = { once<T>(key: string, make: () => T): T };
 
 export type EvalContext = {
+  /** Who is reading, for a `where` that says `someone else`; a figure that says it is held for each reader. */
+  reader?: string | undefined;
   nowMs: number;
   /**
    * Walks ahead already worked out in this one read (`readWalk`), kept by the host only for a read that writes nothing.
@@ -1140,7 +1142,23 @@ function resolvedOf(
     const refs = resolveRefs(dated.predicate, schema, ctx);
     return { predicate: refs.predicate, bad: [...dated.bad, ...refs.bad] };
   }
-  return parseWhere(where, schema, { nowMs, ...refDeps(ctx) });
+  return parseWhere(withoutNobody(where, schema), schema, { nowMs, ...refDeps(ctx) });
+}
+
+/**
+ * `<field> is not someone else` ON A LIST WITH NO SUCH FIELD IS LEFT OUT: nobody else can hold a row that has nowhere to
+ * say who holds it. Work's "yours" says `owner is not someone else` (unassigned or yours), and Work is also installed
+ * where People is not, so its Owner field is not there. The clause is whole between commas, so no value is cut.
+ */
+function withoutNobody(where: string, schema: Schema): string {
+  if (!/ is not someone else/iu.test(where)) return where;
+  return where
+    .split(',')
+    .filter((clause) => {
+      const m = /^\s*([a-z_][a-z0-9_]*) is not someone else\s*$/iu.exec(clause);
+      return m === null || Object.hasOwn(schema.fields, m[1]!);
+    })
+    .join(',');
 }
 
 /** The lookups a ref is read with, without the keys a context left out. */

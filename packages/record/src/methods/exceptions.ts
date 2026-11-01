@@ -126,7 +126,8 @@ export function exceptionsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
   const reader = kernelModule as unknown as Reader;
 
   /** Whether the caller reads this list whole: it is open to them, and their grant does not narrow it to some of it. */
-  const whole = (list: string): boolean => readable(ctx, list) === null && kernel.scope(ctx, list) === undefined;
+  /* AND NO FIELD OF IT HIDDEN: an exception is said by the row's title and day, either of which a share may hide. */
+  const whole = (list: string): boolean => readable(ctx, list) === null && kernel.scope(ctx, list) === undefined && (ctx.hides?.[list]?.length ?? 0) === 0;
 
   /** What an exception opens, by the title its list gives it, or `null` when it is gone or has none. */
   const rowOf = (id: string | null): ExceptionRow | null => {

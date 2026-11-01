@@ -54,7 +54,7 @@ test('the flag is off until the owner flips it, and it holds the page and its fe
   assert.equal(held(), true);
   /* The pricing page came back on 20 October as the early access page, three of the pages for one kind of person
      went, and the teams page went while inviting people is held (22 October). */
-  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/packs', '/download', '/for/personal', '/for/students', '/for/teams', '/for/new-projects']);
+  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/packs', '/download', '/for/personal', '/for/students', '/for/new-projects']);
 });
 
 test('with the flag off the header, the footer, the 404 and the sitemap hold no changelog place', () => {

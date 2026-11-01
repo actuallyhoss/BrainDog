@@ -6617,6 +6617,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * block is once it is installed. The arguments below were written for `page`, and they are the reason it is shared.
    */
   const heldBlock = (ctx: CallContext, b: ReturnType<Kernel['block']>) => {
+    /* A CAPTURE BOX ON A LIST SHE CANNOT ADD TO IS HELD, as a block over a list she cannot read is: it reads nothing, so
+       nothing held it, and Today kept a cell for an "Add a task" she would be refused at the press. */
+    const into = (b as { kind?: unknown; register?: unknown }).kind === 'capture' ? (b as { register?: unknown }).register : undefined;
+    if (typeof into === 'string' && ctx.principal.kind !== 'system') {
+      const stop = guard(ctx, 'append', into);
+      if (stop) return shellOf(b, { code: 'FORBIDDEN', fix: stop.fix }, false);
+    }
     const { log, beyond } = heldBy(ctx, b);
     /* WHERE THIS READER LAST LOOKED. The kernel does not know who is reading, so a feed that marks what is new came back
        with `seen: null` and drew every line as unread; it is the caller's own read mark, the one Home's list moves.
@@ -16429,7 +16436,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     fileHeld(sha256: string, ctx: CallContext): boolean {
       if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(sha256)) return true;
+      /* AND ANYBODY WHO DOES NOT READ EVERY LIST (`readsEveryList`): an Admin, a Viewer and a key are kept from the runs, a
+         personal list and a list kept for owners, and the hash of a file on one of those was a way round that. */
       const narrowed =
+        !readsEveryList(ctx) ||
         Array.isArray(ctx.registers) ||
         Object.values(ctx.levels ?? {}).some((level) => level === 'append') ||
         Object.keys(ctx.wheres ?? {}).length > 0 ||

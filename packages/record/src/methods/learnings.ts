@@ -185,6 +185,8 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
   const cutoff = new Date(nowMs - (fade === null ? LEARNED_FADE_MS : fadeDays(fade.after)! * 86_400_000)).toISOString().slice(0, 10);
   let faded = 0;
   let replaced = 0;
+  const hidden = new Set(ctx.hides?.[id] ?? []);
+  const shown = (field: string): boolean => !hidden.has(field);
   const said = (rows: readonly Entry[], where: Learned['where']): Learned[] =>
     rows.flatMap((row) => {
       if (out.has(row.id)) {
@@ -201,9 +203,10 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
         {
           spoken: kernel.nameOf(row.id),
           lesson: text(row.fields[decl.title]) ?? '',
-          because: text(row.fields.because),
-          kind: text(row.fields.kind),
-          topic: text(row.fields.topic),
+          /* A FIELD A SHARE HIDES FROM HER IS SAID AS NOTHING (`hides`), as `get` leaves it out. */
+          because: shown('because') ? text(row.fields.because) : null,
+          kind: shown('kind') ? text(row.fields.kind) : null,
+          topic: shown('topic') ? text(row.fields.topic) : null,
           where,
           confirmed_on: confirmed,
           made,
@@ -288,10 +291,10 @@ function twiceFor(deps: RecordDeps, ctx: CallContext): { list: Listed; pairs: Pa
   const lessons: Lesson[] = got.value.rows.map((row) => ({
     id: row.id,
     lesson: text(row.fields[decl.title]) ?? '',
-    topic: text(row.fields.topic),
+    topic: (ctx.hides?.[id] ?? []).includes('topic') ? null : text(row.fields.topic),
     active: row.state === standing,
     made: row.created_at,
-    because: text(row.fields.because),
+    because: (ctx.hides?.[id] ?? []).includes('because') ? null : text(row.fields.because),
   }));
   const projectOf = (l: Lesson): string | null => text(byId.get(l.id)?.fields[place.id]);
   const sight = readSight(kernel);

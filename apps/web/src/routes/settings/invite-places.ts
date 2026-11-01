@@ -2,15 +2,15 @@
  * The lists an invitation can open, grouped by the place a person knows them by (Money, Projects, Work), so an owner
  * gives "Projects, and not Money" in two presses instead of a level on each of thirty lists.
  *
- * A LIST GOES WITH THE OTHERS ITS ADD-ON DECLARED, and the add-on's lists go to the place whose page is most made of
- * them: the share of that page's lists that are the add-on's, then how many of them it reads, then the rail's order.
+ * A LIST GOES WITH THE OTHERS ITS ADD-ON DECLARED, and the add-on's lists go to the place drawn with one of their icons,
+ * else to the place whose page is most made of them: the share of that page's lists that are the add-on's, then how many of them it reads, then the rail's order.
  * Money's page reads one line of Tasks, and Tasks' add-on is still Work's, because Work's page is mostly Tasks.
  * Nothing here names an add-on or a list: the record says which add-on declared each list, and each place says the
  * lists its page reads. A list no place reads, and a list no add-on declared, is under "Other lists".
  */
 
-export type InviteList = { id: string; name: string; pack?: string | undefined; kernel?: true | undefined };
-export type InvitePlace = { section: string; place?: number | undefined; lists?: readonly string[] | undefined; row?: true | undefined };
+export type InviteList = { id: string; name: string; pack?: string | undefined; kernel?: true | undefined; icon?: string | undefined };
+export type InvitePlace = { section: string; place?: number | undefined; lists?: readonly string[] | undefined; row?: true | undefined; icon?: string | undefined };
 export type PlaceGroup = { key: string; name: string; lists: { id: string; name: string }[] };
 
 /** The words for the group of lists no place reads. */
@@ -26,8 +26,16 @@ export function placeGroups(lists: readonly { id: string; name: string }[], decl
     const key = packOf.get(l.id) ?? `\u0000${l.id}`;
     byPack.set(key, [...(byPack.get(key) ?? []), l.id]);
   }
+  const iconOf = new Map(declared.map((l) => [l.id, l.icon]));
   const placeOf = new Map<string, string>();
   for (const [pack, ids] of byPack) {
+    /* A PLACE DRAWN WITH A LIST'S OWN ICON IS THAT LIST'S PLACE, first: the agents' runs wear Agents' mark, though Work's
+       page reads them too. */
+    const marked = places.find((p) => p.icon !== undefined && p.lists!.some((l) => ids.includes(l)) && ids.some((id) => iconOf.get(id) === p.icon));
+    if (marked !== undefined) {
+      placeOf.set(pack, marked.section);
+      continue;
+    }
     let best: { section: string; share: number; n: number } | null = null;
     for (const p of places) {
       const read = p.lists!.filter((l) => ids.includes(l) || packOf.get(l) === pack).length;

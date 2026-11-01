@@ -51,7 +51,9 @@ export function methods(deps: RecordDeps) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const read = deps.engineHealth;
-      if (read === undefined) return { ok: true, value: null };
+      /* THE OWNER'S, since it says this month's model spend and the provider's own error text: anybody else is answered as
+         a host with no engine, which draws nothing, rather than a refusal on a screen they did nothing on. */
+      if (read === undefined || deps.guard(ctx, 'owner') !== null) return { ok: true, value: null };
       return { ok: true, value: await read() };
     },
 

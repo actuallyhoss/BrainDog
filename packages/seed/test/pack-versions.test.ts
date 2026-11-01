@@ -3183,6 +3183,24 @@ const DECLARED: Record<string, Version> = {
       'Before 1.20.1 shipped, `page.work` counts its folded groups (Not this week, Needs a project, Not moved in three months, Done lately) from `register.tasks`; no id added or taken away -> 43e75f17c96ed2fb',
     ],
   },
+  'work@1.21.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open
+      metric.tasks-after-week-yours metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-in-play metric.tasks-late-yours metric.tasks-later metric.tasks-no-project
+      metric.tasks-not-this-week metric.tasks-overdue metric.tasks-this-week-yours metric.tasks-today-yours metric.tasks-undated-yours
+      metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.roadmap page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: '18fe9a1352449b91',
+    history: [
+      'Work 1.21.0 (teams, 1 Nov): yours is unassigned or assigned to you, `owner is not someone else` on `metric.tasks-this-week-yours` and every yours figure and on `page.work`, and `register.tasks` says Assigned to; no id added or taken away -> 18fe9a1352449b91',
+    ],
+  },
 
 };
 

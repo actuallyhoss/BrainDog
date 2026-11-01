@@ -383,6 +383,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.21.0', notes: 'On a BrainDog more than one person shares, Yours is the tasks assigned to you or to nobody, and a task assigned to a colleague is theirs. The field reads Assigned to, where it read Owner.' },
     { version: '1.20.1', notes: 'No due day lists the newest tasks first, and Later lists tasks by their due day, then the newest first. Work\'s band reads "Your work this week" and Timeline\'s lane "Tasks by due day". The Next up widget lists the same tasks as Your work this week.' },
     {
       version: '1.20.0',
