@@ -362,7 +362,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
-    { version: '2.7.0', notes: 'Services names each domain that points at nothing, with who it is with, when it renews and what it costs, and Next ninety days says what each renewal costs where it said the name twice. A service's own page leads with what its next renewal takes, and one with no cost written shows no empty figure.' },
+    { version: '2.7.0', notes: 'Services names each domain that points at nothing, with who it is with, when it renews and what it costs, and Next ninety days says what each renewal costs where it said the name twice. A service\'s own page leads with what its next renewal takes, and one with no cost written shows no empty figure.' },
     { version: '2.6.1', notes: 'A service that costs nothing is no longer asked about before it renews, and the answers to that question say what each one does.' },
     { version: '2.6.0', notes: 'The Services page is called Services, as the menu says, and Lapsing says when each service lapses and why, from its own note.' },
     { version: '2.5.0', notes: 'The Vault is now the Keychain. Nothing you keep moved.' },
