@@ -253,6 +253,11 @@
               {:else}
                 <p class="draft-title">{d.title}</p>
               {/if}
+              <p class="draft-where">
+                {#if d.detail}{d.detail.charAt(0).toUpperCase() + d.detail.slice(1)}{:else}{say.where(d.list)}{#if d.day}, {dayShort(d.day)}{/if}{#if d.amount}<span
+                      class="draft-amount num"><Money minor={d.amount.minor} currency={d.amount.currency} home={d.amount.currency} /></span
+                    >{/if}{/if}
+              </p>
               {#if d.needs}
                 {@const n = d.needs}
                 <label class="draft-needs">
@@ -272,11 +277,6 @@
                   >
                 </label>
               {/if}
-              <p class="draft-where">
-                {#if d.detail}{d.detail.charAt(0).toUpperCase() + d.detail.slice(1)}{:else}{say.where(d.list)}{#if d.day}, {dayShort(d.day)}{/if}{#if d.amount}<span
-                      class="draft-amount num"><Money minor={d.amount.minor} currency={d.amount.currency} home={d.amount.currency} /></span
-                    >{/if}{/if}
-              </p>
             </div>
             <div class="draft-acts">
               {#if editing === d.key}
