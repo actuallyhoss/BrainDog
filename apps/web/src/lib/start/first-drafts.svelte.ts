@@ -141,7 +141,7 @@ async function read(b: Begin): Promise<void> {
     const [{ draftOffer, draftsOf, modulesHeld, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
     const modules = modulesHeld(b.registers);
     if (modules.length === 0) return void set({ ...firstDrafts.now!, state: 'none' });
-    const out = await slashAsks(b.base).setup({ said: b.said, offer: draftOffer(modules), today: b.today });
+    const out = await slashAsks(b.base).setup({ said: b.said, offer: draftOffer(modules), today: b.today, first: true });
     /* MOVED ON TO ANOTHER BRAINDOG MEANWHILE: what came back is not this one's to show. */
     if (firstDrafts.now?.base !== b.base) return;
     if (!out.ok) return void set({ ...firstDrafts.now, state: 'none' });

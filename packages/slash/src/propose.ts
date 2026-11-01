@@ -326,6 +326,14 @@ const UNSETTLED = 'RECORD_UNAVAILABLE';
 const ASKED = { purpose: 'ask', spends: 'person' } as const;
 const PROPOSED = { purpose: 'ask', spends: 'none' } as const;
 const PLANNED = { purpose: 'plan', spends: 'person' } as const;
+/**
+ * THE FIRST WORDS, READ ONCE ON THE HOUSE (1 Nov, his call through the coordinator): the read a new BrainDog makes of what
+ * its owner wrote at sign-up, right after the build (`first: true` on the setup ask, `apps/web/src/lib/start/first-drafts.ts`),
+ * spends none of the month's asks. Once per BrainDog: a second such ask is counted as any setup is.
+ */
+const FIRST_WORDS = { purpose: 'plan', spends: 'none' } as const;
+/** Whether this BrainDog has had its first words read on the house already: any row of that charge, answered or not. */
+const FIRST_WORDS_SQL = "SELECT COUNT(*) AS n FROM slash_call WHERE purpose = 'plan' AND spends = 'none'";
 
 export type Palette = {
   read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
@@ -1019,7 +1027,7 @@ export type SetupOffer = {
 };
 
 /** What one person typed about themselves, with the catalogue it is read against and their day (`YYYY-MM-DD`). */
-export type SetupAsk = { said: string; offer: SetupOffer; today: string };
+export type SetupAsk = { said: string; offer: SetupOffer; today: string; /** The owner's sign-up words, read once on the house (`FIRST_WORDS`). */ first?: boolean };
 
 /** The setup the model proposed, every id one it was offered and every phrase one the person typed. */
 export type SetupAnswer = {
@@ -1225,7 +1233,12 @@ export const setupAskOf = (raw: unknown): SetupAsk => {
       : [],
   );
   const today = textOf(r['today']);
-  return { said: textOf(r['said']), offer: { usecases: usecases.slice(0, 40), modules: modules.slice(0, 40) }, today: /^\d{4}-\d{2}-\d{2}$/u.test(today) ? today : '' };
+  return {
+    said: textOf(r['said']),
+    offer: { usecases: usecases.slice(0, 40), modules: modules.slice(0, 40) },
+    today: /^\d{4}-\d{2}-\d{2}$/u.test(today) ? today : '',
+    ...(r['first'] === true ? { first: true } : {}),
+  };
 };
 
 /** `setupAskOf`'s twin for a file: its name, its columns, its first entries as text, and the lists it may go into. */
@@ -1397,9 +1410,12 @@ export const setups = (core: Core, fallback: Inference): Setups => {
 
   /* THE SAME STEP AS `readSetup`, between the owner's checks and the ledger's: one path from a sentence to a reading. */
   const proposeSetup = async (raw: SetupAsk, ctx: CallContext, inference?: Inference): Promise<Result<SetupAnswer>> => {
-    const stop = owner(ctx) ?? spent(PLANNED);
+    /* THE FIRST WORDS ON THE HOUSE, ONCE (`FIRST_WORDS`): the owner's own, never a month spent, never a second time. */
+    const onHouse = isRecord(raw) && raw['first'] === true && owner(ctx) === null && (core.sql.one<{ n: number }>(FIRST_WORDS_SQL)?.n ?? 0) === 0;
+    const charge = onHouse ? FIRST_WORDS : PLANNED;
+    const stop = owner(ctx) ?? (onHouse ? null : spent(PLANNED));
     if (stop) return { ok: false, refusal: stop };
-    return setupStep(raw, (question, slots) => asked('setup', question, slots, inference, PLANNED));
+    return setupStep(raw, (question, slots) => asked('setup', question, slots, inference, charge));
   };
 
   const proposeMapping = async (raw: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>> => {

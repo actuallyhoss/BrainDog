@@ -48,7 +48,8 @@ export type SetupOffer = {
   usecases: { id: string; title: string; summary: string }[];
   modules: { id: string; name: string; lists: { id: string; name: string; fields: string[] }[] }[];
 };
-export type SetupAsked = { said: string; offer: SetupOffer; today: string };
+/** `first`: the owner's sign-up words, read once after the build on the house, never one of the month's asks. */
+export type SetupAsked = { said: string; offer: SetupOffer; today: string; first?: boolean };
 export type MappingAsked = {
   file: string;
   columns: string[];
