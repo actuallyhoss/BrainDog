@@ -15,6 +15,7 @@
 -->
 <script lang="ts">
   import { at } from '../at.ts';
+  import { litSlide } from '../motion/lit.ts';
   import { copy } from '../copy.ts';
   import Icon from '../ui/Icon.svelte';
   import Menu from '../ui/Menu.svelte';
@@ -46,7 +47,8 @@
 </script>
 
 <nav class="page-tabs" aria-label={strip.section}>
-  <div class="tab-row" bind:this={row}>
+  <!-- WHERE YOU ARE GLIDES from the tab you left (`litSlide`): the strip stays mounted between the pages of a section. -->
+  <div class="tab-row" bind:this={row} {@attach litSlide('.tab[aria-current="page"]', { fill: 'var(--tile)' })}>
     {#each strip.shown as tab (tab.href)}
       <a class="tab" href={at(tab.href)} aria-current={tab.current ? 'page' : undefined}>
         <span class="tab-name">{tab.title}</span>

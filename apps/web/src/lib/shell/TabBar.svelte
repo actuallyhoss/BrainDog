@@ -16,6 +16,7 @@
   Safe-area insets are paid exactly once, on the fixed element only. Paying twice is a real, easy bug.
 -->
 <script lang="ts">
+  import { litSlide } from '../motion/lit.ts';
   import { arrive } from '$lib/motion/index.ts';
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
@@ -44,7 +45,7 @@
   const lit = $derived(tabs.find((t) => isHere(t, path))?.key ?? null);
 </script>
 
-<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`}>
+<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`} {@attach litSlide('.tab[aria-current="page"] .badge-slot', { fill: 'var(--nav-selected)' })}>
   {#each tabs as tab (tab.key)}
     <a class="tab tap" href={at(tab.href)} aria-current={lit === tab.key ? 'page' : undefined} in:arrive>
       <span class="badge-slot">
@@ -118,7 +119,8 @@
   }
 
   /* HERE IS A SOFT FILL, as on the top bar: the word in ink a step up and the glyph on the nav's chosen fill,
-     44 by 28. It snaps, so the glyph never crosses its own fill on the way. */
+     44 by 28. The fill glides from the tab you left to this one (`litSlide`, `$lib/motion/lit.ts`), under the glyphs,
+     so no glyph crosses it; the words change at once. */
   .tab[aria-current='page'] {
     color: var(--ink);
     font-weight: var(--fw-semi);

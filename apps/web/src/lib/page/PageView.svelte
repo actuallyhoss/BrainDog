@@ -100,7 +100,7 @@
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '../at.ts';
-  import { barTitled, frame } from '../shell/frame.svelte.ts';
+  import { barTitled, frame, narrow as onPhone } from '../shell/frame.svelte.ts';
   import { listName } from '../record/names.ts';
   import QuickHost from '$lib/money/QuickHost.svelte';
   import { pageOfLedger } from '$lib/money/ledger.ts';
@@ -527,7 +527,7 @@
    * instead (`PageBody`'s `leadEnd`), and share its row whenever both fit. A desk's only: a phone's head already puts
    * them on the row its bar leaves.
    */
-  const besideLead = $derived(led && !tiled && !projectPage && frame.crumbed && wide.current);
+  const besideLead = $derived(led && !tiled && !projectPage && frame.crumbed && !onPhone.current);
 
   /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
@@ -998,7 +998,8 @@
 {:else if mode === 'page'}
   <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
        0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
-  <div class="hosted" data-money={moneyPage ? '' : undefined} {@attach moneyPage ? masonry : undefined}>
+  <!-- `data-arrive` (`$lib/motion/motion.css`): in the skeleton's place it fades up rather than switching on. -->
+  <div class="hosted" data-arrive data-money={moneyPage ? '' : undefined} {@attach moneyPage ? masonry : undefined}>
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
        at one. Not on a page that has its own headline sentence, which says what this page is better than the noun. -->
   <PageHead
@@ -1410,7 +1411,10 @@
   .hosted {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));
-    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
+    /* AND ITS FADE UP IN THE SKELETON'S PLACE (`data-arrive`, `motion.css`), written here since this rule outweighs it. */
+    transition:
+      padding-inline-end var(--d-panel) var(--ease-sheet),
+      opacity var(--d-swap) var(--ease-standard);
   }
 
   /* The blocks' bars stand in the board's gutter, where the first tile will be. */
