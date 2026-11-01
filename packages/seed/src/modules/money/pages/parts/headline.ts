@@ -7,7 +7,9 @@ const ONE_BOOK = { metric: 'books-held', lt: 2 };
  * does not open Money to read, and a model handed that count wrote "2 books are held". Cash now itself is the hero's,
  * drawn under the line, so the line does not say it again.
  */
-const ACCOUNTS_SAID = 'Spread over {{cash-by-account.groups}} account(s).';
+/* IN BOOKS, SINCE money-core 3.34.0 (next-money, M2): "Spread over 2 accounts" counted books (Maya keeps 3 accounts in
+   2 books), and the line is only said with two books or more, so it names the books it counts. */
+const ACCOUNTS_SAID = 'Kept in {{books-held}} books.';
 /**
  * NO LINE OF WHERE THE MONEY IS KEPT, SINCE money-core 3.29.1: "Kept in 2 accounts" said a count the Accounts tile draws
  * a row for, in the page's biggest type. The line is only what needs doing: the part that is late and the card to pay.
@@ -44,6 +46,14 @@ const BILLS_LATE = `Bills {{bad:late}}: [{{overdue}}](${BILLS_SEEN}) to pay.`;
 const LOW_POINT = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.';
 const PART_LATE = { metric: 'installments-late', gt: 0 };
 const BILL_LATE = { metric: 'overdue', gt: 0 };
+/**
+ * AND WHAT IS LATE COMING IN, SINCE money-core 3.34.0 (next-money, M1): the line said "$149 to pay on the card" while a
+ * $3,200 invoice was 4 days late, said only in Heads up at the foot of the page, 3,400px down on a phone. What is late
+ * is said both ways now, money out first, and the figure is the link to the invoices, as the bills' is.
+ */
+const INVOICES_SEEN = '/r/obligations?f=direction:is:owed_to_me&f=state:in:open,part&f=due:before:today';
+const INVOICES_LATE = `Invoices {{bad:late}}: [{{late-in}}](${INVOICES_SEEN}) to come in.`;
+const INVOICE_LATE = { metric: 'late-in', gt: 0 };
 const GOES_UNDER = { all: [{ metric: 'cash-now', gt: 0 }, { metric: 'runway-days', lte: 84 }] };
 /** Something is due or repeats, so the walk has something to last the year against (`due.ts` `bills-open`). */
 const SOME_DUE = { any: [{ metric: 'bills-open', gt: 0 }, { metric: 'repeating-held', gt: 0 }] };
@@ -51,8 +61,12 @@ const NOTHING_DUE = [{ metric: 'bills-open', lt: 1 }, { metric: 'repeating-held'
 
 /** The line's sentences, worst first, each with `between` (what the line says of the accounts or the year) before the card. */
 const says = (between: string): Record<string, unknown>[] => [
-  { when: { all: [PART_LATE, BILL_LATE] }, body: `${LATE_PART} Bills {{bad:late}} too: [{{overdue}}](${BILLS_SEEN}) to pay.${between}${CARD_OWES}` },
-  { when: BILL_LATE, body: `${BILLS_LATE}${between}${CARD_OWES}` },
+  /* SIX SENTENCES AT MOST (`SAYS_MOST`), so the part of a plan rides in each sentence about what is late: on a record
+     with no part late its figures do not read and its sentence goes whole (`leadOf`), as it always has. What is late
+     going out comes first, then what is late coming in. */
+  { when: { all: [BILL_LATE, INVOICE_LATE] }, body: `${LATE_PART} ${BILLS_LATE} ${INVOICES_LATE}${between}${CARD_OWES}` },
+  { when: BILL_LATE, body: `${LATE_PART} ${BILLS_LATE}${between}${CARD_OWES}` },
+  { when: INVOICE_LATE, body: `${LATE_PART} ${INVOICES_LATE}${between}${CARD_OWES}` },
   { when: PART_LATE, body: `${LATE_PART}${between}${CARD_OWES}` },
   { when: GOES_UNDER, body: `${LOW_POINT}${between}${CARD_OWES}` },
   { body: `${between}${CARD_OWES}`.trim() },
@@ -70,8 +84,8 @@ export const HEADLINE: Record<string, unknown>[] = [
     says: says(''),
   },
   {
-    /* WITH TWO BOOKS OR MORE THE LINE SAYS HOW MANY ACCOUNTS THE MONEY IS SPREAD OVER, SINCE money-core 3.30.0, so a
-       person reads that the hero's Cash now holds every book, after what is late. */
+    /* WITH TWO BOOKS OR MORE THE LINE SAYS HOW MANY BOOKS THE MONEY IS KEPT IN (money-core 3.30.0, in books since
+       3.34.0), so a person reads that the hero's Cash now holds every book, after what is late. */
     kind: 'note',
     lead: true,
     span: 12,

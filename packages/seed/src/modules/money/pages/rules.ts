@@ -40,6 +40,9 @@ export const MONEY_RULES_PAGE: SeedPage = {
   icon: 'tag',
   requires: ['register.filing_rules', 'register.transactions'],
   pack: 'money-core',
+  /* ADD A RULE IS THE HEAD'S ONE BUTTON, SINCE money-core 3.34.0 (next-money, M31): it was an underlined link alone in a
+     tile of its own under the rules. The head's Add opens the list's form for a filing rule (`PageView.svelte`). */
+  header: { action: { verb: 'row.create', label: 'Add a rule' } },
   blocks: [
     {
       /* NO RULE YET: what one does, and the way to add one, in place of a count of nought. */
@@ -92,11 +95,12 @@ export const MONEY_RULES_PAGE: SeedPage = {
       span: 12,
       source: 'register.filing_rules',
       where: 'state is on',
+      /* THE TEXT AND WHERE IT FILES, SINCE money-core 3.34.0 (next-money, M30): "Matches How it starts" read as a field's
+         name over its value, and "Lines filed 0" stood on every card under a line that says no rule has filed one. How a
+         rule matches is on its own page, a press away, and what the rules filed is the line's. */
       columns: [
         { field: 'match', as: 'title' },
         { field: 'category', label: 'Files under', as: 'fact' },
-        { field: 'match_by', label: 'Matches', as: 'fact' },
-        { metric: 'filing-rule-filed:{{spoken}}', label: 'Lines filed', as: 'fact' },
       ],
       order: [
         { field: 'rank', dir: 'asc' },
@@ -104,13 +108,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
       ],
       limit: 120,
     },
-    {
-      /* AND THE WAY TO ADD ONE, under the rules, once there is one: with none, the lead says it. */
-      kind: 'note',
-      span: 12,
-      when: HAS_RULES,
-      body: `[Add a rule](${ADD_RULE})`,
-    },
+    /* NO "ADD A RULE" TILE UNDER THE RULES, SINCE money-core 3.34.0: the head's button adds one. */
     {
       /* RULES SWITCHED OFF, APART: kept with what they filed, and filing nothing new. */
       kind: 'table',

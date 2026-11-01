@@ -44,7 +44,9 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'budgets-set', gt: 0 },
-      body: '{{budgets-total}} a month across {{budgets-set}} categories.',
+      /* AND THE MONTH SO FAR, SINCE money-core 3.34.0 (next-money, M20): spent this month and last month were a stat of
+         their own under the bars, two figures the line can say. A clause whose figure is nought goes (`leadOf`). */
+      body: '{{budgets-total}} a month across {{budgets-set}} categories. {{spent-by-category-month}} spent this month, {{spent-last-month}} last month.',
     },
     {
       /* WITH NONE SET: what the page offers instead, and that nothing is set by itself. */
@@ -123,19 +125,7 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       limit: 30,
       empty: 'No yearly budgets.',
     },
-    {
-      /* THE MONTH IN TWO FIGURES, UNDER THE BUDGETS SINCE money-core 3.32.0 (the bars lead, every budget together first): spent so far, and last month whole beside it. What is budgeted is the line's, and what
-         no budget can count yet is the note under this, with the way to file it: a cell for it said the same twice. */
-      kind: 'stat',
-      heading: 'This month',
-      icon: 'calendar',
-      span: 12,
-      cells: [
-        { metric: 'spent-by-category-month', label: 'Spent this month' },
-        { metric: 'spent-last-month', label: 'Spent last month' },
-      ],
-      when: { metric: 'spent-by-category-month', gt: 0 },
-    },
+    /* NO "THIS MONTH" STAT, SINCE money-core 3.34.0 (next-money, M20): its two figures are the line's. */
     {
       /* THE ONE OFFER, WHERE IT CAN BE ANSWERED: the question `offer_budgets` files once a month, "Use these" or "Not
          now". Drawn only while it waits, so a month already answered reads nothing here. */

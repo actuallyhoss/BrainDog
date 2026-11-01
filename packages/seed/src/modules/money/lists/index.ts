@@ -11,6 +11,7 @@ import { FILING_RULES_REGISTER } from './filing-rules.ts';
 import { FX_REGISTER } from './fx.ts';
 import { INSTALLMENTS_REGISTER } from './installments.ts';
 import { OBLIGATIONS_REGISTER } from './obligations.ts';
+import { PAYEE_NAMES_REGISTER } from './payee-names.ts';
 import { PLANS_REGISTER } from './plans.ts';
 import { RECURRING_REGISTER } from './recurring.ts';
 import type { MoneyRegister } from './shared.ts';
@@ -29,6 +30,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      links to the rule that filed it. */
   filing_rules: FILING_RULES_REGISTER,
   transactions: TRANSACTIONS_REGISTER,
+  /* AFTER THE LEDGER, SINCE money-core 3.34.0: a payee name names Ledger lines, and nothing links to it. */
+  payee_names: PAYEE_NAMES_REGISTER,
   recurring: RECURRING_REGISTER,
   /* BEFORE INSTALMENTS, SINCE REC-B12 (folded into the unreleased money-core 3.17.0): a part links to its plan. */
   plans: PLANS_REGISTER,

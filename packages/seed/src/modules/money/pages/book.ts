@@ -40,21 +40,16 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
   pack: 'money-core',
   blocks: [
     ...againstNotes(),
-    {
-      kind: 'stat',
-      lead: true,
-      heading: 'What you have',
-      icon: 'wallet',
-      span: 4,
-      cells: [{ metric: 'book-cash:{{name}}', label: 'Cash now' }],
-    },
+    /* NO "WHAT YOU HAVE" TILE, SINCE money-core 3.34.0 (next-money, M32): it said the book's cash, and Cash ahead beside
+       it says the same from today, so "$6,830" stood three times in one row. Cash ahead is the book's hero now, the
+       whole row. */
     {
       /* THIS BOOK'S WALK, FROM THIS BOOK'S CASH, over this book's bills, repeating lines, instalments and money on its
          way (`BOOK_LEGS`). No `sell`: what a record holds to sell is filed in no book. */
       kind: 'forecast',
       heading: 'Cash ahead',
       icon: 'chart-line',
-      span: 8,
+      span: 12,
       source: 'forecast.runway',
       opening: { metric: 'book-cash:{{name}}' },
       from: BOOK_LEGS,
@@ -90,7 +85,8 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       when: { metric: 'book-net-month:{{name}}', empty: false },
     },
     ...owedRow(declared),
-    ...lastsNote(declared),
+    /* NO "LASTS THE YEAR ON WHAT IS DUE." TILE UNDER THE CHART, SINCE money-core 3.34.0 (next-money, M33): Cash ahead's
+       own summary says how far it stays above nought, so the tile said it a second time. */
     ...monthsChart(declared),
     {
       kind: 'cards',
@@ -210,23 +206,6 @@ function owedRow(declared: (figure: string) => boolean): Record<string, unknown>
   return [{ kind: 'stat', heading: 'What is due', icon: 'scale', span: 12, cells }];
 }
 
-/**
- * THAT THE MONEY LASTS THE YEAR IS A LINE, BECAUSE NO CELL SAYS IT. `book-lasts-until` holds a day only
- * while the walk goes under (`figures/books.ts`), so on a book whose money lasts the cell Money lasts until is left
- * out, and the row with it where nothing else is due: the good news read as nothing at all. One line under What is due
- * says it, as Home's line of what there is does (`usecases/founder.ts`).
- *
- * DRAWN ON THE READING CARRYING `beyond`, the walk having reached its last day above zero, and never on the figure
- * being empty: a book nobody has put money in has no day either, and it is not money that lasts. So exactly one of the
- * cell and the line is drawn, and neither on an empty book. "The year" and not "for good": the walk looks 365 days and
- * knows no further. "On what is due": the walk counts no everyday spending (`EVERYDAY` in `legs.ts`).
- *
- * ONLY ONCE THE FIGURE IS DECLARED, as its cell is: a `when:` naming a figure nobody declared draws nothing for ever.
- */
-function lastsNote(declared: (figure: string) => boolean): Record<string, unknown>[] {
-  if (!declared('book-lasts-until')) return [];
-  return [{ kind: 'note', span: 12, when: { metric: 'book-lasts-until:{{name}}', beyond: true }, body: 'Lasts the year on what is due.' }];
-}
 
 /** The figure the two lines below are drawn on, and the list they send a person to. */
 const AGAINST = 'categories-against-direction';

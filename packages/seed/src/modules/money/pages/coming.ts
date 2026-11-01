@@ -15,28 +15,31 @@ const DUE_COLUMNS = [
 ];
 
 /**
- * One stretch of what falls due, the whole row. Sixty-one days ahead at most, so the stretches reach as far as the page
- * says. SINCE money-core 3.32.0 THE STRETCHES ARE COUNTED FROM TODAY, not from Monday: the next seven days and the seven
- * after them are the fourteen Money's home and Today call Coming up (`COMING_UP_WHERE`, `parts/next30.ts`), so the two
- * add up to the count those say, and what is already late is its own list first.
+ * WHAT FALLS DUE, ONE TABLE IN FOUR STRETCHES, SINCE money-core 3.34.0 (next-money, M17): Late, the next 7 days, the 7
+ * days after them and later were four tables, each saying "What When Amount" over its own rows. Now they are one table
+ * grouped by the stretch each day is in (`group: when`, `sources/deadlines.ts`), a heading each, in that order, and a
+ * stretch with nothing in it has no heading. Sixty-one days ahead at most. THE STRETCHES ARE COUNTED FROM TODAY, as
+ * since money-core 3.32.0, so the next fourteen days are the ones Money's home and Today call Coming up
+ * (`COMING_UP_WHERE`, `parts/next30.ts`). What is late is red in its row, and comes first.
  */
-const week = (heading: string, where: string, empty: string): Record<string, unknown> => ({
+const DUE: Record<string, unknown> = {
   kind: 'table',
-  heading,
+  heading: 'What falls due',
   icon: 'calendar-days',
   span: 12,
   source: 'deadlines',
   horizon: 61,
-  where: `${DUE_WITH_MONEY}, ${where}`,
+  where: DUE_WITH_MONEY,
+  group: 'when',
   columns: DUE_COLUMNS,
-  limit: 20,
-  empty,
-});
+  limit: 60,
+  empty: 'Nothing falls due in 60 days.',
+};
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: Money is a section with a page per job, and this is what comes next.
- * The line, what is late, the month's figures, the bills to tick off as paid, then the next sixty days, this week, next week and later, and what is
- * paused folded at the foot.
+ * The line, what falls due in one table by stretch (late first), the bills to tick off as paid, what repeats a month, and
+ * what is paused folded at the foot.
  *
  * MARK PAID IS THE TICK ON A BILL. The bills are a `todo` over the list, so a tick marks one paid where it is read,
  * with its Undo, as a task is finished on Work; every row of the weeks opens its own page, where a bill's one press is
@@ -61,25 +64,12 @@ export const MONEY_COMING_PAGE: SeedPage = {
     /* WHAT IS ALREADY LATE, ONCE AND AT THE TOP, BEFORE money-core 3.33.0 SHIPPED (design pass of 1 November, M25): the
        late bills were listed twice, in Bills and invoices and again in Late. Now Late is the first list under the line,
        in the late red, drawn only while something is, and Bills and invoices holds what falls due from today. A late
-       row opens its own page, where a bill's one press is Mark paid. */
-    week('Late', 'day before today', 'Nothing is late.'),
-    {
-      /* WHAT REPEATS AT ITS MONTHLY SHARE, in, out and what is left, beside the line's next thirty days. */
-      kind: 'stat',
-      heading: 'Repeating, a month',
-      icon: 'calendar',
-      span: 12,
-      cells: [
-        /* NAMED FOR WHAT EACH HOLDS (live check of 30 October, 9): "Out" read as the hero's thirty days out. */
-        { metric: 'every-month-in', label: 'Repeating in' },
-        { metric: 'every-month-out', label: 'Repeating bills' },
-        { metric: 'every-month-net', label: 'Left over' },
-      ],
-      when: { metric: 'cash-accounts', gt: 0 },
-    },
+       row opens its own page, where a bill's one press is Mark paid. SINCE money-core 3.34.0 Late is the first stretch
+       of the one table of what falls due (`DUE`). */
+    DUE,
     {
       /* THE BILLS AND INVOICES STILL OPEN FROM TODAY TO SIXTY DAYS ON: a `todo`, so a tick marks one paid where it is
-         read. What is already late is Late's, above, and not listed here again. */
+         read. What is already late is the first stretch above, and not listed here again. */
       kind: 'todo',
       heading: 'Bills and invoices',
       icon: 'receipt',
@@ -93,9 +83,24 @@ export const MONEY_COMING_PAGE: SeedPage = {
       limit: 12,
       empty: 'Nothing due in 60 days.',
     },
-    week('Next 7 days', 'day after -1d, day before +7d', 'Nothing falls due in the next 7 days.'),
-    week('The 7 days after', 'day after +6d, day before +14d', 'Nothing falls due in the 7 days after.'),
-    week('Later', 'day after +13d', 'Nothing else due in 60 days.'),
+    {
+      /* WHAT REPEATS AT ITS MONTHLY SHARE, in, out and what is left, AT THE FOOT SINCE money-core 3.34.0 (next-money,
+         M16): it stood between what is late and the bills, three figures about a month in the middle of a list by day.
+         Below nought "Left over" is red: the block's tone is bad, so a figure off its line (`every-month-net` keeps to
+         nought or more) is drawn in the danger colour, with its minus. */
+      kind: 'stat',
+      heading: 'Repeating, a month',
+      icon: 'calendar',
+      span: 12,
+      tone: 'bad',
+      cells: [
+        /* NAMED FOR WHAT EACH HOLDS (live check of 30 October, 9): "Out" read as the hero's thirty days out. */
+        { metric: 'every-month-in', label: 'Repeating in' },
+        { metric: 'every-month-out', label: 'Repeating bills' },
+        { metric: 'every-month-net', label: 'Left over' },
+      ],
+      when: { metric: 'cash-accounts', gt: 0 },
+    },
     {
       /* WHAT IS PAUSED, FOLDED: a paused line is walked by nothing, so it is nowhere above, and still a line to start again. */
       kind: 'section',

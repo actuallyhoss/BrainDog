@@ -101,7 +101,8 @@ test('AN ACCOUNT TYPED THIRTY DAYS AGO IS NAMED, AND LEAVES THE LINE THE DAY A B
   assert.equal(read(k, 'cash-as-of'), epochDay(day(-30)));
   assert.equal(read(k, 'statement-oldest-days'), 30);
 
-  /* MONEY SAYS IT IN HEADS UP, AND THE BOOK'S ACCOUNTS CARDS NAME THE ACCOUNT WITH ITS DAY: Last confirmed is off Money
+  /* MONEY SAYS IT UNDER ITS HERO (in Heads up until money-core 3.34.0), AND THE BOOK'S ACCOUNTS CARDS NAME THE ACCOUNT
+     WITH ITS DAY: Last confirmed is off Money
      since money-where-it-went-100, and each account's last confirmed day is on its book's page. */
   const before = blocksOf(k, 'money');
   assert.notEqual(before.find((b) => String(b.body).startsWith('Oldest balance'))?.drawn, false, 'the old balance is not said');

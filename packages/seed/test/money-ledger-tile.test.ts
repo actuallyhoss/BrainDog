@@ -40,7 +40,10 @@ const declared = MONEY_PAGE.blocks as { kind: string; heading?: string; area?: s
 test('THE LEDGER IS A TILE ON MONEY, under the accounts and above the fold, and it is not said twice', () => {
   const at = declared.findIndex((b) => b.heading === 'Ledger');
   assert.ok(at >= 0, 'Money declares no Ledger tile');
-  assert.deepEqual(declared[at], LEDGER[0]);
+  /* THE PART ITSELF, WITH NO LINE OVER ITS LINES ON THE HOME SINCE money-core 3.34.0: "143 came in today." read as news
+     on a record a minute old. The line stays declared on the part. */
+  const { body: _line, ...tile } = LEDGER[0]!;
+  assert.deepEqual(declared[at], tile);
   assert.ok(at > declared.findIndex((b) => b.heading === 'Accounts'), 'the Ledger is above the accounts');
   assert.ok(declared.every((b, i) => b.fold !== true || at < i), 'the Ledger is under a fold, where he went looking for it');
   assert.equal(declared[at]!.area, undefined, 'the Ledger is in the side column, which is too narrow for a day, a name and an amount');

@@ -40,16 +40,24 @@ const ABOVE_THE_FOLD = 6;
  * the line that its money lasts the year is a seventh: one sentence under What is due, drawn only while the walk never
  * goes under, in place of the cell Money lasts until. Whether it stays a tile of its own, becomes the page's line or
  * takes another tile's place is the owner's; nothing else is let over, and this page by no more than the one line.
+ * SINCE money-core 3.34.0 THE BOOK'S PAGE IS NOT LET OVER: Cash ahead's own summary says how long the money lasts, and
+ * the line went. The pages below are.
  */
 /* AND MONEY'S HOME BY THREE, SINCE ROUND 1030 (the money parity plan of 29 October, his "finish all the money stuff"):
-   Over time the whole row under the hero, This month's budgets beside Instalments, and the line under it saying every
-   budget as one month, on a board the app packs by each tile's height. The board is his ask; whether it folds after six
-   is the owner's to rule on, as money-book's line is. */
-/* AND ACCOUNTS BY ONE, SINCE ROUND 1030 (audit Z18 and Q9 of 29 October): the line saying what a Stripe balance below
-   zero is, drawn only while one is, and the line under the two balance columns saying why they differ. */
-/* AND BUDGETS BY TWO, SINCE ROUND 1030 (a budget for a week or a year, money-core 3.32.0): This week's budgets and This
-   year's budgets, each drawn only while such a budget is kept, beside the month's. */
-const OVER: Record<string, number> = { 'money-book': 1, money: 3, 'money-accounts': 1, 'money-budgets': 2 };
+   Over time the whole row under the hero, This month's budgets beside Instalments, on a board the app packs by each
+   tile's height. The board is his ask; whether it folds after six is the owner's to rule on. SINCE money-core 3.34.0 the
+   line saying every budget as one month went, and the lines of Heads up stand under the hero, whether Cash now adds up
+   and an old balance, each a tile while it is true. */
+/* AND BUDGETS BY ONE, SINCE ROUND 1030 (a budget for a week or a year, money-core 3.32.0): This week's budgets and This
+   year's budgets, each drawn only while such a budget is kept, beside the month's. By one and not two since money-core
+   3.34.0, whose This month stat went into the line. */
+/* SINCE money-core 3.34.0 A BOOK'S PAGE AND ACCOUNTS NEED NO ALLOWANCE: What you have and the line that the money lasts
+   the year left the book, and the Balance bar left Accounts. */
+/* AND AN ACCOUNT'S PAGE BY ONE, SINCE money-core 3.34.0: its hero is one of two stats, the balance once while the bank
+   and the lines agree and the two figures while they differ, and only one of them is ever drawn. */
+/* AND REPORTS BY ONE: Health is drawn as one of its stats, by whether some cash is in another currency, and only one
+   of them is ever drawn. */
+const OVER: Record<string, number> = { money: 3, 'money-budgets': 1, 'money-account': 1, 'money-reports': 1 };
 
 test('THE SWEEP READS EVERY DECLARED PAGE, so a page left out is not a page passed', () => {
   assert.ok(pages.length >= 25, `only ${pages.length} pages were read`);

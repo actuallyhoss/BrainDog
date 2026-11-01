@@ -709,13 +709,23 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.ok(!(page.requires as string[]).includes('register.people'), 'Money needs People again');
   const headings = (page.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.deepEqual(headings, [
-    /* THE LINE, WHICH CARRIES NO HEADING: it is the sentence in the page's headline tile, in three forms, one of which a
-       record draws: where the money is kept, the same ending on the year, and the line for two books. */
+    /* WITH NO ACCOUNT YET: the line asking for one, and what is due and what repeats, while either is held. */
+    undefined,
+    'Bills and invoices',
+    'Repeating',
+    /* THE LINE, WHICH CARRIES NO HEADING: it is the sentence in the page's headline tile, in four forms, one of which a
+       record draws: what is late and the card, the same ending on the year, the same asking for a bill, and the line
+       for two books. */
+    undefined,
     undefined,
     undefined,
     undefined,
     'Add an account',
     /* THE HERO, SINCE money-core 3.29.0: Cash now with the walk ahead drawn small, and the four answers under it. */
+    undefined,
+    /* WHAT NEEDS A LOOK, UNDER THE HERO SINCE money-core 3.34.0, each drawn only while it is true: whether Cash now adds
+       up, then an old balance. Heads up closed the page in a box of its own until then. */
+    'Cash now does not add up',
     undefined,
     /* OVER TIME, SINCE money-core 3.31.0: net worth's line once it has a week of nights, cash's until then; one draws. */
     'Over time',
@@ -726,22 +736,16 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Accounts',
     'Ledger',
     'Instalments',
-    /* AND THE BUDGETS AT A GLANCE, SINCE money-core 3.31.0, with the note that says a week's or a year's as a month. */
+    /* AND THE BUDGETS AT A GLANCE, SINCE money-core 3.31.0, with no note under it since 3.34.0. */
     "This month's budgets",
-    undefined,
-    /* HEADS UP CLOSES THE PAGE: whether Cash now adds up, then its lines, each ending on its one way to act. */
-    'Heads up',
-    'Cash now does not add up',
-    undefined,
-    undefined,
-    undefined,
   ]);
   /* NO SIDE COLUMN AND NO FOLD: the hero takes the row and the tiles under it pair as one board. */
   const blocks = page.blocks as { heading?: string; area?: string; fold?: boolean; box?: boolean }[];
   assert.equal((page as { layout?: unknown }).layout, undefined);
   assert.deepEqual(blocks.filter((b) => b.area !== undefined).map((b) => b.heading), []);
   assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), []);
-  assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up']);
+  /* AND NO BOX SINCE money-core 3.34.0: Heads up went, and its lines stand under the hero. */
+  assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), []);
   /* NO LAW ON A PAGE EVERYBODY DRAWS: the late notes say what is late in words any record's owner reads. */
   assert.ok(!JSON.stringify(page).includes('Statutory'), 'a note speaks for one country');
 
@@ -799,15 +803,22 @@ test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and its home is the hero and o
      nothing would cost a tile that does. When this fails the page reader has learnt it or somebody placed it early. */
   assert.ok(!blocks.includes(BUDGET[1] as never), "the passed-budget line is on Money before a page can write it");
 
-  /* WHAT LEADS THE PAGE: the line, the box to add an account, the hero, and then the board. */
+  /* WHAT LEADS THE PAGE: with no account the line asking for one and what is held, then the line, the box to add an
+     account, the hero, what needs a look under it (since money-core 3.34.0), and then the board. */
   assert.deepEqual(
-    blocks.slice(0, 12).map((b) => [b.kind, b.heading, b.area]),
+    blocks.map((b) => [b.kind, b.heading, b.area]),
     [
+      ['note', undefined, undefined],
+      ['timeline', 'Bills and invoices', undefined],
+      ['timeline', 'Repeating', undefined],
+      ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['capture', 'Add an account', undefined],
       ['stat', undefined, undefined],
+      ['stat', 'Cash now does not add up', undefined],
+      ['note', undefined, undefined],
       /* OVER TIME, SINCE money-core 3.31.0, in its two forms, one of which draws. */
       ['stat', 'Over time', undefined],
       ['stat', 'Over time', undefined],
@@ -816,9 +827,10 @@ test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and its home is the hero and o
       ['bar', 'Accounts', undefined],
       ['timeline', 'Ledger', undefined],
       ['progress', 'Instalments', undefined],
+      ['progress', "This month's budgets", undefined],
     ],
   );
-  assert.deepEqual([blocks[0]!.lead, blocks[1]!.lead, blocks[2]!.lead, blocks[4]!.lead], [true, true, true, true]);
+  assert.deepEqual(blocks.map((b, i) => (b.lead === true ? i : -1)).filter((i) => i >= 0), [0, 3, 4, 5, 6, 8]);
 
   /* AND THE RECORD TAKES THE PAGE AND DRAWS IT ON THE SAMPLE WITHOUT A REFUSAL. */
   const k = await seeded();
@@ -893,14 +905,19 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
         blocks.slice(1, walk).every((b) => b.kind === 'bar' || b.kind === 'capture' || (b.kind === 'note' && (b as { lead?: boolean }).lead === true)),
         `${slug}: something stands between the line and its walk`,
       );
-    } else if (stat >= 0) {
+    } else if (stat >= 0 && stat < walk) {
       assert.equal(blocks[stat]!.span, 4, `${slug}: the headline tile is not a third of the row`);
       assert.equal(blocks[walk]!.span, 8, `${slug}: Cash ahead does not fill the rest of the headline's row`);
       assert.equal(walk, stat + 1, `${slug}: something stands between the headline and its walk`);
     } else {
+      /* A BOOK'S PAGE SINCE money-core 3.34.0: no What you have tile, and Cash ahead is the hero, the whole row. */
       assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole width`);
-      /* ONLY WHAT TAKES THE LINE'S OR THE WALK'S PLACE: a book's bar for the line, and the box for a first account. */
-      assert.ok(blocks.slice(1, walk).every((b) => b.kind === 'bar' || b.kind === 'capture'), `${slug}: something stands between the line and its walk`);
+      /* ONLY WHAT TAKES THE LINE'S OR THE WALK'S PLACE: a book's bar for the line, the box for a first account, and the
+         lines a page opens on. */
+      assert.ok(
+        blocks.slice(1, walk).every((b) => b.kind === 'bar' || b.kind === 'capture' || (b.kind === 'note' && (b as { lead?: boolean }).lead === true)),
+        `${slug}: something stands between the line and its walk`,
+      );
     }
 
     /* WHAT A PERSON READS, AND ONLY THAT: a `where:` is the record's grammar, and `direction is owed to me` is an id. */
@@ -940,8 +957,10 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* EACH CURRENCY APART, AND THE ACCOUNTS THE ACCOUNTS TILE LISTS, SINCE money-core 3.27.0: the sample keeps one
      currency, so nothing is said converted, and every account it counts as cash holds money. */
   /* AND SINCE money-core 3.33.0 (AF4) THE BILLS THAT ARE LATE, OR THE LOW POINT WITH NOTHING LATE, BEFORE THE CARD. */
-  const LINE_SAYS = ['card-to-pay', 'card-to-pay-on', 'overdue', 'runway-days.low', 'runway-days.low_on'];
-  for (const k of Object.keys(lead.values ?? {})) assert.ok(LINE_SAYS.includes(k), `the line says ${k}`);
+  /* AND SINCE money-core 3.34.0 THE INVOICES LATE COMING IN, with the part of a plan that is late riding at the start of
+     each sentence about what is late. */
+  const LINE_SAYS = ['card-to-pay', 'card-to-pay-on', 'overdue', 'late-in', 'runway-days.low', 'runway-days.low_on'];
+  for (const k of Object.keys(lead.values ?? {})) assert.ok(LINE_SAYS.includes(k) || k.startsWith('installments-late.'), `the line says ${k}`);
   assert.ok(Object.hasOwn(lead.values ?? {}, 'card-to-pay'));
   /* HOW MUCH, AND HOW FAR IT MOVED, ARE THE HERO'S SINCE money-core 3.29.0, drawn under the line in the figure's own size. */
   const hero = blocks.find((b) => b.kind === 'stat' && b.lead === true)!;
@@ -956,7 +975,11 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   const said = lead.body?.split(/(?<=\.)\s+/u) ?? [];
   assert.equal(said.at(-1), '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.');
   assert.equal(reading(k, 'installments-late'), 0, 'the sample has no part late');
-  if (said.length > 1) assert.match(said[0]!, /^(?:Bills \{\{bad:late\}\}: \[\{\{overdue\}\}\]\(\/r\/obligations\?[^)]+\) to pay\.|Cash falls to \{\{runway-days\.low\}\})/u);
+  if (said.length > 1)
+    assert.match(
+      said[0]!,
+      /^(?:\{\{installments-late\.first\}\} is \{\{bad:late\}\}|Bills \{\{bad:late\}\}: \[\{\{overdue\}\}\]\(\/r\/obligations\?[^)]+\) to pay\.|Invoices \{\{bad:late\}\}: \[\{\{late-in\}\}\]\(\/r\/obligations\?[^)]+\) to come in\.|Cash falls to \{\{runway-days\.low\}\})/u,
+    );
 
   /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */
   for (const metric of ['cash-now', 'runway-days'])
@@ -997,10 +1020,13 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, Coming up is the next few things, and wha
   assert.equal(reading(k, 'balances-stale'), old);
   const stale = (out.value as { blocks: readonly { body?: string; drawn?: boolean }[] }).blocks.find((b) => String(b.body).startsWith('Oldest balance'));
   assert.ok(stale && stale.drawn !== false, 'an old balance is not said on the page that reads it');
-  assert.notEqual(drawn('Heads up'), false, 'the line about an old balance is drawn with no tile round it');
+  /* UNDER THE HERO SINCE money-core 3.34.0, and in no Heads up box. */
+  const shown = (out.value as { blocks: readonly { heading?: string; kind?: string; lead?: boolean; body?: string }[] }).blocks;
+  assert.equal(shown.some((b) => b.heading === 'Heads up'), false, 'the line about an old balance is drawn in a tile round it');
+  assert.ok(shown.indexOf(stale) < shown.findIndex((b) => b.heading === 'Over time'), 'the line about an old balance is not under the hero');
 
   /* THE NEXT FEW THINGS THAT MOVE MONEY, each with its money: Coming up reads from today and the next two weeks, six lines
-     (money-core 3.32.0, `COMING_UP_WHERE`: what is late is Heads up's), over the one source Today's Due soon reads. */
+     (money-core 3.32.0, `COMING_UP_WHERE`: what is late is the line's), over the one source Today's Due soon reads. */
   const due = blockOf(k, 'money', 'Coming up');
   assert.ok(due.rows.length > 0, 'nothing falls due on the sample, so this proves nothing');
   assert.ok(due.rows.length <= 6, 'Coming up holds more than six lines');
@@ -1038,11 +1064,11 @@ test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line
 });
 
 /**
- * A RECORD WITH AN ACCOUNT AND NOTHING WRONG DRAWS NO HEADS UP. The box is gated on there being an account, and each of
- * its lines on something stale or late, so on the most common healthy day every line is hidden and the box held only
- * its bell heading. The record says the box is not drawn when nothing in it is (`pages.ts` `emptyBoxesShut`).
+ * A RECORD WITH AN ACCOUNT AND NOTHING WRONG DRAWS NOTHING THAT NEEDS A LOOK. Each line under the hero is gated on
+ * something that does not add up or is stale, so on the most common healthy day every one is hidden. Until money-core
+ * 3.34.0 they stood in a Heads up box, shut when nothing in it was drawn; the box is gone, and so is its heading.
  */
-test('HEADS UP IS NOT DRAWN WHEN NOTHING UNDER IT IS TRUE, on a record with an account and nothing stale or late', async () => {
+test('WHAT NEEDS A LOOK IS NOT DRAWN WHEN NOTHING IS TRUE, on a record with an account and nothing stale or late', async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   for (const id of ['portfolio', 'people', 'money-core']) assert.ok((await put(k, document(id))).ok, id);
   const made = k.create('accounts', { name: 'Current account', kind: 'bank', balance: { amount: 250_000, currency: 'GBP' }, as_of: day(0), liquid: true } as never, { actor: 'p_test' });
@@ -1051,8 +1077,10 @@ test('HEADS UP IS NOT DRAWN WHEN NOTHING UNDER IT IS TRUE, on a record with an a
   for (const id of ['balances-stale', 'late-in', 'overdue']) assert.ok(!((reading(k, id) ?? 0) > 0), `${id} is true on a record with nothing wrong`);
   const out = k.page('money');
   assert.ok(out.ok, sayOf(out));
-  const blocks = (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks;
-  assert.equal(blocks.find((b) => b.heading === 'Heads up')?.drawn, false, 'an empty Heads up box is drawn');
+  const blocks = (out.value as { blocks: readonly { heading?: string; body?: string; drawn?: boolean }[] }).blocks;
+  assert.equal(blocks.some((b) => b.heading === 'Heads up'), false, 'Heads up is back on Money');
+  assert.equal(blocks.find((b) => b.heading === 'Cash now does not add up')?.drawn, false, 'Cash now is said not to add up');
+  assert.equal(blocks.find((b) => String(b.body).startsWith('Oldest balance'))?.drawn, false, 'an old balance is said');
 });
 
 /**
@@ -1316,10 +1344,11 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
   const drawn = () => {
     const out = k.page('money');
     assert.ok(out.ok, sayOf(out));
-    /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines of Heads up carry no heading either. */
+    /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines under the hero carry no heading either. With two books it
+       says how many books the money is kept in, since money-core 3.34.0 (it counted accounts before). */
     return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean; body?: string }[] }).blocks
       .filter((b) => b.drawn !== false)
-      .map((b) => (b.lead === true && b.body !== undefined ? (b.body.includes('{{cash-by-account.groups}}') ? 'kept in' : undefined) : (b.heading ?? '')));
+      .map((b) => (b.lead === true && b.body !== undefined ? (b.body.includes('Kept in {{books-held}} books.') ? 'kept in' : undefined) : (b.heading ?? '')));
   };
   assert.ok(drawn().includes(undefined));
   made('Home');

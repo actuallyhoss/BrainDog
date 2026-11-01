@@ -41,7 +41,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
   title: 'Payees',
   nav: { section: 'Money', order: 17 },
   icon: 'store',
-  requires: ['register.transactions', 'register.filing_rules'],
+  requires: ['register.transactions', 'register.filing_rules', 'register.payee_names'],
   pack: 'money-core',
   filters: [{ field: 'payee', control: 'chips' }],
   blocks: [
@@ -75,6 +75,23 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       empty: 'Nobody paid in 90 days.',
     },
     {
+      /* THE NAMES YOU GAVE, SINCE money-core 3.34.0 (next-money, M9): what a bank writes and the name read for it, so
+         "GOOGLE *WORKSPACE" is Google Workspace on every line, the ones already there and every one after
+         (`lists/payee-names.ts`). With none yet, one line says what a name does and where to give one. */
+      kind: 'table',
+      heading: 'Payee names',
+      icon: 'tag',
+      span: 12,
+      source: 'register.payee_names',
+      columns: [
+        { field: 'match', label: 'When the bank writes', width: 'minmax(14ch,1fr)' },
+        { field: 'name', label: 'Call it', width: 'minmax(14ch,1fr)' },
+      ],
+      order: [{ field: 'name', dir: 'asc' }],
+      limit: 60,
+      empty: 'No payee names yet. [Give one](/r/payee_names?new=1) to read "GOOGLE *WORKSPACE" as Google Workspace on every line.',
+    },
+    {
       /* THE CATEGORY EACH PAYEE GOES UNDER, as the rules that read the payee file it. */
       kind: 'table',
       heading: 'Usual category',
@@ -84,8 +101,8 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       where: 'reads is payee, state is on',
       columns: [
         { field: 'match', label: 'Payee', width: 'minmax(14ch,1fr)' },
+        /* NO "WHICH WAY" COLUMN, SINCE money-core 3.34.0 (next-money, M29): it said "Money out" on every row. */
         { field: 'category', label: 'Category', width: 'minmax(10ch,18ch)' },
-        { field: 'direction', label: 'Which way', width: '12ch' },
       ],
       order: [{ field: 'match', dir: 'asc' }],
       limit: 60,

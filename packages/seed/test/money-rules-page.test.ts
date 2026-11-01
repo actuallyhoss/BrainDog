@@ -176,11 +176,17 @@ test('ON A FRESH RECORD WITH TWO RULES AND FIVE FILED ENTRIES, the figures read 
   assert.equal(lead.values?.['rules-filing-30d'], 2);
   assert.equal(lead.values?.['filed-by-rule-30d'], 5);
 
-  /* A CARD A RULE, EACH WITH HOW MANY LINES IT FILED (audit of 31 October): the count is the card's one figure fact. */
+  /* A CARD A RULE, ITS TEXT AND WHERE IT FILES, SINCE money-core 3.34.0: "Lines filed 0" stood on every card under a
+     line that says what the rules filed, and how a rule matches is on its own page. What each filed is the figure's
+     parts, above. */
   const rules = drawn(blocks).find((b) => b.heading === 'Rules')!;
   assert.equal(rules.kind, 'cards');
-  const filed = Object.fromEntries(rules.rows!.map((r, i) => [r.fields.match, rules.facts?.[i]?.[0]]));
-  assert.deepEqual(filed, { Talabat: 3, VOX: 2 });
+  assert.deepEqual(rules.rows!.map((r) => r.fields.match).sort(), ['Talabat', 'VOX']);
+  const declared = (MONEY_RULES_PAGE.blocks as { heading?: string; columns?: unknown }[]).find((b) => b.heading === 'Rules')!;
+  assert.deepEqual(declared.columns, [
+    { field: 'match', as: 'title' },
+    { field: 'category', label: 'Files under', as: 'fact' },
+  ]);
   /* AND WHAT THEY FILED LATELY, the lines the rules filed, newest first. */
   const lately = drawn(blocks).find((b) => b.heading === 'Filed lately')!;
   assert.equal(lately.rows!.length, 5);
@@ -221,12 +227,14 @@ test('WITH NO RULE, THE LEAD SAYS SO AND OFFERS ONE, and nothing else counts', a
   assert.ok(drawn(blocks).length <= 7, 'six tiles or fewer beside the line');
 });
 
-test('A RULE THAT HAS FILED NOTHING SAYS SO, with its card and the way to add another', async () => {
+test("A RULE THAT HAS FILED NOTHING SAYS SO, with its card, and the head's button adds another", async () => {
   const { k, food } = await fresh();
   rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
   const { blocks } = pageOf(k);
   assert.equal(leadOf(blocks).body, 'No rule has filed a line yet.');
   const rules = drawn(blocks).find((b) => b.heading === 'Rules')!;
   assert.deepEqual(rules.rows!.map((r) => r.fields.match), ['Talabat']);
-  assert.ok(drawn(blocks).some((b) => b.kind === 'note' && b.body === '[Add a rule](/r/filing_rules?new=1)'));
+  /* ADD A RULE IS THE HEAD'S ONE BUTTON SINCE money-core 3.34.0, and no tile of its own under the rules. */
+  assert.equal(drawn(blocks).some((b) => b.kind === 'note' && b.body === '[Add a rule](/r/filing_rules?new=1)'), false);
+  assert.deepEqual((MONEY_RULES_PAGE as { header?: unknown }).header, { action: { verb: 'row.create', label: 'Add a rule' } });
 });

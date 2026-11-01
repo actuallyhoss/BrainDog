@@ -138,29 +138,21 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       when: HAS_PARTS,
       empty: 'No parts of {{name}} yet.',
     },
-    {
-      /* WHAT WAS PAID IN ALL BY EACH QUARTER, the quarters before the chart's first in it too: a running line over what
-         was paid each quarter, under the heading Property's chart has. Only once a part is paid. */
-      kind: 'series',
-      heading: 'Paid in all, over time',
-      icon: 'chart-column',
-      span: 12,
-      series: [{ metric: 'plan-paid-by-quarter:{{name}}', label: 'Paid in all', running: true }],
-      back: 24,
-      when: { metric: 'plan-parts-paid:{{name}}', gt: 0 },
-      empty: 'Nothing paid on {{name}} yet.',
-    },
+    /* NO "PAID IN ALL, OVER TIME" CHART, SINCE money-core 3.34.0 (next-money, M35): the plan said one figure three ways,
+       Paid $625 in Where it stands, 3 of 12 on the track under it and "Paid in all $624.75" at the end of the chart's
+       line. Where it stands and its track say what is paid; the parts paid are listed under Paid. */
     {
       /* THE NEXT SIX PARTS, A LIST TO TICK: a tick marks a part paid where it is read, with its Undo, as a bill is on
-         Coming up. Its day and amount are one quiet line under it; a note on the part, where it has one, is the line
-         between. */
+         Coming up. Its amount is at the row's end, and its day and a note, where it has one, the quiet line under it. */
       kind: 'todo',
       heading: 'Upcoming',
       icon: 'calendar-clock',
       span: 12,
       source: 'register.installments',
       where: `${PARTS}, state is open`,
-      columns: [{ field: 'what' }, { field: 'note' }, { field: 'due' }, { field: 'amount' }],
+      /* THE AMOUNT AT THE ROW'S END, SINCE money-core 3.34.0 (next-money, M36), as every money list puts it: the second
+         cell is the one a todo draws at the right in Money's look, where it sat in the quiet line ("9 Nov · $208.25"). */
+      columns: [{ field: 'what' }, { field: 'amount' }, { field: 'due' }, { field: 'note' }],
       order: [{ field: 'due', dir: 'asc' }],
       limit: 6,
       empty: 'Nothing left to pay on {{name}}.',

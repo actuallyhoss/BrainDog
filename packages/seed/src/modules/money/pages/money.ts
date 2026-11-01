@@ -16,23 +16,19 @@ import { BUDGET } from './parts/budget.ts';
 import { SPENDING } from './parts/spending.ts';
 import { TOLD } from './parts/told.ts';
 
+/* THE LEDGER TILE WITH NO LINE OVER ITS LINES ON THE HOME, SINCE money-core 3.34.0 (next-money, M5): "143 came in today."
+   read as news on a record a minute old, and the dates on the lines say when each happened. The line stays declared on
+   the part (`parts/ledger.ts`), for a page that wants the day's count. */
+const { body: _cameIn, ...LEDGER_TILE } = LEDGER[0]!;
+
 /** The budgets tile of Budgets' own page, with no width of its own so it pairs, and its six first. */
 const { span: _span, ...BUDGET_TILE } = BUDGET[0]!;
 /* A MONTH'S BUDGETS ONLY: the bars are set against this month's spending, so a week's or a year's most beside them would
    read as a month's. Budgets draws those against their own period. */
 const BUDGETS_GLANCE: Record<string, unknown> = { ...BUDGET_TILE, heading: "This month's budgets", where: `${String(BUDGET_TILE.where)}, ${A_MONTH}`, limit: 6 };
 
-/**
- * AND EVERY BUDGET AS ONE MONTH, SINCE money-core 3.32.0 (recheck of 30 October, N4): the tile above is a month's
- * budgets, and it said "£0 of £13,550" while Budgets said "£14,633 a month across 7", the week's budget left out of one
- * and counted as a month in the other. Said only while a week's or a year's budget is kept, which is when they differ.
- */
-const BUDGETS_ALL: Record<string, unknown> = {
-  kind: 'note',
-  span: 12,
-  when: { all: [{ metric: 'budgets-set', gt: 0 }, { any: [{ metric: 'budgets-weekly', gt: 0 }, { metric: 'budgets-yearly', gt: 0 }] }] },
-  body: 'All {{budgets-set}} budgets come to {{budgets-total}} a month, a week\'s or a year\'s counted as its share of a month. [See them all](/p/money-budgets)',
-};
+/* NO "ALL 3 BUDGETS COME TO $952 A MONTH" SENTENCE TILE AT THE FOOT, SINCE money-core 3.34.0 (next-money, M4): it stood
+   alone under the board saying what Budgets' own line says, and the month's budgets tile above opens that page. */
 
 /**
  * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM. It leads with the money there is, then how long it lasts, then
@@ -51,8 +47,8 @@ const BUDGETS_ALL: Record<string, unknown> = {
  * - THE BOARD: Coming up beside Spent this month, the accounts beside the Ledger, then Instalments. No tile names a
  *   width, so the app pairs them into two even columns (`paired` in `apps/web/src/lib/page/layout.ts`), and a tile not
  *   drawn takes no place: the columns are always full, and a phone reads them in this order, a late bill first.
- * - HEADS UP closes the page: whether Cash now adds up, an old balance, and money late in or out, each line drawn only
- *   while it is true.
+ * - UNDER THE HERO, ONE LINE A THING, SINCE money-core 3.34.0: whether Cash now adds up and an old balance, each drawn
+ *   only while it is true. It was Heads up, a boxed tile closing the page; what is late is the line's.
  *
  * WHAT WENT TO ITS OWN PAGE, AND STAYS DECLARED IN ITS FILE: the Cash ahead chart and its controls (Forecast), the
  * month's calendar, what repeats every month and the months in and out (Coming up and Reports), what each book holds
@@ -77,6 +73,17 @@ export const MONEY_PAGE: SeedPage = {
     /* The box to add a first account, in the hero's place while there is none. */
     ...ADD_ACCOUNT,
     ...HERO,
+    /* WHAT NEEDS A LOOK, UNDER THE HERO AND ONE LINE A THING, SINCE money-core 3.34.0 (next-money, M3): Heads up closed
+       the page in a boxed tile of its own, 3,400px down on a phone, under a heading that said nothing the lines did not.
+       Now each line stands under the hero while it is true: whether Cash now adds up, then an old balance. Money late
+       coming in or going out is the page's first line (`headline.ts`), so it is not said here again; nor the line on
+       categories marked the other way, empty on nearly every record, nor the Last confirmed cards and the box beside
+       them, whose old balance line opens the same form. */
+    ...CROSS_CHECK,
+    ...HEADS_UP.slice(1).filter((b) => {
+      const metric = (b.when as { metric?: string } | undefined)?.metric;
+      return metric !== 'categories-against-direction' && metric !== 'late-in' && b.kind !== 'cards' && b.kind !== 'capture';
+    }),
     /* The money over time, the whole row under the hero (money-core 3.31.0). */
     ...OVER_TIME,
     /* The board, in pairs: Coming up and Spent this month, the accounts and the Ledger, then Instalments beside the
@@ -84,15 +91,8 @@ export const MONEY_PAGE: SeedPage = {
     ...COMING_UP,
     ...SPENDING,
     ...ACCOUNTS_TILE,
-    ...LEDGER,
+    LEDGER_TILE,
     ...INSTALMENTS,
     BUDGETS_GLANCE,
-    BUDGETS_ALL,
-    /* Heads up's heading, then whether Cash now adds up, then its lines: an old balance, and money late coming in (money late going out is the first line's). Not
-       the line on categories marked the other way, empty on nearly every record, nor the Last confirmed cards and the
-       box beside them, whose old balance line opens the same form. */
-    HEADS_UP[0]!,
-    ...CROSS_CHECK,
-    ...HEADS_UP.slice(1).filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'categories-against-direction' && b.kind !== 'cards' && b.kind !== 'capture'),
   ],
 };

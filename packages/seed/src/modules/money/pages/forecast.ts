@@ -2,6 +2,7 @@
 
 import type { SeedPage } from '../../base.ts';
 import { FORECAST } from './parts/forecast.ts';
+import { INSTALMENTS } from './parts/instalments.ts';
 
 /**
  * CASH AHEAD AS THE PAGE'S ONE ANSWER: the walk Money draws (`parts/forecast.ts`, the legs every walk reads), opening on
@@ -82,23 +83,12 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       empty: 'Nothing dated ahead yet.',
     },
     {
-      /* THE PARTS OF PLANS STILL TO PAY IN THE YEAR AHEAD, each on its day in its own currency: the drops the chart
-         numbers, and the ones past its horizon. */
-      kind: 'table',
-      heading: 'Instalments, the year ahead',
-      icon: 'credit-card',
+      /* WHAT IS BEING PAID IN PARTS, ONE ROW A PLAN, SINCE money-core 3.34.0 (next-money, M23): nine rows of "Laptop for
+         Pocketlab, 4 of 12" to "12 of 12", each the same plan on another month. Now each plan is one track, as Money's
+         Instalments tile draws it (`parts/instalments.ts`): the parts paid of all of them, what is next and on which day,
+         and the plan's name opens its own page, where every part is listed. */
+      ...INSTALMENTS[0]!,
       span: 12,
-      source: 'register.installments',
-      where: 'state is open, due before +366d',
-      columns: [
-        { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-        { field: 'due', label: 'Due', width: '12ch', align: 'end' },
-        { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
-      ],
-      order: [{ field: 'due', dir: 'asc' }],
-      limit: 12,
-      when: { metric: 'installments-left', gt: 0 },
-      empty: 'No instalments due this year.',
     },
     {
       /* WHAT REPEATS, EACH LINE ONCE WITH HOW OFTEN AND WHEN IT NEXT LANDS: the dots on the chart that come round. A
@@ -113,7 +103,9 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       columns: [
         { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
         { field: 'every', label: 'Every', width: '12ch' },
-        { field: 'next_due', label: 'Next', width: '12ch', align: 'end' },
+        /* AS WIDE AS ITS WORDS, SINCE money-core 3.34.0 (next-money, M22): at 12ch "Due in 11 days" was cut to "Due in
+           11 da…" at every desk width. The description takes what is left. */
+        { field: 'next_due', label: 'Next', width: 'max-content', align: 'end' },
         /* SIGNED BY THE WAY IT GOES, as Coming up says the same lines: a salary and the rent read alike without it. */
         { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
       ],
