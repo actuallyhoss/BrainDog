@@ -52,7 +52,7 @@ import { withCalls } from '@braindog/mcp';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
-import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
+import { OPERATION_METHOD, UNBOUND_REFUSED, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
@@ -645,7 +645,8 @@ async function operationFor(sent: string, api: Api, request?: Request): Promise<
      refused unspent, as the token check above refuses a token. The record reads it through the `validFrom` it was
      built with, so this call and the key door's carry the same instant. */
   const grant = await api.operationGrant(sent);
-  if (!grant.ok) return UNKNOWN();
+  /* AN APPROVAL TIED TO NO REQUEST past the owner's date is told so, with the fix; every other failure is one sentence. */
+  if (!grant.ok) return 'refusal' in grant && grant.refusal.fix === UNBOUND_REFUSED ? { refused: grant.refusal } : UNKNOWN();
   /* AND FOR ONE BODY, when the command named it at the start (`boundRequest`). A door that hands no request here names
      none, and a grant bound to a body is refused there rather than taken unchecked. */
   if (grant.value.binds !== null && (request === undefined || !(await boundRequest(request, grant.value.binds)))) return { refused: OTHER_REQUEST };

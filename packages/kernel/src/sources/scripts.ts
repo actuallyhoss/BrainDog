@@ -6,7 +6,7 @@
  * list's row: the block is shown to a reader of the whole record, as the read itself is held to the lists a script
  * touches and a page block cannot be held row by row.
  *
- * WHAT A ROW HOLDS IS THE READ'S, FLAT. What starts it (`every`, `door`, `rule`), where it stands (`status`, `next`, and
+ * WHAT A ROW HOLDS IS THE READ'S, FLAT. What starts it (`every`, its time of day `at`, `door`, `rule`), where it stands (`status`, `next`, and
  * its last run's `last_at`, `last` and `said`), how close it is to pausing (`in_a_row` of `pauses_at`) and this month's
  * runs. No words are made here: the host says "Runs every day" and "Last ran 2 hours ago" from these, as the screen did.
  */
@@ -27,6 +27,7 @@ const SCRIPTS: Schema = {
     title: { type: 'text' },
     status: { type: 'enum', values: ['on', 'paused'] },
     every: { type: 'text' },
+    at: { type: 'text' },
     door: { type: 'text' },
     rule: { type: 'boolean' },
     next: { type: 'instant' },
@@ -51,6 +52,7 @@ function scriptEntry(s: ScriptRow, at: string): Entry {
       title: s.title,
       status: s.status,
       every: s.runs.every,
+      at: s.runs.at,
       door: s.runs.door,
       rule: s.runs.rule,
       next: s.next,

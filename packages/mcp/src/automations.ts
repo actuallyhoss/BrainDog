@@ -86,7 +86,7 @@ export const AUTOMATION_GRAMMAR = {
       '{"metric":{"id":"<metric>","crosses":{"lte":0}}}: read each hour; a run starts when the figure moves to the other side of the line, and the first reading only sets the side. crosses is target, {"lte":n} or {"gte":n}, n in the figure\'s own units (minor units for money). The run reads {{trigger.value}} and {{trigger.side}}, above or below',
     decided:
       '{"decided":{"about":"rule.<name>","option":"<answer>"}}: a question in Decide was decided, once per question. about is the declaration that filed or proposes it and option the chosen answer\'s words, each optional. The run reads {{trigger.option}} and the row the question is about as {{trigger.row.<field>}}',
-    manual: '{"manual":true}: a person presses Run now in the app. No agent and no token can press it',
+    manual: '{"manual":true}: a person presses Run now in the app. An agent runs it with act {"call":"automationRun","args":{"rule":"<name>"}} only while the owner lets agents do everything without asking; otherwise it is refused and stays his to press',
   },
   steps: {
     if: '{"if":"<condition>","then":[...],"else":[...]}: a branch, read over the row and the answers so far',

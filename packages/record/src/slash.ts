@@ -1829,9 +1829,9 @@ function scriptSays(d: { id?: unknown; body?: unknown }): string {
   const hosts = strings(body.egress).map((o) => o.replace(/^https:\/\//iu, '').slice(0, 80));
   const reads = strings(body.reads).map(listNamed);
   const writes = strings(body.writes).map(listNamed);
-  const runs = (body.runs !== null && typeof body.runs === 'object' ? body.runs : {}) as { every?: unknown; door?: unknown; rule?: unknown };
+  const runs = (body.runs !== null && typeof body.runs === 'object' ? body.runs : {}) as { every?: unknown; at?: unknown; door?: unknown; rule?: unknown };
   const when = [
-    ...(typeof runs.every === 'string' ? [`every ${runs.every.slice(0, 16)}`] : []),
+    ...(typeof runs.every === 'string' ? [`every ${runs.every.slice(0, 16)}${typeof runs.at === 'string' ? ` at ${runs.at.slice(0, 5)}` : ''}`] : []),
     ...(typeof runs.door === 'string' ? [`on each arrival at the door "${runs.door.slice(0, 40)}"`] : []),
     ...(runs.rule === true ? ['whenever a rule starts it'] : []),
   ];

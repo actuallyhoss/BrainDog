@@ -59,7 +59,7 @@ export type KeyDeps = {
   depositGrant(
     record: string,
     /* `sealed_under` IS THE HOST'S READING OF THE BODY (`sealedUnderOf`), so the record binds what this host sealed. */
-    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: SealedUnder },
+    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: SealedUnder; everywhere?: unknown },
     by: By,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,
@@ -227,8 +227,8 @@ function doors(keys: KeyDeps, record: () => string | null) {
            project, and reading a second one out of its body would be a way to put a key out of its reach. */
         const args =
           'principal' in by
-            ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential, sealed_under: sealedUnder }
-            : { label: body.label, opens: body.opens, kind: body.kind, sealed_under: sealedUnder };
+            ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential, sealed_under: sealedUnder, everywhere: body.everywhere }
+            : { label: body.label, opens: body.opens, kind: body.kind, sealed_under: sealedUnder, everywhere: body.everywhere };
         return await keys.depositGrant(id, args, by, hints, seal, opts);
       } finally {
         recordKey?.fill(0);

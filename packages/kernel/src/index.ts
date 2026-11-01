@@ -244,7 +244,7 @@ import { answerAsked, arrive, day, exponentOf, fileAsSecond, offerAgain, pattern
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { firstSlotMs } from './slot.ts';
-import { activeScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
+import { activeScript, clockOfScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
 import { finishScript, prepareScript, resumeScript, tryProposal, type ScriptProposal, type ScriptProposed, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
@@ -553,7 +553,7 @@ export {
   type ProfileRow,
   type ProfileWho,
 } from './agent-profile.ts';
-export { BODY_BOUND, OPERATION_METHOD, REACHES, boundBody, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type KeychainGrant, type Waiting } from './device.ts';
+export { BODY_BOUND, OPERATION_METHOD, REACHES, UNBOUND_REFUSED, UNBOUND_REFUSED_FROM, boundBody, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type KeychainGrant, type Waiting } from './device.ts';
 export { shapeGrant };
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
@@ -1186,7 +1186,7 @@ export type WriteContext = {
    * signed by the run it resolves to, `S42` (`30 §3`). Every other principal keeps `actor` as given,
    * which is how a person in a browser is never a run.
    */
-  principal?: { kind: 'person' | 'token' | 'system'; token?: string | undefined } | undefined;
+  principal?: { kind: 'person' | 'token' | 'system'; token?: string | undefined; widens?: true | undefined } | undefined;
   /** What an agent says about its run. Read for a token's write only. */
   session?: SessionHints | undefined;
   /**
@@ -2754,8 +2754,30 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* A SCRIPT IS ARMED ON ITS OWN CLOCK (`script.ts`). One only a door or a rule starts still gets its row, which
          pausing and the list read, and its one turn ends it. */
       if (decl.kind === 'script') {
-        const every = (body.runs as { every?: unknown } | undefined)?.every;
-        arm('script', bare, { script: bare }, firstDueMs(recordIdentity(sql)?.id ?? 'self', bare, typeof every === 'string' ? every : null, clock.now()));
+        const { every, at } = clockOfScript(body);
+        const due = firstDueMs(recordIdentity(sql)?.id ?? 'self', bare, every, clock.now(), { at, tz });
+        /* THE ROW KEEPS THE CLOCK IT WAS ARMED FROM, and a pending row whose clock was changed is armed again from the new
+           one, as a rule's clock is below: `arm` moves only a row that is done or failed, so a script moved from "every
+           day" to "every day at 09:00" would otherwise have run once more at the old hour before it learned the new one.
+           A row armed before it kept a clock is moved only when a time of day is now named, so no unpinned script's
+           spread is reset by this build. */
+        const said = jcs({ every, at } as unknown as Json);
+        const held = sql.one<{ state: string; payload: string }>("SELECT state, payload FROM schedule WHERE kind = 'script' AND key = ?", bare);
+        if (held?.state === 'pending') {
+          let kept: unknown;
+          try {
+            kept = (JSON.parse(held.payload) as { clock?: unknown }).clock;
+          } catch {
+            kept = undefined;
+          }
+          if (typeof kept === 'string' ? kept !== said : at !== null)
+            sql.exec(
+              "UPDATE schedule SET due_at = ?, payload = ?, attempts = 0 WHERE kind = 'script' AND key = ? AND state = 'pending'",
+              instant(due),
+              JSON.stringify({ script: bare, clock: said }),
+              bare,
+            );
+        } else arm('script', bare, { script: bare, clock: said }, due);
         /* A REINSTALL UNPAUSES A SCRIPT, and `arm` only moves a row that is `done` or `failed` (the comment
            above), so a script paused for refusing too many times in a row stayed paused after the fix that was
            supposed to end that streak was installed. `pauseAfterRefusals` counts only the installed version's
@@ -4950,7 +4972,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (scoped) {
         const home = locate().project?.id ?? null;
         if (!current && scoped.type === 'ref' && patch[scoped.id] === undefined && home !== null) merged[scoped.id] = home;
-        if (!current || touched.includes(scoped.id)) {
+        /* AN EDIT BY AN AGENT THE OWNER LETS DO EVERYTHING WITHOUT ASKING (`widens`, set only by the record from its
+           `bypassOf`) may move a row out of its project, which is otherwise his: a key kept for one project is made one
+           for every project so a script can send it. Only where a row applies; a key's value is the keychain's and no
+           token reaches it, switch or not. A create still starts in its run's project. */
+        if ((!current || touched.includes(scoped.id)) && !(current && w.principal?.kind === 'token' && w.principal.widens === true && scoped.scope?.widen === 'person')) {
           const why = scopeFault(scoped, current?.fields[scoped.id], merged[scoped.id], !current, home, nameOf);
           if (why) return no<Entry>('FORBIDDEN', why, { at: scoped.id });
         }
@@ -9993,7 +10019,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     call: (row) => fireAction(actionDeps(), row),
     poll: (row) => fireAction(actionDeps(), row),
     /* A scheduled `script`: one `script.run` outbox row for a host to run in a sandbox, and the next run armed. */
-    script: (row) => fireScript(scriptDeps(sql, { recordId: recordIdentity(sql)?.id ?? 'self', nowMs: clock.now(), mint }), row, activeScript(sql, row.key)),
+    script: (row) => fireScript(scriptDeps(sql, { recordId: recordIdentity(sql)?.id ?? 'self', nowMs: clock.now(), tz: recordTz(), mint }), row, activeScript(sql, row.key)),
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
        notification naming "Stripe, live" tells whoever can see it which one is worth taking. */

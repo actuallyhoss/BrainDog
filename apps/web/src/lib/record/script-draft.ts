@@ -31,6 +31,8 @@ export type Draft = {
   script: string;
   title: string;
   every: string;
+  /** `HH:MM` in the record's zone, or empty for a clock that repeats from its last run. Sent only on a clock of whole days. */
+  at: string;
   door: string;
   rule: boolean;
   egress: string;
@@ -68,6 +70,13 @@ export type Sent =
 const NAME = /^[a-z][a-z0-9_-]{0,31}$/u;
 /** An interval the record reads (`INTERVAL` in `kernel/src/pull.ts`). */
 const INTERVAL = /^\d{1,4}[smhdw]$/u;
+/** A clock a time of day may pin: whole days or weeks, as the kernel's `scriptBody` holds it. */
+const WHOLE_DAYS = /^\d{1,4}[dw]$/u;
+/** A time of day as the kernel's `timeOf` reads it. */
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/u;
+
+/** Whether a clock may be pinned to a time of day: the form offers the time only then. */
+export const takesTime = (every: string): boolean => WHOLE_DAYS.test(every);
 /** How many resolved proposals a page asks for: the record's largest page. */
 const PAGE = 200;
 /** How many pages the source is looked for in. Past them a script is old enough that its author can paste it again. */
@@ -89,6 +98,8 @@ export const words = {
   everyNone: 'No clock',
   everyAs: { '15m': 'Every 15 minutes', '1h': 'Every hour', '6h': 'Every 6 hours', '1d': 'Every day' } as Record<string, string>,
   everyOther: (every: string) => `Every ${every}`,
+  at: 'At a time of day',
+  atHelp: "In your BrainDog's time zone. Leave it empty to run about a day after the last run.",
   door: 'When something arrives at',
   doorNone: 'No door',
   doorTyped: 'The name of the address it listens at',
@@ -139,6 +150,7 @@ export const words = {
   needStart: 'Say what starts it: a clock, a door or an automation.',
   needSource: 'Write what it does.',
   badEvery: (every: string) => `${every} is not a clock BrainDog reads. Write 15m, 1h, 6h or 1d.`,
+  badAt: (at: string) => `${at} is not a time of day. Write it like 09:00.`,
   badDoor: 'A door is named in lower case letters, digits, hyphens and underscores, starting with a letter.',
   badOrigin: (line: string) => `${line} is not an address it may fetch from. Write one starting https://, with no path.`,
   spent: (fetches: number, ms: number) => `${fetches === 1 ? '1 fetch' : `${fetches.toLocaleString('en-GB')} fetches`}, ${ms.toLocaleString('en-GB')} ms`,
@@ -147,7 +159,7 @@ export const words = {
 };
 
 /** An empty draft, for `/scripts/new`. */
-export const blank = (): Draft => ({ script: '', title: '', every: '', door: '', rule: false, egress: '', keys: [], reads: [], writes: [], source: '' });
+export const blank = (): Draft => ({ script: '', title: '', every: '', at: '', door: '', rule: false, egress: '', keys: [], reads: [], writes: [], source: '' });
 
 /** A script id in the kernel's grammar from whatever a person named it, and one no installed script already has. */
 export function idFrom(title: string, taken: readonly string[]): string {
@@ -193,6 +205,7 @@ export function faultsOf(d: Draft): { at: 'title' | 'starts' | 'egress' | 'sourc
   if (d.title.trim() === '') out.push({ at: 'title', say: words.needTitle });
   if (d.every === '' && d.door.trim() === '' && !d.rule) out.push({ at: 'starts', say: words.needStart });
   if (d.every !== '' && !INTERVAL.test(d.every)) out.push({ at: 'starts', say: words.badEvery(d.every) });
+  if (takesTime(d.every) && d.at !== '' && !TIME.test(d.at)) out.push({ at: 'starts', say: words.badAt(d.at) });
   if (d.door.trim() !== '' && !NAME.test(d.door.trim())) out.push({ at: 'starts', say: words.badDoor });
   const wrong = originsOf(d.egress).find((l) => !isOrigin(l));
   if (wrong !== undefined) out.push({ at: 'egress', say: words.badOrigin(wrong) });
@@ -211,6 +224,7 @@ export const canSave = (d: Pick<Draft, 'source'>, o: { sending: boolean; waiting
 export function bodyOf(d: Draft): Record<string, unknown> {
   const runs: Record<string, unknown> = {};
   if (d.every !== '') runs.every = d.every;
+  if (takesTime(d.every) && d.at !== '') runs.at = d.at;
   if (d.door.trim() !== '') runs.door = d.door.trim();
   if (d.rule) runs.rule = true;
   return {
@@ -247,6 +261,7 @@ export function draftOf(row: ScriptRow, body: Record<string, unknown> | null): D
     script: row.script,
     title: row.title,
     every: row.runs.every ?? '',
+    at: row.runs.at ?? '',
     door: row.runs.door ?? '',
     rule: row.runs.rule,
     egress: row.egress.join('\n'),

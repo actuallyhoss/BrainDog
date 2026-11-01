@@ -230,7 +230,7 @@ function started(body: Body): string {
       return `Every ${words(on.every)}${at}${day}.${late}`;
     }
     case 'manual':
-      return 'When somebody presses Run now in the app. No agent and no token can press it.';
+      return "When somebody presses Run now in the app, or an agent runs it while the owner lets agents do everything without asking.";
     case 'metric': {
       /* READ EACH HOUR, AND A CROSSING IS A CHANGE OF SIDE (`flow.ts`'s `onMetrics`): the first reading only sets the
          side, which the sentence says, since a rule whose figure is already past the line starts nothing until it

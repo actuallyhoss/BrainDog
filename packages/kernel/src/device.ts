@@ -107,6 +107,21 @@ export const BODY_BOUND = 'body:';
 /** The bound body's SHA-256 a grant's `scope` holds, or `null` for none. */
 export const boundBody = (scope: string | null): string | null => (scope !== null && scope.startsWith(BODY_BOUND) ? scope.slice(BODY_BOUND.length) : null);
 
+/**
+ * From this instant an operation grant must name the one request it is for (`binds`), and one that names none is
+ * refused when it is asked for (`deviceStart`) and when it is spent (`operationGrant`). SEC13.
+ *
+ * THE OWNER'S DATE, 1 DECEMBER 2026, DECIDED ON 1 NOVEMBER. Every braindog command since bound builds names its body, so
+ * an unbound approval is either an old command or somebody spending the word "token" or "import" on a request the
+ * approver never saw. The month between is for every machine still running an old command to be updated; until it ends,
+ * an unbound approval keeps working as it always has. Midnight UTC, so every host turns it on at the same instant.
+ */
+export const UNBOUND_REFUSED_FROM: number = Date.parse('2026-12-01T00:00:00Z');
+
+/** What an approval that names no request is told once `UNBOUND_REFUSED_FROM` has passed: what happened, and the fix. */
+export const UNBOUND_REFUSED =
+  'This braindog command is too old: it asks for an approval without saying which request it is for, and BrainDog no longer takes those. Update the braindog command: braindog update. Then run it again.';
+
 type Stored = Omit<DeviceRow, 'handle' | 'ended_by'> & { id: string; code_hash: string; token_hash: string | null };
 
 const VISIBLE = 'id, status, reach, scope, label, ua, tries, expires, approved_by, approved_at, last_used';
@@ -199,6 +214,9 @@ export async function deviceStart(
     if (typeof args.binds !== 'string' || !/^[0-9a-f]{64}$/u.test(args.binds))
       return no('VALUE_MALFORMED', "A grant names its request by the SHA-256 of the body, as sixty-four lower-case hex characters.", { at: 'binds' });
     scope = `${BODY_BOUND}${args.binds}`;
+  } else if (OPERATIONS.includes(reach) && deps.nowMs >= UNBOUND_REFUSED_FROM) {
+    /* REFUSED BEFORE ANY CODE IS MADE, so nobody is asked to approve something that could never be spent. */
+    return no('FORBIDDEN', UNBOUND_REFUSED, { at: 'binds' });
   }
 
   const id = b64url(deps.random(32));
@@ -585,6 +603,10 @@ export async function operationGrant(deps: TokenDeps, bearer: string): Promise<R
      to here at the operation doors (`OPERATION_METHOD`), so a grant approved before the instant is refused in the same
      sentence, and it is refused without being spent, as nothing that fails here is. */
   if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
+  /* AN APPROVAL TIED TO NO REQUEST, past the owner's date (`UNBOUND_REFUSED_FROM`): one started before it and spent after
+     it is refused too, unspent like every refusal here. Said in its own words, not `wrong`'s, because the bearer matched
+     and the person holding it is the one who has to update the command. */
+  if (boundBody(row.scope) === null && deps.nowMs >= UNBOUND_REFUSED_FROM) return no<OperationGrant>('FORBIDDEN', UNBOUND_REFUSED, { at: 'operation' });
 
   deps.sql.exec("UPDATE device_grant SET status = 'expired', expires = ?, last_used = ? WHERE id = ? AND status = 'active'", now, now, row.id);
   const reach = row.reach as OperationGrant['reach'];

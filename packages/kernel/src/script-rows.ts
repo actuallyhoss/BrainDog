@@ -34,7 +34,8 @@ export type ScriptRow = {
   title: string;
   version: number;
   pack: string | null;
-  runs: { every: string | null; door: string | null; rule: boolean };
+  /** `at` is the time of day its clock is pinned to, `HH:MM` in the record's zone, or `null` for a clock that repeats from its last run. */
+  runs: { every: string | null; at: string | null; door: string | null; rule: boolean };
   reads: string[];
   writes: string[];
   /** The origins it may fetch from. */
@@ -114,7 +115,7 @@ export function scriptRows(sql: Sql, nowMs: number): ScriptRow[] {
         title: typeof body.title === 'string' && body.title.trim() !== '' ? body.title : bare,
         version: d.version,
         pack: d.pack_id ?? (typeof body.pack === 'string' ? body.pack : null),
-        runs: { every, door: typeof runs.door === 'string' ? runs.door : null, rule: runs.rule === true },
+        runs: { every, at: every !== null && typeof runs.at === 'string' ? runs.at : null, door: typeof runs.door === 'string' ? runs.door : null, rule: runs.rule === true },
         reads: strings(body.reads),
         writes: strings(body.writes),
         egress: strings(body.egress),

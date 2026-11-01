@@ -114,6 +114,7 @@
         /* WHAT STARTS IT, so the head says what started the runs it counts (`reading.ts` `startedBy`). */
         runs: {
           every: typeof e.fields.every === 'string' ? e.fields.every : null,
+          at: typeof e.fields.at === 'string' ? e.fields.at : null,
           door: typeof e.fields.door === 'string' ? e.fields.door : null,
           rule: e.fields.rule === true,
         },

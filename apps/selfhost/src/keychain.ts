@@ -166,8 +166,8 @@ function steps(api: RecordApi, store: KeyStore) {
        way to put a key somewhere the grant does not reach. */
     const args =
       'principal' in by
-        ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential, sealed_under: sealedUnder }
-        : { label: body.label, opens: body.opens, kind: body.kind, sealed_under: sealedUnder };
+        ? { label: body.label, opens: body.opens, kind: body.kind, project: body.project, credential: body.credential, sealed_under: sealedUnder, everywhere: body.everywhere }
+        : { label: body.label, opens: body.opens, kind: body.kind, sealed_under: sealedUnder, everywhere: body.everywhere };
     try {
       return await api.depositGrant(args, by, hints, seal, opts);
     } finally {
