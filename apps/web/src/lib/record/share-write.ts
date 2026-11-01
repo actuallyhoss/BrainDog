@@ -26,7 +26,7 @@ import { wrote, type Wrote } from './settings-write.ts';
  * depend on. The client's calls are typed with the host's, so a drift between the two is a type error at the call.
  */
 export type ShareLink = { id: string; slug: string; expires_at: string; token: string; url: string };
-export type ShareRow = { id: string; slug: string; title: string; opened_at: string; expires_at: string; closed_at: string | null };
+export type ShareRow = { id: string; slug: string; title: string; opened_at: string; expires_at: string; closed_at: string | null; money?: boolean };
 
 export const words = {
   shareOpen: 'Share',
@@ -69,6 +69,8 @@ export const words = {
   linksClosedOn: (day: string) => `Closed ${day}`,
   /* MADE, NOT OPENED (AN21): "opened just now" read as somebody having read it. */
   linksOpened: (when: string) => `made ${when}`,
+  /* WHETHER AMOUNTS ARE ON IT, said beside each link, since two links to Money read the same otherwise. */
+  linksMoney: (on: boolean) => (on ? 'shows amounts' : 'no amounts'),
   sharedChip: 'Shared, read only',
   sharedUntil: (day: string) => `This link works until ${day}.`,
   sharedDead: 'This page is not shared.',

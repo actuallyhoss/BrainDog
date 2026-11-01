@@ -698,7 +698,10 @@ export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'
   let groups: NonNullable<Reading['groups']>;
   let why: string;
   if (cut === 'who') {
-    groups = (Object.keys(WHO_SAID) as (keyof typeof WHO_SAID)[]).map((by) => part(by, WHO_SAID[by], who[by]));
+    /* ON A RECORD MORE THAN ONE PERSON HOLDS, A PERSON'S WRITES ARE "People", not "You": a colleague read "you 395" for the
+       owner's month. The key stays `you`, so a chart keeps its places. */
+    const team = (sql.one<{ n: number }>('SELECT COUNT(DISTINCT person_id) AS n FROM member')?.n ?? 0) > 1;
+    groups = (Object.keys(WHO_SAID) as (keyof typeof WHO_SAID)[]).map((by) => part(by, by === 'you' && team ? 'People' : WHO_SAID[by], who[by]));
     why = `changes written ${span}, by who wrote them`;
   } else if (cut === 'hour') {
     groups = hours.map((n, h) => part(two(h), `${two(h)}:00`, n));

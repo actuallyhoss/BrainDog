@@ -69,7 +69,7 @@ export type ShareOpened = { id: string; slug: string; expires_at: string };
 export type ShareLink = ShareOpened & { token: string; url: string };
 
 /** `shares`: one link the record opened, open or closed, and never its token. */
-export type ShareRow = { id: string; slug: string; title: string; opened_at: string; expires_at: string; closed_at: string | null };
+export type ShareRow = { id: string; slug: string; title: string; opened_at: string; expires_at: string; closed_at: string | null; money?: boolean };
 
 /** `closeShare`: the link that no longer opens anything. */
 export type ShareClosed = { id: string; closed_at: string };

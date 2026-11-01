@@ -21,7 +21,7 @@ A BrainDog keeps at least one owner, and you cannot change your own level. Anoth
 
 ## Teams, roles and private rows
 
-On Cloud Plus, a second person can join your BrainDog. People hold one of four roles over all of it: **Viewer** reads, **Member** reads, writes rows and proposes, **Admin** also settles who is in it, and **Owner** keeps the rest. Billing for teams is not switched on yet, so the gate waits for it.
+A second person joins your BrainDog on Cloud Plus, with their own sign-in: the one they use for every BrainDog, never a second password for yours. People hold one of four roles over all of it: **Viewer** reads, **Member** reads, writes rows and proposes, **Admin** also settles who is in it, and **Owner** keeps the rest. An Admin can give others only what they can see themselves, and never changes what they hold.
 
 A row you made can be kept to yourself: choose **Private to me** in its row menu, and a lock shows on the row, its card and the board. Nobody else reads it, in a list, a figure, a search or an export. Only you can share it again.
 
@@ -29,14 +29,26 @@ A row you made can be kept to yourself: choose **Private to me** in its row menu
 
 ```steps
 Press Invite a person | Give their email address | Settings, under People & sharing
-Choose what it opens | All of your BrainDog at one level, or chosen lists, each at its own level | In the invitation
-Send the link | It works once, for 24 hours, and only for the address you sent it to | By mail
+Choose what it opens | All of your BrainDog at one level, or chosen parts: Projects, Work, Money and the rest, or a list at a time | In the invitation
+Send the link | It works once, for 24 hours, and only for the address you sent it to. Nothing is emailed for you: copy it and send it yourself | Your own mail or chat
 They accept | New to BrainDog, they prove the address from a mail, then add a passkey | On the invitation page
 ```
 
 An invitation that has not been accepted is listed with the level it gives and the day it runs out. Make a **New link** if it ran out.
 
-A colleague who holds some lists and not all of BrainDog lands on a Today that names their lists. The rest belongs to its owner, who can see everything they add.
+A colleague who holds some lists and not all of BrainDog lands on a Today that names their lists. A place they were given nothing in, such as Money, is not in their sidebar at all. The rest belongs to its owner, who can see everything they add.
+
+## What a colleague sees
+
+```comparison | What each role sees
+Role | Sees | Does not see
+Viewer | Every list, page and figure, read only | Keys, the runs of your agents, your private rows, who is invited
+Member | The same, and can add and change rows | The same
+Admin | The same, and People & sharing | Keys, your agents' runs, your private rows, and anything held from them
+Some parts | Only the lists named for them, and pages made of those lists | Everything else, its names and its counts
+```
+
+Their agents see what they see and nothing more. Every change a colleague or their agent makes is in **Activity** with their name on it, and the owner also sees there who was invited, given a level, stopped or removed, and by whom.
 
 ## Share something
 
@@ -79,11 +91,11 @@ Remove | They leave your BrainDog. What they wrote stays, with their name on it
 Erase a person | Everything one person wrote is removed, from every place it is kept, in one go. It cannot be undone
 ```
 
-The People list shows when each person last looked, or that they have not opened it yet.
+The People list shows when each person last looked, or that they have not opened it yet. Each of these changes is kept in Activity, with who made it.
 
 ## Share one page with anybody
 
-For somebody who should see one page and nothing else, press **Share** on the page and make a read-only link. Anybody with it can read that page as it is now. They cannot change anything, open any other page, or see the names of your lists. Choose how long it works: 1, 7, 30 or 90 days. Close it early in Settings, under People & sharing. The link is shown once, so copy it when it appears.
+For somebody who should see one page and nothing else, press **Share** on the page and make a read-only link. Anybody with it can read that page as it is now. They cannot change anything, open any other page, or see the names of your lists. Choose how long it works: 1, 7, 30 or 90 days. Close it early in Settings, under People & sharing, where each link says until when it works and whether it shows amounts. The link is shown once, so copy it when it appears. It shows nothing from any other page: no other project, person, list name or count.
 
 **Include money** says whether amounts, bills and money figures go on the link. Left off, they are not on it at all. It starts off on a project's page, where the bills are rarely meant for whoever holds the link, and on everywhere else.
 
@@ -99,7 +111,7 @@ An agent you connect works at a level too: read only, read and propose changes t
 
 ## Who can share
 
-Free is for one person. Colleagues come with Cloud and Cloud Plus, as many as you like at no extra cost.
+Free and Cloud are for one person. A second person joins on Cloud Plus, and you can add as many as you like at no extra cost. A self-hosted BrainDog takes as many people as you invite.
 
 ## Leaving a BrainDog, or closing your account
 

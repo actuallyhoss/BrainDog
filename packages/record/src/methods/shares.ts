@@ -73,7 +73,17 @@ const SHUT: Refusal = { code: 'PAGE_UNKNOWN', fix: 'This link does not open a pa
 export type ShareOpened = { id: string; slug: string; expires_at: string };
 
 /** One link as `shares` lists it: never its token, which only the host could make and nobody keeps. */
-export type ShareRow = { id: string; slug: string; title: string; opened_at: string; expires_at: string; closed_at: string | null };
+/** `money`: whether the link shows amounts, as it was made (`openShare`), so the owner's list can say so beside it. */
+export type ShareRow = { id: string; slug: string; title: string; opened_at: string; expires_at: string; closed_at: string | null; money: boolean };
+
+/** Whether a link's kept choice (`from_v` of its `share.open`) shows money; a link older than the choice shows none. */
+const moneyOn = (bound: string | null): boolean => {
+  try {
+    return bound !== null && (JSON.parse(bound) as { money?: unknown }).money === true;
+  } catch {
+    return false;
+  }
+};
 
 /** What `sharedPage` answers: the page one link opens, as `shownPage` builds it. */
 export type SharedPage = {
@@ -1674,6 +1684,7 @@ export function methods(deps: RecordDeps) {
           opened_at: r.opened_at,
           expires_at: r.expires_at ?? r.opened_at,
           closed_at: r.closed_at,
+          money: moneyOn(r.bound),
         })),
       );
     },

@@ -98,7 +98,7 @@
         <IconWell name="link" size="l" />
         <div class="link-text">
           <span class="link-title">{l.title}</span>
-          <span class="link-when">{stateSaid(l)} · {words.linksOpened(since(l.opened_at, now))}</span>
+          <span class="link-when">{stateSaid(l)} · {words.linksMoney(l.money === true)} · {words.linksOpened(since(l.opened_at, now))}</span>
         </div>
         {#if open}
           <Button
