@@ -43,11 +43,10 @@ export const words = {
   readAgain: 'Read again, and this is what it found.',
 
   /** The one tap that says the guessed time zone and currency are right, or changes them (1 Nov). */
-  setTitle: 'Set from this device',
+  setTitle: 'Time and money',
   setLine: (zone: string, money: string | null) => (money === null ? `Times in ${zone} time.` : `Times in ${zone} time, money in ${money}.`),
   setChange: 'Change',
   setZone: 'Time zone',
-  setMoney: 'Money',
   setDone: 'Done',
   /** A place named in the words gives a zone the device does not keep: offered, never taken without the tap. */
   setPlaced: (place: string) => `You said ${place}.`,

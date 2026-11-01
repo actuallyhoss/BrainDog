@@ -1548,7 +1548,6 @@
               </select>
             </span>
             {#if moneyAsk !== null}
-              <p class="field-label">{words.setMoney}</p>
               <Currency
                 bind:value={currencyPick}
                 {locale}
