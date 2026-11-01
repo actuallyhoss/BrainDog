@@ -146,8 +146,9 @@
     scale: -1 1;
   }
 
-  /* THE CURRENT AREA IS "HERE", DRAWN AS THE RAIL DRAWS ITS OWN: the tile's fill under the row, the glyph in the
-     working accent with no fill behind it, and the name at 600 in ink. One selection in the product, not two. */
+  /* THE CURRENT AREA IS "HERE", DRAWN AS THE RAIL DRAWS ITS OWN: the tile's fill under the row, the glyph in ink with
+     no fill behind it, and the name at 600 in ink. One selection in the product, not two. INK, NOT RED (design pass
+     1 Nov, M27): Look B keeps red for what is wrong or late, never for what is chosen, as the checkboxes went (M6). */
   .area-row[aria-current='page'] {
     background: var(--tile);
     color: var(--ink);
@@ -156,7 +157,7 @@
   /* TWO CLASSES AND THE ATTRIBUTE, so this outranks the ground's white well (`settings.css`) wherever the row is. */
   .area-row[aria-current='page'] .area-icon :global(.well.well) {
     background: transparent;
-    color: var(--red);
+    color: var(--ink);
   }
 
   .area-row[aria-current='page'] .name {
