@@ -150,6 +150,12 @@
     font-weight: 500;
   }
 
+  .viz-now-text {
+    fill: var(--ink-2);
+    font-size: var(--fs-cap);
+    font-weight: 500;
+  }
+
   /* ── arriving ──────────────────────────────────────────────────────────── */
 
   /* A CHART GROWS ONCE, WHEN IT IS FIRST DRAWN: 240ms on the arrival curve, a bar from its start, a line and a run

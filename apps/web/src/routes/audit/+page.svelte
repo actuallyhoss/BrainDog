@@ -68,6 +68,8 @@
     below,
     byWhoOf,
     burstsOf,
+    sameMinute,
+    minuteSaid,
     busyOf,
     busySaid,
     changesOf,
@@ -510,7 +512,7 @@
   let wanted = $state(30);
   /* A BURST IS ONE LINE (`burstsOf`), and a rule's quiet runs on one day are one line (`rolledRuns`), folded from
      everything that matched, so a line drawn and a line counted are the same line. */
-  const lines = $derived(rolledRuns(burstsOf(matched, listSaid)));
+  const lines = $derived(sameMinute(rolledRuns(burstsOf(matched, listSaid))));
   const told = $derived(lines.slice(0, Math.min(wanted, DOM_CAP)));
   /* ONE PRESS FOR MORE: more of what was read, then the older page under it. */
   const moreRead = $derived(told.length < lines.length && wanted < DOM_CAP);
@@ -703,7 +705,7 @@
   </Sheet>
 {/snippet}
 
-{#snippet entry(t: Told)}
+{#snippet entry(t: Told, sameTime = false)}
   {@const e = t.e}
   {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
   <!-- A RULE OR A SCRIPT THAT RAN LEADS WITH ITS TITLE ("Ran Meet payees"), and says what it is beside its face. -->
@@ -743,7 +745,8 @@
              anchor that goes nowhere. -->
         <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. `declaredOf` makes "Added domain to Projects" of the
              line's target and note, and that sentence is the whole line, so the note is not said twice. -->
-        {#if pass !== null}<span class="line-title">{pass.said}</span>
+        {#if t.fold}<span class="line-title">{minuteSaid(e.kind, kindOf(e.kind).word, t.count)}</span>
+        {:else if pass !== null}<span class="line-title">{pass.said}</span>
         {:else if declared !== null}<span class="line-title">{declared}</span>
         {:else}<span class="line-title"
             >{#if said.verb}<span class="verb">{said.verb}</span>{/if}{#if thing}{said.verb ? ' ' : ''}{#if thing.href}<a class="target tap" href={at(thing.href)}
@@ -762,7 +765,7 @@
       </span>
       <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
            its newest; no version where the record sent none (a member held to named lists is sent `0`). -->
-      <span class="line-when">
+      <span class="line-when" data-same={sameTime ? '' : undefined}>
         <time
           datetime={e.at}
           title={t.count > 1
@@ -775,7 +778,19 @@
     </div>
     <!-- WHAT ONE PASS DID, closed until asked for: each step a line of its own, as Activity draws any line, and each
          still undone on its own in the record. -->
-    {#if pass !== null}
+    {#if t.fold}
+      {@const open = passesOpen.has(t.key)}
+      <div class="fold-row">
+        <button type="button" class="fold tap" aria-expanded={open} onclick={() => togglePass(t.key)}
+          >{open ? historyWords.hideEach : historyWords.showEach(t.count)}</button
+        >
+      </div>
+      {#if open}
+        <ul class="ledger steps">
+          {#each t.fold as s (s.key)}{@render entry(s)}{/each}
+        </ul>
+      {/if}
+    {:else if pass !== null}
       {@const open = passesOpen.has(t.key)}
       <div class="fold-row">
         <button type="button" class="fold tap" aria-expanded={open} onclick={() => togglePass(t.key)}
@@ -888,7 +903,8 @@
               <div class="hour-band">
               <h3 class="hour num">{band.title}</h3>
               <ul class="ledger">
-                {#each band.lines as t (t.key)}{@render entry(t)}{/each}
+                <!-- A MINUTE'S LINES UNDER ONE TIME (G28): the minute is said on its first line, not on every line of it. -->
+                {#each band.lines as t, i (t.key)}{@render entry(t, i > 0 && clockOf(band.lines[i - 1]!.e.at) === clockOf(t.e.at))}{/each}
               </ul>
               </div>
             {/each}
@@ -1174,6 +1190,17 @@
   .act {
     grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
     gap: var(--sp-3);
+  }
+
+  /* A LIST ROW'S HEIGHT, 44 (G28): the log's rows were 53 tall, two lines in the 56 of a tall row with its padding. */
+  .act.line-tall {
+    min-block-size: var(--tap);
+    padding-block: var(--sp-1);
+  }
+
+  /* THE SAME MINUTE AS THE LINE ABOVE IS NOT SAID AGAIN (G28). */
+  .act .line-when[data-same] time {
+    visibility: hidden;
   }
 
   .act .line-main {

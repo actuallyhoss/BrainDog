@@ -70,8 +70,8 @@
 
     {#if g.now}
       <line class="viz-now" x1={g.now.x} y1="16" x2={g.now.x} y2={g.axisY} />
-      <rect class="viz-pill" x={g.now.pillX} y="0" width={g.now.pillW} height="16" rx="8" />
-      <text class="viz-pill-text" x={g.now.pillX + g.now.pillW / 2} y="12" text-anchor="middle">{g.now.text}</text>
+      <!-- A PLAIN LABEL OVER THE NOW LINE (G29): it was a green pill, and Look B draws no pills. -->
+      <text class="viz-now-text" x={g.now.pillX + g.now.pillW / 2} y="12" text-anchor="middle">{g.now.text}</text>
     {/if}
   </svg>
 </div>

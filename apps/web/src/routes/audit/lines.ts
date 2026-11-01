@@ -107,6 +107,9 @@ export const historyWords = {
   /* ONE PASS OF BRAINDOG'S OWN UPDATE, said as one line that opens to what it did (`passOf`). */
   showSteps: (n: number): string => (n === 1 ? 'Show what it did' : `Show the ${count(n)} things it did`),
   hideSteps: 'Hide what it did',
+  /* A MINUTE'S RUN, FOLDED (G28). */
+  showEach: (n: number): string => `Show all ${count(n)}`,
+  hideEach: 'Hide them',
 } as const;
 
 /* ── the record's own bookkeeping ──────────────────────────────────────── */
@@ -568,7 +571,45 @@ export type Told = {
   note: string;
   /** The oldest line's stamp, which is the burst's start; the event's own for a line on its own. */
   from: string;
+  /** A minute's lines of one kind by one doer, folded into this one (`sameMinute`), each still a line under it. */
+  fold?: Told[];
 };
+
+/**
+ * ONE LINE FOR A MINUTE'S RUN OF ONE KIND BY ONE DOER (G28): ten "Gave access" lines in the minute a person connected
+ * ten machines and keys read as one, "Gave access to 10 machines and keys", which opens in place. `burstsOf` folds a
+ * run over the rows of one list; this folds what has no list (an access, a key) and lines a list burst left single.
+ * Never a rule's or a script's run (`rolledRuns` says those), nor a pass of BrainDog's own update.
+ */
+export const MINUTE_MIN = 3;
+export function sameMinute(told: readonly Told[]): Told[] {
+  const out: Told[] = [];
+  const alone = (t: Told): boolean => t.count === 1 && t.fold === undefined && ranOf(t.e) === null && (t.e as Passed).pass === undefined;
+  const minute = (at: string): string => at.slice(0, 16);
+  for (let i = 0; i < told.length; ) {
+    const first = told[i]!;
+    let j = i;
+    if (alone(first))
+      while (j + 1 < told.length && alone(told[j + 1]!) && told[j + 1]!.e.by === first.e.by && told[j + 1]!.e.kind === first.e.kind && minute(told[j + 1]!.e.at) === minute(first.e.at)) j++;
+    if (j + 1 - i < MINUTE_MIN) {
+      out.push(first);
+      i++;
+      continue;
+    }
+    const run = told.slice(i, j + 1);
+    out.push({ ...first, key: `${first.key}~minute`, count: run.length, many: null, note: '', from: run.at(-1)!.e.at, fold: run });
+    i = j + 1;
+  }
+  return out;
+}
+
+/** A minute's folded run as its one line says it. */
+export function minuteSaid(kind: string, word: string, n: number): string {
+  if (kind === 'access.grant') return `Gave access to ${count(n)} machines and keys`;
+  if (kind === 'access.revoke') return `Took access from ${count(n)} machines and keys`;
+  if (kind === 'create') return `Created ${historyWords.rows(n)}`;
+  return `${word}, ${historyWords.times(n)}`;
+}
 
 const joins = (prev: AuditEvent, next: AuditEvent, first: AuditEvent, list: string): boolean =>
   next.by === first.by &&
