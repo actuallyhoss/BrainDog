@@ -1886,6 +1886,37 @@ const originOf = (base: string): string => {
   }
 };
 
+/**
+ * Whether a refusal is answered by signing in again here and now: the record's stale-proof refusals (`at: 'proof'`,
+ * "Sign in again to ...") and the Share sheet's inline confirm (`at: 'confirm'`). NOT a token, a press in a chat or an
+ * order refused `NEEDS_BROWSER_SESSION` at `principal`: no sign-in changes those, so nothing is asked for them.
+ */
+export const wantsProof = (refusal: { code: string; at?: string | undefined } | null | undefined): boolean =>
+  refusal != null && refusal.code === 'NEEDS_BROWSER_SESSION' && (refusal.at === 'proof' || refusal.at === 'confirm');
+
+/**
+ * What the app does when a call is refused for a sign-in that is not recent enough (`wantsProof`): asks for the proof in
+ * place, and answers `proved` once the session is fresh, when the same call is sent once more. Not proved, `fix` (when
+ * given) replaces the refusal's sentence, so the screen that made the call says the app's plain line and no dead end.
+ * `writes` tells a press (a write, or a host door) from a read a screen made by itself.
+ */
+export type StepUp = (refusal: Refusal, asked: { method: string; writes: boolean }) => Promise<{ proved: true } | { proved: false; fix?: string }>;
+
+let STEP_UP: StepUp | null = null;
+
+/** Put the app's step-up in (`StepUp`), or take it away with `null`. One for the tab, whichever client sent the call. */
+export function onStepUp(fn: StepUp | null): void {
+  STEP_UP = fn;
+}
+
+/** `out`, or, refused for a stale proof and proved again in place (`STEP_UP`), the same call sent once more. */
+async function provedAgain<T>(out: Result<T>, again: () => Promise<Result<T>>, method: string, writes: boolean): Promise<Result<T>> {
+  if (out.ok || !('refusal' in out) || !wantsProof(out.refusal) || STEP_UP === null) return out;
+  const said = await STEP_UP(out.refusal, { method, writes }).catch(() => ({ proved: false as const }));
+  if (said.proved) return again();
+  return 'fix' in said && said.fix !== undefined ? { ok: false, refusal: { ...out.refusal, fix: said.fix } } : out;
+}
+
 export function createClient(options: ClientOptions) {
   const doFetch = options.fetch ?? globalThis.fetch;
   const base = options.base.replace(/\/+$/, '');
@@ -2083,6 +2114,16 @@ export function createClient(options: ClientOptions) {
     name: string,
     args: Record<string, unknown> = {},
     how: { outlive?: boolean; wave?: boolean; bare?: boolean } = {},
+  ): Promise<Result<T>> {
+    /* A STALE SIGN-IN IS PROVED AGAIN IN PLACE AND THE SAME CALL SENT ONCE MORE (`provedAgain`), for every screen alike. */
+    const out = await callOnce<T>(name, args, how);
+    return provedAgain(out, () => callOnce<T>(name, args, how), name, WRITES.has(name) && !POST_READS.has(name));
+  }
+
+  async function callOnce<T>(
+    name: string,
+    args: Record<string, unknown>,
+    how: { outlive?: boolean; wave?: boolean; bare?: boolean },
   ): Promise<Result<T>> {
     if (!NAMES.has(name))
       return {
@@ -2318,6 +2359,16 @@ export function createClient(options: ClientOptions) {
     args: Record<string, unknown>,
     how: { busy?: () => void } = {},
   ): Promise<Result<T>> {
+    /* THE KEY DOORS ANSWER THE KEYCHAIN'S STALE PROOF TOO, and a key typed in is sent again once it is proved. */
+    const out = await hostDoorOnce<T>(path, args, how);
+    return provedAgain(out, () => hostDoorOnce<T>(path, args, how), path, true);
+  }
+
+  async function hostDoorOnce<T>(
+    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern' | 'slash/setup' | 'slash/mapping' | 'slash/act',
+    args: Record<string, unknown>,
+    how: { busy?: () => void },
+  ): Promise<Result<T>> {
     OUT.clear();
     const ask = () =>
       doFetch(`${base}/api/${path}`, {
@@ -2349,6 +2400,11 @@ export function createClient(options: ClientOptions) {
    * origin's root whatever record `base` names, with the browser's cookie and never a bearer, as `hostDoor`'s rule.
    */
   async function accountDoor<T>(path: 'email' | 'email/confirm', args: Record<string, unknown>): Promise<Result<T>> {
+    const once = () => accountDoorOnce<T>(path, args);
+    return provedAgain(await once(), once, `account/${path}`, true);
+  }
+
+  async function accountDoorOnce<T>(path: 'email' | 'email/confirm', args: Record<string, unknown>): Promise<Result<T>> {
     return hostAnswer<T>(() =>
       doFetch(new URL(`/account/${path}`, base).toString(), {
         method: 'POST',
