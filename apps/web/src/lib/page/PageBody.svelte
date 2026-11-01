@@ -1352,6 +1352,7 @@
     {now}
     {level}
     fold={mode === 'home' && !unfolded}
+    long={mode === 'page'}
     compact={compactAt(slot.i, block.kind)}
     rows={mode === 'home' || (mode === 'page' && host) ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
     verbs={verbsFor(slot.i)}

@@ -30,3 +30,28 @@ export const linesOf = (height: number, line: number): number => (height > 0 && 
 
 /** The words of the fold's one button, which says what a press does. */
 export const foldWords = { open: 'Read all', shut: 'Show less' } as const;
+
+/* ── a long list on a page ─────────────────────────────────────────────────── */
+
+/**
+ * A LONG LIST ON A PAGE AT ITS OWN ADDRESS SHOWS ITS FIRST THIRTY ROWS, and "Show 30 more" adds the next thirty where they
+ * belong (UI pass, 1 Nov). Money's Ledger drew all 142 lines of three months at once, 12,400px at 1512, and a person
+ * reading this month's spending scrolled past last summer to reach the filing-rules line under it. Thirty is two screens
+ * of a ledger at a desk; a press is cheaper than that scroll, and the filters and the search narrow it first.
+ *
+ * NOT FOR A FEW: a list folds only when more than five rows would go under the fold, so "3 more" never stands under thirty.
+ */
+export const LONG_AT = 30;
+
+/** The rows each press of "Show more" adds. */
+export const LONG_STEP = 30;
+
+/** The kinds that are a list of rows. A figure, a chart or a board is one picture and never cut. */
+const LISTS: ReadonlySet<string> = new Set(['timeline', 'feed', 'table', 'list', 'todo']);
+
+/** How many of `count` rows a long list draws when `shown` are open, and how many wait under it; `null` where none do. */
+export const longFoldOf = (kind: string, count: number, shown: number): { shown: number; more: number } | null =>
+  LISTS.has(kind) && count > shown + 5 ? { shown, more: count - shown } : null;
+
+/** The fold's button: the next thirty, or the last few by their number. */
+export const longWords = (more: number): string => (more > LONG_STEP ? `Show ${LONG_STEP} more` : `Show the last ${more}`);

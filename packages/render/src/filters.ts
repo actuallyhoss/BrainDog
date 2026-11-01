@@ -14,6 +14,8 @@
  * THE ORDER IS THE RECORD'S, as a queue's is: the kernel sends the values most-used first, and this never re-sorts.
  */
 
+import { plainName } from './widgets.ts';
+
 /** One value a field holds: what is matched, what it is called, and how many open things hold it. */
 export type FilterValue = { value: string; label: string; count?: number | undefined; hue?: number | undefined };
 
@@ -58,7 +60,9 @@ export function filtersPlan(filters: readonly Filter[], chosen: Readonly<Record<
     const picked = Object.hasOwn(chosen, f.field) ? chosen[f.field] : undefined;
     const values: FilterChoice[] = f.values.map((v) => ({
       value: v.value,
-      label: v.label || v.value,
+      /* SAID AS A NAME, NOT AS THE BANK SHOUTED IT (UI pass, 1 Nov): Payees' strip read "BLUE BOTTLE COFFEE 20" and
+         "SHELL 0442 8" beside rows that said "Blue Bottle Coffee"; the value matched is untouched. */
+      label: plainName(v.label || v.value) ?? v.value,
       count: typeof v.count === 'number' && Number.isFinite(v.count) ? v.count : null,
       on: v.value === picked,
       hue: typeof v.hue === 'number' && Number.isInteger(v.hue) && v.hue >= 0 && v.hue < 360 ? v.hue : null,

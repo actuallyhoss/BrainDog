@@ -65,6 +65,11 @@ class Held {
   /** Whether `pack` is one whose pages are Money's; false until the record has said, which draws the plain look. */
   moneyPack(pack: string): boolean {
     if (pack === '') return false;
+    /* MONEY'S OWN ADD-ON IS MONEY'S, SAID AND NOT READ (UI pass, 1 Nov): the read below lists each page by its address
+       and title and no add-on, so it never named one, and an account's page, a bill's, a plan's and a book's drew in
+       the plain look: no cards as wells, no amounts in green, Share alone on a row. An add-on of another name still
+       waits on the read. */
+    if (pack === 'money-core') return true;
     const base = typeof location === 'undefined' ? null : apiBase();
     if (base !== null && this.#packsAsked !== base) {
       this.#packsAsked = base;
