@@ -1808,6 +1808,14 @@
     overscroll-behavior: contain;
   }
 
+  /* A PHONE ON ITS SIDE HAS ITS NOTCH AT ONE END: the work steps in by the notch's inset there, and by nothing in
+     portrait, where both insets are 0. The tab bar pays its own. */
+  @media (width < 900px) {
+    .body {
+      padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+    }
+  }
+
   /* THE ROOM THE SEARCH BUTTON IN THE BOTTOM CORNER NEEDS, and only on the shape that draws it: a floating button over
      the last row of a list hides exactly the thing a long list is scrolled to the bottom to see. Every other shape
      ends where the page's own foot does (48px under its last tile), not 68px further down (Today polish, 21 Oct). */
