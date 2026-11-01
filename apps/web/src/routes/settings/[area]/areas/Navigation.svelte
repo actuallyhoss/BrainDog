@@ -33,6 +33,8 @@
   import StateRow from './StateRow.svelte';
   import { widgetHeld } from '$lib/board/widget-held.svelte.ts';
   import Pages from './Pages.svelte';
+  import { page } from '$app/state';
+  import { untrack } from 'svelte';
 
   let { shell, area }: AreaProps = $props();
 
@@ -40,7 +42,17 @@
      order of the pages, which says what a press does in the person's own page names. */
   const words = {
     offers: 'Suggestions',
+    waiting: (n: number) => (n === 1 ? 'One suggestion waits' : `${n} suggestions wait`),
+    waitingWhy: 'Pages and widgets BrainDog thinks you would use',
+    show: 'Show',
   };
+
+  /* THE PEN WAITS BEHIND ITS COUNT (G10): its rows are a different job from the order of the sidebar above it, so the
+     tile says how many wait and opens them on a press; the sidebar's "Review" link (`#suggestions`) opens them at once. */
+  let penOpen = $state(false);
+  $effect(() => {
+    if (page.url.hash === '#suggestions') untrack(() => (penOpen = true));
+  });
 
   /** A refusal is the record's own sentence, and a change it kept is said only once it kept it. */
   const said = (saved: Saved, done?: string) => {
@@ -172,10 +184,7 @@
   }
 </script>
 
-<!-- WHAT THE APP OPENS ON, first: Pages folded in here (agents F14). -->
-<Pages {shell} {area} part="opens" />
-
-<!-- THE PAGES IN THE NAV, their order and Hide, then every page not in it with the way back (Pages folded in here). -->
+<!-- THE PAGES IN THE NAV, their order and Hide, with what the app opens on in that tile's heading row (G9), then every page not in it with the way back (Pages folded in here). -->
 <Pages {shell} {area} part="nav" />
 <Pages {shell} {area} part="others" />
 
@@ -217,7 +226,13 @@
     <Empty kind="cleared" title={copy.suggestOff} body={copy.suggestOffWhy} />
   {:else}
     <!-- ONE LINE, NOT THREE: the pen's long paragraph said what the three buttons already say. -->
-    {#if offers.length > 0}<p class="hint">Nothing changes until you keep one.</p>{/if}
+    {#if offers.length > 0 && !penOpen}
+      <button type="button" class="pen-fold" aria-expanded="false" onclick={() => (penOpen = true)}>
+        <IconWell name="inbox" size="l" />
+        <span class="pen-fold-words"><span class="pen-fold-title">{words.waiting(offers.length)}</span><span class="pen-fold-line">{words.waitingWhy}</span></span>
+        <span class="pen-fold-go" aria-hidden="true">{words.show}<Icon name="chevron" size="s" /></span>
+      </button>
+    {:else if offers.length > 0}<p class="hint">Nothing changes until you keep one.</p>{/if}
     {#if kept.length > 0}
       <ul class="ledger ledger-lead pen">
         {#each kept as row (row.item.id)}
@@ -239,7 +254,7 @@
     {/if}
     {#if offers.length === 0}
       <Empty kind="cleared" title={voiceSaid('pen_nothing')} body={voiceSaid('pen_waits')} />
-    {:else}
+    {:else if penOpen}
       <ul class="ledger ledger-lead pen">
         {#each offers as o (idOf(o))}
           <li class="pen-row" data-pen={idOf(o)}>
@@ -310,6 +325,66 @@
 <style>
   /* THE FRAME OF A CHOICE SHOWN AS PICTURES (`.pictures`) IS `settings.css`'s, which every area shares; the drawing
      inside it is this file's. */
+  /* THE PEN'S ONE ROW WHILE IT IS SHUT: its count, what it holds, and Show. */
+  .pen-fold {
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    inline-size: calc(100% + 2 * var(--sp-2));
+    min-block-size: var(--row-h-2);
+    margin-inline: calc(-1 * var(--sp-2));
+    padding: var(--sp-2);
+    background: none;
+    border: 0;
+    border-block-start: 1px solid var(--rule);
+    border-radius: var(--r-ctl);
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pen-fold:hover {
+      background: var(--hover);
+    }
+  }
+
+  .pen-fold:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+
+  .pen-fold-words {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .pen-fold-title {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .pen-fold-line {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .pen-fold-go {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+  }
+
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: 75ch;

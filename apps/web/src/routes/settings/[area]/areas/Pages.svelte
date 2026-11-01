@@ -492,8 +492,8 @@
         {:else if p.inNav && !p.app}
           <!-- MOVE AND HIDE ARE ALWAYS DRAWN (agents F18), 32px, 44 under a thumb; below 640px they live in the menu. -->
           <span class="moves" data-moves="">
-            <button type="button" class="step" aria-label={words.up(title)} disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}><Icon name="arrow-up" size="s" /></button>
-            <button type="button" class="step" aria-label={words.down(title)} disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}><Icon name="arrow-down" size="s" /></button>
+            <button type="button" class="step tap" aria-label={words.up(title)} disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}><Icon name="arrow-up" size="s" /></button>
+            <button type="button" class="step tap" aria-label={words.down(title)} disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}><Icon name="arrow-down" size="s" /></button>
             <Button size="sm" weight="bare" aria-label={words.hideOne(title)} onclick={() => toggleHidden(p, title)}>{words.hideWord}</Button>
           </span>
         {:else}
@@ -538,8 +538,18 @@
   {/if}
 {/snippet}
 
-{#if drawn('opens')}
-  <!-- WHAT THE APP OPENS ON: one row and one select, at the top of Navigation. -->
+<!-- WHAT THE APP OPENS ON, one select: the sidebar tile's action (G9), where it was a whole tile for itself. -->
+{#snippet opensAction()}
+  <span class="opens-inline">
+    <label class="opens-label" for="home-select">{words.opensOn}</label>
+    <select id="home-select" class="home-select" value={homeNow} onchange={(e) => pickHome(e.currentTarget.value)}>
+      {#each homes as h (h.href)}<option value={h.href}>{h.name}</option>{/each}
+    </select>
+  </span>
+{/snippet}
+
+{#if part === 'opens'}
+  <!-- WHAT THE APP OPENS ON on its own, for a caller that draws it apart from the sidebar's list. -->
   <Tile>
     <div class="opens">
       <IconWell name="home" />
@@ -552,7 +562,7 @@
 {/if}
 
 {#if drawn('nav')}
-  <Tile icon="rows" title={words.inNav}>
+  <Tile icon="rows" title={words.inNav} actions={opensAction}>
     <p class="hint">{words.inNavHint}</p>
     {#if navShown.length === 0}
       <Empty kind="cleared" title={words.none} body={words.noneWhy} />
@@ -751,6 +761,27 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
+  }
+
+  /* IN THE HEADING ROW: "Opens on" in the meta ink, then the select, a control's height. */
+  .opens-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .opens-inline .opens-label {
+    flex: none;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+  }
+
+  .opens-inline .home-select {
+    background: var(--tile-2);
+    border: 0;
+    border-radius: var(--r-ctl);
   }
 
   .page-row[data-hidden] .page-link {
