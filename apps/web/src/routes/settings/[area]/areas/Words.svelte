@@ -76,7 +76,9 @@
        rail's "Your things" keeps out of everywhere else. */
     lists: 'Your lists',
     listsHint: 'Clear a name to put the original back.',
-    money: 'Time and money',
+    /* NOT THE PAGE'S NAME AGAIN (G13): the bar already says Time and money. */
+    money: 'Currency and time zone',
+    allLists: (n: number) => `Show all ${n}`,
     currency: 'Home currency',
     currencyWhy: 'Other currencies add up in this one, at the day’s rate.',
     noMoney: 'Turn on Money in Add-ons first.',
@@ -263,6 +265,8 @@
   /** The lists whose singular was typed by hand, so renaming the list no longer offers one. */
   let oneTyped = $state<Record<string, true>>({});
   let unfolded = $state(false);
+  /* ON A PHONE THE LISTS FOLD AFTER EIGHT (G12): twenty-three names were 840px of one column. */
+  let listsAll = $state(false);
   const pending = $derived(changesOf(all, typed));
   const dirty = $derived(Object.keys(pending).length > 0);
 
@@ -542,11 +546,14 @@
        would let them be renamed. The area is never one row. -->
   {#if !(spoken && voice && all.length > 0) && shell.index.registers.length > 0}
     <Tile icon="rows" title={words.lists} count={shell.index.registers.length}>
-      <ul class="list-lines">
+      <ul class="list-lines" data-all={listsAll ? '' : undefined}>
         {#each shell.index.registers as r (r.id)}
           <li><Icon name={r.icon} size="s" /><span dir="auto">{r.name}</span></li>
         {/each}
       </ul>
+      {#if shell.index.registers.length > 8 && !listsAll}
+        <button type="button" class="lists-more tap" onclick={() => (listsAll = true)}>{words.allLists(shell.index.registers.length)}</button>
+      {/if}
       <p class="hint">{words.renameWith} <a class="link tap" href={at('/addons')}>{words.browse}</a></p>
     </Tile>
   {/if}
@@ -707,6 +714,29 @@
   .list-lines li > :global(.icon) {
     flex: none;
     color: var(--ink-2);
+  }
+
+  .lists-more {
+    display: none;
+  }
+
+  @media (width < 640px) {
+    .list-lines:not([data-all]) li:nth-child(n + 9) {
+      display: none;
+    }
+
+    .lists-more {
+      display: inline-flex;
+      margin: 0 0 var(--sp-3);
+      padding: 0;
+      background: none;
+      border: 0;
+      color: var(--ink-2);
+      font: inherit;
+      font-size: var(--fs-meta);
+      font-weight: var(--fw-medium);
+      cursor: pointer;
+    }
   }
 
   .list-lines li > span {

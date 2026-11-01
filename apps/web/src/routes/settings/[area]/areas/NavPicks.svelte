@@ -10,7 +10,6 @@
   the phone; the shell redraws from the same field the moment it is set.
 -->
 <script lang="ts">
-  import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { arrange, flatNav, listCounts, tabsOf, workOf } from '$lib/nav.ts';
   import { railOf } from '$lib/nav/rail.ts';
@@ -32,8 +31,6 @@
     phoneLine: (most: number) => `Today, then up to ${most} more`,
     usual: 'Back to the usual',
     full: (most: number) => `Only ${most} besides Today. Take one off first.`,
-    words: 'Words',
-    wordsLine: 'List names, currency',
   };
 
   /* TODAY, THEN THREE: the shell draws `tabsOf(places, 4, tabs)`, Today and three more, then Menu. */
@@ -105,13 +102,7 @@
   </div>
 {/if}
 
-<a class="choice words-row" href={at('/settings/words')}>
-  <span class="words-text">
-    <span class="choice-name">{words.words}</span>
-    <span class="choice-line">{words.wordsLine}</span>
-  </span>
-  <Icon name="chevron" size="s" />
-</a>
+<!-- NO "WORDS" ROW HERE (G8): it opened Time and money, which the Settings index already lists. -->
 
 <style>
   /* THE TRACK HUGS ITS TWO OPTIONS, as the scheme and density beside it do; on a phone `full` takes the row. */
@@ -182,15 +173,4 @@
     cursor: pointer;
   }
 
-  .words-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .words-text {
-    display: grid;
-    gap: var(--sp-1);
-  }
 </style>
