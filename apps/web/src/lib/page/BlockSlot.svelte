@@ -58,9 +58,6 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Figure from '$lib/ui/Figure.svelte';
-  import Actions from './panels/Actions.svelte';
-  import ActionRows from './panels/ActionRows.svelte';
-  import Reporting from './panels/Reporting.svelte';
   import { PANEL_WHO, panelOf } from './panels/panel-of.ts';
   import { openInPlace, type Opening } from './group-open.ts';
   import type { Writes } from './page-writes.ts';
@@ -895,7 +892,8 @@
 {:else if block.cannot}
   <p class="block-cannot">{block.cannot}</p>
 {:else if block.actions?.length && !block.refusals.length}
-  <ActionRows rows={block.actions} {now} />
+  <!-- BY `import()`: only a project's page lends a section its actions, and `readHeld` (`panels.ts`) fetches this with them. -->
+  {#await import('./panels/ActionRows.svelte') then { default: ActionRows }}<ActionRows rows={block.actions} {now} />{/await}
 {:else if block.kind === KPIS_KIND && !block.refusals.length && (kpis.length > 0 || (writes !== null && param !== undefined && (block as { for?: unknown }).for === 'project'))}
   <!-- THE KEY NUMBERS ARE DRAWN FROM THE BLOCK'S `kpis`, not from rows (`kpis-in.ts`), and pressed to change one
        (`lib/kpis/KpisBlock.svelte`): Today's few as rows, a project's own as its tiles. A reader who may not write is
@@ -1073,11 +1071,12 @@
   {#await import('./panels/Seen.svelte') then { default: Seen }}<Seen register={param.register} seq={param.seq} {now} ondrew={(d) => (seenDrew = d)} />{/await}{#if seenDrew === false}<span data-seen-none hidden></span>{/if}
 {:else if (panel === 'actions' || panel === 'reporting' || panel === 'run') && param && writes && !arranging}
   <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row. -->
-  {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
+  <!-- LOADED BY `import()` AS SEEN AND JOB ARE: both are a row's page's and never Today's, which draws no row. -->
+  {#if panel === 'actions'}{#await import('./panels/Actions.svelte') then { default: Actions }}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />{/await}
   {:else if panel === 'run'}
     <!-- A RUN'S PAGE, drawn for one row of the list of runs: what it did and its way back, by its handle (`S42`). -->
     {#if param.register === 'session'}{#await import('./panels/RunPanel.svelte') then { default: RunPanel }}<RunPanel run={`S${param.seq}`} title={param.title} onchanged={writes.reread} />{/await}{/if}
-  {:else}<Reporting register={param.register} seq={param.seq} title={param.title} />{/if}
+  {:else}{#await import('./panels/Reporting.svelte') then { default: Reporting }}<Reporting register={param.register} seq={param.seq} title={param.title} />{/await}{/if}
 {:else if panel === 'job' && param && writes && !arranging}
   <!-- THE JOBS FOR THIS ROW AND A WAY TO START ONE (`panel: job`), a row panel, so the hosted branch never draws it. -->
   {#await import('./panels/Job.svelte') then { default: Job }}<Job project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />{/await}

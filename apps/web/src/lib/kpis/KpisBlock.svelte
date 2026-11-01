@@ -40,7 +40,6 @@
   import { homeCurrency } from '$lib/record/api.ts';
   import { spokenOf } from '$lib/record/row-href.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
-  import { control } from '$lib/record/instruct.ts';
   import { may } from '$lib/record/may.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
   import { rowWriter, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
@@ -246,7 +245,8 @@
     if (f.kind === 'add') return void openReading(k);
     busy = true;
     try {
-      const io = control(apiBase());
+      /* THE AGENTS' DOOR ON THE PRESS (`instruct.ts`), so a drawn tile does not carry it. */
+      const io = (await import('$lib/record/instruct.ts')).control(apiBase());
       const out = await io.send(f.args);
       if (!out.ok) return void toasts.push(out.fix, { intent: 'bad' });
       const id = out.value.id;
