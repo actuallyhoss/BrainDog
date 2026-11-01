@@ -930,7 +930,7 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   figure counts changes on a record more than one person holds.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  core: '1.2.1',
+  core: '1.3.0',
   portfolio: '1.30.2',
   people: '4.2.2',
   'money-core': '3.33.0',

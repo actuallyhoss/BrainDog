@@ -104,10 +104,10 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
       /* RED FIRST, since that is what the page is opened for, then what is alive, then what has not been read. */
       group('red', 'Needs a look', 'octagon-alert'),
       group('green', 'All good', 'circle-check'),
-      /* EVERY CHECK NOT RUN YET IS DRAWN, NONE BEHIND "Show all" (finish F54): "14 checks have not run yet." stood over
-         this group's "Show all 10", since the checks nothing was filed for are one card naming them all. Drawn whole, the
-         cards and their names add up to the sentence's count, and no second number is said. */
-      group('none', 'Not checked yet', 'circle-dashed', 24),
+      /* FOLDED AT SIX AS ALL GOOD IS, SINCE core 1.3.0 (the lists review, L39): it drew every card (finish F54) so they
+         added up to a count over them, and that count went (AG25); nine open cards beside All good's six read as the
+         page's main business. "Show all 9" says how many. */
+      group('none', 'Not checked yet', 'circle-dashed'),
       /* HOW LONG IT HAS HELD, from `green-days`: days running, to yesterday, with every watched sign green (the seven-day
          hold's count, `hold.ts`). NOT "NOTHING WAS RED": the hold watches ten of the signs, and a day an automation sign
          read red still counts, so "nothing has been red" was said of days with a red sign on this page. Drawn only

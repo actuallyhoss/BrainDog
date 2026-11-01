@@ -2782,6 +2782,16 @@ const DECLARED: Record<string, Version> = {
       'Before 1.2.1 shipped, `page.health` drops its two "checks have not run yet" lines and the signs read in plain words; no id added or taken away -> b4b0857fc5935c85',
     ],
   },
+  /** A VERSION AND NOT A RESET: core's last version is on `origin/master`. */
+  'core@1.3.0': {
+    holds: `
+      page.activity page.calendar page.health page.scripts
+    `,
+    declares: 'e5b0342f1bc58072',
+    history: [
+      'Core 1.3.0 of 1 November (lists review, L39): `page.health` folds its Not checked yet group at six where it drew every card; no id added or taken away -> e5b0342f1bc58072',
+    ],
+  },
 
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
