@@ -510,7 +510,7 @@
   const kpis = $derived(block.kind === KPIS_KIND ? kpisIn(block as { kpis?: unknown }) : []);
   const glyph = $derived(headIcon(block.kind, block.icon, isGlyph));
   /* A BLOCK MAY SAY A HEAD COUNT OF ITS OWN (`counted`): Today's Needs you counts an agent's question with its rows. */
-  const count = $derived(headCount({ kind: block.kind, total: (block as { counted?: number }).counted ?? block.total, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }));
+  const counted = $derived((block as { counted?: number }).counted ?? block.total);
 
   /* HOME'S OWN LIST, where Home drew the block as one (`home/home-rows.ts`): what is late as one list, what comes up by
      day. THE HEADING'S WELL IS NEUTRAL on every tile: a heading names a group, and a group is not late or good;
@@ -715,6 +715,12 @@
       return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: c.told ? (c.worked ?? null) : (said?.worked ?? null), last: c.told ? (c.last ?? null) : (lasts.get(c.seq) ?? null), moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
   });
+  /* AND PROJECT CARDS ON A BOARD, which wear the tile's heading there: a one-row frame shows one card, and the count says
+     how many it holds. */
+  const count = $derived(
+    headCount({ kind: block.kind, total: counted, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }) ??
+      (widget !== null && projectCards && Number.isInteger(counted) && counted > 0 ? counted : null),
+  );
   /* THE PROJECTS PAGE'S BOARD (`ProjectsBoard.svelte`): a cards block over the projects list keyed `board` is drawn as
      the one board, its headline, its money, its week, its list and its parked, in place of a grid of cards. */
   const board = $derived(block.key === 'board' && projectCards !== null && !arranging ? (block.register ?? null) : null);
