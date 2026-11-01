@@ -826,7 +826,7 @@
     {#snippet actions()}
       {#if acts && !locked}
         <label class="vh" for="lock-after">{accessWords.lockAfter}</label>
-        <div class="field sort-field">
+        <div class="field lock-field">
           <select class="field-input" id="lock-after" value={String(lockAfter)} onchange={(e) => void chooseLockAfter(e)}>
             {#each LOCK_AFTER_MINUTES as m (m)}<option value={String(m)}>{accessWords.lockAfter} {accessWords.minutes(m)}</option>{/each}
           </select>
@@ -1028,6 +1028,7 @@
       {:else if from !== 'reading' && holding.length === 0}
         <!-- A PART OF THE SCREEN, NOT ITS ANSWER (audit 2, B18): no machine yet beside six keys settled Keys as "empty". -->
         <Empty kind="no-data-yet" title={words.noMachines} compact />
+        <p class="said">{words.noMachinesHow}</p>
       {/if}
       <ul class="ledger ledger-lead whos">
         {#each holding as d (d.handle)}
@@ -1239,13 +1240,41 @@
     margin-block-end: 0;
   }
 
-  /* A FOLDED PROJECT IS A LINE A THUMB OPENS: its name and how many keys, the whole line the target. */
+  /* A FOLDED PROJECT IS A LINE A THUMB OPENS: its name and how many keys, the whole line the target. Its chevron says
+     it opens (a flex summary loses the browser's own marker), pointing on while folded and down once open. */
   summary.group-head {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--tap);
+    list-style: none;
     cursor: pointer;
+  }
+
+  summary.group-head::-webkit-details-marker {
+    display: none;
+  }
+
+  summary.group-head::after {
+    content: '';
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    margin-inline: var(--sp-1) var(--sp-1);
+    border: solid var(--ink-3);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(-45deg);
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  details.key-group[open] > summary.group-head::after {
+    transform: rotate(45deg);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    summary.group-head:hover::after {
+      border-color: var(--ink);
+    }
   }
 
   .group-count {
@@ -1267,6 +1296,29 @@
 
   .sort-field {
     flex: 0 1 12rem;
+  }
+
+  /* THE HEADING'S LOCK CHOICE IS A CONTROL, NOT A FIELD: as tall as Lock now beside it and as wide as its words, so the
+     heading holds its three controls on one line on a desk. */
+  .lock-field {
+    flex: none;
+    min-block-size: var(--ctl-h);
+  }
+
+  .lock-field .field-input {
+    min-block-size: var(--ctl-h);
+    font-size: var(--fs-ctl);
+  }
+
+  /* ON A PHONE THE FINDER AND ITS ORDER SHARE ONE LINE: the order no longer wraps under the box at half its width. */
+  @media (width < 640px) {
+    .find {
+      flex-wrap: nowrap;
+    }
+
+    .find .sort-field {
+      flex: 0 0 8.5rem;
+    }
   }
 
   .find-input {

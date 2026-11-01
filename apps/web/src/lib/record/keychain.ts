@@ -52,7 +52,9 @@ export const words = {
   /* THE COMMAND AN AGENT ADDS ONE WITH, said on its own line with Copy, never mid-sentence. */
   noKeysAgent: 'Or have an agent add one:',
   noKeysCommand: 'braindog keys put <name>',
-  noMachines: 'None yet',
+  noMachines: 'No machine opens keys yet',
+  /* HOW ONE GETS HERE, so the empty part says what will be in it and how (Look B: never "None yet" alone). */
+  noMachinesHow: 'A machine asks when an agent on it first needs a key, and shows here once you approve it.',
   /* Putting a key in, replacing one, and reading one back: `/api/keys/*`, a browser session only. */
   addKey: 'Add a key',
   replace: 'Replace value',
