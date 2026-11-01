@@ -168,7 +168,8 @@
 <Tile icon="link" class="section" data-surface="tile" title={copy.doorsTitle}>
   <div class="section-body">
     <p class="hint">{copy.doorsHow}</p>
-    {#if owner}<div class="row-actions"><Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button></div>{/if}
+    <!-- THE BUTTON OVER A LIST THAT HAS ROWS; an empty one carries it in its own state (G17), under what will be here. -->
+    {#if owner && !(listed?.kind === 'doors' && doors.length === 0)}<div class="row-actions"><Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button></div>{/if}
     {#if !owner}
       <p class="hint">{levelWords.ownersOnly}</p>
     {:else if listed === null}
@@ -181,7 +182,8 @@
         </div>
       {/if}
     {:else if doors.length === 0}
-      <Empty kind="no-data-yet" compact title={copy.doorsNone} body={copy.doorsNoneWhy} agentPrompt={copy.doorsPrompt} />
+      {#snippet newDoor()}<Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button>{/snippet}
+      <Empty kind="no-data-yet" compact title={copy.doorsEmpty} body={copy.doorsNoneWhy} agentPrompt={copy.doorsPrompt} actions={newDoor} />
     {:else}
       <p class="hint">{copy.doorsUnknown}</p>
       <ul class="doors">

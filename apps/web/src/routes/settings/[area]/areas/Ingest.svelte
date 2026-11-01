@@ -227,8 +227,10 @@
   const wayRows = $derived(
     (ways ?? [])
       .filter((w) => !(w.channel === 'webhook' && feeds.length > 0))
-      .map((w) => ({ id: w.channel, name: w.name, said: w.last === null ? 'Nothing has come in this way yet' : `Last arrival ${sinceWords(w.last, recordNow())}` })),
+      .map((w) => ({ id: w.channel, name: w.name, quiet: w.last === null, said: w.last === null ? 'Nothing has come in this way yet' : `Last arrival ${sinceWords(w.last, recordNow())}` })),
   );
+  /* ALL QUIET, SAID ONCE (G16): three rows each said "Nothing has come in this way yet"; the names are the rows' only words. */
+  const allQuiet = $derived(feeds.length === 0 && wayRows.length > 0 && wayRows.every((w) => w.quiet));
 
   /**
    * THE TITLES OF THE MAIL SECTION'S THREE STEPS, and the one sentence the third adds. The
@@ -294,13 +296,14 @@
          own refusal is already on the screen, so nothing here repeats it. -->
     <!-- AND EVERY WEB ADDRESS THAT FED IT, with its last arrival (`feedsOf`): card texts posted every hour are a source,
          and the tile said nothing fed the record. A reader who cannot read the doors is not told nothing does. -->
+    {#if allQuiet}<p class="hint all-quiet">Nothing has come in yet.</p>{/if}
     {#if feeds.length > 0 || wayRows.length > 0}
       <ul class="feeds">
         {#each feeds as feed (feed.id)}
           <li class="feed"><span class="feed-name" dir="auto">{feed.name}</span><span class="feed-said">{feed.said}</span></li>
         {/each}
         {#each wayRows as way (way.id)}
-          <li class="feed"><span class="feed-name">{way.name}</span><span class="feed-said">{way.said}</span></li>
+          <li class="feed"><span class="feed-name">{way.name}</span>{#if !allQuiet}<span class="feed-said">{way.said}</span>{/if}</li>
         {/each}
       </ul>
     {/if}

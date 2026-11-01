@@ -27,6 +27,8 @@ export const automations = {
      change somebody approves. It said "an ingest with channel webhook and verify kind path", which is the file's
      spelling and not the person's; those words stay in the prompt, which is handed to an agent. */
   doorsNone: 'Nothing posts in yet',
+  /* WHAT WILL BE HERE, with New web address beside it (G17). */
+  doorsEmpty: 'Each address you make is listed here, with what it writes to.',
   doorsNoneWhy: 'Ask an agent to set one up.',
   doorsPrompt: 'read my BrainDog, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
   doorsWrites: (list: string) => `Writes to ${list}.`,
