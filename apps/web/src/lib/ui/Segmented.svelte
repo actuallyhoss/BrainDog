@@ -113,6 +113,13 @@
     /* The segment the thumb was last put under, so a resize of the same choice is told from a new one. It is kept
        here and not read back from `thumb`: reading state in this effect would run it again on every placing. */
     let under: Element | null = null;
+    /* When the thumb last set off for a new choice. The move itself resizes the labels (the chosen one is set heavier),
+       and that resize landed a frame later as "the same choice at a new size", which put the thumb back to `jump` and
+       cut the slide it had just started (skills pass, 2 Nov: it never travelled). A resize while the slide is still
+       going keeps it going, to the new place. */
+    let setOff = -Infinity;
+    const SLIDING_MS = 320;
+    let went = false;
 
     /* A step in an ordered track is read through its list item. */
     const segmentsOf = (of: HTMLElement) =>
@@ -129,12 +136,17 @@
         el.clientWidth,
         rtl,
       );
-      slide = slides({
+      const moving = {
         had: under !== null,
         changed: chosen !== under,
         wrapped: wraps(segments.map((s) => s.offsetTop)),
         reduced: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
-      });
+      };
+      const now = performance.now();
+      if (slides(moving)) setOff = now;
+      /* `went` mirrors `slide` here: reading the state in this effect would run it again on every placing. */
+      went = slides(moving) || (went && !moving.changed && !moving.wrapped && !moving.reduced && now - setOff < SLIDING_MS);
+      slide = went;
       under = next ? chosen : null;
       thumb = next;
     };

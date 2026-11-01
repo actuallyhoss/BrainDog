@@ -22,6 +22,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Human from '../../routes/signin/Human.svelte';
   import { answered, type Ask } from './ask.ts';
+  import { FADE, ms, still } from '$lib/ui/motion.ts';
 
   let { ask }: { ask: Ask } = $props();
 
@@ -84,6 +85,10 @@
   onMount(() => {
     const dialog = el;
     if (!dialog) return;
+    /* WHERE THE CARET WAS, to put it back when the ask is answered (skills pass, 2 Nov): the dialog leaves the page while
+       it is still open (it is kept for its exit and then taken out), so the browser's own return of focus never ran
+       and the caret fell to the page's top. */
+    const back = document.activeElement;
     dialog.showModal();
     overlays.open();
     const lift = scrims.lay();
@@ -106,11 +111,22 @@
     })();
     return () => {
       if (dialog.open) dialog.close();
+      if (back instanceof HTMLElement && back.isConnected && (document.activeElement === null || document.activeElement === document.body)) back.focus({ preventScroll: true });
       overlays.close();
       lift();
       stopWatching();
     };
   });
+
+  /**
+   * LEAVING, SEEN (skills pass, 2 Nov): the answer goes at once, and the modal is kept for its exit while the CSS under
+   * `[data-leaving]` takes it back the way it came. The press is never held for it.
+   */
+  function leave(node: Element): { duration: number } {
+    node.setAttribute('data-leaving', '');
+    /* Two frames over the step: the CSS starts on the next style pass, and an ease-in covers most of its path last. */
+    return { duration: (still() ? FADE : ms('--d-panel-out', 180)) + 32 };
+  }
 
   function finish(proved: boolean): void {
     if (done) return;
@@ -234,6 +250,7 @@
 
 <dialog
   bind:this={el}
+  out:leave|global
   class="reauth"
   aria-modal="true"
   aria-labelledby="{uid}-title"
@@ -298,8 +315,70 @@
     color: var(--ink);
   }
 
+  /* IT COMES AND GOES AS EVERY SHEET DOES (skills pass, 2 Nov): it snapped in over the screen that pressed. Centred, it
+     grows from 97% and fades in over `--d-panel` on the out curve, and leaves a step quicker on `--ease-in`; on a phone
+     it rises from the bottom edge on the sheet curve and goes back down it (below). `display` and `overlay` are held
+     to the end of the close so it is seen leaving. Reduced motion: a fade (`a11y.css` shortens it further). */
+  .reauth {
+    --reauth-off: scale(0.97);
+    --reauth-curve: var(--ease-out);
+    --reauth-gone: 0;
+
+    opacity: var(--reauth-gone);
+    transform: var(--reauth-off);
+    transition-property: transform, opacity, display, overlay;
+    transition-duration: var(--d-panel-out, var(--d-rows));
+    transition-timing-function: var(--ease-in);
+    transition-behavior: allow-discrete;
+  }
+
+  .reauth[open] {
+    opacity: 1;
+    transform: none;
+    transition-duration: var(--d-panel);
+    transition-timing-function: var(--reauth-curve);
+  }
+
+  @starting-style {
+    .reauth[open] {
+      opacity: var(--reauth-gone);
+      transform: var(--reauth-off);
+    }
+  }
+
+  .reauth[open]:global([data-leaving]) {
+    opacity: var(--reauth-gone);
+    transform: var(--reauth-off);
+    transition-duration: var(--d-panel-out, var(--d-rows));
+    transition-timing-function: var(--ease-in);
+    pointer-events: none;
+  }
+
   .reauth::backdrop {
     background: var(--scrim);
+    opacity: 0;
+    transition-property: opacity, display, overlay;
+    transition-duration: var(--d-panel-out, var(--d-rows));
+    transition-timing-function: var(--ease-in);
+    transition-behavior: allow-discrete;
+  }
+
+  .reauth[open]::backdrop {
+    opacity: 1;
+    transition-duration: var(--d-panel);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .reauth[open]:global([data-leaving])::backdrop {
+    opacity: 0;
+    transition-duration: var(--d-panel-out, var(--d-rows));
+    transition-timing-function: var(--ease-in);
+  }
+
+  @starting-style {
+    .reauth[open]::backdrop {
+      opacity: 0;
+    }
   }
 
   .reauth-body {
@@ -384,6 +463,11 @@
   /* ON A PHONE, A BOTTOM SHEET: full width, its top corners round, buttons stacked 44 tall, the main one on top. */
   @media (width < 900px) {
     .reauth {
+      /* A PHONE'S SHEET SLIDES AND DOES NOT FADE, as `Sheet.svelte`'s does. */
+      --reauth-off: translateY(100%);
+      --reauth-curve: var(--ease-sheet);
+      --reauth-gone: 1;
+
       inset-block-start: auto;
       inset-block-end: var(--kb, 0px);
       inline-size: 100vw;
@@ -412,6 +496,11 @@
   @media (prefers-reduced-motion: reduce) {
     .reauth-dot {
       animation: none;
+    }
+
+    .reauth {
+      --reauth-off: none;
+      --reauth-gone: 0;
     }
   }
 </style>

@@ -35,7 +35,7 @@
   import { keepOrder } from './project-order.ts';
   import { frame } from './frame.svelte.ts';
   import Brand from './Brand.svelte';
-  import { glide, placeIn } from '$lib/motion/index.ts';
+  import { glide, ms, opens as opening, placeIn } from '$lib/motion/index.ts';
   import {
     COUNTS_KEY,
     PINS_KEY,
@@ -451,6 +451,13 @@
   const SETTLING_MS = 2500;
   const born = typeof performance === 'undefined' ? 0 : performance.now();
   const settling = (): boolean => !untrack(() => answered) || performance.now() - born < SETTLING_MS;
+  /* A FOLD PRESSED OPEN OR SHUT (skills pass, 2 Nov): the rows are measured before it changes and glide to their new
+     places after, while what opened comes in on `opens`; the rail is never laid out frame by frame. */
+  function turn(change: () => void): void {
+    const go = glide(rows, ROWS, { step: ms('--d-rows', 180) });
+    change();
+    void tick().then(go);
+  }
   $effect.pre(() => {
     void model;
     void play;
@@ -510,12 +517,12 @@
   {#if list.length > 0}
     {@const open = foldOpen(key, list)}
     <li>
-      <button type="button" class="s-row s-fold tap" aria-expanded={open} onclick={() => (folds[key] = !open)}>
+      <button type="button" class="s-row s-fold tap" aria-expanded={open} onclick={() => turn(() => (folds[key] = !open))}>
         <Icon name={icon} size="m" /><span class="s-name">{label}</span><span class="s-count num">{list.length}</span>
         <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
       </button>
       {#if open}
-        <ul class="s-list s-nested">
+        <ul class="s-list s-nested" in:opening>
           {#each list as p (p.key)}{@render project(p)}{/each}
         </ul>
       {/if}
@@ -548,7 +555,7 @@
       {/if}
     </a>
     {#if phone && p.kids.length > 0}
-      <button type="button" class="s-open tap" aria-expanded={open} aria-label={words.open(p.label)} onclick={() => (opens[p.key] = !open)}>
+      <button type="button" class="s-open tap" aria-expanded={open} aria-label={words.open(p.label)} onclick={() => turn(() => (opens[p.key] = !open))}>
         <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
       </button>
     {/if}
@@ -556,17 +563,19 @@
       {@const lead = leadOf(p)}
       {@const rest = p.kids.slice(lead)}
       {@const restOpen = placeMore[p.key] ?? rest.some((k) => isLit(k.href))}
-      <ul class="s-list s-nested">
+      <!-- OPENS BY ITS HEIGHT ONLY WHEN ITS OWN BUTTON WAS PRESSED (the phone's Menu): a place opening on the desk because
+           you went there is core navigation, and the rail does not make you watch it. -->
+      <ul class="s-list s-nested" in:opening={{ when: phone }}>
         {#each p.kids.slice(0, lead) as k (k.href)}{@render link(k, true)}{/each}
         {#if rest.length > 0}
           <!-- ITS OTHER LISTS UNDER ONE MORE (Money's Snapshots, Books, rates, Categories), open while one of them is. -->
           <li>
-            <button type="button" class="s-row s-link s-more-kids tap" data-nested="" aria-expanded={restOpen} onclick={() => (placeMore[p.key] = !restOpen)}>
+            <button type="button" class="s-row s-link s-more-kids tap" data-nested="" aria-expanded={restOpen} onclick={() => turn(() => (placeMore[p.key] = !restOpen))}>
               <span class="s-name">{words.moreOf}</span>
               <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
             </button>
             {#if restOpen}
-              <ul class="s-list s-nested s-nested-more">
+              <ul class="s-list s-nested s-nested-more" in:opening>
                 {#each rest as k (k.href)}{@render link(k, true)}{/each}
               </ul>
             {/if}
@@ -624,12 +633,12 @@
   {:else if model.more.length > 0}
     <ul class="s-list">
       <li>
-        <button type="button" class="s-row s-fold tap" aria-expanded={moreOpen} onclick={() => (folds.more = !moreOpen)}>
+        <button type="button" class="s-row s-fold tap" aria-expanded={moreOpen} onclick={() => turn(() => (folds.more = !moreOpen))}>
           <Icon name="rows" size="m" /><span class="s-name">{words.more}</span><span class="s-count num">{model.more.length}</span>
           <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
         </button>
         {#if moreOpen}
-          <ul class="s-list s-nested">
+          <ul class="s-list s-nested" in:opening>
             {#each model.more as l (l.href)}{@render link(l, true)}{/each}
           </ul>
         {/if}

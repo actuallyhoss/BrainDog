@@ -22,7 +22,7 @@
  *     short fade and everything else is at once.
  */
 
-import { cubicIn } from 'svelte/easing';
+import { cubicIn, cubicOut } from 'svelte/easing';
 import type { TransitionConfig } from 'svelte/transition';
 
 import { FADE, ms, rowIn, rowOut, still } from '../ui/motion.ts';
@@ -123,9 +123,10 @@ export function placeIn(_node: Element, { hold = false }: { hold?: boolean } = {
  * change is drawn, plays each one that moved from where it stood to where it is now, on the spring and on transform
  * alone (FLIP), so nothing is laid out twice and the rail never shifts under the reader. One inside another that moved
  * plays only its own share of the move. A new element is not here: it arrives by its own `in:` (`placeIn`). Nothing in
- * a screen's first second, nothing under reduced motion.
+ * a screen's first second, nothing under reduced motion. `step` is chrome making room for chrome (a fold pressed open):
+ * that many milliseconds on the emphasis curve, no spring, so the rows land with what opened.
  */
-export function glide(box: HTMLElement | null | undefined, match: string): () => void {
+export function glide(box: HTMLElement | null | undefined, match: string, { step }: { step?: number } = {}): () => void {
   if (!box || calm() || still() || typeof box.animate !== 'function') return () => {};
   const was = new Map<Element, number>();
   for (const el of box.querySelectorAll(match)) was.set(el, el.getBoundingClientRect().top);
@@ -144,9 +145,33 @@ export function glide(box: HTMLElement | null | undefined, match: string): () =>
       const up = el.parentElement?.closest(match);
       const own = dy - (up && box.contains(up) ? (moved.get(up) ?? 0) : 0);
       if (Math.abs(own) <= 0.5) continue;
-      const a = play(el as HTMLElement, { transform: [`translateY(${own.toFixed(2)}px)`, 'none'] }, { duration: ms('--form-settle', 380) });
+      const a = play(el as HTMLElement, { transform: [`translateY(${own.toFixed(2)}px)`, 'none'] }, step === undefined ? { duration: ms('--form-settle', 380) } : { duration: step, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
       if (a) a.id = 'glide';
     }
+  };
+}
+
+/* ── a part opening under its button ──────────────────────────────────── */
+
+/**
+ * A PART THAT OPENS UNDER ITS BUTTON, inside an `{#if}` (skills pass, 2 Nov): the rail's Parked, Finished and More
+ * folds, which popped open and pushed what is under them down in one frame. On transform and opacity alone, as the rail
+ * asks (audit 11-01, AP14: a height opening lays the rail out every frame): the part comes down 4px into place and fades
+ * in over `--d-rows` on the out curve, while its owner glides what is under it to make room (`glide`, measured before
+ * the press changes anything). Shutting is at once, and what was under it glides back up. Nothing on a first draw or
+ * in a screen's first second; a fade under reduced motion. `when: false` is its owner saying this change was not a
+ * press (a place opening because you went there), which draws still.
+ *
+ *   function fold(change) { const go = glide(box, ROWS); change(); void tick().then(go); }
+ *   {#if open}<ul in:opens>…</ul>{/if}
+ */
+export function opens(_node: Element, { when = true }: { when?: boolean } = {}): TransitionConfig {
+  if (!when || calm()) return NONE;
+  if (still()) return fadeIn();
+  return {
+    duration: ms('--d-rows', 180),
+    easing: cubicOut,
+    css: (t, u) => `opacity:${t};transform:translateY(${(-4 * u).toFixed(2)}px)`,
   };
 }
 
