@@ -175,7 +175,9 @@
     arrange: 'Reorder the areas',
     more: 'More',
     designBook: 'Design book',
-    lead: (name: string) => `How ${name || 'BrainDog'} looks and opens, who can reach it, and what it keeps.`,
+    /* A RECORD NAMED FOR ITS OWNER ("Sam Rivera") read as how Sam looks; the name is used only where it names the
+       BrainDog itself. */
+    lead: (name: string) => `How ${/braindog/iu.test(name) ? name : 'your BrainDog'} looks and opens, who can reach it, and what it keeps.`,
   } as const;
 
   /**

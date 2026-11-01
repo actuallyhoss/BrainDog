@@ -54,6 +54,7 @@ export const nameWords = {
  */
 export const AGENT_NAMES: Readonly<Record<string, string>> = {
   claude: 'Claude',
+  chatgpt: 'ChatGPT',
   codex: 'Codex',
   cursor: 'Cursor',
   gemini: 'Gemini',

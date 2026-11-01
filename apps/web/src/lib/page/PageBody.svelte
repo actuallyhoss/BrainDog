@@ -66,6 +66,7 @@
     level = 2,
     headed = false,
     leadHead = null,
+    leadEnd = null,
     strip = null,
     host = null,
     pick = null,
@@ -115,6 +116,12 @@
      * lead tile, and what goes under the sentence goes inside it. `null` keeps the sentence the header's plain line.
      */
     leadHead?: Snippet | null;
+    /**
+     * THE PAGE'S BUTTONS BESIDE ITS PLAIN SENTENCE (1 Nov): where the sentence is the header's line and not a tile, and
+     * the bar already says the name, the head's row held nothing but the buttons, a row of its own over the sentence.
+     * Given, they sit at the end of the sentence's first line, and wrap under it only where both do not fit.
+     */
+    leadEnd?: Snippet | null;
     /** What narrows the page (its filter strip), drawn under the headline on a page whose head rides over it. */
     strip?: Snippet | null;
     /**
@@ -1260,7 +1267,7 @@
         }
       }}
     >
-      {#if leadTile && lifted?.at === at}{@render leadHead?.()}{/if}
+      {#if leadTile && lifted?.at === at}{@render leadHead?.()}{:else if leadEnd && lifted?.at === at}<div class="lead-end head-row-actions">{@render leadEnd()}</div>{/if}
       {#if arranging && arrangement}
         <!-- `a` IS A CONSTANT so the callbacks below keep the narrowing they were built under. -->
         {@const a = arrangement}
@@ -1736,31 +1743,77 @@
     font-weight: inherit;
   }
 
-  /*
-   * WHERE THE BAR SAYS THE PAGE'S NAME, THE LEAD TILE'S FIRST ROW IS ONLY ITS BUTTONS, and it stood as a row of its own
-   * over the sentence: 56px of a tile holding Add, Share and "⋯" at its far end (People, 1 Nov). From 640 the buttons
-   * take the end of the sentence's first line instead, and the sentence keeps the rest of the row; on a phone, where
-   * the sentence needs the whole width, they stay a row over it.
+  /**
+   * THE SENTENCE AND THE PAGE'S BUTTONS SHARE ONE ROW WHENEVER THEY FIT (1 Nov, "11 people besides you" wrapped while
+   * "Add a person" sat on a row of its own above it). Where the bar already says the name (`data-barred`), the head row
+   * holds nothing but the buttons, so from 640px up they take the first row's end and the sentence its start: the
+   * sentence column is `minmax(0, 1fr)`, so it keeps one line while there is room and wraps only when there is not, and
+   * the buttons never shrink. Under 640px the buttons keep their own row over the sentence, which then has the width.
    */
+  /* AND THE SAME ROW FOR A PLAIN SENTENCE (`leadEnd`): the sentence at the start, the buttons at the end, centred on its
+     first line; a sentence too long for the row wraps in its own column, and under 640px the buttons take a row over
+     it. */
+  /* ON THE BOARD, NOT A TILE: a quiet button is the tile's colour, as beside the page's name. */
+  .lead-end {
+    justify-self: end;
+  }
+
+  .lead-end :global(.btn:is([data-weight='quiet'], [data-weight='glass'])) {
+    --btn-fill: var(--tile);
+  }
+
+  /* Where the name's row stood: the head draws no room of its own now, so the row keeps the head's step under the bar. */
+  .block-slot:not([data-arranging]):has(> :global(.lead-end + .block[data-kind='note'][data-form='lead'])) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--sp-2);
+    margin-block-start: var(--sp-4);
+  }
+
   @media (width >= 640px) {
-    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])) {
+    .block-slot:has(> :global(.lead-end + .block[data-kind='note'][data-form='lead'])) {
       grid-template-columns: minmax(0, 1fr) auto;
       column-gap: var(--sp-5);
     }
 
-    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])) > :global(*) {
+    .block-slot:has(> :global(.lead-end + .block[data-kind='note'][data-form='lead'])) > :global(*) {
       grid-column: 1 / -1;
     }
 
-    .block-slot[data-lead] > :global(.lead-head[data-barred]) {
+    .block-slot > :global(.lead-end:has(+ .block[data-kind='note'][data-form='lead'])) {
       grid-row: 1;
       grid-column: 2;
       align-self: start;
-      /* Level with the sentence's first line (40px at the hero size). */
-      min-block-size: 40px;
     }
 
-    .block-slot[data-lead] > :global(.lead-head[data-barred] + *) {
+    .block-slot > :global(.lead-end + .block[data-kind='note'][data-form='lead']) {
+      grid-row: 1;
+      grid-column: 1;
+      align-self: center;
+    }
+  }
+
+  @media (width >= 640px) {
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])):has(> :global(.block[data-kind='note'][data-form='lead'])) {
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: var(--sp-5);
+    }
+
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])):has(> :global(.block[data-kind='note'][data-form='lead'])) > :global(*) {
+      grid-column: 1 / -1;
+    }
+
+    .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) > :global(.lead-head[data-barred]) {
+      grid-row: 1;
+      grid-column: 2;
+      align-self: start;
+      /* LEVEL WITH THE SENTENCE'S FIRST LINE: its 40px line round the 32px buttons. */
+      margin-block-start: calc((40px - var(--ctl-h)) / 2);
+    }
+
+    /* THE SENTENCE TAKES THE FIRST ROW'S START even where the page's search stands between it and the buttons in the
+       source (Numbers): the search then opens the row under the sentence. */
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])) > :global(.block[data-kind='note'][data-form='lead']) {
       grid-row: 1;
       grid-column: 1;
     }

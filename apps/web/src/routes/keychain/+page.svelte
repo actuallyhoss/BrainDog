@@ -476,6 +476,8 @@
    * clipboard clear run as they did. The lock time is the record's where it says one, else fifteen minutes.
    */
   let locked = $state(false);
+  /* WHO LOCKED IT: Lock now says you did, not that it locked itself after a while. */
+  let lockedByYou = $state(false);
   let unlocking = $state(false);
   let idle: Idle | null = null;
   /* THE LOCK WINDOW is the record's (`keyAccess`), fifteen minutes until it has said. */
@@ -523,7 +525,10 @@
       idle?.stop();
     };
   });
-  const lockNow = () => idle?.lockNow();
+  const lockNow = () => {
+    lockedByYou = true;
+    idle?.lockNow();
+  };
   async function unlock() {
     if (unlocking) return;
     unlocking = true;
@@ -532,6 +537,7 @@
     unlocking = false;
     if (!proved) return;
     locked = false;
+    lockedByYou = false;
     rebuildIdle();
     accessTick++;
   }
@@ -817,7 +823,7 @@
   {#if locked}
     <!-- LOCKED: nothing is shown and nothing can be revealed until the sign-in is proved again. Calm, not an error. -->
     <Tile icon="lock" title={dated.locked} data-part="locked">
-      <p class="said">{dated.lockedWhy}</p>
+      <p class="said">{lockedByYou ? dated.lockedByYou : dated.lockedWhy}</p>
       <div class="row-actions"><Button weight="primary" disabled={unlocking} onclick={() => void unlock()}>{dated.unlock}</Button></div>
     </Tile>
   {/if}

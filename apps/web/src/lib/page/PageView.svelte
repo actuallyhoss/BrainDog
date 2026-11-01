@@ -101,7 +101,7 @@
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '../at.ts';
-  import { barTitled, frame } from '../shell/frame.svelte.ts';
+  import { barTitled, frame, narrow as onPhone } from '../shell/frame.svelte.ts';
   import { listName } from '../record/names.ts';
   import QuickHost from '$lib/money/QuickHost.svelte';
   import { pageOfLedger } from '$lib/money/ledger.ts';
@@ -521,6 +521,15 @@
    * Not on a project's page, whose hero already holds its name and its line (`ProjectPart`).
    */
   const tiled = $derived(led && !projectPage && !plain);
+
+  /**
+   * AND WHERE THE SENTENCE STAYS THE HEADER'S PLAIN LINE (`plain`, the Agents page) while the bar says the name, the
+   * head's row would hold nothing but the buttons, a row of their own over the sentence. They go to the sentence's end
+   * instead (`PageBody`'s `leadEnd`), and share its row whenever both fit. A desk's only: a phone's head already puts
+   * them on the row its bar leaves. (Restored 1 Nov evening: the lists merge had dropped it, and Agents drew Share and
+   * "⋯" on a row of their own again.)
+   */
+  const besideLead = $derived(led && !tiled && !projectPage && frame.crumbed && !onPhone.current);
 
   /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
@@ -1024,7 +1033,7 @@
     {tiled}
   >
     {#snippet actions()}
-      {#if !tiled && !buttonsTaken}{@render pageButtons()}{/if}
+      {#if !tiled && !buttonsTaken && !besideLead}{@render pageButtons()}{/if}
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
@@ -1207,6 +1216,7 @@
         {arrangement}
         headed={led && !placed}
         leadHead={tiled && !placed ? leadRow : null}
+        leadEnd={besideLead && !buttonsTaken && !placed ? pageButtons : null}
         captured={placed ? -1 : (headLine?.at ?? -1)}
         under={headLine && (tiled || !wide.current) && !shapeWaits && !placed ? lineInHead : null}
         strip={strip && led && !shapeWaits && !placed ? narrow : null}
@@ -1419,7 +1429,10 @@
   .hosted {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));
-    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
+    /* AND ITS FADE UP IN THE SKELETON'S PLACE (`data-arrive`, `motion.css`), written here since this rule outweighs it. */
+    transition:
+      padding-inline-end var(--d-panel) var(--ease-sheet),
+      opacity var(--d-swap) var(--ease-standard);
   }
 
   /* The blocks' bars stand in the board's gutter, where the first tile will be. */
@@ -1657,6 +1670,7 @@
       inline-size: 36px;
       min-inline-size: 36px;
       min-block-size: 36px;
+      margin: 4px;
     }
 
     .lead-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *) .icon[data-size]) {
@@ -1664,7 +1678,7 @@
       block-size: var(--icon-m);
     }
 
-    .lead-actions :global(:is(.btn[data-weight='quiet'], .share-trigger, .change-more) .icon[data-size]) {
+    .lead-actions :global(:is(.btn[data-weight='quiet'], .change-more, .share-trigger):not(dialog *) .icon[data-size]) {
       inline-size: var(--icon-l);
       block-size: var(--icon-l);
     }

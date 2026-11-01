@@ -109,10 +109,10 @@ export const firstRun = {
   currencyNone: 'No currency matches that.',
   currencyFirst: 'Choose the currency your money is in, and Money is made in it.',
 
-  /* THE REMINDER, offered where what it keeps has due dates and the host can ring this phone (Web Push). */
-  remindOn: 'Remind me on this phone',
+  /* THE REMINDER, offered where what it keeps has due dates and the host can ring this device (Web Push): a laptop as much as a phone. */
+  remindOn: 'Remind me on this device',
   remindWhy: 'What falls due can ring here, once you say yes.',
-  remindIsOn: 'This phone will be reminded.',
+  remindIsOn: 'This device will be reminded.',
 
   /* THE ONE ACCEPT. Everything is written in this press, and nothing before it. */
   makeIt: 'Make it mine',

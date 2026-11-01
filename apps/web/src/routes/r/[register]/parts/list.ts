@@ -702,7 +702,20 @@ export function readingOf(
     return plain(name ? words.lastCame(name, since(newestE.created, now)) : `${words.noneThisWeek}.`);
   }
   const open = entries.filter((e) => !isDone(decl, e));
-  if (open.length === 0) return plain(`${words.nothingOpen}.`);
+  /* ONE STATE SAYS ITSELF: "16 live" over sixteen Live categories and "All 143 cleared" over a cleared ledger, where
+     "16 open" and "Nothing is open" read as though the list were a queue of jobs. */
+  const soleState = (rows: readonly Entry[]): string | null => {
+    if (!decl.state || rows.length === 0) return null;
+    const seen = new Set(rows.map((e) => e.fields[decl.state!]));
+    const [v] = [...seen];
+    if (seen.size !== 1 || typeof v !== 'string' || v.trim() === '') return null;
+    const labels = (decl.fields.find((f) => f.id === decl.state) as { labels?: Record<string, string> } | undefined)?.labels;
+    return (labels?.[v] ?? v).trim().replace(/[_-]+/gu, ' ').toLowerCase();
+  };
+  if (open.length === 0) {
+    const all = entries.length > 1 ? soleState(entries) : null;
+    return plain(all ? `All ${entries.length.toLocaleString('en')} ${all}.` : `${words.nothingOpen}.`);
+  }
   /* "TO SETTLE" ON A LIST OF AMOUNTS (money F16): "28 open" read against a board's "Open 22", which counts one state; a
      bill part paid is still to settle, and the words say what the number counts. */
   const settles = decl.fields.some((f) => f.type === 'money') && Boolean(decl.done?.length);
@@ -723,7 +736,9 @@ export function readingOf(
           ? /* ORDERS ARE SHIPPED, NOT SETTLED (audit 31 Oct o, AO16): the list said "3 to settle" where the Orders page
                over the same rows says "3 to ship". One word for one count. */
             (/^orders?$/iu.test(decl.one ?? '') || /^orders?$/iu.test(decl.name) ? words.toShip : words.toSettle)(open.length)
-          : words.open(open.length)
+          : soleState(open)
+            ? `${open.length.toLocaleString('en')} ${soleState(open)}`
+            : words.open(open.length)
         : counted(decl, open.length);
   /* A LINE THAT IS ONLY THE COUNT IS NOT SAID: the head beside the title already draws it ("Projects 4" over "4 projects.").
      A LIST OF KINDS SAYS HOW IT SPLITS INSTEAD (1 Nov, L18): Projects' lane is Building, Earning, Parked or Finished, so

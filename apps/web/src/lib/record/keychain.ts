@@ -216,7 +216,7 @@ export type Auth = {
  */
 export async function reprove(auth: Auth, go: (href: string) => void): Promise<boolean> {
   /* INSIDE THE APP'S FRAME IT IS THE ONE "CONFIRM IT'S YOU" (`lib/reauth`): a passkey or a mailed link, without leaving. */
-  if (canAsk()) return askProof(null);
+  if (canAsk()) return askProof('Opening your keys needs a fresh check that it is you.');
   const here = auth.support();
   const offered = await auth.methods();
   if (!(offered.ok && offered.value.passkey && here.webauthn && here.secure)) {

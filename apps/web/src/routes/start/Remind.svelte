@@ -1,5 +1,5 @@
 <!--
-  "Remind me on this phone": offered by the first run's preview when what the BrainDog keeps has due dates that ring
+  "Remind me on this device": offered by the first run's preview when what the BrainDog keeps has due dates that ring
   (`preview.ts` `reminds`), and only where the host holds a key to ring this phone with (Web Push, `lib/ui/push.ts`).
 
   THE SAME RULES AS SETTINGS' OWN SWITCH (`PushToggle.svelte`), read from `push.ts`, which the tests hold: nothing at all
