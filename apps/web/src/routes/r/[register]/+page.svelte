@@ -3133,7 +3133,6 @@
   /* This screen's own words: the head's overflow, named with the list it is about. */
   const headWords = { more: (list: string) => `More for ${list}`, whole: 'Add one with all its fields' } as const;
   /* The toolbar's own "⋯": how the list is shown, and keeping what is on screen. */
-  const toolWords = { more: 'Display and views' } as const;
 
   /* THE ADD SHEET'S EXAMPLE, from the list itself: the newest row's name, so the line shows what a name here looks like. */
   const captureExample = $derived.by(() => {
@@ -3147,6 +3146,35 @@
   const captureNamed = $derived<'person' | 'org' | null>(meetsOf(decl) ? 'person' : orgRoleOf(decl) ? 'org' : null);
 
   /** The toolbar's primary: the add line opens, or takes the caret again where it is already open. */
+  /**
+   * THE TOOLBAR KEEPS TO ONE ROW ON A LAPTOP (1 Nov): where its controls would wrap (Tasks at 1280: search, the four
+   * slices, Filter, three views, the "⋯" and Add), the views and Filter give up their words and keep their glyphs, which
+   * still carry their names. Read off the row itself, so a list with room keeps every word, and the width it needed is
+   * kept so a wider window gives the words back.
+   */
+  let toolsTight = $state(false);
+  const fitTools = (el: HTMLElement): (() => void) | void => {
+    if (typeof ResizeObserver === 'undefined') return;
+    let needs = 0;
+    const rows = (): number => {
+      const kids = [...el.querySelectorAll<HTMLElement>(':scope > .bar > *, :scope > .list-views > *')].filter((k) => k.offsetParent !== null && !k.matches('.listed, .bar-clear'));
+      return new Set(kids.map((k) => Math.round(k.getBoundingClientRect().top + k.getBoundingClientRect().height / 2))).size;
+    };
+    const fit = (): void => {
+      if (toolsTight) {
+        if (el.clientWidth > needs) toolsTight = false;
+        return;
+      }
+      if (rows() > 1) {
+        needs = el.clientWidth;
+        toolsTight = true;
+      }
+    };
+    const watch = new ResizeObserver(() => requestAnimationFrame(fit));
+    watch.observe(el);
+    return () => watch.disconnect();
+  };
+
   function openCapture() {
     captureOpen = true;
     void tick().then(() => document.getElementById('capture')?.focus());
@@ -3210,46 +3238,25 @@
        stand inside it, so what is added is the rest. -->
   <div class="list-screen">
   <!-- THE KEYS LIST IS THE KEYCHAIN'S TABLE VIEW (AG16): titled as the one place, with the switch back to its keys. -->
+  <!-- THE HEAD IS THE SENTENCE, WITH NOTHING BESIDE IT (1 Nov, "11 people besides you" broke under "Add a person"):
+       the list's "+" and its one "⋯" stand at the end of the list's own toolbar at every width, so the line that says
+       what the list holds has the row to itself and reads on one line from a laptop down to a phone. The head keeps only
+       what is not about the rows: the Keychain's switch, and New on the arrival, where there is no toolbar yet. -->
+  {#snippet headActions()}
+    {#if id === KEYS_REGISTER}<KeyViews on="table" />{/if}
+    {#if adds && arriving}
+      <span class="new-row">
+        <Button weight="primary" kbd="n" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{said('new_row')} {decl.one}</Button>
+      </span>
+    {/if}
+  {/snippet}
   <PageHead icon={id === KEYS_REGISTER ? 'vault' : iconFor(decl.icon, 'rows')}
     title={id === KEYS_REGISTER ? copy.keychain : decl.name}
     count={head}
     total={denominator}
     sentence={reading ? readingSaid : undefined}
-  >
-    {#snippet actions()}
-      {#if id === KEYS_REGISTER}<KeyViews on="table" />{/if}
-      <!-- THE HEAD HOLDS ONE PRIMARY AND AN OVERFLOW. How the list is drawn, its search and its filters
-           are about the rows, so they moved down into the list's own tile, where the rows are. -->
-      <!-- ONE WAY TO ADD, AND IT IS THE LIST'S FIRST LINE. The head said "New item" over a line saying "Add an item",
-           two controls for one act a hand's width apart. The line stays, since a name and Enter is the cheapest add
-           there is; the whole form is `n` and the first entry of the overflow. On a phone the "+" opens the line as a
-           sheet. New stays only on the arrival (`?first`), where neither the line nor the "+" is drawn. -->
-      {#if adds && arriving}
-        <span class="new-row">
-          <Button weight="primary" kbd="n" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{said('new_row')} {decl.one}</Button>
-        </span>
-      {:else if adds}
-        <CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />
-      {/if}
-      <!-- THE REST OF WHAT A LIST OFFERS, IN THE OVERFLOW: a row started with every field in front of you, the view over
-           what is handed to you, on a list that says who holds its rows, and the list's fields (`ListEditor.svelte`). -->
-      {#if handedToMe || proposes || (adds && !arriving) || rowsAsCards() || shares || (owner && id !== KEYS_REGISTER)}
-        <Menu label={headWords.more(decl.name)} align="end">
-          <!-- NAMED, as every "⋯" is (motion F11): the name is text inside the trigger, never a `title` on a child. On a
-               phone it also holds Display, which the toolbar's own "⋯" holds from 640. -->
-          {#snippet trigger()}<span class="head-more" data-list-more={rowsAsCards() ? '' : undefined}><Icon name="more" size="m" /><span class="sr-only">{headWords.more(decl.name)}</span></span>{/snippet}
-          {#if rowsAsCards()}<button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" />{copy.display}</button>{/if}
-          {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}>{headWords.whole}</button>{/if}
-          {#if handedToMe}<a role="menuitem" href={at(handedToMe)}>{copy.handedToMe}</a>{/if}
-          <!-- SHARE THE LIST, with somebody here, a group or an email, an owner's or an Admin's. -->
-          {#if shares}<button type="button" role="menuitem" data-share-list onclick={shareList}><Icon name="user-plus" size="s" />{copy.shareSheetTitle(decl.name)}</button>{/if}
-          {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}>{sheetWords.open}</button>{/if}
-          <!-- ITS NAME, CHANGED HERE (`SettingHere.svelte`): the record's `renameList`, with an Undo, no trip to Settings. -->
-          {#if owner && id !== KEYS_REGISTER}<button type="button" role="menuitem" onclick={() => (renameOpen = true)}><Icon name="edit" size="s" />Rename this list</button>{/if}
-        </Menu>
-      {/if}
-    {/snippet}
-  </PageHead>
+    actions={id === KEYS_REGISTER || (adds && arriving) ? headActions : undefined}
+  />
   {#if proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />{/if}
   {#if renameOpen}{#await import('$lib/page/SettingHere.svelte') then { default: SettingHere }}<SettingHere bind:open={renameOpen} what={{ kind: 'list', id, name: decl.name }} onchanged={refresh} />{/await}{/if}
 
@@ -3332,7 +3339,7 @@
           onmoved={refresh}
         />
       {:else}
-      <div class="list-tools" data-uncounted={unsaid ? '' : undefined}>
+      <div class="list-tools" data-uncounted={unsaid ? '' : undefined} data-tight={toolsTight ? '' : undefined} {@attach fitTools}>
         <!-- THE SEARCH AND THE FILTERS, which draw themselves only while there is something to sift, and the phone's
              filter sheet behind its one button. Which filters are on is the address, read and written here. -->
         <ChipsBar
@@ -3360,8 +3367,10 @@
              "⋯", so this end is not drawn. -->
         <div class="list-views">
           {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} onview={setView} />{/if}
-          <Menu label={toolWords.more} align="end">
-            {#snippet trigger()}<span class="tool-more" data-list-more><Icon name="more" size="m" /><span class="sr-only">{toolWords.more}</span></span>{/snippet}
+          <!-- ONE "⋯" FOR THE LIST: how it is drawn and its views first, then what the list itself offers (a row with every
+               field, what is handed to you, sharing, its fields, its name). There were two, a hand's width apart. -->
+          <Menu label={headWords.more(decl.name)} align="end">
+            {#snippet trigger()}<span class="tool-more" data-list-more><Icon name="more" size="m" /><span class="sr-only">{headWords.more(decl.name)}</span></span>{/snippet}
             <button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" /><span class="mi-name">{copy.display}</span><Kbd keys="v" /></button>
             {#if (q !== '' || filters.length > 0) && twice === null}
               <button type="button" role="menuitem" onclick={() => void saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</button>
@@ -3370,9 +3379,18 @@
             {#if shares && filters.length > 0}
               <button type="button" role="menuitem" data-share-view onclick={shareView}><Icon name="user-plus" size="s" />{copy.shareThisView}</button>
             {/if}
+            {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}><Icon name="edit" size="s" />{headWords.whole}</button>{/if}
+            {#if handedToMe}<a role="menuitem" href={at(handedToMe)}><Icon name="user-check" size="s" />{copy.handedToMe}</a>{/if}
+            <!-- SHARE THE LIST, with somebody here, a group or an email, an owner's or an Admin's. -->
+            {#if shares}<button type="button" role="menuitem" data-share-list onclick={shareList}><Icon name="user-plus" size="s" />{copy.shareSheetTitle(decl.name)}</button>{/if}
+            {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}><Icon name="rows" size="s" />{sheetWords.open}</button>{/if}
+            <!-- ITS NAME, CHANGED HERE (`SettingHere.svelte`): the record's `renameList`, with an Undo, no trip to Settings. -->
+            {#if owner && id !== KEYS_REGISTER}<button type="button" role="menuitem" onclick={() => (renameOpen = true)}><Icon name="edit" size="s" />Rename this list</button>{/if}
           </Menu>
           {#if adds && !arriving}
             <span class="tool-add"><Button weight="primary" data-capture-open onclick={openCapture}><Icon name="plus" size="s" />{copy.captureIn(decl.one)}</Button></span>
+            <!-- THE PHONE'S "+", the same add as a 44 square that opens the line as a sheet; drawn only below 640. -->
+            <CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />
           {/if}
         </div>
       </div>
@@ -3702,10 +3720,47 @@
     display: contents;
   }
 
-  /* BELOW 640 THE HEAD HOLDS THE "+" AND THE "⋯", so the toolbar's end is not drawn: the bar is search and Filter. */
+  /* SHORT OF ROOM (`fitTools`): the views and Filter keep their glyphs, their words stay their names, and the search
+     box gives up 40px before anything wraps. */
+  .list-tools[data-tight] :global(:is(.view-word, .sift-name)) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .list-tools[data-tight] :global(:is(.view-seg, .sift-build)) {
+    padding-inline: var(--sp-2);
+  }
+
+  .list-tools[data-tight] :global(.bar > .field) {
+    min-inline-size: 200px;
+  }
+
+  /* BELOW 640 THE TOOLBAR IS ONE ROW OF 44s: search, Filter, the "⋯" and the "+", which opens the line as a sheet. The
+     views are not offered (a phone draws cards) and the words-and-plus Add gives way to the square. */
   @media (width < 640px) {
+    .list-tools {
+      flex-wrap: nowrap;
+    }
+
+    .list-tools > :global(.bar) {
+      flex: 1 1 0;
+    }
+
     .list-views {
+      gap: var(--sp-1);
+    }
+
+    .tool-add > :global(.btn) {
       display: none;
+    }
+
+    .tool-more {
+      inline-size: var(--tap);
+      block-size: var(--tap);
     }
   }
 

@@ -414,10 +414,12 @@
     }
   }
 
-  /* A FILTER THAT IS ON TAKES THE SELECTION'S TINT, the red word on `--red-tint`, and its cross takes it off. */
+  /* A FILTER THAT IS ON IS INK ON THE WELL, edged by the field's hairline, as every filter strip draws its choice (Look
+     B: red is never "chosen"), and its cross takes it off. */
   .sift[data-on] {
-    background: var(--red-tint);
-    color: var(--red);
+    background: var(--tile-2);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    color: var(--ink);
   }
 
   .sift-chosen {
