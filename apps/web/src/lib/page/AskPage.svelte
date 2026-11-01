@@ -23,7 +23,10 @@
   import { byRules, changeWords as words, draftChange, fileDrafted, type Drafted, type Kept, type SlashClient } from '$lib/record/slash.ts';
   import type { Rehearsed } from '../../routes/decide/[id]/proposed.ts';
   import Button from '$lib/ui/Button.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import PageView from './PageView.svelte';
+  import type { SaidPage, SayIn } from './say-page.ts';
+  import { sayWords } from './say-page.ts';
 
   let {
     page: about,
@@ -32,6 +35,7 @@
     onsource,
     onkept,
     built,
+    say,
   }: {
     /** The page the description is about, by its address. Left out on the Slash screen, which is about everything. */
     page?: string | undefined;
@@ -48,10 +52,18 @@
      * is the page's first write. Left out for a page the record holds.
      */
     built?: (() => Promise<unknown>) | undefined;
+    /**
+     * What the rules read a line against (`say-page.ts`): the page's own body, its blocks as drawn, his look and the lists.
+     * Read first, before the model, so "move Bills up" or "show only open ones" is a draft at once and for nothing, and
+     * works with no model. Left out where the page cannot be changed that way (a home the record holds none of yet).
+     */
+    say?: (() => Promise<Omit<SayIn, 'text'> | null>) | undefined;
   } = $props();
 
   /** One draft as the sheet holds it: what the record drew for it, and what a press on it came to. */
-  type Shown = { key: number; draft: Drafted; drawn: Rehearsed | null; kept: Kept | null; said: string | null; busy: boolean };
+  type Shown = { key: number; draft: Drafted; drawn: Rehearsed | null; kept: Kept | null; said: string | null; busy: boolean; rule?: Ruled };
+  /** A draft the rules made: what it does, and the page it was read against, which Undo puts back. */
+  type Ruled = { said: Exclude<SaidPage, { do: 'which' }>; ctx: Omit<SayIn, 'text'>; version: number | null };
 
   let asked = $state('');
   let started = false;
@@ -72,7 +84,7 @@
 
   /* A LINE HANDED IN IS SENT ONCE, as if typed, so the model reads it only after the rules would not. */
   $effect(() => {
-    if (started || !model || !ask) return;
+    if (started || (!model && !say) || !ask) return;
     started = true;
     asked = ask;
     void send();
@@ -101,6 +113,23 @@
     cost = null;
     const mine = ++sends;
     try {
+      /* THE RULES FIRST, on a new line (never on Try again, which asks the model for another way): a draft at once. */
+      if (!again && say) {
+        const ruled = await ruleDraft(text, mine);
+        if (mine !== sends) return;
+        if (ruled === 'which') return;
+        if (ruled) return;
+        if (!model) {
+          answered = true;
+          shown = [];
+          fix = sayWords.cannot;
+          return;
+        }
+      } else if (!model) {
+        answered = true;
+        fix = sayWords.rulesOnly;
+        return;
+      }
       const body = built === undefined ? undefined : ((await built()) ?? undefined);
       const out = await draftChange(client(), text, about, body, tried);
       if (mine !== sends) return;
@@ -136,10 +165,92 @@
     }
   }
 
+  /**
+   * THE LINE READ BY THE RULES (`say-page.ts`): a draft drawn as the model's are, through Decide's own preview, but kept
+   * by the one writer its kind has (his look, the page's body, or the list's name), with an Undo. `true` when it drafted,
+   * `'which'` when it asked which block was meant, `false` when the rules could not read it.
+   */
+  async function ruleDraft(text: string, mine: number): Promise<boolean | 'which'> {
+    let ctx: Omit<SayIn, 'text'> | null = null;
+    try {
+      ctx = (await say?.()) ?? null;
+    } catch {
+      ctx = null;
+    }
+    if (ctx === null || mine !== sends) return false;
+    const { sayPage } = await import('./say-page.ts');
+    const said = sayPage({ ...ctx, text });
+    if (said === null) return false;
+    answered = true;
+    dropped = [];
+    cost = null;
+    rules = false;
+    if (said.do === 'which') {
+      shown = [];
+      fix = said.said;
+      return 'which';
+    }
+    const id = `page.${ctx.body.page}`;
+    const draft: Drafted = { question: said.question, change: { to: { id, kind: 'page', body: said.do === 'look' ? said.preview : said.do === 'body' ? said.body : ctx.body } }, rows: {}, preview: { pages: [] } };
+    const key = mine * 1000;
+    shown = [{ key, draft, drawn: said.do === 'rename' ? { from: 'none' } : null, kept: null, said: null, busy: false, rule: { said, ctx, version: ctx.version ?? null } }];
+    chosen = 0;
+    if (said.do !== 'rename') {
+      const { previewOf } = await import('../../routes/decide/[id]/proposed.ts');
+      void previewOf({ to: draft.change.to }, apiBase())
+        .then((drawn) => mine === sends && put(key, { drawn }))
+        .catch(() => mine === sends && put(key, { drawn: { from: 'none' } }));
+    }
+    return true;
+  }
+
+  /** Keeps a rules draft by its own writer, and says so with the way back. */
+  async function keepRule(s: Shown & { rule: Ruled }) {
+    const { said, ctx } = s.rule;
+    put(s.key, { busy: true, said: null });
+    const base = apiBase();
+    try {
+      let undo: (() => Promise<unknown>) | null = null;
+      if (said.do === 'look') {
+        const { bodyOf, retireLook, writeLook } = await import('./look.ts');
+        const was = ctx.look;
+        const out = await writeLook(base, said.look);
+        if (!out.ok) return put(s.key, { busy: false, said: out.fix });
+        undo = () => (was && was.by === 'owner' ? writeLook(base, bodyOf(ctx.slug, was)) : retireLook(base, ctx.slug));
+      } else if (said.do === 'body') {
+        const { setBody } = await import('$lib/record/page-write.ts');
+        const out = await setBody(base, said.body, undefined, s.rule.version);
+        if (out.from !== 'written') return put(s.key, { busy: false, said: out.fix });
+        const made = out.version;
+        undo = () => setBody(base, ctx.body, undefined, made);
+      } else {
+        const { renameListNow } = await import('$lib/record/list-name.ts');
+        const out = await renameListNow(base, said.list, said.name);
+        if (!out.ok) return put(s.key, { busy: false, said: out.fix });
+        undo = () => renameListNow(base, said.list, out.renamed.was);
+      }
+      forget();
+      put(s.key, { busy: false, kept: { kind: 'kept' } });
+      await onkept?.();
+      const back = undo;
+      toasts.push(said.said, {
+        undo: () =>
+          void back().then(async () => {
+            forget();
+            await onkept?.();
+            toasts.push(sayWords.undone);
+          }),
+      });
+    } catch {
+      put(s.key, { busy: false, said: words.unreached });
+    }
+  }
+
   /** Keep a draft (file and accept) or only file it; a double press files once. */
   async function settle(key: number, keep: boolean) {
     const s = shown.find((x) => x.key === key);
     if (!s || s.busy || s.kept) return;
+    if (s.rule) return void keepRule(s as Shown & { rule: Ruled });
     put(key, { busy: true, said: null });
     try {
       const kept = await fileDrafted(client(), s.draft, keep);
@@ -160,7 +271,8 @@
   function retry(key: number) {
     const s = shown.find((x) => x.key === key);
     if (!s || s.busy || s.kept || sending) return;
-    tried = [...tried, s.draft];
+    /* A RULES DRAFT TURNED DOWN ASKS THE MODEL for another way, with nothing of its own to hand back. */
+    if (!s.rule) tried = [...tried, s.draft];
     void send(true);
   }
 
@@ -171,7 +283,7 @@
 </script>
 
 <div class="ask">
-  {#if !model}
+  {#if !model && !say}
     <!-- NO FIELD THAT COULD NEVER WORK. Slash's own rules read how the record is used and cannot read a sentence, so
          with no model the sheet says so and offers the one other way to change a page. -->
     <p class="ask-said">{words.noModel}</p>
@@ -185,6 +297,7 @@
       }}
     >
       <label class="ask-hint" for={fieldId}>{about === undefined ? words.hintRecord : words.hintPage}</label>
+      {#if about !== undefined && say}<p class="ask-said ask-examples">{sayWords.hint}</p>{/if}
       <textarea
         id={fieldId}
         class="ask-field"
@@ -235,7 +348,9 @@
       <section class="ask-draft" aria-label={c.draft.question}>
         {#if shown.length === 1}<p class="ask-question">{c.draft.question}</p>{/if}
 
-        {#if c.drawn === null}
+        {#if c.rule && c.rule.said.do === 'rename'}
+          <p class="ask-said">{c.rule.said.said}</p>
+        {:else if c.drawn === null}
           <p class="ask-said" role="status">{words.drawing}</p>
         {:else if c.drawn.from === 'refused'}
           <p class="ask-said">{c.drawn.fix}</p>
@@ -253,8 +368,8 @@
           {#if c.said !== null}<p class="ask-said" role="alert">{c.said}</p>{/if}
           <div class="ask-actions">
             <Button weight="primary" disabled={c.busy} onclick={() => void settle(c.key, true)}>{c.busy ? words.keeping : words.keep}</Button>
-            <Button disabled={c.busy} onclick={() => void settle(c.key, false)}>{words.file}</Button>
-            <Button disabled={c.busy || sending} onclick={() => retry(c.key)}>{sending ? words.againing : words.again}</Button>
+            {#if !c.rule}<Button disabled={c.busy} onclick={() => void settle(c.key, false)}>{words.file}</Button>{/if}
+            {#if model}<Button disabled={c.busy || sending} onclick={() => retry(c.key)}>{sending ? words.againing : words.again}</Button>{/if}
             <Button weight="bare" disabled={c.busy} onclick={() => drop(c.key)}>{words.drop}</Button>
           </div>
         {:else if c.kept.kind === 'kept'}
@@ -304,6 +419,11 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     resize: vertical;
+  }
+
+  .ask-examples {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .ask-dropped,

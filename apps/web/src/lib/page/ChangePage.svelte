@@ -56,6 +56,8 @@
     type Headed,
   } from './look.ts';
   import { words as pageWords } from './words.ts';
+  import { CHANGE_PAGE_EVENT } from './slash-entry.ts';
+  import type { SayBlock, SayIn, SayList } from './say-page.ts';
 
   let {
     slug,
@@ -102,6 +104,9 @@
 
   let open = $state(false);
   let menu = $state(false);
+  /** A line Slash handed this page ("move Bills up"), sent once as the sheet opens; each one opens a fresh sheet. */
+  let line = $state<string | undefined>(undefined);
+  let lines = $state(0);
 
   /* THE SAME FACT THE PALETTE'S SLASH ROW STANDS ON: whether this host has a model behind Slash. */
   const model = $derived(page.data.slash === true);
@@ -139,6 +144,67 @@
     /* THROUGH `at()`, which hands back an address already under the app as it is (`at-sites.test.ts`). */
     void goto(at(withoutDescribe(page.url)), { replaceState: true, noScroll: true, keepFocus: true });
   });
+
+  /* A LINE ABOUT THE WHOLE PAGE FROM SLASH (`Arrange.svelte` hands it over when no block is in focus): the sheet opens on
+     it and reads it at once, by the rules first and the model only where they cannot. Taken, so it is not also held. */
+  $effect(() => {
+    if (!mayChange) return;
+    const on = (e: Event) => {
+      const said = (e as CustomEvent<{ line?: unknown }>).detail?.line;
+      if (typeof said !== 'string' || said.trim() === '') return;
+      e.preventDefault();
+      line = said.trim();
+      lines += 1;
+      open = true;
+    };
+    addEventListener(CHANGE_PAGE_EVENT, on);
+    return () => removeEventListener(CHANGE_PAGE_EVENT, on);
+  });
+
+  /**
+   * WHAT THE RULES READ A LINE AGAINST (`say-page.ts`), read as the line is sent and not before: the page's own body as
+   * the record stores it, its blocks in the order they are drawn, his look, and the lists with their fields. A home the
+   * record holds none of yet is the model's alone, since there is no body to change.
+   */
+  async function sayCtx(): Promise<Omit<SayIn, 'text'> | null> {
+    if (!change) return null;
+    const [{ authoredOf }, { REGISTERS }] = await Promise.all([import('$lib/record/page-write.ts'), import('$lib/record/held.ts')]);
+    const read = await authoredOf(apiBase(), slug);
+    if ('from' in read) return null;
+    const order = keys();
+    const all = heads() as readonly (Headed & { kind?: string; register?: string | null; source?: string; drawn?: boolean; area?: string })[];
+    const rank = (k: string) => {
+      const n = order.indexOf(k);
+      return n < 0 ? order.length + 1 : n;
+    };
+    const blocks: SayBlock[] = [...all]
+      .sort((a, b) => rank(a.key) - rank(b.key))
+      .map((b) => ({
+        key: b.key,
+        kind: b.kind ?? '',
+        heading: b.heading ?? null,
+        register: b.register ?? null,
+        source: b.source,
+        drawn: order.includes(b.key) && b.drawn !== false,
+        area: b.area === 'rail' ? 'rail' : 'main',
+      }));
+    /* EACH LIST BY THE NAME THIS PERSON SEES IT BY (the shell's, with his words), with the fields the record declared. */
+    const seen = new Map(((page.data as { index?: { registers?: { id: string; name: string }[] } }).index?.registers ?? []).map((r) => [r.id, r.name]));
+    const lists: SayList[] = Object.values(REGISTERS).map((r) => ({
+      id: r.id,
+      name: seen.get(r.id) ?? r.name,
+      one: r.one,
+      title: r.title,
+      state: r.state,
+      done: r.done,
+      fields: r.fields.map((f) => ({ id: f.id, type: f.type, label: f.label, values: (f as { values?: readonly string[] }).values })),
+    }));
+    for (const [id, name] of seen) if (!lists.some((l) => l.id === id)) lists.push({ id, name, fields: [] });
+    const counts = new Map<string, number>();
+    for (const b of blocks) if (b.register) counts.set(b.register, (counts.get(b.register) ?? 0) + 1);
+    const current = blocks.find((b) => b.register && slug.replace(/^r[-/]/u, '') === b.register)?.register ?? [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    return { slug: under, body: read.body, version: read.version, mine: read.mine, blocks, look, lists, current, now: Date.now() };
+  }
 
   /* EDIT LAYOUT FROM 900px, the width the arranging mode is drawn for. Read as the menu is drawn, so a window narrowed
      with the menu shut offers it no more. */
@@ -291,12 +357,13 @@
 {/if}
 
 {#if mayChange}
-  <Sheet bind:open title={words.change}>
-    <!-- KEYED BY THE PAGE, because the reader is kept across pages and a draft for the last page is not this one's. -->
-    {#key slug}
+  <Sheet bind:open title={words.change} onclose={() => (line = undefined)}>
+    <!-- KEYED BY THE PAGE, because the reader is kept across pages and a draft for the last page is not this one's; and by
+         each line Slash hands over, so a second line is read afresh. -->
+    {#key `${slug}:${lines}`}
       {#await import('./AskPage.svelte') then { default: AskPage }}
-        {#if built !== null && !change}<AskPage page={slug} {model} onsource={toSource} onkept={keptFirst} {built} />
-        {:else}<AskPage page={slug} {model} onsource={toSource} onkept={reread} />{/if}
+        {#if built !== null && !change}<AskPage page={slug} {model} onsource={toSource} onkept={keptFirst} {built} ask={line} />
+        {:else}<AskPage page={slug} {model} onsource={toSource} onkept={reread} say={sayCtx} ask={line} />{/if}
       {/await}
     {/key}
   </Sheet>

@@ -682,7 +682,16 @@
   function blockHeads() {
     const blocks = arranged(declaredOnly(live?.page.blocks ?? []));
     const keyed = blockKeys(blocks);
-    return blocks.map((b, i) => ({ key: keyed[i]!, heading: typeof (b as { heading?: unknown }).heading === 'string' ? (b as { heading: string }).heading : null }));
+    /* AND WHAT A LINE SAID ABOUT THE PAGE IS READ AGAINST (`say-page.ts`): its kind, its list, its source and column. */
+    return blocks.map((b, i) => ({
+      key: keyed[i]!,
+      heading: typeof (b as { heading?: unknown }).heading === 'string' ? (b as { heading: string }).heading : null,
+      kind: b.kind,
+      register: typeof b.register === 'string' ? b.register : null,
+      source: typeof (b as { source?: unknown }).source === 'string' ? (b as { source: string }).source : undefined,
+      drawn: b.drawn,
+      area: (b as { area?: unknown }).area === 'rail' ? 'rail' : 'main',
+    }));
   }
 
   /**

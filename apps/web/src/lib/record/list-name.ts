@@ -40,3 +40,30 @@ export async function renameList(base: string, id: string, was: string, name: st
   const change = { declaration_id: `register.${id}`, to: { id: `register.${id}`, kind: 'register', body: renamedBody(body, name) } };
   return fileChange(base, id, `Rename the list ${was} to ${name}?`, change, owner, 'Renamed by the owner.', io);
 }
+
+/** What the record's `renameList` answers: the old name, the new one, and the sentence the toast says. */
+export type ListRenamed = { list: string; was: string; name: string; said: string };
+
+/**
+ * ONE LIST RENAMED BY THE RECORD'S OWN CALL (`renameList`), wherever the name is kept: the speaking use case's word for
+ * it, or its own name. Slash, the first run's drafts and the page's own "Change this" send it; Undo is the same call with
+ * `was`. A record older than the call answers `ROUTE_UNKNOWN`, and that is said, never guessed around.
+ */
+export async function renameListNow(
+  base: string,
+  list: string,
+  name: string,
+  one?: string | null,
+  io?: Fetch,
+): Promise<{ ok: true; renamed: ListRenamed } | { ok: false; fix: string }> {
+  try {
+    const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+    const out = await client.call<ListRenamed>('renameList', { list, name, ...(one ? { one } : {}) });
+    if (out.ok) return { ok: true, renamed: out.value };
+    if (!('refusal' in out)) return { ok: false, fix: 'Something changed while this was open. Try again.' };
+    if (out.refusal.code === 'ROUTE_UNKNOWN' || out.refusal.code === 'NOT_IN_THIS_BUILD') return { ok: false, fix: 'This BrainDog cannot rename a list from here yet. Rename it in Settings, under Words.' };
+    return { ok: false, fix: out.refusal.fix };
+  } catch {
+    return { ok: false, fix: 'BrainDog could not be reached, so the list kept its name.' };
+  }
+}

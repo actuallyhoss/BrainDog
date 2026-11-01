@@ -79,7 +79,7 @@
   import { tokensOf as lineTokens, untoken, type Chip } from './tokens.ts';
   import { homeSlugOf, labels as heardLabels, relabel, singularOf } from '../voice.ts';
   import type { Shell } from '../record/boot-live.ts';
-  import { entryHref, slashEntryWords, slashLine } from '../page/slash-entry.ts';
+  import { entryHref, sayLine, slashEntryWords, slashLine } from '../page/slash-entry.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
   import { widgetRows } from '../board/palette-rows.ts';
   import { todayOffer } from '../board/offer.svelte.ts';
@@ -1159,7 +1159,9 @@
     if (plainMade && plainAt && into)
       kept.push({ id: 'c-add-plain', title: createWords.plain(into.one ?? into.name), detail: plainMade.title, href: null, group: createWords.plainGroup, icon: plainAt.icon, act: plainAt.act, creation: plainMade, plain: true });
     /* "MAKE ..." AND "CHANGE ..." GO TO THE PAGE: the first row, since a person who typed the verb means it. */
-    const entry = parsed.prefix === null ? slashLine(parsed.text) : null;
+    /* AND THE PAGE'S OWN CHANGES SAID WITHOUT "CHANGE" ("move Bills up", "show only open ones"), where no other row took
+       the line: "hide Inbox" is the nav's, and stays its. */
+    const entry = parsed.prefix === null ? (slashLine(parsed.text) ?? (pageHere && (live.customise ?? []).length === 0 ? sayLine(parsed.text) : null)) : null;
     const toPage = entry ? entryHref(entry, pageHere ? page.url.pathname : null) : null;
     if (entry && toPage)
       kept.unshift({ id: `c-${entry.verb}`, title: slashEntryWords[entry.verb](entry.line), href: toPage, group: '', icon: entry.verb === 'make' ? 'plus' : 'edit' });

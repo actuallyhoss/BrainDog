@@ -73,6 +73,7 @@ import { methods as toolsSeenMethods } from './tools-seen.ts';
 import { methods as namedTwiceMethods } from './named-twice.ts';
 import { methods as exportPack } from './export-pack.ts';
 import { methods as deviceRenameMethods } from './device-rename.ts';
+import { methods as renameListMethods } from './rename-list.ts';
 import { methods as packsRemovedMethods } from './packs-removed.ts';
 import { methods as deciderMethods } from './decider.ts';
 import { methods as flowGrammarMethods } from './flow-grammar.ts';
@@ -302,6 +303,7 @@ export function methods(deps: RecordDeps) {
     ...namedTwiceMethods(deps),
     ...exportPack(deps),
     ...deviceRenameMethods(deps),
+    ...renameListMethods(deps),
     ...packsRemovedMethods(deps),
     ...deciderMethods(deps),
     ...flowGrammarMethods(deps),
