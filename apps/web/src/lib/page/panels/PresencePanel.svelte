@@ -53,6 +53,7 @@
     type Thread,
   } from '$lib/record/instruct.ts';
   import { machinesOf } from './machines.ts';
+  import NamedAgents from '$lib/agents/NamedAgents.svelte';
 
   let {
     owner = false,
@@ -215,6 +216,8 @@
     <span class="at-work-busy" aria-busy="true"></span>
   {:else if drawn === 0}
     <p class="at-work-none">{words.none}</p>
+    <!-- THE AGENTS HE NAMED THAT HAVE NOT CALLED YET, each with Connect (`NamedAgents.svelte`), for the owner. -->
+    {#if owner}<NamedAgents />{/if}
   {:else}
     <div class="at-work">
       {#if shownViews.length > 0}{@render list('shown', shownViews)}{/if}

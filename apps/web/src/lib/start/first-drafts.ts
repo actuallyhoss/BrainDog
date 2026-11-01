@@ -228,7 +228,7 @@ const ABOUT_ME = /^(?:hi|hello|hey)?[\s,!]*(?:i'?m|i am|i run|i own|i work|i hav
  * DOING COUNTS AT THE FRONT OF THE CLAUSE (1 Nov, a live run: "A spreadsheet and invoices by email", an answer about how
  * she works, was offered as a task for its "email"), and "want to" is a wish, not a thing to do.
  */
-const DOING = /\b(?:need to|have to|must|got to|remember to|going to)\b|^(?:(?:and|also|then)\s+)?(?:(?:i|we)\s+(?:also\s+)?(?:should|will|'ll|must)\s+)?(?:call|email|text|send|book|buy|pay|finish|fix|file|renew|cancel|chase|ask|meet|pick up|drop off|submit|reply to|follow up|invoice|sign|post|ship|review|update|prepare|write)\b/iu;
+const DOING = /\b(?:need to|have to|must|got to|remember to|going to)\b|^(?:(?:and|also|then)\s+)?(?:(?:i|we)\s+(?:also\s+)?(?:should|will|'ll|must)\s+)?(?:call|email|text|send|book|buy|pay|finish|fix|file|renew|cancel|chase|ask|meet|pick up|drop off|submit|reply to|follow up|invoice|sign|post|ship|review|update|prepare|write|set up|list|add)\b/iu;
 
 /** Whether an entry's title reads as a thing to do ("Send Fenwick's invoice"), for the drafts that land in Tasks. */
 export const readsAsTodo = (title: string): boolean => DOING.test(title.trim());

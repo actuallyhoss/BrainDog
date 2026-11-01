@@ -1200,6 +1200,12 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     heard: typed === null ? sayCurrency(lines, modules, currency) : lines,
     ...(Object.keys(names).length === 0 ? {} : { names }),
   };
+  /* A CLIENT BY ONE NAME IS A COMPANY (`clientCompany`), kept in organisations, where no other entry points at it. */
+  for (const [i, r] of rows.entries()) {
+    if (rows.some((x) => x.party === i)) continue;
+    const org = clientCompany({ register: r.register, fields: r.fields }, modules);
+    if (org !== null) rows[i] = { register: org.register, fields: org.fields };
+  }
   return businessNotProject({
     ...out,
     currency,
@@ -1225,10 +1231,27 @@ function calledClient(name: string, sentence: string): boolean {
  * projects and as organisations drawn as "a project you are building"). A project so named becomes a person in People
  * with the role client, where People is kept; an organisation so named is kept as one, marked a client.
  */
+/** Whether a client's name reads as a company's: one word ("Fenwick", "Acme"), or a company's ending ("Acme Ltd"). */
+const COMPANY = /^\S+$|\b(?:ltd|limited|inc|llc|plc|gmbh|co|corp|group|studio|studios|labs|agency|partners|holdings|bank|foundation)\.?$/iu;
+
+/**
+ * A CLIENT WHO IS A COMPANY IS AN ORGANISATION (1 Nov, a live run: People read "2 people besides you" over Fenwick and
+ * Acme, two companies): a person in People with the role client whose name reads as a company's (`COMPANY`) is kept in
+ * organisations as a client instead, where the build keeps that list. `null` where the entry stays as it is.
+ */
+export function clientCompany(row: Pick<Proposal['rows'][number], 'register' | 'fields'>, modules: readonly string[]): Proposal['rows'][number] | null {
+  const name = String(row.fields['name'] ?? '').trim();
+  if (row.register !== PEOPLE || row.fields['role'] !== 'client' || name === '' || !COMPANY.test(name) || !listById(ORGANISATIONS, modules)) return null;
+  return { register: ORGANISATIONS, fields: { name, kind: 'client' } };
+}
+
+const ORGANISATIONS = 'organisations';
+
 export function clientNotProject(row: Proposal['rows'][number], sentence: string, modules: readonly string[]): Proposal['rows'][number] {
   const name = String(row.fields['name'] ?? '').trim();
   if (name === '' || !calledClient(name, sentence)) return row;
-  if (row.register === 'things' && listById(PEOPLE, modules)) return { register: PEOPLE, fields: { name, role: 'client' } };
+  if (row.register === 'things' && listById(PEOPLE, modules)) return clientCompany({ register: PEOPLE, fields: { name, role: 'client' } }, modules) ?? { register: PEOPLE, fields: { name, role: 'client' } };
+  if (row.register === PEOPLE) return clientCompany(row, modules) ?? row;
   if (row.register === 'organisations' && row.fields['kind'] === undefined) return { ...row, fields: { ...row.fields, kind: 'client' } };
   return row;
 }

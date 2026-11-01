@@ -76,6 +76,11 @@ export type Accepting = {
   /** A press after one that came back with something not made: the record writes only what is missing. */
   again?: boolean;
   /**
+   * THE AI APPS THEY NAMED THAT ARE AGENTS BRAINDOG KNOWS (`agentsNamed` in `lib/start/chat.ts`), each kept as its agent's
+   * row (`keepAgents`), not connected until it first calls.
+   */
+  agents?: readonly { kind: string; name: string }[];
+  /**
    * THE BUILD'S OWN HANDLE, set once by the page that built it and sent again with every press of the same build, so the
    * record writes its entries once. A press whose answer never came back and is pressed again with `again` must carry the
    * key the first one carried, or the record takes it for a new press and writes every entry twice (finding
@@ -439,6 +444,10 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   const arrivesBy = asked.proposal.answers?.arrivesBy;
   if (arrivesBy !== undefined) writePref({ arrivesBy });
 
+  /* THE AGENTS THEY NAMED, EACH ITS OWN ROW (`keepAgents`), once the build is in. One that could not be kept is no
+     failure of the build: Settings, Agents makes it the day the agent first calls. */
+  if ((asked.agents ?? []).length > 0) await keepAgents(client, asked.agents ?? []).catch(() => undefined);
+
   /* WHAT THE MAKING WROTE, COUNTED ONCE IT IS IN (AH19): a Guide's plan is the starter's, not something the person added,
      so Today still offers to tell it one real thing. Before the file, which the person brought. */
   const made = await madeCounts(client);
@@ -452,6 +461,25 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   }
 
   return { failed, left, nav, filed, refused, ...(formed.length === 0 ? {} : { plan }) };
+}
+
+/**
+ * ONE ROW FOR EACH AGENT THEY NAMED (1 Nov, a live run: "Claude, and Figma" said "That adds Agents" and the Agents page
+ * then held no agent): the agent's own settings row, matched by its kind, as the record makes one for each kind of agent
+ * that calls (`agent_profile`, migration 42). It starts as Defaults are and says nothing about the agent being connected:
+ * that is the first call it makes, and the Agents page offers to connect it until then. A kind that has a row already is
+ * left as it is. The owner's alone, signed in, which the press always is.
+ */
+export async function keepAgents(client: Client, agents: readonly { kind: string; name: string }[]): Promise<void> {
+  const c = client as unknown as {
+    agentProfiles?: () => Promise<Wire<{ match?: { kind?: string; token?: string; host?: string; seat?: string }; retired_at?: string | null }[]>>;
+    setAgentProfile?: (args: Record<string, unknown>) => Promise<Wire<unknown>>;
+  };
+  if (typeof c.agentProfiles !== 'function' || typeof c.setAgentProfile !== 'function') return;
+  const held = await c.agentProfiles();
+  if (!held.ok) return;
+  const kinds = new Set(held.value.filter((p) => !p.retired_at && p.match?.kind && !p.match.token && !p.match.host && !p.match.seat).map((p) => p.match?.kind));
+  for (const a of agents) if (!kinds.has(a.kind)) await c.setAgentProfile({ name: a.name, match: { kind: a.kind } });
 }
 
 /** How many of a file's entries go to the record in one call. */

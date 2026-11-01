@@ -130,18 +130,22 @@
   import Forming from './Forming.svelte';
   import {
     ackOf,
+    agentsNamed,
     askedLines,
     atLeast,
     caseTitle,
     chatWords,
     currencyUnclear,
     draftsSaid,
+    entriesSaid,
     firstAsk,
+    firstTurnsOn,
     namedCurrency,
     nextAsk,
     QUICK_MS,
     READS_MOST,
     saidOf,
+    todosOf,
     toolRows,
     TURNS_ON,
     valueOf,
@@ -300,12 +304,16 @@
     const handCurrency = currencyByHand || (currency !== null && currency !== (proposal?.currency ?? null));
     /* A NAME ANSWERED IN THE CONVERSATION STANDS OVER EVERY LATER READING. */
     if (nameAnswer !== null) p = withName(p, nameAnswer);
-    /* THE TOOLS THEY NAMED ARE KEPT IN AGENTS' TOOLS, whichever reading stands (`toolRows`). */
-    if (toolsSaid.length > 0 && p.modules.includes('agents')) p = { ...p, rows: [...p.rows, ...toolsSaid.filter((t) => !p.rows.some((r) => r.register === 'tools' && String(r.fields['name']).toLowerCase() === String(t.fields['name']).toLowerCase()))] };
     if (merge && proposal !== null) {
       const was = proposal;
-      p = { ...p, rows: p.rows.length > 0 ? p.rows : was.rows, heard: p.heard.length > 0 ? p.heard : was.heard, ...(p.names ? {} : was.names ? { names: was.names } : {}) };
+      /* EVERY ENTRY A READING NAMED STANDS (1 Nov, a live run: the whole reading landed with its own entries and the tool
+         and the clients the turns had kept were gone by Make it mine): the newer reading's first, then each earlier one
+         it does not name (`sameEntry`). */
+      p = { ...p, rows: unionRows(p.rows, was.rows), heard: p.heard.length > 0 ? p.heard : was.heard, ...(p.names ? {} : was.names ? { names: was.names } : {}) };
     }
+    /* THE TOOLS THEY NAMED ARE KEPT IN AGENTS' TOOLS, whichever reading stands and whatever it read (`toolRows`): the
+       tools question turns Agents on by itself (`TURNS_ON`), so a reading that left Agents out still keeps them. */
+    if (toolsSaid.length > 0) p = { ...p, rows: unionRows(p.rows, toolsSaid) };
     const before = merge ? kept : [];
     proposal = p;
     owed = undefined;
@@ -320,6 +328,40 @@
     /* A FILE ALONE, WITH NOTHING SAID, IS NOT A BUSINESS TO DRAFT FOR: its own list is what it makes. */
     /* ONLY ONCE THE TALK IS DONE: a draft is a model ask of its own, and the conversation asks one per answer already. */
     if (talkDone) draftIfOutside();
+  }
+
+  /** Two entries are one where they name the same thing in one list, or the same somebody in People's two lists. */
+  const sameEntry = (a: { register: string; fields: Record<string, unknown> }, b: { register: string; fields: Record<string, unknown> }): boolean => {
+    const t = (r: typeof a) => String(r.fields['name'] ?? r.fields['what'] ?? r.fields['title'] ?? '').trim().toLowerCase();
+    const who = (r: typeof a) => r.register === 'people' || r.register === 'organisations';
+    return t(a) !== '' && t(a) === t(b) && (a.register === b.register || (who(a) && who(b)));
+  };
+  /** `first`'s entries, then each of `then`'s that none of them names. A `party` between them is kept only within `first`. */
+  function unionRows<R extends { register: string; fields: Record<string, unknown>; party?: number }>(first: readonly R[], then: readonly R[]): R[] {
+    const out = [...first];
+    for (const r of then) {
+      if (out.some((x) => sameEntry(x, r))) continue;
+      const { party: _party, ...rest } = r;
+      out.push(rest as R);
+    }
+    return out;
+  }
+
+  /** The entries without the things to do, each `party` pointed again at its entry's new place. */
+  function withoutTasks<R extends { register: string; party?: number }>(rows: readonly R[]): R[] {
+    const place = new Map<number, number>();
+    const out: R[] = [];
+    for (const [i, r] of rows.entries()) {
+      if (r.register === 'tasks') continue;
+      place.set(i, out.length);
+      out.push(r);
+    }
+    return out.map((r) => {
+      if (r.party === undefined) return r;
+      const to = place.get(r.party);
+      const { party: _p, ...rest } = r;
+      return (to === undefined ? rest : { ...rest, party: to }) as R;
+    });
   }
 
   function draftIfOutside() {
@@ -346,6 +388,8 @@
   const knownName = $derived(page.data.live ? ((page.data as unknown as Shell).me?.name ?? '').trim() || null : null);
   /** The tools they named that are not AI apps, kept in Agents' Tools (`toolRows`). */
   let toolsSaid = $state.raw<{ register: string; fields: Record<string, unknown> }[]>([]);
+  /** The AI apps they named that BrainDog knows as agents, kept as agents not yet connected (`agentsNamed`). */
+  let agentsSaid = $state.raw<{ kind: string; name: string }[]>([]);
   /** A currency answered in the conversation, which no reading replaces. */
   let currencyByHand = $state(false);
   /** The model reads this conversation has spent, `READS_MOST` at most; the rules read after that. */
@@ -429,7 +473,7 @@
     /* HER ANSWER STAYS WHERE SHE SENT IT, under its question, while BrainDog reads it (1 Nov: both went for the dots and
        came back with the reply). BrainDog's line back is laid on the same turn when the reading lands. */
     chatTurns = all;
-    const laid: { currency?: string | null; usecase?: string | null; name?: string | null } = {};
+    const laid: { currency?: string | null; usecase?: string | null; name?: string | null; entries?: string | null } = {};
     if (q.topic === 'currency' && value !== null) {
       currency = value;
       currencyByHand = true;
@@ -441,7 +485,11 @@
         kept = [...kept, 'money-core'];
       }
     }
-    if (q.topic === 'tools' && text !== null) toolsSaid = toolRows(text);
+    if (q.topic === 'tools' && text !== null) {
+      toolsSaid = toolRows(text);
+      agentsSaid = agentsNamed(text);
+    }
+    const rowsBefore = proposal?.rows ?? [];
     if (q.topic === 'closest' && value !== null) {
       caseByHand = true;
       chosen = value;
@@ -463,7 +511,7 @@
            the use case under the person (a founder's money answer read the whole as a small business). */
         if (q.topic === 'what' && chosen !== null) caseKept = true;
         /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`), kept as by hand. */
-        const part = TURNS_ON[q.topic];
+        const part = TURNS_ON[q.topic] ?? (text !== null && (q.topic === 'first' || /\bfirst\b/iu.test(q.question)) ? firstTurnsOn(text) : null) ?? undefined;
         if (part !== undefined && adds !== '' && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !kept.includes(part) && offered.includes(part)) {
           onByHand = new Set([...onByHand, part]);
           offByHand = new Set([...offByHand].filter((x) => x !== part));
@@ -479,6 +527,9 @@
         if (named !== null) currency = named;
       }
       await tick();
+      /* WHAT IT ADDED BY NAME (`entriesSaid`): the clients, people and projects this answer brought, never the tools,
+         which "That adds Agents" already says. */
+      laid.entries = q.topic === 'tools' ? null : entriesSaid(rowsBefore, proposal?.rows ?? []);
       chatTurns = [...chatTurns.filter((t) => t !== turned), { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
       await atLeast(since);
     } finally {
@@ -486,11 +537,25 @@
     }
     const next = nextAsk(where());
     lateAsk = null;
-    /* THE WHOLE READING, ONCE TWO ANSWERS ARE IN: by the end it has usually landed. */
-    if (next !== null && chatTurns.filter((t) => t.answer !== null).length === 2) readWhole(sentence, askedLines(chatTurns));
     if (next === null) finishTalk();
     else asking = next;
+    /* THE WHOLE READING, ONCE TWO ANSWERS ARE IN AND THE NEXT QUESTION IS ON SCREEN (1 Nov, a live run: the first
+       question took eight seconds while two calls ran at once). Never before the second answer, never while a turn is
+       being read, and nothing waits on it: by the end it has usually landed. */
+    if (next !== null && chatTurns.filter((t) => t.answer !== null).length === 2) wholeSoon();
   }
+
+  /** The whole reading, a beat after the question is drawn, and only while no turn is being read. */
+  let wholeTimer: ReturnType<typeof setTimeout> | undefined;
+  function wholeSoon() {
+    clearTimeout(wholeTimer);
+    wholeTimer = setTimeout(() => {
+      if (busy || made || talkDone) return;
+      if (thinking) return void wholeSoon();
+      readWhole(sentence, askedLines(chatTurns));
+    }, 400);
+  }
+  $effect(() => () => clearTimeout(wholeTimer));
 
   /** What the next question is chosen from (`nextAsk`). */
   function where() {
@@ -790,6 +855,9 @@
   let drawAsked = $state.raw<Record<string, unknown>[]>([]);
   let drawKey = '';
   $effect(() => {
+    /* ONLY ONCE THE TALK IS DONE, where the pages are drawn (1 Nov): every module's install document was built and read
+       on every answer while nobody could see it, and the next question waited behind it. */
+    if (!talkDone) return;
     const key = JSON.stringify(asks);
     if (key === drawKey) return;
     drawKey = key;
@@ -889,13 +957,21 @@
 
   async function make() {
     if (!proposal || !ready) return;
-    /* WHAT THE PRESS MAKES IS WHAT WAS ON SCREEN WHEN IT LANDED, read once here, before the first call goes out. */
+    /* WHAT THE PRESS MAKES IS WHAT WAS ON SCREEN WHEN IT LANDED, read once here, before the first call goes out.
+       EVERY TOOL NAMED GOES IN WITH IT, through the same rows (1 Nov, a live run: "Claude, and Figma" and then "Nothing in
+       Tools yet"), and Agents with them. A THING TO DO IS NOT WRITTEN UNASKED: it waits on Today with the to-dos drawn
+       from what they said, for a press (`todos` below). */
+    const tools = toolsSaid.length > 0 || agentsSaid.length > 0;
+    const shown = proposal;
+    const build = { ...proposal, rows: withoutTasks(unionRows(proposal.rows, toolsSaid)) };
+    const todo = proposal.rows.filter((r) => r.register === 'tasks').map((r) => String(r.fields['what'] ?? '').trim()).filter((x) => x !== '');
     const asked = {
       sentence,
-      proposal,
+      proposal: build,
       usecase: u?.usecase ?? null,
       also: also.map((a) => a.usecase),
-      modules,
+      modules: tools && !modules.includes('agents') && offered.includes('agents') ? [...modules, 'agents'] : modules,
+      agents: agentsSaid,
       currency: money === null ? null : currency,
       today: dayOf(Date.now()),
       nav: pref.read().nav ?? [],
@@ -940,8 +1016,14 @@
         madeModules = asked.modules;
         madePlaces = railPlaces(asked.proposal.places, filledBy(asked.proposal.rows)).filter((x) => x.kind !== 'today').map((x) => x.name);
         madeAddons = tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }));
-        /* ONLY WHAT MAY HOLD A THING TO DO is read again for Today (`draftsSaid`): never the answers that set it up. */
-        const forDrafts = chatTurns.length > 0 ? draftsSaid(chatTurns) : sentence;
+        /* ONLY WHAT MAY HOLD A THING TO DO is read again for Today (`draftsSaid`): never the answers that set it up. With
+           it, the things to do the readings found and the first to-dos drawn from what to keep first and the clients
+           named (`todosOf`), one to three, each offered on Today for a press. */
+        const clients = asked.proposal.rows
+          .filter((r) => (r.register === 'organisations' && r.fields['kind'] === 'client') || (r.register === 'people' && r.fields['role'] === 'client'))
+          .map((r) => String(r.fields['name'] ?? ''));
+        const todos = [...todo, ...todosOf(chatTurns, clients, todo)].slice(0, 3);
+        const forDrafts = chatTurns.length > 0 ? draftsSaid(chatTurns, todos) : sentence;
         madeSaid = forDrafts.trim() === '' ? null : saidMade(forDrafts, asked.proposal.rows);
         made = true;
         globalThis.scrollTo?.({ top: 0 });
@@ -949,7 +1031,7 @@
       }
       /* WHAT WENT IN STAYS IN, AND IS NOT ASKED FOR AGAIN: the proposal keeps only the entries not written, so pressing
          "Make it mine" after a refusal writes only the ones that were not made. */
-      if (out.left.length < asked.proposal.rows.length && proposal === asked.proposal) proposal = { ...asked.proposal, rows: out.left };
+      if (out.left.length < asked.proposal.rows.length && proposal === shown) proposal = { ...asked.proposal, rows: out.left };
       /* A DRAFT ON DECIDE IS NOT FILED TWICE: kept, or waiting there, the next press leaves it where it is. */
       if (out.filed && draft === asked.drafted) draft = null;
       failed = out.failed;

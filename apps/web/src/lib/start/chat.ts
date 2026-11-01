@@ -118,7 +118,9 @@ const PEOPLE_WORDS = /\b(alone|solo|by myself|just me|on my own|clients?|custome
 const TOOL_WORDS = /\b(claude|chatgpt|gpt|cursor|codex|copilot|gemini|windsurf|perplexity|ai tools?|no ai|none yet)\b/iu;
 /* A thing they work on, said by name: "clients Fenwick and Acme", "an app called Tidepool", "for Fenwick". */
 /* A NAME HAS A SMALL LETTER AFTER ITS CAPITAL, so a currency code ("clients pay me in USD") is never taken for one. */
-const NAMED_WORK = /\b(?:clients?|customers?|projects?|products?|apps?|called|named|for|with|on|building)\b[^.?!\n]{0,40}?\b\p{Lu}\p{Ll}[\p{L}\p{N}'’-]*/u;
+/* A PLACE IS NO NAME OF THEIR WORK: "3 clients in the Gulf" names where the clients are, not who (1 Nov, the rules took
+   it for named clients and never asked which). */
+const NAMED_WORK = /\b(?:clients?|customers?|projects?|products?|apps?|called|named|for|with|on|building)\b[^.?!\n]{0,40}?\b(?<!\b(?:in|at|from|across|around|near|based in)\s+(?:the\s+)?)\p{Lu}\p{Ll}[\p{L}\p{N}'’-]*/u;
 
 /** The ISO codes a sentence names outright ("USD", "in EUR"). */
 function codesIn(said: string): string[] {
@@ -328,22 +330,79 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
   }
 }
 
+/**
+ * THE TOPICS THE MODEL MAY ASK ABOUT IN THE CONVERSATION (1 Nov, a live run asked "What's your main expense category?" of
+ * somebody who never raised one): what they work on, money in and out, the currency, who they work with, their tools, and
+ * what to keep first. A question about anything else is dropped and the rules ask their next.
+ */
+export const MODEL_TOPICS: ReadonlySet<Topic> = new Set<Topic>(['work', 'money', 'currency', 'people', 'tools', 'first']);
+
+/** Money words a question may only use where the person used them first: a category, a budget, a tax, a goal. */
+const UNRAISED = /\b(categor\w*|budget\w*|tax\w*|expense\w*|spending|savings?|goals?|rates?|pricing|profit\w*|margins?)\b/giu;
+
+/** Whether a question brings in a money word nobody said ("your main expense category" to somebody who said she is paid). */
+function raisesNew(question: string, said: string): boolean {
+  const s = said.toLowerCase();
+  for (const m of question.toLowerCase().matchAll(UNRAISED)) {
+    const stem = (m[1] ?? '').replace(/(?:ies|es|s)$/u, '').slice(0, 6);
+    if (stem !== '' && !s.includes(stem)) return true;
+  }
+  return false;
+}
+
+/**
+ * THE NAMES ALREADY SAID AS SOMETHING, read without case: every entry the reading holds (a client, a person, a project) and
+ * every tool named. A suggested answer is never one of them (1 Nov, a live run offered "Fenwick" and "Acme", named as
+ * clients, as the answers to which projects to track).
+ */
+export function namedIn(w: Pick<Where, 'proposal' | 'turns'>): Set<string> {
+  const out = new Set<string>();
+  for (const r of w.proposal?.rows ?? []) {
+    const t = String(r.fields['name'] ?? r.fields['what'] ?? r.fields['title'] ?? '').trim().toLowerCase();
+    if (t !== '') out.add(t);
+  }
+  for (const t of w.turns) if (t.ask.topic === 'tools' && t.answer) for (const n of splitNames(t.answer)) out.add(n.toLowerCase());
+  return out;
+}
+
+/** Plain examples for a question about which work to track, where the model's taps were names said as something else. */
+const WORK_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
+  freelance: ['A redesign', 'A new website', 'Ongoing support'],
+  founder: ['Our first launch', 'Finding customers', 'Hiring'],
+  student: ['My courses', 'A side project', 'A thesis'],
+  shop: ['New products', 'A sale', 'Restocking'],
+};
+
 /** The model's question, held to what the screen can say and to a topic not yet asked, or `null`. */
 function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): ChatAsk | null {
   if (!m) return null;
   const topic = m.about as Topic;
-  /* THE MODEL READ THE WHOLE CONVERSATION, so its question stands over the rules' guesses at what is settled; only a
-     topic asked already, a name known and a currency named are never asked again. */
-  if (asked.has(topic) || ((topic === 'name' || topic === 'currency' || topic === 'closest') && settled(topic, w))) return null;
+  /* ONLY THE CONVERSATION'S OWN TOPICS (`MODEL_TOPICS`), never one asked already. A name known, a currency named, money
+     already said and the tools already named are never asked again, whatever the model read. */
+  if (!MODEL_TOPICS.has(topic) || asked.has(topic)) return null;
+  if ((topic === 'currency' || topic === 'money' || topic === 'tools') && settled(topic, w)) return null;
   const question = m.question.trim();
-  if (!fits(question, QUESTION_MOST)) return null;
+  if (!fits(question, QUESTION_MOST) || raisesNew(question, w.said)) return null;
   /* A CURRENCY IS A CODE THIS DEVICE KNOWS: the model's words, the rules' taps. */
   if (topic === 'currency') {
     const r = rulesAsk('currency', w);
     return r === null ? null : { ...r, question, by: 'model' };
   }
+  /* NO TAP RE-OFFERS A NAME ALREADY SAID AS SOMETHING ELSE (`namedIn`): a client is not offered as a project. */
+  const named = namedIn(w);
   const choices: Choice[] = [];
-  for (const c of m.choices) if (fits(c.trim(), CHOICE_MOST) && !choices.some((x) => x.value === c.trim())) choices.push(tap(c.trim()));
+  for (const c of m.choices) {
+    const v = c.trim();
+    if (fits(v, CHOICE_MOST) && !named.has(v.toLowerCase()) && !choices.some((x) => x.value === v)) choices.push(tap(v));
+  }
+  /* WHERE THAT LEFT FEWER THAN TWO: plain examples for their work, the rules' own taps for what first, or none. */
+  if (choices.length < 2 && m.choices.length > 0) {
+    const kind = kindOf(w.said, w.usecase) ?? '';
+    /* A QUESTION ABOUT WHICH PROJECTS IS ANSWERED WITH PLAIN EXAMPLES OF WORK, whatever topic it came under. */
+    const work = topic === 'work' || /\bprojects?\b/iu.test(question);
+    const instead = work ? (WORK_EXAMPLES[kind] ?? ['A few projects', 'One big project']) : topic === 'first' ? (rulesAsk('first', w)?.choices.map((c) => c.label) ?? []) : [];
+    choices.splice(0, choices.length, ...instead.filter((x) => !named.has(x.toLowerCase())).map((x) => tap(x)));
+  }
   return { topic, question, choices: choices.slice(0, 4), many: topic === 'tools' || topic === 'first', by: 'model' };
 }
 
@@ -383,6 +442,12 @@ export function nextAsk(w: Where): ChatAsk | null {
  * with keeps People, the AI tools keep Agents. The question was about that part, so the answer is its reason.
  */
 export const TURNS_ON: Partial<Record<Topic, string>> = { money: 'money-core', people: 'people', tools: 'agents' };
+
+/**
+ * AND WHAT AN ANSWER TO "WHAT FIRST" ASKS FOR BY ITS OWN WORDS: deadlines, to-dos or tasks keep Work, where the first
+ * to-dos drawn from them wait (`todosOf`). `null` where it names none.
+ */
+export const firstTurnsOn = (answer: string): string | null => (/\b(?:deadlines?|due dates?|tasks?|to-?dos?|things to do)\b/iu.test(answer) ? 'work' : null);
 
 /** The answer is a no ("Not now", "None yet", "Just me" to money): it adds nothing to build from. */
 const NO = /^(?:no|nope|none|none yet|not now|not yet|not really|nothing|n\/a|-)\.?$/iu;
@@ -469,14 +534,60 @@ export function askedLines(turns: readonly ChatTurn[], next: ChatAsk | null = nu
  * WHAT BRAINDOG SAYS TO AN ANSWER before it asks the next: the places it added ("That adds Money and Clients."), the
  * currency or use case or name laid on, or a plain thanks. One short line.
  */
-export function ackOf(ask: ChatAsk, answer: string | null, before: readonly string[], after: readonly string[], i: number, laid: { currency?: string | null; usecase?: string | null; name?: string | null } = {}): string | null {
+export function ackOf(
+  ask: ChatAsk,
+  answer: string | null,
+  before: readonly string[],
+  after: readonly string[],
+  i: number,
+  laid: { currency?: string | null; usecase?: string | null; name?: string | null; entries?: string | null } = {},
+): string | null {
   if (answer === null) return null;
   if (laid.currency) return chatWords.currencyIs(laid.currency);
   if (laid.usecase) return chatWords.caseIs(laid.usecase);
   if (laid.name) return chatWords.callYou(laid.name);
   const came = after.filter((p) => !before.includes(p));
+  /* WHAT THE ANSWER ADDED BY NAME COMES FIRST (1 Nov, a live run answered "Clients Fenwick and Acme" with "Good to know"):
+     "Added Fenwick and Acme as clients.", and the places it turned on after it. */
+  if (laid.entries) return came.length > 0 ? `${laid.entries} ${chatWords.adds(came)}` : laid.entries;
   if (came.length > 0) return chatWords.adds(came);
   return chatWords.thanks[i % chatWords.thanks.length] ?? 'Got it.';
+}
+
+/** One entry the reading holds, as `entriesSaid` reads it. */
+type Entry = { register: string; fields: Record<string, unknown> };
+
+/** What kind of thing an entry is, in the words the line back says it in, or `null` for one it does not say. */
+function kindOfEntry(r: Entry): { one: string; many: string } | null {
+  const role = String(r.fields['role'] ?? r.fields['kind'] ?? '');
+  if ((r.register === 'people' || r.register === 'organisations') && role === 'client') return { one: 'a client', many: 'clients' };
+  if (r.register === 'people') return { one: 'someone you work with', many: 'people you work with' };
+  if (r.register === 'organisations') return { one: 'an organisation', many: 'organisations' };
+  if (r.register === 'things') return { one: 'a project', many: 'projects' };
+  if (r.register === 'tools') return { one: 'a tool', many: 'tools' };
+  return null;
+}
+
+const titleOfEntry = (r: Entry): string => String(r.fields['name'] ?? r.fields['what'] ?? r.fields['title'] ?? '').trim();
+
+/**
+ * THE ENTRIES AN ANSWER ADDED, SAID BY NAME ("Added Fenwick and Acme as clients."), or `null` where it added none that
+ * the line says. By kind, in the order they came; at most two kinds.
+ */
+export function entriesSaid(before: readonly Entry[], after: readonly Entry[]): string | null {
+  const had = new Set(before.map((r) => titleOfEntry(r).toLowerCase()));
+  const groups = new Map<string, { kind: { one: string; many: string }; names: string[] }>();
+  for (const r of after) {
+    const t = titleOfEntry(r);
+    const k = kindOfEntry(r);
+    if (t === '' || k === null || had.has(t.toLowerCase())) continue;
+    had.add(t.toLowerCase());
+    const g = groups.get(k.many) ?? { kind: k, names: [] };
+    g.names.push(t);
+    groups.set(k.many, g);
+  }
+  const parts = [...groups.values()].slice(0, 2).map((g) => `${and(g.names)} as ${g.names.length === 1 ? g.kind.one : g.kind.many}`);
+  return parts.length === 0 ? null : `Added ${parts.join(', and ')}.`;
 }
 
 /* ── a name answered ───────────────────────────────────────────────────── */
@@ -553,12 +664,44 @@ const AI_APPS = /^(?:claude(?: code| desktop)?|chatgpt|gpt(?:-?\d.*)?|openai|cur
  * picked Claude on Made and left Figma nowhere). Each is an integration by its name, as typed; Claude, ChatGPT, Cursor and
  * the like are the apps Made connects and are left out. At most four.
  */
-export function toolRows(answer: string): { register: string; fields: Record<string, unknown> }[] {
-  const names = plain(answer)
+/** Every name an answer lists ("Claude, and Figma" is Claude and Figma), as typed, none twice, the AI apps included. */
+export function splitNames(answer: string): string[] {
+  const out: string[] = [];
+  for (const n of plain(answer)
     .replace(/^(?:i\s+(?:also\s+)?use|we\s+use|mostly|just|only)\s+/iu, '')
     .split(/\s*(?:,|\band\b|&|\+|\/|\bplus\b)\s*/iu)
-    .map((x) => x.trim().replace(/^(?:the|a|an)\s+/iu, ''))
-    .filter((x) => x !== '' && [...x].length <= 40 && !AI_APPS.test(x));
+    .map((x) => x.trim().replace(/^(?:the|a|an)\s+/iu, ''))) {
+    if (n !== '' && [...n].length <= 40 && !out.some((x) => x.toLowerCase() === n.toLowerCase())) out.push(n);
+  }
+  return out;
+}
+
+/** The AI apps BrainDog knows as a kind of agent (`PROFILE_KINDS`), by the words a person names them with. */
+const AGENT_KINDS: readonly (readonly [RegExp, string, string])[] = [
+  [/^claude(?: code| desktop)?$/iu, 'claude', 'Claude'],
+  [/^cursor$/iu, 'cursor', 'Cursor'],
+  [/^codex$/iu, 'codex', 'Codex'],
+  [/^gemini$/iu, 'gemini', 'Gemini'],
+  [/^(?:github )?copilot$/iu, 'copilot', 'Copilot'],
+  [/^windsurf$/iu, 'windsurf', 'Windsurf'],
+];
+
+/**
+ * THE AI APPS A PERSON NAMED THAT ARE AGENTS BRAINDOG KNOWS, as `{ kind, name }` (1 Nov, a live run: "Claude, and Figma"
+ * said "That adds Agents" and the Agents page then showed no agent). Make it mine keeps one agent row for each, not yet
+ * connected, and the Agents page offers to connect it. ChatGPT and the like have no kind of their own and are left out.
+ */
+export function agentsNamed(answer: string): { kind: string; name: string }[] {
+  const out: { kind: string; name: string }[] = [];
+  for (const n of splitNames(answer)) {
+    const hit = AGENT_KINDS.find(([re]) => re.test(n));
+    if (hit && !out.some((x) => x.kind === hit[1])) out.push({ kind: hit[1], name: hit[2] });
+  }
+  return out;
+}
+
+export function toolRows(answer: string): { register: string; fields: Record<string, unknown> }[] {
+  const names = splitNames(answer).filter((x) => !AI_APPS.test(x));
   const out: { register: string; fields: Record<string, unknown> }[] = [];
   for (const n of names) {
     const name = n.charAt(0).toUpperCase() + n.slice(1);
@@ -572,16 +715,48 @@ export function toolRows(answer: string): { register: string; fields: Record<str
 /** The topics whose answers are how they work and what to set up, never a thing to do (`draftsSaid`). */
 const NOT_TODO: ReadonlySet<Topic> = new Set(['closest', 'currency', 'tools', 'name', 'first', 'kind']);
 
+/** What to keep first, as the words the to-dos are drawn from ("invoices and deadlines"), or `''`. */
+function firstOf(turns: readonly ChatTurn[]): string {
+  const t = turns.find((x) => x.ask.topic === 'first' && x.answer !== null);
+  return t ? plain(t.answer ?? '').replace(/^(?:first(?:ly)?|to start)[,:]?\s+/iu, '').replace(/[,\s]+(?:first|to start with|to start)$/iu, '') : '';
+}
+
+/**
+ * THE FIRST TO-DOS, DRAWN FROM WHAT THEY SAID (1 Nov, a live run: a freelancer who named two clients and "invoices and
+ * deadlines first" opened a Today with nothing to keep). One thing to do for each thing they keep first that a to-do fits,
+ * on the clients they named, one to three in all: "Send Fenwick's invoice", "Set up deadlines for Acme". Offered on
+ * Today, never written unasked.
+ */
+export function todosOf(turns: readonly ChatTurn[], clients: readonly string[], have: readonly string[] = []): string[] {
+  const first = firstOf(turns).toLowerCase();
+  const c = clients.filter((x) => x.trim() !== '');
+  const one = c[0] ?? null;
+  const two = c[1] ?? one;
+  const out: string[] = [];
+  const add = (s: string) => {
+    if (!out.includes(s) && !have.some((h) => h.toLowerCase() === s.toLowerCase())) out.push(s);
+  };
+  if (/\binvoic|\bbill(?:ing|s)?\b|\bgetting paid|\bpayments?\b/u.test(first)) add(one ? `Send ${one}'s invoice` : "Send this month's invoices");
+  if (/\bdeadlines?|\bdue dates?|\bschedule/u.test(first)) add(two ? `Set up deadlines for ${two}` : "Write down this month's deadlines");
+  if (/\bprojects?\b/u.test(first)) add(one ? `List the work for ${one}` : 'List the projects on now');
+  if (/\bclients?\b|\bcustomers?\b/u.test(first) && one) add(`Add a contact at ${one}`);
+  return out.slice(0, 3);
+}
+
 /**
  * WHAT THE CONVERSATION SAID THAT MAY HOLD A THING TO DO, for the drafts read again on Today (1 Nov, a live run: Today
  * offered "A spreadsheet and invoices by email" and "First I want to keep track of invoices and deadlines first" as tasks).
- * The answers to the setup questions (the currency, the tools, a name, what to keep first) are left out; the rest are
- * said as they were added to the conversation.
+ * The answers to the setup questions (the currency, the tools, a name) are left out; the rest are said as they were added
+ * to the conversation. What to keep first is said as what it is ("I want to keep track of invoices and deadlines first."),
+ * and the to-dos drawn from it (`todos`, `todosOf`) are said after, each as a thing to do, so both readers offer them.
  */
-export function draftsSaid(turns: readonly ChatTurn[]): string {
-  return turns
-    .filter((t) => t.answer !== null && !NOT_TODO.has(t.ask.topic))
-    .map((t) => saidOf(t.ask, t.answer ?? ''))
+export function draftsSaid(turns: readonly ChatTurn[], todos: readonly string[] = []): string {
+  const first = firstOf(turns);
+  return [
+    ...turns.filter((t) => t.answer !== null && !NOT_TODO.has(t.ask.topic)).map((t) => saidOf(t.ask, t.answer ?? '')),
+    first === '' ? '' : `I want to keep track of ${first} first.`,
+    ...todos.map((t) => `${t}.`),
+  ]
     .filter((x) => x !== '')
     .join(' ');
 }
