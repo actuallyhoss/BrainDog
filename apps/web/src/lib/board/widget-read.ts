@@ -33,7 +33,7 @@ export const sheetWords = {
   forBoth: 'For you and for work',
   which: 'Which one',
   notReached: 'BrainDog could not be reached, so nothing was added.',
-  onToday: 'Today already shows this.',
+  onToday: 'On Today',
   /** The same, where Today's tile has another name. */
   onTodayAs: (heading: string): string => `Today shows this as ${heading}.`,
   makeOwn: 'Make your own',

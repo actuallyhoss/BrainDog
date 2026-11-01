@@ -442,10 +442,14 @@
       </span>
       <span class="ws-cap">
         <span class="ws-name">{w.title.replace(/\{\{[a-z_]+\}\}/gu, w.filled.project ?? '')}</span>
-        <span class="ws-line">{offer ? offer.why : w.onBoard ? (w.onBoardAs ? sheetWords.onTodayAs(w.onBoardAs) : sheetWords.onToday) : !w.ready && w.need && !waiting ? w.need : w.says}</span>
+        <span class="ws-line">{offer ? offer.why : w.onBoard && w.onBoardAs ? sheetWords.onTodayAs(w.onBoardAs) : !w.onBoard && !w.ready && w.need && !waiting ? w.need : w.says}</span>
       </span>
     </button>
-    {#if w.ready || waiting}
+    <!-- ON TODAY ALREADY, IT SAYS SO WHERE THE + WOULD BE (his call, 1 Nov): "Today already shows this." beside a + read as
+         an offer to add it twice. -->
+    {#if w.onBoard && !offer}
+      <span class="ws-on">{sheetWords.onToday}</span>
+    {:else if w.ready || waiting}
       <button type="button" class="ws-plus tap" aria-label={sheetWords.addNamed(w.title)} title={sheetWords.add} disabled={adding || waiting} onclick={() => add(w, s, offer)}>
         <Icon name="plus" size="s" />
       </button>
@@ -454,6 +458,22 @@
 {/snippet}
 
 <style>
+  /* WHERE THE + STANDS ON A CARD NOT ON TODAY: its corner, ringed in the sheet's colour as the + is. */
+  .ws-on {
+    position: absolute;
+    inset-block-start: -8px;
+    inset-inline-end: -8px;
+    padding: 3px var(--sp-2);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    box-shadow: 0 0 0 3px var(--tile);
+    color: var(--ink-2);
+    font-size: var(--fs-cap);
+    font-weight: var(--fw-medium);
+    line-height: 18px;
+    pointer-events: none;
+  }
+
   .ws {
     /* THE SHEET'S BOARD: four columns in the drawer, two on the phone, a Small square, gaps as the board's. */
     --ws-gap: 12px;
