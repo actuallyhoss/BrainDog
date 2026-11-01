@@ -31,8 +31,7 @@ import { factCells } from './card-fact-cells.ts';
 import { lateSaid } from '../home/today-tiles.ts';
 import { isForecast } from '../home/card-kpi.ts';
 import type { WorkedAt } from '../home/project-cards.ts';
-import { ratesPreset } from './action-draft.ts';
-import { live as actionsOf, type ActionRow, type Outcome } from './actions.ts';
+import type { ActionRow, Outcome } from './actions.ts';
 import {
   agentsTable,
   columnHeading,
@@ -167,12 +166,22 @@ const RATES_HELD = '/automations?tab=scheduled';
  * before. The preset's own comes first where both are held, since that is the one the sheet opens again.
  */
 export function ratesActionOf<A extends { ingest: string; writes?: string | null }>(actions: readonly A[]): A | null {
-  RATES_FILED ??= ratesPreset({ currencies: ['USD', 'EUR'], home: 'USD' })?.filled ?? null;
-  const filed = RATES_FILED;
+  const filed = RATES_FILED ?? null;
   if (filed === null) return null;
   return actions.find((a) => a.ingest === filed.ingest) ?? (filed.register === '' ? null : (actions.find((a) => a.writes === filed.register) ?? null));
 }
 let RATES_FILED: { ingest: string; register: string } | null | undefined;
+
+/**
+ * THE PRESET'S NAME AND LIST, LEARNT ONCE BEFORE `ratesActionOf` IS ASKED: the sheet's preset (`action-draft.ts`) is
+ * asked by `import()`, and only for a page whose rates are out of date, so a page that has none does not load the
+ * action sheet's drafting to draw. The reader learns it beside the actions it reads for the foot.
+ */
+export async function learnRates(): Promise<void> {
+  if (RATES_FILED !== undefined) return;
+  const { ratesPreset } = await import('./action-draft.ts');
+  RATES_FILED ??= ratesPreset({ currencies: ['USD', 'EUR'], home: 'USD' })?.filled ?? null;
+}
 
 /** A refusal as the record sends one, and only the keys read here. */
 type Said = { code: string; fix: string };
@@ -2884,6 +2893,8 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
          date and none on the rest. A read the record refuses is `null`, and the foot then offers nothing. */
       let held: ActionRow[] | null = [];
       if (oldestStale(blocks, drawn) !== null) {
+        /* THE ACTIONS' READER AND THE PRESET BY `import()`, on the few pages with a foot to say. */
+        const [{ live: actionsOf }] = await Promise.all([import('./actions.ts'), learnRates()]);
         const got = await actionsOf(io ?? ((url, init) => fetch(url, init)), base).actions();
         held = got.ok && Array.isArray(got.value) ? got.value : null;
       }

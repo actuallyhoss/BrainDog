@@ -15,7 +15,10 @@ import { copy } from '../copy.ts';
 import { ratesPreset } from './action-draft.ts';
 import { REGISTERS } from './api.ts';
 import { toSegments } from './blocks.ts';
-import { blockOf, footWords, footed, onceATile, pageReader, ratesActionOf, tileOf, type Fetch, type LiveBlock } from './page-live.ts';
+import { blockOf, footWords, footed, learnRates, onceATile, pageReader, ratesActionOf, tileOf, type Fetch, type LiveBlock } from './page-live.ts';
+
+/* THE PRESET'S NAME IS LEARNT BY `import()` (`learnRates`), as the reader learns it before it draws a foot. */
+await learnRates();
 
 const NOW = Date.parse('2026-10-13T09:00:00Z');
 

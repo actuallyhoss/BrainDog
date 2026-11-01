@@ -24,7 +24,8 @@
  * NODE LOADS IT, so `panels.test.ts` holds each rule without a component.
  */
 
-import { forProject, live, type ActionRow, type Fetch, type ForProject } from '../record/actions.ts';
+import type { ActionRow, Fetch } from '../record/actions.ts';
+import { forProject, type ForProject } from '../record/actions-plain.ts';
 
 /** What this file reads of a block: its kind, whether it is drawn and why not, and the keys a section names its panel by. */
 type Lendable = { kind: string; drawn?: boolean | undefined; why?: string | undefined };
@@ -87,6 +88,8 @@ export function heldFor(rows: readonly ActionRow[], project: ForProject): Action
  */
 export async function readHeld(io: Fetch, base: string, blocks: readonly Lendable[], project: ForProject | null): Promise<ActionRow[] | null> {
   if (project === null || !asksActions(blocks)) return null;
+  /* THE ACTIONS' READER BY `import()`, asked only by a page drawn for a row whose section waits on them. */
+  const { live } = await import('../record/actions.ts');
   const got = await live(io, base).actions();
   return got.ok ? heldFor(got.value, project) : null;
 }

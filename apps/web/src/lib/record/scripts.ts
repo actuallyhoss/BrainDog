@@ -25,7 +25,7 @@ import { moneyInText } from './money.ts';
 import { recordNow } from './boot-live.ts';
 import { recordTime, recordToday } from './zone.ts';
 import { humanize, listName } from './names.ts';
-import { often } from './actions.ts';
+import { often } from './actions-plain.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
