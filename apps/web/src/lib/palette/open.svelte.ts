@@ -11,7 +11,7 @@
  * in a place nothing can typecheck; a rune in a module is the same state the shell already had, with
  * one more reader.
  */
-export const palette = $state({ open: false, seed: '', mode: 'find' as 'find' | 'ask', thread: null as string | null });
+export const palette = $state({ open: false, seed: '', mode: 'find' as 'find' | 'ask', thread: null as string | null, question: '' });
 
 /** Open it. The one verb a page needs, so no page has to know how the shell holds it. */
 export function openPalette(): void {
@@ -26,6 +26,13 @@ export function openPalette(): void {
 export function openAsk(): void {
   palette.mode = 'ask';
   palette.open = true;
+}
+
+/** Open Ask with a question already asked: the Slash page's own field (T24), so the first question is one step. */
+export function askNow(question: string): void {
+  palette.question = question.trim();
+  palette.thread = null;
+  openAsk();
 }
 
 /** Open Ask on one thread, read back from the record, to continue it (the Slash page's list). */

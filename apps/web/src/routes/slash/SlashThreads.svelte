@@ -12,12 +12,13 @@
   import { since } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
   import { keptThreads, threadsKey, threads as recordThreads, type KeptThread } from '$lib/palette/slash-chat.ts';
-  import { openAsk, openThread, palette } from '$lib/palette/open.svelte.ts';
+  import { askNow, openAsk, openThread, palette } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
+  import { copy } from '$lib/copy.ts';
 
   const words = {
     title: 'Slash',
@@ -29,7 +30,19 @@
     fresh: 'New conversation',
     list: 'Conversations',
     history: 'Past suggestions',
+    /* THE PAGE'S OWN FIELD (T24): the first question is typed here, not behind a button that opens a field. */
+    field: 'Ask Slash',
+    placeholder: 'Ask a question',
+    ask: 'Ask',
   } as const;
+
+  let question = $state('');
+  function asked(e: SubmitEvent) {
+    e.preventDefault();
+    if (question.trim() === '') return void fresh();
+    askNow(question);
+    question = '';
+  }
 
   let threads = $state<KeptThread[]>([]);
   let now = $state(Date.now());
@@ -64,14 +77,25 @@
   <Button weight="primary" kbd="⌘J" onclick={fresh}><Icon name="plus" size="m" />{words.fresh}</Button>
 {/snippet}
 
+{#snippet composer()}
+  <form class="ask" onsubmit={asked}>
+    <input class="ask-field" type="text" autocomplete="off" aria-label={words.field} placeholder={words.placeholder} bind:value={question} />
+    <Button type="submit" weight="primary">{words.ask}</Button>
+  </form>
+  <!-- WITH NO MODEL BEHIND SLASH THE FIELD SAYS SO before the question is spent, with the way to connect one. -->
+  {#if page.data.slash !== true}<p class="ask-needs">{copy.askNeedsModel} <a href={at('/settings/agents')}>{copy.askConnect}</a>.</p>{/if}
+{/snippet}
+
 <PageHead icon="slash" title={words.title} sentence={threads[0] ? words.sentence(threads.length, since(new Date(threads[0].at).toISOString(), now)) : undefined} />
 <div class="page">
   <!-- EMPTY, ONE TILE: what will be here, how it gets there, and the one way to start; with conversations, the button
        leads the list. -->
   {#if threads.length === 0}
-    <Empty kind="no-data-yet" glyph="slash" title={words.none} body={words.noneWhy}>
-      {#snippet actions()}{@render start()}<Button weight="bare" href="/slash?history">{words.history}</Button>{/snippet}
-    </Empty>
+    <div class="first">
+      <Empty kind="no-data-yet" glyph="slash" title={words.none} body={words.noneWhy}>
+        {#snippet actions()}{@render composer()}<Button weight="bare" href="/slash?history">{words.history}</Button>{/snippet}
+      </Empty>
+    </div>
   {:else}
     <div class="lead">{@render start()}</div>
     <ul class="threads" aria-label={words.list}>
@@ -98,6 +122,51 @@
 
   .lead {
     display: flex;
+  }
+
+  /* THE EMPTY TILE AT THE PAGE'S GUTTER (T24), like every page's first tile, not centred 640 wide in a blank page. */
+  .first :global(.empty:not(.compact)) {
+    align-items: flex-start;
+    margin-inline: 0;
+    text-align: start;
+  }
+
+  .first :global(.empty-actions) {
+    align-self: stretch;
+    justify-content: flex-start;
+  }
+
+  .ask {
+    display: flex;
+    flex: 1 1 100%;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .ask-needs {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .ask-field {
+    flex: 1;
+    min-inline-size: 0;
+    min-block-size: var(--ctl-h, 32px);
+    padding: 0 var(--sp-3);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
+  }
+
+  @media (width < 900px) {
+    .ask-field {
+      min-block-size: var(--tap, 44px);
+    }
   }
 
   .threads {

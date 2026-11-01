@@ -83,7 +83,6 @@
   import {
     FIRST_TODAY_MOST,
     NEEDS_YOU_LIMIT_PHONE,
-    TELL_LINE,
     drawsAny,
     homeDrawn,
     peopleOf,
@@ -131,7 +130,8 @@
   import { leftBlock, phoneAsk, withLeft } from '$lib/home/phone-ask.ts';
   import { fitted, widgetsOf, type Phone } from '$lib/board/board-widgets.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
+  import { glide } from '$lib/motion/index.ts';
   import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
   import Icon from '$lib/ui/Icon.svelte';
@@ -893,7 +893,20 @@
   listen(reread, () => reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
   /** After the card's press: it goes, the next steps come, and Today's body is read again, so what it added is drawn at once. */
+  /* THE FIRST TELL GLIDES (T9): the card collapsing and Needs you rising were two redraws a frame apart. Each tile is
+     measured before the press redraws the page (`onadded` comes before the next draw), and glides from there once it is
+     drawn; and again across the board's own redraw when the record's answer lands (`model.shown`), never on a timer. */
+  const GLIDES = '[data-tell-one], [data-board-key]';
+  let glideOnShown = false;
+  function glideAfterDraw(): void {
+    if (typeof document === 'undefined') return;
+    const play = glide(document.querySelector<HTMLElement>('main') ?? document.body, GLIDES);
+    void tick().then(() => requestAnimationFrame(play));
+  }
+
   function toldOne(lines: ToldLine[] = []) {
+    glideAfterDraw();
+    glideOnShown = true;
     keepTold(lines);
     pressed = true;
     void reread();
@@ -953,6 +966,13 @@
      nothing beside it, or nothing in it, is one column. */
   /** The board and its editor, which the screen hands what it reads (`src`), so it follows without a step between. */
   const boardModel = new BoardModel();
+  /* THE SECOND GLIDE OF A FIRST TELL (T9), across the board's redraw. */
+  $effect.pre(() => {
+    void boardModel.shown;
+    if (!glideOnShown) return;
+    glideOnShown = false;
+    glideAfterDraw();
+  });
   /** Whether Today still waits for the record's own answer, so the board holds its cells (`Board.svelte` `loading`). */
   let boardLoading = $state(true);
   const deskedRaw = $derived.by(() => {
@@ -1533,7 +1553,7 @@
   icon="today"
   tiled={headed}
   kicker={today}
-  sentence={tell ? TELL_LINE : slashed ? slashSaid : lead ? leadSaid : undefined}
+  sentence={tell ? undefined : slashed ? slashSaid : lead ? leadSaid : undefined}
   heldLines={board ? 3 : 1}
   heldText={waitsLine?.text ?? nothing}
   actions={capture && wide.current && !board ? headCapture : undefined}
@@ -1586,7 +1606,7 @@
 <!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
 {#snippet needsFoot()}
   {#if shaped}
-    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={late ? null : shaped.lateBills} handled={handledCount} told={toldNeeds} finished={finishedBy} shared={sharedNow} calm={words.nothingNeedsYou} calmWhy={words.nothingNeedsYouWhy} />
+    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={late ? null : shaped.lateBills} handled={handledCount} told={toldNeeds} finished={finishedBy} shared={sharedNow} calm={words.nothingNeedsYou} calmWhy={words.nothingNeedsYouWhy} line={tell || slim} />
   {/if}
 {/snippet}
 
@@ -2143,7 +2163,7 @@
      figure is never cut. It wraps under the figure, where the frame has room for a second line. */
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child .cell-note) {
     white-space: normal;
-    text-wrap: balance;
+    text-wrap: pretty;
   }
 
   /* AT THE BOARD'S SHORTEST ROW (a laptop window about 1280 wide, his call of 23 Oct): the row is 164 tall and the frame

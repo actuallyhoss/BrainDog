@@ -48,6 +48,10 @@
     <button type="button" class="dot tap" aria-label={boardWords.remove(name)} onclick={() => model.hide(key)} onpointerdown={(e) => e.stopPropagation()}>
       <Icon name="x" size="s" />
     </button>
+  {:else}
+    <!-- NO REMOVE DOT, AND IT SAYS WHY (T11): Needs you and Late cannot be hidden. A quiet lock in the dot's place, its
+         reason on hover and to a screen reader. -->
+    <span class="dot pinned" role="img" aria-label={boardWords.alwaysOn} title={boardWords.alwaysOn}><Icon name="lock" size="s" /></span>
   {/if}
   {#if model.tapped === key && resizable && !model.inspects}
     <div class="sizes" role="group" aria-label="{boardWords.size}, {name}">
@@ -146,6 +150,13 @@
 
   .dot:hover {
     background: var(--tile-2);
+  }
+
+  .dot.pinned {
+    border-color: var(--rule);
+    background: var(--tile);
+    color: var(--ink-3);
+    cursor: help;
   }
 
   /* ENTERING EDIT, THE HANDLES COME IN (the board is about to change, so say so): the dot and the corner fade up from

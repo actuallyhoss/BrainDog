@@ -34,6 +34,7 @@
     shared,
     calm,
     calmWhy = null,
+    line = false,
   }: {
     /** Nothing waits: the foot is the whole tile. */
     alone?: boolean;
@@ -53,12 +54,15 @@
     calm: string;
     /** What will be here, under the calm line on a tile with nothing in it, so the tile says how it fills (Look B Empty). */
     calmWhy?: string | null;
+    /** A first Today's (T8): with nothing to ask, one line under Tell instead of a whole tile, until something waits. */
+    line?: boolean;
   } = $props();
 
   const words = {
     late: (n: number, said: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'payment is' : 'payments are'} late, ${said} in all`,
     handled: (n: number) => `BrainDog handled ${n.toLocaleString('en-GB')} today`,
     review: 'Review',
+    waits: 'When a bill is late or an agent asks, it waits here.',
     answer: 'Answer',
     finished: (who: readonly string[]) =>
       who.length === 1 ? `${who[0]!} finished what you asked` : `Agents finished ${who.length.toLocaleString('en-GB')} asks today`,
@@ -70,7 +74,12 @@
   const calmNow = $derived(alone && told.length === 0);
 </script>
 
-{#if alone || any}
+{#if line && alone && !any && told.length === 0}
+  <!-- ONE LINE ON A FIRST TODAY (T8): the tile was a full row for two lines of nothing. Named for a reader, as the tile is. -->
+  <section class="needs-foot" data-needs-foot data-line aria-label={heading}>
+    <p class="nf-one"><Icon name="inbox" size="s" /><span><span class="nf-one-calm">{calm}.</span> {words.waits}</span></p>
+  </section>
+{:else if alone || any}
   <!-- NOT A LANDMARK OF ITS OWN UNDER THE QUEUE: there it is the lower part of the Needs you tile, which is already the
        region named Needs you, and a second region of the same name gave a landmark list two alike with no way to tell
        which is which. Unnamed, a section is no landmark, and its lines read as the tile's. -->
@@ -134,6 +143,31 @@
     padding: 0 var(--tile-pad) var(--sp-4);
     background: var(--tile);
     border-radius: 0 0 var(--r-tile) var(--r-tile);
+  }
+
+  .needs-foot[data-line] {
+    padding: var(--sp-3) var(--tile-pad);
+    border-radius: var(--r-tile);
+  }
+
+  .nf-one {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 20px;
+  }
+
+  .nf-one > :global(svg) {
+    flex: none;
+    align-self: center;
+  }
+
+  .nf-one-calm {
+    color: var(--ink);
+    font-weight: 500;
   }
 
   .needs-foot[data-alone] {

@@ -76,6 +76,13 @@
     const at = head.lastIndexOf(' ');
     return `${(at > 3 ? head.slice(0, at) : t.slice(0, LABEL_MAX)).trimEnd()}…`;
   });
+  /* THE SAME LABEL SAID SHORT WHERE THE CARD IS NARROW (T3): "Revenue a m…" at 1280 reads "Revenue/mo". Only a label
+     ending in how often ("a month", "a year", "a week") has a short form; any other is cut as before. */
+  const SHORT_EVERY: Record<string, string> = { month: '/mo', year: '/yr', week: '/wk' };
+  const labelTight = $derived.by(() => {
+    const m = / (?:a|per) (month|year|week)$/iu.exec(labelShort);
+    return m ? `${labelShort.slice(0, m.index)}${SHORT_EVERY[m[1]!.toLowerCase()]}` : null;
+  });
   /* A PROJECT WITH NO MONEY LEADS WITH HOW FAR ALONG IT IS, so its card has no hole where the figure would be. */
   const leadsWithProgress = $derived(figure === null && card.progress !== null);
   const meterSaid = $derived.by(() => {
@@ -152,7 +159,9 @@
       {#if figure}
         <!-- SAID SHORT, AS A TILE SAYS A FIGURE: £18,400, never £18,400.00. -->
         {#key figure}<span class="pc-num num" data-arrived={arrived.has('figure') ? '' : undefined}>{figure}</span>{/key}
-        {#if figureLabel}<span class="pc-label" dir="auto" title={labelShort === figureLabel ? undefined : figureLabel}>{labelShort}</span>{/if}
+        {#if figureLabel}<span class="pc-label" dir="auto" title={labelShort === figureLabel && labelTight === null ? undefined : figureLabel}
+            >{#if labelTight}<span class="pc-l-long">{labelShort}</span><span class="pc-l-tight">{labelTight}</span>{:else}{labelShort}{/if}</span
+          >{/if}
       {:else}
         {#key card.progress}<span class="pc-num num" data-arrived={arrived.has('progress') ? '' : undefined}>{card.progress}%</span>{/key}
         <span class="pc-label">of the way</span>
@@ -205,6 +214,7 @@
   .pcard {
     --ph: var(--ink);
     --ph-tint: var(--tile-2);
+    container: pcard / inline-size;
     display: flex;
     flex-direction: column;
     block-size: 100%;
@@ -356,6 +366,20 @@
     font-size: var(--fs-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .pc-l-tight {
+    display: none;
+  }
+
+  @container pcard (inline-size < 340px) {
+    .pc-l-long {
+      display: none;
+    }
+
+    .pc-l-tight {
+      display: inline;
+    }
   }
 
   .pc-line {

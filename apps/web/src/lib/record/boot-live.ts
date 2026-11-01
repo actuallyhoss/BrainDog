@@ -984,10 +984,23 @@ function scriptRuns(events: readonly EventLine[]): { folded: Set<EventLine>; sai
     had.wrote += run.wrote;
     folded.add(e);
   }
+  /* THE LIST A SCRIPT WROTE IN MOST, by its own write lines, by script and day. */
+  const tally = new Map<string, Map<string, number>>();
+  for (const e of events) {
+    if (!scriptWrite(e) || !e.register) continue;
+    const key = `${e.actor}\u0001${e.ts.slice(0, 10)}`;
+    const by = tally.get(key) ?? new Map<string, number>();
+    by.set(e.register, (by.get(e.register) ?? 0) + 1);
+    tally.set(key, by);
+  }
+  const wroteIn = new Map<string, string>([...tally].map(([key, by]) => [key, listName([...by].sort((a, b) => b[1] - a[1])[0]![0])]));
+  /* NO RULE'S NAME IN QUOTES (T21): "“Give each plan a page and count what is left after each part” ran 4 times and
+     wrote…" quoted a sentence at him. It is "A rule ran 4 times on Instalments", and the line opens the rule. */
   for (const n of newest.values()) {
     if (n.runs < 2) continue;
+    const list = wroteIn.get(`${n.line.actor}\u0001${n.line.ts.slice(0, 10)}`);
     const lines = n.wrote === 0 ? 'nothing' : n.wrote === 1 ? 'one line' : `${n.wrote} lines`;
-    said.set(n.line, `${n.named} ran ${n.runs} times and wrote ${lines}`);
+    said.set(n.line, list ? `A rule ran ${n.runs} times on ${list}` : `A rule ran ${n.runs} times and wrote ${lines}`);
   }
   return { folded, said };
 }

@@ -241,7 +241,7 @@
       <button type="button" class="ico" aria-label={boardWords.undo} title="{boardWords.undo} ({mod}Z)" disabled={model.past.length === 0} onclick={() => model.undo()}><Icon name="undo-2" size="s" /></button>
       <button type="button" class="ico" aria-label={boardWords.redo} title="{boardWords.redo} ({mod}{shift}Z)" disabled={model.future.length === 0} onclick={() => model.redo()}><Icon name="redo-2" size="s" /></button>
       {#if four.current}
-        <span class="seg" role="group" aria-label="Which board">
+        <span class="seg" role="group" aria-label={boardWords.showing(model.phoneView)}>
           <button type="button" aria-pressed={!model.phoneView} onclick={() => (model.phoneView = false)}><Icon name="monitor" size="s" />{boardWords.laptop}</button>
           <button type="button" aria-pressed={model.phoneView} onclick={() => (model.phoneView = true)}><Icon name="rows-3" size="s" />{boardWords.phone}</button>
         </span>
@@ -297,7 +297,7 @@
     {#if mayEdit && !model.editing && todayOffer.offer !== null}
       <!-- ONE QUIET SUGGESTION AT THE BOARD'S END (§6.3), its widget drawn at the board's own cell. ITS CODE ONLY ONCE
            THERE IS ONE: it is asked after Today has drawn, and loading the cell before then put it on a cold open's path. -->
-      <div class="suggest">{#await suggestPart() then { default: SuggestCell }}<SuggestCell onadd={added} {onremove} />{/await}</div>
+      <div class="suggest">{#await suggestPart() then { default: SuggestCell }}<SuggestCell line onadd={added} {onremove} />{/await}</div>
     {/if}
   </div>
 

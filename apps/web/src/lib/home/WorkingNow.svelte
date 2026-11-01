@@ -105,6 +105,13 @@
 
   const drawn = $derived(live ? live.rows : rows);
   const shown = $derived(drawn.slice(0, WORKING_MOST));
+  /* ONE RULE FOR THE DOT (T2): every row on a project draws its dot, in the colour any row on that project was given, and
+     the quiet ink where none was. "Claude • Kiln" drew Kiln's blue while "Codex   Kiln" drew nothing. */
+  const slotOf = $derived(new Map(shown.flatMap((r) => (r.project && r.slot !== null ? [[r.project, r.slot] as const] : []))));
+  const dotOf = (r: { project: string | null; slot: string | null }): string => {
+    const slot = r.slot ?? (r.project ? slotOf.get(r.project) : undefined) ?? null;
+    return `--dot:${slot === null ? 'var(--ink-3)' : `var(--cat-${slot})`}`;
+  };
   const folds = $derived(live?.folds ?? []);
 
   /* THE RUN WHOSE SHEET IS OPEN, and the sheet itself, fetched on the first press. */
@@ -135,7 +142,7 @@
           <span class="r-who">
             <b class="r-name">{r.agent}</b>
             {#if r.project}
-              <span class="r-project"><span class="r-dot" style={r.slot === null ? undefined : `--dot:var(--cat-${r.slot})`} aria-hidden="true"></span>{r.project}</span>
+              <span class="r-project"><span class="r-dot" style={dotOf(r)} aria-hidden="true"></span>{r.project}</span>
             {/if}
           </span>
           {#if r.doing}<span class="r-doing" dir="auto">{r.doing}</span>{/if}

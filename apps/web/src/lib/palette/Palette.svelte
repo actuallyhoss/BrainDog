@@ -1425,6 +1425,12 @@
       lookKept = keptNow();
       pageHere = pageMenu() !== null;
       if (slashHere) warm();
+      /* A QUESTION THE SLASH PAGE'S FIELD ASKED (`askNow`), taken once: asked at once, in a new conversation. */
+      const question = untrack(() => opener.question);
+      if (question !== '') {
+        untrack(() => (opener.question = ''));
+        askSlash(question);
+      }
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
       el.close();

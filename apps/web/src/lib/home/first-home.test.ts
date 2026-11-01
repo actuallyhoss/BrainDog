@@ -150,7 +150,8 @@ test('A FRESH SHOP RECORD OPENS ON THE CARD under its line, with no next step ye
   const src = homeSource();
   assert.match(src, /const tell = \$derived\([^;]*showTell\(/u);
   assert.match(src, /\{#if tell\}<TellOne options=\{tellOptions\} onadded=\{toldOne\} \/>\{\/if\}/u);
-  assert.match(src, /sentence=\{tell \? TELL_LINE :/u);
+  /* NO HEAD SENTENCE OVER THE CARD (T7): the made screen just said it, and the card's title and foot say the rest. */
+  assert.match(src, /sentence=\{tell \? undefined :/u);
   assert.equal(TELL_LINE, 'Your BrainDog is ready. Start with something from today, and watch where it goes.');
   assert.ok(!TELL_LINE.startsWith('Tell it one real thing'), 'the line does not say the card\'s title again');
   assert.ok(src.indexOf('<ClearExamples />') < src.indexOf('<TellOne'), 'the examples offer stays first');
