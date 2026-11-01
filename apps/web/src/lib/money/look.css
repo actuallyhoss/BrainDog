@@ -739,6 +739,12 @@
   border-color: var(--rule-strong);
 }
 
+@media (pointer: coarse) {
+  [data-money] .head-search {
+    min-block-size: var(--tap);
+  }
+}
+
 /* ── a part's chip on a bar's row ────────────────────────────────────────── */
 
 /* A ROW WITH ITS CATEGORY'S OR ACCOUNT'S CHIP: the chip at the start across the name and the bar, as a finance app lists

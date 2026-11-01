@@ -286,7 +286,15 @@
     font: inherit;
     background: var(--tile-2);
     border: 1px solid var(--rule);
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
+  }
+
+  /* UNDER A THUMB A FIELD IS 44 TALL (Look B "44 on a phone"; design pass, 1 Nov): these were 36. */
+  @media (pointer: coarse) {
+    .bset-most input,
+    .bset-per select {
+      min-block-size: var(--tap);
+    }
   }
 
   .bset-most input {
