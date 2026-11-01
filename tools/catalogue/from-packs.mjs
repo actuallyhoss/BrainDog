@@ -317,8 +317,9 @@ for (const entry of index.entries) {
   /* A USE CASE PUBLISHED BEFORE ITS ENTRY SAID ITS WORDS is given them here, from the same latest file, as categories were. */
   const u = file.value.kind === 'usecase' ? file.value.shared.usecase : null;
   const heard = { ...(u && u.signals.length > 0 ? { signals: [...u.signals] } : {}), ...(u && u.modules.length > 0 ? { modules: [...u.modules] } : {}) };
-  /* THE ICON IS THE ONE THE LATEST FILE NAMES (`icon` in the manifest), carried so Browse, Installed and the page draw it. */
-  const iconSaid = file.value.kind === 'pack' ? file.value.file.doc.icon : undefined;
+  /* THE ICON IS THE ONE THE LATEST FILE NAMES (`icon` in an add-on's manifest or a use case's file), carried so Browse,
+     Installed and the page draw it. */
+  const iconSaid = file.value.kind === 'pack' ? file.value.file.doc.icon : file.value.shared?.usecase?.icon;
   described.push({ ...rest, ...(typeof iconSaid === 'string' ? { icon: iconSaid } : {}), categories: categoriesOf(file.value, BRAINDOG_PUBLISHER.name), publisher: BRAINDOG_PUBLISHER, ...(unlisted ? { unlisted: true } : {}), ...tier, ...heard });
 }
 index = { ...index, entries: described };

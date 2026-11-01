@@ -158,6 +158,7 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
       /* WHAT EACH VERSION CHANGED, so an update offered to a record on an older one says what it brings (`changes.ts`). */
       versions: bundledVersions(u.version, USE_CASE_CHANGES[u.usecase] ?? [], reach),
       count: counted(listingKey('usecase', u.usecase)),
+      ...iconOfStarter(u.usecase, u.icon),
     };
   });
 
@@ -181,6 +182,32 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
   });
 }
 
+/**
+ * BRAINDOG'S OWN PICK FOR EACH STARTER IT SHIPS, where its file names no icon (1 Nov): the starters' cards in the store
+ * all wore the same grid, so Personal, Solo founder, Shop and Small business looked alike. A file's own `icon` wins.
+ */
+export const STARTER_ICONS: Readonly<Record<string, string>> = {
+  personal: 'wallet',
+  founder: 'rocket',
+  business: 'briefcase',
+  shop: 'store',
+  student: 'graduation-cap',
+  studies: 'book-open',
+  team: 'users',
+  'team-board': 'square-kanban',
+  'new-project': 'milestone',
+  guide: 'compass',
+  landlord: 'house',
+  photographer: 'camera',
+  'retainer-hours': 'clock',
+};
+
+/** A starter's icon: its file's, else BrainDog's pick, else none (the generic one is drawn). */
+function iconOfStarter(id: string, own: string | undefined): { icon?: string } {
+  const icon = own ?? STARTER_ICONS[id];
+  return icon === undefined ? {} : { icon };
+}
+
 /** One catalogue entry as a listing, with its rounded count. */
 function listingOfEntry(e: CatalogueEntry, count: number | null): Listing {
   return {
@@ -198,7 +225,7 @@ function listingOfEntry(e: CatalogueEntry, count: number | null): Listing {
     latest: offered(e.versions, e.latest),
     versions: e.versions,
     count,
-    ...(e.icon !== undefined ? { icon: e.icon } : {}),
+    ...(e.kind === 'usecase' ? iconOfStarter(e.id, e.icon) : e.icon !== undefined ? { icon: e.icon } : {}),
     ...(e.shelf !== undefined ? { shelf: e.shelf } : {}),
     ...(e.example === true ? { example: true as const } : {}),
   };

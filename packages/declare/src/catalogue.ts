@@ -791,7 +791,7 @@ export async function publishTo(
     return no('PACK_MALFORMED', 'unlisted is either true, for a pack named for one person or one bank, or left out.', { at: 'unlisted' });
 
   /* AN ICON IS A NAME FROM THE APP'S ICON SET, and an unknown one is refused with the nearest names. */
-  const iconSaid = file.kind === 'pack' ? file.file.doc.icon : undefined;
+  const iconSaid = file.kind === 'pack' ? file.file.doc.icon : file.shared.usecase.icon;
   if (iconSaid !== undefined) {
     if (typeof iconSaid !== 'string') return no('PACK_MALFORMED', "icon is the name of one icon from the app's icon set, such as wallet or people. Write it as a word, or take it out.", { at: 'icon' });
     const unknown = glyphFault(iconSaid);

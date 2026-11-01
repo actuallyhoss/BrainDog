@@ -261,3 +261,12 @@ test('THE VOICE WRITTEN DOWN: exactly one use case on speaks, and no id sorting 
   assert.deepEqual(voiceWrites([{ id: 'usecase-personal', disabled_at: null }], 'usecase-personal'), [], 'one alone is not written');
   assert.deepEqual(voiceWrites(three, 'usecase-guide'), [], 'a use case switched off is never made to speak');
 });
+
+/* AN ICON, AS AN ADD-ON'S MANIFEST SAYS ONE (1 Nov): optional, a name in the icon set's own spelling, and left out of what
+   a file with none reads back as, so no shipped use case's fingerprint moves. */
+test('A USE CASE MAY NAME ITS ICON, AND ONE WITH NONE READS BACK WITHOUT IT', () => {
+  assert.equal(value<UseCase>(normaliseUseCase(DOC({ icon: 'book-open' }))).icon, 'book-open');
+  assert.equal('icon' in value<UseCase>(normaliseUseCase(DOC())), false);
+  assert.equal(refused(normaliseUseCase(DOC({ icon: 'Book Open' }))).at, 'icon');
+  assert.equal(refused(normaliseUseCase(DOC({ icon: 7 }))).at, 'icon');
+});
