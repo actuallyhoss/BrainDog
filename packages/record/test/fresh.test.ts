@@ -27,7 +27,7 @@ test('THE KEYCHAIN OPENS FOR A PROOF FIFTEEN MINUTES OLD AND NOT A MILLISECOND O
 
   const stale = await api.listGrants(owner(now - 15 * MINUTE - 1));
   assert.equal(stale.ok, false);
-  assert.deepEqual('refusal' in stale ? stale.refusal : null, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'principal' });
+  assert.deepEqual('refusal' in stale ? stale.refusal : null, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'proof' });
 
   /* No session, no freshness question. */
   assert.ok((await api.listGrants(owner())).ok);

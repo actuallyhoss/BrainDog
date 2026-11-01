@@ -233,6 +233,7 @@ async function emailAsked(door: EmailDoor, origin: string, who: Who, body: Recor
       refusal: {
         code: 'NEEDS_BROWSER_SESSION',
         fix: 'Sign in again to change your sign-in email. It has been more than fifteen minutes since you last did.',
+        at: 'proof',
       },
     };
   const typed = text(body.email).trim();
@@ -261,6 +262,7 @@ async function emailConfirmed(door: EmailDoor, who: Who, body: Record<string, un
       refusal: {
         code: 'NEEDS_BROWSER_SESSION',
         fix: 'Sign in again to finish changing your sign-in email, then open the link once more. It has been more than fifteen minutes since you last did.',
+        at: 'proof',
       },
     };
   const moved = await door.move(who.person, text(body.token).trim());
@@ -310,7 +312,7 @@ export function closeDoor(deps: CloseDeps): AccountAsk {
     if (deps.now() - who.provedAt > FRESH)
       return {
         ok: false,
-        refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to close your account. It has been more than fifteen minutes since you last did.' },
+        refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to close your account. It has been more than fifteen minutes since you last did.', at: 'proof' },
       };
     const typed = text(body.email).trim().toLowerCase();
     if (typed === '' || typed !== who.email.trim().toLowerCase())

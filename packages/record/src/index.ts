@@ -3308,9 +3308,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        cookie is thirty days of standing access; the keychain is the one place a laptop left open on a desk
        should not be enough. After the owner check, so somebody who is not an owner is told that instead. The window
        is the owner's `lock_after`, five, fifteen or sixty minutes, and fifteen (`FRESH`) until he sets one; Lock now
-       (`lockKeychain`, a sign-in route) puts the session's proof behind the longest of them. */
+       (`lockKeychain`, a sign-in route) puts the session's proof behind the longest of them.
+       `at: 'proof'` IS THE MARK OF EVERY REFUSAL A FRESH SIGN-IN ANSWERS, here and at each "Sign in again" a stale
+       proof earns (bypass, invite, tokens, a device, restore, delete): the app asks for the proof in place and sends the
+       same call again, and `principal` stays for what no sign-in changes (a token, a press in a chat, an order). */
     if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000)
-      return { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'principal' };
+      return { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'proof' };
     return null;
   };
 
@@ -14001,7 +14004,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (owner) return { ok: false as const, refusal: owner };
         if (value !== null && value !== 'on' && value !== 'off') return no('VALUE_MALFORMED', `${key} is on or off, or null to take it away.`, { at: 'value', allowed: ['on', 'off'] });
         if (value === 'on' && ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000)
-          return no('NEEDS_BROWSER_SESSION', 'Sign in again to let agents do everything without asking.', { at: 'principal' });
+          return no('NEEDS_BROWSER_SESSION', 'Sign in again to let agents do everything without asking.', { at: 'proof' });
         kept = value as 'on' | 'off' | null;
       } else if (value !== null && (key === 'look.contrast' || key === 'look.shot')) {
         if (typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
@@ -15697,7 +15700,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          be enough to hand the record to a stranger. `provedAt` is set only from a session row, so an agent's token and
          the self-host's server key are judged by `admin` above and never by this. */
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to invite somebody or change what they can do. Nothing was changed.', at: 'principal' } };
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to invite somebody or change what they can do. Nothing was changed.', at: 'proof' } };
       /* AN ADDRESS AND NO PERSON IS AN INVITATION (`30 §5`, `12 §3`): a single-use link for that one address, good
          for 24 hours, handed back once to copy. Nothing is mailed, by this or by anything. */
       if (!args?.person && typeof args?.email === 'string') {
@@ -15834,7 +15837,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND A SIGN-IN IN THE LAST FIFTEEN MINUTES, for the reason `invite` gives: a token is the record's reach handed to
          a machine for as long as it lives, so a stale session is not enough to mint one. */
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a token. Nothing was made.', at: 'principal' } };
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a token. Nothing was made.', at: 'proof' } };
       /* AND MINTING NEEDS A CREDENTIAL OF ITS OWN, which is not true of any other ADMIN method here.
          A self-host with no `BRAINDOG_TOKEN` treats an unauthenticated request as the owner — right
          for one person on one machine, where the process binds loopback and the machine is the
@@ -15993,14 +15996,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           },
         };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'principal' } };
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'proof' } };
       /* AND A DEVICE LET INTO THE KEYCHAIN IS HELD TO THE KEYCHAIN'S OWN LOCK WINDOW (`keychain` above), which the owner
          may have set to five minutes: approving a `vault` grant hands a machine what opening the keychain here would, so
          a proof the keychain itself would refuse does not approve one either. */
       const proved = ctx.provedAt;
       const locked = (reach: string): Refusal | null =>
         reach === 'vault' && proved !== undefined && clock.now() - proved > kernel.lockAfter() * 60_000
-          ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to let a device into the keychain.', at: 'principal' }
+          ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to let a device into the keychain.', at: 'proof' }
           : null;
       return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never), locked));
     },
@@ -16172,7 +16175,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
         return {
           ok: false as const,
-          refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to restore this BrainDog. Going back replaces everything written since.', at: 'principal' },
+          refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to restore this BrainDog. Going back replaces everything written since.', at: 'proof' },
         };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['bookmark', 'at']);
       if (extra) return { ok: false as const, refusal: extra };
@@ -16256,7 +16259,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
       if (!destroy) return { ok: false as const, refusal: NO_DELETE };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to delete this BrainDog. Nothing was deleted.', at: 'principal' } };
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to delete this BrainDog. Nothing was deleted.', at: 'proof' } };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['slug']);
       if (extra) return { ok: false as const, refusal: extra };
       if (typeof args?.slug !== 'string' || !args.slug.trim())
@@ -16465,7 +16468,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           },
         };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a webhook token.', at: 'principal' } };
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a webhook token.', at: 'proof' } };
 
       const ingest = args?.ingest;
       if (typeof ingest !== 'string' || ingest === '') return no('REQUIRED_MISSING', 'Which ingest is the token for? Name it by its id.', { at: 'ingest' });

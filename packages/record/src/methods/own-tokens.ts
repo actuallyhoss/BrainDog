@@ -123,7 +123,7 @@ export function methods(deps: RecordDeps) {
       const who = personOf(ctx);
       if ('code' in who) return { ok: false, refusal: who };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a key. Nothing was made.', at: 'principal' } };
+        return { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a key. Nothing was made.', at: 'proof' } };
 
       const scope = args?.scope ?? 'write';
       if (!SCOPES.includes(scope))

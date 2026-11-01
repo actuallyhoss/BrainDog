@@ -264,7 +264,7 @@ test('A PASSKEY: MADE BEHIND A SESSION, SIGNED OUT, SIGNED IN WITH, ROTATED AFTE
     s.advance(16 * MINUTE);
     const stale = await s.call('/api/listGrants', { sid: second });
     assert.equal(stale.status, 403);
-    assert.deepEqual(stale.body?.refusal, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'principal' });
+    assert.deepEqual(stale.body?.refusal, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to open the keychain.', at: 'proof' });
     assert.equal((await s.call('/api/boot', { sid: second })).status, 200);
 
     /* ROTATED AFTER A DAY OF USE: a new id on the answer, the old one good for a minute, then not. */

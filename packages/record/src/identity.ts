@@ -660,7 +660,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     return {
       status: 401,
       reason: 'stale',
-      refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change your passkeys. It has been more than fifteen minutes since you last did.' },
+      refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change your passkeys. It has been more than fifteen minutes since you last did.', at: 'proof' },
       ...carry(found),
     };
   };

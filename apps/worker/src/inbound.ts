@@ -208,7 +208,7 @@ export async function serveInbound(request: Request, door: InboundDoor, ctx: Cal
      AND ABSENT IS NOT STALE. `provedAt` reaches a context only from a session row, so undefined is a
      caller with no session at all, which `credentialed` a line above has already had its say about. */
   if (ctx.provedAt !== undefined && Date.now() - ctx.provedAt > FRESH)
-    return refusal(403, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change where this BrainDog takes its mail.', at: 'principal' });
+    return refusal(403, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change where this BrainDog takes its mail.', at: 'proof' });
 
   /* REVOCATION IS THE SAME WRITE WITH NOTHING IN IT, and it answers no value: there is nothing to
      show, and the record now takes no forwarded mail at all until somebody mints again. */

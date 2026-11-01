@@ -47,8 +47,8 @@ test('A PROOF FIFTEEN MINUTES OLD, OR NO SESSION AT ALL, IS NOT ASKED AGAIN', as
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.com' } }).ok);
   for (const ctx of [owner(NOW - 15 * MINUTE), owner()]) {
     const invited = refusalOf(await api.invite({ email: 'bo@example.com', level: 'read' }, ctx));
-    assert.notEqual(invited?.at === 'principal' ? invited.code : null, 'NEEDS_BROWSER_SESSION', 'a recent proof was asked to sign in again');
+    assert.notEqual(invited?.at === 'proof' ? invited.code : null, 'NEEDS_BROWSER_SESSION', 'a recent proof was asked to sign in again');
     const minted = refusalOf(await api.createToken({ scope: 'read', label: 'an agent' }, ctx));
-    assert.notEqual(minted?.at === 'principal' ? minted.code : null, 'NEEDS_BROWSER_SESSION', 'a recent proof was asked to sign in again');
+    assert.notEqual(minted?.at === 'proof' ? minted.code : null, 'NEEDS_BROWSER_SESSION', 'a recent proof was asked to sign in again');
   }
 });

@@ -16,7 +16,7 @@ import { openSqlite } from '../../kernel/test/sqlite.ts';
 const MINUTE = 60_000;
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const ADDRESS = '203.0.113.7';
-const AGAIN = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'principal' };
+const AGAIN = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'proof' };
 
 /** A record with one owner, a clock the test moves, and a device start that must succeed. */
 async function record() {

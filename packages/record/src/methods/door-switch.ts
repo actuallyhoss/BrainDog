@@ -151,7 +151,7 @@ export function methods(deps: RecordDeps) {
       if (typeof args?.on !== 'boolean') return no('REQUIRED_MISSING', 'Say on: true to open the door or on: false to switch it off.', { at: 'on' });
       const on = args.on;
       if (on && ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to switch this door back on. It is still off.', at: 'principal' } };
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to switch this door back on. It is still off.', at: 'proof' } };
 
       const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${ingest}`);
       if (!row) return no('DECLARATION_UNKNOWN', `There is no door called ${ingest} here.`, { at: 'ingest' });
