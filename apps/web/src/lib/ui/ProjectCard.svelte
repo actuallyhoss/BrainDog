@@ -174,7 +174,7 @@
   {/if}
   {#if card.progress !== null}
     <span class="pc-c">
-      <span class="meter" aria-hidden="true"><span class="meter-fill" style:inline-size="{card.progress}%"></span></span>
+      <span class="meter" aria-hidden="true"><span class="meter-fill" data-grow style:inline-size="{card.progress}%"></span></span>
       {#if meterSaid}<span class="pc-quiet">{meterSaid}</span>{/if}
     </span>
   {/if}
