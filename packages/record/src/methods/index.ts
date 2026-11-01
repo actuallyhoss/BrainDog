@@ -234,7 +234,7 @@ export type RecordDeps = {
    */
   wordOf?: ((ctx: CallContext, said: unknown) => Result<{ by: string; byName: string; said: string }>) | undefined;
   /** Why his word may not answer one question (a key, an amount on what is there), or `null` (`wordFault` in `index.ts`). */
-  wordFault?: ((row: Record<string, unknown>) => string | null) | undefined;
+  wordFault?: ((row: Record<string, unknown>, ctx?: CallContext) => string | null) | undefined;
   /** The record's own `metric`, every check it makes, which `metrics` answers each figure with. Absent, `metrics` is refused. */
   metricAs?: ((args: { metric: string }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
   /** Where this host keeps sealed bytes (`sealed.ts`). Absent, the four sealed methods keep and hand back none. */

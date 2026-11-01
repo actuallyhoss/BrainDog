@@ -39,15 +39,24 @@ export const FLOORS = 'money, keys and deletes are asked';
 export const ON_WORD = 'On their word, passed as said, only money and keys still are.';
 
 /**
+ * What a key may do while its owner's "Let agents do everything without asking" is on (`agents.bypass`, `bypassOf` in
+ * `index.ts`): the May line `context` says, so the agent acts instead of asking, and knows what still waits.
+ */
+export const BYPASS_SAYS =
+  'The owner lets you do everything without asking: write, delete, money, settings, add-ons, automations and sharing land at once, each logged with your name and undoable. Still theirs in BrainDog: reading or depositing a key, making keys, deleting or exporting all of BrainDog, changing the owner and paying. This holds after reading things from outside BrainDog too, and such a change says so beside it.';
+
+/**
  * The one sentence a row's ceiling, lists and projects come to: "Writes Tasks and Learnings; money, keys and deletes are
  * asked." With `onWord`, for a key that may act on the person's word, it adds what that word lifts (`ON_WORD`): a delete
- * lands on it, money and keys never do (audit 10k, AK6).
+ * lands on it, money and keys never do (audit 10k, AK6). With `bypass`, for a key whose owner lets agents do everything
+ * without asking, the floors are not said at all: `BYPASS_SAYS` follows what the row narrows to.
  */
-export function saysOf(p: Pick<Profile, 'ceiling' | 'lists_write' | 'projects'>, nameOf: (list: string) => string = (l) => l, onWord = false): string {
+export function saysOf(p: Pick<Profile, 'ceiling' | 'lists_write' | 'projects'>, nameOf: (list: string) => string = (l) => l, onWord = false, bypass = false): string {
   if (p.ceiling === 'read') return 'Reads only; every change is refused.';
   if (p.ceiling === 'propose') return 'Suggests; every change is asked first.';
   const lists = p.lists_write === null ? '' : ` ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(p.lists_write.map(nameOf))}`;
   const where = p.projects === null ? '' : ` on ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(p.projects)}`;
+  if (bypass) return `Writes${lists}${where}${p.lists_write !== null || p.projects !== null ? '; anything outside that is asked' : ''}. ${BYPASS_SAYS}`;
   return `Writes${lists}${where}; ${FLOORS}${p.lists_write !== null || p.projects !== null ? ', and so is anything outside that' : ''}.${onWord ? ` ${ON_WORD}` : ''}`;
 }
 

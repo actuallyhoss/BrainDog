@@ -202,14 +202,18 @@ export type LadderDeps = { sql: Sql; kernel: Kernel; now: () => number };
 /**
  * A token call as the ladder reads it: the grant, its scope, the run it writes as (when there is one yet), its app, and
  * the conversation it says it is (`client_id`, the host's session id), or `null` when it names none.
+ *
+ * `bypass` IS THE OWNER'S "LET AGENTS DO EVERYTHING WITHOUT ASKING" (`agents.bypass`), set only by the record from
+ * `bypassOf` in `index.ts`, which the record works out for itself on every call and never takes from the caller. With
+ * it, `gate` lets every write through at Do and tell, floors and outside text included, and counts it towards no rung.
  */
-export type Caller = { token: string; scope: Scope; person: string; run: string | null; app: string | null; conv?: string | null };
+export type Caller = { token: string; scope: Scope; person: string; run: string | null; app: string | null; conv?: string | null; bypass?: true };
 
 /** The record's per-agent memory of one kind: when each change was kept, newest last, and the declines in a row. */
 type Kept = { kept: string[]; declines: number };
 
 /** What a write at its rung does: write it, or file it as a question and say why in one line. */
-export type Gate = { write: true; rung: Rung; kinds: ChangeKind[] } | { write: false; why: string; kinds: ChangeKind[]; outside?: true };
+export type Gate = { write: true; rung: Rung; kinds: ChangeKind[]; read?: string } | { write: false; why: string; kinds: ChangeKind[]; outside?: true };
 
 const json = (text: string | undefined): unknown => {
   if (text === undefined) return undefined;
@@ -434,6 +438,10 @@ export function ladder(deps: LadderDeps) {
     const shape = shapeIn(sql, list);
     const kinds = kindsOfWrite({ list, op, patch, shape, madeBy: selfId === null ? null : madeByIn(sql, selfId), person: c.person, was });
     const from = untrusted(c);
+    /* THE OWNER LETS HIS AGENTS DO EVERYTHING WITHOUT ASKING (`Caller.bypass`): written at Do and tell, the floors and
+       outside text included, and counted towards no rung, so no offer to climb is filed while he has said so already.
+       A run that read text from outside says so beside the change (`read`), so the log keeps why it was not asked. */
+    if (c.bypass === true) return { write: true, rung: 'tell', kinds: [], ...(from === null ? {} : { read: from }) };
     if (from !== null) return { write: false, kinds, why: `This run read ${from}, so its changes ask for the rest of it.`, outside: true };
     const floor = kinds.find((k) => k.floor !== null);
     if (floor) return { write: false, kinds, why: `${FLOOR_SAID[floor.floor!]}, which always asks.` };
@@ -455,6 +463,7 @@ export function ladder(deps: LadderDeps) {
    * be filed as a question, so it is refused with what to do instead.
    */
   const noteFault = (c: Caller, list: string, selfId: string): string | null => {
+    if (c.bypass === true) return null;
     const [k] = kindsOfWrite({ list, op: 'note', shape: shapeIn(sql, list), madeBy: madeByIn(sql, selfId), person: c.person });
     if (!k || (k.floor !== 'others' && k.floor !== 'keys')) return null;
     return `${FLOOR_SAID[k.floor]}, so an agent's note on it is not written. Say it as a question with propose instead.`;

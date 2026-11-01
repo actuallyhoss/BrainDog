@@ -608,7 +608,8 @@ export function methods(deps: RecordDeps) {
        taken back with withdraw once they have said. */
     const askedBy = String(row.opened_by ?? '');
     const key = ctx.principal.kind === 'token' ? ctx.principal.id : null;
-    if (askedBy === run || (key !== null && (askedBy === key || askedKeyOf(sql, askedBy, draftedOf(id)) === key)))
+    /* WHILE HE LETS HIS AGENTS DO EVERYTHING WITHOUT ASKING (`bypass`), a question it asked before is its to settle too. */
+    if (ctx.bypass === undefined && (askedBy === run || (key !== null && (askedBy === key || askedKeyOf(sql, askedBy, draftedOf(id)) === key))))
       return no(
         'FORBIDDEN',
         `You asked ${given} yourself, so the person answers it in BrainDog. If they told you what to do, make that change with said on create or update, or take the question back.`,
@@ -627,7 +628,7 @@ export function methods(deps: RecordDeps) {
     const body = typeof row.body === 'object' && row.body !== null ? (row.body as Record<string, unknown>) : {};
     const options = Array.isArray(body.options) ? body.options : [];
     const weighed = kind === 'options' ? { ...row, body: { ...body, options: options.filter((o) => typeof o === 'object' && o !== null && (o as { id?: unknown }).id === chosen) } } : row;
-    const fault = kind !== 'options' && (chosen === 'reject' || chosen === 'apart') ? null : deps.wordFault(weighed);
+    const fault = kind !== 'options' && (chosen === 'reject' || chosen === 'apart') ? null : deps.wordFault(weighed, ctx);
     if (fault !== null) return no('FORBIDDEN', fault, { at: 'answer' });
     const { by, byName, said: words } = word.value;
     /* A QUESTION SOMEBODY ELSE OPENED IS THEIR WORDS, which the run had to read to answer: another person's, a feed's or
