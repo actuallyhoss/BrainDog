@@ -113,7 +113,8 @@
   import ListPeople from './parts/ListPeople.svelte';
   import ListOrgs from './parts/ListOrgs.svelte';
   import ListRuns from './parts/ListRuns.svelte';
-  import { meetsOf, mergedAway, orgRoleOf } from './folk.ts';
+  import { peopleOrder, setPeopleOrder } from './parts/people-order.svelte.ts';
+  import { lastDayOf, meetsOf, mergedAway, orgRoleOf } from './folk.ts';
   import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
   import { amountField, signedSaid, wayField, wayOf } from '$lib/record/money-way.ts';
   import ListBoard from './parts/ListBoard.svelte';
@@ -1448,8 +1449,22 @@
    * THE SENTENCE UNDER THE TITLE: what is open, what is late in red, and when the next thing falls due
    * (`readingOf`). It counts the rows in hand, so it says nothing while the list is still being paged.
    */
+  /* WHO HAS GONE QUIET LONGEST, on a list of people that says when each was last in touch (`meets`): a month or more
+     since, or nobody. The sentence leads with them (L1). */
+  const quietest = $derived.by((): { name: string; day: string } | null => {
+    const m = meetsOf(decl);
+    if (!m || !decl) return null;
+    let best: { name: string; day: string } | null = null;
+    for (const e of standing) {
+      if (m.self && e.fields[m.self] === true) continue;
+      const day = lastDayOf(e.fields, m);
+      const name = String(e.fields[decl.title] ?? '').trim();
+      if (day && name && (!best || day < best.day)) best = { name, day };
+    }
+    return best && now - Date.parse(`${best.day}T12:00:00Z`) > 30 * 86_400_000 ? best : null;
+  });
   const reading = $derived(
-    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted), besides: youListed }),
+    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted), besides: youListed, quiet: quietest }),
   );
 
   /** A row's title as the list says it, for the summary tile's largest rows. */
@@ -3135,7 +3150,7 @@
   const tiled = $derived(view === 'table' || view === 'groups' || rowsAsCards() || rows.length === 0);
 
   /* This screen's own words: the head's overflow, named with the list it is about. */
-  const headWords = { more: (list: string) => `More for ${list}`, whole: 'Add one with all its fields' } as const;
+  const headWords = { more: (list: string) => `More for ${list}`, whole: 'Add one with all its fields', sortRecent: 'Sort by most recent', sortAz: 'Sort A to Z' } as const;
   /* The toolbar's own "⋯": how the list is shown, and keeping what is on screen. */
 
   /* THE ADD SHEET'S EXAMPLE, from the list itself: the newest row's name, so the line shows what a name here looks like. */
@@ -3376,6 +3391,12 @@
           <Menu label={headWords.more(decl.name)} align="end">
             {#snippet trigger()}<span class="tool-more" data-list-more><Icon name="more" size="m" /><span class="sr-only">{headWords.more(decl.name)}</span></span>{/snippet}
             <button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" /><span class="mi-name">{copy.display}</span><Kbd keys="v" /></button>
+            <!-- SORT, ON A PHONE, WHERE PEOPLE ARE IN GROUPS: Recent or A to Z, which a laptop keeps as the segmented over
+                 the groups (L3). -->
+            {#if view === 'groups' && meetsOf(decl) && !orgRoleOf(decl)}
+              <button type="button" role="menuitemradio" class="phone-only" aria-checked={peopleOrder.value === 'recent'} onclick={() => setPeopleOrder('recent')}><Icon name={peopleOrder.value === 'recent' ? 'check' : 'clock'} size="s" />{headWords.sortRecent}</button>
+              <button type="button" role="menuitemradio" class="phone-only" aria-checked={peopleOrder.value === 'az'} onclick={() => setPeopleOrder('az')}><Icon name={peopleOrder.value === 'az' ? 'check' : 'rows'} size="s" />{headWords.sortAz}</button>
+            {/if}
             {#if (q !== '' || filters.length > 0) && twice === null}
               <button type="button" role="menuitem" onclick={() => void saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</button>
             {/if}
@@ -3645,6 +3666,13 @@
 {/if}
 
 <style>
+  /* THE PHONE'S SORT IN THE "⋯" (L3): a laptop has the segmented over People's groups, so the menu does not repeat it. */
+  @media (width >= 640px) {
+    :global([role='menuitemradio'].phone-only) {
+      display: none;
+    }
+  }
+
   /* EVERY OTHER RULE THIS SCREEN DRAWS IS IN THE PART THAT DRAWS ITS MARKUP (`parts/`), because a
      `<style>` block styles only what its own file writes. What is left here is the page's frame. */
 

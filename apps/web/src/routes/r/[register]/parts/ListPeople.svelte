@@ -25,6 +25,7 @@
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import { foldPeople, folds, lastDayOf, letterPeople, meetsOf, orgFieldOf, roleFieldOf, seenWords, type Member } from '../folk.ts';
   import { daySaid, localDay } from '../[seq]/said.ts';
+  import { peopleOrder, setPeopleOrder } from './people-order.svelte.ts';
 
   let {
     register,
@@ -48,23 +49,9 @@
   } = $props();
 
   /* RECENT OR A TO Z (29 October): by when you last spoke, which is what People is read for most days, or by name, for
-     finding somebody you know by name. Kept on this device only, as a convenience; nothing on the record changes. */
-  const ORDER_KEY = 'bd_people_order';
-  let order = $state<'recent' | 'az'>((() => {
-    try {
-      return localStorage.getItem(ORDER_KEY) === 'az' ? 'az' : 'recent';
-    } catch {
-      return 'recent';
-    }
-  })());
-  const setOrder = (o: 'recent' | 'az'): void => {
-    order = o;
-    try {
-      localStorage.setItem(ORDER_KEY, o);
-    } catch {
-      /* A browser that keeps nothing opens on Recent next time. */
-    }
-  };
+     finding somebody you know by name. One choice with the phone's "⋯" Sort (`people-order.svelte.ts`). */
+  const order = $derived(peopleOrder.value);
+  const setOrder = setPeopleOrder;
   /* YOU ARE THE LIST'S FIRST ROW, MARKED You, AND IN NO GROUP (29 October): the record is yours, so you stand above the
      people you know rather than among them by when you last spoke, and no count of them includes you. */
   const selfPart = $derived(meetsOf(decl)?.self);
@@ -107,7 +94,12 @@
     /* AND WHO THEY ARE, IN THE NOTE'S FIRST SENTENCE (29 October): "Engineer on Otters.gg", "Family", where the line said
        nothing past the name for most people here. One line, cut by the row's width; the whole note is on their page. */
     const said = whoOf(m.entry);
-    return [what, said].filter(Boolean).join(' · ');
+    /* THE ORGANISATION ONCE (1 Nov, L5): "Client at Hart Street Grocer · Buys for Hart Street Grocer" said it twice, so
+       a note that names the organisation the role line already names is left for their page. */
+    const org_ = at === null ? '' : namedOrg(at);
+    const first = org_.split(/\s+/u)[0] ?? '';
+    const repeats = org_ !== '' && (said.toLowerCase().includes(org_.toLowerCase()) || (first.length >= 4 && said.toLowerCase().includes(first.toLowerCase())));
+    return [what, repeats ? '' : said].filter(Boolean).join(' · ');
   };
   const noteField = $derived(decl.fields.find((f) => f.id === 'note' && !f.retired && (f.type === 'text' || f.type === 'document'))?.id ?? null);
   const whoOf = (e: Entry): string => {
@@ -257,6 +249,29 @@
   @media (pointer: coarse) {
     .order button {
       min-block-size: var(--tap);
+    }
+  }
+
+  /* TWO COLUMNS OF THE SAME ROWS FROM 1280 (1 Nov, L7): a band was one 1100px column of 56px rows, a name at one end
+     and its day 1000px away at the other. Each band's rows now fill two columns, read across; the hairline between rows
+     is drawn from the second row of each column on, so the two columns' lines meet. */
+  @media (width >= 1280px) {
+    .band > .ledger {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--sp-6);
+      align-items: start;
+    }
+
+    .band > .ledger > li:nth-child(2) > :global(.line::after) {
+      display: none;
+    }
+  }
+
+  /* ON A PHONE THE ORDER IS THE "⋯"'S SORT (L3), and the row it stood on alone goes. */
+  @media (width < 640px) {
+    .order {
+      display: none;
     }
   }
 

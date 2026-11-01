@@ -574,6 +574,13 @@ export function dueOf(decl: RegisterDecl | undefined, e: Entry, now: number): { 
   return { text: words.due(dayWord(due, now)), late: false };
 }
 
+/** A day as its month, "July", with the year when it is not the record's this year, "July 2025". */
+function monthOf(day: string, now: number): string {
+  const at = new Date(`${day}T12:00:00Z`);
+  const month = at.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
+  return at.getUTCFullYear() === new Date(now).getUTCFullYear() ? month : `${month} ${at.getUTCFullYear()}`;
+}
+
 /** The list's name for how many rows, "1 bill" or "12 bills". */
 const counted = (decl: RegisterDecl, n: number): string => `${n} ${(n === 1 ? decl.one : decl.name).toLowerCase()}`;
 
@@ -624,6 +631,7 @@ const words = {
   newestNamed: (name: string) => `the newest ${name}`,
   lastCame: (name: string, when: string) => `Nothing new this week; the last added was ${name}, ${when}.`,
   noneThisWeek: 'Nothing new this week',
+  quietSince: (name: string, month: string) => `${name} quiet since ${month}`,
   match: (n: number, of: number) => `${n} of ${of} ${n === 1 ? 'matches' : 'match'}.`,
   today: 'today',
   tomorrow: 'tomorrow',
@@ -668,7 +676,7 @@ export function readingOf(
   decl: RegisterDecl | undefined,
   entries: readonly Entry[],
   now: number,
-  at: { whole: boolean; filtered: boolean; matched: number; total: number; besides?: boolean },
+  at: { whole: boolean; filtered: boolean; matched: number; total: number; besides?: boolean; quiet?: { name: string; day: string } | null },
 ): Reading | null {
   if (!decl) return null;
   if (at.filtered) return plain(words.match(at.matched, at.total));
@@ -682,10 +690,15 @@ export function readingOf(
     const name = newestE && decl.title ? String(newestE.fields[decl.title] ?? '').trim() : '';
     const week = entries.filter((e) => now - Date.parse(e.created) < 7 * DAY_MS).length;
     if (!newestE) return null;
+    /* ON A LIST OF PEOPLE, WHO HAS GONE QUIET LEADS (People's page says the same): "June Park quiet since July; 2 added
+       this week." The page hands it over (`quiet`), since when somebody was last in touch is the list's `meets`. */
+    const quiet = at.quiet ? words.quietSince(at.quiet.name, monthOf(at.quiet.day, now)) : '';
     if (week > 0) {
       const lead = week === entries.length && week > 1 ? words.allThisWeek(week) : words.thisWeek(week);
+      if (quiet) return plain(`${quiet}; ${lead.charAt(0).toLowerCase()}${lead.slice(1)}.`);
       return plain(name && week > 1 ? `${lead}, ${words.newestNamed(name)}.` : name ? `${lead}: ${name}.` : `${lead}.`);
     }
+    if (quiet) return plain(`${quiet}; ${words.noneThisWeek.toLowerCase()}.`);
     return plain(name ? words.lastCame(name, since(newestE.created, now)) : `${words.noneThisWeek}.`);
   }
   const open = entries.filter((e) => !isDone(decl, e));
