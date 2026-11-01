@@ -45,6 +45,7 @@
   import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
   import ChatAnswer from '$lib/agents/ChatAnswer.svelte';
   import OnWord from '$lib/agents/OnWord.svelte';
+  import Bypass from '$lib/agents/Bypass.svelte';
   import Apart from '$lib/agents/Apart.svelte';
   import { page } from '$app/state';
   import { lineOf as appLineOf, madeByOther, partsOf } from '$lib/record/apps.ts';
@@ -768,10 +769,12 @@
     </Tile>
   {/if}
 
-  <!-- THE OWNER'S THREE ANSWERING SWITCHES IN ONE TILE, a row each: answering from the card in a chat app
+  <!-- THE OWNER'S FOUR ANSWERING SWITCHES IN ONE TILE, a row each: agents doing everything without asking, answering from the card in a chat app
        (`ChatAnswer.svelte`), agents answering on his word (`OnWord.svelte`), and agents' suggestions kept apart from
        Needs you (`Apart.svelte`). Three tiles of one switch each read as three screens. -->
   <Tile icon="decide" title={words.answering} data-part="answering">
+    <!-- FIRST, THE ONE THAT LIFTS THE REST: agents doing everything without asking (`Bypass.svelte`). -->
+    <Bypass prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
     <ChatAnswer prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
     <OnWord prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
     <Apart prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
