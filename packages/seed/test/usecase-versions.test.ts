@@ -1890,6 +1890,28 @@ const DECLARED: Record<string, Version> = {
     declares: 'a6976e13e5227761',
     history: ['`page.dashboard` takes the place after Agents, so a full rail keeps what it had (review 31 Oct g, RG17); no id added or taken away -> a6976e13e5227761'],
   },
+  'founder@3.9.2': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 extends.register.datapoints.about_service
+      extends.register.datapoints.organisation hands.register.datapoints.portfolio hands.register.organisations.people
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
+      metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
+      metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories setting.label_installments
+      setting.label_obligations setting.label_people setting.label_recurring setting.label_services setting.label_tasks
+      setting.label_things setting.label_tracks setting.label_transactions setting.label_updates setting.one_accounts
+      setting.one_books setting.one_categories setting.one_installments setting.one_obligations setting.one_people
+      setting.one_recurring setting.one_services setting.one_tasks setting.one_things setting.one_tracks
+      setting.one_transactions setting.one_updates setting.shared_version setting.speaks setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: 'd2c981f6c0c8949c',
+    history: ['`page.dashboard` says a project sends its numbers to its own address, shown on its page, where it said its page has the key (audit 1 Nov, AP32); no id added or taken away -> d2c981f6c0c8949c'],
+  },
   'founder@3.7.1': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3

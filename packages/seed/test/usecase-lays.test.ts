@@ -326,6 +326,21 @@ const LAID: Record<string, Laid> = {
     declares: '192a7f45d2533b26',
     history: ['3.9.1 lays what 3.9.0 laid, word for word: only the Dashboard\'s place on the rail moved, after Agents -> 192a7f45d2533b26'],
   },
+  'founder@3.9.2': {
+    lays: [
+      'adds page.relation after People: Numbers, 30 days',
+      'adds page.relation after People: Latest numbers',
+      'adds page.relation after People: Send numbers here',
+      'adds page.portfolio after In play: ',
+      'adds page.estate after Next ninety days: Server and provider numbers',
+      'adds page.relation after Notes: Where it was seen',
+      'adds page.someone after Notes: Where it was seen',
+      'hands register.organisations to people',
+      'hands register.datapoints to portfolio',
+    ],
+    declares: '192a7f45d2533b26',
+    history: ['3.9.2 lays what 3.9.1 laid, word for word: only the Dashboard\'s feed lines changed -> 192a7f45d2533b26'],
+  },
   /* PERSONAL LAYS FOR THE FIRST TIME AT 2.4.0 (budgets-set-73, integrate 73): the count of budgets set goes to Money,
      which declares it since money-core 3.17.0. 2.3.1, released, laid nothing and has no entry. */
   'personal@2.4.0': {

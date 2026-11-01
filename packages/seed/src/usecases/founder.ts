@@ -514,8 +514,11 @@ export const FOUNDER = {
      only once a feed has sent a number; before that, a project's numbers are set up. Blocks added and nothing taken
      away, so a minor step; 3.8.2 is published.
      3.9.1 (review 31 Oct g, RG17): the Dashboard's place is after Agents, not after Work, so a full rail keeps what it
-     had and the Dashboard waits under More. Its place only, so a patch step; 3.9.0 is published. */
-  version: '3.9.1',
+     had and the Dashboard waits under More. Its place only, so a patch step; 3.9.0 is published.
+     3.9.2 (audit 1 Nov, AP32): Set up a numbers feed and Fix the numbers feed say "Each project sends its numbers to its
+     own address, shown on its page.", where they said its page "has the key", with no full stop. Words only, so a patch
+     step; 3.9.1 is published. */
+  version: '3.9.2',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
@@ -767,7 +770,7 @@ export const FOUNDER = {
             icon: 'send',
             span: 12,
             when: { all: [{ metric: 'projects-live', gte: 1 }, { metric: 'datapoints-reported', lt: 1 }] },
-            authored: [{ cells: ['Set up a numbers feed', SEND_NUMBERS, "Each project sends its numbers to its own address; its page has the key"] }],
+            authored: [{ cells: ['Set up a numbers feed', SEND_NUMBERS, 'Each project sends its numbers to its own address, shown on its page.'] }],
           },
           /* A FEED THAT SENT ONCE AND WENT QUIET: only then is it "no numbers in thirty days", and a feed to fix. */
           {
@@ -787,7 +790,7 @@ export const FOUNDER = {
             icon: 'send',
             span: 12,
             when: { all: [{ metric: 'datapoints-reported', gte: 1 }, { metric: 'datapoints-30d', lt: 1 }] },
-            authored: [{ cells: ['Fix the numbers feed', SEND_NUMBERS, "Each project sends its numbers to its own address; its page has the key"] }],
+            authored: [{ cells: ['Fix the numbers feed', SEND_NUMBERS, 'Each project sends its numbers to its own address, shown on its page.'] }],
           },
           /* ON THE FIGURE THE LINE SAYS, so the chart is drawn exactly while the sentence over it counts something. The
              example number shows under Latest numbers and is left out here. */
