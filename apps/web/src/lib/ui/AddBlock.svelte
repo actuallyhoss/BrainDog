@@ -46,7 +46,7 @@
   import { blockWords } from '../record/block-edit.ts';
   import type { InstalledKind } from '../record/kinds.ts';
   import type { PageBlock } from '../record/schema.ts';
-  import { composeWords } from '../page/compose.ts';
+  import { composeWords } from '../page/compose-words.ts';
   import { shelfWords, type Shelved } from '../page/shelf.ts';
   import Button from './Button.svelte';
   import Define from './Define.svelte';
