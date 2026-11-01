@@ -20,6 +20,7 @@
   import { actor } from '$lib/record/names.ts';
   import { midnightOf, type SessionRow } from '$lib/record/today-live.ts';
   import VisualStrip from '../visual/VisualStrip.svelte';
+  import { pageButtons, take } from './page-buttons.svelte.ts';
   import { HERO_WORDS } from '$lib/record/project.ts';
   import { slotStyle } from '$lib/home/project-cards.ts';
   import ProjectVisuals from './ProjectVisuals.svelte';
@@ -120,6 +121,9 @@
     /* A SERVICE IS SAID ONCE, above, with when it renews; a cancelled one not at all. */
     ...onceEach(hold.runsOn.filter((x) => !/service/iu.test(x.kind ?? ''))).map((x): RunsLine => ({ name: x.title, sub: singular(x.kind), right: '', tone: 'plain', href: null, icon: runsIcon(x.kind) })),
   ]);
+
+  /* THE PAGE'S BUTTONS, lent to the hero's top row from 900px. */
+  const lent = pageButtons();
 </script>
 
 {#if cols}
@@ -163,6 +167,9 @@
               </p>
             {/if}
           </div>
+          <!-- THE PAGE'S SHARE AND "⋯", at the end of the name's row from 900px, where the head had a row of its own for
+               them (`page-buttons.svelte.ts`). -->
+          {#if lent?.buttons}<div class="h-page-acts" {@attach take(lent)}>{@render lent.buttons()}</div>{/if}
         </div>
         <p class="h-head" dir="auto">{facts.headline}</p>
         {#if hold.modelLine}
@@ -487,6 +494,22 @@
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 12px;
+  }
+
+  .h-top:has(> .h-page-acts) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  /* SHARE AND "⋯" ON THE HERO: quiet, on the tile's own fill, as the head drew them on the board. */
+  .h-page-acts {
+    display: flex;
+    align-items: center;
+    align-self: start;
+    gap: var(--sp-2);
+  }
+
+  .h-page-acts :global(:is(.btn[data-weight='quiet'], .share-trigger, .change-more)) {
+    background: var(--tile);
   }
 
   .h-well {

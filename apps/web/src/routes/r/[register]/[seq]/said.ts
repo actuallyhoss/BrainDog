@@ -40,6 +40,9 @@ export const rowWords = {
   /* What the fields tile is called to a screen reader, and what it says when the row has answered nothing yet. */
   details: 'Details',
   nothingYet: 'Nothing filled in yet.',
+  /* The press under the first six facts that opens the rest, and closes them again. */
+  moreDetails: (n: number): string => `${n} more details`,
+  fewerDetails: 'Fewer details',
   /* The last choice under "Add a field": a field the list does not have yet, on every row of it. */
   newField: (one: string): string => `New field for every ${one.toLowerCase()}`,
   today: 'Today',

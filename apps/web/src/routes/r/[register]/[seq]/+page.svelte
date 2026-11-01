@@ -43,6 +43,7 @@
   import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf } from '$lib/record/api.ts';
   import { REGISTERS, TITLES } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import { rowIn, rowOut } from '$lib/ui/motion.ts';
   import Face from '$lib/ui/Face.svelte';
   import AgentFace from '$lib/ui/AgentFace.svelte';
   import { faceWords, liveOf, slotOf } from '$lib/ui/face.ts';
@@ -835,6 +836,21 @@
   );
 
   /**
+   * THE FIRST SIX FACTS, AND THE REST ONE PRESS AWAY (1 Nov, "row pages lead with the one thing that matters"): a key
+   * number listed fourteen settings at one weight (Unit, Shape, Shown first, Order, Not kept yet, State...), so what it
+   * measures and where it comes from read no louder than its sort order. The state and the fields the list puts first
+   * lead; "More details" opens the rest in place. A row with eight or fewer shows them all, since a press that opens two
+   * lines costs more than the lines. A field being changed is always shown.
+   */
+  const LEAD_FACTS = 6;
+  let factsOpen = $state(false);
+  const folds = $derived(facts.length > LEAD_FACTS + 2);
+  const factsShown = $derived(!folds || factsOpen ? facts : facts.filter((f, i) => i < LEAD_FACTS || editing === f.id));
+  const factsHidden = $derived(folds ? facts.length - LEAD_FACTS : 0);
+  const foldIn = (node: Element, more: boolean) => (more ? rowIn(node) : { duration: 0 });
+  const foldOut = (node: Element, more: boolean) => (more ? rowOut(node) : { duration: 0 });
+
+  /**
    * A PERSON'S PAGE LEADS WITH WHO THEY ARE, AND AN ORGANISATION'S WITH WHAT IT IS, on a list that declares the role
    * (`people.ts`): the people `meet` writes (`meets:`) or the organisations (`org:`). Never by the list's name, so any
    * record's people read this way, whoever it belongs to.
@@ -1319,9 +1335,11 @@
 
   <!-- ONE FACT: its label in the first column, its value in the second, and its pencil in the trailing one. A deadline
        that has passed is said in red, the one red a fact can carry. -->
-  {#snippet fact(f: FieldDecl)}
+  {#snippet fact(f: FieldDecl, more = false)}
     {@const value = row.fields[f.id]}
-    <div class="fact">
+    <!-- A FACT PAST THE FIRST SIX OPENS IN PLACE: its height grows from nothing and it fades up, and it leaves the same
+         way (`rowIn`, `rowOut`; a fade alone under reduced motion). The first six are simply there. -->
+    <div class="fact" in:foldIn={more} out:foldOut={more}>
       <dt class="fact-label">{labelOf(f)}</dt>
       <dd class="fact-value" data-type={f.type} data-own={OWN_TYPES.has(f.type) ? '' : undefined} data-late={f.id === dueField?.id && lateTone === 'bad' ? '' : undefined} dir={dirOf(id, f.id)}>
         {#if editing === f.id}
@@ -1518,7 +1536,7 @@
           {#if facts.length > 0 || knownGroups.length > 0}
             <div class="facts-box">
             <dl class="facts">
-              {#each facts as f (f.id)}{@render fact(f)}{/each}
+              {#each factsShown as f, i (f.id)}{@render fact(f, i >= LEAD_FACTS)}{/each}
               <!-- WHAT THEY ARE KNOWN BY, each line by its kind; the pencil on a field's first line opens that field. -->
               {#each knownGroups as g (g.field.id)}
                 {#if editing === g.field.id}
@@ -1534,6 +1552,11 @@
                 {/if}
               {/each}
             </dl>
+            {#if folds}
+              <button type="button" class="facts-fold" aria-expanded={factsOpen} onclick={() => (factsOpen = !factsOpen)}>
+                <span>{factsOpen ? rowWords.fewerDetails : rowWords.moreDetails(factsHidden)}</span><Icon name="chevronDown" size="s" />
+              </button>
+            {/if}
             </div>
           {:else if figure === null && !self && !about}
             <p class="quiet">{rowWords.nothingYet}</p>
@@ -2202,6 +2225,49 @@
   }
 
   /* THE TILE'S FOOT: "Add a field", and for a reader who cannot change the list, why there is no Edit. */
+  /* "6 MORE DETAILS": a quiet line under the facts, its chevron turning as they open. */
+  .facts-fold {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: 32px;
+    margin-block-start: var(--sp-2);
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+  }
+
+  .facts-fold :global(.icon) {
+    transition: rotate var(--d-state, 180ms) var(--ease-out);
+  }
+
+  .facts-fold[aria-expanded='true'] :global(.icon) {
+    rotate: 180deg;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .facts-fold:hover {
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .facts-fold {
+      min-block-size: var(--tap);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .facts-fold :global(.icon) {
+      transition: none;
+    }
+  }
+
   .facts-foot {
     display: flex;
     flex-wrap: wrap;
@@ -2632,14 +2698,18 @@
       display: contents;
     }
 
-    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart])::after) {
+    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart], .sb)::after) {
       content: '';
       flex-basis: 100%;
       order: 1;
     }
 
+    /* SEND GOES WITH THE PRIMARY, under the name (1 Nov): beside the "…" it took 100px of the name's row and broke
+       "Send Northbound invoices on the 1st, not the 15th." into four lines of two words. The name's row is the name
+       and the "…"; the verbs are the row under it, the primary first. */
     .row-head :global(.page-head [data-head-primary]),
-    .row-head :global(.page-head [data-row-chart]) {
+    .row-head :global(.page-head [data-row-chart]),
+    .row-head :global(.page-head .sb) {
       order: 2;
       margin-block-start: var(--sp-3);
     }

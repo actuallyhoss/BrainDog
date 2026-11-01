@@ -37,6 +37,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import { isGlyph, type IconName } from '$lib/ui/icons.ts';
   import { glyphOf, ownIcon } from '$lib/market/ListingCard.svelte';
   import StoreCard from '$lib/market/StoreCard.svelte';
@@ -80,6 +81,7 @@
 
   /** Four to a shelf until Show all, a search or a chip. */
   const FOLDED_AT = 4;
+  const phone = new MediaQuery('(width < 640px)', false);
   const folded = (shelf: Shelf, n: number): boolean => n > FOLDED_AT && !searching && chip === null && opened[shelf] !== true;
 
   /* ── what each card says ───────────────────────────────────────────────── */
@@ -137,8 +139,13 @@
   const featured = $derived.by((): Listing[] => {
     if (searching || chip !== null || states === null) return [];
     const named = new Set(suggested.flatMap((s) => (s.listing ? [s.listing.key] : [])));
+    /* NOR ONE ITS OWN SHELF ALREADY SHOWS (1 Nov): the four it picked were Money's first four, so Card alerts,
+       Certificates, Count the cash and Debts stood twice on one screen. It offers what a folded shelf keeps out of
+       sight, and says nothing when every shelf shows all it holds. */
+    const shown = new Set(laid.shelves.flatMap((s) => s.items.slice(0, FOLDED_AT).map((l) => l.key)));
     return laid.shelves
       .flatMap((s) => s.items)
+      .filter((l) => !shown.has(l.key))
       .filter((l) => l.kind === 'pack' && ours(l) && !named.has(l.key) && cueOf(l).cue === store.add)
       .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
       .slice(0, FEATURED_MOST);
@@ -187,12 +194,15 @@
 
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
-<PageHead icon="packs" title={copy.packs} sentence={store.sentence}>
-  {#snippet actions()}
-    <Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>
-    <!-- ANYBODY SIGNED IN MAY PUBLISH ONE: the form makes it from what they built, and it waits for review. -->
-    <Button size="sm" weight="bare" href={addonHref}>{words.publish}</Button>
-  {/snippet}
+<!-- ON A PHONE THE TWO WAYS ON SIT UNDER THE SENTENCE (1 Nov): beside it they squeezed "Each shows its plan before
+     anything changes." into five lines of two words. -->
+{#snippet ways()}
+  <Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>
+  <!-- ANYBODY SIGNED IN MAY PUBLISH ONE: the form makes it from what they built, and it waits for review. -->
+  <Button size="sm" weight="bare" href={addonHref}>{words.publish}</Button>
+{/snippet}
+<PageHead icon="packs" title={copy.packs} sentence={store.sentence} actions={phone.current ? undefined : ways}>
+  {#snippet below()}{#if phone.current}<div class="ways">{@render ways()}</div>{/if}{/snippet}
 </PageHead>
 
 {#snippet card(l: Listing, hue: (typeof SHELF_SLOTS)[keyof typeof SHELF_SLOTS], note: string | null = null)}
@@ -317,9 +327,31 @@
   }
 
   .tools > :global(.segmented) {
+    flex-wrap: nowrap;
     align-self: flex-start;
     max-inline-size: 100%;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .tools .chip {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* ON A PHONE THE SHELVES ARE ONE STRIP THAT SCROLLS INSIDE ITSELF, fading at its end so a shelf past it reads as more
+     to scroll to; they wrapped into three rows of chips over the first card. */
+  @media (width < 640px) {
+    .tools > :global(.segmented) {
+      -webkit-mask-image: linear-gradient(to right, var(--ink) calc(100% - 28px), transparent);
+      mask-image: linear-gradient(to right, var(--ink) calc(100% - 28px), transparent);
+    }
+  }
+
+  .ways {
+    display: flex;
+    gap: var(--sp-2);
   }
 
   .find {

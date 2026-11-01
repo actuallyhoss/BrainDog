@@ -16,6 +16,8 @@
   import { display } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn, springy } from '$lib/motion/index.ts';
   import Face from '$lib/ui/Face.svelte';
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import { foldOrgs, orgFieldOf, orgNameSaid, orgRoleOf, orgsCounted, meetsOf, seenWords, type OrgGroup } from '../folk.ts';
@@ -95,7 +97,8 @@
         {#each g.items as item (item.entry.seq)}
           {@const name = nameOf(item.entry)}
           {@const detail = detailOf(item.entry)}
-          <li>
+          <!-- AN ORGANISATION ADDED, MOVED OR GONE, as a person is in their list: it rises in, the rest close the gap. -->
+          <li in:lineIn out:dismiss animate:flip={springy()}>
             <a
               class="line line-tall"
               href={at(`/r/${register}/${item.entry.seq}`)}

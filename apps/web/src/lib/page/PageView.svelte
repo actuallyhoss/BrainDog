@@ -67,6 +67,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
+  import { hostButtons } from './page-buttons.svelte.ts';
   import PageBody from './PageBody.svelte';
   import { isProject, withoutRepeats, type Block } from '$lib/record/project.ts';
   import { REGISTERS } from '$lib/record/held.ts';
@@ -100,7 +101,7 @@
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '../at.ts';
-  import { barTitled, frame, narrow as onPhone } from '../shell/frame.svelte.ts';
+  import { barTitled, frame } from '../shell/frame.svelte.ts';
   import { listName } from '../record/names.ts';
   import QuickHost from '$lib/money/QuickHost.svelte';
   import { pageOfLedger } from '$lib/money/ledger.ts';
@@ -522,14 +523,6 @@
   const tiled = $derived(led && !projectPage && !plain);
 
   /**
-   * AND WHERE THE SENTENCE STAYS THE HEADER'S PLAIN LINE (`plain`, the Agents page) while the bar says the name, the
-   * head's row would hold nothing but the buttons, a row of their own over the sentence. They go to the sentence's end
-   * instead (`PageBody`'s `leadEnd`), and share its row whenever both fit. A desk's only: a phone's head already puts
-   * them on the row its bar leaves.
-   */
-  const besideLead = $derived(led && !tiled && !projectPage && frame.crumbed && !onPhone.current);
-
-  /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
    * generic "One screen that gathers what you keep an eye on" under its title as well (`define`), which on Work stood
    * between the name and the page's own sentence and said less than it. Read whether or not the page opens on it, so the
@@ -785,6 +778,21 @@
   /* A PHONE'S HEAD HOLDS TWO CONTROLS BESIDE THE NAME, Share and the "⋯" menu, so Show the data is the menu's first row
      there, as Edit details is on a project: a button of its own pushed the row past a 390px screen. */
   const roomy = new MediaQuery('(width >= 640px)', true);
+
+  /* THE BUTTONS GO TO THE LEAD TILE where the head would hold nothing else (`page-buttons.svelte.ts`): a project's page
+     and Projects, from 900px, while the page is read and not arranged. */
+  const buttonsHost = hostButtons();
+  const buttonsLent = $derived(mode === 'page' && wide.current && !arranging && !showSource && (projectPage || slug === 'portfolio'));
+  /* Attached beside the snippet, which is the template's and not this script's to name. */
+  const lendButtons =
+    (b: Snippet) =>
+    (_el: HTMLElement): (() => void) => {
+      buttonsHost.buttons = buttonsLent ? b : null;
+      return () => {
+        buttonsHost.buttons = null;
+      };
+    };
+  const buttonsTaken = $derived(buttonsLent && buttonsHost.held > 0);
   const headLine = $derived.by((): { at: number; block: LiveBlock } | null => {
     if (!hosting || !live) return null;
     const layout = layoutOf(live.page.page);
@@ -999,7 +1007,7 @@
   <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
        0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
   <!-- `data-arrive` (`$lib/motion/motion.css`): in the skeleton's place it fades up rather than switching on. -->
-  <div class="hosted" data-arrive data-money={moneyPage ? '' : undefined} {@attach moneyPage ? masonry : undefined}>
+  <div class="hosted" data-arrive data-money={moneyPage ? '' : undefined} data-lent={buttonsTaken ? '' : undefined} {@attach moneyPage ? masonry : undefined}>
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
        at one. Not on a page that has its own headline sentence, which says what this page is better than the noun. -->
   <PageHead
@@ -1016,12 +1024,13 @@
     {tiled}
   >
     {#snippet actions()}
-      {#if !tiled && !besideLead}{@render pageButtons()}{/if}
+      {#if !tiled && !buttonsTaken}{@render pageButtons()}{/if}
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
   {#if accountPage && about && sharable && !arranging}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="line" seq={about.seq} name={about.title} />{/await}{/if}
 
+  <span hidden {@attach lendButtons(pageButtons)}></span>
   <!-- THE PAGE'S OWN BUTTONS, drawn once: at the end of the name's row, or on the lead tile's first row. -->
   {#snippet pageButtons()}
       {#if headLine && wide.current && !tiled}{@render lineInHead()}{/if}
@@ -1198,7 +1207,6 @@
         {arrangement}
         headed={led && !placed}
         leadHead={tiled && !placed ? leadRow : null}
-        leadEnd={besideLead && !placed ? pageButtons : null}
         captured={placed ? -1 : (headLine?.at ?? -1)}
         under={headLine && (tiled || !wide.current) && !shapeWaits && !placed ? lineInHead : null}
         strip={strip && led && !shapeWaits && !placed ? narrow : null}
@@ -1411,10 +1419,7 @@
   .hosted {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));
-    /* AND ITS FADE UP IN THE SKELETON'S PLACE (`data-arrive`, `motion.css`), written here since this rule outweighs it. */
-    transition:
-      padding-inline-end var(--d-panel) var(--ease-sheet),
-      opacity var(--d-swap) var(--ease-standard);
+    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
   }
 
   /* The blocks' bars stand in the board's gutter, where the first tile will be. */
@@ -1506,6 +1511,17 @@
     .home-tools {
       transition: none;
     }
+  }
+
+  /* THE HEAD GIVES ITS ROW BACK while the lead tile draws the page's buttons (`page-buttons.svelte.ts`): what is left in
+     it (the unseen `h1` on Projects, the arranging controls at rest) stays for a screen reader and takes no room. */
+  .hosted[data-lent] :global(.page-head:is([data-headless], [data-titled])) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   /* THE STRIP SITS IN THE PAGE'S OWN GUTTER, over the first tile, with the gap a row of tiles keeps. */
@@ -1634,13 +1650,13 @@
       color: var(--ink);
     }
 
-    /* THE GLYPHS AT THE SIZE THE HEAD DRAWS THEM ON A PHONE (`PageHead.svelte`): the red + a 36 square with a 16px
-       glyph, a quiet glyph at 20. At 12 in a 44 square they read as specks (People at 390, 1 Nov). */
+    /* THE GLYPHS AT THE SIZES THE HEAD DRAWS THEM (`PageHead.svelte`): the page's "+" a 36 square with its 16px glyph,
+       Share and the "⋯" bare 44s with 20px glyphs. Left at their words' sizes they were 12px specks in 44px boxes
+       (People at 390, 1 Nov). */
     .lead-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *)) {
       inline-size: 36px;
       min-inline-size: 36px;
       min-block-size: 36px;
-      margin: 4px;
     }
 
     .lead-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *) .icon[data-size]) {
@@ -1648,7 +1664,7 @@
       block-size: var(--icon-m);
     }
 
-    .lead-actions :global(:is(.btn[data-weight='quiet'], .change-more, .share-trigger):not(dialog *) .icon[data-size]) {
+    .lead-actions :global(:is(.btn[data-weight='quiet'], .share-trigger, .change-more) .icon[data-size]) {
       inline-size: var(--icon-l);
       block-size: var(--icon-l);
     }

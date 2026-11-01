@@ -61,7 +61,10 @@
 <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, beside the one primary action, which is the tab's own: "New
      automation", "New scheduled action", "New script", and none on Doors, whose section carries "New door" for an
      owner, and none on Runs, where nothing is made. -->
-<!-- THE TABS ARE DRAWN ONCE, beside the name at a desk's width and under the sentence on a phone. -->
+<!-- THE TABS ARE DRAWN ONCE, UNDER THE SENTENCE AT EVERY WIDTH (1 Nov): beside it at a desk they took 360px of the
+     sentence's row, so "23 scripts ran 472 times this month, on their clocks and when an automation started one." broke
+     onto a second line at 1440 beside four tabs and New script. The row is the sentence and the tab's one primary; the
+     tabs are the row under it, at their own width on a desk and the whole width on a phone. -->
 {#snippet tabs(at: Tab)}<HubTabs here={at} full={phone.current} />{/snippet}
 
 <!-- ON RUNS THE NAME IS "Runs": its count is the runs', and "Automations 4" over a list of
@@ -69,14 +72,13 @@
 {#if tab && shown}
   <PageHead icon="refresh" title={tab === 'runs' ? w.tab.runs : words.heading} count={shown.count} sentence={shown.sentence} needs={shown.needs}>
     {#snippet actions()}
-      {#if !phone.current}{@render tabs(tab)}{/if}
       {#if make && phone.current}
         <Button weight="primary" href={make.href} aria-label={make.label} data-circle><Icon name="plus" size="s" /></Button>
       {:else if make}
         <Button weight="primary" href={make.href}>{make.label}</Button>
       {/if}
     {/snippet}
-    {#snippet below()}{#if phone.current}{@render tabs(tab)}{/if}{/snippet}
+    {#snippet below()}{@render tabs(tab)}{/snippet}
   </PageHead>
 {/if}
 

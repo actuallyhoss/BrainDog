@@ -36,6 +36,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { Bars, Ring } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
@@ -219,10 +220,16 @@
         <Bars items={bars} subject={w.runsMonthSubject} />
         {#if bars.some((b) => (b.part ?? 0) > 0)}<p class="key">The red part of a bar is its failed runs.</p>{/if}
         <p class="reading">{monthReading(rows, now)}</p>
+        <!-- WHY THEY FAILED, ONE PRESS AWAY (1 Nov): the run's own words, three paragraphs of them, stood open under the
+             chart and made the tile twice the height of its neighbour. The count and the reading say what is true; the
+             reasons open under them. -->
         {#if why.length > 0}
-          <ul class="why" aria-label={w.whyFailed}>
-            {#each why as f, i (i)}<li><span class="why-name">{f.name}</span> {f.say}</li>{/each}
-          </ul>
+          <details class="why-fold">
+            <summary class="why-open"><span>{w.whyFailed}</span><span class="why-n num">{why.length}</span><Icon name="chevronDown" size="s" /></summary>
+            <ul class="why" aria-label={w.whyFailed}>
+              {#each why as f, i (i)}<li><span class="why-name">{f.name}</span> {f.say}</li>{/each}
+            </ul>
+          </details>
         {/if}
       </Tile>
       <Tile icon="check" title={w.endedTitle}>
@@ -277,6 +284,65 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     list-style: none;
+  }
+
+  .why-fold {
+    margin-block-start: var(--sp-2);
+    interpolate-size: allow-keywords;
+  }
+
+  /* THE FOLD OPENS ON ITS HEIGHT, 180ms on the house curve, and at once under reduced motion. */
+  .why-fold::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size var(--d-state, 180ms) var(--ease-out),
+      content-visibility var(--d-state, 180ms) allow-discrete;
+  }
+
+  .why-fold[open]::details-content {
+    block-size: auto;
+  }
+
+  .why-open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: 32px;
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .why-open::-webkit-details-marker {
+    display: none;
+  }
+
+  .why-open :global(.icon) {
+    transition: rotate var(--d-state, 180ms) var(--ease-out);
+  }
+
+  .why-fold[open] .why-open :global(.icon) {
+    rotate: 180deg;
+  }
+
+  .why-n {
+    color: var(--ink-3);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .why-open:hover {
+      color: var(--ink);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .why-fold::details-content,
+    .why-open :global(.icon) {
+      transition: none;
+    }
   }
 
   .why-name {
