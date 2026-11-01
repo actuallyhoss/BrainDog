@@ -17,7 +17,8 @@
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import { forgetLocal, localSize } from '$lib/data/local-tab.ts';
 
-  let { shell }: AreaProps = $props();
+  /* `bare` (G4): inside Signing in's You tile, under a small heading, not a tile of its own. */
+  let { shell, bare = false }: AreaProps & { bare?: boolean } = $props();
 
   /* WHO IS SIGNED IN IS THE HOST'S ANSWER, shared with Identity and Recovery (`settings-state.svelte.ts`). A session is
      only listed for somebody who has one, so nothing is asked until the host has said who that is. */
@@ -100,8 +101,7 @@
   }
 </script>
 
-<Tile icon="monitor" class="section" data-surface="tile" title={copy.sessions} count={(ordered?.length ?? 0) || undefined}>
-  <div class="section-body">
+{#snippet body()}
     <!-- WHAT SIGNING OUT DOES, only where there is somebody signed in to do it. -->
     {#if me !== null}<p class="hint">{copy.sessionsHow}</p>{/if}
     {#if me === null}
@@ -137,8 +137,17 @@
       {/if}
     {/if}
     {#if said}<p class="hint" role="status">{said}</p>{/if}
-  </div>
+{/snippet}
+{#if bare}
+  <section class="bare-sessions" aria-labelledby="sessions-h">
+    <h3 class="bare-h" id="sessions-h">{copy.sessions}</h3>
+    {@render body()}
+  </section>
+{:else}
+<Tile icon="monitor" class="section" data-surface="tile" title={copy.sessions} count={(ordered?.length ?? 0) || undefined}>
+  <div class="section-body">{@render body()}</div>
 </Tile>
+{/if}
 
 <!-- ONLY ONCE SOMETHING IS KEPT: a card saying nothing was kept here was a
      card with nothing in it to act on. Just forgotten, it says so once. -->
@@ -198,5 +207,18 @@
       justify-content: center;
       min-block-size: 44px;
     }
+  }
+
+  .bare-sessions {
+    margin-block-start: var(--sp-4);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .bare-h {
+    margin: 0 0 var(--sp-2);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
   }
 </style>

@@ -29,7 +29,8 @@
   /* `part` DRAWS HALF OF IT inside Signing in (agents F14): `you` is who you are and how you sign in, `records` the
      records you can open and closing your account, so the passkeys and the places you are signed in sit between them.
      With no part it is all of it, in its old order. */
-  let { shell, part }: AreaProps & { part?: 'you' | 'records' | undefined } = $props();
+  /* `extra` (G4): what Signing in folds into the You tile under who you are, the ways back in and the browsers. */
+  let { shell, part, extra }: AreaProps & { part?: 'you' | 'records' | undefined; extra?: import('svelte').Snippet } = $props();
 
   /* THE MEMBERS AND THE SIGN-IN ARE SHARED: People reads the same list and Recovery the same host
      answer (`settings-state.svelte.ts`). The names below are the ones this markup reads. */
@@ -39,6 +40,7 @@
   const signedOut = $derived(s.signedOut);
   /* THE TWO SIGN-IN STATES THAT ARE NOT A SESSION, said in the row where "Signed in as" stands when there is one. */
   const identityWords = {
+    addName: 'Add your name',
     here: 'This browser',
     openHost: 'Let in without signing in, as this BrainDog’s one person',
     notSignedIn: 'Not signed in',
@@ -370,6 +372,10 @@
       <span class="person-face"><Face name={faceName} you size="l" /></span>
       <div class="person-words">
         <p class="person-name">{myName ?? copy.identityNoName}</p>
+        <!-- NO NAME YET, AND THE WAY TO ONE RIGHT THERE (G3): the "?" face was the first thing read, its fix a row below. -->
+        {#if myName === null && !renaming && !signedOut && (s.hostAuth?.me || s.hostAuth?.open)}
+          <button type="button" class="add-name tap" onclick={startRename}>{identityWords.addName}</button>
+        {/if}
         {#if myEmail && !signedOut}<p class="person-email">{myEmail}</p>{/if}
       </div>
     </div>
@@ -402,7 +408,7 @@
         </form>
       {:else}
         <div class="row-actions">
-          <Button onclick={startRename}>{copy.identityChangeName}</Button>
+          {#if myName !== null}<Button onclick={startRename}>{copy.identityChangeName}</Button>{/if}
         </div>
       {/if}
       {#if nameSaid}<p class="hint" role="status">{nameSaid}</p>{/if}
@@ -522,6 +528,7 @@
       {/if}
     </div>
     {#if outSaid}<p class="hint" role="status">{outSaid}</p>{/if}
+    {#if extra}{@render extra()}{/if}
   </div>
 </Tile>
 
@@ -867,5 +874,23 @@
       justify-content: center;
       min-block-size: 44px;
     }
+  }
+
+  .add-name {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--red);
+    font: inherit;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .add-name:hover {
+    text-decoration-color: currentColor;
   }
 </style>

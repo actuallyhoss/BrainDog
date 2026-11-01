@@ -12,7 +12,11 @@
   let { shell, area }: AreaProps = $props();
 </script>
 
-<Identity {shell} {area} part="you" />
-<Recovery {shell} {area} />
-<Sessions {shell} {area} />
+<!-- FIVE TILES TO THREE (G4): getting back in (one line) and where you are signed in stand in the You tile. -->
+{#snippet more()}
+  <Recovery {shell} {area} part="back" />
+  <Sessions {shell} {area} bare />
+{/snippet}
+<Identity {shell} {area} part="you" extra={more} />
+<Recovery {shell} {area} part="passkeys" />
 <Identity {shell} {area} part="records" />

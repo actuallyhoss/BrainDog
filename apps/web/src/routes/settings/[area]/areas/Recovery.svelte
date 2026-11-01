@@ -18,7 +18,8 @@
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
 
-  let { shell }: AreaProps = $props();
+  /* `part` (G4): Signing in draws the passkeys as a tile and the ways back in inside its You tile, bare. */
+  let { shell, part }: AreaProps & { part?: 'passkeys' | 'back' | undefined } = $props();
 
   /* THIS AREA'S OWN WORDS: the group the ways back in sit under. */
   const words = {
@@ -89,7 +90,9 @@
   the fallback is the email link. Anything else here would be a control with nothing behind it
   on the one screen where that costs somebody their record.
 -->
-{#if livePasskeys}
+{#if part === 'back'}
+  <!-- NO PASSKEYS HERE: this part is the ways back in alone. -->
+{:else if livePasskeys}
   <!-- THE HOST'S OWN PASSKEYS, for somebody signed in to a host that offers them. Adding one is
        real only here, because only a live session can say whose passkey it is. -->
   <Tile icon="key" class="section" data-surface="tile" id="passkeys" title={copy.passkeys} count={(liveKeys?.length ?? 0) || undefined}>
@@ -171,8 +174,7 @@
 {/snippet}
 
 <!-- THE WAYS BACK IN, IN THE ORDER THEY ARE NEEDED: one passkey lost, all of them lost, and too many tries. -->
-<Tile icon="clock" class="section" data-surface="tile" title={words.wayBack}>
-  <div class="section-body">
+{#snippet wayBack()}
     <!-- WHAT A LOST PASSKEY COSTS, said before it happens. The last passkey cannot be removed from this screen (above),
          and the host allows it on purpose (`passkey.remove`, "the last one included"), so a person who signs in by the
          mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
@@ -187,9 +189,20 @@
     {#if hostAuth?.magic}
       <StateRow icon="link" title={copy.magicLink} line={copy.magicHow} />
     {/if}
-    <StateRow icon="clock" title={copy.lockout} line={copy.lockoutHow} />
-  </div>
+    {#if part === 'back'}
+      <!-- ONE FACT, ONE LINE (G4): it was a tile of its own with a heading, a row and a title over one sentence. -->
+      <p class="lockout-line">{copy.lockoutHow}</p>
+    {:else}
+      <StateRow icon="clock" title={copy.lockout} line={copy.lockoutHow} />
+    {/if}
+{/snippet}
+{#if part === 'back'}
+  {@render wayBack()}
+{:else if part !== 'passkeys'}
+<Tile icon="clock" class="section" data-surface="tile" title={words.wayBack}>
+  <div class="section-body">{@render wayBack()}</div>
 </Tile>
+{/if}
 
 <style>
   .hint {
@@ -238,5 +251,12 @@
       justify-content: center;
       min-block-size: 44px;
     }
+  }
+
+  .lockout-line {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 </style>
