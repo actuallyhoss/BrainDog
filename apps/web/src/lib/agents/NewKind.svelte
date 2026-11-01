@@ -348,7 +348,20 @@
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
+    /* IT GROWS WITH WHAT IS TYPED, SO NO GRIP (G30): where field-sizing is not known, the grip stays as it was. */
     resize: vertical;
+  }
+
+  @supports (field-sizing: content) {
+    .lines {
+      field-sizing: content;
+      min-block-size: calc(3lh + 2 * var(--sp-2));
+      resize: none;
+    }
+
+    #kind-prompt {
+      min-block-size: calc(6lh + 2 * var(--sp-2));
+    }
   }
 
   .code {

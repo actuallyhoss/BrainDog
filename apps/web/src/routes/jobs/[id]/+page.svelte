@@ -284,7 +284,7 @@
       </Tile>
     {/if}
 
-    <Tile class="section" data-surface="tile" title={runWords.transcript} count={steps.length || undefined}>
+    <Tile icon="doc" class="section" data-surface="tile" title={runWords.transcript} count={steps.length || undefined}>
       <div class="section-body">
         {#if steps.length === 0}
           <p class="none">{words.empty}</p>
@@ -349,10 +349,11 @@
 </div>
 
 <style>
+  /* TILES 12 APART, THE BOARD'S GAP (G27): this page stood its tiles 24 apart where every other page stands them 12. */
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--sp-3);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
     /* NO CAP: the page runs the window's width to the gutters, and each line of prose keeps `--measure` below. */
   }
