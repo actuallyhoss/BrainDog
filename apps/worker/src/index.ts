@@ -37,7 +37,7 @@ import { withCalls } from '@braindog/mcp';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
-import { INVITE_GONE, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
+import { INVITE_GONE, UNBOUND_REFUSED, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, tickBudget, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
@@ -3179,7 +3179,8 @@ function bearerDeps(env: Env): BearerDeps {
        before its grant is read, so the ask again after a reset spends it once, and a 503 spends nothing. */
     operation: async (id, bearer) => {
       const out = (await held<unknown>(env, id, (record) => record.operationGrant(bearer))) as Result<OperationGrant>;
-      return out.ok ? { method: out.value.method, person: out.value.person, binds: out.value.binds ?? null } : null;
+      if (!out.ok) return 'refusal' in out && out.refusal.fix === UNBOUND_REFUSED ? { refused: out.refusal } : null;
+      return { method: out.value.method, person: out.value.person, binds: out.value.binds ?? null };
     },
   };
 }

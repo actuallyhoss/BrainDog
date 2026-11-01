@@ -191,7 +191,7 @@ export type BearerDeps = {
    * The record's `operationGrant`: the method an operation bearer opens and who approved it, SPENT BY THE ASKING, or
    * `null` when the bearer is not one. Absent, and no operation bearer is taken, which is the Worker before operation grants.
    */
-  operation?: (record: string, bearer: string) => Promise<{ method: string; person: string; binds?: string | null } | null>;
+  operation?: (record: string, bearer: string) => Promise<{ method: string; person: string; binds?: string | null } | { refused: Refusal } | null>;
   /**
    * Whether the record's billing has lapsed, the Directory's `billing({ op: 'lapsed' })`. Asked only once the secret is
    * checked, so a stranger learns nothing from it. Absent, and no bearer is capped, which is the Worker before the lapse ladder.
@@ -290,6 +290,9 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
     if (asked !== null && slug !== null && (named === null || (await nameOf()) !== record)) return { status: 401 };
     const grant = asked !== null && bearer && deps.operation ? await deps.operation(record, bearer) : null;
     if (!grant) return { status: 401 };
+    /* AN APPROVAL TIED TO NO REQUEST past the owner's date (`UNBOUND_REFUSED_FROM`): the record's own sentence, which
+       names the fix, since the bearer matched and its holder has an old command to update. */
+    if ('refused' in grant) return { status: 403, refusal: grant.refused };
     if (grant.method !== asked)
       return { status: 403, refusal: { code: 'FORBIDDEN', fix: `This bearer was approved for one ${grant.method} and reaches nothing else. Start the device again for this.`, at: 'operation' } };
     /* AND FOR ONE BODY, when the command named it at the start (`boundRequest`). */

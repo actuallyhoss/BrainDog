@@ -553,7 +553,7 @@ export {
   type ProfileRow,
   type ProfileWho,
 } from './agent-profile.ts';
-export { BODY_BOUND, OPERATION_METHOD, REACHES, boundBody, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type KeychainGrant, type Waiting } from './device.ts';
+export { BODY_BOUND, OPERATION_METHOD, REACHES, UNBOUND_REFUSED, UNBOUND_REFUSED_FROM, boundBody, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type KeychainGrant, type Waiting } from './device.ts';
 export { shapeGrant };
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
